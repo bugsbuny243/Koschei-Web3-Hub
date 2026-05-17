@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "strict": true,
+    "esModuleInterop": true,
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "types": ["node", "hardhat"]
+  },
+  "include": ["./scripts", "./test", "./src", "./hardhat.config.ts"]
+}
