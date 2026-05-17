@@ -9,10 +9,12 @@ contract GameAsset is ERC721Enumerable, Ownable {
         string assetType;
         string godotId;
         string properties;
+        uint256 mintedAt;
     }
 
     uint256 private _nextTokenId;
     mapping(uint256 => AssetData) public assetData;
+    mapping(string => bool) public godotIdUsed;
 
     event AssetMinted(uint256 indexed tokenId, address indexed to, string assetType, string godotId);
     event AssetPropertiesUpdated(uint256 indexed tokenId, string properties);
@@ -25,9 +27,12 @@ contract GameAsset is ERC721Enumerable, Ownable {
         returns (uint256)
     {
         require(to != address(0), "invalid recipient");
+        require(!godotIdUsed[godotId], "godotId already minted");
+        godotIdUsed[godotId] = true;
+
         uint256 tokenId = ++_nextTokenId;
         _safeMint(to, tokenId);
-        assetData[tokenId] = AssetData(assetType, godotId, properties);
+        assetData[tokenId] = AssetData(assetType, godotId, properties, block.timestamp);
         emit AssetMinted(tokenId, to, assetType, godotId);
         return tokenId;
     }

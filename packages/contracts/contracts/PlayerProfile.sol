@@ -5,6 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract PlayerProfile is Ownable {
     uint256 public constant XP_PER_LEVEL = 1000;
+    uint256 public constant MAX_LEVEL = 100;
 
     struct Profile {
         string username;
@@ -38,8 +39,11 @@ contract PlayerProfile is Ownable {
         require(profile.exists, "profile missing");
         require(amount > 0, "amount zero");
 
+        require(profile.level < MAX_LEVEL, "max level reached");
+
         profile.experience += amount;
         uint256 computedLevel = (profile.experience / XP_PER_LEVEL) + 1;
+        if (computedLevel > MAX_LEVEL) computedLevel = MAX_LEVEL;
         if (computedLevel > profile.level) {
             profile.level = computedLevel;
         }
