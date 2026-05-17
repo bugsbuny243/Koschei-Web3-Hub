@@ -1,7 +1,18 @@
 import { Wallet } from "ethers";
+import { encryptSecret } from "../crypto/encryption";
 
-const wallet = Wallet.createRandom();
+function main() {
+  const wallet = Wallet.createRandom();
+  const encryptedPrivateKey = encryptSecret(wallet.privateKey);
 
-console.log("Address:", wallet.address);
-console.log("Private Key:", wallet.privateKey);
-console.log("Mnemonic:", wallet.mnemonic?.phrase ?? "N/A");
+  const output = {
+    address: wallet.address,
+    encryptedPrivateKey,
+    chain: "base-sepolia",
+    createdAt: new Date().toISOString()
+  };
+
+  console.log(JSON.stringify(output, null, 2));
+}
+
+main();

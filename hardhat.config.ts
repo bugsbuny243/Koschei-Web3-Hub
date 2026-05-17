@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const baseSepoliaChainId = Number(process.env.BASE_SEPOLIA_CHAIN_ID || 84532);
+
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.24",
@@ -19,7 +21,7 @@ const config: HardhatUserConfig = {
     baseSepolia: {
       url: process.env.BASE_SEPOLIA_RPC_URL || "",
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
-      chainId: 84532
+      chainId: baseSepoliaChainId
     }
   },
   etherscan: {
