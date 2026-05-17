@@ -1,0 +1,30 @@
+{
+  "name": "koscei-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Base Sepolia bridge smart contract and custodial wallet development environment",
+  "scripts": {
+    "build": "hardhat compile",
+    "test": "hardhat test",
+    "lint": "eslint .",
+    "node": "hardhat node",
+    "deploy:base-sepolia": "hardhat run scripts/deploy.ts --network baseSepolia",
+    "accounts": "hardhat run scripts/accounts.ts",
+    "wallet:generate": "tsx src/wallet/generateWallet.ts",
+    "wallet:sign": "tsx src/wallet/signTransaction.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "ethers": "^6.13.2",
+    "@openzeppelin/contracts": "^5.1.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "eslint": "^9.18.0",
+    "hardhat": "^2.22.17",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
