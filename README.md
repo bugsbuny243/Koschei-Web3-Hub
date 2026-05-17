@@ -1,70 +1,63 @@
-# Koscei Bridge — Base Sepolia Web3 Geliştirme Ortamı
+# Koschei Bridge Monorepo
 
-Bu repo, Base ekosistemi için köprü projesinin:
-- akıllı kontrat geliştirme,
-- Base Sepolia deploy ve doğrulama,
-- custodial wallet (görünmez cüzdan) backend akışları
+## Project Purpose
+Koschei Bridge is a backend-controlled custodial bridge foundation on Base Sepolia. The platform uses invisible server-side wallets where private keys are generated and managed only on the backend.
 
-için hızlı başlangıç ortamını içerir.
+## Architecture
+- **apps/web**: Next.js + TypeScript + Tailwind UI, Auth.js authentication, protected routes, wallet APIs.
+- **packages/contracts**: Hardhat smart contracts, deployment scripts, and tests.
+- **packages/shared**: shared types and cryptographic helpers used by backend code.
+- **prisma**: PostgreSQL schema and migrations.
 
-## 1) Kurulum
+### Core Security Decisions
+- No Supabase, Firebase, or Privy.
+- No private key material in frontend code.
+- No private key or mnemonic returned in API responses.
+- Private keys encrypted before storing in PostgreSQL.
+- Server secrets must stay outside `NEXT_PUBLIC_*` variables.
 
+## Setup
 ```bash
 npm install
 cp .env.example .env
 ```
 
-`.env` içinde en az aşağıdaki alanları doldurun:
-- `BASE_SEPOLIA_RPC_URL`
-- `DEPLOYER_PRIVATE_KEY`
-- `CUSTODIAL_SIGNER_PRIVATE_KEY`
+## Required Environment Variables
+```env
+DATABASE_URL=
+AUTH_SECRET=
+AUTH_URL=
+KOSCHEI_WALLET_ENCRYPTION_KEY=
+BASE_SEPOLIA_RPC_URL=
+DEPLOYER_PRIVATE_KEY=
+BASESCAN_API_KEY=
+```
 
-## 2) Derleme ve test
-
+## Database Commands
 ```bash
+npm run prisma:generate
+npm run prisma:migrate
+```
+
+## Local Development Commands
+```bash
+npm run dev
 npm run build
 npm run test
 ```
 
-## 3) Base Sepolia deploy
+## Wallet Security Notes
+- `POST /api/wallet/create` requires an authenticated session.
+- If a wallet exists, API returns existing `address` + `chain` only.
+- If absent, backend generates wallet with `ethers.Wallet.createRandom()`.
+- Backend encrypts private key with `KOSCHEI_WALLET_ENCRYPTION_KEY` before DB write.
+- `GET /api/wallet/me` returns public wallet metadata only.
+- Private keys and mnemonics are never logged or returned.
+
+## Contract Deployment Notes
+Contracts live under `packages/contracts` and support Base Sepolia (`chainId: 84532`).
 
 ```bash
-npm run deploy:base-sepolia
+npm run deploy:base-sepolia -w packages/contracts
+npm run test -w packages/contracts
 ```
-
-Kontrat: `contracts/CustodialVault.sol`
-
-### CustodialVault yetkileri
-- `owner`: operatör ekler/çıkarır.
-- `operator`: native ve ERC20 çekim işlemlerini yürütür.
-
-Bu yapı, backend servisinizin operasyonel anahtarını (`operator`) owner anahtarından ayırarak risk azaltır.
-
-## 4) Custodial wallet scriptleri
-
-Yeni cüzdan üretmek için:
-
-```bash
-npm run wallet:generate
-```
-
-Offline tx imzalama örneği:
-
-```bash
-npm run wallet:sign
-```
-
-## 5) Dosya yapısı
-
-- `hardhat.config.ts`: Base Sepolia network ve compiler ayarları
-- `contracts/CustodialVault.sol`: custody operasyon kontratı
-- `scripts/deploy.ts`: deploy scripti
-- `src/wallet/`: custodial wallet yardımcı scriptleri
-- `test/CustodialVault.ts`: temel yetki/withdraw testi
-
-## Sonraki adımlar
-
-- Multisig owner (Safe) ile `owner` rolünü taşıma
-- Operator için HSM/KMS entegrasyonu
-- Withdraw için hız limiti / allowlist / günlük limit gibi risk kontrolleri
-- Event indexing ve muhasebe reconciler servisi
