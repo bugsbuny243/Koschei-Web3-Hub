@@ -1,28 +1,25 @@
 {
-  "name": "web",
+  "name": "@agentforge/web",
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.7.4",
-    "@koschei/shared": "file:../../packages/shared",
-    "@prisma/client": "^5.20.0",
-    "bcryptjs": "^2.4.3",
-    "ethers": "^6.13.2",
-    "next": "14.2.16",
-    "next-auth": "^5.0.0-beta.25",
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "@agentforge/agent-core": "*",
+    "@agentforge/shared": "*",
+    "next": "15.1.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
