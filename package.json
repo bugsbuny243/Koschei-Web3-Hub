@@ -13,7 +13,7 @@
     "wallet:generate": "tsx src/wallet/generateWallet.ts",
     "wallet:sign": "tsx src/wallet/signTransaction.ts",
     "verify:base-sepolia": "hardhat verify --network baseSepolia",
-    "configure:vault": "hardhat run scripts/configureVault.ts --network baseSepolia"
+    "vault:configure:base-sepolia": "hardhat run scripts/configureVault.ts --network baseSepolia"
   },
   "dependencies": {
     "dotenv": "^16.5.0",

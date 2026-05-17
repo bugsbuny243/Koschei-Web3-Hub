@@ -42,7 +42,7 @@ OPERATOR_ADDRESS=
 ALLOW_OPERATOR=true
 RECIPIENT_ADDRESS=
 ALLOW_RECIPIENT=true
-INITIAL_NATIVE_DAILY_LIMIT_ETH=1
+INITIAL_NATIVE_DAILY_LIMIT_ETH=0.1
 
 CUSTODIAL_SIGNER_ENCRYPTED_PRIVATE_KEY=
 
@@ -87,7 +87,7 @@ npm run verify:base-sepolia -- <VAULT_ADDRESS> <OWNER_ADDRESS> <DAILY_LIMIT_WEI>
 
 ## Configure vault
 ```bash
-npm run configure:vault
+npm run vault:configure:base-sepolia
 ```
 
 Bu script:
