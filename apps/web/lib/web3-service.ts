@@ -17,11 +17,27 @@ type PaymentInput = {
   raw_event?: Record<string, unknown>;
 };
 
-export async function createAccountingEntry(invoiceId: string | null, eventId: string | null, entryType: string, payload: unknown) {
+export async function createAccountingEntry(input: {
+  invoice_id: string | null;
+  payment_event_id: string | null;
+  entry_type: string;
+  amount: string;
+  currency: string;
+  description: string;
+  metadata?: Record<string, unknown>;
+}) {
   await web3Db.query(
-    `insert into web3_accounting_entries (invoice_id, payment_event_id, entry_type, payload)
-     values ($1,$2,$3,$4)`,
-    [invoiceId, eventId, entryType, JSON.stringify(payload ?? {})]
+    `insert into web3_accounting_entries (invoice_id, payment_event_id, entry_type, amount, currency, description, metadata)
+     values ($1,$2,$3,$4,$5,$6,$7)`,
+    [
+      input.invoice_id,
+      input.payment_event_id,
+      input.entry_type,
+      input.amount,
+      input.currency,
+      input.description,
+      JSON.stringify(input.metadata ?? {})
+    ]
   );
 }
 
@@ -30,35 +46,60 @@ export async function processPaymentEvent(input: PaymentInput) {
   if (!chain) throw new Error("Invalid chain_slug");
 
   const eventInsert = await web3Db.query<{ id: string }>(
-    `insert into web3_payment_events (chain_id, tx_hash, log_index, from_address, to_address, token_contract, token_symbol, token_decimals, amount, raw_amount, block_number, raw_event, status)
+    `insert into web3_payment_events (chain_slug, tx_hash, log_index, from_address, to_address, token_contract, token_symbol, token_decimals, amount, raw_amount, block_number, raw_event, status)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'detected')
      returning id::text`,
-    [chain.id, input.tx_hash, input.log_index ?? null, input.from_address, input.to_address, input.token_contract, input.token_symbol, input.token_decimals, input.amount, input.raw_amount ?? null, input.block_number ?? null, JSON.stringify(input.raw_event ?? {})]
+    [input.chain_slug, input.tx_hash, input.log_index ?? null, input.from_address, input.to_address, input.token_contract, input.token_symbol, input.token_decimals, input.amount, input.raw_amount ?? null, input.block_number ?? null, JSON.stringify(input.raw_event ?? {})]
   );
   const insertedEvent = eventInsert.rows[0];
   if (!insertedEvent) throw new Error("Failed to create payment event");
   const eventId = insertedEvent.id;
 
-  const invoiceMatch = await web3Db.query<{ id: string }>(
-    `select id::text from web3_invoices
-     where chain_id = $1
+  const invoiceMatch = await web3Db.query<{ id: string; currency: string; expected_amount: string }>(
+    `select id::text, currency, expected_amount::text from web3_invoices
+     where chain_slug = $1
        and lower(receiver_address) = lower($2)
        and lower(stablecoin_contract) = lower($3)
        and expected_amount <= $4::numeric
        and status in ('pending','partially_paid')
      order by created_at asc limit 1`,
-    [chain.id, input.to_address, input.token_contract, input.amount]
+    [input.chain_slug, input.to_address, input.token_contract, input.amount]
   );
 
-  await createAccountingEntry(null, eventId, "payment_detected", input);
+  await createAccountingEntry({
+    invoice_id: null,
+    payment_event_id: eventId,
+    entry_type: "payment_detected",
+    amount: input.amount,
+    currency: input.token_symbol,
+    description: "Payment transfer detected",
+    metadata: { chain_slug: input.chain_slug, tx_hash: input.tx_hash }
+  });
 
   const invoice = invoiceMatch.rows[0];
   if (!invoice) return { eventId, matched: false };
 
   await web3Db.query(`update web3_invoices set status = 'paid', paid_at = now() where id = $1`, [invoice.id]);
   await web3Db.query(`update web3_payment_events set status = 'matched', invoice_id = $1 where id = $2`, [invoice.id, eventId]);
-  await createAccountingEntry(invoice.id, eventId, "payment_matched", input);
-  await createAccountingEntry(invoice.id, eventId, "invoice_paid", { paid_at: new Date().toISOString() });
+
+  await createAccountingEntry({
+    invoice_id: invoice.id,
+    payment_event_id: eventId,
+    entry_type: "payment_matched",
+    amount: input.amount,
+    currency: invoice.currency,
+    description: "Payment matched to invoice",
+    metadata: { tx_hash: input.tx_hash }
+  });
+  await createAccountingEntry({
+    invoice_id: invoice.id,
+    payment_event_id: eventId,
+    entry_type: "invoice_paid",
+    amount: invoice.expected_amount,
+    currency: invoice.currency,
+    description: "Invoice marked as paid",
+    metadata: { paid_at: new Date().toISOString(), tx_hash: input.tx_hash }
+  });
 
   return { eventId, matched: true, invoiceId: invoice.id };
 }
