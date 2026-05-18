@@ -8,15 +8,16 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "lint": "turbo lint",
-    "test": "turbo test",
-    "typecheck": "turbo typecheck",
-    "clean": "turbo clean && rm -rf node_modules"
+    "dev": "npm run dev -w apps/web",
+    "build": "npm run build -w packages/contracts && npm run build -w apps/web",
+    "lint": "turbo run lint",
+    "test": "npm run test -w packages/contracts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
   },
   "devDependencies": {
-    "turbo": "^2.0.12",
-    "typescript": "^5.7.2"
+    "prisma": "^5.20.0",
+    "typescript": "^5.7.2",
+    "turbo": "^2.0.0"
   }
 }
