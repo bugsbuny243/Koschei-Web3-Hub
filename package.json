@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "dev": "npm run dev -w apps/web",
-    "build": "npm run build -w packages/contracts && npm run build -w apps/web",
+    "build": "npm run build -w apps/web",
     "lint": "turbo run lint",
     "test": "npm run test -w packages/contracts",
     "prisma:generate": "prisma generate",

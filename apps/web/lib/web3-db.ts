@@ -5,7 +5,7 @@ import { web3Env } from "@/lib/web3-env";
 export type ChainRow = { id: string; slug: string; name: string; is_active: boolean };
 export type InvoiceRow = {
   id: string;
-  chain_id: string;
+  chain_slug: string;
   stablecoin_symbol: string;
   stablecoin_contract: string;
   receiver_address: string;
@@ -16,12 +16,11 @@ export type InvoiceRow = {
   status: string;
   metadata: Record<string, unknown> | null;
   created_at: string;
-  chain_slug?: string;
 };
 export type PaymentEventRow = {
   id: string;
   invoice_id: string | null;
-  chain_id: string;
+  chain_slug: string;
   tx_hash: string;
   log_index: number | null;
   from_address: string;
@@ -60,22 +59,21 @@ export const web3Db = {
   invoices: {
     async list() {
       const { rows } = await pool.query<InvoiceRow>(
-        `select i.id::text, i.chain_id::text, c.slug as chain_slug, i.stablecoin_symbol, i.stablecoin_contract, i.receiver_address,
+        `select i.id::text, i.chain_slug, i.stablecoin_symbol, i.stablecoin_contract, i.receiver_address,
                 i.expected_amount::text, i.currency, i.due_at::text, i.paid_at::text, i.status, i.metadata, i.created_at::text
          from web3_invoices i
-         join web3_chains c on c.id = i.chain_id
          order by i.created_at desc`
       );
       return rows;
     },
-    async create(input: Omit<InvoiceRow, "id" | "paid_at" | "status" | "created_at" | "chain_slug">) {
+    async create(input: Omit<InvoiceRow, "id" | "paid_at" | "status" | "created_at">) {
       const { rows } = await pool.query<InvoiceRow>(
-        `insert into web3_invoices (chain_id, stablecoin_symbol, stablecoin_contract, receiver_address, expected_amount, currency, due_at, metadata)
+        `insert into web3_invoices (chain_slug, stablecoin_symbol, stablecoin_contract, receiver_address, expected_amount, currency, due_at, metadata)
          values ($1,$2,$3,$4,$5,$6,$7,$8)
-         returning id::text, chain_id::text, stablecoin_symbol, stablecoin_contract, receiver_address, expected_amount::text,
+         returning id::text, chain_slug, stablecoin_symbol, stablecoin_contract, receiver_address, expected_amount::text,
                    currency, due_at::text, paid_at::text, status, metadata, created_at::text`,
         [
-          input.chain_id,
+          input.chain_slug,
           input.stablecoin_symbol,
           input.stablecoin_contract,
           input.receiver_address,
