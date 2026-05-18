@@ -1,28 +1,102 @@
-# Koscei-Bridge
+# Koscei Bridge (Turborepo MVP)
 
-Production-ready Web3 game infrastructure for Base.
+Koscei Bridge, kullanıcıların doğal dil prompt'larıyla DeFi odaklı AI agent'lar oluşturmasını hedefleyen bir monorepo MVP projesidir. Bu sürümde temel amaç:
+- Web arayüzünden “Create your AI Agent” prompt'unu almak,
+- `agent-core` içinde LangGraph tabanlı bir workflow çalıştırmak,
+- Cüzdan/price/yield/swap araçlarını bir agent katmanında birleştirmek,
+- `turbo dev` ile geliştirme ortamını tek komutta ayağa kaldırmaktır.
 
-## Why Koscei-Bridge Deserves a Base Grant
+## Tech Stack
 
-**Impact Metrics:**
-- X total players onboarded
-- Y total NFTs minted on Base
-- Z daily transactions
+- **Monorepo:** Turborepo + npm workspaces
+- **Frontend:** Next.js 14 (App Router), React, TypeScript
+- **Wallet UX:** wagmi + RainbowKit + WalletConnect
+- **Agent Core:** TypeScript, LangGraph, LangChain, Groq
+- **EVM Integration:** viem (Arbitrum RPC), alchemy endpoints
+- **Data/Infra:** Prisma, Postgres, Pinata (IPFS)
 
-**Base Integration:**
-- ✅ Gasless onboarding via Paymaster
-- ✅ Smart Wallet support (EIP-4337)
-- ✅ Basenames integration
-- ✅ 7 contracts deployed on Base Sepolia
-- ✅ Full Godot + Web3 bridge (unique)
+## Repository Yapısı
 
-**Innovation:**
-- First Web3 bridge for Godot engine
-- Invisible wallet UX (no seed phrases)
-- Batch transactions for gas efficiency
-- On-chain achievement badges (ERC1155)
+- `apps/web`: Next.js web uygulaması
+- `packages/agent-core`: Agent sınıfları, tools ve LangGraph workflow
+- `packages/contracts`: Solidity + Hardhat
+- `packages/shared`: Ortak tip ve yardımcılar
 
-**Public Goods Value:**
-- Open source infrastructure
-- Any game developer can use this
-- Documented, tested, production-ready
+## Kurulum
+
+1. Bağımlılıkları kur:
+   ```bash
+   npm install
+   ```
+
+2. Environment dosyasını oluştur:
+   ```bash
+   cp .env.example .env
+   ```
+   Ardından `.env` dosyasına gerçek API key/secret değerlerini gir.
+
+3. (Opsiyonel) Prisma setup:
+   ```bash
+   npm run prisma:generate
+   npm run prisma:migrate
+   ```
+
+4. Geliştirme ortamını başlat:
+   ```bash
+   npm run dev
+   ```
+   > Bu komut turbo üzerinden `apps/web` ve `packages/agent-core` dev süreçlerini birlikte başlatır.
+
+## MVP Akışı (Grant Odaklı)
+
+### Hedef 1 — Prompt-to-Agent Deneyimi
+- Kullanıcı ana sayfada prompt girer: *“Create your AI Agent”*.
+- Web uygulaması backend API’ye agent oluşturma isteği yollar.
+
+### Hedef 2 — Agent Tooling
+`AutoYieldOptimizerAgent` aşağıdaki tool'ları orkestre eder:
+- `getWalletBalance`
+- `getTokenPrice` (Pyth / Chainlink fallback)
+- `suggestBestYield` (Aave / Compound benzeri mock strateji)
+- `executeSwap` (Arbitrum üzerinde viem üzerinden demo execution)
+
+### Hedef 3 — Wallet-first UX
+- RainbowKit ile wallet bağlantısı
+- WalletConnect Project ID ile çoklu cüzdan desteği
+
+### Hedef 4 — Çalıştırılabilir Monorepo
+- Tutarlı TypeScript config
+- optimize `turbo.json` pipeline (`dev`, `build`, `lint`)
+- Tek komutla çalışma: `npm run dev`
+
+## Scripts
+
+Kök dizin:
+
+- `npm run dev` — web + agent-core dev
+- `npm run build` — tüm workspace build
+- `npm run lint` — tüm workspace lint
+- `npm run test` — mevcut test scriptleri
+
+## Notlar
+
+- Bu MVP’de bazı DeFi entegrasyonları “production-safe execution” yerine “hackathon/demo-safe” yaklaşımla hazırlanmıştır.
+- Gerçek swap/yield işlemleri için ek güvenlik kontrolleri, simulation ve izin katmanları şarttır.
+
+## Koschei PayWatch for Arbitrum MVP
+
+### Setup
+- Use Neon Postgres and provide `DATABASE_URL` / `DIRECT_DATABASE_URL` in Railway.
+- Configure Railway env: `ALCHEMY_API_KEY`, `ARBITRUM_RPC_URL`, `ARBITRUM_SEPOLIA_RPC_URL`, `WEBHOOK_SECRET`, `CRON_SECRET`.
+- Optional: `ALCHEMY_WEBHOOK_SIGNING_KEY`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`.
+- No private keys are required.
+
+### Arbitrum Sepolia testing flow
+1. Create invoice at `/web3/invoices/new`.
+2. Simulate payment via `/web3/testing` manual event form (uses `/api/web3/payment-events/manual`).
+3. Run scanner from `/web3/testing` (uses `/api/web3/scan/arbitrum-sepolia`).
+4. Inspect matching + accounting trail at `/web3/invoices/[id]`.
+
+### Notes
+- This MVP is no-custody and read-only for chain data.
+- It does not deploy contracts, sign transactions, or move user assets.
