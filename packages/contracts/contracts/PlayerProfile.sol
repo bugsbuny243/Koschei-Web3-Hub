@@ -17,11 +17,13 @@ contract PlayerProfile is Ownable {
 
     mapping(address => Profile) public profiles;
     mapping(address => mapping(bytes32 => bool)) public achievements;
+    mapping(address => string) public basenames;
 
     event ProfileCreated(address indexed player, string username);
     event ExperienceAdded(address indexed player, uint256 amount, uint256 totalExperience, uint256 newLevel);
     event AchievementUnlocked(address indexed player, bytes32 indexed achievementId);
     event GameTokensAwarded(address indexed player, uint256 amount, uint256 total);
+    event BasenameSet(address indexed player, string basename);
 
     constructor(address initialOwner) Ownable(initialOwner) {}
 
@@ -64,5 +66,15 @@ contract PlayerProfile is Ownable {
         require(amount > 0, "amount zero");
         profile.gameTokens += amount;
         emit GameTokensAwarded(player, amount, profile.gameTokens);
+    }
+
+    function setBasename(address player, string calldata basename) external onlyOwner {
+        require(bytes(basename).length > 0, "empty basename");
+        basenames[player] = basename;
+        emit BasenameSet(player, basename);
+    }
+
+    function getBasename(address player) external view returns (string memory) {
+        return basenames[player];
     }
 }
