@@ -82,3 +82,21 @@ Kök dizin:
 
 - Bu MVP’de bazı DeFi entegrasyonları “production-safe execution” yerine “hackathon/demo-safe” yaklaşımla hazırlanmıştır.
 - Gerçek swap/yield işlemleri için ek güvenlik kontrolleri, simulation ve izin katmanları şarttır.
+
+## Koschei PayWatch for Arbitrum MVP
+
+### Setup
+- Use Neon Postgres and provide `DATABASE_URL` / `DIRECT_DATABASE_URL` in Railway.
+- Configure Railway env: `ALCHEMY_API_KEY`, `ARBITRUM_RPC_URL`, `ARBITRUM_SEPOLIA_RPC_URL`, `WEBHOOK_SECRET`, `CRON_SECRET`.
+- Optional: `ALCHEMY_WEBHOOK_SIGNING_KEY`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`.
+- No private keys are required.
+
+### Arbitrum Sepolia testing flow
+1. Create invoice at `/web3/invoices/new`.
+2. Simulate payment via `/web3/testing` manual event form (uses `/api/web3/payment-events/manual`).
+3. Run scanner from `/web3/testing` (uses `/api/web3/scan/arbitrum-sepolia`).
+4. Inspect matching + accounting trail at `/web3/invoices/[id]`.
+
+### Notes
+- This MVP is no-custody and read-only for chain data.
+- It does not deploy contracts, sign transactions, or move user assets.
