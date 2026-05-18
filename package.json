@@ -1,7 +1,8 @@
 {
-  "name": "koschei-bridge-monorepo",
+  "name": "agentforge-monorepo",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "npm@10.8.2",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -9,12 +10,14 @@
   "scripts": {
     "dev": "npm run dev -w apps/web",
     "build": "npm run build -w packages/contracts && npm run build -w apps/web",
+    "lint": "turbo run lint",
     "test": "npm run test -w packages/contracts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
   "devDependencies": {
     "prisma": "^5.20.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "turbo": "^2.0.0"
   }
 }

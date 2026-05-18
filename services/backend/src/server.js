@@ -44,11 +44,18 @@ app.post('/api/profile/create', async (req, res, next) => {
   return ok(res, { txHash: 'pending' });
 });
 
-app.post('/api/asset/mint', (req, res, next) => {
-  const { error, value } = assetSchema.validate(req.body);
-  if (error) return next(error);
-  logger.info('asset.mint', value);
-  return ok(res, { txHash: 'pending' });
+app.post('/api/player/experience', async (req, res, next) => {
+  try {
+    const { error, value } = xpSchema.validate(req.body);
+    if (error) return next(error);
+    logger.info('player.experience', value);
+    const tx = await playerProfile.addExperience(value.player, value.amount);
+    const receipt = await tx.wait();
+    return ok(res, { txHash: receipt.hash });
+  } catch (err) {
+    logger.error('player.experience.error', { message: err.message });
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.post('/api/player/experience', async (req, res, next) => {
