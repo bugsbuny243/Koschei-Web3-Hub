@@ -1,5 +1,4 @@
-import { gameFactoryPositioning, gameFactorySafetyCopy } from "@/lib/game-factory";
+import { SupportCta } from "@/components/support-cta";
+import { gameFactorySafetyCopy } from "@/lib/game-factory";
 
-export default function GameFactoryGrantPage() {
-  return <main className="mx-auto max-w-4xl space-y-4 p-6"><h1 className="text-3xl font-bold">Web Game Factory Grant Narrative</h1><p>{gameFactoryPositioning}</p><p>Core MVP: prompt → brief → Phaser template → preview → item/reward extraction → NFT metadata JSON → Arbitrum Sepolia bridge config → Web3-ready package export.</p><p className="rounded bg-amber-100 p-3 text-sm">{gameFactorySafetyCopy}</p></main>;
-}
+export default function Page(){return <main className="mx-auto max-w-4xl space-y-4 p-6"><h1 className="text-3xl font-bold">Koschei Grant Brief</h1><p><b>Problem:</b> small teams struggle to move from idea to playable demo with Web3-ready data.</p><p><b>Solution:</b> prompt-to-brief-to-playable game flow plus deterministic Web3 package generator.</p><p><b>Why Web Game Factory:</b> fast prototype loop and clearer game scopes.</p><p><b>Why Web3 Bridge:</b> package standards for items, rewards, and metadata.</p><p><b>Why Arbitrum Sepolia:</b> low-cost testnet for integration readiness.</p><p><b>Milestones:</b> project creation, generation, preview, package export.</p><p><b>Team:</b> Koschei MVP builder team.</p><p><b>Demo links:</b> /game-factory, /game-factory/projects, /game-factory/projects/[id]/preview</p><p className="rounded bg-amber-100 p-3 text-sm">{gameFactorySafetyCopy}</p><SupportCta compact /></main>}

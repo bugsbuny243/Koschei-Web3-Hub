@@ -1,10 +1,5 @@
+export const dynamic = 'force-dynamic';
 import { notFound } from "next/navigation";
-import { buildNftMetadata, buildWeb3BridgeConfig, gameFactoryDb } from "@/lib/game-factory";
+import { gameFactoryDb, gameFactorySafetyCopy } from "@/lib/game-factory";
 
-export default async function GameFactoryWeb3Page({ params }: { params: { id: string } }) {
-  const project = await gameFactoryDb.getProject(params.id);
-  if (!project) return notFound();
-  const metadata = buildNftMetadata(project.extracted_items ?? []);
-  const config = buildWeb3BridgeConfig(project.id);
-  return <main className="mx-auto max-w-5xl space-y-4 p-6"><h1 className="text-3xl font-bold">Web3-ready Package</h1><pre className="overflow-auto rounded bg-gray-100 p-3 text-xs">{JSON.stringify({ metadata, config }, null, 2)}</pre></main>;
-}
+export default async function Page({params}:{params:{id:string}}){const p=await gameFactoryDb.getProject(params.id);if(!p)return notFound();const pkg=await gameFactoryDb.getWeb3Package(p.id);return <main className="mx-auto max-w-5xl space-y-4 p-6"><h1 className="text-3xl font-bold">Web3-ready Package</h1><p className="rounded bg-amber-100 p-3 text-sm">{gameFactorySafetyCopy}</p><pre className="rounded bg-gray-100 p-3 text-xs overflow-auto">{JSON.stringify(pkg ?? {message:"Generate package via API POST /api/game-factory/projects/[id]/web3-package"},null,2)}</pre></main>;}

@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
-import { buildNftMetadata, buildWeb3BridgeConfig, gameFactoryDb } from "@/lib/game-factory";
+import { buildWeb3Package, gameFactoryDb } from "@/lib/game-factory";
 import { web3Db } from "@/lib/web3-db";
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
-  const project = await gameFactoryDb.getProject(params.id);
-  if (!project) return NextResponse.json({ error: "not found" }, { status: 404 });
-  const items = project.extracted_items ?? [];
-  const metadata = buildNftMetadata(items);
-  const bridge_config = buildWeb3BridgeConfig(project.id);
-  const { rows } = await web3Db.query<{ id: string }>(`insert into game_factory_web3_packages (project_id, chain_slug, nft_metadata, bridge_config, export_bundle) values ($1,$2,$3::jsonb,$4::jsonb,$5::jsonb) returning id::text`, [project.id, "arbitrum-sepolia", JSON.stringify(metadata), JSON.stringify(bridge_config), JSON.stringify({ files: ["game.js", "metadata.json", "bridge-config.json"] })]);
-  return NextResponse.json({ package_id: rows[0].id, metadata, bridge_config });
+  try {
+    const project = await gameFactoryDb.getProject(params.id);
+    if (!project) return NextResponse.json({ ok:false, error:"not_found" },{status:404});
+    const brief = await gameFactoryDb.getBrief(project.id);
+    if (!brief) return NextResponse.json({ ok:false, error:"generate_first" },{status:400});
+    const assets = await gameFactoryDb.getAssets(project.id);
+    const pkg = buildWeb3Package(project, brief, assets);
+    await web3Db.query("insert into game_factory_web3_packages (project_id,target_chain,manifest,item_schema,nft_metadata,reward_config,adapter_config) values ($1,$2,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb)",[project.id,project.target_chain,JSON.stringify(pkg.manifest),JSON.stringify(pkg.item_schema),JSON.stringify(pkg.nft_metadata),JSON.stringify(pkg.reward_config),JSON.stringify(pkg.adapter_config)]);
+    return NextResponse.json({ ok:true, package: pkg });
+  } catch { return NextResponse.json({ ok:false, error:"failed_to_build_package" },{status:500}); }
 }
