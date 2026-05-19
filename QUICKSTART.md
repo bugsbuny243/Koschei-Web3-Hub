@@ -1,220 +1,28 @@
-# QUICKSTART
+# Quickstart
 
-Generated documentation scaffold for Web3 game bridge.
+## 1) Install
+```bash
+npm install
+```
 
-- Section note 1: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 2: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 3: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 4: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 5: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 6: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 7: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 8: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 9: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 10: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 11: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 12: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 13: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 14: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 15: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 16: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 17: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 18: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 19: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 20: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 21: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 22: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 23: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 24: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 25: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 26: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 27: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 28: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 29: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 30: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 31: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 32: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 33: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 34: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 35: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 36: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 37: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 38: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 39: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 40: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 41: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 42: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 43: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 44: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 45: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 46: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 47: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 48: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 49: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 50: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 51: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 52: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 53: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 54: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 55: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 56: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 57: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 58: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 59: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 60: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 61: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 62: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 63: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 64: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 65: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 66: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 67: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 68: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 69: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 70: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 71: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 72: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 73: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 74: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 75: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 76: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 77: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 78: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 79: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 80: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 81: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 82: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 83: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 84: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 85: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 86: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 87: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 88: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 89: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 90: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 91: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 92: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 93: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 94: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 95: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 96: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 97: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 98: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 99: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 100: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 101: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 102: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 103: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 104: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 105: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 106: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 107: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 108: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 109: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 110: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 111: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 112: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 113: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 114: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 115: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 116: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 117: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 118: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 119: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 120: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 121: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 122: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 123: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 124: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 125: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 126: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 127: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 128: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 129: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 130: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 131: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 132: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 133: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 134: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 135: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 136: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 137: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 138: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 139: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 140: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 141: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 142: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 143: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 144: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 145: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 146: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 147: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 148: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 149: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 150: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 151: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 152: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 153: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 154: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 155: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 156: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 157: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 158: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 159: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 160: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 161: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 162: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 163: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 164: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 165: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 166: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 167: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 168: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 169: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 170: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 171: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 172: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 173: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 174: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 175: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 176: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 177: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 178: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 179: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 180: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 181: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 182: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 183: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 184: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 185: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 186: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 187: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 188: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 189: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 190: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 191: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 192: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 193: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 194: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 195: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 196: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 197: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 198: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 199: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 200: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 201: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 202: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 203: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 204: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 205: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 206: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 207: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 208: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 209: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 210: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 211: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 212: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 213: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 214: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 215: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
-- Section note 216: implementation guidance for Base Sepolia, contracts, backend, and Godot bridge.
+## 2) Run web app
+```bash
+npm run dev -w apps/web
+```
+
+## 3) Build check
+```bash
+npm run build -w apps/web
+```
+
+## 4) Use locked MVP flows
+- `/game-factory/new`
+- `/game-factory/projects`
+- `/game-factory/projects/[id]`
+- `/game-factory/projects/[id]/preview`
+- `/game-factory/projects/[id]/web3`
+- `/web3/game-bridge`
+
+## Scope
+Prompt -> playable HTML5 preview -> Web3-ready package.
+No custody, no wallets, no minting, no deploy, no transaction signing.

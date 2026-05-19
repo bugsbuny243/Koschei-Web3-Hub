@@ -11,26 +11,23 @@ func _ready() -> void:
 	add_child(_http)
 	_http.request_completed.connect(_on_completed)
 
-func create_wallet(player: String, wallet_address: String) -> void:
-	if player.is_empty() or wallet_address.is_empty():
-		emit_signal("request_failed", "/api/wallet/create", "Invalid input")
+func create_item_metadata(project_id: String, payload: Dictionary) -> void:
+	if project_id.is_empty():
+		emit_signal("request_failed", "/api/game-factory/projects/[id]/web3-package", "Project id is required")
 		return
-	_post("/api/wallet/create", {"player": player, "walletAddress": wallet_address})
+	_post("/api/game-factory/projects/%s/web3-package" % project_id, payload)
 
-func create_profile(player: String, username: String) -> void:
-	if username.length() < 3:
-		emit_signal("request_failed", "/api/profile/create", "Username too short")
+func generate_adapter_config(project_id: String, payload: Dictionary) -> void:
+	if project_id.is_empty():
+		emit_signal("request_failed", "/api/game-factory/projects/[id]/web3-package", "Project id is required")
 		return
-	_post("/api/profile/create", {"player": player, "username": username})
+	_post("/api/game-factory/projects/%s/web3-package" % project_id, payload)
 
-func mint_asset(to: String, asset_type: String, godot_id: String, properties: String) -> void:
-	_post("/api/asset/mint", {"to": to, "assetType": asset_type, "godotId": godot_id, "properties": properties})
-
-func add_experience(player: String, amount: int) -> void:
-	if amount <= 0:
-		emit_signal("request_failed", "/api/player/experience", "Amount must be positive")
+func export_readiness_package(project_id: String) -> void:
+	if project_id.is_empty():
+		emit_signal("request_failed", "/api/game-factory/projects/[id]/web3-package", "Project id is required")
 		return
-	_post("/api/player/experience", {"player": player, "amount": amount})
+	_post("/api/game-factory/projects/%s/web3-package" % project_id, {})
 
 func _post(endpoint: String, body: Dictionary) -> void:
 	var headers = ["Content-Type: application/json"]
