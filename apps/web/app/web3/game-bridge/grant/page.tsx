@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { gameBridgePositioning, gameBridgeSafetyCopy } from "@/lib/game-bridge-copy";
+import { SupportCta } from "@/components/support-cta";
 
 export default function GameBridgeGrantPage() {
   return <main className="mx-auto max-w-4xl space-y-6 p-6">
@@ -32,6 +33,8 @@ export default function GameBridgeGrantPage() {
     <section><h2 className="text-xl font-semibold">Team</h2><p className="text-gray-700">Koschei product + engineering team building PayWatch and Game Bridge tracks, with Game Bridge prioritized as the main public grant direction.</p></section>
 
     <section className="rounded bg-amber-100 p-3 text-sm"><h2 className="font-semibold">Safety / no-custody statement</h2><p>{gameBridgeSafetyCopy}</p></section>
+
+    <SupportCta />
 
     <div className="flex gap-4 text-sm underline">
       <Link href="/web3/game-bridge">Back to Game Bridge</Link>

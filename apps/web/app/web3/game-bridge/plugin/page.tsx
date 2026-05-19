@@ -1,4 +1,5 @@
 import { gameBridgeSafetyCopy } from "@/lib/game-bridge-copy";
+import { SupportCta } from "@/components/support-cta";
 
 const plannedFiles = [
   "addons/koschei_bridge/plugin.cfg",
@@ -32,5 +33,7 @@ export default function PluginPage() {
     <section className="rounded bg-amber-100 p-3 text-sm">
       <p>{gameBridgeSafetyCopy}</p>
     </section>
+
+    <SupportCta />
   </main>;
 }

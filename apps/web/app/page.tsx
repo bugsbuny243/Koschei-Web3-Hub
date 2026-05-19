@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { SupportCta } from "@/components/support-cta";
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
@@ -38,6 +39,8 @@ export default function Home() {
       </div>
 
       {result && <pre className="overflow-auto rounded bg-gray-100 p-4 text-sm">{result}</pre>}
+
+      <SupportCta />
     </main>
   );
 }
