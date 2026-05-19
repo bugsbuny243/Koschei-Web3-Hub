@@ -1,5 +1,7 @@
 import "server-only";
 import { web3Db } from "@/lib/web3-db";
+import { gameBridgeSafetyCopy } from "@/lib/game-bridge-copy";
+export { gameBridgeSafetyCopy };
 
 export type GameBridgeProject = {
   id: string;
