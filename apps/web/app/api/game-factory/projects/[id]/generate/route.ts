@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { buildAssets, buildGameBrief, buildPreviewHtml, gameFactoryDb } from "@/lib/game-factory";
 import { web3Db } from "@/lib/web3-db";
 
-export async function POST(_req: Request, { params }: { params: { id: string } }) {
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const p = await gameFactoryDb.getProject(params.id);
+    const { id } = await params;
+    const p = await gameFactoryDb.getProject(id);
     if (!p) return NextResponse.json({ ok:false, error:"not_found" },{status:404});
     const brief = buildGameBrief({ title:p.title, prompt:p.prompt, genre:p.genre, style:p.visual_style });
     const preview = buildPreviewHtml(brief);
