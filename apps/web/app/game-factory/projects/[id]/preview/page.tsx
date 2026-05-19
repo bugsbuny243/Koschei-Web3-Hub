@@ -31,7 +31,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       </div>
 
       {html ? (
-        <iframe title="preview" className="h-[420px] w-full rounded border" srcDoc={html} />
+        <iframe title="preview" className="h-[420px] w-full rounded border" sandbox="allow-scripts" srcDoc={html} />
       ) : (
         <div className="space-y-3 rounded border p-4">
           <p>No generated game preview yet.</p>
