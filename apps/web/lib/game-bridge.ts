@@ -1,8 +1,6 @@
 import "server-only";
 import { web3Db } from "@/lib/web3-db";
 
-export const gameBridgeSafetyCopy = "Koschei Web3 Game Bridge MVP does not hold funds, manage private keys, deploy contracts, mint NFTs, or custody user assets. It only prepares game item metadata, adapter configs, and integration scripts.";
-
 export type GameBridgeProject = {
   id: string;
   name: string;

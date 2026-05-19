@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { gameBridgeSafetyCopy } from "@/lib/game-bridge";
+import { gameBridgeSafetyCopy } from "@/lib/game-bridge-copy";
 
 const demoRoutes: Array<{ label: string; href: string; description: string }> = [
   {
