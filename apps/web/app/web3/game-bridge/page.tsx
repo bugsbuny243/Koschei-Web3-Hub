@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { gameBridgePositioning, gameBridgeSafetyCopy } from "@/lib/game-bridge-copy";
+import { SupportCta } from "@/components/support-cta";
 
 export default function GameBridgePage() {
   return <main className="mx-auto max-w-6xl space-y-8 p-6">
@@ -44,5 +45,7 @@ export default function GameBridgePage() {
     <section className="rounded border p-4 text-sm">
       <p>{gameBridgeSafetyCopy}</p>
     </section>
+
+    <SupportCta />
   </main>;
 }
