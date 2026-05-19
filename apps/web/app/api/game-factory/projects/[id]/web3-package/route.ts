@@ -6,8 +6,8 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-function jsonError(status: number, error: string, message: string) {
-  return NextResponse.json({ ok: false, error, message }, { status });
+function jsonError(status: number, error: string, detail: string) {
+  return NextResponse.json({ ok: false, error, detail }, { status });
 }
 
 type DbError = Error & {
@@ -23,7 +23,9 @@ export async function GET(_req: Request, context: RouteContext) {
 
     const existingPackage = await gameFactoryDb.getWeb3Package(project.id);
     return NextResponse.json({ ok: true, package: existingPackage });
-  } catch {
+  } catch (error) {
+    const dbError = error as DbError;
+    console.error("[game-factory web3-package GET]", { route: "GET /api/game-factory/projects/[id]/web3-package", message: dbError?.message, code: dbError?.code, constraint: dbError?.constraint });
     return jsonError(500, "failed_to_load_package", "Failed to load Web3 package");
   }
 }
@@ -39,7 +41,7 @@ export async function POST(_req: Request, context: RouteContext) {
     const project = projectResult.rows[0] ?? null;
 
     if (!project) {
-      return NextResponse.json({ ok: false, error: "project_not_found" }, { status: 404 });
+      return NextResponse.json({ ok: false, error: "project_not_found", detail: "Project not found" }, { status: 404 });
     }
 
     const brief = await gameFactoryDb.getBrief(project.id);
@@ -76,7 +78,8 @@ export async function POST(_req: Request, context: RouteContext) {
     return NextResponse.json({ ok: true, package: row });
   } catch (error) {
     const dbError = error as DbError;
-    console.error("[web3-package POST]", {
+    console.error("[game-factory web3-package POST]", {
+      route: "POST /api/game-factory/projects/[id]/web3-package",
       projectId: (await context.params).id,
       message: dbError?.message,
       code: dbError?.code,
@@ -84,7 +87,7 @@ export async function POST(_req: Request, context: RouteContext) {
     });
 
     return NextResponse.json(
-      { ok: false, error: "failed_to_build_package", detail: dbError?.message ?? "unknown_error" },
+      { ok: false, error: "failed_to_build_package", detail: "Failed to build Web3 package" },
       { status: 500 }
     );
   }

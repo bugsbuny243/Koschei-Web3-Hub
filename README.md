@@ -1,64 +1,36 @@
-# Koschei Web Game Factory + Web3 Bridge (Locked MVP)
+# Koschei Web Game Factory + Web3 Bridge MVP
 
-Koschei is a **prompt-to-playable web game factory** with a **no-custody Web3-ready packaging flow**.
+Koschei converts a plain-language game prompt into a playable browser preview and a no-custody Web3-ready package.
 
-## Locked MVP product flow
-1. User submits a game prompt.
-2. API creates a structured game brief.
-3. System generates a playable HTML5 preview.
-4. System extracts game items/rewards/achievements.
-5. System generates NFT-compatible metadata.
-6. System generates a Web3-ready package with:
-   - game manifest
-   - item schema
-   - NFT metadata
-   - reward config
-   - quest/achievement config
-   - Arbitrum Sepolia adapter config
+## Locked MVP flow
+1. User creates a game project from prompt.
+2. Project is saved to Neon Postgres.
+3. Game preview is generated.
+4. Project detail page shows generated outputs.
+5. Web3 package is generated.
+6. Projects list works.
+7. Shopier support CTA remains visible.
 
-## No-custody safety scope
-This MVP is strictly no-custody:
-- no MetaMask / WalletConnect connect flow
-- no `window.ethereum`
-- no transaction signing
-- no private key handling
-- no contract deployment
-- no minting
-- no escrow or funds movement
+## Product scope
+- Koschei Web Game Factory
+- Koschei Web3 Bridge (no-custody)
+- Prompt-to-game generation
+- Preview generation (canvas HTML)
+- Web3-ready package (manifest, item schemas, NFT-compatible metadata, reward config, adapter config)
 
-## Stack
-- Next.js App Router (apps/web)
-- Neon Postgres (via Prisma + PG queries)
-- Railway deployment target
-- Alchemy read-only chain monitoring/config surface (future extension)
+## Safety
+Koschei Web3 Bridge MVP does not hold funds, manage private keys, connect wallets, deploy contracts, mint NFTs, sign transactions, or custody user assets. It only prepares game manifests, item schemas, NFT-compatible metadata, reward configs, and adapter configs.
 
-## Core routes
-- `/game-factory/new` create project and run full generation pipeline
-- `/game-factory/projects` list projects
-- `/game-factory/projects/[id]` project detail + generation actions
-- `/game-factory/projects/[id]/preview` playable web preview
-- `/game-factory/projects/[id]/web3` Web3 package JSON outputs
+## Infrastructure
+- App runtime: Next.js
+- Database: Neon Postgres
+- Deployment: Railway
+- Web3 RPC/reads: Alchemy read-only/future config
+- Support: Shopier CTA
 
-## Supporting routes kept active
-- PayWatch routes (`/web3`, `/web3/invoices`, scan/webhook APIs)
-- Game Bridge pages (`/web3/game-bridge/...`)
-- Grant pages (`/web3/grant`, `/web3/game-bridge/grant`)
-- Shopier support CTA in global layout footer
-
-## Demo flow
-1. Open `/game-factory/new`
-2. Enter prompt and submit
-3. Wait for project creation + game generation + web3 package generation
-4. Land on preview page
-5. Open Web3 package page to copy JSON blocks
-
-## Local development
+## Development
 ```bash
 npm install
-npm run dev
-```
-
-## Build
-```bash
 npm run build -w apps/web
+npm run start -w apps/web
 ```

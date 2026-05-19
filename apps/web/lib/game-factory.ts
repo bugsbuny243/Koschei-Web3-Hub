@@ -5,8 +5,7 @@ export const gameFactoryPositioning = "Koschei Web Game Factory turns a plain-la
 export const gameFactorySafetyCopy = "Koschei Web3 Bridge MVP does not hold funds, manage private keys, connect wallets, deploy contracts, mint NFTs, sign transactions, or custody user assets. It only prepares game manifests, item schemas, NFT-compatible metadata, reward configs, and adapter configs.";
 
 export type GFProject = { id:string; title:string|null; prompt:string; genre:string|null; visual_style:string|null; target_chain:string; status:string; metadata:Record<string,unknown>; created_at:string; updated_at:string };
-
-type TemplateKey = "quest_arena_rpg"|"arena_survival"|"tower_defense"|"boss_fight"|"platformer"|"card_battle"|"resource_management"|"runner";
+export type TemplateKey = "quest_arena_rpg"|"arena_survival"|"tower_defense"|"boss_fight"|"platformer"|"card_battle"|"resource_management"|"runner";
 
 type SceneConfig = { template: TemplateKey; title: string; hud: string[]; entities: string[]; victory: string; gameOver: string };
 
