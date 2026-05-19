@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "Koscei Bridge",
-  description: "Create your AI Agent"
+  title: "Koschei Web Game Factory",
+  description: "Prompt-to-playable HTML5 games with no-custody Web3-ready package generation."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

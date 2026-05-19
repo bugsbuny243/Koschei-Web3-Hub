@@ -1,102 +1,64 @@
-# Koscei Bridge (Turborepo MVP)
+# Koschei Web Game Factory + Web3 Bridge (Locked MVP)
 
-Koscei Bridge, kullanıcıların doğal dil prompt'larıyla DeFi odaklı AI agent'lar oluşturmasını hedefleyen bir monorepo MVP projesidir. Bu sürümde temel amaç:
-- Web arayüzünden “Create your AI Agent” prompt'unu almak,
-- `agent-core` içinde LangGraph tabanlı bir workflow çalıştırmak,
-- Cüzdan/price/yield/swap araçlarını bir agent katmanında birleştirmek,
-- `turbo dev` ile geliştirme ortamını tek komutta ayağa kaldırmaktır.
+Koschei is a **prompt-to-playable web game factory** with a **no-custody Web3-ready packaging flow**.
 
-## Tech Stack
+## Locked MVP product flow
+1. User submits a game prompt.
+2. API creates a structured game brief.
+3. System generates a playable HTML5 preview.
+4. System extracts game items/rewards/achievements.
+5. System generates NFT-compatible metadata.
+6. System generates a Web3-ready package with:
+   - game manifest
+   - item schema
+   - NFT metadata
+   - reward config
+   - quest/achievement config
+   - Arbitrum Sepolia adapter config
 
-- **Monorepo:** Turborepo + npm workspaces
-- **Frontend:** Next.js 14 (App Router), React, TypeScript
-- **Wallet UX:** wagmi + RainbowKit + WalletConnect
-- **Agent Core:** TypeScript, LangGraph, LangChain, Groq
-- **EVM Integration:** viem (Arbitrum RPC), alchemy endpoints
-- **Data/Infra:** Prisma, Postgres, Pinata (IPFS)
+## No-custody safety scope
+This MVP is strictly no-custody:
+- no MetaMask / WalletConnect connect flow
+- no `window.ethereum`
+- no transaction signing
+- no private key handling
+- no contract deployment
+- no minting
+- no escrow or funds movement
 
-## Repository Yapısı
+## Stack
+- Next.js App Router (apps/web)
+- Neon Postgres (via Prisma + PG queries)
+- Railway deployment target
+- Alchemy read-only chain monitoring/config surface (future extension)
 
-- `apps/web`: Next.js web uygulaması
-- `packages/agent-core`: Agent sınıfları, tools ve LangGraph workflow
-- `packages/contracts`: Solidity + Hardhat
-- `packages/shared`: Ortak tip ve yardımcılar
+## Core routes
+- `/game-factory/new` create project and run full generation pipeline
+- `/game-factory/projects` list projects
+- `/game-factory/projects/[id]` project detail + generation actions
+- `/game-factory/projects/[id]/preview` playable web preview
+- `/game-factory/projects/[id]/web3` Web3 package JSON outputs
 
-## Kurulum
+## Supporting routes kept active
+- PayWatch routes (`/web3`, `/web3/invoices`, scan/webhook APIs)
+- Game Bridge pages (`/web3/game-bridge/...`)
+- Grant pages (`/web3/grant`, `/web3/game-bridge/grant`)
+- Shopier support CTA in global layout footer
 
-1. Bağımlılıkları kur:
-   ```bash
-   npm install
-   ```
+## Demo flow
+1. Open `/game-factory/new`
+2. Enter prompt and submit
+3. Wait for project creation + game generation + web3 package generation
+4. Land on preview page
+5. Open Web3 package page to copy JSON blocks
 
-2. Environment dosyasını oluştur:
-   ```bash
-   cp .env.example .env
-   ```
-   Ardından `.env` dosyasına gerçek API key/secret değerlerini gir.
+## Local development
+```bash
+npm install
+npm run dev
+```
 
-3. (Opsiyonel) Prisma setup:
-   ```bash
-   npm run prisma:generate
-   npm run prisma:migrate
-   ```
-
-4. Geliştirme ortamını başlat:
-   ```bash
-   npm run dev
-   ```
-   > Bu komut turbo üzerinden `apps/web` ve `packages/agent-core` dev süreçlerini birlikte başlatır.
-
-## MVP Akışı (Grant Odaklı)
-
-### Hedef 1 — Prompt-to-Agent Deneyimi
-- Kullanıcı ana sayfada prompt girer: *“Create your AI Agent”*.
-- Web uygulaması backend API’ye agent oluşturma isteği yollar.
-
-### Hedef 2 — Agent Tooling
-`AutoYieldOptimizerAgent` aşağıdaki tool'ları orkestre eder:
-- `getWalletBalance`
-- `getTokenPrice` (Pyth / Chainlink fallback)
-- `suggestBestYield` (Aave / Compound benzeri mock strateji)
-- `executeSwap` (Arbitrum üzerinde viem üzerinden demo execution)
-
-### Hedef 3 — Wallet-first UX
-- RainbowKit ile wallet bağlantısı
-- WalletConnect Project ID ile çoklu cüzdan desteği
-
-### Hedef 4 — Çalıştırılabilir Monorepo
-- Tutarlı TypeScript config
-- optimize `turbo.json` pipeline (`dev`, `build`, `lint`)
-- Tek komutla çalışma: `npm run dev`
-
-## Scripts
-
-Kök dizin:
-
-- `npm run dev` — web + agent-core dev
-- `npm run build` — tüm workspace build
-- `npm run lint` — tüm workspace lint
-- `npm run test` — mevcut test scriptleri
-
-## Notlar
-
-- Bu MVP’de bazı DeFi entegrasyonları “production-safe execution” yerine “hackathon/demo-safe” yaklaşımla hazırlanmıştır.
-- Gerçek swap/yield işlemleri için ek güvenlik kontrolleri, simulation ve izin katmanları şarttır.
-
-## Koschei PayWatch for Arbitrum MVP
-
-### Setup
-- Use Neon Postgres and provide `DATABASE_URL` / `DIRECT_DATABASE_URL` in Railway.
-- Configure Railway env: `ALCHEMY_API_KEY`, `ARBITRUM_RPC_URL`, `ARBITRUM_SEPOLIA_RPC_URL`, `WEBHOOK_SECRET`, `CRON_SECRET`.
-- Optional: `ALCHEMY_WEBHOOK_SIGNING_KEY`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`.
-- No private keys are required.
-
-### Arbitrum Sepolia testing flow
-1. Create invoice at `/web3/invoices/new`.
-2. Simulate payment via `/web3/testing` manual event form (uses `/api/web3/payment-events/manual`).
-3. Run scanner from `/web3/testing` (uses `/api/web3/scan/arbitrum-sepolia`).
-4. Inspect matching + accounting trail at `/web3/invoices/[id]`.
-
-### Notes
-- This MVP is no-custody and read-only for chain data.
-- It does not deploy contracts, sign transactions, or move user assets.
+## Build
+```bash
+npm run build -w apps/web
+```
