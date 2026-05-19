@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { gameBridgeSafetyCopy } from "@/lib/game-bridge";
+import { gameBridgeSafetyCopy } from "@/lib/game-bridge-copy";
 
 export default function GameBridgeGrantPage() {
   return <main className="mx-auto max-w-4xl space-y-5 p-6">

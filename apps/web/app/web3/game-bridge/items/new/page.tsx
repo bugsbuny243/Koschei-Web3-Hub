@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { gameBridgeSafetyCopy } from "@/lib/game-bridge";
+import { gameBridgeSafetyCopy } from "@/lib/game-bridge-copy";
 
 const defaults = {
   item_key: "sword_of_koschei",

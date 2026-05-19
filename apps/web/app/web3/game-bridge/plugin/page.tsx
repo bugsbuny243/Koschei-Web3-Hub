@@ -1,4 +1,5 @@
-import { gameBridgeSafetyCopy, generateAdapterConfig } from "@/lib/game-bridge";
+import { generateAdapterConfig } from "@/lib/game-bridge";
+import { gameBridgeSafetyCopy } from "@/lib/game-bridge-copy";
 
 export default function PluginPage() {
   const pluginExport = {
