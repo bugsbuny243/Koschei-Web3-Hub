@@ -10,6 +10,11 @@ function jsonError(status: number, error: string, message: string) {
   return NextResponse.json({ ok: false, error, message }, { status });
 }
 
+type DbError = Error & {
+  code?: string;
+  constraint?: string;
+};
+
 export async function GET(_req: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
@@ -70,9 +75,16 @@ export async function POST(_req: Request, context: RouteContext) {
     const row = upsertResult.rows[0] ?? null;
     return NextResponse.json({ ok: true, package: row });
   } catch (error) {
-    const detail = error instanceof Error ? error.message : "unknown_error";
+    const dbError = error as DbError;
+    console.error("[web3-package POST]", {
+      projectId: (await context.params).id,
+      message: dbError?.message,
+      code: dbError?.code,
+      constraint: dbError?.constraint
+    });
+
     return NextResponse.json(
-      { ok: false, error: "failed_to_build_package", detail },
+      { ok: false, error: "failed_to_build_package", detail: dbError?.message ?? "unknown_error" },
       { status: 500 }
     );
   }
