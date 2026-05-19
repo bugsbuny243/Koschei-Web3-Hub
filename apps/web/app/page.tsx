@@ -1,46 +1,19 @@
-"use client";
-
-import { useState } from "react";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import Link from "next/link";
 import { SupportCta } from "@/components/support-cta";
+import { gameFactorySafetyCopy } from "@/lib/game-factory";
 
 export default function Home() {
-  const [prompt, setPrompt] = useState("");
-  const [result, setResult] = useState<string>("");
-
-  const handleCreate = async () => {
-    const res = await fetch("/api/agent/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
-    });
-    const data = await res.json();
-    setResult(JSON.stringify(data, null, 2));
-  };
-
-  return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Koscei Bridge</h1>
-        <ConnectButton />
+  return <main className="mx-auto max-w-5xl space-y-6 p-6">
+    <section className="rounded-xl border bg-gradient-to-r from-cyan-50 to-emerald-50 p-6">
+      <h1 className="text-4xl font-bold">Koschei Web Game Factory + Web3 Bridge</h1>
+      <p className="mt-3 text-gray-700">Prompt-to-playable HTML5 game demos with one-click Web3-ready package generation.</p>
+      <p className="mt-3 rounded bg-amber-100 p-3 text-sm">{gameFactorySafetyCopy}</p>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <Link className="rounded bg-black px-4 py-2 text-white" href="/game-factory/new">Create Game</Link>
+        <Link className="rounded border px-4 py-2" href="/web3/game-bridge">View Web3 Bridge</Link>
+        <a className="rounded border border-emerald-700 px-4 py-2 text-emerald-700" href="https://www.shopier.com/TradeVisual/47208457" target="_blank">Support with 10 TL</a>
       </div>
-
-      <div className="rounded-xl border p-4 shadow-sm">
-        <label className="mb-2 block text-lg font-semibold">Create your AI Agent</label>
-        <textarea
-          className="min-h-40 w-full rounded-lg border p-3"
-          placeholder="Create your AI Agent..."
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-        />
-        <button onClick={handleCreate} className="mt-3 rounded bg-black px-4 py-2 text-white">
-          Create Agent
-        </button>
-      </div>
-
-      {result && <pre className="overflow-auto rounded bg-gray-100 p-4 text-sm">{result}</pre>}
-
-      <SupportCta />
-    </main>
-  );
+    </section>
+    <SupportCta />
+  </main>;
 }

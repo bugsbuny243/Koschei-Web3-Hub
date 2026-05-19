@@ -1,86 +1,23 @@
 import "server-only";
 import { web3Db } from "@/lib/web3-db";
 
-export const gameFactoryPositioning = "AI-assisted prompt-to-HTML5 game generation with one-click Web3-ready ownership packaging.";
-export const gameFactorySafetyCopy = "MVP safety: no private keys, no wallet custody, no contract deployment, no minting, no transaction sending, no escrow, and no funds movement.";
+export const gameFactoryPositioning = "Koschei Web Game Factory turns a plain-language game prompt into a playable HTML5 demo and a Web3-ready package.";
+export const gameFactorySafetyCopy = "Koschei Web3 Bridge MVP does not hold funds, manage private keys, connect wallets, deploy contracts, mint NFTs, sign transactions, or custody user assets. It only prepares game manifests, item schemas, NFT-compatible metadata, reward configs, and adapter configs.";
 
-export type GameFactoryProject = {
-  id: string;
-  name: string;
-  slug: string;
-  prompt: string;
-  status: string;
-  game_brief: Record<string, unknown> | null;
-  phaser_template: string | null;
-  extracted_items: Record<string, unknown>[];
-  created_at: string;
-};
+export type GFProject = { id:string; title:string|null; prompt:string; genre:string|null; visual_style:string|null; target_chain:string; status:string; metadata:Record<string,unknown>; created_at:string; updated_at:string };
 
-export function buildGameBrief(prompt: string) {
-  return {
-    title: "Prompt-generated web game",
-    core_loop: "Move, collect, and survive",
-    genre: "arcade",
-    art_style: "minimal",
-    mechanics: ["movement", "collectibles", "scoring"],
-    rewards: ["coin", "gem", "star"],
-    achievements: ["first_run", "high_score_100", "collector_10"],
-    prompt
-  };
-}
+export function slugify(v:string){return v.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"") || "game-project";}
+export function buildGameBrief(input:{title?:string|null;prompt:string;genre?:string|null;style?:string|null}){const title=input.title?.trim()||"Prompt Runner";const genre=input.genre?.trim()||"arcade";const style=input.style?.trim()||"minimal neon";return {title,genre,style,player:"runner",collectible:"star shard",obstacle:"void spike",goal:"collect and survive",score_rule:"+10 per collectible",game_over:"3 collisions",prompt:input.prompt};}
+export function buildPreviewHtml(brief:Record<string,unknown>){const t=String(brief.title);const player=String(brief.player);const collectible=String(brief.collectible);const obstacle=String(brief.obstacle);return `<!doctype html><html><body><canvas id=c width=640 height=360></canvas><script>const c=document.getElementById('c'),x=c.getContext('2d');let p={x:80,y:180,w:20,h:20},col={x:300,y:120,r:8},obs={x:500,y:140,w:24,h:80},s=0,h=3,run=true,k={};onkeydown=e=>k[e.key]=1;onkeyup=e=>k[e.key]=0;function hit(a,b){return a.x<a.x+a.w&&a.x+a.w>b.x&&a.y<a.y+a.h&&a.y+a.h>b.y;}function loop(){x.fillStyle='#0a0f1f';x.fillRect(0,0,640,360);x.fillStyle='#fff';x.fillText('${t}',10,20);x.fillText('Score '+s+' HP '+h,10,40);if(run){if(k.ArrowUp)p.y-=3;if(k.ArrowDown)p.y+=3;if(k.ArrowLeft)p.x-=3;if(k.ArrowRight)p.x+=3;p.x=Math.max(0,Math.min(620,p.x));p.y=Math.max(0,Math.min(340,p.y));obs.x-=2;if(obs.x<-30)obs.x=660;if((p.x-col.x)**2+(p.y-col.y)**2<220){s+=10;col.x=100+Math.random()*500;col.y=60+Math.random()*240;}if(p.x<obs.x+obs.w&&p.x+p.w>obs.x&&p.y<obs.y+obs.h&&p.y+p.h>obs.y){h--;obs.x=660;if(h<=0)run=false;}}x.fillStyle='#22d3ee';x.fillRect(p.x,p.y,p.w,p.h);x.fillStyle='#facc15';x.beginPath();x.arc(col.x,col.y,col.r,0,6.28);x.fill();x.fillStyle='#ef4444';x.fillRect(obs.x,obs.y,obs.w,obs.h);x.fillStyle='#9ca3af';x.fillText('${player}',p.x-5,p.y-6);x.fillText('${collectible}',col.x-18,col.y-14);x.fillText('${obstacle}',obs.x-16,obs.y-8);if(!run){x.fillStyle='#fff';x.fillText('Game Over - Press R to restart',220,180);if(k.r||k.R){s=0;h=3;run=true;p={x:80,y:180,w:20,h:20};}}requestAnimationFrame(loop);}loop();</script></body></html>`;}
+export function buildAssets(brief:Record<string,unknown>){return[{asset_type:"player",name:String(brief.player),description:"Controllable character",rarity:"common",metadata:{}},{asset_type:"collectible",name:String(brief.collectible),description:"Score item",rarity:"common",metadata:{}},{asset_type:"obstacle",name:String(brief.obstacle),description:"Avoid this",rarity:"uncommon",metadata:{}},{asset_type:"reward",name:"Prompt Pioneer Badge",description:"Generated MVP reward badge",rarity:"rare",metadata:{badge:true}}];}
+export function buildWeb3Package(project:GFProject, brief:Record<string,unknown>, assets:Record<string,unknown>[]){return{manifest:{project_id:project.id,title:brief.title,target_chain:project.target_chain,generated_at:new Date().toISOString()},item_schema:{version:"1.0",items:assets.map((a)=>({type:a.asset_type,name:a.name,rarity:a.rarity}))},nft_metadata:assets.map((a)=>({name:a.name,description:a.description,attributes:[{trait_type:"type",value:a.asset_type},{trait_type:"rarity",value:a.rarity}]})),reward_config:{currency:"points",events:[{key:"collect",reward:10},{key:"game_complete",reward:50}]},adapter_config:{chain:"arbitrum-sepolia",mode:"readiness-only",wallet_required:false,tx_signing:false,deploy:false}};}
 
-export function buildPhaserTemplate(projectId: string, brief: Record<string, unknown>) {
-  const title = String(brief.title ?? "Koschei Game");
-  return `// Generated Phaser template\nconst config={type:Phaser.AUTO,width:800,height:600,scene:{preload,create,update}};\nconst game=new Phaser.Game(config);\nlet player;let cursors;let score=0;let scoreText;\nfunction preload(){}\nfunction create(){this.cameras.main.setBackgroundColor('#0f172a');player=this.add.rectangle(400,300,28,28,0x22d3ee);this.physics.add.existing(player);cursors=this.input.keyboard.createCursorKeys();scoreText=this.add.text(16,16,'${title} | Score: 0',{color:'#fff'});}\nfunction update(){const body=player.body;body.setVelocity(0);if(cursors.left.isDown) body.setVelocityX(-160);if(cursors.right.isDown) body.setVelocityX(160);if(cursors.up.isDown) body.setVelocityY(-160);if(cursors.down.isDown) body.setVelocityY(160);score+=0.02;scoreText.setText('${title} | Score: '+Math.floor(score));}\n// project:${projectId}`;
-}
-
-export function extractItemsFromBrief(brief: Record<string, unknown>) {
-  const rewards = Array.isArray(brief.rewards) ? brief.rewards : ["coin"];
-  const achievements = Array.isArray(brief.achievements) ? brief.achievements : ["starter"];
-  return [
-    ...rewards.map((r, i) => ({ kind: "reward", key: String(r), name: String(r), rarity: i === 0 ? "common" : "rare" })),
-    ...achievements.map((a) => ({ kind: "achievement", key: String(a), name: String(a), rarity: "badge" }))
-  ];
-}
-
-export function buildNftMetadata(items: Record<string, unknown>[]) {
-  return items.map((item) => ({
-    name: String(item.name),
-    description: `In-game ${String(item.kind)} from Koschei Web Game Factory`,
-    image: "",
-    attributes: [
-      { trait_type: "kind", value: item.kind },
-      { trait_type: "key", value: item.key },
-      { trait_type: "rarity", value: item.rarity }
-    ]
-  }));
-}
-
-export function buildWeb3BridgeConfig(projectId: string) {
-  return {
-    project_id: projectId,
-    chain: "arbitrum-sepolia",
-    adapter: "alchemy-readonly",
-    rpc_env_key: "ALCHEMY_ARBITRUM_SEPOLIA_URL",
-    can_send_transactions: false,
-    custody: "none"
-  };
-}
-
-export const gameFactoryDb = {
-  async createProject(input: { name: string; slug: string; prompt: string }) {
-    const { rows } = await web3Db.query<GameFactoryProject>(`insert into game_factory_projects (name, slug, prompt) values ($1,$2,$3) returning id::text, name, slug, prompt, status, game_brief, phaser_template, extracted_items, created_at::text`, [input.name, input.slug, input.prompt]);
-    return rows[0];
-  },
-  async listProjects() {
-    return (await web3Db.query<GameFactoryProject>(`select id::text, name, slug, prompt, status, game_brief, phaser_template, extracted_items, created_at::text from game_factory_projects order by created_at desc`)).rows;
-  },
-  async getProject(id: string) {
-    const { rows } = await web3Db.query<GameFactoryProject>(`select id::text, name, slug, prompt, status, game_brief, phaser_template, extracted_items, created_at::text from game_factory_projects where id=$1 limit 1`, [id]);
-    return rows[0] ?? null;
-  },
-  async saveGenerated(id: string, brief: Record<string, unknown>, template: string, items: Record<string, unknown>[]) {
-    const { rows } = await web3Db.query<GameFactoryProject>(`update game_factory_projects set game_brief=$2::jsonb, phaser_template=$3, extracted_items=$4::jsonb, status='generated' where id=$1 returning id::text, name, slug, prompt, status, game_brief, phaser_template, extracted_items, created_at::text`, [id, JSON.stringify(brief), template, JSON.stringify(items)]);
-    return rows[0] ?? null;
-  }
+export const gameFactoryDb={
+ async createProject(input:{title?:string;prompt:string;genre?:string;visual_style?:string;target_chain?:string}){const q=`insert into game_factory_projects (title,prompt,genre,visual_style,target_chain) values ($1,$2,$3,$4,$5) returning id::text,title,prompt,genre,visual_style,target_chain,status,metadata,created_at::text,updated_at::text`;return (await web3Db.query<GFProject>(q,[input.title||null,input.prompt,input.genre||null,input.visual_style||null,input.target_chain||"arbitrum-sepolia"])).rows[0];},
+ async listProjects(){return (await web3Db.query<GFProject>(`select id::text,title,prompt,genre,visual_style,target_chain,status,metadata,created_at::text,updated_at::text from game_factory_projects order by created_at desc`)).rows;},
+ async getProject(id:string){return (await web3Db.query<GFProject>(`select id::text,title,prompt,genre,visual_style,target_chain,status,metadata,created_at::text,updated_at::text from game_factory_projects where id=$1 limit 1`,[id])).rows[0]??null;},
+ async getBrief(id:string){return (await web3Db.query<{brief:Record<string,unknown>}>(`select brief from game_factory_briefs where project_id=$1 order by created_at desc limit 1`,[id])).rows[0]?.brief??null;},
+ async getAssets(id:string){return (await web3Db.query<Record<string,unknown>>(`select asset_type,name,description,rarity,metadata from game_factory_assets where project_id=$1 order by created_at asc`,[id])).rows;},
+ async getFiles(id:string){return (await web3Db.query<Record<string,unknown>>(`select file_path,file_type,content,metadata from game_factory_generated_files where project_id=$1 order by created_at asc`,[id])).rows;},
+ async getWeb3Package(id:string){return (await web3Db.query<Record<string,unknown>>(`select manifest,item_schema,nft_metadata,reward_config,adapter_config from game_factory_web3_packages where project_id=$1 order by created_at desc limit 1`,[id])).rows[0]??null;}
 };

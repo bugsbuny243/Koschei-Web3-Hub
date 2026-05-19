@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 import { gameFactoryDb } from "@/lib/game-factory";
 
 export async function GET() {
-  const projects = await gameFactoryDb.listProjects();
-  return NextResponse.json({ projects });
+  try { return NextResponse.json({ ok: true, projects: await gameFactoryDb.listProjects() }); }
+  catch { return NextResponse.json({ ok:false, error:"failed_to_list_projects" },{status:500}); }
 }
 
 export async function POST(req: Request) {
-  const body = await req.json();
-  if (!body?.name || !body?.slug || !body?.prompt) return NextResponse.json({ error: "name, slug, prompt are required" }, { status: 400 });
-  const project = await gameFactoryDb.createProject(body);
-  return NextResponse.json({ project }, { status: 201 });
+  try {
+    const b = await req.json();
+    if (!b?.prompt || typeof b.prompt !== "string") return NextResponse.json({ ok:false, error:"prompt_required" },{status:400});
+    const project = await gameFactoryDb.createProject({ title:b.title, prompt:b.prompt, genre:b.genre, visual_style:b.style, target_chain:b.target_chain || "arbitrum-sepolia" });
+    return NextResponse.json({ ok:true, project }, { status: 201 });
+  } catch { return NextResponse.json({ ok:false, error:"failed_to_create_project" },{status:500}); }
 }
