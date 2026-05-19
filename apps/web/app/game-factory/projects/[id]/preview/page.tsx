@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { gameFactoryDb } from "@/lib/game-factory";
 import { GameFactoryGenerateButton } from "@/components/game-factory-generate-button";
 
-export default async function Page({ params }: { params: { id: string } }) {
-  const p = await gameFactoryDb.getProject(params.id);
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const p = await gameFactoryDb.getProject(id);
   if (!p) return notFound();
   const files = await gameFactoryDb.getFiles(p.id);
   const html = (files.find((f) => f.file_type === "html") as { content?: string } | undefined)?.content;
