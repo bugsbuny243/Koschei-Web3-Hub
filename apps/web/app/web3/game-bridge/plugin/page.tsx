@@ -11,17 +11,17 @@ const plannedFiles = [
 ];
 
 export default function PluginPage() {
-  return <main className="mx-auto max-w-5xl space-y-5 p-6">
-    <h1 className="text-3xl font-bold">Godot Plugin Plan</h1>
+  return <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6">
+    <h1 className="text-3xl font-bold">Godot Web3 Bridge Plugin Plan</h1>
 
-    <section>
+    <section className="rounded-xl border p-5">
       <h2 className="text-xl font-semibold">Godot plugin structure</h2>
-      <p className="text-gray-700">The MVP plugin separates editor registration, core item models, metadata building, web3 adapter configuration, and editor UI panel utilities.</p>
+      <p className="mt-2 text-gray-700">The MVP plugin separates editor registration, core item models, NFT metadata building, Web3 adapter configuration, and editor UI utilities.</p>
     </section>
 
-    <section>
+    <section className="rounded-xl border p-5">
       <h2 className="text-xl font-semibold">Planned files</h2>
-      <ul className="ml-6 list-disc font-mono text-sm">
+      <ul className="mt-2 ml-6 list-disc break-all font-mono text-sm leading-6">
         {plannedFiles.map((file) => <li key={file}>{file}</li>)}
       </ul>
     </section>
