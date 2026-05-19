@@ -17,9 +17,14 @@ function JsonBlock({ title, data }: { title: string; data: unknown }) {
   );
 }
 
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+type PageProps = {
+  params: Promise<{ id: string }>;
+};
+
+export default async function Web3PackagePage({ params }: PageProps) {
   const { id } = await params;
   const project = await gameFactoryDb.getProject(id);
+  console.error("[web3-package-page]", { id, found: Boolean(project) });
 
   if (!project) {
     return (
@@ -43,6 +48,9 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-6">
       <h1 className="text-3xl font-bold">Web3 Package</h1>
+      <h2 className="text-xl font-semibold">{project.title || "Untitled project"}</h2>
+      <p>{project.prompt}</p>
+      <p className="text-sm text-gray-600">Target chain: {project.target_chain}</p>
 
       <div className="flex flex-wrap gap-2">
         <Link className="rounded border px-3 py-2" href={`/game-factory/projects/${project.id}`}>
