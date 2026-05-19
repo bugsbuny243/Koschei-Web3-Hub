@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "packageManager": "npm@10.8.2",
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/web",
+    "packages/shared",
+    "packages/agent-core"
   ],
   "scripts": {
     "dev": "npm run dev -w apps/web",
