@@ -80,7 +80,6 @@ export default async function Web3PackagePage({ params }: PageProps) {
           <JsonBlock title="Item Schema" data={pkg.item_schema} />
           <JsonBlock title="NFT Metadata" data={pkg.nft_metadata} />
           <JsonBlock title="Reward Config" data={pkg.reward_config} />
-          <JsonBlock title="Quest / Achievement Config" data={pkg.reward_config} />
           <JsonBlock title="Arbitrum Sepolia Adapter Config" data={pkg.adapter_config} />
         </div>
       )}

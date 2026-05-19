@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildWeb3Package, gameFactoryDb } from "@/lib/game-factory";
+import { buildWeb3Package, gameFactoryDb, type GFProject } from "@/lib/game-factory";
 import { web3Db } from "@/lib/web3-db";
 
 type RouteContext = {
@@ -26,7 +26,13 @@ export async function GET(_req: Request, context: RouteContext) {
 export async function POST(_req: Request, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const project = await gameFactoryDb.getProject(id);
+
+    const projectResult = await web3Db.query<GFProject>(
+      `select id::text,title,prompt,genre,visual_style,target_chain,status,metadata,created_at::text,updated_at::text from game_factory_projects where id = $1 limit 1`,
+      [id]
+    );
+    const project = projectResult.rows[0] ?? null;
+
     if (!project) {
       return NextResponse.json({ ok: false, error: "project_not_found" }, { status: 404 });
     }
@@ -37,9 +43,9 @@ export async function POST(_req: Request, context: RouteContext) {
     const assets = await gameFactoryDb.getAssets(project.id);
     const pkg = buildWeb3Package(project, brief, assets);
 
-    await web3Db.query(
+    const upsertResult = await web3Db.query(
       `insert into game_factory_web3_packages (project_id, target_chain, manifest, item_schema, nft_metadata, reward_config, adapter_config)
-       values ($1,$2,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb)
+       values ($1, $2, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb)
        on conflict (project_id)
        do update set
          target_chain = excluded.target_chain,
@@ -48,7 +54,8 @@ export async function POST(_req: Request, context: RouteContext) {
          nft_metadata = excluded.nft_metadata,
          reward_config = excluded.reward_config,
          adapter_config = excluded.adapter_config,
-         updated_at = now()`,
+         updated_at = now()
+       returning *`,
       [
         project.id,
         project.target_chain,
@@ -60,8 +67,13 @@ export async function POST(_req: Request, context: RouteContext) {
       ]
     );
 
-    return NextResponse.json({ ok: true, package: pkg });
-  } catch {
-    return jsonError(500, "failed_to_build_package", "Failed to build Web3 package");
+    const row = upsertResult.rows[0] ?? null;
+    return NextResponse.json({ ok: true, package: row });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "unknown_error";
+    return NextResponse.json(
+      { ok: false, error: "failed_to_build_package", detail },
+      { status: 500 }
+    );
   }
 }
