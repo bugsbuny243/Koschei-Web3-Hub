@@ -36,20 +36,27 @@ export type PaymentEventRow = {
   created_at: string;
 };
 
-const pool = new Pool({ connectionString: web3Env.DATABASE_URL });
+let pool: Pool | null = null;
+
+function getPool() {
+  if (!pool) {
+    pool = new Pool({ connectionString: web3Env.DATABASE_URL });
+  }
+  return pool;
+}
 
 export const web3Db = {
-  query: <T>(text: string, params?: unknown[]) => pool.query<T>(text, params),
+  query: <T>(text: string, params?: unknown[]) => getPool().query<T>(text, params),
 
   chains: {
     async listActive() {
-      const { rows } = await pool.query<ChainRow>(
+      const { rows } = await getPool().query<ChainRow>(
         `select id::text, slug, name, is_active from web3_chains where is_active = true order by name asc`
       );
       return rows;
     },
     async bySlug(slug: string) {
-      const { rows } = await pool.query<ChainRow>(
+      const { rows } = await getPool().query<ChainRow>(
         `select id::text, slug, name, is_active from web3_chains where slug = $1 limit 1`,
         [slug]
       );
@@ -58,7 +65,7 @@ export const web3Db = {
   },
   invoices: {
     async list() {
-      const { rows } = await pool.query<InvoiceRow>(
+      const { rows } = await getPool().query<InvoiceRow>(
         `select i.id::text, i.chain_slug, i.stablecoin_symbol, i.stablecoin_contract, i.receiver_address,
                 i.expected_amount::text, i.currency, i.due_at::text, i.paid_at::text, i.status, i.metadata, i.created_at::text
          from web3_invoices i
@@ -67,7 +74,7 @@ export const web3Db = {
       return rows;
     },
     async create(input: Omit<InvoiceRow, "id" | "paid_at" | "status" | "created_at">) {
-      const { rows } = await pool.query<InvoiceRow>(
+      const { rows } = await getPool().query<InvoiceRow>(
         `insert into web3_invoices (chain_slug, stablecoin_symbol, stablecoin_contract, receiver_address, expected_amount, currency, due_at, metadata)
          values ($1,$2,$3,$4,$5,$6,$7,$8)
          returning id::text, chain_slug, stablecoin_symbol, stablecoin_contract, receiver_address, expected_amount::text,

@@ -12,6 +12,7 @@ const optionalVars = [
   "NEON_AUTH_BASE_URL",
   "NEON_AUTH_COOKIE_SECRET"
 ] as const;
+const optionalVarSet = new Set<string>(optionalVars);
 
 type RequiredEnv = { [K in (typeof requiredVars)[number]]: string };
 type OptionalEnv = { [K in (typeof optionalVars)[number]]?: string };
@@ -37,10 +38,33 @@ function getEnv() {
   }
 
   if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
+    const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+    if (!isBuildPhase) {
+      throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
+    }
+
+    for (const key of missing) {
+      env[key as keyof RequiredEnv] = "";
+    }
   }
 
   return env;
 }
 
-export const web3Env = getEnv();
+let cachedEnv: (RequiredEnv & OptionalEnv) | null = null;
+
+function resolveEnv() {
+  if (!cachedEnv) {
+    cachedEnv = getEnv();
+  }
+  return cachedEnv;
+}
+
+export const web3Env: RequiredEnv & OptionalEnv = new Proxy({} as RequiredEnv & OptionalEnv, {
+  get(_target, prop: string) {
+    if (optionalVarSet.has(prop)) {
+      return process.env[prop];
+    }
+    return resolveEnv()[prop as keyof (RequiredEnv & OptionalEnv)];
+  }
+});
