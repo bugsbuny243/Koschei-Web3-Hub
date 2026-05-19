@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildGameAssets, buildGameBrief, buildGameSceneConfig, detectGameTemplate, gameFactoryDb, renderPreviewHtml } from "@/lib/game-factory";
 import { web3Db } from "@/lib/web3-db";
 
+export const runtime = "nodejs";
 type DbError = Error & { code?: string; constraint?: string };
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {

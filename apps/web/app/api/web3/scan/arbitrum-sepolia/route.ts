@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 import { web3Env } from "@/lib/web3-env";
 import { parseTransferLog, processPaymentEvent } from "@/lib/web3-service";
 
+export const runtime = "nodejs";
 const MAX_BLOCK_RANGE = 3000;
 
 export async function POST(req: NextRequest) {

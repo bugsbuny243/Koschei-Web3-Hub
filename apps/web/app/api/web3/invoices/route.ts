@@ -3,6 +3,7 @@ import { isAddress } from "ethers";
 import { web3Db } from "@/lib/web3-db";
 import { createAccountingEntry } from "@/lib/web3-service";
 
+export const runtime = "nodejs";
 export async function GET() {
   const invoices = await web3Db.invoices.list();
   return NextResponse.json({ invoices });

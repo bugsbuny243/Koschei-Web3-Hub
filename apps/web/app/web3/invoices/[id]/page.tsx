@@ -1,5 +1,6 @@
 import { web3Db } from "@/lib/web3-db";
 
+export const runtime = "nodejs";
 const warning = "Koschei PayWatch is a no-custody monitoring MVP. It does not hold funds, send transactions, manage private keys, provide escrow, or move user assets. It only monitors blockchain payment activity and records accounting events.";
 
 type PageProps = {

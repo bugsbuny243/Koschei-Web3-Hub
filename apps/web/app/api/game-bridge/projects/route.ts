@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { gameBridgeDb } from "@/lib/game-bridge";
 
+export const runtime = "nodejs";
 export async function GET() {
   const rows = await gameBridgeDb.listProjects();
   return NextResponse.json({ projects: rows });

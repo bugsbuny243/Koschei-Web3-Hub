@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { web3Env } from "@/lib/web3-env";
 import { processPaymentEvent } from "@/lib/web3-service";
 
+export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   if (req.headers.get("x-webhook-secret") !== web3Env.WEBHOOK_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

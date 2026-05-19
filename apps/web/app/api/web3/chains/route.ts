@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { web3Db } from "@/lib/web3-db";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 

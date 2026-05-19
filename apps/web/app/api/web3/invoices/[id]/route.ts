@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { web3Db } from "@/lib/web3-db";
 
+export const runtime = "nodejs";
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const invoiceResult = await web3Db.query(`select * from web3_invoices where id = $1`, [id]);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { gameFactoryDb } from "@/lib/game-factory";
 
+export const runtime = "nodejs";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
