@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildWeb3Package, gameFactoryDb, type GFProject } from "@/lib/game-factory";
+import { buildWeb3PackageFromGeneratedAssets, gameFactoryDb, type GFProject } from "@/lib/game-factory";
 import { web3Db } from "@/lib/web3-db";
 
 type RouteContext = {
@@ -46,7 +46,7 @@ export async function POST(_req: Request, context: RouteContext) {
     if (!brief) return jsonError(400, "generate_first", "Generate project content first");
 
     const assets = await gameFactoryDb.getAssets(project.id);
-    const pkg = buildWeb3Package(project, brief, assets);
+    const pkg = buildWeb3PackageFromGeneratedAssets({ ...project, metadata: { ...project.metadata, brief } }, assets);
 
     const upsertResult = await web3Db.query(
       `insert into game_factory_web3_packages (project_id, target_chain, manifest, item_schema, nft_metadata, reward_config, adapter_config)
