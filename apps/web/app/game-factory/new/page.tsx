@@ -32,8 +32,15 @@ export default function Page() {
       const genRes = await fetch(`/api/game-factory/projects/${id}/generate`, { method: "POST" });
       if (!genRes.ok) throw new Error((await genRes.json())?.error || "failed_to_generate");
 
-      const web3Res = await fetch(`/api/game-factory/projects/${id}/web3-package`, { method: "POST" });
-      if (!web3Res.ok) throw new Error((await web3Res.json())?.error || "failed_to_build_package");
+      try {
+        const web3Res = await fetch(`/api/game-factory/projects/${id}/web3-package`, { method: "POST" });
+        if (!web3Res.ok) {
+          const web3Json = await web3Res.json().catch(() => null);
+          console.warn("Web3 package generation failed, continuing to preview", web3Json?.error || web3Json?.detail || web3Res.statusText);
+        }
+      } catch (e) {
+        console.warn("Web3 package generation failed, continuing to preview", e);
+      }
 
       router.push(`/game-factory/projects/${id}/preview`);
     } catch (e) {
@@ -49,7 +56,7 @@ export default function Page() {
     <input className="w-full rounded border p-2" placeholder="Genre (optional)" value={genre} onChange={e=>setGenre(e.target.value)} disabled={loading}/>
     <input className="w-full rounded border p-2" placeholder="Style (optional)" value={style} onChange={e=>setStyle(e.target.value)} disabled={loading}/>
     <input className="w-full rounded border p-2 bg-gray-50" value="arbitrum-sepolia" readOnly/>
-    <button className="rounded bg-black px-4 py-2 text-white disabled:opacity-60" onClick={submit} disabled={loading}>{loading ? "Generating project, preview, and Web3 package..." : "Create Project"}</button>
+    <button className="rounded bg-black px-4 py-2 text-white disabled:opacity-60" onClick={submit} disabled={loading}>{loading ? "Generating project and preview..." : "Create Project"}</button>
     {error && <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
   </main>;
 }
