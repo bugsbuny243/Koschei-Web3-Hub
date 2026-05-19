@@ -2,13 +2,17 @@ import { NextResponse } from "next/server";
 import { buildWeb3Package, gameFactoryDb } from "@/lib/game-factory";
 import { web3Db } from "@/lib/web3-db";
 
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
+
 function jsonError(status: number, error: string, message: string) {
   return NextResponse.json({ ok: false, error, message }, { status });
 }
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_req: Request, context: RouteContext) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
     const project = await gameFactoryDb.getProject(id);
     if (!project) return jsonError(404, "not_found", "Project not found");
 
@@ -19,11 +23,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 }
 
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(_req: Request, context: RouteContext) {
   try {
-    const { id } = await params;
+    const { id } = await context.params;
     const project = await gameFactoryDb.getProject(id);
-    if (!project) return jsonError(404, "not_found", "Project not found");
+    if (!project) {
+      return NextResponse.json({ ok: false, error: "project_not_found" }, { status: 404 });
+    }
 
     const brief = await gameFactoryDb.getBrief(project.id);
     if (!brief) return jsonError(400, "generate_first", "Generate project content first");
@@ -33,7 +39,16 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
     await web3Db.query(
       `insert into game_factory_web3_packages (project_id, target_chain, manifest, item_schema, nft_metadata, reward_config, adapter_config)
-       values ($1,$2,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb)`,
+       values ($1,$2,$3::jsonb,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb)
+       on conflict (project_id)
+       do update set
+         target_chain = excluded.target_chain,
+         manifest = excluded.manifest,
+         item_schema = excluded.item_schema,
+         nft_metadata = excluded.nft_metadata,
+         reward_config = excluded.reward_config,
+         adapter_config = excluded.adapter_config,
+         updated_at = now()`,
       [
         project.id,
         project.target_chain,
