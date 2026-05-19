@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildAssets, buildGameBrief, buildPreviewHtml, gameFactoryDb } from "@/lib/game-factory";
+import { buildGameAssets, buildGameBrief, buildGameSceneConfig, detectGameTemplate, gameFactoryDb, renderPreviewHtml } from "@/lib/game-factory";
 import { web3Db } from "@/lib/web3-db";
 
 type DbError = Error & { code?: string; constraint?: string };
@@ -11,16 +11,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const { id } = await params;
     projectId = id;
     const p = await gameFactoryDb.getProject(id);
-    if (!p) return NextResponse.json({ ok:false, error:"not_found", detail:"Project not found" },{status:404});
-
+    if (!p) return NextResponse.json({ ok:false, error:"not_found" },{status:404});
+    const template = detectGameTemplate(p.prompt, p.genre);
+    const sceneConfig = buildGameSceneConfig(template, p);
     const brief = buildGameBrief({ title:p.title, prompt:p.prompt, genre:p.genre, style:p.visual_style });
-    const preview = buildPreviewHtml(brief);
-    const assets = buildAssets(brief);
-
-    await web3Db.query("delete from game_factory_generated_files where project_id=$1", [p.id]);
-    await web3Db.query("delete from game_factory_assets where project_id=$1", [p.id]);
-    await web3Db.query("delete from game_factory_briefs where project_id=$1", [p.id]);
-
+    const preview = renderPreviewHtml(sceneConfig);
+    const assets = buildGameAssets(template, brief);
     await web3Db.query("insert into game_factory_briefs (project_id, brief) values ($1,$2::jsonb)",[p.id, JSON.stringify(brief)]);
     for (const a of assets) await web3Db.query("insert into game_factory_assets (project_id, asset_type, name, description, rarity, metadata) values ($1,$2,$3,$4,$5,$6::jsonb)",[p.id,a.asset_type,a.name,a.description,a.rarity,JSON.stringify(a.metadata)]);
     await web3Db.query("insert into game_factory_generated_files (project_id, file_path, file_type, content, metadata) values ($1,$2,$3,$4,$5::jsonb)",[p.id,"preview/index.html","html",preview,JSON.stringify({generated:true})]);
