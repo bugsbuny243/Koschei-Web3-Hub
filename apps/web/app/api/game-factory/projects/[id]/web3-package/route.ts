@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { buildWeb3PackageFromGeneratedAssets, gameFactoryDb, type GFProject } from "@/lib/game-factory";
 import { web3Db } from "@/lib/web3-db";
 
+export const runtime = "nodejs";
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
@@ -31,8 +32,11 @@ export async function GET(_req: Request, context: RouteContext) {
 }
 
 export async function POST(_req: Request, context: RouteContext) {
+  let projectId = "unknown";
+
   try {
     const { id } = await context.params;
+    projectId = id;
 
     const projectResult = await web3Db.query<GFProject>(
       `select id::text,title,prompt,genre,visual_style,target_chain,status,metadata,created_at::text,updated_at::text from game_factory_projects where id = $1 limit 1`,
@@ -80,7 +84,7 @@ export async function POST(_req: Request, context: RouteContext) {
     const dbError = error as DbError;
     console.error("[game-factory web3-package POST]", {
       route: "POST /api/game-factory/projects/[id]/web3-package",
-      projectId: (await context.params).id,
+      projectId,
       message: dbError?.message,
       code: dbError?.code,
       constraint: dbError?.constraint

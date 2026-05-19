@@ -39,9 +39,15 @@ export type PaymentEventRow = {
 let pool: Pool | null = null;
 
 function getPool() {
-  if (!pool) {
-    pool = new Pool({ connectionString: web3Env.DATABASE_URL });
+  const connectionString = web3Env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is required for database access");
   }
+
+  if (!pool) {
+    pool = new Pool({ connectionString, connectionTimeoutMillis: 5000 });
+  }
+
   return pool;
 }
 

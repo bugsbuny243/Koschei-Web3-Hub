@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { web3Env } from "@/lib/web3-env";
 
+export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   const payload = await req.json().catch(() => null);
   if (!payload) return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });

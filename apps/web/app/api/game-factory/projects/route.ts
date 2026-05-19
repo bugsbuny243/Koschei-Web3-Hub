@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { gameFactoryDb } from "@/lib/game-factory";
 
+export const runtime = "nodejs";
 type DbError = Error & { code?: string; constraint?: string };
 
 export async function GET() {

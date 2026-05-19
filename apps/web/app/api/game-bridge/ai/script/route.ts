@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { generateAdapterConfig, generateGodotSnippet } from "@/lib/game-bridge";
 
+export const runtime = "nodejs";
 export async function POST(req: Request) {
   const body = await req.json();
   const item = body?.item ?? { item_key: "sword_of_koschei", name: "Sword of Koschei" };

@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 export const dynamic = 'force-dynamic';
 import Link from "next/link";
 import { gameFactoryDb } from "@/lib/game-factory";
