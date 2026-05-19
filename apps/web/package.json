@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
-    "@koschei/shared": "file:../../packages/shared",
     "@prisma/client": "^5.20.0",
     "bcryptjs": "^2.4.3",
     "ethers": "^6.13.2",
