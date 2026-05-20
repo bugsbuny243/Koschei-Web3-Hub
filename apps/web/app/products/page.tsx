@@ -24,9 +24,8 @@ export default function ProductsPage() {
             <p>
               <strong>Pricing:</strong> Quote-based
             </p>
-            <div className="mt-4 flex gap-3">
-              <a href={`/products/${product.slug}`} className="btn btn-primary">Request Quote</a>
-            </div>
+            <p>{product.description}</p>
+            <a className="btn btn-primary" href="/request-quote">Request Quote</a>
           </article>
         ))}
       </section>

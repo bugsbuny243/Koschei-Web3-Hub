@@ -1,0 +1,5 @@
+export default async function Page({ searchParams, params }: { searchParams: Promise<{ password?: string }>; params: Promise<{ id: string }> }) {
+  const { password } = await searchParams; const { id } = await params;
+  if (password !== process.env.ADMIN_PASSWORD) return <div>Unauthorized</div>;
+  return <form method="post" action={`/api/admin/quote-requests/${id}/customer-quote?password=${password}`} className="page-stack card"><h1>Customer Quote Calculator</h1>{["internal_total_cost","markup_type","markup_amount","markup_percent","valid_until","payment_terms_public","delivery_terms_public","quote_notes"].map((k)=><input key={k} name={k} placeholder={k} defaultValue={k==='markup_type'?'fixed':k==='payment_terms_public'?'Payment terms will be confirmed in the official proforma invoice.':undefined} className="input" />)}<p>Final price includes the configuration and delivery terms stated in this quotation only. Freight, customs, taxes and destination charges may change if the shipment date, delivery address, trade term or machine configuration changes.</p><button className="btn btn-primary">Save customer quote</button></form>;
+}
