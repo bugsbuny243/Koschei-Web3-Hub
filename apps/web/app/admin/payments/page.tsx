@@ -1,23 +1,8 @@
-import { escrowTransactions } from "@/lib/payment-store";
-
+import { getDbPool } from "@/lib/db";
 export default async function AdminPaymentsPage({ searchParams }: { searchParams: Promise<{ password?: string }> }) {
   const { password } = await searchParams;
   if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD) return <div className="page-stack"><h1>Admin Access Required</h1></div>;
-
-  return (
-    <div className="page-stack">
-      <h1>Admin Payments</h1>
-      <p>Escrow.com payments are created only after quote approval. No public checkout is enabled.</p>
-      <table>
-        <thead><tr><th>Quote Request</th><th>Customer</th><th>Quote Amount</th><th>Escrow Txn</th><th>Escrow Status</th><th>Supplier 30%</th><th>Supplier 70%</th><th>Gross Profit</th><th>Created</th></tr></thead>
-        <tbody>
-          {escrowTransactions.map((row) => (
-            <tr key={row.escrow_transaction_id}>
-              <td>{row.quote_request_id}</td><td>{row.buyer_email}</td><td>{row.final_customer_price}</td><td>{row.escrow_transaction_id}</td><td>{row.escrow_status}</td><td>{row.supplier_deposit_status}</td><td>{row.supplier_balance_status}</td><td>{(row.final_customer_price - 0).toFixed(2)}</td><td>{row.created_at}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const pool=getDbPool(); if(!pool) return <div className="page-stack">DB unavailable</div>;
+  const rows=(await pool.query(`select qr.full_name, qr.company_name, cq.final_customer_price, cq.internal_total_cost, cq.gross_profit, cq.gross_margin_percent, et.escrow_transaction_id, et.escrow_status, sp30.status as s30, sp70.status as s70 from quote_requests qr left join customer_quotes cq on cq.quote_request_id=qr.id left join escrow_transactions et on et.quote_request_id=qr.id left join supplier_payments sp30 on sp30.quote_request_id=qr.id and sp30.payment_stage='deposit_30' left join supplier_payments sp70 on sp70.quote_request_id=qr.id and sp70.payment_stage='balance_70' order by qr.created_at desc limit 100`)).rows;
+  return <div className="page-stack"><h1>Admin Payments</h1><table><thead><tr><th>customer</th><th>final quote amount</th><th>internal total cost</th><th>gross profit</th><th>gross margin</th><th>escrow transaction id</th><th>escrow status</th><th>supplier 30% status</th><th>supplier 70% status</th></tr></thead><tbody>{rows.map((r:any,i:number)=><tr key={i}><td>{r.full_name} / {r.company_name}</td><td>{r.final_customer_price}</td><td>{r.internal_total_cost}</td><td>{r.gross_profit}</td><td>{r.gross_margin_percent}</td><td>{r.escrow_transaction_id}</td><td>{r.escrow_status}</td><td>{r.s30}</td><td>{r.s70}</td></tr>)}</tbody></table></div>;
 }

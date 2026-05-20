@@ -4,3 +4,8 @@ artifacts
 cache
 typechain-types
 coverage
+
+private-docs/
+*.pem
+*.key
+.env.local
