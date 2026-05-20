@@ -1,128 +1,174 @@
 "use client";
 
-const machineProfiles = [
+const machineModels = [
   {
-    code: "Model 5X-5 Fine Cleaner System",
-    description:
-      "Complete grain calibration station containing the main 5X-5 cleaning body, Model 4-72-4.5A Fan (7.5KW), Model 2-0900 Cyclone, integrated inverters electric cabinet, Model W6 anti-broken bucket elevator (1.1KW), and 7PCS white bean spare sifters.",
-    specs: ["Capacity: 5 TPH based on wheat density"],
+    name: "Fine Cleaner Model 5X-5 (Amiral Gemisi Komple Sistem)",
+    details: [
+      "Tam entegre tahıl eleme ve hava aspirasyon tesisi; ana 5X-5 gövdesi (komponent değeri: $13,000).",
+      "Model 4-72-4.5A Emiş Fanı: 7.5KW.",
+      "Model 2-0900 Cyclone Air Locker: $1,800, 1.1KW.",
+      "İnverter kontrollü entegre kontrol kabini.",
+      "Model W6 düşük hızlı kırılma önleyici kovalı elevatör: 1.1KW.",
+      "Beyaz fasulye işleme için 1 takım 7 adet özel elek.",
+      "Kapasite: Buğday yoğunluğu bazında 5 TPH.",
+      "Ölçüler: 3200x1940x3600 mm.",
+    ],
   },
   {
-    code: "LCSX Intelligent Photoelectric Color Sorter",
-    description:
-      "High-resolution optical sorting grid using automated shape recognition algorithms and cloud-connected remote parameter settings via mobile app interfaces.",
-    specs: [],
+    name: "LCSX Intelligent Photoelectric Color Sorter",
+    details: [
+      "Dijital fotoelektrik hücre matris teknolojisiyle optik ayıklama ızgarası.",
+      "Şekil tanıma algoritmalarıyla akıllı ayıklama.",
+      "Hava basıncı için akıllı bulut izleme.",
+      "Mobil APP arayüzü üzerinden uzaktan kalibrasyon.",
+      "Tekli/çift kanallı genişleme desteği.",
+    ],
   },
   {
-    code: "TQSF Gravity De-Stoner",
-    description:
-      "Specific gravity heavy impurity separator with double-deck reciprocating screen links and enclosed negative pressure dust extraction.",
-    specs: [],
+    name: "High-Capacity TQSF Series Gravity De-Stoner",
+    details: [
+      "Özgül ağırlık farkına göre ağır yabancı madde ve taş ayırma.",
+      "Karşılıklı hareketli çift katmanlı elek + akışkan hava süspansiyonu.",
+      "Toz emisyonunu engelleyen kapalı negatif basınçlı şase.",
+      "Elek eğimi ve hava hızı bağımsız ayarlanabilir.",
+    ],
   },
   {
-    code: "DCS Electronic Quantitative Packing Scale",
-    description:
-      "Microcomputer-controlled automated bagging, weighing, and stitching unit.",
-    specs: ["Programmable scale range: 10kg - 65kg", "Accuracy: ±0.2%"],
+    name: "DCS Electronic Quantitative Packing Scale",
+    details: [
+      "Mikrobilgisayar kontrollü otomatik torbalama.",
+      "Yüksek hızlı tartım ve bant konveyör dikiş istasyonu.",
+      "Programlanabilir çalışma aralığı: 10kg - 65kg.",
+      "Kapasite: 420-1080 torba/saat.",
+      "Hassasiyet toleransı: ±0.2%.",
+    ],
   },
   {
-    code: "5XZ Series Gravity Separator",
-    description:
-      "Premium density separation system designed to extract blighted, insect-damaged, or immature seeds using high-frequency vibration air tables.",
-    specs: [],
+    name: "5XZ Series Gravity Separator (Özgül Ağırlık Masası)",
+    details: [
+      "Ağır hizmet tipi hava masalı titreşimli yoğunluk separatörü.",
+      "Küflü, çimlenmiş, bozulmuş veya böcek hasarlı hafif taneleri uzaklaştırır.",
+      "Değişken salınım hızı ve çoklu fan hava hacmi yönetimi.",
+    ],
   },
   {
-    code: "5BY Series Automatic Seed Coater",
-    description:
-      "Automated centrifugal chemical liquid batch mixing system with precise dosing micro-processors for professional seed treatment.",
-    specs: [],
+    name: "5BY Series Automatic Seed Coater (Tohum İlaçlama)",
+    details: [
+      "Hassas dozaj mikroişlemcileriyle otomatik sıvı santrifüj batch karıştırma.",
+      "Senkron çift salınımlı disklerle kimyasal kaplamayı homojen atomize eder.",
+      "Tohum kabuğunda sürtünme kaynaklı hasarı azaltan uygulama mimarisi.",
+    ],
   },
   {
-    code: "TQLZ Series Vibrating Cleaner",
-    description:
-      "Heavy-duty industrial pre-cleaning separator powered by dual-vibratory motors for high-volume intake straw and coarse foreign matter removal.",
-    specs: [],
+    name: "TQLZ Series Vibrating Pre-Cleaner",
+    details: [
+      "Çift titreşim motorlu yüksek hacimli ön temizleme separatörü.",
+      "İnce eleme öncesi kaba sap, ip ve yüzey atıklarını hızlıca uzaklaştırır.",
+      "Kolay değiştirilebilir elek kaset yapısı.",
+    ],
   },
   {
-    code: "DT Series Heavy-Duty Bucket Elevator",
-    description:
-      "Vertical bulk material handling conveyor equipped with wear-resistant polymer buckets and mechanical backstop safety brake units.",
-    specs: [],
+    name: "DT Series Heavy-Duty Bucket Elevator (Dikey Taşıma)",
+    details: [
+      "Endüstriyel dikey dökme malzeme taşıma konveyörü.",
+      "Aşınmaya dayanıklı yüksek yoğunluklu polimer kova seti.",
+      "Düzgün anti-shred hat hızı.",
+      "Mekanik geri kaçırmaz fren güvenlik kilitleri.",
+    ],
   },
 ];
 
 export default function HomePage() {
-  const scrollToContact = () => {
-    const contactSection = document.getElementById("contact");
-    contactSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const scrollToContact = (productName: string) => {
+    const select = document.getElementById("productSelect") as HTMLSelectElement | null;
+    if (select) {
+      select.value = productName;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    const formSection = document.getElementById("corporate-rfo-form");
+    if (formSection) {
+      formSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
   return (
-    <div className="page-stack">
-      <section className="hero">
-        <p className="eyebrow">TradePi Globall</p>
-        <h1>Industrial Grain & Seed Processing Request For Quote Portal</h1>
-        <p>
-          Review certified machine profiles and submit an RFQ directly to our technical sales team.
-          This architecture is strictly quote-driven with professional data capture.
+    <main className="mx-auto max-w-7xl space-y-10 p-6 md:p-10">
+      <section className="rounded-2xl bg-slate-900 p-8 text-white">
+        <p className="text-sm uppercase tracking-[0.2em]">TradePi Globall</p>
+        <h1 className="mt-2 text-3xl font-bold md:text-4xl">Kurumsal Endüstriyel Hatlar - Request For Quote (RFO)</h1>
+        <p className="mt-4 text-slate-200">
+          Bu sayfa yalnızca kurumsal teklif toplama amaçlıdır. Teknik uygunluk doğrulaması sonrası
+          ürün bazlı resmi teklif hazırlanır.
         </p>
-        <div className="hero-actions">
-          <button type="button" className="btn btn-primary" onClick={scrollToContact}>
-            Request For Quote
-          </button>
-        </div>
       </section>
 
-      <section>
-        <h2>Factory Machine Profiles</h2>
-        <div className="grid">
-          {machineProfiles.map((machine) => (
-            <article key={machine.code} className="card">
-              <h3>{machine.code}</h3>
-              <p>{machine.description}</p>
-              {machine.specs.length > 0 && (
-                <ul>
-                  {machine.specs.map((spec) => (
-                    <li key={spec}>{spec}</li>
-                  ))}
-                </ul>
-              )}
+      <section className="space-y-6">
+        <h2 className="text-2xl font-semibold">Makine Listesi ve Teknik Parametreler</h2>
+        <div className="grid gap-6 md:grid-cols-2">
+          {machineModels.map((machine) => (
+            <article key={machine.name} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <img src="" alt={machine.name} className="h-48 w-full rounded-xl object-cover" />
+              <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                <p className="text-sm font-medium text-slate-600">Video Alanı (YouTube iframe hazır)</p>
+                <div className="mt-2 aspect-video w-full rounded-lg bg-slate-200" />
+              </div>
+              <h3 className="mt-4 text-lg font-semibold">{machine.name}</h3>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-700">
+                {machine.details.map((detail) => (
+                  <li key={detail}>{detail}</li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => scrollToContact(machine.name)}
+                className="mt-5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Bu model için teklif iste
+              </button>
             </article>
           ))}
         </div>
       </section>
 
-      <section id="contact">
-        <h2>Request For Quote</h2>
-        <form
-          className="card"
-          onSubmit={(event) => {
-            event.preventDefault();
-            alert(
-              "Thank you. Your RFQ has been captured by our TradePi Globall technical team. We will respond with a formal configuration proposal.",
-            );
-          }}
-        >
-          <label htmlFor="productSelect">Select Machine Model</label>
-          <select id="productSelect" name="productSelect" required defaultValue="">
-            <option value="" disabled>
-              Choose a model for quotation
-            </option>
-            {machineProfiles.map((machine) => (
-              <option key={machine.code} value={machine.code}>
-                {machine.code}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="company">Company Name</label>
-          <input id="company" name="company" type="text" required />
-          <label htmlFor="email">Business Email</label>
-          <input id="email" name="email" type="email" required />
-          <button type="submit" className="btn btn-primary">
-            Submit RFQ
+      <section id="corporate-rfo-form" className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-2xl font-semibold">Kurumsal Veri Alım Formu</h2>
+        <p className="mt-2 text-sm text-slate-700">
+          Kurulum yapılacak ili ve mahsul tipinizi belirtin, adınıza özel güncel DDP lojistik ve gümrük teklifini hazırlayalım.
+        </p>
+        <form className="mt-6 grid gap-4 md:grid-cols-2">
+          <label className="flex flex-col gap-2 text-sm font-medium text-slate-700 md:col-span-2">
+            Talep edilen model
+            <select id="productSelect" name="productSelect" className="rounded-lg border border-slate-300 p-3">
+              <option value="">Model seçiniz</option>
+              {machineModels.map((machine) => (
+                <option key={machine.name} value={machine.name}>
+                  {machine.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+            Firma Adı
+            <input type="text" name="company" className="rounded-lg border border-slate-300 p-3" />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+            İletişim Kişisi
+            <input type="text" name="contact" className="rounded-lg border border-slate-300 p-3" />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+            Kurulum İli
+            <input type="text" name="city" className="rounded-lg border border-slate-300 p-3" />
+          </label>
+          <label className="flex flex-col gap-2 text-sm font-medium text-slate-700">
+            Mahsul Tipi
+            <input type="text" name="crop" className="rounded-lg border border-slate-300 p-3" />
+          </label>
+          <button type="submit" className="rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white md:col-span-2">
+            Kurumsal RFO Gönder
           </button>
         </form>
       </section>
-    </div>
+    </main>
   );
 }
