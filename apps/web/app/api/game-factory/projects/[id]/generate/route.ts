@@ -14,6 +14,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const p = await gameFactoryDb.getProject(id);
     if (!p) return NextResponse.json({ ok:false, error:"not_found" },{status:404});
     const template = detectGameTemplate(p.prompt, p.genre);
+    console.error("[game-factory template]", { projectId: p.id, title: p.title, genre: p.genre, template });
     const sceneConfig = buildGameSceneConfig(template, p);
     const brief = buildGameBrief({ title:p.title, prompt:p.prompt, genre:p.genre, style:p.visual_style });
     const preview = renderPreviewHtml(sceneConfig);

@@ -21,14 +21,47 @@ export function slugify(v:string){return v.toLowerCase().replace(/[^a-z0-9]+/g,"
 function hasAny(text:string, kws:string[]){return kws.some((k)=>text.includes(k));}
 
 export function detectGameTemplate(prompt:string, genre?:string|null):TemplateKey {
-  const text = `${prompt} ${genre??""}`.toLowerCase();
-  if (hasAny(text,["tower defense","tower","lanes","base hp","wave counter"])) return "tower_defense";
-  if (hasAny(text,["boss fight","boss","titan","raid","bullet hell"])) return "boss_fight";
-  if (hasAny(text,["card","deck","turn","duel","hand"])) return "card_battle";
-  if (hasAny(text,["resource","management","colony","minerals","economy","builder"])) return "resource_management";
-  if (hasAny(text,["quest","badge","guardian","chest","rpg","guild","arena"])) return "quest_arena_rpg";
-  if (hasAny(text,["survival","swarm","horde","wave","roguelite"])) return "arena_survival";
-  if (hasAny(text,["platformer","jump","platform","portal","side scroller"])) return "platformer";
+  const genreText = (genre ?? "").toLowerCase();
+  const promptText = prompt.toLowerCase();
+  const text = `${promptText} ${genreText}`;
+  const include = (value:string, kws:string[]) => kws.some((k)=>value.includes(k));
+  const score = (value:string, kws:string[], weight:number) => kws.reduce((sum, k) => sum + (value.includes(k) ? weight : 0), 0);
+
+  if (include(genreText,["arena survival"])) return "arena_survival";
+  if (include(genreText,["tower defense"])) return "tower_defense";
+  if (include(genreText,["boss rush","boss"])) return "boss_fight";
+  if (include(genreText,["platformer"])) return "platformer";
+  if (include(genreText,["card","deck"])) return "card_battle";
+  if (include(genreText,["resource","tycoon","colony"])) return "resource_management";
+  if (include(genreText,["quest","rpg","badge"])) return "quest_arena_rpg";
+
+  const templateScores: Record<TemplateKey, number> = {
+    quest_arena_rpg: 0,
+    arena_survival: 0,
+    tower_defense: 0,
+    boss_fight: 0,
+    platformer: 0,
+    card_battle: 0,
+    resource_management: 0,
+    runner: 0
+  };
+
+  templateScores.arena_survival += score(genreText,["arena survival","survival","swarm","wave","enemies spawn","enemies chase","xp orbs","top-down arena","cyber fighter"], 6);
+  templateScores.arena_survival += score(promptText,["arena survival","survival","swarm","wave","enemies spawn","enemies chase","xp orbs","top-down arena","cyber fighter"], 3);
+  templateScores.arena_survival += score(text,["horde","roguelite"], 2);
+
+  templateScores.tower_defense += score(genreText,["tower defense","tower","towers","base hp","credits","path","tower slots","defense grid"], 6);
+  templateScores.tower_defense += score(promptText,["tower defense","tower","towers","base hp","credits","path","tower slots","defense grid"], 3);
+
+  templateScores.boss_fight += score(genreText,["boss fight","boss","titan","raid","bullet hell"], 5);
+  templateScores.boss_fight += score(promptText,["boss fight","boss","titan","raid","bullet hell"], 3);
+  templateScores.card_battle += score(genreText,["card","deck","turn","duel","hand"], 5) + score(promptText,["card","deck","turn","duel","hand"], 2);
+  templateScores.resource_management += score(genreText,["resource","management","colony","minerals","economy","builder","tycoon"], 5) + score(promptText,["resource","management","colony","minerals","economy","builder","tycoon"], 2);
+  templateScores.quest_arena_rpg += score(genreText,["quest","badge","guardian","chest","rpg","guild"], 5) + score(promptText,["quest","badge","guardian","chest","rpg","guild"], 2);
+  templateScores.platformer += score(genreText,["platformer","jump","platform","portal","side scroller"], 5) + score(promptText,["platformer","jump","platform","portal","side scroller"], 2);
+
+  const ranked = (Object.entries(templateScores) as Array<[TemplateKey, number]>).sort((a, b) => b[1] - a[1]);
+  if (ranked[0] && ranked[0][1] > 0) return ranked[0][0];
   return "runner";
 }
 
@@ -50,8 +83,8 @@ export function buildGameBrief(input:{title?:string|null;prompt:string;genre?:st
   const scene = buildGameSceneConfig(template, { title });
   const common = {title,genre,style,prompt:input.prompt, scene};
   if (template === "quest_arena_rpg") return {...common,template,player:"hero",collectible:"ancient badge",obstacle:"guardian enemy",goal:"collect 3 badges and unlock final chest",score_rule:"+15 per badge, +30 per guardian",game_over:"HP reaches 0",labels:["hero","ancient badge","guardian","final treasure chest"],web3:{item_schema:["badge_item_schema","badge_metadata","guardian_reward","final_chest_reward"],nft_traits:["badge","quest"],reward_events:[{key:"collect_3_badges",reward:60},{key:"defeat_guardians",reward:40},{key:"unlock_final_chest",reward:100}],notes:["quest_progress_enabled"],quest_reward_config:{required_badges:3,guardian_reward:40,final_chest_reward:100}}};
-  if (template === "arena_survival") return {...common,template,player:"arena fighter",collectible:"xp orb",obstacle:"swarm enemy",goal:"survive escalating waves",score_rule:"+5 per orb, +20 per enemy",game_over:"HP reaches 0",labels:["arena fighter","xp orb","wave","enemy swarm"],web3:{item_schema:["xp_orb","wave_reward"],nft_traits:["survival","wave"],reward_events:[{key:"clear_wave",reward:25},{key:"collect_xp",reward:5}]}};
-  if (template === "tower_defense") return {...common,template,player:"tower commander",collectible:"credits",obstacle:"path enemy",goal:"defend base across waves",score_rule:"+10 per defeated enemy",game_over:"Base HP reaches 0",labels:["tower slot","tower","enemy path","base hp"],web3:{item_schema:["tower_core","defense_credits"],nft_traits:["defense","tower"],reward_events:[{key:"defeat_enemy",reward:10},{key:"survive_wave",reward:30}]}};
+  if (template === "arena_survival") return {...common,template,player:"arena fighter",collectible:"xp orb",obstacle:"swarm enemy",goal:"survive escalating waves",score_rule:"+5 per orb, +20 per enemy",game_over:"HP reaches 0",labels:["arena fighter","xp orb","wave","enemy swarm"],web3:{item_schema:["xp_orb","enemy_drop","survival_badge_reward"],nft_traits:["survival","wave"],reward_events:[{key:"survive_wave",reward:25},{key:"collect_xp",reward:5},{key:"defeat_swarm",reward:15}]}};
+  if (template === "tower_defense") return {...common,template,player:"tower commander",collectible:"credits",obstacle:"path enemy",goal:"defend base across waves",score_rule:"+10 per defeated enemy",game_over:"Base HP reaches 0",labels:["tower slot","tower","enemy path","base hp"],web3:{item_schema:["tower","credit_reward","defense_module"],nft_traits:["defense","tower"],reward_events:[{key:"wave_clear",reward:30},{key:"base_defended",reward:50}]}};
   if (template === "boss_fight") return {...common,template,player:"player ship",collectible:"repair orb",obstacle:"titan boss",goal:"defeat boss before HP depletion",score_rule:"+20 per boss hit",game_over:"Player HP reaches 0",labels:["player ship","titan boss","boss hp","repair orb"],web3:{item_schema:["repair_orb","boss_core"],nft_traits:["boss","phase"],reward_events:[{key:"survive_phase",reward:30},{key:"defeat_boss",reward:150}]}};
   if (template === "platformer") return {...common,template,player:"platform explorer",collectible:"crystal",obstacle:"spike trap",goal:"collect crystals then reach portal",score_rule:"+10 per crystal",game_over:"HP reaches 0",labels:["platform","crystal","spike","portal"],web3:{item_schema:["crystal","portal_pass"],nft_traits:["platformer","jump"],reward_events:[{key:"collect_crystal",reward:10},{key:"reach_portal",reward:70}]}};
   if (template === "card_battle") return {...common,template,player:"duelist",collectible:"energy",obstacle:"enemy champion",goal:"reduce enemy HP to zero",score_rule:"+15 per winning turn",game_over:"Player HP reaches 0",labels:["attack card","shield card","energy blast","turn"],web3:{item_schema:["battle_card","energy_charge"],nft_traits:["card","turn"],reward_events:[{key:"win_turn",reward:15},{key:"win_match",reward:100}]}};
@@ -105,8 +138,21 @@ export function buildAssets(brief:Record<string,unknown>){const b=brief as GameB
 export function buildWeb3PackageFromGeneratedAssets(project:GFProject, assets:Record<string,unknown>[]){
   const brief = (project.metadata?.brief ?? {}) as Partial<GameBrief>;
   const template = (brief.template as TemplateKey) || "runner";
-  const itemSchemaRecommended = template === "quest_arena_rpg" ? ["badge_item_schema","badge_metadata","guardian_reward","final_chest_reward","quest_reward_config"] : (brief.web3?.item_schema ?? []);
-  return {manifest:{project_id:project.id,title:project.title,target_chain:project.target_chain,generated_at:new Date().toISOString(),template,prompt:project.prompt},item_schema:{version:"1.0",items:assets.map((a)=>({type:a.asset_type,name:a.name,rarity:a.rarity})),recommended:itemSchemaRecommended},nft_metadata:assets.map((a)=>({name:a.name,description:a.description,attributes:[{trait_type:"type",value:a.asset_type},{trait_type:"rarity",value:a.rarity}]})),reward_config:template==="quest_arena_rpg"?{currency:"points",events:[{key:"collect_3_badges",reward:60},{key:"defeat_guardians",reward:40},{key:"unlock_final_chest",reward:100}],quest_reward_config:{required_badges:3,guardian_reward:40,final_chest_reward:100}}:{currency:"points",events:brief.web3?.reward_events??[]},adapter_config:{chain:project.target_chain,mode:"readiness-only",wallet_required:false,tx_signing:false,deploy:false}};
+  const itemSchemaRecommended = template === "quest_arena_rpg"
+    ? ["badge_item_schema","badge_metadata","guardian_reward","final_chest_reward","quest_reward_config"]
+    : template === "arena_survival"
+      ? ["xp_orb","enemy_drop","survival_badge_reward"]
+      : template === "tower_defense"
+        ? ["tower","credit_reward","defense_module"]
+        : (brief.web3?.item_schema ?? []);
+  const rewardConfig = template === "quest_arena_rpg"
+    ? {currency:"points",events:[{key:"collect_3_badges",reward:60},{key:"defeat_guardians",reward:40},{key:"unlock_final_chest",reward:100}],quest_reward_config:{required_badges:3,guardian_reward:40,final_chest_reward:100}}
+    : template === "arena_survival"
+      ? {currency:"points",events:[{key:"survive_wave",reward:25},{key:"collect_xp",reward:5},{key:"defeat_swarm",reward:15}]}
+      : template === "tower_defense"
+        ? {currency:"points",events:[{key:"wave_clear",reward:30},{key:"base_defended",reward:50}]}
+        : {currency:"points",events:brief.web3?.reward_events??[]};
+  return {manifest:{project_id:project.id,title:project.title,target_chain:project.target_chain,generated_at:new Date().toISOString(),template,prompt:project.prompt},item_schema:{version:"1.0",items:assets.map((a)=>({type:a.asset_type,name:a.name,rarity:a.rarity})),recommended:itemSchemaRecommended},nft_metadata:assets.map((a)=>({name:a.name,description:a.description,attributes:[{trait_type:"type",value:a.asset_type},{trait_type:"rarity",value:a.rarity}]})),reward_config:rewardConfig,adapter_config:{chain:project.target_chain,mode:"readiness-only",wallet_required:false,tx_signing:false,deploy:false}};
 }
 
 export const buildWeb3Package = (project:GFProject, brief:Record<string,unknown>, assets:Record<string,unknown>[]) => buildWeb3PackageFromGeneratedAssets({ ...project, metadata: { ...project.metadata, brief } }, assets);
