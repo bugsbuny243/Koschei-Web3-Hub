@@ -53,6 +53,9 @@ export default function RequestQuotePage() {
         </form>
 
         <p className="mt-4 text-sm text-slate-600">
+          Secure payment will be arranged through Escrow.com after quote confirmation. The customer pays the final quotation amount stated in the official quote/proforma.
+        </p>
+        <p className="mt-4 text-sm text-slate-600">
           Freight and DDP door-to-door cost can change depending on destination, shipment date and customs/tax conditions.
         </p>
         <p className="mt-4 text-sm text-slate-700">
