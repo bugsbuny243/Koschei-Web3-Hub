@@ -55,7 +55,10 @@ export default async function CatalogCandidatesPage({
               <strong>Slug:</strong> {candidate.slug}
             </p>
             <p>
-              <strong>Source Page Image:</strong> {candidate.source_page_image}
+              <strong>Source Page Evidence:</strong> {candidate.source_page_image}
+            </p>
+            <p>
+              <em>Evidence-only asset for admin review. Not a public product image.</em>
             </p>
             <p>
               <strong>Status:</strong> {candidate.status}

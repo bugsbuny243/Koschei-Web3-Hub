@@ -1,0 +1,14 @@
+{
+  "pack_name": "tradepi-maosheng-source-pages-pack.zip",
+  "status": "awaiting_manual_upload",
+  "intended_extract_root": "apps/web/public/machinery/source-pages/maosheng-catalog/",
+  "usage_policy": {
+    "admin_catalog_candidates_only": true,
+    "public_product_images_allowed": false,
+    "notes": "Source-page evidence images only. Do not publish as product images."
+  },
+  "public_products_page_policy": {
+    "allowed_public_product": ["Fine Cleaner 5X-5"],
+    "catalog_candidates_public_pages_allowed": false
+  }
+}
