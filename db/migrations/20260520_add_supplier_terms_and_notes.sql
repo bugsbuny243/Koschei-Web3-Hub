@@ -1,3 +1,16 @@
+create table if not exists suppliers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  contact_name text,
+  country text,
+  is_active boolean default true,
+  created_at timestamptz default now()
+);
+
+insert into suppliers (name, contact_name, country)
+select 'Kaifeng Lecheng Machinery Co., Ltd.', 'Cathy', 'China'
+where not exists (select 1 from suppliers where name='Kaifeng Lecheng Machinery Co., Ltd.');
+
 create table if not exists supplier_terms (
   id uuid primary key default gen_random_uuid(),
   supplier_id uuid references suppliers(id),

@@ -1,3 +1,19 @@
+CREATE TABLE IF NOT EXISTS quote_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  full_name text,
+  company_name text,
+  email text,
+  phone text,
+  country text,
+  city text,
+  product_interest text,
+  required_capacity_tph text,
+  message text,
+  status text DEFAULT 'new',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
 ALTER TABLE quote_requests
   ADD COLUMN IF NOT EXISTS whatsapp text,
   ADD COLUMN IF NOT EXISTS district text,

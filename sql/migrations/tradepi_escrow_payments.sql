@@ -12,7 +12,7 @@ create table if not exists escrow_transactions (
   item_description text,
   item_category text default 'heavy_equipment_and_machinery',
   final_customer_price numeric not null,
-  escrow_fee_payer text default 'buyer',
+  escrow_fee_payer text default 'tradepi_globall',
   escrow_fee_estimate numeric,
   payment_link text,
   raw_create_payload jsonb default '{}'::jsonb,
