@@ -1,0 +1,25 @@
+[
+  {
+    "supplier": "Unknown supplier",
+    "product_slug": "fine-cleaner-5x-5",
+    "channel": "Made-in-China + WhatsApp",
+    "contact_name": "Cathy",
+    "summary": "Initial supplier discussion for Fine Cleaner 5X-5 and related configuration. Buyer asked whether the machine can process white beans, wheat, barley, alfalfa seed and cumin by changing screens. Supplier indicated grain cleaning machine can process these crops by changing screens and discussed fine cleaner configuration, control cabinet, fan, cyclone dust collection, low-speed bucket elevator, screen sets, 380V 50Hz 3 phase compatibility, and DDP/door-to-door Erzincan freight inquiry.",
+    "extracted_requirements": {
+      "target_crops": ["white bean", "wheat", "barley", "alfalfa seed", "cumin"],
+      "machine": "Fine Cleaner 5X-5",
+      "needs_control_cabinet": true,
+      "needs_fan": true,
+      "needs_cyclone": true,
+      "needs_bucket_elevator": true,
+      "bucket_elevator_note": "low-speed / anti-broken requested",
+      "screen_sets": ["wheat", "barley", "white bean"],
+      "voltage": "380V 50Hz 3 Phase",
+      "delivery_request": "DDP / door-to-door Erzincan, Turkey",
+      "freight_warning": "Freight is not fixed and must be recalculated at actual shipment date",
+      "payment_terms": "T/T 30% advance payment, 70% balance before delivery"
+    },
+    "private_note": "Internal only. Do not publish source conversation.",
+    "is_public": false
+  }
+]
