@@ -1,34 +1,41 @@
-import "./globals.css";
 import type { Metadata } from "next";
-import { Providers } from "@/components/providers";
+import "./globals.css";
+import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Koschei Web Game Factory",
-  description: "Prompt-to-playable HTML5 games with no-custody Web3-ready package generation."
+  title: "KOSCEI Dropshop",
+  description: "Modern dropshipping mağazası",
 };
+
+const navItems = [
+  { href: "/", label: "Ana Sayfa" },
+  { href: "/products", label: "Ürünler" },
+  { href: "/about", label: "Hakkımızda" },
+  { href: "/contact", label: "İletişim" },
+];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="tr">
       <body>
-        <Providers>
-          <div className="min-h-screen">
-            {children}
-            <footer className="mt-12 border-t bg-gray-50">
-              <div className="mx-auto flex max-w-6xl flex-col gap-3 p-6 text-sm text-gray-700 md:flex-row md:items-center md:justify-between">
-                <p>Voluntary support helps sustain ongoing Koschei Web3 Game Bridge development.</p>
-                <a
-                  href="https://www.shopier.com/TradeVisual/47208457"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-fit rounded border border-emerald-700 px-3 py-2 font-semibold text-emerald-700 hover:bg-emerald-100"
-                >
-                  Support with 10 TL
-                </a>
-              </div>
-            </footer>
+        <header className="site-header">
+          <div className="container header-content">
+            <Link href="/" className="brand">
+              KOSCEI DROPSHOP
+            </Link>
+            <nav className="main-nav">
+              {navItems.map((item) => (
+                <Link key={item.href} href={item.href}>
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
           </div>
-        </Providers>
+        </header>
+        <main className="container">{children}</main>
+        <footer className="site-footer">
+          <div className="container">© 2026 KOSCEI Dropshop. Tüm hakları saklıdır.</div>
+        </footer>
       </body>
     </html>
   );

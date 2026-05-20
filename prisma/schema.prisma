@@ -1,2 +1,0 @@
-// Prisma is not used in the locked MVP.
-// Database access runs through Neon SQL migrations and the pg client in apps/web.
