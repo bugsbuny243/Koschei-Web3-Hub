@@ -58,6 +58,10 @@ export default function RequestQuotePage() {
         <p className="mt-4 text-sm text-slate-700">
           TradePi Globall coordinates B2B sourcing and quotation workflow. TradePi Globall does not display fixed public prices for heavy machinery. Final price, freight, customs, taxes, payment terms and delivery terms are confirmed per official quotation / proforma invoice.
         </p>
+        <p className="mt-4 text-sm text-slate-700">
+          Secure payment will be arranged through Escrow.com after TradePi Globall confirms your quote and transaction details.
+        </p>
+
       </section>
     </div>
   );
