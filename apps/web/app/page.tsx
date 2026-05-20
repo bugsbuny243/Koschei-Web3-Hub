@@ -1,40 +1,65 @@
 import Link from "next/link";
 
 const featuredProducts = [
-  { id: 1, name: "Akıllı LED Gece Lambası", price: "₺499", badge: "Çok Satan" },
-  { id: 2, name: "Kablosuz Araç Süpürgesi", price: "₺899", badge: "Yeni" },
-  { id: 3, name: "Mini Blender Bottle", price: "₺649", badge: "Hızlı Kargo" },
+  {
+    id: 1,
+    name: "5X-5 Fine Cleaner (Amiral Gemisi Komple Sistem)",
+    partCode: "Fine Cleaner Model 5X-5",
+    badge: "RFQ Active",
+  },
+  {
+    id: 2,
+    name: "LCSX Intelligent Photoelectric Color Sorter",
+    partCode: "LCSX Cloud-Connected Sorting Series",
+    badge: "RFQ Active",
+  },
+  {
+    id: 3,
+    name: "TQSF Gravity De-Stoner",
+    partCode: "High-Capacity TQSF Series",
+    badge: "RFQ Active",
+  },
+  {
+    id: 4,
+    name: "DCS Electronic Quantitative Packing Scale",
+    partCode: "Automated DCS Filling & Stitching Station",
+    badge: "RFQ Active",
+  },
 ];
 
 export default function HomePage() {
   return (
     <div className="page-stack">
       <section className="hero">
-        <p className="eyebrow">Tek Tıkla Trend Ürünler</p>
-        <h1>Türkiye&apos;nin yeni nesil dropshipping mağazası</h1>
+        <p className="eyebrow">Industrial Machinery Catalog</p>
+        <h1>Official Product Data with Active RFQ Flow</h1>
         <p>
-          Viral ürünleri stok riski olmadan sana getiriyoruz. Güvenli ödeme, hızlı teslimat ve
-          7/24 destek ile alışveriş artık daha kolay.
+          Access exact model names, technical specifications, and part codes from official catalog
+          sources. Request For Quote (RFO) submissions are active without price or payment terms.
         </p>
         <div className="hero-actions">
           <Link href="/products" className="btn btn-primary">
-            Ürünleri Keşfet
+            View Product Data
           </Link>
           <Link href="/contact" className="btn btn-secondary">
-            Destek Al
+            Submit RFQ Request
           </Link>
         </div>
       </section>
 
       <section>
-        <h2>Öne Çıkan Ürünler</h2>
+        <h2>Catalog Models</h2>
         <div className="grid">
           {featuredProducts.map((product) => (
             <article key={product.id} className="card">
               <span className="badge">{product.badge}</span>
               <h3>{product.name}</h3>
-              <p className="price">{product.price}</p>
-              <button className="btn btn-primary">Sepete Ekle</button>
+              <p>
+                <strong>Code:</strong> {product.partCode}
+              </p>
+              <Link href="/products" className="btn btn-primary">
+                Request For Quote (RFO)
+              </Link>
             </article>
           ))}
         </div>
