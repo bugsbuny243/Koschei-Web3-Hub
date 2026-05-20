@@ -14,8 +14,8 @@ export default function ProductsPage() {
         <p className="eyebrow">Industrial Product Data</p>
         <h1>Machine Catalog (RFQ Active)</h1>
         <p>
-          Public product listing currently includes only Fine Cleaner 5X-5. Additional machinery
-          from supplier catalogues is restricted to admin review until explicitly approved.
+          Public product listing currently includes only Fine Cleaner 5X-5. Supplier catalogue source-page
+          evidence remains restricted to admin candidate review and is never published as product images.
         </p>
       </section>
       <section className="grid">
