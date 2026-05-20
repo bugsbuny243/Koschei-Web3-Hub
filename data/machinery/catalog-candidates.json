@@ -1,0 +1,68 @@
+[
+  {
+    "name": "5XT Sheller",
+    "slug": "5xt-sheller",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/5xt-sheller-tcxt-magnetic-separator.jpg",
+    "status": "draft_verified_from_catalog"
+  },
+  {
+    "name": "TCXT series permanent magnet cylinder / magnetic separator",
+    "slug": "tcxt-magnetic-separator",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/5xt-sheller-tcxt-magnetic-separator.jpg",
+    "status": "draft_verified_from_catalog"
+  },
+  {
+    "name": "5ZYB-16 Corn Peeling Machine / Corn Husker",
+    "slug": "5zyb-16-corn-peeling-machine",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/corn-husker-corn-sheller.jpg",
+    "status": "draft_verified_from_catalog"
+  },
+  {
+    "name": "7PS-750C Corn Seed Sheller and Pre-cleaner",
+    "slug": "7ps-750c-corn-seed-sheller-pre-cleaner",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/corn-husker-corn-sheller.jpg",
+    "status": "draft_verified_from_catalog"
+  },
+  {
+    "name": "T4-72 series centrifugal fan",
+    "slug": "t4-72-centrifugal-fan",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/t4-72-fan-mc-pulse-bag-filter.jpg",
+    "status": "draft_verified_from_catalog"
+  },
+  {
+    "name": "MC series pulse bag filter",
+    "slug": "mc-pulse-bag-filter",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/t4-72-fan-mc-pulse-bag-filter.jpg",
+    "status": "draft_verified_from_catalog"
+  },
+  {
+    "name": "SPS series horizontal vibration conveyor",
+    "slug": "sps-horizontal-vibration-conveyor",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/sps-conveyor-tfxh-air-sorter.jpg",
+    "status": "draft_verified_from_catalog"
+  },
+  {
+    "name": "TFXH series circulating air sorter",
+    "slug": "tfxh-circulating-air-sorter",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/sps-conveyor-tfxh-air-sorter.jpg",
+    "status": "draft_verified_from_catalog"
+  },
+  {
+    "name": "ST series bucket elevator",
+    "slug": "st-bucket-elevator",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/st-bucket-elevator-tgss-chain-conveyor.jpg",
+    "status": "draft_verified_from_catalog"
+  },
+  {
+    "name": "TGSS series scraper chain conveyor",
+    "slug": "tgss-scraper-chain-conveyor",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/st-bucket-elevator-tgss-chain-conveyor.jpg",
+    "status": "draft_verified_from_catalog"
+  },
+  {
+    "name": "5ZT series seed processing line",
+    "slug": "5zt-seed-processing-line",
+    "source_page_image": "/machinery/source-pages/maosheng-catalog/complete-seed-processing-line.jpg",
+    "status": "draft_verified_from_catalog"
+  }
+]
