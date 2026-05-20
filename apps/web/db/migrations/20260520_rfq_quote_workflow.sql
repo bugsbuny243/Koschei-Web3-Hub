@@ -104,3 +104,40 @@ CREATE TABLE IF NOT EXISTS customer_quotes (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS supplier_ddp_quotes (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  quote_request_id uuid REFERENCES quote_requests(id),
+  supplier_name text,
+  contact_name text,
+  supplier_ddp_price_usd numeric,
+  production_time_working_days integer,
+  estimated_total_delivery_min_days integer,
+  estimated_total_delivery_max_days integer,
+  insurance_scope_notes text,
+  ddp_scope_notes text,
+  required_buyer_documents text,
+  quote_valid_until date,
+  raw_supplier_message text,
+  raw_supplier_response text,
+  status text DEFAULT 'draft',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS tradepi_commissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  quote_request_id uuid REFERENCES quote_requests(id),
+  supplier_ddp_quote_id uuid REFERENCES supplier_ddp_quotes(id),
+  commission_type text DEFAULT 'fixed',
+  commission_percent numeric,
+  commission_fixed_usd numeric,
+  escrow_fee_internal_usd numeric,
+  bank_fee_internal_usd numeric,
+  operation_cost_internal_usd numeric,
+  final_customer_price_usd numeric,
+  commission_amount_usd numeric,
+  status text DEFAULT 'draft',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
