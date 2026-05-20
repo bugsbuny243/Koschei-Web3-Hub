@@ -45,7 +45,12 @@ function getPool() {
   }
 
   if (!pool) {
-    pool = new Pool({ connectionString, connectionTimeoutMillis: 5000 });
+    pool = new Pool({
+      connectionString,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 5000,
+      allowExitOnIdle: true
+    });
   }
 
   return pool;

@@ -5,5 +5,11 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   const body = await req.json();
   if (!body?.prompt) return NextResponse.json({ error: "prompt is required" }, { status: 400 });
-  return NextResponse.json({ brief: buildGameBrief(body.prompt) });
+  const brief = buildGameBrief({
+    title: body.title,
+    prompt: body.prompt,
+    genre: body.genre,
+    style: body.style
+  });
+  return NextResponse.json({ ok: true, brief });
 }

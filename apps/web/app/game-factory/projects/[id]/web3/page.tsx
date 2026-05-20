@@ -25,7 +25,6 @@ type PageProps = {
 export default async function Web3PackagePage({ params }: PageProps) {
   const { id } = await params;
   const project = await gameFactoryDb.getProject(id);
-  console.error("[web3-package-page]", { id, found: Boolean(project) });
 
   if (!project) {
     return (
