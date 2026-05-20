@@ -1,0 +1,1 @@
+export default function Contact(){return <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6"><h1 className="text-3xl font-bold">Contact</h1><p className="mt-3">For machinery sourcing and quotation requests, please use the RFQ form so technical and logistics details can be reviewed accurately.</p></main>}

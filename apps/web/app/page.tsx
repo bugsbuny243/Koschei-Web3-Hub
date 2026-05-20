@@ -1,39 +1,29 @@
 import Link from "next/link";
-import { SupportCta } from "@/components/support-cta";
-import { gameFactorySafetyCopy } from "@/lib/game-factory";
 
 export default function Home() {
-  return <main className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6">
-    <section className="rounded-xl border bg-gradient-to-r from-cyan-50 to-emerald-50 p-5 sm:p-6">
-      <h1 className="text-3xl font-bold sm:text-4xl">Koschei Web Game Factory + Web3 Bridge</h1>
-      <p className="mt-3 text-base text-gray-700">Prompt → playable HTML5 game → live preview → Web3-ready package.</p>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <Link className="rounded bg-black px-4 py-3 text-sm font-semibold text-white" href="/game-factory/new">Create Game</Link>
-        <Link className="rounded border px-4 py-3 text-sm font-semibold" href="/web3/game-bridge">View Web3 Bridge</Link>
-        <a className="rounded border border-emerald-700 px-4 py-3 text-sm font-semibold text-emerald-700" href="https://www.shopier.com/TradeVisual/47208457" target="_blank" rel="noopener noreferrer">Support with 10 TL</a>
+  return <main className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
+    <section className="rounded-xl border bg-white p-6">
+      <h1 className="text-3xl font-bold">Grain Processing & Seed Cleaning Machinery from China to Global Buyers</h1>
+      <p className="mt-3 text-slate-700">TradePi Globall Machinery is a B2B sourcing, dropshipping, and RFQ coordination platform for industrial machinery.</p>
+      <div className="mt-5 flex gap-3">
+        <Link href="/request-quote" className="rounded bg-slate-900 px-4 py-2 text-white">Request a Quote</Link>
+        <Link href="/products" className="rounded border px-4 py-2">View Products</Link>
       </div>
     </section>
-
-    <section className="rounded-xl border p-5 sm:p-6">
-      <h2 className="text-xl font-semibold">What it does</h2>
-      <p className="mt-2 text-gray-700">Koschei Web Game Factory turns plain-language prompts into a playable browser demo and prepares a Web3-ready package for downstream developer workflows.</p>
+    <section className="grid gap-4 rounded-xl border bg-white p-6 md:grid-cols-2">
+      <div>
+        <h2 className="text-xl font-semibold">Why buyers choose this network</h2>
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-slate-700">
+          <li>Manufacturer catalogue history since 1976.</li>
+          <li>Grain cleaning and seed cleaning machinery.</li>
+          <li>Flour mill and storage/silo equipment.</li>
+          <li>Export-oriented machinery categories.</li>
+        </ul>
+      </div>
+      <div className="rounded border bg-amber-50 p-4 text-sm text-slate-700">
+        <h3 className="font-semibold">Safety & commercial note</h3>
+        <p className="mt-2">TradePi Globall coordinates buyer inquiries, supplier quotation, documentation and dropshipping workflow. Final technical confirmation, freight, customs, taxes and delivery terms are quote-based and validated per destination/date.</p>
+      </div>
     </section>
-
-    <section className="rounded-xl border p-5 sm:p-6">
-      <h2 className="text-xl font-semibold">How it works</h2>
-      <ol className="mt-2 ml-5 list-decimal space-y-2 text-gray-700">
-        <li>Enter a game prompt in Koschei Web Game Factory.</li>
-        <li>Generate an HTML5 demo and review the live preview.</li>
-        <li>Generate the Web3-ready package with item schemas and NFT metadata.</li>
-        <li>Export artifacts for your own integration workflow.</li>
-      </ol>
-    </section>
-
-    <section className="rounded bg-amber-100 p-4 text-sm">
-      <h2 className="mb-1 text-base font-semibold">MVP safety boundary</h2>
-      <p>{gameFactorySafetyCopy}</p>
-    </section>
-
-    <SupportCta />
   </main>;
 }
