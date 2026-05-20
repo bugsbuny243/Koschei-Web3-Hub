@@ -26,7 +26,7 @@ export default function ProductsPage() {
               <strong>Exact Part & Model Code:</strong> {product.partCode}
             </p>
             <p>{product.description}</p>
-            <button className="btn btn-primary">Request For Quote (RFO)</button>
+            <a className="btn btn-primary" href="/request-quote">Request Quote</a>
           </article>
         ))}
       </section>
