@@ -1,1 +1,0 @@
--- Initial migration placeholder. Run `npm run prisma:migrate` to generate SQL for your environment.
