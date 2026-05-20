@@ -1,15 +1,20 @@
+import Link from "next/link";
+
 export default function ContactPage() {
   return (
-    <div className="page-stack">
-      <section>
-        <p className="eyebrow">İletişim</p>
-        <h1>Bizimle iletişime geç</h1>
-        <p>Sipariş, iade veya iş birliği için aşağıdaki kanallardan ulaşabilirsin.</p>
-      </section>
+    <div className="container page-stack">
       <section className="card">
-        <p><strong>E-posta:</strong> destek@kosceidropshop.com</p>
-        <p><strong>WhatsApp:</strong> +90 555 000 00 00</p>
-        <p><strong>Çalışma saatleri:</strong> 09:00 - 22:00</p>
+        <p className="eyebrow">İletişim</p>
+        <h1>Machinery RFQ Communication</h1>
+        <p>For machinery requests, use the RFQ form.</p>
+        <div className="hero-actions">
+          <Link href="/request-quote" className="btn btn-primary">
+            Teklif Formu Aç
+          </Link>
+        </div>
+        <p className="muted-note">
+          Direct contact details are confirmed during the official quotation process.
+        </p>
       </section>
     </div>
   );

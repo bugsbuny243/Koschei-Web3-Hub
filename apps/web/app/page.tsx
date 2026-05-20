@@ -1,22 +1,80 @@
+import Link from "next/link";
+
+const workflowSteps = [
+  "Customer submits crop, location, capacity and delivery requirements.",
+  "TradePi Globall reviews the technical and commercial request.",
+  "Supplier-side machine configuration and landed cost are calculated internally.",
+  "TradePi Globall prepares one final customer quotation.",
+  "Payment workflow can be arranged after quote approval.",
+];
+
 export default function HomePage() {
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10 md:px-8">
-      <section className="rounded-2xl bg-slate-900 p-8 text-white md:p-12">
-        <p className="text-sm uppercase tracking-[0.2em] text-sky-300">TradePi Globall Machinery</p>
-        <h1 className="mt-3 text-3xl font-bold md:text-5xl">Quote-based B2B Machinery Supply</h1>
-        <p className="mt-5 max-w-3xl text-slate-200">
-          Current verified public product: Fine Cleaner 5X-5. Public listing is quote-based only.
+    <div className="container page-stack">
+      <section className="hero">
+        <p className="eyebrow">TradePi Globall Machinery</p>
+        <h1>Agricultural Machinery Supply, Quotation &amp; Logistics Coordination</h1>
+        <p>
+          TradePi Globall coordinates quote-based B2B sourcing for agricultural processing
+          machinery. Final configuration, freight, customs, taxes, delivery terms and payment
+          terms are confirmed only through RFQ review and official proforma invoice.
         </p>
-        <div className="mt-6 flex gap-3">
-          <a href="/products" className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900">Request Quote</a>
-          <a href="/request-quote" className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-white">Quote-based</a>
+        <div className="hero-actions">
+          <Link href="/request-quote" className="btn btn-primary">
+            Teklif Al
+          </Link>
+          <Link href="/products/fine-cleaner-5x-5" className="btn btn-secondary">
+            Fine Cleaner 5X-5 İncele
+          </Link>
         </div>
+        <ul className="trust-list">
+          <li>Quote-based B2B workflow</li>
+          <li>No public fixed pricing</li>
+          <li>Supplier-backed configuration review</li>
+          <li>Escrow-ready payment workflow after quote approval</li>
+        </ul>
       </section>
 
-      <section className="mt-10 rounded-2xl border border-slate-200 bg-white p-6">
-        <h2 className="text-2xl font-semibold text-slate-900">Public pricing rule</h2>
-        <p className="mt-3 text-slate-700">Final price confirmed per official proforma invoice.</p>
+      <section className="card">
+        <h2>No Public Price Listing</h2>
+        <p>
+          Heavy machinery pricing depends on machine configuration, crop type, capacity
+          requirement, spare screen sets, delivery location, trade term, freight, customs, taxes
+          and shipment date. TradePi Globall does not display fixed public prices. Final price is
+          confirmed by official quotation/proforma invoice only.
+        </p>
       </section>
-    </main>
+
+      <section className="card">
+        <h2>Current Verified Public Product</h2>
+        <h3>Fine Cleaner 5X-5</h3>
+        <p>
+          Fine Cleaner 5X-5 is the current verified product prepared for public RFQ listing.
+          Configuration can include control cabinet, fan, cyclone dust collection, low-speed bucket
+          elevator and crop-specific screen sets, subject to supplier confirmation.
+        </p>
+        <Link href="/request-quote" className="btn btn-primary">
+          Request Quote
+        </Link>
+      </section>
+
+      <section className="card">
+        <h2>How the RFQ Workflow Works</h2>
+        <ol className="step-list">
+          {workflowSteps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="card">
+        <h2>Transparent Scope, Private Costing</h2>
+        <p>
+          Supplier cost, logistics cost breakdown, TradePi margin, Escrow.com fees and internal
+          operating costs are not displayed publicly. Customers receive only the final official
+          quotation amount and terms.
+        </p>
+      </section>
+    </div>
   );
 }

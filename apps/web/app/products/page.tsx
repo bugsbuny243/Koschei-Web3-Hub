@@ -1,33 +1,33 @@
-const products = [
-  {
-    name: "Fine Cleaner 5X-5",
-    slug: "fine-cleaner-5x-5",
-    description:
-      "Current verified public product listing. Supply is managed via quote-based B2B workflow and final terms are confirmed per official quotation / proforma invoice.",
-  },
-];
+import Link from "next/link";
 
 export default function ProductsPage() {
   return (
-    <div className="page-stack">
-      <section>
-        <p className="eyebrow">Industrial Product Data</p>
-        <h1>Machine Catalog (Quote-based)</h1>
-        <p>Final price confirmed per official proforma invoice.</p>
+    <div className="container page-stack">
+      <section className="card">
+        <p className="eyebrow">Ürünler</p>
+        <h1>Current Verified Public Product</h1>
+        <p>
+          TradePi Globall publishes only verified machinery suitable for quote-based RFQ workflow.
+        </p>
       </section>
 
-      <section className="grid">
-        {products.map((product) => (
-          <article key={product.name} className="card">
-            <h3>{product.name}</h3>
-            <p>{product.description}</p>
-            <p>
-              <strong>Pricing:</strong> Quote-based
-            </p>
-            <p>{product.description}</p>
-            <a className="btn btn-primary" href="/request-quote">Request Quote</a>
-          </article>
-        ))}
+      <section className="grid single-grid">
+        <article className="card product-card">
+          <span className="badge">Quote-based</span>
+          <h2>Fine Cleaner 5X-5</h2>
+          <p>
+            Current verified public machinery listing for agricultural processing applications.
+            Configuration details are finalized through supplier-backed RFQ review.
+          </p>
+          <div className="hero-actions">
+            <Link className="btn btn-secondary" href="/products/fine-cleaner-5x-5">
+              Ürünü İncele
+            </Link>
+            <Link className="btn btn-primary" href="/request-quote">
+              Teklif Al
+            </Link>
+          </div>
+        </article>
       </section>
     </div>
   );
