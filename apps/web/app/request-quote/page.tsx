@@ -71,8 +71,9 @@ export default function RequestQuotePage() {
         </div>
 
         <p className="muted-note">
-          Final price is not calculated automatically. TradePi Globall reviews the request and
-          prepares an official quotation/proforma after supplier-side cost and logistics evaluation.
+          AI supports RFQ completeness checks and supplier-message drafting only. AI does not set
+          price, guarantee delivery, or decide DDP responsibility. Final terms come only from the
+          supplier’s official written quotation/proforma.
         </p>
 
         <button className="btn btn-primary" type="submit">

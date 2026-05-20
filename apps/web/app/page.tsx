@@ -2,9 +2,10 @@ import Link from "next/link";
 
 const workflowSteps = [
   "Customer submits crop, location, capacity and delivery requirements.",
-  "TradePi Globall reviews the technical and commercial request.",
-  "Supplier-side machine configuration and landed cost are calculated internally.",
-  "TradePi Globall prepares one final customer quotation.",
+  "TradePi Globall validates RFQ details and detects missing importer/company information.",
+  "TradePi Globall drafts supplier-ready English inquiry for Cathy and receives supplier DDP proforma terms.",
+  "TradePi Globall records supplier-confirmed DDP quote and applies internal commission workflow.",
+  "TradePi Globall prepares one final customer quotation after admin approval.",
   "Payment workflow can be arranged after quote approval.",
 ];
 
@@ -13,11 +14,11 @@ export default function HomePage() {
     <div className="container page-stack">
       <section className="hero">
         <p className="eyebrow">TradePi Globall Machinery</p>
-        <h1>Agricultural Machinery Supply, Quotation &amp; Logistics Coordination</h1>
+        <h1>Commission-Based RFQ Brokerage for Agricultural Machinery</h1>
         <p>
-          TradePi Globall coordinates quote-based B2B sourcing for agricultural processing
-          machinery. Final configuration, freight, customs, taxes, delivery terms and payment
-          terms are confirmed only through RFQ review and official proforma invoice.
+          TradePi Globall is a quote-based B2B RFQ and secure payment coordination platform for
+          agricultural machinery. TradePi does not manufacture, ship, insure, clear customs, or
+          guarantee supplier delivery.
         </p>
         <div className="hero-actions">
           <Link href="/request-quote" className="btn btn-primary">
@@ -70,9 +71,9 @@ export default function HomePage() {
       <section className="card">
         <h2>Transparent Scope, Private Costing</h2>
         <p>
-          Supplier cost, logistics cost breakdown, TradePi margin, Escrow.com fees and internal
-          operating costs are not displayed publicly. Customers receive only the final official
-          quotation amount and terms.
+          Supplier raw DDP cost, TradePi commission and internal cost breakdown are not displayed
+          publicly. Customers receive only the final official quotation amount and supplier-
+          confirmed delivery/payment scope.
         </p>
       </section>
     </div>

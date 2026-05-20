@@ -5,10 +5,10 @@ export default function AboutPage() {
         <p className="eyebrow">Hakkımızda</p>
         <h1>TradePi Globall Machinery</h1>
         <p>
-          TradePi Globall Machinery is building a quote-based B2B sourcing and quotation workflow
-          for agricultural processing machinery. The platform collects buyer requirements,
-          coordinates supplier-side cost/configuration review and prepares official customer
-          quotations.
+          TradePi Globall Machinery operates as a commission-based RFQ brokerage workflow for
+          agricultural processing machinery. The platform collects buyer requirements, prepares
+          supplier-ready RFQ messages, coordinates secure payment workflow, and prepares official
+          customer-facing offers after supplier confirmation.
         </p>
       </section>
 
@@ -17,8 +17,8 @@ export default function AboutPage() {
         <ul className="check-list">
           <li>RFQ-first workflow</li>
           <li>No public fixed pricing</li>
-          <li>Supplier-backed configuration review</li>
-          <li>Logistics/customs/delivery cost evaluation</li>
+          <li>Supplier-backed configuration and DDP confirmation</li>
+          <li>Commission-based brokerage (not margin-based resale)</li>
           <li>Escrow-ready secure payment workflow after quote approval</li>
         </ul>
       </section>
