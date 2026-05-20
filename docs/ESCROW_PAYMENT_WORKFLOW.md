@@ -1,33 +1,25 @@
-# Escrow Payment Workflow (TradePi Globall Machinery)
+# Escrow Payment Workflow
 
-- Escrow.com is used only **after** customer quote approval.
-- No public checkout is enabled.
-- No public prices are displayed for machinery pages.
-- Customer pays Escrow.com via an admin-created transaction.
-- Supplier payments are tracked manually as T/T 30% advance and 70% balance before delivery.
-- Webhook notifications are never trusted alone; API fetch verification is required before final status update.
-- Sandbox first, production only after real account and key verification.
-- Escrow fees must be included in customer quote calculation or explicitly assigned to buyer/seller.
+## Policy
 
-## Required environment variables
+Escrow.com fees are treated as TradePi Globall internal operating costs. They are included in internal quote calculation and are not displayed as separate charges to the customer or supplier.
 
-```env
-ESCROW_ENV=sandbox
-ESCROW_API_BASE_URL=https://api.escrow-sandbox.com/2017-09-01
-ESCROW_EMAIL=
-ESCROW_API_KEY=
-ESCROW_WEBHOOK_TOKEN=
-ESCROW_DEFAULT_SELLER_EMAIL=
-ESCROW_DEFAULT_CURRENCY=usd
-```
+## Quote model
 
-Production later:
+Internal calculation model:
 
-```env
-ESCROW_ENV=production
-ESCROW_API_BASE_URL=https://api.escrow.com/2017-09-01
-```
+- supplier landed cost
+- + escrow fee paid by TradePi Globall
+- + bank/wire/operation costs paid by TradePi Globall
+- + TradePi Globall markup/profit
+- = final customer quote
 
-## Railway setup
+Public customer quote remains one final price only.
 
-Set all variables in Railway service environment. Keep `ESCROW_API_KEY` server-only and never expose it to client bundles.
+## Escrow transaction creation
+
+- Fee payer defaults to `tradepi_globall` in internal records.
+- Buyer-pays-fee and seller-pays-fee options must not be exposed on public pages.
+- If Escrow API requires fee payer party details, the decision must remain in server/admin logic only.
+- Supplier payment tracking remains separate (`T/T 30% advance`, `T/T 70% balance before delivery`).
+- Escrow fee must not reduce supplier payment amounts.
