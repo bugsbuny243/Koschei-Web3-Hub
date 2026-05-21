@@ -7,7 +7,9 @@
     "source_pdf_page": "英文宣传册.pdf (Fine Cleaner page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "TQSF(B) Gravity De-stoner",
@@ -17,7 +19,9 @@
     "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5X Air Screen Cleaner",
@@ -27,7 +31,9 @@
     "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "TQLZ Vibration Cleaner",
@@ -37,7 +43,9 @@
     "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "Rotary Vibrating Cleaner",
@@ -47,7 +55,9 @@
     "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "HZZD Large Volume Air Screener",
@@ -57,7 +67,9 @@
     "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "HZZP series cleaner",
@@ -67,7 +79,9 @@
     "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5XZ Gravity Separator",
@@ -77,7 +91,9 @@
     "source_pdf_page": "英文宣传册.pdf (separator section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5XW Indented Cylinder",
@@ -87,7 +103,9 @@
     "source_pdf_page": "英文宣传册.pdf (separator section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "Gravity Grain Separator",
@@ -97,7 +115,9 @@
     "source_pdf_page": "英文宣传册.pdf (separator section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5XDC Belt Separator",
@@ -107,7 +127,9 @@
     "source_pdf_page": "英文宣传册.pdf (separator section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "LCSX Color Sorter",
@@ -117,7 +139,9 @@
     "source_pdf_page": "英文宣传册.pdf (sorting section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5XFZ-10 Compound Cleaner",
@@ -127,7 +151,9 @@
     "source_pdf_page": "英文宣传册.pdf (compound cleaner section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5XP Flat Grading Machine",
@@ -137,7 +163,9 @@
     "source_pdf_page": "英文宣传册.pdf (grading section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "LCPF Rotary Grading Machine",
@@ -147,7 +175,9 @@
     "source_pdf_page": "英文宣传册.pdf (grading section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "TQLMZA Rotary Grader",
@@ -157,7 +187,9 @@
     "source_pdf_page": "英文宣传册.pdf (grading section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5BG Seed Coating Machine",
@@ -167,7 +199,9 @@
     "source_pdf_page": "英文宣传册.pdf (coating section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5BY100-10P Batch Coating Machine",
@@ -177,7 +211,9 @@
     "source_pdf_page": "英文宣传册.pdf (coating section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5BH-5 Dryer After Coating",
@@ -187,7 +223,9 @@
     "source_pdf_page": "英文宣传册.pdf (coating/drying section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "Grain Steel Plate Silo",
@@ -197,7 +235,9 @@
     "source_pdf_page": "英文宣传册.pdf (storage section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "DCS Electronic Packing Scale",
@@ -207,7 +247,9 @@
     "source_pdf_page": "英文宣传册.pdf (packing section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "TDTM-W Anti-crushing Elevator",
@@ -217,7 +259,9 @@
     "source_pdf_page": "英文宣传册.pdf (elevator/conveyor section)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "ST Bucket Elevator",
@@ -227,7 +271,9 @@
     "source_pdf_page": "英文宣传册.pdf (st-bucket-elevator-tgss-chain-conveyor page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "TGSS Scraper Chain Conveyor",
@@ -237,7 +283,9 @@
     "source_pdf_page": "英文宣传册.pdf (st-bucket-elevator-tgss-chain-conveyor page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "SPS Horizontal Vibration Conveyor",
@@ -247,7 +295,9 @@
     "source_pdf_page": "英文宣传册.pdf (sps-conveyor-tfxh-air-sorter page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "TFXH Circulating Air Sorter",
@@ -257,7 +307,9 @@
     "source_pdf_page": "英文宣传册.pdf (sps-conveyor-tfxh-air-sorter page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "T4-72 Centrifugal Fan",
@@ -267,7 +319,9 @@
     "source_pdf_page": "英文宣传册.pdf (t4-72-fan-mc-pulse-bag-filter page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "MC Series Pulse Bag Filter",
@@ -277,7 +331,9 @@
     "source_pdf_page": "英文宣传册.pdf (t4-72-fan-mc-pulse-bag-filter page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5ZYB-16 Corn Peeling Machine / Corn Husker",
@@ -287,7 +343,9 @@
     "source_pdf_page": "英文宣传册.pdf (corn-husker-corn-sheller page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "7PS-750C Corn Seed Sheller and Pre-cleaner",
@@ -297,7 +355,9 @@
     "source_pdf_page": "英文宣传册.pdf (corn-husker-corn-sheller page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5XT Sheller",
@@ -307,7 +367,9 @@
     "source_pdf_page": "英文宣传册.pdf (5xt-sheller-tcxt-magnetic-separator page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "TCXT Permanent Magnet Cylinder / Magnetic Separator",
@@ -317,7 +379,9 @@
     "source_pdf_page": "英文宣传册.pdf (5xt-sheller-tcxt-magnetic-separator page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   },
   {
     "name": "5ZT Seed Processing Line",
@@ -327,6 +391,8 @@
     "source_pdf_page": "英文宣传册.pdf (complete-seed-processing-line page)",
     "status": "supplier_catalog_verified",
     "quote_based": true,
-    "public_pricing": false
+    "public_pricing": false,
+    "image_path": null,
+    "image_status": "pending_extraction"
   }
 ]
