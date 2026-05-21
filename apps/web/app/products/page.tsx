@@ -2,9 +2,11 @@ import Link from "next/link";
 import { getAllMachineryProducts } from "@/lib/machinery-catalog";
 import { machineryVideos } from "@/lib/machinery-media";
 import { MachineryImage } from "./machinery-image";
+import { getPrimaryMediaMap } from "@/lib/product-media";
 
-export default function ProductsPage() {
+export default async function ProductsPage() {
   const products = getAllMachineryProducts();
+  const mediaMap = await getPrimaryMediaMap(products.map((p) => p.slug));
 
   return (
     <div className="container page-stack">
@@ -44,8 +46,8 @@ export default function ProductsPage() {
           <article className="card product-card" key={product.slug}>
             <div className="card" style={{ marginBottom: "1rem", background: "#f8fafc" }}>
               <MachineryImage
-                imagePath={product.image_path}
-                imageStatus={product.image_status}
+                imagePath={mediaMap.get(product.slug) ?? null}
+                imageStatus={mediaMap.get(product.slug) ? "ready" : "pending_extraction"}
                 productName={product.name}
                 width={1200}
                 height={1600}
