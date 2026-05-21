@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { calculateFinalQuote, isOwnerRequest, parseNumber } from "@/lib/owner-command-center";
+import { calculateFinalQuote, parseNumber } from "@/lib/owner-command-center";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  if (!isOwnerRequest(body.password ?? null)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isOwnerAuthenticated(body.password ?? null))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const result = calculateFinalQuote({
     supplier_machine_cost: parseNumber(body.supplier_machine_cost),
     supplier_ddp_total_cost: parseNumber(body.supplier_ddp_total_cost),

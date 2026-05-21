@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
-import { isOwnerRequest } from "@/lib/owner-command-center";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 import { uploadProductImage } from "@/lib/media/cloudinary";
 
 export async function POST(req: Request) {
   const form = await req.formData();
   const password = String(form.get("password") ?? "");
-  if (!isOwnerRequest(password)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isOwnerAuthenticated(password))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (process.env.MEDIA_PROVIDER !== "cloudinary") return NextResponse.json({ error: "MEDIA_PROVIDER must be cloudinary" }, { status: 400 });
 
   const productSlug = String(form.get("product_slug") ?? "").trim();

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createEscrowTransaction } from "@/lib/escrow-client";
 import { getDbPool } from "@/lib/db";
-import { appendMilestone, isOwnerRequest } from "@/lib/owner-command-center";
+import { appendMilestone } from "@/lib/owner-command-center";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  if (!isOwnerRequest(body.password ?? null)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isOwnerAuthenticated(body.password ?? null))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const quoteRequestId = String(body.quote_request_id || "");
   const pool = getDbPool();
   if (!pool || !quoteRequestId) return NextResponse.json({ error: "missing quote_request_id" }, { status: 400 });

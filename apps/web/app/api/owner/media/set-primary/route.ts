@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
-import { isOwnerRequest } from "@/lib/owner-command-center";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 
 export async function POST(req: Request) {
   const body = await req.json();
-  if (!isOwnerRequest(String(body.password ?? ""))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isOwnerAuthenticated(String(body.password ?? "")))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const mediaId = String(body.media_id ?? "");
   if (!mediaId) return NextResponse.json({ error: "missing media_id" }, { status: 400 });
 

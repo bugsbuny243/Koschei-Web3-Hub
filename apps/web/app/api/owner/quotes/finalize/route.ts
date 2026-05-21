@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
-import { appendMilestone, calculateFinalQuote, isOwnerRequest, parseNumber } from "@/lib/owner-command-center";
+import { appendMilestone, calculateFinalQuote, parseNumber } from "@/lib/owner-command-center";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  if (!isOwnerRequest(body.password ?? null)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isOwnerAuthenticated(body.password ?? null))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const pool = getDbPool();
   const quoteRequestId = String(body.quote_request_id || "");
   if (!pool || !quoteRequestId) return NextResponse.json({ error: "missing quote_request_id" }, { status: 400 });
