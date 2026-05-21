@@ -1,7 +1,7 @@
-import Image from "next/image";
 import Link from "next/link";
 import { getAllMachineryProducts } from "@/lib/machinery-catalog";
 import { machineryVideos } from "@/lib/machinery-media";
+import { MachineryImage } from "./machinery-image";
 
 export default function ProductsPage() {
   const products = getAllMachineryProducts();
@@ -43,17 +43,13 @@ export default function ProductsPage() {
         {products.map((product) => (
           <article className="card product-card" key={product.slug}>
             <div className="card" style={{ marginBottom: "1rem", background: "#f8fafc" }}>
-              {product.image_path ? (
-                <Image
-                  src={product.image_path}
-                  alt={`${product.name} catalog page`}
-                  width={1200}
-                  height={1600}
-                  style={{ width: "100%", height: "auto", borderRadius: "0.5rem" }}
-                />
-              ) : (
-                <p style={{ margin: 0, color: "#64748b" }}>Catalog image pending extraction</p>
-              )}
+              <MachineryImage
+                imagePath={product.image_path}
+                productName={product.name}
+                width={1200}
+                height={1600}
+                style={{ width: "100%", height: "auto", borderRadius: "0.5rem" }}
+              />
             </div>
             <span className="badge">Quote-based</span>
             <p className="eyebrow">{product.category}</p>

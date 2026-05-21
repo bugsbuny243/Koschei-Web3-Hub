@@ -1,8 +1,8 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMachineryProductBySlug } from "@/lib/machinery-catalog";
 import { machineryVideos } from "@/lib/machinery-media";
+import { MachineryImage } from "./machinery-image";
 
 export function MachineryProductDetail({
   slug,
@@ -20,15 +20,13 @@ export function MachineryProductDetail({
   return (
     <div className="container page-stack">
       <section className="card">
-        {product.image_path ? (
-          <Image
-            src={product.image_path}
-            alt={`${product.name} catalog page`}
-            width={1600}
-            height={2200}
-            style={{ width: "100%", height: "auto", marginBottom: "1rem", borderRadius: "0.5rem" }}
-          />
-        ) : null}
+        <MachineryImage
+          imagePath={product.image_path}
+          productName={product.name}
+          width={1600}
+          height={2200}
+          style={{ width: "100%", height: "auto", marginBottom: "1rem", borderRadius: "0.5rem" }}
+        />
         <p className="eyebrow">Product Detail</p>
         <h1>{product.name}</h1>
         <p>{product.short_description}</p>
