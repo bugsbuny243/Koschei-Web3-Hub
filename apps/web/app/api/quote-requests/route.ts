@@ -122,5 +122,5 @@ export async function POST(req: Request) {
     ],
   );
 
-  return NextResponse.redirect(new URL("/request-quote/thank-you", req.url));
+  return NextResponse.redirect(new URL("/request-quote/thank-you", req.url), { status: 303 });
 }

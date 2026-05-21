@@ -36,6 +36,9 @@ export type QuoteRequestFormInput = {
 };
 
 const REQUIRED_COMPANY_INFO_FIELDS: Array<keyof QuoteRequestFormInput> = [
+  "full_name",
+  "email",
+  "phone",
   "company_name",
   "company_registration_status",
   "tax_number",
