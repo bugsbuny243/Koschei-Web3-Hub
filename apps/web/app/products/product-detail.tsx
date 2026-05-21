@@ -2,8 +2,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMachineryProductBySlug } from "@/lib/machinery-catalog";
+import { machineryVideos } from "@/lib/machinery-media";
 
-export function MachineryProductDetail({ slug }: { slug: string }) {
+export function MachineryProductDetail({
+  slug,
+  videoSectionTitle = "Product Videos",
+}: {
+  slug: string;
+  videoSectionTitle?: string;
+}) {
   const product = getMachineryProductBySlug(slug);
 
   if (!product) {
@@ -53,6 +60,27 @@ export function MachineryProductDetail({ slug }: { slug: string }) {
           Teklif Al (RFQ)
         </Link>
       </section>
+
+      <section className="card">
+        <h2>{videoSectionTitle}</h2>
+        <div className="video-grid">
+          {machineryVideos.map((video) => (
+            <article className="video-card" key={video.id}>
+              <div className="video-frame">
+                <iframe
+                  src={video.embedUrl}
+                  title={video.title}
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+              <p>{video.title}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
       {product.source_pdf_page ? (
         <section className="card">
           <h2>Source Catalog Reference</h2>
