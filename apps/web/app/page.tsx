@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAllMachineryProducts, getFeaturedMachineryProduct } from "@/lib/machinery-catalog";
+import { machineryVideos } from "@/lib/machinery-media";
 
 const workflowSteps = [
   "Customer submits crop, location, capacity and delivery requirements.",
@@ -67,6 +68,27 @@ export default function HomePage() {
           <Link href="/products" className="btn btn-primary">
             Tüm Kataloğu Gör
           </Link>
+        </div>
+      </section>
+
+
+      <section className="card">
+        <h2>Machinery Videos</h2>
+        <div className="video-grid">
+          {machineryVideos.map((video) => (
+            <article className="video-card" key={video.id}>
+              <div className="video-frame">
+                <iframe
+                  src={video.embedUrl}
+                  title={video.title}
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+              <p>{video.title}</p>
+            </article>
+          ))}
         </div>
       </section>
 

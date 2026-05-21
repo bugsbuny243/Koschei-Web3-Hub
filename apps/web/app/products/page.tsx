@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getAllMachineryProducts } from "@/lib/machinery-catalog";
+import { machineryVideos } from "@/lib/machinery-media";
 
 export default function ProductsPage() {
   const products = getAllMachineryProducts();
@@ -14,6 +15,28 @@ export default function ProductsPage() {
           Real supplier-catalog machinery candidates are listed below for quote-based RFQ workflow.
           Final configuration and commercial terms require supplier confirmation.
         </p>
+      </section>
+
+
+      <section className="card">
+        <h2>Machinery Videos</h2>
+        <p>Preview real TradePi Globall machinery videos before reviewing full catalog entries.</p>
+        <div className="video-grid">
+          {machineryVideos.map((video) => (
+            <article className="video-card" key={video.id}>
+              <div className="video-frame">
+                <iframe
+                  src={video.embedUrl}
+                  title={video.title}
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                />
+              </div>
+              <p>{video.title}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="grid product-grid">
