@@ -1,68 +1,332 @@
 [
   {
-    "name": "5XT Sheller",
-    "slug": "5xt-sheller",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/5xt-sheller-tcxt-magnetic-separator.jpg",
-    "status": "draft_verified_from_catalog"
+    "name": "Fine Cleaner 5X-5",
+    "slug": "fine-cleaner-5x-5",
+    "category": "Cleaning",
+    "short_description": "Air-screen based fine cleaning machine for grain and seed pre/post cleaning in RFQ-based projects.",
+    "source_pdf_page": "英文宣传册.pdf (Fine Cleaner page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
   },
   {
-    "name": "TCXT series permanent magnet cylinder / magnetic separator",
-    "slug": "tcxt-magnetic-separator",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/5xt-sheller-tcxt-magnetic-separator.jpg",
-    "status": "draft_verified_from_catalog"
+    "name": "TQSF(B) Gravity De-stoner",
+    "slug": "tqsfb-gravity-de-stoner",
+    "category": "Cleaning",
+    "short_description": "Gravity type de-stoner for removing heavy impurities from grain streams.",
+    "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "5X Air Screen Cleaner",
+    "slug": "5x-air-screen-cleaner",
+    "category": "Cleaning",
+    "short_description": "Air-screen cleaner for primary impurity removal across seed and grain applications.",
+    "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "TQLZ Vibration Cleaner",
+    "slug": "tqlz-vibration-cleaner",
+    "category": "Cleaning",
+    "short_description": "Vibratory cleaning unit for separating oversized and undersized contaminants.",
+    "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "Rotary Vibrating Cleaner",
+    "slug": "rotary-vibrating-cleaner",
+    "category": "Cleaning",
+    "short_description": "Rotary vibrating cleaner for continuous pre-cleaning in seed processing lines.",
+    "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "HZZD Large Volume Air Screener",
+    "slug": "hzzd-large-volume-air-screener",
+    "category": "Cleaning",
+    "short_description": "High-throughput air screener for large volume grain cleaning operations.",
+    "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "HZZP series cleaner",
+    "slug": "hzzp-series-cleaner",
+    "category": "Cleaning",
+    "short_description": "HZZP series cleaning equipment used for impurity reduction before grading/sorting.",
+    "source_pdf_page": "英文宣传册.pdf (cleaning equipment section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "5XZ Gravity Separator",
+    "slug": "5xz-gravity-separator",
+    "category": "Separation",
+    "short_description": "Specific gravity separator for seed quality upgrading and density-based separation.",
+    "source_pdf_page": "英文宣传册.pdf (separator section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "5XW Indented Cylinder",
+    "slug": "5xw-indented-cylinder",
+    "category": "Separation",
+    "short_description": "Indented cylinder separator for length-based seed and grain separation.",
+    "source_pdf_page": "英文宣传册.pdf (separator section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "Gravity Grain Separator",
+    "slug": "gravity-grain-separator",
+    "category": "Separation",
+    "short_description": "Gravity-driven grain separator for differentiating materials by density characteristics.",
+    "source_pdf_page": "英文宣传册.pdf (separator section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "5XDC Belt Separator",
+    "slug": "5xdc-belt-separator",
+    "category": "Separation",
+    "short_description": "Belt-type separator used for precision separation in seed improvement processes.",
+    "source_pdf_page": "英文宣传册.pdf (separator section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "LCSX Color Sorter",
+    "slug": "lcsx-color-sorter",
+    "category": "Sorting",
+    "short_description": "Optical color sorter for defect rejection and quality sorting.",
+    "source_pdf_page": "英文宣传册.pdf (sorting section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "5XFZ-10 Compound Cleaner",
+    "slug": "5xfz-10-compound-cleaner",
+    "category": "Cleaning",
+    "short_description": "Compound cleaner integrating multiple cleaning stages in one processing workflow.",
+    "source_pdf_page": "英文宣传册.pdf (compound cleaner section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "5XP Flat Grading Machine",
+    "slug": "5xp-flat-grading-machine",
+    "category": "Grading",
+    "short_description": "Flat grading machine for size-based seed and grain classification.",
+    "source_pdf_page": "英文宣传册.pdf (grading section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "LCPF Rotary Grading Machine",
+    "slug": "lcpf-rotary-grading-machine",
+    "category": "Grading",
+    "short_description": "Rotary grading machine for efficient particle-size classification.",
+    "source_pdf_page": "英文宣传册.pdf (grading section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "TQLMZA Rotary Grader",
+    "slug": "tqlmza-rotary-grader",
+    "category": "Grading",
+    "short_description": "Rotary grader for multi-stage grading of grain and seed materials.",
+    "source_pdf_page": "英文宣传册.pdf (grading section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "5BG Seed Coating Machine",
+    "slug": "5bg-seed-coating-machine",
+    "category": "Coating",
+    "short_description": "Seed coating equipment for accurate application of treatment formulations.",
+    "source_pdf_page": "英文宣传册.pdf (coating section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "5BY100-10P Batch Coating Machine",
+    "slug": "5by100-10p-batch-coating-machine",
+    "category": "Coating",
+    "short_description": "Batch seed coating machine for controlled treatment workflows.",
+    "source_pdf_page": "英文宣传册.pdf (coating section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "5BH-5 Dryer After Coating",
+    "slug": "5bh-5-dryer-after-coating",
+    "category": "Drying",
+    "short_description": "Post-coating dryer designed to stabilize coated seed before packing.",
+    "source_pdf_page": "英文宣传册.pdf (coating/drying section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "Grain Steel Plate Silo",
+    "slug": "grain-steel-plate-silo",
+    "category": "Storage",
+    "short_description": "Steel plate silo solution for grain storage in integrated plant layouts.",
+    "source_pdf_page": "英文宣传册.pdf (storage section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "DCS Electronic Packing Scale",
+    "slug": "dcs-electronic-packing-scale",
+    "category": "Packing",
+    "short_description": "Electronic packing scale for controlled and repeatable bagging operations.",
+    "source_pdf_page": "英文宣传册.pdf (packing section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "TDTM-W Anti-crushing Elevator",
+    "slug": "tdtm-w-anti-crushing-elevator",
+    "category": "Conveying",
+    "short_description": "Low-damage bucket elevator designed to reduce grain breakage during lifting.",
+    "source_pdf_page": "英文宣传册.pdf (elevator/conveyor section)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "ST Bucket Elevator",
+    "slug": "st-bucket-elevator",
+    "category": "Conveying",
+    "short_description": "Bucket elevator for vertical conveying in grain and seed handling lines.",
+    "source_pdf_page": "英文宣传册.pdf (st-bucket-elevator-tgss-chain-conveyor page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "TGSS Scraper Chain Conveyor",
+    "slug": "tgss-scraper-chain-conveyor",
+    "category": "Conveying",
+    "short_description": "Scraper chain conveyor for horizontal and inclined bulk material transport.",
+    "source_pdf_page": "英文宣传册.pdf (st-bucket-elevator-tgss-chain-conveyor page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "SPS Horizontal Vibration Conveyor",
+    "slug": "sps-horizontal-vibration-conveyor",
+    "category": "Conveying",
+    "short_description": "Horizontal vibrating conveyor for steady grain flow transfer between process steps.",
+    "source_pdf_page": "英文宣传册.pdf (sps-conveyor-tfxh-air-sorter page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "TFXH Circulating Air Sorter",
+    "slug": "tfxh-circulating-air-sorter",
+    "category": "Sorting",
+    "short_description": "Air circulation sorter for lightweight impurity and quality separation tasks.",
+    "source_pdf_page": "英文宣传册.pdf (sps-conveyor-tfxh-air-sorter page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "T4-72 Centrifugal Fan",
+    "slug": "t4-72-centrifugal-fan",
+    "category": "Auxiliary",
+    "short_description": "Centrifugal fan for air handling and dust-control airflow support.",
+    "source_pdf_page": "英文宣传册.pdf (t4-72-fan-mc-pulse-bag-filter page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
+  },
+  {
+    "name": "MC Series Pulse Bag Filter",
+    "slug": "mc-series-pulse-bag-filter",
+    "category": "Auxiliary",
+    "short_description": "Pulse bag filtration system for dust collection in processing facilities.",
+    "source_pdf_page": "英文宣传册.pdf (t4-72-fan-mc-pulse-bag-filter page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
   },
   {
     "name": "5ZYB-16 Corn Peeling Machine / Corn Husker",
-    "slug": "5zyb-16-corn-peeling-machine",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/corn-husker-corn-sheller.jpg",
-    "status": "draft_verified_from_catalog"
+    "slug": "5zyb-16-corn-peeling-machine-corn-husker",
+    "category": "Corn Processing",
+    "short_description": "Corn peeling and husking machine for seed and processing preparation.",
+    "source_pdf_page": "英文宣传册.pdf (corn-husker-corn-sheller page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
   },
   {
     "name": "7PS-750C Corn Seed Sheller and Pre-cleaner",
-    "slug": "7ps-750c-corn-seed-sheller-pre-cleaner",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/corn-husker-corn-sheller.jpg",
-    "status": "draft_verified_from_catalog"
+    "slug": "7ps-750c-corn-seed-sheller-and-pre-cleaner",
+    "category": "Corn Processing",
+    "short_description": "Integrated shelling and pre-cleaning system for corn seed operations.",
+    "source_pdf_page": "英文宣传册.pdf (corn-husker-corn-sheller page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
   },
   {
-    "name": "T4-72 series centrifugal fan",
-    "slug": "t4-72-centrifugal-fan",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/t4-72-fan-mc-pulse-bag-filter.jpg",
-    "status": "draft_verified_from_catalog"
+    "name": "5XT Sheller",
+    "slug": "5xt-sheller",
+    "category": "Shelling",
+    "short_description": "Sheller machine for dehulling/shelling workflows in grain processing lines.",
+    "source_pdf_page": "英文宣传册.pdf (5xt-sheller-tcxt-magnetic-separator page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
   },
   {
-    "name": "MC series pulse bag filter",
-    "slug": "mc-pulse-bag-filter",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/t4-72-fan-mc-pulse-bag-filter.jpg",
-    "status": "draft_verified_from_catalog"
+    "name": "TCXT Permanent Magnet Cylinder / Magnetic Separator",
+    "slug": "tcxt-permanent-magnet-cylinder-magnetic-separator",
+    "category": "Magnetic Separation",
+    "short_description": "Permanent magnet cylinder separator for ferrous contaminant removal.",
+    "source_pdf_page": "英文宣传册.pdf (5xt-sheller-tcxt-magnetic-separator page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
   },
   {
-    "name": "SPS series horizontal vibration conveyor",
-    "slug": "sps-horizontal-vibration-conveyor",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/sps-conveyor-tfxh-air-sorter.jpg",
-    "status": "draft_verified_from_catalog"
-  },
-  {
-    "name": "TFXH series circulating air sorter",
-    "slug": "tfxh-circulating-air-sorter",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/sps-conveyor-tfxh-air-sorter.jpg",
-    "status": "draft_verified_from_catalog"
-  },
-  {
-    "name": "ST series bucket elevator",
-    "slug": "st-bucket-elevator",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/st-bucket-elevator-tgss-chain-conveyor.jpg",
-    "status": "draft_verified_from_catalog"
-  },
-  {
-    "name": "TGSS series scraper chain conveyor",
-    "slug": "tgss-scraper-chain-conveyor",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/st-bucket-elevator-tgss-chain-conveyor.jpg",
-    "status": "draft_verified_from_catalog"
-  },
-  {
-    "name": "5ZT series seed processing line",
+    "name": "5ZT Seed Processing Line",
     "slug": "5zt-seed-processing-line",
-    "source_page_image": "/machinery/source-pages/maosheng-catalog/complete-seed-processing-line.jpg",
-    "status": "draft_verified_from_catalog"
+    "category": "Complete Line",
+    "short_description": "Complete seed processing line integrating cleaning, grading, and conveying modules.",
+    "source_pdf_page": "英文宣传册.pdf (complete-seed-processing-line page)",
+    "status": "supplier_catalog_verified",
+    "quote_based": true,
+    "public_pricing": false
   }
 ]
