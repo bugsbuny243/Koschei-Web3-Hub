@@ -8,9 +8,7 @@
     "notes": "User uploaded Maosheng catalogue screenshots. Mapping to product candidates still requires manual review."
   },
   "public_products_page_policy": {
-    "allowed_public_product": [
-      "Fine Cleaner 5X-5"
-    ],
-    "catalog_candidates_public_pages_allowed": false
+    "allowed_public_product": [],
+    "catalog_candidates_public_pages_allowed": true
   }
 }
