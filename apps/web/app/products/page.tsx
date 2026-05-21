@@ -45,6 +45,7 @@ export default function ProductsPage() {
             <div className="card" style={{ marginBottom: "1rem", background: "#f8fafc" }}>
               <MachineryImage
                 imagePath={product.image_path}
+                imageStatus={product.image_status}
                 productName={product.name}
                 width={1200}
                 height={1600}

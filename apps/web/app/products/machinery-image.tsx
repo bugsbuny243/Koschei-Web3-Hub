@@ -4,19 +4,20 @@ import { useState, type CSSProperties } from "react";
 import Image from "next/image";
 
 type MachineryImageProps = {
-  imagePath?: string;
+  imagePath?: string | null;
+  imageStatus?: "ready" | "pending_extraction";
   productName: string;
   width: number;
   height: number;
   style?: CSSProperties;
 };
 
-export function MachineryImage({ imagePath, productName, width, height, style }: MachineryImageProps) {
+export function MachineryImage({ imagePath, imageStatus, productName, width, height, style }: MachineryImageProps) {
   const [imageFailed, setImageFailed] = useState(false);
-  const shouldShowImage = Boolean(imagePath) && !imageFailed;
+  const shouldShowImage = imageStatus === "ready" && Boolean(imagePath) && !imageFailed;
 
   if (!shouldShowImage) {
-    return <p style={{ margin: 0, color: "#64748b" }}>Catalog image pending extraction</p>;
+    return <p style={{ margin: 0, color: "#64748b" }}>Makine görseli hazırlanıyor</p>;
   }
 
   return (

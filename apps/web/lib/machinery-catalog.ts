@@ -6,7 +6,8 @@ export type MachineryProduct = {
   category: string;
   short_description: string;
   source_pdf_page?: string;
-  image_path?: string;
+  image_path?: string | null;
+  image_status: "ready" | "pending_extraction";
   status: "supplier_catalog_verified";
   quote_based: true;
   public_pricing: false;
