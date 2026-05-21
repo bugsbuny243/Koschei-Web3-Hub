@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
 import { analyzeQuoteRequestWithAi } from "@/lib/ai/tradepi-ai";
-import { appendMilestone, isOwnerRequest } from "@/lib/owner-command-center";
+import { appendMilestone } from "@/lib/owner-command-center";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 
 export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
   const body = form ? Object.fromEntries(form.entries()) : await req.json().catch(() => ({}));
   const password = (body.password as string) ?? null;
-  if (!isOwnerRequest(password)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isOwnerAuthenticated(password))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const quoteRequestId = String(body.quote_request_id || "");
   const pool = getDbPool();

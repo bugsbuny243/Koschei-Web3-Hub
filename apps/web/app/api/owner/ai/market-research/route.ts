@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { togetherChatJson } from "@/lib/ai/together-client";
 import { getDbPool } from "@/lib/db";
-import { isOwnerRequest } from "@/lib/owner-command-center";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 
 type BraveResult = { title?: string; url?: string; description?: string };
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  if (!isOwnerRequest(body.password ?? null)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isOwnerAuthenticated(body.password ?? null))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const q = String(body.query || "Turkish agricultural machinery manufacturers");
   const qrId = String(body.quote_request_id || "");
   const apiKey = process.env.BRAVE_SEARCH_API_KEY;

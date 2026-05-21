@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
-import { isOwnerRequest } from "@/lib/owner-command-center";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 import { normalizeSupplierUrl, searchSuppliers } from "@/lib/research/brave-search";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  if (!isOwnerRequest(body.password ?? null)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isOwnerAuthenticated(body.password ?? null))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (!process.env.BRAVE_SEARCH_API_KEY) return NextResponse.json({ error: "Brave Search API is not configured." }, { status: 400 });
   const pool = getDbPool();
   if (!pool) return NextResponse.json({ error: "Database is not configured." }, { status: 500 });

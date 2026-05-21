@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
-import { isOwnerRequest } from "@/lib/owner-command-center";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  if (!isOwnerRequest(body.password ?? null)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isOwnerAuthenticated(body.password ?? null))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const messageId = String(body.message_id || "");
   const pool = getDbPool();
   if (!pool || !messageId) return NextResponse.json({ error: "missing message_id" }, { status: 400 });

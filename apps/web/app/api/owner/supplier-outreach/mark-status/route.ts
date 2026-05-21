@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { getDbPool } from "@/lib/db";
-import { isOwnerRequest } from "@/lib/owner-command-center";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 
 const allowed = new Set(["new", "reviewed", "message_ready", "sent", "replied", "interested", "rejected", "not_relevant", "blocked"]);
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  if (!isOwnerRequest(body.password ?? null)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isOwnerAuthenticated(body.password ?? null))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const supplierLeadId = String(body.supplier_lead_id || "");
   const status = String(body.status || "");
   const pool = getDbPool();
