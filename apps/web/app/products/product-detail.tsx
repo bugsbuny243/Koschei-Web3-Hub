@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { getMachineryProductBySlug } from "@/lib/machinery-catalog";
 import { machineryVideos } from "@/lib/machinery-media";
 import { MachineryImage } from "./machinery-image";
+import { getPrimaryMedia } from "@/lib/product-media";
 
-export function MachineryProductDetail({
+export async function MachineryProductDetail({
   slug,
   videoSectionTitle = "Product Videos",
 }: {
@@ -12,6 +13,7 @@ export function MachineryProductDetail({
   videoSectionTitle?: string;
 }) {
   const product = getMachineryProductBySlug(slug);
+  const primaryMediaUrl = await getPrimaryMedia(slug);
 
   if (!product) {
     notFound();
@@ -21,8 +23,9 @@ export function MachineryProductDetail({
     <div className="container page-stack">
       <section className="card">
         <MachineryImage
-          imagePath={product.image_path}
+          imagePath={primaryMediaUrl}
           productName={product.name}
+          imageStatus={primaryMediaUrl ? "ready" : "pending_extraction"}
           width={1600}
           height={2200}
           style={{ width: "100%", height: "auto", marginBottom: "1rem", borderRadius: "0.5rem" }}
