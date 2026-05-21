@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMachineryProductBySlug } from "@/lib/machinery-catalog";
@@ -12,6 +13,15 @@ export function MachineryProductDetail({ slug }: { slug: string }) {
   return (
     <div className="container page-stack">
       <section className="card">
+        {product.image_path ? (
+          <Image
+            src={product.image_path}
+            alt={`${product.name} catalog page`}
+            width={1600}
+            height={2200}
+            style={{ width: "100%", height: "auto", marginBottom: "1rem", borderRadius: "0.5rem" }}
+          />
+        ) : null}
         <p className="eyebrow">Product Detail</p>
         <h1>{product.name}</h1>
         <p>{product.short_description}</p>
