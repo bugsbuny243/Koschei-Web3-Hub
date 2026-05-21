@@ -11,5 +11,5 @@ export default async function SupplierOutreachPage({ searchParams }: { searchPar
   const pool = getDbPool();
   const leads = pool ? (await pool.query("select l.*, a.product_fit,a.risk_notes,a.recommended_action,m.id as message_id,m.subject,m.body,m.approved_by_owner from supplier_leads l left join lateral (select * from supplier_ai_analyses a where a.supplier_lead_id=l.id order by created_at desc limit 1) a on true left join lateral (select * from supplier_outreach_messages m where m.supplier_lead_id=l.id order by created_at desc limit 1) m on true order by l.created_at desc limit 200")).rows : [];
 
-  return <SupplierOutreachClient password={params.password ?? ""} initialLeads={leads} braveConfigured={!!process.env.BRAVE_SEARCH_API_KEY} />;
+  return <SupplierOutreachClient password={params.password ?? ""} initialLeads={leads} braveConfigured={!!process.env.BRAVE_SEARCH_API_KEY} togetherConfigured={!!process.env.TOGETHER_API_KEY} dbConfigured={!!pool} />;
 }

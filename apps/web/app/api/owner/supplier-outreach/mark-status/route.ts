@@ -12,6 +12,6 @@ export async function POST(req: Request) {
   const pool = getDbPool();
   if (!pool || !supplierLeadId || !allowed.has(status)) return NextResponse.json({ error: "invalid payload" }, { status: 400 });
   await pool.query("update supplier_leads set status=$2,updated_at=now() where id=$1", [supplierLeadId, status]);
-  await pool.query("insert into supplier_outreach_events (supplier_lead_id,event_type,note,created_by) values ($1,'status_change',$2,'owner')", [supplierLeadId, status]);
+  await pool.query("insert into supplier_outreach_events (supplier_lead_id,event_type,note,created_by) values ($1,'status_changed',$2,'owner')", [supplierLeadId, status]);
   return NextResponse.json({ ok: true });
 }
