@@ -17,6 +17,23 @@ function detectPlatform(url: string): string {
   return "Website";
 }
 
+export function normalizeSupplierUrl(rawUrl: string): string {
+  try {
+    const parsed = new URL(rawUrl);
+    const blockedPrefixes = ["utm_", "spm", "gclid", "fbclid", "msclkid", "ref", "source", "from", "campaign"];
+    for (const key of [...parsed.searchParams.keys()]) {
+      const lower = key.toLowerCase();
+      if (blockedPrefixes.some((prefix) => lower === prefix || lower.startsWith(prefix))) parsed.searchParams.delete(key);
+    }
+    parsed.hash = "";
+    parsed.hostname = parsed.hostname.toLowerCase();
+    parsed.pathname = parsed.pathname.replace(/\/+$/, "") || "/";
+    return parsed.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 export async function searchSuppliers(query: string): Promise<SupplierSearchResult[]> {
   const apiKey = process.env.BRAVE_SEARCH_API_KEY;
   if (!apiKey) throw new Error("Brave Search API is not configured.");
@@ -34,7 +51,7 @@ export async function searchSuppliers(query: string): Promise<SupplierSearchResu
   const data = (await res.json()) as { web?: { results?: Array<{ title?: string; url?: string; description?: string }> } };
   return (data.web?.results ?? []).filter((r) => r.url).map((r) => ({
     title: r.title ?? "",
-    url: r.url ?? "",
+    url: normalizeSupplierUrl(r.url ?? ""),
     snippet: r.description ?? "",
     platform: detectPlatform(r.url ?? ""),
     search_query: query,

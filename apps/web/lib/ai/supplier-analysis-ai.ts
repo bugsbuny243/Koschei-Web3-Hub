@@ -4,7 +4,8 @@ import { togetherChatJson } from "@/lib/ai/together-client";
 type SourceInput = { title: string; url: string; snippet: string; platform: string };
 
 export type SupplierAiAnalysis = {
-  company_name: string;
+  company_name: string | null;
+  possible_company_name?: string | null;
   platform: string;
   source_url: string;
   country: string;
@@ -27,14 +28,14 @@ export async function analyzeSupplierLead(source: SourceInput): Promise<Supplier
     { role: "system", content: "You are a cautious B2B supplier risk analyst. Use only provided source data. Return valid JSON only." },
     {
       role: "user",
-      content: `Analyze this supplier lead from public search result only:\n${JSON.stringify(source)}\nRules: Do not invent company names, verification, prices, or contact data. If weak evidence, set confidence low/medium and explain in risk_notes.`,
+      content: `Analyze this supplier lead from public search result only:\n${JSON.stringify(source)}\nRules: Never invent manufacturer status, verification, contact details, prices, or certifications. If evidence is weak, confidence must be low and risk_notes must explain why. If company name is unclear, keep company_name as null and use possible_company_name for weak guess.`,
     },
   ]);
 }
 
-export function buildOutreachMessage() {
+export function buildOutreachMessage(input: { productCategory?: string | null; platform?: string | null; companyName?: string | null; sourceUrl?: string | null; }) {
   return {
-    subject: "Turkey B2B Machinery RFQ Cooperation Inquiry - TradePi Globall",
-    body: `Hello,\n\nMy name is Onur Sel from TradePi Globall Machinery.\n\nWe are building a Turkey-focused B2B RFQ platform for agricultural machinery and processing equipment. We connect Turkish buyers with reliable manufacturers and coordinate quote-based sourcing, supplier confirmation, and escrow-secured payment workflow.\n\nWe are currently looking for manufacturer partners for products such as seed cleaning machines, grain cleaners, gravity separators, color sorters, bucket elevators, packing scales, and complete seed processing lines.\n\nCould you please confirm:\n\n1. Are you the direct manufacturer?\n2. Can you support Turkey market buyers?\n3. Can you provide DDP door-to-door quotations to Turkey?\n4. Can you provide production time, shipping time, warranty, spare parts and technical documents?\n5. Can you provide clean product photos/videos for Turkish RFQ listings?\n6. Can you work with an escrow-secured international buyer payment process?\n7. Can you provide catalog, quotation terms, and export documents?\n\nWe are interested in long-term cooperation and can send qualified buyer RFQs after supplier verification.\n\nBest regards,\nOnur Sel\nTradePi Globall Machinery`,
+    subject: `Turkey B2B ${input.productCategory ?? "Machinery"} Cooperation Inquiry`,
+    body: `Hello ${input.companyName ?? "Supplier Team"},\n\nMy name is Onur Sel from TradePi Globall Machinery.\n\nWe are building a Turkey-focused B2B sourcing workflow for machinery categories and are currently evaluating ${input.productCategory ?? "industrial machinery"} suppliers discovered on ${input.platform ?? "your platform"}.\n\nReference source: ${input.sourceUrl ?? "N/A"}\nTarget market: Turkey\n\nCould you please confirm the points below:\n\n1. Are you a direct manufacturer?\n2. Can you support Turkish B2B buyers?\n3. Can you provide DDP door-to-door quotation to Turkey?\n4. Can you provide clean product photos/videos?\n5. Can you provide production time, warranty, spare parts, and export documents?\n6. Can you work with escrow-secured buyer workflow?\n\nIf aligned, we would like to continue with a professional and transparent onboarding process.\n\nBest regards,\nOnur Sel\nTradePi Globall Machinery`,
   };
 }

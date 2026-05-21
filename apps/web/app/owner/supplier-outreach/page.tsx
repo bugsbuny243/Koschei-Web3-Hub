@@ -168,18 +168,5 @@ export default async function SupplierOutreachPage({ searchParams }: { searchPar
         <p>Placeholder only. Draft generation and message sending are intentionally disabled in Phase 1.</p>
       </section>
 
-      <section className="card">
-        <h2>6. Manual status buttons placeholder</h2>
-        <p>Status lifecycle for supplier leads:</p>
-        <ul>
-          {leadStatuses.map((status) => (
-            <li key={status}>{status}</li>
-          ))}
-        </ul>
-        <button className="btn" type="button" disabled>
-          Update Status (Coming Soon)
-        </button>
-      </section>
-    </main>
-  );
+  return <SupplierOutreachClient password={params.password ?? ""} initialLeads={leads} braveConfigured={!!process.env.BRAVE_SEARCH_API_KEY} togetherConfigured={!!process.env.TOGETHER_API_KEY} dbConfigured={!!pool} />;
 }
