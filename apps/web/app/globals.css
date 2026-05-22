@@ -262,3 +262,20 @@ input, textarea {
   .owner-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
   .owner-rfq-row{flex-direction:column}
 }
+
+@keyframes authGradientShift {
+  0% { transform: translate3d(-12%, -8%, 0) scale(1); }
+  50% { transform: translate3d(8%, 6%, 0) scale(1.08); }
+  100% { transform: translate3d(-12%, -8%, 0) scale(1); }
+}
+
+.auth-animated-bg {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(0, 255, 135, 0.16), transparent 42%),
+    radial-gradient(circle at 80% 15%, rgba(0, 255, 135, 0.09), transparent 38%),
+    radial-gradient(circle at 50% 85%, rgba(0, 255, 135, 0.12), transparent 40%),
+    linear-gradient(135deg, #050505 0%, #0a0a0a 45%, #0f0f0f 100%);
+  transform-origin: center;
+  animation: authGradientShift 14s ease-in-out infinite;
+  will-change: transform;
+}
