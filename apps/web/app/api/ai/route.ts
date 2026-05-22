@@ -71,6 +71,12 @@ export async function POST(req: NextRequest) {
     if (!togetherRes.ok || !togetherRes.body) {
       await db.query(`UPDATE app_users SET credits = credits + $1 WHERE id = $2`, [cost, authUser.sub]);
       const details = await togetherRes.text();
+      console.error("Together API error:", JSON.stringify({
+        status: togetherRes.status,
+        model: model,
+        hasApiKey: !!process.env.TOGETHER_API_KEY,
+        error: details,
+      }));
       return new Response(JSON.stringify({ error: "Together API failed", details }), { status: 502 });
     }
 
@@ -103,4 +109,13 @@ export async function POST(req: NextRequest) {
     console.error("ai route error", error);
     return new Response(JSON.stringify({ error: "AI request failed" }), { status: 500 });
   }
+}
+
+
+export async function GET() {
+  return Response.json({
+    hasApiKey: !!process.env.TOGETHER_API_KEY,
+    model: process.env.TOGETHER_MODEL,
+    modelComplex: process.env.TOGETHER_MODEL_COMPLEX,
+  });
 }
