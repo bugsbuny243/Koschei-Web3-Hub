@@ -1,22 +1,13 @@
 {
-  "name": "agentforge-monorepo",
+  "name": "koschei-root",
   "private": true,
   "version": "0.1.0",
-  "packageManager": "npm@10.8.2",
-  "workspaces": [
-    "apps/web"
-  ],
   "scripts": {
-    "dev": "npm run dev -w apps/web",
-    "build": "npm run build -w apps/web",
-    "start": "npm run start -w apps/web",
-    "lint": "turbo run lint"
-  },
-  "devDependencies": {
-    "typescript": "^5.7.2",
-    "turbo": "^2.0.0"
+    "dev": "npm run dev --prefix koschei/frontend",
+    "build": "npm run build --prefix koschei/frontend",
+    "preview": "npm run preview --prefix koschei/frontend"
   },
   "engines": {
-    "node": "20.19.x"
+    "node": "20.x"
   }
 }
