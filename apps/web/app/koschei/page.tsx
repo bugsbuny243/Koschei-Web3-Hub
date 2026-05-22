@@ -97,7 +97,7 @@ export default function KoscheiPage() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const jwt = localStorage.getItem("token");
+    const jwt = localStorage.getItem("koschei_token");
     if (!jwt) {
       window.location.href = "/auth";
       return;
@@ -267,7 +267,7 @@ export default function KoscheiPage() {
         <button
           type="button"
           onClick={() => {
-            localStorage.removeItem("token");
+            localStorage.removeItem("koschei_token");
             window.location.href = "/auth";
           }}
           className="mt-4 rounded-lg bg-red-600/90 px-4 py-2 text-sm font-medium hover:bg-red-500"
