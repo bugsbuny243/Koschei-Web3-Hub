@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     const db = await ensureUsersTable();
     const cost = COST_BY_TYPE[requestType] ?? 4;
     const debitResult = await db.query(
-      `UPDATE app_users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits`,
+      `UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits`,
       [cost, authUser.sub],
     );
     if (!debitResult.rowCount) return new Response(JSON.stringify({ error: "Insufficient credits" }), { status: 402 });
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!togetherRes.ok || !togetherRes.body) {
-      await db.query(`UPDATE app_users SET credits = credits + $1 WHERE id = $2`, [cost, authUser.sub]);
+      await db.query(`UPDATE users SET credits = credits + $1 WHERE id = $2`, [cost, authUser.sub]);
       const details = await togetherRes.text();
       console.error("Together API error:", JSON.stringify({
         status: togetherRes.status,

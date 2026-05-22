@@ -1,0 +1,1 @@
+export default function PricingPage(){return <div className="container page-stack"><section className="card"><h1>Pricing</h1><p>Monthly subscriptions or credits for Koschei public tools.</p></section></div>}

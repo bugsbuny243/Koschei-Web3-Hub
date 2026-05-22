@@ -13,10 +13,10 @@ export async function POST(req: NextRequest) {
     if (action === "register") {
       const passwordHash = hashPassword(password);
       const created = await db.query(
-        `INSERT INTO app_users (email, password_hash, credits)
+        `INSERT INTO users (email, password_hash, credits)
          VALUES ($1, $2, 100)
          ON CONFLICT (email) DO NOTHING
-         RETURNING id, email, credits`,
+         RETURNING id, email, credits, role`,
         [email.toLowerCase(), passwordHash],
       );
       if (!created.rowCount) {
@@ -27,13 +27,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "login") {
-      const found = await db.query("SELECT id, email, credits, password_hash FROM app_users WHERE email = $1", [email.toLowerCase()]);
+      const found = await db.query("SELECT id, email, credits, role, password_hash FROM users WHERE email = $1", [email.toLowerCase()]);
       const user = found.rows[0];
       if (!user || !validatePassword(password, user.password_hash)) {
         return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
       }
-      const token = createToken({ id: user.id, email: user.email, credits: user.credits });
-      return NextResponse.json({ token, user: { id: user.id, email: user.email, credits: user.credits } });
+      const token = createToken({ id: user.id, email: user.email, credits: user.credits, role: user.role });
+      return NextResponse.json({ token, user: { id: user.id, email: user.email, credits: user.credits, role: user.role } });
     }
 
     return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
