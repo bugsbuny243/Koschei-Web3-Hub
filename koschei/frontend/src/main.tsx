@@ -1,16 +1,35 @@
-import React, { useState } from 'react'
-import { createRoot } from 'react-dom/client'
+import React, { useEffect, useMemo, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { colors } from './theme/tokens';
+import type { AiTool, DeliveryPackage, GenerationHistoryItem, OwnerOrder, OwnerOrderStatus, ServiceTemplate, UserProject } from './types/domain';
 
-function App() {
-  const [message, setMessage] = useState('')
-  const [response, setResponse] = useState('')
+const routes = ['/', '/pricing','/tools','/tools/code','/tools/app-builder','/tools/web-builder','/tools/game-builder','/tools/image','/tools/video','/tools/audio','/showcase','/login','/register','/app','/app/new','/app/projects','/app/code','/app/video','/app/image','/app/audio','/app/history','/app/billing','/app/settings','/owner','/owner/orders','/owner/orders/new','/owner/orders/:id','/owner/orders/:id/production','/owner/orders/:id/delivery','/owner/prompt-studio','/owner/service-templates','/owner/profit','/owner/media','/owner/admin'];
+const tools: AiTool[] = [/* truncated */
+{id:'qwen',name:'Qwen3-Coder-480B',capability:'Code, debug, refactor',category:'code',model:'Together',description:'High precision coding workflows.'},
+{id:'llama',name:'Llama 3.3-70B',capability:'Chat and Turkish/English analysis',category:'app-builder',model:'Together',description:'Fast bilingual assistant.'},
+{id:'deepseek',name:'DeepSeek V4 Pro',capability:'Deep reasoning, strategy, math',category:'web-builder',model:'Together',description:'Complex planning model.'},
+{id:'flux2',name:'FLUX.2 Pro',capability:'Image generation',category:'image',model:'Together',description:'Premium image generation.'},
+{id:'fluxk',name:'FLUX Kontext Pro',capability:'Image editing',category:'image',model:'Together',description:'Context-aware visual editing.'},
+{id:'veo',name:'Google Veo 3.0',capability:'Video with audio',category:'video',model:'Together',description:'Narrative video generation.'},
+{id:'kling',name:'Kling 2.1 Pro',capability:'Cinematic video',category:'video',model:'Together',description:'Stylized cinematic control.'},
+{id:'kokoro',name:'Kokoro 82M',capability:'Text-to-speech',category:'audio',model:'Together',description:'Natural multilingual voices.'},
+{id:'whisper',name:'Whisper large-v3',capability:'Speech-to-text',category:'audio',model:'Together',description:'Production transcription.'}];
+const projects: UserProject[]=[{id:'p1',title:'Immortal Mobile Quest',category:'game',updatedAt:'2026-05-22',creditsUsed:320}];
+const history: GenerationHistoryItem[]=[{id:'h1',toolId:'qwen',title:'Auth service scaffold',status:'completed',createdAt:'2026-05-22T10:20:00Z'}];
+const orders: OwnerOrder[]=[{id:'ORD-101',clientName:'Client Alpha',status:'in_production',sourcePlatform:'fiverr',serviceType:'Web builder',dueDate:'2026-05-29'}];
+const templates: ServiceTemplate[]=[{id:'s1',name:'Landing + Funnel',description:'Fast delivery website package.',checklist:['Wireframe','Build','QA'],basePriceUsd:299}];
+const delivery: DeliveryPackage={id:'d1',orderId:'ORD-101',summary:'Production assets and final notes',assets:['source.zip','preview.mp4'],notes:'Ready for manual delivery.'};
+const statusTone: Record<OwnerOrderStatus,string>={draft:'#7e8aa6',requirements_received:'#7ad7ff',in_production:'#f5c451',ready_for_review:'#c78dff',ready_for_delivery:'#00d5ff',delivered:'#47dfb6',revision_requested:'#ff8aa5',completed:'#2fdaa2',cancelled:'#7f849c'};
 
-  const send = async () => {
-    const res = await fetch('http://localhost:8080/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) })
-    const data = await res.json(); setResponse(`${data.model}: ${data.response || data.error}`)
-  }
+const nav = (to:string,label?:string)=><a href={to} onClick={(e)=>{e.preventDefault(); historyPush(to);}} style={{color:colors.accent2,textDecoration:'none'}}>{label||to}</a>;
+const historyPush=(path:string)=>{window.history.pushState({},'',path);window.dispatchEvent(new PopStateEvent('popstate'));};
+const page=(title:string,subtitle:string,body:React.ReactNode)=><div style={{padding:20}}><h1>{title}</h1><p style={{color:colors.muted}}>{subtitle}</p>{body}</div>;
+const card=(body:React.ReactNode)=><div style={{background:colors.panel,border:`1px solid ${colors.border}`,borderRadius:14,padding:14,marginBottom:10}}>{body}</div>;
 
-  return <div style={{fontFamily:'sans-serif',padding:24}}><h1>KOSCHEI AI Super App</h1><textarea value={message} onChange={e=>setMessage(e.target.value)} /><br/><button onClick={send}>Send</button><pre>{response}</pre></div>
-}
+function App(){ const [path,setPath]=useState(window.location.pathname); useEffect(()=>{const on=()=>setPath(window.location.pathname);window.addEventListener('popstate',on);return()=>window.removeEventListener('popstate',on);},[]);
+  const shell=useMemo(()=>path.startsWith('/owner')?'owner':path.startsWith('/app')?'app':'public',[path]);
+  const route = routes.includes(path)?path:(path.match(/^\/owner\/orders\/[^/]+$/)?'/owner/orders/:id':path.match(/^\/owner\/orders\/[^/]+\/production$/)?'/owner/orders/:id/production':path.match(/^\/owner\/orders\/[^/]+\/delivery$/)?'/owner/orders/:id/delivery':'/');
+  const body = (()=>{ switch(route){ case '/': return page('Koschei','The Immortal AI Platform',card(<p>Build apps, games, websites, scripts, images, videos and voices with one immortal AI engine.</p>)); case '/pricing': return page('Pricing','Premium SaaS plans.',card(<p>Starter • Pro • Immortal</p>)); case '/tools': return page('Tools','AI tool suite',<>{tools.map(t=>card(<><b>{t.name}</b><p>{t.description}</p></>))}</>); case '/showcase': return page('Showcase','Public results',card(<p>Empty state: No public showcases yet.</p>)); case '/login': return page('Login','Access workspace',card(<p>Loading state placeholder...</p>)); case '/register': return page('Register','Create account',card(<p>Error state placeholder: Email already in use.</p>)); case '/app/projects': return page('Projects','Project cards',<>{projects.map(p=>card(<><b>{p.title}</b><p>{p.category} • {p.updatedAt}</p></>))}</>); case '/app/history': return page('Generation History','History cards',<>{history.map(h=>card(<><b>{h.title}</b><p>{h.status}</p></>))}</>); case '/owner/orders': return page('Owner Orders','Private queue',<>{orders.map(o=>card(<><b style={{color:statusTone[o.status]}}>{o.id} • {o.status}</b><p>{o.clientName}</p></>))}</>); case '/owner/service-templates': return page('Service Templates','Reusable templates',<>{templates.map(t=>card(<><b>{t.name}</b><p>{t.description}</p></>))}</>); case '/owner/orders/:id/production': return page('Production Checklist','Checklist state',card(<p>☑ Requirements parsed ☑ Prompt drafted ☐ Assets finalized</p>)); case '/owner/orders/:id/delivery': return page('Delivery Package','Delivery component',card(<p>{delivery.summary} — {delivery.assets.join(', ')}</p>)); default: return page(route.replace('/','').toUpperCase(),'Production-ready placeholder screen.',card(<p>Secure backend placeholder: Go API routes only.</p>)); }})();
+  return <div style={{fontFamily:'Inter,system-ui',background:colors.bg,color:colors.text,minHeight:'100vh'}}>{shell==='public'&&<div style={{padding:12,borderBottom:`1px solid ${colors.border}`,display:'flex',gap:12,flexWrap:'wrap'}}>{nav('/','Koschei')}{nav('/pricing')}{nav('/tools')}{nav('/showcase')}{nav('/login')}{nav('/register')}</div>}{shell==='app'&&<div style={{display:'flex'}}><div style={{minWidth:220,padding:12,borderRight:`1px solid ${colors.border}`,display:'grid',gap:8}}>{['/app','/app/new','/app/projects','/app/code','/app/video','/app/image','/app/audio','/app/history','/app/billing','/app/settings'].map(p=><div key={p}>{nav(p,p)}</div>)}</div><div style={{flex:1}}>{body}</div></div>}{shell==='owner'&&<div><div style={{padding:12,borderBottom:`1px solid ${colors.border}`}}><b style={{color:'#ff4db8'}}>OWNER GOD MODE</b><p style={{color:colors.muted}}>Role guard placeholder (owner/admin only)</p></div><div style={{padding:10,display:'flex',gap:10,flexWrap:'wrap'}}>{['/owner','/owner/orders','/owner/orders/new','/owner/prompt-studio','/owner/service-templates','/owner/profit','/owner/media','/owner/admin'].map(p=><span key={p}>{nav(p)}</span>)}</div>{body}</div>} </div>}
 
-createRoot(document.getElementById('root')!).render(<App />)
+createRoot(document.getElementById('root')!).render(<App/>);
