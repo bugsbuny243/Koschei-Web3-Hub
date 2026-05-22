@@ -20,7 +20,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	h := handlers.Handler{DB: database, JWTSecret: cfg.JWTSecret, Router: services.AIRouter{}, Together: services.TogetherClient{APIKey: cfg.TogetherAPIKey}, Fal: services.FalClient{APIKey: cfg.FalKey}}
+	h := handlers.Handler{
+		DB:              database,
+		JWTSecret:       cfg.JWTSecret,
+		Router:          services.AIRouter{Cfg: cfg},
+		Together:        services.TogetherClient{APIKey: cfg.TogetherAPIKey},
+		Worker:          services.PythonWorkerClient{BaseURL: cfg.PythonWorkerURL},
+		OwnerGodModeKey: cfg.OwnerGodModeKey,
+	}
 	r := router.New(h)
 	log.Fatal(r.Run(":" + cfg.Port))
 }
