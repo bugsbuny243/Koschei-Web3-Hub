@@ -1,35 +1,184 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { colors } from './theme/tokens';
-import type { AiTool, DeliveryPackage, GenerationHistoryItem, OwnerOrder, OwnerOrderStatus, ServiceTemplate, UserProject } from './types/domain';
 
-const routes = ['/', '/pricing','/tools','/tools/code','/tools/app-builder','/tools/web-builder','/tools/game-builder','/tools/image','/tools/video','/tools/audio','/showcase','/login','/register','/app','/app/new','/app/projects','/app/code','/app/video','/app/image','/app/audio','/app/history','/app/billing','/app/settings','/owner','/owner/orders','/owner/orders/new','/owner/orders/:id','/owner/orders/:id/production','/owner/orders/:id/delivery','/owner/prompt-studio','/owner/service-templates','/owner/profit','/owner/media','/owner/admin'];
-const tools: AiTool[] = [/* truncated */
-{id:'qwen',name:'Qwen3-Coder-480B',capability:'Code, debug, refactor',category:'code',model:'Together',description:'High precision coding workflows.'},
-{id:'llama',name:'Llama 3.3-70B',capability:'Chat and Turkish/English analysis',category:'app-builder',model:'Together',description:'Fast bilingual assistant.'},
-{id:'deepseek',name:'DeepSeek V4 Pro',capability:'Deep reasoning, strategy, math',category:'web-builder',model:'Together',description:'Complex planning model.'},
-{id:'flux2',name:'FLUX.2 Pro',capability:'Image generation',category:'image',model:'Together',description:'Premium image generation.'},
-{id:'fluxk',name:'FLUX Kontext Pro',capability:'Image editing',category:'image',model:'Together',description:'Context-aware visual editing.'},
-{id:'veo',name:'Google Veo 3.0',capability:'Video with audio',category:'video',model:'Together',description:'Narrative video generation.'},
-{id:'kling',name:'Kling 2.1 Pro',capability:'Cinematic video',category:'video',model:'Together',description:'Stylized cinematic control.'},
-{id:'kokoro',name:'Kokoro 82M',capability:'Text-to-speech',category:'audio',model:'Together',description:'Natural multilingual voices.'},
-{id:'whisper',name:'Whisper large-v3',capability:'Speech-to-text',category:'audio',model:'Together',description:'Production transcription.'}];
-const projects: UserProject[]=[{id:'p1',title:'Immortal Mobile Quest',category:'game',updatedAt:'2026-05-22',creditsUsed:320}];
-const history: GenerationHistoryItem[]=[{id:'h1',toolId:'qwen',title:'Auth service scaffold',status:'completed',createdAt:'2026-05-22T10:20:00Z'}];
-const orders: OwnerOrder[]=[{id:'ORD-101',clientName:'Client Alpha',status:'in_production',sourcePlatform:'fiverr',serviceType:'Web builder',dueDate:'2026-05-29'}];
-const templates: ServiceTemplate[]=[{id:'s1',name:'Landing + Funnel',description:'Fast delivery website package.',checklist:['Wireframe','Build','QA'],basePriceUsd:299}];
-const delivery: DeliveryPackage={id:'d1',orderId:'ORD-101',summary:'Production assets and final notes',assets:['source.zip','preview.mp4'],notes:'Ready for manual delivery.'};
-const statusTone: Record<OwnerOrderStatus,string>={draft:'#7e8aa6',requirements_received:'#7ad7ff',in_production:'#f5c451',ready_for_review:'#c78dff',ready_for_delivery:'#00d5ff',delivered:'#47dfb6',revision_requested:'#ff8aa5',completed:'#2fdaa2',cancelled:'#7f849c'};
+type Role = 'public' | 'user' | 'owner';
 
-const nav = (to:string,label?:string)=><a href={to} onClick={(e)=>{e.preventDefault(); historyPush(to);}} style={{color:colors.accent2,textDecoration:'none'}}>{label||to}</a>;
-const historyPush=(path:string)=>{window.history.pushState({},'',path);window.dispatchEvent(new PopStateEvent('popstate'));};
-const page=(title:string,subtitle:string,body:React.ReactNode)=><div style={{padding:20}}><h1>{title}</h1><p style={{color:colors.muted}}>{subtitle}</p>{body}</div>;
-const card=(body:React.ReactNode)=><div style={{background:colors.panel,border:`1px solid ${colors.border}`,borderRadius:14,padding:14,marginBottom:10}}>{body}</div>;
+type ToolCard = { title: string; description: string };
+type Plan = { name: string; price: string; details: string };
+type RouteLink = { href: string; label: string; protected?: boolean };
 
-function App(){ const [path,setPath]=useState(window.location.pathname); useEffect(()=>{const on=()=>setPath(window.location.pathname);window.addEventListener('popstate',on);return()=>window.removeEventListener('popstate',on);},[]);
-  const shell=useMemo(()=>path.startsWith('/owner')?'owner':path.startsWith('/app')?'app':'public',[path]);
-  const route = routes.includes(path)?path:(path.match(/^\/owner\/orders\/[^/]+$/)?'/owner/orders/:id':path.match(/^\/owner\/orders\/[^/]+\/production$/)?'/owner/orders/:id/production':path.match(/^\/owner\/orders\/[^/]+\/delivery$/)?'/owner/orders/:id/delivery':'/');
-  const body = (()=>{ switch(route){ case '/': return page('Koschei','The Immortal AI Platform',card(<p>Build apps, games, websites, scripts, images, videos and voices with one immortal AI engine.</p>)); case '/pricing': return page('Pricing','Premium SaaS plans.',card(<p>Starter • Pro • Immortal</p>)); case '/tools': return page('Tools','AI tool suite',<>{tools.map(t=>card(<><b>{t.name}</b><p>{t.description}</p></>))}</>); case '/showcase': return page('Showcase','Public results',card(<p>Empty state: No public showcases yet.</p>)); case '/login': return page('Login','Access workspace',card(<p>Loading state placeholder...</p>)); case '/register': return page('Register','Create account',card(<p>Error state placeholder: Email already in use.</p>)); case '/app/projects': return page('Projects','Project cards',<>{projects.map(p=>card(<><b>{p.title}</b><p>{p.category} • {p.updatedAt}</p></>))}</>); case '/app/history': return page('Generation History','History cards',<>{history.map(h=>card(<><b>{h.title}</b><p>{h.status}</p></>))}</>); case '/owner/orders': return page('Owner Orders','Private queue',<>{orders.map(o=>card(<><b style={{color:statusTone[o.status]}}>{o.id} • {o.status}</b><p>{o.clientName}</p></>))}</>); case '/owner/service-templates': return page('Service Templates','Reusable templates',<>{templates.map(t=>card(<><b>{t.name}</b><p>{t.description}</p></>))}</>); case '/owner/orders/:id/production': return page('Production Checklist','Checklist state',card(<p>☑ Requirements parsed ☑ Prompt drafted ☐ Assets finalized</p>)); case '/owner/orders/:id/delivery': return page('Delivery Package','Delivery component',card(<p>{delivery.summary} — {delivery.assets.join(', ')}</p>)); default: return page(route.replace('/','').toUpperCase(),'Production-ready placeholder screen.',card(<p>Secure backend placeholder: Go API routes only.</p>)); }})();
-  return <div style={{fontFamily:'Inter,system-ui',background:colors.bg,color:colors.text,minHeight:'100vh'}}>{shell==='public'&&<div style={{padding:12,borderBottom:`1px solid ${colors.border}`,display:'flex',gap:12,flexWrap:'wrap'}}>{nav('/','Koschei')}{nav('/pricing')}{nav('/tools')}{nav('/showcase')}{nav('/login')}{nav('/register')}</div>}{shell==='app'&&<div style={{display:'flex'}}><div style={{minWidth:220,padding:12,borderRight:`1px solid ${colors.border}`,display:'grid',gap:8}}>{['/app','/app/new','/app/projects','/app/code','/app/video','/app/image','/app/audio','/app/history','/app/billing','/app/settings'].map(p=><div key={p}>{nav(p,p)}</div>)}</div><div style={{flex:1}}>{body}</div></div>}{shell==='owner'&&<div><div style={{padding:12,borderBottom:`1px solid ${colors.border}`}}><b style={{color:'#ff4db8'}}>OWNER GOD MODE</b><p style={{color:colors.muted}}>Role guard placeholder (owner/admin only)</p></div><div style={{padding:10,display:'flex',gap:10,flexWrap:'wrap'}}>{['/owner','/owner/orders','/owner/orders/new','/owner/prompt-studio','/owner/service-templates','/owner/profit','/owner/media','/owner/admin'].map(p=><span key={p}>{nav(p)}</span>)}</div>{body}</div>} </div>}
+const currentRole: Role = 'public'; // Placeholder auth role from Go backend session.
 
-createRoot(document.getElementById('root')!).render(<App/>);
+const tools: ToolCard[] = [
+  { title: 'Code Generator', description: 'Generate, refactor and ship production code faster.' },
+  { title: 'App Builder', description: 'Compose full applications with multi-step AI workflows.' },
+  { title: 'Web Builder', description: 'Launch premium web experiences from prompts and assets.' },
+  { title: 'Game Builder', description: 'Prototype game mechanics, worlds and logic instantly.' },
+  { title: 'Image Generator', description: 'Create marketing visuals, assets and concept art.' },
+  { title: 'Video Generator', description: 'Produce cinematic clips and branded social reels.' },
+  { title: 'Voice Tools', description: 'Generate voiceovers, clones and studio-ready narration.' },
+  { title: 'Automation Workflows', description: 'Automate multi-tool chains with resilient orchestration.' }
+];
+
+const models = [
+  'Qwen3-Coder-480B for code',
+  'Llama 3.3-70B for chat and analysis',
+  'DeepSeek V4 Pro for reasoning',
+  'FLUX.2 Pro for images',
+  'FLUX Kontext Pro for image editing',
+  'Veo 3.0 for video',
+  'Kling 2.1 Pro for cinema',
+  'Kokoro 82M for TTS',
+  'Whisper large-v3 for STT'
+];
+
+const plans: Plan[] = [
+  { name: 'Free', price: '$0', details: 'Start building with core tools and limited usage.' },
+  { name: 'Starter', price: '$29/mo', details: 'For founders shipping faster with more generation credits.' },
+  { name: 'Pro', price: '$99/mo', details: 'For teams that need full velocity and premium model access.' }
+];
+
+const publicNav: RouteLink[] = [
+  { href: '/', label: 'Home' },
+  { href: '/platform', label: 'Platform' },
+  { href: '/pricing', label: 'Pricing' }
+];
+
+const appNav: RouteLink[] = [
+  { href: '/dashboard', label: 'Dashboard', protected: true },
+  { href: '/billing', label: 'Billing', protected: true }
+];
+
+const ownerNav: RouteLink[] = [{ href: '/owner', label: 'Owner Console', protected: true }];
+
+const navigate = (to: string) => {
+  window.history.pushState({}, '', to);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+};
+
+const api = {
+  getPublicPlatform: async () => ({ endpoint: '/api/platform', backend: 'go-placeholder' }),
+  getPricing: async () => ({ endpoint: '/api/pricing', backend: 'go-placeholder' })
+};
+
+const palette = {
+  bg: '#05040c',
+  bg2: '#0b0a16',
+  text: '#ecedff',
+  muted: '#a5a8c7',
+  neonGreen: '#57ff8a',
+  neonPurple: '#9f6bff',
+  border: 'rgba(157, 114, 255, 0.25)',
+  glass: 'rgba(255, 255, 255, 0.06)'
+};
+
+const styles: Record<string, React.CSSProperties> = {
+  app: { background: `radial-gradient(circle at 15% -20%, #1f1a3d 0%, ${palette.bg} 40%, #040308 100%)`, color: palette.text, minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' },
+  nav: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: '14px 18px', background: 'rgba(7, 6, 16, 0.72)', borderBottom: `1px solid ${palette.border}`, backdropFilter: 'blur(12px)' },
+  navLinks: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  shell: { maxWidth: 1160, margin: '0 auto', padding: '0 16px 48px' },
+  hero: { padding: '68px 0 34px' },
+  heroTitle: { fontSize: 'clamp(2rem, 5vw, 3.5rem)', lineHeight: 1.05, margin: '0 0 12px', letterSpacing: '-0.02em' },
+  subtitle: { color: palette.muted, fontSize: 'clamp(1rem, 2vw, 1.2rem)', maxWidth: 820, lineHeight: 1.6 },
+  buttonRow: { display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 26 },
+  grid: { display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' },
+  card: { background: palette.glass, border: `1px solid ${palette.border}`, borderRadius: 18, padding: 16, boxShadow: '0 8px 26px rgba(9, 9, 18, 0.35)' },
+  section: { marginTop: 30 },
+  sectionTitle: { fontSize: '1.35rem', marginBottom: 14 },
+  cta: { marginTop: 36, padding: 24, borderRadius: 20, background: 'linear-gradient(90deg, rgba(87,255,138,0.18), rgba(159,107,255,0.18))', border: `1px solid ${palette.border}` }
+};
+
+const LinkButton = ({ href, label, filled = false }: { href: string; label: string; filled?: boolean }) => (
+  <button
+    onClick={() => navigate(href)}
+    style={{
+      padding: '11px 16px',
+      borderRadius: 999,
+      border: `1px solid ${filled ? palette.neonGreen : palette.border}`,
+      background: filled ? `linear-gradient(90deg, ${palette.neonGreen}, ${palette.neonPurple})` : 'transparent',
+      color: filled ? '#06060f' : palette.text,
+      cursor: 'pointer',
+      fontWeight: 700
+    }}
+  >
+    {label}
+  </button>
+);
+
+function HomePage() {
+  useEffect(() => { void api.getPublicPlatform(); }, []);
+  return (
+    <div style={styles.shell}>
+      <section style={styles.hero}>
+        <p style={{ color: palette.neonGreen, marginBottom: 12 }}>Koschei — The Immortal AI Platform</p>
+        <h1 style={styles.heroTitle}>Build apps, games, websites, scripts, images, videos and voices with one immortal AI engine.</h1>
+        <p style={styles.subtitle}>Koschei combines code generation, AI chat, deep reasoning, image generation, video generation, voice tools and automation into one production platform.</p>
+        <div style={styles.buttonRow}><LinkButton href="/platform" label="Start Building" filled /><LinkButton href="/pricing" label="View Pricing" /></div>
+      </section>
+
+      <section style={styles.section}>
+        <h2 style={styles.sectionTitle}>AI Tools</h2>
+        <div style={styles.grid}>{tools.map((tool) => <div key={tool.title} style={styles.card}><h3>{tool.title}</h3><p style={{ color: palette.muted }}>{tool.description}</p></div>)}</div>
+      </section>
+
+      <section style={styles.section}>
+        <h2 style={styles.sectionTitle}>Model Router</h2>
+        <div style={styles.grid}>{models.map((model) => <div key={model} style={styles.card}>{model}</div>)}</div>
+      </section>
+
+      <section style={styles.section}>
+        <h2 style={styles.sectionTitle}>Public SaaS Platform</h2>
+        <div style={styles.card}><p style={{ margin: 0, color: palette.muted }}>From prototype to production, Koschei unifies generation, orchestration and delivery in one public platform experience.</p></div>
+      </section>
+
+      <section style={styles.section}>
+        <h2 style={styles.sectionTitle}>Pricing Preview</h2>
+        <div style={styles.grid}>{plans.map((plan) => <div key={plan.name} style={styles.card}><h3>{plan.name}</h3><p style={{ color: palette.neonGreen, fontWeight: 700 }}>{plan.price}</p><p style={{ color: palette.muted }}>{plan.details}</p></div>)}</div>
+      </section>
+
+      <section style={styles.cta}><h2 style={{ marginTop: 0 }}>Start building with Koschei</h2><div style={styles.buttonRow}><LinkButton href="/platform" label="Start Building" filled /><LinkButton href="/pricing" label="View Pricing" /></div></section>
+    </div>
+  );
+}
+
+const Placeholder = ({ title, description }: { title: string; description: string }) => <div style={{ ...styles.shell, paddingTop: 42 }}><h1>{title}</h1><div style={styles.card}><p style={{ color: palette.muted }}>{description}</p></div></div>;
+
+function App() {
+  const [path, setPath] = useState(window.location.pathname);
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const route = useMemo(() => {
+    if (path === '/' || path === '/platform' || path === '/pricing' || path === '/dashboard' || path === '/billing' || path.startsWith('/owner')) return path;
+    return '/';
+  }, [path]);
+
+  const canUserAccessProtected = currentRole === 'user' || currentRole === 'owner';
+  const canOwnerAccess = currentRole === 'owner';
+
+  return (
+    <div style={{ ...styles.app, background: colors.bg }}>
+      <header style={styles.nav}>
+        <button onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: palette.text, fontWeight: 800, cursor: 'pointer' }}>Koschei</button>
+        <nav style={styles.navLinks}>
+          {publicNav.map((item) => <LinkButton key={item.href} href={item.href} label={item.label} />)}
+          {appNav.filter((item) => !item.protected || canUserAccessProtected).map((item) => <LinkButton key={item.href} href={item.href} label={item.label} />)}
+          {ownerNav.filter(() => canOwnerAccess).map((item) => <LinkButton key={item.href} href={item.href} label={item.label} />)}
+        </nav>
+      </header>
+
+      {route === '/' && <HomePage />}
+      {route === '/platform' && <Placeholder title="Koschei Platform" description="Public platform route placeholder. API integrations should call Go backend endpoints only." />}
+      {route === '/pricing' && <Placeholder title="Pricing" description="Pricing page route placeholder with Go backend data source contract." />}
+      {route === '/dashboard' && (canUserAccessProtected ? <Placeholder title="Dashboard" description="Protected dashboard placeholder. Requires authenticated user session." /> : <Placeholder title="Access Required" description="Dashboard is protected. Sign in through the Go auth backend to continue." />)}
+      {route === '/billing' && (canUserAccessProtected ? <Placeholder title="Billing" description="Protected billing placeholder. Connect subscription APIs via Go backend." /> : <Placeholder title="Access Required" description="Billing is protected. Sign in through the Go auth backend to continue." />)}
+      {route.startsWith('/owner') && (canOwnerAccess ? <Placeholder title="Owner Control" description="Owner-only route placeholder under /owner namespace." /> : <Placeholder title="Unauthorized" description="Owner routes are hidden and restricted by owner role checks only." />)}
+    </div>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<App />);
