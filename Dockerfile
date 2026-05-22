@@ -10,6 +10,7 @@ WORKDIR /app/koschei/frontend
 ENV NODE_ENV=production
 ENV PORT=8080
 RUN npm i -g vite
+COPY --from=builder /app/koschei/frontend/package*.json ./
 COPY --from=builder /app/koschei/frontend/dist ./dist
 EXPOSE 8080
 CMD ["vite", "preview", "--host", "0.0.0.0", "--port", "8080"]
