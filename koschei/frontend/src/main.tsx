@@ -1,198 +1,109 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { colors } from './theme/tokens';
 
 type Role = 'public' | 'user' | 'owner';
-type Plan = { name: string; price: string; detail: string; highlight?: boolean };
-type Tool = { name: string; description: string };
+const currentRole: Role = 'public';
 
-type AppRoute = '/' | '/platform' | '/pricing' | '/dashboard' | '/billing' | '/owner';
-
-const session = {
-  role: 'public' as Role
-};
-
-const tools: Tool[] = [
-  { name: 'Code Generator', description: 'Generate production-ready code, refactor legacy modules and scaffold APIs in minutes.' },
-  { name: 'App Builder', description: 'Ship full product flows with a guided AI planner, QA assistant and integration prompts.' },
-  { name: 'Web Builder', description: 'Create modern web experiences with responsive layouts, component logic and launch-ready copy.' },
-  { name: 'Game Builder', description: 'Prototype gameplay loops, dialogue trees, balancing logic and asset prompts instantly.' },
-  { name: 'Image Studio', description: 'Generate campaign visuals, thumbnails and design variations with premium fidelity models.' },
-  { name: 'Video Studio', description: 'Create cinematic social clips, ads and explainers with timeline-aware AI generation.' },
-  { name: 'Voice Lab', description: 'Produce synthetic narration, multilingual dubbing and studio voice pipelines from text.' },
-  { name: 'Automation Workflows', description: 'Orchestrate cross-tool chains that transform prompts into end-to-end deliverables.' }
+const tools = [
+  'Code Generator', 'App Builder', 'Web Builder', 'Game Builder',
+  'Image Studio', 'Video Studio', 'Voice Lab', 'Automation Workflows'
 ];
 
-const models = [
-  'Qwen3-Coder-480B',
-  'Llama 3.3-70B',
-  'DeepSeek V4 Pro',
-  'FLUX.2 Pro',
-  'FLUX Kontext Pro',
-  'Google Veo 3.0',
-  'Kling 2.1 Pro',
-  'Kokoro 82M',
-  'Whisper large-v3'
+const modelRouter = [
+  'Qwen3-Coder-480B — code, debug, refactor',
+  'Llama 3.3-70B — chat and Turkish/English analysis',
+  'DeepSeek V4 Pro — reasoning, strategy and math',
+  'FLUX.2 Pro — high-quality image generation',
+  'FLUX Kontext Pro — image editing',
+  'Google Veo 3.0 — video with audio',
+  'Kling 2.1 Pro — cinematic video',
+  'Kokoro 82M — text-to-speech',
+  'Whisper large-v3 — speech-to-text'
 ];
 
-const plans: Plan[] = [
-  { name: 'Free', price: '0 TL', detail: 'Ideal for testing core tools and previewing the immortal workflow stack.' },
-  { name: 'Builder', price: '899 TL / month', detail: 'Best for solo founders building apps and launching client-ready assets.' },
-  { name: 'Pro', price: '2,299 TL / month', detail: 'High-throughput generation, premium routing and team-level velocity.', highlight: true },
-  { name: 'Studio', price: '4,999 TL / month', detail: 'For agencies and studios requiring predictable output and priority handling.' }
+const pricing = [
+  { name: 'Free', price: '0 TL' },
+  { name: 'Builder', price: '899 TL / month' },
+  { name: 'Pro', price: '2,299 TL / month' }
 ];
 
-const shopierLinks = {
-  builder: 'https://shopier.com/placeholder-builder',
-  pro: 'https://shopier.com/placeholder-pro',
-  studio: 'https://shopier.com/placeholder-studio'
-};
-
-const palette = {
-  bg: '#06050e',
-  panel: 'rgba(20, 18, 36, 0.68)',
-  panelSoft: 'rgba(255,255,255,0.05)',
-  text: '#edf0ff',
-  muted: '#aeb2cb',
-  green: '#59ff9d',
-  purple: '#a86dff',
-  border: 'rgba(168, 109, 255, 0.32)',
-  heroGlow: 'radial-gradient(circle at 25% 10%, rgba(89,255,157,0.20), transparent 38%), radial-gradient(circle at 85% 5%, rgba(168,109,255,0.22), transparent 34%)'
-};
-
-const navigate = (route: AppRoute) => {
-  window.history.pushState({}, '', route);
+const navigate = (to: string) => {
+  window.history.pushState({}, '', to);
   window.dispatchEvent(new PopStateEvent('popstate'));
 };
 
 const styles: Record<string, React.CSSProperties> = {
-  app: { minHeight: '100vh', color: palette.text, fontFamily: 'Inter, ui-sans-serif, system-ui', background: `${palette.heroGlow}, ${colors.bg}` },
-  shell: { width: 'min(1160px, 100%)', margin: '0 auto', padding: '0 16px 48px' },
-  nav: { position: 'sticky', top: 0, zIndex: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: `1px solid ${palette.border}`, background: 'rgba(8, 7, 18, 0.8)', backdropFilter: 'blur(16px)' },
-  navLinks: { display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end' },
-  hero: { marginTop: 26, border: `1px solid ${palette.border}`, borderRadius: 24, background: palette.panel, backdropFilter: 'blur(16px)', padding: 'clamp(18px, 5vw, 40px)', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' },
-  heroTitle: { margin: '8px 0 10px', fontSize: 'clamp(1.9rem, 6vw, 3.9rem)', lineHeight: 1.04, letterSpacing: '-0.02em' },
-  subtitle: { color: palette.muted, maxWidth: 860, lineHeight: 1.6, fontSize: 'clamp(0.95rem, 2vw, 1.15rem)' },
-  section: { marginTop: 28 },
-  sectionTitle: { marginBottom: 12, fontSize: 'clamp(1.15rem, 2.4vw, 1.5rem)' },
-  grid: { display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' },
-  card: { border: `1px solid ${palette.border}`, borderRadius: 18, background: palette.panelSoft, padding: 16, backdropFilter: 'blur(14px)' },
-  cta: { marginTop: 26, border: `1px solid ${palette.border}`, borderRadius: 20, background: 'linear-gradient(120deg, rgba(89,255,157,0.18), rgba(168,109,255,0.2))', padding: '22px 18px' }
+  app: { minHeight: '100vh', background: 'radial-gradient(circle at 10% 0%, #251641 0%, #090710 40%, #04050a 100%)', color: '#eef0ff', fontFamily: 'Inter,system-ui,sans-serif' },
+  shell: { maxWidth: 1150, margin: '0 auto', padding: '0 16px 56px' },
+  nav: { position: 'sticky', top: 0, zIndex: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', background: 'rgba(8,8,16,.75)', borderBottom: '1px solid rgba(126,99,255,.3)', backdropFilter: 'blur(10px)' },
+  row: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  hero: { padding: '76px 0 32px' },
+  h1: { fontSize: 'clamp(2.1rem, 5vw, 3.8rem)', lineHeight: 1.05, margin: '8px 0 12px' },
+  sub: { color: '#afb5d9', lineHeight: 1.6, maxWidth: 880, fontSize: 'clamp(1rem, 2vw, 1.2rem)' },
+  section: { marginTop: 30 },
+  sectionTitle: { fontSize: '1.4rem', marginBottom: 12 },
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14 },
+  card: { borderRadius: 18, padding: 16, background: 'linear-gradient(160deg, rgba(255,255,255,.1), rgba(255,255,255,.03))', border: '1px solid rgba(93,255,149,.24)', boxShadow: '0 10px 30px rgba(0,0,0,.28)' },
 };
 
-function LinkBtn({ label, to, primary = false }: { label: string; to: AppRoute; primary?: boolean }) {
-  return (
-    <button
-      onClick={() => navigate(to)}
-      style={{
-        borderRadius: 999,
-        border: `1px solid ${primary ? palette.green : palette.border}`,
-        padding: '10px 16px',
-        background: primary ? 'linear-gradient(110deg, #59ff9d, #a86dff)' : 'rgba(255,255,255,0.02)',
-        color: primary ? '#080910' : palette.text,
-        fontWeight: 700,
-        cursor: 'pointer'
-      }}
-    >
-      {label}
-    </button>
-  );
-}
+const Button = ({ label, to, primary = false }: { label: string; to: string; primary?: boolean }) => (
+  <button onClick={() => navigate(to)} style={{ padding: '11px 16px', borderRadius: 999, border: primary ? '1px solid #62ff95' : '1px solid rgba(166,137,255,.5)', background: primary ? 'linear-gradient(90deg,#62ff95,#9f6bff)' : 'transparent', color: primary ? '#04050a' : '#eef0ff', cursor: 'pointer', fontWeight: 700 }}>
+    {label}
+  </button>
+);
 
-const Section = ({ title, children }: { title: string; children: React.ReactNode }) => <section style={styles.section}><h2 style={styles.sectionTitle}>{title}</h2>{children}</section>;
+const Placeholder = ({ title, text }: { title: string; text: string }) => (
+  <main style={styles.shell}><section style={{ ...styles.section, paddingTop: 30 }}><h1>{title}</h1><div style={styles.card}>{text}</div></section></main>
+);
 
-function LandingPage() {
-  return (
-    <div style={styles.shell}>
-      <section style={styles.hero}>
-        <p style={{ color: palette.green, fontWeight: 700, margin: 0 }}>Koschei — The Immortal AI Platform</p>
-        <h1 style={styles.heroTitle}>Build apps, games, websites, scripts, images, videos and voices with one immortal AI engine.</h1>
-        <p style={styles.subtitle}>A premium AI SaaS platform for builders who need one command center for generation, routing and delivery.</p>
-        <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}>
-          <LinkBtn to="/platform" label="Start Building" primary />
-          <LinkBtn to="/pricing" label="View Pricing" />
-        </div>
-      </section>
+function Home() {
+  return <main style={styles.shell}>
+    <section style={styles.hero}>
+      <p style={{ color: '#62ff95', margin: 0 }}>Koschei — The Immortal AI Platform</p>
+      <h1 style={styles.h1}>Build apps, games, websites, scripts, images, videos and voices with one immortal AI engine.</h1>
+      <p style={styles.sub}>Koschei combines code generation, AI chat, deep reasoning, image generation, video generation, voice tools and automation into one production platform.</p>
+      <div style={{ ...styles.row, marginTop: 24 }}><Button label='Start Building' to='/platform' primary /><Button label='View Pricing' to='/pricing' /></div>
+    </section>
 
-      <Section title="AI Tools">
-        <div style={styles.grid}>{tools.map((tool) => <div key={tool.name} style={styles.card}><h3 style={{ marginTop: 0 }}>{tool.name}</h3><p style={{ color: palette.muted, marginBottom: 0 }}>{tool.description}</p></div>)}</div>
-      </Section>
-
-      <Section title="Together Model Router">
-        <div style={styles.grid}>{models.map((model) => <div key={model} style={styles.card}><strong>{model}</strong></div>)}</div>
-      </Section>
-
-      <section style={styles.cta}>
-        <h2 style={{ marginTop: 0 }}>One immortal engine. Multiple creative outputs.</h2>
-        <p style={{ color: palette.muted }}>Route tasks by objective and unlock code, media and automation from a single interface.</p>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <LinkBtn to="/platform" label="Start Building" primary />
-          <LinkBtn to="/pricing" label="View Pricing" />
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function PlatformPage() {
-  return <div style={styles.shell}><section style={styles.hero}><h1 style={styles.heroTitle}>Platform / Tools</h1><p style={styles.subtitle}>Koschei workspace includes tool-specific lanes, model routing rules and project orchestration layers. Backend APIs stay in Go placeholder mode.</p><div style={styles.grid}>{tools.map((tool) => <div key={tool.name} style={styles.card}><h3 style={{ marginTop: 0 }}>{tool.name}</h3><p style={{ color: palette.muted }}>{tool.description}</p></div>)}</div></section></div>;
-}
-
-function PricingPage() {
-  return <div style={styles.shell}><section style={styles.hero}><h1 style={styles.heroTitle}>Pricing</h1><p style={styles.subtitle}>Transparent TL pricing for creators, teams and studios.</p><div style={styles.grid}>{plans.map((plan) => <div key={plan.name} style={{ ...styles.card, outline: plan.highlight ? `1px solid ${palette.green}` : 'none' }}><h3 style={{ marginTop: 0 }}>{plan.name}</h3><p style={{ color: palette.green, fontWeight: 800 }}>{plan.price}</p><p style={{ color: palette.muted, marginBottom: 0 }}>{plan.detail}</p></div>)}</div></section></div>;
-}
-
-function DashboardPage() {
-  return <div style={styles.shell}><section style={styles.hero}><h1 style={styles.heroTitle}>Dashboard</h1><p style={styles.subtitle}>Authenticated user dashboard placeholder. Connect to Go auth session and API gateways.</p></section></div>;
-}
-
-function BillingPage() {
-  return <div style={styles.shell}><section style={styles.hero}><h1 style={styles.heroTitle}>Billing</h1><p style={styles.subtitle}>Payment automation is disabled for now. Manual activation after payment is required.</p><div style={styles.grid}><div style={styles.card}><h3>Manual activation after payment</h3><p style={{ color: palette.muted }}>After a payment is verified, owner panel assigns the selected plan and credits manually.</p></div><div style={styles.card}><h3>Shopier links (placeholder)</h3><p style={{ color: palette.muted, marginBottom: 8 }}>Builder: {shopierLinks.builder}</p><p style={{ color: palette.muted, marginBottom: 8 }}>Pro: {shopierLinks.pro}</p><p style={{ color: palette.muted, marginBottom: 0 }}>Studio: {shopierLinks.studio}</p></div></div></section></div>;
-}
-
-function OwnerPage() {
-  return <div style={styles.shell}><section style={styles.hero}><h1 style={styles.heroTitle}>Private Owner God Mode</h1><p style={styles.subtitle}>Owner-only namespace for admin operations, manual plan assignment and credit management.</p><div style={styles.card}><strong>Role guard placeholder:</strong><p style={{ color: palette.muted }}>Only owner/admin role should access /owner routes. Public navigation never shows this route.</p></div></section></div>;
+    <section style={styles.section}><h2 style={styles.sectionTitle}>AI Tools Grid</h2><div style={styles.grid}>{tools.map((t) => <article key={t} style={styles.card}><h3 style={{ marginTop: 0 }}>{t}</h3></article>)}</div></section>
+    <section style={styles.section}><h2 style={styles.sectionTitle}>Smart model router</h2><div style={styles.grid}>{modelRouter.map((m) => <article key={m} style={styles.card}>{m}</article>)}</div></section>
+    <section style={styles.section}><h2 style={styles.sectionTitle}>Public SaaS</h2><article style={styles.card}>Normal users access Koschei through monthly plans and usage credits, while advanced AI execution is routed through backend services.</article></section>
+    <section style={styles.section}><h2 style={styles.sectionTitle}>Pricing preview</h2><div style={styles.grid}>{pricing.map((p) => <article key={p.name} style={styles.card}><h3 style={{ marginTop: 0 }}>{p.name}</h3><p style={{ marginBottom: 0, color: '#62ff95', fontWeight: 700 }}>{p.price}</p></article>)}</div></section>
+    <section style={{ ...styles.section, ...styles.card, marginTop: 38 }}><h2 style={{ marginTop: 0 }}>Start building with Koschei.</h2><div style={styles.row}><Button label='Start Building' to='/platform' primary /><Button label='View Pricing' to='/pricing' /></div></section>
+  </main>;
 }
 
 function App() {
   const [path, setPath] = useState(window.location.pathname);
-  useEffect(() => {
+  React.useEffect(() => {
     const onPop = () => setPath(window.location.pathname);
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  const route = useMemo<AppRoute>(() => {
-    if (path === '/' || path === '/platform' || path === '/pricing' || path === '/dashboard' || path === '/billing' || path.startsWith('/owner')) {
-      return (path.startsWith('/owner') ? '/owner' : path) as AppRoute;
-    }
-    return '/';
-  }, [path]);
+  const route = useMemo(() => ['/', '/platform', '/dashboard', '/pricing', '/billing'].includes(path) || path.startsWith('/owner') ? path : '/', [path]);
+  const canUser = currentRole === 'user' || currentRole === 'owner';
+  const canOwner = currentRole === 'owner';
 
-  const canUseProtected = session.role === 'user' || session.role === 'owner';
-  const canUseOwner = session.role === 'owner';
+  return <div style={styles.app}>
+    <header style={styles.nav}>
+      <button onClick={() => navigate('/')} style={{ border: 'none', background: 'none', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>Koschei</button>
+      <div style={styles.row}>
+        <Button label='Home' to='/' />
+        <Button label='Platform' to='/platform' />
+        <Button label='Pricing' to='/pricing' />
+        {canUser && <><Button label='Dashboard' to='/dashboard' /><Button label='Billing' to='/billing' /></>}
+        {canOwner && <Button label='Owner' to='/owner' />}
+      </div>
+    </header>
 
-  return (
-    <div style={styles.app}>
-      <header style={styles.nav}>
-        <button onClick={() => navigate('/')} style={{ background: 'transparent', border: 'none', color: palette.text, fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}>Koschei</button>
-        <nav style={styles.navLinks}>
-          <LinkBtn to="/" label="Landing" />
-          <LinkBtn to="/platform" label="Platform" />
-          <LinkBtn to="/pricing" label="Pricing" />
-          {canUseProtected && <LinkBtn to="/dashboard" label="Dashboard" />}
-          {canUseProtected && <LinkBtn to="/billing" label="Billing" />}
-        </nav>
-      </header>
-
-      {route === '/' && <LandingPage />}
-      {route === '/platform' && <PlatformPage />}
-      {route === '/pricing' && <PricingPage />}
-      {route === '/dashboard' && (canUseProtected ? <DashboardPage /> : <DashboardPage />)}
-      {route === '/billing' && (canUseProtected ? <BillingPage /> : <BillingPage />)}
-      {route === '/owner' && (canUseOwner ? <OwnerPage /> : <div style={styles.shell}><section style={styles.hero}><h1 style={styles.heroTitle}>Unauthorized</h1><p style={styles.subtitle}>Owner God Mode is protected by owner/admin role guard placeholder.</p></section></div>)}
-    </div>
-  );
+    {route === '/' && <Home />}
+    {route === '/platform' && <Placeholder title='Platform' text='Public route placeholder. Future AI calls must go through Go backend APIs only.' />}
+    {route === '/pricing' && <Placeholder title='Pricing' text='Public pricing route placeholder.' />}
+    {route === '/dashboard' && (canUser ? <Placeholder title='Dashboard' text='Protected dashboard placeholder route.' /> : <Placeholder title='Access Required' text='Dashboard requires authenticated user role.' />)}
+    {route === '/billing' && (canUser ? <Placeholder title='Billing' text='Protected billing placeholder route.' /> : <Placeholder title='Access Required' text='Billing requires authenticated user role.' />)}
+    {route.startsWith('/owner') && (canOwner ? <Placeholder title='Owner Panel' text='Private /owner route placeholder for admin-only tools.' /> : <Placeholder title='Unauthorized' text='Owner routes are private and never shown to public users.' />)}
+  </div>;
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

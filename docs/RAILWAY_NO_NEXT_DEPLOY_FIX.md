@@ -1,12 +1,38 @@
 # Railway No-Next Deploy Fix
 
-## What was fixed
+## Problem
+Railway was deploying the legacy `apps/web` Next.js skeleton, which produced a plain-text public page instead of the Koschei platform landing experience.
 
-- Railway build strategy was switched from the old `apps/web` Next.js command path to root-level Dockerfile deployment.
-- Root `Dockerfile` now builds and serves `koschei/frontend` (React + TypeScript + Vite) as the production web output.
-- `railway.toml` was updated to use the Dockerfile builder so Railway root directory can remain `/`.
-- This disables the accidental deployment path that previously pointed to the old `apps/web` Next.js skeleton.
+## Fix Summary
+- Root Directory remains `/`.
+- Railway build switched to Dockerfile mode.
+- Root `Dockerfile` now builds from `koschei/frontend`.
+- Root `package.json` no longer points to `apps/web` Next.js workspace scripts.
+- `railway.toml` no longer uses Nixpacks Next.js build/start commands.
+- Public homepage removes **Enter God Mode** and keeps owner controls private under `/owner`.
 
-## Result
+## Required Railway Settings
+`railway.toml` should be:
 
-Railway deploy now serves the premium Koschei frontend from `koschei/frontend/dist` instead of the older minimal/incorrect page path.
+```toml
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "./Dockerfile"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+```
+
+## Docker Build Path
+The deploy container builds the frontend from:
+
+- `koschei/frontend/package*.json`
+- `npm ci`
+- `npm run build`
+- runtime preview via `vite preview --host 0.0.0.0 --port 8080`
+
+## Public vs Owner Visibility
+- Public homepage includes: hero, AI tools, model router, SaaS explanation, pricing preview, CTA.
+- Public users do **not** see owner links or owner actions.
+- Owner-only tools are routed under `/owner` and should stay role-protected.
