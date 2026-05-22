@@ -1,104 +1,99 @@
-import Link from "next/link";
-import { getAllMachineryProducts, getFeaturedMachineryProduct } from "@/lib/machinery-catalog";
-import { machineryVideos } from "@/lib/machinery-media";
+"use client";
 
-const workflowSteps = [
-  "Customer submits crop, location, capacity and delivery requirements.",
-  "TradePi Globall validates RFQ details and detects missing importer/company information.",
-  "TradePi Globall drafts supplier-ready English inquiry for Cathy and receives supplier DDP proforma terms.",
-  "TradePi Globall records supplier-confirmed DDP quote and applies internal commission workflow.",
-  "TradePi Globall prepares one final customer quotation after admin approval.",
-  "Payment workflow can be arranged after quote approval.",
-];
+import { FormEvent, useMemo, useState } from "react";
+
+type Message = { role: "user" | "assistant"; text: string; type?: string; mediaUrl?: string };
+
+function detectLocalType(prompt: string) {
+  const lower = prompt.toLowerCase();
+  if (/(write code|typescript|python|kod|function|api)/i.test(lower)) return "code";
+  if (/(image|draw|logo|resim|görsel)/i.test(lower)) return "image";
+  if (/(video|cinematic|clip|kısa video)/i.test(lower)) return "video";
+  return "chat";
+}
 
 export default function HomePage() {
-  const featured = getFeaturedMachineryProduct();
-  const catalogPreview = getAllMachineryProducts().slice(0, 8);
+  const [prompt, setPrompt] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
+
+  const token = useMemo(() => (typeof window !== "undefined" ? localStorage.getItem("koschei_token") : null), []);
+
+  async function sendPrompt(e: FormEvent) {
+    e.preventDefault();
+    if (!prompt.trim()) return;
+    const localType = detectLocalType(prompt);
+    const userMessage: Message = { role: "user", text: prompt, type: localType };
+    setMessages((m) => [...m, userMessage]);
+    setLoading(true);
+    setPrompt("");
+
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token ?? ""}` },
+        body: JSON.stringify({ prompt, type: localType }),
+      });
+      if (!res.ok || !res.body) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Request failed");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let assistantText = "";
+      let metadataSeen = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        if (!metadataSeen) {
+          const lines = chunk.split("\n");
+          try {
+            const metadata = JSON.parse(lines[0] ?? "{}");
+            if (typeof metadata.credits === "number") setCredits(metadata.credits);
+            metadataSeen = true;
+            assistantText += lines.slice(1).join("\n");
+          } catch {
+            assistantText += chunk;
+          }
+        } else {
+          assistantText += chunk;
+        }
+        setMessages((prev) => [...prev.filter((x) => x.role === "user"), { role: "assistant", text: assistantText, type: localType }]);
+      }
+    } catch (error) {
+      setMessages((m) => [...m, { role: "assistant", text: error instanceof Error ? error.message : "Unknown error" }]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="container page-stack">
       <section className="hero">
-        <p className="eyebrow">TradePi Globall Machinery</p>
-        <h1>Commission-Based RFQ Brokerage for Agricultural Machinery</h1>
-        <p>
-          TradePi Globall is a quote-based B2B RFQ and secure payment coordination platform for
-          agricultural machinery. TradePi does not manufacture, ship, insure, clear customs, or
-          guarantee supplier delivery.
-        </p>
-        <div className="hero-actions">
-          <Link href="/request-quote" className="btn btn-primary">
-            Teklif Al
-          </Link>
-          {featured ? (
-            <Link href={`/products/${featured.slug}`} className="btn btn-secondary">
-              {featured.name} İncele
-            </Link>
-          ) : null}
-        </div>
+        <p className="eyebrow">KOSCHEI AI SUPER-APP</p>
+        <h1>Talk in English or Turkish — code, chat, image & video in one place.</h1>
+        <p>Automatic model routing: Qwen for code, Llama for chat, FLUX for images and Veo for video.</p>
+        <p><strong>Remaining credits:</strong> {credits ?? "-"}</p>
       </section>
 
       <section className="card">
-        <h2>Current Featured Product</h2>
-        <h3>{featured?.name ?? "Fine Cleaner 5X-5"}</h3>
-        <p>
-          Fine Cleaner 5X-5 remains featured, while the broader supplier machinery catalog is now
-          available for RFQ-based review.
-        </p>
+        <form onSubmit={sendPrompt} className="form-grid" style={{ gridTemplateColumns: "1fr auto" }}>
+          <input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Type in Turkish or English..." />
+          <button className="btn btn-primary" disabled={loading}>{loading ? "Thinking..." : "Send"}</button>
+        </form>
       </section>
 
-      <section className="card">
-        <h2>Machinery Catalog</h2>
-        <p>
-          Supplier catalog candidates are published without public pricing. Final machine scope and
-          quotation require supplier confirmation.
-        </p>
-        <div className="grid product-grid">
-          {catalogPreview.map((product) => (
-            <article className="card product-card" key={product.slug}>
-              <p className="eyebrow">{product.category}</p>
-              <h3>{product.name}</h3>
-              <p>{product.short_description}</p>
-              <Link href={`/products/${product.slug}`} className="btn btn-secondary">
-                Ürünü İncele
-              </Link>
-            </article>
-          ))}
-        </div>
-        <div className="hero-actions" style={{ marginTop: "1rem" }}>
-          <Link href="/products" className="btn btn-primary">
-            Tüm Kataloğu Gör
-          </Link>
-        </div>
-      </section>
-
-
-      <section className="card">
-        <h2>Machinery Videos</h2>
-        <div className="video-grid">
-          {machineryVideos.map((video) => (
-            <article className="video-card" key={video.id}>
-              <div className="video-frame">
-                <iframe
-                  src={video.embedUrl}
-                  title={video.title}
-                  loading="lazy"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                />
-              </div>
-              <p>{video.title}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="card">
-        <h2>How the RFQ Workflow Works</h2>
-        <ol className="step-list">
-          {workflowSteps.map((step) => (
-            <li key={step}>{step}</li>
-          ))}
-        </ol>
+      <section className="card" style={{ display: "grid", gap: 12 }}>
+        {messages.map((msg, i) => (
+          <article key={i} style={{ background: msg.role === "user" ? "#152635" : "#0f1c2b", color: "#f8fafc", padding: 12, borderRadius: 10 }}>
+            <p className="eyebrow" style={{ color: "#93c5fd" }}>{msg.role} {msg.type ? `• ${msg.type}` : ""}</p>
+            {msg.type === "code" ? <pre style={{ whiteSpace: "pre-wrap" }}>{msg.text}</pre> : <p style={{ whiteSpace: "pre-wrap" }}>{msg.text}</p>}
+          </article>
+        ))}
       </section>
     </div>
   );
