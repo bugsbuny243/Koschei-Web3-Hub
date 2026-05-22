@@ -25,7 +25,8 @@ export default function AuthPage() {
       if (!res.ok) throw new Error(data.error ?? "Failed");
       localStorage.setItem("koschei_token", data.token);
       localStorage.setItem("koschei_user", JSON.stringify(data.user));
-      router.push("/");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      router.push("/koschei");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
