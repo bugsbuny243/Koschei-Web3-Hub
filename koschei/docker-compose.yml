@@ -1,0 +1,31 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: koschei
+    ports: ["5432:5432"]
+  backend:
+    image: golang:1.22
+    working_dir: /app
+    volumes: ["./backend:/app"]
+    command: sh -c "go mod tidy && go run ./cmd/server"
+    environment:
+      PORT: 8080
+      DATABASE_URL: ${DATABASE_URL}
+      TOGETHER_API_KEY: ${TOGETHER_API_KEY}
+      FAL_KEY: ${FAL_KEY}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
+    ports: ["8080:8080"]
+    depends_on: [db]
+  frontend:
+    image: node:20
+    working_dir: /app
+    volumes: ["./frontend:/app"]
+    command: sh -c "npm install && npm run dev -- --host"
+    ports: ["5173:5173"]
+    depends_on: [backend]
