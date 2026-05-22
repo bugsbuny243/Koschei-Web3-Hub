@@ -143,7 +143,7 @@ export default function KoscheiPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ prompt: input }),
       });
 
       if (!response.ok || !response.body) {
