@@ -153,6 +153,7 @@ export default function KoscheiPage() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let assistantContent = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -163,13 +164,28 @@ export default function KoscheiPage() {
         buffer = lines.pop() ?? "";
 
         for (const line of lines) {
-          if (!line.trim()) continue;
+          const trimmedLine = line.trim();
+          if (!trimmedLine) continue;
+
+          const payload = trimmedLine.startsWith("data:")
+            ? trimmedLine.slice(5).trim()
+            : trimmedLine;
+
+          if (!payload || payload === "[DONE]") continue;
 
           let chunk: ApiChunk | null = null;
           try {
-            chunk = JSON.parse(line) as ApiChunk;
+            const parsed = JSON.parse(payload) as ApiChunk & {
+              choices?: Array<{ delta?: { content?: string } }>;
+            };
+            const deltaContent = parsed.choices?.[0]?.delta?.content;
+
+            chunk = {
+              ...parsed,
+              content: typeof deltaContent === "string" ? deltaContent : parsed.content,
+            };
           } catch {
-            chunk = { content: line };
+            chunk = { content: payload };
           }
 
           if (typeof chunk.creditsRemaining === "number") {
@@ -177,13 +193,15 @@ export default function KoscheiPage() {
           }
 
           if (typeof chunk.content === "string") {
+            assistantContent += chunk.content;
+            const nextType = chunk.type ?? detectTypeFromContent(assistantContent);
             setMessages((prev) =>
               prev.map((message) =>
                 message.id === assistantId
                   ? {
                       ...message,
-                      content: `${message.content}${chunk?.content ?? ""}`,
-                      type: chunk?.type ?? detectTypeFromContent(`${message.content}${chunk?.content ?? ""}`),
+                      content: assistantContent,
+                      type: nextType,
                     }
                   : message,
               ),
@@ -193,31 +211,45 @@ export default function KoscheiPage() {
       }
 
       if (buffer.trim()) {
-        let trailingChunk: ApiChunk | null = null;
-        try {
-          trailingChunk = JSON.parse(buffer) as ApiChunk;
-        } catch {
-          trailingChunk = { content: buffer };
-        }
+        const trimmedBuffer = buffer.trim();
+        const payload = trimmedBuffer.startsWith("data:")
+          ? trimmedBuffer.slice(5).trim()
+          : trimmedBuffer;
 
-        if (typeof trailingChunk.creditsRemaining === "number") {
-          setCreditsRemaining(trailingChunk.creditsRemaining);
-        }
+        if (payload && payload !== "[DONE]") {
+          let trailingChunk: ApiChunk | null = null;
+          try {
+            const parsed = JSON.parse(payload) as ApiChunk & {
+              choices?: Array<{ delta?: { content?: string } }>;
+            };
+            const deltaContent = parsed.choices?.[0]?.delta?.content;
+            trailingChunk = {
+              ...parsed,
+              content: typeof deltaContent === "string" ? deltaContent : parsed.content,
+            };
+          } catch {
+            trailingChunk = { content: payload };
+          }
 
-        if (typeof trailingChunk.content === "string") {
-          setMessages((prev) =>
-            prev.map((message) =>
-              message.id === assistantId
-                ? {
-                    ...message,
-                    content: `${message.content}${trailingChunk?.content ?? ""}`,
-                    type:
-                      trailingChunk?.type ??
-                      detectTypeFromContent(`${message.content}${trailingChunk?.content ?? ""}`),
-                  }
-                : message,
-            ),
-          );
+          if (typeof trailingChunk.creditsRemaining === "number") {
+            setCreditsRemaining(trailingChunk.creditsRemaining);
+          }
+
+          if (typeof trailingChunk.content === "string") {
+            assistantContent += trailingChunk.content;
+            const nextType = trailingChunk.type ?? detectTypeFromContent(assistantContent);
+            setMessages((prev) =>
+              prev.map((message) =>
+                message.id === assistantId
+                  ? {
+                      ...message,
+                      content: assistantContent,
+                      type: nextType,
+                    }
+                  : message,
+              ),
+            );
+          }
         }
       }
     } catch (error) {
@@ -282,7 +314,7 @@ export default function KoscheiPage() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`rounded-xl border p-4 ${
+                className={`rounded-xl border p-4 max-w-full overflow-x-hidden ${
                   message.role === "user"
                     ? "ml-auto max-w-[90%] border-sky-700/60 bg-sky-900/20"
                     : "mr-auto max-w-[95%] border-zinc-800 bg-zinc-900/80"
@@ -299,7 +331,8 @@ export default function KoscheiPage() {
                   <video src={message.content} controls className="h-auto max-w-full rounded-lg" />
                 ) : (
                   <div
-                    className="prose prose-invert max-w-none text-sm"
+                    className="prose prose-invert max-w-none text-sm whitespace-pre-wrap break-words"
+                    style={{ wordWrap: "break-word", overflowWrap: "break-word", maxWidth: "100%", overflowX: "hidden" }}
                     dangerouslySetInnerHTML={{ __html: renderMarkdownLike(message.content) }}
                   />
                 )}
