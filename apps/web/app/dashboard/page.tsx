@@ -1,0 +1,1 @@
+export default function DashboardPage(){return <section className="card"><h2>Public SaaS Dashboard</h2><p>Koschei tools: code generation, chat and analysis, image/video/audio generation, smart AI model router, project history, and credit usage tracking.</p></section>}

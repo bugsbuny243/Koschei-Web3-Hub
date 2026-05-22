@@ -1,0 +1,1 @@
+export default function Page(){return <section className="card"><h2>Order Detail</h2><p>Status lifecycle: draft → requirements_received → in_production → ready_for_review → ready_for_delivery → delivered → revision_requested → completed / cancelled.</p></section>}

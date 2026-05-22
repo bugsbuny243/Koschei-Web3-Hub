@@ -3,14 +3,14 @@ import "./globals.css";
 import { SiteChrome } from "./site-chrome";
 
 export const metadata: Metadata = {
-  title: "TradePi Globall Machinery",
+  title: "Koschei | The Immortal AI Platform",
   description:
-    "Quote-based B2B machinery supply and RFQ workflow for agricultural processing equipment.",
+    "Koschei public SaaS platform and private owner command center with one shared AI production engine.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="tr">
+    <html lang="en">
       <body><SiteChrome>{children}</SiteChrome></body>
     </html>
   );

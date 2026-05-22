@@ -1,0 +1,1 @@
+export default function Page(){return <section className="card"><h2>Delivery Workspace</h2><p>Delivery message generator, revision response generator, and final delivery package checklist.</p></section>}

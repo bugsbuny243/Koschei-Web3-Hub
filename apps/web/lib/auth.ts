@@ -4,18 +4,17 @@ import { getDbPool } from "@/lib/db";
 const JWT_SECRET = process.env.TOGETHER_API_KEY;
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
 
+type UserRole = "user" | "owner" | "admin";
+
 export type AppUser = {
   id: number;
   email: string;
   credits: number;
+  role: UserRole;
 };
 
 function base64url(input: Buffer | string) {
-  return Buffer.from(input)
-    .toString("base64")
-    .replace(/=/g, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_");
+  return Buffer.from(input).toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function sign(payload: Record<string, unknown>) {
@@ -28,7 +27,7 @@ function sign(payload: Record<string, unknown>) {
 
 export function createToken(user: AppUser) {
   const now = Math.floor(Date.now() / 1000);
-  return sign({ sub: user.id, email: user.email, credits: user.credits, iat: now, exp: now + TOKEN_TTL_SECONDS });
+  return sign({ sub: user.id, email: user.email, credits: user.credits, role: user.role, iat: now, exp: now + TOKEN_TTL_SECONDS });
 }
 
 export function verifyToken(token: string) {
@@ -39,17 +38,18 @@ export function verifyToken(token: string) {
   if (signature !== expected) return null;
   const payload = JSON.parse(Buffer.from(body, "base64").toString("utf-8"));
   if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
-  return payload as { sub: number; email: string; credits: number; exp: number };
+  return payload as { sub: number; email: string; credits: number; role: UserRole; exp: number };
 }
 
 export async function ensureUsersTable() {
   const db = getDbPool();
   if (!db) throw new Error("DATABASE_URL is not configured");
   await db.query(`
-    CREATE TABLE IF NOT EXISTS app_users (
+    CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'user',
       credits INTEGER NOT NULL DEFAULT 100,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
