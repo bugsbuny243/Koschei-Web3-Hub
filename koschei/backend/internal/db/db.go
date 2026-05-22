@@ -24,8 +24,18 @@ func RunMigrations(db *sql.DB) error {
 		id UUID PRIMARY KEY,
 		email TEXT UNIQUE NOT NULL,
 		password_hash TEXT NOT NULL,
-		tier TEXT NOT NULL DEFAULT 'free',
+		tier TEXT NOT NULL DEFAULT 'public_saas',
 		credits INTEGER NOT NULL DEFAULT 100,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	);
+	CREATE TABLE IF NOT EXISTS ai_generations (
+		id UUID PRIMARY KEY,
+		user_id UUID,
+		task_type TEXT NOT NULL,
+		model_name TEXT NOT NULL,
+		output_type TEXT NOT NULL,
+		credits_used INTEGER NOT NULL DEFAULT 0,
+		response_payload JSONB NOT NULL,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	);
 	`
