@@ -20,6 +20,7 @@ func NewServer(db *sql.DB, adminPassword string, corsOrigin string) http.Handler
 		if r.Method == http.MethodPost { h.CreateJob(w, r); return }
 		http.NotFound(w, r)
 	})
+	mux.HandleFunc("/api/runtime/route", method("POST", h.RuntimeRoute))
 	mux.HandleFunc("/api/owner/payment-requests", method("GET", h.OwnerPaymentRequests))
 	mux.HandleFunc("/api/owner/activate-plan", method("POST", h.OwnerActivatePlan))
 	mux.HandleFunc("/api/owner/grant-credits", method("POST", h.OwnerGrantCredits))
