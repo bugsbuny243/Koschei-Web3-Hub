@@ -40,8 +40,8 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	if os.Getenv("JWT_SECRET") == "" {
-		log.Printf("JWT_SECRET is not set")
+	if os.Getenv("NEON_AUTH_JWKS_URL") == "" {
+		log.Printf("NEON_AUTH_JWKS_URL is not set")
 	}
 	staticDir := os.Getenv("STATIC_DIR")
 	if staticDir == "" {
