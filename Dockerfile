@@ -8,7 +8,7 @@ COPY koschei/frontend ./
 RUN npm run build
 
 FROM golang:1.23-alpine AS go-builder
-WORKDIR /src
+WORKDIR /src/koschei/api
 
 COPY koschei/api/go.mod koschei/api/go.sum ./
 RUN go mod download
@@ -20,7 +20,7 @@ FROM alpine:3.20 AS runner
 WORKDIR /app
 
 COPY --from=go-builder /app/koschei-api /app/koschei-api
-COPY --from=go-builder /src/migrations /app/migrations
+COPY --from=go-builder /src/koschei/api/migrations /app/migrations
 COPY --from=frontend-builder /app/dist /app/public
 
 ENV PORT=8080
