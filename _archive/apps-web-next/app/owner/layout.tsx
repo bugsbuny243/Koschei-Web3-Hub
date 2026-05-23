@@ -1,3 +1,0 @@
-import Link from "next/link";
-
-export default function OwnerLayout({children}:{children:React.ReactNode}){return <div className="owner-shell"><aside className="owner-sidebar"><p className="owner-logo">Koschei God Mode</p><p className="owner-subtitle">Owner Command Center</p><nav className="owner-nav"><Link href="/owner">Overview</Link><Link href="/owner/orders">Orders</Link><Link href="/owner/service-templates">Service Templates</Link><Link href="/owner/profit-tracker">Profit Tracker</Link><Link href="/owner/prompt-studio">Prompt Studio</Link></nav></aside><main className="owner-content">{children}</main></div>}

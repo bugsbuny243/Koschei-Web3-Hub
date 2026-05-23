@@ -1,1 +1,0 @@
-export default function Page(){return <section className="card"><h2>Owner Orders</h2><p>Manual external order entry, requirement parsing, production briefs, checklists, and delivery preparation.</p></section>}
