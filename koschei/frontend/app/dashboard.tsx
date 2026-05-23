@@ -18,6 +18,11 @@ export default function Dashboard() {
 
   useEffect(() => {
     const loadMe = async () => {
+      const token = await auth.getToken();
+      if (!token) {
+        router.replace('/login');
+        return;
+      }
       try {
         const me: any = await api.me();
         if (me?.user) {
@@ -25,7 +30,10 @@ export default function Dashboard() {
           setPlan(typeof me.user.plan === 'string' && me.user.plan.trim() ? me.user.plan : 'free');
           setEmail(me.user.email || '');
         }
-      } catch {
+      } catch (e: any) {
+        if (String(e?.message || '').includes('401')) {
+          await auth.clearToken();
+        }
         router.replace('/login');
       }
     };

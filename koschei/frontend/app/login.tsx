@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { neonAuth } from '@/lib/neonAuth';
 import { auth } from '@/lib/auth';
+import { neonAuth } from '@/lib/neonAuth';
 import { Button, ErrorState, Input } from '@/components/ui';
 
 export default function Login() {
@@ -13,11 +13,18 @@ export default function Login() {
   const submit = async () => {
     setError('');
     try {
-      const token = await neonAuth.signInWithEmail(email.trim(), password);
+      const res: any = await neonAuth.signInWithEmail(email.trim(), password);
+      const token = neonAuth.tokenFrom(res);
+      if (!token) throw new Error('auth service unavailable');
       await auth.setToken(token);
       router.replace('/dashboard');
     } catch (e: any) {
-      setError(e?.message || 'auth service unavailable');
+      const msg = String(e?.message || '').toLowerCase();
+      if (msg.includes('invalid') || msg.includes('credential') || msg.includes('password')) {
+        setError('invalid email/password');
+      } else {
+        setError('auth service unavailable');
+      }
     }
   };
 

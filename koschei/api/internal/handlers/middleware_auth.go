@@ -17,7 +17,7 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			writeJSON(w, 401, map[string]string{"error": "unauthorized"})
 			return
 		}
-		claims, err := neonClaimsFromToken(strings.TrimSpace(strings.TrimPrefix(h, "Bearer ")))
+		claims, err := parseAndVerifyNeonJWT(r.Context(), strings.TrimSpace(strings.TrimPrefix(h, "Bearer ")))
 		if err != nil {
 			writeJSON(w, 401, map[string]string{"error": "unauthorized"})
 			return
