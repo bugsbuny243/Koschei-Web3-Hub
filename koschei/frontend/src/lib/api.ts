@@ -1,31 +1,30 @@
-const rawApiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
-const API_BASE = rawApiBase?.trim() || '';
+const API_BASE = (import.meta.env.EXPO_PUBLIC_API_URL as string | undefined)?.trim() || '';
+const TOKEN_KEY = 'koschei_token';
 
-export const apiConnected = true;
+export const tokenStore = {
+  get: () => localStorage.getItem(TOKEN_KEY) || '',
+  set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+};
 
-async function request(path: string, init?: RequestInit) {
+async function request(path: string, init?: RequestInit, auth = false) {
   const target = API_BASE ? `${API_BASE}${path}` : path;
-  const res = await fetch(target, {
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
-    ...init,
-  });
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init?.headers as Record<string, string> || {}) };
+  if (auth && tokenStore.get()) headers.Authorization = `Bearer ${tokenStore.get()}`;
+  const res = await fetch(target, { ...init, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
 
 export const api = {
+  register: (body: {email:string;password:string}) => request('/api/auth/register', { method:'POST', body: JSON.stringify(body)}),
+  login: (body: {email:string;password:string}) => request('/api/auth/login', { method:'POST', body: JSON.stringify(body)}),
+  me: () => request('/api/me', undefined, true),
   getPlans: () => request('/api/plans'),
-  createPaymentRequest: (body: unknown) => request('/api/billing/manual-payment-request', { method: 'POST', body: JSON.stringify(body) }),
-  getCredits: (email: string) => request(`/api/credits?email=${encodeURIComponent(email)}`),
-  getJobs: (email: string) => request(`/api/jobs?email=${encodeURIComponent(email)}`),
-  createJob: (body: unknown) => request('/api/jobs', { method: 'POST', body: JSON.stringify(body) }),
-  getRuntimeProjects: (email: string) => request(`/api/runtime/projects?email=${encodeURIComponent(email)}`),
-  getRuntimeTasks: (email: string) => request(`/api/runtime/tasks?email=${encodeURIComponent(email)}`),
-  getRuntimeLogs: (projectId: string) => request(`/api/runtime/logs/${projectId}`),
-  createRuntimeProject: (body: unknown) => request('/api/runtime/projects', { method: 'POST', body: JSON.stringify(body) }),
-  ownerPaymentRequests: (password: string) => request('/api/owner/payment-requests', { headers: { 'x-admin-password': password } }),
-  ownerActivatePlan: (password: string, body: unknown) => request('/api/owner/activate-plan', { method: 'POST', headers: { 'x-admin-password': password }, body: JSON.stringify(body) }),
-  ownerGrantCredits: (password: string, body: unknown) => request('/api/owner/grant-credits', { method: 'POST', headers: { 'x-admin-password': password }, body: JSON.stringify(body) }),
-  ownerUpdateJobStatus: (password: string, id: string, body: unknown) => request(`/api/owner/jobs/${id}/status`, { method: 'PATCH', headers: { 'x-admin-password': password }, body: JSON.stringify(body) }),
+  createPaymentRequest: (body: unknown) => request('/api/billing/manual-payment-request', { method: 'POST', body: JSON.stringify(body) }, true),
+  getRuntimeProjects: (email: string) => request(`/api/runtime/projects?email=${encodeURIComponent(email)}`, undefined, true),
+  getRuntimeTasks: (email: string) => request(`/api/runtime/tasks?email=${encodeURIComponent(email)}`, undefined, true),
+  getRuntimeLogs: (projectId: string) => request(`/api/runtime/logs/${projectId}`, undefined, true),
+  createRuntimeProject: (body: unknown) => request('/api/runtime/projects', { method: 'POST', body: JSON.stringify(body) }, true),
 };
