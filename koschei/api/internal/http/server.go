@@ -21,7 +21,7 @@ func NewServer(db *sql.DB, adminPassword string, corsOrigin string, staticDir st
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"app":    "koschei",
 			"status": "ok",
-			"build":  "phase3-current",
+			"build":  "phase3-a-runtime-stable",
 		})
 	}))
 	mux.HandleFunc("/api/auth/register", requiresDB(h, method("POST", h.Register)))
