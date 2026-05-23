@@ -51,18 +51,18 @@ func (h *Handler) OwnerActivatePlan(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
-	_, err := h.DB.Exec(`INSERT INTO credits_ledger (email, amount, reason) VALUES ($1,$2,$3)`, req.Email, req.Credits, "plan activation: "+req.Note)
-	if err != nil {
+	if _, err := h.DB.Exec(`UPDATE app_user_profiles SET credits = credits + $2, updated_at=now() WHERE lower(email)=lower($1)`, req.Email, req.Credits); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
-
-	_, err = h.DB.Exec(`UPDATE payment_requests SET status='approved', reviewed_at=now() WHERE email=$1 AND plan=$2 AND status='pending'`, req.Email, req.Plan)
-	if err != nil {
+	if _, err := h.DB.Exec(`INSERT INTO credit_events (email, amount, reason, event_type) VALUES ($1,$2,$3,$4)`, req.Email, req.Credits, "plan activation: "+req.Note, "plan_activation"); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
-
+	if _, err := h.DB.Exec(`UPDATE payment_requests SET status='approved', reviewed_at=now() WHERE email=$1 AND plan=$2 AND status='pending'`, req.Email, req.Plan); err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		return
+	}
 	writeJSON(w, 200, map[string]string{"message": "plan activated"})
 }
 
@@ -75,8 +75,11 @@ func (h *Handler) OwnerGrantCredits(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
-	_, err := h.DB.Exec(`INSERT INTO credits_ledger (email, amount, reason) VALUES ($1,$2,$3)`, req.Email, req.Credits, req.Reason)
-	if err != nil {
+	if _, err := h.DB.Exec(`UPDATE app_user_profiles SET credits = credits + $2, updated_at=now() WHERE lower(email)=lower($1)`, req.Email, req.Credits); err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		return
+	}
+	if _, err := h.DB.Exec(`INSERT INTO credit_events (email, amount, reason, event_type) VALUES ($1,$2,$3,$4)`, req.Email, req.Credits, req.Reason, "manual_grant"); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
