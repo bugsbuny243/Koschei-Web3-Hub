@@ -1,10 +1,11 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const rawApiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
+const API_BASE = rawApiBase?.trim() || '';
 
-export const apiConnected = Boolean(API_BASE);
+export const apiConnected = true;
 
 async function request(path: string, init?: RequestInit) {
-  if (!API_BASE) throw new Error('API not connected yet');
-  const res = await fetch(`${API_BASE}${path}`, {
+  const target = API_BASE ? `${API_BASE}${path}` : path;
+  const res = await fetch(target, {
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
     ...init,
   });

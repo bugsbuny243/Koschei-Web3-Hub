@@ -2,13 +2,16 @@ package http
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"koschei/api/internal/handlers"
 )
 
-func NewServer(db *sql.DB, adminPassword string, corsOrigin string) http.Handler {
+func NewServer(db *sql.DB, adminPassword string, corsOrigin string, staticDir string) http.Handler {
 	h := &handlers.Handler{DB: db, AdminPassword: adminPassword, Limiter: handlers.NewLimiter()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", h.Health)
@@ -67,7 +70,35 @@ func NewServer(db *sql.DB, adminPassword string, corsOrigin string) http.Handler
 		}
 		http.NotFound(w, r)
 	})
-	return cors(mux, corsOrigin)
+
+	if staticDir != "" {
+		if info, err := os.Stat(staticDir); err != nil || !info.IsDir() {
+			log.Printf("warning: static directory unavailable at %q: %v", staticDir, err)
+		} else {
+			static := http.FileServer(http.Dir(staticDir))
+			indexPath := filepath.Join(staticDir, "index.html")
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				if strings.HasPrefix(r.URL.Path, "/api/") {
+					http.NotFound(w, r)
+					return
+				}
+				if r.Method != http.MethodGet && r.Method != http.MethodHead {
+					http.NotFound(w, r)
+					return
+				}
+				candidate := filepath.Join(staticDir, strings.TrimPrefix(filepath.Clean(r.URL.Path), "/"))
+				if fileInfo, err := os.Stat(candidate); err == nil && !fileInfo.IsDir() {
+					static.ServeHTTP(w, r)
+					return
+				}
+				http.ServeFile(w, r, indexPath)
+			})
+		}
+	} else {
+		log.Printf("warning: STATIC_DIR is empty; frontend static files not enabled")
+	}
+
+	return securityHeaders(cors(mux, corsOrigin))
 }
 
 func method(m string, next http.HandlerFunc) http.HandlerFunc {
@@ -90,6 +121,16 @@ func cors(next http.Handler, origin string) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 		next.ServeHTTP(w, r)
 	})
 }
