@@ -1,30 +1,33 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api, apiConnected } from './lib/api';
+import { useEffect, useState } from 'react';
 
-const pricing = [
-  { id: 'free', name: 'Free', price: '0 TL', credits: 500 },
-  { id: 'builder', name: 'Builder', price: '899 TL', credits: 20000 },
-  { id: 'pro', name: 'Pro', price: '2299 TL', credits: 70000 },
-  { id: 'studio', name: 'Studio', price: '4999 TL', credits: 180000 },
-];
-const nav = (to: string) => { window.history.pushState({}, '', to); window.dispatchEvent(new PopStateEvent('popstate')); };
-const disconnected = <p className="subtext">API not connected yet</p>;
+type Project = { id:string; title:string; prompt:string; status:string; created_at:string };
+type Task = { id:string; project_id:string; task_type:string; status:string; result?:string; error?:string };
+type Log = { id:string; level:string; message:string; created_at:string };
 
-function Home() { return <main className="container"><section className="hero premium-card"><div><p className="eyebrow">Koschei Premium AI SaaS</p><h1>Build with an Immortal AI Command Center for Code, Media, and Automation.</h1><p className="subtext">Koschei unifies tools so teams can generate products, content, and workflows from one premium platform.</p><div className="actions"><button className="btn primary" onClick={()=>nav('/pricing')}>View Pricing</button><button className="btn" onClick={()=>nav('/dashboard')}>Open Dashboard</button></div></div></section></main>; }
-function PricingPage() { return <main className="container page premium-card"><h1>Pricing</h1><div className="grid">{pricing.map((p)=><article className="card" key={p.id}><h3>{p.name}</h3><p className="price">{p.price}</p><p>{p.credits} credits/mo</p><button className="btn primary" onClick={()=>nav(`/billing?plan=${p.id}`)}>Choose {p.name}</button></article>)}</div></main>; }
+const navigate = (to: string) => { window.history.pushState({}, '', to); window.dispatchEvent(new PopStateEvent('popstate')); };
 
-function BillingPage() { const params = new URLSearchParams(window.location.search); const [plan,setPlan]=useState(params.get('plan')||'builder'); const [email,setEmail]=useState(''); const [payment_reference,setRef]=useState(''); const [note,setNote]=useState(''); const [msg,setMsg]=useState('');
-  const submit=async()=>{ try{const d=await api.createPaymentRequest({email,plan,payment_provider:'shopier',payment_reference,note}); setMsg(d.message);}catch(e:any){setMsg(e.message);} };
-  return <main className="container page premium-card"><h1>Billing</h1>{!apiConnected?disconnected:<><select value={plan} onChange={e=>setPlan(e.target.value)}>{pricing.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><input placeholder="email" value={email} onChange={e=>setEmail(e.target.value)} /><input value="shopier" disabled /><input placeholder="payment reference (optional)" value={payment_reference} onChange={e=>setRef(e.target.value)} /><textarea placeholder="note (optional)" value={note} onChange={e=>setNote(e.target.value)} /><button className="btn primary" onClick={submit}>Create Payment Request</button><p>{msg}</p></>}</main>; }
+function Home() {
+  return <main className="container"><section className="hero premium-card"><h1>Koschei AI Production Engine</h1><p>Koschei routes each request through planning, generation, review and delivery stages.</p></section><section className="premium-card"><h2>Command Center</h2><div className="grid"><article className="card"><h3>Workflow Router</h3></article><article className="card"><h3>Parallel AI Workers</h3></article><article className="card"><h3>Credit Ledger</h3></article></div></section></main>
+}
 
-function DashboardPage(){ const [email,setEmail]=useState(''); const [credits,setCredits]=useState<number|undefined>(); const [jobs,setJobs]=useState<any[]>([]); const [tool,setTool]=useState('code-generator'); const [prompt,setPrompt]=useState(''); const [msg,setMsg]=useState('');
-  const load=async()=>{ try{const c=await api.getCredits(email); const j=await api.getJobs(email); setCredits(c.credits); setJobs(j.jobs||[]);}catch(e:any){setMsg(e.message);} };
-  const create=async()=>{ try{const r=await api.createJob({email,tool,prompt}); setMsg(`Job created: ${r.id} (${r.status})`); await load();}catch(e:any){setMsg(e.message);} };
-  return <main className="container page premium-card"><h1>Dashboard</h1>{!apiConnected?disconnected:<><input placeholder="email" value={email} onChange={e=>setEmail(e.target.value)} /><button className="btn" onClick={load}>Load Data</button><p>Credits: {credits ?? '-'}</p><select value={tool} onChange={e=>setTool(e.target.value)}><option>code-generator</option><option>web-builder</option><option>image-studio</option></select><textarea placeholder="prompt" value={prompt} onChange={e=>setPrompt(e.target.value)} /><button className="btn primary" onClick={create}>Create Queued Job</button><p>{msg}</p><ul>{jobs.map((j)=><li key={j.id}>{j.tool} - {j.status}</li>)}</ul></>}</main>; }
+function Dashboard() {
+  const [email,setEmail]=useState(''); const [title,setTitle]=useState(''); const [prompt,setPrompt]=useState('');
+  const [projects,setProjects]=useState<Project[]>([]); const [tasks,setTasks]=useState<Task[]>([]); const [logs,setLogs]=useState<Log[]>([]); const [projectId,setProjectId]=useState('');
+  const refresh = async () => {
+    if (!email) return;
+    const p=await fetch(`/api/runtime/projects?email=${encodeURIComponent(email)}`).then(r=>r.json()); setProjects(Array.isArray(p)?p:[]);
+    const t=await fetch(`/api/runtime/tasks?email=${encodeURIComponent(email)}`).then(r=>r.json()); setTasks(Array.isArray(t)?t:[]);
+  };
+  const createProject = async () => {
+    await fetch('/api/runtime/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,title,prompt})});
+    setTitle(''); setPrompt(''); refresh();
+  };
+  const loadLogs = async (pid:string) => { setProjectId(pid); const l=await fetch(`/api/runtime/logs/${pid}`).then(r=>r.json()); setLogs(Array.isArray(l)?l:[]); };
+  useEffect(()=>{ if(email) refresh(); },[]);
+  return <main className="container page premium-card"><h1>Command Center Dashboard</h1><div className="actions"><input placeholder='email' value={email} onChange={e=>setEmail(e.target.value)} /><button className='btn' onClick={refresh}>Refresh</button></div><div className='grid'><input placeholder='Project title' value={title} onChange={e=>setTitle(e.target.value)} /><input placeholder='Prompt' value={prompt} onChange={e=>setPrompt(e.target.value)} /><button className='btn primary' onClick={createProject}>Create Project</button></div><h2>Projects</h2>{projects.map(p=><article className='card' key={p.id}><b>{p.title}</b> <span>{p.status}</span> <button className='btn' onClick={()=>loadLogs(p.id)}>Logs</button></article>)}<h2>Tasks</h2>{tasks.map(t=><article className='card' key={t.id}><b>{t.task_type}</b> <span>{t.status}</span><p>{t.result || t.error || 'Pending...'}</p></article>)}<h2>Logs {projectId && `(Project ${projectId.slice(0,8)})`}</h2>{logs.map(l=><article className='card' key={l.id}><b>[{l.level}]</b> {l.message}</article>)}</main>
+}
 
-function OwnerPage(){ const [pwd,setPwd]=useState(''); const [requests,setRequests]=useState<any[]>([]); const [email,setEmail]=useState(''); const [plan,setPlan]=useState('builder'); const [credits,setCredits]=useState(20000); const [note,setNote]=useState('manual Shopier activation'); const [jobId,setJobId]=useState(''); const [status,setStatus]=useState('completed'); const [result,setResult]=useState(''); const [msg,setMsg]=useState('');
-  const load=async()=>{try{const d=await api.ownerPaymentRequests(pwd); setRequests(d.payment_requests||[]);}catch(e:any){setMsg(e.message)}};
-  return <main className="container page premium-card"><h1>Owner</h1>{!apiConnected?disconnected:<><input placeholder="admin password" value={pwd} onChange={e=>setPwd(e.target.value)} /><button className="btn" onClick={load}>Load Payment Requests</button><ul>{requests.map((r)=><li key={r.id}>{r.email} - {r.plan} - {r.status}</li>)}</ul><h3>Activate Plan</h3><input placeholder="email" value={email} onChange={e=>setEmail(e.target.value)} /><select value={plan} onChange={e=>setPlan(e.target.value)}>{pricing.map(p=><option key={p.id} value={p.id}>{p.id}</option>)}</select><input type="number" value={credits} onChange={e=>setCredits(Number(e.target.value))}/><input value={note} onChange={e=>setNote(e.target.value)}/><button className="btn" onClick={async()=>{try{await api.ownerActivatePlan(pwd,{email,plan,credits,note});setMsg('Plan activated')}catch(e:any){setMsg(e.message)}}}>Activate</button><h3>Grant Credits</h3><button className="btn" onClick={async()=>{try{await api.ownerGrantCredits(pwd,{email,credits:1000,reason:'manual top-up'});setMsg('Credits granted')}catch(e:any){setMsg(e.message)}}}>Grant +1000</button><h3>Update Job Status</h3><input placeholder="job id" value={jobId} onChange={e=>setJobId(e.target.value)} /><input value={status} onChange={e=>setStatus(e.target.value)} /><textarea value={result} onChange={e=>setResult(e.target.value)} /><button className="btn" onClick={async()=>{try{await api.ownerUpdateJobStatus(pwd,jobId,{status,result});setMsg('Job updated')}catch(e:any){setMsg(e.message)}}}>Update Job</button><p>{msg}</p></>}</main>; }
+function Owner() { return <main className='container page premium-card'><h1>Owner Cockpit / God Mode</h1><p>Private controls for payment requests, users/credits, runtime projects, runtime tasks, retry/cancel.</p></main>; }
 
-export default function App(){ const [path,setPath]=useState(window.location.pathname); useEffect(()=>{const p=()=>setPath(window.location.pathname); window.addEventListener('popstate',p); return ()=>window.removeEventListener('popstate',p);},[]); const route=useMemo(()=>['/','/pricing','/billing','/dashboard','/owner'].includes(path)?path:'/',[path]);
-return <div><header className="topbar"><button className="logo" onClick={()=>nav('/')}>KOSCHEI</button><nav><button className="btn" onClick={()=>nav('/pricing')}>Pricing</button><button className="btn" onClick={()=>nav('/dashboard')}>Dashboard</button><button className="btn" onClick={()=>nav('/billing')}>Billing</button></nav></header>{route==='/'&&<Home/>}{route==='/pricing'&&<PricingPage/>}{route==='/billing'&&<BillingPage/>}{route==='/dashboard'&&<DashboardPage/>}{route==='/owner'&&<OwnerPage/>}</div>; }
+export default function App(){ const [path,setPath]=useState(window.location.pathname); useEffect(()=>{const f=()=>setPath(window.location.pathname); window.addEventListener('popstate',f); return ()=>window.removeEventListener('popstate',f)},[]);
+return <div><header className='topbar'><button className='logo' onClick={()=>navigate('/')}>KOSCHEI</button><nav><button className='btn' onClick={()=>navigate('/dashboard')}>Dashboard</button><button className='btn' onClick={()=>navigate('/pricing')}>Pricing</button></nav></header>{path==='/dashboard'?<Dashboard/>:path==='/owner'?<Owner/>:<Home/>}</div>}
