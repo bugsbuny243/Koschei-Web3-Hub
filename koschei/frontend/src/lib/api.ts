@@ -12,13 +12,11 @@ async function request(path: string, init?: RequestInit, auth = false) {
   }
   const res = await fetch(target, { ...init, headers });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.details ? `${data.error || 'Request failed'}: ${data.details}` : (data.error || `Request failed (${res.status})`));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
 
 export const api = {
-  register: (body: {email:string;password:string}) => request('/api/auth/register', { method:'POST', body: JSON.stringify(body)}),
-  login: (body: {email:string;password:string}) => request('/api/auth/login', { method:'POST', body: JSON.stringify(body)}),
   me: () => request('/api/me', undefined, true),
   getPlans: () => request('/api/plans'),
   createPaymentRequest: (body: unknown) => request('/api/billing/manual-payment-request', { method: 'POST', body: JSON.stringify(body) }, true),
