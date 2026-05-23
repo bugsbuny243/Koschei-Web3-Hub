@@ -26,15 +26,15 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	claims, ok := userFromContext(r.Context())
 	if !ok || strings.TrimSpace(claims.Email) == "" {
-		writeJSON(w, 401, map[string]string{"error": "unauthorized"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
 	user, err := h.upsertAppProfile(r.Context(), claims.Sub, claims.Email)
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db failed"})
 		return
 	}
-	writeJSON(w, 200, map[string]any{"user": user})
+	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 
 func (h *Handler) upsertAppProfile(ctx context.Context, subject, email string) (authUser, error) {
@@ -47,10 +47,6 @@ RETURNING id::text, email, role, plan_id, credits`
 		return h.DB.QueryRowContext(inner, q, subject, strings.ToLower(strings.TrimSpace(email))).Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
 	})
 	return out, err
-}
-
-func parseAndVerifyNeonJWT(_ context.Context, token string) (jwtClaims, error) {
-	return neonClaimsFromToken(token)
 }
 
 func (h *Handler) runWithRetry(ctx context.Context, op func(context.Context) error) error {

@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-type jwtClaims struct {
+type neonJWTClaims struct {
 	Sub   string `json:"sub"`
 	Email string `json:"email"`
 	Iss   string `json:"iss"`
@@ -28,10 +28,10 @@ type userProfile struct {
 	ID, Email, Role, PlanID string
 	Credits                 int
 }
-type jwksDoc struct {
-	Keys []jwk `json:"keys"`
+type neonJWKSDoc struct {
+	Keys []neonJWK `json:"keys"`
 }
-type jwk struct {
+type neonJWK struct {
 	Kid, Kty, N, E string `json:"kid","kty","n","e"`
 }
 
@@ -40,8 +40,11 @@ var (
 	jwksMu    sync.RWMutex
 )
 
-func neonClaimsFromToken(token string) (jwtClaims, error) {
-	var out jwtClaims
+func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
+	return neonClaimsFromToken(token)
+}
+func neonClaimsFromToken(token string) (neonJWTClaims, error) {
+	var out neonJWTClaims
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return out, errors.New("invalid token")
@@ -112,7 +115,7 @@ func loadJWKSPublicKey(kid string) (*rsa.PublicKey, error) {
 	if resp.StatusCode/100 != 2 {
 		return nil, errors.New("jwks unavailable")
 	}
-	var doc jwksDoc
+	var doc neonJWKSDoc
 	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
 		return nil, err
 	}
