@@ -6,7 +6,31 @@ import { auth } from '@/lib/auth';
 import { Button, ErrorState, Input } from '@/components/ui';
 
 export default function Register() {
-  const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [error, setError] = useState('');
-  const submit = async () => { setError(''); try { const res:any = await api.register({ email, password }); if (!res.token) throw new Error('Missing token in response.'); await auth.setToken(res.token); router.replace('/dashboard'); } catch (e:any) { setError(e.message); } };
-  return <View className="flex-1 bg-[#0a0a0a] p-6 gap-3"><Text className="text-3xl text-white">Register</Text><Input placeholder="Email" autoCapitalize="none" value={email} onChangeText={setEmail}/><Input placeholder="Password" secureTextEntry value={password} onChangeText={setPassword}/>{!!error && <ErrorState text={error}/>}<Button label="Create Account" onPress={submit}/></View>;
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    setError('');
+    try {
+      const res: any = await api.register({ email, password });
+      if (!res.token) throw new Error('Missing token in response.');
+      await auth.setToken(res.token);
+      router.replace('/dashboard');
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  return (
+    <View className="flex-1 bg-[#0a0a0a] p-6 gap-3" style={{ backgroundColor: '#0a0a0a' }}>
+      <Text className="text-3xl text-white" style={{ color: '#ffffff' }}>
+        Register
+      </Text>
+      <Input placeholder="Email" autoCapitalize="none" value={email} onChangeText={setEmail} />
+      <Input placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
+      {!!error && <ErrorState text={error} />}
+      <Button label="Create Account" onPress={submit} />
+    </View>
+  );
 }
