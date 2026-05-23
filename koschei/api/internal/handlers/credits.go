@@ -10,7 +10,7 @@ func (h *Handler) Credits(w http.ResponseWriter, r *http.Request) {
 	}
 	email := claims.Email
 	var total int
-	if err := h.DB.QueryRow(`SELECT COALESCE(SUM(amount),0) FROM credits_ledger WHERE email=$1`, email).Scan(&total); err != nil {
+	if err := h.DB.QueryRow(`SELECT COALESCE(SUM(amount),0) FROM credit_events WHERE email=$1`, email).Scan(&total); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}

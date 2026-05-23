@@ -121,7 +121,7 @@ func runMigrations(db *sql.DB) (int, int, error) {
 }
 
 func verifySchema(db *sql.DB) error {
-	required := []string{"schema_migrations", "plans", "payment_requests", "credits_ledger", "generation_jobs", "model_route_logs", "runtime_projects", "runtime_tasks", "runtime_logs", "auth_accounts"}
+	required := []string{"schema_migrations", "plans", "payment_requests", "credit_events", "generation_jobs", "model_route_logs", "runtime_projects", "runtime_tasks", "runtime_logs"}
 	for _, t := range required {
 		var ok bool
 		if err := db.QueryRow(`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name=$1)`, t).Scan(&ok); err != nil || !ok {

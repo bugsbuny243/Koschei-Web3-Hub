@@ -51,7 +51,7 @@ func (h *Handler) OwnerActivatePlan(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
-	_, err := h.DB.Exec(`INSERT INTO credits_ledger (email, amount, reason) VALUES ($1,$2,$3)`, req.Email, req.Credits, "plan activation: "+req.Note)
+	_, err := h.DB.Exec(`INSERT INTO credit_events (email, amount, reason) VALUES ($1,$2,$3)`, req.Email, req.Credits, "plan activation: "+req.Note)
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
@@ -75,7 +75,7 @@ func (h *Handler) OwnerGrantCredits(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
-	_, err := h.DB.Exec(`INSERT INTO credits_ledger (email, amount, reason) VALUES ($1,$2,$3)`, req.Email, req.Credits, req.Reason)
+	_, err := h.DB.Exec(`INSERT INTO credit_events (email, amount, reason) VALUES ($1,$2,$3)`, req.Email, req.Credits, req.Reason)
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return

@@ -7,8 +7,12 @@ import (
 )
 
 type authUser struct {
-	ID, Email, Role, Plan string
-	Credits               int
+	ID          string `json:"id"`
+	AuthSubject string `json:"auth_subject"`
+	Email       string `json:"email"`
+	Role        string `json:"role"`
+	PlanID      string `json:"plan_id"`
+	Credits     int    `json:"credits"`
 }
 
 func (h *Handler) Register(w http.ResponseWriter, _ *http.Request) {
@@ -34,7 +38,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db failed"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": user})
+	writeJSON(w, http.StatusOK, user)
 }
 
 func (h *Handler) upsertAppProfile(ctx context.Context, subject, email string) (authUser, error) {
@@ -42,9 +46,9 @@ func (h *Handler) upsertAppProfile(ctx context.Context, subject, email string) (
 	q := `INSERT INTO app_user_profiles (auth_subject, email)
 VALUES ($1, $2)
 ON CONFLICT (auth_subject) DO UPDATE SET email=EXCLUDED.email, updated_at=now()
-RETURNING id::text, email, role, plan_id, credits`
+RETURNING id::text, auth_subject, email, role, plan_id, credits`
 	err := h.runWithRetry(ctx, func(inner context.Context) error {
-		return h.DB.QueryRowContext(inner, q, subject, strings.ToLower(strings.TrimSpace(email))).Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
+		return h.DB.QueryRowContext(inner, q, subject, strings.ToLower(strings.TrimSpace(email))).Scan(&out.ID, &out.AuthSubject, &out.Email, &out.Role, &out.PlanID, &out.Credits)
 	})
 	return out, err
 }

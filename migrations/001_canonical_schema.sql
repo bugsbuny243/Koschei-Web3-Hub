@@ -16,21 +16,6 @@ CREATE TABLE IF NOT EXISTS plans (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE plans
-ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-
-ALTER TABLE plans
-ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
-
-CREATE TABLE IF NOT EXISTS auth_accounts (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email citext UNIQUE NOT NULL,
-  password_hash text NOT NULL,
-  plan text NOT NULL DEFAULT 'free',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);
-
 CREATE TABLE IF NOT EXISTS payment_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text NOT NULL,
@@ -39,11 +24,12 @@ CREATE TABLE IF NOT EXISTS payment_requests (
   payment_reference text NOT NULL,
   note text NOT NULL DEFAULT '',
   status text NOT NULL DEFAULT 'pending',
+  reviewed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS credits_ledger (
+CREATE TABLE IF NOT EXISTS credit_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text NOT NULL,
   amount integer NOT NULL,
@@ -57,7 +43,7 @@ CREATE TABLE IF NOT EXISTS generation_jobs (
   prompt text NOT NULL,
   tool text,
   status text NOT NULL DEFAULT 'queued',
-  output text,
+  result text,
   error text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()

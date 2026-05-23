@@ -11,7 +11,7 @@ func (h *Handler) OwnerDBHealth(w http.ResponseWriter, r *http.Request) {
 		"schema_migrations",
 		"plans",
 		"payment_requests",
-		"credits_ledger",
+		"credit_events",
 		"generation_jobs",
 		"runtime_projects",
 		"runtime_tasks",
@@ -93,21 +93,21 @@ func (h *Handler) OwnerDBHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	rows.Close()
 
-	var creditsLedgerRowCount int
-	if err := h.DB.QueryRow(`SELECT COUNT(*) FROM credits_ledger`).Scan(&creditsLedgerRowCount); err != nil {
+	var creditEventsRowCount int
+	if err := h.DB.QueryRow(`SELECT COUNT(*) FROM credit_events`).Scan(&creditEventsRowCount); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
 
-	duplicateTables := []string{"credit_events", "credit_ledger", "app_users", "users", "user_projects"}
-	duplicatePresence := map[string]bool{}
-	for _, table := range duplicateTables {
+	legacyTables := []string{"credit_ledger", "app_users", "users", "user_projects", "auth_accounts"}
+	legacyPresence := map[string]bool{}
+	for _, table := range legacyTables {
 		var ok bool
 		if err := h.DB.QueryRow(`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=$1)`, table).Scan(&ok); err != nil {
 			writeJSON(w, 500, map[string]string{"error": "db failed"})
 			return
 		}
-		duplicatePresence[table] = ok
+		legacyPresence[table] = ok
 	}
 
 	writeJSON(w, 200, map[string]any{
@@ -115,11 +115,11 @@ func (h *Handler) OwnerDBHealth(w http.ResponseWriter, r *http.Request) {
 			"present": present,
 			"missing": missing,
 		},
-		"plan_ids":                   planIDs,
-		"payment_requests_by_status": paymentByStatus,
-		"runtime_projects_count":     runtimeProjectsCount,
-		"runtime_tasks_by_status":    runtimeTasksByStatus,
-		"credits_ledger_row_count":   creditsLedgerRowCount,
-		"legacy_duplicate_tables":    duplicatePresence,
+		"plan_ids":                      planIDs,
+		"payment_requests_by_status":    paymentByStatus,
+		"runtime_projects_count":        runtimeProjectsCount,
+		"runtime_tasks_by_status":       runtimeTasksByStatus,
+		"credit_events_row_count":       creditEventsRowCount,
+		"legacy_removed_tables_present": legacyPresence,
 	})
 }
