@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -11,15 +12,19 @@ import (
 
 func main() {
 	databaseURL := os.Getenv("DATABASE_URL")
+	var conn = (*sql.DB)(nil)
 	if databaseURL == "" {
-		log.Fatal("DATABASE_URL is required")
+		log.Printf("warning: DATABASE_URL is not set; database-backed API routes will return 503")
+	} else {
+		var err error
+		conn, err = db.Connect(databaseURL)
+		if err != nil {
+			log.Printf("warning: database connection failed: %v", err)
+		}
 	}
-
-	conn, err := db.Connect(databaseURL)
-	if err != nil {
-		log.Fatal(err)
+	if conn != nil {
+		defer conn.Close()
 	}
-	defer conn.Close()
 
 	port := os.Getenv("PORT")
 	if port == "" {
