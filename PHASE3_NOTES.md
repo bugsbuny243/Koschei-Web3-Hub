@@ -1,4 +1,6 @@
 # Phase 3 Notes
 
-- Streaming chat endpoint is not currently present in Go API routes. Frontend currently uses request/response flow for project generation.
-- React web build now uses `EXPO_PUBLIC_API_URL` to support Expo/RNW-compatible env naming and avoids hardcoded API URLs.
+- Auth endpoints are present in Go API (`/api/auth/register`, `/api/auth/login`, `/api/me`) and token-auth protected private endpoints are wired.
+- Streaming response endpoint is not currently present in Go API routes.
+- Chat endpoint (`/api/chat`) is not present; dashboard currently uses runtime flow (`/api/runtime/projects`, `/api/runtime/tasks`, `/api/runtime/logs/:projectId`).
+- Expo frontend uses `process.env.EXPO_PUBLIC_API_URL` with same-origin fallback when unset.
