@@ -24,7 +24,7 @@ func Connect(databaseURL string) (*sql.DB, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("db ping failed: %w", err)
 	}
 	applied, skipped, err := runMigrations(db)
 	if err != nil {
@@ -32,7 +32,7 @@ func Connect(databaseURL string) (*sql.DB, error) {
 	}
 	log.Printf("migrations applied/skipped: %d/%d", applied, skipped)
 	if err := verifySchema(db); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("schema verification failed: %w", err)
 	}
 	return db, nil
 }
@@ -67,7 +67,7 @@ func runMigrations(db *sql.DB) (int, int, error) {
 			return applied, skipped, err
 		}
 		if _, err := db.Exec(string(b)); err != nil {
-			return applied, skipped, fmt.Errorf("migration %s failed: %w", v, err)
+			return applied, skipped, fmt.Errorf("migration failed: %s %w", v, err)
 		}
 		if _, err := db.Exec(`INSERT INTO schema_migrations (version) VALUES ($1)`, v); err != nil {
 			return applied, skipped, err

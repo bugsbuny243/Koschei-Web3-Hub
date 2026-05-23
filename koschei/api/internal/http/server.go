@@ -12,8 +12,8 @@ import (
 	"koschei/api/internal/handlers"
 )
 
-func NewServer(db *sql.DB, adminPassword string, corsOrigin string, staticDir string) http.Handler {
-	h := &handlers.Handler{DB: db, AdminPassword: adminPassword, Limiter: handlers.NewLimiter()}
+func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string) http.Handler {
+	h := &handlers.Handler{DB: db, DBInitError: dbInitError, AdminPassword: adminPassword, Limiter: handlers.NewLimiter()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", h.Health)
 	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) {
