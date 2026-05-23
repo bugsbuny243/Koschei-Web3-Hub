@@ -1,27 +1,30 @@
-import { auth } from './auth';
+const API_BASE = (import.meta.env.EXPO_PUBLIC_API_URL as string | undefined)?.trim() || '';
+const TOKEN_KEY = 'koschei_token';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL?.trim() || '';
+export const tokenStore = {
+  get: () => localStorage.getItem(TOKEN_KEY) || '',
+  set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+};
 
-type ReqOptions = RequestInit & { authRequired?: boolean };
-
-async function request(path: string, options: ReqOptions = {}) {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (options.authRequired) {
-    const token = await auth.getToken();
-    if (!token) throw new Error('You are not logged in.');
-    headers.Authorization = `Bearer ${token}`;
-  }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers: { ...headers, ...(options.headers as Record<string,string> || {}) } });
+async function request(path: string, init?: RequestInit, auth = false) {
+  const target = API_BASE ? `${API_BASE}${path}` : path;
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(init?.headers as Record<string, string> || {}) };
+  if (auth && tokenStore.get()) headers.Authorization = `Bearer ${tokenStore.get()}`;
+  const res = await fetch(target, { ...init, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
 
 export const api = {
+  register: (body: {email:string;password:string}) => request('/api/auth/register', { method:'POST', body: JSON.stringify(body)}),
+  login: (body: {email:string;password:string}) => request('/api/auth/login', { method:'POST', body: JSON.stringify(body)}),
+  me: () => request('/api/me', undefined, true),
   getPlans: () => request('/api/plans'),
-  getVersion: () => request('/api/version'),
-  register: (email: string, password: string) => request('/api/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  login: (email: string, password: string) => request('/api/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
-  credits: (email: string) => request(`/api/credits?email=${encodeURIComponent(email)}`, { authRequired: true }),
-  chat: (payload: unknown) => request('/api/runtime/route', { method: 'POST', body: JSON.stringify(payload), authRequired: true }),
+  createPaymentRequest: (body: unknown) => request('/api/billing/manual-payment-request', { method: 'POST', body: JSON.stringify(body) }, true),
+  getRuntimeProjects: (email: string) => request(`/api/runtime/projects?email=${encodeURIComponent(email)}`, undefined, true),
+  getRuntimeTasks: (email: string) => request(`/api/runtime/tasks?email=${encodeURIComponent(email)}`, undefined, true),
+  getRuntimeLogs: (projectId: string) => request(`/api/runtime/logs/${projectId}`, undefined, true),
+  createRuntimeProject: (body: unknown) => request('/api/runtime/projects', { method: 'POST', body: JSON.stringify(body) }, true),
 };

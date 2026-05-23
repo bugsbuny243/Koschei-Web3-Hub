@@ -21,9 +21,12 @@ func NewServer(db *sql.DB, adminPassword string, corsOrigin string, staticDir st
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"app":    "koschei",
 			"status": "ok",
-			"build":  "runtime-current",
+			"build":  "phase3-current",
 		})
 	}))
+	mux.HandleFunc("/api/auth/register", requiresDB(h, method("POST", h.Register)))
+	mux.HandleFunc("/api/auth/login", requiresDB(h, method("POST", h.Login)))
+	mux.HandleFunc("/api/me", requiresDB(h, method("GET", h.Me)))
 	mux.HandleFunc("/api/plans", requiresDB(h, method("GET", h.Plans)))
 	mux.HandleFunc("/api/billing/manual-payment-request", requiresDB(h, method("POST", h.ManualPaymentRequest)))
 	mux.HandleFunc("/api/credits", requiresDB(h, method("GET", h.Credits)))
@@ -158,7 +161,7 @@ func cors(next http.Handler, origin string) http.Handler {
 		if origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
