@@ -17,14 +17,17 @@ func main() {
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	var conn *sql.DB
+	var dbInitError string
 
 	if databaseURL == "" {
-		log.Printf("warning: DATABASE_URL is not set; starting in degraded mode")
+		dbInitError = "DATABASE_URL is not set"
+		log.Printf(dbInitError)
 	} else {
 		var err error
 		conn, err = db.Connect(databaseURL)
 		if err != nil {
-			log.Printf("warning: database unavailable; starting in degraded mode: %v", err)
+			dbInitError = err.Error()
+			log.Printf("database initialization failed: %v", err)
 		} else {
 			log.Printf("database connected")
 		}
@@ -41,7 +44,7 @@ func main() {
 	if staticDir == "" {
 		staticDir = "/app/public"
 	}
-	srv := apihttp.NewServer(conn, os.Getenv("ADMIN_PASSWORD"), os.Getenv("CORS_ALLOWED_ORIGIN"), staticDir)
+	srv := apihttp.NewServer(conn, dbInitError, os.Getenv("ADMIN_PASSWORD"), os.Getenv("CORS_ALLOWED_ORIGIN"), staticDir)
 	log.Printf("api listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, srv); err != nil {
 		log.Fatal(err)

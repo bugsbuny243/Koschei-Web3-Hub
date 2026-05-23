@@ -108,10 +108,10 @@ CREATE TABLE IF NOT EXISTS runtime_logs (
 
 INSERT INTO plans (id, name, price_try, monthly_credits, is_active)
 VALUES
-  ('free', 'Free', 0, 100, true),
-  ('starter', 'Starter', 299, 1000, true),
-  ('pro', 'Pro', 999, 5000, true),
-  ('studio', 'Studio', 2999, 20000, true)
+  ('free', 'Free', 0, 0, true),
+  ('starter', 'Starter', 899, 20000, true),
+  ('pro', 'Pro', 2299, 70000, true),
+  ('studio', 'Studio', 4999, 180000, true)
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   price_try = EXCLUDED.price_try,

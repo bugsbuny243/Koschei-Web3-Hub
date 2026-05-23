@@ -13,17 +13,22 @@ type Handler struct {
 	DB            *sql.DB
 	AdminPassword string
 	Limiter       *rateLimiter
+	DBInitError   string
 }
 
 func (h *Handler) RequireDB(w http.ResponseWriter) bool {
 	if h.DB == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
+		resp := map[string]string{"error": "database unavailable"}
+		if h.DBInitError != "" {
+			resp["details"] = h.DBInitError
+		}
+		writeJSON(w, http.StatusServiceUnavailable, resp)
 		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	if err := h.DB.PingContext(ctx); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable", "details": err.Error()})
 		return false
 	}
 	return true
@@ -31,6 +36,9 @@ func (h *Handler) RequireDB(w http.ResponseWriter) bool {
 
 func (h *Handler) DBPingError() error {
 	if h.DB == nil {
+		if h.DBInitError != "" {
+			return fmt.Errorf(h.DBInitError)
+		}
 		return fmt.Errorf("database connection is not initialized")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
