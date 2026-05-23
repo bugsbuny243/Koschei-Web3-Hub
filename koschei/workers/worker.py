@@ -1,4 +1,5 @@
 import os, time, uuid
+import json
 import psycopg2
 
 DB_URL = os.getenv("DATABASE_URL")
@@ -23,20 +24,20 @@ while True:
         cur.execute("""
             SELECT id, project_id, email, task_type FROM runtime_tasks
             WHERE status='queued'
-            ORDER BY priority ASC, created_at ASC
+            ORDER BY created_at ASC
             LIMIT 1 FOR UPDATE SKIP LOCKED
         """)
         row = cur.fetchone()
         if not row:
             conn.commit(); cur.close(); conn.close(); time.sleep(5); continue
         task_id, project_id, email, task_type = row
-        cur.execute("UPDATE runtime_tasks SET status='running', started_at=NOW(), updated_at=NOW() WHERE id=%s", (task_id,))
+        cur.execute("UPDATE runtime_tasks SET status='running', updated_at=NOW() WHERE id=%s", (task_id,))
         cur.execute("INSERT INTO runtime_logs (id, project_id, task_id, level, message) VALUES (%s,%s,%s,'info',%s)", (str(uuid.uuid4()), project_id, task_id, f"Task {task_type} started"))
         conn.commit()
         time.sleep(2)
 
-        result = MOCK_RESULTS.get(task_type, f"Mock result for {task_type}")
-        cur.execute("UPDATE runtime_tasks SET status='completed', result=%s, completed_at=NOW(), updated_at=NOW() WHERE id=%s", (result, task_id))
+        result = {"result": MOCK_RESULTS.get(task_type, f"Mock result for {task_type}")}
+        cur.execute("UPDATE runtime_tasks SET status='completed', output_json=%s::jsonb, updated_at=NOW() WHERE id=%s", (json.dumps(result), task_id))
         cur.execute("INSERT INTO runtime_logs (id, project_id, task_id, level, message) VALUES (%s,%s,%s,'info',%s)", (str(uuid.uuid4()), project_id, task_id, f"Task {task_type} completed"))
         cur.execute("INSERT INTO credits_ledger (id,email,amount,reason) VALUES (%s,%s,%s,%s)", (str(uuid.uuid4()), email, -1, f"mock_runtime_{task_type}:{project_id}:{task_id}"))
         conn.commit()

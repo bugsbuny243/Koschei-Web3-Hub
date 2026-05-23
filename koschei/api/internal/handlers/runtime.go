@@ -72,11 +72,38 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var createdTasks []map[string]any
+	rows, err := tx.Query(`SELECT id,project_id,email,task_type,status,input_json,output_json,error,created_at,updated_at FROM runtime_tasks WHERE project_id=$1 ORDER BY created_at ASC`, projectID)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, pid, e, taskType, status string
+		var inputJSON, outputJSON, runtimeErr, created, updated any
+		if err := rows.Scan(&id, &pid, &e, &taskType, &status, &inputJSON, &outputJSON, &runtimeErr, &created, &updated); err != nil {
+			writeJSON(w, 500, map[string]string{"error": "db failed"})
+			return
+		}
+		createdTasks = append(createdTasks, map[string]any{"id": id, "project_id": pid, "email": e, "task_type": taskType, "status": status, "input_json": inputJSON, "output_json": outputJSON, "error": runtimeErr, "created_at": created, "updated_at": updated})
+	}
+
+	var taskCount, logCount int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM runtime_tasks WHERE project_id=$1`, projectID).Scan(&taskCount); err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		return
+	}
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM runtime_logs WHERE project_id=$1`, projectID).Scan(&logCount); err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		return
+	}
+
 	if err := tx.Commit(); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
-	writeJSON(w, 201, map[string]any{"project_id": projectID})
+	writeJSON(w, 201, map[string]any{"project_id": projectID, "task_count": taskCount, "log_count": logCount, "tasks": createdTasks})
 }
 
 func (h *Handler) ListRuntimeProjects(w http.ResponseWriter, r *http.Request) {

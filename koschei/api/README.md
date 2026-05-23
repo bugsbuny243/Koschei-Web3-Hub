@@ -28,7 +28,7 @@ go run main.go
 - `GET /api/runtime/projects?email=...`
 - `POST /api/runtime/projects`
 - `GET /api/runtime/tasks?email=...`
-- `GET /api/runtime/logs?project_id=...`
+- `GET /api/runtime/logs/:projectId`
 
 ## Owner endpoints (header `x-admin-password`)
 - `GET /api/owner/payment-requests`
@@ -44,3 +44,5 @@ go run main.go
 - `migrations/003_model_routing.sql`
 - `migrations/004_rename_builder_to_starter.sql`
 - `migrations/005_db_indexes_and_safety.sql`
+- `migrations/006_runtime_observability.sql`
+- `migrations/007_normalize_runtime_schema.sql`

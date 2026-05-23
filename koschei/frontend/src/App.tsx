@@ -140,6 +140,7 @@ function Dashboard() {
   const [email, setEmail] = useState(''); const [title, setTitle] = useState(''); const [prompt, setPrompt] = useState('');
   const [projects, setProjects] = useState<Project[]>([]); const [tasks, setTasks] = useState<Task[]>([]); const [logs, setLogs] = useState<Log[]>([]); const [projectId, setProjectId] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [createStats, setCreateStats] = useState<{task_count?: number; log_count?: number} | null>(null);
 
   const refresh = async () => {
     if (!email) return;
@@ -152,14 +153,17 @@ function Dashboard() {
     if (!apiConnected) return;
     setStatusMessage('Creating project...');
     try {
-      const created = await api.createRuntimeProject({ email, title, prompt }) as { project_id?: string };
+      const created = await api.createRuntimeProject({ email, title, prompt }) as { project_id?: string; task_count?: number; log_count?: number; tasks?: Task[] };
       setTitle('');
       setPrompt('');
+      setCreateStats({ task_count: created.task_count, log_count: created.log_count });
+      if (Array.isArray(created.tasks)) setTasks(created.tasks);
       const refreshedProjects = await refresh();
       const latestProjectID = created.project_id || refreshedProjects?.[0]?.id;
       if (latestProjectID) await loadLogs(latestProjectID);
       setStatusMessage('Project created successfully.');
     } catch (err) {
+      setCreateStats(null);
       const message = err instanceof Error ? err.message : 'Failed to create project.';
       setStatusMessage(`Create project failed: ${message}`);
     }
@@ -179,6 +183,7 @@ function Dashboard() {
       </div>
     </div>
     {!!statusMessage && <p>{statusMessage}</p>}
+    {!!createStats && <p>New project queued with {createStats.task_count ?? 0} tasks and {createStats.log_count ?? 0} logs.</p>}
     <h2>Projects</h2>
     {projects.length === 0 ? <article className='card'>No projects yet</article> : projects.map(p => <article className='card row' key={p.id}><b>{p.title}</b><span>{p.status}</span><button className='btn' onClick={() => loadLogs(p.id)}>Logs</button></article>)}
     <h2>Tasks</h2>
