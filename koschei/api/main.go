@@ -11,6 +11,9 @@ import (
 )
 
 func main() {
+	log.Printf("koschei api starting")
+	log.Printf("migrations path: /app/migrations")
+
 	databaseURL := os.Getenv("DATABASE_URL")
 	var conn *sql.DB
 
@@ -21,6 +24,8 @@ func main() {
 		conn, err = db.Connect(databaseURL)
 		if err != nil {
 			log.Printf("warning: database unavailable; starting in degraded mode: %v", err)
+		} else {
+			log.Printf("database connected")
 		}
 	}
 	if conn != nil {

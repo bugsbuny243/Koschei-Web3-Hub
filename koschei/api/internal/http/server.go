@@ -16,6 +16,14 @@ func NewServer(db *sql.DB, adminPassword string, corsOrigin string, staticDir st
 	h := &handlers.Handler{DB: db, AdminPassword: adminPassword, Limiter: handlers.NewLimiter()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", h.Health)
+	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"app":    "koschei",
+			"status": "ok",
+			"build":  "runtime-current",
+		})
+	}))
 	mux.HandleFunc("/api/plans", requiresDB(h, method("GET", h.Plans)))
 	mux.HandleFunc("/api/billing/manual-payment-request", requiresDB(h, method("POST", h.ManualPaymentRequest)))
 	mux.HandleFunc("/api/credits", requiresDB(h, method("GET", h.Credits)))
@@ -117,7 +125,7 @@ func NewServer(db *sql.DB, adminPassword string, corsOrigin string, staticDir st
 
 func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") && db == nil {
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/version" && db == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable"})
