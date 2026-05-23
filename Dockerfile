@@ -20,6 +20,7 @@ FROM alpine:3.20 AS runner
 WORKDIR /app
 
 COPY --from=go-builder /app/koschei-api /app/koschei-api
+COPY --from=go-builder /src/migrations /app/migrations
 COPY --from=frontend-builder /app/dist /app/public
 
 ENV PORT=8080

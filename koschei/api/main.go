@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -11,15 +12,20 @@ import (
 
 func main() {
 	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		log.Fatal("DATABASE_URL is required")
-	}
+	var conn *sql.DB
 
-	conn, err := db.Connect(databaseURL)
-	if err != nil {
-		log.Fatal(err)
+	if databaseURL == "" {
+		log.Printf("warning: DATABASE_URL is not set; starting in degraded mode")
+	} else {
+		var err error
+		conn, err = db.Connect(databaseURL)
+		if err != nil {
+			log.Printf("warning: database unavailable; starting in degraded mode: %v", err)
+		}
 	}
-	defer conn.Close()
+	if conn != nil {
+		defer conn.Close()
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {

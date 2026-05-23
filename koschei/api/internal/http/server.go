@@ -2,6 +2,7 @@ package http
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -98,7 +99,19 @@ func NewServer(db *sql.DB, adminPassword string, corsOrigin string, staticDir st
 		log.Printf("warning: STATIC_DIR is empty; frontend static files not enabled")
 	}
 
-	return securityHeaders(cors(mux, corsOrigin))
+	return securityHeaders(cors(apiReadiness(db, mux), corsOrigin))
+}
+
+func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") && db == nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable"})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func method(m string, next http.HandlerFunc) http.HandlerFunc {
