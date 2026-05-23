@@ -9,6 +9,7 @@ import (
 type Handler struct {
 	DB            *sql.DB
 	AdminPassword string
+	Limiter       *rateLimiter
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -18,6 +19,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 }
 
 func decodeJSON(r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(nil, r.Body, 1<<20)
 	return json.NewDecoder(r.Body).Decode(dst)
 }
 
