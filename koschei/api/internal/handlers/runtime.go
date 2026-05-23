@@ -25,22 +25,36 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	projectID := newID()
+	if h.DB == nil {
+		writeJSON(w, 503, map[string]string{"error": "database unavailable: connection is not initialized"})
+		return
+	}
+	if err := h.DB.PingContext(r.Context()); err != nil {
+		writeJSON(w, 503, map[string]string{"error": fmt.Sprintf("database unavailable: %v", err)})
+		return
+	}
 	tx, err := h.DB.Begin()
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		writeJSON(w, 500, map[string]string{"error": "db failed: unable to create runtime project"})
 		return
 	}
 	defer tx.Rollback()
 
 	_, err = tx.Exec(`INSERT INTO runtime_projects (id,email,title,prompt,status) VALUES ($1,$2,$3,$4,'queued')`, projectID, req.Email, req.Title, req.Prompt)
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		writeJSON(w, 500, map[string]string{"error": "db failed: unable to create project log"})
 		return
 	}
 
 	_, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Project created")
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		return
+	}
+
+	_, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Runtime workflow initialized")
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db failed: could not create initialization log"})
 		return
 	}
 

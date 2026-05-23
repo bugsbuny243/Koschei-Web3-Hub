@@ -161,7 +161,7 @@ function Dashboard() {
       const refreshedProjects = await refresh();
       const latestProjectID = created.project_id || refreshedProjects?.[0]?.id;
       if (latestProjectID) await loadLogs(latestProjectID);
-      setStatusMessage('Project created successfully.');
+      setStatusMessage(`project created (task_count=${created.task_count ?? 0}, log_count=${created.log_count ?? 0})`);
     } catch (err) {
       setCreateStats(null);
       const message = err instanceof Error ? err.message : 'Failed to create project.';

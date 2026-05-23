@@ -21,7 +21,7 @@ func NewServer(db *sql.DB, adminPassword string, corsOrigin string, staticDir st
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"app":    "koschei",
 			"status": "ok",
-			"build":  "runtime-current",
+			"build":  "phase3-a-runtime-stable",
 		})
 	}))
 	mux.HandleFunc("/api/plans", requiresDB(h, method("GET", h.Plans)))
