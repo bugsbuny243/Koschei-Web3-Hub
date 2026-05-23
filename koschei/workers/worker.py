@@ -39,7 +39,8 @@ while True:
         result = {"result": MOCK_RESULTS.get(task_type, f"Mock result for {task_type}")}
         cur.execute("UPDATE runtime_tasks SET status='completed', output_json=%s::jsonb, updated_at=NOW() WHERE id=%s", (json.dumps(result), task_id))
         cur.execute("INSERT INTO runtime_logs (id, project_id, task_id, level, message) VALUES (%s,%s,%s,'info',%s)", (str(uuid.uuid4()), project_id, task_id, f"Task {task_type} completed"))
-        cur.execute("INSERT INTO credits_ledger (id,email,amount,reason) VALUES (%s,%s,%s,%s)", (str(uuid.uuid4()), email, -1, f"mock_runtime_{task_type}:{project_id}:{task_id}"))
+        cur.execute("UPDATE app_user_profiles SET credits = credits - 1, updated_at=NOW() WHERE lower(email)=lower(%s)", (email,))
+        cur.execute("INSERT INTO credit_events (id,email,amount,reason,event_type) VALUES (%s,%s,%s,%s,%s)", (str(uuid.uuid4()), email, -1, f"mock_runtime_{task_type}:{project_id}:{task_id}", "runtime_usage"))
         conn.commit()
     except Exception as e:
         conn.rollback()

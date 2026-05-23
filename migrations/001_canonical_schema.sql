@@ -1,10 +1,4 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE EXTENSION IF NOT EXISTS citext;
-
-CREATE TABLE IF NOT EXISTS schema_migrations (
-  version text PRIMARY KEY,
-  applied_at timestamptz NOT NULL DEFAULT now()
-);
 
 CREATE TABLE IF NOT EXISTS plans (
   id text PRIMARY KEY,
@@ -16,38 +10,37 @@ CREATE TABLE IF NOT EXISTS plans (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE plans
-ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
-
-ALTER TABLE plans
-ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
-
-CREATE TABLE IF NOT EXISTS auth_accounts (
+CREATE TABLE IF NOT EXISTS app_user_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email citext UNIQUE NOT NULL,
-  password_hash text NOT NULL,
-  plan text NOT NULL DEFAULT 'free',
+  auth_subject text UNIQUE NOT NULL,
+  email text NOT NULL,
+  role text NOT NULL DEFAULT 'user',
+  plan_id text NOT NULL DEFAULT 'free',
+  credits integer NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS app_user_profiles_email_lower_idx ON app_user_profiles (lower(email));
 
 CREATE TABLE IF NOT EXISTS payment_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text NOT NULL,
   plan text NOT NULL,
   payment_provider text NOT NULL,
-  payment_reference text NOT NULL,
-  note text NOT NULL DEFAULT '',
+  payment_reference text,
+  note text,
   status text NOT NULL DEFAULT 'pending',
+  reviewed_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS credits_ledger (
+CREATE TABLE IF NOT EXISTS credit_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text NOT NULL,
   amount integer NOT NULL,
   reason text NOT NULL DEFAULT '',
+  event_type text NOT NULL DEFAULT 'adjustment',
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -104,6 +97,56 @@ CREATE TABLE IF NOT EXISTS runtime_logs (
   message text NOT NULL,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS owner_client_orders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text NOT NULL,
+  title text NOT NULL,
+  status text NOT NULL DEFAULT 'open',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS owner_order_requirements (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL REFERENCES owner_client_orders(id) ON DELETE CASCADE,
+  requirement text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS owner_order_assets (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL REFERENCES owner_client_orders(id) ON DELETE CASCADE,
+  asset_url text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS owner_delivery_packages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL REFERENCES owner_client_orders(id) ON DELETE CASCADE,
+  package_url text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS owner_revision_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL REFERENCES owner_client_orders(id) ON DELETE CASCADE,
+  note text NOT NULL,
+  status text NOT NULL DEFAULT 'open',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS owner_profit_records (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id uuid REFERENCES owner_client_orders(id) ON DELETE SET NULL,
+  amount integer NOT NULL,
+  currency text NOT NULL DEFAULT 'TRY',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS owner_service_templates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  description text NOT NULL DEFAULT '',
+  is_active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 INSERT INTO plans (id, name, price_try, monthly_credits, is_active)

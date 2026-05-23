@@ -8,11 +8,10 @@ func (h *Handler) Credits(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 401, map[string]string{"error": "unauthorized"})
 		return
 	}
-	email := claims.Email
 	var total int
-	if err := h.DB.QueryRow(`SELECT COALESCE(SUM(amount),0) FROM credits_ledger WHERE email=$1`, email).Scan(&total); err != nil {
+	if err := h.DB.QueryRow(`SELECT credits FROM app_user_profiles WHERE auth_subject=$1`, claims.Sub).Scan(&total); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
-	writeJSON(w, 200, map[string]any{"email": email, "credits": total})
+	writeJSON(w, 200, map[string]any{"email": claims.Email, "credits": total})
 }

@@ -11,7 +11,7 @@ func (h *Handler) OwnerDBHealth(w http.ResponseWriter, r *http.Request) {
 		"schema_migrations",
 		"plans",
 		"payment_requests",
-		"credits_ledger",
+		"credit_events",
 		"generation_jobs",
 		"runtime_projects",
 		"runtime_tasks",
@@ -94,12 +94,12 @@ func (h *Handler) OwnerDBHealth(w http.ResponseWriter, r *http.Request) {
 	rows.Close()
 
 	var creditsLedgerRowCount int
-	if err := h.DB.QueryRow(`SELECT COUNT(*) FROM credits_ledger`).Scan(&creditsLedgerRowCount); err != nil {
+	if err := h.DB.QueryRow(`SELECT COUNT(*) FROM credit_events`).Scan(&creditsLedgerRowCount); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
 
-	duplicateTables := []string{"credit_events", "credit_ledger", "app_users", "users", "user_projects"}
+	duplicateTables := []string{"credit_ledger", "app_users", "users", "user_projects", "auth_accounts", "subscriptions"}
 	duplicatePresence := map[string]bool{}
 	for _, table := range duplicateTables {
 		var ok bool
@@ -119,7 +119,7 @@ func (h *Handler) OwnerDBHealth(w http.ResponseWriter, r *http.Request) {
 		"payment_requests_by_status": paymentByStatus,
 		"runtime_projects_count":     runtimeProjectsCount,
 		"runtime_tasks_by_status":    runtimeTasksByStatus,
-		"credits_ledger_row_count":   creditsLedgerRowCount,
+		"credit_events_row_count":    creditsLedgerRowCount,
 		"legacy_duplicate_tables":    duplicatePresence,
 	})
 }
