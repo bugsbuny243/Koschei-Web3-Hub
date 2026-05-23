@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { api, apiConnected } from './lib/api';
 
 const SHOPIER_LINKS = {
   starter: 'https://www.shopier.com/TradeVisual/47465449',
@@ -98,12 +99,11 @@ function Billing() {
 
   const submit = async () => {
     setStatus('Submitting...');
-    const res = await fetch('/api/billing/manual-payment-request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, plan, payment_provider: 'Shopier', payment_reference: paymentReference, note }),
-    });
-    setStatus(res.ok ? 'Payment request sent. Credits will be activated manually after review.' : 'Failed to send request.');
+    if (!apiConnected) { setStatus('API not connected yet'); return; }
+    try {
+      await api.createPaymentRequest({ email, plan, payment_provider: 'Shopier', payment_reference: paymentReference, note });
+      setStatus('Payment request sent. Credits will be activated manually after review.');
+    } catch { setStatus('Failed to send request.'); }
   };
 
   return <main className='container page premium-card'>
@@ -126,7 +126,7 @@ function Billing() {
         <input value='Shopier' disabled readOnly />
         <input placeholder='payment/order reference' value={paymentReference} onChange={e => setPaymentReference(e.target.value)} />
         <input placeholder='note' value={note} onChange={e => setNote(e.target.value)} />
-        <button className='btn primary wide-btn' onClick={submit}>Submit Manual Activation</button>
+        <button className='btn primary wide-btn' onClick={submit} disabled={!apiConnected}>Submit Manual Activation</button>
       </div>
       {!!status && <p>{status}</p>}
       <div className='trust-notes'>
@@ -143,14 +143,16 @@ function Dashboard() {
 
   const refresh = async () => {
     if (!email) return;
-    const p = await fetch(`/api/runtime/projects?email=${encodeURIComponent(email)}`).then(r => r.json()); setProjects(Array.isArray(p) ? p : []);
-    const t = await fetch(`/api/runtime/tasks?email=${encodeURIComponent(email)}`).then(r => r.json()); setTasks(Array.isArray(t) ? t : []);
+    if (!apiConnected) return;
+    const p = await api.getRuntimeProjects(email); setProjects(Array.isArray(p) ? p : []);
+    const t = await api.getRuntimeTasks(email); setTasks(Array.isArray(t) ? t : []);
   };
   const createProject = async () => {
-    await fetch('/api/runtime/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, title, prompt }) });
+    if (!apiConnected) return;
+    await api.createRuntimeProject({ email, title, prompt });
     setTitle(''); setPrompt(''); refresh();
   };
-  const loadLogs = async (pid: string) => { setProjectId(pid); const l = await fetch(`/api/runtime/logs/${pid}`).then(r => r.json()); setLogs(Array.isArray(l) ? l : []); };
+  const loadLogs = async (pid: string) => { if (!apiConnected) return; setProjectId(pid); const l = await api.getRuntimeLogs(pid); setLogs(Array.isArray(l) ? l : []); };
   useEffect(() => { if (email) refresh(); }, []);
 
   return <main className="container page premium-card">
@@ -161,8 +163,8 @@ function Dashboard() {
       <input placeholder='project title' value={title} onChange={e => setTitle(e.target.value)} />
       <textarea placeholder='what do you want to build?' value={prompt} onChange={e => setPrompt(e.target.value)} rows={4} />
       <div className='actions'>
-        <button className='btn' onClick={refresh}>Refresh</button>
-        <button className='btn primary wide-btn' onClick={createProject}>Create Project</button>
+        <button className='btn' onClick={refresh} disabled={!apiConnected}>Refresh</button>
+        <button className='btn primary wide-btn' onClick={createProject} disabled={!apiConnected}>Create Project</button>
       </div>
     </div>
     <h2>Projects</h2>
