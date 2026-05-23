@@ -1,40 +1,30 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 
 COPY koschei/frontend/package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY koschei/frontend ./
 RUN npm run build
 
-FROM nginx:1.27-alpine AS runner
+FROM golang:1.23-alpine AS go-builder
+WORKDIR /src
 
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY koschei/api/go.mod koschei/api/go.sum ./
+RUN go mod download
 
-RUN cat > /etc/nginx/conf.d/default.conf <<'NGINX_EOF'
-server {
-  listen 8080;
-  server_name _;
+COPY koschei/api ./
+RUN go build -o /app/koschei-api .
 
-  root /usr/share/nginx/html;
-  index index.html;
+FROM alpine:3.20 AS runner
+WORKDIR /app
 
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header X-Frame-Options "DENY" always;
-  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-  add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+COPY --from=go-builder /app/koschei-api /app/koschei-api
+COPY --from=frontend-builder /app/dist /app/public
 
-  location / {
-    try_files $uri $uri/ /index.html;
-  }
-
-  location = /health {
-    add_header Content-Type text/plain;
-    return 200 'ok';
-  }
-}
-NGINX_EOF
+ENV PORT=8080
+ENV STATIC_DIR=/app/public
 
 EXPOSE 8080
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/app/koschei-api"]
