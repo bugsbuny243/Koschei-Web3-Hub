@@ -47,10 +47,12 @@ func (h *Handler) OwnerActivatePlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req activateReq
-	if err := decodeJSON(r, &req); err != nil || !validEmail(req.Email) || !validPlan(req.Plan) || req.Credits == 0 {
+	if err := decodeJSON(r, &req); err != nil || !validEmail(req.Email) || !validPaidActivationPlan(req.Plan) || req.Credits == 0 {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
+	// Runtime credits and billing must use credits_ledger and payment_requests only.
+	// Do not add runtime auth/project coupling to legacy users/app_users/user_projects tables.
 	_, err := h.DB.Exec(`INSERT INTO users (email, plan) VALUES ($1,$2) ON CONFLICT(email) DO UPDATE SET plan=EXCLUDED.plan, updated_at=now()`, req.Email, req.Plan)
 	if err == nil {
 		_, err = h.DB.Exec(`INSERT INTO credits_ledger (email, amount, reason) VALUES ($1,$2,$3)`, req.Email, req.Credits, "plan activation: "+req.Note)

@@ -14,7 +14,7 @@ func validEmail(email string) bool { return emailRe.MatchString(email) }
 
 func validPlan(plan string) bool {
 	switch plan {
-	case "starter", "pro", "studio":
+	case "free", "starter", "pro", "studio":
 		return true
 	default:
 		return false
@@ -61,4 +61,13 @@ func (rl *rateLimiter) allow(key string, max int, window time.Duration) bool {
 	}
 	rl.hits[key] = append(arr, now)
 	return true
+}
+
+func validPaidActivationPlan(plan string) bool {
+	switch plan {
+	case "starter", "pro", "studio":
+		return true
+	default:
+		return false
+	}
 }

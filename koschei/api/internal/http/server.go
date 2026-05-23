@@ -55,6 +55,7 @@ func NewServer(db *sql.DB, adminPassword string, corsOrigin string, staticDir st
 	mux.HandleFunc("/api/owner/payment-requests", requiresDB(h, method("GET", h.OwnerPaymentRequests)))
 	mux.HandleFunc("/api/owner/activate-plan", requiresDB(h, method("POST", h.OwnerActivatePlan)))
 	mux.HandleFunc("/api/owner/grant-credits", requiresDB(h, method("POST", h.OwnerGrantCredits)))
+	mux.HandleFunc("/api/owner/db-health", requiresDB(h, method("GET", h.OwnerDBHealth)))
 	mux.HandleFunc("/api/owner/jobs/", func(w http.ResponseWriter, r *http.Request) {
 		if !h.RequireDB(w) {
 			return
