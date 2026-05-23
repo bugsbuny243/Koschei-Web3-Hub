@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"database/sql"
@@ -27,6 +28,10 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	if !h.requireJWTConfigured(w) {
 		return
 	}
+	if err := h.dbAvailable(r.Context()); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable", "details": err.Error()})
+		return
+	}
 	var req authReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
@@ -38,7 +43,10 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var id, role, planID string
-	err := h.DB.QueryRow(`INSERT INTO auth_accounts (email,password_hash,role,plan_id,is_active) VALUES ($1, crypt($2, gen_salt('bf')),'user','free',true) RETURNING id,role,plan_id`, email, req.Password).Scan(&id, &role, &planID)
+	query := `INSERT INTO auth_accounts (email,password_hash,role,plan_id,is_active) VALUES ($1, crypt($2, gen_salt('bf')),'user','free',true) RETURNING id,role,plan_id`
+	err := h.runWithRetry(r.Context(), func(ctx context.Context) error {
+		return h.DB.QueryRowContext(ctx, query, email, req.Password).Scan(&id, &role, &planID)
+	})
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "duplicate") || strings.Contains(strings.ToLower(err.Error()), "unique") {
 			writeJSON(w, 409, map[string]string{"error": "account exists"})
@@ -59,6 +67,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if !h.requireJWTConfigured(w) {
 		return
 	}
+	if err := h.dbAvailable(r.Context()); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable", "details": err.Error()})
+		return
+	}
 	var req authReq
 	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
@@ -70,7 +82,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var id, role, plan string
-	err := h.DB.QueryRow(`SELECT id,role,plan_id FROM auth_accounts WHERE lower(email)=lower($1) AND is_active=true AND password_hash = crypt($2, password_hash)`, email, req.Password).Scan(&id, &role, &plan)
+	query := `SELECT id,role,plan_id FROM auth_accounts WHERE lower(email)=lower($1) AND is_active=true AND password_hash = crypt($2, password_hash)`
+	err := h.runWithRetry(r.Context(), func(ctx context.Context) error {
+		return h.DB.QueryRowContext(ctx, query, email, req.Password).Scan(&id, &role, &plan)
+	})
 	if err == sql.ErrNoRows {
 		writeJSON(w, 401, map[string]string{"error": "invalid credentials"})
 		return
@@ -89,6 +104,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	if err := h.dbAvailable(r.Context()); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable", "details": err.Error()})
+		return
+	}
 	claims, ok := userFromContext(r.Context())
 	if !ok {
 		writeJSON(w, 401, map[string]string{"error": "unauthorized"})
@@ -98,12 +117,28 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"user": authUser{ID: claims.Sub, Email: claims.Email, Role: claims.Role, Plan: claims.PlanID, Credits: credits}})
 }
 
+func (h *Handler) runWithRetry(ctx context.Context, op func(context.Context) error) error {
+	err := op(ctx)
+	if !isTransientDBError(err) {
+		return err
+	}
+	_ = h.dbAvailable(ctx)
+	return op(ctx)
+}
+
 func (h *Handler) userCredits(userID string) (int, error) {
 	var credits int
-	err := h.DB.QueryRow(`SELECT COALESCE(SUM(cl.amount),0) FROM credits_ledger cl JOIN auth_accounts a ON lower(cl.email)=lower(a.email) WHERE a.id=$1`, userID).Scan(&credits)
+	query := `SELECT COALESCE(SUM(cl.amount),0) FROM credits_ledger cl JOIN auth_accounts a ON lower(cl.email)=lower(a.email) WHERE a.id=$1`
+	err := h.runWithRetry(context.Background(), func(ctx context.Context) error {
+		return h.DB.QueryRowContext(ctx, query, userID).Scan(&credits)
+	})
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
 	return credits, err
 }
 
+// jwt helpers unchanged
 func (h *Handler) requireJWTConfigured(w http.ResponseWriter) bool {
 	if strings.TrimSpace(os.Getenv("JWT_SECRET")) == "" {
 		writeJSON(w, 500, map[string]string{"error": "config error", "details": "JWT_SECRET is not set"})
@@ -111,7 +146,6 @@ func (h *Handler) requireJWTConfigured(w http.ResponseWriter) bool {
 	}
 	return true
 }
-
 func issueJWT(c jwtClaims) (string, error) {
 	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	if secret == "" {
@@ -128,7 +162,6 @@ func issueJWT(c jwtClaims) (string, error) {
 	mac.Write([]byte(signing))
 	return signing + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
-
 func parseJWT(token string) (jwtClaims, error) {
 	var out jwtClaims
 	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))

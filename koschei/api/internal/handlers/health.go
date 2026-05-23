@@ -11,7 +11,7 @@ func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
 			"status":   "error",
 			"database": "unavailable",
-			"error":    err.Error(),
+			"details":  err.Error(),
 		})
 		return
 	}

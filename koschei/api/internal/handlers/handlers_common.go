@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -16,18 +18,20 @@ type Handler struct {
 	DBInitError   string
 }
 
-func (h *Handler) RequireDB(w http.ResponseWriter) bool {
+func (h *Handler) dbAvailable(ctx context.Context) error {
 	if h.DB == nil {
-		resp := map[string]string{"error": "database unavailable"}
 		if h.DBInitError != "" {
-			resp["details"] = h.DBInitError
+			return errors.New(h.DBInitError)
 		}
-		writeJSON(w, http.StatusServiceUnavailable, resp)
-		return false
+		return errors.New("database handle is nil")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	if err := h.DB.PingContext(ctx); err != nil {
+	return h.DB.PingContext(ctx)
+}
+
+func (h *Handler) RequireDB(w http.ResponseWriter) bool {
+	if err := h.dbAvailable(context.Background()); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable", "details": err.Error()})
 		return false
 	}
@@ -35,15 +39,24 @@ func (h *Handler) RequireDB(w http.ResponseWriter) bool {
 }
 
 func (h *Handler) DBPingError() error {
-	if h.DB == nil {
-		if h.DBInitError != "" {
-			return fmt.Errorf(h.DBInitError)
-		}
-		return fmt.Errorf("database connection is not initialized")
+	if err := h.dbAvailable(context.Background()); err != nil {
+		return fmt.Errorf("%w", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	return h.DB.PingContext(ctx)
+	return nil
+}
+
+func isTransientDBError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	patterns := []string{"driver: bad connection", "connection reset", "connection closed", "broken pipe", "eof"}
+	for _, p := range patterns {
+		if strings.Contains(msg, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

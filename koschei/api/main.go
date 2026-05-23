@@ -21,13 +21,13 @@ func main() {
 
 	if databaseURL == "" {
 		dbInitError = "DATABASE_URL is not set"
-		log.Printf(dbInitError)
+		log.Printf("database unavailable: %s", dbInitError)
 	} else {
 		var err error
 		conn, err = db.Connect(databaseURL)
 		if err != nil {
 			dbInitError = err.Error()
-			log.Printf("database initialization failed: %v", err)
+			log.Printf("database unavailable: %v", err)
 		} else {
 			log.Printf("database connected")
 		}
