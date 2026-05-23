@@ -14,7 +14,7 @@ function authUnavailable() {
 }
 
 function resolveToken(payload: AuthResponse): string {
-  return payload.access_token || payload.token || payload.session?.access_token || '';
+  return payload.token || payload.access_token || payload.session?.access_token || '';
 }
 
 async function callNeonAuth(path: string, body: { email: string; password: string }) {
@@ -38,10 +38,10 @@ async function callNeonAuth(path: string, body: { email: string; password: strin
 
 export const neonAuth = {
   async signUpWithEmail(email: string, password: string) {
-    return callNeonAuth('/signup/email', { email, password });
+    return callNeonAuth('/api/auth/sign-up/email', { email, password });
   },
   async signInWithEmail(email: string, password: string) {
-    return callNeonAuth('/signin/email', { email, password });
+    return callNeonAuth('/api/auth/sign-in/email', { email, password });
   },
   tokenFrom(payload: AuthResponse) {
     return resolveToken(payload);
