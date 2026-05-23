@@ -3,6 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"strings"
 )
 
 type manualPaymentRequest struct {
@@ -19,7 +20,18 @@ func (h *Handler) ManualPaymentRequest(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 429, map[string]string{"error": "rate limited"})
 		return
 	}
-	if err := decodeJSON(r, &req); err != nil || !validEmail(req.Email) || !validPlan(req.Plan) || req.PaymentProvider == "" {
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "invalid body"})
+		return
+	}
+
+	req.Email = strings.TrimSpace(req.Email)
+	req.Plan = strings.TrimSpace(req.Plan)
+	req.PaymentProvider = strings.TrimSpace(req.PaymentProvider)
+	req.PaymentReference = strings.TrimSpace(req.PaymentReference)
+	req.Note = strings.TrimSpace(req.Note)
+
+	if !validEmail(req.Email) || !validPlan(req.Plan) || req.PaymentProvider == "" || req.PaymentReference == "" {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
