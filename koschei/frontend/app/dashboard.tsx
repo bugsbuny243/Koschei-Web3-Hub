@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Sidebar } from '@/components/Sidebar';
 import { Button, ErrorState, Input } from '@/components/ui';
@@ -8,9 +8,24 @@ export default function Dashboard() {
   const [prompt, setPrompt] = useState('');
   const [error, setError] = useState('');
   const [credits, setCredits] = useState(0);
+  const [plan, setPlan] = useState('free');
   const [projects, setProjects] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadMe = async () => {
+      try {
+        const me: any = await api.me();
+        if (typeof me.credits === 'number') setCredits(me.credits);
+        if (typeof me.plan === 'string' && me.plan.trim() !== '') setPlan(me.plan);
+      } catch {
+        setCredits(0);
+        setPlan('free');
+      }
+    };
+    loadMe();
+  }, []);
 
   const send = async () => {
     try {
@@ -25,6 +40,7 @@ export default function Dashboard() {
       setLogs(logRows);
       setPrompt('');
       if (typeof me.credits === 'number') setCredits(me.credits);
+      if (typeof me.plan === 'string' && me.plan.trim() !== '') setPlan(me.plan);
     } catch (e: any) {
       setError(e.message);
     }
@@ -32,7 +48,7 @@ export default function Dashboard() {
 
   return (
     <View className="flex-1 bg-[#0a0a0a] p-4 md:flex-row gap-4" style={{ backgroundColor: '#0a0a0a' }}>
-      <Sidebar credits={credits} plan="free" />
+      <Sidebar credits={credits} plan={plan} />
       <View className="flex-1">
         <Text className="text-white mb-2" style={{ color: '#ffffff' }}>
           Runtime Project Prompt

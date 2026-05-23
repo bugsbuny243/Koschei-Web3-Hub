@@ -26,22 +26,26 @@ func Connect(databaseURL string) (*sql.DB, error) {
 	if err := db.PingContext(ctx); err != nil {
 		return nil, err
 	}
-	if err := runMigrations(db); err != nil {
+	applied, skipped, err := runMigrations(db)
+	if err != nil {
 		return nil, err
 	}
+	log.Printf("migrations applied/skipped: %d/%d", applied, skipped)
 	if err := verifySchema(db); err != nil {
 		return nil, err
 	}
 	return db, nil
 }
 
-func runMigrations(db *sql.DB) error {
+func runMigrations(db *sql.DB) (int, int, error) {
+	applied := 0
+	skipped := 0
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`); err != nil {
-		return err
+		return 0, 0, err
 	}
 	files, err := filepath.Glob("migrations/*.sql")
 	if err != nil {
-		return err
+		return 0, 0, err
 	}
 	sort.Strings(files)
 	if len(files) == 0 {
@@ -52,23 +56,25 @@ func runMigrations(db *sql.DB) error {
 		var exists string
 		err = db.QueryRow(`SELECT version FROM schema_migrations WHERE version=$1`, v).Scan(&exists)
 		if err == nil {
+			skipped++
 			continue
 		}
 		if err != sql.ErrNoRows {
-			return err
+			return applied, skipped, err
 		}
 		b, err := os.ReadFile(f)
 		if err != nil {
-			return err
+			return applied, skipped, err
 		}
 		if _, err := db.Exec(string(b)); err != nil {
-			return fmt.Errorf("migration %s failed: %w", v, err)
+			return applied, skipped, fmt.Errorf("migration %s failed: %w", v, err)
 		}
 		if _, err := db.Exec(`INSERT INTO schema_migrations (version) VALUES ($1)`, v); err != nil {
-			return err
+			return applied, skipped, err
 		}
+		applied++
 	}
-	return nil
+	return applied, skipped, nil
 }
 
 func verifySchema(db *sql.DB) error {
