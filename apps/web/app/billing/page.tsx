@@ -1,6 +1,8 @@
-const SHOPIER_STARTER_PACK_URL = "https://www.shopier.com/TradeVisual/47465449";
+import { PRICING_PACKAGES } from "@/lib/pricing";
 
 export default function BillingPage() {
+  const { starter, pro } = PRICING_PACKAGES;
+
   return (
     <div className="container page-stack">
       <section className="card">
@@ -9,17 +11,44 @@ export default function BillingPage() {
       </section>
 
       <section className="card">
-        <h2>Payment Option</h2>
-        <p><strong>Koschei Starter Pack – 20.000 Credits</strong></p>
-        <p><strong>899 TL</strong></p>
-        <a
-          className="btn btn-primary"
-          href={SHOPIER_STARTER_PACK_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Buy on Shopier
-        </a>
+        <h2>Payment Options</h2>
+
+        <div className="page-stack" style={{ marginTop: "0.5rem" }}>
+          <div>
+            <p>
+              <strong>{starter.title}</strong>
+            </p>
+            <p>
+              <strong>{starter.priceLabel}</strong>
+            </p>
+            <a
+              className="btn btn-primary"
+              href={starter.shopierUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Buy on Shopier
+            </a>
+          </div>
+
+          <div>
+            <p>
+              <strong>{pro.title}</strong>
+            </p>
+            <p>
+              <strong>{pro.priceLabel}</strong>
+            </p>
+            <a
+              className="btn btn-primary"
+              href={pro.shopierUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {pro.ctaLabel}
+            </a>
+          </div>
+        </div>
+
         <p className="muted-note" style={{ marginTop: "0.75rem" }}>
           After payment, return to this page and submit your Koschei account email and payment reference. Your credits will be activated manually by the owner.
         </p>
@@ -36,12 +65,7 @@ export default function BillingPage() {
 
             <label>
               Selected package
-              <input
-                type="text"
-                name="selectedPackage"
-                defaultValue="Koschei Starter Pack – 20.000 Credits"
-                readOnly
-              />
+              <input type="text" name="selectedPackage" defaultValue={starter.title} readOnly />
             </label>
 
             <label>

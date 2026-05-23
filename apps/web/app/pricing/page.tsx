@@ -1,6 +1,8 @@
-const SHOPIER_STARTER_PACK_URL = "https://www.shopier.com/TradeVisual/47465449";
+import { PRICING_PACKAGES } from "@/lib/pricing";
 
 export default function PricingPage() {
+  const { starter, pro } = PRICING_PACKAGES;
+
   return (
     <div className="container page-stack">
       <section className="card">
@@ -9,16 +11,34 @@ export default function PricingPage() {
       </section>
 
       <section className="card product-card">
-        <span className="badge">Starter Pack</span>
-        <h2>Koschei Starter Pack – 20.000 Credits</h2>
-        <p><strong>899 TL</strong> • One-time digital credit package</p>
+        <span className="badge">{starter.badge}</span>
+        <h2>{starter.title}</h2>
+        <p>
+          <strong>{starter.priceLabel}</strong> • One-time digital credit package
+        </p>
         <a
           className="btn btn-primary"
-          href={SHOPIER_STARTER_PACK_URL}
+          href={starter.shopierUrl}
           target="_blank"
           rel="noopener noreferrer"
         >
-          Buy 20.000 Credits
+          {starter.ctaLabel}
+        </a>
+      </section>
+
+      <section className="card product-card">
+        <span className="badge">{pro.badge}</span>
+        <h2>{pro.title}</h2>
+        <p>
+          <strong>{pro.priceLabel}</strong>
+        </p>
+        <a
+          className="btn btn-primary"
+          href={pro.shopierUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {pro.ctaLabel}
         </a>
       </section>
     </div>
