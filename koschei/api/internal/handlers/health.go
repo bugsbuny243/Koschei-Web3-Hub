@@ -1,10 +1,22 @@
 package handlers
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+)
 
 func (h *Handler) Health(w http.ResponseWriter, _ *http.Request) {
-	if !h.RequireDB(w) {
+	if err := h.DBPingError(); err != nil {
+		log.Printf("health check database ping failed: %v", err)
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"status":   "error",
+			"database": "unavailable",
+			"error":    err.Error(),
+		})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status":   "ok",
+		"database": "connected",
+	})
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -26,6 +27,15 @@ func (h *Handler) RequireDB(w http.ResponseWriter) bool {
 		return false
 	}
 	return true
+}
+
+func (h *Handler) DBPingError() error {
+	if h.DB == nil {
+		return fmt.Errorf("database connection is not initialized")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return h.DB.PingContext(ctx)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
