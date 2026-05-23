@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -43,6 +44,9 @@ func runMigrations(db *sql.DB) error {
 		return err
 	}
 	sort.Strings(files)
+	if len(files) == 0 {
+		log.Printf("warning: no migrations found at %s; continuing with schema verification", filepath.Join("migrations", "*.sql"))
+	}
 	for _, f := range files {
 		v := filepath.Base(f)
 		var exists string
