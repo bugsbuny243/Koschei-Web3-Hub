@@ -16,6 +16,12 @@ CREATE TABLE IF NOT EXISTS plans (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+ALTER TABLE plans
+ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE plans
+ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
 CREATE TABLE IF NOT EXISTS auth_accounts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email citext UNIQUE NOT NULL,
