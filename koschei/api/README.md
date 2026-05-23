@@ -1,5 +1,9 @@
 # Koschei API (Runtime Phase 1)
 
+## Architecture
+- Single-service, same-origin deployment: Go API serves frontend static files and `/api/*` routes from one container/service.
+- No separate API service is required in Railway for runtime mode.
+
 ## Environment
 - `DATABASE_URL` (required)
 - `ADMIN_PASSWORD` (required for owner endpoints)
@@ -12,18 +16,31 @@ go mod tidy
 go run main.go
 ```
 
-## Endpoints
+## Health
 - `GET /health`
+
+## Public runtime endpoints
 - `GET /api/plans`
 - `POST /api/billing/manual-payment-request`
 - `GET /api/credits?email=...`
 - `GET /api/jobs?email=...`
 - `POST /api/jobs`
-- Owner (header `x-admin-password`):
-  - `GET /api/owner/payment-requests`
-  - `POST /api/owner/activate-plan`
-  - `POST /api/owner/grant-credits`
-  - `PATCH /api/owner/jobs/:id/status`
+- `GET /api/runtime/projects?email=...`
+- `POST /api/runtime/projects`
+- `GET /api/runtime/tasks?email=...`
+- `GET /api/runtime/logs?project_id=...`
+
+## Owner endpoints (header `x-admin-password`)
+- `GET /api/owner/payment-requests`
+- `POST /api/owner/activate-plan`
+- `POST /api/owner/grant-credits`
+- `PATCH /api/owner/jobs/:id/status`
+- `GET /api/owner/db-health`
 
 ## Migrations
-SQL migration is in `migrations/001_runtime_core.sql`.
+- `migrations/001_runtime_core.sql`
+- `migrations/002_quantum_runtime.sql`
+- `migrations/002_runtime_tables.sql`
+- `migrations/003_model_routing.sql`
+- `migrations/004_rename_builder_to_starter.sql`
+- `migrations/005_db_indexes_and_safety.sql`

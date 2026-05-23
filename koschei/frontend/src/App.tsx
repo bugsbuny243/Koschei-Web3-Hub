@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, apiConnected } from './lib/api';
 
 const SHOPIER_LINKS = {
@@ -139,7 +139,6 @@ function Billing() {
 function Dashboard() {
   const [email, setEmail] = useState(''); const [title, setTitle] = useState(''); const [prompt, setPrompt] = useState('');
   const [projects, setProjects] = useState<Project[]>([]); const [tasks, setTasks] = useState<Task[]>([]); const [logs, setLogs] = useState<Log[]>([]); const [projectId, setProjectId] = useState('');
-  const apiMissing = useMemo(() => !import.meta.env.VITE_API_BASE_URL, []);
 
   const refresh = async () => {
     if (!email) return;
@@ -157,7 +156,6 @@ function Dashboard() {
 
   return <main className="container page premium-card">
     <h1>Command Center Dashboard</h1>
-    {apiMissing && <p className='api-warning'>API not connected yet</p>}
     <div className='form-grid'>
       <input placeholder='email' value={email} onChange={e => setEmail(e.target.value)} />
       <input placeholder='project title' value={title} onChange={e => setTitle(e.target.value)} />
