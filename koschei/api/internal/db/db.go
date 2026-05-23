@@ -34,9 +34,51 @@ func Connect(databaseURL string) (*sql.DB, error) {
 	if err := verifySchema(db); err != nil {
 		return nil, fmt.Errorf("schema verification failed: %w", err)
 	}
+	if err := ensureCanonicalPlans(db); err != nil {
+		return nil, fmt.Errorf("canonical plans sync failed: %w", err)
+	}
+	log.Printf("canonical plans synced")
 	return db, nil
 }
 
+func ensureCanonicalPlans(db *sql.DB) error {
+	if _, err := db.Exec(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`); err != nil {
+		return err
+	}
+
+	canonicalPlans := []struct {
+		id             string
+		name           string
+		priceTry       int
+		monthlyCredits int
+		isActive       bool
+	}{
+		{id: "free", name: "Free", priceTry: 0, monthlyCredits: 0, isActive: true},
+		{id: "starter", name: "Starter", priceTry: 899, monthlyCredits: 20000, isActive: true},
+		{id: "pro", name: "Pro", priceTry: 2299, monthlyCredits: 70000, isActive: true},
+		{id: "studio", name: "Studio", priceTry: 4999, monthlyCredits: 180000, isActive: true},
+	}
+
+	for _, plan := range canonicalPlans {
+		if _, err := db.Exec(`
+			INSERT INTO plans (id, name, price_try, monthly_credits, is_active)
+			VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (id) DO UPDATE
+			SET name = EXCLUDED.name,
+				price_try = EXCLUDED.price_try,
+				monthly_credits = EXCLUDED.monthly_credits,
+				is_active = EXCLUDED.is_active,
+				updated_at = now()
+		`, plan.id, plan.name, plan.priceTry, plan.monthlyCredits, plan.isActive); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
 func runMigrations(db *sql.DB) (int, int, error) {
 	applied := 0
 	skipped := 0
