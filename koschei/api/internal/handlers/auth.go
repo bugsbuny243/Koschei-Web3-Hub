@@ -9,9 +9,6 @@ import (
 	"log"
 	"math/big"
 	"net/http"
-	"os"
-	"strings"
-	"time"
 )
 
 type authUser struct {
