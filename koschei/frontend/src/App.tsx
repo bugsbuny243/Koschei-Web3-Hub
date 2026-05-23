@@ -148,8 +148,10 @@ function Dashboard() {
   };
   const createProject = async () => {
     if (!apiConnected) return;
-    await api.createRuntimeProject({ email, title, prompt });
-    setTitle(''); setPrompt(''); refresh();
+    const created = await api.createRuntimeProject({ email, title, prompt });
+    setTitle(''); setPrompt('');
+    await refresh();
+    if (created?.project?.id) await loadLogs(created.project.id);
   };
   const loadLogs = async (pid: string) => { if (!apiConnected) return; setProjectId(pid); const l = await api.getRuntimeLogs(pid); setLogs(Array.isArray(l) ? l : []); };
   useEffect(() => { if (email) refresh(); }, []);

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -24,20 +25,57 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	projectID := newID()
-	_, err := h.DB.Exec(`INSERT INTO runtime_projects (id,email,title,prompt,status) VALUES ($1,$2,$3,$4,'queued')`, projectID, req.Email, req.Title, req.Prompt)
+	tx, err := h.DB.Begin()
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
-	for i, taskType := range []string{"planning", "generation", "review", "delivery"} {
-		_, err = h.DB.Exec(`INSERT INTO runtime_tasks (id,project_id,email,task_type,tool,prompt,status,priority) VALUES ($1,$2,$3,$4,$5,$6,'queued',$7)`, newID(), projectID, req.Email, taskType, "runtime_worker", req.Prompt, i+1)
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`INSERT INTO runtime_projects (id,email,title,prompt,status) VALUES ($1,$2,$3,$4,'queued')`, projectID, req.Email, req.Title, req.Prompt)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		return
+	}
+
+	taskTypes := []string{"planning", "generation", "review", "delivery"}
+	inputJSON, _ := json.Marshal(map[string]string{"title": req.Title, "prompt": req.Prompt})
+	outputJSON := "{}"
+	tasks := make([]map[string]any, 0, len(taskTypes))
+
+	for _, taskType := range taskTypes {
+		taskID := newID()
+		_, err = tx.Exec(`INSERT INTO runtime_tasks (id,project_id,email,task_type,tool,prompt,status,priority,input_json,output_json) VALUES ($1,$2,$3,$4,$5,$6,'queued',$7,$8::jsonb,$9::jsonb)`, taskID, projectID, req.Email, taskType, "runtime_worker", req.Prompt, 5, string(inputJSON), outputJSON)
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": "db failed"})
+			return
+		}
+		tasks = append(tasks, map[string]any{"id": taskID, "project_id": projectID, "email": req.Email, "task_type": taskType, "status": "queued", "input_json": json.RawMessage(inputJSON), "output_json": json.RawMessage(outputJSON)})
+
+		_, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,task_id,level,message) VALUES ($1,$2,$3,'info',$4)`, newID(), projectID, taskID, "Task created: "+taskType)
 		if err != nil {
 			writeJSON(w, 500, map[string]string{"error": "db failed"})
 			return
 		}
 	}
-	_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Project created and tasks queued")
-	writeJSON(w, 201, map[string]any{"project_id": projectID})
+
+	logCount := 1 + len(taskTypes)
+	_, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Project created")
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db failed"})
+		return
+	}
+
+	writeJSON(w, 201, map[string]any{
+		"project": map[string]any{"id": projectID, "email": req.Email, "title": req.Title, "prompt": req.Prompt, "status": "queued"},
+		"tasks": tasks,
+		"log_count": logCount,
+	})
 }
 
 func (h *Handler) ListRuntimeProjects(w http.ResponseWriter, r *http.Request) {
