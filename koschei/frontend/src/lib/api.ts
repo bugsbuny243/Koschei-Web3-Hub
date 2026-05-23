@@ -13,7 +13,7 @@ async function request(path: string, init?: RequestInit, auth = false) {
   if (auth && tokenStore.get()) headers.Authorization = `Bearer ${tokenStore.get()}`;
   const res = await fetch(target, { ...init, headers });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Request failed');
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
 
