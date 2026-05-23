@@ -3,6 +3,7 @@
     "name": "Koschei",
     "slug": "koschei",
     "scheme": "koschei",
+    "userInterfaceStyle": "automatic",
     "web": {
       "bundler": "metro",
       "output": "static"
