@@ -12,14 +12,15 @@ import (
 
 func main() {
 	databaseURL := os.Getenv("DATABASE_URL")
-	var conn = (*sql.DB)(nil)
+	var conn *sql.DB
+
 	if databaseURL == "" {
-		log.Printf("warning: DATABASE_URL is not set; database-backed API routes will return 503")
+		log.Printf("warning: DATABASE_URL is not set; starting in degraded mode")
 	} else {
 		var err error
 		conn, err = db.Connect(databaseURL)
 		if err != nil {
-			log.Printf("warning: database connection failed: %v", err)
+			log.Printf("warning: database unavailable; starting in degraded mode: %v", err)
 		}
 	}
 	if conn != nil {
