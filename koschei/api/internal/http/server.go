@@ -26,10 +26,10 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	}))
 	mux.HandleFunc("/api/auth/register", requiresDB(h, method("POST", h.Register)))
 	mux.HandleFunc("/api/auth/login", requiresDB(h, method("POST", h.Login)))
-	mux.HandleFunc("/api/me", requiresDB(h, method("GET", h.Me)))
+	mux.HandleFunc("/api/me", requiresDB(h, handlers.RequireAuth(method("GET", h.Me))))
 	mux.HandleFunc("/api/plans", requiresDB(h, method("GET", h.Plans)))
 	mux.HandleFunc("/api/billing/manual-payment-request", requiresDB(h, method("POST", h.ManualPaymentRequest)))
-	mux.HandleFunc("/api/credits", requiresDB(h, method("GET", h.Credits)))
+	mux.HandleFunc("/api/credits/me", requiresDB(h, handlers.RequireAuth(method("GET", h.Credits))))
 	mux.HandleFunc("/api/jobs", func(w http.ResponseWriter, r *http.Request) {
 		if !h.RequireDB(w) {
 			return
@@ -44,10 +44,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 		}
 		http.NotFound(w, r)
 	})
-	mux.HandleFunc("/api/runtime/projects", func(w http.ResponseWriter, r *http.Request) {
-		if !h.RequireDB(w) {
-			return
-		}
+	mux.HandleFunc("/api/runtime/projects", requiresDB(h, handlers.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.CreateRuntimeProject(w, r)
 			return
@@ -57,11 +54,11 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 			return
 		}
 		http.NotFound(w, r)
-	})
-	mux.HandleFunc("/api/runtime/projects/", requiresDB(h, method("GET", h.GetRuntimeProject)))
-	mux.HandleFunc("/api/runtime/tasks", requiresDB(h, method("GET", h.ListRuntimeTasks)))
-	mux.HandleFunc("/api/runtime/tasks/", requiresDB(h, method("GET", h.GetRuntimeTask)))
-	mux.HandleFunc("/api/runtime/logs/", requiresDB(h, method("GET", h.GetRuntimeLogs)))
+	})))
+	mux.HandleFunc("/api/runtime/projects/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetRuntimeProject))))
+	mux.HandleFunc("/api/runtime/tasks", requiresDB(h, handlers.RequireAuth(method("GET", h.ListRuntimeTasks))))
+	mux.HandleFunc("/api/runtime/tasks/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetRuntimeTask))))
+	mux.HandleFunc("/api/runtime/logs/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetRuntimeLogs))))
 	mux.HandleFunc("/api/runtime/route", requiresDB(h, method("POST", h.RuntimeRoute)))
 	mux.HandleFunc("/api/owner/payment-requests", requiresDB(h, method("GET", h.OwnerPaymentRequests)))
 	mux.HandleFunc("/api/owner/activate-plan", requiresDB(h, method("POST", h.OwnerActivatePlan)))
@@ -131,7 +128,7 @@ func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/version" && db == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable", "details": "database connection is not initialized"})
 			return
 		}
 		next.ServeHTTP(w, r)

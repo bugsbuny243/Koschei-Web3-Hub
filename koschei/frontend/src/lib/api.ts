@@ -12,7 +12,7 @@ async function request(path: string, init?: RequestInit, auth = false) {
   }
   const res = await fetch(target, { ...init, headers });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) throw new Error(data.details ? `${data.error || 'Request failed'}: ${data.details}` : (data.error || `Request failed (${res.status})`));
   return data;
 }
 

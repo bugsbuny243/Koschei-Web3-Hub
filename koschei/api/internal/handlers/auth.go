@@ -6,46 +6,71 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 )
 
-type authReq struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+type authReq struct{ Email, Password string }
+type authUser struct {
+	ID, Email, Role, Plan string
+	Credits               int
+}
+type jwtClaims struct {
+	Sub, Email, Role, PlanID string
+	Exp                      int64
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	if !h.requireJWTConfigured(w) {
+		return
+	}
 	var req authReq
-	if err := decodeJSON(r, &req); err != nil || !validEmail(req.Email) || len(req.Password) < 8 {
+	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
-	hash := hashPassword(req.Password)
-	_, err := h.DB.Exec(`INSERT INTO auth_accounts (email,password_hash,plan) VALUES ($1,$2,'free')`, strings.ToLower(strings.TrimSpace(req.Email)), hash)
-	if err != nil {
-		writeJSON(w, 409, map[string]string{"error": "account exists"})
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if !validEmail(email) || len(req.Password) < 8 {
+		writeJSON(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
-	token, err := issueJWT(strings.ToLower(strings.TrimSpace(req.Email)))
+	var id, role, planID string
+	err := h.DB.QueryRow(`INSERT INTO auth_accounts (email,password_hash,role,plan_id,is_active) VALUES ($1, crypt($2, gen_salt('bf')),'user','free',true) RETURNING id,role,plan_id`, email, req.Password).Scan(&id, &role, &planID)
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": "token failed"})
+		if strings.Contains(strings.ToLower(err.Error()), "duplicate") || strings.Contains(strings.ToLower(err.Error()), "unique") {
+			writeJSON(w, 409, map[string]string{"error": "account exists"})
+			return
+		}
+		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
-	writeJSON(w, 201, map[string]any{"token": token, "email": req.Email})
+	token, err := issueJWT(jwtClaims{Sub: id, Email: email, Role: role, PlanID: planID})
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "config error", "details": err.Error()})
+		return
+	}
+	writeJSON(w, 201, map[string]any{"token": token, "user": authUser{ID: id, Email: email, Role: role, Plan: planID, Credits: 0}})
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	if !h.requireJWTConfigured(w) {
+		return
+	}
 	var req authReq
-	if err := decodeJSON(r, &req); err != nil || !validEmail(req.Email) || req.Password == "" {
+	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
-	var hash string
-	err := h.DB.QueryRow(`SELECT password_hash FROM auth_accounts WHERE email=$1`, strings.ToLower(strings.TrimSpace(req.Email))).Scan(&hash)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if !validEmail(email) || req.Password == "" {
+		writeJSON(w, 400, map[string]string{"error": "invalid body"})
+		return
+	}
+	var id, role, plan string
+	err := h.DB.QueryRow(`SELECT id,role,plan_id FROM auth_accounts WHERE lower(email)=lower($1) AND is_active=true AND password_hash = crypt($2, password_hash)`, email, req.Password).Scan(&id, &role, &plan)
 	if err == sql.ErrNoRows {
 		writeJSON(w, 401, map[string]string{"error": "invalid credentials"})
 		return
@@ -54,98 +79,88 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
-	if hash != hashPassword(req.Password) {
-		writeJSON(w, 401, map[string]string{"error": "invalid credentials"})
-		return
-	}
-	token, err := issueJWT(strings.ToLower(strings.TrimSpace(req.Email)))
+	token, err := issueJWT(jwtClaims{Sub: id, Email: email, Role: role, PlanID: plan})
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": "token failed"})
+		writeJSON(w, 500, map[string]string{"error": "config error", "details": err.Error()})
 		return
 	}
-	writeJSON(w, 200, map[string]any{"token": token, "email": req.Email})
+	credits, _ := h.userCredits(id)
+	writeJSON(w, 200, map[string]any{"token": token, "user": authUser{ID: id, Email: email, Role: role, Plan: plan, Credits: credits}})
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
-	email, ok := emailFromAuthHeader(r)
+	claims, ok := userFromContext(r.Context())
 	if !ok {
 		writeJSON(w, 401, map[string]string{"error": "unauthorized"})
 		return
 	}
-	var plan string
-	_ = h.DB.QueryRow(`SELECT COALESCE(plan,'free') FROM auth_accounts WHERE email=$1`, email).Scan(&plan)
-	var credits int
-	_ = h.DB.QueryRow(`SELECT COALESCE(SUM(amount),0) FROM credits_ledger WHERE email=$1`, email).Scan(&credits)
-	writeJSON(w, 200, map[string]any{"email": email, "plan": plan, "credits": credits})
+	credits, _ := h.userCredits(claims.Sub)
+	writeJSON(w, 200, map[string]any{"user": authUser{ID: claims.Sub, Email: claims.Email, Role: claims.Role, Plan: claims.PlanID, Credits: credits}})
 }
 
-func issueJWT(email string) (string, error) {
+func (h *Handler) userCredits(userID string) (int, error) {
+	var credits int
+	err := h.DB.QueryRow(`SELECT COALESCE(SUM(cl.amount),0) FROM credits_ledger cl JOIN auth_accounts a ON lower(cl.email)=lower(a.email) WHERE a.id=$1`, userID).Scan(&credits)
+	return credits, err
+}
+
+func (h *Handler) requireJWTConfigured(w http.ResponseWriter) bool {
+	if strings.TrimSpace(os.Getenv("JWT_SECRET")) == "" {
+		writeJSON(w, 500, map[string]string{"error": "config error", "details": "JWT_SECRET is not set"})
+		return false
+	}
+	return true
+}
+
+func issueJWT(c jwtClaims) (string, error) {
 	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	if secret == "" {
-		secret = strings.TrimSpace(os.Getenv("ADMIN_PASSWORD"))
+		return "", errors.New("JWT_SECRET is not set")
 	}
-	if secret == "" {
-		return "", fmt.Errorf("missing secret")
+	if c.Exp == 0 {
+		c.Exp = time.Now().Add(7 * 24 * time.Hour).Unix()
 	}
 	head := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256","typ":"JWT"}`))
-	payloadObj := map[string]any{"sub": email, "exp": time.Now().Add(7 * 24 * time.Hour).Unix(), "iat": time.Now().Unix()}
-	pb, _ := json.Marshal(payloadObj)
+	pb, _ := json.Marshal(map[string]any{"sub": c.Sub, "email": c.Email, "role": c.Role, "plan_id": c.PlanID, "exp": c.Exp})
 	payload := base64.RawURLEncoding.EncodeToString(pb)
 	signing := head + "." + payload
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(signing))
-	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	return signing + "." + sig, nil
+	return signing + "." + base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
 }
 
-func emailFromAuthHeader(r *http.Request) (string, bool) {
-	h := r.Header.Get("Authorization")
-	if !strings.HasPrefix(h, "Bearer ") {
-		return "", false
-	}
-	parts := strings.Split(strings.TrimPrefix(h, "Bearer "), ".")
-	if len(parts) != 3 {
-		return "", false
-	}
+func parseJWT(token string) (jwtClaims, error) {
+	var out jwtClaims
 	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	if secret == "" {
-		secret = strings.TrimSpace(os.Getenv("ADMIN_PASSWORD"))
+		return out, errors.New("JWT_SECRET is not set")
 	}
-	if secret == "" {
-		return "", false
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return out, errors.New("invalid token")
 	}
-	signing := parts[0] + "." + parts[1]
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(signing))
-	expected := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	if !hmac.Equal([]byte(expected), []byte(parts[2])) {
-		return "", false
+	mac.Write([]byte(parts[0] + "." + parts[1]))
+	if !hmac.Equal([]byte(base64.RawURLEncoding.EncodeToString(mac.Sum(nil))), []byte(parts[2])) {
+		return out, errors.New("invalid token")
 	}
 	pb, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return "", false
+		return out, err
 	}
 	var claims map[string]any
-	if json.Unmarshal(pb, &claims) != nil {
-		return "", false
+	if err := json.Unmarshal(pb, &claims); err != nil {
+		return out, err
 	}
-	exp, ok := claims["exp"].(float64)
-	if !ok || int64(exp) < time.Now().Unix() {
-		return "", false
+	out.Sub, _ = claims["sub"].(string)
+	out.Email, _ = claims["email"].(string)
+	out.Role, _ = claims["role"].(string)
+	out.PlanID, _ = claims["plan_id"].(string)
+	if exp, ok := claims["exp"].(float64); ok {
+		out.Exp = int64(exp)
 	}
-	sub, ok := claims["sub"].(string)
-	if !ok || !validEmail(sub) {
-		return "", false
+	if out.Sub == "" || out.Exp < time.Now().Unix() {
+		return out, errors.New("expired or invalid token")
 	}
-	return sub, true
-}
-
-func hashPassword(pw string) string {
-	s := strings.TrimSpace(os.Getenv("JWT_SECRET"))
-	if s == "" {
-		s = "koschei-phase3"
-	}
-	mac := hmac.New(sha256.New, []byte(s))
-	mac.Write([]byte(pw))
-	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return out, nil
 }
