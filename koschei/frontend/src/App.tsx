@@ -9,7 +9,7 @@ const SHOPIER_LINKS = {
 
 type PackageId = 'starter' | 'pro' | 'studio';
 type Project = { id: string; title: string; prompt: string; status: string; created_at: string };
-type Task = { id: string; project_id: string; task_type: string; status: string; result?: string; error?: string };
+type Task = { id: string; project_id: string; task_type: string; status: string; output_json?: unknown; error?: string };
 type Log = { id: string; level: string; message: string; created_at: string };
 
 const navigate = (to: string) => {
@@ -139,17 +139,30 @@ function Billing() {
 function Dashboard() {
   const [email, setEmail] = useState(''); const [title, setTitle] = useState(''); const [prompt, setPrompt] = useState('');
   const [projects, setProjects] = useState<Project[]>([]); const [tasks, setTasks] = useState<Task[]>([]); const [logs, setLogs] = useState<Log[]>([]); const [projectId, setProjectId] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
 
   const refresh = async () => {
     if (!email) return;
     if (!apiConnected) return;
     const p = await api.getRuntimeProjects(email); setProjects(Array.isArray(p) ? p : []);
     const t = await api.getRuntimeTasks(email); setTasks(Array.isArray(t) ? t : []);
+    return Array.isArray(p) ? p as Project[] : [];
   };
   const createProject = async () => {
     if (!apiConnected) return;
-    await api.createRuntimeProject({ email, title, prompt });
-    setTitle(''); setPrompt(''); refresh();
+    setStatusMessage('Creating project...');
+    try {
+      const created = await api.createRuntimeProject({ email, title, prompt }) as { project_id?: string };
+      setTitle('');
+      setPrompt('');
+      const refreshedProjects = await refresh();
+      const latestProjectID = created.project_id || refreshedProjects?.[0]?.id;
+      if (latestProjectID) await loadLogs(latestProjectID);
+      setStatusMessage('Project created successfully.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to create project.';
+      setStatusMessage(`Create project failed: ${message}`);
+    }
   };
   const loadLogs = async (pid: string) => { if (!apiConnected) return; setProjectId(pid); const l = await api.getRuntimeLogs(pid); setLogs(Array.isArray(l) ? l : []); };
   useEffect(() => { if (email) refresh(); }, []);
@@ -165,10 +178,11 @@ function Dashboard() {
         <button className='btn primary wide-btn' onClick={createProject} disabled={!apiConnected}>Create Project</button>
       </div>
     </div>
+    {!!statusMessage && <p>{statusMessage}</p>}
     <h2>Projects</h2>
     {projects.length === 0 ? <article className='card'>No projects yet</article> : projects.map(p => <article className='card row' key={p.id}><b>{p.title}</b><span>{p.status}</span><button className='btn' onClick={() => loadLogs(p.id)}>Logs</button></article>)}
     <h2>Tasks</h2>
-    {tasks.length === 0 ? <article className='card'>No tasks yet</article> : tasks.map(t => <article className='card' key={t.id}><b>{t.task_type}</b> <span>{t.status}</span><p>{t.result || t.error || 'Pending...'}</p></article>)}
+    {tasks.length === 0 ? <article className='card'>No tasks yet</article> : tasks.map(t => <article className='card' key={t.id}><b>{t.task_type}</b> <span>{t.status}</span><p>{t.error || 'Pending...'}</p></article>)}
     <h2>Logs {projectId && `(Project ${projectId.slice(0, 8)})`}</h2>
     {logs.length === 0 ? <article className='card'>No logs yet</article> : logs.map(l => <article className='card' key={l.id}><b>[{l.level}]</b> {l.message}</article>)}
   </main>;
