@@ -40,6 +40,9 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	if os.Getenv("JWT_SECRET") == "" {
+		log.Printf("JWT_SECRET is not set")
+	}
 	staticDir := os.Getenv("STATIC_DIR")
 	if staticDir == "" {
 		staticDir = "/app/public"
