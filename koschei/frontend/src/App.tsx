@@ -1,159 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
-
-type Role = 'public' | 'user' | 'owner';
-const currentRole: Role = 'public';
-
-type Tool = { title: string; icon: string; description: string };
-const tools: Tool[] = [
-  { title: 'Code Generator', icon: '🧠', description: 'Generate production-ready code, refactor modules, and ship faster with AI pair programming.' },
-  { title: 'App Builder', icon: '📱', description: 'Design and launch full-stack app experiences from prompts, flows, and templates.' },
-  { title: 'Web Builder', icon: '🌐', description: 'Build premium marketing sites, landing pages, and internal tools with live previews.' },
-  { title: 'Game Builder', icon: '🎮', description: 'Create game loops, levels, assets, and scripts for rapid prototype-to-play cycles.' },
-  { title: 'Image Studio', icon: '🖼️', description: 'Generate visual assets, concept art, and brand content with model-guided control.' },
-  { title: 'Video Studio', icon: '🎬', description: 'Turn ideas into short-form videos, cinematic clips, and story-driven visual outputs.' },
-  { title: 'Voice Lab', icon: '🎙️', description: 'Produce TTS voiceovers, transcribe audio, and run multilingual speech pipelines.' },
-  { title: 'Automation Workflows', icon: '⚙️', description: 'Chain tools into repeatable workflows for campaigns, content ops, and delivery tasks.' },
-];
-
-const modelCategories = ['Code', 'Chat', 'Reasoning', 'Image', 'Image Edit', 'Video', 'Cinematic Video', 'TTS', 'STT'];
+import { api, apiConnected } from './lib/api';
 
 const pricing = [
-  { name: 'Free', price: '0 TL', credits: '500 monthly credits', toolsIncluded: 'Core tools', limits: 'Image/Video: trial limits', cta: 'Start Free' },
-  { name: 'Builder', price: '899 TL / month', credits: '20,000 monthly credits', toolsIncluded: 'All builder tools', limits: 'Image/Video: standard limits', cta: 'Choose Builder' },
-  { name: 'Pro', price: '2,299 TL / month', credits: '70,000 monthly credits', toolsIncluded: 'All tools + priority queue', limits: 'Image/Video: high limits', cta: 'Upgrade to Pro' },
-  { name: 'Studio', price: '4,999 TL / month', credits: '180,000 monthly credits', toolsIncluded: 'Full studio suite + premium routing', limits: 'Image/Video: studio limits', cta: 'Go Studio' },
+  { id: 'free', name: 'Free', price: '0 TL', credits: 500 },
+  { id: 'builder', name: 'Builder', price: '899 TL', credits: 20000 },
+  { id: 'pro', name: 'Pro', price: '2299 TL', credits: 70000 },
+  { id: 'studio', name: 'Studio', price: '4999 TL', credits: 180000 },
 ];
+const nav = (to: string) => { window.history.pushState({}, '', to); window.dispatchEvent(new PopStateEvent('popstate')); };
+const disconnected = <p className="subtext">API not connected yet</p>;
 
-const navigate = (to: string) => {
-  window.history.pushState({}, '', to);
-  window.dispatchEvent(new PopStateEvent('popstate'));
-};
+function Home() { return <main className="container"><section className="hero premium-card"><div><p className="eyebrow">Koschei Premium AI SaaS</p><h1>Build with an Immortal AI Command Center for Code, Media, and Automation.</h1><p className="subtext">Koschei unifies tools so teams can generate products, content, and workflows from one premium platform.</p><div className="actions"><button className="btn primary" onClick={()=>nav('/pricing')}>View Pricing</button><button className="btn" onClick={()=>nav('/dashboard')}>Open Dashboard</button></div></div></section></main>; }
+function PricingPage() { return <main className="container page premium-card"><h1>Pricing</h1><div className="grid">{pricing.map((p)=><article className="card" key={p.id}><h3>{p.name}</h3><p className="price">{p.price}</p><p>{p.credits} credits/mo</p><button className="btn primary" onClick={()=>nav(`/billing?plan=${p.id}`)}>Choose {p.name}</button></article>)}</div></main>; }
 
-function Home() {
-  return (
-    <main className="container">
-      <section className="hero premium-card">
-        <div>
-          <p className="eyebrow">Koschei Premium AI SaaS</p>
-          <h1>Build with an Immortal AI Command Center for Code, Media, and Automation.</h1>
-          <p className="subtext">Koschei unifies tools and model routing so teams can generate products, content, and workflows from one premium platform.</p>
-          <div className="actions">
-            <button className="btn primary" onClick={() => navigate('/platform')}>Start Building</button>
-            <button className="btn" onClick={() => navigate('/pricing')}>View Pricing</button>
-          </div>
-        </div>
-        <aside className="mockup-card">
-          <h3>AI Command Center</h3>
-          <p className="status">Router Status: <span>Online</span></p>
-          <ul>
-            <li>Credits: 18,420</li>
-            <li>Active tools: 8</li>
-            <li>Queue: 3 running jobs</li>
-          </ul>
-          <p className="model">Model selected: Qwen3-Coder / DeepSeek / FLUX / Veo</p>
-        </aside>
-      </section>
+function BillingPage() { const params = new URLSearchParams(window.location.search); const [plan,setPlan]=useState(params.get('plan')||'builder'); const [email,setEmail]=useState(''); const [payment_reference,setRef]=useState(''); const [note,setNote]=useState(''); const [msg,setMsg]=useState('');
+  const submit=async()=>{ try{const d=await api.createPaymentRequest({email,plan,payment_provider:'shopier',payment_reference,note}); setMsg(d.message);}catch(e:any){setMsg(e.message);} };
+  return <main className="container page premium-card"><h1>Billing</h1>{!apiConnected?disconnected:<><select value={plan} onChange={e=>setPlan(e.target.value)}>{pricing.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><input placeholder="email" value={email} onChange={e=>setEmail(e.target.value)} /><input value="shopier" disabled /><input placeholder="payment reference (optional)" value={payment_reference} onChange={e=>setRef(e.target.value)} /><textarea placeholder="note (optional)" value={note} onChange={e=>setNote(e.target.value)} /><button className="btn primary" onClick={submit}>Create Payment Request</button><p>{msg}</p></>}</main>; }
 
-      <section className="premium-card">
-        <h2>Live Dashboard Preview</h2>
-        <div className="dashboard-grid">
-          <article className="card"><h3>AI Router</h3><p>Stable • low latency • smart fallback</p></article>
-          <article className="card"><h3>Credits</h3><p>18,420 available this cycle</p></article>
-          <article className="card"><h3>Active Tools</h3><p>Code, Web, Image, Video, Voice</p></article>
-          <article className="card"><h3>Recent Jobs</h3><p>Landing page generation, video teaser, and app scaffold</p></article>
-        </div>
-      </section>
+function DashboardPage(){ const [email,setEmail]=useState(''); const [credits,setCredits]=useState<number|undefined>(); const [jobs,setJobs]=useState<any[]>([]); const [tool,setTool]=useState('code-generator'); const [prompt,setPrompt]=useState(''); const [msg,setMsg]=useState('');
+  const load=async()=>{ try{const c=await api.getCredits(email); const j=await api.getJobs(email); setCredits(c.credits); setJobs(j.jobs||[]);}catch(e:any){setMsg(e.message);} };
+  const create=async()=>{ try{const r=await api.createJob({email,tool,prompt}); setMsg(`Job created: ${r.id} (${r.status})`); await load();}catch(e:any){setMsg(e.message);} };
+  return <main className="container page premium-card"><h1>Dashboard</h1>{!apiConnected?disconnected:<><input placeholder="email" value={email} onChange={e=>setEmail(e.target.value)} /><button className="btn" onClick={load}>Load Data</button><p>Credits: {credits ?? '-'}</p><select value={tool} onChange={e=>setTool(e.target.value)}><option>code-generator</option><option>web-builder</option><option>image-studio</option></select><textarea placeholder="prompt" value={prompt} onChange={e=>setPrompt(e.target.value)} /><button className="btn primary" onClick={create}>Create Queued Job</button><p>{msg}</p><ul>{jobs.map((j)=><li key={j.id}>{j.tool} - {j.status}</li>)}</ul></>}</main>; }
 
-      <section className="premium-card">
-        <h2>Tools</h2>
-        <div className="grid">{tools.map((item) => <article key={item.title} className="card"><h3>{item.icon} {item.title}</h3><p>{item.description}</p></article>)}</div>
-      </section>
+function OwnerPage(){ const [pwd,setPwd]=useState(''); const [requests,setRequests]=useState<any[]>([]); const [email,setEmail]=useState(''); const [plan,setPlan]=useState('builder'); const [credits,setCredits]=useState(20000); const [note,setNote]=useState('manual Shopier activation'); const [jobId,setJobId]=useState(''); const [status,setStatus]=useState('completed'); const [result,setResult]=useState(''); const [msg,setMsg]=useState('');
+  const load=async()=>{try{const d=await api.ownerPaymentRequests(pwd); setRequests(d.payment_requests||[]);}catch(e:any){setMsg(e.message)}};
+  return <main className="container page premium-card"><h1>Owner</h1>{!apiConnected?disconnected:<><input placeholder="admin password" value={pwd} onChange={e=>setPwd(e.target.value)} /><button className="btn" onClick={load}>Load Payment Requests</button><ul>{requests.map((r)=><li key={r.id}>{r.email} - {r.plan} - {r.status}</li>)}</ul><h3>Activate Plan</h3><input placeholder="email" value={email} onChange={e=>setEmail(e.target.value)} /><select value={plan} onChange={e=>setPlan(e.target.value)}>{pricing.map(p=><option key={p.id} value={p.id}>{p.id}</option>)}</select><input type="number" value={credits} onChange={e=>setCredits(Number(e.target.value))}/><input value={note} onChange={e=>setNote(e.target.value)}/><button className="btn" onClick={async()=>{try{await api.ownerActivatePlan(pwd,{email,plan,credits,note});setMsg('Plan activated')}catch(e:any){setMsg(e.message)}}}>Activate</button><h3>Grant Credits</h3><button className="btn" onClick={async()=>{try{await api.ownerGrantCredits(pwd,{email,credits:1000,reason:'manual top-up'});setMsg('Credits granted')}catch(e:any){setMsg(e.message)}}}>Grant +1000</button><h3>Update Job Status</h3><input placeholder="job id" value={jobId} onChange={e=>setJobId(e.target.value)} /><input value={status} onChange={e=>setStatus(e.target.value)} /><textarea value={result} onChange={e=>setResult(e.target.value)} /><button className="btn" onClick={async()=>{try{await api.ownerUpdateJobStatus(pwd,jobId,{status,result});setMsg('Job updated')}catch(e:any){setMsg(e.message)}}}>Update Job</button><p>{msg}</p></>}</main>; }
 
-      <section className="premium-card">
-        <h2>Model Router</h2>
-        <div className="grid">{modelCategories.map((item) => <article key={item} className="card"><p>{item}</p></article>)}</div>
-      </section>
-
-      <section className="premium-card">
-        <h2>Pricing</h2>
-        <div className="grid">
-          {pricing.map((plan) => (
-            <article key={plan.name} className="card price-card">
-              <h3>{plan.name}</h3>
-              <p className="price">{plan.price}</p>
-              <ul>
-                <li>{plan.credits}</li>
-                <li>{plan.toolsIncluded}</li>
-                <li>{plan.limits}</li>
-              </ul>
-              <button className="btn primary">{plan.cta}</button>
-            </article>
-          ))}
-        </div>
-      </section>
-    </main>
-  );
-}
-
-function Platform() {
-  return <main className="container page premium-card"><h1>Platform</h1><p>Koschei combines Code, App, Web, Game, Image, Video, Voice, and Automation tools in one workflow engine with intelligent model routing across code, chat, reasoning, image, video, and audio categories.</p></main>;
-}
-function PricingPage() {
-  return <main className="container page premium-card"><h1>Pricing</h1><div className="grid">{pricing.map((plan) => <article key={plan.name} className="card price-card"><h3>{plan.name}</h3><p className="price">{plan.price}</p><p>{plan.credits}</p><p>{plan.toolsIncluded}</p><p>{plan.limits}</p><button className="btn primary">{plan.cta}</button></article>)}</div></main>;
-}
-function BillingPage() {
-  return <main className="container page premium-card"><h1>Billing</h1><p>Automatic payment API is not active yet. Payments are manually verified and activated.</p><ol><li>Choose a plan and pay via Shopier payment link placeholder.</li><li>Share payment confirmation with owner.</li><li>Owner manually activates your plan and credits.</li></ol><div className="actions"><button className="btn">Shopier Free/Builder Placeholder</button><button className="btn">Shopier Pro/Studio Placeholder</button></div></main>;
-}
-function DashboardPage() {
-  return <main className="container page premium-card"><h1>Dashboard</h1><div className="dashboard-grid"><article className="card"><h3>Credits</h3><p>0</p></article><article className="card"><h3>Projects</h3><p>0</p></article><article className="card"><h3>AI Jobs</h3><p>No jobs yet</p></article><article className="card"><h3>Model Router</h3><p>Ready to route</p></article></div><p className="subtext">Premium dashboard modules coming soon.</p></main>;
-}
-function OwnerPage() {
-  return <main className="container page premium-card"><h1>Private Owner Cockpit</h1><p>This area is restricted by owner role guard placeholder. Public users cannot access owner tools.</p></main>;
-}
-
-export default function App() {
-  const [path, setPath] = useState(window.location.pathname);
-
-  useEffect(() => {
-    const onPop = () => setPath(window.location.pathname);
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
-
-  const route = useMemo(() => (['/', '/platform', '/dashboard', '/pricing', '/billing', '/owner'].includes(path) ? path : '/'), [path]);
-  const canOwner = currentRole === 'owner';
-
-  return (
-    <div>
-      <header className="topbar">
-        <button className="logo" onClick={() => navigate('/')}>KOSCHEI</button>
-        <nav>
-          <button className="btn" onClick={() => navigate('/platform')}>Platform</button>
-          <button className="btn" onClick={() => navigate('/pricing')}>Pricing</button>
-          <button className="btn" onClick={() => navigate('/dashboard')}>Dashboard</button>
-          <button className="btn" onClick={() => navigate('/billing')}>Billing</button>
-          {canOwner && <button className="btn" onClick={() => navigate('/owner')}>Owner</button>}
-        </nav>
-      </header>
-
-      {route === '/' && <Home />}
-      {route === '/platform' && <Platform />}
-      {route === '/dashboard' && <DashboardPage />}
-      {route === '/pricing' && <PricingPage />}
-      {route === '/billing' && <BillingPage />}
-      {route === '/owner' && <OwnerPage />}
-
-      <footer className="footer">
-        <div className="container footer-inner">
-          <p className="logo">KOSCHEI</p>
-          <div className="footer-links">
-            <button className="btn" onClick={() => navigate('/platform')}>Platform</button>
-            <button className="btn" onClick={() => navigate('/pricing')}>Pricing</button>
-            <button className="btn" onClick={() => navigate('/billing')}>Billing</button>
-          </div>
-          <p className="subtext">Security: Owner tools are private and not visible publicly.</p>
-        </div>
-      </footer>
-    </div>
-  );
-}
+export default function App(){ const [path,setPath]=useState(window.location.pathname); useEffect(()=>{const p=()=>setPath(window.location.pathname); window.addEventListener('popstate',p); return ()=>window.removeEventListener('popstate',p);},[]); const route=useMemo(()=>['/','/pricing','/billing','/dashboard','/owner'].includes(path)?path:'/',[path]);
+return <div><header className="topbar"><button className="logo" onClick={()=>nav('/')}>KOSCHEI</button><nav><button className="btn" onClick={()=>nav('/pricing')}>Pricing</button><button className="btn" onClick={()=>nav('/dashboard')}>Dashboard</button><button className="btn" onClick={()=>nav('/billing')}>Billing</button></nav></header>{route==='/'&&<Home/>}{route==='/pricing'&&<PricingPage/>}{route==='/billing'&&<BillingPage/>}{route==='/dashboard'&&<DashboardPage/>}{route==='/owner'&&<OwnerPage/>}</div>; }
