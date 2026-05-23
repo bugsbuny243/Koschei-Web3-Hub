@@ -1,34 +1,37 @@
 CREATE TABLE IF NOT EXISTS runtime_projects (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email text NOT NULL,
-  title text NOT NULL,
-  prompt text NOT NULL,
-  status text NOT NULL DEFAULT 'queued',
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  id UUID PRIMARY KEY,
+  email TEXT NOT NULL,
+  title TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS runtime_tasks (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id uuid NOT NULL REFERENCES runtime_projects(id) ON DELETE CASCADE,
-  email text NOT NULL,
-  task_type text NOT NULL,
-  status text NOT NULL DEFAULT 'queued',
-  input_json jsonb NOT NULL DEFAULT '{}'::jsonb,
-  output_json jsonb NOT NULL DEFAULT '{}'::jsonb,
-  error text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  id UUID PRIMARY KEY,
+  project_id UUID REFERENCES runtime_projects(id),
+  email TEXT NOT NULL,
+  task_type TEXT NOT NULL,
+  tool TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued',
+  priority INTEGER NOT NULL DEFAULT 5,
+  result TEXT,
+  error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS runtime_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  project_id uuid REFERENCES runtime_projects(id) ON DELETE CASCADE,
-  task_id uuid REFERENCES runtime_tasks(id) ON DELETE SET NULL,
-  level text NOT NULL DEFAULT 'info',
-  message text NOT NULL,
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now()
+  id UUID PRIMARY KEY,
+  project_id UUID,
+  task_id UUID,
+  level TEXT NOT NULL DEFAULT 'info',
+  message TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_runtime_projects_email ON runtime_projects(email);
