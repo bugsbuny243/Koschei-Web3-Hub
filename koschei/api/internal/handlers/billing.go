@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http"
 )
 
@@ -22,7 +23,19 @@ func (h *Handler) ManualPaymentRequest(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "invalid body"})
 		return
 	}
-	_, err := h.DB.Exec(`INSERT INTO payment_requests (email, plan, payment_provider, payment_reference, note) VALUES ($1,$2,$3,$4,$5)`, req.Email, req.Plan, req.PaymentProvider, req.PaymentReference, req.Note)
+
+	var duplicateID string
+	err := h.DB.QueryRow(`SELECT id FROM payment_requests WHERE payment_provider=$1 AND payment_reference=$2 AND status IN ('pending','approved') LIMIT 1`, req.PaymentProvider, req.PaymentReference).Scan(&duplicateID)
+	if err == nil {
+		writeJSON(w, 409, map[string]string{"error": "duplicate payment request: payment_provider + payment_reference already exists with pending/approved status"})
+		return
+	}
+	if err != nil && err != sql.ErrNoRows {
+		writeJSON(w, 500, map[string]string{"error": "db check failed"})
+		return
+	}
+
+	_, err = h.DB.Exec(`INSERT INTO payment_requests (email, plan, payment_provider, payment_reference, note) VALUES ($1,$2,$3,$4,$5)`, req.Email, req.Plan, req.PaymentProvider, req.PaymentReference, req.Note)
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db insert failed"})
 		return

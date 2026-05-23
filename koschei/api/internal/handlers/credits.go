@@ -9,6 +9,7 @@ func (h *Handler) Credits(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var total int
+	// Runtime credit balance source-of-truth: credits_ledger only (never credit_events / credit_ledger).
 	if err := h.DB.QueryRow(`SELECT COALESCE(SUM(amount),0) FROM credits_ledger WHERE email=$1`, email).Scan(&total); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
