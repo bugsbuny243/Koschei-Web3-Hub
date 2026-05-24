@@ -144,14 +144,17 @@ export default function Dashboard() {
   };
 
   return (
-    <View className="flex-1 bg-[#0a0a0a] p-4" style={{ backgroundColor: '#0a0a0a' }}>
+    <View className="flex-1 bg-[#020207] p-4" style={{ backgroundColor: '#020207' }}>
+      <View className="absolute -left-16 top-28 h-72 w-72 rounded-full bg-cyan-500/10" />
+      <View className="absolute -right-16 bottom-24 h-72 w-72 rounded-full bg-violet-500/10" />
       <View className="mx-auto w-full max-w-6xl gap-4">
         <View className="gap-4 md:flex-row">
           <View className="md:w-72">
             <Card>
-              <Text className="text-sm text-zinc-400">Signed in as</Text>
+              <Text className="text-xs uppercase tracking-[2px] text-cyan-300">Identity Core</Text>
+              <Text className="mt-3 text-sm text-zinc-400">Signed in as</Text>
               <Text className="mt-1 text-sm text-white" numberOfLines={2}>{email || 'Signed in'}</Text>
-              <View className="mt-4 border-t border-zinc-800 pt-4">
+              <View className="mt-4 border-t border-emerald-500/20 pt-4">
                 <Text className="text-xs uppercase tracking-wider text-zinc-400">Plan</Text>
                 <Text className="mt-1 text-lg font-semibold text-white">{plan}</Text>
               </View>
@@ -167,7 +170,7 @@ export default function Dashboard() {
 
           <View className="flex-1">
             <Card>
-              <Text className="mb-2 text-base font-semibold text-white">Runtime Project Prompt</Text>
+              <Text className="mb-2 text-base font-semibold text-white">Quantum Runtime Prompt</Text>
               <Input
                 placeholder="Describe your runtime project..."
                 value={prompt}
@@ -183,11 +186,11 @@ export default function Dashboard() {
 
         <ScrollView className="max-h-[65vh]" contentContainerStyle={{ gap: 12, paddingBottom: 24 }}>
           <Card>
-            <Text className="text-lg font-semibold text-white">Projects ({sortedProjects.length})</Text>
+            <Text className="text-lg font-semibold text-white">Runtime Projects ({sortedProjects.length})</Text>
             <View className="mt-3 gap-2">
               {sortedProjects.length === 0 && <Text className="text-zinc-500">No projects yet</Text>}
               {sortedProjects.map((p) => (
-                <View key={p.id} className="flex-row items-start justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
+                <View key={p.id} className="flex-row items-start justify-between rounded-lg border border-emerald-500/20 bg-[#040a15] px-3 py-2">
                   <Text className="mr-3 flex-1 flex-wrap text-zinc-100">{p.title}</Text>
                   <Text className={statusTextClass(p.status)}>{String(p.status || 'unknown')}</Text>
                 </View>
@@ -196,14 +199,14 @@ export default function Dashboard() {
           </Card>
 
           <Card>
-            <Text className="text-lg font-semibold text-white">Tasks ({displayedTasks.length})</Text>
+            <Text className="text-lg font-semibold text-white">Agent Task Queue ({displayedTasks.length})</Text>
             <View className="mt-3 gap-3">
               {displayedTasks.length === 0 && <Text className="text-zinc-500">No tasks yet</Text>}
               {taskGroups.map((group) => (
                 <View key={group.title} className="gap-2">
                   <Text className="text-xs uppercase tracking-wide text-zinc-500">{group.title}</Text>
                   {group.rows.map((t) => (
-                    <View key={t.id} className="flex-row items-start justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
+                    <View key={t.id} className="flex-row items-start justify-between rounded-lg border border-cyan-500/20 bg-[#040a15] px-3 py-2">
                       <Text className="mr-3 flex-1 flex-wrap text-zinc-100">{t.task_type}</Text>
                       <Text className={statusTextClass(t.status)}>{String(t.status || 'unknown')}</Text>
                     </View>
@@ -214,11 +217,11 @@ export default function Dashboard() {
           </Card>
 
           <Card>
-            <Text className="text-lg font-semibold text-white">Logs ({displayedLogs.length})</Text>
+            <Text className="text-lg font-semibold text-white">System Logs ({displayedLogs.length})</Text>
             <View className="mt-3 gap-2">
               {displayedLogs.length === 0 && <Text className="text-zinc-500">No logs yet</Text>}
               {displayedLogs.map((l) => (
-                <View key={l.id} className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
+                <View key={l.id} className="rounded-lg border border-violet-500/20 bg-[#040a15] px-3 py-2">
                   <Text className="text-xs uppercase text-zinc-400">{String(l.level || 'info')}</Text>
                   <Text className="mt-1 flex-wrap text-zinc-100">{l.message}</Text>
                 </View>

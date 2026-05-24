@@ -50,14 +50,19 @@ export default function Register() {
   };
 
   return (
-    <View className="flex-1 bg-[#0a0a0a] p-6 gap-3" style={{ backgroundColor: '#0a0a0a' }}>
-      <Text className="text-3xl text-white" style={{ color: '#ffffff' }}>
-        Register
-      </Text>
-      <Input placeholder="Email" autoCapitalize="none" value={email} onChangeText={setEmail} />
-      <Input placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
-      {!!error && <ErrorState text={error} />}
-      <Button label="Create Account" onPress={submit} />
+    <View className="flex-1 items-center justify-center bg-[#020207] p-6" style={{ backgroundColor: '#020207' }}>
+      <View className="absolute -left-20 top-20 h-64 w-64 rounded-full bg-cyan-500/10" />
+      <View className="absolute -right-24 bottom-16 h-72 w-72 rounded-full bg-violet-500/10" />
+      <View className="w-full max-w-md rounded-3xl border border-emerald-500/20 bg-[#060a13]/95 p-6 shadow-[0_0_30px_rgba(0,255,135,0.15)] gap-3">
+        <Text className="text-3xl font-semibold text-white" style={{ color: '#ffffff' }}>
+          Create Koschei Identity
+        </Text>
+        <Text className="mb-2 text-sm text-zinc-400">Secure Neon Auth access</Text>
+        <Input placeholder="Email" autoCapitalize="none" value={email} onChangeText={setEmail} />
+        <Input placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
+        {!!error && <ErrorState text={error} />}
+        <Button label="Create Account" onPress={submit} />
+      </View>
     </View>
   );
 }
