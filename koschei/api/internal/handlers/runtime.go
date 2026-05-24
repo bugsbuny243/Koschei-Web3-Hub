@@ -38,18 +38,36 @@ type runtimeBlueprint struct {
 
 const runtimeSystemPrompt = `You are Koschei Runtime Factory.
 Default language is Turkish.
-You turn a user idea into a real production blueprint.
-Do not act like a normal chatbot.
-Be practical, technical, and production-focused.
-For serious game/app/web/software ideas, produce MVP-first plan.
-Do not promise instant full clone.
-If the idea resembles PUBG, GTA, TikTok, YouTube, marketplace, SaaS, or social app:
+Return ONLY valid JSON.
+Do not wrap in markdown.
+Do not use ` + "```json" + ` fences.
+Do not add explanation outside JSON.
+For PUBG-like, GTA-like, TikTok-like, marketplace-like, YouTube-like:
+- do not refuse
+- do not promise instant full clone
 - make it original/IP-safe
-- explain realistic MVP
-- list infrastructure
-- list technical risks
+- MVP first
+- list real infrastructure
+- list risks
 - list build sequence
-Respond in JSON with keys: project_title, project_type, user_intent, mvp_scope, required_infrastructure, architecture, file_plan, api_plan, database_plan, ai_model_usage, build_steps, risks, review_checklist, delivery_package, next_action.`
+Required JSON shape:
+{
+  "project_title": "string",
+  "project_type": "string",
+  "user_intent": "string",
+  "mvp_scope": ["string"],
+  "required_infrastructure": ["string"],
+  "architecture": ["string"],
+  "file_plan": ["string"],
+  "api_plan": ["string"],
+  "database_plan": ["string"],
+  "ai_model_usage": ["string"],
+  "build_steps": ["string"],
+  "risks": ["string"],
+  "review_checklist": ["string"],
+  "delivery_package": ["string"],
+  "next_action": "string"
+}`
 
 func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 	if !h.Limiter.allow("runtime-project:"+clientIP(r), 20, 10_000_000_000) {
@@ -139,24 +157,38 @@ func (h *Handler) runRuntimeProductionPipeline(projectID, authSub, email, title,
 		return nil, err
 	}
 	bp := buildRuntimeBlueprint(aiOut, prompt)
-	if err := h.completeRuntimePipeline(projectID, authSub, email, bp, isPrivileged); err != nil {
+	creditCharged, err := h.completeRuntimePipeline(projectID, authSub, email, bp, isPrivileged)
+	if err != nil {
 		_ = h.markRuntimeFailed(projectID, "Runtime AI pipeline failed: "+shortError(err.Error()), "delivery", err.Error())
 		return nil, err
 	}
-	return h.fetchRuntimeResponse(projectID, bp)
+	return h.fetchRuntimeResponse(projectID, bp, creditCharged)
 }
 func (h *Handler) callTogetherRuntimeBlueprint(prompt string) (string, error) {
 	model := firstEnv("TOGETHER_MODEL_REASONING", "TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL")
 	if strings.TrimSpace(model) == "" {
 		return "", errors.New("together model is empty")
 	}
-	return h.callTogetherChat(model, "reason", "SYSTEM OVERRIDE:\n"+runtimeSystemPrompt+"\n\n"+prompt)
+	return h.callTogetherWithSystem(model, runtimeSystemPrompt, prompt)
 }
 func buildRuntimeBlueprint(raw, prompt string) runtimeBlueprint {
 	var bp runtimeBlueprint
-	if err := json.Unmarshal([]byte(strings.TrimSpace(raw)), &bp); err != nil {
-		bp.RawAIOutput = raw
+	raw = strings.TrimSpace(raw)
+	if err := json.Unmarshal([]byte(raw), &bp); err != nil {
+		start := strings.Index(raw, "{")
+		end := strings.LastIndex(raw, "}")
+		if start >= 0 && end > start {
+			if extractErr := json.Unmarshal([]byte(raw[start:end+1]), &bp); extractErr == nil {
+				goto defaults
+			}
+		}
+		if raw != "" {
+			bp.RawAIOutput = raw
+			bp.ReviewChecklist = append(bp.ReviewChecklist, "raw_ai_output_available")
+			bp.DeliveryPackage = append(bp.DeliveryPackage, "raw_ai_output_available")
+		}
 	}
+defaults:
 	if strings.TrimSpace(bp.ProjectTitle) == "" {
 		bp.ProjectTitle = normalizeRuntimeTitle("", prompt)
 	}
@@ -201,47 +233,56 @@ func (h *Handler) markRuntimeFailed(projectID, msg, taskType, taskErr string) er
 	_, err := h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'error',$3)`, newID(), projectID, msg)
 	return err
 }
-func (h *Handler) completeRuntimePipeline(projectID, authSub, email string, bp runtimeBlueprint, isPrivileged bool) error {
+func (h *Handler) completeRuntimePipeline(projectID, authSub, email string, bp runtimeBlueprint, isPrivileged bool) (bool, error) {
 	taskOutputs := map[string]map[string]any{
 		"intake":       {"summary": bp.UserIntent, "project_type": bp.ProjectType, "user_intent": bp.UserIntent},
-		"blueprint":    {"project_title": bp.ProjectTitle, "mvp_scope": bp.MVPScope, "next_action": bp.NextAction},
-		"architecture": {"required_infrastructure": bp.RequiredInfrastructure, "architecture": bp.Architecture},
+		"blueprint":    {"project_title": bp.ProjectTitle, "project_type": bp.ProjectType, "user_intent": bp.UserIntent, "mvp_scope": bp.MVPScope, "next_action": bp.NextAction},
+		"architecture": {"required_infrastructure": bp.RequiredInfrastructure, "architecture": bp.Architecture, "api_plan": bp.APIPlan, "database_plan": bp.DatabasePlan, "ai_model_usage": bp.AIModelUsage},
 		"file_plan":    {"file_plan": bp.FilePlan},
 		"build_steps":  {"build_steps": bp.BuildSteps},
 		"review":       {"risks": bp.Risks, "review_checklist": bp.ReviewChecklist},
 		"delivery":     {"delivery_package": bp.DeliveryPackage, "status": "ready"},
 	}
+	if strings.TrimSpace(bp.RawAIOutput) != "" {
+		taskOutputs["blueprint"]["raw_ai_output"] = bp.RawAIOutput
+		taskOutputs["delivery"]["raw_ai_output"] = bp.RawAIOutput
+	}
 	tx, err := h.DB.Begin()
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer tx.Rollback()
 	for _, t := range []string{"intake", "blueprint", "architecture", "file_plan", "build_steps", "review", "delivery"} {
 		out, _ := json.Marshal(taskOutputs[t])
 		if _, err = tx.Exec(`UPDATE runtime_tasks SET status='completed', output_json=$3, error=NULL, updated_at=NOW() WHERE project_id=$1 AND task_type=$2`, projectID, t, out); err != nil {
-			return err
+			return false, err
 		}
 		if _, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Task completed: "+t); err != nil {
-			return err
+			return false, err
 		}
 	}
 	if _, err = tx.Exec(`UPDATE runtime_projects SET status='completed', title=$2, updated_at=NOW() WHERE id=$1`, projectID, bp.ProjectTitle); err != nil {
-		return err
+		return false, err
 	}
 	if _, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "AI blueprint generated"); err != nil {
-		return err
+		return false, err
 	}
 	if _, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Runtime workflow completed"); err != nil {
-		return err
+		return false, err
 	}
+	creditCharged := false
 	if !isPrivileged {
-		if err := h.applyCreditChargeTx(tx, authSub, email); err != nil {
-			return err
+		if err := h.applyCreditChargeTxWithReason(tx, authSub, email, "runtime_project"); err != nil {
+			return false, err
 		}
+		creditCharged = true
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return creditCharged, nil
 }
-func (h *Handler) fetchRuntimeResponse(projectID string, bp runtimeBlueprint) (map[string]any, error) {
+func (h *Handler) fetchRuntimeResponse(projectID string, bp runtimeBlueprint, creditCharged bool) (map[string]any, error) {
 	rows, err := h.DB.Query(`SELECT id,project_id,email,task_type,status,input_json,output_json,error,created_at,updated_at FROM runtime_tasks WHERE project_id=$1 ORDER BY created_at ASC`, projectID)
 	if err != nil {
 		return nil, err
@@ -263,7 +304,7 @@ func (h *Handler) fetchRuntimeResponse(projectID string, bp runtimeBlueprint) (m
 	if err := h.DB.QueryRow(`SELECT COUNT(*) FROM runtime_logs WHERE project_id=$1`, projectID).Scan(&logCount); err != nil {
 		return nil, err
 	}
-	return map[string]any{"project_id": projectID, "status": "completed", "credits_charged": true, "task_count": taskCount, "log_count": logCount, "blueprint": bp, "tasks": tasks}, nil
+	return map[string]any{"project_id": projectID, "status": "completed", "credits_charged": creditCharged, "task_count": taskCount, "log_count": logCount, "blueprint": bp, "tasks": tasks}, nil
 }
 func (h *Handler) ListRuntimeProjects(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
