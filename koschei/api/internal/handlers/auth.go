@@ -7,8 +7,11 @@ import (
 )
 
 type authUser struct {
-	ID, Email, Role, Plan string
-	Credits               int
+	ID      string `json:"id"`
+	Email   string `json:"email"`
+	Role    string `json:"role"`
+	Plan    string `json:"plan"`
+	Credits int    `json:"credits"`
 }
 
 func (h *Handler) Register(w http.ResponseWriter, _ *http.Request) {
