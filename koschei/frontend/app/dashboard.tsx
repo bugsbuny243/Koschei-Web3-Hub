@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button, Card, ErrorState, Input } from '@/components/ui';
 import { api } from '@/lib/api';
 import { auth } from '@/lib/auth';
@@ -33,6 +34,11 @@ const parseTimestamp = (item: any) => {
 export default function Dashboard() {
   const [prompt, setPrompt] = useState('');
   const [error, setError] = useState('');
+  const [aiTool, setAiTool] = useState<'chat' | 'code' | 'reason'>('chat');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiResult, setAiResult] = useState('');
+  const [aiError, setAiError] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
   const [credits, setCredits] = useState(0);
   const [plan, setPlan] = useState('free');
   const [projects, setProjects] = useState<any[]>([]);
@@ -143,6 +149,40 @@ export default function Dashboard() {
     }
   };
 
+  const runAiTest = async () => {
+    if (aiLoading) return;
+    setAiError('');
+    setAiResult('');
+    setAiLoading(true);
+    try {
+      const token = await AsyncStorage.getItem('koschei_token');
+      const response = await fetch(`${(process.env.EXPO_PUBLIC_API_URL || '').trim()}/api/ai/generate`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tool: aiTool,
+          prompt: aiPrompt,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const errorText = `${data?.error || data?.message || 'ai_request_failed'} (status ${response.status})`;
+        setAiError(errorText);
+        return;
+      }
+
+      setAiResult(typeof data?.result === 'string' ? data.result : JSON.stringify(data));
+    } catch (e: any) {
+      setAiError(e?.message || 'ai_request_failed');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   return (
     <View className="flex-1 bg-[#020207] p-4" style={{ backgroundColor: '#020207' }}>
       <View className="absolute -left-16 top-28 h-72 w-72 rounded-full bg-cyan-500/10" />
@@ -181,6 +221,37 @@ export default function Dashboard() {
               </View>
               {!!error && <View className="mt-3"><ErrorState text={error} /></View>}
             </Card>
+
+            <View className="mt-4">
+              <Card>
+                <Text className="mb-2 text-base font-semibold text-white">Phase 4 AI Test</Text>
+                <Text className="mb-2 text-xs uppercase tracking-wide text-zinc-400">Tool</Text>
+                <View className="mb-3 flex-row gap-2">
+                  {(['chat', 'code', 'reason'] as const).map((tool) => (
+                    <Pressable
+                      key={tool}
+                      onPress={() => setAiTool(tool)}
+                      className={`rounded-xl border px-3 py-2 ${aiTool === tool ? 'border-cyan-300 bg-cyan-500/20' : 'border-cyan-500/20 bg-[#040812]'}`}
+                    >
+                      <Text className={`${aiTool === tool ? 'text-cyan-100' : 'text-zinc-300'}`}>{tool}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Input
+                  placeholder="Enter prompt for AI tool..."
+                  value={aiPrompt}
+                  onChangeText={setAiPrompt}
+                />
+                <View className="mt-3">
+                  <Button label={aiLoading ? 'Running AI...' : 'Run AI'} onPress={runAiTest} />
+                </View>
+                {!!aiError && <View className="mt-3"><ErrorState text={aiError} /></View>}
+                <View className="mt-3 rounded-xl border border-violet-500/20 bg-[#040a15] p-3">
+                  <Text className="text-xs uppercase tracking-wide text-zinc-400">Result</Text>
+                  <Text className="mt-2 text-zinc-100">{aiLoading ? 'Loading...' : (aiResult || 'No result yet')}</Text>
+                </View>
+              </Card>
+            </View>
           </View>
         </View>
 
