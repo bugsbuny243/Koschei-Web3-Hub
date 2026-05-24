@@ -163,7 +163,7 @@ export default function Home() {
         <Text style={[styles.subtitle, { color: VIOLET }]}>THE IMMORTAL AI</Text>
 
         <Text style={styles.tagline}>
-          9 yapay zeka modeli. Tek komuta merkezi. Türkçe fikrini söyle —{' '}
+          Tek komuta merkezi. Türkçe fikrini söyle —{' '}
           <Text style={{ color: VIOLET }}>kod, görsel, video, ses</Text> olarak geri al.
         </Text>
 
