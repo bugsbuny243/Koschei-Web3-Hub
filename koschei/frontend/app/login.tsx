@@ -1,9 +1,27 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { auth } from '@/lib/auth';
 import { neonAuth } from '@/lib/neonAuth';
 import { Button, ErrorState, Input } from '@/components/ui';
+
+const API_BASE = (process.env.EXPO_PUBLIC_API_URL || '').trim();
+const TOKEN_KEY = 'koschei_token';
+
+async function verifySession(token: string) {
+  const target = API_BASE ? `${API_BASE}/api/me` : '/api/me';
+  const res = await fetch(target, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const payload: any = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || payload?.message || `Request failed (${res.status})`);
+  }
+}
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -13,18 +31,17 @@ export default function Login() {
   const submit = async () => {
     setError('');
     try {
-      const res: any = await neonAuth.signInWithEmail(email.trim(), password);
-      const token = neonAuth.tokenFrom(res);
-      if (!token) throw new Error('auth service unavailable');
-      await auth.setToken(token);
+      const response: any = await neonAuth.signInWithEmail(email.trim(), password);
+      const token = neonAuth.tokenFrom(response);
+      if (!token) throw new Error('auth_token_missing: Neon Auth succeeded but no access token returned');
+
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+      await verifySession(token);
       router.replace('/dashboard');
     } catch (e: any) {
-      const msg = String(e?.message || '').toLowerCase();
-      if (msg.includes('invalid') || msg.includes('credential') || msg.includes('password')) {
-        setError('invalid email/password');
-      } else {
-        setError('auth service unavailable');
-      }
+      console.error('auth error', e);
+      console.error('neon auth url present', Boolean(process.env.EXPO_PUBLIC_NEON_AUTH_URL));
+      setError(String(e?.message || e || 'unknown_error').slice(0, 180));
     }
   };
 
