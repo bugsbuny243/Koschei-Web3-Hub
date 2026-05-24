@@ -64,6 +64,30 @@ func originOnly(raw string) string {
 	return u.Scheme + "://" + u.Host
 }
 
+func trimSlash(s string) string {
+	return strings.TrimRight(strings.TrimSpace(s), "/")
+}
+
+func addIssuerCandidate(set map[string]bool, raw string) {
+	raw = trimSlash(raw)
+	if raw == "" {
+		return
+	}
+	set[raw] = true
+
+	origin := originOnly(raw)
+	if origin != "" {
+		set[trimSlash(origin)] = true
+	}
+}
+
+func allowedIssuers() map[string]bool {
+	allowed := map[string]bool{}
+	addIssuerCandidate(allowed, os.Getenv("NEON_AUTH_ISSUER"))
+	addIssuerCandidate(allowed, os.Getenv("NEON_AUTH_BASE_URL"))
+	return allowed
+}
+
 func neonClaimsFromToken(token string) (neonJWTClaims, error) {
 	var out neonJWTClaims
 	parts := strings.Split(token, ".")
@@ -123,14 +147,12 @@ func neonClaimsFromToken(token string) (neonJWTClaims, error) {
 	if out.Exp < time.Now().Unix() || out.Sub == "" || out.Email == "" {
 		return out, errors.New("invalid token")
 	}
-	expectedIssuer := originOnly(os.Getenv("NEON_AUTH_ISSUER"))
-	if expectedIssuer == "" {
-		expectedIssuer = originOnly(os.Getenv("NEON_AUTH_BASE_URL"))
+	allowed := allowedIssuers()
+	actualIssuer := trimSlash(out.Iss)
+	if len(allowed) > 0 && !allowed[actualIssuer] {
+		return out, errors.New("invalid issuer: " + actualIssuer)
 	}
-	if expectedIssuer != "" && out.Iss != expectedIssuer {
-		return out, errors.New("invalid issuer")
-	}
-	aud := originOnly(os.Getenv("NEON_AUTH_AUDIENCE"))
+	aud := trimSlash(os.Getenv("NEON_AUTH_AUDIENCE"))
 	if aud != "" && !matchesAudience(out.Aud, aud) {
 		return out, errors.New("invalid audience")
 	}
