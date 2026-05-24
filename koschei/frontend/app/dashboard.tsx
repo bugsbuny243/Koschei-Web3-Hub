@@ -181,26 +181,30 @@ export default function Dashboard() {
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const errorText = `${data?.error || data?.message || 'ai_request_failed'} (status ${response.status})`;
+        const detail = typeof data?.detail === 'string' && data.detail.trim() ? ` — ${data.detail}` : '';
+        const creditInfo = data?.credits_charged === false ? ' — credits not charged' : '';
+        const errorText = `${data?.error || data?.message || 'ai_request_failed'}${detail}${creditInfo} (status ${response.status})`;
         setAiError(errorText);
         return;
       }
 
       setAiResult(typeof data?.result === 'string' ? data.result : JSON.stringify(data));
 
-      const me: any = await api.me();
-      if (me?.user) {
-        const profileCredits = readProfileField<number>(me.user, 'credits', 'Credits', 0);
-        const profilePlan = readProfileField<string>(me.user, 'plan', 'Plan', 'free');
-        const profileEmail = readProfileField<string>(me.user, 'email', 'Email', '');
-
-        setCredits(typeof profileCredits === 'number' ? profileCredits : 0);
-        setPlan(typeof profilePlan === 'string' && profilePlan.trim() ? profilePlan : 'free');
-        setEmail(typeof profileEmail === 'string' ? profileEmail : '');
-      }
     } catch (e: any) {
       setAiError(e?.message || 'ai_request_failed');
     } finally {
+      try {
+        const me: any = await api.me();
+        if (me?.user) {
+          const profileCredits = readProfileField<number>(me.user, 'credits', 'Credits', 0);
+          const profilePlan = readProfileField<string>(me.user, 'plan', 'Plan', 'free');
+          const profileEmail = readProfileField<string>(me.user, 'email', 'Email', '');
+
+          setCredits(typeof profileCredits === 'number' ? profileCredits : 0);
+          setPlan(typeof profilePlan === 'string' && profilePlan.trim() ? profilePlan : 'free');
+          setEmail(typeof profileEmail === 'string' ? profileEmail : '');
+        }
+      } catch (_) {}
       setAiLoading(false);
     }
   };
