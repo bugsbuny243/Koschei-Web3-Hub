@@ -14,6 +14,22 @@ const statusTextClass = (status: string) => {
   return 'text-zinc-300';
 };
 
+const statusPriority = (status: string) => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'completed') return 0;
+  if (normalized === 'running') return 1;
+  if (normalized === 'queued') return 2;
+  if (normalized === 'failed') return 3;
+  return 4;
+};
+
+const parseTimestamp = (item: any) => {
+  const raw = item?.updated_at || item?.created_at || item?.timestamp || item?.createdAt || item?.updatedAt;
+  if (!raw) return 0;
+  const parsed = Date.parse(String(raw));
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+
 export default function Dashboard() {
   const [prompt, setPrompt] = useState('');
   const [error, setError] = useState('');
@@ -24,13 +40,66 @@ export default function Dashboard() {
   const [logs, setLogs] = useState<any[]>([]);
   const [email, setEmail] = useState('');
 
+  const sortedProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      const timeDiff = parseTimestamp(b) - parseTimestamp(a);
+      if (timeDiff !== 0) return timeDiff;
+      return statusPriority(a.status) - statusPriority(b.status);
+    });
+  }, [projects]);
+
+  const newestProject = useMemo(() => (sortedProjects.length > 0 ? sortedProjects[0] : null), [sortedProjects]);
+
+  const displayedTasks = useMemo(() => {
+    const sortedAll = [...tasks].sort((a, b) => {
+      const timeDiff = parseTimestamp(b) - parseTimestamp(a);
+      if (timeDiff !== 0) return timeDiff;
+      return statusPriority(a.status) - statusPriority(b.status);
+    });
+
+    if (newestProject?.id) {
+      const filtered = sortedAll.filter((t) => t?.project_id === newestProject.id);
+      if (filtered.length > 0) return filtered;
+    }
+
+    return sortedAll;
+  }, [tasks, newestProject]);
+
+  const taskGroups = useMemo(() => {
+    if (newestProject?.id) {
+      return [{ title: 'Latest project tasks', rows: displayedTasks }];
+    }
+
+    const latestCompleted = displayedTasks.filter((t) => String(t?.status || '').toLowerCase() === 'completed');
+    const olderQueued = displayedTasks.filter((t) => String(t?.status || '').toLowerCase() === 'queued');
+    const other = displayedTasks.filter((t) => !['completed', 'queued'].includes(String(t?.status || '').toLowerCase()));
+
+    return [
+      { title: 'Latest completed tasks', rows: latestCompleted },
+      { title: 'Older queued tasks', rows: olderQueued },
+      ...(other.length ? [{ title: 'Other tasks', rows: other }] : []),
+    ];
+  }, [displayedTasks, newestProject]);
+
+  const displayedLogs = useMemo(() => {
+    const sorted = [...logs].sort((a, b) => parseTimestamp(b) - parseTimestamp(a));
+    return sorted.slice(0, 20);
+  }, [logs]);
+
   const refreshRuntimeData = async () => {
     const projectRows: any[] = await api.getRuntimeProjects();
     const taskRows: any[] = await api.getRuntimeTasks();
     setProjects(projectRows);
     setTasks(taskRows);
-    if (projectRows.length > 0) {
-      const latestProject = projectRows[0];
+
+    const sorted = [...projectRows].sort((a, b) => {
+      const timeDiff = parseTimestamp(b) - parseTimestamp(a);
+      if (timeDiff !== 0) return timeDiff;
+      return statusPriority(a.status) - statusPriority(b.status);
+    });
+
+    if (sorted.length > 0) {
+      const latestProject = sorted[0];
       const logRows: any[] = await api.getRuntimeLogs(latestProject.id);
       setLogs(logRows);
       return;
@@ -74,10 +143,6 @@ export default function Dashboard() {
     }
   };
 
-  const projectsNewestFirst = useMemo(() => [...projects].reverse(), [projects]);
-  const tasksNewestFirst = useMemo(() => [...tasks].reverse(), [tasks]);
-  const logsNewestFirst = useMemo(() => [...logs].reverse(), [logs]);
-
   return (
     <View className="flex-1 bg-[#0a0a0a] p-4" style={{ backgroundColor: '#0a0a0a' }}>
       <View className="mx-auto w-full max-w-6xl gap-4">
@@ -85,7 +150,7 @@ export default function Dashboard() {
           <View className="md:w-72">
             <Card>
               <Text className="text-sm text-zinc-400">Signed in as</Text>
-              <Text className="mt-1 text-sm text-white">{email || 'Unknown user'}</Text>
+              <Text className="mt-1 text-sm text-white" numberOfLines={2}>{email || 'Signed in'}</Text>
               <View className="mt-4 border-t border-zinc-800 pt-4">
                 <Text className="text-xs uppercase tracking-wider text-zinc-400">Plan</Text>
                 <Text className="mt-1 text-lg font-semibold text-white">{plan}</Text>
@@ -118,12 +183,12 @@ export default function Dashboard() {
 
         <ScrollView className="max-h-[65vh]" contentContainerStyle={{ gap: 12, paddingBottom: 24 }}>
           <Card>
-            <Text className="text-lg font-semibold text-white">Projects ({projectsNewestFirst.length})</Text>
+            <Text className="text-lg font-semibold text-white">Projects ({sortedProjects.length})</Text>
             <View className="mt-3 gap-2">
-              {projectsNewestFirst.length === 0 && <Text className="text-zinc-500">No projects yet.</Text>}
-              {projectsNewestFirst.map((p) => (
-                <View key={p.id} className="flex-row items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
-                  <Text className="mr-3 flex-1 text-zinc-100">{p.title}</Text>
+              {sortedProjects.length === 0 && <Text className="text-zinc-500">No projects yet</Text>}
+              {sortedProjects.map((p) => (
+                <View key={p.id} className="flex-row items-start justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
+                  <Text className="mr-3 flex-1 flex-wrap text-zinc-100">{p.title}</Text>
                   <Text className={statusTextClass(p.status)}>{String(p.status || 'unknown')}</Text>
                 </View>
               ))}
@@ -131,26 +196,31 @@ export default function Dashboard() {
           </Card>
 
           <Card>
-            <Text className="text-lg font-semibold text-white">Tasks ({tasksNewestFirst.length})</Text>
-            <View className="mt-3 gap-2">
-              {tasksNewestFirst.length === 0 && <Text className="text-zinc-500">No tasks yet.</Text>}
-              {tasksNewestFirst.map((t) => (
-                <View key={t.id} className="flex-row items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
-                  <Text className="mr-3 flex-1 text-zinc-100">{t.task_type}</Text>
-                  <Text className={statusTextClass(t.status)}>{String(t.status || 'unknown')}</Text>
+            <Text className="text-lg font-semibold text-white">Tasks ({displayedTasks.length})</Text>
+            <View className="mt-3 gap-3">
+              {displayedTasks.length === 0 && <Text className="text-zinc-500">No tasks yet</Text>}
+              {taskGroups.map((group) => (
+                <View key={group.title} className="gap-2">
+                  <Text className="text-xs uppercase tracking-wide text-zinc-500">{group.title}</Text>
+                  {group.rows.map((t) => (
+                    <View key={t.id} className="flex-row items-start justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
+                      <Text className="mr-3 flex-1 flex-wrap text-zinc-100">{t.task_type}</Text>
+                      <Text className={statusTextClass(t.status)}>{String(t.status || 'unknown')}</Text>
+                    </View>
+                  ))}
                 </View>
               ))}
             </View>
           </Card>
 
           <Card>
-            <Text className="text-lg font-semibold text-white">Logs ({logsNewestFirst.length})</Text>
+            <Text className="text-lg font-semibold text-white">Logs ({displayedLogs.length})</Text>
             <View className="mt-3 gap-2">
-              {logsNewestFirst.length === 0 && <Text className="text-zinc-500">No logs yet.</Text>}
-              {logsNewestFirst.map((l) => (
+              {displayedLogs.length === 0 && <Text className="text-zinc-500">No logs yet</Text>}
+              {displayedLogs.map((l) => (
                 <View key={l.id} className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
                   <Text className="text-xs uppercase text-zinc-400">{String(l.level || 'info')}</Text>
-                  <Text className="mt-1 text-zinc-100">{l.message}</Text>
+                  <Text className="mt-1 flex-wrap text-zinc-100">{l.message}</Text>
                 </View>
               ))}
             </View>
