@@ -17,6 +17,7 @@ async function request(path: string, init?: RequestInit, auth = false) {
 }
 
 export const api = {
+  get: (path: string) => request(path, undefined, true),
   me: () => request('/api/me', undefined, true),
   getPlans: () => request('/api/plans'),
   createPaymentRequest: (body: unknown) => request('/api/billing/manual-payment-request', { method: 'POST', body: JSON.stringify(body) }, true),

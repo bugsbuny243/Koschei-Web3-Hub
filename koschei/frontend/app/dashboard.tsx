@@ -51,6 +51,7 @@ export default function Dashboard() {
   const [projects, setProjects] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [aiJobs, setAiJobs] = useState<any[]>([]);
   const [email, setEmail] = useState('');
 
   const sortedProjects = useMemo(() => {
@@ -120,6 +121,23 @@ export default function Dashboard() {
     setLogs([]);
   };
 
+  const refreshMe = async () => {
+    const me: any = await api.me();
+    if (me?.user) {
+      const profileCredits = readProfileField<number>(me.user, 'credits', 'Credits', 0);
+      const profilePlan = readProfileField<string>(me.user, 'plan', 'Plan', 'free');
+      const profileEmail = readProfileField<string>(me.user, 'email', 'Email', '');
+      setCredits(typeof profileCredits === 'number' ? profileCredits : 0);
+      setPlan(typeof profilePlan === 'string' && profilePlan.trim() ? profilePlan : 'free');
+      setEmail(typeof profileEmail === 'string' ? profileEmail : '');
+    }
+  };
+
+  const refreshAiJobs = async () => {
+    const rows: any = await api.get('/api/ai/jobs');
+    setAiJobs(Array.isArray(rows?.jobs) ? rows.jobs : []);
+  };
+
   useEffect(() => {
     const loadMe = async () => {
       const token = await auth.getToken();
@@ -128,17 +146,9 @@ export default function Dashboard() {
         return;
       }
       try {
-        const me: any = await api.me();
-        if (me?.user) {
-          const profileCredits = readProfileField<number>(me.user, 'credits', 'Credits', 0);
-          const profilePlan = readProfileField<string>(me.user, 'plan', 'Plan', 'free');
-          const profileEmail = readProfileField<string>(me.user, 'email', 'Email', '');
-
-          setCredits(typeof profileCredits === 'number' ? profileCredits : 0);
-          setPlan(typeof profilePlan === 'string' && profilePlan.trim() ? profilePlan : 'free');
-          setEmail(typeof profileEmail === 'string' ? profileEmail : '');
-        }
+        await refreshMe();
         await refreshRuntimeData();
+        await refreshAiJobs();
       } catch (e: any) {
         if (String(e?.message || '').includes('401')) {
           await auth.clearToken();
@@ -182,28 +192,21 @@ export default function Dashboard() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         const detail = typeof data?.detail === 'string' && data.detail.trim() ? ` — ${data.detail}` : '';
-        const creditInfo = data?.credits_charged === false ? ' — credits not charged' : '';
+        const creditInfo = data?.credits_charged === false ? ' — Credits not charged' : '';
         const errorText = `${data?.error || data?.message || 'ai_request_failed'}${detail}${creditInfo} (status ${response.status})`;
         setAiError(errorText);
         return;
       }
 
       setAiResult(typeof data?.result === 'string' ? data.result : JSON.stringify(data));
+      await refreshAiJobs();
 
     } catch (e: any) {
       setAiError(e?.message || 'ai_request_failed');
     } finally {
       try {
-        const me: any = await api.me();
-        if (me?.user) {
-          const profileCredits = readProfileField<number>(me.user, 'credits', 'Credits', 0);
-          const profilePlan = readProfileField<string>(me.user, 'plan', 'Plan', 'free');
-          const profileEmail = readProfileField<string>(me.user, 'email', 'Email', '');
-
-          setCredits(typeof profileCredits === 'number' ? profileCredits : 0);
-          setPlan(typeof profilePlan === 'string' && profilePlan.trim() ? profilePlan : 'free');
-          setEmail(typeof profileEmail === 'string' ? profileEmail : '');
-        }
+        await refreshMe();
+        await refreshAiJobs();
       } catch (_) {}
       setAiLoading(false);
     }
@@ -274,7 +277,7 @@ export default function Dashboard() {
                 {!!aiError && <View className="mt-3"><ErrorState text={aiError} /></View>}
                 <View className="mt-3 rounded-xl border border-violet-500/20 bg-[#040a15] p-3">
                   <Text className="text-xs uppercase tracking-wide text-zinc-400">Result</Text>
-                  <Text className="mt-2 text-zinc-100">{aiLoading ? 'Loading...' : (aiResult || 'No result yet')}</Text>
+                  <Text selectable className="mt-2 text-zinc-100" style={{ lineHeight: 22 }}>{aiLoading ? 'Loading...' : (aiResult || 'No result yet')}</Text>
                 </View>
               </Card>
             </View>
@@ -308,6 +311,23 @@ export default function Dashboard() {
                       <Text className={statusTextClass(t.status)}>{String(t.status || 'unknown')}</Text>
                     </View>
                   ))}
+                </View>
+              ))}
+            </View>
+          </Card>
+
+          <Card>
+            <Text className="text-lg font-semibold text-white">AI Jobs ({aiJobs.length})</Text>
+            <View className="mt-3 gap-2">
+              {aiJobs.length === 0 && <Text className="text-zinc-500">No AI jobs yet</Text>}
+              {aiJobs.map((j) => (
+                <View key={j.id} className="rounded-lg border border-cyan-500/20 bg-[#040a15] px-3 py-2">
+                  <View className="flex-row items-start justify-between">
+                    <Text className="text-zinc-100">{String(j.tool || 'unknown')}</Text>
+                    <Text className={statusTextClass(j.status)}>{String(j.status || 'unknown')}</Text>
+                  </View>
+                  <Text className="mt-1 text-xs text-zinc-400" numberOfLines={2}>{String(j.prompt || '')}</Text>
+                  <Text className="mt-1 text-[11px] text-zinc-500">{String(j.created_at || '')}</Text>
                 </View>
               ))}
             </View>

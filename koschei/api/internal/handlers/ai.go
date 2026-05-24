@@ -25,8 +25,8 @@ type aiRoute struct {
 }
 
 const (
-	commonAIInstruction = "Default language is Turkish. Use clean markdown headings. Do not be vague. Be practical and production-focused."
-	chatSystemPrompt    = "You are Koschei AI chat mode. " + commonAIInstruction + " Understand Turkish slang, typos, and casual street language. Keep answers short unless the user explicitly asks for detail. Avoid long architecture/product planning in chat mode. Output format:\nKısa cevap:\n..."
+	commonAIInstruction = "Default language is Turkish. Understand Turkish slang and typos. Do not explain the user’s language unless asked. Be practical, production-focused, and direct. Use clean markdown headings."
+	chatSystemPrompt    = "You are Koschei Chat Core. " + commonAIInstruction + " Answer short, friendly, Turkish-first. For casual messages like \"nbr lan kanka\", answer naturally in Turkish. Do not produce long architecture unless user asks."
 	codeSystemPrompt    = "You are Koschei Code Engine. " + commonAIInstruction + " For technical build requests, always respond using exactly this structure:\n\n## Teknik Hedef\n\n## Mimari\n\n## Dosya Planı\n\n## API / Endpoint Planı\n\n## DB / Migration Planı\n\n## Uygulama Adımları\n\n## Örnek Kod\n\n## Test Planı\n\nRules:\n- Do not provide random standalone code without context.\n- Include code only when useful and specify target file path for each snippet.\n- Keep implementation details concrete (client/backend/db/worker/provider as needed).\n- If a section is not relevant, write 'Bu istek için gerekli değil.'"
 	reasonSystemPrompt  = "You are Koschei Reason Matrix. " + commonAIInstruction + " For serious project/product/game/app requests, always respond using exactly this structure:\n\n## Ne İstiyorsun?\n\n## Gerçekçilik Analizi\n\n## MVP Sürüm\n\n## Gerekli Altyapı\n\n## Büyük Sürüm\n\n## Riskler\n\n## Üretim Sırası\n\n## Sonraki Net Adım\n\nRules:\n- Be honest but constructive.\n- Do not say 'impossible' for PUBG-like, GTA-like, TikTok-like, YouTube-like, marketplace-like, social app-like requests.\n- Do not promise instant full clone.\n- Clearly state it must be original and not a brand/IP clone.\n- Always provide MVP-first staged production plan and infrastructure details."
 )
@@ -77,7 +77,7 @@ func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) {
 	if !isTextTool(tool) {
 		_ = h.finishGenerationJob(jobID, "failed", "tool_not_implemented_yet")
 		_ = h.insertModelRouteLog(claims.Email, tool, route.Route, req.Prompt, "failed")
-		writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "tool_not_implemented_yet", "tool": tool})
+		writeJSON(w, http.StatusNotImplemented, map[string]any{"error": "tool_not_implemented_yet", "tool": tool, "credits_charged": false})
 		return
 	}
 
@@ -99,17 +99,18 @@ func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("ai generation completed: email=%s tool=%s model=%s", claims.Email, tool, usedModel)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"job_id":   jobID,
-		"provider": "together",
-		"route":    route.Route,
-		"model":    usedModel,
-		"status":   "completed",
-		"result":   resultText,
+		"job_id":          jobID,
+		"provider":        "together",
+		"route":           route.Route,
+		"model":           usedModel,
+		"status":          "completed",
+		"credits_charged": true,
+		"result":          resultText,
 	})
 }
 
 func (h *Handler) generateWithRoute(tool string, route aiRoute, prompt string) (string, string, error) {
-	resultText, err := h.callTogetherChat(route.Model, systemPromptForTool(tool), prompt)
+	resultText, err := h.callTogetherChat(route.Model, tool, prompt)
 	if err == nil {
 		return resultText, route.Model, nil
 	}
@@ -121,7 +122,7 @@ func (h *Handler) generateWithRoute(tool string, route aiRoute, prompt string) (
 		return "", route.Model, err
 	}
 	log.Printf("reason route fallback: primary model failed, retrying fallback model=%s", fallbackModel)
-	resultText, fallbackErr := h.callTogetherChat(fallbackModel, reasonSystemPrompt, prompt)
+	resultText, fallbackErr := h.callTogetherChat(fallbackModel, "reason", prompt)
 	if fallbackErr != nil {
 		return "", fallbackModel, fmt.Errorf("primary: %v; fallback: %v", err, fallbackErr)
 	}
@@ -238,10 +239,11 @@ func (h *Handler) completeGenerationAndCharge(jobID, authSub, email, tool, route
 	return tx.Commit()
 }
 
-func (h *Handler) callTogetherChat(model, systemPrompt, prompt string) (string, error) {
+func (h *Handler) callTogetherChat(model string, tool string, prompt string) (string, error) {
 	if strings.TrimSpace(model) == "" {
 		return "", errors.New("together model is empty")
 	}
+	systemPrompt := systemPromptForTool(tool)
 	payload := map[string]any{
 		"model": model,
 		"messages": []map[string]string{
@@ -285,6 +287,50 @@ func (h *Handler) callTogetherChat(model, systemPrompt, prompt string) (string, 
 		return "", errors.New("empty ai response")
 	}
 	return parsed.Choices[0].Message.Content, nil
+}
+
+func (h *Handler) AIJobs(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	rows, err := h.DB.Query(`SELECT id, tool, prompt, route, provider, status, result, error, created_at, updated_at FROM generation_jobs WHERE email=$1 ORDER BY created_at DESC LIMIT 20`, claims.Email)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	defer rows.Close()
+	jobs := make([]map[string]any, 0, 20)
+	for rows.Next() {
+		var id, tool, prompt, route, provider, status string
+		var result, jobError sql.NullString
+		var createdAt, updatedAt time.Time
+		if err := rows.Scan(&id, &tool, &prompt, &route, &provider, &status, &result, &jobError, &createdAt, &updatedAt); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+			return
+		}
+		jobs = append(jobs, map[string]any{
+			"id":         id,
+			"tool":       tool,
+			"prompt":     prompt,
+			"route":      route,
+			"provider":   provider,
+			"status":     status,
+			"result":     nullableString(result),
+			"error":      nullableString(jobError),
+			"created_at": createdAt,
+			"updated_at": updatedAt,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"jobs": jobs})
+}
+
+func nullableString(v sql.NullString) any {
+	if !v.Valid {
+		return nil
+	}
+	return v.String
 }
 
 func shortError(v string) string {
