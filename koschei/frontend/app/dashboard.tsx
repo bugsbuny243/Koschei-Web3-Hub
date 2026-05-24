@@ -1,10 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { Sidebar } from '@/components/Sidebar';
-import { Button, ErrorState, Input } from '@/components/ui';
+import { Button, Card, ErrorState, Input } from '@/components/ui';
 import { api } from '@/lib/api';
 import { auth } from '@/lib/auth';
 import { router } from 'expo-router';
+
+const statusTextClass = (status: string) => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'completed') return 'text-green-400';
+  if (normalized === 'queued') return 'text-yellow-300';
+  if (normalized === 'running') return 'text-blue-400';
+  if (normalized === 'failed') return 'text-red-400';
+  return 'text-zinc-300';
+};
 
 export default function Dashboard() {
   const [prompt, setPrompt] = useState('');
@@ -61,50 +69,92 @@ export default function Dashboard() {
       await api.createRuntimeProject({ title: `Project ${new Date().toISOString()}`, prompt });
       await refreshRuntimeData();
       setPrompt('');
-      
     } catch (e: any) {
       setError(e.message);
     }
   };
 
+  const projectsNewestFirst = useMemo(() => [...projects].reverse(), [projects]);
+  const tasksNewestFirst = useMemo(() => [...tasks].reverse(), [tasks]);
+  const logsNewestFirst = useMemo(() => [...logs].reverse(), [logs]);
+
   return (
-    <View className="flex-1 bg-[#0a0a0a] p-4 md:flex-row gap-4" style={{ backgroundColor: '#0a0a0a' }}>
-      <Sidebar credits={credits} plan={plan} />
-      <View><Text className="text-zinc-300" style={{ color: '#ffffff' }}>{email}</Text><Button label="Logout" onPress={async()=>{await auth.clearToken(); router.replace('/login');}} /></View>
-      <View className="flex-1">
-        <Text className="text-white mb-2" style={{ color: '#ffffff' }}>
-          Runtime Project Prompt
-        </Text>
-        <Input placeholder="Describe your project..." value={prompt} onChangeText={setPrompt} />
-        <View className="mt-2">
-          <Button label="Create Runtime Project" onPress={send} />
+    <View className="flex-1 bg-[#0a0a0a] p-4" style={{ backgroundColor: '#0a0a0a' }}>
+      <View className="mx-auto w-full max-w-6xl gap-4">
+        <View className="gap-4 md:flex-row">
+          <View className="md:w-72">
+            <Card>
+              <Text className="text-sm text-zinc-400">Signed in as</Text>
+              <Text className="mt-1 text-sm text-white">{email || 'Unknown user'}</Text>
+              <View className="mt-4 border-t border-zinc-800 pt-4">
+                <Text className="text-xs uppercase tracking-wider text-zinc-400">Plan</Text>
+                <Text className="mt-1 text-lg font-semibold text-white">{plan}</Text>
+              </View>
+              <View className="mt-4">
+                <Text className="text-xs uppercase tracking-wider text-zinc-400">Credits</Text>
+                <Text className="mt-1 text-lg font-semibold text-white">{credits}</Text>
+              </View>
+              <View className="mt-5">
+                <Button label="Logout" onPress={async () => { await auth.clearToken(); router.replace('/login'); }} />
+              </View>
+            </Card>
+          </View>
+
+          <View className="flex-1">
+            <Card>
+              <Text className="mb-2 text-base font-semibold text-white">Runtime Project Prompt</Text>
+              <Input
+                placeholder="Describe your runtime project..."
+                value={prompt}
+                onChangeText={setPrompt}
+              />
+              <View className="mt-3">
+                <Button label="Create Runtime Project" onPress={send} />
+              </View>
+              {!!error && <View className="mt-3"><ErrorState text={error} /></View>}
+            </Card>
+          </View>
         </View>
-        {!!error && <ErrorState text={error} />}
-        <ScrollView className="mt-4">
-          <Text className="text-white text-lg" style={{ color: '#ffffff' }}>
-            Projects ({projects.length})
-          </Text>
-          {projects.map((p) => (
-            <Text key={p.id} className="text-zinc-300" style={{ color: '#ffffff' }}>
-              {p.title} · {p.status}
-            </Text>
-          ))}
-          <Text className="text-white text-lg mt-4" style={{ color: '#ffffff' }}>
-            Tasks ({tasks.length})
-          </Text>
-          {tasks.map((t) => (
-            <Text key={t.id} className="text-zinc-300" style={{ color: '#ffffff' }}>
-              {t.task_type} · {t.status}
-            </Text>
-          ))}
-          <Text className="text-white text-lg mt-4" style={{ color: '#ffffff' }}>
-            Logs ({logs.length})
-          </Text>
-          {logs.map((l) => (
-            <Text key={l.id} className="text-zinc-300" style={{ color: '#ffffff' }}>
-              [{l.level}] {l.message}
-            </Text>
-          ))}
+
+        <ScrollView className="max-h-[65vh]" contentContainerStyle={{ gap: 12, paddingBottom: 24 }}>
+          <Card>
+            <Text className="text-lg font-semibold text-white">Projects ({projectsNewestFirst.length})</Text>
+            <View className="mt-3 gap-2">
+              {projectsNewestFirst.length === 0 && <Text className="text-zinc-500">No projects yet.</Text>}
+              {projectsNewestFirst.map((p) => (
+                <View key={p.id} className="flex-row items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
+                  <Text className="mr-3 flex-1 text-zinc-100">{p.title}</Text>
+                  <Text className={statusTextClass(p.status)}>{String(p.status || 'unknown')}</Text>
+                </View>
+              ))}
+            </View>
+          </Card>
+
+          <Card>
+            <Text className="text-lg font-semibold text-white">Tasks ({tasksNewestFirst.length})</Text>
+            <View className="mt-3 gap-2">
+              {tasksNewestFirst.length === 0 && <Text className="text-zinc-500">No tasks yet.</Text>}
+              {tasksNewestFirst.map((t) => (
+                <View key={t.id} className="flex-row items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
+                  <Text className="mr-3 flex-1 text-zinc-100">{t.task_type}</Text>
+                  <Text className={statusTextClass(t.status)}>{String(t.status || 'unknown')}</Text>
+                </View>
+              ))}
+            </View>
+          </Card>
+
+          <Card>
+            <Text className="text-lg font-semibold text-white">Logs ({logsNewestFirst.length})</Text>
+            <View className="mt-3 gap-2">
+              {logsNewestFirst.length === 0 && <Text className="text-zinc-500">No logs yet.</Text>}
+              {logsNewestFirst.map((l) => (
+                <View key={l.id} className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2">
+                  <Text className="text-xs uppercase text-zinc-400">{String(l.level || 'info')}</Text>
+                  <Text className="mt-1 text-zinc-100">{l.message}</Text>
+                </View>
+              ))}
+            </View>
+          </Card>
         </ScrollView>
       </View>
     </View>
