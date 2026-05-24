@@ -31,6 +31,13 @@ const parseTimestamp = (item: any) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
+
+
+const readProfileField = <T,>(user: any, lower: string, upper: string, fallback: T): T => {
+  const value = user?.[lower] ?? user?.[upper];
+  return (value ?? fallback) as T;
+};
+
 export default function Dashboard() {
   const [prompt, setPrompt] = useState('');
   const [error, setError] = useState('');
@@ -123,9 +130,13 @@ export default function Dashboard() {
       try {
         const me: any = await api.me();
         if (me?.user) {
-          setCredits(typeof me.user.credits === 'number' ? me.user.credits : 0);
-          setPlan(typeof me.user.plan === 'string' && me.user.plan.trim() ? me.user.plan : 'free');
-          setEmail(me.user.email || '');
+          const profileCredits = readProfileField<number>(me.user, 'credits', 'Credits', 0);
+          const profilePlan = readProfileField<string>(me.user, 'plan', 'Plan', 'free');
+          const profileEmail = readProfileField<string>(me.user, 'email', 'Email', '');
+
+          setCredits(typeof profileCredits === 'number' ? profileCredits : 0);
+          setPlan(typeof profilePlan === 'string' && profilePlan.trim() ? profilePlan : 'free');
+          setEmail(typeof profileEmail === 'string' ? profileEmail : '');
         }
         await refreshRuntimeData();
       } catch (e: any) {
@@ -176,6 +187,17 @@ export default function Dashboard() {
       }
 
       setAiResult(typeof data?.result === 'string' ? data.result : JSON.stringify(data));
+
+      const me: any = await api.me();
+      if (me?.user) {
+        const profileCredits = readProfileField<number>(me.user, 'credits', 'Credits', 0);
+        const profilePlan = readProfileField<string>(me.user, 'plan', 'Plan', 'free');
+        const profileEmail = readProfileField<string>(me.user, 'email', 'Email', '');
+
+        setCredits(typeof profileCredits === 'number' ? profileCredits : 0);
+        setPlan(typeof profilePlan === 'string' && profilePlan.trim() ? profilePlan : 'free');
+        setEmail(typeof profileEmail === 'string' ? profileEmail : '');
+      }
     } catch (e: any) {
       setAiError(e?.message || 'ai_request_failed');
     } finally {
