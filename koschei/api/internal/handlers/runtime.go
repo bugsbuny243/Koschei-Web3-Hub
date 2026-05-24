@@ -64,7 +64,9 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, taskType := range []string{"planning", "generation", "review", "delivery"} {
+	taskOrder := []string{"planning", "generation", "review", "delivery"}
+	taskIDs := map[string]string{}
+	for _, taskType := range taskOrder {
 		inputJSON, marshalErr := json.Marshal(map[string]string{
 			"title":  req.Title,
 			"prompt": req.Prompt,
@@ -80,7 +82,9 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		_, err = tx.Exec(`INSERT INTO runtime_tasks (id,project_id,email,task_type,status,input_json,output_json) VALUES ($1,$2,$3,$4,'queued',$5,$6)`, newID(), projectID, email, taskType, inputJSON, outputJSON)
+		taskID := newID()
+		taskIDs[taskType] = taskID
+		_, err = tx.Exec(`INSERT INTO runtime_tasks (id,project_id,email,task_type,status,input_json,output_json) VALUES ($1,$2,$3,$4,'queued',$5,$6)`, taskID, projectID, email, taskType, inputJSON, outputJSON)
 		if err != nil {
 			writeJSON(w, 500, map[string]string{"error": "db failed"})
 			return
@@ -90,6 +94,76 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 500, map[string]string{"error": "db failed"})
 			return
 		}
+	}
+
+	taskOutputs := map[string]map[string]any{
+		"planning": {
+			"summary": "Runtime project planning completed",
+			"steps":   []string{"generation", "review", "delivery"},
+		},
+		"generation": {
+			"title":        "Koschei AI Runtime Test",
+			"sections":     []string{"hero", "features", "pricing", "contact"},
+			"content_type": "landing_page_brief",
+		},
+		"review": {
+			"status": "approved",
+			"notes":  "Smoke test review passed",
+		},
+		"delivery": {
+			"status":  "ready",
+			"message": "Runtime smoke test completed",
+		},
+	}
+
+	for _, taskType := range taskOrder {
+		taskID := taskIDs[taskType]
+		if _, err = tx.Exec(`UPDATE runtime_tasks SET status='running', updated_at=NOW() WHERE id=$1`, taskID); err != nil {
+			_, _ = tx.Exec(`UPDATE runtime_tasks SET status='failed', error=$2, updated_at=NOW() WHERE id=$1`, taskID, err.Error())
+			_, _ = tx.Exec(`UPDATE runtime_projects SET status='failed', updated_at=NOW() WHERE id=$1`, projectID)
+			_, _ = tx.Exec(`INSERT INTO runtime_logs (id,project_id,task_id,level,message) VALUES ($1,$2,$3,'error',$4)`, newID(), projectID, taskID, "Runtime workflow failed at "+taskType+": "+err.Error())
+			writeJSON(w, 500, map[string]string{"error": "runtime execution failed at " + taskType})
+			return
+		}
+		if _, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,task_id,level,message) VALUES ($1,$2,$3,'info',$4)`, newID(), projectID, taskID, "[info] Task started: "+taskType); err != nil {
+			_, _ = tx.Exec(`UPDATE runtime_tasks SET status='failed', error=$2, updated_at=NOW() WHERE id=$1`, taskID, err.Error())
+			_, _ = tx.Exec(`UPDATE runtime_projects SET status='failed', updated_at=NOW() WHERE id=$1`, projectID)
+			_, _ = tx.Exec(`INSERT INTO runtime_logs (id,project_id,task_id,level,message) VALUES ($1,$2,$3,'error',$4)`, newID(), projectID, taskID, "Runtime workflow failed at "+taskType+": "+err.Error())
+			writeJSON(w, 500, map[string]string{"error": "runtime execution failed at " + taskType})
+			return
+		}
+
+		outputJSON, marshalErr := json.Marshal(taskOutputs[taskType])
+		if marshalErr != nil {
+			_, _ = tx.Exec(`UPDATE runtime_tasks SET status='failed', error=$2, updated_at=NOW() WHERE id=$1`, taskID, marshalErr.Error())
+			_, _ = tx.Exec(`UPDATE runtime_projects SET status='failed', updated_at=NOW() WHERE id=$1`, projectID)
+			_, _ = tx.Exec(`INSERT INTO runtime_logs (id,project_id,task_id,level,message) VALUES ($1,$2,$3,'error',$4)`, newID(), projectID, taskID, "Runtime workflow failed at "+taskType+": "+marshalErr.Error())
+			writeJSON(w, 500, map[string]string{"error": "runtime execution failed at " + taskType})
+			return
+		}
+		if _, err = tx.Exec(`UPDATE runtime_tasks SET status='completed', output_json=$2, error=NULL, updated_at=NOW() WHERE id=$1`, taskID, outputJSON); err != nil {
+			_, _ = tx.Exec(`UPDATE runtime_tasks SET status='failed', error=$2, updated_at=NOW() WHERE id=$1`, taskID, err.Error())
+			_, _ = tx.Exec(`UPDATE runtime_projects SET status='failed', updated_at=NOW() WHERE id=$1`, projectID)
+			_, _ = tx.Exec(`INSERT INTO runtime_logs (id,project_id,task_id,level,message) VALUES ($1,$2,$3,'error',$4)`, newID(), projectID, taskID, "Runtime workflow failed at "+taskType+": "+err.Error())
+			writeJSON(w, 500, map[string]string{"error": "runtime execution failed at " + taskType})
+			return
+		}
+		if _, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,task_id,level,message) VALUES ($1,$2,$3,'info',$4)`, newID(), projectID, taskID, "[info] Task completed: "+taskType); err != nil {
+			_, _ = tx.Exec(`UPDATE runtime_tasks SET status='failed', error=$2, updated_at=NOW() WHERE id=$1`, taskID, err.Error())
+			_, _ = tx.Exec(`UPDATE runtime_projects SET status='failed', updated_at=NOW() WHERE id=$1`, projectID)
+			_, _ = tx.Exec(`INSERT INTO runtime_logs (id,project_id,task_id,level,message) VALUES ($1,$2,$3,'error',$4)`, newID(), projectID, taskID, "Runtime workflow failed at "+taskType+": "+err.Error())
+			writeJSON(w, 500, map[string]string{"error": "runtime execution failed at " + taskType})
+			return
+		}
+	}
+
+	if _, err = tx.Exec(`UPDATE runtime_projects SET status='completed', updated_at=NOW() WHERE id=$1`, projectID); err != nil {
+		writeJSON(w, 500, map[string]string{"error": "runtime execution failed: could not complete project"})
+		return
+	}
+	if _, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "[info] Runtime workflow completed"); err != nil {
+		writeJSON(w, 500, map[string]string{"error": "runtime execution failed: could not write completion log"})
+		return
 	}
 
 	var createdTasks []map[string]any
