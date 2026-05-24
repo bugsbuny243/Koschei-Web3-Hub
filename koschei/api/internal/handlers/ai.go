@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -248,6 +249,20 @@ func (h *Handler) callTogetherChat(model string, tool string, prompt string) (st
 }
 
 func (h *Handler) callTogetherWithSystem(model string, systemPrompt string, userPrompt string) (string, error) {
+	timeout := 45 * time.Second
+	if v := strings.TrimSpace(os.Getenv("TOGETHER_TIMEOUT_SECONDS")); v != "" {
+		if parsed, parseErr := time.ParseDuration(v + "s"); parseErr == nil && parsed >= 5*time.Second {
+			timeout = parsed
+		}
+	}
+	return h.callTogetherWithSystemTimeoutAndMaxTokens(model, systemPrompt, userPrompt, timeout, 0)
+}
+
+func (h *Handler) callTogetherWithSystemTimeout(model string, systemPrompt string, userPrompt string, timeout time.Duration) (string, error) {
+	return h.callTogetherWithSystemTimeoutAndMaxTokens(model, systemPrompt, userPrompt, timeout, 0)
+}
+
+func (h *Handler) callTogetherWithSystemTimeoutAndMaxTokens(model string, systemPrompt string, userPrompt string, timeout time.Duration, maxTokens int) (string, error) {
 	if strings.TrimSpace(model) == "" {
 		return "", errors.New("together model is empty")
 	}
@@ -258,20 +273,22 @@ func (h *Handler) callTogetherWithSystem(model string, systemPrompt string, user
 			{"role": "user", "content": userPrompt},
 		},
 	}
+	if maxTokens > 0 {
+		payload["max_tokens"] = maxTokens
+	}
 	body, _ := json.Marshal(payload)
 	req, _ := http.NewRequest(http.MethodPost, "https://api.together.xyz/v1/chat/completions", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")))
 	req.Header.Set("Content-Type", "application/json")
-
-	timeout := 45 * time.Second
-	if v := strings.TrimSpace(os.Getenv("TOGETHER_TIMEOUT_SECONDS")); v != "" {
-		if parsed, parseErr := time.ParseDuration(v + "s"); parseErr == nil && parsed >= 5*time.Second {
-			timeout = parsed
-		}
+	if timeout < 5*time.Second {
+		timeout = 5 * time.Second
 	}
 	client := &http.Client{Timeout: timeout}
 	resp, err := client.Do(req)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return "", fmt.Errorf("together_timeout: %w", err)
+		}
 		return "", err
 	}
 	defer resp.Body.Close()

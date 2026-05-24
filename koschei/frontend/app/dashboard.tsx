@@ -214,10 +214,15 @@ export default function Dashboard() {
       await refreshRuntimeData();
       setPrompt('');
     } catch (e: any) {
-      const backendDetail = typeof e?.data?.detail === 'string' && e.data.detail.trim() ? `: ${e.data.detail}` : '';
+      const detailRaw = typeof e?.data?.detail === 'string' ? e.data.detail.trim() : '';
+      const timeoutLike = /timeout|context deadline exceeded|client\.timeout exceeded/i.test(detailRaw);
+      const friendly = timeoutLike ? 'Runtime AI provider timed out. Credits not charged. Try again or use a shorter prompt.' : '';
+      const backendDetail = detailRaw ? `: ${detailRaw}` : '';
       const base = e?.message || 'runtime_request_failed';
       const creditInfo = e?.data?.credits_charged === false ? ' — Credits not charged' : '';
-      setError(`${base}${backendDetail}${creditInfo}`);
+      const composed = `${base}${backendDetail}${creditInfo}`;
+      setError(friendly ? `${friendly} | ${composed}` : composed);
+      await refreshMe();
     } finally {
       setRuntimeLoading(false);
     }
