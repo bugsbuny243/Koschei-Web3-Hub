@@ -60,6 +60,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/runtime/tasks/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetRuntimeTask))))
 	mux.HandleFunc("/api/runtime/logs/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetRuntimeLogs))))
 	mux.HandleFunc("/api/runtime/route", requiresDB(h, method("POST", h.RuntimeRoute)))
+	mux.HandleFunc("/api/ai/generate", requiresDB(h, handlers.RequireAuth(method("POST", h.AIGenerate))))
 	mux.HandleFunc("/api/owner/payment-requests", requiresDB(h, method("GET", h.OwnerPaymentRequests)))
 	mux.HandleFunc("/api/owner/activate-plan", requiresDB(h, method("POST", h.OwnerActivatePlan)))
 	mux.HandleFunc("/api/owner/grant-credits", requiresDB(h, method("POST", h.OwnerGrantCredits)))
