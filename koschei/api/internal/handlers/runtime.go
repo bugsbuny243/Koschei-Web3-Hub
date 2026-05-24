@@ -1,14 +1,17 @@
 package handlers
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 type createRuntimeProjectRequest struct{ Email, Title, Prompt string }
@@ -42,6 +45,10 @@ Return ONLY valid JSON.
 Do not wrap in markdown.
 Do not use ` + "```json" + ` fences.
 Do not add explanation outside JSON.
+Be concise.
+Each array should contain 3 to 7 items.
+Do not write huge paragraphs.
+Keep total response compact but useful.
 For PUBG-like, GTA-like, TikTok-like, marketplace-like, YouTube-like:
 - do not refuse
 - do not promise instant full clone
@@ -151,10 +158,17 @@ func (h *Handler) runRuntimeProductionPipeline(projectID, authSub, email, title,
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	aiOut, err := h.callTogetherRuntimeBlueprint(prompt)
+	aiOut, err := h.callTogetherRuntimeBlueprint(projectID, prompt)
 	if err != nil {
-		_ = h.markRuntimeFailed(projectID, "Runtime AI pipeline failed: "+shortError(err.Error()), "blueprint", err.Error())
-		return nil, err
+		timeoutFailure := isTimeoutError(err)
+		failureMsg := "Runtime AI pipeline failed: " + shortError(err.Error())
+		responseErr := err
+		if timeoutFailure {
+			failureMsg = "Runtime AI pipeline failed: provider timeout"
+			responseErr = errors.New("runtime_generation_failed: Together provider timeout. Credits not charged.")
+		}
+		_ = h.markRuntimeFailed(projectID, failureMsg, "blueprint", err.Error())
+		return nil, responseErr
 	}
 	bp := buildRuntimeBlueprint(aiOut, prompt)
 	creditCharged, err := h.completeRuntimePipeline(projectID, authSub, email, bp, isPrivileged)
@@ -164,12 +178,61 @@ func (h *Handler) runRuntimeProductionPipeline(projectID, authSub, email, title,
 	}
 	return h.fetchRuntimeResponse(projectID, bp, creditCharged)
 }
-func (h *Handler) callTogetherRuntimeBlueprint(prompt string) (string, error) {
-	model := firstEnv("TOGETHER_MODEL_REASONING", "TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL")
+func (h *Handler) callTogetherRuntimeBlueprint(projectID, prompt string) (string, error) {
+	model := firstEnv("TOGETHER_MODEL_RUNTIME", "TOGETHER_MODEL_REASONING", "TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL")
 	if strings.TrimSpace(model) == "" {
 		return "", errors.New("together model is empty")
 	}
-	return h.callTogetherWithSystem(model, runtimeSystemPrompt, prompt)
+	timeout := 120 * time.Second
+	if v := strings.TrimSpace(os.Getenv("TOGETHER_RUNTIME_TIMEOUT_SECONDS")); v != "" {
+		if parsed, parseErr := time.ParseDuration(v + "s"); parseErr == nil && parsed >= 5*time.Second {
+			timeout = parsed
+		}
+	}
+	maxTokens := 2200
+	if v := strings.TrimSpace(os.Getenv("TOGETHER_RUNTIME_MAX_TOKENS")); v != "" {
+		var parsed int
+		if _, scanErr := fmt.Sscanf(v, "%d", &parsed); scanErr == nil && parsed >= 200 {
+			maxTokens = parsed
+		}
+	}
+	out, err := h.callTogetherWithSystemTimeoutAndMaxTokens(model, runtimeSystemPrompt, prompt, timeout, maxTokens)
+	if err == nil {
+		return out, nil
+	}
+	if !isTimeoutError(err) {
+		return "", err
+	}
+	fmt.Println("Runtime AI provider timeout on model:", model)
+	_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'error',$3)`, newID(), projectID, "Runtime AI provider timeout on model: "+model)
+	fallbackModel := firstEnv("TOGETHER_MODEL", "TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL_REASONING")
+	if strings.TrimSpace(fallbackModel) == "" || fallbackModel == model {
+		return "", err
+	}
+	fmt.Println("Runtime AI fallback started with model:", fallbackModel)
+	_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Runtime AI fallback started with model: "+fallbackModel)
+	fallbackOut, fallbackErr := h.callTogetherWithSystemTimeoutAndMaxTokens(fallbackModel, runtimeSystemPrompt, prompt, timeout, maxTokens)
+	if fallbackErr != nil {
+		return "", fallbackErr
+	}
+	fmt.Println("Runtime AI fallback succeeded")
+	_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Runtime AI fallback succeeded with model: "+fallbackModel)
+	return fallbackOut, nil
+}
+
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "context deadline exceeded") || strings.Contains(msg, "client.timeout exceeded")
 }
 func buildRuntimeBlueprint(raw, prompt string) runtimeBlueprint {
 	var bp runtimeBlueprint
