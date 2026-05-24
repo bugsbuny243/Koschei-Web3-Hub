@@ -5,6 +5,8 @@ COPY koschei/frontend/package*.json ./
 RUN npm install
 
 COPY koschei/frontend ./
+ARG EXPO_PUBLIC_NEON_AUTH_URL
+ENV EXPO_PUBLIC_NEON_AUTH_URL=$EXPO_PUBLIC_NEON_AUTH_URL
 RUN npm run build
 
 FROM golang:1.23-alpine AS go-builder
@@ -38,5 +40,3 @@ ENV STATIC_DIR=/app/public
 EXPOSE 8080
 
 CMD ["/app/koschei-api"]
-ARG EXPO_PUBLIC_NEON_AUTH_URL
-ENV EXPO_PUBLIC_NEON_AUTH_URL=$EXPO_PUBLIC_NEON_AUTH_URL
