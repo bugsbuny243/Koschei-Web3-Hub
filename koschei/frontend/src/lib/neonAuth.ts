@@ -38,7 +38,7 @@ async function post(path: string, body: Record<string, unknown>): Promise<any> {
 
 export const neonAuth = {
   async signUpWithEmail(email: string, password: string) {
-    return post('/auth/sign-up/email', {
+    return post('/api/auth/sign-up/email', {
       email,
       password,
       name: email.split('@')[0] || 'User',
@@ -46,7 +46,7 @@ export const neonAuth = {
   },
 
   async signInWithEmail(email: string, password: string) {
-    return post('/auth/sign-in/email', { email, password });
+    return post('/api/auth/sign-in/email', { email, password });
   },
 
   async signOut() {
