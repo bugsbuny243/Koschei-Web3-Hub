@@ -27,14 +27,6 @@ const MODULES = [
   { ico: '⟁', name: 'REASON MATRIX', desc: 'Derin analiz ve karar motoru', accent: VIOLET },
 ];
 
-const STACK = [
-  'Go API Gateway',
-  'Python AI Orchestration',
-  'Together AI Router',
-  'Runtime Task Engine',
-  'Neon Auth + Database',
-];
-
 function RainColumn({
   left,
   delay,
@@ -210,6 +202,7 @@ function QuantumCore() {
   return (
     <View style={styles.coreWrap}>
       <View style={styles.coreHalo} />
+
       <Ring size={246} color={CYAN} duration={7200} />
       <Ring size={198} color={VIOLET} duration={5200} reverse />
       <Ring size={148} color={MAGENTA} duration={3900} />
@@ -254,6 +247,7 @@ export default function Home() {
 
   const rainColumns = useMemo(() => {
     const count = Math.min(18, Math.max(10, Math.floor(width / 34)));
+
     return Array.from({ length: count }).map((_, i) => ({
       left: i * 38 + 4,
       delay: i * 220,
@@ -278,6 +272,7 @@ export default function Home() {
         <View style={styles.topBar}>
           <View style={styles.brandBox}>
             <Text style={styles.brandMark}>K</Text>
+
             <View>
               <Text style={styles.brandName}>KOSCHEI</Text>
               <Text style={styles.brandSub}>IMMORTAL AI</Text>
@@ -329,26 +324,14 @@ export default function Home() {
             >
               <View style={styles.moduleTop}>
                 <Text style={[styles.moduleIcon, { color: module.accent }]}>{module.ico}</Text>
+
                 <View style={styles.activeBadge}>
                   <Text style={styles.activeText}>ACTIVE</Text>
                 </View>
               </View>
+
               <Text style={styles.moduleName}>{module.name}</Text>
               <Text style={styles.moduleDesc}>{module.desc}</Text>
-            </View>
-          ))}
-        </View>
-
-        <SectionTitle title="COMMAND STACK" />
-
-        <View style={styles.stackPanel}>
-          {STACK.map((item, index) => (
-            <View key={item} style={styles.stackItem}>
-              <View style={styles.stackIndex}>
-                <Text style={styles.stackIndexText}>{String(index + 1).padStart(2, '0')}</Text>
-              </View>
-              <Text style={styles.stackText}>{item}</Text>
-              <Text style={styles.stackSignal}>READY</Text>
             </View>
           ))}
         </View>
@@ -396,7 +379,6 @@ const styles = StyleSheet.create({
     borderRadius: 160,
     backgroundColor: 'rgba(0,255,157,0.09)',
   },
-
   gridLayer: {
     position: 'absolute',
     top: 0,
@@ -760,60 +742,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  stackPanel: {
-    borderWidth: 1,
-    borderColor: 'rgba(0,229,255,0.18)',
-    borderRadius: 22,
-    backgroundColor: 'rgba(5,12,25,0.78)',
-    padding: 12,
-    marginBottom: 22,
-  },
-  stackItem: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.055)',
-    backgroundColor: 'rgba(0,229,255,0.035)',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    marginBottom: 9,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stackIndex: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    borderWidth: 1,
-    borderColor: 'rgba(157,78,221,0.36)',
-    backgroundColor: 'rgba(157,78,221,0.09)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 11,
-  },
-  stackIndexText: {
-    color: VIOLET,
-    fontSize: 10,
-    fontWeight: '900',
-    fontFamily: 'monospace',
-  },
-  stackText: {
-    color: '#d7e6f8',
-    fontSize: 13,
-    fontWeight: '700',
-    flex: 1,
-  },
-  stackSignal: {
-    color: GREEN,
-    fontSize: 9,
-    letterSpacing: 1.2,
-    fontWeight: '900',
-    fontFamily: 'monospace',
-  },
-
   footerPanel: {
     borderTopWidth: 1,
     borderColor: 'rgba(0,229,255,0.12)',
     paddingTop: 18,
+    paddingBottom: 18,
     alignItems: 'center',
   },
   footerTitle: {
