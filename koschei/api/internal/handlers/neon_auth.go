@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -85,6 +86,7 @@ func allowedIssuers() map[string]bool {
 	allowed := map[string]bool{}
 	addIssuerCandidate(allowed, os.Getenv("NEON_AUTH_ISSUER"))
 	addIssuerCandidate(allowed, os.Getenv("NEON_AUTH_BASE_URL"))
+	addIssuerCandidate(allowed, os.Getenv("NEON_AUTH_JWKS_URL"))
 	return allowed
 }
 
@@ -150,7 +152,12 @@ func neonClaimsFromToken(token string) (neonJWTClaims, error) {
 	allowed := allowedIssuers()
 	actualIssuer := trimSlash(out.Iss)
 	if len(allowed) > 0 && !allowed[actualIssuer] {
-		return out, errors.New("invalid issuer: " + actualIssuer)
+		keys := make([]string, 0, len(allowed))
+		for k := range allowed {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return out, errors.New("invalid issuer: " + actualIssuer + " allowed=" + strings.Join(keys, ","))
 	}
 	aud := trimSlash(os.Getenv("NEON_AUTH_AUDIENCE"))
 	if aud != "" && !matchesAudience(out.Aud, aud) {
