@@ -134,8 +134,12 @@ export default function Dashboard() {
   };
 
   const refreshAiJobs = async () => {
-    const rows: any = await api.get('/api/ai/jobs');
-    setAiJobs(Array.isArray(rows?.jobs) ? rows.jobs : []);
+    try {
+      const rows: any = await api.get('/api/ai/jobs');
+      setAiJobs(Array.isArray(rows?.jobs) ? rows.jobs : []);
+    } catch {
+      setAiJobs([]);
+    }
   };
 
   useEffect(() => {
@@ -152,8 +156,10 @@ export default function Dashboard() {
       } catch (e: any) {
         if (String(e?.message || '').includes('401')) {
           await auth.clearToken();
+          router.replace('/login');
+          return;
         }
-        router.replace('/login');
+        setAiJobs([]);
       }
     };
     loadMe();

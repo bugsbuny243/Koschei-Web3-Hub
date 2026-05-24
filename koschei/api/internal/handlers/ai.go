@@ -47,12 +47,12 @@ func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) {
 	tool := strings.ToLower(strings.TrimSpace(req.Tool))
 	route, err := resolveAIRoute(tool)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_tool"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_tool", "credits_charged": false})
 		return
 	}
 
 	if strings.ToLower(strings.TrimSpace(os.Getenv("TOGETHER_AI_ENABLED"))) != "true" || strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "ai_provider_not_configured"})
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "ai_provider_not_configured", "credits_charged": false})
 		return
 	}
 
@@ -76,7 +76,7 @@ func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) {
 
 	if !isTextTool(tool) {
 		_ = h.finishGenerationJob(jobID, "failed", "tool_not_implemented_yet")
-		_ = h.insertModelRouteLog(claims.Email, tool, route.Route, req.Prompt, "failed")
+		_ = h.insertModelRouteLog(claims.Email, tool, route.Route, route.Model, req.Prompt, "failed")
 		writeJSON(w, http.StatusNotImplemented, map[string]any{"error": "tool_not_implemented_yet", "tool": tool, "credits_charged": false})
 		return
 	}
@@ -85,14 +85,14 @@ func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) {
 	if callErr != nil {
 		log.Printf("ai generation failed: email=%s tool=%s err=%v", claims.Email, tool, callErr)
 		_ = h.finishGenerationJob(jobID, "failed", shortError(callErr.Error()))
-		_ = h.insertModelRouteLog(claims.Email, tool, route.Route, req.Prompt, "failed")
+		_ = h.insertModelRouteLog(claims.Email, tool, route.Route, usedModel, req.Prompt, "failed")
 		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "generation_failed", "detail": shortError(callErr.Error()), "credits_charged": false})
 		return
 	}
 
-	if err := h.completeGenerationAndCharge(jobID, claims.Sub, claims.Email, tool, route.Route, req.Prompt, resultText, isPrivileged); err != nil {
+	if err := h.completeGenerationAndCharge(jobID, claims.Sub, claims.Email, tool, route.Route, usedModel, req.Prompt, resultText, isPrivileged); err != nil {
 		_ = h.finishGenerationJob(jobID, "failed", shortError(err.Error()))
-		_ = h.insertModelRouteLog(claims.Email, tool, route.Route, req.Prompt, "failed")
+		_ = h.insertModelRouteLog(claims.Email, tool, route.Route, usedModel, req.Prompt, "failed")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
@@ -200,8 +200,8 @@ func (h *Handler) finishGenerationJob(id, status, result string) error {
 	return err
 }
 
-func (h *Handler) insertModelRouteLog(email, tool, route, prompt, status string) error {
-	_, err := h.DB.Exec(`INSERT INTO model_route_logs (email, tool, route, provider, prompt, status) VALUES ($1,$2,$3,'together',$4,$5)`, email, tool, route, prompt, status)
+func (h *Handler) insertModelRouteLog(email, tool, route, model, prompt, status string) error {
+	_, err := h.DB.Exec(`INSERT INTO model_route_logs (email, tool, route, model, provider, prompt, status) VALUES ($1,$2,$3,$4,'together',$5,$6)`, email, tool, route, model, prompt, status)
 	return err
 }
 
@@ -218,7 +218,7 @@ func (h *Handler) applyCreditChargeTx(tx *sql.Tx, authSub, email string) error {
 	return err
 }
 
-func (h *Handler) completeGenerationAndCharge(jobID, authSub, email, tool, route, prompt, resultText string, isPrivileged bool) error {
+func (h *Handler) completeGenerationAndCharge(jobID, authSub, email, tool, route, model, prompt, resultText string, isPrivileged bool) error {
 	tx, err := h.DB.Begin()
 	if err != nil {
 		return err
@@ -228,7 +228,7 @@ func (h *Handler) completeGenerationAndCharge(jobID, authSub, email, tool, route
 	if _, err := tx.Exec(`UPDATE generation_jobs SET status='completed', result=$2, updated_at=now() WHERE id=$1`, jobID, resultText); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(`INSERT INTO model_route_logs (email, tool, route, provider, prompt, status) VALUES ($1,$2,$3,'together',$4,'completed')`, email, tool, route, prompt); err != nil {
+	if _, err := tx.Exec(`INSERT INTO model_route_logs (email, tool, route, model, provider, prompt, status) VALUES ($1,$2,$3,$4,'together',$5,'completed')`, email, tool, route, model, prompt); err != nil {
 		return err
 	}
 	if !isPrivileged {

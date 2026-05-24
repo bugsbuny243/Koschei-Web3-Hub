@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	modelrouter "koschei/api/internal/router"
 )
@@ -49,12 +50,19 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	route := modelrouter.ResolveModelRoute(req.Tool)
+	model := strings.TrimSpace(route.Route)
+	if model == "" {
+		model = strings.TrimSpace(route.Provider)
+	}
+	if model == "" {
+		model = "unknown"
+	}
 	var id, status string
 	if err := h.DB.QueryRow(`INSERT INTO generation_jobs (email, tool, prompt, route, provider, status) VALUES ($1,$2,$3,$4,$5,'queued') RETURNING id, status`, req.Email, req.Tool, req.Prompt, route.Route, route.Provider).Scan(&id, &status); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db failed"})
 		return
 	}
-	_, _ = h.DB.Exec(`INSERT INTO model_route_logs (email, tool, route, provider, prompt, status) VALUES ($1,$2,$3,$4,$5,$6)`, req.Email, req.Tool, route.Route, route.Provider, req.Prompt, route.Status)
+	_, _ = h.DB.Exec(`INSERT INTO model_route_logs (email, tool, route, model, provider, prompt, status) VALUES ($1,$2,$3,$4,$5,$6,$7)`, req.Email, req.Tool, route.Route, model, route.Provider, req.Prompt, route.Status)
 	writeJSON(w, 201, map[string]any{"id": id, "tool": req.Tool, "route": route.Route, "provider": route.Provider, "status": status})
 }
 
@@ -71,6 +79,13 @@ func (h *Handler) RuntimeRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = req.Prompt
 	route := modelrouter.ResolveModelRoute(req.Tool)
-	_, _ = h.DB.Exec(`INSERT INTO model_route_logs (tool, route, provider, prompt, status) VALUES ($1,$2,$3,$4,$5)`, req.Tool, route.Route, route.Provider, req.Prompt, route.Status)
+	model := strings.TrimSpace(route.Route)
+	if model == "" {
+		model = strings.TrimSpace(route.Provider)
+	}
+	if model == "" {
+		model = "unknown"
+	}
+	_, _ = h.DB.Exec(`INSERT INTO model_route_logs (tool, route, model, provider, prompt, status) VALUES ($1,$2,$3,$4,$5,$6)`, req.Tool, route.Route, model, route.Provider, req.Prompt, route.Status)
 	writeJSON(w, 200, route)
 }
