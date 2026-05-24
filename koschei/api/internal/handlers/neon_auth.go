@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
@@ -32,11 +33,17 @@ type neonJWKSDoc struct {
 	Keys []neonJWK `json:"keys"`
 }
 type neonJWK struct {
-	Kid, Kty, N, E string `json:"kid","kty","n","e"`
+	Kid string `json:"kid"`
+	Kty string `json:"kty"`
+	Alg string `json:"alg"`
+	N   string `json:"n"`
+	E   string `json:"e"`
+	Crv string `json:"crv"`
+	X   string `json:"x"`
 }
 
 var (
-	jwksCache map[string]*rsa.PublicKey
+	jwksCache map[string]neonJWK
 	jwksMu    sync.RWMutex
 )
 
@@ -59,19 +66,37 @@ func neonClaimsFromToken(token string) (neonJWTClaims, error) {
 	}
 	kid, _ := header["kid"].(string)
 	alg, _ := header["alg"].(string)
-	if kid == "" || alg != "RS256" {
+	if kid == "" || alg == "" {
 		return out, errors.New("invalid token")
 	}
-	pub, err := loadJWKSPublicKey(kid)
+	jwk, err := loadJWKSKey(kid)
 	if err != nil {
 		return out, err
 	}
-	h := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
+	signingInput := []byte(parts[0] + "." + parts[1])
 	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
 		return out, err
 	}
-	if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, h[:], sig); err != nil {
+	switch alg {
+	case "RS256":
+		pub, err := rsaPublicKeyFromJWK(jwk)
+		if err != nil {
+			return out, errors.New("invalid token")
+		}
+		h := sha256.Sum256(signingInput)
+		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, h[:], sig); err != nil {
+			return out, errors.New("invalid token")
+		}
+	case "EdDSA":
+		pub, err := ed25519PublicKeyFromJWK(jwk)
+		if err != nil {
+			return out, errors.New("invalid token")
+		}
+		if !ed25519.Verify(pub, signingInput, sig) {
+			return out, errors.New("invalid token")
+		}
+	default:
 		return out, errors.New("invalid token")
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
@@ -93,7 +118,7 @@ func neonClaimsFromToken(token string) (neonJWTClaims, error) {
 	return out, nil
 }
 
-func loadJWKSPublicKey(kid string) (*rsa.PublicKey, error) {
+func loadJWKSKey(kid string) (neonJWK, error) {
 	jwksMu.RLock()
 	if k, ok := jwksCache[kid]; ok {
 		jwksMu.RUnlock()
@@ -102,47 +127,74 @@ func loadJWKSPublicKey(kid string) (*rsa.PublicKey, error) {
 	jwksMu.RUnlock()
 	jwksURL := strings.TrimSpace(os.Getenv("NEON_AUTH_JWKS_URL"))
 	if jwksURL == "" {
-		return nil, errors.New("jwks missing")
+		baseURL := strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL"))
+		if baseURL != "" {
+			jwksURL = strings.TrimRight(baseURL, "/") + "/.well-known/jwks.json"
+		}
+	}
+	if jwksURL == "" {
+		return neonJWK{}, errors.New("jwks missing")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, jwksURL, nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		return neonJWK{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode/100 != 2 {
-		return nil, errors.New("jwks unavailable")
+		return neonJWK{}, errors.New("jwks unavailable")
 	}
 	var doc neonJWKSDoc
 	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
-		return nil, err
+		return neonJWK{}, err
 	}
-	cache := map[string]*rsa.PublicKey{}
+	cache := map[string]neonJWK{}
 	for _, key := range doc.Keys {
-		if key.Kty != "RSA" || key.Kid == "" {
+		if key.Kid == "" {
 			continue
 		}
-		nBytes, errN := base64.RawURLEncoding.DecodeString(key.N)
-		eBytes, errE := base64.RawURLEncoding.DecodeString(key.E)
-		if errN != nil || errE != nil {
-			continue
-		}
-		eInt := 0
-		for _, b := range eBytes {
-			eInt = eInt<<8 + int(b)
-		}
-		cache[key.Kid] = &rsa.PublicKey{N: new(big.Int).SetBytes(nBytes), E: eInt}
+		cache[key.Kid] = key
 	}
 	jwksMu.Lock()
 	jwksCache = cache
 	k := jwksCache[kid]
 	jwksMu.Unlock()
-	if k == nil {
-		return nil, errors.New("unknown key")
+	if k.Kid == "" {
+		return neonJWK{}, errors.New("unknown key")
 	}
 	return k, nil
+}
+
+func rsaPublicKeyFromJWK(key neonJWK) (*rsa.PublicKey, error) {
+	if key.Kty != "RSA" || key.N == "" || key.E == "" {
+		return nil, errors.New("invalid rsa jwk")
+	}
+	nBytes, errN := base64.RawURLEncoding.DecodeString(key.N)
+	eBytes, errE := base64.RawURLEncoding.DecodeString(key.E)
+	if errN != nil || errE != nil {
+		return nil, errors.New("invalid rsa jwk")
+	}
+	eInt := 0
+	for _, b := range eBytes {
+		eInt = eInt<<8 + int(b)
+	}
+	if eInt <= 0 {
+		return nil, errors.New("invalid rsa jwk")
+	}
+	return &rsa.PublicKey{N: new(big.Int).SetBytes(nBytes), E: eInt}, nil
+}
+
+func ed25519PublicKeyFromJWK(key neonJWK) (ed25519.PublicKey, error) {
+	if key.Kty != "OKP" || key.Crv != "Ed25519" || key.X == "" {
+		return nil, errors.New("invalid eddsa jwk")
+	}
+	xBytes, err := base64.RawURLEncoding.DecodeString(key.X)
+	if err != nil || len(xBytes) != ed25519.PublicKeySize {
+		return nil, errors.New("invalid eddsa jwk")
+	}
+	return ed25519.PublicKey(xBytes), nil
 }
 
 func matchesAudience(v any, target string) bool {
