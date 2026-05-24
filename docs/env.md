@@ -28,7 +28,8 @@ This document defines the canonical environment variables for Koschei Phase 3.
 ## Optional variables
 
 - `NEON_AUTH_ISSUER`: Optional issuer to enforce when validating JWTs from Neon Auth.
-- `TOGETHER_ENABLED`: Feature flag for Together routing (default: `true`).
+- `TOGETHER_AI_ENABLED`: Primary feature flag for Together routing (default: `true`).
+- `TOGETHER_ENABLED`: Backward-compatible fallback feature flag for older environments.
 - `TOGETHER_MODEL_*`: Individual model overrides can be swapped per deployment.
 - `SEARCH_PROVIDER`: Search provider selector (default: `brave`).
 - `MEDIA_PROVIDER`: Media provider selector (default: `cloudinary`).
