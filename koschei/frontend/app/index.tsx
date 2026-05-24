@@ -1,5 +1,4 @@
-Koschei/frontend/app/quantum_command.tsx
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Link } from 'expo-router';
 import {
   Animated,
@@ -8,50 +7,78 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
-  Dimensions
 } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
-
+const GREEN = '#00ff9d';
 const CYAN = '#00e5ff';
 const VIOLET = '#9d4edd';
 const MAGENTA = '#ff2bd1';
-const BG = '#04020a';
-const PANEL_BG = 'rgba(0, 229, 255, 0.05)';
-const GRID_COLOR = 'rgba(0, 229, 255, 0.1)';
+const BG = '#03040a';
+const PANEL = 'rgba(5, 12, 25, 0.78)';
 
-/* ---- Matrix Rain Column (Improved Style) ---- */
-function RainColumn({ left, delay, duration }: { left: number; delay: number; duration: number }) {
-  const y = useRef(new Animated.Value(-200)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
+const MODULES = [
+  { ico: '⌬', name: 'CODE ENGINE', desc: 'Üretim hazır kod akışı', accent: CYAN },
+  { ico: '◈', name: 'IMAGE FORGE', desc: 'Sinematik görsel üretimi', accent: MAGENTA },
+  { ico: '▣', name: 'VIDEO LAB', desc: 'Video fikir ve sahne üretimi', accent: VIOLET },
+  { ico: '◊', name: 'AUDIO CORE', desc: 'Seslendirme ve audio akışı', accent: GREEN },
+  { ico: '⬢', name: 'CHAT NEXUS', desc: 'Akıllı sohbet merkezi', accent: CYAN },
+  { ico: '⟁', name: 'REASON MATRIX', desc: 'Derin analiz ve karar motoru', accent: VIOLET },
+];
+
+const STACK = [
+  'Go API Gateway',
+  'Python AI Orchestration',
+  'Together AI Router',
+  'Runtime Task Engine',
+  'Neon Auth + Database',
+];
+
+function RainColumn({
+  left,
+  delay,
+  duration,
+}: {
+  left: number;
+  delay: number;
+  duration: number;
+}) {
+  const y = useRef(new Animated.Value(-260)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(y, { toValue: height + 200, duration, delay, easing: Easing.linear, useNativeDriver: true }),
-          Animated.timing(opacity, { toValue: 1, duration: 500, delay, useNativeDriver: true }),
-        ]),
-        Animated.timing(opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
-      ])
-    ).start();
-    return () => { y.stopAnimation(); opacity.stopAnimation(); };
-  }, [y, opacity, delay, duration]);
+    const loop = Animated.loop(
+      Animated.timing(y, {
+        toValue: 980,
+        duration,
+        delay,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
 
-  const chars = 'KOSCHEIAISYSTEM99COREMATRIXQUANTUMΦΨ'.split('');
+    loop.start();
+    return () => loop.stop();
+  }, [delay, duration, y]);
+
+  const chars = '01KOSCHEIΦΨλΔカキクケコ'.split('');
+
   return (
-    <Animated.View style={[styles.rainCol, { left, transform: [{ translateY: y }], opacity }]}>
+    <Animated.View style={[styles.rainCol, { left, transform: [{ translateY: y }] }]}>
       {Array.from({ length: 18 }).map((_, i) => (
         <Text
           key={i}
-          style={{
-            color: i === 0 ? CYAN : i < 6 ? VIOLET : 'rgba(157,78,221,0.25)',
-            fontSize: 11,
-            fontFamily: 'monospace',
-            lineHeight: 14,
-            fontWeight: i === 0 ? '700' : '400'
-          }}
+          style={[
+            styles.rainText,
+            {
+              color:
+                i === 0
+                  ? 'rgba(0,255,157,0.9)'
+                  : i < 4
+                    ? 'rgba(0,229,255,0.62)'
+                    : 'rgba(157,78,221,0.18)',
+            },
+          ]}
         >
           {chars[(i + left) % chars.length]}
         </Text>
@@ -60,365 +87,747 @@ function RainColumn({ left, delay, duration }: { left: number; delay: number; du
   );
 }
 
-/* ---- Data Stream (Static Line with Pulse) ---- */
-function DataStreamLine({ top }: { top: number }) {
+function GlowButton({
+  label,
+  href,
+  primary,
+}: {
+  label: string;
+  href: string;
+  primary?: boolean;
+}) {
   const glow = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
-    Animated.loop(
+    if (!primary) return;
+
+    const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(glow, { toValue: 1, duration: 2500, useNativeDriver: true }),
-        Animated.timing(glow, { toValue: 0, duration: 2500, useNativeDriver: true }),
-      ])
-    ).start();
-  }, [glow]);
-  const opacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] });
+        Animated.timing(glow, { toValue: 1, duration: 1300, useNativeDriver: false }),
+        Animated.timing(glow, { toValue: 0, duration: 1300, useNativeDriver: false }),
+      ]),
+    );
 
-  return (
-    <View style={[styles.streamLine, { top }]}>
-      <Animated.View style={[styles.streamInner, { opacity }]} />
-    </View>
-  );
-}
+    loop.start();
+    return () => loop.stop();
+  }, [glow, primary]);
 
-/* ---- Spinning Reactor Ring (Optimized) ---- */
-function Ring({ size, color, duration, reverse, isGlow }: { size: number; color: string; duration: number; reverse?: boolean; isGlow?: boolean }) {
-  const spin = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(spin, { toValue: 1, duration, easing: Easing.linear, useNativeDriver: true }),
-    ).start();
-  }, [spin, duration]);
-  const rotate = spin.interpolate({
+  const shadowRadius = glow.interpolate({
     inputRange: [0, 1],
-    outputRange: reverse ? ['360deg', '0deg'] : ['0deg', '360deg'],
+    outputRange: [10, 28],
   });
-  return (
-    <Animated.View
-      style={{
-        position: 'absolute',
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        borderWidth: isGlow ? 4 : 1,
-        borderColor: isGlow ? 'rgba(0,229,255,0.05)' : 'rgba(0,229,255,0.18)',
-        borderTopColor: color,
-        transform: [{ rotate }],
-        shadowColor: isGlow ? color : 'transparent',
-        shadowOffset: { width: 0, height: 0 },
-        shadowRadius: isGlow ? 15 : 0,
-        shadowOpacity: isGlow ? 0.8 : 0
-      }}
-    />
-  );
-}
-
-/* ---- Status Panel Component ---- */
-function StatusPanel({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.statusPanel}>
-      <Text style={styles.statusPanelLabel}>{label}</Text>
-      <Text style={styles.statusPanelValue}>{value}</Text>
-    </View>
-  );
-}
-
-/* ---- Interactive Holographic Button ---- */
-function HoloButton({ label, href }: { label: string; href: string }) {
-  const scale = useRef(new Animated.Value(1)).current;
-  const onPressIn = () => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true }).start();
-  const onPressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start();
 
   return (
     <Link href={href} asChild>
-      <Pressable onPressIn={onPressIn} onPressOut={onPressOut}>
-        <Animated.View style={[styles.holoBtn, { transform: [{ scale }] }]}>
-          <Text style={styles.holoBtnText}>{label}</Text>
-          <View style={styles.holoBtnGlow} />
+      <Pressable>
+        <Animated.View
+          style={[
+            styles.button,
+            primary ? styles.buttonPrimary : styles.buttonGhost,
+            primary ? { shadowRadius: shadowRadius as any } : null,
+          ]}
+        >
+          <Text style={[styles.buttonText, { color: primary ? '#00160f' : CYAN }]}>
+            {label}
+          </Text>
         </Animated.View>
       </Pressable>
     </Link>
   );
 }
 
-const MODULES = [
-  { ico: '⌬', name: 'KOD_GEN', desc: 'Koschei Kod Çekirdeği' },
-  { ico: '◈', name: 'GÖR_ÜRT', desc: 'Yapay Zeka Görselleştirici' },
-  { ico: '▣', name: 'VİD_GEN', desc: 'Koschei Video Motoru' },
-  { ico: '◊', name: 'SES_İŞL', desc: 'Ses Dosyası İşleme' },
-  { ico: '⬢', name: 'SOH_MOD', desc: 'Diyalog Motoru v1.0' },
-  { ico: '⟁', name: 'ANL_MER', desc: 'Derin Analiz Merkezi' },
-];
+function Ring({
+  size,
+  color,
+  duration,
+  reverse,
+}: {
+  size: number;
+  color: string;
+  duration: number;
+  reverse?: boolean;
+}) {
+  const spin = useRef(new Animated.Value(0)).current;
 
-export default function KoscheiAICommandCenter() {
-  const corePulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
+      Animated.timing(spin, {
+        toValue: 1,
+        duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [duration, spin]);
+
+  const rotate = spin.interpolate({
+    inputRange: [0, 1],
+    outputRange: reverse ? ['360deg', '0deg'] : ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        styles.ring,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          borderTopColor: color,
+          borderRightColor: 'rgba(255,255,255,0.04)',
+          borderBottomColor: 'rgba(0,229,255,0.12)',
+          borderLeftColor: 'rgba(157,78,221,0.14)',
+          transform: [{ rotate }],
+        },
+      ]}
+    />
+  );
+}
+
+function QuantumCore() {
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(corePulse, { toValue: 1, duration: 1500, useNativeDriver: true }),
-        Animated.timing(corePulse, { toValue: 0, duration: 1500, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 1100, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1100, useNativeDriver: true }),
       ]),
-    ).start();
-  }, [corePulse]);
-  const coreScale = corePulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] });
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+
+  const scale = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.1],
+  });
+
+  return (
+    <View style={styles.coreWrap}>
+      <View style={styles.coreHalo} />
+      <Ring size={246} color={CYAN} duration={7200} />
+      <Ring size={198} color={VIOLET} duration={5200} reverse />
+      <Ring size={148} color={MAGENTA} duration={3900} />
+      <Ring size={108} color={GREEN} duration={2800} reverse />
+
+      <Animated.View style={[styles.core, { transform: [{ scale }] }]}>
+        <Text style={styles.coreTop}>AI CORE</Text>
+        <Text style={styles.coreNum}>99.9%</Text>
+        <Text style={styles.coreBottom}>ONLINE</Text>
+      </Animated.View>
+
+      <View style={[styles.statChip, styles.statChipLeft]}>
+        <Text style={styles.statNum}>9</Text>
+        <Text style={styles.statLbl}>MODELS</Text>
+      </View>
+
+      <View style={[styles.statChip, styles.statChipRight]}>
+        <Text style={styles.statNum}>5</Text>
+        <Text style={styles.statLbl}>MODULES</Text>
+      </View>
+
+      <View style={[styles.statChip, styles.statChipBottom]}>
+        <Text style={styles.statNum}>LIVE</Text>
+        <Text style={styles.statLbl}>RUNTIME</Text>
+      </View>
+    </View>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <View style={styles.sectionTitle}>
+      <View style={styles.sectionLine} />
+      <Text style={styles.sectionText}>{title}</Text>
+      <View style={[styles.sectionLine, { flex: 1, opacity: 0.35 }]} />
+    </View>
+  );
+}
+
+export default function Home() {
+  const { width } = useWindowDimensions();
+
+  const rainColumns = useMemo(() => {
+    const count = Math.min(18, Math.max(10, Math.floor(width / 34)));
+    return Array.from({ length: count }).map((_, i) => ({
+      left: i * 38 + 4,
+      delay: i * 220,
+      duration: 5400 + (i % 5) * 850,
+    }));
+  }, [width]);
 
   return (
     <View style={styles.root}>
-      {/* Background Matrix Rain (Deeper Layer) */}
+      <View style={styles.glowCyan} pointerEvents="none" />
+      <View style={styles.glowPurple} pointerEvents="none" />
+      <View style={styles.glowGreen} pointerEvents="none" />
+      <View style={styles.gridLayer} pointerEvents="none" />
+
       <View style={styles.rainLayer} pointerEvents="none">
-        {Array.from({ length: 20 }).map((_, i) => (
-          <RainColumn
-            key={i}
-            left={i * 20 + 2}
-            delay={i * 200}
-            duration={6000 + (i % 5) * 1200}
-          />
+        {rainColumns.map((col, i) => (
+          <RainColumn key={i} left={col.left} delay={col.delay} duration={col.duration} />
         ))}
       </View>
-      {/* Background Grid */}
-      <View style={styles.gridLayer} pointerEvents="none" />
-      {/* Vertical Data Streams */}
-      <DataStreamLine top={150} />
-      <DataStreamLine top={350} />
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Main Header / Status Panel */}
-        <View style={styles.header}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={styles.dotOnline} />
-            <Text style={styles.statusText}>SİSTEM_ÇEVRİMİÇİ</Text>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.topBar}>
+          <View style={styles.brandBox}>
+            <Text style={styles.brandMark}>K</Text>
+            <View>
+              <Text style={styles.brandName}>KOSCHEI</Text>
+              <Text style={styles.brandSub}>IMMORTAL AI</Text>
+            </View>
           </View>
-          <Text style={styles.statusText}>DRM: AKTİF</Text>
-          <Text style={styles.statusText}>KOSCHEI://EU.SYSTEM.R1</Text>
+
+          <View style={styles.statusPill}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>ONLINE</Text>
+          </View>
         </View>
 
-        {/* System Title */}
-        <View style={styles.titleContainer}>
-          <Text style={styles.preTitle}>// KOSCHEI GLOBAL KOMUTA MERKEZİ</Text>
-          <Text style={styles.mainTitle}>KOSCHEİ AI</Text>
-          <Text style={styles.subTitle}>[ÖLÜMSÜZ ZEKÂ]</Text>
+        <View style={styles.heroPanel}>
+          <View style={styles.statusRow}>
+            <Text style={styles.microText}>● SYSTEM ONLINE</Text>
+            <Text style={styles.microText}>NODE: EU-CENTRAL-1</Text>
+          </View>
+
+          <Text style={styles.kicker}>// SKYNET MATRIX QUANTUM RUNTIME</Text>
+          <Text style={styles.title}>KOSCHEI</Text>
+          <Text style={styles.titleSub}>THE IMMORTAL AI</Text>
+
+          <Text style={styles.heroText}>
+            Tek komutla kod, görsel, video, ses ve chat üret. Koschei tüm AI
+            modellerini tek komuta merkezinde toplar.
+          </Text>
+
+          <QuantumCore />
+
+          <View style={styles.buttonStack}>
+            <GlowButton label="▶ SİSTEME GİR — ÜCRETSİZ" href="/register" primary />
+            <GlowButton label="⬡ LOGIN" href="/login" />
+          </View>
         </View>
 
-        {/* System Tagline */}
-        <Text style={styles.tagline}>
-          Türkçe dilinde fikirlerinizi komuta edin —{' '}
-          <Text style={{ color: VIOLET }}>Anında kod, görsel, video, ses</Text> olarak işleme alınsın.
-        </Text>
+        <SectionTitle title="AKTİF MODÜLLER" />
 
-        {/* Key System Panels */}
-        <View style={styles.statusGrid}>
-          <StatusPanel label="ÇEKİRDEK_YÜKÜ" value="12.7%" />
-          <StatusPanel label="BEL_KULLAN" value="48.1GB" />
-          <StatusPanel label="İŞLEM_HIZI" value="999.7 TFLOPS" />
-          <StatusPanel label="GÜVENLİK" value="MAKSİMUM" />
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.btnRow}>
-          <HoloButton label="▶ YENİ KOMUT GİRİŞİ" href="/new_command" />
-          <HoloButton label="⬡ MEVCUT KOMUTLAR" href="/commands" />
-        </View>
-
-        {/* Active Modules Section */}
-        <View style={styles.sectLabel}>
-          <View style={styles.sectLine} />
-          <Text style={styles.sectText}>AKTİF KOSCHEI MODÜLLERİ</Text>
-        </View>
-        <View style={styles.modGrid}>
-          {MODULES.map((m, i) => (
+        <View style={styles.moduleGrid}>
+          {MODULES.map((module) => (
             <View
-              key={m.name}
+              key={module.name}
               style={[
-                styles.mod,
-                { borderColor: i % 2 ? 'rgba(157,78,221,0.4)' : 'rgba(0,229,255,0.4)' },
+                styles.moduleCard,
+                {
+                  borderColor: `${module.accent}55`,
+                  shadowColor: module.accent,
+                },
               ]}
             >
-              <Text style={styles.modIco}>{m.ico}</Text>
-              <Text style={styles.modName}>{m.name}</Text>
-              <Text style={styles.modDesc}>{m.desc}</Text>
-              <View style={[styles.modGlow, { backgroundColor: i % 2 ? VIOLET : CYAN }]}/>
+              <View style={styles.moduleTop}>
+                <Text style={[styles.moduleIcon, { color: module.accent }]}>{module.ico}</Text>
+                <View style={styles.activeBadge}>
+                  <Text style={styles.activeText}>ACTIVE</Text>
+                </View>
+              </View>
+              <Text style={styles.moduleName}>{module.name}</Text>
+              <Text style={styles.moduleDesc}>{module.desc}</Text>
             </View>
           ))}
         </View>
 
-        {/* KOSCHEI AI Core / Reactor */}
-        <View style={styles.sectLabel}>
-          <View style={styles.sectLine} />
-          <Text style={styles.sectText}>ÇEKİRDEK REAKTÖRÜ (KOSCHEI AI)</Text>
-        </View>
-        <View style={styles.reactor}>
-          <Ring size={250} color={CYAN} duration={8000} isGlow />
-          <Ring size={210} color={VIOLET} duration={5000} reverse isGlow />
-          <Ring size={160} color={MAGENTA} duration={3500} />
-          <Ring size={100} color={CYAN} duration={2000} isGlow/>
-          <Animated.View style={[styles.core, { transform: [{ scale: coreScale }] }]}>
-            <Text style={styles.coreNum}>STABİL</Text>
-            <Text style={styles.coreLbl}>KOSCHEI AI</Text>
-            <View style={styles.coreGlow}/>
-          </Animated.View>
+        <SectionTitle title="COMMAND STACK" />
+
+        <View style={styles.stackPanel}>
+          {STACK.map((item, index) => (
+            <View key={item} style={styles.stackItem}>
+              <View style={styles.stackIndex}>
+                <Text style={styles.stackIndexText}>{String(index + 1).padStart(2, '0')}</Text>
+              </View>
+              <Text style={styles.stackText}>{item}</Text>
+              <Text style={styles.stackSignal}>READY</Text>
+            </View>
+          ))}
         </View>
 
-        <Text style={styles.footer}>KOSCHEI AI COMMAND CENTER v2.0 — TRADEPIGLOBALL.CO</Text>
+        <View style={styles.footerPanel}>
+          <Text style={styles.footerTitle}>KOSCHEI RUNTIME v1.0</Text>
+          <Text style={styles.footerText}>TRADEPIGLOBALL.CO // QUANTUM COMMAND CENTER</Text>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
-  rainLayer: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.18 },
-  rainCol: { position: 'absolute', top: 0 },
-  gridLayer: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderWidth: 0.5, borderColor: GRID_COLOR, opacity: 0.2 },
-  streamLine: { position: 'absolute', left: width * 0.1, width: 2, height: '40%', opacity: 0.6, overflow: 'hidden' },
-  streamInner: { width: '100%', height: '100%', backgroundColor: CYAN, shadowColor: CYAN, shadowRadius: 10, shadowOpacity: 0.8 },
-  scroll: { padding: 20, paddingTop: 60, paddingBottom: 80 },
+  root: {
+    flex: 1,
+    backgroundColor: BG,
+    overflow: 'hidden',
+  },
 
-  header: {
+  glowCyan: {
+    position: 'absolute',
+    top: -90,
+    left: -110,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: 'rgba(0,229,255,0.16)',
+  },
+  glowPurple: {
+    position: 'absolute',
+    top: 190,
+    right: -160,
+    width: 340,
+    height: 340,
+    borderRadius: 170,
+    backgroundColor: 'rgba(157,78,221,0.17)',
+  },
+  glowGreen: {
+    position: 'absolute',
+    bottom: 120,
+    left: -150,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: 'rgba(0,255,157,0.09)',
+  },
+
+  gridLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderWidth: 1,
+    borderColor: 'rgba(0,229,255,0.04)',
+  },
+
+  rainLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    opacity: 0.3,
+  },
+  rainCol: {
+    position: 'absolute',
+    top: 0,
+  },
+  rainText: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: 'monospace',
+  },
+
+  scroll: {
+    padding: 16,
+    paddingTop: 34,
+    paddingBottom: 54,
+  },
+
+  topBar: {
+    minHeight: 54,
+    borderWidth: 1,
+    borderColor: 'rgba(0,229,255,0.18)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(5,12,25,0.62)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  brandBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  brandMark: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,255,157,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,157,0.35)',
+    color: GREEN,
+    textAlign: 'center',
+    lineHeight: 32,
+    fontSize: 18,
+    fontWeight: '900',
+    marginRight: 10,
+    textShadowColor: 'rgba(0,255,157,0.9)',
+    textShadowRadius: 12,
+  },
+  brandName: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+  },
+  brandSub: {
+    color: 'rgba(0,229,255,0.78)',
+    fontSize: 9,
+    letterSpacing: 2,
+    marginTop: 2,
+    fontFamily: 'monospace',
+  },
+
+  statusPill: {
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,157,0.35)',
+    backgroundColor: 'rgba(0,255,157,0.08)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: GREEN,
+    marginRight: 7,
+  },
+  statusText: {
+    color: GREEN,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.3,
+  },
+
+  heroPanel: {
+    borderWidth: 1,
+    borderColor: 'rgba(0,229,255,0.22)',
+    borderRadius: 26,
+    backgroundColor: PANEL,
+    padding: 18,
+    marginBottom: 24,
+    shadowColor: CYAN,
+    shadowOpacity: 0.24,
+    shadowRadius: 34,
+    shadowOffset: { width: 0, height: 0 },
+  },
+
+  statusRow: {
+    borderWidth: 1,
+    borderColor: 'rgba(0,229,255,0.16)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,229,255,0.045)',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  microText: {
+    color: CYAN,
+    fontSize: 9,
+    letterSpacing: 1.5,
+    fontFamily: 'monospace',
+  },
+
+  kicker: {
+    color: CYAN,
+    fontSize: 11,
+    letterSpacing: 2.4,
+    fontFamily: 'monospace',
+    marginBottom: 8,
+  },
+  title: {
+    color: '#ffffff',
+    fontSize: 62,
+    lineHeight: 66,
+    fontWeight: '900',
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0,229,255,0.85)',
+    textShadowRadius: 22,
+  },
+  titleSub: {
+    color: VIOLET,
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 4,
+    marginTop: 2,
+    textShadowColor: 'rgba(157,78,221,0.9)',
+    textShadowRadius: 12,
+  },
+  heroText: {
+    color: '#b7c8dd',
+    fontSize: 14,
+    lineHeight: 22,
+    marginTop: 18,
+    marginBottom: 8,
+  },
+
+  coreWrap: {
+    height: 288,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  coreHalo: {
+    position: 'absolute',
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    backgroundColor: 'rgba(0,229,255,0.12)',
+    shadowColor: CYAN,
+    shadowOpacity: 0.75,
+    shadowRadius: 42,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  ring: {
+    position: 'absolute',
+    borderWidth: 1.4,
+  },
+  core: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,157,0.65)',
+    backgroundColor: 'rgba(0,20,26,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: GREEN,
+    shadowOpacity: 0.8,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  coreTop: {
+    color: CYAN,
+    fontSize: 9,
+    letterSpacing: 2,
+    fontWeight: '800',
+  },
+  coreNum: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '900',
+    marginVertical: 2,
+  },
+  coreBottom: {
+    color: GREEN,
+    fontSize: 9,
+    letterSpacing: 2,
+    fontWeight: '900',
+  },
+
+  statChip: {
+    position: 'absolute',
+    borderWidth: 1,
+    borderColor: 'rgba(0,229,255,0.28)',
+    backgroundColor: 'rgba(4,10,22,0.92)',
+    borderRadius: 14,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  statChipLeft: {
+    left: 6,
+    top: 74,
+  },
+  statChipRight: {
+    right: 4,
+    top: 78,
+  },
+  statChipBottom: {
+    bottom: 14,
+  },
+  statNum: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  statLbl: {
+    color: CYAN,
+    fontSize: 8,
+    letterSpacing: 1.4,
+    marginTop: 2,
+    fontFamily: 'monospace',
+  },
+
+  buttonStack: {
+    marginTop: 8,
+  },
+  button: {
+    minHeight: 54,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    shadowColor: GREEN,
+    shadowOpacity: 0.55,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  buttonPrimary: {
+    backgroundColor: GREEN,
+  },
+  buttonGhost: {
+    borderWidth: 1,
+    borderColor: 'rgba(0,229,255,0.42)',
+    backgroundColor: 'rgba(0,229,255,0.055)',
+  },
+  buttonText: {
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 1.4,
+  },
+
+  sectionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    marginTop: 6,
+  },
+  sectionLine: {
+    width: 24,
+    height: 1,
+    backgroundColor: VIOLET,
+    marginRight: 9,
+  },
+  sectionText: {
+    color: VIOLET,
+    fontSize: 11,
+    letterSpacing: 2.6,
+    fontWeight: '900',
+    fontFamily: 'monospace',
+    marginRight: 9,
+  },
+
+  moduleGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  moduleCard: {
+    width: '48.6%',
+    minHeight: 132,
+    borderWidth: 1,
+    borderRadius: 18,
+    backgroundColor: 'rgba(5,12,25,0.82)',
+    padding: 14,
+    marginBottom: 12,
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  moduleTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0,229,255,0.3)',
-    backgroundColor: 'rgba(0,229,255,0.06)',
-    borderRadius: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    marginBottom: 40,
   },
-  dotOnline: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#00ff9d',
-    marginRight: 8,
-    shadowColor: '#00ff9d',
-    shadowRadius: 10,
-    shadowOpacity: 0.9
-  },
-  statusText: { color: CYAN, fontSize: 10, letterSpacing: 1.5, fontFamily: 'monospace' },
-
-  titleContainer: { marginBottom: 30 },
-  preTitle: { color: CYAN, fontSize: 12, letterSpacing: 2.5, fontFamily: 'monospace', opacity: 0.8 },
-  mainTitle: {
-    color: '#fff',
-    fontSize: 60,
+  moduleIcon: {
+    fontSize: 24,
     fontWeight: '900',
-    letterSpacing: 3,
-    marginTop: 6,
-    marginBottom: 2,
-    textShadowColor: 'rgba(0,229,255,0.85)',
-    textShadowRadius: 20,
-    textAlign: 'center'
   },
-  subTitle: {
-    color: VIOLET,
-    fontSize: 16,
-    letterSpacing: 4,
-    fontFamily: 'monospace',
-    fontWeight: '700',
-    textShadowColor: 'rgba(157,78,221,0.6)',
-    textShadowRadius: 10,
-    textAlign: 'center'
-  },
-
-  tagline: {
-    color: '#9dc8e2',
-    fontSize: 14,
-    lineHeight: 22,
-    marginTop: 20,
-    marginBottom: 40,
-    fontFamily: 'monospace',
-    textAlign: 'center'
-  },
-
-  statusGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 40 },
-  statusPanel: {
-    width: '48%',
-    backgroundColor: PANEL_BG,
+  activeBadge: {
     borderWidth: 1,
-    borderColor: 'rgba(0, 229, 255, 0.2)',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 15
+    borderColor: 'rgba(0,255,157,0.28)',
+    backgroundColor: 'rgba(0,255,157,0.08)',
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
-  statusPanelLabel: { color: CYAN, fontSize: 10, fontFamily: 'monospace', textTransform: 'uppercase', opacity: 0.7 },
-  statusPanelValue: { color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 5 },
+  activeText: {
+    color: GREEN,
+    fontSize: 7,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+  moduleName: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
+    marginTop: 18,
+    letterSpacing: 0.8,
+  },
+  moduleDesc: {
+    color: '#8ea7c2',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 6,
+  },
 
-  btnRow: { flexDirection: 'row', justifyContent: 'space-around', gap: 10, marginBottom: 40 },
-  holoBtn: {
-    flex: 1,
-    paddingVertical: 18,
-    borderRadius: 12,
+  stackPanel: {
+    borderWidth: 1,
+    borderColor: 'rgba(0,229,255,0.18)',
+    borderRadius: 22,
+    backgroundColor: 'rgba(5,12,25,0.78)',
+    padding: 12,
+    marginBottom: 22,
+  },
+  stackItem: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.055)',
+    backgroundColor: 'rgba(0,229,255,0.035)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    marginBottom: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stackIndex: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: 'rgba(157,78,221,0.36)',
+    backgroundColor: 'rgba(157,78,221,0.09)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 229, 255, 0.1)',
-    borderWidth: 1.5,
-    borderColor: CYAN,
-    overflow: 'hidden',
-    shadowColor: CYAN,
-    shadowRadius: 25,
-    shadowOpacity: 0.85,
-    elevation: 8,
+    marginRight: 11,
   },
-  holoBtnGlow: {
-    position: 'absolute',
-    top: 0, left: 0, width: '100%', height: '100%',
-    backgroundColor: CYAN, opacity: 0.05
-  },
-  holoBtnText: { fontSize: 15, fontWeight: '800', color: '#fff', letterSpacing: 2 },
-
-  sectLabel: { flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 10 },
-  sectLine: { width: 25, height: 1.5, backgroundColor: VIOLET },
-  sectText: { color: VIOLET, fontSize: 11, letterSpacing: 2, fontFamily: 'monospace', fontWeight: '700' },
-
-  modGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 50 },
-  mod: {
-    width: '48%',
-    borderWidth: 1.5,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 15,
-    backgroundColor: 'rgba(0,229,255,0.06)',
-    position: 'hidden',
-  },
-  modIco: { fontSize: 26, marginBottom: 10, color: '#fff', textShadowColor: CYAN, textShadowRadius: 10 },
-  modName: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 1.2 },
-  modDesc: { color: '#88a6c3', fontSize: 10, marginTop: 4, fontFamily: 'monospace' },
-  modGlow: { position: 'absolute', top: -10, left: -10, width: 20, height: 20, borderRadius: 10, opacity: 0.15 },
-
-  reactor: {
-    height: 300,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 40,
-    position: 'relative',
-    top: 20
-  },
-  core: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,229,255,0.18)',
-    borderWidth: 2,
-    borderColor: CYAN,
-    shadowColor: CYAN,
-    shadowOpacity: 1,
-    shadowRadius: 40,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 10,
-  },
-  coreNum: { color: '#fff', fontSize: 20, fontWeight: '900' },
-  coreLbl: { color: CYAN, fontSize: 8, letterSpacing: 1.5, marginTop: 4 },
-  coreGlow: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: 50, backgroundColor: CYAN, opacity: 0.05 },
-
-  footer: {
-    color: '#4e6d86',
+  stackIndexText: {
+    color: VIOLET,
     fontSize: 10,
-    letterSpacing: 1.8,
-    textAlign: 'center',
-    marginTop: 50,
+    fontWeight: '900',
     fontFamily: 'monospace',
-    opacity: 0.8
+  },
+  stackText: {
+    color: '#d7e6f8',
+    fontSize: 13,
+    fontWeight: '700',
+    flex: 1,
+  },
+  stackSignal: {
+    color: GREEN,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    fontWeight: '900',
+    fontFamily: 'monospace',
+  },
+
+  footerPanel: {
+    borderTopWidth: 1,
+    borderColor: 'rgba(0,229,255,0.12)',
+    paddingTop: 18,
+    alignItems: 'center',
+  },
+  footerTitle: {
+    color: '#ffffff',
+    fontSize: 12,
+    letterSpacing: 2,
+    fontWeight: '900',
+  },
+  footerText: {
+    color: '#52708e',
+    fontSize: 9,
+    letterSpacing: 1.6,
+    marginTop: 6,
+    fontFamily: 'monospace',
+    textAlign: 'center',
   },
 });
