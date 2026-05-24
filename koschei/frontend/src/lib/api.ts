@@ -12,7 +12,14 @@ async function request(path: string, init?: RequestInit, auth = false) {
   }
   const res = await fetch(target, { ...init, headers });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    const base = data?.error || `Request failed (${res.status})`;
+    const detail = typeof data?.detail === 'string' && data.detail.trim() ? `: ${data.detail}` : '';
+    const err: any = new Error(`${base}${detail}`);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
   return data;
 }
 

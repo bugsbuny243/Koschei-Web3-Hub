@@ -51,7 +51,7 @@ func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.ToLower(strings.TrimSpace(os.Getenv("TOGETHER_AI_ENABLED"))) != "true" || strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {
+	if !togetherAIEnabled() || strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "ai_provider_not_configured", "credits_charged": false})
 		return
 	}
@@ -206,6 +206,10 @@ func (h *Handler) insertModelRouteLog(email, tool, route, model, prompt, status 
 }
 
 func (h *Handler) applyCreditChargeTx(tx *sql.Tx, authSub, email string) error {
+	return h.applyCreditChargeTxWithReason(tx, authSub, email, "ai_generation")
+}
+
+func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSub, email, reason string) error {
 	res, err := tx.Exec(`UPDATE app_user_profiles SET credits=credits-1, updated_at=now() WHERE auth_subject=$1 AND credits>0`, authSub)
 	if err != nil {
 		return err
@@ -214,7 +218,7 @@ func (h *Handler) applyCreditChargeTx(tx *sql.Tx, authSub, email string) error {
 	if rows == 0 {
 		return errors.New("insufficient credits")
 	}
-	_, err = tx.Exec(`INSERT INTO credit_events (email, amount, reason, created_at) VALUES ($1,-1,'ai_generation',now())`, email)
+	_, err = tx.Exec(`INSERT INTO credit_events (email, amount, reason, created_at) VALUES ($1,-1,$2,now())`, email, reason)
 	return err
 }
 
@@ -240,15 +244,18 @@ func (h *Handler) completeGenerationAndCharge(jobID, authSub, email, tool, route
 }
 
 func (h *Handler) callTogetherChat(model string, tool string, prompt string) (string, error) {
+	return h.callTogetherWithSystem(model, systemPromptForTool(tool), "User message follows. Answer in Turkish unless the user explicitly requests another language.\n\n"+prompt)
+}
+
+func (h *Handler) callTogetherWithSystem(model string, systemPrompt string, userPrompt string) (string, error) {
 	if strings.TrimSpace(model) == "" {
 		return "", errors.New("together model is empty")
 	}
-	systemPrompt := systemPromptForTool(tool)
 	payload := map[string]any{
 		"model": model,
 		"messages": []map[string]string{
 			{"role": "system", "content": systemPrompt},
-			{"role": "user", "content": "User message follows. Answer in Turkish unless the user explicitly requests another language.\n\n" + prompt},
+			{"role": "user", "content": userPrompt},
 		},
 	}
 	body, _ := json.Marshal(payload)

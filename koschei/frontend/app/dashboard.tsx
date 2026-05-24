@@ -54,6 +54,19 @@ export default function Dashboard() {
   const [aiJobs, setAiJobs] = useState<any[]>([]);
   const [email, setEmail] = useState('');
   const [latestOutput, setLatestOutput] = useState<any>(null);
+  const [runtimeLoading, setRuntimeLoading] = useState(false);
+
+  const safeJson = (value: any) => {
+    if (value && typeof value === 'object') return value;
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  };
 
   const sortedProjects = useMemo(() => {
     return [...projects].sort((a, b) => {
@@ -111,15 +124,19 @@ export default function Dashboard() {
       const projectTasks = taskRows.filter((t) => t?.project_id === latestCompletedProject.id);
       const blueprintTask = projectTasks.find((t) => String(t?.task_type || '').toLowerCase() === 'blueprint');
       if (blueprintTask?.output_json) {
-        const output = typeof blueprintTask.output_json === 'string' ? JSON.parse(blueprintTask.output_json) : blueprintTask.output_json;
-        const arch = projectTasks.find((t) => t?.task_type === 'architecture')?.output_json || {};
-        const steps = projectTasks.find((t) => t?.task_type === 'build_steps')?.output_json || {};
+        const output = safeJson(blueprintTask.output_json);
+        const arch = safeJson(projectTasks.find((t) => t?.task_type === 'architecture')?.output_json);
+        const steps = safeJson(projectTasks.find((t) => t?.task_type === 'build_steps')?.output_json);
         setLatestOutput({
           ...output,
           required_infrastructure: arch?.required_infrastructure || [],
           build_steps: steps?.build_steps || [],
         });
+      } else {
+        setLatestOutput(null);
       }
+    } else {
+      setLatestOutput(null);
     }
 
     const sorted = [...projectRows].sort((a, b) => {
@@ -182,7 +199,9 @@ export default function Dashboard() {
   }, []);
 
   const send = async () => {
+    if (runtimeLoading) return;
     try {
+      setRuntimeLoading(true);
       setError('');
       const data: any = await api.createRuntimeProject({ title: `Project ${new Date().toISOString()}`, prompt });
       if (data?.credits_charged === false) {
@@ -195,7 +214,12 @@ export default function Dashboard() {
       await refreshRuntimeData();
       setPrompt('');
     } catch (e: any) {
-      setError(e.message);
+      const backendDetail = typeof e?.data?.detail === 'string' && e.data.detail.trim() ? `: ${e.data.detail}` : '';
+      const base = e?.message || 'runtime_request_failed';
+      const creditInfo = e?.data?.credits_charged === false ? ' — Credits not charged' : '';
+      setError(`${base}${backendDetail}${creditInfo}`);
+    } finally {
+      setRuntimeLoading(false);
     }
   };
 
@@ -275,7 +299,7 @@ export default function Dashboard() {
                 onChangeText={setPrompt}
               />
               <View className="mt-3">
-                <Button label="Create Runtime Project" onPress={send} />
+                <Button label={runtimeLoading ? 'Creating Runtime Project...' : 'Create Runtime Project'} onPress={send} disabled={runtimeLoading} />
               </View>
               {!!error && <View className="mt-3"><ErrorState text={error} /></View>}
             </Card>
@@ -337,6 +361,12 @@ export default function Dashboard() {
                 <Text className="text-zinc-100">Infrastructure: {Array.isArray(latestOutput.required_infrastructure) ? latestOutput.required_infrastructure.join(' • ') : '-'}</Text>
                 <Text className="text-zinc-100">Build Steps: {Array.isArray(latestOutput.build_steps) ? latestOutput.build_steps.join(' • ') : '-'}</Text>
                 <Text className="text-zinc-100">Next Action: {String(latestOutput.next_action || '-')}</Text>
+                {!!latestOutput.raw_ai_output && (
+                  <View className="rounded-lg border border-cyan-500/20 bg-[#040a15] p-2">
+                    <Text className="text-xs uppercase tracking-wide text-zinc-400">Raw AI Output</Text>
+                    <Text selectable className="mt-1 text-xs text-zinc-300" style={{ lineHeight: 18 }}>{String(latestOutput.raw_ai_output)}</Text>
+                  </View>
+                )}
               </View>
             )}
           </Card>
