@@ -32,8 +32,11 @@ export default function Login() {
     setError('');
     try {
       const response: any = await neonAuth.signInWithEmail(email.trim(), password);
-      const token = neonAuth.tokenFrom(response);
-      if (!token) throw new Error('auth_token_missing: Neon Auth succeeded but no access token returned');
+      let token = neonAuth.tokenFrom(response);
+      if (!token) {
+        token = await neonAuth.getToken();
+      }
+      if (!token) throw new Error('auth_token_missing');
 
       await AsyncStorage.setItem(TOKEN_KEY, token);
       await verifySession(token);
