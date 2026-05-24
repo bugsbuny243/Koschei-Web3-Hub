@@ -10,9 +10,11 @@ ALTER TABLE credit_events
   ALTER COLUMN id SET DEFAULT gen_random_uuid();
 
 ALTER TABLE generation_jobs
+  ADD COLUMN IF NOT EXISTS tool text,
   ADD COLUMN IF NOT EXISTS provider text,
   ADD COLUMN IF NOT EXISTS route text,
   ADD COLUMN IF NOT EXISTS result text,
+  ADD COLUMN IF NOT EXISTS error text,
   ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now(),
   ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
