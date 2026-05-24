@@ -16,6 +16,20 @@ export default function Dashboard() {
   const [logs, setLogs] = useState<any[]>([]);
   const [email, setEmail] = useState('');
 
+  const refreshRuntimeData = async () => {
+    const projectRows: any[] = await api.getRuntimeProjects();
+    const taskRows: any[] = await api.getRuntimeTasks();
+    setProjects(projectRows);
+    setTasks(taskRows);
+    if (projectRows.length > 0) {
+      const latestProject = projectRows[0];
+      const logRows: any[] = await api.getRuntimeLogs(latestProject.id);
+      setLogs(logRows);
+      return;
+    }
+    setLogs([]);
+  };
+
   useEffect(() => {
     const loadMe = async () => {
       const token = await auth.getToken();
@@ -30,6 +44,7 @@ export default function Dashboard() {
           setPlan(typeof me.user.plan === 'string' && me.user.plan.trim() ? me.user.plan : 'free');
           setEmail(me.user.email || '');
         }
+        await refreshRuntimeData();
       } catch (e: any) {
         if (String(e?.message || '').includes('401')) {
           await auth.clearToken();
@@ -43,13 +58,8 @@ export default function Dashboard() {
   const send = async () => {
     try {
       setError('');
-      const created: any = await api.createRuntimeProject({ title: `Project ${new Date().toISOString()}`, prompt });
-      const projectRows: any[] = await api.getRuntimeProjects();
-      const taskRows: any[] = await api.getRuntimeTasks();
-      const logRows: any[] = await api.getRuntimeLogs(created.project_id);
-      setProjects(projectRows);
-      setTasks(taskRows);
-      setLogs(logRows);
+      await api.createRuntimeProject({ title: `Project ${new Date().toISOString()}`, prompt });
+      await refreshRuntimeData();
       setPrompt('');
       
     } catch (e: any) {
