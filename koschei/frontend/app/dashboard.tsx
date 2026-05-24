@@ -53,6 +53,7 @@ export default function Dashboard() {
   const [logs, setLogs] = useState<any[]>([]);
   const [aiJobs, setAiJobs] = useState<any[]>([]);
   const [email, setEmail] = useState('');
+  const [latestOutput, setLatestOutput] = useState<any>(null);
 
   const sortedProjects = useMemo(() => {
     return [...projects].sort((a, b) => {
@@ -105,6 +106,21 @@ export default function Dashboard() {
     const taskRows: any[] = await api.getRuntimeTasks();
     setProjects(projectRows);
     setTasks(taskRows);
+    const latestCompletedProject = [...projectRows].find((p) => String(p?.status || '').toLowerCase() === 'completed');
+    if (latestCompletedProject?.id) {
+      const projectTasks = taskRows.filter((t) => t?.project_id === latestCompletedProject.id);
+      const blueprintTask = projectTasks.find((t) => String(t?.task_type || '').toLowerCase() === 'blueprint');
+      if (blueprintTask?.output_json) {
+        const output = typeof blueprintTask.output_json === 'string' ? JSON.parse(blueprintTask.output_json) : blueprintTask.output_json;
+        const arch = projectTasks.find((t) => t?.task_type === 'architecture')?.output_json || {};
+        const steps = projectTasks.find((t) => t?.task_type === 'build_steps')?.output_json || {};
+        setLatestOutput({
+          ...output,
+          required_infrastructure: arch?.required_infrastructure || [],
+          build_steps: steps?.build_steps || [],
+        });
+      }
+    }
 
     const sorted = [...projectRows].sort((a, b) => {
       const timeDiff = parseTimestamp(b) - parseTimestamp(a);
@@ -168,7 +184,14 @@ export default function Dashboard() {
   const send = async () => {
     try {
       setError('');
-      await api.createRuntimeProject({ title: `Project ${new Date().toISOString()}`, prompt });
+      const data: any = await api.createRuntimeProject({ title: `Project ${new Date().toISOString()}`, prompt });
+      if (data?.credits_charged === false) {
+        setError('Credits not charged');
+      }
+      if (data?.blueprint) {
+        setLatestOutput(data.blueprint);
+      }
+      await refreshMe();
       await refreshRuntimeData();
       setPrompt('');
     } catch (e: any) {
@@ -259,7 +282,7 @@ export default function Dashboard() {
 
             <View className="mt-4">
               <Card>
-                <Text className="mb-2 text-base font-semibold text-white">Phase 4 AI Test</Text>
+                <Text className="mb-2 text-base font-semibold text-white">AI Debug Console (Phase 4 AI Test)</Text>
                 <Text className="mb-2 text-xs uppercase tracking-wide text-zinc-400">Tool</Text>
                 <View className="mb-3 flex-row gap-2">
                   {(['chat', 'code', 'reason'] as const).map((tool) => (
@@ -302,6 +325,20 @@ export default function Dashboard() {
                 </View>
               ))}
             </View>
+          </Card>
+          <Card>
+            <Text className="text-lg font-semibold text-white">Latest Runtime Output</Text>
+            {!latestOutput && <Text className="mt-2 text-zinc-500">No completed output yet</Text>}
+            {!!latestOutput && (
+              <View className="mt-2 gap-2">
+                <Text className="text-zinc-100">Title: {String(latestOutput.project_title || '-')}</Text>
+                <Text className="text-zinc-100">Type: {String(latestOutput.project_type || '-')}</Text>
+                <Text className="text-zinc-100">MVP: {Array.isArray(latestOutput.mvp_scope) ? latestOutput.mvp_scope.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Infrastructure: {Array.isArray(latestOutput.required_infrastructure) ? latestOutput.required_infrastructure.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Build Steps: {Array.isArray(latestOutput.build_steps) ? latestOutput.build_steps.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Next Action: {String(latestOutput.next_action || '-')}</Text>
+              </View>
+            )}
           </Card>
 
           <Card>
