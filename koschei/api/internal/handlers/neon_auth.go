@@ -11,6 +11,7 @@ import (
 	"errors"
 	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -50,6 +51,19 @@ var (
 func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
 	return neonClaimsFromToken(token)
 }
+
+func originOnly(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return raw
+	}
+	return u.Scheme + "://" + u.Host
+}
+
 func neonClaimsFromToken(token string) (neonJWTClaims, error) {
 	var out neonJWTClaims
 	parts := strings.Split(token, ".")
@@ -109,11 +123,16 @@ func neonClaimsFromToken(token string) (neonJWTClaims, error) {
 	if out.Exp < time.Now().Unix() || out.Sub == "" || out.Email == "" {
 		return out, errors.New("invalid token")
 	}
-	if iss := strings.TrimSpace(os.Getenv("NEON_AUTH_ISSUER")); iss != "" && out.Iss != iss {
-		return out, errors.New("invalid token")
+	expectedIssuer := originOnly(os.Getenv("NEON_AUTH_ISSUER"))
+	if expectedIssuer == "" {
+		expectedIssuer = originOnly(os.Getenv("NEON_AUTH_BASE_URL"))
 	}
-	if aud := strings.TrimSpace(os.Getenv("NEON_AUTH_AUDIENCE")); aud != "" && !matchesAudience(out.Aud, aud) {
-		return out, errors.New("invalid token")
+	if expectedIssuer != "" && out.Iss != expectedIssuer {
+		return out, errors.New("invalid issuer")
+	}
+	aud := originOnly(os.Getenv("NEON_AUTH_AUDIENCE"))
+	if aud != "" && !matchesAudience(out.Aud, aud) {
+		return out, errors.New("invalid audience")
 	}
 	return out, nil
 }

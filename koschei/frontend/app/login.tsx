@@ -19,7 +19,7 @@ async function verifySession(token: string) {
 
   const payload: any = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(payload?.error || payload?.message || `Request failed (${res.status})`);
+    throw new Error(`api_me_failed_${res.status}: ${payload?.error || payload?.message || 'unknown'}`);
   }
 }
 
@@ -37,6 +37,7 @@ export default function Login() {
         token = await neonAuth.getToken();
       }
       if (!token) throw new Error('auth_token_missing');
+      if (token.split('.').length !== 3) throw new Error('auth_token_not_jwt');
 
       await AsyncStorage.setItem(TOKEN_KEY, token);
       await verifySession(token);

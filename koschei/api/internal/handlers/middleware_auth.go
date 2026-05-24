@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -19,6 +20,7 @@ func RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		claims, err := parseAndVerifyNeonJWT(strings.TrimSpace(strings.TrimPrefix(h, "Bearer ")))
 		if err != nil {
+			log.Printf("neon auth verify failed: %v", err)
 			writeJSON(w, 401, map[string]string{"error": "unauthorized"})
 			return
 		}

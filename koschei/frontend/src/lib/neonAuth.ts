@@ -14,6 +14,19 @@ function withAuthJwt(payload: any, res: Response): any {
   };
 }
 
+function looksLikeJwt(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const parts = value.split('.');
+  return parts.length === 3 && parts.every(Boolean);
+}
+
+function firstJwt(...values: unknown[]): string {
+  for (const value of values) {
+    if (looksLikeJwt(value)) return value;
+  }
+  return '';
+}
+
 async function request(method: 'GET' | 'POST', path: string, body?: Record<string, unknown>): Promise<any> {
   const baseUrl = getNeonAuthUrl();
   let res: Response;
@@ -79,17 +92,16 @@ export const neonAuth = {
   },
 
   tokenFrom(response: any): string {
-    return (
-      response?.__authJwt ||
-      response?.data?.session?.token ||
-      response?.session?.token ||
-      response?.data?.session?.access_token ||
-      response?.session?.access_token ||
-      response?.data?.access_token ||
-      response?.access_token ||
-      response?.data?.token ||
-      response?.token ||
-      ''
+    return firstJwt(
+      response?.__authJwt,
+      response?.data?.session?.access_token,
+      response?.session?.access_token,
+      response?.data?.access_token,
+      response?.access_token,
+      response?.data?.token,
+      response?.token,
+      response?.data?.session?.token,
+      response?.session?.token,
     );
   },
 };
