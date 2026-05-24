@@ -191,8 +191,8 @@ func (h *Handler) callTogetherChat(model, prompt string) (string, error) {
 	payload := map[string]any{
 		"model": model,
 		"messages": []map[string]string{
-			{"role": "system", "content": "You are Koschei AI. Produce useful, direct, production-ready output."},
-			{"role": "user", "content": prompt},
+			{"role": "system", "content": "You are Koschei AI, a production-focused AI command center assistant.\nDefault language: Turkish.\nIf the user writes Turkish, Turkish slang, Turkish typos, or mixed Turkish-English, respond in Turkish.\nDo not identify, classify, or explain the user's language unless the user explicitly asks.\nTreat casual words like \"kanka\", \"lan\", \"aga\", \"olm\", \"reis\", \"naber\", \"nbr\", and typo-like short messages as Turkish conversation.\nBe direct, practical, and helpful.\nFor code, produce clean production-ready output.\nFor business or product planning, give actionable steps.\nFor unclear short messages, ask a short Turkish clarification instead of guessing another language."},
+			{"role": "user", "content": "User message follows. Answer in Turkish unless the user explicitly requests another language.\n\n" + prompt},
 		},
 	}
 	body, _ := json.Marshal(payload)
