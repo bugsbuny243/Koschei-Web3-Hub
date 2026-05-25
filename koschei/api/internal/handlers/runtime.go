@@ -147,12 +147,34 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 	}
 	projectID := newID()
 	title := normalizeRuntimeTitle(req.Title, req.Prompt)
-	result, runErr := h.runRuntimeProductionPipeline(projectID, claims.Sub, claims.Email, title, req.Prompt, isPrivileged)
-	if runErr != nil {
-		writeJSON(w, 502, map[string]any{"error": "runtime_generation_failed", "detail": shortError(runErr.Error()), "credits_charged": false})
+	taskOrder := []string{"intake", "blueprint", "architecture", "file_plan", "build_steps", "review", "delivery"}
+	tx, txErr := h.DB.Begin()
+	if txErr != nil {
+		writeJSON(w, 500, map[string]string{"error": "db_failed"})
 		return
 	}
-	writeJSON(w, 201, result)
+	defer tx.Rollback()
+	if _, txErr = tx.Exec(`INSERT INTO runtime_projects (id,email,title,prompt,status) VALUES ($1,$2,$3,$4,'running')`, projectID, claims.Email, title, req.Prompt); txErr != nil {
+		writeJSON(w, 500, map[string]string{"error": "db_failed"})
+		return
+	}
+	for _, t := range taskOrder {
+		inp, _ := json.Marshal(map[string]any{"title": title, "prompt": req.Prompt, "stage": t})
+		if _, txErr = tx.Exec(`INSERT INTO runtime_tasks (id,project_id,email,task_type,status,input_json,output_json) VALUES ($1,$2,$3,$4,'queued',$5,'{}'::jsonb)`, newID(), projectID, claims.Email, t, inp); txErr != nil {
+			writeJSON(w, 500, map[string]string{"error": "db_failed"})
+			return
+		}
+	}
+	if _, txErr = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Runtime project queued"); txErr != nil {
+		writeJSON(w, 500, map[string]string{"error": "db_failed"})
+		return
+	}
+	if txErr = tx.Commit(); txErr != nil {
+		writeJSON(w, 500, map[string]string{"error": "db_failed"})
+		return
+	}
+	go h.processRuntimeProject(projectID, claims.Sub, claims.Email, req.Prompt, isPrivileged)
+	writeJSON(w, 201, map[string]any{"project_id": projectID, "status": "running", "message": "Runtime project queued", "credits_charged": false})
 }
 
 func togetherAIEnabled() bool {
@@ -175,6 +197,31 @@ func normalizeRuntimeTitle(title, prompt string) string {
 	}
 	return clean
 }
+func (h *Handler) processRuntimeProject(projectID, authSub, email, prompt string, isPrivileged bool) {
+	res, err := h.DB.Exec(`UPDATE runtime_projects SET status='processing', updated_at=NOW() WHERE id=$1 AND status='running'`, projectID)
+	if err != nil {
+		return
+	}
+	if rows, _ := res.RowsAffected(); rows == 0 {
+		return
+	}
+	_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Runtime AI pipeline started")
+	_, _ = h.DB.Exec(`UPDATE runtime_tasks SET status='running', updated_at=NOW() WHERE project_id=$1 AND task_type='blueprint'`, projectID)
+	aiOut, aiErr := h.callTogetherRuntimeBlueprint(projectID, prompt)
+	if aiErr != nil {
+		failureMsg := "Runtime AI pipeline failed: " + shortError(aiErr.Error())
+		if isTimeoutError(aiErr) {
+			failureMsg = "Runtime AI pipeline failed: provider timeout"
+		}
+		_ = h.markRuntimeFailed(projectID, failureMsg, "blueprint", aiErr.Error())
+		return
+	}
+	bp := buildRuntimeBlueprint(aiOut, prompt)
+	if _, err = h.completeRuntimePipeline(projectID, authSub, email, bp, isPrivileged); err != nil {
+		_ = h.markRuntimeFailed(projectID, "Runtime AI pipeline failed: "+shortError(err.Error()), "delivery", err.Error())
+	}
+}
+
 func (h *Handler) runRuntimeProductionPipeline(projectID, authSub, email, title, prompt string, isPrivileged bool) (map[string]any, error) {
 	taskOrder := []string{"intake", "blueprint", "architecture", "file_plan", "build_steps", "review", "delivery"}
 	tx, err := h.DB.Begin()

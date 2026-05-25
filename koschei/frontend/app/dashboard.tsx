@@ -10,7 +10,8 @@ const statusTextClass = (status: string) => {
   const normalized = String(status || '').toLowerCase();
   if (normalized === 'completed') return 'text-green-400';
   if (normalized === 'queued') return 'text-yellow-300';
-  if (normalized === 'running') return 'text-blue-400';
+  if (normalized === 'running' || normalized === 'processing') return 'text-cyan-300';
+  if (normalized === 'review_needed') return 'text-amber-300';
   if (normalized === 'failed') return 'text-red-400';
   return 'text-zinc-300';
 };
@@ -18,10 +19,11 @@ const statusTextClass = (status: string) => {
 const statusPriority = (status: string) => {
   const normalized = String(status || '').toLowerCase();
   if (normalized === 'completed') return 0;
-  if (normalized === 'running') return 1;
-  if (normalized === 'queued') return 2;
-  if (normalized === 'failed') return 3;
-  return 4;
+  if (normalized === 'running' || normalized === 'processing') return 1;
+  if (normalized === 'review_needed') return 2;
+  if (normalized === 'queued') return 3;
+  if (normalized === 'failed') return 4;
+  return 5;
 };
 
 const parseTimestamp = (item: any) => {
@@ -119,9 +121,17 @@ export default function Dashboard() {
     const taskRows: any[] = await api.getRuntimeTasks();
     setProjects(projectRows);
     setTasks(taskRows);
-    const latestCompletedProject = [...projectRows].find((p) => String(p?.status || '').toLowerCase() === 'completed');
-    if (latestCompletedProject?.id) {
-      const projectTasks = taskRows.filter((t) => t?.project_id === latestCompletedProject.id);
+    const sortedByTime = [...projectRows].sort((a, b) => parseTimestamp(b) - parseTimestamp(a));
+    const latestSuccessfulProject = sortedByTime.find((p) => ['completed', 'review_needed'].includes(String(p?.status || '').toLowerCase()));
+    const latestFailedProject = sortedByTime.find((p) => String(p?.status || '').toLowerCase() === 'failed');
+    const newest = sortedByTime[0];
+
+    if (newest && String(newest?.status || '').toLowerCase() === 'failed' && latestFailedProject?.id === newest.id) {
+      const failedLogs: any[] = await api.getRuntimeLogs(newest.id);
+      const latestFailureLog = [...failedLogs].sort((a, b) => parseTimestamp(b) - parseTimestamp(a)).find((l) => String(l?.level || '').toLowerCase() === 'error');
+      setLatestOutput({ failed_message: latestFailureLog?.message || 'Runtime project failed.' });
+    } else if (latestSuccessfulProject?.id) {
+      const projectTasks = taskRows.filter((t) => t?.project_id === latestSuccessfulProject.id);
       const blueprintTask = projectTasks.find((t) => String(t?.task_type || '').toLowerCase() === 'blueprint');
       if (blueprintTask?.output_json) {
         const output = safeJson(blueprintTask.output_json);
@@ -131,6 +141,7 @@ export default function Dashboard() {
           ...output,
           required_infrastructure: arch?.required_infrastructure || [],
           build_steps: steps?.build_steps || [],
+          project_status: String(latestSuccessfulProject?.status || '').toLowerCase(),
         });
       } else {
         setLatestOutput(null);
@@ -198,19 +209,29 @@ export default function Dashboard() {
     loadMe();
   }, []);
 
+
+  useEffect(() => {
+    const hasActiveProjects = projects.some((p) => ['running', 'processing'].includes(String(p?.status || '').toLowerCase()));
+    if (!hasActiveProjects) {
+      refreshMe().catch(() => {});
+      refreshAiJobs().catch(() => {});
+      return;
+    }
+    const timer = setInterval(() => {
+      refreshRuntimeData().catch(() => {});
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [projects]);
+
   const send = async () => {
     if (runtimeLoading) return;
     try {
       setRuntimeLoading(true);
       setError('');
       const data: any = await api.createRuntimeProject({ title: `Project ${new Date().toISOString()}`, prompt });
-      if (data?.credits_charged === false) {
-        setError('Credits not charged');
+      if (String(data?.status || '').toLowerCase() === 'running') {
+        setError('Runtime project queued. Processing...');
       }
-      if (data?.blueprint) {
-        setLatestOutput(data.blueprint);
-      }
-      await refreshMe();
       await refreshRuntimeData();
       setPrompt('');
     } catch (e: any) {
@@ -304,7 +325,7 @@ export default function Dashboard() {
                 onChangeText={setPrompt}
               />
               <View className="mt-3">
-                <Button label={runtimeLoading ? 'Creating Runtime Project...' : 'Create Runtime Project'} onPress={send} disabled={runtimeLoading} />
+                <Button label={runtimeLoading ? 'Queueing Runtime Project...' : 'Create Runtime Project'} onPress={send} disabled={runtimeLoading} />
               </View>
               {!!error && <View className="mt-3"><ErrorState text={error} /></View>}
             </Card>
@@ -358,7 +379,7 @@ export default function Dashboard() {
           <Card>
             <Text className="text-lg font-semibold text-white">Latest Runtime Output</Text>
             {!latestOutput && <Text className="mt-2 text-zinc-500">No completed output yet</Text>}
-            {!!latestOutput && (
+            {!!latestOutput && !latestOutput.failed_message && (
               <View className="mt-2 gap-2">
                 <Text className="text-zinc-100">Title: {String(latestOutput.project_title || '-')}</Text>
                 <Text className="text-zinc-100">Type: {String(latestOutput.project_type || '-')}</Text>
@@ -372,6 +393,11 @@ export default function Dashboard() {
                     <Text selectable className="mt-1 text-xs text-zinc-300" style={{ lineHeight: 18 }}>{String(latestOutput.raw_ai_output)}</Text>
                   </View>
                 )}
+              </View>
+            )}
+            {!!latestOutput?.failed_message && (
+              <View className="mt-2 gap-2">
+                <Text className="text-red-300">Latest runtime failed: {String(latestOutput.failed_message)}</Text>
               </View>
             )}
           </Card>
