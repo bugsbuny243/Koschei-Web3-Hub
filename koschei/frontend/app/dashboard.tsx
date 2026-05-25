@@ -16,12 +16,22 @@ const statusTextClass = (status: string) => {
   return 'text-zinc-300';
 };
 
+const statusBgClass = (status: string) => {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'completed') return 'border-green-500/30 bg-green-500/10';
+  if (normalized === 'queued') return 'border-yellow-500/30 bg-yellow-500/10';
+  if (normalized === 'running' || normalized === 'processing') return 'border-cyan-500/30 bg-cyan-500/10';
+  if (normalized === 'review_needed') return 'border-amber-500/30 bg-amber-500/10';
+  if (normalized === 'failed') return 'border-red-500/30 bg-red-500/10';
+  return 'border-zinc-500/30 bg-zinc-500/10';
+};
+
 const statusPriority = (status: string) => {
   const normalized = String(status || '').toLowerCase();
-  if (normalized === 'completed') return 0;
-  if (normalized === 'running' || normalized === 'processing') return 1;
+  if (normalized === 'running' || normalized === 'processing') return 0;
+  if (normalized === 'queued') return 1;
   if (normalized === 'review_needed') return 2;
-  if (normalized === 'queued') return 3;
+  if (normalized === 'completed') return 3;
   if (normalized === 'failed') return 4;
   return 5;
 };
@@ -33,11 +43,45 @@ const parseTimestamp = (item: any) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
-
-
 const readProfileField = <T,>(user: any, lower: string, upper: string, fallback: T): T => {
   const value = user?.[lower] ?? user?.[upper];
   return (value ?? fallback) as T;
+};
+
+const formatTime = (raw: any) => {
+  if (!raw) return '-';
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return String(raw);
+  return d.toLocaleString();
+};
+
+const SectionCard = ({ title, subtitle, right, children }: any) => (
+  <Card>
+    <View className="flex-row items-start justify-between gap-3">
+      <View className="flex-1">
+        <Text className="text-xs uppercase tracking-[2px] text-cyan-300">{title}</Text>
+        {!!subtitle && <Text className="mt-1 text-sm text-zinc-400">{subtitle}</Text>}
+      </View>
+      {right}
+    </View>
+    <View className="mt-3">{children}</View>
+  </Card>
+);
+
+const StatusPill = ({ status }: { status: string }) => (
+  <View className={`rounded-full border px-2 py-1 ${statusBgClass(status)}`}>
+    <Text className={`text-xs uppercase ${statusTextClass(status)}`}>{String(status || 'unknown')}</Text>
+  </View>
+);
+
+const taskDescription: Record<string, string> = {
+  intake: 'Input analysis',
+  blueprint: 'MVP/product plan',
+  architecture: 'Infra/API/database plan',
+  file_plan: 'File/package map',
+  build_steps: 'Proposed tool plan',
+  review: 'Guardrail and human review',
+  delivery: 'Delivery package plan',
 };
 
 export default function Dashboard() {
@@ -73,51 +117,18 @@ export default function Dashboard() {
     return {};
   };
 
-  const sortedProjects = useMemo(() => {
-    return [...projects].sort((a, b) => {
-      const timeDiff = parseTimestamp(b) - parseTimestamp(a);
-      if (timeDiff !== 0) return timeDiff;
-      return statusPriority(a.status) - statusPriority(b.status);
-    });
-  }, [projects]);
-
+  const sortedProjects = useMemo(() => [...projects].sort((a, b) => parseTimestamp(b) - parseTimestamp(a) || statusPriority(a.status) - statusPriority(b.status)), [projects]);
   const newestProject = useMemo(() => (sortedProjects.length > 0 ? sortedProjects[0] : null), [sortedProjects]);
-
   const displayedTasks = useMemo(() => {
-    const sortedAll = [...tasks].sort((a, b) => {
-      const timeDiff = parseTimestamp(b) - parseTimestamp(a);
-      if (timeDiff !== 0) return timeDiff;
-      return statusPriority(a.status) - statusPriority(b.status);
-    });
-
+    const sortedAll = [...tasks].sort((a, b) => parseTimestamp(b) - parseTimestamp(a) || statusPriority(a.status) - statusPriority(b.status));
     if (newestProject?.id) {
       const filtered = sortedAll.filter((t) => t?.project_id === newestProject.id);
       if (filtered.length > 0) return filtered;
     }
-
     return sortedAll;
   }, [tasks, newestProject]);
-
-  const taskGroups = useMemo(() => {
-    if (newestProject?.id) {
-      return [{ title: 'Latest project tasks', rows: displayedTasks }];
-    }
-
-    const latestCompleted = displayedTasks.filter((t) => String(t?.status || '').toLowerCase() === 'completed');
-    const olderQueued = displayedTasks.filter((t) => String(t?.status || '').toLowerCase() === 'queued');
-    const other = displayedTasks.filter((t) => !['completed', 'queued'].includes(String(t?.status || '').toLowerCase()));
-
-    return [
-      { title: 'Latest completed tasks', rows: latestCompleted },
-      { title: 'Older queued tasks', rows: olderQueued },
-      ...(other.length ? [{ title: 'Other tasks', rows: other }] : []),
-    ];
-  }, [displayedTasks, newestProject]);
-
-  const displayedLogs = useMemo(() => {
-    const sorted = [...logs].sort((a, b) => parseTimestamp(b) - parseTimestamp(a));
-    return sorted.slice(0, 20);
-  }, [logs]);
+  const displayedLogs = useMemo(() => [...logs].sort((a, b) => parseTimestamp(b) - parseTimestamp(a)).slice(0, 5), [logs]);
+  const displayedJobs = useMemo(() => [...aiJobs].sort((a, b) => parseTimestamp(b) - parseTimestamp(a)).slice(0, 5), [aiJobs]);
 
   const refreshRuntimeData = async () => {
     const projectRows: any[] = await api.getRuntimeProjects();
@@ -126,11 +137,9 @@ export default function Dashboard() {
     setTasks(taskRows);
     const sortedByTime = [...projectRows].sort((a, b) => parseTimestamp(b) - parseTimestamp(a));
     const newest = sortedByTime[0];
-
     if (newest?.id) {
       try { setArtifacts(await api.getProjectArtifacts(newest.id)); } catch { setArtifacts([]); }
     }
-
     if (newest && String(newest?.status || '').toLowerCase() === 'failed') {
       const failedLogs: any[] = await api.getRuntimeLogs(newest.id);
       const latestFailureLog = [...failedLogs].sort((a, b) => parseTimestamp(b) - parseTimestamp(a)).find((l) => String(l?.level || '').toLowerCase() === 'error');
@@ -162,413 +171,182 @@ export default function Dashboard() {
           validation_errors: review?.validation?.errors || delivery?.validation?.errors || [],
           delivery_package: delivery?.output?.delivery_package || [],
           next_steps: delivery?.output?.next_steps || [],
-          raw_ai_output: delivery?.raw_ai_output || output?.raw_ai_output,
           project_status: String(newest?.status || '').toLowerCase(),
         });
-      } else {
-        setLatestOutput(null);
-      }
-    } else {
-      setLatestOutput(null);
-    }
-
-    const sorted = [...projectRows].sort((a, b) => {
-      const timeDiff = parseTimestamp(b) - parseTimestamp(a);
-      if (timeDiff !== 0) return timeDiff;
-      return statusPriority(a.status) - statusPriority(b.status);
-    });
-
-    if (sorted.length > 0) {
-      const latestProject = sorted[0];
-      const logRows: any[] = await api.getRuntimeLogs(latestProject.id);
-      setLogs(logRows);
-      return;
-    }
-    setLogs([]);
+      } else setLatestOutput(null);
+    } else setLatestOutput(null);
+    if (newest?.id) setLogs(await api.getRuntimeLogs(newest.id)); else setLogs([]);
   };
 
   const refreshMe = async () => {
     const me: any = await api.me();
     if (me?.user) {
-      const profileCredits = readProfileField<number>(me.user, 'credits', 'Credits', 0);
-      const profilePlan = readProfileField<string>(me.user, 'plan', 'Plan', 'free');
-      const profileEmail = readProfileField<string>(me.user, 'email', 'Email', '');
-      setCredits(typeof profileCredits === 'number' ? profileCredits : 0);
-      setPlan(typeof profilePlan === 'string' && profilePlan.trim() ? profilePlan : 'free');
-      setEmail(typeof profileEmail === 'string' ? profileEmail : '');
+      setCredits(readProfileField<number>(me.user, 'credits', 'Credits', 0) || 0);
+      setPlan(readProfileField<string>(me.user, 'plan', 'Plan', 'free') || 'free');
+      setEmail(readProfileField<string>(me.user, 'email', 'Email', '') || '');
     }
   };
 
   const refreshAiJobs = async () => {
-    try {
-      const rows: any = await api.get('/api/ai/jobs');
-      setAiJobs(Array.isArray(rows?.jobs) ? rows.jobs : []);
-    } catch {
-      setAiJobs([]);
-    }
+    try { const rows: any = await api.get('/api/ai/jobs'); setAiJobs(Array.isArray(rows?.jobs) ? rows.jobs : []); } catch { setAiJobs([]); }
   };
 
-  useEffect(() => {
-    const loadMe = async () => {
-      const token = await auth.getToken();
-      if (!token) {
-        router.replace('/login');
-        return;
-      }
-      try {
-        await refreshMe();
-        await refreshRuntimeData();
-        await refreshAiJobs();
-      } catch (e: any) {
-        if (String(e?.message || '').includes('401')) {
-          await auth.clearToken();
-          router.replace('/login');
-          return;
-        }
-        setAiJobs([]);
-      }
-    };
-    loadMe();
-  }, []);
-
-
-  useEffect(() => {
-    const hasActiveProjects = projects.some((p) => ['running', 'processing'].includes(String(p?.status || '').toLowerCase()));
-    if (!hasActiveProjects) {
-      refreshMe().catch(() => {});
-      refreshAiJobs().catch(() => {});
-      return;
+  useEffect(() => { (async () => {
+    const token = await auth.getToken();
+    if (!token) return router.replace('/login');
+    try { await refreshMe(); await refreshRuntimeData(); await refreshAiJobs(); } catch (e: any) {
+      if (String(e?.message || '').includes('401')) { await auth.clearToken(); router.replace('/login'); }
     }
-    const timer = setInterval(() => {
-      refreshRuntimeData().catch(() => {});
-    }, 3000);
+  })(); }, []);
+
+  useEffect(() => {
+    const active = projects.some((p) => ['running', 'processing'].includes(String(p?.status || '').toLowerCase()));
+    if (!active) return;
+    const timer = setInterval(() => refreshRuntimeData().catch(() => {}), 3000);
     return () => clearInterval(timer);
   }, [projects]);
 
   const send = async () => {
     if (runtimeLoading) return;
     try {
-      setRuntimeLoading(true);
-      setError('');
-      const data: any = await api.createRuntimeProject({ title: `Project ${new Date().toISOString()}`, prompt });
-      if (String(data?.status || '').toLowerCase() === 'running') {
-        setError('Runtime project queued. Processing...');
-      }
-      await refreshRuntimeData();
-      setPrompt('');
+      setRuntimeLoading(true); setError('');
+      await api.createRuntimeProject({ title: `Project ${new Date().toISOString()}`, prompt });
+      await refreshRuntimeData(); setPrompt('');
     } catch (e: any) {
       const detailRaw = typeof e?.data?.detail === 'string' ? e.data.detail.trim() : '';
-      const timeoutLike = /timeout|context deadline exceeded|client\.timeout exceeded/i.test(detailRaw);
-      const friendly = timeoutLike ? 'Runtime AI provider timed out. Credits not charged. Try again or use a shorter prompt.' : '';
+      const timeoutLike = /timeout|context deadline exceeded|client\.timeout exceeded|awaiting headers/i.test(detailRaw);
+      const friendly = timeoutLike ? 'Runtime AI provider timed out. Credits were not charged. Try again with a shorter prompt or wait for fallback/async artifact worker improvements.' : '';
       const backendDetail = detailRaw ? `: ${detailRaw}` : '';
-      const base = e?.message || 'runtime_request_failed';
-      const creditInfo = e?.data?.credits_charged === false ? ' — Credits not charged' : '';
-      const composed = `${base}${backendDetail}${creditInfo}`;
+      const composed = `${e?.message || 'runtime_request_failed'}${backendDetail}`;
       setError(friendly ? `${friendly} | ${composed}` : composed);
       await refreshMe();
-    } finally {
-      setRuntimeLoading(false);
-    }
+    } finally { setRuntimeLoading(false); }
   };
-
 
   const generateArtifact = async () => {
     if (!newestProject?.id || artifactLoading) return;
-    try {
-      setArtifactLoading(true);
-      setError('Generating artifact package...');
-      await api.generateArtifact(newestProject.id, false);
-      await refreshRuntimeData();
-      setError('Artifact package generated.');
-    } catch (e: any) {
-      setError(e?.message || 'artifact_generation_failed');
-    } finally {
-      setArtifactLoading(false);
-    }
+    try { setArtifactLoading(true); await api.generateArtifact(newestProject.id, false); await refreshRuntimeData(); }
+    catch (e: any) { setError(e?.message || 'artifact_generation_failed'); }
+    finally { setArtifactLoading(false); }
   };
 
-  const loadArtifactDetail = async (artifactId: string) => {
-    const data = await api.getArtifact(artifactId);
-    setArtifactDetail(data);
-  };
-
+  const loadArtifactDetail = async (artifactId: string) => setArtifactDetail(await api.getArtifact(artifactId));
   const loadArtifactFile = async (artifactId: string, fileId: string) => {
     const data = await api.getArtifactFile(artifactId, fileId);
     setExpandedFileId(fileId);
     setArtifactDetail((prev: any) => ({ ...prev, files: (prev?.files || []).map((f: any) => f.id === fileId ? { ...f, content: data?.content } : f) }));
   };
-
   const downloadArtifactZip = async (artifactId: string) => {
-    if (Platform.OS !== 'web') {
-      setError('Protected download links for mobile will be added next.');
-      return;
-    }
-    try {
-      const blob = await api.downloadArtifactZip(artifactId);
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = objectUrl;
-      anchor.download = 'koschei-artifact.zip';
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(objectUrl);
-    } catch (e: any) {
-      setError(e?.message || 'artifact_download_failed');
-    }
+    if (Platform.OS !== 'web') return setError('Protected download links for mobile will be added next.');
+    const blob = await api.downloadArtifactZip(artifactId);
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a'); anchor.href = objectUrl; anchor.download = 'koschei-artifact.zip'; document.body.appendChild(anchor); anchor.click(); document.body.removeChild(anchor); URL.revokeObjectURL(objectUrl);
   };
+
   const runAiTest = async () => {
     if (aiLoading) return;
-    setAiError('');
-    setAiResult('');
-    setAiLoading(true);
+    setAiError(''); setAiResult(''); setAiLoading(true);
     try {
       const token = await AsyncStorage.getItem('koschei_token');
-      const response = await fetch(`${(process.env.EXPO_PUBLIC_API_URL || '').trim()}/api/ai/generate`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token || ''}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tool: aiTool,
-          prompt: aiPrompt,
-        }),
-      });
-
+      const response = await fetch(`${(process.env.EXPO_PUBLIC_API_URL || '').trim()}/api/ai/generate`, { method: 'POST', headers: { Authorization: `Bearer ${token || ''}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ tool: aiTool, prompt: aiPrompt }) });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const detail = typeof data?.detail === 'string' && data.detail.trim() ? ` — ${data.detail}` : '';
-        const creditInfo = data?.credits_charged === false ? ' — Credits not charged' : '';
-        const errorText = `${data?.error || data?.message || 'ai_request_failed'}${detail}${creditInfo} (status ${response.status})`;
-        setAiError(errorText);
-        return;
-      }
-
+      if (!response.ok) return setAiError(`${data?.error || data?.message || 'ai_request_failed'} (status ${response.status})`);
       setAiResult(typeof data?.result === 'string' ? data.result : JSON.stringify(data));
       await refreshAiJobs();
-
-    } catch (e: any) {
-      setAiError(e?.message || 'ai_request_failed');
-    } finally {
-      try {
-        await refreshMe();
-        await refreshAiJobs();
-      } catch (_) {}
-      setAiLoading(false);
-    }
+    } catch (e: any) { setAiError(e?.message || 'ai_request_failed'); }
+    finally { setAiLoading(false); await refreshMe().catch(() => {}); }
   };
 
+  const pipeline = ['intake', 'blueprint', 'architecture', 'file_plan', 'build_steps', 'review', 'delivery'];
+  const isFailed = Boolean(latestOutput?.failed_message);
+  const technicalDetail = isFailed ? String(latestOutput?.failed_message || '') : (error.includes('|') ? error.split('|')[1]?.trim() : '');
+
   return (
-    <View className="flex-1 bg-[#020207] p-4" style={{ backgroundColor: '#020207' }}>
-      <View className="absolute -left-16 top-28 h-72 w-72 rounded-full bg-cyan-500/10" />
+    <ScrollView className="flex-1 bg-[#020207]" contentContainerStyle={{ padding: 14, paddingBottom: 32 }}>
+      <View className="absolute -left-16 top-24 h-72 w-72 rounded-full bg-cyan-500/10" />
       <View className="absolute -right-16 bottom-24 h-72 w-72 rounded-full bg-violet-500/10" />
-      <View className="mx-auto w-full max-w-6xl gap-4">
-        <View className="gap-4 md:flex-row">
-          <View className="md:w-72">
-            <Card>
-              <Text className="text-xs uppercase tracking-[2px] text-cyan-300">Identity Core</Text>
-              <Text className="mt-3 text-sm text-zinc-400">Signed in as</Text>
-              <Text className="mt-1 text-sm text-white" numberOfLines={2}>{email || 'Signed in'}</Text>
-              <View className="mt-4 border-t border-emerald-500/20 pt-4">
-                <Text className="text-xs uppercase tracking-wider text-zinc-400">Plan</Text>
-                <Text className="mt-1 text-lg font-semibold text-white">{plan}</Text>
-              </View>
-              <View className="mt-4">
-                <Text className="text-xs uppercase tracking-wider text-zinc-400">Credits</Text>
-                <Text className="mt-1 text-lg font-semibold text-white">{credits}</Text>
-              </View>
-              <View className="mt-5">
-                <Button label="Logout" onPress={async () => { await auth.clearToken(); router.replace('/login'); }} />
-              </View>
-            </Card>
+      <View className="mx-auto w-full max-w-6xl gap-3">
+        <SectionCard title="KOSCHEI COMMAND CENTER" subtitle="Agentic Runtime Factory • Artifact Builder • AI Production Cockpit" right={<StatusPill status="ONLINE" />}>
+          <Text className="text-xs text-zinc-400">{email} • {plan} • {credits} credits</Text>
+          <View className="mt-3 gap-2 md:flex-row">
+            <Button label="UI Lab" onPress={() => router.push('/ui-lab')} />
+            <Button label="Pricing" onPress={() => router.push('/pricing')} />
+            <Button label="Logout" onPress={async () => { await auth.clearToken(); router.replace('/login'); }} />
           </View>
+        </SectionCard>
 
-          <View className="flex-1">
-            <Card>
-              <Text className="mb-2 text-base font-semibold text-white">Quantum Runtime Prompt</Text>
-              <Input
-                placeholder="Describe your runtime project..."
-                value={prompt}
-                onChangeText={setPrompt}
-              />
-              <View className="mt-3">
-                <Button label={runtimeLoading ? 'Queueing Runtime Project...' : 'Create Runtime Project'} onPress={send} disabled={runtimeLoading} />
+        <View className="gap-3 md:flex-row">
+          <View className="md:w-[320px]">
+            <SectionCard title="Operator Core" subtitle="Identity / credits / access level">
+              <Text className="text-zinc-300">{email || 'Signed in'}</Text>
+              <View className="mt-2 flex-row gap-2"><StatusPill status={plan} /><StatusPill status={`${credits} CR`} /></View>
+              {credits <= 2 && <Text className="mt-2 text-amber-300">Low credits</Text>}
+            </SectionCard>
+          </View>
+          <View className="flex-1 gap-3">
+            <SectionCard title="Runtime Factory" subtitle="Turn an idea into an agentic production contract and delivery plan.">
+              <Input placeholder="Describe the app, game, automation, SaaS, or AI system you want Koschei to build..." value={prompt} onChangeText={setPrompt} />
+              <View className="mt-3"><Button label={runtimeLoading ? 'Queueing Runtime Project...' : 'Create Runtime Project'} onPress={send} disabled={runtimeLoading} /></View>
+              {!!error && <View className="mt-2"><ErrorState text={error.split('|')[0]} /></View>}
+              {!!technicalDetail && <Text className="mt-2 text-xs text-zinc-500" numberOfLines={3}>Technical detail: {technicalDetail}</Text>}
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                {pipeline.map((step) => {
+                  const task = displayedTasks.find((t) => String(t?.task_type || '').toLowerCase() === step);
+                  return <View key={step} className={`rounded-full border px-2 py-1 ${statusBgClass(task?.status || 'queued')}`}><Text className={`text-[10px] uppercase ${statusTextClass(task?.status || 'queued')}`}>{step.replace('_', ' ')}</Text></View>;
+                })}
               </View>
-              {!!error && <View className="mt-3"><ErrorState text={error} /></View>}
-            </Card>
-
-            <View className="mt-4">
-              <Card>
-                <Text className="mb-2 text-base font-semibold text-white">AI Debug Console (Phase 4 AI Test)</Text>
-                <Text className="mb-2 text-xs uppercase tracking-wide text-zinc-400">Tool</Text>
-                <View className="mb-3 flex-row gap-2">
-                  {(['chat', 'code', 'reason'] as const).map((tool) => (
-                    <Pressable
-                      key={tool}
-                      onPress={() => setAiTool(tool)}
-                      className={`rounded-xl border px-3 py-2 ${aiTool === tool ? 'border-cyan-300 bg-cyan-500/20' : 'border-cyan-500/20 bg-[#040812]'}`}
-                    >
-                      <Text className={`${aiTool === tool ? 'text-cyan-100' : 'text-zinc-300'}`}>{tool}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <Input
-                  placeholder="Enter prompt for AI tool..."
-                  value={aiPrompt}
-                  onChangeText={setAiPrompt}
-                />
-                <View className="mt-3">
-                  <Button label={aiLoading ? 'Running AI...' : 'Run AI'} onPress={runAiTest} />
-                </View>
-                {!!aiError && <View className="mt-3"><ErrorState text={aiError} /></View>}
-                <View className="mt-3 rounded-xl border border-violet-500/20 bg-[#040a15] p-3">
-                  <Text className="text-xs uppercase tracking-wide text-zinc-400">Result</Text>
-                  <Text selectable className="mt-2 text-zinc-100" style={{ lineHeight: 22 }}>{aiLoading ? 'Loading...' : (aiResult || 'No result yet')}</Text>
-                </View>
-              </Card>
-            </View>
+            </SectionCard>
+            <SectionCard title="AI Console" subtitle="Quick test console for chat/code/reason routes.">
+              <View className="mb-2 flex-row gap-2">{(['chat', 'code', 'reason'] as const).map((tool) => <Pressable key={tool} onPress={() => setAiTool(tool)} className={`rounded-xl border px-3 py-2 ${aiTool === tool ? 'border-cyan-300 bg-cyan-500/20' : 'border-cyan-500/20 bg-[#040812]'}`}><Text className={aiTool === tool ? 'text-cyan-100' : 'text-zinc-300'}>{tool}</Text></Pressable>)}</View>
+              <Input placeholder="Enter prompt for AI tool..." value={aiPrompt} onChangeText={setAiPrompt} />
+              <View className="mt-2"><Button label={aiLoading ? 'Running AI...' : 'Run AI'} onPress={runAiTest} /></View>
+              {!!aiError && <View className="mt-2"><ErrorState text={aiError} /></View>}
+              <Text className="mt-2 text-xs text-zinc-300" numberOfLines={6}>{aiLoading ? 'Loading...' : (aiResult || 'No result yet')}</Text>
+            </SectionCard>
           </View>
         </View>
 
-        <ScrollView className="max-h-[65vh]" contentContainerStyle={{ gap: 12, paddingBottom: 24 }}>
-          <Card>
-            <Text className="text-lg font-semibold text-white">Runtime Projects ({sortedProjects.length})</Text>
-            <View className="mt-3 gap-2">
-              {sortedProjects.length === 0 && <Text className="text-zinc-500">No projects yet</Text>}
-              {sortedProjects.map((p) => (
-                <View key={p.id} className="flex-row items-start justify-between rounded-lg border border-emerald-500/20 bg-[#040a15] px-3 py-2">
-                  <Text className="mr-3 flex-1 flex-wrap text-zinc-100">{p.title}</Text>
-                  <Text className={statusTextClass(p.status)}>{String(p.status || 'unknown')}</Text>
-                </View>
-              ))}
-            </View>
-          </Card>
-          <Card>
-            <Text className="text-lg font-semibold text-white">Latest Runtime Output</Text>
-            {!latestOutput && <Text className="mt-2 text-zinc-500">No completed output yet</Text>}
-            {!!latestOutput && !latestOutput.failed_message && (
-              <View className="mt-2 gap-2">
-                <Text className="text-zinc-100">Contract Version: {String(latestOutput.contract_version || '-')}</Text>
-                <Text className="text-zinc-100">Project title: {String(latestOutput.project_title || '-')}</Text>
-                <Text className="text-zinc-100">Project type: {String(latestOutput.project_type || '-')}</Text>
-                <Text className="text-zinc-100">User intent: {String(latestOutput.user_intent || '-')}</Text>
-                <Text className="text-zinc-100">Intake summary: {String(latestOutput.intake_summary || '-')}</Text>
-                <Text className="text-zinc-100">MVP scope: {Array.isArray(latestOutput.mvp_scope) ? latestOutput.mvp_scope.join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Required infrastructure: {Array.isArray(latestOutput.required_infrastructure) ? latestOutput.required_infrastructure.join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">File plan: {Array.isArray(latestOutput.file_plan) ? latestOutput.file_plan.map((f: any) => `${f?.path || '-'} [${f?.action || '-'} | ${f?.priority || '-'}]`).join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Proposed tool calls (Not executed yet): {Array.isArray(latestOutput.proposed_tool_calls) ? latestOutput.proposed_tool_calls.map((c: any) => `${c?.tool_name || '-'} [${c?.risk_level || '-'} | approval: ${String(c?.requires_human_approval)}`).join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Review status: {String(latestOutput.review_status || '-')}</Text>
-                {String(latestOutput.project_status || '').toLowerCase() === 'review_needed' && <Text className="text-amber-300">Human review required before Phase 6 artifact generation.</Text>}
-                <View className="mt-2">
-                  <Button
-                    label={artifactLoading ? 'Generating artifact package...' : 'Generate Artifact Package'}
-                    onPress={generateArtifact}
-                    disabled={!newestProject || !['completed'].includes(String(newestProject?.status || '').toLowerCase()) || artifactLoading}
-                  />
-                  {String(newestProject?.status || '').toLowerCase() === 'review_needed' && <Text className="mt-1 text-amber-300">Human review required before artifact generation.</Text>}
-                </View>
-                <Text className="text-zinc-100">Guardrail flags: {Array.isArray(latestOutput.guardrail_flags) ? latestOutput.guardrail_flags.join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Validation status: {String(latestOutput.validation_status || '-')} {latestOutput.validation_blocked ? '(blocked)' : latestOutput.validation_review_needed ? '(review_needed)' : ''}</Text>
-                <Text className="text-amber-300">Validation warnings: {Array.isArray(latestOutput.validation_warnings) && latestOutput.validation_warnings.length > 0 ? latestOutput.validation_warnings.join(' • ') : '-'}</Text>
-                <Text className="text-red-400">Validation errors: {Array.isArray(latestOutput.validation_errors) && latestOutput.validation_errors.length > 0 ? latestOutput.validation_errors.join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Delivery package: {Array.isArray(latestOutput.delivery_package) ? latestOutput.delivery_package.join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Next steps: {Array.isArray(latestOutput.next_steps) ? latestOutput.next_steps.join(' • ') : '-'}</Text>
-                {!!latestOutput.raw_ai_output && (
-                  <View className="rounded-lg border border-cyan-500/20 bg-[#040a15] p-2">
-                    <Text className="text-xs uppercase tracking-wide text-zinc-400">Raw AI Output</Text>
-                    <Text selectable className="mt-1 text-xs text-zinc-300" style={{ lineHeight: 18 }}>{String(latestOutput.raw_ai_output)}</Text>
-                  </View>
-                )}
-              </View>
-            )}
-            {!!latestOutput?.failed_message && (
-              <View className="mt-2 gap-2">
-                <Text className="text-red-300">Latest runtime failed: {String(latestOutput.failed_message)}</Text>
-              </View>
-            )}
-          </Card>
+        <SectionCard title="Latest Project Status" subtitle={newestProject?.title || 'No runtime project yet'} right={<StatusPill status={String(newestProject?.status || 'unknown')} />}>
+          <Text className="text-xs text-zinc-400">Created: {formatTime(newestProject?.created_at)} • Updated: {formatTime(newestProject?.updated_at)}</Text>
+          {isFailed && <Text className="mt-2 text-red-300">Runtime provider timed out or failed. Credits were not charged.</Text>}
+        </SectionCard>
 
+        <SectionCard title="Runtime Contract" subtitle="Premium production contract view">
+          {!latestOutput || isFailed ? <Text className="text-zinc-500">No production contract yet.</Text> : <View className="gap-2">
+            {latestOutput?.project_status === 'review_needed' && <Text className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-amber-300">Human review required before artifact generation.</Text>}
+            <Text className="text-zinc-100">Contract: v{latestOutput.contract_version} • {latestOutput.project_title} • {latestOutput.project_type}</Text>
+            <Text className="text-zinc-300">Intent: {latestOutput.user_intent}</Text>
+            <Text className="text-zinc-300">Intake: {latestOutput.intake_summary}</Text>
+            <Text className="text-zinc-300">MVP Scope: {Array.isArray(latestOutput.mvp_scope) ? latestOutput.mvp_scope.join(' • ') : '-'}</Text>
+            <Text className="text-zinc-300">Infrastructure: {Array.isArray(latestOutput.required_infrastructure) ? latestOutput.required_infrastructure.join(' • ') : '-'}</Text>
+            <Text className="text-zinc-300">Proposed Tool Calls — Not executed yet</Text>
+            {(latestOutput.proposed_tool_calls || []).map((c: any, i: number) => <Text key={i} className="text-xs text-zinc-400">{c?.tool_name || '-'} • {c?.risk_level || '-'} • approval:{String(c?.requires_human_approval)}</Text>)}
+            <View className="mt-2"><Button label={artifactLoading ? 'Generating artifact package...' : 'Generate Artifact Package'} onPress={generateArtifact} disabled={!newestProject || String(newestProject?.status || '').toLowerCase() !== 'completed' || artifactLoading || latestOutput?.project_status === 'review_needed'} /></View>
+          </View>}
+        </SectionCard>
 
-          <Card>
-            <Text className="text-lg font-semibold text-white">Artifacts ({artifacts.length})</Text>
-            {artifacts.length === 0 && <Text className="mt-2 text-zinc-500">No artifacts yet</Text>}
-            <View className="mt-2 gap-2">
-              {artifacts.map((a) => (
-                <View key={a.id} className="rounded-lg border border-cyan-500/20 bg-[#040a15] p-2">
-                  <Text className="text-zinc-100">{a.title || a.id}</Text>
-                  <Text className="text-zinc-400">Status: {a.status} • Files: {a.file_count}</Text>
-                  <Text className="text-zinc-300">{a.summary || '-'}</Text>
-                  <View className="mt-2 flex-row gap-2">
-                    <Button label="View Files" onPress={() => loadArtifactDetail(a.id)} />
-                    {a.status === 'completed' && <Button label="Download ZIP" onPress={() => downloadArtifactZip(a.id)} />}
-                  </View>
-                </View>
-              ))}
-            </View>
-            {!!artifactDetail?.files && (
-              <View className="mt-3 gap-2">
-                {artifactDetail.files.map((f: any) => (
-                  <View key={f.id} className="rounded border border-violet-500/20 p-2">
-                    <Text className="text-zinc-100">{f.path} [{f.language || '-'} | {f.action || '-'}]</Text>
-                    <Text className="text-zinc-400">{f.purpose || '-'}</Text>
-                    <Button label="Preview" onPress={() => loadArtifactFile(artifactDetail.id, f.id)} />
-                    {expandedFileId === f.id && !!f.content && <Text selectable className="mt-2 text-xs text-zinc-300">{String(f.content)}</Text>}
-                  </View>
-                ))}
-              </View>
-            )}
-          </Card>
+        <SectionCard title={`Artifact Forge (${artifacts.length})`} subtitle="Generate downloadable delivery packages from completed runtime contracts.">
+          {artifacts.length === 0 && <Text className="text-zinc-500">No artifacts yet</Text>}
+          <View className="gap-2">{artifacts.map((a) => <View key={a.id} className="rounded-lg border border-cyan-500/20 bg-[#040a15] p-2"><Text className="text-zinc-100">{a.title || a.id}</Text><Text className="text-xs text-zinc-400">{a.status} • files:{a.file_count}</Text><Text className="text-zinc-300" numberOfLines={2}>{a.summary || '-'}</Text><View className="mt-2 gap-2 md:flex-row"><Button label="View Files" onPress={() => loadArtifactDetail(a.id)} />{a.status === 'completed' && <Button label="Download ZIP" onPress={() => downloadArtifactZip(a.id)} />}</View></View>)}</View>
+          {!!artifactDetail?.files && artifactDetail.files.map((f: any) => <View key={f.id} className="mt-2 rounded border border-violet-500/20 p-2"><Text className="text-xs text-zinc-200">{f.path} [{f.language || '-'} | {f.action || '-'}]</Text><Button label="Preview" onPress={() => loadArtifactFile(artifactDetail.id, f.id)} />{expandedFileId === f.id && !!f.content && <Text selectable className="mt-1 text-xs text-zinc-300" numberOfLines={12}>{String(f.content)}</Text>}</View>)}
+        </SectionCard>
 
-          <Card>
-            <Text className="text-lg font-semibold text-white">Agent Task Queue ({displayedTasks.length})</Text>
-            <View className="mt-3 gap-3">
-              {displayedTasks.length === 0 && <Text className="text-zinc-500">No tasks yet</Text>}
-              {taskGroups.map((group) => (
-                <View key={group.title} className="gap-2">
-                  <Text className="text-xs uppercase tracking-wide text-zinc-500">{group.title}</Text>
-                  {group.rows.map((t) => (
-                    <View key={t.id} className="flex-row items-start justify-between rounded-lg border border-cyan-500/20 bg-[#040a15] px-3 py-2">
-                      <Text className="mr-3 flex-1 flex-wrap text-zinc-100">{t.task_type}</Text>
-                      <Text className={statusTextClass(t.status)}>{String(t.status || 'unknown')}</Text>
-                    </View>
-                  ))}
-                </View>
-              ))}
-            </View>
-          </Card>
+        <SectionCard title={`Project Fleet (${sortedProjects.length})`}>
+          {sortedProjects.map((p) => <View key={p.id} className="mb-2 flex-row items-center justify-between rounded-lg border border-zinc-700 bg-[#040a15] px-3 py-2"><View className="flex-1"><Text className="text-zinc-100" numberOfLines={1}>{p.title}</Text><Text className="text-xs text-zinc-500">{formatTime(p.updated_at || p.created_at)}</Text></View><StatusPill status={String(p.status || 'unknown')} /></View>)}
+        </SectionCard>
 
-          <Card>
-            <Text className="text-lg font-semibold text-white">AI Jobs ({aiJobs.length})</Text>
-            <View className="mt-3 gap-2">
-              {aiJobs.length === 0 && <Text className="text-zinc-500">No AI jobs yet</Text>}
-              {aiJobs.map((j) => (
-                <View key={j.id} className="rounded-lg border border-cyan-500/20 bg-[#040a15] px-3 py-2">
-                  <View className="flex-row items-start justify-between">
-                    <Text className="text-zinc-100">{String(j.tool || 'unknown')}</Text>
-                    <Text className={statusTextClass(j.status)}>{String(j.status || 'unknown')}</Text>
-                  </View>
-                  <Text className="mt-1 text-xs text-zinc-400" numberOfLines={2}>{String(j.prompt || '')}</Text>
-                  <Text className="mt-1 text-[11px] text-zinc-500">{String(j.created_at || '')}</Text>
-                </View>
-              ))}
-            </View>
-          </Card>
+        <SectionCard title={`Agent Pipeline (${displayedTasks.length})`}>
+          {displayedTasks.map((t) => <View key={t.id} className="mb-2 rounded-lg border border-cyan-500/20 bg-[#040a15] px-3 py-2"><View className="flex-row items-center justify-between"><Text className="text-zinc-100">{t.task_type}</Text><StatusPill status={String(t.status || 'unknown')} /></View><Text className="mt-1 text-xs text-zinc-400">{taskDescription[String(t.task_type || '').toLowerCase()] || 'Task processing'}</Text></View>)}
+        </SectionCard>
 
-          <Card>
-            <Text className="text-lg font-semibold text-white">System Logs ({displayedLogs.length})</Text>
-            <View className="mt-3 gap-2">
-              {displayedLogs.length === 0 && <Text className="text-zinc-500">No logs yet</Text>}
-              {displayedLogs.map((l) => (
-                <View key={l.id} className="rounded-lg border border-violet-500/20 bg-[#040a15] px-3 py-2">
-                  <Text className="text-xs uppercase text-zinc-400">{String(l.level || 'info')}</Text>
-                  <Text className="mt-1 flex-wrap text-zinc-100">{l.message}</Text>
-                </View>
-              ))}
-            </View>
-          </Card>
-        </ScrollView>
+        <SectionCard title={`Model Activity (${displayedJobs.length})`}>
+          {displayedJobs.map((j) => <View key={j.id} className="mb-2 rounded-lg border border-cyan-500/20 bg-[#040a15] px-3 py-2"><View className="flex-row items-center justify-between"><Text className="text-zinc-100">{String(j.tool || 'unknown')}</Text><StatusPill status={String(j.status || 'unknown')} /></View><Text className="text-xs text-zinc-400" numberOfLines={2}>{String(j.prompt || '')}</Text><Text className="text-[11px] text-zinc-500">{formatTime(j.created_at)}</Text></View>)}
+        </SectionCard>
+
+        <SectionCard title={`System Telemetry (${displayedLogs.length})`}>
+          {displayedLogs.map((l) => <View key={l.id} className={`mb-2 rounded-lg border px-3 py-2 ${String(l.level || '').toLowerCase() === 'error' ? 'border-red-500/30 bg-red-500/10' : 'border-violet-500/20 bg-[#040a15]'}`}><Text className="text-xs uppercase text-zinc-400">{String(l.level || 'info')}</Text><Text className="text-zinc-100" numberOfLines={3}>{String(l.message || '')}</Text></View>)}
+        </SectionCard>
       </View>
-    </View>
+    </ScrollView>
   );
 }
