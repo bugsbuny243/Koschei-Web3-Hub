@@ -45,10 +45,15 @@ Koschei uses agent contracts to transform a single blueprint response into a sta
 
 ## Phase 6.1 — Artifact Generation Stabilizer
 - Artifact generation is hardened for safer parsing, preview routing, zip assembly, and credit behavior.
-- Phase 6.1 final fix adds transaction failure safety so failed artifacts cannot remain in `processing`.
+- **Phase 6.1.1** fixed artifact transaction lock safety so `failArtifact` is never called while a transaction is still open.
 - Protected ZIP download on web now uses authenticated fetch (Bearer token), while mobile keeps protected-link placeholder behavior.
 - Artifact-specific env vars and strict JSON schema prompt are now part of Phase 6.1 hardening.
 - Generated files are stored in database tables (`generated_artifacts`, `generated_files`) only.
 - Generated code is not executed.
 - No shell execution and no repo writes are performed by artifact generation.
 - Proposed tool calls are still not executed.
+
+
+## Next Step (Phase 6.2)
+- Artifact generation remains synchronous in Phase 6.1.1.
+- Next planned step is Phase 6.2 async artifact worker migration.
