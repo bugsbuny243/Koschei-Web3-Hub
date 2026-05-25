@@ -1,30 +1,29 @@
-# Koschei Shopier Products
+# SHOPIER PRODUCTS — KOSCHEI
 
-Current SaaS products:
-- Koschei Starter — 899 TL — 20,000 credits  
+## Current SaaS Plans (Official)
+
+These are the active Koschei SaaS plans:
+
+- **Koschei Starter** — **899 TL** — **20,000 credits**  
   https://www.shopier.com/TradeVisual/47465449
-- Koschei Pro — 2,299 TL — 70,000 credits  
+- **Koschei Pro** — **2,299 TL** — **70,000 credits**  
   https://www.shopier.com/TradeVisual/47465484
-- Koschei Studio — 4,999 TL — 180,000 credits  
+- **Koschei Studio** — **4,999 TL** — **180,000 credits**  
   https://www.shopier.com/TradeVisual/47465499
 
-Current behavior:
-- Shopier handles checkout.
-- Koschei does not yet process Shopier webhooks automatically.
-- Owner/admin manually activates credits/plans.
-- Later phase will add payment reconciliation/webhook automation.
+## Checkout and Activation Status
 
-Legacy/standalone product note:
-If older standalone Shopier products exist, keep them documented separately and do not mix them into SaaS plans unless explicitly activated.
+- Payments are handled through Shopier.
+- Activation is manual for now (owner/admin).
+- Webhook/payment automation is planned for a later billing phase.
 
-Known previous standalone/support links:
+## Legacy / Standalone Links (Not Current SaaS Plans)
+
+The links below are legacy or standalone products and are **not** part of current Koschei SaaS plans:
+
 - 10 TL support/donation:  
   https://www.shopier.com/TradeVisual/47208457
-- Spin & Win Embed Tool, 499 TL / 30 days:  
+- Spin & Win Embed Tool:  
   https://www.shopier.com/TradeVisual/46953900
-- SwipeCart Embed Tool, 1,999 TL / 30 days:  
+- SwipeCart Embed Tool:  
   https://www.shopier.com/TradeVisual/46953946
-
-Mark these as:
-- legacy_or_standalone
-- not current SaaS plan products

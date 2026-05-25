@@ -11,13 +11,13 @@ export default function Billing() {
         Billing & Activation
       </Text>
       <Text className="text-zinc-300" style={{ color: '#d4d4d8' }}>
-        Koschei currently uses Shopier checkout links.
+        Payments are handled through Shopier checkout links.
       </Text>
       <Text className="text-zinc-300" style={{ color: '#d4d4d8' }}>
-        After payment, plan/credits are activated manually by owner/admin.
+        Activation is manual for now (owner/admin).
       </Text>
       <Text className="text-zinc-300" style={{ color: '#d4d4d8' }}>
-        Automatic Shopier webhook/payment reconciliation is planned for a later billing phase.
+        Webhook/payment automation is planned for a later billing phase.
       </Text>
       <Text className="text-zinc-300" style={{ color: '#d4d4d8' }}>
         If payment is completed but credits are not visible yet, contact owner/support.

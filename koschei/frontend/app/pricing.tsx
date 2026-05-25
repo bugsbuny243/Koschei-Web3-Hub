@@ -8,7 +8,7 @@ export default function Pricing() {
   return (
     <View className="flex-1 bg-[#0a0a0a] p-6 gap-3" style={{ backgroundColor: '#0a0a0a' }}>
       <Text className="text-3xl text-white" style={{ color: '#ffffff' }}>
-        Pricing
+        Koschei Plans
       </Text>
       <Text className="text-zinc-300" style={{ color: '#d4d4d8' }}>
         Payments are handled through Shopier. Activation is manual for now.
