@@ -20,30 +20,14 @@ const AMBER = '#ffc857';
 const GRAY = '#8aa0b8';
 const BG = '#03040a';
 const PANEL = 'rgba(5, 12, 25, 0.78)';
-const TOKEN_KEY = 'koschei_token';
 
-type ModuleStatus = 'ACTIVE' | 'NEXT' | 'PAUSED' | 'ENTERPRISE FUTURE';
-
-type ModuleItem = {
-  ico: string;
-  title: string;
-  subtitle: string;
-  status: ModuleStatus;
-  route?: '/dashboard' | '/pricing' | '/ui-lab' | '/owner' | '/m-image' | '/cyber-defense';
-  enabled: boolean;
-  note: string;
-  accent: string;
-};
-
-const MODULES: ModuleItem[] = [
-  { ico: '⌬', title: 'RUNTIME FACTORY', subtitle: 'Agentic project planning and production contracts.', status: 'ACTIVE', route: '/dashboard', enabled: true, note: 'OPEN MODULE', accent: CYAN },
-  { ico: '⬢', title: 'ARTIFACT FORGE', subtitle: 'Generate downloadable code and delivery packages.', status: 'ACTIVE', route: '/dashboard', enabled: true, note: 'OPEN MODULE', accent: GREEN },
-  { ico: '⟁', title: 'AI CONSOLE', subtitle: 'Chat, code, and reasoning test cockpit.', status: 'ACTIVE', route: '/dashboard', enabled: true, note: 'OPEN MODULE', accent: CYAN },
-  { ico: '◫', title: 'PUBLIC SAAS PLANS', subtitle: 'Credits, plans, and Shopier activation.', status: 'ACTIVE', route: '/pricing', enabled: true, note: 'OPEN MODULE', accent: GREEN },
-  { ico: '✦', title: 'UI LAB', subtitle: 'Koschei Command Universe prototype.', status: 'ACTIVE', route: '/ui-lab', enabled: true, note: 'OPEN MODULE', accent: VIOLET },
-  { ico: '◉', title: 'OWNER GOD MODE', subtitle: 'Internal client/Fiverr production cockpit.', status: 'NEXT', route: '/owner', enabled: false, note: 'Coming next', accent: AMBER },
-  { ico: '◈', title: 'MEDIA FACTORY', subtitle: 'Image, audio, and video modules paused to reduce cost.', status: 'PAUSED', route: '/m-image', enabled: false, note: 'Paused for now', accent: GRAY },
-  { ico: '⚡', title: 'CYBER DEFENSE', subtitle: 'Enterprise future module. Paused pending company/legal foundation.', status: 'ENTERPRISE FUTURE', route: '/cyber-defense', enabled: false, note: 'Enterprise future', accent: MAGENTA },
+const MODULES = [
+  { ico: '⌬', name: 'CODE ENGINE', desc: 'Üretim hazır kod akışı', accent: CYAN, route: '' },
+  { ico: '◈', name: 'IMAGE FORGE', desc: 'Sinematik görsel üretimi', accent: MAGENTA, route: '/m-image' },
+  { ico: '▣', name: 'VIDEO LAB', desc: 'Video fikir ve sahne üretimi', accent: VIOLET, route: '' },
+  { ico: '◊', name: 'AUDIO CORE', desc: 'Seslendirme ve audio akışı', accent: GREEN, route: '' },
+  { ico: '⬢', name: 'CHAT NEXUS', desc: 'Akıllı sohbet merkezi', accent: CYAN, route: '' },
+  { ico: '⟁', name: 'REASON MATRIX', desc: 'Derin analiz ve karar motoru', accent: VIOLET, route: '' },
 ];
 
 function RainColumn({ left, delay, duration }: { left: number; delay: number; duration: number }) {
@@ -99,7 +83,113 @@ export default function Home() {
     router.push(token ? '/dashboard' : '/login');
   };
 
-  return <View style={styles.root}><View style={styles.glowCyan} pointerEvents="none" /><View style={styles.glowPurple} pointerEvents="none" /><View style={styles.glowGreen} pointerEvents="none" /><View style={styles.gridLayer} pointerEvents="none" /><View style={styles.rainLayer} pointerEvents="none">{rainColumns.map((col, i) => <RainColumn key={i} left={col.left} delay={col.delay} duration={col.duration} />)}</View><ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}><View style={styles.heroPanel}><Text style={styles.title}>KOSCHEI</Text><Text style={styles.heroText}>Koschei Command Universe entry point for runtime production and module operations.</Text><QuantumCore /><View style={styles.buttonStack}><GlowButton label="ENTER COMMAND CENTER" onPress={enterCommandCenter} primary /><GlowButton label="LOGIN" href="/login" /><GlowButton label="ENTER UI LAB" href="/ui-lab" /><GlowButton label="VIEW PLANS" href="/pricing" /></View></View><View style={styles.moduleGrid}>{MODULES.map((module) => <Pressable key={module.title} disabled={!module.route} onPress={() => module.route && router.push(module.route)} style={({ pressed }) => [styles.moduleCard, { borderColor: `${module.accent}66`, opacity: pressed ? 0.88 : 1 }, pressed ? { shadowColor: module.accent, shadowOpacity: 0.35 } : null]}><View style={styles.moduleTop}><Text style={[styles.moduleIcon, { color: module.accent }]}>{module.ico}</Text><View style={[styles.statusBadge, getStatusStyle(module.status)]}><Text style={styles.statusBadgeText}>{module.status}</Text></View></View><Text style={styles.moduleName}>{module.title}</Text><Text style={styles.moduleDesc}>{module.subtitle}</Text><Text style={styles.moduleNote}>{module.enabled ? 'OPEN MODULE' : module.note}</Text></Pressable>)}</View><View style={styles.footerPanel}><Text style={styles.footerTitle}>KOSCHEI COMMAND UNIVERSE</Text><Text style={styles.footerText}>Runtime Factory • Artifact Forge • Owner God Mode</Text></View></ScrollView></View>;
+      <View style={styles.rainLayer} pointerEvents="none">
+        {rainColumns.map((col, i) => (
+          <RainColumn key={i} left={col.left} delay={col.delay} duration={col.duration} />
+        ))}
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.topBar}>
+          <View style={styles.brandBox}>
+            <Text style={styles.brandMark}>K</Text>
+
+            <View>
+              <Text style={styles.brandName}>KOSCHEI</Text>
+              <Text style={styles.brandSub}>IMMORTAL AI</Text>
+            </View>
+          </View>
+
+          <View style={styles.statusPill}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>ONLINE</Text>
+          </View>
+        </View>
+
+        <View style={styles.heroPanel}>
+          <View style={styles.statusRow}>
+            <Text style={styles.microText}>● SYSTEM ONLINE</Text>
+            <Text style={styles.microText}>NODE: EU-CENTRAL-1</Text>
+          </View>
+
+          <Text style={styles.kicker}>// SKYNET MATRIX QUANTUM RUNTIME</Text>
+          <Text style={styles.title}>KOSCHEI</Text>
+          <Text style={styles.titleSub}>THE IMMORTAL AI</Text>
+
+          <Text style={styles.heroText}>
+            Tek komutla kod, görsel, video, ses ve chat üret. Koschei tüm AI
+            modellerini tek komuta merkezinde toplar.
+          </Text>
+
+          <QuantumCore />
+
+          <View style={styles.buttonStack}>
+            <GlowButton label="▶ SİSTEME GİR — ÜCRETSİZ" href="/register" primary />
+            <GlowButton label="⬡ LOGIN" href="/login" />
+            <GlowButton label="✦ ENTER UI LAB" href="/ui-lab" />
+          </View>
+        </View>
+
+        <SectionTitle title="AKTİF MODÜLLER" />
+
+        <View style={styles.moduleGrid}>
+          {MODULES.map((module) => (
+            module.route ? (
+              <Link key={module.name} href={module.route} asChild>
+                <Pressable
+                  style={[
+                    styles.moduleCard,
+                    {
+                      borderColor: `${module.accent}55`,
+                      shadowColor: module.accent,
+                    },
+                  ]}
+                >
+                  <View style={styles.moduleTop}>
+                    <Text style={[styles.moduleIcon, { color: module.accent }]}>{module.ico}</Text>
+
+                    <View style={styles.activeBadge}>
+                      <Text style={styles.activeText}>ACTIVE</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.moduleName}>{module.name}</Text>
+                  <Text style={styles.moduleDesc}>{module.desc}</Text>
+                </Pressable>
+              </Link>
+            ) : (
+              <View
+                key={module.name}
+                style={[
+                  styles.moduleCard,
+                  {
+                    borderColor: `${module.accent}55`,
+                    shadowColor: module.accent,
+                  },
+                ]}
+              >
+                <View style={styles.moduleTop}>
+                  <Text style={[styles.moduleIcon, { color: module.accent }]}>{module.ico}</Text>
+
+                  <View style={styles.activeBadge}>
+                    <Text style={styles.activeText}>YAKINDA</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.moduleName}>{module.name}</Text>
+                <Text style={styles.moduleDesc}>{module.desc}</Text>
+              </View>
+            )
+          ))}
+        </View>
+
+        <View style={styles.footerPanel}>
+          <Text style={styles.footerTitle}>KOSCHEI RUNTIME v1.0</Text>
+          <Text style={styles.footerText}>TRADEPIGLOBALL.CO // QUANTUM COMMAND CENTER</Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({root:{flex:1,backgroundColor:BG,overflow:'hidden'},glowCyan:{position:'absolute',top:-90,left:-110,width:280,height:280,borderRadius:140,backgroundColor:'rgba(0,229,255,0.16)'},glowPurple:{position:'absolute',top:190,right:-160,width:340,height:340,borderRadius:170,backgroundColor:'rgba(157,78,221,0.17)'},glowGreen:{position:'absolute',bottom:120,left:-150,width:320,height:320,borderRadius:160,backgroundColor:'rgba(0,255,157,0.09)'},gridLayer:{position:'absolute',top:0,right:0,bottom:0,left:0,borderWidth:1,borderColor:'rgba(0,229,255,0.04)'},rainLayer:{position:'absolute',top:0,right:0,bottom:0,left:0,opacity:0.3},rainCol:{position:'absolute',top:0},rainText:{fontSize:12,lineHeight:16,fontFamily:'monospace'},scroll:{padding:16,paddingTop:34,paddingBottom:54},heroPanel:{borderWidth:1,borderColor:'rgba(0,229,255,0.22)',borderRadius:26,backgroundColor:PANEL,padding:18,marginBottom:24},title:{color:'#fff',fontSize:56,fontWeight:'900'},heroText:{color:'#b7c8dd',fontSize:14,lineHeight:22,marginTop:10},coreWrap:{height:260,alignItems:'center',justifyContent:'center'},coreHalo:{position:'absolute',width:190,height:190,borderRadius:95,backgroundColor:'rgba(0,229,255,0.12)'},ring:{position:'absolute',borderWidth:1.4},core:{width:112,height:112,borderRadius:56,borderWidth:1,borderColor:'rgba(0,255,157,0.65)',backgroundColor:'rgba(0,20,26,0.92)',alignItems:'center',justifyContent:'center'},coreTop:{color:CYAN,fontSize:9,fontWeight:'800'},coreNum:{color:'#fff',fontSize:28,fontWeight:'900'},coreBottom:{color:GREEN,fontSize:9,fontWeight:'900'},buttonStack:{marginTop:8},button:{minHeight:54,borderRadius:16,alignItems:'center',justifyContent:'center',marginBottom:12},buttonPrimary:{backgroundColor:GREEN},buttonGhost:{borderWidth:1,borderColor:'rgba(0,229,255,0.42)',backgroundColor:'rgba(0,229,255,0.055)'},buttonText:{fontSize:14,fontWeight:'900',letterSpacing:1.2},moduleGrid:{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',marginBottom:24},moduleCard:{width:'48.6%',minHeight:170,borderWidth:1,borderRadius:18,backgroundColor:'rgba(5,12,25,0.82)',padding:14,marginBottom:12},moduleTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},moduleIcon:{fontSize:24,fontWeight:'900'},statusBadge:{borderWidth:1,borderRadius:999,paddingHorizontal:7,paddingVertical:3},badgeActive:{borderColor:'rgba(0,255,157,0.28)',backgroundColor:'rgba(0,255,157,0.08)'},badgeNext:{borderColor:'rgba(255,200,87,0.5)',backgroundColor:'rgba(157,78,221,0.22)'},badgePaused:{borderColor:'rgba(138,160,184,0.4)',backgroundColor:'rgba(138,160,184,0.1)'},badgeFuture:{borderColor:'rgba(255,43,209,0.45)',backgroundColor:'rgba(157,78,221,0.2)'},statusBadgeText:{color:'#d8f2ff',fontSize:7,fontWeight:'900',letterSpacing:0.9},moduleName:{color:'#fff',fontSize:13,fontWeight:'900',marginTop:16},moduleDesc:{color:'#8ea7c2',fontSize:11,lineHeight:16,marginTop:6},moduleNote:{color:CYAN,fontSize:10,fontWeight:'800',marginTop:12,letterSpacing:1},footerPanel:{borderTopWidth:1,borderColor:'rgba(0,229,255,0.12)',paddingTop:18,paddingBottom:18,alignItems:'center'},footerTitle:{color:'#fff',fontSize:12,letterSpacing:2,fontWeight:'900'},footerText:{color:'#52708e',fontSize:10,letterSpacing:1.2,marginTop:6,textAlign:'center'}});
