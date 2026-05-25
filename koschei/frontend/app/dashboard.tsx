@@ -122,16 +122,14 @@ export default function Dashboard() {
     setProjects(projectRows);
     setTasks(taskRows);
     const sortedByTime = [...projectRows].sort((a, b) => parseTimestamp(b) - parseTimestamp(a));
-    const latestSuccessfulProject = sortedByTime.find((p) => ['completed', 'review_needed'].includes(String(p?.status || '').toLowerCase()));
-    const latestFailedProject = sortedByTime.find((p) => String(p?.status || '').toLowerCase() === 'failed');
     const newest = sortedByTime[0];
 
-    if (newest && String(newest?.status || '').toLowerCase() === 'failed' && latestFailedProject?.id === newest.id) {
+    if (newest && String(newest?.status || '').toLowerCase() === 'failed') {
       const failedLogs: any[] = await api.getRuntimeLogs(newest.id);
       const latestFailureLog = [...failedLogs].sort((a, b) => parseTimestamp(b) - parseTimestamp(a)).find((l) => String(l?.level || '').toLowerCase() === 'error');
       setLatestOutput({ failed_message: latestFailureLog?.message || 'Runtime project failed.' });
-    } else if (latestSuccessfulProject?.id) {
-      const projectTasks = taskRows.filter((t) => t?.project_id === latestSuccessfulProject.id);
+    } else if (newest?.id && ['completed', 'review_needed'].includes(String(newest?.status || '').toLowerCase())) {
+      const projectTasks = taskRows.filter((t) => t?.project_id === newest.id);
       const blueprintTask = projectTasks.find((t) => String(t?.task_type || '').toLowerCase() === 'blueprint');
       if (blueprintTask?.output_json) {
         const output = safeJson(blueprintTask.output_json);
@@ -141,6 +139,11 @@ export default function Dashboard() {
         const delivery = safeJson(projectTasks.find((t) => t?.task_type === 'delivery')?.output_json);
         setLatestOutput({
           ...output,
+          contract_version: output?.contract_version || '-',
+          intake_summary: output?.output?.summary || output?.intake?.summary || '-',
+          user_intent: output?.user_intent || '-',
+          mvp_scope: output?.output?.mvp_scope || output?.mvp_scope || [],
+          file_plan: safeJson(projectTasks.find((t) => t?.task_type === 'file_plan')?.output_json)?.output?.files || [],
           required_infrastructure: arch?.output?.required_infrastructure || arch?.required_infrastructure || [],
           proposed_tool_calls: steps?.output?.proposed_tool_calls || [],
           review_status: review?.output?.review_status || '-',
@@ -148,7 +151,7 @@ export default function Dashboard() {
           delivery_package: delivery?.output?.delivery_package || [],
           next_steps: delivery?.output?.next_steps || [],
           raw_ai_output: delivery?.raw_ai_output || output?.raw_ai_output,
-          project_status: String(latestSuccessfulProject?.status || '').toLowerCase(),
+          project_status: String(newest?.status || '').toLowerCase(),
         });
       } else {
         setLatestOutput(null);
@@ -388,15 +391,20 @@ export default function Dashboard() {
             {!latestOutput && <Text className="mt-2 text-zinc-500">No completed output yet</Text>}
             {!!latestOutput && !latestOutput.failed_message && (
               <View className="mt-2 gap-2">
-                <Text className="text-zinc-100">Title: {String(latestOutput.project_title || '-')}</Text>
-                <Text className="text-zinc-100">Type: {String(latestOutput.project_type || '-')}</Text>
-                <Text className="text-zinc-100">MVP: {Array.isArray(latestOutput?.output?.mvp_scope || latestOutput.mvp_scope) ? (latestOutput?.output?.mvp_scope || latestOutput.mvp_scope).join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Infrastructure: {Array.isArray(latestOutput.required_infrastructure) ? latestOutput.required_infrastructure.join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Proposed tool calls (Not executed yet): {Array.isArray(latestOutput.proposed_tool_calls) ? latestOutput.proposed_tool_calls.map((c: any) => c?.tool_name).filter(Boolean).join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Review Status: {String(latestOutput.review_status || '-')}</Text>
-                <Text className="text-zinc-100">Guardrail Flags: {Array.isArray(latestOutput.guardrail_flags) ? latestOutput.guardrail_flags.join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Delivery Package: {Array.isArray(latestOutput.delivery_package) ? latestOutput.delivery_package.join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Next Steps: {Array.isArray(latestOutput.next_steps) ? latestOutput.next_steps.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Contract Version: {String(latestOutput.contract_version || '-')}</Text>
+                <Text className="text-zinc-100">Project title: {String(latestOutput.project_title || '-')}</Text>
+                <Text className="text-zinc-100">Project type: {String(latestOutput.project_type || '-')}</Text>
+                <Text className="text-zinc-100">User intent: {String(latestOutput.user_intent || '-')}</Text>
+                <Text className="text-zinc-100">Intake summary: {String(latestOutput.intake_summary || '-')}</Text>
+                <Text className="text-zinc-100">MVP scope: {Array.isArray(latestOutput.mvp_scope) ? latestOutput.mvp_scope.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Required infrastructure: {Array.isArray(latestOutput.required_infrastructure) ? latestOutput.required_infrastructure.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">File plan: {Array.isArray(latestOutput.file_plan) ? latestOutput.file_plan.map((f: any) => `${f?.path || '-'} [${f?.action || '-'} | ${f?.priority || '-'}]`).join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Proposed tool calls (Not executed yet): {Array.isArray(latestOutput.proposed_tool_calls) ? latestOutput.proposed_tool_calls.map((c: any) => `${c?.tool_name || '-'} [${c?.risk_level || '-'} | approval: ${String(c?.requires_human_approval)}`).join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Review status: {String(latestOutput.review_status || '-')}</Text>
+                {String(latestOutput.project_status || '').toLowerCase() === 'review_needed' && <Text className="text-amber-300">Human review required before Phase 6 artifact generation.</Text>}
+                <Text className="text-zinc-100">Guardrail flags: {Array.isArray(latestOutput.guardrail_flags) ? latestOutput.guardrail_flags.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Delivery package: {Array.isArray(latestOutput.delivery_package) ? latestOutput.delivery_package.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Next steps: {Array.isArray(latestOutput.next_steps) ? latestOutput.next_steps.join(' • ') : '-'}</Text>
                 {!!latestOutput.raw_ai_output && (
                   <View className="rounded-lg border border-cyan-500/20 bg-[#040a15] p-2">
                     <Text className="text-xs uppercase tracking-wide text-zinc-400">Raw AI Output</Text>
