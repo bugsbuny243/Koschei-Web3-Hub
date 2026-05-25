@@ -14,13 +14,13 @@ export default function Billing() {
         Payments are handled through Shopier checkout links.
       </Text>
       <Text className="text-zinc-300" style={{ color: '#d4d4d8' }}>
-        Activation is manual for now (owner/admin).
+        Subscription activation is reviewed manually by the private owner team.
       </Text>
       <Text className="text-zinc-300" style={{ color: '#d4d4d8' }}>
         Webhook/payment automation is planned for a later billing phase.
       </Text>
       <Text className="text-zinc-300" style={{ color: '#d4d4d8' }}>
-        If payment is completed but credits are not visible yet, contact owner/support.
+        If payment is completed but credits are not visible yet, contact support.
       </Text>
 
       {activeProducts.map((product) => (
