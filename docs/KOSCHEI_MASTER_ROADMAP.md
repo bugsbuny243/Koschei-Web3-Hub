@@ -27,7 +27,7 @@ Legacy documentation may still reference Phase 3 or Phase 4, but active developm
 
 ## Upcoming Phases
 
-- Phase 6 — Artifact & Code Package Generation
+- **Phase 6 — Artifact & Code Package Generation (Current/Next Active)**
 - Phase 7 — Owner God Mode
 - Phase 8 — Public SaaS Billing
 - Phase 9 — Media Factory
