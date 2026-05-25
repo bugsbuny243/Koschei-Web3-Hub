@@ -187,7 +187,7 @@ func (h *Handler) userCreditsAndRole(authSub string) (bool, int, error) {
 		return false, 0, err
 	}
 	role = strings.ToLower(strings.TrimSpace(role))
-	return role == "owner" || role == "admin", credits, nil
+	return role == "owner", credits, nil
 }
 
 func (h *Handler) insertGenerationJob(email, tool, prompt, route string) (string, error) {

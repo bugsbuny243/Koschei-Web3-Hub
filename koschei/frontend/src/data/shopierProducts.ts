@@ -35,7 +35,7 @@ export const shopierProducts: ShopierProduct[] = [
     name: 'Koschei Studio',
     priceTry: 4999,
     credits: 180000,
-    description: 'Ajans, geliştirici ve owner üretim akışları için yüksek kredi paketi.',
+    description: 'Ajans ve geliştirici ekipleri için yüksek kredi paketi.',
     shopierUrl: 'https://www.shopier.com/TradeVisual/47465499',
     badge: 'Studio',
     isActive: true,
