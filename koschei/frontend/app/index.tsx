@@ -305,6 +305,7 @@ export default function Home() {
           <View style={styles.buttonStack}>
             <GlowButton label="▶ SİSTEME GİR — ÜCRETSİZ" href="/register" primary />
             <GlowButton label="⬡ LOGIN" href="/login" />
+            <GlowButton label="✦ ENTER UI LAB" href="/ui-lab" />
           </View>
         </View>
 
