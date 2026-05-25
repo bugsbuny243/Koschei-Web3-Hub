@@ -137,10 +137,17 @@ export default function Dashboard() {
         const output = safeJson(blueprintTask.output_json);
         const arch = safeJson(projectTasks.find((t) => t?.task_type === 'architecture')?.output_json);
         const steps = safeJson(projectTasks.find((t) => t?.task_type === 'build_steps')?.output_json);
+        const review = safeJson(projectTasks.find((t) => t?.task_type === 'review')?.output_json);
+        const delivery = safeJson(projectTasks.find((t) => t?.task_type === 'delivery')?.output_json);
         setLatestOutput({
           ...output,
-          required_infrastructure: arch?.required_infrastructure || [],
-          build_steps: steps?.build_steps || [],
+          required_infrastructure: arch?.output?.required_infrastructure || arch?.required_infrastructure || [],
+          proposed_tool_calls: steps?.output?.proposed_tool_calls || [],
+          review_status: review?.output?.review_status || '-',
+          guardrail_flags: review?.output?.guardrail_flags || [],
+          delivery_package: delivery?.output?.delivery_package || [],
+          next_steps: delivery?.output?.next_steps || [],
+          raw_ai_output: delivery?.raw_ai_output || output?.raw_ai_output,
           project_status: String(latestSuccessfulProject?.status || '').toLowerCase(),
         });
       } else {
@@ -383,10 +390,13 @@ export default function Dashboard() {
               <View className="mt-2 gap-2">
                 <Text className="text-zinc-100">Title: {String(latestOutput.project_title || '-')}</Text>
                 <Text className="text-zinc-100">Type: {String(latestOutput.project_type || '-')}</Text>
-                <Text className="text-zinc-100">MVP: {Array.isArray(latestOutput.mvp_scope) ? latestOutput.mvp_scope.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">MVP: {Array.isArray(latestOutput?.output?.mvp_scope || latestOutput.mvp_scope) ? (latestOutput?.output?.mvp_scope || latestOutput.mvp_scope).join(' • ') : '-'}</Text>
                 <Text className="text-zinc-100">Infrastructure: {Array.isArray(latestOutput.required_infrastructure) ? latestOutput.required_infrastructure.join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Build Steps: {Array.isArray(latestOutput.build_steps) ? latestOutput.build_steps.join(' • ') : '-'}</Text>
-                <Text className="text-zinc-100">Next Action: {String(latestOutput.next_action || '-')}</Text>
+                <Text className="text-zinc-100">Proposed tool calls (Not executed yet): {Array.isArray(latestOutput.proposed_tool_calls) ? latestOutput.proposed_tool_calls.map((c: any) => c?.tool_name).filter(Boolean).join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Review Status: {String(latestOutput.review_status || '-')}</Text>
+                <Text className="text-zinc-100">Guardrail Flags: {Array.isArray(latestOutput.guardrail_flags) ? latestOutput.guardrail_flags.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Delivery Package: {Array.isArray(latestOutput.delivery_package) ? latestOutput.delivery_package.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Next Steps: {Array.isArray(latestOutput.next_steps) ? latestOutput.next_steps.join(' • ') : '-'}</Text>
                 {!!latestOutput.raw_ai_output && (
                   <View className="rounded-lg border border-cyan-500/20 bg-[#040a15] p-2">
                     <Text className="text-xs uppercase tracking-wide text-zinc-400">Raw AI Output</Text>
