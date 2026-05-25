@@ -4,9 +4,9 @@ Koschei is a multi-agent AI super-app and command universe.
 
 ## Current Official Phase
 
-**Phase 6.1.1 — Artifact Transaction Lock Safety Fix**
+**Phase 6.1 — Artifact Stabilizer + Cyber Defense Center Phase 1**
 
-### Phase 6.1.1 Final Fix Scope
+### Active Direction
 
 - Transaction safety for artifact failure states (no stuck `processing` rows).
 - Protected ZIP download flow for web via authenticated fetch.
@@ -33,14 +33,24 @@ Koschei is a multi-agent AI super-app and command universe.
 - Activation is manual for now.
 - Webhook/payment automation is planned later.
 
+## Paused / Later Media Factory
+
+- Image Forge
+- Audio Core
+- Video Lab
+
 ## Future
 
 - Owner God Mode
 - Public SaaS billing
-- Media Factory
 - 3D Command Universe UI
-- Hybrid Security Shield (final future phase only)
+- Hybrid Security Shield / Smart Glasses (final future phase only)
 
 
 ## Planned Next
 - **Phase 6.2 — Async Artifact Worker** (artifact generation is still synchronous in 6.1.1).
+
+
+## Planned Next
+- Phase 6.1 Artifact Stabilizer hardening continuation
+- Cyber Defense Center Phase 1 (defensive-only, human approval workflows)

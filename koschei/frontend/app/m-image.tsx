@@ -12,12 +12,17 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function MImageScreen() {
+  const isEnabled = String(process.env.EXPO_PUBLIC_ENABLE_IMAGE_FORGE || 'false').toLowerCase() === 'true' && String(process.env.ENABLE_MEDIA_MODULES || 'false').toLowerCase() === 'true';
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState('');
 
   const generate = async () => {
+    if (!isEnabled) {
+      setError('Module paused');
+      return;
+    }
     if (!prompt.trim()) {
       setError('Komut gir');
       return;
@@ -67,6 +72,7 @@ export default function MImageScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {!isEnabled ? <Text style={styles.paused}>This module is currently paused. Koschei is focusing on Cyber Defense and Runtime Factory.</Text> : null}
       <Text style={styles.title}>GÖRSEL ÜRET</Text>
 
       <TextInput
@@ -79,7 +85,7 @@ export default function MImageScreen() {
         style={styles.input}
       />
 
-      <Pressable onPress={generate} style={styles.button}>
+      <Pressable onPress={generate} style={[styles.button, !isEnabled ? styles.disabled : null]} disabled={!isEnabled}>
         <Text style={styles.buttonText}>ÜRET</Text>
       </Pressable>
 
@@ -146,4 +152,6 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: 12,
   },
+  paused: { color: '#facc15', fontSize: 14 },
+  disabled: { opacity: 0.5 },
 });

@@ -6,7 +6,7 @@ It combines public SaaS product flows, owner-grade operational control, agentic 
 
 ## Official Program Status
 
-**Current Official Phase:** **Phase 6 / Phase 6.1 — Artifact Generation Stabilization**
+**Current Official Phase:** **Phase 6.1 — Artifact Stabilizer + Cyber Defense Center Phase 1**
 
 This is the active production focus.
 
@@ -31,7 +31,8 @@ Primary product surfaces:
 - Owner God Mode (next major operational surface)
 - Runtime Factory (agentic execution and planning backbone)
 - Artifact generation pipelines
-- Future media and immersive command interfaces
+- Cyber Defense Center (defensive security command surface)
+- Future media and immersive command interfaces (paused/optional)
 
 ## Billing Status
 
@@ -43,7 +44,7 @@ Primary product surfaces:
 
 - Owner God Mode
 - Public SaaS billing
-- Media Factory
+- Media Factory (paused/optional due to current cost/priority)
 - 3D Command Universe UI
 - **Hybrid Security Shield (final future phase only)**
 
@@ -52,3 +53,10 @@ Primary product surfaces:
 - Generated artifacts are stored and delivered; they are not auto-executed.
 - Proposed tool calls remain controlled and non-autonomous.
 - Security-critical concepts are defensive-only and human-approved.
+
+
+## Strategic Pivot (May 2026)
+
+- Runtime Factory and Cyber Defense Center are the current core focus.
+- Image Forge and Audio Core remain in codebase but are paused/optional in main UX due to quality/cost priorities.
+- Video Lab is also moved to later Media Factory priority.

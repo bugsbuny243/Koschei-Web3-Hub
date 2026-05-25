@@ -85,6 +85,9 @@ const taskDescription: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const mediaEnabled = String(process.env.ENABLE_MEDIA_MODULES || 'false').toLowerCase() === 'true';
+  const imageEnabled = String(process.env.EXPO_PUBLIC_ENABLE_IMAGE_FORGE || 'false').toLowerCase() === 'true';
+  const audioEnabled = String(process.env.EXPO_PUBLIC_ENABLE_AUDIO_CORE || 'false').toLowerCase() === 'true';
   const [prompt, setPrompt] = useState('');
   const [error, setError] = useState('');
   const [aiTool, setAiTool] = useState<'chat' | 'code' | 'reason'>('chat');
@@ -305,6 +308,23 @@ export default function Dashboard() {
             </SectionCard>
           </View>
         </View>
+        <SectionCard title="Strategic Modules" subtitle="Current active direction for Koschei.">
+          <View className="gap-2">
+            <View className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3">
+              <Text className="text-zinc-100">Runtime Factory • ACTIVE</Text>
+            </View>
+            <View className="rounded-lg border border-violet-500/30 bg-violet-500/10 p-3">
+              <Text className="text-zinc-100">Artifact Forge • ACTIVE</Text>
+            </View>
+            <View className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
+              <Text className="text-zinc-100">Cyber Defense Center • NEW / ACTIVE</Text>
+              <Text className="mt-1 text-sm text-zinc-300">Defensive security audits, risk analysis, compliance checklists, incident planning, and human-approved security workflows.</Text>
+              <View className="mt-2"><Button label="Open Cyber Defense" onPress={() => router.push('/cyber-defense')} /></View>
+            </View>
+            {mediaEnabled && imageEnabled && <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Image Forge • Optional</Text></View>}
+            {mediaEnabled && audioEnabled && <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Audio Core • Optional</Text></View>}
+          </View>
+        </SectionCard>
 
         <SectionCard title="Latest Project Status" subtitle={newestProject?.title || 'No runtime project yet'} right={<StatusPill status={String(newestProject?.status || 'unknown')} />}>
           <Text className="text-xs text-zinc-400">Created: {formatTime(newestProject?.created_at)} • Updated: {formatTime(newestProject?.updated_at)}</Text>

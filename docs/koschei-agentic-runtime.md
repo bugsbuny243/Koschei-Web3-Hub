@@ -57,3 +57,7 @@ Koschei uses agent contracts to transform a single blueprint response into a sta
 ## Next Step (Phase 6.2)
 - Artifact generation remains synchronous in Phase 6.1.1.
 - Next planned step is Phase 6.2 async artifact worker migration.
+
+
+## Strategic routing update
+For cyber/security ideas, route conceptually to Cyber Defense Center. Rules: defensive-only, human approval required, no autonomous action, no offensive instructions.
