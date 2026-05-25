@@ -37,4 +37,17 @@ export const api = {
   getProjectArtifacts: (projectId: string) => request(`/api/runtime/projects/${projectId}/artifacts`, undefined, true),
   getArtifact: (artifactId: string) => request(`/api/artifacts/${artifactId}`, undefined, true),
   getArtifactFile: (artifactId: string, fileId: string) => request(`/api/artifacts/${artifactId}/files/${fileId}`, undefined, true),
+  downloadArtifactZip: async (artifactId: string): Promise<Blob> => {
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    const target = API_BASE ? `${API_BASE}/api/artifacts/${artifactId}/download` : `/api/artifacts/${artifactId}/download`;
+    const res = await fetch(target, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.error || `Request failed (${res.status})`);
+    }
+    return await res.blob();
+  },
 };

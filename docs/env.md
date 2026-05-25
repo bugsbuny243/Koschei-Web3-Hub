@@ -13,6 +13,7 @@ This document defines the canonical environment variables for Koschei Phase 3.
 - `TOGETHER_MODEL`: Default Together model.
 - `TOGETHER_MODEL_COMPLEX`: Together model for complex prompts.
 - `TOGETHER_MODEL_REASONING`: Together model for reasoning tasks.
+- `TOGETHER_MODEL_ARTIFACT`: Together model for Phase 6 artifact/code package generation.
 - `TOGETHER_MODEL_IMAGE`: Together image generation model.
 - `TOGETHER_MODEL_IMAGE_EDIT`: Together image editing model.
 - `TOGETHER_MODEL_VIDEO`: Together video model.
@@ -31,6 +32,13 @@ This document defines the canonical environment variables for Koschei Phase 3.
 - `TOGETHER_AI_ENABLED`: Primary feature flag for Together routing (default: `true`).
 - `TOGETHER_ENABLED`: Backward-compatible fallback feature flag for older environments.
 - `TOGETHER_MODEL_*`: Individual model overrides can be swapped per deployment.
+- Artifact model fallback order for Phase 6 artifact generation:
+  1. `TOGETHER_MODEL_ARTIFACT`
+  2. `TOGETHER_MODEL_CODE`
+  3. `TOGETHER_MODEL_COMPLEX`
+  4. `TOGETHER_MODEL`
+- `TOGETHER_ARTIFACT_TIMEOUT_SECONDS`: Artifact generation timeout in seconds (default: `120`).
+- `TOGETHER_ARTIFACT_MAX_TOKENS`: Artifact generation max tokens (default: `3000`).
 - `SEARCH_PROVIDER`: Search provider selector (default: `brave`).
 - `MEDIA_PROVIDER`: Media provider selector (default: `cloudinary`).
 
