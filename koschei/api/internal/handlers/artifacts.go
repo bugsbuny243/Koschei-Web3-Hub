@@ -34,15 +34,40 @@ type artifactAIResponse struct {
 }
 
 const artifactSystemPrompt = `You are Koschei Artifact Builder.
-Default language is Turkish for explanations and README.
-Generate safe project files from the provided Runtime Contract 5.3 file_plan.
+Default language is Turkish for README and explanations.
 Return ONLY valid JSON.
 Do not use markdown fences.
+Do not add text outside JSON.
 Do not execute anything.
 Do not include secrets, API keys, private keys, passwords, tokens, or real credentials.
 Do not include malware, exploit code, credential theft, bypass logic, or unauthorized access logic.
 For security/government/bank projects, generate defensive templates only.
-Generated code must be safe skeleton/MVP code, not dangerous automation.`
+Required JSON shape:
+{
+  "artifact_title": "string",
+  "artifact_summary": "string",
+  "files": [
+    {
+      "path": "string",
+      "language": "string",
+      "purpose": "string",
+      "action": "create|update|review_only",
+      "content": "string"
+    }
+  ],
+  "readme": "string",
+  "warnings": ["string"],
+  "next_steps": ["string"]
+}
+Rules:
+- Generate 3 to 10 safe files maximum.
+- Use only safe project paths.
+- Include README content in readme.
+- Use placeholders like YOUR_API_KEY_HERE, never real secrets.
+- Keep code skeleton/MVP-safe.
+- Do not include destructive shell commands.
+- Do not include code that attempts unauthorized access.
+- Proposed tool calls are still not executed.`
 
 func sanitizeArtifactFilePath(path string) (string, bool, string) {
 	p := strings.TrimSpace(path)
@@ -120,6 +145,17 @@ func buildArtifactAIResponse(raw string) (artifactAIResponse, string, error) {
 	return artifactAIResponse{}, raw, fmt.Errorf("invalid_json")
 }
 
+func (h *Handler) failArtifact(artifactID string, errorMessage string, metadata map[string]any) {
+	if strings.TrimSpace(artifactID) == "" {
+		return
+	}
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	metaBytes, _ := json.Marshal(metadata)
+	_, _ = h.DB.Exec(`UPDATE generated_artifacts SET status='failed',error_message=$2,metadata=coalesce(metadata,'{}'::jsonb) || $3::jsonb,updated_at=now() WHERE id=$1`, artifactID, errorMessage, string(metaBytes))
+}
+
 func (h *Handler) RuntimeArtifactsRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/artifacts/generate") {
 		h.GenerateArtifact(w, r)
@@ -162,7 +198,7 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		writeJSON(w, 404, map[string]string{"error": "not_found"})
 		return
 	}
-	isPriv, _, _ := h.userCreditsAndRole(claims.Sub)
+	isPriv, credits, _ := h.userCreditsAndRole(claims.Sub)
 	if email != claims.Email && !isPriv {
 		writeJSON(w, 403, map[string]string{"error": "forbidden"})
 		return
@@ -185,9 +221,13 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		var existingID string
 		var fileCount int
 		if err := h.DB.QueryRow(`SELECT id,file_count FROM generated_artifacts WHERE runtime_project_id=$1 AND status='completed' ORDER BY created_at DESC LIMIT 1`, projectID).Scan(&existingID, &fileCount); err == nil {
-			writeJSON(w, 200, map[string]any{"artifact_id": existingID, "status": "completed", "file_count": fileCount, "existing": true})
+			writeJSON(w, 200, map[string]any{"artifact_id": existingID, "status": "completed", "file_count": fileCount, "existing": true, "credits_charged": false})
 			return
 		}
+	}
+	if !isPriv && credits < 1 {
+		writeJSON(w, 402, map[string]any{"error": "insufficient_credits", "credits_charged": false})
+		return
 	}
 
 	artifactID := newID()
@@ -219,7 +259,7 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		}
 	}
 	if len(filePlan) == 0 {
-		_, _ = h.DB.Exec(`UPDATE generated_artifacts SET status='failed',error_message='missing_file_plan',updated_at=now() WHERE id=$1`, artifactID)
+		h.failArtifact(artifactID, "missing_file_plan", map[string]any{"credits_charged": false})
 		writeJSON(w, 400, map[string]string{"error": "missing_file_plan"})
 		return
 	}
@@ -261,13 +301,13 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		}
 	}
 	if callErr != nil {
-		_, _ = h.DB.Exec(`UPDATE generated_artifacts SET status='failed',error_message=$2,updated_at=now() WHERE id=$1`, artifactID, shortError(callErr.Error()))
+		h.failArtifact(artifactID, shortError(callErr.Error()), map[string]any{"credits_charged": false})
 		writeJSON(w, 502, map[string]any{"error": "generation_failed", "detail": shortError(callErr.Error()), "credits_charged": false})
 		return
 	}
 	ai, rawFallback, err := buildArtifactAIResponse(out)
 	if err != nil {
-		_, _ = h.DB.Exec(`UPDATE generated_artifacts SET status='failed',error_message='invalid_json',metadata=jsonb_set(metadata,'{raw_ai_output}',to_jsonb($2::text),true),updated_at=now() WHERE id=$1`, artifactID, out)
+		h.failArtifact(artifactID, "invalid_json", map[string]any{"raw_ai_output": out, "credits_charged": false})
 		writeJSON(w, 502, map[string]any{"error": "invalid_generation_json", "detail": "invalid_json", "raw_ai_output": rawFallback, "credits_charged": false})
 		return
 	}
@@ -281,7 +321,12 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		}{Path: "README.md", Language: "markdown", Purpose: "Project README", Action: "create", Content: ai.Readme})
 	}
 
-	tx, _ := h.DB.Begin()
+	tx, txErr := h.DB.Begin()
+	if txErr != nil {
+		h.failArtifact(artifactID, "db_failed", map[string]any{"credits_charged": false})
+		writeJSON(w, 500, map[string]string{"error": "db_failed"})
+		return
+	}
 	defer tx.Rollback()
 	count := 0
 	for _, f := range ai.Files {
@@ -304,23 +349,25 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		}
 	}
 	if count == 0 {
-		meta, _ := json.Marshal(map[string]any{"warnings": ai.Warnings})
-		_, _ = tx.Exec(`UPDATE generated_artifacts SET status='failed',error_message='no_safe_files_generated',metadata=$2::jsonb,updated_at=now() WHERE id=$1`, artifactID, string(meta))
+		h.failArtifact(artifactID, "no_safe_files_generated", map[string]any{"warnings": ai.Warnings, "credits_charged": false})
 		writeJSON(w, 400, map[string]any{"error": "no_safe_files_generated", "detail": "no_safe_files_generated", "credits_charged": false})
 		return
 	}
 	meta, _ := json.Marshal(map[string]any{"warnings": ai.Warnings, "next_steps": ai.NextSteps})
 	if _, err := tx.Exec(`UPDATE generated_artifacts SET status='completed',title=$2,summary=$3,file_count=$4,zip_ready=true,metadata=$5::jsonb,updated_at=now() WHERE id=$1`, artifactID, ai.ArtifactTitle, ai.ArtifactSummary, count, string(meta)); err != nil {
+		h.failArtifact(artifactID, "db_failed", map[string]any{"credits_charged": false})
 		writeJSON(w, 500, map[string]string{"error": "db_failed"})
 		return
 	}
 	if !isPriv {
 		if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, claims.Email, "artifact_generation"); err != nil {
+			h.failArtifact(artifactID, "insufficient_credits", map[string]any{"credits_charged": false})
 			writeJSON(w, 402, map[string]string{"error": "insufficient_credits"})
 			return
 		}
 	}
 	if err := tx.Commit(); err != nil {
+		h.failArtifact(artifactID, "db_failed", map[string]any{"credits_charged": false})
 		writeJSON(w, 500, map[string]string{"error": "db_failed"})
 		return
 	}
@@ -359,13 +406,24 @@ func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request) {
 	}
 	id := strings.TrimPrefix(r.URL.Path, "/api/artifacts/")
 	var owner string
-	_ = h.DB.QueryRow(`SELECT user_email FROM generated_artifacts WHERE id=$1`, strings.Split(id, "/")[0]).Scan(&owner)
+	if err := h.DB.QueryRow(`SELECT user_email FROM generated_artifacts WHERE id=$1`, strings.Split(id, "/")[0]).Scan(&owner); err != nil {
+		if err == sql.ErrNoRows {
+			writeJSON(w, 404, map[string]string{"error": "not_found"})
+			return
+		}
+		writeJSON(w, 500, map[string]string{"error": "db_failed"})
+		return
+	}
 	isPriv, _, _ := h.userCreditsAndRole(claims.Sub)
 	if owner != claims.Email && !isPriv {
 		writeJSON(w, 403, map[string]string{"error": "forbidden"})
 		return
 	}
-	rows, _ := h.DB.Query(`SELECT id,path,language,purpose,action,left(content,2000) FROM generated_files WHERE artifact_id=$1 ORDER BY path`, strings.Split(id, "/")[0])
+	rows, err := h.DB.Query(`SELECT id,path,language,purpose,action,left(content,2000) FROM generated_files WHERE artifact_id=$1 ORDER BY path`, strings.Split(id, "/")[0])
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db_failed"})
+		return
+	}
 	defer rows.Close()
 	files := []map[string]any{}
 	for rows.Next() {
@@ -418,7 +476,11 @@ func (h *Handler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 403, map[string]string{"error": "forbidden"})
 		return
 	}
-	rows, _ := h.DB.Query(`SELECT path,content,language,purpose,action FROM generated_files WHERE artifact_id=$1`, aid)
+	rows, err := h.DB.Query(`SELECT path,content,language,purpose,action FROM generated_files WHERE artifact_id=$1`, aid)
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": "db_failed"})
+		return
+	}
 	defer rows.Close()
 	type rf struct{ P, C, L, Pu, A string }
 	var fs []rf

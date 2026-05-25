@@ -6,6 +6,15 @@ Koschei is a multi-agent AI super-app and command universe.
 
 **Phase 6.1 — Artifact Generation Stabilizer + Product/README cleanup**
 
+### Phase 6.1 Final Fix Scope
+
+- Transaction safety for artifact failure states (no stuck `processing` rows).
+- Protected ZIP download flow for web via authenticated fetch.
+- Artifact-specific Together env variables and model fallback docs.
+- Stricter Artifact Builder JSON schema prompt and safety rules.
+- Generated files are stored in DB only (no repo writes, no shell execution).
+- Proposed tool calls remain proposal-only and are not executed.
+
 ## Completed
 
 - auth

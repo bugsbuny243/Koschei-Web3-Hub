@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button, Card, ErrorState, Input } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -61,8 +61,6 @@ export default function Dashboard() {
   const [artifacts, setArtifacts] = useState<any[]>([]);
   const [artifactDetail, setArtifactDetail] = useState<any>(null);
   const [expandedFileId, setExpandedFileId] = useState('');
-  const apiBaseUrl = String(process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
-
   const safeJson = (value: any) => {
     if (value && typeof value === 'object') return value;
     if (typeof value === 'string') {
@@ -301,15 +299,22 @@ export default function Dashboard() {
   };
 
   const downloadArtifactZip = async (artifactId: string) => {
-    if (!apiBaseUrl) {
-      setError('EXPO_PUBLIC_API_URL is not set.');
+    if (Platform.OS !== 'web') {
+      setError('Protected download links for mobile will be added next.');
       return;
     }
-    const downloadUrl = `${apiBaseUrl}/api/artifacts/${artifactId}/download`;
     try {
-      await Linking.openURL(downloadUrl);
-    } catch {
-      setError('Download endpoint is protected; signed download link will be added next.');
+      const blob = await api.downloadArtifactZip(artifactId);
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = 'koschei-artifact.zip';
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(objectUrl);
+    } catch (e: any) {
+      setError(e?.message || 'artifact_download_failed');
     }
   };
   const runAiTest = async () => {
