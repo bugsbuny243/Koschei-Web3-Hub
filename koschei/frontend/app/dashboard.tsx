@@ -148,6 +148,11 @@ export default function Dashboard() {
           proposed_tool_calls: steps?.output?.proposed_tool_calls || [],
           review_status: review?.output?.review_status || '-',
           guardrail_flags: review?.output?.guardrail_flags || [],
+          validation_status: review?.validation?.valid === false || delivery?.validation?.valid === false ? 'invalid' : 'valid',
+          validation_review_needed: Boolean(review?.validation?.review_needed ?? delivery?.validation?.review_needed),
+          validation_blocked: Boolean(review?.validation?.blocked ?? delivery?.validation?.blocked),
+          validation_warnings: review?.validation?.warnings || delivery?.validation?.warnings || [],
+          validation_errors: review?.validation?.errors || delivery?.validation?.errors || [],
           delivery_package: delivery?.output?.delivery_package || [],
           next_steps: delivery?.output?.next_steps || [],
           raw_ai_output: delivery?.raw_ai_output || output?.raw_ai_output,
@@ -403,6 +408,9 @@ export default function Dashboard() {
                 <Text className="text-zinc-100">Review status: {String(latestOutput.review_status || '-')}</Text>
                 {String(latestOutput.project_status || '').toLowerCase() === 'review_needed' && <Text className="text-amber-300">Human review required before Phase 6 artifact generation.</Text>}
                 <Text className="text-zinc-100">Guardrail flags: {Array.isArray(latestOutput.guardrail_flags) ? latestOutput.guardrail_flags.join(' • ') : '-'}</Text>
+                <Text className="text-zinc-100">Validation status: {String(latestOutput.validation_status || '-')} {latestOutput.validation_blocked ? '(blocked)' : latestOutput.validation_review_needed ? '(review_needed)' : ''}</Text>
+                <Text className="text-amber-300">Validation warnings: {Array.isArray(latestOutput.validation_warnings) && latestOutput.validation_warnings.length > 0 ? latestOutput.validation_warnings.join(' • ') : '-'}</Text>
+                <Text className="text-red-400">Validation errors: {Array.isArray(latestOutput.validation_errors) && latestOutput.validation_errors.length > 0 ? latestOutput.validation_errors.join(' • ') : '-'}</Text>
                 <Text className="text-zinc-100">Delivery package: {Array.isArray(latestOutput.delivery_package) ? latestOutput.delivery_package.join(' • ') : '-'}</Text>
                 <Text className="text-zinc-100">Next steps: {Array.isArray(latestOutput.next_steps) ? latestOutput.next_steps.join(' • ') : '-'}</Text>
                 {!!latestOutput.raw_ai_output && (
