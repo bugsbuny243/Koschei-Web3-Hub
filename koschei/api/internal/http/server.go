@@ -58,7 +58,21 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 		}
 		http.NotFound(w, r)
 	})))
-	mux.HandleFunc("/api/runtime/projects/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetRuntimeProject))))
+	mux.HandleFunc("/api/runtime/projects/", requiresDB(h, handlers.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/artifacts") {
+			h.RuntimeArtifactsRoute(w, r)
+			return
+		}
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/artifacts/generate") {
+			h.RuntimeArtifactsRoute(w, r)
+			return
+		}
+		if r.Method == http.MethodGet {
+			h.GetRuntimeProject(w, r)
+			return
+		}
+		http.NotFound(w, r)
+	})))
 	mux.HandleFunc("/api/runtime/tasks", requiresDB(h, handlers.RequireAuth(method("GET", h.ListRuntimeTasks))))
 	mux.HandleFunc("/api/runtime/tasks/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetRuntimeTask))))
 	mux.HandleFunc("/api/runtime/logs/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetRuntimeLogs))))
@@ -75,6 +89,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/ai/generate", requiresDB(h, handlers.RequireAuth(method("POST", h.AIGenerate))))
 	mux.HandleFunc("/api/ai/jobs", requiresDB(h, handlers.RequireAuth(method("GET", h.AIJobs))))
 	mux.HandleFunc("/api/ai/image", requiresDB(h, handlers.RequireAuth(method("POST", h.AIImageGenerate))))
+	mux.HandleFunc("/api/artifacts/", requiresDB(h, handlers.RequireAuth(h.ArtifactRoute)))
 	mux.HandleFunc("/api/owner/payment-requests", requiresDB(h, method("GET", h.OwnerPaymentRequests)))
 	mux.HandleFunc("/api/owner/activate-plan", requiresDB(h, method("POST", h.OwnerActivatePlan)))
 	mux.HandleFunc("/api/owner/grant-credits", requiresDB(h, method("POST", h.OwnerGrantCredits)))

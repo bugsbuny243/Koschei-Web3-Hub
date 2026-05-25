@@ -33,4 +33,8 @@ export const api = {
   getRuntimeTasks: () => request('/api/runtime/tasks', undefined, true),
   getRuntimeLogs: (projectId: string) => request(`/api/runtime/logs/${projectId}`, undefined, true),
   createRuntimeProject: (body: unknown) => request('/api/runtime/projects', { method: 'POST', body: JSON.stringify(body) }, true),
+  generateArtifact: (projectId: string, force = false) => request(`/api/runtime/projects/${projectId}/artifacts/generate`, { method: 'POST', body: JSON.stringify({ force }) }, true),
+  getProjectArtifacts: (projectId: string) => request(`/api/runtime/projects/${projectId}/artifacts`, undefined, true),
+  getArtifact: (artifactId: string) => request(`/api/artifacts/${artifactId}`, undefined, true),
+  getArtifactFile: (artifactId: string, fileId: string) => request(`/api/artifacts/${artifactId}/files/${fileId}`, undefined, true),
 };

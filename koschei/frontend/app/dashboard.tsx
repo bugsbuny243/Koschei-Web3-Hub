@@ -57,6 +57,10 @@ export default function Dashboard() {
   const [email, setEmail] = useState('');
   const [latestOutput, setLatestOutput] = useState<any>(null);
   const [runtimeLoading, setRuntimeLoading] = useState(false);
+  const [artifactLoading, setArtifactLoading] = useState(false);
+  const [artifacts, setArtifacts] = useState<any[]>([]);
+  const [artifactDetail, setArtifactDetail] = useState<any>(null);
+  const [expandedFileId, setExpandedFileId] = useState('');
 
   const safeJson = (value: any) => {
     if (value && typeof value === 'object') return value;
@@ -123,6 +127,10 @@ export default function Dashboard() {
     setTasks(taskRows);
     const sortedByTime = [...projectRows].sort((a, b) => parseTimestamp(b) - parseTimestamp(a));
     const newest = sortedByTime[0];
+
+    if (newest?.id) {
+      try { setArtifacts(await api.getProjectArtifacts(newest.id)); } catch { setArtifacts([]); }
+    }
 
     if (newest && String(newest?.status || '').toLowerCase() === 'failed') {
       const failedLogs: any[] = await api.getRuntimeLogs(newest.id);
@@ -264,6 +272,32 @@ export default function Dashboard() {
     }
   };
 
+
+  const generateArtifact = async () => {
+    if (!newestProject?.id || artifactLoading) return;
+    try {
+      setArtifactLoading(true);
+      setError('Generating artifact package...');
+      await api.generateArtifact(newestProject.id, false);
+      await refreshRuntimeData();
+      setError('Artifact package generated.');
+    } catch (e: any) {
+      setError(e?.message || 'artifact_generation_failed');
+    } finally {
+      setArtifactLoading(false);
+    }
+  };
+
+  const loadArtifactDetail = async (artifactId: string) => {
+    const data = await api.getArtifact(artifactId);
+    setArtifactDetail(data);
+  };
+
+  const loadArtifactFile = async (artifactId: string, fileId: string) => {
+    const data = await api.getArtifactFile(artifactId, fileId);
+    setExpandedFileId(fileId);
+    setArtifactDetail((prev: any) => ({ ...prev, files: (prev?.files || []).map((f: any) => f.id === fileId ? { ...f, content: data?.content } : f) }));
+  };
   const runAiTest = async () => {
     if (aiLoading) return;
     setAiError('');
@@ -407,6 +441,14 @@ export default function Dashboard() {
                 <Text className="text-zinc-100">Proposed tool calls (Not executed yet): {Array.isArray(latestOutput.proposed_tool_calls) ? latestOutput.proposed_tool_calls.map((c: any) => `${c?.tool_name || '-'} [${c?.risk_level || '-'} | approval: ${String(c?.requires_human_approval)}`).join(' • ') : '-'}</Text>
                 <Text className="text-zinc-100">Review status: {String(latestOutput.review_status || '-')}</Text>
                 {String(latestOutput.project_status || '').toLowerCase() === 'review_needed' && <Text className="text-amber-300">Human review required before Phase 6 artifact generation.</Text>}
+                <View className="mt-2">
+                  <Button
+                    label={artifactLoading ? 'Generating artifact package...' : 'Generate Artifact Package'}
+                    onPress={generateArtifact}
+                    disabled={!newestProject || !['completed'].includes(String(newestProject?.status || '').toLowerCase()) || artifactLoading}
+                  />
+                  {String(newestProject?.status || '').toLowerCase() === 'review_needed' && <Text className="mt-1 text-amber-300">Human review required before artifact generation.</Text>}
+                </View>
                 <Text className="text-zinc-100">Guardrail flags: {Array.isArray(latestOutput.guardrail_flags) ? latestOutput.guardrail_flags.join(' • ') : '-'}</Text>
                 <Text className="text-zinc-100">Validation status: {String(latestOutput.validation_status || '-')} {latestOutput.validation_blocked ? '(blocked)' : latestOutput.validation_review_needed ? '(review_needed)' : ''}</Text>
                 <Text className="text-amber-300">Validation warnings: {Array.isArray(latestOutput.validation_warnings) && latestOutput.validation_warnings.length > 0 ? latestOutput.validation_warnings.join(' • ') : '-'}</Text>
@@ -424,6 +466,37 @@ export default function Dashboard() {
             {!!latestOutput?.failed_message && (
               <View className="mt-2 gap-2">
                 <Text className="text-red-300">Latest runtime failed: {String(latestOutput.failed_message)}</Text>
+              </View>
+            )}
+          </Card>
+
+
+          <Card>
+            <Text className="text-lg font-semibold text-white">Artifacts ({artifacts.length})</Text>
+            {artifacts.length === 0 && <Text className="mt-2 text-zinc-500">No artifacts yet</Text>}
+            <View className="mt-2 gap-2">
+              {artifacts.map((a) => (
+                <View key={a.id} className="rounded-lg border border-cyan-500/20 bg-[#040a15] p-2">
+                  <Text className="text-zinc-100">{a.title || a.id}</Text>
+                  <Text className="text-zinc-400">Status: {a.status} • Files: {a.file_count}</Text>
+                  <Text className="text-zinc-300">{a.summary || '-'}</Text>
+                  <View className="mt-2 flex-row gap-2">
+                    <Button label="View Files" onPress={() => loadArtifactDetail(a.id)} />
+                    {a.status === 'completed' && <Button label="Download ZIP" onPress={() => setError(`Download: /api/artifacts/${a.id}/download`)} />}
+                  </View>
+                </View>
+              ))}
+            </View>
+            {!!artifactDetail?.files && (
+              <View className="mt-3 gap-2">
+                {artifactDetail.files.map((f: any) => (
+                  <View key={f.id} className="rounded border border-violet-500/20 p-2">
+                    <Text className="text-zinc-100">{f.path} [{f.language || '-'} | {f.action || '-'}]</Text>
+                    <Text className="text-zinc-400">{f.purpose || '-'}</Text>
+                    <Button label="Preview" onPress={() => loadArtifactFile(artifactDetail.id, f.id)} />
+                    {expandedFileId === f.id && !!f.content && <Text selectable className="mt-2 text-xs text-zinc-300">{String(f.content)}</Text>}
+                  </View>
+                ))}
               </View>
             )}
           </Card>

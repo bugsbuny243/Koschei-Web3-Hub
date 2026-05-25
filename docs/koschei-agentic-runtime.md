@@ -35,3 +35,10 @@ Koschei uses agent contracts to transform a single blueprint response into a sta
 - Human approval is mandatory for high-risk, security, government, bank, and smart-glasses workflows.
 - The async runtime worker flow is required (`processRuntimeProject`).
 - Old sync runtime generation flow must not be used.
+
+## Phase 6 — Artifact & Code Package Generation
+- Runtime Contract 5.3 now feeds Koschei Artifact Builder.
+- file_plan entries are transformed into generated_files rows.
+- proposed_tool_calls remain proposed-only and are not executed.
+- Generated package is downloadable as zip.
+- No shell execution, no repo write, no deploy in this phase.
