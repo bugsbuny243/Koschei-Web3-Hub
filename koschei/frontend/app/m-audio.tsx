@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 export default function MAudioScreen() {
+  const isEnabled = String(process.env.EXPO_PUBLIC_ENABLE_AUDIO_CORE || 'false').toLowerCase() === 'true' && String(process.env.ENABLE_MEDIA_MODULES || 'false').toLowerCase() === 'true';
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -19,6 +20,10 @@ export default function MAudioScreen() {
   const soundRef = useRef<Audio.Sound | null>(null);
 
   const generate = async () => {
+    if (!isEnabled) {
+      setError('Module paused');
+      return;
+    }
     if (!input.trim()) {
       setError('Metin gir');
       return;
@@ -86,6 +91,7 @@ export default function MAudioScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+      {!isEnabled ? <Text style={styles.paused}>This module is currently paused. Koschei is focusing on Cyber Defense and Runtime Factory.</Text> : null}
       <Text style={styles.title}>SESLENDİR</Text>
 
       <TextInput
@@ -98,7 +104,7 @@ export default function MAudioScreen() {
         style={styles.input}
       />
 
-      <Pressable onPress={generate} style={styles.button}>
+      <Pressable onPress={generate} style={[styles.button, !isEnabled ? styles.disabled : null]} disabled={!isEnabled}>
         <Text style={styles.buttonText}>SESLENDİR</Text>
       </Pressable>
 
@@ -164,4 +170,6 @@ const styles = StyleSheet.create({
     color: '#ff6b6b',
     fontSize: 14,
   },
+  paused: { color: '#facc15', fontSize: 14 },
+  disabled: { opacity: 0.5 },
 });

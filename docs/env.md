@@ -55,3 +55,12 @@ The following were removed because they are out-of-scope for Phase 3 or from dep
 ## Security warning
 
 Any variable prefixed with `EXPO_PUBLIC_` is bundled into the client app and is publicly visible. Never store secrets in `EXPO_PUBLIC_*` variables.
+
+
+## Strategic module flags
+- EXPO_PUBLIC_ENABLE_IMAGE_FORGE=false
+- EXPO_PUBLIC_ENABLE_AUDIO_CORE=false
+- ENABLE_MEDIA_MODULES=false
+- TOGETHER_MODEL_SECURITY=
+- TOGETHER_SECURITY_TIMEOUT_SECONDS=120
+- TOGETHER_SECURITY_MAX_TOKENS=2500
