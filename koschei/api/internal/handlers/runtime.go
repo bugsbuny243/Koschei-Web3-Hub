@@ -20,101 +20,96 @@ type ownerRuntimeStatusReq struct {
 	Status string `json:"status"`
 }
 
-type runtimeBlueprint struct {
-	ProjectTitle           string   `json:"project_title"`
-	ProjectType            string   `json:"project_type"`
-	UserIntent             string   `json:"user_intent"`
-	MVPScope               []string `json:"mvp_scope"`
+type RuntimeAgentContract struct {
+	ProjectTitle    string             `json:"project_title"`
+	ProjectType     string             `json:"project_type"`
+	UserIntent      string             `json:"user_intent"`
+	Intake          IntakeOutput       `json:"intake"`
+	Blueprint       BlueprintOutput    `json:"blueprint"`
+	Architecture    ArchitectureOutput `json:"architecture"`
+	FilePlan        FilePlanOutput     `json:"file_plan"`
+	ToolPlan        ToolPlanOutput     `json:"tool_plan"`
+	Review          ReviewOutput       `json:"review"`
+	Delivery        DeliveryOutput     `json:"delivery"`
+	RawAIOutput     string             `json:"raw_ai_output,omitempty"`
+	ContractVersion string             `json:"contract_version"`
+}
+type IntakeOutput struct {
+	Summary             string   `json:"summary"`
+	DetectedProjectType string   `json:"detected_project_type"`
+	TargetUser          string   `json:"target_user"`
+	Complexity          string   `json:"complexity"`
+	Assumptions         []string `json:"assumptions"`
+}
+type BlueprintOutput struct {
+	ProjectTitle    string   `json:"project_title"`
+	ProjectType     string   `json:"project_type"`
+	MVPScope        []string `json:"mvp_scope"`
+	SuccessCriteria []string `json:"success_criteria"`
+	NextAction      string   `json:"next_action"`
+}
+type ArchitectureOutput struct {
 	RequiredInfrastructure []string `json:"required_infrastructure"`
-	Architecture           []string `json:"architecture"`
-	FilePlan               []string `json:"file_plan"`
-	APIPlan                []string `json:"api_plan"`
+	BackendPlan            []string `json:"backend_plan"`
+	FrontendPlan           []string `json:"frontend_plan"`
 	DatabasePlan           []string `json:"database_plan"`
-	AIModelUsage           []string `json:"ai_model_usage"`
-	BuildSteps             []string `json:"build_steps"`
-	Risks                  []string `json:"risks"`
-	ReviewChecklist        []string `json:"review_checklist"`
-	DeliveryPackage        []string `json:"delivery_package"`
-	NextAction             string   `json:"next_action"`
-	RawAIOutput            string   `json:"raw_ai_output,omitempty"`
-}
-
-type intakeOutput struct {
-	Summary     string `json:"summary"`
-	ProjectType string `json:"project_type"`
-	UserIntent  string `json:"user_intent"`
-}
-
-type blueprintOutput struct {
-	ProjectTitle string   `json:"project_title"`
-	ProjectType  string   `json:"project_type"`
-	UserIntent   string   `json:"user_intent"`
-	MVPScope     []string `json:"mvp_scope"`
-	NextAction   string   `json:"next_action"`
-}
-
-type architectureOutput struct {
-	RequiredInfrastructure []string `json:"required_infrastructure"`
-	Architecture           []string `json:"architecture"`
 	APIPlan                []string `json:"api_plan"`
-	DatabasePlan           []string `json:"database_plan"`
+	ExternalServices       []string `json:"external_services"`
 	AIModelUsage           []string `json:"ai_model_usage"`
-	PlannedActions         []string `json:"planned_actions"`
 }
-
-type filePlanOutput struct {
-	FilePlan       []string `json:"file_plan"`
-	PlannedActions []string `json:"planned_actions"`
-	FileWrites     string   `json:"file_writes"`
+type FilePlanOutput struct {
+	Files []FilePlanItem `json:"files"`
 }
-
-type reviewOutput struct {
-	Risks           []string `json:"risks"`
-	ReviewChecklist []string `json:"review_checklist"`
+type FilePlanItem struct {
+	Path, Purpose, Language, Priority, Action string
 }
-
-type deliveryOutput struct {
+type ToolPlanOutput struct {
+	ProposedToolCalls []ProposedToolCall `json:"proposed_tool_calls"`
+}
+type ProposedToolCall struct {
+	ToolName              string         `json:"tool_name"`
+	Intent                string         `json:"intent"`
+	Arguments             map[string]any `json:"arguments"`
+	RiskLevel             string         `json:"risk_level"`
+	RequiresHumanApproval bool           `json:"requires_human_approval"`
+}
+type ReviewOutput struct {
+	Risks               []string `json:"risks"`
+	GuardrailFlags      []string `json:"guardrail_flags"`
+	SecurityNotes       []string `json:"security_notes"`
+	MissingRequirements []string `json:"missing_requirements"`
+	ReviewStatus        string   `json:"review_status"`
+}
+type DeliveryOutput struct {
 	DeliveryPackage []string `json:"delivery_package"`
-	Status          string   `json:"status"`
-	PlannedActions  []string `json:"planned_actions"`
-	Saveable        bool     `json:"saveable"`
+	UserSummary     string   `json:"user_summary"`
+	NextSteps       []string `json:"next_steps"`
+	ReadyForPhase6  bool     `json:"ready_for_phase6"`
+}
+type ValidationResult struct {
+	Valid, ReviewNeeded, Blocked bool
+	Errors, Warnings             []string
 }
 
-const runtimeSystemPrompt = `You are Koschei Runtime Factory.
+const runtimeSystemPrompt = `You are Koschei Agentic Runtime Factory.
 Default language is Turkish.
 Return ONLY valid JSON.
-Do not wrap in markdown.
-Do not use ` + "```json" + ` fences.
+Do not use markdown.
+Do not wrap in ` + "```json" + `.
 Do not add explanation outside JSON.
-Be concise.
-Each array should contain 3 to 7 items.
-Do not write huge paragraphs.
-Keep total response compact but useful.
-For PUBG-like, GTA-like, TikTok-like, marketplace-like, YouTube-like:
-- do not refuse
-- do not promise instant full clone
-- make it original/IP-safe
-- MVP first
-- list real infrastructure
-- list risks
-- list build sequence
 Required JSON shape:
 {
+  "contract_version": "5.3",
   "project_title": "string",
   "project_type": "string",
   "user_intent": "string",
-  "mvp_scope": ["string"],
-  "required_infrastructure": ["string"],
-  "architecture": ["string"],
-  "file_plan": ["string"],
-  "api_plan": ["string"],
-  "database_plan": ["string"],
-  "ai_model_usage": ["string"],
-  "build_steps": ["string"],
-  "risks": ["string"],
-  "review_checklist": ["string"],
-  "delivery_package": ["string"],
-  "next_action": "string"
+  "intake": {},
+  "blueprint": {},
+  "architecture": {},
+  "file_plan": {},
+  "tool_plan": {},
+  "review": {},
+  "delivery": {}
 }`
 
 func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
@@ -216,8 +211,8 @@ func (h *Handler) processRuntimeProject(projectID, authSub, email, prompt string
 		_ = h.markRuntimeFailed(projectID, failureMsg, "blueprint", aiErr.Error())
 		return
 	}
-	bp := buildRuntimeBlueprint(aiOut, prompt)
-	if _, err = h.completeRuntimePipeline(projectID, authSub, email, bp, isPrivileged); err != nil {
+	contract := buildRuntimeAgentContract(aiOut, prompt)
+	if _, err = h.completeRuntimePipeline(projectID, authSub, email, contract, isPrivileged); err != nil {
 		_ = h.markRuntimeFailed(projectID, "Runtime AI pipeline failed: "+shortError(err.Error()), "delivery", err.Error())
 	}
 }
@@ -258,13 +253,13 @@ func (h *Handler) runRuntimeProductionPipeline(projectID, authSub, email, title,
 		_ = h.markRuntimeFailed(projectID, failureMsg, "blueprint", err.Error())
 		return nil, responseErr
 	}
-	bp := buildRuntimeBlueprint(aiOut, prompt)
-	creditCharged, err := h.completeRuntimePipeline(projectID, authSub, email, bp, isPrivileged)
+	contract := buildRuntimeAgentContract(aiOut, prompt)
+	creditCharged, err := h.completeRuntimePipeline(projectID, authSub, email, contract, isPrivileged)
 	if err != nil {
 		_ = h.markRuntimeFailed(projectID, "Runtime AI pipeline failed: "+shortError(err.Error()), "delivery", err.Error())
 		return nil, err
 	}
-	return h.fetchRuntimeResponse(projectID, bp, creditCharged)
+	return h.fetchRuntimeResponse(projectID, contract, creditCharged)
 }
 func (h *Handler) callTogetherRuntimeBlueprint(projectID, prompt string) (string, error) {
 	model := firstEnv("TOGETHER_MODEL_RUNTIME", "TOGETHER_MODEL_REASONING", "TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL")
@@ -322,151 +317,147 @@ func isTimeoutError(err error) bool {
 	msg := strings.ToLower(err.Error())
 	return strings.Contains(msg, "context deadline exceeded") || strings.Contains(msg, "client.timeout exceeded")
 }
-func buildRuntimeBlueprint(raw, prompt string) runtimeBlueprint {
-	var bp runtimeBlueprint
-	raw = strings.TrimSpace(raw)
-	if err := json.Unmarshal([]byte(raw), &bp); err != nil {
-		start := strings.Index(raw, "{")
-		end := strings.LastIndex(raw, "}")
-		if start >= 0 && end > start {
-			if extractErr := json.Unmarshal([]byte(raw[start:end+1]), &bp); extractErr == nil {
-				goto defaults
-			}
-		}
-		if raw != "" {
-			bp.RawAIOutput = raw
-			bp.ReviewChecklist = append(bp.ReviewChecklist, "raw_ai_output_available")
-			bp.DeliveryPackage = append(bp.DeliveryPackage, "raw_ai_output_available")
-		}
-	}
-defaults:
-	if strings.TrimSpace(bp.ProjectTitle) == "" {
-		bp.ProjectTitle = normalizeRuntimeTitle("", prompt)
-	}
-	if strings.TrimSpace(bp.ProjectType) == "" {
-		bp.ProjectType = "software_mvp"
-	}
-	if strings.TrimSpace(bp.UserIntent) == "" {
-		bp.UserIntent = prompt
-	}
-	if len(bp.MVPScope) == 0 {
-		bp.MVPScope = []string{"MVP hedefleri netleştir", "Çekirdek özellikleri çıkar", "İlk sürümü üret"}
-	}
-	if len(bp.RequiredInfrastructure) == 0 {
-		bp.RequiredInfrastructure = []string{"backend api", "database", "auth", "monitoring"}
-	}
-	if len(bp.Architecture) == 0 {
-		bp.Architecture = []string{"istemci", "api servisi", "veri katmanı"}
-	}
-	if len(bp.FilePlan) == 0 {
-		bp.FilePlan = []string{"src/app", "src/api", "migrations"}
-	}
-	if len(bp.BuildSteps) == 0 {
-		bp.BuildSteps = []string{"Analiz", "MVP geliştirme", "Test ve yayın"}
-	}
-	if len(bp.Risks) == 0 {
-		bp.Risks = []string{"kapsam şişmesi", "altyapı maliyeti"}
-	}
-	if len(bp.ReviewChecklist) == 0 {
-		bp.ReviewChecklist = []string{"testler geçiyor", "güvenlik kontrolleri tamam"}
-	}
-	if len(bp.DeliveryPackage) == 0 {
-		bp.DeliveryPackage = []string{"kaynak kod", "deploy notları", "test raporu"}
-	}
-	if strings.TrimSpace(bp.NextAction) == "" {
-		bp.NextAction = "MVP backlog’unu onayla ve sprint 1’i başlat."
-	}
-	return bp
-}
+
 func (h *Handler) markRuntimeFailed(projectID, msg, taskType, taskErr string) error {
 	_, _ = h.DB.Exec(`UPDATE runtime_projects SET status='failed', updated_at=NOW() WHERE id=$1`, projectID)
 	_, _ = h.DB.Exec(`UPDATE runtime_tasks SET status='failed', error=$3, updated_at=NOW() WHERE project_id=$1 AND task_type=$2`, projectID, taskType, shortError(taskErr))
 	_, err := h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'error',$3)`, newID(), projectID, msg)
 	return err
 }
-func (h *Handler) completeRuntimePipeline(projectID, authSub, email string, bp runtimeBlueprint, isPrivileged bool) (bool, error) {
-	plannedActions := []string{"create_file_plan", "propose_api_routes", "propose_db_migration", "estimate_infra", "prepare_delivery_package"}
-	intakeOut := intakeOutput{Summary: bp.UserIntent, ProjectType: bp.ProjectType, UserIntent: bp.UserIntent}
-	blueprintOut := blueprintOutput{ProjectTitle: bp.ProjectTitle, ProjectType: bp.ProjectType, UserIntent: bp.UserIntent, MVPScope: bp.MVPScope, NextAction: bp.NextAction}
-	architectureOut := architectureOutput{
-		RequiredInfrastructure: bp.RequiredInfrastructure,
-		Architecture:           bp.Architecture,
-		APIPlan:                bp.APIPlan,
-		DatabasePlan:           bp.DatabasePlan,
-		AIModelUsage:           bp.AIModelUsage,
-		PlannedActions:         []string{"propose_api_routes", "propose_db_migration", "estimate_infra"},
+func buildRuntimeAgentContract(raw, prompt string) RuntimeAgentContract {
+	var c RuntimeAgentContract
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return c
 	}
-	filePlanOut := filePlanOutput{
-		FilePlan:       bp.FilePlan,
-		PlannedActions: []string{"create_file_plan"},
-		FileWrites:     "planned_only_no_writes",
+	if err := json.Unmarshal([]byte(raw), &c); err != nil {
+		start := strings.Index(raw, "{")
+		end := strings.LastIndex(raw, "}")
+		if start < 0 || end <= start || json.Unmarshal([]byte(raw[start:end+1]), &c) != nil {
+			c.RawAIOutput = raw
+		}
 	}
-	reviewOut := reviewOutput{Risks: bp.Risks, ReviewChecklist: bp.ReviewChecklist}
-	deliveryOut := deliveryOutput{
-		DeliveryPackage: bp.DeliveryPackage,
-		Status:          "ready",
-		PlannedActions:  []string{"prepare_delivery_package"},
-		Saveable:        true,
+	if c.ContractVersion == "" {
+		c.ContractVersion = "5.3"
 	}
-	if strings.TrimSpace(bp.RawAIOutput) != "" {
-		deliveryOut.Saveable = false
-		deliveryOut.Status = "review_needed"
+	if c.ProjectTitle == "" {
+		c.ProjectTitle = normalizeRuntimeTitle("", prompt)
 	}
+	if c.ProjectType == "" {
+		c.ProjectType = "software_mvp"
+	}
+	if c.UserIntent == "" {
+		c.UserIntent = prompt
+	}
+	if len(c.Blueprint.MVPScope) == 0 {
+		c.Blueprint.MVPScope = []string{"MVP kapsamını netleştir"}
+	}
+	if len(c.Architecture.RequiredInfrastructure) == 0 {
+		c.Architecture.RequiredInfrastructure = []string{"backend", "database"}
+	}
+	if len(c.FilePlan.Files) == 0 {
+		c.FilePlan.Files = []FilePlanItem{{Path: "docs/plan.md", Purpose: "plan", Language: "markdown", Priority: "high", Action: "review_only"}}
+	}
+	if len(c.Delivery.NextSteps) == 0 {
+		c.Delivery.NextSteps = []string{"İnsan onayı al"}
+	}
+	if c.Review.ReviewStatus == "" {
+		c.Review.ReviewStatus = "review_needed"
+	}
+	if c.RawAIOutput != "" {
+		c.Review.GuardrailFlags = append(c.Review.GuardrailFlags, "invalid_json")
+	}
+	return c
+}
 
-	taskOutputs := map[string]map[string]any{
-		"intake":       {"summary": intakeOut.Summary, "project_type": intakeOut.ProjectType, "user_intent": intakeOut.UserIntent},
-		"blueprint":    {"project_title": blueprintOut.ProjectTitle, "project_type": blueprintOut.ProjectType, "user_intent": blueprintOut.UserIntent, "mvp_scope": blueprintOut.MVPScope, "next_action": blueprintOut.NextAction},
-		"architecture": {"required_infrastructure": architectureOut.RequiredInfrastructure, "architecture": architectureOut.Architecture, "api_plan": architectureOut.APIPlan, "database_plan": architectureOut.DatabasePlan, "ai_model_usage": architectureOut.AIModelUsage, "planned_actions": architectureOut.PlannedActions},
-		"file_plan":    {"file_plan": filePlanOut.FilePlan, "planned_actions": filePlanOut.PlannedActions, "file_writes": filePlanOut.FileWrites},
-		"build_steps":  {"build_steps": bp.BuildSteps},
-		"review":       {"risks": reviewOut.Risks, "review_checklist": reviewOut.ReviewChecklist},
-		"delivery":     {"delivery_package": deliveryOut.DeliveryPackage, "status": deliveryOut.Status, "planned_actions": deliveryOut.PlannedActions, "saveable": deliveryOut.Saveable, "pipeline_actions": plannedActions},
+func validateRuntimeAgentContract(contract RuntimeAgentContract) ValidationResult {
+	v := ValidationResult{Valid: true}
+	if contract.ProjectTitle == "" {
+		v.Valid = false
+		v.Errors = append(v.Errors, "project_title required")
 	}
-	if strings.TrimSpace(bp.RawAIOutput) != "" {
-		taskOutputs["blueprint"]["raw_ai_output"] = bp.RawAIOutput
-		taskOutputs["delivery"]["raw_ai_output"] = bp.RawAIOutput
+	if contract.ProjectType == "" {
+		v.Valid = false
+		v.Errors = append(v.Errors, "project_type required")
+	}
+	if contract.UserIntent == "" {
+		v.Valid = false
+		v.Errors = append(v.Errors, "user_intent required")
+	}
+	if len(contract.Blueprint.MVPScope) == 0 {
+		v.Valid = false
+		v.Errors = append(v.Errors, "blueprint.mvp_scope required")
+	}
+	if len(contract.Architecture.RequiredInfrastructure) == 0 {
+		v.Valid = false
+		v.Errors = append(v.Errors, "architecture.required_infrastructure required")
+	}
+	if len(contract.FilePlan.Files) == 0 {
+		v.Valid = false
+		v.Errors = append(v.Errors, "file_plan.files required")
+	}
+	if len(contract.Delivery.NextSteps) == 0 {
+		v.Valid = false
+		v.Errors = append(v.Errors, "delivery.next_steps required")
+	}
+	for _, f := range contract.FilePlan.Files {
+		if strings.Contains(f.Path, "../") {
+			v.Blocked = true
+			v.Errors = append(v.Errors, "dangerous file path")
+		}
+	}
+	for _, t := range contract.ToolPlan.ProposedToolCalls {
+		if strings.EqualFold(t.RiskLevel, "high") && !t.RequiresHumanApproval {
+			v.ReviewNeeded = true
+			v.Warnings = append(v.Warnings, "high risk tool call without approval")
+		}
+	}
+	if contract.Review.ReviewStatus == "blocked" {
+		v.Blocked = true
+	}
+	if contract.Review.ReviewStatus == "review_needed" {
+		v.ReviewNeeded = true
+	}
+	return v
+}
+
+func (h *Handler) completeRuntimePipeline(projectID, authSub, email string, contract RuntimeAgentContract, isPrivileged bool) (bool, error) {
+	validation := validateRuntimeAgentContract(contract)
+	status := "completed"
+	if validation.Blocked {
+		status = "failed"
+	} else if validation.ReviewNeeded || !validation.Valid {
+		status = "review_needed"
+	}
+	taskOutputs := map[string]map[string]any{
+		"intake":       {"agent": "intake", "contract_version": "5.3", "output": contract.Intake, "validation": validation},
+		"blueprint":    {"agent": "blueprint", "contract_version": "5.3", "output": contract.Blueprint, "project_title": contract.ProjectTitle, "project_type": contract.ProjectType, "user_intent": contract.UserIntent, "validation": validation},
+		"architecture": {"agent": "architecture", "contract_version": "5.3", "output": contract.Architecture, "validation": validation},
+		"file_plan":    {"agent": "file_plan", "contract_version": "5.3", "output": contract.FilePlan, "validation": validation},
+		"build_steps":  {"agent": "tool_plan", "contract_version": "5.3", "output": contract.ToolPlan, "note": "Proposed tool calls only. No tool execution in Phase 5.3.", "validation": validation},
+		"review":       {"agent": "review", "contract_version": "5.3", "output": contract.Review, "validation": validation},
+		"delivery":     {"agent": "delivery", "contract_version": "5.3", "output": contract.Delivery, "raw_ai_output": contract.RawAIOutput, "validation": validation},
 	}
 	tx, err := h.DB.Begin()
 	if err != nil {
 		return false, err
 	}
 	defer tx.Rollback()
-	reviewNeeded := false
 	for _, t := range []string{"intake", "blueprint", "architecture", "file_plan", "build_steps", "review", "delivery"} {
-		if !runtimeTaskOutputValid(t, taskOutputs[t]) {
-			taskOutputs[t]["status"] = "review_needed"
-			taskOutputs[t]["validation_error"] = "required_fields_missing"
-			reviewNeeded = true
-		}
 		out, _ := json.Marshal(taskOutputs[t])
-		taskStatus := "completed"
-		taskErr := any(nil)
-		if reviewNeeded && t == "delivery" {
-			taskStatus = "review_needed"
-			taskErr = "delivery_requires_review_before_save"
+		ts := "completed"
+		if status != "completed" && t == "delivery" {
+			ts = status
 		}
-		if _, err = tx.Exec(`UPDATE runtime_tasks SET status=$4, output_json=$3, error=$5, updated_at=NOW() WHERE project_id=$1 AND task_type=$2`, projectID, t, out, taskStatus, taskErr); err != nil {
-			return false, err
-		}
-		if _, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Task completed: "+t); err != nil {
+		if _, err = tx.Exec(`UPDATE runtime_tasks SET status=$4, output_json=$3, updated_at=NOW() WHERE project_id=$1 AND task_type=$2`, projectID, t, out, ts); err != nil {
 			return false, err
 		}
 	}
-	projectStatus := "completed"
-	if reviewNeeded || !deliveryOut.Saveable {
-		projectStatus = "review_needed"
-	}
-	if _, err = tx.Exec(`UPDATE runtime_projects SET status=$3, title=$2, updated_at=NOW() WHERE id=$1`, projectID, bp.ProjectTitle, projectStatus); err != nil {
-		return false, err
-	}
-	if _, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "AI blueprint generated"); err != nil {
-		return false, err
-	}
-	if _, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Runtime workflow completed"); err != nil {
+	if _, err = tx.Exec(`UPDATE runtime_projects SET status=$3, title=$2, updated_at=NOW() WHERE id=$1`, projectID, contract.ProjectTitle, status); err != nil {
 		return false, err
 	}
 	creditCharged := false
-	if !isPrivileged && projectStatus == "completed" {
+	if !isPrivileged && status == "completed" {
 		if err := h.applyCreditChargeTxWithReason(tx, authSub, email, "runtime_project"); err != nil {
 			return false, err
 		}
@@ -478,39 +469,7 @@ func (h *Handler) completeRuntimePipeline(projectID, authSub, email string, bp r
 	return creditCharged, nil
 }
 
-func runtimeTaskOutputValid(taskType string, out map[string]any) bool {
-	required := map[string][]string{
-		"intake":       {"summary", "project_type", "user_intent"},
-		"blueprint":    {"project_title", "project_type", "user_intent", "mvp_scope", "next_action"},
-		"architecture": {"required_infrastructure", "architecture", "api_plan", "database_plan", "ai_model_usage"},
-		"file_plan":    {"file_plan"},
-		"build_steps":  {"build_steps"},
-		"review":       {"risks", "review_checklist"},
-		"delivery":     {"delivery_package", "status"},
-	}
-	for _, key := range required[taskType] {
-		v, ok := out[key]
-		if !ok {
-			return false
-		}
-		switch val := v.(type) {
-		case string:
-			if strings.TrimSpace(val) == "" {
-				return false
-			}
-		case []string:
-			if len(val) == 0 {
-				return false
-			}
-		case []any:
-			if len(val) == 0 {
-				return false
-			}
-		}
-	}
-	return true
-}
-func (h *Handler) fetchRuntimeResponse(projectID string, bp runtimeBlueprint, creditCharged bool) (map[string]any, error) {
+func (h *Handler) fetchRuntimeResponse(projectID string, contract RuntimeAgentContract, creditCharged bool) (map[string]any, error) {
 	rows, err := h.DB.Query(`SELECT id,project_id,email,task_type,status,input_json,output_json,error,created_at,updated_at FROM runtime_tasks WHERE project_id=$1 ORDER BY created_at ASC`, projectID)
 	if err != nil {
 		return nil, err
@@ -532,7 +491,7 @@ func (h *Handler) fetchRuntimeResponse(projectID string, bp runtimeBlueprint, cr
 	if err := h.DB.QueryRow(`SELECT COUNT(*) FROM runtime_logs WHERE project_id=$1`, projectID).Scan(&logCount); err != nil {
 		return nil, err
 	}
-	return map[string]any{"project_id": projectID, "status": "completed", "credits_charged": creditCharged, "task_count": taskCount, "log_count": logCount, "blueprint": bp, "tasks": tasks}, nil
+	return map[string]any{"project_id": projectID, "status": "completed", "credits_charged": creditCharged, "task_count": taskCount, "log_count": logCount, "blueprint": contract, "tasks": tasks}, nil
 }
 func (h *Handler) ListRuntimeProjects(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
