@@ -28,6 +28,12 @@ Legacy documentation may still reference Phase 3 or Phase 4, but active developm
 ## Upcoming Phases
 
 - **Phase 6 — Artifact & Code Package Generation (Current/Next Active)**
+- **Phase 6.1 — Artifact Generation Stabilizer**
+  - Safety/path/content hardening for artifact files.
+  - Robust JSON/JSONB parsing and fallback handling.
+  - Safer ZIP generation and preview route stabilization.
+  - Credit charging only after successful artifact completion.
+  - Generated files remain DB-only; generated code and proposed tool calls are not executed.
 - Phase 7 — Owner God Mode
 - Phase 8 — Public SaaS Billing
 - Phase 9 — Media Factory

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button, Card, ErrorState, Input } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -61,6 +61,7 @@ export default function Dashboard() {
   const [artifacts, setArtifacts] = useState<any[]>([]);
   const [artifactDetail, setArtifactDetail] = useState<any>(null);
   const [expandedFileId, setExpandedFileId] = useState('');
+  const apiBaseUrl = String(process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
 
   const safeJson = (value: any) => {
     if (value && typeof value === 'object') return value;
@@ -298,6 +299,19 @@ export default function Dashboard() {
     setExpandedFileId(fileId);
     setArtifactDetail((prev: any) => ({ ...prev, files: (prev?.files || []).map((f: any) => f.id === fileId ? { ...f, content: data?.content } : f) }));
   };
+
+  const downloadArtifactZip = async (artifactId: string) => {
+    if (!apiBaseUrl) {
+      setError('EXPO_PUBLIC_API_URL is not set.');
+      return;
+    }
+    const downloadUrl = `${apiBaseUrl}/api/artifacts/${artifactId}/download`;
+    try {
+      await Linking.openURL(downloadUrl);
+    } catch {
+      setError('Download endpoint is protected; signed download link will be added next.');
+    }
+  };
   const runAiTest = async () => {
     if (aiLoading) return;
     setAiError('');
@@ -482,7 +496,7 @@ export default function Dashboard() {
                   <Text className="text-zinc-300">{a.summary || '-'}</Text>
                   <View className="mt-2 flex-row gap-2">
                     <Button label="View Files" onPress={() => loadArtifactDetail(a.id)} />
-                    {a.status === 'completed' && <Button label="Download ZIP" onPress={() => setError(`Download: /api/artifacts/${a.id}/download`)} />}
+                    {a.status === 'completed' && <Button label="Download ZIP" onPress={() => downloadArtifactZip(a.id)} />}
                   </View>
                 </View>
               ))}

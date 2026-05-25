@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -48,16 +49,75 @@ func sanitizeArtifactFilePath(path string) (string, bool, string) {
 	if p == "" {
 		return "", false, "empty_path"
 	}
+	if strings.HasPrefix(p, "/") {
+		return "", false, "absolute_path_not_allowed"
+	}
 	lower := strings.ToLower(p)
-	for _, b := range []string{"../", "..\\", "/etc", "/root", "/home", "c:\\", "windows", "system32", ".env", "id_rsa"} {
+	for _, b := range []string{"../", "..\\", "/etc", "/root", "/home", "c:\\", "windows/system32", "windows\\system32", ".env", "id_rsa", "private_key", "secrets.", "credentials."} {
 		if strings.Contains(lower, b) {
 			return "", false, "unsafe_path"
 		}
 	}
-	if strings.HasPrefix(p, "/") {
-		return "", false, "absolute_path_not_allowed"
-	}
 	return strings.ReplaceAll(p, "\\", "/"), true, ""
+}
+
+func sanitizeArtifactContent(content string) (string, bool) {
+	c := content
+	lower := strings.ToLower(c)
+	if strings.Contains(c, "BEGIN PRIVATE KEY") || strings.Contains(c, "BEGIN RSA PRIVATE KEY") {
+		return "", false
+	}
+	if strings.Contains(lower, "password=") || strings.Contains(lower, "token=") || strings.Contains(lower, "api_key") {
+		c = strings.ReplaceAll(c, "API_KEY", "YOUR_API_KEY_HERE")
+		c = strings.ReplaceAll(c, "api_key", "YOUR_API_KEY_HERE")
+		c = strings.ReplaceAll(c, "SECRET", "YOUR_SECRET_HERE")
+	}
+	return c, true
+}
+
+func decodeJSONB(value any) map[string]any {
+	if value == nil {
+		return map[string]any{}
+	}
+	switch v := value.(type) {
+	case map[string]any:
+		return v
+	case []byte:
+		var out map[string]any
+		_ = json.Unmarshal(v, &out)
+		if out != nil {
+			return out
+		}
+	case string:
+		var out map[string]any
+		_ = json.Unmarshal([]byte(v), &out)
+		if out != nil {
+			return out
+		}
+	case json.RawMessage:
+		var out map[string]any
+		_ = json.Unmarshal(v, &out)
+		if out != nil {
+			return out
+		}
+	}
+	return map[string]any{}
+}
+
+func buildArtifactAIResponse(raw string) (artifactAIResponse, string, error) {
+	var ai artifactAIResponse
+	if err := json.Unmarshal([]byte(raw), &ai); err == nil {
+		return ai, "", nil
+	}
+	start := strings.Index(raw, "{")
+	end := strings.LastIndex(raw, "}")
+	if start >= 0 && end > start {
+		sub := raw[start : end+1]
+		if err := json.Unmarshal([]byte(sub), &ai); err == nil {
+			return ai, "", nil
+		}
+	}
+	return artifactAIResponse{}, raw, fmt.Errorf("invalid_json")
 }
 
 func (h *Handler) RuntimeArtifactsRoute(w http.ResponseWriter, r *http.Request) {
@@ -148,12 +208,10 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		var tt string
 		var out any
 		_ = rows.Scan(&tt, &out)
-		payload[tt] = out
+		decoded := decodeJSONB(out)
+		payload[tt] = decoded
 		if tt == "file_plan" {
-			b, _ := json.Marshal(out)
-			var obj map[string]any
-			_ = json.Unmarshal(b, &obj)
-			if m, ok := obj["output"].(map[string]any); ok {
+			if m, ok := decoded["output"].(map[string]any); ok {
 				if files, ok := m["files"].([]any); ok {
 					filePlan = files
 				}
@@ -166,20 +224,51 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		return
 	}
 	promptBytes, _ := json.Marshal(map[string]any{"contract_version": "5.3", "project_id": projectID, "file_plan": filePlan, "runtime_payload": payload})
-	model := strings.TrimSpace(os.Getenv("TOGETHER_MODEL"))
+	model := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_ARTIFACT"))
+	if model == "" {
+		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_CODE"))
+	}
+	if model == "" {
+		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_COMPLEX"))
+	}
+	if model == "" {
+		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL"))
+	}
 	if model == "" {
 		model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 	}
-	out, callErr := h.callTogetherWithSystemTimeout(model, artifactSystemPrompt, string(promptBytes), 60*time.Second)
+	timeoutSeconds := 120
+	if v := strings.TrimSpace(os.Getenv("TOGETHER_ARTIFACT_TIMEOUT_SECONDS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			timeoutSeconds = n
+		}
+	}
+	maxTokens := 3000
+	if v := strings.TrimSpace(os.Getenv("TOGETHER_ARTIFACT_MAX_TOKENS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			maxTokens = n
+		}
+	}
+	timeout := time.Duration(timeoutSeconds) * time.Second
+	out, callErr := h.callTogetherWithSystemTimeoutAndMaxTokens(model, artifactSystemPrompt, string(promptBytes), timeout, maxTokens)
+	if callErr != nil && strings.Contains(strings.ToLower(callErr.Error()), "timeout") {
+		fallback := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_COMPLEX"))
+		if fallback == "" || fallback == model {
+			fallback = strings.TrimSpace(os.Getenv("TOGETHER_MODEL"))
+		}
+		if fallback != "" && fallback != model {
+			out, callErr = h.callTogetherWithSystemTimeoutAndMaxTokens(fallback, artifactSystemPrompt, string(promptBytes), timeout, maxTokens)
+		}
+	}
 	if callErr != nil {
 		_, _ = h.DB.Exec(`UPDATE generated_artifacts SET status='failed',error_message=$2,updated_at=now() WHERE id=$1`, artifactID, shortError(callErr.Error()))
-		writeJSON(w, 502, map[string]string{"error": "generation_failed"})
+		writeJSON(w, 502, map[string]any{"error": "generation_failed", "detail": shortError(callErr.Error()), "credits_charged": false})
 		return
 	}
-	var ai artifactAIResponse
-	if err := json.Unmarshal([]byte(out), &ai); err != nil {
+	ai, rawFallback, err := buildArtifactAIResponse(out)
+	if err != nil {
 		_, _ = h.DB.Exec(`UPDATE generated_artifacts SET status='failed',error_message='invalid_json',metadata=jsonb_set(metadata,'{raw_ai_output}',to_jsonb($2::text),true),updated_at=now() WHERE id=$1`, artifactID, out)
-		writeJSON(w, 502, map[string]string{"error": "invalid_generation_json"})
+		writeJSON(w, 502, map[string]any{"error": "invalid_generation_json", "detail": "invalid_json", "raw_ai_output": rawFallback, "credits_charged": false})
 		return
 	}
 	if strings.TrimSpace(ai.Readme) != "" {
@@ -205,13 +294,20 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		if a != "create" && a != "update" && a != "review_only" {
 			a = "review_only"
 		}
-		c := f.Content
-		if strings.Contains(strings.ToLower(c), "api_key") {
-			c = strings.ReplaceAll(c, "API_KEY", "YOUR_API_KEY_HERE")
+		c, contentSafe := sanitizeArtifactContent(f.Content)
+		if !contentSafe {
+			ai.Warnings = append(ai.Warnings, "skipped "+f.Path+": unsafe_content")
+			continue
 		}
 		if _, err := tx.Exec(`INSERT INTO generated_files (id,artifact_id,runtime_project_id,path,language,purpose,action,content,content_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,md5($8))`, newID(), artifactID, projectID, path, f.Language, f.Purpose, a, c); err == nil {
 			count++
 		}
+	}
+	if count == 0 {
+		meta, _ := json.Marshal(map[string]any{"warnings": ai.Warnings})
+		_, _ = tx.Exec(`UPDATE generated_artifacts SET status='failed',error_message='no_safe_files_generated',metadata=$2::jsonb,updated_at=now() WHERE id=$1`, artifactID, string(meta))
+		writeJSON(w, 400, map[string]any{"error": "no_safe_files_generated", "detail": "no_safe_files_generated", "credits_charged": false})
+		return
 	}
 	meta, _ := json.Marshal(map[string]any{"warnings": ai.Warnings, "next_steps": ai.NextSteps})
 	if _, err := tx.Exec(`UPDATE generated_artifacts SET status='completed',title=$2,summary=$3,file_count=$4,zip_ready=true,metadata=$5::jsonb,updated_at=now() WHERE id=$1`, artifactID, ai.ArtifactTitle, ai.ArtifactSummary, count, string(meta)); err != nil {
@@ -228,7 +324,7 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		writeJSON(w, 500, map[string]string{"error": "db_failed"})
 		return
 	}
-	writeJSON(w, 200, map[string]any{"artifact_id": artifactID, "status": "completed", "file_count": count, "warnings": ai.Warnings})
+	writeJSON(w, 200, map[string]any{"artifact_id": artifactID, "status": "completed", "file_count": count, "warnings": ai.Warnings, "credits_charged": !isPriv})
 }
 
 func (h *Handler) ListProjectArtifacts(w http.ResponseWriter, r *http.Request) {
@@ -287,11 +383,11 @@ func (h *Handler) GetArtifactFile(w http.ResponseWriter, r *http.Request) {
 	}
 	p := strings.TrimPrefix(r.URL.Path, "/api/artifacts/")
 	seg := strings.Split(p, "/")
-	if len(seg) < 4 {
+	if len(seg) < 3 || seg[1] != "files" {
 		writeJSON(w, 404, map[string]string{"error": "not_found"})
 		return
 	}
-	aid, fid := seg[0], seg[3]
+	aid, fid := seg[0], seg[2]
 	var owner, path, lang, purpose, action, content string
 	if err := h.DB.QueryRow(`SELECT a.user_email,f.path,f.language,f.purpose,f.action,f.content FROM generated_files f JOIN generated_artifacts a ON a.id=f.artifact_id WHERE f.artifact_id=$1 AND f.id=$2`, aid, fid).Scan(&owner, &path, &lang, &purpose, &action, &content); err != nil {
 		writeJSON(w, 404, map[string]string{"error": "not_found"})
@@ -338,10 +434,19 @@ func (h *Handler) DownloadArtifact(w http.ResponseWriter, r *http.Request) {
 		zf, _ := zw.Create(f.P)
 		_, _ = zf.Write([]byte(f.C))
 	}
-	readme, _ := zw.Create("README.md")
-	_, _ = readme.Write([]byte("# " + title + "\n\n" + summary + "\n"))
+	hasReadme := false
+	for _, f := range fs {
+		if strings.EqualFold(f.P, "README.md") {
+			hasReadme = true
+			break
+		}
+	}
+	if !hasReadme {
+		readme, _ := zw.Create("README.md")
+		_, _ = readme.Write([]byte("# " + title + "\n\n" + summary + "\n"))
+	}
 	manifest, _ := zw.Create("koschei-artifact-manifest.json")
-	m, _ := json.MarshalIndent(map[string]any{"artifact_id": aid, "generated_at": time.Now().UTC(), "file_count": len(fs)}, "", "  ")
+	m, _ := json.MarshalIndent(map[string]any{"artifact_id": aid, "generated_at": time.Now().UTC(), "file_count": len(fs), "title": title, "summary": summary, "safety_note": "Generated by Koschei. Review before production use."}, "", "  ")
 	_, _ = manifest.Write(m)
 	_ = zw.Close()
 	w.Header().Set("Content-Type", "application/zip")

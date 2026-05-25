@@ -42,3 +42,9 @@ Koschei uses agent contracts to transform a single blueprint response into a sta
 - proposed_tool_calls remain proposed-only and are not executed.
 - Generated package is downloadable as zip.
 - No shell execution, no repo write, no deploy in this phase.
+
+## Phase 6.1 — Artifact Generation Stabilizer
+- Artifact generation is hardened for safer parsing, preview routing, zip assembly, and credit behavior.
+- Generated files are stored in database tables (`generated_artifacts`, `generated_files`) only.
+- Generated code is not executed.
+- Proposed tool calls are still not executed.
