@@ -23,7 +23,7 @@ func validPlan(plan string) bool {
 
 func validStatus(status string) bool {
 	switch status {
-	case "queued", "running", "completed", "failed", "cancelled":
+	case "queued", "running", "completed", "failed", "cancelled", "review_needed":
 		return true
 	default:
 		return false
