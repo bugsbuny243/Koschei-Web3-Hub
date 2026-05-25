@@ -1,145 +1,97 @@
-# Koschei — The Immortal AI Platform
+# Koschei — The Immortal AI Command Universe
 
-Koschei is being rebuilt as a **two-surface AI SaaS platform**:
+Koschei is a multi-agent AI super-app and command universe for generating software, media, runtime plans, and delivery packages through coordinated AI workflows.
 
-1. **Public Koschei SaaS** for normal users
-2. **Private Owner God Mode** for Onur to manually fulfill Fiverr/client orders
+Built as a public SaaS with an owner-grade operational surface, Koschei combines agentic orchestration, artifact production, and immersive command interfaces into one serious production platform.
 
-This repository now documents and organizes the platform around a **Go + Python + React Native + TypeScript** architecture.
+## 1) What Koschei Is
 
----
+Koschei is not a single-feature AI chatbot. It is a command universe where multiple AI capabilities are organized into coordinated product surfaces:
 
-## Core Product Vision
+- Public SaaS for users building and shipping outcomes.
+- Owner God Mode for high-control operational workflows.
+- Agentic Runtime Factory for structured AI execution planning.
+- Artifact & Code Package Generation for delivery-ready outputs.
+- Media Factory direction for image/video/audio production pipelines.
+- 3D Command Universe UI direction for advanced interaction.
 
-Koschei provides production-grade AI creation workflows for:
-- code generation (apps/sites/scripts)
-- image generation
-- video generation
-- audio tooling
+Hybrid Security Shield remains a future/final phase objective only.
 
-Public users access these capabilities through subscription and credit plans.
+## 2) Product Surfaces
 
-Owner God Mode is intentionally manual for client-delivery operations:
-- no Fiverr login integration
-- no scraping
-- no bot messaging
-- no automatic Fiverr delivery
-- owner manually enters order requirements
-- Koschei generates outputs
-- owner manually delivers work in Fiverr
+### Public SaaS
+User-facing product for AI-assisted generation, credit usage, and plan-based workflows.
 
----
+### Owner God Mode
+Private operational surface for owner/admin-level execution, oversight, and controlled fulfillment flows.
 
-## Mandatory Stack (No Next.js)
+### Runtime Factory
+Agentic planning and execution contract system that structures how AI tasks are proposed, reviewed, and produced.
 
-> **Important:** Next.js is not part of the target architecture.
+### Media Factory
+Media generation and processing direction for visual/audio outputs in dedicated pipelines.
 
-- **Backend API:** Go / Golang
-- **AI & media workers:** Python
-- **Frontend app:** React Native + TypeScript
-- **Web delivery of app UI:** React Native Web / Expo Web
-- **Database:** PostgreSQL / Neon
-- **Media storage:** Cloudinary
-- **AI model provider:** Together AI
-- **Deployment:** Railway
+### UI Lab / Command Universe
+Experimental and advanced command-interface layer, including the 3D command universe direction.
 
----
+## 3) Current Official Phase
 
-## Target Architecture
+- Official focus: **Phase 6 / Phase 6.1 Artifact Generation Stabilization**.
+- Some legacy docs may still mention Phase 3 or Phase 4 references.
 
-### 1) Go Backend Service
-Responsible for:
-- REST API endpoints
-- authentication and session logic
-- subscription and credit accounting
-- owner role protection
-- public SaaS APIs
-- private owner order APIs
-- database access
+## 4) Completed Capabilities
 
-### 2) Python Worker Service
-Responsible for:
-- AI generation jobs
-- image/video/audio processing pipelines
-- prompt routing
-- Cloudinary upload helpers
-- background queue execution
+- Auth / Neon Auth / JWKS
+- Dashboard
+- Credits
+- Together AI routing
+- Phase 4 AI chat/code/reason
+- Async Runtime Project
+- Agentic Runtime Contract 5.3
+- Guardrails / `review_needed`
+- Artifact generation tables/endpoints
+- UI Lab
 
-### 3) React Native + TypeScript Frontend
-Responsible for:
-- public landing experience
-- authenticated user dashboard
-- owner god mode panel
-- mobile-ready UI
-- web compatibility via React Native Web / Expo Web
+## 5) Active Work
 
-### 4) Two Product Surfaces
-- **Public SaaS Surface:** user-facing generation and account workflows
-- **Owner Surface (God Mode):** private operational workspace for manual client fulfillment
+- Artifact generation stabilizer
+- `generated_files` safety hardening
+- ZIP download reliability
+- No code execution policy remains enforced
 
----
+## 6) Monetization
 
-## Repository Structure (Refactor Target)
+- Koschei currently uses Shopier plan links for SaaS purchases.
+- Manual activation is active for now (owner/admin activation after payment).
+- Automated Shopier webhook/payment reconciliation is not enabled yet.
 
-```text
-koschei/
-  backend/                 # Go REST API service
-    cmd/server/
-    internal/
-      auth/
-      handlers/
-      services/
-      db/
-      models/
-      billing/
-      owner/
-  workers/                 # Python workers for generation + media pipelines
-    app/
-      jobs/
-      processors/
-      prompt_router/
-      cloudinary/
-      providers/together/
-    tests/
-  frontend/                # React Native + TypeScript app
-    src/
-      features/public/
-      features/dashboard/
-      features/owner/
-      shared/
-    app.config.ts
-  infra/
-    railway/
-    migrations/
-  docs/
-    IMPLEMENTATION_PLAN.md
-```
+## 7) Stack
 
----
+- Go API
+- React Native / Expo Web frontend
+- TypeScript
+- Neon Postgres + Neon Auth
+- Together AI (primary provider)
+- Cloudinary
+- Railway
+- Python workers planned for media/worker pipelines
 
-## Migration Notes
+> No Next.js target architecture.
 
-Current repository contents may include legacy web artifacts from prior experiments. The refactor direction is:
+## 8) Safety Principles
 
-1. Remove framework assumptions tied to Next.js and Next API routes
-2. Move API responsibilities into Go service routes
-3. Move generation/media logic into Python workers
-4. Consolidate UI into React Native + TypeScript with web support through React Native Web / Expo Web
+- Generated code is stored, not executed.
+- Proposed tool calls are not executed yet.
+- No shell execution from AI output.
+- No repository write actions from AI output yet.
+- Security/government/bank workflow concepts are defensive-only and human-approved.
 
-Detailed rollout is in `docs/IMPLEMENTATION_PLAN.md`.
+## 9) Roadmap
 
----
-
-## Deployment Targets
-
-- **API:** Railway service for Go backend
-- **Workers:** Railway worker service(s) for Python job processing
-- **Frontend Web:** Expo Web build deployment on Railway (or static edge target)
-- **Database:** Neon PostgreSQL
-- **Media:** Cloudinary assets and delivery
-
----
-
-## Status
-
-This repo is in active architecture transition toward the stack above.
+- Phase 6.1 — Artifact Stabilizer
+- Phase 7 — Owner God Mode
+- Phase 8 — Public SaaS Billing
+- Phase 9 — Media Factory
+- Phase 10 — 3D Command Universe UI
+- Phase 11 — Ops / Hardening
+- Final Phase — Hybrid Security Shield

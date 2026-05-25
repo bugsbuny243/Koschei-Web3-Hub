@@ -5,9 +5,9 @@ Koschei is a multi-agent AI super-app / AI command universe.
 
 ## Official Current Phase
 
-**Phase 5.3 — Agentic Runtime Contract Stabilization**
+**Phase 6.1 — Artifact Generation Stabilizer + Product/README cleanup**
 
-Legacy documentation may still reference Phase 3 or Phase 4, but active development is officially in **Phase 5.3**.
+Legacy documentation may still reference Phase 3 or Phase 4, but active development is officially in **Phase 6.1**.
 
 ## Completed Foundations
 
@@ -23,12 +23,19 @@ Legacy documentation may still reference Phase 3 or Phase 4, but active developm
 - Agentic Runtime Contract 5.3
 - Proposed tool calls
 - Guardrails / review_needed
+- Artifact generation tables/endpoints
 - UI Lab
+
+## Monetization
+
+- Current monetization uses Shopier Starter / Pro / Studio products.
+- Plan activation is manual for now (owner/admin).
+- Later billing phase will add automated reconciliation/webhooks.
+- Standalone older products are documented but are not part of main SaaS plans unless reactivated.
 
 ## Upcoming Phases
 
-- **Phase 6 — Artifact & Code Package Generation (Current/Next Active)**
-- **Phase 6.1 — Artifact Generation Stabilizer**
+- Phase 6.1 — Artifact Generation Stabilizer
   - Safety/path/content hardening for artifact files.
   - Robust JSON/JSONB parsing and fallback handling.
   - Safer ZIP generation and preview route stabilization.
