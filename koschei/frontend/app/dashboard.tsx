@@ -85,7 +85,7 @@ const taskDescription: Record<string, string> = {
 };
 
 export default function Dashboard() {
-  const mediaEnabled = String(process.env.ENABLE_MEDIA_MODULES || 'false').toLowerCase() === 'true';
+  const mediaEnabled = String(process.env.EXPO_PUBLIC_ENABLE_MEDIA_MODULES || 'false').toLowerCase() === 'true';
   const imageEnabled = String(process.env.EXPO_PUBLIC_ENABLE_IMAGE_FORGE || 'false').toLowerCase() === 'true';
   const audioEnabled = String(process.env.EXPO_PUBLIC_ENABLE_AUDIO_CORE || 'false').toLowerCase() === 'true';
   const [prompt, setPrompt] = useState('');
@@ -321,6 +321,7 @@ export default function Dashboard() {
               <Text className="mt-1 text-sm text-zinc-300">Defensive security audits, risk analysis, compliance checklists, incident planning, and human-approved security workflows.</Text>
               <View className="mt-2"><Button label="Open Cyber Defense" onPress={() => router.push('/cyber-defense')} /></View>
             </View>
+            <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Media Factory • PAUSED / Later</Text><Text className="mt-1 text-xs text-zinc-400">Media modules are paused to reduce cost and focus on Runtime + Cyber Defense.</Text></View>
             {mediaEnabled && imageEnabled && <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Image Forge • Optional</Text></View>}
             {mediaEnabled && audioEnabled && <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Audio Core • Optional</Text></View>}
           </View>
