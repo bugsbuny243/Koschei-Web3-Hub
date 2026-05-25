@@ -61,7 +61,11 @@ type FilePlanOutput struct {
 	Files []FilePlanItem `json:"files"`
 }
 type FilePlanItem struct {
-	Path, Purpose, Language, Priority, Action string
+	Path     string `json:"path"`
+	Purpose  string `json:"purpose"`
+	Language string `json:"language"`
+	Priority string `json:"priority"`
+	Action   string `json:"action"`
 }
 type ToolPlanOutput struct {
 	ProposedToolCalls []ProposedToolCall `json:"proposed_tool_calls"`
@@ -87,30 +91,96 @@ type DeliveryOutput struct {
 	ReadyForPhase6  bool     `json:"ready_for_phase6"`
 }
 type ValidationResult struct {
-	Valid, ReviewNeeded, Blocked bool
-	Errors, Warnings             []string
+	Valid        bool     `json:"valid"`
+	ReviewNeeded bool     `json:"review_needed"`
+	Blocked      bool     `json:"blocked"`
+	Errors       []string `json:"errors"`
+	Warnings     []string `json:"warnings"`
 }
 
 const runtimeSystemPrompt = `You are Koschei Agentic Runtime Factory.
 Default language is Turkish.
 Return ONLY valid JSON.
 Do not use markdown.
-Do not wrap in ` + "```json" + `.
+Do not wrap in code fences.
 Do not add explanation outside JSON.
-Required JSON shape:
+Use contract_version "5.3".
+Required JSON root:
 {
   "contract_version": "5.3",
   "project_title": "string",
   "project_type": "string",
   "user_intent": "string",
-  "intake": {},
-  "blueprint": {},
-  "architecture": {},
-  "file_plan": {},
-  "tool_plan": {},
-  "review": {},
-  "delivery": {}
-}`
+  "intake": {
+    "summary": "string",
+    "detected_project_type": "string",
+    "target_user": "string",
+    "complexity": "low|medium|high|enterprise",
+    "assumptions": ["string"]
+  },
+  "blueprint": {
+    "project_title": "string",
+    "project_type": "string",
+    "mvp_scope": ["string"],
+    "success_criteria": ["string"],
+    "next_action": "string"
+  },
+  "architecture": {
+    "required_infrastructure": ["string"],
+    "backend_plan": ["string"],
+    "frontend_plan": ["string"],
+    "database_plan": ["string"],
+    "api_plan": ["string"],
+    "external_services": ["string"],
+    "ai_model_usage": ["string"]
+  },
+  "file_plan": {
+    "files": [
+      {
+        "path": "string",
+        "purpose": "string",
+        "language": "string",
+        "priority": "low|medium|high",
+        "action": "create|update|review_only"
+      }
+    ]
+  },
+  "tool_plan": {
+    "proposed_tool_calls": [
+      {
+        "tool_name": "create_file_plan|propose_api_routes|propose_db_migration|estimate_infra|prepare_delivery_package|review_security_risk|summarize_project",
+        "intent": "string",
+        "arguments": {},
+        "risk_level": "low|medium|high",
+        "requires_human_approval": true
+      }
+    ]
+  },
+  "review": {
+    "risks": ["string"],
+    "guardrail_flags": ["string"],
+    "security_notes": ["string"],
+    "missing_requirements": ["string"],
+    "review_status": "approved|review_needed|blocked"
+  },
+  "delivery": {
+    "delivery_package": ["string"],
+    "user_summary": "string",
+    "next_steps": ["string"],
+    "ready_for_phase6": true
+  }
+}
+Prompt rules:
+- Be concise but useful.
+- Arrays should contain 3 to 7 items.
+- For serious app/game ideas, MVP first.
+- For bank/government/security ideas:
+  - defensive monitoring only
+  - no unauthorized access
+  - no offensive exploitation
+  - no autonomous shutdown
+  - human approval required
+  - likely review_needed`
 
 func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 	if !h.Limiter.allow("runtime-project:"+clientIP(r), 20, 10_000_000_000) {
@@ -212,55 +282,12 @@ func (h *Handler) processRuntimeProject(projectID, authSub, email, prompt string
 		return
 	}
 	contract := buildRuntimeAgentContract(aiOut, prompt)
+	_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Agentic contract generated")
 	if _, err = h.completeRuntimePipeline(projectID, authSub, email, contract, isPrivileged); err != nil {
 		_ = h.markRuntimeFailed(projectID, "Runtime AI pipeline failed: "+shortError(err.Error()), "delivery", err.Error())
 	}
 }
 
-func (h *Handler) runRuntimeProductionPipeline(projectID, authSub, email, title, prompt string, isPrivileged bool) (map[string]any, error) {
-	taskOrder := []string{"intake", "blueprint", "architecture", "file_plan", "build_steps", "review", "delivery"}
-	tx, err := h.DB.Begin()
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	if _, err = tx.Exec(`INSERT INTO runtime_projects (id,email,title,prompt,status) VALUES ($1,$2,$3,$4,'running')`, projectID, email, title, prompt); err != nil {
-		return nil, err
-	}
-	for _, m := range []string{"Project created", "Runtime AI pipeline started"} {
-		if _, err = tx.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, m); err != nil {
-			return nil, err
-		}
-	}
-	for _, t := range taskOrder {
-		inp, _ := json.Marshal(map[string]any{"title": title, "prompt": prompt, "stage": t})
-		if _, err = tx.Exec(`INSERT INTO runtime_tasks (id,project_id,email,task_type,status,input_json,output_json) VALUES ($1,$2,$3,$4,'queued',$5,'{}'::jsonb)`, newID(), projectID, email, t, inp); err != nil {
-			return nil, err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	aiOut, err := h.callTogetherRuntimeBlueprint(projectID, prompt)
-	if err != nil {
-		timeoutFailure := isTimeoutError(err)
-		failureMsg := "Runtime AI pipeline failed: " + shortError(err.Error())
-		responseErr := err
-		if timeoutFailure {
-			failureMsg = "Runtime AI pipeline failed: provider timeout"
-			responseErr = errors.New("runtime_generation_failed: Together provider timeout. Credits not charged.")
-		}
-		_ = h.markRuntimeFailed(projectID, failureMsg, "blueprint", err.Error())
-		return nil, responseErr
-	}
-	contract := buildRuntimeAgentContract(aiOut, prompt)
-	creditCharged, err := h.completeRuntimePipeline(projectID, authSub, email, contract, isPrivileged)
-	if err != nil {
-		_ = h.markRuntimeFailed(projectID, "Runtime AI pipeline failed: "+shortError(err.Error()), "delivery", err.Error())
-		return nil, err
-	}
-	return h.fetchRuntimeResponse(projectID, contract, creditCharged)
-}
 func (h *Handler) callTogetherRuntimeBlueprint(projectID, prompt string) (string, error) {
 	model := firstEnv("TOGETHER_MODEL_RUNTIME", "TOGETHER_MODEL_REASONING", "TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL")
 	if strings.TrimSpace(model) == "" {
@@ -372,6 +399,33 @@ func buildRuntimeAgentContract(raw, prompt string) RuntimeAgentContract {
 
 func validateRuntimeAgentContract(contract RuntimeAgentContract) ValidationResult {
 	v := ValidationResult{Valid: true}
+	allowedToolNames := map[string]struct{}{
+		"create_file_plan":         {},
+		"propose_api_routes":       {},
+		"propose_db_migration":     {},
+		"estimate_infra":           {},
+		"prepare_delivery_package": {},
+		"review_security_risk":     {},
+		"summarize_project":        {},
+	}
+	allowedActions := map[string]struct{}{"create": {}, "update": {}, "review_only": {}}
+	containsAny := func(text string, tokens []string) bool {
+		l := strings.ToLower(text)
+		for _, token := range tokens {
+			if strings.Contains(l, token) {
+				return true
+			}
+		}
+		return false
+	}
+	appendFlag := func(flag string) {
+		for _, existing := range contract.Review.GuardrailFlags {
+			if existing == flag {
+				return
+			}
+		}
+		contract.Review.GuardrailFlags = append(contract.Review.GuardrailFlags, flag)
+	}
 	if contract.ProjectTitle == "" {
 		v.Valid = false
 		v.Errors = append(v.Errors, "project_title required")
@@ -400,18 +454,56 @@ func validateRuntimeAgentContract(contract RuntimeAgentContract) ValidationResul
 		v.Valid = false
 		v.Errors = append(v.Errors, "delivery.next_steps required")
 	}
-	for _, f := range contract.FilePlan.Files {
-		if strings.Contains(f.Path, "../") {
+
+	for i, f := range contract.FilePlan.Files {
+		path := strings.TrimSpace(f.Path)
+		lowerPath := strings.ToLower(path)
+		if path == "" || strings.Contains(path, "../") || strings.Contains(path, "..\\") || strings.HasPrefix(lowerPath, "/etc") || strings.HasPrefix(lowerPath, "/root") || strings.HasPrefix(lowerPath, "c:\\") || strings.Contains(lowerPath, "windows\\system") {
 			v.Blocked = true
-			v.Errors = append(v.Errors, "dangerous file path")
+			v.Errors = append(v.Errors, "dangerous or empty file path")
+			appendFlag("unsafe_file_path")
+		}
+		action := strings.TrimSpace(strings.ToLower(f.Action))
+		if _, ok := allowedActions[action]; !ok {
+			v.ReviewNeeded = true
+			v.Warnings = append(v.Warnings, "unknown file action normalized to review_only")
+			contract.FilePlan.Files[i].Action = "review_only"
+			appendFlag("unknown_file_action")
 		}
 	}
+
 	for _, t := range contract.ToolPlan.ProposedToolCalls {
+		if _, ok := allowedToolNames[strings.TrimSpace(strings.ToLower(t.ToolName))]; !ok {
+			v.ReviewNeeded = true
+			v.Warnings = append(v.Warnings, "unknown tool_name: "+t.ToolName)
+			appendFlag("unknown_tool_name")
+		}
 		if strings.EqualFold(t.RiskLevel, "high") && !t.RequiresHumanApproval {
 			v.ReviewNeeded = true
 			v.Warnings = append(v.Warnings, "high risk tool call without approval")
+			appendFlag("high_risk_without_approval")
 		}
 	}
+
+	securityKeywords := []string{"banka", "devlet", "government", "security", "güvenlik", "kamera", "gözlük", "sunucu odası", "physical", "cyber"}
+	combined := contract.UserIntent + " " + contract.ProjectType
+	if containsAny(combined, securityKeywords) {
+		v.ReviewNeeded = true
+		v.Warnings = append(v.Warnings, "human approval required for security/bank/government workflows")
+		appendFlag("human_approval_required")
+	}
+
+	dangerousKeywords := []string{"autonomous shutdown", "credential extraction", "unauthorized access", "attack", "exploit", "bypass"}
+	dangerousText := combined + " " + strings.Join(contract.Review.Risks, " ") + " " + strings.Join(contract.Review.SecurityNotes, " ")
+	if containsAny(dangerousText, dangerousKeywords) {
+		v.ReviewNeeded = true
+		v.Warnings = append(v.Warnings, "dangerous autonomous or offensive wording detected")
+		appendFlag("dangerous_autonomous_action")
+		if containsAny(dangerousText, []string{"credential extraction", "unauthorized access", "attack", "exploit", "bypass"}) {
+			v.Blocked = true
+		}
+	}
+
 	if contract.Review.ReviewStatus == "blocked" {
 		v.Blocked = true
 	}
@@ -424,9 +516,12 @@ func validateRuntimeAgentContract(contract RuntimeAgentContract) ValidationResul
 func (h *Handler) completeRuntimePipeline(projectID, authSub, email string, contract RuntimeAgentContract, isPrivileged bool) (bool, error) {
 	validation := validateRuntimeAgentContract(contract)
 	status := "completed"
+	_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Guardrail validation completed")
 	if validation.Blocked {
+		_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'error',$3)`, newID(), projectID, "Runtime contract blocked")
 		status = "failed"
 	} else if validation.ReviewNeeded || !validation.Valid {
+		_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'warn',$3)`, newID(), projectID, "Runtime contract review_needed")
 		status = "review_needed"
 	}
 	taskOutputs := map[string]map[string]any{
@@ -462,6 +557,12 @@ func (h *Handler) completeRuntimePipeline(projectID, authSub, email string, cont
 			return false, err
 		}
 		creditCharged = true
+	}
+	if status == "completed" {
+		_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Runtime contract approved")
+	}
+	if validation.ReviewNeeded {
+		_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'warn',$3)`, newID(), projectID, "Human approval required")
 	}
 	if err := tx.Commit(); err != nil {
 		return false, err

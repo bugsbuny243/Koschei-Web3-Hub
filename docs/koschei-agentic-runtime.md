@@ -27,3 +27,11 @@ Koschei uses agent contracts to transform a single blueprint response into a sta
 - Together remains the primary provider.
 - Tool calls are proposed only (not executed).
 - Real artifact generation starts in Phase 6.
+
+## Phase 5.3 stabilization notes
+- Phase 5.3 is planning/contract only.
+- Phase 6 will consume `file_plan` and `proposed_tool_calls` for artifact generation.
+- Proposed tool calls are not executed in Phase 5.3.
+- Human approval is mandatory for high-risk, security, government, bank, and smart-glasses workflows.
+- The async runtime worker flow is required (`processRuntimeProject`).
+- Old sync runtime generation flow must not be used.
