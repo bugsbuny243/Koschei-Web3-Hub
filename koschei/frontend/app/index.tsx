@@ -83,6 +83,13 @@ export default function Home() {
     router.push(token ? '/dashboard' : '/login');
   };
 
+  return (
+    <View style={styles.root}>
+      <View style={styles.glowCyan} />
+      <View style={styles.glowPurple} />
+      <View style={styles.glowGreen} />
+      <View style={styles.gridLayer} />
+
       <View style={styles.rainLayer} pointerEvents="none">
         {rainColumns.map((col, i) => (
           <RainColumn key={i} left={col.left} delay={col.delay} duration={col.duration} />
