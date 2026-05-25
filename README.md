@@ -60,3 +60,10 @@ Primary product surfaces:
 - Runtime Factory and Cyber Defense Center are the current core focus.
 - Image Forge and Audio Core remain in codebase but are paused/optional in main UX due to quality/cost priorities.
 - Video Lab is also moved to later Media Factory priority.
+
+
+## Cyber Defense Phase 1.1
+- Hardened JSON parsing and guardrails for defensive-only cyber analysis.
+- Media modules are paused by default.
+- Cyber Defense is planning/audit only (no live scanning or exploitation).
+- Hybrid Security Shield / Smart Glasses remains final future phase only.

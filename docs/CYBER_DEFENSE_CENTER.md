@@ -52,3 +52,10 @@ It does **not** provide:
 - audit log expansion
 - approval workflows
 - smart glasses / hybrid security shield as final future phase
+
+
+## Cyber Defense Phase 1.1
+- Hardened JSON parsing and guardrails for defensive-only cyber analysis.
+- Media modules are paused by default.
+- Cyber Defense is planning/audit only (no live scanning or exploitation).
+- Hybrid Security Shield / Smart Glasses remains final future phase only.

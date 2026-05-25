@@ -54,3 +54,10 @@ Koschei is a multi-agent AI super-app and command universe.
 ## Planned Next
 - Phase 6.1 Artifact Stabilizer hardening continuation
 - Cyber Defense Center Phase 1 (defensive-only, human approval workflows)
+
+
+## Cyber Defense Phase 1.1
+- Hardened JSON parsing and guardrails for defensive-only cyber analysis.
+- Media modules are paused by default.
+- Cyber Defense is planning/audit only (no live scanning or exploitation).
+- Hybrid Security Shield / Smart Glasses remains final future phase only.
