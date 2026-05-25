@@ -297,20 +297,40 @@ func (h *Handler) callTogetherWithSystemTimeoutAndMaxTokens(model string, system
 		return "", fmt.Errorf("together status %d: %s", resp.StatusCode, shortError(string(respBody)))
 	}
 
-	var parsed struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if err := json.Unmarshal(respBody, &parsed); err != nil {
+	content, _, err := extractTogetherContent(respBody)
+	if err != nil {
 		return "", err
 	}
-	if len(parsed.Choices) == 0 || strings.TrimSpace(parsed.Choices[0].Message.Content) == "" {
-		return "", errors.New("empty ai response")
+	return content, nil
+}
+
+func extractTogetherContent(respBody []byte) (string, map[string]any, error) {
+	provider := map[string]any{}
+	if err := json.Unmarshal(respBody, &provider); err != nil {
+		return "", map[string]any{"raw_body": shortError(string(respBody))}, errors.New("provider_invalid_response")
 	}
-	return parsed.Choices[0].Message.Content, nil
+	choices, _ := provider["choices"].([]any)
+	if len(choices) > 0 {
+		if choice, ok := choices[0].(map[string]any); ok {
+			if msg, ok := choice["message"].(map[string]any); ok {
+				if content, ok := msg["content"]; ok {
+					if s, ok := content.(string); ok && strings.TrimSpace(s) != "" {
+						return s, provider, nil
+					}
+					if b, err := json.Marshal(content); err == nil && strings.TrimSpace(string(b)) != "" && string(b) != "null" {
+						return string(b), provider, nil
+					}
+				}
+				if reasoning, ok := msg["reasoning_content"].(string); ok && strings.TrimSpace(reasoning) != "" {
+					return reasoning, provider, nil
+				}
+			}
+			if text, ok := choice["text"].(string); ok && strings.TrimSpace(text) != "" {
+				return text, provider, nil
+			}
+		}
+	}
+	return "", provider, errors.New("empty_ai_response")
 }
 
 func (h *Handler) AIJobs(w http.ResponseWriter, r *http.Request) {

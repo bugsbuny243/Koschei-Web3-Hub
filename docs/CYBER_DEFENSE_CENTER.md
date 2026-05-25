@@ -33,14 +33,17 @@ It does **not** provide:
 
 ## Model Environment Variables
 - `TOGETHER_MODEL_SECURITY`
+- First test recommendation: set `TOGETHER_MODEL_SECURITY` to the same stable model as `TOGETHER_MODEL` or `TOGETHER_MODEL_COMPLEX`.
 - fallback: `TOGETHER_MODEL_REASONING` → `TOGETHER_MODEL_COMPLEX` → `TOGETHER_MODEL`
 - `TOGETHER_SECURITY_TIMEOUT_SECONDS` (default `120`)
 - `TOGETHER_SECURITY_MAX_TOKENS` (default `2500`)
+- Prefer models that reliably return strict JSON-only output.
 
 ## Credit Behavior
 - Normal user: charge 1 credit on successful analysis.
 - Owner/admin: no charge.
 - Failed provider call: no charge.
+- Failed provider output (empty/invalid JSON): no charge.
 - Credit event reason: `cyber_analysis`.
 
 ## Human Approval Requirement

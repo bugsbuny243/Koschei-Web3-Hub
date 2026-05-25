@@ -45,8 +45,12 @@ For bank, government, server room, camera, smart glasses, physical/cyber workflo
 - do not perform live scanning
 - recommend audit logs, access control, monitoring, reporting, and approval workflows
 
-Return ONLY valid JSON.
-No markdown fences.
+Return compact JSON only.
+Do not include markdown.
+Do not include commentary.
+Do not include reasoning text.
+Arrays must contain 3 to 5 items maximum where applicable.
+If unsure, still return valid JSON with safe defensive placeholders.
 
 Required JSON:
 {
@@ -81,7 +85,10 @@ func buildCyberAnalysis(raw string) (map[string]any, string, error) {
 			return analysis, extracted, nil
 		}
 	}
-	return nil, "", errors.New("provider_invalid_response")
+	if strings.TrimSpace(raw) != "" {
+		return nil, "", errors.New("provider_invalid_response")
+	}
+	return nil, "", errors.New("empty_ai_response")
 }
 
 func sanitizeCyberAnalysis(analysis map[string]any, prompt string) (map[string]any, []string, bool) {
@@ -202,22 +209,57 @@ func (h *Handler) CyberAnalyze(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	userPrompt := "Mode: " + mode + "\n\nSecurity Scenario / Audit Prompt:\n" + prompt
+	userPrompt := "Mode: " + mode + "\nReturn the JSON object only.\nScenario:\n" + prompt
 	respText, callErr := h.callTogetherWithSystemTimeoutAndMaxTokens(model, cyberSystemPrompt, userPrompt, timeout, maxTokens)
+	primaryModel := model
+	fallbackModel := ""
+	fallbackUsed := false
+	tryFallback := false
+	callErrText := ""
+	if callErr != nil {
+		callErrText = strings.ToLower(callErr.Error())
+		tryFallback = strings.Contains(callErrText, "timeout") || strings.Contains(callErrText, "deadline") || strings.Contains(callErrText, "empty_ai_response") || strings.Contains(callErrText, "provider_invalid_response") || strings.Contains(callErrText, "invalid character")
+	}
+	if tryFallback {
+		for _, candidate := range []string{firstEnv("TOGETHER_MODEL_COMPLEX"), firstEnv("TOGETHER_MODEL"), firstEnv("TOGETHER_MODEL_REASONING")} {
+			candidate = strings.TrimSpace(candidate)
+			if candidate == "" || candidate == model {
+				continue
+			}
+			fallbackModel = candidate
+			fallbackUsed = true
+			respText, callErr = h.callTogetherWithSystemTimeoutAndMaxTokens(candidate, cyberSystemPrompt, userPrompt, timeout, maxTokens)
+			model = candidate
+			break
+		}
+	}
 	if callErr != nil {
 		detail := shortError(callErr.Error())
-		if strings.Contains(strings.ToLower(detail), "timeout") || strings.Contains(strings.ToLower(detail), "deadline") {
+		errType := "generation_failed"
+		detailLower := strings.ToLower(detail)
+		switch {
+		case strings.Contains(detailLower, "empty_ai_response"):
+			errType = "empty_ai_response"
+		case strings.Contains(detailLower, "provider_invalid_response"), strings.Contains(detailLower, "invalid character"):
+			errType = "provider_invalid_response"
+		case strings.Contains(detailLower, "timeout"), strings.Contains(detailLower, "deadline"):
+			errType = "generation_timeout"
 			detail = "Cyber analysis provider timed out. Credits not charged."
 		}
-		_ = h.insertCyberAnalysis(claims.Sub, claims.Email, mode, prompt, "failed", model, map[string]any{}, detail, false, map[string]any{"raw_ai_output": respText})
-		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "generation_failed", "detail": detail, "credits_charged": false})
+		_ = h.insertCyberAnalysis(claims.Sub, claims.Email, mode, prompt, "failed", model, map[string]any{}, detail, false, map[string]any{"raw_ai_output": respText, "primary_model": primaryModel, "fallback_model": fallbackModel, "fallback_used": fallbackUsed})
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": errType, "detail": detail, "credits_charged": false, "model": model, "fallback_model": fallbackModel, "fallback_used": fallbackUsed})
 		return
 	}
 
 	analysis, extractedRaw, parseErr := buildCyberAnalysis(respText)
 	if parseErr != nil {
-		_ = h.insertCyberAnalysis(claims.Sub, claims.Email, mode, prompt, "failed", model, map[string]any{}, "provider_non_json_response", false, map[string]any{"raw_ai_output": respText})
-		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "provider_invalid_response", "detail": "Provider returned invalid JSON.", "credits_charged": false})
+		errType := parseErr.Error()
+		detail := "Provider returned invalid JSON."
+		if errType == "empty_ai_response" {
+			detail = "Cyber model returned an empty answer. Credits not charged."
+		}
+		_ = h.insertCyberAnalysis(claims.Sub, claims.Email, mode, prompt, "failed", model, map[string]any{}, errType, false, map[string]any{"raw_ai_output": respText, "primary_model": primaryModel, "fallback_model": fallbackModel, "fallback_used": fallbackUsed})
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": errType, "detail": detail, "credits_charged": false, "model": model, "fallback_model": fallbackModel, "fallback_used": fallbackUsed})
 		return
 	}
 	if extractedRaw != "" {
@@ -229,7 +271,7 @@ func (h *Handler) CyberAnalyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "blocked_content", "detail": "Request/result blocked by defensive-only guardrails.", "credits_charged": false})
 		return
 	}
-	if err := h.insertCyberAnalysisAndCharge(claims.Sub, claims.Email, mode, prompt, "completed", model, sanitized, isPrivileged, nil); err != nil {
+	if err := h.insertCyberAnalysisAndCharge(claims.Sub, claims.Email, mode, prompt, "completed", model, sanitized, isPrivileged, map[string]any{"primary_model": primaryModel, "fallback_model": fallbackModel, "fallback_used": fallbackUsed}); err != nil {
 		if errors.Is(err, sql.ErrNoRows) || strings.Contains(strings.ToLower(err.Error()), "insufficient") {
 			writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": "insufficient_credits", "credits_charged": false})
 			return
@@ -237,7 +279,7 @@ func (h *Handler) CyberAnalyze(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "db_failed", "credits_charged": false})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"status": "completed", "analysis": sanitized, "credits_charged": !isPrivileged, "warnings": warnings})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "completed", "analysis": sanitized, "credits_charged": !isPrivileged, "warnings": warnings, "model": model, "fallback_used": fallbackUsed})
 }
 
 func (h *Handler) insertCyberAnalysisAndCharge(authSub, email, mode, prompt, status, model string, result map[string]any, isPrivileged bool, metadata map[string]any) error {

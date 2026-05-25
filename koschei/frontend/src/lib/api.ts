@@ -10,7 +10,12 @@ async function request(path: string, init?: RequestInit, auth = false) {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     if (token) headers.Authorization = `Bearer ${token}`;
   }
-  const res = await fetch(target, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(target, { ...init, headers });
+  } catch {
+    throw new Error('network_failed: API request could not reach backend');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const base = data?.error || `Request failed (${res.status})`;
