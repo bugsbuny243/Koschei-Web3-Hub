@@ -19,12 +19,12 @@ const BG = '#03040a';
 const PANEL = 'rgba(5, 12, 25, 0.78)';
 
 const MODULES = [
-  { ico: '⌬', name: 'CODE ENGINE', desc: 'Üretim hazır kod akışı', accent: CYAN },
-  { ico: '◈', name: 'IMAGE FORGE', desc: 'Sinematik görsel üretimi', accent: MAGENTA },
-  { ico: '▣', name: 'VIDEO LAB', desc: 'Video fikir ve sahne üretimi', accent: VIOLET },
-  { ico: '◊', name: 'AUDIO CORE', desc: 'Seslendirme ve audio akışı', accent: GREEN },
-  { ico: '⬢', name: 'CHAT NEXUS', desc: 'Akıllı sohbet merkezi', accent: CYAN },
-  { ico: '⟁', name: 'REASON MATRIX', desc: 'Derin analiz ve karar motoru', accent: VIOLET },
+  { ico: '⌬', name: 'CODE ENGINE', desc: 'Üretim hazır kod akışı', accent: CYAN, route: '' },
+  { ico: '◈', name: 'IMAGE FORGE', desc: 'Sinematik görsel üretimi', accent: MAGENTA, route: '/m-image' },
+  { ico: '▣', name: 'VIDEO LAB', desc: 'Video fikir ve sahne üretimi', accent: VIOLET, route: '' },
+  { ico: '◊', name: 'AUDIO CORE', desc: 'Seslendirme ve audio akışı', accent: GREEN, route: '' },
+  { ico: '⬢', name: 'CHAT NEXUS', desc: 'Akıllı sohbet merkezi', accent: CYAN, route: '' },
+  { ico: '⟁', name: 'REASON MATRIX', desc: 'Derin analiz ve karar motoru', accent: VIOLET, route: '' },
 ];
 
 function RainColumn({
@@ -313,27 +313,52 @@ export default function Home() {
 
         <View style={styles.moduleGrid}>
           {MODULES.map((module) => (
-            <View
-              key={module.name}
-              style={[
-                styles.moduleCard,
-                {
-                  borderColor: `${module.accent}55`,
-                  shadowColor: module.accent,
-                },
-              ]}
-            >
-              <View style={styles.moduleTop}>
-                <Text style={[styles.moduleIcon, { color: module.accent }]}>{module.ico}</Text>
+            module.route ? (
+              <Link key={module.name} href={module.route} asChild>
+                <Pressable
+                  style={[
+                    styles.moduleCard,
+                    {
+                      borderColor: `${module.accent}55`,
+                      shadowColor: module.accent,
+                    },
+                  ]}
+                >
+                  <View style={styles.moduleTop}>
+                    <Text style={[styles.moduleIcon, { color: module.accent }]}>{module.ico}</Text>
 
-                <View style={styles.activeBadge}>
-                  <Text style={styles.activeText}>ACTIVE</Text>
+                    <View style={styles.activeBadge}>
+                      <Text style={styles.activeText}>ACTIVE</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.moduleName}>{module.name}</Text>
+                  <Text style={styles.moduleDesc}>{module.desc}</Text>
+                </Pressable>
+              </Link>
+            ) : (
+              <View
+                key={module.name}
+                style={[
+                  styles.moduleCard,
+                  {
+                    borderColor: `${module.accent}55`,
+                    shadowColor: module.accent,
+                  },
+                ]}
+              >
+                <View style={styles.moduleTop}>
+                  <Text style={[styles.moduleIcon, { color: module.accent }]}>{module.ico}</Text>
+
+                  <View style={styles.activeBadge}>
+                    <Text style={styles.activeText}>YAKINDA</Text>
+                  </View>
                 </View>
-              </View>
 
-              <Text style={styles.moduleName}>{module.name}</Text>
-              <Text style={styles.moduleDesc}>{module.desc}</Text>
-            </View>
+                <Text style={styles.moduleName}>{module.name}</Text>
+                <Text style={styles.moduleDesc}>{module.desc}</Text>
+              </View>
+            )
           ))}
         </View>
 
