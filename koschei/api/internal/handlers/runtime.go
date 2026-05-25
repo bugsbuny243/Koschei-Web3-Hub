@@ -397,7 +397,7 @@ func buildRuntimeAgentContract(raw, prompt string) RuntimeAgentContract {
 	return c
 }
 
-func validateRuntimeAgentContract(contract RuntimeAgentContract) ValidationResult {
+func sanitizeAndValidateRuntimeAgentContract(contract RuntimeAgentContract) (RuntimeAgentContract, ValidationResult) {
 	v := ValidationResult{Valid: true}
 	allowedToolNames := map[string]struct{}{
 		"create_file_plan":         {},
@@ -510,11 +510,11 @@ func validateRuntimeAgentContract(contract RuntimeAgentContract) ValidationResul
 	if contract.Review.ReviewStatus == "review_needed" {
 		v.ReviewNeeded = true
 	}
-	return v
+	return contract, v
 }
 
 func (h *Handler) completeRuntimePipeline(projectID, authSub, email string, contract RuntimeAgentContract, isPrivileged bool) (bool, error) {
-	validation := validateRuntimeAgentContract(contract)
+	contract, validation := sanitizeAndValidateRuntimeAgentContract(contract)
 	status := "completed"
 	_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Guardrail validation completed")
 	if validation.Blocked {
@@ -558,41 +558,16 @@ func (h *Handler) completeRuntimePipeline(projectID, authSub, email string, cont
 		}
 		creditCharged = true
 	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
 	if status == "completed" {
 		_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'info',$3)`, newID(), projectID, "Runtime contract approved")
 	}
 	if validation.ReviewNeeded {
 		_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'warn',$3)`, newID(), projectID, "Human approval required")
 	}
-	if err := tx.Commit(); err != nil {
-		return false, err
-	}
 	return creditCharged, nil
-}
-
-func (h *Handler) fetchRuntimeResponse(projectID string, contract RuntimeAgentContract, creditCharged bool) (map[string]any, error) {
-	rows, err := h.DB.Query(`SELECT id,project_id,email,task_type,status,input_json,output_json,error,created_at,updated_at FROM runtime_tasks WHERE project_id=$1 ORDER BY created_at ASC`, projectID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var tasks []map[string]any
-	for rows.Next() {
-		var id, pid, e, tt, s string
-		var in, out, e2, ca, ua any
-		if err := rows.Scan(&id, &pid, &e, &tt, &s, &in, &out, &e2, &ca, &ua); err != nil {
-			return nil, err
-		}
-		tasks = append(tasks, map[string]any{"id": id, "project_id": pid, "email": e, "task_type": tt, "status": s, "input_json": in, "output_json": out, "error": e2, "created_at": ca, "updated_at": ua})
-	}
-	var taskCount, logCount int
-	if err := h.DB.QueryRow(`SELECT COUNT(*) FROM runtime_tasks WHERE project_id=$1`, projectID).Scan(&taskCount); err != nil {
-		return nil, err
-	}
-	if err := h.DB.QueryRow(`SELECT COUNT(*) FROM runtime_logs WHERE project_id=$1`, projectID).Scan(&logCount); err != nil {
-		return nil, err
-	}
-	return map[string]any{"project_id": projectID, "status": "completed", "credits_charged": creditCharged, "task_count": taskCount, "log_count": logCount, "blueprint": contract, "tasks": tasks}, nil
 }
 func (h *Handler) ListRuntimeProjects(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
