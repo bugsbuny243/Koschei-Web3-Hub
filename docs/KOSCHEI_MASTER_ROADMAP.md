@@ -4,9 +4,9 @@ Koschei is a multi-agent AI super-app and command universe.
 
 ## Current Official Phase
 
-**Phase 6.1 — Artifact Generation Stabilizer + Product/README cleanup**
+**Phase 6.1.1 — Artifact Transaction Lock Safety Fix**
 
-### Phase 6.1 Final Fix Scope
+### Phase 6.1.1 Final Fix Scope
 
 - Transaction safety for artifact failure states (no stuck `processing` rows).
 - Protected ZIP download flow for web via authenticated fetch.
@@ -40,3 +40,7 @@ Koschei is a multi-agent AI super-app and command universe.
 - Media Factory
 - 3D Command Universe UI
 - Hybrid Security Shield (final future phase only)
+
+
+## Planned Next
+- **Phase 6.2 — Async Artifact Worker** (artifact generation is still synchronous in 6.1.1).
