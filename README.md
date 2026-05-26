@@ -1,28 +1,31 @@
-# Koschei — The Immortal AI Command Universe
+# Koschei
 
-## Current Official Focus
+Koschei is an Unreal Engine-focused game production and build pipeline platform.
 
-**Phase 6.1 / 6.2 — Artifact Stabilizer + Owner God Mode Preparation**
+## Active Direction
+- Unreal Engine / UE6-ready game production workflows
+- Automated Android packaging pipeline
+- Google Play draft publishing integration
+- Customer-owned delivered games/products
 
-### Active core
-- Runtime Factory
-- Artifact Forge
-- AI Console
-- Public SaaS plans/credits
-- UI Lab
+## Core Platform Ownership
+Koschei platform ownership remains with Koschei team:
+- backend services
+- automation pipeline
+- reusable templates
+- workers/tooling/infrastructure
 
-### Next
-- Owner God Mode
+Commercial model target:
+- 60% customer / 40% Koschei on net distributable revenue (or equivalent production-cost model)
+- Unreal build compute costs are tracked operationally
+- no unlimited free Unreal builds
 
-### Paused
-- Media Factory
-- Cyber Defense
+## Backend and Deploy
+- Go backend retained
+- Neon Auth integration retained
+- PostgreSQL/Neon DB integration retained
+- Railway deployment files retained
+- Health endpoint: `/health`
 
-### Why Cyber is paused
-Cybersecurity for bank/government/enterprise requires company structure, team, legal responsibility, certifications, audit processes, and enterprise trust.
-
-### Why Media is paused
-Image/audio/video are paused because they are costly and not current business priority.
-
-### Final future only
-- Hybrid Security Shield / Smart Glasses
+## Minimal Landing
+Static landing page is served from `public/index.html`.

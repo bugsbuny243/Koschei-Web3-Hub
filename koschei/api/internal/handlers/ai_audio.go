@@ -45,7 +45,7 @@ func (h *Handler) AIAudioGenerate(w http.ResponseWriter, r *http.Request) {
 		req.Voice = "tara"
 	}
 
-	model := os.Getenv("TOGETHER_MODEL_TTS")
+	model := os.Getenv("TOGETHER_MODEL_BUILD_ANALYZER")
 	if model == "" {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "tts_model_not_configured"})
 		return
