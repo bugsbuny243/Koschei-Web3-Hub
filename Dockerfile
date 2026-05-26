@@ -1,14 +1,3 @@
-FROM node:20-alpine AS frontend-builder
-WORKDIR /app
-
-COPY koschei/frontend/package*.json ./
-RUN npm install
-
-COPY koschei/frontend ./
-ARG EXPO_PUBLIC_NEON_AUTH_URL
-ENV EXPO_PUBLIC_NEON_AUTH_URL=$EXPO_PUBLIC_NEON_AUTH_URL
-RUN npm run build
-
 FROM golang:1.23-alpine AS go-builder
 WORKDIR /src
 
@@ -36,7 +25,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY --from=go-builder /app/koschei-api /app/koschei-api
 COPY --from=go-builder /tmp/migrations /app/migrations
-COPY --from=frontend-builder /app/dist /app/public
+COPY public /app/public
 COPY koschei/workers/worker.py /app/worker.py
 COPY start.sh /app/start.sh
 

@@ -34,7 +34,7 @@ func (h *Handler) AIVideoCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	model := os.Getenv("TOGETHER_MODEL_VIDEO")
+	model := os.Getenv("TOGETHER_MODEL_BUILD_ANALYZER")
 	if model == "" {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "video_model_not_configured"})

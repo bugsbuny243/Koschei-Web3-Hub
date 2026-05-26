@@ -200,7 +200,7 @@ func (h *Handler) CyberAnalyze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	model := firstEnv("TOGETHER_MODEL_SECURITY", "TOGETHER_MODEL_REASONING", "TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL")
+	model := firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_GAME_DESIGN")
 	if model == "" {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "security_model_not_configured", "credits_charged": false})
 		return
@@ -230,7 +230,7 @@ func (h *Handler) CyberAnalyze(w http.ResponseWriter, r *http.Request) {
 		tryFallback = strings.Contains(callErrText, "timeout") || strings.Contains(callErrText, "deadline") || strings.Contains(callErrText, "empty_ai_response") || strings.Contains(callErrText, "provider_invalid_response") || strings.Contains(callErrText, "invalid character")
 	}
 	if tryFallback {
-		for _, candidate := range []string{firstEnv("TOGETHER_MODEL_COMPLEX"), firstEnv("TOGETHER_MODEL"), firstEnv("TOGETHER_MODEL_REASONING")} {
+		for _, candidate := range []string{firstEnv("TOGETHER_MODEL_UNREAL_CODE"), firstEnv("TOGETHER_MODEL_GAME_DESIGN"), firstEnv("TOGETHER_MODEL_BUILD_ANALYZER")} {
 			candidate = strings.TrimSpace(candidate)
 			if candidate == "" || candidate == model {
 				continue

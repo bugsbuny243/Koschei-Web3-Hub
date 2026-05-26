@@ -243,7 +243,7 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func togetherAIEnabled() bool {
-	if strings.ToLower(strings.TrimSpace(os.Getenv("TOGETHER_AI_ENABLED"))) == "true" {
+	if strings.ToLower(strings.TrimSpace(os.Getenv("TOGETHER_ENABLED"))) == "true" {
 		return true
 	}
 	return strings.ToLower(strings.TrimSpace(os.Getenv("TOGETHER_ENABLED"))) == "true"
@@ -289,7 +289,7 @@ func (h *Handler) processRuntimeProject(projectID, authSub, email, prompt string
 }
 
 func (h *Handler) callTogetherRuntimeBlueprint(projectID, prompt string) (string, error) {
-	model := firstEnv("TOGETHER_MODEL_RUNTIME", "TOGETHER_MODEL_REASONING", "TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL")
+	model := firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_GAME_DESIGN")
 	if strings.TrimSpace(model) == "" {
 		return "", errors.New("together model is empty")
 	}
@@ -315,7 +315,7 @@ func (h *Handler) callTogetherRuntimeBlueprint(projectID, prompt string) (string
 	}
 	fmt.Println("Runtime AI provider timeout on model:", model)
 	_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'error',$3)`, newID(), projectID, "Runtime AI provider timeout on model: "+model)
-	fallbackModel := firstEnv("TOGETHER_MODEL", "TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL_REASONING")
+	fallbackModel := firstEnv("TOGETHER_MODEL_GAME_DESIGN", "TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_BUILD_ANALYZER")
 	if strings.TrimSpace(fallbackModel) == "" || fallbackModel == model {
 		return "", err
 	}

@@ -95,7 +95,7 @@ func (h *Handler) AIImageGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	model := os.Getenv("TOGETHER_MODEL_IMAGE")
+	model := os.Getenv("TOGETHER_MODEL_CONCEPT_ART")
 	if model == "" {
 		_, _ = h.DB.ExecContext(r.Context(), `UPDATE app_user_profiles SET credits = credits + $1 WHERE auth_subject = $2`, imageCreditCost, claims.Sub)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "image_model_not_configured"})

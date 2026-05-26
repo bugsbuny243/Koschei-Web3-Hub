@@ -118,7 +118,7 @@ func (h *Handler) generateWithRoute(tool string, route aiRoute, prompt string) (
 	if tool != "reason" {
 		return "", route.Model, err
 	}
-	fallbackModel := firstEnv("TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL")
+	fallbackModel := firstEnv("TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_GAME_DESIGN")
 	if strings.TrimSpace(fallbackModel) == "" || fallbackModel == route.Model {
 		return "", route.Model, err
 	}
@@ -144,23 +144,23 @@ func systemPromptForTool(tool string) string {
 func resolveAIRoute(tool string) (aiRoute, error) {
 	switch tool {
 	case "chat":
-		return aiRoute{Route: "chat", Model: firstEnv("TOGETHER_MODEL")}, nil
+		return aiRoute{Route: "chat", Model: firstEnv("TOGETHER_MODEL_GAME_DESIGN")}, nil
 	case "code":
-		return aiRoute{Route: "code", Model: firstEnv("TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL")}, nil
+		return aiRoute{Route: "code", Model: firstEnv("TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_GAME_DESIGN")}, nil
 	case "reason":
-		return aiRoute{Route: "reason", Model: firstEnv("TOGETHER_MODEL_REASONING", "TOGETHER_MODEL_COMPLEX", "TOGETHER_MODEL")}, nil
+		return aiRoute{Route: "reason", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_GAME_DESIGN")}, nil
 	case "image":
-		return aiRoute{Route: "image", Model: firstEnv("TOGETHER_MODEL_IMAGE")}, nil
+		return aiRoute{Route: "image", Model: firstEnv("TOGETHER_MODEL_CONCEPT_ART")}, nil
 	case "image_edit":
-		return aiRoute{Route: "image_edit", Model: firstEnv("TOGETHER_MODEL_IMAGE_EDIT")}, nil
+		return aiRoute{Route: "image_edit", Model: firstEnv("TOGETHER_MODEL_CONCEPT_ART")}, nil
 	case "video":
-		return aiRoute{Route: "video", Model: firstEnv("TOGETHER_MODEL_VIDEO")}, nil
+		return aiRoute{Route: "video", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER")}, nil
 	case "video_cinema":
-		return aiRoute{Route: "video_cinema", Model: firstEnv("TOGETHER_MODEL_VIDEO_CINEMA")}, nil
+		return aiRoute{Route: "video_cinema", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER")}, nil
 	case "tts":
-		return aiRoute{Route: "tts", Model: firstEnv("TOGETHER_MODEL_TTS")}, nil
+		return aiRoute{Route: "tts", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER")}, nil
 	case "stt":
-		return aiRoute{Route: "stt", Model: firstEnv("TOGETHER_MODEL_STT")}, nil
+		return aiRoute{Route: "stt", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER")}, nil
 	default:
 		return aiRoute{}, errors.New("unsupported tool")
 	}

@@ -274,15 +274,15 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		return
 	}
 	promptBytes, _ := json.Marshal(map[string]any{"contract_version": "5.3", "project_id": projectID, "file_plan": filePlan, "runtime_payload": payload})
-	model := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_ARTIFACT"))
+	model := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_UNREAL_CODE"))
 	if model == "" {
-		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_CODE"))
+		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_UNREAL_CODE"))
 	}
 	if model == "" {
-		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_COMPLEX"))
+		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_UNREAL_CODE"))
 	}
 	if model == "" {
-		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL"))
+		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_GAME_DESIGN"))
 	}
 	if model == "" {
 		model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
@@ -302,9 +302,9 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 	timeout := time.Duration(timeoutSeconds) * time.Second
 	out, callErr := h.callTogetherWithSystemTimeoutAndMaxTokens(model, artifactSystemPrompt, string(promptBytes), timeout, maxTokens)
 	if callErr != nil && strings.Contains(strings.ToLower(callErr.Error()), "timeout") {
-		fallback := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_COMPLEX"))
+		fallback := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_UNREAL_CODE"))
 		if fallback == "" || fallback == model {
-			fallback = strings.TrimSpace(os.Getenv("TOGETHER_MODEL"))
+			fallback = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_GAME_DESIGN"))
 		}
 		if fallback != "" && fallback != model {
 			out, callErr = h.callTogetherWithSystemTimeoutAndMaxTokens(fallback, artifactSystemPrompt, string(promptBytes), timeout, maxTokens)
