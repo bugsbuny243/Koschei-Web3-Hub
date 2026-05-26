@@ -23,6 +23,15 @@ type togetherAudioGenerateRequest struct {
 }
 
 func (h *Handler) AIAudioGenerate(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ENABLE_MEDIA_MODULES") != "true" {
+		writeJSON(w, http.StatusGone, map[string]any{
+			"error":           "feature_paused",
+			"detail":          "Media Factory is paused. Koschei is focused on Runtime Factory, Artifact Forge, and Owner God Mode.",
+			"credits_charged": false,
+		})
+		return
+	}
+
 	var req aiAudioGenerateRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})

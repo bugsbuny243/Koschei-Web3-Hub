@@ -1,69 +1,28 @@
 # Koschei — The Immortal AI Command Universe
 
-Koschei is a serious multi-agent AI super-app built as a command universe for execution, generation, and delivery.
+## Current Official Focus
 
-It combines public SaaS product flows, owner-grade operational control, agentic runtime contracts, and artifact production into one unified platform direction.
+**Phase 6.1 / 6.2 — Artifact Stabilizer + Owner God Mode Preparation**
 
-## Official Program Status
-
-**Current Official Phase:** **Phase 6.1 — Artifact Stabilizer + Cyber Defense Center Phase 1**
-
-This is the active production focus.
-
-## Completed Core Milestones
-
-- Auth
-- Dashboard
-- Credits
-- Together AI routing
-- Phase 4 AI
-- Async Runtime Factory
-- Agentic Runtime Contract 5.3
-- Artifact generation
+### Active core
+- Runtime Factory
+- Artifact Forge
+- AI Console
+- Public SaaS plans/credits
 - UI Lab
 
-## Product Positioning
-
-Koschei is designed as a full command universe, not a single chatbot feature.
-
-Primary product surfaces:
-- Public SaaS command experience
-- Owner God Mode (next major operational surface)
-- Runtime Factory (agentic execution and planning backbone)
-- Artifact generation pipelines
-- Cyber Defense Center (defensive security command surface)
-- Future media and immersive command interfaces (paused/optional)
-
-## Billing Status
-
-- Payments are currently handled through Shopier.
-- Activation is manual for now.
-- Webhook/payment automation is planned in a later billing phase.
-
-## Future Program Direction
-
+### Next
 - Owner God Mode
-- Public SaaS billing
-- Media Factory (paused/optional due to current cost/priority)
-- 3D Command Universe UI
-- **Hybrid Security Shield (final future phase only)**
 
-## Safety and Execution Policy
+### Paused
+- Media Factory
+- Cyber Defense
 
-- Generated artifacts are stored and delivered; they are not auto-executed.
-- Proposed tool calls remain controlled and non-autonomous.
-- Security-critical concepts are defensive-only and human-approved.
+### Why Cyber is paused
+Cybersecurity for bank/government/enterprise requires company structure, team, legal responsibility, certifications, audit processes, and enterprise trust.
 
+### Why Media is paused
+Image/audio/video are paused because they are costly and not current business priority.
 
-## Strategic Pivot (May 2026)
-
-- Runtime Factory and Cyber Defense Center are the current core focus.
-- Image Forge and Audio Core remain in codebase but are paused/optional in main UX due to quality/cost priorities.
-- Video Lab is also moved to later Media Factory priority.
-
-
-## Cyber Defense Phase 1.1
-- Hardened JSON parsing and guardrails for defensive-only cyber analysis.
-- Media modules are paused by default.
-- Cyber Defense is planning/audit only (no live scanning or exploitation).
-- Hybrid Security Shield / Smart Glasses remains final future phase only.
+### Final future only
+- Hybrid Security Shield / Smart Glasses

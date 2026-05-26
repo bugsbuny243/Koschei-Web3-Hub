@@ -160,6 +160,15 @@ func sanitizeCyberAnalysis(analysis map[string]any, prompt string) (map[string]a
 }
 
 func (h *Handler) CyberAnalyze(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ENABLE_CYBER_DEFENSE") != "true" {
+		writeJSON(w, http.StatusGone, map[string]any{
+			"error":           "feature_paused",
+			"detail":          "Cyber Defense Center is paused. Koschei is focused on Runtime Factory, Artifact Forge, and Owner God Mode.",
+			"credits_charged": false,
+		})
+		return
+	}
+
 	claims, ok := userFromContext(r.Context())
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})

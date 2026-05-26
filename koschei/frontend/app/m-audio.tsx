@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 
-export default function MVideoScreen() {
+export default function MAudioScreen() {
   const enabled = String(process.env.EXPO_PUBLIC_ENABLE_MEDIA_MODULES || 'false').toLowerCase() === 'true';
   if (!enabled) {
     return (
