@@ -86,9 +86,7 @@ const taskDescription: Record<string, string> = {
 
 export default function Dashboard() {
   const mediaEnabled = String(process.env.EXPO_PUBLIC_ENABLE_MEDIA_MODULES || 'false').toLowerCase() === 'true';
-  const imageEnabled = String(process.env.EXPO_PUBLIC_ENABLE_IMAGE_FORGE || 'false').toLowerCase() === 'true';
-  const audioEnabled = String(process.env.EXPO_PUBLIC_ENABLE_AUDIO_CORE || 'false').toLowerCase() === 'true';
-  const [prompt, setPrompt] = useState('');
+    const [prompt, setPrompt] = useState('');
   const [error, setError] = useState('');
   const [aiTool, setAiTool] = useState<'chat' | 'code' | 'reason'>('chat');
   const [aiPrompt, setAiPrompt] = useState('');
@@ -310,19 +308,13 @@ export default function Dashboard() {
         </View>
         <SectionCard title="Strategic Modules" subtitle="Current active direction for Koschei.">
           <View className="gap-2">
-            <View className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3">
-              <Text className="text-zinc-100">Runtime Factory • ACTIVE</Text>
-            </View>
-            <View className="rounded-lg border border-violet-500/30 bg-violet-500/10 p-3">
-              <Text className="text-zinc-100">Artifact Forge • ACTIVE</Text>
-            </View>
-            <View className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
-              <Text className="text-zinc-100">Cyber Defense Center • NEW / ACTIVE</Text>
-              <Text className="mt-1 text-sm text-zinc-300">Defensive security audits, risk analysis, compliance checklists, incident planning, and human-approved security workflows.</Text>
-            </View>
-            <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Media Factory • PAUSED / Later</Text><Text className="mt-1 text-xs text-zinc-400">Media modules are paused to reduce cost and focus on Runtime + Cyber Defense.</Text></View>
-            {mediaEnabled && imageEnabled && <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Image Forge • Optional</Text></View>}
-            {mediaEnabled && audioEnabled && <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Audio Core • Optional</Text></View>}
+            <View className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3"><Text className="text-zinc-100">Runtime Factory — ACTIVE</Text></View>
+            <View className="rounded-lg border border-violet-500/30 bg-violet-500/10 p-3"><Text className="text-zinc-100">Artifact Forge — ACTIVE</Text></View>
+            <View className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3"><Text className="text-zinc-100">AI Console — ACTIVE</Text></View>
+            <View className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3"><Text className="text-zinc-100">Owner God Mode — NEXT</Text><View className="mt-2"><Button label="Prepare Owner Mode" onPress={() => router.push('/owner')} /></View></View>
+            <View className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3"><Text className="text-zinc-100">Public SaaS — ACTIVE</Text></View>
+            <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Media Factory — PAUSED</Text></View>
+            <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Cyber Defense — PAUSED / Enterprise Future</Text></View>
           </View>
         </SectionCard>
 

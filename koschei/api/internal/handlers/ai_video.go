@@ -9,6 +9,15 @@ import (
 )
 
 func (h *Handler) AIVideoCreate(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("ENABLE_MEDIA_MODULES") != "true" {
+		writeJSON(w, http.StatusGone, map[string]any{
+			"error":           "feature_paused",
+			"detail":          "Media Factory is paused. Koschei is focused on Runtime Factory, Artifact Forge, and Owner God Mode.",
+			"credits_charged": false,
+		})
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
 	var in struct {
