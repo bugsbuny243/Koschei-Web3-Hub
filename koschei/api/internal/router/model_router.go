@@ -1,6 +1,9 @@
 package router
 
-import "strings"
+import (
+	"os"
+	"strings"
+)
 
 type ModelRoute struct {
 	Route    string `json:"route"`
@@ -10,9 +13,7 @@ type ModelRoute struct {
 }
 
 const (
-	mockProvider = "together"
-	mockStatus   = "mock"
-	mockMessage  = "Model route selected. Real inference is disabled in this phase."
+	liveStatus = "live"
 )
 
 var toolRouteMap = map[string]string{
@@ -34,5 +35,26 @@ func ResolveModelRoute(tool string) ModelRoute {
 	if route == "" {
 		route = "chat_analysis"
 	}
-	return ModelRoute{Route: route, Provider: mockProvider, Status: mockStatus, Message: mockMessage}
+	provider := providerFromEnv()
+	model := defaultModel(provider)
+	return ModelRoute{Route: model, Provider: provider, Status: liveStatus, Message: "Live provider route selected."}
 }
+
+func providerFromEnv() string {
+	if strings.EqualFold(strings.TrimSpace(getEnv("CLAUDE_API_KEY")), "") == false {
+		return "claude"
+	}
+	if strings.EqualFold(strings.TrimSpace(getEnv("LLAMA_API_KEY")), "") == false {
+		return "llama"
+	}
+	return "llama"
+}
+
+func defaultModel(provider string) string {
+	if provider == "claude" {
+		return "claude-sonnet-4"
+	}
+	return "llama-4.1-70b"
+}
+
+var getEnv = os.Getenv
