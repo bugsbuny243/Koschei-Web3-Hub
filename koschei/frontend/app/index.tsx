@@ -19,9 +19,10 @@ const MODULES: ModuleItem[] = [
   { ico: '⌬', name: 'CODE ENGINE', desc: 'Üretim hazır kod akışı', accent: CYAN, route: '/m-code' },
   { ico: '◈', name: 'IMAGE FORGE', desc: 'Sinematik görsel üretimi', accent: MAGENTA, route: '/m-image' },
   { ico: '▣', name: 'VIDEO LAB', desc: 'Video ve sahne üretimi', accent: VIOLET, route: '/m-video' },
-  { ico: '◊', name: 'AUDIO CORE', desc: 'Seslendirme ve audio', accent: GREEN, route: '/m-audio' },
   { ico: '⬢', name: 'CHAT NEXUS', desc: 'Akıllı sohbet merkezi', accent: CYAN, route: '/m-chat' },
   { ico: '⟁', name: 'REASON MATRIX', desc: 'Adım adım düşünce ve karar analizi', accent: VIOLET, route: '/m-reason' },
+  { ico: '✦', name: 'RESEARCH SCOUT', desc: 'Hızlı pazar/ürün araştırma özeti', accent: GREEN, route: '/m-research' },
+  { ico: '◎', name: 'PROMPT LAB', desc: 'Prompt iyileştirme ve varyasyon', accent: CYAN, route: '/m-promptlab' },
 ];
 
 function ModuleCard({ module }: { module: ModuleItem }) {
@@ -74,6 +75,7 @@ export default function Home() {
           Tek komuta merkezi. Fikrini yaz — Koschei senin için üretsin.
         </Text>
 
+        <Text style={styles.authLabel}>Hızlı Erişim</Text>
         <View style={styles.btns}>
           <Link href="/register" asChild>
             <Pressable style={[styles.btn, styles.btnPrimary]}>
@@ -167,6 +169,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
 
+  authLabel: { color: '#7bb6d9', fontSize: 12, marginBottom: 8, letterSpacing: 1.2 },
   btns: { gap: 13, marginBottom: 40 },
   btn: { paddingVertical: 17, borderRadius: 11, alignItems: 'center' },
   btnPrimary: { backgroundColor: CYAN },

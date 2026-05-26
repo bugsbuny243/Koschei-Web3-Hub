@@ -319,7 +319,6 @@ export default function Dashboard() {
             <View className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
               <Text className="text-zinc-100">Cyber Defense Center • NEW / ACTIVE</Text>
               <Text className="mt-1 text-sm text-zinc-300">Defensive security audits, risk analysis, compliance checklists, incident planning, and human-approved security workflows.</Text>
-              <View className="mt-2"><Button label="Open Cyber Defense" onPress={() => router.push('/cyber-defense')} /></View>
             </View>
             <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Media Factory • PAUSED / Later</Text><Text className="mt-1 text-xs text-zinc-400">Media modules are paused to reduce cost and focus on Runtime + Cyber Defense.</Text></View>
             {mediaEnabled && imageEnabled && <View className="rounded-lg border border-zinc-700 bg-[#040a15] p-3"><Text className="text-zinc-300">Image Forge • Optional</Text></View>}
