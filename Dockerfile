@@ -27,16 +27,26 @@ RUN mkdir -p /tmp/migrations \
         cp -a /src/migrations/. /tmp/migrations/; \
     fi
 
-FROM alpine:3.20 AS runner
+FROM python:3.12-alpine AS runner
 WORKDIR /app
+
+RUN apk add --no-cache bash gzip tar openjdk17-jre
+COPY koschei/workers/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY --from=go-builder /app/koschei-api /app/koschei-api
 COPY --from=go-builder /tmp/migrations /app/migrations
 COPY --from=frontend-builder /app/dist /app/public
+COPY koschei/workers/worker.py /app/worker.py
+COPY start.sh /app/start.sh
 
 ENV PORT=8080
 ENV STATIC_DIR=/app/public
+ENV ANDROID_HOME=/opt/android-cache/sdk
+ENV ANDROID_SDK_ROOT=/opt/android-cache/sdk
+ENV ANDROID_NDK_HOME=/opt/android-cache/ndk
+ENV UE6_PROJECT_PATH=/opt/android-cache/ue6/KoscheiGame.uproject
 
 EXPOSE 8080
 
-CMD ["/app/koschei-api"]
+CMD ["/app/start.sh"]
