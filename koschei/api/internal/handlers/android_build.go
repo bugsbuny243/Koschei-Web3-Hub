@@ -78,8 +78,14 @@ func (h *Handler) BuildAndroid(w http.ResponseWriter, r *http.Request) {
 	mr := modelrouter.ResolveModelRoute(route)
 	_, _ = tx.Exec(`INSERT INTO model_route_logs (email, tool, route, model, provider, prompt, status) VALUES ($1,$2,$3,$4,$5,$6,$7)`, claims.Email, req.Tool, mr.Route, mr.Route, mr.Provider, req.Prompt, mr.Status)
 
-	if _, err := tx.Exec(`UPDATE app_user_profiles SET credits = credits - 1, updated_at = now() WHERE lower(email)=lower($1) AND credits > 0`, claims.Email); err != nil {
+	creditRes, err := tx.Exec(`UPDATE app_user_profiles SET credits = credits - 1, updated_at = now() WHERE lower(email)=lower($1) AND credits > 0`, claims.Email)
+	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "credit update failed"})
+		return
+	}
+	creditRows, _ := creditRes.RowsAffected()
+	if creditRows == 0 {
+		writeJSON(w, http.StatusPaymentRequired, map[string]string{"error": "insufficient credits"})
 		return
 	}
 	if _, err := tx.Exec(`INSERT INTO credit_events (email, amount, reason, event_type) VALUES ($1,-1,$2,'android_build')`, claims.Email, "android_build:"+req.ProjectID+":"+taskID); err != nil {
