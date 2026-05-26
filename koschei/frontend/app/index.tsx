@@ -16,12 +16,12 @@ type ModuleItem = {
 };
 
 const MODULES: ModuleItem[] = [
-  { ico: '⌬', name: 'CODE ENGINE', desc: 'Üretim hazır kod akışı', accent: CYAN, route: '' },
+  { ico: '⌬', name: 'CODE ENGINE', desc: 'Üretim hazır kod akışı', accent: CYAN, route: '/m-code' },
   { ico: '◈', name: 'IMAGE FORGE', desc: 'Sinematik görsel üretimi', accent: MAGENTA, route: '/m-image' },
-  { ico: '▣', name: 'VIDEO LAB', desc: 'Video ve sahne üretimi', accent: VIOLET, route: '' },
-  { ico: '◊', name: 'AUDIO CORE', desc: 'Seslendirme ve audio', accent: GREEN, route: '' },
-  { ico: '⬢', name: 'CHAT NEXUS', desc: 'Akıllı sohbet merkezi', accent: CYAN, route: '' },
-  { ico: '⟁', name: 'REASON MATRIX', desc: 'Derin analiz motoru', accent: VIOLET, route: '' },
+  { ico: '▣', name: 'VIDEO LAB', desc: 'Video ve sahne üretimi', accent: VIOLET, route: '/m-video' },
+  { ico: '◊', name: 'AUDIO CORE', desc: 'Seslendirme ve audio', accent: GREEN, route: '/m-audio' },
+  { ico: '⬢', name: 'CHAT NEXUS', desc: 'Akıllı sohbet merkezi', accent: CYAN, route: '/m-chat' },
+  { ico: '⟁', name: 'REASON MATRIX', desc: 'Adım adım düşünce ve karar analizi', accent: VIOLET, route: '/m-reason' },
 ];
 
 function ModuleCard({ module }: { module: ModuleItem }) {

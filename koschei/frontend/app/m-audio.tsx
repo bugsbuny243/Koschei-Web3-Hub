@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 
 export default function MAudioScreen() {
-  const isEnabled = String(process.env.EXPO_PUBLIC_ENABLE_MEDIA_MODULES || 'false').toLowerCase() === 'true' && String(process.env.EXPO_PUBLIC_ENABLE_AUDIO_CORE || 'false').toLowerCase() === 'true';
+  const isEnabled = true;
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
