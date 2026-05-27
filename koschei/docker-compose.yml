@@ -15,8 +15,6 @@ services:
       PORT: 8080
       DATABASE_URL: ${DATABASE_URL}
       TOGETHER_API_KEY: ${TOGETHER_API_KEY}
-      FAL_KEY: ${FAL_KEY}
-      JWT_SECRET: ${JWT_SECRET}
     ports: ["8080:8080"]
     depends_on: [db]
   frontend:

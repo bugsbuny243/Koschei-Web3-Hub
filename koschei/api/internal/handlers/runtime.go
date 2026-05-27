@@ -286,7 +286,7 @@ func (h *Handler) processRuntimeProject(projectID, authSub, email, prompt string
 }
 
 func (h *Handler) callTogetherRuntimeBlueprint(projectID, prompt string) (string, error) {
-	model := firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")
+	model := firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")
 	if strings.TrimSpace(model) == "" {
 		return "", errors.New("together model is empty")
 	}

@@ -143,14 +143,24 @@ func systemPromptForTool(tool string) string {
 
 func resolveAIRoute(tool string) (aiRoute, error) {
 	switch tool {
-	case "game_design":
-		return aiRoute{Route: "game_design", Model: firstEnv("TOGETHER_MODEL_GAME_DESIGN")}, nil
-	case "game_code":
+	case "chat":
+		return aiRoute{Route: "chat", Model: firstEnv("TOGETHER_MODEL_GAME_DESIGN")}, nil
+	case "code":
 		return aiRoute{Route: "code", Model: firstEnv("TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")}, nil
-	case "build_analyzer":
+	case "reason":
 		return aiRoute{Route: "reason", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")}, nil
-	case "concept_art":
-		return aiRoute{Route: "concept_art", Model: firstEnv("TOGETHER_MODEL_CONCEPT_ART")}, nil
+	case "image":
+		return aiRoute{Route: "image", Model: firstEnv("TOGETHER_MODEL_CONCEPT_ART")}, nil
+	case "image_edit":
+		return aiRoute{Route: "image_edit", Model: firstEnv("TOGETHER_MODEL_CONCEPT_ART")}, nil
+	case "video":
+		return aiRoute{Route: "video", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER")}, nil
+	case "video_cinema":
+		return aiRoute{Route: "video_cinema", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER")}, nil
+	case "tts":
+		return aiRoute{Route: "tts", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER")}, nil
+	case "stt":
+		return aiRoute{Route: "stt", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER")}, nil
 	default:
 		return aiRoute{}, errors.New("unsupported tool")
 	}
