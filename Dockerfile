@@ -34,7 +34,6 @@ ENV STATIC_DIR=/app/public
 ENV ANDROID_HOME=/opt/android-cache/sdk
 ENV ANDROID_SDK_ROOT=/opt/android-cache/sdk
 ENV ANDROID_NDK_HOME=/opt/android-cache/ndk
-ENV UE6_PROJECT_PATH=/opt/android-cache/ue6/KoscheiGame.uproject
 
 EXPOSE 8080
 
