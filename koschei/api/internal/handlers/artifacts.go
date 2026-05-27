@@ -274,12 +274,12 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		return
 	}
 	promptBytes, _ := json.Marshal(map[string]any{"contract_version": "5.3", "project_id": projectID, "file_plan": filePlan, "runtime_payload": payload})
-	model := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_UNREAL_CODE"))
+	model := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_GAME_CODE"))
 	if model == "" {
-		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_UNREAL_CODE"))
+		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_GAME_CODE"))
 	}
 	if model == "" {
-		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_UNREAL_CODE"))
+		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_GAME_CODE"))
 	}
 	if model == "" {
 		model = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_GAME_DESIGN"))
@@ -302,7 +302,7 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 	timeout := time.Duration(timeoutSeconds) * time.Second
 	out, callErr := h.callTogetherWithSystemTimeoutAndMaxTokens(model, artifactSystemPrompt, string(promptBytes), timeout, maxTokens)
 	if callErr != nil && strings.Contains(strings.ToLower(callErr.Error()), "timeout") {
-		fallback := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_UNREAL_CODE"))
+		fallback := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_GAME_CODE"))
 		if fallback == "" || fallback == model {
 			fallback = strings.TrimSpace(os.Getenv("TOGETHER_MODEL_GAME_DESIGN"))
 		}
