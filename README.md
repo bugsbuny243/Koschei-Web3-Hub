@@ -47,6 +47,7 @@ Koschei Engine is built to replace Unreal-style complexity for small and medium 
 - `game_artifacts`
 - `google_play_integrations`
 - `production_release_jobs`
+- `game_store_metadata` (Google Play AI Discovery Pack per generated game spec)
 
 ## Ownership and Commercial Model
 - Customer owns each generated game.
