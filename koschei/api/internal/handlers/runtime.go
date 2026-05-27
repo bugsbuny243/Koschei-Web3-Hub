@@ -243,10 +243,7 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func togetherAIEnabled() bool {
-	if strings.ToLower(strings.TrimSpace(os.Getenv("TOGETHER_ENABLED"))) == "true" {
-		return true
-	}
-	return strings.ToLower(strings.TrimSpace(os.Getenv("TOGETHER_ENABLED"))) == "true"
+	return strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) != ""
 }
 func normalizeRuntimeTitle(title, prompt string) string {
 	clean := strings.TrimSpace(title)
@@ -289,7 +286,7 @@ func (h *Handler) processRuntimeProject(projectID, authSub, email, prompt string
 }
 
 func (h *Handler) callTogetherRuntimeBlueprint(projectID, prompt string) (string, error) {
-	model := firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")
+	model := firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")
 	if strings.TrimSpace(model) == "" {
 		return "", errors.New("together model is empty")
 	}

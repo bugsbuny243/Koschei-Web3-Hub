@@ -33,6 +33,50 @@ type artifactAIResponse struct {
 	NextSteps []string `json:"next_steps"`
 }
 
+
+
+type gameStoreMetadataResponse struct {
+	WhatTheGameIs         string         `json:"what_the_game_is"`
+	WhoItIsFor            string         `json:"who_it_is_for"`
+	UserIntentSatisfied   []string       `json:"user_intent_satisfied"`
+	AskPlayWhyRecommended string         `json:"ask_play_why_recommended"`
+	ShortDescription      string         `json:"short_description"`
+	FullDescription       string         `json:"full_description"`
+	SearchIntentPhrases   []string       `json:"search_intent_phrases"`
+	TargetAudience        map[string]any `json:"target_audience"`
+	CategorySuggestions   []string       `json:"category_suggestions"`
+	LocalizationPlan      map[string]any `json:"localization_plan"`
+	PlayShortsScript      string         `json:"play_shorts_script"`
+	PlayShortsScenePlan   []any          `json:"play_shorts_scene_plan"`
+	AskPlaySummary        string         `json:"ask_play_summary"`
+	PolicyNotes           []string       `json:"policy_notes"`
+}
+
+const gameStoreMetadataPrompt = `You are Koschei Google Play Discovery Metadata Builder.
+Return ONLY valid JSON.
+Do not use markdown fences.
+Do not add text outside JSON.
+Do not include claims of guaranteed ranking, guaranteed installs, or guaranteed recommendation placement.
+Do not use spammy keyword stuffing.
+Keep all text compliant with Google Play policy and suitable for customer-owned games.
+This is store publishing metadata, not a separate video generation module.
+Required JSON shape:
+{
+  "what_the_game_is": "string",
+  "who_it_is_for": "string",
+  "user_intent_satisfied": ["string"],
+  "ask_play_why_recommended": "string",
+  "short_description": "string",
+  "full_description": "string",
+  "search_intent_phrases": ["string"],
+  "target_audience": {"age_range": "string", "player_profiles": ["string"], "content_notes": ["string"]},
+  "category_suggestions": ["string"],
+  "localization_plan": {"primary_language": "string", "secondary_languages": ["string"], "adaptation_notes": ["string"]},
+  "play_shorts_script": "string",
+  "play_shorts_scene_plan": [{"scene": 1, "duration_seconds": 5, "visual": "string", "voiceover": "string"}],
+  "ask_play_summary": "string",
+  "policy_notes": ["string"]
+}`
 const artifactSystemPrompt = `You are Koschei Artifact Builder.
 Default language is Turkish for README and explanations.
 Return ONLY valid JSON.
@@ -155,6 +199,61 @@ func (h *Handler) failArtifact(artifactID string, errorMessage string, metadata 
 	}
 	metaBytes, _ := json.Marshal(metadata)
 	_, _ = h.DB.Exec(`UPDATE generated_artifacts SET status='failed',error_message=$2,metadata=coalesce(metadata,'{}'::jsonb) || $3::jsonb,updated_at=now() WHERE id=$1`, artifactID, errorMessage, string(metaBytes))
+}
+
+
+func buildGameStoreMetadataResponse(raw string) (gameStoreMetadataResponse, error) {
+	var ai gameStoreMetadataResponse
+	if err := json.Unmarshal([]byte(raw), &ai); err == nil {
+		return ai, nil
+	}
+	start := strings.Index(raw, "{")
+	end := strings.LastIndex(raw, "}")
+	if start >= 0 && end > start {
+		sub := raw[start : end+1]
+		if err := json.Unmarshal([]byte(sub), &ai); err == nil {
+			return ai, nil
+		}
+	}
+	return gameStoreMetadataResponse{}, fmt.Errorf("invalid_json")
+}
+
+func (h *Handler) persistGameStoreMetadata(projectID string, payload map[string]any) {
+	_, _ = h.DB.Exec(`INSERT INTO game_store_metadata (id,game_project_id,short_description,full_description,search_intent_phrases,target_audience,category_suggestions,localization_plan,play_shorts_script,play_shorts_scene_plan,ask_play_summary,updated_at)
+VALUES (gen_random_uuid(),$1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7::jsonb,$8,$9::jsonb,$10,now())
+ON CONFLICT (game_project_id) DO UPDATE SET
+  short_description=EXCLUDED.short_description,
+  full_description=EXCLUDED.full_description,
+  search_intent_phrases=EXCLUDED.search_intent_phrases,
+  target_audience=EXCLUDED.target_audience,
+  category_suggestions=EXCLUDED.category_suggestions,
+  localization_plan=EXCLUDED.localization_plan,
+  play_shorts_script=EXCLUDED.play_shorts_script,
+  play_shorts_scene_plan=EXCLUDED.play_shorts_scene_plan,
+  ask_play_summary=EXCLUDED.ask_play_summary,
+  updated_at=now()`,
+		projectID,
+		payload["short_description"],
+		payload["full_description"],
+		stringifyJSONValue(payload["search_intent_phrases"]),
+		stringifyJSONValue(payload["target_audience"]),
+		stringifyJSONValue(payload["category_suggestions"]),
+		stringifyJSONValue(payload["localization_plan"]),
+		payload["play_shorts_script"],
+		stringifyJSONValue(payload["play_shorts_scene_plan"]),
+		payload["ask_play_summary"],
+	)
+}
+
+func stringifyJSONValue(v any) string {
+	if v == nil {
+		return "{}"
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
 }
 
 func (h *Handler) RuntimeArtifactsRoute(w http.ResponseWriter, r *http.Request) {
@@ -393,6 +492,31 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		return
 	}
 	txClosed = true
+
+	storeInput, _ := json.Marshal(map[string]any{
+		"project_id": projectID,
+		"artifact_title": ai.ArtifactTitle,
+		"artifact_summary": ai.ArtifactSummary,
+		"warnings": ai.Warnings,
+		"next_steps": ai.NextSteps,
+		"runtime_payload": payload,
+	})
+	storeOut, storeErr := h.callTogetherWithSystemTimeoutAndMaxTokens(firstEnv("TOGETHER_MODEL_GAME_DESIGN", "TOGETHER_MODEL_GAME_CODE"), gameStoreMetadataPrompt, string(storeInput), timeout, 2000)
+	if storeErr == nil {
+		if metaAI, parseErr := buildGameStoreMetadataResponse(storeOut); parseErr == nil {
+			h.persistGameStoreMetadata(projectID, map[string]any{
+				"short_description": metaAI.ShortDescription,
+				"full_description": metaAI.FullDescription,
+				"search_intent_phrases": metaAI.SearchIntentPhrases,
+				"target_audience": metaAI.TargetAudience,
+				"category_suggestions": metaAI.CategorySuggestions,
+				"localization_plan": metaAI.LocalizationPlan,
+				"play_shorts_script": metaAI.PlayShortsScript,
+				"play_shorts_scene_plan": metaAI.PlayShortsScenePlan,
+				"ask_play_summary": metaAI.AskPlaySummary,
+			})
+		}
+	}
 	writeJSON(w, 200, map[string]any{"artifact_id": artifactID, "status": "completed", "file_count": count, "warnings": ai.Warnings, "credits_charged": !isPriv})
 }
 

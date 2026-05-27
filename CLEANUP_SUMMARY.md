@@ -38,7 +38,6 @@
 - `TOGETHER_MODEL_TTS`
 - `TOGETHER_MODEL_VIDEO`
 - `TOGETHER_MODEL_VIDEO_CINEMA`
-- `TOGETHER_AI_ENABLED`
 
 ## Build/Test Command Results
 - `go test ./...` (pass)
