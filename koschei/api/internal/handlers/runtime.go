@@ -243,10 +243,7 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func togetherAIEnabled() bool {
-	if strings.ToLower(strings.TrimSpace(os.Getenv("TOGETHER_ENABLED"))) == "true" {
-		return true
-	}
-	return strings.ToLower(strings.TrimSpace(os.Getenv("TOGETHER_ENABLED"))) == "true"
+	return strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) != ""
 }
 func normalizeRuntimeTitle(title, prompt string) string {
 	clean := strings.TrimSpace(title)
