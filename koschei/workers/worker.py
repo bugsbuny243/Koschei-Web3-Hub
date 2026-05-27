@@ -8,8 +8,8 @@ from pathlib import Path
 import psycopg2
 
 DB_URL = os.getenv("DATABASE_URL")
-UE6_EDITOR = os.getenv("UE6_EDITOR_BIN", "/opt/unreal/Engine/Binaries/Linux/UnrealEditor")
-UE6_PROJECT = os.getenv("UE6_PROJECT_PATH", "/workspace/ue6/KoscheiGame/KoscheiGame.uproject")
+ENGINE_EDITOR = os.getenv("ENGINE_EDITOR_BIN", "/opt/koschei/Engine/Binaries/Linux/KoscheiEditor")
+ENGINE_PROJECT = os.getenv("ENGINE_PROJECT_PATH", "/workspace/koschei/KoscheiGame/KoscheiGame.project")
 
 BASE_BUNDLE_LIMIT_MB = 200
 ASSET_PACK_LIMIT_MB = 4096
@@ -50,7 +50,7 @@ bUseExternalFilesDir=True
 
 
 def run_headless_build():
-    cmd = [UE6_EDITOR, UE6_PROJECT, "-run=Cook", "-TargetPlatform=Android", "-nullrhi", "-server", "-unattended"]
+    cmd = [ENGINE_EDITOR, ENGINE_PROJECT, "-run=Cook", "-TargetPlatform=Android", "-nullrhi", "-server", "-unattended"]
     return subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
 
 
@@ -98,7 +98,7 @@ while True:
         log(cur, project_id, task_id, artifact_id, "info", "Android build started", {"email": email})
         conn.commit()
 
-        inject_gpad_config(UE6_PROJECT)
+        inject_gpad_config(ENGINE_PROJECT)
         result = run_headless_build()
         if result.returncode != 0:
             raise RuntimeError(result.stderr[-1000:])

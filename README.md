@@ -3,7 +3,7 @@
 Koschei Engine is a lightweight AI-assisted web and Android game engine for customer-owned games.
 
 ## Positioning
-Koschei Engine is built to replace Unreal-style complexity for small and medium game production by making creation faster, simpler, cheaper, and publishing-focused.
+Koschei Engine is built to replace legacy heavyweight engine complexity for small and medium game production by making creation faster, simpler, cheaper, and publishing-focused.
 
 ## Core Customer Promise
 1. The customer enters a game idea.
@@ -55,4 +55,4 @@ Koschei Engine is built to replace Unreal-style complexity for small and medium 
 
 ## Product Boundaries
 - Focus: simple/medium web games, Android games, fast publishing, AAB generation, customer ownership, Google Play automation.
-- Do not claim AAA graphics, Unreal-level rendering, or one-prompt massive open-world generation.
+- Do not claim AAA graphics, heavyweight-console-level rendering, or one-prompt massive open-world generation.

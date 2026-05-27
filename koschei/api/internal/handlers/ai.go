@@ -118,7 +118,7 @@ func (h *Handler) generateWithRoute(tool string, route aiRoute, prompt string) (
 	if tool != "reason" {
 		return "", route.Model, err
 	}
-	fallbackModel := firstEnv("TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_GAME_DESIGN")
+	fallbackModel := firstEnv("TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")
 	if strings.TrimSpace(fallbackModel) == "" || fallbackModel == route.Model {
 		return "", route.Model, err
 	}
@@ -146,9 +146,9 @@ func resolveAIRoute(tool string) (aiRoute, error) {
 	case "chat":
 		return aiRoute{Route: "chat", Model: firstEnv("TOGETHER_MODEL_GAME_DESIGN")}, nil
 	case "code":
-		return aiRoute{Route: "code", Model: firstEnv("TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_GAME_DESIGN")}, nil
+		return aiRoute{Route: "code", Model: firstEnv("TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")}, nil
 	case "reason":
-		return aiRoute{Route: "reason", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_GAME_DESIGN")}, nil
+		return aiRoute{Route: "reason", Model: firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")}, nil
 	case "image":
 		return aiRoute{Route: "image", Model: firstEnv("TOGETHER_MODEL_CONCEPT_ART")}, nil
 	case "image_edit":
