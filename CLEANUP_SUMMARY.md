@@ -18,12 +18,12 @@
 - `NEON_AUTH_JWKS_URL` (+ existing Neon Auth envs used in deployment)
 - `CORS_ALLOWED_ORIGIN` (if cross-origin frontend is used)
 - `ADMIN_PASSWORD` (if owner-protected endpoints are used)
-- `GOOGLE_APPLICATION_CREDENTIALS_JSON` (if Google Play publisher flow enabled)
+- `GOOGLE_APPLICATION_CREDENTIALS_JSON` (if Google Play production publishing flow is enabled)
 - `ANDROID_PLAY_PACKAGE_NAME`
 - `WORKER_MAX_BUILD_THREADS`
 - `TOGETHER_API_KEY`
 - `TOGETHER_MODEL_GAME_DESIGN`
-- `TOGETHER_MODEL_UNREAL_CODE`
+- `TOGETHER_MODEL_GAME_CODE`
 - `TOGETHER_MODEL_BUILD_ANALYZER`
 - Optional: `TOGETHER_MODEL_CONCEPT_ART`
 
