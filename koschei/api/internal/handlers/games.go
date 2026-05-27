@@ -92,6 +92,10 @@ func (h *Handler) CreateGameProject(w http.ResponseWriter, r *http.Request) {
 	projectID := newID()
 	status := "spec_generated"
 	summary := buildSpecSummary(spec)
+	userID := strings.TrimSpace(claims.Sub)
+	if userID == "" {
+		userID = strings.TrimSpace(claims.Email)
+	}
 
 	tx, err := h.DB.Begin()
 	if err != nil {
@@ -100,11 +104,11 @@ func (h *Handler) CreateGameProject(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`INSERT INTO game_projects (id, email, title, prompt, target_platform, status) VALUES ($1,$2,$3,$4,$5,$6)`, projectID, claims.Email, title, prompt, platform, status); err != nil {
+	if _, err := tx.Exec(`INSERT INTO game_projects (id, user_id, title, prompt, game_type, target_platform, ownership_status, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, projectID, userID, title, prompt, spec.GameType, platform, "customer_owned", status); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	if _, err := tx.Exec(`INSERT INTO game_specs (id, game_project_id, spec_json, summary, status) VALUES ($1,$2,$3::jsonb,$4,$5)`, newID(), projectID, string(specJSON), summary, status); err != nil {
+	if _, err := tx.Exec(`INSERT INTO game_specs (id, game_project_id, spec_json, generated_by_model, status) VALUES ($1,$2,$3::jsonb,$4,$5)`, newID(), projectID, string(specJSON), model, status); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
