@@ -289,7 +289,7 @@ func (h *Handler) processRuntimeProject(projectID, authSub, email, prompt string
 }
 
 func (h *Handler) callTogetherRuntimeBlueprint(projectID, prompt string) (string, error) {
-	model := firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_GAME_DESIGN")
+	model := firstEnv("TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_BUILD_ANALYZER", "TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")
 	if strings.TrimSpace(model) == "" {
 		return "", errors.New("together model is empty")
 	}
@@ -315,7 +315,7 @@ func (h *Handler) callTogetherRuntimeBlueprint(projectID, prompt string) (string
 	}
 	fmt.Println("Runtime AI provider timeout on model:", model)
 	_, _ = h.DB.Exec(`INSERT INTO runtime_logs (id,project_id,level,message) VALUES ($1,$2,'error',$3)`, newID(), projectID, "Runtime AI provider timeout on model: "+model)
-	fallbackModel := firstEnv("TOGETHER_MODEL_GAME_DESIGN", "TOGETHER_MODEL_UNREAL_CODE", "TOGETHER_MODEL_BUILD_ANALYZER")
+	fallbackModel := firstEnv("TOGETHER_MODEL_GAME_DESIGN", "TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_BUILD_ANALYZER")
 	if strings.TrimSpace(fallbackModel) == "" || fallbackModel == model {
 		return "", err
 	}

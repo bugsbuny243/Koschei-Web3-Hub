@@ -1,12 +1,17 @@
-# Koschei API (Runtime Phase 1)
+# Koschei API
 
 ## Architecture
-- Single-service, same-origin deployment: Go API serves frontend static files and `/api/*` routes from one container/service.
-- No separate API service is required in Railway for runtime mode.
+- Single-service deployment: Go API serves static frontend + `/api/*` routes from one container/service.
+- Railway-friendly runtime for web game execution, build jobs, and publishing workflows.
 
 ## Environment
 - `DATABASE_URL` (required)
-- `ADMIN_PASSWORD` (required for internal admin operations)
+- `ADMIN_PASSWORD` (required for internal operations)
+- `TOGETHER_API_KEY` (required for AI generation)
+- `TOGETHER_MODEL_GAME_DESIGN` (required)
+- `TOGETHER_MODEL_GAME_CODE` (required)
+- `TOGETHER_MODEL_BUILD_ANALYZER` (required)
+- `TOGETHER_MODEL_CONCEPT_ART` (optional)
 - `CORS_ALLOWED_ORIGIN` (optional)
 - `PORT` (optional, default `8080`)
 
@@ -19,13 +24,14 @@ go run main.go
 ## Health
 - `GET /health`
 
-## Product Goal Alignment
-- Runtime flow supports customer-owned game generation and real user publishing.
-- Android publishing target is Google Play production release by default.
-- AAB is the primary Play artifact; APK may be produced as an optional testing/download artifact.
-- Google Play review/approval remains controlled by Google.
+## Product Alignment
+- Customer enters a game idea and receives a real playable game.
+- Web runtime builds are supported.
+- Android export supports AAB as primary Play artifact; APK remains optional for testing/download.
+- Google Play publishing uses customer-connected account credentials.
+- Google Play review and approval remain controlled by Google.
 
-## Public runtime endpoints
+## Runtime/Generation Endpoints
 - `GET /api/plans`
 - `POST /api/billing/manual-payment-request`
 - `GET /api/credits?email=...`
@@ -36,27 +42,20 @@ go run main.go
 - `GET /api/runtime/tasks?email=...`
 - `GET /api/runtime/logs/:projectId`
 
-## Internal admin endpoints (header `x-admin-password`)
+## Internal Operations Endpoints (header `x-admin-password`)
 - `GET /api/owner/payment-requests`
 - `POST /api/owner/activate-plan`
 - `POST /api/owner/grant-credits`
 - `PATCH /api/owner/jobs/:id/status`
 - `GET /api/owner/db-health`
 
-## Production Data Model Naming Direction
+## Database Naming Direction
 - `game_projects`
+- `game_templates`
+- `game_scenes`
+- `game_entities`
+- `game_assets`
 - `game_build_jobs`
 - `game_artifacts`
 - `google_play_integrations`
 - `production_release_jobs`
-- `customer_game_ownership`
-
-## Migrations
-- `migrations/001_runtime_core.sql`
-- `migrations/002_quantum_runtime.sql`
-- `migrations/002_runtime_tables.sql`
-- `migrations/003_model_routing.sql`
-- `migrations/004_rename_builder_to_starter.sql`
-- `migrations/005_db_indexes_and_safety.sql`
-- `migrations/006_runtime_observability.sql`
-- `migrations/007_normalize_runtime_schema.sql`

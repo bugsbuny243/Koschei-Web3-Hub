@@ -1,56 +1,58 @@
-# Koschei
+# Koschei Engine
 
-Koschei Game Factory creates the actual customer-requested game and automates publishing to real users through the customer’s own Google Play account.
+Koschei Engine is a lightweight AI-assisted web and Android game engine for customer-owned games.
 
-## Active Product
-- Customer-owned web game and Android game creation
-- Build automation and Android AAB build artifact generation
-- Google Play production rollout automation
-- Real user publishing flow through customer-connected Play Console credentials
+## Positioning
+Koschei Engine is built to replace Unreal-style complexity for small and medium game production by making creation faster, simpler, cheaper, and publishing-focused.
 
-## Final Customer Flow
-1. Customer signs in.
-2. Customer enters the game idea.
-3. Koschei generates the actual customer-owned game.
-4. Koschei creates a playable web version if selected.
-5. Koschei creates an Android AAB for Google Play.
-6. APK generation is optional for download/testing only, not the primary Play publishing format.
-7. Customer connects their own Google Play account / Play Console credentials.
-8. Koschei submits the release through the customer’s Google Play account.
-9. Default target is production release unless customer explicitly chooses internal/closed testing.
-10. The game is intended for real users.
+## Core Customer Promise
+1. The customer enters a game idea.
+2. Koschei Engine generates a real playable game.
+3. The game can run on the web.
+4. The game can be exported as an Android AAB.
+5. The customer connects their own Google Play account.
+6. Koschei publishes/releases through the customer account.
 
-## Publishing Truth
-- Koschei automates submission and release preparation.
-- Google Play review and approval cannot be bypassed.
-- Google controls review outcome, policy approval, and final availability timing.
+## Product Modules
+1. `koschei-runtime` — runtime that executes generated games.
+2. `koschei-editor` — simple visual/prompt editor for scenes, sprites, levels, enemies, score, UI, and game rules.
+3. `koschei-templates` — starter templates: runner, platformer, clicker, puzzle, quiz, arcade shooter.
+4. `koschei-ai-generator` — converts prompts into specs, scenes, entities, rules, code, and asset metadata.
+5. `koschei-web-exporter` — exports playable web builds.
+6. `koschei-android-exporter` — packages Android APK/AAB artifacts.
+7. `koschei-play-publisher` — publishes AAB releases via customer-connected Google Play accounts.
 
-## Core Platform Ownership
-The generated game belongs to the customer. Koschei platform ownership remains with Koschei:
-- backend services
-- generators and reusable templates
-- workers/tooling/infrastructure
-- build system and publishing automation
+## Platform Scope (Kept)
+- Go backend
+- Neon Auth
+- PostgreSQL / Neon DB
+- Railway deploy/build config
+- Google Play / GCP publishing integration
+- Together AI integration
 
-Commercial model target:
-- 60% customer / 40% Koschei on net distributable revenue (or equivalent production-cost model)
+## Together AI Environment Variables
+- `TOGETHER_API_KEY`
+- `TOGETHER_MODEL_GAME_DESIGN`
+- `TOGETHER_MODEL_GAME_CODE`
+- `TOGETHER_MODEL_BUILD_ANALYZER`
+- Optional later: `TOGETHER_MODEL_CONCEPT_ART`
 
-## Backend and Deploy
-- Go backend retained
-- Neon Auth integration retained
-- PostgreSQL/Neon DB integration retained
-- Railway deployment/build retained
-- Google Play / GCP publishing integration retained
-- Together AI game design/code/build analyzer model integration retained
-- Health endpoint: `/health`
-
-## Production Data Model Direction
+## Database Concepts
 - `game_projects`
+- `game_templates`
+- `game_scenes`
+- `game_entities`
+- `game_assets`
 - `game_build_jobs`
 - `game_artifacts`
 - `google_play_integrations`
 - `production_release_jobs`
-- `customer_game_ownership`
 
-## Minimal Landing
-Static landing page is served from `public/index.html`.
+## Ownership and Commercial Model
+- Customer owns each generated game.
+- Koschei owns the engine, platform, templates, generator, exporters, workers, and publishing automation.
+- Commercial model target: support production fee + optional 60% customer / 40% Koschei net revenue share.
+
+## Product Boundaries
+- Focus: simple/medium web games, Android games, fast publishing, AAB generation, customer ownership, Google Play automation.
+- Do not claim AAA graphics, Unreal-level rendering, or one-prompt massive open-world generation.
