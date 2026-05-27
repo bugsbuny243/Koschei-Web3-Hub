@@ -57,3 +57,11 @@ Koschei Engine is built to replace legacy heavyweight engine complexity for smal
 ## Product Boundaries
 - Focus: simple/medium web games, Android games, fast publishing, AAB generation, customer ownership, Google Play automation.
 - Do not claim AAA graphics, heavyweight-console-level rendering, or one-prompt massive open-world generation.
+
+## Grant / Funding Sprint
+
+- [Koschei Web3 Bridge Grant Application](docs/grants/KOSCHEI_WEB3_BRIDGE_GRANT_APPLICATION.md)
+- [Superteam Solana Microgrant Draft](docs/grants/SUPERTEAM_SOLANA_MICROGRANT_DRAFT.md)
+- [Alchemy Credit Application Draft](docs/grants/ALCHEMY_CREDIT_APPLICATION_DRAFT.md)
+- [Shopier Early Support Product](docs/grants/SHOPIER_EARLY_SUPPORT_PRODUCT.md)
+- [Demo Video Script](docs/grants/DEMO_VIDEO_SCRIPT.md)
