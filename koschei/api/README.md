@@ -6,7 +6,7 @@
 
 ## Environment
 - `DATABASE_URL` (required)
-- `ADMIN_PASSWORD` (required for owner endpoints)
+- `ADMIN_PASSWORD` (required for internal admin operations)
 - `CORS_ALLOWED_ORIGIN` (optional)
 - `PORT` (optional, default `8080`)
 
@@ -19,6 +19,12 @@ go run main.go
 ## Health
 - `GET /health`
 
+## Product Goal Alignment
+- Runtime flow supports customer-owned game generation and real user publishing.
+- Android publishing target is Google Play production release by default.
+- AAB is the primary Play artifact; APK may be produced as an optional testing/download artifact.
+- Google Play review/approval remains controlled by Google.
+
 ## Public runtime endpoints
 - `GET /api/plans`
 - `POST /api/billing/manual-payment-request`
@@ -30,12 +36,20 @@ go run main.go
 - `GET /api/runtime/tasks?email=...`
 - `GET /api/runtime/logs/:projectId`
 
-## Owner endpoints (header `x-admin-password`)
+## Internal admin endpoints (header `x-admin-password`)
 - `GET /api/owner/payment-requests`
 - `POST /api/owner/activate-plan`
 - `POST /api/owner/grant-credits`
 - `PATCH /api/owner/jobs/:id/status`
 - `GET /api/owner/db-health`
+
+## Production Data Model Naming Direction
+- `game_projects`
+- `game_build_jobs`
+- `game_artifacts`
+- `google_play_integrations`
+- `production_release_jobs`
+- `customer_game_ownership`
 
 ## Migrations
 - `migrations/001_runtime_core.sql`
