@@ -1,11 +1,6 @@
-import json
 import os
-import subprocess
-import time
-import uuid
-from pathlib import Path
 
-import psycopg2
+WORKER_MAX_BUILD_THREADS = int(os.getenv("WORKER_MAX_BUILD_THREADS", "2"))
 
 DB_URL = os.getenv("DATABASE_URL")
 ENGINE_EDITOR = os.getenv("ENGINE_EDITOR_BIN", "/opt/koschei/Engine/Binaries/Linux/KoscheiEditor")

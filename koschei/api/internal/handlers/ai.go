@@ -27,9 +27,9 @@ type aiRoute struct {
 
 const (
 	commonAIInstruction = "Default language is Turkish. Understand Turkish slang and typos. Do not explain the user’s language unless asked. Be practical, production-focused, and direct. Use clean markdown headings."
-	chatSystemPrompt    = "You are Koschei Chat Core. " + commonAIInstruction + " Answer short, friendly, Turkish-first. For casual messages like \"nbr lan kanka\", answer naturally in Turkish. Do not produce long architecture unless user asks."
-	codeSystemPrompt    = "You are Koschei Code Engine. " + commonAIInstruction + " For technical build requests, always respond using exactly this structure:\n\n## Teknik Hedef\n\n## Mimari\n\n## Dosya Planı\n\n## API / Endpoint Planı\n\n## DB / Migration Planı\n\n## Uygulama Adımları\n\n## Örnek Kod\n\n## Test Planı\n\nRules:\n- Do not provide random standalone code without context.\n- Include code only when useful and specify target file path for each snippet.\n- Keep implementation details concrete (client/backend/db/worker/provider as needed).\n- If a section is not relevant, write 'Bu istek için gerekli değil.'"
-	reasonSystemPrompt  = "You are Koschei Reason Matrix. " + commonAIInstruction + " For serious project/product/game/app requests, always respond using exactly this structure:\n\n## Ne İstiyorsun?\n\n## Gerçekçilik Analizi\n\n## MVP Sürüm\n\n## Gerekli Altyapı\n\n## Büyük Sürüm\n\n## Riskler\n\n## Üretim Sırası\n\n## Sonraki Net Adım\n\nRules:\n- Be honest but constructive.\n- Do not say 'impossible' for PUBG-like, GTA-like, TikTok-like, YouTube-like, marketplace-like, social app-like requests.\n- Do not promise instant full clone.\n- Clearly state it must be original and not a brand/IP clone.\n- Always provide MVP-first staged production plan and infrastructure details."
+	chatSystemPrompt    = "You are Koschei Game Design Core. " + commonAIInstruction + " Answer short, friendly, Turkish-first. For casual messages like \"nbr lan kanka\", answer naturally in Turkish. Do not produce long architecture unless user asks."
+	codeSystemPrompt    = "You are Koschei Game Code Engine. " + commonAIInstruction + " For technical build requests, always respond using exactly this structure:\n\n## Teknik Hedef\n\n## Mimari\n\n## Dosya Planı\n\n## API / Endpoint Planı\n\n## DB / Migration Planı\n\n## Uygulama Adımları\n\n## Örnek Kod\n\n## Test Planı\n\nRules:\n- Do not provide random standalone code without context.\n- Include code only when useful and specify target file path for each snippet.\n- Keep implementation details concrete (client/backend/db/worker/provider as needed).\n- If a section is not relevant, write 'Bu istek için gerekli değil.'"
+	reasonSystemPrompt  = "You are Koschei Build Analyzer. " + commonAIInstruction + " For serious project/product/game/app requests, always respond using exactly this structure:\n\n## Ne İstiyorsun?\n\n## Gerçekçilik Analizi\n\n## MVP Sürüm\n\n## Gerekli Altyapı\n\n## Büyük Sürüm\n\n## Riskler\n\n## Üretim Sırası\n\n## Sonraki Net Adım\n\nRules:\n- Be honest but constructive.\n- Do not say 'impossible' for PUBG-like, GTA-like, TikTok-like, YouTube-like, marketplace-like, social app-like requests.\n- Do not promise instant full clone.\n- Clearly state it must be original and not a brand/IP clone.\n- Always provide MVP-first staged production plan and infrastructure details."
 )
 
 func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) {
@@ -115,7 +115,7 @@ func (h *Handler) generateWithRoute(tool string, route aiRoute, prompt string) (
 	if err == nil {
 		return resultText, route.Model, nil
 	}
-	if tool != "reason" {
+	if tool != "build_analyzer" {
 		return "", route.Model, err
 	}
 	fallbackModel := firstEnv("TOGETHER_MODEL_GAME_CODE", "TOGETHER_MODEL_GAME_DESIGN")
@@ -123,7 +123,7 @@ func (h *Handler) generateWithRoute(tool string, route aiRoute, prompt string) (
 		return "", route.Model, err
 	}
 	log.Printf("reason route fallback: primary model failed, retrying fallback model=%s", fallbackModel)
-	resultText, fallbackErr := h.callTogetherChat(fallbackModel, "reason", prompt)
+	resultText, fallbackErr := h.callTogetherChat(fallbackModel, "build_analyzer", prompt)
 	if fallbackErr != nil {
 		return "", fallbackModel, fmt.Errorf("primary: %v; fallback: %v", err, fallbackErr)
 	}
@@ -132,12 +132,12 @@ func (h *Handler) generateWithRoute(tool string, route aiRoute, prompt string) (
 
 func systemPromptForTool(tool string) string {
 	switch tool {
-	case "code":
+	case "game_code":
 		return codeSystemPrompt
-	case "reason":
+	case "build_analyzer":
 		return reasonSystemPrompt
 	default:
-		return chatSystemPrompt
+		return codeSystemPrompt
 	}
 }
 
@@ -175,7 +175,7 @@ func firstEnv(keys ...string) string {
 	return ""
 }
 
-func isTextTool(tool string) bool { return tool == "chat" || tool == "code" || tool == "reason" }
+func isTextTool(tool string) bool { return tool == "game_design" || tool == "game_code" || tool == "build_analyzer" || tool == "concept_art" }
 
 func (h *Handler) userCreditsAndRole(authSub string) (bool, int, error) {
 	var role string
