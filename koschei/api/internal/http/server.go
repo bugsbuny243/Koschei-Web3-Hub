@@ -92,6 +92,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/ai/audio", requiresDB(h, handlers.RequireAuth(method("POST", h.AIAudioGenerate))))
 	mux.HandleFunc("/api/ai/video", requiresDB(h, handlers.RequireAuth(method("POST", h.AIVideoCreate))))
 	mux.HandleFunc("/api/ai/video/status", requiresDB(h, handlers.RequireAuth(method("GET", h.AIVideoStatus))))
+	mux.HandleFunc("/api/v1/games", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateGameProject))))
 	mux.HandleFunc("/api/v1/build/android", requiresDB(h, handlers.RequireAuth(method("POST", h.BuildAndroid))))
 	mux.HandleFunc("/api/cyber/analyze", requiresDB(h, handlers.RequireAuth(method("POST", h.CyberAnalyze))))
 	mux.HandleFunc("/api/cyber/analyses", requiresDB(h, handlers.RequireAuth(method("GET", h.ListCyberAnalyses))))
