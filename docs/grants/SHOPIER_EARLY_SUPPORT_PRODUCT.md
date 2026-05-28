@@ -1,38 +1,24 @@
-# Shopier Early Support Package Copy
+# Koschei Shopier SaaS Credit / Support Packages
 
-> These offerings are **support / early-access / service-priority packages only**.
-> They are **not** equity, investment contracts, token sales, or financial return products.
+This document lists the current Koschei Shopier packages used in the funding sprint context.
 
-## 499 TL — Early Support
-Koschei Web3 Bridge’i erken aşamada desteklemek isteyenler için başlangıç paketi.
+## Current Packages
 
-Dahil olanlar:
-- Teşekkür listesinde destekçi adı (isteğe bağlı)
-- Erken gelişim güncellemelerine erişim
-- Ürün yol haritası özet bülteni
+### 1) Koschei Starter
+- **Price:** 899 TL
+- **Credits:** 20,000 credits
+- **Shopier:** https://www.shopier.com/TradeVisual/47465449
 
-**Not:** Bu paket bir destek/erken erişim paketidir.
+### 2) Koschei Pro
+- **Price:** 2,299 TL
+- **Credits:** 70,000 credits
+- **Shopier:** https://www.shopier.com/TradeVisual/47465484
 
----
+### 3) Koschei Studio
+- **Price:** 4,999 TL
+- **Credits:** 180,000 credits
+- **Shopier:** https://www.shopier.com/TradeVisual/47465499
 
-## 999 TL — Founder Support
-Projeye daha güçlü katkı sunmak isteyen destekçiler için genişletilmiş erken destek paketi.
-
-Dahil olanlar:
-- Early Support paketindeki tüm içerikler
-- Öncelikli geri bildirim kanalı
-- Demo/Q&A oturum davetlerinde öncelik
-
-**Not:** Bu paket bir destek/erken erişim paketidir.
-
----
-
-## 1.999 TL — Setup Priority
-Kurulum ve başlangıç yönlendirmesinde öncelik isteyen kullanıcılar için hizmet öncelik paketi.
-
-Dahil olanlar:
-- Founder Support paketindeki tüm içerikler
-- Kurulum planlamasında öncelik sırası
-- Uygunluk durumuna göre daha hızlı onboarding yönlendirmesi
-
-**Not:** Bu paket bir hizmet önceliği/satış sonrası destek paketidir; yatırım ürünü değildir.
+## Compliance / Positioning Note
+These are **SaaS credit/support packages** only.
+They are **not investment products**, **not securities**, **not token sales**, and **do not include profit-sharing promises**.
