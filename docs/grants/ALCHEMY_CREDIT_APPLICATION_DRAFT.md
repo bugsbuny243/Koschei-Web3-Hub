@@ -6,6 +6,16 @@
 ## Positioning
 Koschei Web3 Bridge is an **Alchemy-first event monitoring and Web3 operations bridge** focused on reliable ingestion, searchable event intelligence, and AI-assisted operational context.
 
+## Funding Sprint Package Context (Real Koschei SaaS Pricing)
+For sprint communication and community support, we currently use the following Shopier SaaS credit/support packages:
+
+1. **Koschei Starter** — **899 TL** — **20,000 credits**  
+   https://www.shopier.com/TradeVisual/47465449
+2. **Koschei Pro** — **2,299 TL** — **70,000 credits**  
+   https://www.shopier.com/TradeVisual/47465484
+3. **Koschei Studio** — **4,999 TL** — **180,000 credits**  
+   https://www.shopier.com/TradeVisual/47465499
+
 ## What We Are Building
 - Alchemy-first webhook/on-chain event intake.
 - Normalized event pipeline for multi-network operations.
@@ -24,6 +34,14 @@ Alchemy infrastructure credits directly accelerate:
 - Multi-network development/staging validation.
 - Observability and reliability benchmarking.
 - Demo environments and public-good documentation examples.
+
+## Compliance / Positioning Note
+These are **Koschei SaaS credit/support packages**.
+They are **not investment products**.
+They are **not securities**.
+They are **not token sales**.
+They **do not promise profit sharing**.
+They are **service/credit/support packages only**.
 
 ## Impact
 With credits, we can ship a robust safety-first operations bridge that helps teams detect issues faster, reduce manual incident handling, and improve trust in Web3 workflows.
