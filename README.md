@@ -60,6 +60,16 @@ Koschei Engine is built to replace legacy heavyweight engine complexity for smal
 
 ## Grant / Funding Sprint
 
+### Real Koschei SaaS Pricing (Shopier)
+1. **Koschei Starter** — **899 TL** — **20,000 credits**  
+   https://www.shopier.com/TradeVisual/47465449
+2. **Koschei Pro** — **2,299 TL** — **70,000 credits**  
+   https://www.shopier.com/TradeVisual/47465484
+3. **Koschei Studio** — **4,999 TL** — **180,000 credits**  
+   https://www.shopier.com/TradeVisual/47465499
+
+**Compliance wording:** These are Koschei SaaS credit/support packages. They are not investment products, not securities, not token sales, do not promise profit sharing, and are service/credit/support packages only.
+
 - [Koschei Web3 Bridge Grant Application](docs/grants/KOSCHEI_WEB3_BRIDGE_GRANT_APPLICATION.md)
 - [Superteam Solana Microgrant Draft](docs/grants/SUPERTEAM_SOLANA_MICROGRANT_DRAFT.md)
 - [Alchemy Credit Application Draft](docs/grants/ALCHEMY_CREDIT_APPLICATION_DRAFT.md)

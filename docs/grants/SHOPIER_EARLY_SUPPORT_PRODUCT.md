@@ -1,6 +1,6 @@
 # Koschei Shopier SaaS Credit / Support Packages
 
-This document lists the current Koschei Shopier packages used in the funding sprint context.
+This document lists the real Koschei Shopier pricing used in the funding sprint context.
 
 ## Current Packages
 
@@ -19,6 +19,10 @@ This document lists the current Koschei Shopier packages used in the funding spr
 - **Credits:** 180,000 credits
 - **Shopier:** https://www.shopier.com/TradeVisual/47465499
 
-## Compliance / Positioning Note
-These are **SaaS credit/support packages** only.
-They are **not investment products**, **not securities**, **not token sales**, and **do not include profit-sharing promises**.
+## Important Wording (Compliance)
+These are **Koschei SaaS credit/support packages**.
+They are **not investment products**.
+They are **not securities**.
+They are **not token sales**.
+They **do not promise profit sharing**.
+They are **service/credit/support packages only**.
