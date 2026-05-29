@@ -11,15 +11,22 @@
     .card { border: 1px solid rgba(166, 190, 255, .18); border-radius: 28px; padding: 32px; background: rgba(13, 20, 33, .86); box-shadow: 0 24px 80px rgba(0,0,0,.32); }
     h1 { font-size: clamp(2.2rem, 7vw, 4.5rem); line-height: .95; margin: 0 0 16px; letter-spacing: -.06em; }
     h2 { margin: 28px 0 10px; }
-    p, li { color: #b9c7dd; font-size: 1.05rem; line-height: 1.6; }
+    p, li, label { color: #b9c7dd; font-size: 1.05rem; line-height: 1.6; }
+    form { display: grid; gap: 14px; margin-top: 22px; }
+    label { display: grid; gap: 8px; font-weight: 700; }
+    input { width: 100%; box-sizing: border-box; border: 1px solid rgba(166, 190, 255, .2); border-radius: 14px; padding: 13px 14px; color: #eef4ff; background: rgba(5, 9, 18, .72); font: inherit; }
+    input:focus { border-color: rgba(115, 247, 209, .72); outline: 2px solid rgba(115, 247, 209, .16); }
     .notice { border: 1px solid rgba(251, 191, 36, .38); border-radius: 18px; padding: 16px; background: rgba(120, 53, 15, .24); color: #fde68a; }
     .success { border-color: rgba(115, 247, 209, .32); background: rgba(6, 78, 59, .2); color: #d7fbff; }
+    .error { border-color: rgba(248, 113, 113, .42); background: rgba(127, 29, 29, .22); color: #fecaca; }
     .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 22px; }
     button, a.button { border: 0; border-radius: 14px; padding: 12px 16px; color: #06111f; background: #73f7d1; cursor: pointer; font-weight: 800; text-decoration: none; display: inline-block; }
     button.secondary, a.secondary { color: #eaf2ff; background: rgba(126, 154, 255, .2); border: 1px solid rgba(166, 190, 255, .22); }
+    button:disabled, a.disabled { cursor: not-allowed; opacity: .48; pointer-events: none; }
     code { color: #9ff5df; word-break: break-all; }
     .status { min-height: 24px; color: #a8bbd8; }
     .muted { color: #8799b5; }
+    .otp-panel[hidden] { display: none; }
   </style>
 </head>
 <body>
@@ -28,32 +35,54 @@
       <h1>Koschei Login</h1>
       <p id="status" class="status">Checking for an existing authenticated Koschei session…</p>
       <div id="sessionPanel" class="notice" role="status">
-        Production sign-in is not wired to this static page yet.
+        Use your email to receive a Neon Auth magic link or one-time code for Koschei Web3 Bridge.
       </div>
 
-      <h2>Production authentication status</h2>
-      <p>The backend currently disables custom email/password auth and protects application APIs with Neon Auth bearer tokens verified by <code>/api/me</code>. This static login page does not mint, request, display, log, or place tokens in URLs.</p>
-      <p>Connect the production Neon Auth frontend flow here before using this page as the normal sign-in entry point. Until then, protected Web3 Bridge APIs remain locked unless the browser already has a valid app session created by the real auth frontend.</p>
+      <h2>Sign in to manage Web3 Bridge</h2>
+      <p>Koschei uses provider-issued Neon Auth sessions. This page never asks for passwords, never mints local tokens, and never places tokens in URLs. Protected APIs stay locked until <code>/api/me</code> verifies a bearer JWT from the auth provider.</p>
+
+      <form id="emailForm">
+        <label>
+          Email address
+          <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
+        </label>
+        <button id="sendCode" type="submit">Send magic link / sign-in code</button>
+      </form>
+
+      <form id="otpForm" class="otp-panel" hidden>
+        <label>
+          One-time code
+          <input id="otpCode" name="otpCode" type="text" autocomplete="one-time-code" inputmode="numeric" placeholder="123456">
+        </label>
+        <button id="verifyCode" type="submit">Verify and sign in</button>
+        <p class="muted">If you clicked the magic link in this same browser, verification starts automatically. Otherwise, paste the one-time code from your email.</p>
+      </form>
 
       <div class="actions">
-        <button id="refreshSession">Refresh session</button>
-        <a class="button" id="continueBridge" href="/web3-bridge.html">Continue to Web3 Bridge</a>
-        <button id="clearSession" class="secondary">Log out / clear session</button>
+        <button id="refreshSession" type="button" class="secondary">Refresh session</button>
+        <a class="button disabled" id="continueBridge" href="/web3-bridge.html" aria-disabled="true">Continue to Web3 Bridge</a>
+        <button id="clearSession" type="button" class="secondary">Clear session</button>
         <a class="button secondary" href="/">Back to homepage</a>
       </div>
 
-      <h2>Implementation note</h2>
+      <h2>No-custody boundary</h2>
       <ul>
-        <li>Use the same browser storage token key pattern already detected by <code>/web3-bridge.html</code> after the real auth frontend obtains a session.</li>
-        <li>Never put tokens in URLs and never print tokens on this page.</li>
-        <li>No custody rules are unchanged: Koschei does not hold funds, private keys, escrow, or signing authority.</li>
+        <li>Signing in only unlocks source and event management for the current Koschei user.</li>
+        <li>Koschei does not hold funds, private keys, escrow, or signing authority.</li>
+        <li>Web3 Bridge remains read-only event monitoring and developer tooling.</li>
       </ul>
-      <p class="muted">If you have just signed in through the production auth frontend, refresh this page. A verified session redirects to the Web3 Bridge automatically.</p>
     </section>
   </main>
   <script>
     const statusEl = document.getElementById('status');
     const sessionPanel = document.getElementById('sessionPanel');
+    const emailForm = document.getElementById('emailForm');
+    const otpForm = document.getElementById('otpForm');
+    const emailInput = document.getElementById('email');
+    const otpInput = document.getElementById('otpCode');
+    const sendCodeButton = document.getElementById('sendCode');
+    const verifyCodeButton = document.getElementById('verifyCode');
+    const continueBridge = document.getElementById('continueBridge');
 
     const APP_SESSION_TOKEN_KEYS = [
       'koschei_auth_token',
@@ -65,6 +94,9 @@
       'jwt',
       'token'
     ];
+    const PRIMARY_SESSION_TOKEN_KEY = 'koschei_auth_token';
+    const OTP_NONCE_KEY = 'koschei_auth_otp_nonce';
+    const OTP_EMAIL_KEY = 'koschei_auth_otp_email';
 
     function tokenLooksLikeJWT(value) {
       return typeof value === 'string' && value.split('.').length === 3 && value.length > 40;
@@ -120,7 +152,7 @@
     }
 
     function clearSessionStorageKeys() {
-      const keys = [...APP_SESSION_TOKEN_KEYS, 'koschei_web3_token'];
+      const keys = [...APP_SESSION_TOKEN_KEYS, 'koschei_web3_token', OTP_NONCE_KEY, OTP_EMAIL_KEY];
       for (const storage of [localStorage, sessionStorage]) {
         try {
           keys.forEach(key => storage.removeItem(key));
@@ -132,6 +164,24 @@
       }
     }
 
+    function setPanel(message, kind = 'notice') {
+      sessionPanel.className = kind;
+      sessionPanel.textContent = message;
+    }
+
+    function setContinueEnabled(enabled) {
+      continueBridge.classList.toggle('disabled', !enabled);
+      continueBridge.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    }
+
+    async function parseJSONResponse(response) {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Request failed');
+      }
+      return data;
+    }
+
     async function verifyToken(token) {
       if (!token) return null;
       const response = await fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } });
@@ -140,30 +190,111 @@
       return data.user || null;
     }
 
-    async function refreshSession() {
+    async function refreshSession({ redirect = false } = {}) {
       statusEl.textContent = 'Checking for an existing authenticated Koschei session…';
-      sessionPanel.className = 'notice';
+      setContinueEnabled(false);
       const user = await verifyToken(findAppSessionToken());
       if (user) {
-        sessionPanel.className = 'notice success';
-        sessionPanel.textContent = `Signed in as ${user.email || 'Koschei user'}. Redirecting to the Web3 Bridge…`;
+        setPanel(`Signed in as ${user.email || 'Koschei user'}.`, 'notice success');
         statusEl.textContent = 'Authenticated session verified.';
-        window.setTimeout(() => { window.location.assign('/web3-bridge.html'); }, 700);
-        return;
+        setContinueEnabled(true);
+        if (redirect) window.setTimeout(() => { window.location.assign('/web3-bridge.html'); }, 700);
+        return user;
       }
-      sessionPanel.textContent = 'No valid app session was found. Production auth must be connected before this page can sign users in.';
-      statusEl.textContent = 'Sign-in unavailable on this static placeholder.';
+      setPanel('No valid app session was found. Enter your email to request a Neon Auth magic link or one-time code.');
+      statusEl.textContent = 'Ready to sign in.';
+      return null;
     }
 
-    document.getElementById('refreshSession').addEventListener('click', refreshSession);
-    document.getElementById('clearSession').addEventListener('click', () => {
-      clearSessionStorageKeys();
-      sessionPanel.className = 'notice';
-      sessionPanel.textContent = 'Session data cleared from this browser.';
-      statusEl.textContent = 'Signed out locally. Protected APIs remain locked until a valid session is created.';
+    async function startLogin(email) {
+      sendCodeButton.disabled = true;
+      statusEl.textContent = 'Requesting a sign-in code…';
+      try {
+        const callbackURL = `${window.location.origin}/login.html`;
+        const response = await fetch('/api/auth/otp/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, callback_url: callbackURL })
+        });
+        const data = await parseJSONResponse(response);
+        sessionStorage.setItem(OTP_NONCE_KEY, data.nonce);
+        sessionStorage.setItem(OTP_EMAIL_KEY, data.email || email);
+        otpForm.hidden = false;
+        otpInput.focus();
+        setPanel(`Sign-in email sent to ${data.email || email}. Use the magic link or enter the one-time code here.`, 'notice success');
+        statusEl.textContent = 'Check your email for the magic link or code.';
+      } catch (err) {
+        setPanel(`Unable to start sign-in: ${err.message}`, 'notice error');
+        statusEl.textContent = 'Sign-in could not be started.';
+      } finally {
+        sendCodeButton.disabled = false;
+      }
+    }
+
+    async function completeLogin(code) {
+      const email = sessionStorage.getItem(OTP_EMAIL_KEY) || emailInput.value.trim();
+      const nonce = sessionStorage.getItem(OTP_NONCE_KEY) || '';
+      if (!email || !nonce || !code) {
+        setPanel('Email, one-time code, and nonce are required. Request a new sign-in email if needed.', 'notice error');
+        return;
+      }
+      verifyCodeButton.disabled = true;
+      statusEl.textContent = 'Verifying sign-in code…';
+      try {
+        const response = await fetch('/api/auth/otp/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code, nonce })
+        });
+        const data = await parseJSONResponse(response);
+        if (!tokenLooksLikeJWT(data.access_token)) throw new Error('Auth provider did not return a valid browser session token');
+        localStorage.setItem(PRIMARY_SESSION_TOKEN_KEY, data.access_token);
+        sessionStorage.removeItem(OTP_NONCE_KEY);
+        sessionStorage.removeItem(OTP_EMAIL_KEY);
+        setPanel(`Signed in as ${(data.user && data.user.email) || email}. Redirecting to the Web3 Bridge…`, 'notice success');
+        statusEl.textContent = 'Authenticated session verified.';
+        setContinueEnabled(true);
+        window.setTimeout(() => { window.location.assign('/web3-bridge.html'); }, 700);
+      } catch (err) {
+        setPanel(`Unable to complete sign-in: ${err.message}`, 'notice error');
+        statusEl.textContent = 'Verification failed. Check the code or request a new sign-in email.';
+      } finally {
+        verifyCodeButton.disabled = false;
+      }
+    }
+
+    emailForm.addEventListener('submit', event => {
+      event.preventDefault();
+      startLogin(emailInput.value.trim());
     });
 
-    refreshSession();
+    otpForm.addEventListener('submit', event => {
+      event.preventDefault();
+      completeLogin(otpInput.value.trim());
+    });
+
+    document.getElementById('refreshSession').addEventListener('click', () => refreshSession());
+    document.getElementById('clearSession').addEventListener('click', () => {
+      clearSessionStorageKeys();
+      setContinueEnabled(false);
+      otpForm.hidden = true;
+      setPanel('Session data cleared from this browser. Protected APIs remain locked until a valid Neon Auth session is created.');
+      statusEl.textContent = 'Signed out locally.';
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    const linkCode = params.get('code') || '';
+    const storedEmail = sessionStorage.getItem(OTP_EMAIL_KEY) || '';
+    if (storedEmail) emailInput.value = storedEmail;
+    refreshSession().then(user => {
+      if (user) return;
+      if (linkCode) {
+        otpForm.hidden = false;
+        otpInput.value = linkCode;
+        completeLogin(linkCode);
+        window.history.replaceState({}, document.title, '/login.html');
+      }
+    });
   </script>
 </body>
 </html>

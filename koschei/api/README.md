@@ -9,6 +9,10 @@ Core Go backend for Koschei Engine.
 - NEON_AUTH_BASE_URL
 - NEON_AUTH_ISSUER
 - NEON_AUTH_JWKS_URL
+- NEON_AUTH_AUDIENCE
+- NEON_AUTH_PROJECT_ID
+- NEON_AUTH_PUBLISHABLE_CLIENT_KEY
+- NEON_AUTH_STACK_API_BASE_URL (optional; defaults to Stack Auth API)
 - TOGETHER_API_KEY
 - TOGETHER_MODEL_GAME_DESIGN
 - TOGETHER_MODEL_GAME_CODE
@@ -21,7 +25,9 @@ Core Go backend for Koschei Engine.
 ## Main Endpoints
 - GET /health
 - POST /api/auth/register
-- POST /api/auth/login
+- POST /api/auth/login (disabled custom auth)
+- POST /api/auth/otp/start
+- POST /api/auth/otp/verify
 - GET /api/me
 - POST /api/ai/generate
 - POST /api/v1/build/android
