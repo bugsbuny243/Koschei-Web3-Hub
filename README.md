@@ -61,7 +61,7 @@ Koschei Engine is built to replace legacy heavyweight engine complexity for smal
 
 ## Web3 Bridge MVP
 
-Koschei Web3 Bridge adds a no-custody, read-only event monitoring dashboard concept for grant/demo work. See [No-Custody Architecture](docs/web3/NO_CUSTODY_ARCHITECTURE.md) for the safety boundaries: no private keys, no custody, no escrow, no automatic transfers, and future webhook signature verification.
+Koschei Web3 Bridge adds a no-custody, read-only event monitoring dashboard concept for grant/demo work. Open the dashboard at [/web3-bridge.html](/web3-bridge.html). See [No-Custody Architecture](docs/web3/NO_CUSTODY_ARCHITECTURE.md) for the safety boundaries: no private keys, no custody, no escrow, no automatic transfers, and future webhook signature verification.
 
 ## Grant / Funding Sprint
 
