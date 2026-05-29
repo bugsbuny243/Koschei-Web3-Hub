@@ -57,6 +57,8 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/v1/games", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateGameProject))))
 	mux.HandleFunc("/api/v1/build/android", requiresDB(h, handlers.RequireAuth(method("POST", h.BuildAndroid))))
 	mux.HandleFunc("/api/web3/events/alchemy", requiresDB(h, method("POST", h.Web3AlchemyEvent)))
+	mux.HandleFunc("/api/web3/sources", requiresDB(h, handlers.RequireAuth(h.Web3Sources)))
+	mux.HandleFunc("/api/web3/sources/", requiresDB(h, handlers.RequireAuth(h.Web3Source)))
 	mux.HandleFunc("/api/web3/events/test", requiresDB(h, handlers.RequireAuth(method("POST", h.Web3TestEvent))))
 	mux.HandleFunc("/api/web3/events", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3Events))))
 	mux.HandleFunc("/api/web3/events/", requiresDB(h, handlers.RequireAuth(method("POST", h.Web3ExplainEvent))))
@@ -118,7 +120,7 @@ func cors(next http.Handler, origin string) http.Handler {
 		if origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-Koschei-Source-Id, X-Koschei-Webhook-Secret")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
