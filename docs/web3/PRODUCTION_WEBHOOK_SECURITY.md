@@ -13,6 +13,8 @@ The `/web3-bridge.html` dashboard is for authenticated Koschei app users. Source
 
 Production users should use the normal app login flow before managing Web3 event sources. Manual bearer-token entry is temporary admin/testing access only, should be kept collapsed away from the main dashboard flow, and must not be used as the normal production authentication model.
 
+Current implementation note: custom `/api/auth/register` and `/api/auth/login` are disabled, and the backend only verifies Neon Auth bearer sessions through protected routes such as `/api/me`. `/login.html` is therefore a safe static placeholder that can detect an already-created browser session, redirect authenticated users to `/web3-bridge.html`, and clear local session storage, but it does not mint tokens or fake authentication. Wire the production Neon Auth frontend flow into `/login.html` before relying on it as the normal user sign-in page.
+
 ## Alchemy Auth Token setup
 
 Alchemy webhook setup can use its Auth Token flow, which avoids relying on custom headers that may not be available in the Alchemy UI.
