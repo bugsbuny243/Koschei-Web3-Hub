@@ -11,9 +11,9 @@ Unauthenticated webhook endpoints can be called by anyone who knows or guesses t
 
 The `/web3-bridge.html` dashboard is for authenticated Koschei app users. Source creation, source listing, recent event listing, test event creation, and event explanation all call protected API routes and require a valid Neon Auth-backed application session. If the browser does not have an app session available, the dashboard must show: `Please sign in first to manage Web3 event sources.`
 
-Production users authenticate through the normal Koschei login page at `/login.html` before managing Web3 event sources. The login flow uses Neon Auth/Stack Auth OTP or magic-link sign-in: users enter an email address, receive a provider-issued one-time code or magic link, and the browser stores only the provider-issued bearer JWT in the same app session storage keys already read by `/web3-bridge.html`. Koschei does not store passwords and does not implement custom password authentication.
+Production users authenticate through the normal Koschei login page at `/login.html` before managing Web3 event sources. The login flow uses the current Neon Auth / Better Auth provider configuration: users enter an email address, receive the provider-backed one-time sign-in code, and the browser stores only the provider-issued bearer JWT in the same app session storage keys already read by `/web3-bridge.html`. Koschei does not store passwords, does not implement custom password authentication, and does not mint local replacement tokens.
 
-Web3 Bridge APIs require verified bearer/session auth. Protected routes such as `/api/me`, `/api/web3/sources`, `/api/web3/events`, `/api/web3/events/test`, and event explanation verify the Neon Auth JWT before they create source rows, list events, or perform source/event actions. If a bearer/session token is missing, expired, signed by an unknown JWKS key, has an invalid issuer/audience, or lacks the required `sub` and `email` claims, the APIs must return `401` and remain locked.
+Web3 Bridge APIs require verified bearer/session auth. Protected routes such as `/api/me`, `/api/web3/sources`, `/api/web3/events`, `/api/web3/events/test`, and event explanation verify the Neon Auth / Better Auth JWT with `NEON_AUTH_JWKS_URL` and `NEON_AUTH_ISSUER` before they create source rows, list events, or perform source/event actions. `/api/me` remains the source of truth for the browser session and upserts `app_user_profiles` by auth subject and email only after token verification succeeds. If a bearer/session token is missing, expired, signed by an unknown JWKS key, has an invalid issuer/audience, or lacks the required `sub` and `email` claims, the APIs must return `401` and remain locked.
 
 Manual bearer-token entry in `/web3-bridge.html` remains admin/testing only. It is useful for controlled verification while operating or debugging the deployment, but it is not the production user authentication model and should not be treated as a replacement for normal Koschei login.
 
@@ -85,6 +85,15 @@ Production Web3 Bridge features must stay inside these boundaries:
 - Human-controlled external wallets remain responsible for all transaction signing and fund movement.
 
 ## Railway environment reminder
+
+Production auth uses the current Neon Auth / Better Auth dashboard configuration. Railway must provide these auth environment variables:
+
+- `NEON_AUTH_BASE_URL`
+- `NEON_AUTH_ISSUER`
+- `NEON_AUTH_JWKS_URL`
+- `EXPO_PUBLIC_NEON_AUTH_URL`
+
+`EXPO_PUBLIC_NEON_AUTH_URL` is for static/frontend hints only; protected APIs verify provider-issued bearer JWTs with `NEON_AUTH_JWKS_URL` and `NEON_AUTH_ISSUER`. Stack Auth-style project ID and publishable-client-key variables are not required for this production login flow.
 
 Alchemy RPC URLs and API keys must stay in Railway environment variables only. Do not commit Alchemy RPC URLs, API keys, webhook secrets, or other provider credentials to the repository or frontend/public files.
 

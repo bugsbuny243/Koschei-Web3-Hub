@@ -31,39 +31,25 @@ type otpStartRequest struct {
 type otpVerifyRequest struct {
 	Email string `json:"email"`
 	Code  string `json:"code"`
-	Nonce string `json:"nonce"`
 }
 
-type stackOTPStartResponse struct {
-	Nonce string `json:"nonce"`
+type betterAuthConfig struct {
+	BaseURL string
+	JWKSURL string
 }
 
-type stackOTPVerifyResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	UserID       string `json:"user_id"`
-}
-
-type stackAuthConfig struct {
-	BaseURL              string
-	ProjectID            string
-	PublishableClientKey string
-}
-
-type stackAuthTransport interface {
+type authProviderTransport interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-var stackAuthHTTPClient stackAuthTransport = &http.Client{Timeout: 10 * time.Second}
-
-const defaultStackAuthAPIBaseURL = "https://api.stack-auth.com/api/v1"
+var authProviderHTTPClient authProviderTransport = &http.Client{Timeout: 10 * time.Second}
 
 func (h *Handler) Register(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusGone, map[string]string{"error": "custom_auth_disabled", "message": "Use Neon Auth email sign-in"})
+	writeJSON(w, http.StatusGone, map[string]string{"error": "custom_auth_disabled", "message": "Use Neon Auth / Better Auth email sign-in"})
 }
 
 func (h *Handler) Login(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusGone, map[string]string{"error": "custom_auth_disabled", "message": "Use Neon Auth email sign-in"})
+	writeJSON(w, http.StatusGone, map[string]string{"error": "custom_auth_disabled", "message": "Use Neon Auth / Better Auth email sign-in"})
 }
 
 func (h *Handler) StartOTPLogin(w http.ResponseWriter, r *http.Request) {
@@ -77,26 +63,20 @@ func (h *Handler) StartOTPLogin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_email"})
 		return
 	}
-	cfg, err := stackAuthConfigFromEnv()
+	if _, err := safeAuthCallbackURL(r, in.CallbackURL); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_callback_url"})
+		return
+	}
+	cfg, err := betterAuthConfigFromEnv()
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
 		return
 	}
-	callbackURL, err := safeAuthCallbackURL(r, in.CallbackURL)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_callback_url"})
+	if err := postBetterAuth(r.Context(), cfg, "/email-otp/send-verification-otp", map[string]string{"email": email, "type": "sign-in"}, nil); err != nil {
+		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
 		return
 	}
-	var out stackOTPStartResponse
-	if err := postStackAuth(r.Context(), cfg, "/auth/otp/send-sign-in-code", map[string]string{"email": email, "callback_url": callbackURL}, &out); err != nil {
-		writeJSON(w, stackAuthStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicStackAuthError(err)})
-		return
-	}
-	if strings.TrimSpace(out.Nonce) == "" {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "auth_provider_failed", "message": "auth provider did not return a nonce"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"nonce": out.Nonce, "email": email})
+	writeJSON(w, http.StatusOK, map[string]string{"email": email, "flow": "email_otp"})
 }
 
 func (h *Handler) VerifyOTPLogin(w http.ResponseWriter, r *http.Request) {
@@ -111,22 +91,28 @@ func (h *Handler) VerifyOTPLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	code := strings.TrimSpace(in.Code)
-	nonce := strings.TrimSpace(in.Nonce)
-	if code == "" || nonce == "" {
+	if code == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing_otp_fields"})
 		return
 	}
-	cfg, err := stackAuthConfigFromEnv()
+	cfg, err := betterAuthConfigFromEnv()
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
 		return
 	}
-	var out stackOTPVerifyResponse
-	if err := postStackAuth(r.Context(), cfg, "/auth/otp/sign-in", map[string]string{"email": email, "code": code, "nonce": nonce}, &out); err != nil {
-		writeJSON(w, stackAuthStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicStackAuthError(err)})
+	signInResp, setCookies, err := postBetterAuthWithCookies(r.Context(), cfg, "/sign-in/email-otp", map[string]string{"email": email, "otp": code})
+	if err != nil {
+		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
 		return
 	}
-	accessToken := strings.TrimSpace(out.AccessToken)
+	accessToken := extractJWTFromAny(signInResp)
+	if accessToken == "" {
+		accessToken, err = fetchBetterAuthJWT(r.Context(), cfg, setCookies, extractSessionToken(signInResp))
+		if err != nil {
+			writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
+			return
+		}
+	}
 	claims, err := parseAndVerifyNeonJWT(accessToken)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "auth_provider_failed", "message": "auth provider returned a token that this API could not verify"})
@@ -191,17 +177,20 @@ func normalizeEmail(raw string) (string, error) {
 	return email, nil
 }
 
-func stackAuthConfigFromEnv() (stackAuthConfig, error) {
-	cfg := stackAuthConfig{
-		BaseURL:              strings.TrimRight(strings.TrimSpace(os.Getenv("NEON_AUTH_STACK_API_BASE_URL")), "/"),
-		ProjectID:            strings.TrimSpace(os.Getenv("NEON_AUTH_PROJECT_ID")),
-		PublishableClientKey: strings.TrimSpace(os.Getenv("NEON_AUTH_PUBLISHABLE_CLIENT_KEY")),
+func betterAuthConfigFromEnv() (betterAuthConfig, error) {
+	cfg := betterAuthConfig{
+		BaseURL: strings.TrimRight(strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL")), "/"),
+		JWKSURL: strings.TrimSpace(os.Getenv("NEON_AUTH_JWKS_URL")),
 	}
+	missing := []string{}
 	if cfg.BaseURL == "" {
-		cfg.BaseURL = defaultStackAuthAPIBaseURL
+		missing = append(missing, "NEON_AUTH_BASE_URL")
 	}
-	if cfg.ProjectID == "" || cfg.PublishableClientKey == "" {
-		return cfg, errors.New("NEON_AUTH_PROJECT_ID and NEON_AUTH_PUBLISHABLE_CLIENT_KEY are required")
+	if cfg.JWKSURL == "" {
+		missing = append(missing, "NEON_AUTH_JWKS_URL")
+	}
+	if len(missing) > 0 {
+		return cfg, errors.New(strings.Join(missing, " and ") + " must be set for Neon Auth / Better Auth login")
 	}
 	return cfg, nil
 }
@@ -250,45 +239,164 @@ func requestOrigin(r *http.Request) string {
 	return proto + "://" + host
 }
 
-func postStackAuth(ctx context.Context, cfg stackAuthConfig, path string, payload any, out any) error {
-	body, err := json.Marshal(payload)
+func postBetterAuth(ctx context.Context, cfg betterAuthConfig, path string, payload any, out any) error {
+	respBody, _, err := postBetterAuthWithCookies(ctx, cfg, path, payload)
 	if err != nil {
 		return err
+	}
+	if out == nil {
+		return nil
+	}
+	encoded, err := json.Marshal(respBody)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(encoded, out)
+}
+
+func postBetterAuthWithCookies(ctx context.Context, cfg betterAuthConfig, path string, payload any) (map[string]any, []string, error) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, cfg.BaseURL+path, bytes.NewReader(body))
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Stack-Access-Type", "client")
-	req.Header.Set("X-Stack-Project-Id", cfg.ProjectID)
-	req.Header.Set("X-Stack-Publishable-Client-Key", cfg.PublishableClientKey)
-	resp, err := stackAuthHTTPClient.Do(req)
+	resp, err := authProviderHTTPClient.Do(req)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	if resp.StatusCode/100 != 2 {
-		return stackAuthHTTPError{StatusCode: resp.StatusCode, Body: string(respBody)}
+		return nil, nil, authProviderHTTPError{StatusCode: resp.StatusCode, Body: string(respBody)}
 	}
-	if err := json.Unmarshal(respBody, out); err != nil {
-		return err
+	out := map[string]any{}
+	if len(bytes.TrimSpace(respBody)) > 0 {
+		if err := json.Unmarshal(respBody, &out); err != nil {
+			return nil, nil, err
+		}
 	}
-	return nil
+	return out, resp.Header.Values("Set-Cookie"), nil
 }
 
-type stackAuthHTTPError struct {
+func fetchBetterAuthJWT(ctx context.Context, cfg betterAuthConfig, setCookies []string, sessionToken string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.BaseURL+"/token", nil)
+	if err != nil {
+		return "", err
+	}
+	if cookieHeader := cookieHeaderFromSetCookies(setCookies); cookieHeader != "" {
+		req.Header.Set("Cookie", cookieHeader)
+	}
+	if sessionToken != "" {
+		req.Header.Set("Authorization", "Bearer "+sessionToken)
+	}
+	resp, err := authProviderHTTPClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	if resp.StatusCode/100 != 2 {
+		return "", authProviderHTTPError{StatusCode: resp.StatusCode, Body: string(respBody)}
+	}
+	if token := extractJWTFromHeaders(resp.Header); token != "" {
+		return token, nil
+	}
+	if token := extractJWTFromAny(string(bytes.TrimSpace(respBody))); token != "" {
+		return token, nil
+	}
+	var payload any
+	if len(bytes.TrimSpace(respBody)) > 0 {
+		if err := json.Unmarshal(respBody, &payload); err != nil {
+			return "", err
+		}
+	}
+	if token := extractJWTFromAny(payload); token != "" {
+		return token, nil
+	}
+	return "", errors.New("auth provider did not return a JWT")
+}
+
+func cookieHeaderFromSetCookies(values []string) string {
+	parts := []string{}
+	for _, value := range values {
+		if first := strings.TrimSpace(strings.Split(value, ";")[0]); first != "" {
+			parts = append(parts, first)
+		}
+	}
+	return strings.Join(parts, "; ")
+}
+
+func extractSessionToken(payload map[string]any) string {
+	for _, key := range []string{"token", "session_token", "sessionToken"} {
+		if token, ok := payload[key].(string); ok && strings.TrimSpace(token) != "" && !tokenLooksLikeJWT(token) {
+			return strings.TrimSpace(token)
+		}
+	}
+	if session, ok := payload["session"].(map[string]any); ok {
+		return extractSessionToken(session)
+	}
+	return ""
+}
+
+func extractJWTFromHeaders(header http.Header) string {
+	for _, key := range []string{"Authorization", "set-auth-jwt"} {
+		for _, value := range header.Values(key) {
+			value = strings.TrimSpace(strings.TrimPrefix(value, "Bearer "))
+			if tokenLooksLikeJWT(value) {
+				return value
+			}
+		}
+	}
+	return ""
+}
+
+func extractJWTFromAny(value any) string {
+	switch v := value.(type) {
+	case string:
+		v = strings.TrimSpace(strings.TrimPrefix(v, "Bearer "))
+		if tokenLooksLikeJWT(v) {
+			return v
+		}
+	case map[string]any:
+		for _, key := range []string{"access_token", "accessToken", "id_token", "idToken", "token", "jwt"} {
+			if token := extractJWTFromAny(v[key]); token != "" {
+				return token
+			}
+		}
+		for _, item := range v {
+			if token := extractJWTFromAny(item); token != "" {
+				return token
+			}
+		}
+	case []any:
+		for _, item := range v {
+			if token := extractJWTFromAny(item); token != "" {
+				return token
+			}
+		}
+	}
+	return ""
+}
+
+func tokenLooksLikeJWT(value string) bool {
+	return strings.Count(value, ".") == 2 && len(value) > 40
+}
+
+type authProviderHTTPError struct {
 	StatusCode int
 	Body       string
 }
 
-func (e stackAuthHTTPError) Error() string {
-	return fmt.Sprintf("stack auth returned %d", e.StatusCode)
+func (e authProviderHTTPError) Error() string {
+	return fmt.Sprintf("auth provider returned %d", e.StatusCode)
 }
 
-func stackAuthStatusCode(err error) int {
-	var httpErr stackAuthHTTPError
+func authProviderStatusCode(err error) int {
+	var httpErr authProviderHTTPError
 	if errors.As(err, &httpErr) {
 		if httpErr.StatusCode == http.StatusTooManyRequests {
 			return http.StatusTooManyRequests
@@ -300,8 +408,8 @@ func stackAuthStatusCode(err error) int {
 	return http.StatusBadGateway
 }
 
-func publicStackAuthError(err error) string {
-	var httpErr stackAuthHTTPError
+func publicAuthProviderError(err error) string {
+	var httpErr authProviderHTTPError
 	if errors.As(err, &httpErr) {
 		var payload map[string]any
 		if json.Unmarshal([]byte(httpErr.Body), &payload) == nil {
@@ -312,6 +420,9 @@ func publicStackAuthError(err error) string {
 			}
 		}
 		return "auth provider rejected the request"
+	}
+	if strings.Contains(err.Error(), "did not return a JWT") {
+		return "auth provider did not return a bearer JWT"
 	}
 	return "auth provider is unavailable"
 }
