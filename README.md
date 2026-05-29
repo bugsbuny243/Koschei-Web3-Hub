@@ -61,7 +61,7 @@ Koschei Engine is built to replace legacy heavyweight engine complexity for smal
 
 ## Web3 Bridge
 
-Koschei Web3 Bridge adds a no-custody, read-only event monitoring dashboard for grant/demo work and production-safe developer tooling. The MVP foundation is complete, and production hardening has started with source-scoped shared-secret webhook verification, payload hashing, and event source management APIs. Open the dashboard at [/web3-bridge.html](/web3-bridge.html). See [No-Custody Architecture](docs/web3/NO_CUSTODY_ARCHITECTURE.md) for the safety boundaries: no private keys, no custody, no escrow, and no automatic transfers. See [Production Webhook Security](docs/web3/PRODUCTION_WEBHOOK_SECURITY.md) for webhook setup, source IDs, secret rotation, and Railway environment reminders.
+Koschei Web3 Bridge adds a no-custody, read-only event monitoring dashboard for grant/demo work and production-safe developer tooling. The MVP foundation is complete, and production hardening has started with source-scoped shared-secret webhook verification, payload hashing, and event source management APIs. Open the dashboard at [/web3-bridge.html](/web3-bridge.html). See [No-Custody Architecture](docs/web3/NO_CUSTODY_ARCHITECTURE.md) for the safety boundaries: no private keys, no custody, no escrow, and no automatic transfers. See [Production Webhook Security](docs/web3/PRODUCTION_WEBHOOK_SECURITY.md) for webhook setup, source IDs, secret rotation, and Railway environment reminders. See [Solana Integration Guide](docs/web3/SOLANA_INTEGRATION_GUIDE.md) for the production Solana rollout: read-only first, devnet before mainnet, Railway-only RPC secrets, and Alchemy webhook headers.
 
 ## Grant / Funding Sprint
 
