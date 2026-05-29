@@ -11,9 +11,11 @@ Unauthenticated webhook endpoints can be called by anyone who knows or guesses t
 
 The `/web3-bridge.html` dashboard is for authenticated Koschei app users. Source creation, source listing, recent event listing, test event creation, and event explanation all call protected API routes and require a valid Neon Auth-backed application session. If the browser does not have an app session available, the dashboard must show: `Please sign in first to manage Web3 event sources.`
 
-Production users should use the normal app login flow before managing Web3 event sources. Manual bearer-token entry is temporary admin/testing access only, should be kept collapsed away from the main dashboard flow, and must not be used as the normal production authentication model.
+Production users authenticate through the normal Koschei login page at `/login.html` before managing Web3 event sources. The login flow uses Neon Auth/Stack Auth OTP or magic-link sign-in: users enter an email address, receive a provider-issued one-time code or magic link, and the browser stores only the provider-issued bearer JWT in the same app session storage keys already read by `/web3-bridge.html`. Koschei does not store passwords and does not implement custom password authentication.
 
-Current implementation note: custom `/api/auth/register` and `/api/auth/login` are disabled, and the backend only verifies Neon Auth bearer sessions through protected routes such as `/api/me`. `/login.html` is therefore a safe static placeholder that can detect an already-created browser session, redirect authenticated users to `/web3-bridge.html`, and clear local session storage, but it does not mint tokens or fake authentication. Wire the production Neon Auth frontend flow into `/login.html` before relying on it as the normal user sign-in page.
+Web3 Bridge APIs require verified bearer/session auth. Protected routes such as `/api/me`, `/api/web3/sources`, `/api/web3/events`, `/api/web3/events/test`, and event explanation verify the Neon Auth JWT before they create source rows, list events, or perform source/event actions. If a bearer/session token is missing, expired, signed by an unknown JWKS key, has an invalid issuer/audience, or lacks the required `sub` and `email` claims, the APIs must return `401` and remain locked.
+
+Manual bearer-token entry in `/web3-bridge.html` remains admin/testing only. It is useful for controlled verification while operating or debugging the deployment, but it is not the production user authentication model and should not be treated as a replacement for normal Koschei login.
 
 ## Alchemy Auth Token setup
 

@@ -22,6 +22,8 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	}))
 	mux.HandleFunc("/api/auth/register", requiresDB(h, method("POST", h.Register)))
 	mux.HandleFunc("/api/auth/login", requiresDB(h, method("POST", h.Login)))
+	mux.HandleFunc("/api/auth/otp/start", method("POST", h.StartOTPLogin))
+	mux.HandleFunc("/api/auth/otp/verify", requiresDB(h, method("POST", h.VerifyOTPLogin)))
 	mux.HandleFunc("/api/me", requiresDB(h, handlers.RequireAuth(method("GET", h.Me))))
 	mux.HandleFunc("/api/runtime/projects", requiresDB(h, handlers.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
