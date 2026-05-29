@@ -59,8 +59,9 @@
         <p id="authMessage"><strong>Please sign in first to manage Web3 event sources.</strong></p>
         <p>Use the normal Koschei app login. This page will reuse the existing browser session when a Neon Auth bearer token is available to the app frontend.</p>
         <div class="actions">
-          <a class="secondary" href="/login.html?return_to=/web3-bridge.html" style="border:1px solid rgba(166,190,255,.22); border-radius:14px; padding:12px 16px; text-decoration:none;">Sign in</a>
+          <a class="secondary" href="/login.html" style="border:1px solid rgba(166,190,255,.22); border-radius:14px; padding:12px 16px; text-decoration:none;">Open Koschei app</a>
           <button id="refreshSession" class="secondary">Refresh session</button>
+          <button id="logoutSession" class="secondary">Log out / clear session</button>
           <button id="createTest" disabled>Create test event</button>
           <button id="refresh" class="secondary" disabled>Refresh events</button>
         </div>
@@ -185,6 +186,19 @@
 
     function findTemporaryToken() {
       try { return extractJWT(localStorage.getItem('koschei_web3_token')); } catch (_) { return ''; }
+    }
+
+    function clearSessionStorageKeys() {
+      const keys = [...APP_SESSION_TOKEN_KEYS, 'koschei_web3_token'];
+      for (const storage of [localStorage, sessionStorage]) {
+        try {
+          keys.forEach(key => storage.removeItem(key));
+          for (let i = storage.length - 1; i >= 0; i -= 1) {
+            const key = storage.key(i) || '';
+            if (/(auth|session|token|jwt|neon|koschei)/i.test(key)) storage.removeItem(key);
+          }
+        } catch (_) {}
+      }
     }
 
     function authHeaders() {
@@ -339,6 +353,14 @@
       await refreshSession();
     });
     document.getElementById('refreshSession').addEventListener('click', refreshSession);
+    document.getElementById('logoutSession').addEventListener('click', async () => {
+      clearSessionStorageKeys();
+      tokenInput.value = '';
+      activeAuthToken = '';
+      activeAuthMode = '';
+      setStatus('Session data cleared from this browser. Sign in again before managing Web3 event sources.');
+      await refreshSession();
+    });
     document.getElementById('refresh').addEventListener('click', loadEvents);
     document.getElementById('refreshSources').addEventListener('click', loadSources);
     document.getElementById('generateSecret').addEventListener('click', () => {
