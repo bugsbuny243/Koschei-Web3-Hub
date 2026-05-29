@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,14 +15,12 @@ func (f roundTripFunc) Do(r *http.Request) (*http.Response, error) {
 	return f(r)
 }
 
-func TestStartOTPLoginSendsBetterAuthRequest(t *testing.T) {
-	t.Setenv("NEON_AUTH_BASE_URL", "https://auth.example.test/api/auth")
-	t.Setenv("NEON_AUTH_JWKS_URL", "https://auth.example.test/api/auth/jwks")
+func TestPostBetterAuthEmailPasswordUsesSignInEmailPayload(t *testing.T) {
 	oldClient := authProviderHTTPClient
 	defer func() { authProviderHTTPClient = oldClient }()
 
 	authProviderHTTPClient = roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if r.URL.String() != "https://auth.example.test/api/auth/email-otp/send-verification-otp" {
+		if r.URL.String() != "https://auth.example.test/api/auth/sign-in/email" {
 			t.Fatalf("unexpected Better Auth URL: %s", r.URL.String())
 		}
 		if got := r.Header.Get("Content-Type"); got != "application/json" {
@@ -37,64 +36,94 @@ func TestStartOTPLoginSendsBetterAuthRequest(t *testing.T) {
 		if !strings.Contains(string(body), `"email":"user@example.com"`) {
 			t.Fatalf("request body did not include normalized email: %s", string(body))
 		}
-		if !strings.Contains(string(body), `"type":"sign-in"`) {
-			t.Fatalf("request body did not request sign-in OTP: %s", string(body))
+		if !strings.Contains(string(body), `"password":"correct horse battery staple"`) {
+			t.Fatalf("request body did not include provider password field: %s", string(body))
 		}
-		if strings.Contains(string(body), "callback_url") {
-			t.Fatalf("request body should not include Stack Auth callback URL: %s", string(body))
+		if strings.Contains(string(body), "otp") || strings.Contains(string(body), "callback_url") {
+			t.Fatalf("request body should not include OTP or callback fields: %s", string(body))
 		}
-		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`)), Header: make(http.Header)}, nil
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"token":"session-token"}`)), Header: make(http.Header)}, nil
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/otp/start", strings.NewReader(`{"email":"User@Example.COM","callback_url":"/login.html"}`))
-	req.Host = "app.example.test"
-	req.Header.Set("X-Forwarded-Proto", "https")
-	w := httptest.NewRecorder()
-
-	(&Handler{}).StartOTPLogin(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
-	}
-	if !strings.Contains(w.Body.String(), `"flow":"email_otp"`) {
-		t.Fatalf("response did not include email OTP flow: %s", w.Body.String())
+	_, _, err := postBetterAuthWithCookies(
+		context.Background(),
+		betterAuthConfig{BaseURL: "https://auth.example.test/api/auth", IssuerURL: "https://auth.example.test", JWKSURL: "https://auth.example.test/api/auth/jwks"},
+		"/sign-in/email",
+		map[string]string{"email": "user@example.com", "password": "correct horse battery staple"},
+	)
+	if err != nil {
+		t.Fatalf("postBetterAuthWithCookies returned error: %v", err)
 	}
 }
 
-func TestStartOTPLoginRequiresBetterAuthEnv(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/otp/start", strings.NewReader(`{"email":"user@example.com","callback_url":"/login.html"}`))
-	req.Host = "app.example.test"
+func TestLoginRequiresEmailPasswordAuthEnv(t *testing.T) {
+	t.Setenv("NEON_AUTH_BASE_URL", "")
+	t.Setenv("NEON_AUTH_ISSUER", "")
+	t.Setenv("NEON_AUTH_JWKS_URL", "")
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"email":"user@example.com","password":"secret-password"}`))
 	w := httptest.NewRecorder()
 
-	(&Handler{}).StartOTPLogin(w, req)
+	(&Handler{}).Login(w, req)
 
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusServiceUnavailable, w.Body.String())
 	}
-	if !strings.Contains(w.Body.String(), "NEON_AUTH_BASE_URL") || !strings.Contains(w.Body.String(), "NEON_AUTH_JWKS_URL") {
-		t.Fatalf("response did not explain missing Better Auth env: %s", w.Body.String())
+	for _, name := range []string{"NEON_AUTH_BASE_URL", "NEON_AUTH_ISSUER", "NEON_AUTH_JWKS_URL"} {
+		if !strings.Contains(w.Body.String(), name) {
+			t.Fatalf("response did not explain missing %s env: %s", name, w.Body.String())
+		}
+	}
+	if strings.Contains(w.Body.String(), "secret-password") {
+		t.Fatalf("response must not echo password: %s", w.Body.String())
 	}
 }
 
-func TestStartOTPLoginRejectsCrossOriginCallback(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/otp/start", strings.NewReader(`{"email":"user@example.com","callback_url":"https://evil.example/login.html"}`))
-	req.Host = "app.example.test"
+func TestLoginRequiresPassword(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"email":"user@example.com"}`))
 	w := httptest.NewRecorder()
 
-	(&Handler{}).StartOTPLogin(w, req)
+	(&Handler{}).Login(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusBadRequest, w.Body.String())
 	}
+	if !strings.Contains(w.Body.String(), "missing_password") {
+		t.Fatalf("response did not explain missing password: %s", w.Body.String())
+	}
 }
 
-func TestVerifyOTPLoginRequiresFields(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/otp/verify", strings.NewReader(`{"email":"user@example.com"}`))
-	w := httptest.NewRecorder()
+func TestOTPLoginEndpointsAreDisabled(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		handler func(http.ResponseWriter, *http.Request)
+	}{
+		{name: "start", handler: (&Handler{}).StartOTPLogin},
+		{name: "verify", handler: (&Handler{}).VerifyOTPLogin},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/auth/otp/"+tc.name, strings.NewReader(`{}`))
+			w := httptest.NewRecorder()
 
-	(&Handler{}).VerifyOTPLogin(w, req)
+			tc.handler(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusBadRequest, w.Body.String())
+			if w.Code != http.StatusGone {
+				t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusGone, w.Body.String())
+			}
+			if !strings.Contains(w.Body.String(), "email and password") {
+				t.Fatalf("response did not explain email/password auth mode: %s", w.Body.String())
+			}
+		})
+	}
+}
+
+func TestPublicAuthProviderErrorMessages(t *testing.T) {
+	if got := publicAuthProviderError(authProviderHTTPError{StatusCode: http.StatusNotFound}); got != "Configured Neon Auth endpoint not found. Check NEON_AUTH_BASE_URL and auth method." {
+		t.Fatalf("404 message = %q", got)
+	}
+	if got := publicAuthProviderError(authProviderHTTPError{StatusCode: http.StatusUnauthorized}); got != "Invalid email or password." {
+		t.Fatalf("401 message = %q", got)
+	}
+	if got := publicAuthProviderError(authProviderHTTPError{StatusCode: http.StatusBadRequest, Body: `{"message":"Invalid credentials"}`}); got != "Invalid email or password." {
+		t.Fatalf("invalid credentials message = %q", got)
 	}
 }

@@ -26,7 +26,7 @@
     code { color: #9ff5df; word-break: break-all; }
     .status { min-height: 24px; color: #a8bbd8; }
     .muted { color: #8799b5; }
-    .otp-panel[hidden] { display: none; }
+    .auth-help { margin-top: 10px; }
   </style>
 </head>
 <body>
@@ -35,27 +35,23 @@
       <h1>Koschei Login</h1>
       <p id="status" class="status">Checking for an existing authenticated Koschei session…</p>
       <div id="sessionPanel" class="notice" role="status">
-        Use your email to receive a Neon Auth / Better Auth one-time sign-in code for Koschei Web3 Bridge.
+        Use your Neon Auth / Better Auth email and password to sign in to Koschei Web3 Bridge.
       </div>
 
       <h2>Sign in to manage Web3 Bridge</h2>
-      <p>Koschei uses provider-issued Neon Auth / Better Auth sessions. This page never asks for passwords, never mints local tokens, and never stores anything except the provider-issued bearer JWT. Protected APIs stay locked until <code>/api/me</code> verifies that JWT with the configured issuer and JWKS URL.</p>
+      <p>Koschei uses provider-issued Neon Auth / Better Auth email + password sessions. This page sends your password only to the Koschei backend so it can start the provider sign-in flow, never stores or displays passwords, never mints local tokens, and never stores anything except the provider-issued bearer JWT. Protected APIs stay locked until <code>/api/me</code> verifies that JWT with the configured issuer and JWKS URL.</p>
 
-      <form id="emailForm">
+      <form id="loginForm">
         <label>
           Email address
           <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
         </label>
-        <button id="sendCode" type="submit">Send sign-in code</button>
-      </form>
-
-      <form id="otpForm" class="otp-panel" hidden>
         <label>
-          One-time code
-          <input id="otpCode" name="otpCode" type="text" autocomplete="one-time-code" inputmode="numeric" placeholder="123456">
+          Password
+          <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Your Neon Auth password">
         </label>
-        <button id="verifyCode" type="submit">Verify and sign in</button>
-        <p class="muted">Paste the one-time code from your Neon Auth email. If production login is not configured, Koschei will report the missing <code>NEON_AUTH_BASE_URL</code> or <code>NEON_AUTH_JWKS_URL</code> setting.</p>
+        <button id="signIn" type="submit">Sign in</button>
+        <p class="muted auth-help">If production login is not configured, Koschei will report the missing <code>NEON_AUTH_BASE_URL</code>, <code>NEON_AUTH_ISSUER</code>, or <code>NEON_AUTH_JWKS_URL</code> setting. Email OTP is not used unless the Neon Auth OTP plugin is enabled and the backend is updated for it later.</p>
       </form>
 
       <div class="actions">
@@ -76,12 +72,10 @@
   <script>
     const statusEl = document.getElementById('status');
     const sessionPanel = document.getElementById('sessionPanel');
-    const emailForm = document.getElementById('emailForm');
-    const otpForm = document.getElementById('otpForm');
+    const loginForm = document.getElementById('loginForm');
     const emailInput = document.getElementById('email');
-    const otpInput = document.getElementById('otpCode');
-    const sendCodeButton = document.getElementById('sendCode');
-    const verifyCodeButton = document.getElementById('verifyCode');
+    const passwordInput = document.getElementById('password');
+    const signInButton = document.getElementById('signIn');
     const continueBridge = document.getElementById('continueBridge');
 
     const APP_SESSION_TOKEN_KEYS = [
@@ -95,7 +89,6 @@
       'token'
     ];
     const PRIMARY_SESSION_TOKEN_KEY = 'koschei_auth_token';
-    const OTP_EMAIL_KEY = 'koschei_auth_otp_email';
 
     function tokenLooksLikeJWT(value) {
       return typeof value === 'string' && value.split('.').length === 3 && value.length > 40;
@@ -151,7 +144,7 @@
     }
 
     function clearSessionStorageKeys() {
-      const keys = [...APP_SESSION_TOKEN_KEYS, 'koschei_web3_token', OTP_NONCE_KEY, OTP_EMAIL_KEY];
+      const keys = [...APP_SESSION_TOKEN_KEYS, 'koschei_web3_token'];
       for (const storage of [localStorage, sessionStorage]) {
         try {
           keys.forEach(key => storage.removeItem(key));
@@ -200,97 +193,55 @@
         if (redirect) window.setTimeout(() => { window.location.assign('/web3-bridge.html'); }, 700);
         return user;
       }
-      setPanel('No valid app session was found. Enter your email to request a Neon Auth / Better Auth one-time sign-in code.');
+      setPanel('No valid app session was found. Enter your Neon Auth / Better Auth email and password to sign in.');
       statusEl.textContent = 'Ready to sign in.';
       return null;
     }
 
-    async function startLogin(email) {
-      sendCodeButton.disabled = true;
-      statusEl.textContent = 'Requesting a sign-in code…';
-      try {
-        const callbackURL = `${window.location.origin}/login.html`;
-        const response = await fetch('/api/auth/otp/start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, callback_url: callbackURL })
-        });
-        const data = await parseJSONResponse(response);
-        sessionStorage.setItem(OTP_EMAIL_KEY, data.email || email);
-        otpForm.hidden = false;
-        otpInput.focus();
-        setPanel(`Sign-in email sent to ${data.email || email}. Enter the one-time code from the provider email here.`, 'notice success');
-        statusEl.textContent = 'Check your email for the provider sign-in code.';
-      } catch (err) {
-        setPanel(`Unable to start sign-in: ${err.message}`, 'notice error');
-        statusEl.textContent = 'Sign-in could not be started.';
-      } finally {
-        sendCodeButton.disabled = false;
-      }
-    }
-
-    async function completeLogin(code) {
-      const email = sessionStorage.getItem(OTP_EMAIL_KEY) || emailInput.value.trim();
-      if (!email || !code) {
-        setPanel('Email and one-time code are required. Request a new sign-in email if needed.', 'notice error');
+    async function startLogin(email, password) {
+      if (!email || !password) {
+        setPanel('Email and password are required.', 'notice error');
+        statusEl.textContent = 'Sign-in needs both fields.';
         return;
       }
-      verifyCodeButton.disabled = true;
-      statusEl.textContent = 'Verifying sign-in code…';
+      signInButton.disabled = true;
+      statusEl.textContent = 'Signing in with Neon Auth / Better Auth…';
       try {
-        const response = await fetch('/api/auth/otp/verify', {
+        const response = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, code })
+          body: JSON.stringify({ email, password })
         });
         const data = await parseJSONResponse(response);
         if (!tokenLooksLikeJWT(data.access_token)) throw new Error('Auth provider did not return a valid browser session token');
         localStorage.setItem(PRIMARY_SESSION_TOKEN_KEY, data.access_token);
-        sessionStorage.removeItem(OTP_EMAIL_KEY);
         setPanel(`Signed in as ${(data.user && data.user.email) || email}. Redirecting to the Web3 Bridge…`, 'notice success');
         statusEl.textContent = 'Authenticated session verified.';
         setContinueEnabled(true);
         window.setTimeout(() => { window.location.assign('/web3-bridge.html'); }, 700);
       } catch (err) {
-        setPanel(`Unable to complete sign-in: ${err.message}`, 'notice error');
-        statusEl.textContent = 'Verification failed. Check the code or request a new sign-in email.';
+        setPanel(`Unable to sign in: ${err.message}`, 'notice error');
+        statusEl.textContent = 'Sign-in failed. Check your email and password.';
       } finally {
-        verifyCodeButton.disabled = false;
+        signInButton.disabled = false;
       }
     }
 
-    emailForm.addEventListener('submit', event => {
+    loginForm.addEventListener('submit', event => {
       event.preventDefault();
-      startLogin(emailInput.value.trim());
-    });
-
-    otpForm.addEventListener('submit', event => {
-      event.preventDefault();
-      completeLogin(otpInput.value.trim());
+      startLogin(emailInput.value.trim(), passwordInput.value);
     });
 
     document.getElementById('refreshSession').addEventListener('click', () => refreshSession());
     document.getElementById('clearSession').addEventListener('click', () => {
       clearSessionStorageKeys();
       setContinueEnabled(false);
-      otpForm.hidden = true;
+      passwordInput.value = '';
       setPanel('Session data cleared from this browser. Protected APIs remain locked until a valid Neon Auth / Better Auth session is created.');
       statusEl.textContent = 'Signed out locally.';
     });
 
-    const params = new URLSearchParams(window.location.search);
-    const linkCode = params.get('code') || params.get('otp') || '';
-    const storedEmail = sessionStorage.getItem(OTP_EMAIL_KEY) || '';
-    if (storedEmail) emailInput.value = storedEmail;
-    refreshSession().then(user => {
-      if (user) return;
-      if (linkCode) {
-        otpForm.hidden = false;
-        otpInput.value = linkCode;
-        completeLogin(linkCode);
-        window.history.replaceState({}, document.title, '/login.html');
-      }
-    });
+    refreshSession();
   </script>
 </body>
 </html>

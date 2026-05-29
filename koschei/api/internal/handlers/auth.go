@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/mail"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -23,19 +22,15 @@ type authUser struct {
 	Credits int    `json:"credits"`
 }
 
-type otpStartRequest struct {
-	Email       string `json:"email"`
-	CallbackURL string `json:"callback_url"`
-}
-
-type otpVerifyRequest struct {
-	Email string `json:"email"`
-	Code  string `json:"code"`
+type emailPasswordLoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type betterAuthConfig struct {
-	BaseURL string
-	JWKSURL string
+	BaseURL   string
+	IssuerURL string
+	JWKSURL   string
 }
 
 type authProviderTransport interface {
@@ -45,15 +40,11 @@ type authProviderTransport interface {
 var authProviderHTTPClient authProviderTransport = &http.Client{Timeout: 10 * time.Second}
 
 func (h *Handler) Register(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusGone, map[string]string{"error": "custom_auth_disabled", "message": "Use Neon Auth / Better Auth email sign-in"})
+	writeJSON(w, http.StatusGone, map[string]string{"error": "custom_auth_disabled", "message": "Use Neon Auth / Better Auth email and password sign-in"})
 }
 
-func (h *Handler) Login(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusGone, map[string]string{"error": "custom_auth_disabled", "message": "Use Neon Auth / Better Auth email sign-in"})
-}
-
-func (h *Handler) StartOTPLogin(w http.ResponseWriter, r *http.Request) {
-	var in otpStartRequest
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	var in emailPasswordLoginRequest
 	if err := decodeJSON(r, &in); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
 		return
@@ -63,8 +54,8 @@ func (h *Handler) StartOTPLogin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_email"})
 		return
 	}
-	if _, err := safeAuthCallbackURL(r, in.CallbackURL); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_callback_url"})
+	if in.Password == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing_password", "message": "Email and password are required."})
 		return
 	}
 	cfg, err := betterAuthConfigFromEnv()
@@ -72,35 +63,7 @@ func (h *Handler) StartOTPLogin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
 		return
 	}
-	if err := postBetterAuth(r.Context(), cfg, "/email-otp/send-verification-otp", map[string]string{"email": email, "type": "sign-in"}, nil); err != nil {
-		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"email": email, "flow": "email_otp"})
-}
-
-func (h *Handler) VerifyOTPLogin(w http.ResponseWriter, r *http.Request) {
-	var in otpVerifyRequest
-	if err := decodeJSON(r, &in); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
-		return
-	}
-	email, err := normalizeEmail(in.Email)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_email"})
-		return
-	}
-	code := strings.TrimSpace(in.Code)
-	if code == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing_otp_fields"})
-		return
-	}
-	cfg, err := betterAuthConfigFromEnv()
-	if err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
-		return
-	}
-	signInResp, setCookies, err := postBetterAuthWithCookies(r.Context(), cfg, "/sign-in/email-otp", map[string]string{"email": email, "otp": code})
+	signInResp, setCookies, err := postBetterAuthWithCookies(r.Context(), cfg, "/sign-in/email", map[string]string{"email": email, "password": in.Password})
 	if err != nil {
 		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
 		return
@@ -124,6 +87,14 @@ func (h *Handler) VerifyOTPLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"access_token": accessToken, "token_type": "Bearer", "user": user})
+}
+
+func (h *Handler) StartOTPLogin(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusGone, map[string]string{"error": "email_password_required", "message": "Neon Auth / Better Auth email OTP is not enabled. Use email and password sign-in."})
+}
+
+func (h *Handler) VerifyOTPLogin(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusGone, map[string]string{"error": "email_password_required", "message": "Neon Auth / Better Auth email OTP is not enabled. Use email and password sign-in."})
 }
 
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
@@ -179,64 +150,24 @@ func normalizeEmail(raw string) (string, error) {
 
 func betterAuthConfigFromEnv() (betterAuthConfig, error) {
 	cfg := betterAuthConfig{
-		BaseURL: strings.TrimRight(strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL")), "/"),
-		JWKSURL: strings.TrimSpace(os.Getenv("NEON_AUTH_JWKS_URL")),
+		BaseURL:   strings.TrimRight(strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL")), "/"),
+		IssuerURL: strings.TrimRight(strings.TrimSpace(os.Getenv("NEON_AUTH_ISSUER")), "/"),
+		JWKSURL:   strings.TrimSpace(os.Getenv("NEON_AUTH_JWKS_URL")),
 	}
 	missing := []string{}
 	if cfg.BaseURL == "" {
 		missing = append(missing, "NEON_AUTH_BASE_URL")
 	}
+	if cfg.IssuerURL == "" {
+		missing = append(missing, "NEON_AUTH_ISSUER")
+	}
 	if cfg.JWKSURL == "" {
 		missing = append(missing, "NEON_AUTH_JWKS_URL")
 	}
 	if len(missing) > 0 {
-		return cfg, errors.New(strings.Join(missing, " and ") + " must be set for Neon Auth / Better Auth login")
+		return cfg, errors.New(strings.Join(missing, " and ") + " must be set for Neon Auth / Better Auth email/password login")
 	}
 	return cfg, nil
-}
-
-func safeAuthCallbackURL(r *http.Request, raw string) (string, error) {
-	origin := requestOrigin(r)
-	if strings.TrimSpace(raw) == "" {
-		return origin + "/login.html", nil
-	}
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil {
-		return "", err
-	}
-	if !u.IsAbs() {
-		if !strings.HasPrefix(u.Path, "/") {
-			return "", errors.New("callback must be absolute path")
-		}
-		return origin + u.RequestURI(), nil
-	}
-	allowed, _ := url.Parse(origin)
-	if !strings.EqualFold(u.Scheme, allowed.Scheme) || !strings.EqualFold(u.Host, allowed.Host) {
-		return "", errors.New("callback origin mismatch")
-	}
-	return u.String(), nil
-}
-
-func requestOrigin(r *http.Request) string {
-	proto := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))
-	if proto == "" {
-		if r.TLS != nil {
-			proto = "https"
-		} else {
-			proto = "http"
-		}
-	}
-	if idx := strings.Index(proto, ","); idx >= 0 {
-		proto = strings.TrimSpace(proto[:idx])
-	}
-	host := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
-	if host == "" {
-		host = r.Host
-	}
-	if idx := strings.Index(host, ","); idx >= 0 {
-		host = strings.TrimSpace(host[:idx])
-	}
-	return proto + "://" + host
 }
 
 func postBetterAuth(ctx context.Context, cfg betterAuthConfig, path string, payload any, out any) error {
@@ -411,11 +342,24 @@ func authProviderStatusCode(err error) int {
 func publicAuthProviderError(err error) string {
 	var httpErr authProviderHTTPError
 	if errors.As(err, &httpErr) {
+		if httpErr.StatusCode == http.StatusNotFound {
+			return "Configured Neon Auth endpoint not found. Check NEON_AUTH_BASE_URL and auth method."
+		}
+		if httpErr.StatusCode == http.StatusUnauthorized || httpErr.StatusCode == http.StatusForbidden {
+			return "Invalid email or password."
+		}
 		var payload map[string]any
 		if json.Unmarshal([]byte(httpErr.Body), &payload) == nil {
 			for _, key := range []string{"message", "error", "code"} {
-				if v, ok := payload[key].(string); ok && strings.TrimSpace(v) != "" {
-					return strings.TrimSpace(v)
+				if v, ok := payload[key].(string); ok {
+					message := strings.TrimSpace(v)
+					if message == "" {
+						continue
+					}
+					if authProviderMessageLooksLikeInvalidCredentials(message) {
+						return "Invalid email or password."
+					}
+					return message
 				}
 			}
 		}
@@ -425,4 +369,13 @@ func publicAuthProviderError(err error) string {
 		return "auth provider did not return a bearer JWT"
 	}
 	return "auth provider is unavailable"
+}
+
+func authProviderMessageLooksLikeInvalidCredentials(message string) bool {
+	message = strings.ToLower(message)
+	return strings.Contains(message, "invalid credential") ||
+		strings.Contains(message, "invalid email") ||
+		strings.Contains(message, "invalid password") ||
+		strings.Contains(message, "wrong password") ||
+		strings.Contains(message, "incorrect password")
 }
