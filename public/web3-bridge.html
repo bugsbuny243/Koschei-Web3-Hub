@@ -129,7 +129,7 @@
 
     function renderEvents(events) {
       if (!events.length) {
-        eventsEl.innerHTML = '<p class="empty">No events yet. Create a test event after authenticating, or configure Alchemy to POST verified payloads to <code>/api/web3/events/alchemy</code>.</p>';
+        eventsEl.innerHTML = '<p class="empty">No events yet. Create a test event after authenticating, or configure Alchemy to POST verified payloads to <code>/api/web3/events/alchemy?source_id=SOURCE_ID</code>.</p>';
         return;
       }
       eventsEl.innerHTML = `<table>
@@ -193,10 +193,12 @@
         document.getElementById('sourceSecret').value = '';
         sourceHintEl.style.display = 'block';
         sourceHintEl.innerHTML = `<strong>One-time webhook setup</strong><br>
-          POST URL: <code>/api/web3/events/alchemy</code><br>
-          Header <code>X-Koschei-Source-Id</code>: <code>${escapeHTML(data.source.id)}</code><br>
-          Header <code>X-Koschei-Webhook-Secret</code>: <code>${escapeHTML(secret)}</code><br>
-          Store this secret now. Koschei stores only a hash and will not show it after refresh.`;
+          Webhook URL: <code>/api/web3/events/alchemy?source_id=${escapeHTML(data.source.id)}</code><br>
+          Alchemy Auth Token: <code>${escapeHTML(secret)}</code><br>
+          Custom headers only if your provider supports them:<br>
+          <code>X-Koschei-Source-Id</code>: <code>${escapeHTML(data.source.id)}</code><br>
+          <code>X-Koschei-Webhook-Secret</code>: <code>${escapeHTML(secret)}</code><br>
+          Store this secret now. Koschei stores only a hash and will not show it after refresh. Do not put the secret in the URL.`;
         setStatus(data.setup_hint || 'Source created. Configure provider headers now.');
         await loadSources();
       } catch (error) { setStatus(`Could not create source: ${error.message}`); }

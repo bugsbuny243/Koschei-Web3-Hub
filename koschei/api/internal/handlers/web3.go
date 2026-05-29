@@ -84,7 +84,7 @@ func (h *Handler) Web3AlchemyEvent(w http.ResponseWriter, r *http.Request) {
 	payloadHash := sha256Hex(raw)
 	network := firstNonEmptyString(findStringByKeys(payload, "network"), findStringByKeys(payload, "chain", "blockchain"))
 	sourceID := firstNonEmptyString(r.URL.Query().Get("source_id"), r.Header.Get("X-Koschei-Source-Id"))
-	source, status, err := h.findWebhookSource(sourceID, network)
+	source, status, err := h.findWebhookSource(sourceID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
@@ -94,7 +94,7 @@ func (h *Handler) Web3AlchemyEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	providedSecret := strings.TrimSpace(r.Header.Get("X-Koschei-Webhook-Secret"))
+	providedSecret := webhookSecretFromRequest(r)
 	if !source.SecretHash.Valid || strings.TrimSpace(source.SecretHash.String) == "" {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unconfigured_source"})
 		return
@@ -131,30 +131,15 @@ func (h *Handler) Web3AlchemyEvent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "event_id": eventID, "verification_status": "verified"})
 }
 
-func (h *Handler) findWebhookSource(sourceID, network string) (webhookSource, string, error) {
+func (h *Handler) findWebhookSource(sourceID string) (webhookSource, string, error) {
 	var source webhookSource
-	if strings.TrimSpace(sourceID) != "" {
-		err := h.DB.QueryRow(`
-			SELECT id, user_id, name, provider, network, secret_hash, verification_mode
-			FROM web3_event_sources
-			WHERE id=$1 AND provider='alchemy' AND is_active=true`, strings.TrimSpace(sourceID)).Scan(&source.ID, &source.UserID, &source.Name, &source.Provider, &source.Network, &source.SecretHash, &source.VerificationMode)
-		if err == sql.ErrNoRows {
-			return source, "unconfigured_source", nil
-		}
-		if err != nil {
-			return source, "", err
-		}
-		return source, "verified", nil
-	}
-	if strings.TrimSpace(network) == "" {
+	if strings.TrimSpace(sourceID) == "" {
 		return source, "unconfigured_source", nil
 	}
 	err := h.DB.QueryRow(`
 		SELECT id, user_id, name, provider, network, secret_hash, verification_mode
 		FROM web3_event_sources
-		WHERE provider='alchemy' AND network=$1 AND is_active=true
-		ORDER BY updated_at DESC
-		LIMIT 1`, strings.TrimSpace(network)).Scan(&source.ID, &source.UserID, &source.Name, &source.Provider, &source.Network, &source.SecretHash, &source.VerificationMode)
+		WHERE id=$1 AND provider='alchemy' AND is_active=true`, strings.TrimSpace(sourceID)).Scan(&source.ID, &source.UserID, &source.Name, &source.Provider, &source.Network, &source.SecretHash, &source.VerificationMode)
 	if err == sql.ErrNoRows {
 		return source, "unconfigured_source", nil
 	}
@@ -291,8 +276,9 @@ func (h *Handler) createWeb3Source(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"source":           source,
-		"setup_hint":       "Configure your webhook provider to send X-Koschei-Source-Id and X-Koschei-Webhook-Secret headers. Store the secret securely; Koschei will not show it again.",
+		"setup_hint":       "Configure Alchemy with /api/web3/events/alchemy?source_id=SOURCE_ID and set its Auth Token to this generated secret. If your provider supports custom headers, X-Koschei-Source-Id and X-Koschei-Webhook-Secret are also accepted. Store the secret securely; Koschei will not show it again.",
 		"required_headers": []string{"X-Koschei-Source-Id", "X-Koschei-Webhook-Secret"},
+		"secret_locations": []string{"X-Koschei-Webhook-Secret", "Authorization: Bearer <secret>", "X-Alchemy-Token"},
 	})
 }
 
@@ -569,6 +555,21 @@ func firstNonEmptyString(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func webhookSecretFromRequest(r *http.Request) string {
+	if secret := strings.TrimSpace(r.Header.Get("X-Koschei-Webhook-Secret")); secret != "" {
+		return secret
+	}
+
+	authorization := strings.TrimSpace(r.Header.Get("Authorization"))
+	if len(authorization) > len("Bearer ") && strings.EqualFold(authorization[:len("Bearer ")], "Bearer ") {
+		if secret := strings.TrimSpace(authorization[len("Bearer "):]); secret != "" {
+			return secret
+		}
+	}
+
+	return strings.TrimSpace(r.Header.Get("X-Alchemy-Token"))
 }
 
 func sha256Hex(data []byte) string {
