@@ -6,6 +6,13 @@ Koschei Web3 Bridge is production-hardened for **read-only, no-custody event mon
 
 Unauthenticated webhook endpoints can be called by anyone who knows or guesses the URL. Without verification, an attacker could inject fake transaction events, pollute audit trails, trigger misleading AI summaries, or overwhelm operator workflows. Production webhook ingestion must prove that an event came from a configured source before the event is stored as trusted monitoring data.
 
+
+## Dashboard authentication
+
+The `/web3-bridge.html` dashboard is for authenticated Koschei app users. Source creation, source listing, recent event listing, test event creation, and event explanation all call protected API routes and require a valid Neon Auth-backed application session. If the browser does not have an app session available, the dashboard must show: `Please sign in first to manage Web3 event sources.`
+
+Production users should use the normal app login flow before managing Web3 event sources. Manual bearer-token entry is temporary admin/testing access only, should be kept collapsed away from the main dashboard flow, and must not be used as the normal production authentication model.
+
 ## Alchemy Auth Token setup
 
 Alchemy webhook setup can use its Auth Token flow, which avoids relying on custom headers that may not be available in the Alchemy UI.

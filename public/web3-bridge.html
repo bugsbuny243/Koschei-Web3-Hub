@@ -31,6 +31,12 @@
     .status { min-height: 24px; color: #a8bbd8; }
     .empty { color: #8799b5; padding: 18px 0; }
     .hint { border: 1px solid rgba(115, 247, 209, .22); border-radius: 16px; padding: 14px; background: rgba(20, 184, 166, .1); }
+    .auth-card { border-color: rgba(115, 247, 209, .28); background: rgba(6, 78, 59, .16); }
+    .auth-card strong { color: #d7fbff; }
+    .auth-card a { color: #9ff5df; font-weight: 800; }
+    details { margin-top: 18px; border: 1px solid rgba(251, 191, 36, .24); border-radius: 16px; padding: 14px; background: rgba(120, 53, 15, .14); }
+    summary { cursor: pointer; color: #fde68a; font-weight: 900; }
+    button:disabled { cursor: not-allowed; opacity: .48; }
   </style>
 </head>
 <body>
@@ -46,16 +52,28 @@
         <li>Read-only monitoring</li>
       </ul>
       <div class="panel warning">
-        <strong>Production access warning:</strong> authenticated app sessions should protect dashboard APIs. The manual bearer token field below is temporary admin/testing access only and should not be treated as the normal production auth model.
+        <strong>Production access warning:</strong> the Web3 Bridge dashboard requires the normal authenticated Koschei app session. Manual bearer tokens are temporary admin/testing access only and should not be treated as the production auth model.
       </div>
-      <div class="panel">
+      <div class="panel auth-card">
+        <h2>Dashboard access</h2>
+        <p id="authMessage"><strong>Please sign in first to manage Web3 event sources.</strong></p>
+        <p>Use the normal Koschei app login. This page will reuse the existing browser session when a Neon Auth bearer token is available to the app frontend.</p>
         <div class="actions">
-          <input id="token" type="password" placeholder="Temporary admin/testing bearer token only">
-          <button id="saveToken" class="secondary">Save token locally</button>
-          <button id="createTest">Create test event</button>
-          <button id="refresh" class="secondary">Refresh events</button>
+          <a class="secondary" href="/" style="border:1px solid rgba(166,190,255,.22); border-radius:14px; padding:12px 16px; text-decoration:none;">Open Koschei app</a>
+          <button id="refreshSession" class="secondary">Refresh session</button>
+          <button id="createTest" disabled>Create test event</button>
+          <button id="refresh" class="secondary" disabled>Refresh events</button>
         </div>
-        <p id="status" class="status">Protected dashboard APIs require an authenticated session or temporary testing bearer token. Webhook ingestion now requires source and shared-secret verification.</p>
+        <details id="adminAccess">
+          <summary>Temporary admin/testing access</summary>
+          <p>Use this only for controlled admin testing while the production app login is unavailable. Saved temporary tokens are used silently and are not displayed after save.</p>
+          <div class="actions">
+            <input id="token" type="password" autocomplete="off" placeholder="Paste temporary bearer token">
+            <button id="saveToken" class="secondary">Save temporary token</button>
+            <button id="clearToken" class="secondary">Clear temporary token</button>
+          </div>
+        </details>
+        <p id="status" class="status">Protected dashboard APIs require an authenticated session. Webhook ingestion requires source and shared-secret verification.</p>
       </div>
       <div class="panel">
         <h2>Event source setup</h2>
@@ -67,9 +85,9 @@
           <label>Shared secret<input id="sourceSecret" type="password" placeholder="Generate or paste a strong secret"></label>
         </div>
         <div class="actions" style="margin-top: 12px;">
-          <button id="generateSecret" class="secondary">Generate secret</button>
-          <button id="createSource">Create source</button>
-          <button id="refreshSources" class="secondary">Refresh sources</button>
+          <button id="generateSecret" class="secondary" disabled>Generate secret</button>
+          <button id="createSource" disabled>Create source</button>
+          <button id="refreshSources" class="secondary" disabled>Refresh sources</button>
         </div>
         <div id="sourceHint" class="hint" style="display:none; margin-top: 14px;"></div>
         <div id="sources"></div>
@@ -83,17 +101,98 @@
   <script>
     const tokenInput = document.getElementById('token');
     const statusEl = document.getElementById('status');
+    const authMessageEl = document.getElementById('authMessage');
     const eventsEl = document.getElementById('events');
     const sourcesEl = document.getElementById('sources');
     const sourceHintEl = document.getElementById('sourceHint');
-    tokenInput.value = localStorage.getItem('koschei_web3_token') || '';
+    const protectedControls = [
+      'createTest',
+      'refresh',
+      'createSource',
+      'refreshSources',
+      'generateSecret'
+    ].map(id => document.getElementById(id));
+    let activeAuthToken = '';
+    let activeAuthMode = '';
+
+    const APP_SESSION_TOKEN_KEYS = [
+      'koschei_auth_token',
+      'koschei_token',
+      'neon_auth_token',
+      'neon_access_token',
+      'access_token',
+      'id_token',
+      'jwt',
+      'token'
+    ];
+
+    function setProtectedControls(enabled) {
+      protectedControls.forEach(control => { if (control) control.disabled = !enabled; });
+    }
+
+    function tokenLooksLikeJWT(value) {
+      return typeof value === 'string' && value.split('.').length === 3 && value.length > 40;
+    }
+
+    function extractJWT(value, depth = 0) {
+      if (!value || depth > 3) return '';
+      if (tokenLooksLikeJWT(value)) return value;
+      if (typeof value !== 'string') return '';
+      try {
+        const parsed = JSON.parse(value);
+        if (typeof parsed === 'string') return extractJWT(parsed, depth + 1);
+        if (parsed && typeof parsed === 'object') {
+          for (const key of APP_SESSION_TOKEN_KEYS) {
+            const found = extractJWT(parsed[key], depth + 1);
+            if (found) return found;
+          }
+          for (const item of Object.values(parsed)) {
+            const found = extractJWT(item, depth + 1);
+            if (found) return found;
+          }
+        }
+      } catch (_) {
+        return '';
+      }
+      return '';
+    }
+
+    function findStoredToken(keyName) {
+      try {
+        const token = extractJWT(localStorage.getItem(keyName)) || extractJWT(sessionStorage.getItem(keyName));
+        if (token) return token;
+      } catch (_) {}
+      return '';
+    }
+
+    function findAppSessionToken() {
+      for (const key of APP_SESSION_TOKEN_KEYS) {
+        const token = findStoredToken(key);
+        if (token) return token;
+      }
+      for (const storage of [localStorage, sessionStorage]) {
+        try {
+          for (let i = 0; i < storage.length; i += 1) {
+            const key = storage.key(i) || '';
+            if (key === 'koschei_web3_token' || !/(auth|session|token|jwt|neon|koschei)/i.test(key)) continue;
+            const token = extractJWT(storage.getItem(key));
+            if (token) return token;
+          }
+        } catch (_) {}
+      }
+      return '';
+    }
+
+    function findTemporaryToken() {
+      try { return extractJWT(localStorage.getItem('koschei_web3_token')); } catch (_) { return ''; }
+    }
 
     function authHeaders() {
-      const token = tokenInput.value.trim();
-      return token ? { Authorization: `Bearer ${token}` } : {};
+      return activeAuthToken ? { Authorization: `Bearer ${activeAuthToken}` } : {};
     }
 
     async function api(path, options = {}) {
+      if (!activeAuthToken) throw new Error('Please sign in first to manage Web3 event sources.');
       const response = await fetch(path, {
         ...options,
         headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(options.headers || {}) }
@@ -103,6 +202,48 @@
       return data;
     }
 
+    async function verifyToken(token) {
+      if (!token) return null;
+      const response = await fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return null;
+      return data.user || null;
+    }
+
+    async function refreshSession() {
+      setProtectedControls(false);
+      activeAuthToken = '';
+      activeAuthMode = '';
+      const appToken = findAppSessionToken();
+      const appUser = await verifyToken(appToken);
+      if (appUser) {
+        activeAuthToken = appToken;
+        activeAuthMode = 'session';
+        authMessageEl.innerHTML = `<strong>Signed in as ${escapeHTML(appUser.email || 'Koschei user')}.</strong>`;
+        setStatus('Authenticated with the existing app session.');
+        setProtectedControls(true);
+        await Promise.all([loadSources(), loadEvents()]);
+        return;
+      }
+
+      const temporaryToken = findTemporaryToken();
+      const temporaryUser = await verifyToken(temporaryToken);
+      if (temporaryUser) {
+        activeAuthToken = temporaryToken;
+        activeAuthMode = 'temporary';
+        authMessageEl.innerHTML = '<strong>Temporary admin/testing bearer token is active.</strong> Production users should use normal app login.';
+        setStatus('Temporary admin/testing access enabled for this browser.');
+        setProtectedControls(true);
+        await Promise.all([loadSources(), loadEvents()]);
+        return;
+      }
+
+      authMessageEl.innerHTML = '<strong>Please sign in first to manage Web3 event sources.</strong>';
+      renderSources([]);
+      renderEvents([]);
+      setStatus('Please sign in first to manage Web3 event sources.');
+    }
+
     function setStatus(message) { statusEl.textContent = message; }
     function short(value) { return value ? String(value).slice(0, 18) : '—'; }
     function escapeHTML(value) {
@@ -110,6 +251,10 @@
     }
 
     function renderSources(sources) {
+      if (!activeAuthToken) {
+        sourcesEl.innerHTML = '<p class="empty">Please sign in first to manage Web3 event sources.</p>';
+        return;
+      }
       if (!sources.length) {
         sourcesEl.innerHTML = '<p class="empty">No event sources yet. Create one before configuring production webhooks.</p>';
         return;
@@ -128,6 +273,10 @@
     }
 
     function renderEvents(events) {
+      if (!activeAuthToken) {
+        eventsEl.innerHTML = '<p class="empty">Please sign in first to view recent Web3 events.</p>';
+        return;
+      }
       if (!events.length) {
         eventsEl.innerHTML = '<p class="empty">No events yet. Create a test event after authenticating, or configure Alchemy to POST verified payloads to <code>/api/web3/events/alchemy?source_id=SOURCE_ID</code>.</p>';
         return;
@@ -168,10 +317,28 @@
       }
     }
 
-    document.getElementById('saveToken').addEventListener('click', () => {
-      localStorage.setItem('koschei_web3_token', tokenInput.value.trim());
+    document.getElementById('saveToken').addEventListener('click', async () => {
+      const token = tokenInput.value.trim();
+      if (!token) {
+        setStatus('Paste a temporary admin/testing bearer token before saving.');
+        return;
+      }
+      localStorage.setItem('koschei_web3_token', token);
+      tokenInput.value = '';
       setStatus('Temporary testing token saved locally in this browser. Do not use pasted bearer tokens as the production auth model.');
+      await refreshSession();
     });
+    document.getElementById('clearToken').addEventListener('click', async () => {
+      localStorage.removeItem('koschei_web3_token');
+      tokenInput.value = '';
+      if (activeAuthMode === 'temporary') {
+        activeAuthToken = '';
+        activeAuthMode = '';
+      }
+      setStatus('Temporary testing token cleared.');
+      await refreshSession();
+    });
+    document.getElementById('refreshSession').addEventListener('click', refreshSession);
     document.getElementById('refresh').addEventListener('click', loadEvents);
     document.getElementById('refreshSources').addEventListener('click', loadSources);
     document.getElementById('generateSecret').addEventListener('click', () => {
@@ -219,8 +386,7 @@
         await loadEvents();
       } catch (error) { setStatus(`Could not explain event: ${error.message}`); }
     });
-    loadSources();
-    loadEvents();
+    refreshSession();
   </script>
 </body>
 </html>
