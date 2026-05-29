@@ -35,18 +35,18 @@
       <h1>Koschei Login</h1>
       <p id="status" class="status">Checking for an existing authenticated Koschei session…</p>
       <div id="sessionPanel" class="notice" role="status">
-        Use your email to receive a Neon Auth magic link or one-time code for Koschei Web3 Bridge.
+        Use your email to receive a Neon Auth / Better Auth one-time sign-in code for Koschei Web3 Bridge.
       </div>
 
       <h2>Sign in to manage Web3 Bridge</h2>
-      <p>Koschei uses provider-issued Neon Auth sessions. This page never asks for passwords, never mints local tokens, and never places tokens in URLs. Protected APIs stay locked until <code>/api/me</code> verifies a bearer JWT from the auth provider.</p>
+      <p>Koschei uses provider-issued Neon Auth / Better Auth sessions. This page never asks for passwords, never mints local tokens, and never stores anything except the provider-issued bearer JWT. Protected APIs stay locked until <code>/api/me</code> verifies that JWT with the configured issuer and JWKS URL.</p>
 
       <form id="emailForm">
         <label>
           Email address
           <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@example.com">
         </label>
-        <button id="sendCode" type="submit">Send magic link / sign-in code</button>
+        <button id="sendCode" type="submit">Send sign-in code</button>
       </form>
 
       <form id="otpForm" class="otp-panel" hidden>
@@ -55,7 +55,7 @@
           <input id="otpCode" name="otpCode" type="text" autocomplete="one-time-code" inputmode="numeric" placeholder="123456">
         </label>
         <button id="verifyCode" type="submit">Verify and sign in</button>
-        <p class="muted">If you clicked the magic link in this same browser, verification starts automatically. Otherwise, paste the one-time code from your email.</p>
+        <p class="muted">Paste the one-time code from your Neon Auth email. If production login is not configured, Koschei will report the missing <code>NEON_AUTH_BASE_URL</code> or <code>NEON_AUTH_JWKS_URL</code> setting.</p>
       </form>
 
       <div class="actions">
@@ -95,7 +95,6 @@
       'token'
     ];
     const PRIMARY_SESSION_TOKEN_KEY = 'koschei_auth_token';
-    const OTP_NONCE_KEY = 'koschei_auth_otp_nonce';
     const OTP_EMAIL_KEY = 'koschei_auth_otp_email';
 
     function tokenLooksLikeJWT(value) {
@@ -201,7 +200,7 @@
         if (redirect) window.setTimeout(() => { window.location.assign('/web3-bridge.html'); }, 700);
         return user;
       }
-      setPanel('No valid app session was found. Enter your email to request a Neon Auth magic link or one-time code.');
+      setPanel('No valid app session was found. Enter your email to request a Neon Auth / Better Auth one-time sign-in code.');
       statusEl.textContent = 'Ready to sign in.';
       return null;
     }
@@ -217,12 +216,11 @@
           body: JSON.stringify({ email, callback_url: callbackURL })
         });
         const data = await parseJSONResponse(response);
-        sessionStorage.setItem(OTP_NONCE_KEY, data.nonce);
         sessionStorage.setItem(OTP_EMAIL_KEY, data.email || email);
         otpForm.hidden = false;
         otpInput.focus();
-        setPanel(`Sign-in email sent to ${data.email || email}. Use the magic link or enter the one-time code here.`, 'notice success');
-        statusEl.textContent = 'Check your email for the magic link or code.';
+        setPanel(`Sign-in email sent to ${data.email || email}. Enter the one-time code from the provider email here.`, 'notice success');
+        statusEl.textContent = 'Check your email for the provider sign-in code.';
       } catch (err) {
         setPanel(`Unable to start sign-in: ${err.message}`, 'notice error');
         statusEl.textContent = 'Sign-in could not be started.';
@@ -233,9 +231,8 @@
 
     async function completeLogin(code) {
       const email = sessionStorage.getItem(OTP_EMAIL_KEY) || emailInput.value.trim();
-      const nonce = sessionStorage.getItem(OTP_NONCE_KEY) || '';
-      if (!email || !nonce || !code) {
-        setPanel('Email, one-time code, and nonce are required. Request a new sign-in email if needed.', 'notice error');
+      if (!email || !code) {
+        setPanel('Email and one-time code are required. Request a new sign-in email if needed.', 'notice error');
         return;
       }
       verifyCodeButton.disabled = true;
@@ -244,12 +241,11 @@
         const response = await fetch('/api/auth/otp/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, code, nonce })
+          body: JSON.stringify({ email, code })
         });
         const data = await parseJSONResponse(response);
         if (!tokenLooksLikeJWT(data.access_token)) throw new Error('Auth provider did not return a valid browser session token');
         localStorage.setItem(PRIMARY_SESSION_TOKEN_KEY, data.access_token);
-        sessionStorage.removeItem(OTP_NONCE_KEY);
         sessionStorage.removeItem(OTP_EMAIL_KEY);
         setPanel(`Signed in as ${(data.user && data.user.email) || email}. Redirecting to the Web3 Bridge…`, 'notice success');
         statusEl.textContent = 'Authenticated session verified.';
@@ -278,12 +274,12 @@
       clearSessionStorageKeys();
       setContinueEnabled(false);
       otpForm.hidden = true;
-      setPanel('Session data cleared from this browser. Protected APIs remain locked until a valid Neon Auth session is created.');
+      setPanel('Session data cleared from this browser. Protected APIs remain locked until a valid Neon Auth / Better Auth session is created.');
       statusEl.textContent = 'Signed out locally.';
     });
 
     const params = new URLSearchParams(window.location.search);
-    const linkCode = params.get('code') || '';
+    const linkCode = params.get('code') || params.get('otp') || '';
     const storedEmail = sessionStorage.getItem(OTP_EMAIL_KEY) || '';
     if (storedEmail) emailInput.value = storedEmail;
     refreshSession().then(user => {
