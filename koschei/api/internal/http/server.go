@@ -120,7 +120,7 @@ func cors(next http.Handler, origin string) http.Handler {
 		if origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-Koschei-Source-Id, X-Koschei-Webhook-Secret")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-Koschei-Source-Id, X-Koschei-Webhook-Secret, X-Alchemy-Token")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
