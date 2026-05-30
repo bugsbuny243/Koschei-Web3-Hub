@@ -6,7 +6,7 @@ Core Go backend for Koschei Engine.
 - DATABASE_URL
 - CORS_ALLOWED_ORIGIN
 - ADMIN_PASSWORD
-- NEON_AUTH_BASE_URL (Better Auth / Neon Auth API base used for `/sign-in/email`)
+- NEON_AUTH_BASE_URL (Better Auth / Neon Auth URL; usually the Auth URL copied from the Neon Auth configuration)
 - NEON_AUTH_ISSUER (issuer expected in provider-issued bearer JWTs)
 - NEON_AUTH_JWKS_URL (JWKS used to verify provider-issued bearer JWTs)
 - NEON_AUTH_AUDIENCE (optional)
@@ -23,7 +23,7 @@ Core Go backend for Koschei Engine.
 ## Main Endpoints
 - GET /health
 - POST /api/auth/register (disabled custom auth)
-- POST /api/auth/login (Neon Auth / Better Auth email + password sign-in via `/sign-in/email`)
+- POST /api/auth/login (Neon Auth / Better Auth email + password sign-in with safe `/sign-in/email` and `/api/auth/sign-in/email` endpoint fallbacks)
 - POST /api/auth/otp/start (disabled unless an OTP plugin is enabled and the backend is updated later)
 - POST /api/auth/otp/verify (disabled unless an OTP plugin is enabled and the backend is updated later)
 - GET /api/me
@@ -33,6 +33,6 @@ Core Go backend for Koschei Engine.
 
 ## Authentication mode
 
-Koschei delegates production user authentication to Neon Auth / Better Auth email + password. The login handler accepts `email` and `password`, forwards them to the configured provider endpoint at `NEON_AUTH_BASE_URL + /sign-in/email`, and does not store, log, or return the password. After the provider returns a session/JWT/cookie, Koschei extracts the provider-issued bearer JWT, verifies it with `NEON_AUTH_JWKS_URL` and `NEON_AUTH_ISSUER`, upserts `app_user_profiles` by auth subject and email, and returns only `access_token`, `token_type`, and `user` to the browser.
+Koschei delegates production user authentication to Neon Auth / Better Auth email + password. `NEON_AUTH_BASE_URL` should usually be the Auth URL copied from the Neon Auth configuration. The login handler accepts `email` and `password`, first posts to `NEON_AUTH_BASE_URL + /sign-in/email`, and if that provider endpoint returns 404 it safely retries equivalent `/api/auth/sign-in/email` candidates for Auth URLs copied with or without `/api/auth` or `/auth`. It stops on the first non-404 provider response, and does not store, log, or return the password. After the provider returns a session/JWT/cookie, Koschei extracts the provider-issued bearer JWT, verifies it with `NEON_AUTH_JWKS_URL` and `NEON_AUTH_ISSUER`, upserts `app_user_profiles` by auth subject and email, and returns only `access_token`, `token_type`, and `user` to the browser.
 
 Email OTP routes are intentionally disabled in this backend because the current provider dashboard enables email/password sign-up and sign-in, not the Better Auth OTP plugin. Do not configure the browser to call `/email-otp/send-verification-otp` or `/sign-in/email-otp` unless that plugin is enabled later and the backend is explicitly updated.
