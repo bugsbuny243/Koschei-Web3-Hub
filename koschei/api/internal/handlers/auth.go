@@ -360,7 +360,17 @@ func (e authProviderHTTPError) Error() string {
 	return fmt.Sprintf("auth provider returned %d", e.StatusCode)
 }
 
+type authProviderEmailEndpointNotFoundError struct{}
+
+func (e authProviderEmailEndpointNotFoundError) Error() string {
+	return "Neon Auth email/password endpoint not found"
+}
+
 func authProviderStatusCode(err error) int {
+	var endpointErr authProviderEmailEndpointNotFoundError
+	if errors.As(err, &endpointErr) {
+		return http.StatusBadRequest
+	}
 	var httpErr authProviderHTTPError
 	if errors.As(err, &httpErr) {
 		if httpErr.StatusCode == http.StatusTooManyRequests {
@@ -374,6 +384,10 @@ func authProviderStatusCode(err error) int {
 }
 
 func publicAuthProviderError(err error) string {
+	var endpointErr authProviderEmailEndpointNotFoundError
+	if errors.As(err, &endpointErr) {
+		return "Neon Auth email/password endpoint not found. Check whether Auth URL includes /api/auth."
+	}
 	var httpErr authProviderHTTPError
 	if errors.As(err, &httpErr) {
 		if httpErr.StatusCode == http.StatusNotFound {
