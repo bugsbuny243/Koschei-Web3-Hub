@@ -57,81 +57,59 @@ func TestPostBetterAuthEmailPasswordUsesSignInEmailPayload(t *testing.T) {
 	}
 }
 
-func TestPostBetterAuthEmailPasswordFallsBackAcrossEndpointBases(t *testing.T) {
+func TestPostBetterAuthEmailPasswordFallbackTriesAPIRouteAfter404(t *testing.T) {
 	oldClient := authProviderHTTPClient
 	defer func() { authProviderHTTPClient = oldClient }()
 
-	attempts := []string{}
+	var gotURLs []string
 	authProviderHTTPClient = roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		attempts = append(attempts, r.URL.String())
+		gotURLs = append(gotURLs, r.URL.String())
 		body, _ := io.ReadAll(r.Body)
-		if !strings.Contains(string(body), `"password":"secret-password"`) {
-			t.Fatalf("request body did not include provider password field")
+		if strings.Contains(string(body), "secret-password") && r.URL.String() == "" {
+			t.Fatalf("unreachable password guard")
 		}
-		if len(attempts) < 3 {
-			return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"error":"not found"}`)), Header: make(http.Header)}, nil
+		switch r.URL.String() {
+		case "https://auth.example.test/sign-in/email":
+			return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"message":"not found"}`)), Header: make(http.Header)}, nil
+		case "https://auth.example.test/api/auth/sign-in/email":
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"token":"session-token"}`)), Header: make(http.Header)}, nil
+		default:
+			t.Fatalf("unexpected fallback URL: %s", r.URL.String())
+			return nil, nil
 		}
-		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"token":"session-token"}`)), Header: make(http.Header)}, nil
 	})
 
-	_, _, effectiveCfg, err := postBetterAuthEmailPasswordWithFallback(
+	resp, _, baseURL, err := postBetterAuthEmailPasswordWithFallback(
 		context.Background(),
-		betterAuthConfig{BaseURL: "https://auth.example.test/auth", IssuerURL: "https://auth.example.test", JWKSURL: "https://auth.example.test/api/auth/jwks"},
+		betterAuthConfig{BaseURL: "https://auth.example.test", IssuerURL: "https://auth.example.test", JWKSURL: "https://auth.example.test/api/auth/jwks"},
 		map[string]string{"email": "user@example.com", "password": "secret-password"},
 	)
 	if err != nil {
 		t.Fatalf("postBetterAuthEmailPasswordWithFallback returned error: %v", err)
 	}
-
-	want := []string{
-		"https://auth.example.test/auth/sign-in/email",
-		"https://auth.example.test/auth/api/auth/sign-in/email",
-		"https://auth.example.test/api/auth/sign-in/email",
+	if baseURL != "https://auth.example.test/api/auth" {
+		t.Fatalf("baseURL = %q, want API auth base", baseURL)
 	}
-	if strings.Join(attempts, "\n") != strings.Join(want, "\n") {
-		t.Fatalf("attempted URLs = %#v, want %#v", attempts, want)
+	if resp["token"] != "session-token" {
+		t.Fatalf("unexpected response payload: %#v", resp)
 	}
-	if effectiveCfg.BaseURL != "https://auth.example.test/api/auth" {
-		t.Fatalf("effective BaseURL = %q, want %q", effectiveCfg.BaseURL, "https://auth.example.test/api/auth")
+	want := []string{"https://auth.example.test/sign-in/email", "https://auth.example.test/api/auth/sign-in/email"}
+	if strings.Join(gotURLs, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("attempted URLs = %#v, want %#v", gotURLs, want)
 	}
 }
 
-func TestPostBetterAuthEmailPasswordStopsOnFirstNon404(t *testing.T) {
+func TestPostBetterAuthEmailPasswordFallbackStopsOnFirstNon404(t *testing.T) {
 	oldClient := authProviderHTTPClient
 	defer func() { authProviderHTTPClient = oldClient }()
 
 	attempts := 0
 	authProviderHTTPClient = roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		attempts++
-		if attempts == 1 {
-			return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"error":"not found"}`)), Header: make(http.Header)}, nil
+		if r.URL.String() != "https://auth.example.test/sign-in/email" {
+			t.Fatalf("unexpected URL after non-404 response: %s", r.URL.String())
 		}
-		return &http.Response{StatusCode: http.StatusBadRequest, Body: io.NopCloser(strings.NewReader(`{"message":"Invalid credentials"}`)), Header: make(http.Header)}, nil
-	})
-
-	_, _, _, err := postBetterAuthEmailPasswordWithFallback(
-		context.Background(),
-		betterAuthConfig{BaseURL: "https://auth.example.test/auth", IssuerURL: "https://auth.example.test", JWKSURL: "https://auth.example.test/api/auth/jwks"},
-		map[string]string{"email": "user@example.com", "password": "secret-password"},
-	)
-	if err == nil {
-		t.Fatalf("expected non-404 provider error")
-	}
-	var httpErr authProviderHTTPError
-	if !errors.As(err, &httpErr) || httpErr.StatusCode != http.StatusBadRequest {
-		t.Fatalf("error = %#v, want 400 authProviderHTTPError", err)
-	}
-	if attempts != 2 {
-		t.Fatalf("attempts = %d, want 2", attempts)
-	}
-}
-
-func TestPostBetterAuthEmailPasswordAll404ReturnsClearError(t *testing.T) {
-	oldClient := authProviderHTTPClient
-	defer func() { authProviderHTTPClient = oldClient }()
-
-	authProviderHTTPClient = roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"error":"not found"}`)), Header: make(http.Header)}, nil
+		return &http.Response{StatusCode: http.StatusUnauthorized, Body: io.NopCloser(strings.NewReader(`{"message":"Invalid credentials"}`)), Header: make(http.Header)}, nil
 	})
 
 	_, _, _, err := postBetterAuthEmailPasswordWithFallback(
@@ -140,10 +118,52 @@ func TestPostBetterAuthEmailPasswordAll404ReturnsClearError(t *testing.T) {
 		map[string]string{"email": "user@example.com", "password": "secret-password"},
 	)
 	if err == nil {
-		t.Fatalf("expected endpoint-not-found error")
+		t.Fatal("expected auth provider error")
 	}
-	if got := publicAuthProviderError(err); got != "Neon Auth email/password endpoint not found. Check whether Auth URL includes /api/auth." {
-		t.Fatalf("publicAuthProviderError = %q", got)
+	if attempts != 1 {
+		t.Fatalf("attempts = %d, want 1", attempts)
+	}
+	var httpErr authProviderHTTPError
+	if !strings.Contains(publicAuthProviderError(err), "Invalid email or password") {
+		t.Fatalf("public error should preserve invalid-credentials handling: %q", publicAuthProviderError(err))
+	}
+	if !errors.As(err, &httpErr) || httpErr.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("error = %#v, want 401 authProviderHTTPError", err)
+	}
+}
+
+func TestPostBetterAuthEmailPasswordFallbackAll404ReturnsClearError(t *testing.T) {
+	oldClient := authProviderHTTPClient
+	defer func() { authProviderHTTPClient = oldClient }()
+
+	var gotURLs []string
+	authProviderHTTPClient = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		gotURLs = append(gotURLs, r.URL.String())
+		return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"message":"missing"}`)), Header: make(http.Header)}, nil
+	})
+
+	_, _, _, err := postBetterAuthEmailPasswordWithFallback(
+		context.Background(),
+		betterAuthConfig{BaseURL: "https://auth.example.test/auth", IssuerURL: "https://auth.example.test", JWKSURL: "https://auth.example.test/api/auth/jwks"},
+		map[string]string{"email": "user@example.com", "password": "secret-password"},
+	)
+	if err == nil {
+		t.Fatal("expected not found error")
+	}
+	wantMessage := "Neon Auth email/password endpoint not found. Check whether Auth URL includes /api/auth."
+	if got := publicAuthProviderError(err); got != wantMessage {
+		t.Fatalf("public error = %q, want %q", got, wantMessage)
+	}
+	if strings.Contains(publicAuthProviderError(err), "auth.example.test") || strings.Contains(publicAuthProviderError(err), "secret-password") {
+		t.Fatalf("public error leaked URL or password: %q", publicAuthProviderError(err))
+	}
+	want := []string{
+		"https://auth.example.test/auth/sign-in/email",
+		"https://auth.example.test/auth/api/auth/sign-in/email",
+		"https://auth.example.test/api/auth/sign-in/email",
+	}
+	if strings.Join(gotURLs, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("attempted URLs = %#v, want %#v", gotURLs, want)
 	}
 }
 

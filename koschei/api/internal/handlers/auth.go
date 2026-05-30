@@ -63,14 +63,14 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
 		return
 	}
-	signInResp, setCookies, signInCfg, err := postBetterAuthEmailPasswordWithFallback(r.Context(), cfg, map[string]string{"email": email, "password": in.Password})
+	signInResp, setCookies, signInBaseURL, err := postBetterAuthEmailPasswordWithFallback(r.Context(), cfg, map[string]string{"email": email, "password": in.Password})
 	if err != nil {
 		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
 		return
 	}
 	accessToken := extractJWTFromAny(signInResp)
 	if accessToken == "" {
-		accessToken, err = fetchBetterAuthJWT(r.Context(), signInCfg, setCookies, extractSessionToken(signInResp))
+		accessToken, err = fetchBetterAuthJWT(r.Context(), cfg.withBaseURL(signInBaseURL), setCookies, extractSessionToken(signInResp))
 		if err != nil {
 			writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
 			return
@@ -170,6 +170,11 @@ func betterAuthConfigFromEnv() (betterAuthConfig, error) {
 	return cfg, nil
 }
 
+func (cfg betterAuthConfig) withBaseURL(baseURL string) betterAuthConfig {
+	cfg.BaseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	return cfg
+}
+
 func postBetterAuth(ctx context.Context, cfg betterAuthConfig, path string, payload any, out any) error {
 	respBody, _, err := postBetterAuthWithCookies(ctx, cfg, path, payload)
 	if err != nil {
@@ -186,39 +191,35 @@ func postBetterAuth(ctx context.Context, cfg betterAuthConfig, path string, payl
 }
 
 func postBetterAuthWithCookies(ctx context.Context, cfg betterAuthConfig, path string, payload any) (map[string]any, []string, error) {
-	return postBetterAuthURLWithCookies(ctx, cfg.BaseURL+path, payload)
+	return postBetterAuthWithCookiesURL(ctx, cfg.BaseURL+path, payload)
 }
 
-func postBetterAuthEmailPasswordWithFallback(ctx context.Context, cfg betterAuthConfig, payload any) (map[string]any, []string, betterAuthConfig, error) {
-	candidates := betterAuthEmailPasswordEndpointCandidates(cfg)
-	var lastNotFound error
-	for _, candidate := range candidates {
-		body, setCookies, err := postBetterAuthURLWithCookies(ctx, candidate.BaseURL+"/sign-in/email", payload)
-		if err == nil {
-			cfg.BaseURL = candidate.BaseURL
-			return body, setCookies, cfg, nil
+func postBetterAuthEmailPasswordWithFallback(ctx context.Context, cfg betterAuthConfig, payload any) (map[string]any, []string, string, error) {
+	for _, baseURL := range emailPasswordSignInBaseURLCandidates(cfg.BaseURL) {
+		respBody, setCookies, err := postBetterAuthWithCookiesURL(ctx, baseURL+"/sign-in/email", payload)
+		if isAuthProviderNotFound(err) {
+			continue
 		}
-		var httpErr authProviderHTTPError
-		if !errors.As(err, &httpErr) || httpErr.StatusCode != http.StatusNotFound {
-			return nil, nil, cfg, err
-		}
-		lastNotFound = err
+		return respBody, setCookies, baseURL, err
 	}
-	if lastNotFound != nil {
-		return nil, nil, cfg, authProviderEmailEndpointNotFoundError{}
-	}
-	return nil, nil, cfg, errors.New("auth provider endpoint was not configured")
+	return nil, nil, "", authProviderHTTPError{StatusCode: http.StatusNotFound}
 }
 
-func betterAuthEmailPasswordEndpointCandidates(cfg betterAuthConfig) []betterAuthConfig {
-	return []betterAuthConfig{
-		{BaseURL: cfg.BaseURL, IssuerURL: cfg.IssuerURL, JWKSURL: cfg.JWKSURL},
-		{BaseURL: strings.TrimSuffix(cfg.BaseURL, "/api/auth") + "/api/auth", IssuerURL: cfg.IssuerURL, JWKSURL: cfg.JWKSURL},
-		{BaseURL: strings.TrimSuffix(cfg.BaseURL, "/auth") + "/api/auth", IssuerURL: cfg.IssuerURL, JWKSURL: cfg.JWKSURL},
+func emailPasswordSignInBaseURLCandidates(baseURL string) []string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	return []string{
+		baseURL,
+		strings.TrimSuffix(baseURL, "/api/auth") + "/api/auth",
+		strings.TrimSuffix(baseURL, "/auth") + "/api/auth",
 	}
 }
 
-func postBetterAuthURLWithCookies(ctx context.Context, url string, payload any) (map[string]any, []string, error) {
+func isAuthProviderNotFound(err error) bool {
+	var httpErr authProviderHTTPError
+	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
+}
+
+func postBetterAuthWithCookiesURL(ctx context.Context, url string, payload any) (map[string]any, []string, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, nil, err
