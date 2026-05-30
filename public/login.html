@@ -91,7 +91,7 @@
     const PRIMARY_SESSION_TOKEN_KEY = 'koschei_auth_token';
 
     function tokenLooksLikeJWT(value) {
-      return typeof value === 'string' && value.split('.').length === 3 && value.length > 40;
+      return typeof value === 'string' && value.split('.').length === 3 && value.split('.').every(Boolean);
     }
 
     function extractJWT(value, depth = 0) {
@@ -166,10 +166,16 @@
       continueBridge.setAttribute('aria-disabled', enabled ? 'false' : 'true');
     }
 
+    function safeAuthFailureMessage(value) {
+      const message = String(value || 'Request failed');
+      if (/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(message)) return 'auth_provider_failed';
+      return message.replace(/[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}/g, '[redacted-token]');
+    }
+
     async function parseJSONResponse(response) {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.message || data.error || 'Request failed');
+        throw new Error(safeAuthFailureMessage(data.message || data.error || 'Request failed'));
       }
       return data;
     }
