@@ -11,9 +11,7 @@ import (
 	"errors"
 	"math/big"
 	"net/http"
-	"net/url"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +42,33 @@ type neonJWK struct {
 	X   string `json:"x"`
 }
 
+type neonJWTFailureCategory string
+
+const (
+	neonJWTFailureNonJWTToken       neonJWTFailureCategory = "non_jwt_token"
+	neonJWTFailureMissingKID        neonJWTFailureCategory = "missing_kid"
+	neonJWTFailureJWKSKeyNotFound   neonJWTFailureCategory = "jwks_key_not_found"
+	neonJWTFailureIssuerMismatch    neonJWTFailureCategory = "issuer_mismatch"
+	neonJWTFailureExpiredToken      neonJWTFailureCategory = "expired_token"
+	neonJWTFailureMissingEmailClaim neonJWTFailureCategory = "missing_email_claim"
+	neonJWTFailureInvalidSignature  neonJWTFailureCategory = "invalid_signature"
+	neonJWTFailureUnknown           neonJWTFailureCategory = "unknown"
+)
+
+type neonJWTVerificationError struct {
+	Category neonJWTFailureCategory
+	Cause    error
+}
+
+func (e neonJWTVerificationError) Error() string {
+	if e.Cause == nil {
+		return string(e.Category)
+	}
+	return string(e.Category) + ": " + e.Cause.Error()
+}
+
+func (e neonJWTVerificationError) Unwrap() error { return e.Cause }
+
 var (
 	jwksCache map[string]neonJWK
 	jwksMu    sync.RWMutex
@@ -53,115 +78,92 @@ func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
 	return neonClaimsFromToken(token)
 }
 
-func originOnly(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ""
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return raw
-	}
-	return u.Scheme + "://" + u.Host
-}
-
 func trimSlash(s string) string {
 	return strings.TrimRight(strings.TrimSpace(s), "/")
 }
 
-func addIssuerCandidate(set map[string]bool, raw string) {
-	raw = trimSlash(raw)
-	if raw == "" {
-		return
-	}
-	set[raw] = true
-
-	origin := originOnly(raw)
-	if origin != "" {
-		set[trimSlash(origin)] = true
-	}
+func configuredIssuer() string {
+	return trimSlash(os.Getenv("NEON_AUTH_ISSUER"))
 }
 
-func allowedIssuers() map[string]bool {
-	allowed := map[string]bool{}
-	addIssuerCandidate(allowed, os.Getenv("NEON_AUTH_ISSUER"))
-	addIssuerCandidate(allowed, os.Getenv("NEON_AUTH_BASE_URL"))
-	addIssuerCandidate(allowed, os.Getenv("NEON_AUTH_JWKS_URL"))
-	return allowed
+func jwtVerifyError(category neonJWTFailureCategory, err error) error {
+	return neonJWTVerificationError{Category: category, Cause: err}
 }
 
 func neonClaimsFromToken(token string) (neonJWTClaims, error) {
 	var out neonJWTClaims
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return out, errors.New("invalid token")
+	if !tokenLooksLikeJWT(token) {
+		return out, jwtVerifyError(neonJWTFailureNonJWTToken, errors.New("token is not three JWT segments"))
 	}
+	parts := strings.Split(token, ".")
 	headerRaw, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return out, err
+		return out, jwtVerifyError(neonJWTFailureUnknown, err)
 	}
 	var header map[string]any
 	if err := json.Unmarshal(headerRaw, &header); err != nil {
-		return out, err
+		return out, jwtVerifyError(neonJWTFailureUnknown, err)
 	}
 	kid, _ := header["kid"].(string)
 	alg, _ := header["alg"].(string)
-	if kid == "" || alg == "" {
-		return out, errors.New("invalid token")
+	if strings.TrimSpace(kid) == "" {
+		return out, jwtVerifyError(neonJWTFailureMissingKID, errors.New("JWT header missing kid"))
+	}
+	if strings.TrimSpace(alg) == "" {
+		return out, jwtVerifyError(neonJWTFailureUnknown, errors.New("JWT header missing alg"))
 	}
 	jwk, err := loadJWKSKey(kid)
 	if err != nil {
-		return out, err
+		return out, jwtVerifyError(neonJWTFailureJWKSKeyNotFound, err)
 	}
 	signingInput := []byte(parts[0] + "." + parts[1])
 	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
 	if err != nil {
-		return out, err
+		return out, jwtVerifyError(neonJWTFailureInvalidSignature, err)
 	}
 	switch alg {
 	case "RS256":
 		pub, err := rsaPublicKeyFromJWK(jwk)
 		if err != nil {
-			return out, errors.New("invalid token")
+			return out, jwtVerifyError(neonJWTFailureJWKSKeyNotFound, err)
 		}
 		h := sha256.Sum256(signingInput)
 		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, h[:], sig); err != nil {
-			return out, errors.New("invalid token")
+			return out, jwtVerifyError(neonJWTFailureInvalidSignature, err)
 		}
 	case "EdDSA":
 		pub, err := ed25519PublicKeyFromJWK(jwk)
 		if err != nil {
-			return out, errors.New("invalid token")
+			return out, jwtVerifyError(neonJWTFailureJWKSKeyNotFound, err)
 		}
 		if !ed25519.Verify(pub, signingInput, sig) {
-			return out, errors.New("invalid token")
+			return out, jwtVerifyError(neonJWTFailureInvalidSignature, errors.New("signature verification failed"))
 		}
 	default:
-		return out, errors.New("invalid token")
+		return out, jwtVerifyError(neonJWTFailureInvalidSignature, errors.New("unsupported JWT signing algorithm"))
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
-		return out, err
+		return out, jwtVerifyError(neonJWTFailureUnknown, err)
 	}
 	if err := json.Unmarshal(payload, &out); err != nil {
-		return out, err
+		return out, jwtVerifyError(neonJWTFailureUnknown, err)
 	}
-	if out.Exp < time.Now().Unix() || out.Sub == "" || out.Email == "" {
-		return out, errors.New("invalid token")
+	if out.Exp < time.Now().Unix() {
+		return out, jwtVerifyError(neonJWTFailureExpiredToken, errors.New("JWT is expired"))
 	}
-	allowed := allowedIssuers()
-	actualIssuer := trimSlash(out.Iss)
-	if len(allowed) > 0 && !allowed[actualIssuer] {
-		keys := make([]string, 0, len(allowed))
-		for k := range allowed {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		return out, errors.New("invalid issuer: " + actualIssuer + " allowed=" + strings.Join(keys, ","))
+	if strings.TrimSpace(out.Email) == "" {
+		return out, jwtVerifyError(neonJWTFailureMissingEmailClaim, errors.New("JWT missing email claim"))
+	}
+	if strings.TrimSpace(out.Sub) == "" {
+		return out, jwtVerifyError(neonJWTFailureUnknown, errors.New("JWT missing sub claim"))
+	}
+	if issuer := configuredIssuer(); issuer != "" && trimSlash(out.Iss) != issuer {
+		return out, jwtVerifyError(neonJWTFailureIssuerMismatch, errors.New("JWT issuer does not match NEON_AUTH_ISSUER"))
 	}
 	aud := trimSlash(os.Getenv("NEON_AUTH_AUDIENCE"))
 	if aud != "" && !matchesAudience(out.Aud, aud) {
-		return out, errors.New("invalid audience")
+		return out, jwtVerifyError(neonJWTFailureUnknown, errors.New("invalid audience"))
 	}
 	return out, nil
 }

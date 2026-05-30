@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"context"
-	"errors"
+	"crypto/ed25519"
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -237,4 +240,152 @@ func TestPublicAuthProviderErrorMessages(t *testing.T) {
 	if got := publicAuthProviderError(authProviderHTTPError{StatusCode: http.StatusBadRequest, Body: `{"message":"Invalid credentials"}`}); got != "Invalid email or password." {
 		t.Fatalf("invalid credentials message = %q", got)
 	}
+}
+
+func TestExtractJWTIgnoresOpaqueSessionToken(t *testing.T) {
+	payload := map[string]any{
+		"token":   "opaque-session-token-without-jwt-segments",
+		"session": map[string]any{"token": "another-opaque-session-token"},
+	}
+	if got := extractJWTFromAny(payload); got != "" {
+		t.Fatalf("extractJWTFromAny() = %q, want empty opaque session tokens ignored", got)
+	}
+	if got := extractSessionToken(payload); got != "opaque-session-token-without-jwt-segments" {
+		t.Fatalf("extractSessionToken() = %q, want opaque session token preserved for provider follow-up", got)
+	}
+}
+
+func TestExtractJWTAcceptsJWTLookingToken(t *testing.T) {
+	jwt := strings.Repeat("a", 18) + "." + strings.Repeat("b", 18) + "." + strings.Repeat("c", 18)
+	payload := map[string]any{"session": map[string]any{"token": "opaque-session-token"}, "access_token": jwt}
+	if got := extractJWTFromAny(payload); got != jwt {
+		t.Fatalf("extractJWTFromAny() = %q, want JWT-looking token", got)
+	}
+}
+
+func TestParseAndVerifyNeonJWTIssuerMismatchSafeError(t *testing.T) {
+	_, token := setupEdDSANeonJWTTest(t, neonJWTClaims{Sub: "user_1", Email: "user@example.com", Iss: "https://wrong.example.test", Exp: time.Now().Add(time.Hour).Unix()}, "kid-issuer")
+	t.Setenv("NEON_AUTH_ISSUER", "https://issuer.example.test")
+
+	_, err := parseAndVerifyNeonJWT(token)
+	if err == nil {
+		t.Fatal("parseAndVerifyNeonJWT() error = nil, want issuer mismatch")
+	}
+	if got := publicAuthProviderError(err); got != "issuer_mismatch: check NEON_AUTH_ISSUER against provider token issuer" {
+		t.Fatalf("publicAuthProviderError() = %q", got)
+	}
+	if strings.Contains(publicAuthProviderError(err), token) {
+		t.Fatalf("public error must not contain JWT: %s", publicAuthProviderError(err))
+	}
+}
+
+func TestParseAndVerifyNeonJWTJWKSKeyMissingSafeError(t *testing.T) {
+	setupJWKS(t, neonJWKSDoc{Keys: []neonJWK{}})
+	_, token := signedEdDSATestJWT(t, neonJWTClaims{Sub: "user_1", Email: "user@example.com", Iss: "https://issuer.example.test", Exp: time.Now().Add(time.Hour).Unix()}, "missing-kid")
+	t.Setenv("NEON_AUTH_ISSUER", "https://issuer.example.test")
+
+	_, err := parseAndVerifyNeonJWT(token)
+	if err == nil {
+		t.Fatal("parseAndVerifyNeonJWT() error = nil, want JWKS key missing")
+	}
+	if got := publicAuthProviderError(err); got != "jwks_key_not_found: check NEON_AUTH_JWKS_URL" {
+		t.Fatalf("publicAuthProviderError() = %q", got)
+	}
+}
+
+func TestFetchBetterAuthVerifiedJWTFallsBackWithCookies(t *testing.T) {
+	_, token := setupEdDSANeonJWTTest(t, neonJWTClaims{Sub: "user_1", Email: "user@example.com", Iss: "https://issuer.example.test", Exp: time.Now().Add(time.Hour).Unix()}, "kid-fallback")
+	t.Setenv("NEON_AUTH_ISSUER", "https://issuer.example.test")
+
+	oldClient := authProviderHTTPClient
+	defer func() { authProviderHTTPClient = oldClient }()
+	var requested []string
+	authProviderHTTPClient = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		requested = append(requested, r.URL.Path)
+		if got := r.Header.Get("Cookie"); got != "better-auth.session=signed-cookie; other=value" {
+			t.Fatalf("Cookie header = %q, want sign-in Set-Cookie values", got)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer opaque-session" {
+			t.Fatalf("Authorization header = %q, want opaque session bearer for provider follow-up", got)
+		}
+		switch r.URL.Path {
+		case "/api/auth/token":
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"token":"opaque-token"}`)), Header: make(http.Header)}, nil
+		case "/api/auth/get-session":
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"user":{"email":"user@example.com"}}`)), Header: make(http.Header)}, nil
+		case "/api/auth/session":
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"access_token":"` + token + `"}`)), Header: make(http.Header)}, nil
+		default:
+			t.Fatalf("unexpected provider path: %s", r.URL.Path)
+			return nil, nil
+		}
+	})
+
+	gotToken, claims, err := fetchBetterAuthVerifiedJWT(
+		context.Background(),
+		betterAuthConfig{BaseURL: "https://auth.example.test/api/auth", IssuerURL: "https://issuer.example.test", JWKSURL: "unused"},
+		[]string{"better-auth.session=signed-cookie; Path=/; HttpOnly", "other=value; Path=/"},
+		"opaque-session",
+	)
+	if err != nil {
+		t.Fatalf("fetchBetterAuthVerifiedJWT() error = %v", err)
+	}
+	if gotToken != token {
+		t.Fatalf("token = %q, want fallback JWT", gotToken)
+	}
+	if claims.Email != "user@example.com" {
+		t.Fatalf("claims.Email = %q", claims.Email)
+	}
+	if strings.Join(requested, ",") != "/api/auth/token,/api/auth/get-session,/api/auth/session" {
+		t.Fatalf("requested paths = %v", requested)
+	}
+}
+
+func setupEdDSANeonJWTTest(t *testing.T, claims neonJWTClaims, kid string) (neonJWK, string) {
+	t.Helper()
+	jwk, token := signedEdDSATestJWT(t, claims, kid)
+	setupJWKS(t, neonJWKSDoc{Keys: []neonJWK{jwk}})
+	return jwk, token
+}
+
+func signedEdDSATestJWT(t *testing.T, claims neonJWTClaims, kid string) (neonJWK, string) {
+	t.Helper()
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("GenerateKey() error = %v", err)
+	}
+	header := map[string]any{"alg": "EdDSA", "kid": kid, "typ": "JWT"}
+	headerJSON, err := json.Marshal(header)
+	if err != nil {
+		t.Fatalf("marshal header: %v", err)
+	}
+	payloadJSON, err := json.Marshal(claims)
+	if err != nil {
+		t.Fatalf("marshal claims: %v", err)
+	}
+	headerPart := base64.RawURLEncoding.EncodeToString(headerJSON)
+	payloadPart := base64.RawURLEncoding.EncodeToString(payloadJSON)
+	signingInput := headerPart + "." + payloadPart
+	sig := ed25519.Sign(priv, []byte(signingInput))
+	token := signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+	jwk := neonJWK{Kid: kid, Kty: "OKP", Alg: "EdDSA", Crv: "Ed25519", X: base64.RawURLEncoding.EncodeToString(pub)}
+	return jwk, token
+}
+
+func setupJWKS(t *testing.T, doc neonJWKSDoc) {
+	t.Helper()
+	jwksMu.Lock()
+	jwksCache = nil
+	jwksMu.Unlock()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(doc)
+	}))
+	t.Cleanup(server.Close)
+	t.Cleanup(func() {
+		jwksMu.Lock()
+		jwksCache = nil
+		jwksMu.Unlock()
+	})
+	t.Setenv("NEON_AUTH_JWKS_URL", server.URL+"/jwks.json")
 }

@@ -91,9 +91,10 @@ Production auth uses the current Neon Auth / Better Auth dashboard configuration
 - `NEON_AUTH_BASE_URL`
 - `NEON_AUTH_ISSUER`
 - `NEON_AUTH_JWKS_URL`
+- `NEON_AUTH_AUDIENCE` (optional; omit unless known)
 - `EXPO_PUBLIC_NEON_AUTH_URL`
 
-`NEON_AUTH_BASE_URL` should usually be the Auth URL copied from Neon Auth configuration. The backend tries the direct `/sign-in/email` route first, then common `/api/auth/sign-in/email` handler variants when the copied URL or deployment path requires the `/api/auth` base. `EXPO_PUBLIC_NEON_AUTH_URL` is for static/frontend hints only; protected APIs verify provider-issued bearer JWTs with `NEON_AUTH_JWKS_URL` and `NEON_AUTH_ISSUER`. Stack Auth-style project ID and publishable-client-key variables are not required for this production login flow. Email OTP is not part of this auth mode unless the Neon Auth / Better Auth OTP plugin is enabled later and the backend is intentionally changed to call the OTP endpoints.
+`NEON_AUTH_BASE_URL` must be the Auth URL copied from the Neon Auth configuration and must expose `/sign-in/email`; Koschei also uses that same base for safe provider follow-up checks at `/token`, `/get-session`, and `/session` when sign-in returns an opaque session token instead of a bearer JWT. `NEON_AUTH_ISSUER` must match the provider bearer JWT `iss` claim. `NEON_AUTH_JWKS_URL` must match the provider signing keys used to verify those bearer JWTs. `NEON_AUTH_AUDIENCE` is optional and should be omitted unless the expected JWT audience is known. `EXPO_PUBLIC_NEON_AUTH_URL` is for static/frontend hints only; protected APIs verify provider-issued bearer JWTs with the backend auth variables. Stack Auth-style project ID and publishable-client-key variables are not required for this production login flow. Email OTP is not part of this auth mode unless the Neon Auth / Better Auth OTP plugin is enabled later and the backend is intentionally changed to call the OTP endpoints.
 
 Alchemy RPC URLs and API keys must stay in Railway environment variables only. Do not commit Alchemy RPC URLs, API keys, webhook secrets, or other provider credentials to the repository or frontend/public files.
 

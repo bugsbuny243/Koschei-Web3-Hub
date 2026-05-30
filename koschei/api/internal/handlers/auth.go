@@ -69,17 +69,20 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	accessToken := extractJWTFromAny(signInResp)
-	if accessToken == "" {
-		accessToken, err = fetchBetterAuthJWT(r.Context(), cfg.withBaseURL(signInBaseURL), setCookies, extractSessionToken(signInResp))
+	var firstVerifyErr error
+	claims, err := parseAndVerifyNeonJWT(accessToken)
+	if accessToken == "" || err != nil {
+		if accessToken != "" {
+			firstVerifyErr = err
+		}
+		accessToken, claims, err = fetchBetterAuthVerifiedJWT(r.Context(), cfg, setCookies, extractSessionToken(signInResp))
 		if err != nil {
+			if firstVerifyErr != nil {
+				err = firstVerifyErr
+			}
 			writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
 			return
 		}
-	}
-	claims, err := parseAndVerifyNeonJWT(accessToken)
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "auth_provider_failed", "message": "auth provider returned a token that this API could not verify"})
-		return
 	}
 	user, err := h.upsertAppProfile(r.Context(), claims.Sub, claims.Email)
 	if err != nil {
@@ -248,41 +251,69 @@ func postBetterAuthWithCookiesURL(ctx context.Context, url string, payload any) 
 }
 
 func fetchBetterAuthJWT(ctx context.Context, cfg betterAuthConfig, setCookies []string, sessionToken string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.BaseURL+"/token", nil)
-	if err != nil {
-		return "", err
-	}
-	if cookieHeader := cookieHeaderFromSetCookies(setCookies); cookieHeader != "" {
-		req.Header.Set("Cookie", cookieHeader)
-	}
-	if sessionToken != "" {
-		req.Header.Set("Authorization", "Bearer "+sessionToken)
-	}
-	resp, err := authProviderHTTPClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
-	if resp.StatusCode/100 != 2 {
-		return "", authProviderHTTPError{StatusCode: resp.StatusCode, Body: string(respBody)}
-	}
-	if token := extractJWTFromHeaders(resp.Header); token != "" {
-		return token, nil
-	}
-	if token := extractJWTFromAny(string(bytes.TrimSpace(respBody))); token != "" {
-		return token, nil
-	}
-	var payload any
-	if len(bytes.TrimSpace(respBody)) > 0 {
-		if err := json.Unmarshal(respBody, &payload); err != nil {
-			return "", err
+	token, _, err := fetchBetterAuthVerifiedJWT(ctx, cfg, setCookies, sessionToken)
+	return token, err
+}
+
+func fetchBetterAuthVerifiedJWT(ctx context.Context, cfg betterAuthConfig, setCookies []string, sessionToken string) (string, neonJWTClaims, error) {
+	var lastVerifyErr error
+	var sawJWT bool
+	var lastHTTPErr error
+	for _, path := range []string{"/token", "/get-session", "/session"} {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.BaseURL+path, nil)
+		if err != nil {
+			return "", neonJWTClaims{}, err
+		}
+		if cookieHeader := cookieHeaderFromSetCookies(setCookies); cookieHeader != "" {
+			req.Header.Set("Cookie", cookieHeader)
+		}
+		if sessionToken != "" {
+			req.Header.Set("Authorization", "Bearer "+sessionToken)
+		}
+		resp, err := authProviderHTTPClient.Do(req)
+		if err != nil {
+			lastHTTPErr = err
+			continue
+		}
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+		_ = resp.Body.Close()
+		if resp.StatusCode/100 != 2 {
+			lastHTTPErr = authProviderHTTPError{StatusCode: resp.StatusCode, Body: string(respBody)}
+			continue
+		}
+		for _, token := range extractJWTsFromResponse(resp.Header, respBody) {
+			sawJWT = true
+			claims, err := parseAndVerifyNeonJWT(token)
+			if err == nil {
+				return token, claims, nil
+			}
+			lastVerifyErr = err
 		}
 	}
-	if token := extractJWTFromAny(payload); token != "" {
-		return token, nil
+	if lastVerifyErr != nil {
+		return "", neonJWTClaims{}, lastVerifyErr
 	}
-	return "", errors.New("auth provider did not return a JWT")
+	if sawJWT {
+		return "", neonJWTClaims{}, errors.New("auth provider did not return a verifiable JWT")
+	}
+	if lastHTTPErr != nil {
+		return "", neonJWTClaims{}, lastHTTPErr
+	}
+	return "", neonJWTClaims{}, errors.New("auth provider did not return a JWT")
+}
+
+func extractJWTsFromResponse(header http.Header, respBody []byte) []string {
+	tokens := extractJWTsFromHeaders(header)
+	trimmed := bytes.TrimSpace(respBody)
+	if len(trimmed) == 0 {
+		return tokens
+	}
+	tokens = append(tokens, extractJWTsFromAny(string(trimmed))...)
+	var payload any
+	if json.Unmarshal(trimmed, &payload) == nil {
+		tokens = append(tokens, extractJWTsFromAny(payload)...)
+	}
+	return uniqueStrings(tokens)
 }
 
 func cookieHeaderFromSetCookies(values []string) string {
@@ -308,47 +339,74 @@ func extractSessionToken(payload map[string]any) string {
 }
 
 func extractJWTFromHeaders(header http.Header) string {
+	if tokens := extractJWTsFromHeaders(header); len(tokens) > 0 {
+		return tokens[0]
+	}
+	return ""
+}
+
+func extractJWTsFromHeaders(header http.Header) []string {
+	tokens := []string{}
 	for _, key := range []string{"Authorization", "set-auth-jwt"} {
 		for _, value := range header.Values(key) {
 			value = strings.TrimSpace(strings.TrimPrefix(value, "Bearer "))
 			if tokenLooksLikeJWT(value) {
-				return value
+				tokens = append(tokens, value)
 			}
 		}
+	}
+	return tokens
+}
+
+func extractJWTFromAny(value any) string {
+	if tokens := extractJWTsFromAny(value); len(tokens) > 0 {
+		return tokens[0]
 	}
 	return ""
 }
 
-func extractJWTFromAny(value any) string {
+func extractJWTsFromAny(value any) []string {
 	switch v := value.(type) {
 	case string:
 		v = strings.TrimSpace(strings.TrimPrefix(v, "Bearer "))
 		if tokenLooksLikeJWT(v) {
-			return v
+			return []string{v}
 		}
 	case map[string]any:
+		tokens := []string{}
 		for _, key := range []string{"access_token", "accessToken", "id_token", "idToken", "token", "jwt"} {
-			if token := extractJWTFromAny(v[key]); token != "" {
-				return token
-			}
+			tokens = append(tokens, extractJWTsFromAny(v[key])...)
 		}
 		for _, item := range v {
-			if token := extractJWTFromAny(item); token != "" {
-				return token
-			}
+			tokens = append(tokens, extractJWTsFromAny(item)...)
 		}
+		return uniqueStrings(tokens)
 	case []any:
+		tokens := []string{}
 		for _, item := range v {
-			if token := extractJWTFromAny(item); token != "" {
-				return token
-			}
+			tokens = append(tokens, extractJWTsFromAny(item)...)
 		}
+		return uniqueStrings(tokens)
 	}
-	return ""
+	return nil
+}
+
+func uniqueStrings(values []string) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, value := range values {
+		if value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out
 }
 
 func tokenLooksLikeJWT(value string) bool {
-	return strings.Count(value, ".") == 2 && len(value) > 40
+	parts := strings.Split(strings.TrimSpace(value), ".")
+	return len(parts) == 3 && parts[0] != "" && parts[1] != "" && parts[2] != ""
 }
 
 type authProviderHTTPError struct {
@@ -384,9 +442,16 @@ func authProviderStatusCode(err error) int {
 }
 
 func publicAuthProviderError(err error) string {
-	var endpointErr authProviderEmailEndpointNotFoundError
-	if errors.As(err, &endpointErr) {
-		return "Neon Auth email/password endpoint not found. Check whether Auth URL includes /api/auth."
+	var verifyErr neonJWTVerificationError
+	if errors.As(err, &verifyErr) {
+		switch verifyErr.Category {
+		case neonJWTFailureIssuerMismatch:
+			return "issuer_mismatch: check NEON_AUTH_ISSUER against provider token issuer"
+		case neonJWTFailureJWKSKeyNotFound:
+			return "jwks_key_not_found: check NEON_AUTH_JWKS_URL"
+		default:
+			return "auth provider returned a token that this API could not verify: " + string(verifyErr.Category)
+		}
 	}
 	var httpErr authProviderHTTPError
 	if errors.As(err, &httpErr) {
