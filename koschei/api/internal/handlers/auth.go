@@ -68,6 +68,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
 		return
 	}
+	cfg = cfg.withBaseURL(signInBaseURL)
 	accessToken := extractJWTFromAny(signInResp)
 	var firstVerifyErr error
 	claims, err := parseAndVerifyNeonJWT(accessToken)
