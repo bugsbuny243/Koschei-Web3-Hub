@@ -23,7 +23,7 @@ Core Go backend for Koschei Engine.
 ## Main Endpoints
 - GET /health
 - POST /api/auth/register (disabled custom auth)
-- POST /api/auth/login (Neon Auth / Better Auth email + password sign-in via `/sign-in/email`)
+- POST /api/auth/login (Neon Auth / Better Auth email + password sign-in via the configured Auth URL, with safe fallback attempts for `/sign-in/email` and `/api/auth/sign-in/email`)
 - POST /api/auth/otp/start (disabled unless an OTP plugin is enabled and the backend is updated later)
 - POST /api/auth/otp/verify (disabled unless an OTP plugin is enabled and the backend is updated later)
 - GET /api/me
