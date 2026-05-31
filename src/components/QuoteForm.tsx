@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
-import { generateEnglishOfferText, generateFollowUpMessage, generateQuotationNumber, getLatestQuoteFromLocalStorage, saveQuoteToLocalStorage } from "@/lib/quote";
-import type { BuyerInfo, CompanyInfo, ProductInfo } from "@/lib/types";
+import { createFallbackQuoteContent, generateQuotationNumber, getLatestQuoteFromLocalStorage, saveQuoteToLocalStorage } from "@/lib/quote";
+import type { BuyerInfo, CompanyInfo, GeneratedQuoteContent, ProductInfo } from "@/lib/types";
 
 const defaultCompany: CompanyInfo = { name: "", contactPerson: "", email: "", phone: "", address: "", website: "", logoUrl: "" };
 const defaultBuyer: BuyerInfo = { company: "", contactName: "", country: "", email: "" };
@@ -23,26 +23,42 @@ export function QuoteForm() {
   const [company, setCompany] = useState(defaultCompany);
   const [buyer, setBuyer] = useState(defaultBuyer);
   const [product, setProduct] = useState(defaultProduct);
-  useEffect(() => { if (new URLSearchParams(window.location.search).get("edit") !== "latest") return; const latest = getLatestQuoteFromLocalStorage(); if (latest) { setCompany(latest.company); setBuyer(latest.buyer); setProduct(latest.product); } }, []);
+  const [isGenerating, setIsGenerating] = useState(false);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      if (new URLSearchParams(window.location.search).get("edit") !== "latest") return;
+      const latest = getLatestQuoteFromLocalStorage();
+      if (latest) { setCompany(latest.company); setBuyer(latest.buyer); setProduct(latest.product); }
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, []);
   const companyField = (key: keyof CompanyInfo) => ({ value: company[key] ?? "", onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setCompany({ ...company, [key]: event.target.value }) });
   const buyerField = (key: keyof BuyerInfo) => ({ value: buyer[key], onChange: (event: React.ChangeEvent<HTMLInputElement>) => setBuyer({ ...buyer, [key]: event.target.value }) });
   const productField = (key: keyof ProductInfo) => ({ value: product[key] ?? "", onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setProduct({ ...product, [key]: event.target.value }) });
   const numberField = (key: "quantity" | "unitPrice" | "validityDays") => ({ value: product[key], min: key === "unitPrice" ? 0.01 : 1, step: key === "unitPrice" ? "0.01" : "1", onChange: (event: React.ChangeEvent<HTMLInputElement>) => setProduct({ ...product, [key]: Number(event.target.value) }) });
 
+  function fillSampleData() {
+    setCompany(sampleCompany);
+    setBuyer(sampleBuyer);
+    setProduct(sampleProduct);
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const templateText = { englishOfferText: generateEnglishOfferText(company, buyer, product), followUpMessage: generateFollowUpMessage(buyer, product) };
-    let generatedText = templateText;
+    if (isGenerating) return;
+    const fallback = createFallbackQuoteContent(company, buyer, product);
+    let generatedText: GeneratedQuoteContent = fallback;
+    setIsGenerating(true);
 
     try {
-      const response = await fetch("/api/quote/generate", {
+      const response = await fetch("/api/ai/generate-quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ company, buyer, product }),
       });
-      if (response.ok) generatedText = await response.json() as typeof templateText;
+      if (response.ok) generatedText = await response.json() as GeneratedQuoteContent;
     } catch {
-      generatedText = templateText;
+      generatedText = fallback;
     }
 
     const quote = { quotationNumber: generateQuotationNumber(), createdAt: new Date().toISOString(), company, buyer, product, ...generatedText };
@@ -56,7 +72,7 @@ export function QuoteForm() {
     <Card className="p-5 sm:p-6"><SectionTitle number="02" title="Alıcı bilgileri" copy="Teklifin ulaşacağı müşteri ve ülke bilgileri."/><div className="mt-6 grid gap-4 md:grid-cols-2"><Field label="Alıcı firma" placeholder="Örn. Nordic Home Trading GmbH" required {...buyerField("company")}/><Field label="Alıcı yetkili adı" placeholder="Örn. Anna Müller" required {...buyerField("contactName")}/><Field label="Alıcı ülke" placeholder="Örn. Germany" required {...buyerField("country")}/><Field label="Alıcı e-posta" type="email" placeholder="anna@alici-firma.com" required {...buyerField("email")}/></div></Card>
     <Card className="p-5 sm:p-6"><SectionTitle number="03" title="Ürün ve ticari koşullar" copy="Fiyatlandırma ve teslimat için gereken temel detaylar."/><div className="mt-6 grid gap-4 md:grid-cols-2"><Field label="Ürün adı" placeholder="Örn. Handmade Ceramic Dinnerware Set" required {...productField("name")}/><Field label="Ürün kategorisi" placeholder="Örn. Tableware / Ceramic Products" required {...productField("category")}/><div className="md:col-span-2"><Area label="Türkçe ürün açıklaması" placeholder="Ürünün öne çıkan özelliklerini ve kapsamını yazın" required {...productField("descriptionTr")}/></div><Field label="Miktar" type="number" required {...numberField("quantity")}/><Field label="Birim" placeholder="Örn. pcs, kg, sets, boxes" required {...productField("unit")}/><Field label="Birim fiyat" type="number" required {...numberField("unitPrice")}/><Select label="Para birimi" value={product.currency} options={["USD", "EUR", "TRY"]} onChange={(currency) => setProduct({ ...product, currency: currency as ProductInfo["currency"] })}/><Select label="Incoterm" value={product.incoterm} options={["EXW", "FOB", "CIF", "DAP"]} onChange={(incoterm) => setProduct({ ...product, incoterm: incoterm as ProductInfo["incoterm"] })}/><Field label="Teslimat süresi" placeholder="Örn. 3-4 weeks after order confirmation" required {...productField("deliveryTime")}/><Field label="Ödeme koşulları" placeholder="Örn. 50% advance, 50% before shipment" required {...productField("paymentTerms")}/><Field label="Geçerlilik süresi (gün)" type="number" required {...numberField("validityDays")}/></div></Card>
     <Card className="p-5 sm:p-6"><SectionTitle number="04" title="İhracat yardımcı bilgileri" copy="Gümrük ve paketleme görüşmelerinde kullanabileceğiniz ek alanlar."/><div className="mt-6 grid gap-4 md:grid-cols-2"><Field label="Tahmini HS / GTIP kodu (opsiyonel)" placeholder="Örn. 6912.00" {...productField("hsCode")}/><Field label="Paketleme detayları" placeholder="Örn. Export carton, 20 cartons per pallet" required {...productField("packagingDetails")}/><div className="md:col-span-2"><Area label="Notlar" placeholder="Teklife eklemek istediğiniz ilave notlar..." {...productField("notes")}/></div></div></Card>
-    <div className="flex flex-col items-end gap-3"><p className="text-right text-xs leading-5 text-slate-600">Devam ederek bilgilerin bu tarayıcıda yerel olarak saklanmasını kabul edersiniz.</p><Button type="submit" className="w-full sm:w-auto">İngilizce Teklifi Hazırla <span className="ml-1">→</span></Button></div>
+    <div className="flex flex-col items-end gap-3"><p className="text-right text-xs leading-5 text-slate-600">Devam ederek bilgilerin bu tarayıcıda yerel olarak saklanmasını kabul edersiniz.</p><Button type="submit" disabled={isGenerating} className="w-full sm:w-auto disabled:cursor-wait disabled:opacity-70">{isGenerating ? "Teklif hazırlanıyor..." : "İngilizce Teklifi Hazırla"} <span className="ml-1">→</span></Button></div>
   </form>;
 }
 function SectionTitle({ number, title, copy }: { number: string; title: string; copy: string }) { return <div className="flex gap-4"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-xs font-black text-cyan-400">{number}</span><div><h2 className="text-lg font-black text-slate-950">{title}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{copy}</p></div></div>; }

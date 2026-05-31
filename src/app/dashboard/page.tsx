@@ -11,8 +11,11 @@ export default function DashboardPage() {
   const [quotes, setQuotes] = useState<QuoteData[]>([]);
   const [latest, setLatest] = useState<QuoteData | null>(null);
   useEffect(() => {
-    setQuotes(getQuoteHistory());
-    setLatest(getLatestQuoteFromLocalStorage());
+    const timeout = window.setTimeout(() => {
+      setQuotes(getQuoteHistory());
+      setLatest(getLatestQuoteFromLocalStorage());
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   return (

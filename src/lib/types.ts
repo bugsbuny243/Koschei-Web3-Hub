@@ -35,12 +35,21 @@ export interface ProductInfo {
   notes: string;
 }
 
-export interface QuoteData {
-  quotationNumber: string;
-  createdAt: string;
+export interface QuoteFormData {
   company: CompanyInfo;
   buyer: BuyerInfo;
   product: ProductInfo;
+}
+
+export interface GeneratedQuoteContent {
   englishOfferText: string;
   followUpMessage: string;
+  productDescriptionEn: string;
+  exportNotes: string;
+  usedFallback: boolean;
+}
+
+export interface QuoteData extends QuoteFormData, GeneratedQuoteContent {
+  quotationNumber: string;
+  createdAt: string;
 }
