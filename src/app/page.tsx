@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Web3Card } from "@/components/Web3Card";
+import { Web3PricingSection } from "@/components/Web3PricingSection";
 
 const modules = [
   ["Web3 Hub Dashboard", "Open the central workspace for Web3 builder tools and ecosystem outputs.", "/hub"],
@@ -82,6 +83,8 @@ export default function Home() {
           </p>
         </div>
       </section>
+
+      <Web3PricingSection />
 
       <section className="border-t border-white/10 bg-blue-600/10">
         <div className="mx-auto max-w-7xl px-5 py-20 text-center lg:px-8">
