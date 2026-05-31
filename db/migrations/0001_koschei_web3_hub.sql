@@ -16,6 +16,20 @@ ALTER TABLE payment_requests
   ADD COLUMN IF NOT EXISTS raw_payload JSONB DEFAULT '{}'::jsonb,
   ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 
+-- Reuse the existing application profile table for public member authentication.
+-- Public signup only inserts email and password_hash; it cannot grant an admin or owner role.
+CREATE TABLE IF NOT EXISTS app_user_profiles (
+  email TEXT PRIMARY KEY,
+  password_hash TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE app_user_profiles
+  ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS app_user_profiles_lower_email_idx ON app_user_profiles (lower(email));
+
 -- Web3 Hub entitlement and generated-output persistence layer.
 CREATE TABLE IF NOT EXISTS entitlements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

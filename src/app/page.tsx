@@ -38,8 +38,9 @@ export default function Home() {
             AI-powered Web3 operating layer for builders, game assets, metadata, risk transparency and ChainOps.
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
-            <Link href="/hub" className="web3-button">Open Web3 Hub →</Link>
-            <Link href="/builder" className="web3-button-secondary">Start Building →</Link>
+            <Link href="/signup" className="web3-button">Get started →</Link>
+            <Link href="/login" className="web3-button-secondary">Sign in</Link>
+            <Link href="/hub" className="web3-button-secondary">Open Web3 Hub →</Link>
             <Link href="/chains" className="web3-button-secondary">Check Chains →</Link>
           </div>
           <div className="mt-14 grid gap-3 text-xs font-bold text-slate-400 sm:grid-cols-3">
@@ -89,8 +90,9 @@ export default function Home() {
           <p className="eyebrow">Build with confidence</p>
           <h2 className="mt-4 text-3xl font-black text-white sm:text-4xl">Build Web3 outputs that ecosystems can trust.</h2>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
-            <Link href="/hub" className="web3-button">Open Web3 Hub →</Link>
-            <Link href="/builder" className="web3-button-secondary">Start Building →</Link>
+            <Link href="/signup" className="web3-button">Get started →</Link>
+            <Link href="/login" className="web3-button-secondary">Sign in</Link>
+            <Link href="/hub" className="web3-button-secondary">Open Web3 Hub →</Link>
             <Link href="/chains" className="web3-button-secondary">Check Chains →</Link>
           </div>
         </div>

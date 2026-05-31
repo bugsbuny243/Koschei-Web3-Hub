@@ -33,7 +33,10 @@ Koschei; chain'ler, altyapı sağlayıcıları ve geliştirici toplulukları tar
 | `/chains` | ChainOps testnet RPC health dashboard |
 | `/ecosystem` | Ekosistem büyüme vizyonu |
 | `/docs` | Geliştirici dokümantasyonu |
-| `/dashboard`, `/quote/new`, `/quote/preview` | Korunan mevcut TeklifPilot route'ları |
+| `/login`, `/signup` | Standart kullanıcı giriş ve kayıt route'ları |
+| `/dashboard` | Giriş gerektiren kullanıcı paket ve çıktı hakkı paneli |
+| `/admin` | Public navigasyonda gösterilmeyen owner-only operasyon paneli |
+| `/quote/new`, `/quote/preview` | Mevcut TeklifPilot route'ları |
 
 ## Yerel Çalıştırma
 
