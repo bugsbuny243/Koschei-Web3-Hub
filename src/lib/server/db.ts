@@ -93,3 +93,58 @@ JOIN entitlements ON web3_outputs.entitlement_id = entitlements.id
 ORDER BY web3_outputs.created_at DESC
 LIMIT 200`);
 }
+
+export type UserDashboard = {
+  email: string;
+  plan_name: string | null;
+  package_status: string | null;
+  outputs_remaining: number;
+  saved_outputs: number;
+};
+
+export async function createUserProfile(email: string, passwordHash: string) {
+  const existing = await query(`SELECT email FROM app_user_profiles WHERE lower(email) = lower($1) LIMIT 1`, [email]);
+  if (existing[0]) throw new Error("Account already exists.");
+  const rows = await query(`INSERT INTO app_user_profiles (email, password_hash)
+VALUES ($1, $2)
+RETURNING email`, [email, passwordHash]);
+  return rows[0];
+}
+
+export async function getUserProfileForLogin(email: string) {
+  const rows = await query<{ email: string; password_hash: string | null }>(`SELECT email, password_hash
+FROM app_user_profiles
+WHERE lower(email) = lower($1)
+LIMIT 1`, [email]);
+  return rows[0];
+}
+
+export async function getUserDashboard(email: string) {
+  const rows = await query<UserDashboard>(`SELECT profile.email,
+  latest.plan_name,
+  latest.status AS package_status,
+  COALESCE(rights.outputs_remaining, 0)::int AS outputs_remaining,
+  COALESCE(outputs.saved_outputs, 0)::int AS saved_outputs
+FROM app_user_profiles profile
+LEFT JOIN LATERAL (
+  SELECT plans.name AS plan_name, entitlements.status
+  FROM entitlements
+  JOIN plans ON plans.id = entitlements.plan_id
+  WHERE lower(entitlements.email) = lower(profile.email)
+  ORDER BY (entitlements.status = 'active') DESC, entitlements.created_at DESC
+  LIMIT 1
+) latest ON true
+LEFT JOIN LATERAL (
+  SELECT SUM(entitlements.outputs_remaining) AS outputs_remaining
+  FROM entitlements
+  WHERE lower(entitlements.email) = lower(profile.email) AND entitlements.status = 'active'
+) rights ON true
+LEFT JOIN LATERAL (
+  SELECT COUNT(*) AS saved_outputs
+  FROM web3_outputs
+  WHERE lower(web3_outputs.email) = lower(profile.email)
+) outputs ON true
+WHERE lower(profile.email) = lower($1)
+LIMIT 1`, [email]);
+  return rows[0];
+}
