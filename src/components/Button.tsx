@@ -15,7 +15,7 @@ const variants = {
 };
 
 export function Button({ children, href, variant = "primary", className = "", ...props }: Props) {
-  const classes = `inline-flex cursor-pointer items-center justify-center rounded-xl px-5 py-3 text-sm font-bold ${variants[variant]} ${className}`;
+  const classes = `inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl px-5 py-3 text-center text-sm font-bold ${variants[variant]} ${className}`;
   if (href) return <Link href={href} className={classes}>{children}</Link>;
   return <button className={classes} {...props}>{children}</button>;
 }

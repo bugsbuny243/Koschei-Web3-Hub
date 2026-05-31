@@ -14,10 +14,10 @@ export default function Home() {
     <main>
       <Header />
       <section className="overflow-hidden bg-slate-950 text-white">
-        <div className="mx-auto grid max-w-7xl gap-14 px-5 py-20 lg:grid-cols-[1.05fr_.95fr] lg:px-8 lg:py-28">
+        <div className="mx-auto grid max-w-7xl gap-12 px-5 py-14 sm:py-20 lg:grid-cols-[1.05fr_.95fr] lg:px-8 lg:py-28">
           <div>
             <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-4 py-2 text-xs font-bold tracking-widest text-cyan-300">KOBİ&apos;LER İÇİN İHRACAT ASİSTANI</span>
-            <h1 className="mt-7 max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-6xl">WhatsApp&apos;tan gelen ürün taleplerini <span className="text-cyan-400">5 dakikada</span> İngilizce ihracat teklifine çevir.</h1>
+            <h1 className="mt-7 max-w-3xl text-4xl font-black leading-[1.12] tracking-tight sm:text-6xl">WhatsApp&apos;tan gelen ürün taleplerini <span className="text-cyan-400">5 dakikada</span> İngilizce ihracat teklifine çevir.</h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">Dağınık mesajlardan profesyonel tekliflere geçin. TeklifPilot, ihracat teklifinizi hazırlar; siz satışa ve müşterinize odaklanırsınız.</p>
             <div className="mt-9 flex flex-wrap gap-3"><Button href="/quote/new">Teklif Oluştur <span className="ml-1">→</span></Button><Button href="/dashboard" variant="secondary">Panele Git</Button></div>
             <div className="mt-9 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-400"><span>✓ Kredi kartı gerekmez</span><span>✓ Kurulum gerekmez</span><span>✓ PDF çıktısı hazır</span></div>
@@ -38,7 +38,7 @@ export default function Home() {
 
       <section className="mx-auto max-w-7xl px-5 py-20 lg:px-8">
         <div className="grid gap-7 lg:grid-cols-2">
-          <Card className="bg-slate-950 p-8 text-white"><p className="text-xs font-black tracking-widest text-cyan-400">SORUN</p><h2 className="mt-4 text-3xl font-black">İhracat fırsatları dağınık mesajlarda kaybolmasın.</h2><p className="mt-4 leading-7 text-slate-300">WhatsApp&apos;tan gelen ürün soruları, Excel tabloları ve eksik İngilizce metinler satış ekibinizi yavaşlatır. Teklif geciktiğinde müşteri başka tedarikçiye gider.</p></Card>
+          <Card className="bg-slate-950 p-7 text-white sm:p-8"><p className="text-xs font-black tracking-widest text-cyan-400">SORUN</p><h2 className="mt-4 text-3xl font-black">İhracat fırsatları dağınık mesajlarda kaybolmasın.</h2><p className="mt-4 leading-7 text-slate-200">WhatsApp&apos;tan gelen ürün soruları, Excel tabloları ve eksik İngilizce metinler satış ekibinizi yavaşlatır. Teklif geciktiğinde müşteri başka tedarikçiye gider.</p></Card>
           <Card className="p-8"><p className="text-xs font-black tracking-widest text-cyan-700">ÇÖZÜM</p><h2 className="mt-4 text-3xl font-black text-slate-950">Dakikalar içinde güven veren bir teklif gönderin.</h2><p className="mt-4 leading-7 text-slate-600">TeklifPilot ürün, fiyat ve teslimat bilgilerinizi tek sayfada toplar; İngilizce teklif metnini, takip mesajını ve yazdırılabilir teklif sayfasını otomatik hazırlar.</p></Card>
         </div>
       </section>
@@ -49,7 +49,7 @@ export default function Home() {
 
       <section className="mx-auto max-w-7xl px-5 py-20 lg:px-8" id="pricing"><div className="mx-auto max-w-2xl text-center"><p className="text-xs font-black tracking-widest text-cyan-700">FİYATLANDIRMA</p><h2 className="mt-3 text-3xl font-black sm:text-4xl">İhracat hızınıza uygun planı seçin.</h2><p className="mt-4 leading-7 text-slate-600">Bugün ücretsiz MVP ile deneyin. İşletmenize özel kurulum için size en uygun paketle başlayın.</p></div><div className="mt-10 grid gap-5 lg:grid-cols-3"><PricingCard name="Başlangıç" price="2.500 TL kurulum + 1.499 TL/ay" description="İlk ihracat tekliflerini hızlandırmak isteyen işletmeler için." features={["Profesyonel teklif sayfası", "İngilizce teklif metni", "PDF olarak dışa aktarma"]}/><PricingCard name="Pro" price="4.999 TL/ay" description="Düzenli teklif gönderen büyüyen satış ekipleri için." features={["Başlangıç özelliklerinin tamamı", "Ekip kullanımına hazır yapı", "Öncelikli destek"]} featured/><PricingCard name="Ajans/İhracatçı" price="9.999 TL/ay" description="Birden fazla marka ve müşteri yöneten ekipler için." features={["Pro özelliklerinin tamamı", "Çoklu firma senaryoları", "Özel süreç danışmanlığı"]}/></div></section>
 
-      <section className="bg-cyan-400"><div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-5 px-5 py-12 lg:flex-row lg:items-center lg:px-8"><div><h2 className="text-3xl font-black text-slate-950">İlk teklifinizi bugün hazırlayın.</h2><p className="mt-2 text-slate-800">Formu doldurun, teklifinizi kontrol edin ve PDF olarak müşterinize gönderin.</p></div><Button href="/quote/new" className="bg-slate-950 text-white hover:bg-slate-800">Teklif Oluştur <span className="ml-1">→</span></Button></div></section>
+      <section className="bg-cyan-400"><div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-5 px-5 py-12 lg:flex-row lg:items-center lg:px-8"><div><h2 className="text-3xl font-black text-slate-950">İlk teklif PDF’inizi bugün hazırlayın.</h2><p className="mt-2 text-slate-800">Formu doldurun, teklifinizi kontrol edin ve PDF olarak müşterinize gönderin.</p></div><div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row"><Button href="/quote/new" className="bg-slate-950 text-white hover:bg-slate-800">Teklif Oluştur <span className="ml-1">→</span></Button><Button type="button" disabled variant="secondary" className="cursor-not-allowed border border-slate-950/10 bg-white/80 text-slate-700 opacity-80 hover:bg-white/80">WhatsApp Demo İste</Button></div></div></section>
       <footer className="bg-slate-950 px-5 py-8 text-center text-sm text-slate-400">© 2026 TeklifPilot. KOBİ&apos;ler için hızlı ve profesyonel ihracat teklifleri.</footer>
     </main>
   );

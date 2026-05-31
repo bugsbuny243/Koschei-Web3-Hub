@@ -15,11 +15,11 @@ export function calculateTotal(product: ProductInfo) {
 }
 
 export function generateEnglishOfferText(company: CompanyInfo, buyer: BuyerInfo, product: ProductInfo) {
-  return `Dear ${buyer.contactName},\n\nThank you for your interest in our ${product.name}. On behalf of ${company.name}, we are pleased to submit our commercial quotation for your consideration. The offer has been prepared based on the requested quantity of ${product.quantity} ${product.unit} and the ${product.incoterm} delivery term.\n\nWe would be glad to answer your questions and discuss the next steps for a smooth export process. We look forward to establishing a successful business relationship with ${buyer.company}.\n\nKind regards,\n${company.contactPerson}\n${company.name}`;
+  return `Dear ${buyer.contactName},\n\nThank you for your interest in our ${product.name}. On behalf of ${company.name}, we are pleased to submit our commercial quotation for ${product.quantity} ${product.unit} under ${product.incoterm} delivery terms.\n\nPlease find the product details, pricing, delivery timeline, and payment terms in this offer. Should you need any clarification or wish to discuss adjustments, we would be pleased to assist you.\n\nWe look forward to the opportunity to work with ${buyer.company} and to building a successful long-term business relationship.\n\nKind regards,\n${company.contactPerson}\n${company.name}`;
 }
 
 export function generateFollowUpMessage(buyer: BuyerInfo, product: ProductInfo) {
-  return `Hello ${buyer.contactName}, I have shared our quotation for ${product.name}. The offer is valid for ${product.validityDays} days. Please let me know if you have any questions or would like to discuss the next steps. Best regards.`;
+  return `Hello ${buyer.contactName}, I have shared our quotation for ${product.name}. The offer is valid for ${product.validityDays} days. Please let me know if you have any questions or if you would like to discuss the next steps. I would be happy to assist. Best regards.`;
 }
 
 export function saveQuoteToLocalStorage(quote: QuoteData) {
