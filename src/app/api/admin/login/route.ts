@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server";
+export async function POST(request:Request){let body:unknown;try{body=await request.json()}catch{return NextResponse.json({ok:false},{status:400})}const {email,password}=body as Record<string,unknown>;const configured=Boolean(process.env.ADMIN_EMAIL&&process.env.ADMIN_PASSWORD);const ok=configured&&email===process.env.ADMIN_EMAIL&&password===process.env.ADMIN_PASSWORD;return NextResponse.json({ok},{status:ok?200:401})}

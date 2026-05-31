@@ -1,0 +1,2 @@
+export type ModuleStatus = "Live MVP" | "Infra Ready" | "Coming Next";
+export function StatusBadge({ status }: { status: ModuleStatus }) { const tone = status === "Live MVP" ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" : status === "Infra Ready" ? "border-blue-400/30 bg-blue-400/10 text-blue-300" : "border-violet-400/30 bg-violet-400/10 text-violet-300"; return <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${tone}`}>{status}</span>; }

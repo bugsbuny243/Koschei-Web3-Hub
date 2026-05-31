@@ -1,63 +1,104 @@
-# TeklifPilot
+# Koschei Web3 Hub
 
-TeklifPilot, Türk KOBİ'lerinin WhatsApp ve benzeri kanallardan gelen ürün taleplerini profesyonel İngilizce ihracat tekliflerine dönüştürmesine yardımcı olan yerel çalışan MVP web uygulamasıdır.
+Koschei Web3 Hub; builder'lar, oyunlar, varlıklar, metadata, launch sayfaları, risk şeffaflığı ve ekosistem büyümesi için AI destekli bir Web3 operasyon katmanıdır.
 
-## Özellikler
+> Koschei bir grant başvuru uygulaması değildir. Token trading, custody veya private-key deployment ürünü değildir. Yatırım getirisi ya da token fiyatı vaadinde bulunmaz.
 
-- Türkçe ürün, firma ve alıcı bilgileriyle teklif oluşturma
-- Together AI etkinleştirildiğinde yapay zekâ destekli, aksi durumda deterministik şablonlarla profesyonel İngilizce teklif metni üretme
-- WhatsApp veya e-posta için hazır takip mesajı oluşturma
-- Temiz, A4 uyumlu teklif önizleme sayfası
-- Tarayıcı üzerinden yazdırma veya PDF olarak kaydetme
-- Son teklifleri tarayıcının yerel depolamasında saklama
+## Vizyon
 
-## Yerel Kurulum
+Koschei, fikirden geliştiriciye hazır çıktıya giden yolu kısaltır: oyun varlığı ve NFT metadata taslakları oluşturur, proje metinlerini güvenli kurallarla üretir, kamuya açık güven sinyallerini risk checklist'i ile görünür kılar ve desteklenen testnet RPC bağlantılarını sunucu tarafında kontrol eder. Ekosistem büyümesi, builder onboarding ve daha standart proje çıktıları odağındadır.
 
-Node.js ve npm kurulu bir ortamda proje klasöründe aşağıdaki komutları çalıştırın:
+Koschei; chain'ler, altyapı sağlayıcıları ve geliştirici toplulukları tarafından desteklenebilecek bir ekosistem büyüme katmanı olarak tasarlanmıştır.
+
+## Güvenlik İlkeleri
+
+- Wallet private key, seed phrase veya deployer key istenmez ve işlenmez.
+- Fon veya token custody yapılmaz.
+- Token trading özelliği yoktur.
+- Gerçek token veya contract deploy edilmez.
+- Yatırım getirisi ya da token fiyatı sözü verilmez.
+- `TOGETHER_API_KEY` ve `ALCHEMY_API_KEY` yalnızca sunucuda okunur. Frontend'e açık `NEXT_PUBLIC_` API anahtarı oluşturulmaz.
+- MVP asset çıktıları yalnızca tarayıcının `localStorage` alanında saklanır.
+
+## MVP Route'ları
+
+| Route | Açıklama |
+| --- | --- |
+| `/` | Koschei Web3 Hub landing page |
+| `/hub` | Modül dashboard'u |
+| `/builder` | No-code Web3 metadata ve asset concept builder |
+| `/metadata` | AI Metadata Studio |
+| `/risk` | Risk & Trust Scanner checklist MVP |
+| `/chains` | ChainOps testnet RPC health dashboard |
+| `/ecosystem` | Ekosistem büyüme vizyonu |
+| `/docs` | Geliştirici dokümantasyonu |
+| `/admin` | Basit MVP admin / intake ekranı |
+| `/dashboard`, `/quote/new`, `/quote/preview` | Korunan mevcut TeklifPilot route'ları |
+
+## Yerel Çalıştırma
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Ardından tarayıcınızda [http://localhost:3000](http://localhost:3000) adresini açın.
-
-Production build almak için:
+Tarayıcıda [http://localhost:3000](http://localhost:3000) adresini açın. Production kontrolü için:
 
 ```bash
+npm run lint
 npm run build
 npm run start
 ```
 
-## Together AI Yapılandırması
+## Ortam Değişkenleri
 
-Together AI ile teklif metni üretimini etkinleştirmek için Railway ortam değişkenlerini aşağıdaki gibi ayarlayın:
+Tüm desteklenen değişkenler `.env.example` dosyasındadır. İlk MVP için önerilen temel ayarlar:
 
 ```bash
-AI_ENABLED=true
+APP_NAME=Koschei Web3 Hub
+APP_ENV=development
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+CORS_ALLOWED_ORIGIN=http://localhost:3000
+ADMIN_EMAIL=...
+ADMIN_PASSWORD=...
 AI_PROVIDER=together
+AI_ENABLED=false
 TOGETHER_API_KEY=...
-TOGETHER_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507-tput
+TOGETHER_MODEL=...
+WEB3_PROVIDER=alchemy
+ALCHEMY_API_KEY=...
+SOLANA_RPC_URL=...
 ```
 
-- `TOGETHER_API_KEY` yalnızca sunucu tarafında okunur; istemciye açık bir `NEXT_PUBLIC_` anahtarı kullanılmaz.
-- `AI_ENABLED=true`, `AI_PROVIDER=together` ve `TOGETHER_API_KEY` birlikte mevcut değilse deterministik yerel şablon kullanılır. `TOGETHER_MODEL` belirtilmezse varsayılan model kullanılır.
-- Together isteği başarısız olursa teklif oluşturma işlemi kesilmez; deterministik yerel şablona geri dönülür.
-- Form, sunucu tarafındaki `POST /api/ai/generate-quote` route’una gider. API anahtarı tarayıcıya gönderilmez.
+- AI opsiyoneldir. `AI_ENABLED=true`, `AI_PROVIDER=together` ve `TOGETHER_API_KEY` birlikte yoksa veya Together isteği başarısız olursa deterministik fallback metni döner.
+- Chain health için explicit RPC URL varsa önceliklidir. Solana için `SOLANA_RPC_URL`, EVM chain'ler için opsiyonel `*_RPC_URL` override'ları kullanılabilir. Explicit URL yoksa `ALCHEMY_API_KEY` ile desteklenen testnet Alchemy endpoint'i sunucu tarafında oluşturulur.
+- `DATABASE_URL` ve `DIRECT_DATABASE_URL` sonraki persistence katmanı için hazırlanmıştır; ilk asset MVP localStorage kullanır.
+- `FEATURE_TOKEN_TRADING`, `FEATURE_CUSTODY` ve `FEATURE_PRIVATE_KEY_DEPLOY` kapalı tutulmalıdır.
 
-## Önemli MVP Notları
+## AI Akışı
 
-- Bu sürümde veritabanı veya üyelik sistemi yoktur. Together AI entegrasyonu isteğe bağlıdır.
-- Oluşturulan teklifler yalnızca kullanılan tarayıcının `localStorage` alanında saklanır. Tarayıcı verileri temizlenirse kayıtlar silinir.
-- PDF dosyası sunucuda oluşturulmaz. Teklif önizleme ekranında **Yazdır / PDF Kaydet** düğmesine tıklayın ve tarayıcının yazdırma penceresinden **PDF olarak kaydet** seçeneğini kullanın.
-- İngilizce teklif metni, Together AI etkin değilse veya Together isteği başarısız olursa deterministik şablonlarla hazırlanır.
-- HS/GTIP bilgisi tahmini yardımcı alandır; sevkiyat öncesinde yetkili gümrük müşaviri veya ilgili makam tarafından doğrulanmalıdır.
+`POST /api/ai/web3-generate`, `metadata`, `description`, `pitch`, `lore` ve `launch` modlarını kabul eder. Together API isteği sunucudan yapılır. Sistem prompt'u fiyat/getiri vaadi, uydurma audit veya partnership, resmi chain/Alchemy desteği iddiası ve pump/scam dilini yasaklar. Sağlayıcı kapalıysa veya hata verirse uygulama kırılmaz; deterministik fallback kullanılır.
+
+TeklifPilot için mevcut `POST /api/ai/generate-quote` route'u korunmuştur.
+
+## ChainOps Akışı
+
+`GET /api/web3/health?chain=solana|base|arbitrum|polygon|optimism|ethereum` desteklenen testnet'e JSON-RPC sağlık isteği gönderir. RPC URL veya API key response içine eklenmez. Dashboard yalnızca güvenli health sonucu, chain, network, provider ve hata veya sonucu gösterir.
+
+## Railway Deploy Notları
+
+1. Repository'yi Railway servisine bağlayın.
+2. `.env.example` içindeki gerekli değişkenleri Railway Variables alanında tanımlayın.
+3. Secret değerlerde gerçek key kullanın; hiçbir secret'ı `NEXT_PUBLIC_` ile yayınlamayın.
+4. Build komutu olarak `npm run build`, start komutu olarak `npm run start` kullanın.
+5. Feature flag'leri ihtiyaca göre açın; trading, custody ve private-key deploy flag'lerini kapalı tutun.
 
 ## Yol Haritası
 
-1. WhatsApp üzerinden talep alma
-2. Müşteri hesapları
-3. Teklif geçmişi
-4. Gerçek PDF üreticisi
-5. Ödeme sayfası
-6. Yönetici paneli
+1. Daha kapsamlı game asset şemaları ve doğrulama
+2. Launch page çıktılarının genişletilmesi
+3. Opsiyonel veritabanı persistence ve production-grade auth
+4. Ecosystem lead ve project intake workflow'ları
+5. Developer integration örnekleri ve standartlaştırılmış export paketleri
+6. Daha kapsamlı risk transparency kuralları

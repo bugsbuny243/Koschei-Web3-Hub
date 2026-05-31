@@ -1,0 +1,3 @@
+import Link from "next/link";
+import { ModuleStatus, StatusBadge } from "./StatusBadge";
+export function Web3Card({ title, description, status, href, action = "Open module" }: { title: string; description: string; status?: ModuleStatus; href?: string; action?: string }) { return <article className="glass-card flex h-full flex-col p-6"><div>{status && <StatusBadge status={status} />}<h3 className="mt-4 text-xl font-bold text-white">{title}</h3><p className="mt-3 text-sm leading-6 text-slate-400">{description}</p></div>{href && <Link href={href} className="mt-6 inline-flex text-sm font-bold text-blue-300 hover:text-blue-200">{action} →</Link>}</article>; }

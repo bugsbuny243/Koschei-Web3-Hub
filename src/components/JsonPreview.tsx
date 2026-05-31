@@ -1,0 +1,1 @@
+export function JsonPreview({ value }: { value: unknown }) { return <pre className="max-h-[34rem] overflow-auto rounded-xl border border-white/10 bg-black/30 p-4 text-xs leading-6 text-blue-100">{JSON.stringify(value, null, 2)}</pre>; }
