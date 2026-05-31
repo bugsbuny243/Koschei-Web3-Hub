@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const links = [
   ["Hub", "/hub"], ["Builder", "/builder"], ["Metadata", "/metadata"], ["Risk", "/risk"],
-  ["Chains", "/chains"], ["Ecosystem", "/ecosystem"], ["Docs", "/docs"], ["Admin", "/admin"],
+  ["Chains", "/chains"], ["Ecosystem", "/ecosystem"], ["Docs", "/docs"],
 ];
 
 export function Header() {

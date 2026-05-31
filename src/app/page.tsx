@@ -11,7 +11,6 @@ const modules = [
   ["ChainOps Dashboard", "Check supported testnet RPC connectivity without exposing keys.", "/chains"],
   ["Ecosystem Layer", "Explore the ecosystem growth layer for builders, chains and communities.", "/ecosystem"],
   ["Developer Docs", "Review safe architecture, metadata schemas and integration guidance.", "/docs"],
-  ["Admin / Intake", "Open the local MVP intake and feature-flag administration workspace.", "/admin"],
 ];
 
 const footerLinks = [
@@ -22,7 +21,6 @@ const footerLinks = [
   ["Chains", "/chains"],
   ["Ecosystem", "/ecosystem"],
   ["Docs", "/docs"],
-  ["Admin", "/admin"],
 ];
 
 export default function Home() {
