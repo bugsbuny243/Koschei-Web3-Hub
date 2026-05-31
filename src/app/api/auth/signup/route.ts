@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createUserProfile } from "@/lib/server/db";
-import { hashPassword, isValidEmail, isValidPassword, normalizeEmail, setUserCookie } from "@/lib/server/user-auth";
+import { upsertUserProfile } from "@/lib/server/db";
+import { appendNeonAuthCookies, authenticateWithNeonAuth } from "@/lib/server/neon-auth";
+import { isValidEmail, isValidPassword, normalizeEmail } from "@/lib/server/user-auth";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -8,9 +9,9 @@ export async function POST(request: Request) {
   const email = normalizeEmail(body.email);
   if (!isValidEmail(email) || !isValidPassword(body.password)) return NextResponse.json({ error: "Enter a valid email and a password with at least 8 characters." }, { status: 400 });
   try {
-    await createUserProfile(email, hashPassword(body.password));
-    await setUserCookie(email);
-    return NextResponse.json({ email }, { status: 201 });
+    const auth = await authenticateWithNeonAuth("signup", email, body.password);
+    await upsertUserProfile(auth.user.id, auth.user.email);
+    return appendNeonAuthCookies(NextResponse.json({ email: auth.user.email }, { status: 201 }), auth.cookies);
   } catch {
     return NextResponse.json({ error: "Could not create account. The email may already be registered." }, { status: 400 });
   }
