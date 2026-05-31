@@ -1,0 +1,11 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { Header } from "@/components/Header";
+
+export function Web3Shell({ children }: { children: ReactNode }) { return <main className="min-h-screen bg-[#050816] text-slate-100"><Header />{children}<footer className="border-t border-white/10 px-5 py-8 text-center text-xs text-slate-500">Koschei Web3 Hub · no custody · no private keys · infrastructure-first</footer></main>; }
+export function Container({ children, className="" }: { children: ReactNode; className?: string }) { return <div className={`mx-auto max-w-7xl px-5 lg:px-8 ${className}`}>{children}</div>; }
+export function Eyebrow({ children }: { children: ReactNode }) { return <p className="text-xs font-black uppercase tracking-[.22em] text-cyan-300">{children}</p>; }
+export function Panel({ children, className="" }: { children: ReactNode; className?: string }) { return <div className={`rounded-2xl border border-white/10 bg-white/[.045] ${className}`}>{children}</div>; }
+export function Pill({ children, tone="cyan" }: { children: ReactNode; tone?: "cyan"|"violet"|"slate" }) { const styles={cyan:"border-cyan-400/30 bg-cyan-400/10 text-cyan-200",violet:"border-violet-400/30 bg-violet-400/10 text-violet-200",slate:"border-white/10 bg-white/5 text-slate-300"}; return <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${styles[tone]}`}>{children}</span>; }
+export function HubButton({ children, href, secondary=false }: { children: ReactNode; href: string; secondary?: boolean }) { return <Link href={href} className={`inline-flex min-h-11 items-center justify-center rounded-xl px-5 py-3 text-sm font-black ${secondary ? "border border-white/15 bg-white/5 text-white hover:bg-white/10" : "bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 hover:brightness-110"}`}>{children}</Link>; }
+export function PageIntro({ eyebrow, title, text }: { eyebrow: string; title: string; text: string }) { return <div className="max-w-3xl"><Eyebrow>{eyebrow}</Eyebrow><h1 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">{title}</h1><p className="mt-5 text-lg leading-8 text-slate-400">{text}</p></div>; }

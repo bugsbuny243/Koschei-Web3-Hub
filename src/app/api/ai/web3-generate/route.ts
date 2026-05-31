@@ -1,0 +1,3 @@
+import { NextResponse } from "next/server"; import { generateWeb3WithTogether, type Web3GenerationMode } from "@/lib/ai/together";
+const modes=new Set<Web3GenerationMode>(["metadata","description","pitch","lore"]);
+export async function POST(request:Request){try{const body=await request.json() as {mode?:unknown;payload?:unknown};if(typeof body.mode!=="string"||!modes.has(body.mode as Web3GenerationMode)||typeof body.payload!=="object"||body.payload===null||Array.isArray(body.payload))return NextResponse.json({error:"Invalid generation request."},{status:400});return NextResponse.json(await generateWeb3WithTogether(body.mode as Web3GenerationMode,body.payload as Record<string,unknown>))}catch{return NextResponse.json({error:"Invalid JSON request body."},{status:400})}}
