@@ -1,3 +1,9 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+import Image from "next/image";
+
+const productImageExists = (image: string) => existsSync(path.join(process.cwd(), "public", image));
+
 const products = [
   {
     name: "Koschei Starter Pack",
@@ -13,6 +19,7 @@ const products = [
     ],
     button: "Buy Starter Pack",
     href: "https://www.shopier.com/TradeVisual/47465449",
+    image: "/koschei_starter_pack_web3.png",
   },
   {
     name: "Koschei Builder Pack",
@@ -28,6 +35,7 @@ const products = [
     ],
     button: "Buy Builder Pack",
     href: "https://www.shopier.com/TradeVisual/47465484",
+    image: "/koschei_builder_pack_web3.png",
     featured: true,
   },
   {
@@ -45,8 +53,9 @@ const products = [
     ],
     button: "Buy Studio Pack",
     href: "https://www.shopier.com/TradeVisual/47465499",
+    image: "/koschei_studio_pack_web3.png",
   },
-];
+].map((product) => ({ ...product, imageAvailable: productImageExists(product.image) }));
 
 export function Web3PricingSection({ className = "" }: { className?: string }) {
   return (
@@ -62,23 +71,32 @@ export function Web3PricingSection({ className = "" }: { className?: string }) {
           {products.map((product) => (
             <article
               key={product.name}
-              className={`relative flex h-full flex-col overflow-hidden rounded-2xl border p-6 shadow-2xl shadow-black/20 sm:p-7 ${
+              className={`relative flex h-full flex-col overflow-hidden rounded-2xl border p-5 shadow-2xl shadow-black/20 sm:p-7 ${
                 product.featured
                   ? "border-violet-400/70 bg-gradient-to-b from-violet-500/20 via-slate-900/95 to-slate-950 ring-1 ring-violet-400/40"
                   : "border-white/10 bg-gradient-to-b from-slate-900/90 to-slate-950/95"
               }`}
             >
               {product.featured && (
-                <span className="absolute right-5 top-5 rounded-full border border-violet-300/30 bg-violet-400/15 px-3 py-1 text-[.65rem] font-black uppercase tracking-[.14em] text-violet-200">
+                <span className="absolute right-8 top-8 z-10 rounded-full border border-violet-300/30 bg-slate-950/80 px-3 py-1 text-[.65rem] font-black uppercase tracking-[.14em] text-violet-200 backdrop-blur-sm">
                   Most popular
                 </span>
               )}
-              <div className={product.featured ? "pr-28" : ""}>
+              <div className="relative mb-6 aspect-[16/9] overflow-hidden rounded-xl border border-white/10 bg-slate-950/65">
+                {product.imageAvailable ? (
+                  <Image src={product.image} alt={`${product.name} product image`} fill sizes="(max-width: 1024px) 100vw, 33vw" className="object-contain" />
+                ) : (
+                  <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_center,rgba(37,99,235,.18),transparent_65%)] px-4 text-center">
+                    <span className="text-xs font-black uppercase tracking-[.16em] text-slate-500">Product image coming soon</span>
+                  </div>
+                )}
+              </div>
+              <div>
                 <p className="text-xs font-black uppercase tracking-[.14em] text-blue-300">{product.subtitle}</p>
                 <h3 className="mt-3 text-xl font-black text-white">{product.name}</h3>
               </div>
-              <p className="mt-6 text-4xl font-black tracking-tight text-white">{product.price}</p>
-              <p className="mt-5 min-h-20 text-sm leading-6 text-slate-400">{product.description}</p>
+              <p className="mt-4 text-4xl font-black tracking-tight text-white">{product.price}</p>
+              <p className="mt-5 text-sm leading-6 text-slate-400 lg:min-h-20">{product.description}</p>
               <ul className="mt-6 flex-1 space-y-3 border-t border-white/10 pt-6 text-sm leading-5 text-slate-300">
                 {product.features.map((feature) => (
                   <li key={feature} className="flex gap-3">
@@ -93,7 +111,7 @@ export function Web3PricingSection({ className = "" }: { className?: string }) {
                 rel="noopener noreferrer"
                 className={`mt-8 w-full ${product.featured ? "web3-button" : "web3-button-secondary"}`}
               >
-                {product.button} →
+                {product.button}
               </a>
             </article>
           ))}
