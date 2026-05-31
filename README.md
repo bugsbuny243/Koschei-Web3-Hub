@@ -12,6 +12,7 @@ Koschei; chain'ler, altyapı sağlayıcıları ve geliştirici toplulukları tar
 
 ## Güvenlik İlkeleri
 
+- Wallet bağlantısı sunulmaz.
 - Wallet private key, seed phrase veya deployer key istenmez ve işlenmez.
 - Fon veya token custody yapılmaz.
 - Token trading özelliği yoktur.
@@ -38,10 +39,12 @@ Koschei; chain'ler, altyapı sağlayıcıları ve geliştirici toplulukları tar
 ## Yerel Çalıştırma
 
 ```bash
-npm install
+npm ci
 cp .env.example .env.local
 npm run dev
 ```
+
+`package-lock.json` commit edilmiştir. Railway ve yerel kurulumlarda kilitli bağımlılık sürümleriyle tekrarlanabilir build almak için `npm ci` kullanın.
 
 Tarayıcıda [http://localhost:3000](http://localhost:3000) adresini açın. Production kontrolü için:
 
@@ -72,7 +75,7 @@ SOLANA_RPC_URL=...
 ```
 
 - AI opsiyoneldir. `AI_ENABLED=true`, `AI_PROVIDER=together` ve `TOGETHER_API_KEY` birlikte yoksa veya Together isteği başarısız olursa deterministik fallback metni döner.
-- Chain health için explicit RPC URL varsa önceliklidir. Solana için `SOLANA_RPC_URL`, EVM chain'ler için opsiyonel `*_RPC_URL` override'ları kullanılabilir. Explicit URL yoksa `ALCHEMY_API_KEY` ile desteklenen testnet Alchemy endpoint'i sunucu tarafında oluşturulur.
+- Chain health için birincil yapılandırma `ALCHEMY_API_KEY` değeridir. Solana için `SOLANA_RPC_URL`, EVM chain'ler için opsiyonel `*_RPC_URL` override'ları kullanılabilir; explicit RPC URL tanımlanırsa ilgili chain için önceliklidir. API key ve RPC URL değerleri yalnızca sunucuda kalır.
 - `DATABASE_URL` ve `DIRECT_DATABASE_URL` sonraki persistence katmanı için hazırlanmıştır; ilk asset MVP localStorage kullanır.
 - `FEATURE_TOKEN_TRADING`, `FEATURE_CUSTODY` ve `FEATURE_PRIVATE_KEY_DEPLOY` kapalı tutulmalıdır.
 
@@ -91,7 +94,7 @@ TeklifPilot için mevcut `POST /api/ai/generate-quote` route'u korunmuştur.
 1. Repository'yi Railway servisine bağlayın.
 2. `.env.example` içindeki gerekli değişkenleri Railway Variables alanında tanımlayın.
 3. Secret değerlerde gerçek key kullanın; hiçbir secret'ı `NEXT_PUBLIC_` ile yayınlamayın.
-4. Build komutu olarak `npm run build`, start komutu olarak `npm run start` kullanın.
+4. Kilitli bağımlılıklarla tekrarlanabilir kurulum için install komutu olarak `npm ci` kullanın. Build komutu olarak `npm run build`, start komutu olarak `npm run start` kullanın.
 5. Feature flag'leri ihtiyaca göre açın; trading, custody ve private-key deploy flag'lerini kapalı tutun.
 
 ## Yol haritası
