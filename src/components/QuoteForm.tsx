@@ -26,9 +26,23 @@ export function QuoteForm() {
   const productField = (key: keyof ProductInfo) => ({ value: product[key] ?? "", onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setProduct({ ...product, [key]: event.target.value }) });
   const numberField = (key: "quantity" | "unitPrice" | "validityDays") => ({ value: product[key], min: key === "unitPrice" ? 0 : 1, step: key === "unitPrice" ? "0.01" : "1", onChange: (event: React.ChangeEvent<HTMLInputElement>) => setProduct({ ...product, [key]: Number(event.target.value) }) });
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
-    const quote = { quotationNumber: generateQuotationNumber(), createdAt: new Date().toISOString(), company, buyer, product, englishOfferText: generateEnglishOfferText(company, buyer, product), followUpMessage: generateFollowUpMessage(buyer, product) };
+    const templateText = { englishOfferText: generateEnglishOfferText(company, buyer, product), followUpMessage: generateFollowUpMessage(buyer, product) };
+    let generatedText = templateText;
+
+    try {
+      const response = await fetch("/api/quote/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company, buyer, product }),
+      });
+      if (response.ok) generatedText = await response.json() as typeof templateText;
+    } catch {
+      generatedText = templateText;
+    }
+
+    const quote = { quotationNumber: generateQuotationNumber(), createdAt: new Date().toISOString(), company, buyer, product, ...generatedText };
     saveQuoteToLocalStorage(quote);
     router.push("/quote/preview");
   }
