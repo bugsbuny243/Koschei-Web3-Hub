@@ -1,70 +1,144 @@
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+BEGIN;
 
-DO $$ BEGIN CREATE TYPE order_provider AS ENUM ('shopier', 'manual'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE order_status AS ENUM ('pending', 'paid', 'manual_verified', 'failed', 'cancelled', 'refunded'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE entitlement_status AS ENUM ('active', 'exhausted', 'cancelled'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE generated_output_type AS ENUM ('game_asset', 'risk_report', 'launch_copy', 'docs_bundle'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- Extend existing commerce tables without removing or rewriting legacy data.
+ALTER TABLE plans
+  ADD COLUMN IF NOT EXISTS pack_type TEXT,
+  ADD COLUMN IF NOT EXISTS output_quota INTEGER DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS shopier_url TEXT,
+  ADD COLUMN IF NOT EXISTS description TEXT,
+  ADD COLUMN IF NOT EXISTS image_url TEXT;
 
-CREATE TABLE IF NOT EXISTS products (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text NOT NULL UNIQUE, name text NOT NULL,
-  price_try_cents integer NOT NULL CHECK (price_try_cents > 0), output_quota integer NOT NULL CHECK (output_quota > 0),
-  shopier_url text NOT NULL, is_active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS customers (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, full_name text NOT NULL,
-  company text, country text, source text, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS orders (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid NOT NULL REFERENCES customers(id), product_id uuid NOT NULL REFERENCES products(id),
-  provider order_provider NOT NULL, provider_order_id text, amount_try_cents integer NOT NULL CHECK (amount_try_cents > 0),
-  status order_status NOT NULL DEFAULT 'pending', raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (provider, provider_order_id)
-);
+ALTER TABLE payment_requests
+  ADD COLUMN IF NOT EXISTS full_name TEXT,
+  ADD COLUMN IF NOT EXISTS product_id TEXT,
+  ADD COLUMN IF NOT EXISTS amount_try INTEGER,
+  ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'TRY',
+  ADD COLUMN IF NOT EXISTS raw_payload JSONB DEFAULT '{}'::jsonb;
+
+-- Web3 Hub entitlement and generated-output persistence layer.
 CREATE TABLE IF NOT EXISTS entitlements (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid NOT NULL REFERENCES customers(id), order_id uuid NOT NULL UNIQUE REFERENCES orders(id),
-  product_id uuid NOT NULL REFERENCES products(id), outputs_total integer NOT NULL CHECK (outputs_total > 0),
-  outputs_remaining integer NOT NULL CHECK (outputs_remaining >= 0 AND outputs_remaining <= outputs_total), status entitlement_status NOT NULL DEFAULT 'active',
-  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  plan_id TEXT REFERENCES plans(id),
+  payment_request_id UUID REFERENCES payment_requests(id),
+  outputs_total INTEGER NOT NULL,
+  outputs_remaining INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  starts_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE TABLE IF NOT EXISTS projects (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid NOT NULL REFERENCES customers(id), name text NOT NULL,
-  ecosystem text NOT NULL, project_type text NOT NULL, description text, status text NOT NULL DEFAULT 'draft',
-  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS generated_outputs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid NOT NULL REFERENCES customers(id), entitlement_id uuid NOT NULL REFERENCES entitlements(id),
-  project_id uuid REFERENCES projects(id), output_type generated_output_type NOT NULL, metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
-  content_json jsonb, content_text text, used_ai boolean NOT NULL DEFAULT false, used_fallback boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS risk_reports (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid REFERENCES projects(id), generated_output_id uuid REFERENCES generated_outputs(id),
-  score integer CHECK (score BETWEEN 0 AND 100), severity text, findings jsonb NOT NULL DEFAULT '[]'::jsonb, created_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS chain_health_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), chain text NOT NULL, network text, provider text, is_healthy boolean NOT NULL,
-  latency_ms integer, details jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS ai_generation_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid REFERENCES customers(id), project_id uuid REFERENCES projects(id), generated_output_id uuid REFERENCES generated_outputs(id),
-  mode text NOT NULL, provider text, model text, used_ai boolean NOT NULL DEFAULT false, used_fallback boolean NOT NULL DEFAULT false,
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS intake_requests (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid REFERENCES customers(id), email text NOT NULL, full_name text, company text,
-  ecosystem text, project_type text, description text, status text NOT NULL DEFAULT 'new', metadata jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS admin_audit_logs (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), admin_email text NOT NULL, action text NOT NULL, entity_type text NOT NULL, entity_id uuid,
-  metadata jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS orders_customer_id_idx ON orders(customer_id);
-CREATE INDEX IF NOT EXISTS orders_status_idx ON orders(status);
-CREATE INDEX IF NOT EXISTS entitlements_customer_id_idx ON entitlements(customer_id);
-CREATE INDEX IF NOT EXISTS generated_outputs_entitlement_id_idx ON generated_outputs(entitlement_id);
 
-INSERT INTO products (slug, name, price_try_cents, output_quota, shopier_url, is_active) VALUES
-  ('starter', 'Starter Pack', 89900, 1, 'https://www.shopier.com/TradeVisual/47465449', true),
-  ('builder', 'Builder Pack', 229900, 3, 'https://www.shopier.com/TradeVisual/47465484', true),
-  ('studio', 'Studio Pack', 499900, 10, 'https://www.shopier.com/TradeVisual/47465499', true)
-ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, price_try_cents = EXCLUDED.price_try_cents, output_quota = EXCLUDED.output_quota, shopier_url = EXCLUDED.shopier_url, is_active = EXCLUDED.is_active, updated_at = now();
+CREATE TABLE IF NOT EXISTS web3_projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  title TEXT NOT NULL,
+  ecosystem TEXT,
+  project_type TEXT,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS web3_outputs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  project_id UUID REFERENCES web3_projects(id) ON DELETE CASCADE,
+  entitlement_id UUID REFERENCES entitlements(id),
+  output_type TEXT NOT NULL,
+  title TEXT,
+  ecosystem TEXT,
+  content_json JSONB DEFAULT '{}'::jsonb,
+  content_text TEXT,
+  used_ai BOOLEAN DEFAULT false,
+  used_fallback BOOLEAN DEFAULT false,
+  ai_model TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS risk_reports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  project_id UUID REFERENCES web3_projects(id) ON DELETE CASCADE,
+  score INTEGER NOT NULL,
+  risk_level TEXT NOT NULL,
+  checklist JSONB NOT NULL DEFAULT '{}'::jsonb,
+  recommended_fixes JSONB NOT NULL DEFAULT '[]'::jsonb,
+  disclaimer TEXT NOT NULL DEFAULT 'This is an informational risk checklist, not legal, financial, investment, or security advice.',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS chain_health_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  chain TEXT NOT NULL,
+  network TEXT NOT NULL,
+  provider TEXT NOT NULL DEFAULT 'alchemy',
+  ok BOOLEAN NOT NULL DEFAULT false,
+  result TEXT,
+  error TEXT,
+  checked_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS ai_generation_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT,
+  mode TEXT NOT NULL,
+  provider TEXT,
+  model TEXT,
+  prompt JSONB DEFAULT '{}'::jsonb,
+  output_text TEXT,
+  used_fallback BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS entitlements_email_idx ON entitlements (email);
+CREATE INDEX IF NOT EXISTS entitlements_status_idx ON entitlements (status);
+CREATE INDEX IF NOT EXISTS web3_projects_email_idx ON web3_projects (email);
+CREATE INDEX IF NOT EXISTS web3_outputs_email_idx ON web3_outputs (email);
+CREATE INDEX IF NOT EXISTS web3_outputs_project_id_idx ON web3_outputs (project_id);
+CREATE INDEX IF NOT EXISTS risk_reports_project_id_idx ON risk_reports (project_id);
+CREATE INDEX IF NOT EXISTS chain_health_logs_chain_network_idx ON chain_health_logs (chain, network);
+CREATE INDEX IF NOT EXISTS ai_generation_logs_email_idx ON ai_generation_logs (email);
+
+INSERT INTO plans (id, name, price_try, monthly_credits, pack_type, output_quota, shopier_url)
+VALUES
+  (
+    'starter',
+    'Koschei Starter Pack – Web3 Project Output',
+    899,
+    1,
+    'starter',
+    1,
+    'https://www.shopier.com/TradeVisual/47465449'
+  ),
+  (
+    'builder',
+    'Koschei Builder Pack – Metadata + Risk + Launch',
+    2299,
+    3,
+    'builder',
+    3,
+    'https://www.shopier.com/TradeVisual/47465484'
+  ),
+  (
+    'studio',
+    'Koschei Studio Pack – Web3 Builder Studio',
+    4999,
+    10,
+    'studio',
+    10,
+    'https://www.shopier.com/TradeVisual/47465499'
+  )
+ON CONFLICT (id) DO UPDATE
+SET
+  name = EXCLUDED.name,
+  price_try = EXCLUDED.price_try,
+  monthly_credits = EXCLUDED.monthly_credits,
+  pack_type = EXCLUDED.pack_type,
+  output_quota = EXCLUDED.output_quota,
+  shopier_url = EXCLUDED.shopier_url;
+
+COMMIT;
