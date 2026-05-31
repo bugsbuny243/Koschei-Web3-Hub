@@ -14,7 +14,7 @@ const configs: Record<Chain, Config> = {
 };
 
 export function isSupportedChain(value: string): value is Chain {
-  return value in configs;
+  return Object.prototype.hasOwnProperty.call(configs, value);
 }
 
 function readableError(error: unknown, rpc: string, key?: string) {
