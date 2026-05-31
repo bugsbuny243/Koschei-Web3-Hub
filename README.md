@@ -106,3 +106,7 @@ TeklifPilot için mevcut `POST /api/ai/generate-quote` route'u korunmuştur.
 4. Ecosystem lead ve project intake workflow'ları
 5. Developer integration örnekleri ve standartlaştırılmış export paketleri
 6. Daha kapsamlı risk transparency kuralları
+
+## Web3 Hub Database Migration
+
+`sql/2026_05_31_koschei_web3_hub_schema.sql` migration'ı mevcut tabloları silmez. Web3 Hub paketleri mevcut `plans` tablosuna seed edilir. `entitlements`, satın alınan çıktı haklarını tutar; `web3_outputs`, üretilen metadata, risk ve launch çıktılarını saklamak içindir. Shopier ödemeleri ilk aşamada manuel doğrulanır. `DATABASE_URL` yalnızca sunucu tarafında tutulmalıdır; frontend'e açık bir `NEXT_PUBLIC_DATABASE_URL` oluşturulmaz.
