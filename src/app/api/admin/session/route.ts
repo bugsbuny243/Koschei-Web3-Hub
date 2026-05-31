@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { clearAdminCookie, isAdminRequest } from "@/lib/server/admin-auth";
+import { isAdminRequest } from "@/lib/server/admin-auth";
 
-export async function POST() {
+export async function GET() {
   if (!await isAdminRequest()) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  await clearAdminCookie();
   return NextResponse.json({ ok: true });
 }
