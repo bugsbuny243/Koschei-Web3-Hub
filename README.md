@@ -1,35 +1,41 @@
 # Koschei Web3 Hub
 
-Koschei Web3 Hub; geliştiriciler, oyun varlıkları, NFT/token metadata çıktıları, launch sayfaları, risk şeffaflığı ve ekosistem büyümesi için tasarlanan AI destekli bir Web3 operating layer MVP'sidir.
+Koschei Web3 Hub; builder'lar, oyunlar, varlıklar, metadata, launch sayfaları, risk şeffaflığı ve ekosistem büyümesi için AI destekli bir Web3 operasyon katmanıdır.
 
-## Ürün vizyonu
+> Koschei bir grant başvuru uygulaması değildir. Token trading, custody veya private-key deployment ürünü değildir. Yatırım getirisi ya da token fiyatı vaadinde bulunmaz.
 
-Koschei bir grant başvuru uygulaması değildir ve “grant başvurusu yapma” ürünü olarak konumlanmaz. Zincirlerin, altyapı sağlayıcılarının ve geliştirici topluluklarının destekleyebileceği bir ekosistem büyüme ve builder altyapı katmanı olarak tasarlanır.
+## Vizyon
 
-### Güvenlik sınırları
+Koschei, fikirden geliştiriciye hazır çıktıya giden yolu kısaltır: oyun varlığı ve NFT metadata taslakları oluşturur, proje metinlerini güvenli kurallarla üretir, kamuya açık güven sinyallerini risk checklist'i ile görünür kılar ve desteklenen testnet RPC bağlantılarını sunucu tarafında kontrol eder. Ekosistem büyümesi, builder onboarding ve daha standart proje çıktıları odağındadır.
 
-- Private key veya seed phrase istenmez, saklanmaz ve işlenmez.
-- Wallet custody yapılmaz; varlık veya fon tutulmaz.
-- Token satışı, alım-satımı veya trading özelliği yoktur.
-- Yatırım getirisi, token fiyatı veya garantili değer vaadi yoktur.
-- `TOGETHER_API_KEY`, `ALCHEMY_API_KEY` ve `SOLANA_RPC_URL` yalnızca sunucu tarafında kullanılır. Frontend'e açık anahtar eklenmez.
+Koschei; chain'ler, altyapı sağlayıcıları ve geliştirici toplulukları tarafından desteklenebilecek bir ekosistem büyüme katmanı olarak tasarlanmıştır.
 
-## MVP rotaları
+## Güvenlik İlkeleri
 
-| Rota | Açıklama |
+- Wallet private key, seed phrase veya deployer key istenmez ve işlenmez.
+- Fon veya token custody yapılmaz.
+- Token trading özelliği yoktur.
+- Gerçek token veya contract deploy edilmez.
+- Yatırım getirisi ya da token fiyatı sözü verilmez.
+- `TOGETHER_API_KEY` ve `ALCHEMY_API_KEY` yalnızca sunucuda okunur. Frontend'e açık `NEXT_PUBLIC_` API anahtarı oluşturulmaz.
+- MVP asset çıktıları yalnızca tarayıcının `localStorage` alanında saklanır.
+
+## MVP Route'ları
+
+| Route | Açıklama |
 | --- | --- |
-| `/` | Koschei Web3 Hub landing sayfası |
+| `/` | Koschei Web3 Hub landing page |
 | `/hub` | Modül dashboard'u |
-| `/builder` | No-code asset builder ve JSON export |
+| `/builder` | No-code Web3 metadata ve asset concept builder |
 | `/metadata` | AI Metadata Studio |
-| `/risk` | Informational Risk & Trust Scanner |
-| `/chains` | Solana RPC sağlık kontrolü |
+| `/risk` | Risk & Trust Scanner checklist MVP |
+| `/chains` | ChainOps testnet RPC health dashboard |
 | `/ecosystem` | Ekosistem büyüme vizyonu |
-| `/docs` | MVP dokümantasyonu |
-| `/admin` | Basit intake/admin ekranı |
-| `/quote/new`, `/quote/preview`, `/dashboard` | Çalışmaya devam eden eski TeklifPilot rotaları |
+| `/docs` | Geliştirici dokümantasyonu |
+| `/admin` | Basit MVP admin / intake ekranı |
+| `/dashboard`, `/quote/new`, `/quote/preview` | Korunan mevcut TeklifPilot route'ları |
 
-## Yerel kurulum
+## Yerel Çalıştırma
 
 ```bash
 npm install
@@ -37,7 +43,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Uygulamayı `http://localhost:3000` adresinde açın. Production kontrolü için:
+Tarayıcıda [http://localhost:3000](http://localhost:3000) adresini açın. Production kontrolü için:
 
 ```bash
 npm run lint
@@ -45,38 +51,54 @@ npm run build
 npm run start
 ```
 
-## Ortam değişkenleri
+## Ortam Değişkenleri
 
-Temel UI, AI veya chain bağlantısı olmadan çalışabilir. Aşağıdaki değişkenler ilgili özellikleri etkinleştirir:
+Tüm desteklenen değişkenler `.env.example` dosyasındadır. İlk MVP için önerilen temel ayarlar:
 
-- Genel: `APP_NAME`, `APP_ENV`, `NEXT_PUBLIC_APP_URL`
-- AI: `AI_PROVIDER=together`, `AI_ENABLED=true`, `TOGETHER_API_KEY`, `TOGETHER_MODEL`
-- Web3: `WEB3_PROVIDER=alchemy`, `ALCHEMY_API_KEY`, `SOLANA_NETWORK`, `NEXT_PUBLIC_SOLANA_NETWORK`, `SOLANA_RPC_URL`
-- İleri aşama veritabanı: `DATABASE_URL`, `DIRECT_DATABASE_URL` (temel MVP UI için zorunlu değildir)
-- Admin: `ADMIN_EMAIL`, `ADMIN_PASSWORD`
+```bash
+APP_NAME=Koschei Web3 Hub
+APP_ENV=development
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+CORS_ALLOWED_ORIGIN=http://localhost:3000
+ADMIN_EMAIL=...
+ADMIN_PASSWORD=...
+AI_PROVIDER=together
+AI_ENABLED=false
+TOGETHER_API_KEY=...
+TOGETHER_MODEL=...
+WEB3_PROVIDER=alchemy
+ALCHEMY_API_KEY=...
+SOLANA_RPC_URL=...
+```
 
-`NEXT_PUBLIC_ALCHEMY_API_KEY` veya `NEXT_PUBLIC_TOGETHER_API_KEY` eklemeyin. Sunucu tarafındaki `GET /api/web3/solana/health`, `SOLANA_RPC_URL` üzerinden `getVersion` JSON-RPC çağrısı yapar ve URL ya da API key döndürmez. `POST /api/ai/web3-generate`, Together yapılandırması eksikse veya çağrı başarısızsa deterministik fallback metni döndürür.
+- AI opsiyoneldir. `AI_ENABLED=true`, `AI_PROVIDER=together` ve `TOGETHER_API_KEY` birlikte yoksa veya Together isteği başarısız olursa deterministik fallback metni döner.
+- Chain health için explicit RPC URL varsa önceliklidir. Solana için `SOLANA_RPC_URL`, EVM chain'ler için opsiyonel `*_RPC_URL` override'ları kullanılabilir. Explicit URL yoksa `ALCHEMY_API_KEY` ile desteklenen testnet Alchemy endpoint'i sunucu tarafında oluşturulur.
+- `DATABASE_URL` ve `DIRECT_DATABASE_URL` sonraki persistence katmanı için hazırlanmıştır; ilk asset MVP localStorage kullanır.
+- `FEATURE_TOKEN_TRADING`, `FEATURE_CUSTODY` ve `FEATURE_PRIVATE_KEY_DEPLOY` kapalı tutulmalıdır.
 
-## Railway deploy notları
+## AI Akışı
 
-1. Repository'yi Railway'e bağlayın ve `.env.example` içindeki değerleri Railway Variables bölümüne ekleyin.
-2. AI kullanımı için Together anahtarını, ChainOps için server-side Solana RPC URL'sini ayarlayın.
-3. Admin ekranını kullanacaksanız `ADMIN_EMAIL` ve güçlü bir `ADMIN_PASSWORD` tanımlayın.
-4. `npm run build` komutunun başarılı olduğunu doğrulayın.
+`POST /api/ai/web3-generate`, `metadata`, `description`, `pitch`, `lore` ve `launch` modlarını kabul eder. Together API isteği sunucudan yapılır. Sistem prompt'u fiyat/getiri vaadi, uydurma audit veya partnership, resmi chain/Alchemy desteği iddiası ve pump/scam dilini yasaklar. Sağlayıcı kapalıysa veya hata verirse uygulama kırılmaz; deterministik fallback kullanılır.
 
-## MVP sınırlamaları
+TeklifPilot için mevcut `POST /api/ai/generate-quote` route'u korunmuştur.
 
-- Builder asset kayıtları şimdilik yalnızca tarayıcı `localStorage` alanında saklanır.
-- Admin ekranı tam auth sistemi değildir; server-side credential kontrolü sonrası tarayıcı oturumu kullanır.
-- Risk sonucu bilgi amaçlı checklist'tir; hukuki, finansal, yatırım veya güvenlik tavsiyesi değildir.
-- Metadata çıktıları yayınlanmadan önce insan tarafından incelenmelidir.
-- Veritabanı CRUD akışı henüz aktif değildir.
+## ChainOps Akışı
+
+`GET /api/web3/health?chain=solana|base|arbitrum|polygon|optimism|ethereum` desteklenen testnet'e JSON-RPC sağlık isteği gönderir. RPC URL veya API key response içine eklenmez. Dashboard yalnızca güvenli health sonucu, chain, network, provider ve hata veya sonucu gösterir.
+
+## Railway Deploy Notları
+
+1. Repository'yi Railway servisine bağlayın.
+2. `.env.example` içindeki gerekli değişkenleri Railway Variables alanında tanımlayın.
+3. Secret değerlerde gerçek key kullanın; hiçbir secret'ı `NEXT_PUBLIC_` ile yayınlamayın.
+4. Build komutu olarak `npm run build`, start komutu olarak `npm run start` kullanın.
+5. Feature flag'leri ihtiyaca göre açın; trading, custody ve private-key deploy flag'lerini kapalı tutun.
 
 ## Yol haritası
 
-1. Gelişmiş launch page builder
-2. Güvenli intake ve waitlist iş akışları
-3. Daha derin game asset şemaları
-4. Provider-aware chain analytics
-5. Opsiyonel veritabanı kalıcılığı
-6. Developer education ve public-goods içerikleri
+1. Daha kapsamlı game asset şemaları ve doğrulama
+2. Launch page çıktılarının genişletilmesi
+3. Opsiyonel veritabanı persistence ve production-grade auth
+4. Ecosystem lead ve project intake workflow'ları
+5. Developer integration örnekleri ve standartlaştırılmış export paketleri
+6. Daha kapsamlı risk transparency kuralları
