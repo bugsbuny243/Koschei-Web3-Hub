@@ -55,3 +55,10 @@ button, a { transition: all 180ms ease; }
 .web3-input { width: 100%; border: 1px solid rgba(148,163,184,.2); border-radius: .65rem; background: rgba(2,6,23,.55); padding: .72rem .85rem; color: #e2e8f0; outline: none; }
 .web3-input:focus { border-color: rgba(96,165,250,.8); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
 .web3-label { display: grid; gap: .42rem; font-size: .74rem; font-weight: 800; color: #94a3b8; }
+
+/* Mobile-safe controls and content containment for the Web3 Hub. */
+body { overflow-x: hidden; }
+.web3-page { max-width: 100%; overflow-x: hidden; }
+.web3-button, .web3-button-secondary { min-height: 2.75rem; padding: .75rem 1rem; }
+.web3-input { min-height: 2.75rem; }
+.glass-card { overflow-wrap: anywhere; }
