@@ -17,12 +17,40 @@ export function calculateTotal(product: ProductInfo) {
   return product.quantity * product.unitPrice;
 }
 
+export function stripExportDisclaimers(exportNotes: string) {
+  return exportNotes
+    .replaceAll(HS_GTIP_DISCLAIMER, "")
+    .replaceAll(PLATFORM_DISCLAIMER, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function generateEnglishOfferText(company: CompanyInfo, buyer: BuyerInfo, product: ProductInfo) {
-  return `Dear ${buyer.contactName},\n\nThank you for your interest in our ${product.name}. On behalf of ${company.name}, we are pleased to submit our commercial quotation for ${product.quantity} ${product.unit} under ${product.incoterm} delivery terms.\n\nPlease find the product details, pricing, delivery timeline, and payment terms in this offer. Should you need any clarification or wish to discuss adjustments, we would be pleased to assist you.\n\nWe look forward to the opportunity to work with ${buyer.company} and to building a successful long-term business relationship.\n\nKind regards,\n${company.contactPerson}\n${company.name}`;
+  const total = calculateTotal(product);
+  const money = new Intl.NumberFormat("en-US", { style: "currency", currency: product.currency });
+
+  return `Dear ${buyer.contactName},
+
+Thank you for your interest in ${product.name}. We are pleased to submit our quotation for your review.
+
+Product: ${product.name}
+Quantity: ${product.quantity} ${product.unit}
+Unit price: ${money.format(product.unitPrice)}
+Total amount: ${money.format(total)}
+Incoterm: ${product.incoterm}
+Delivery time: ${product.deliveryTime}
+Payment terms: ${product.paymentTerms}
+Offer validity: ${product.validityDays} days
+
+Please review the quotation and let us know if you would like to proceed or request any changes. We will be happy to support the next steps.
+
+Kind regards,
+${company.contactPerson}
+${company.name}`;
 }
 
 export function generateFollowUpMessage(buyer: BuyerInfo, product: ProductInfo) {
-  return `Hello ${buyer.contactName}, I have shared our quotation for ${product.name}. The offer is valid for ${product.validityDays} days. Please let me know if you have any questions or if you would like to discuss the next steps. I would be happy to assist. Best regards.`;
+  return `Hello ${buyer.contactName}, I’m sharing our quotation for ${product.quantity} ${product.unit} of ${product.name}. Please review the offer and let us know if you would like to proceed or request any changes. We’ll be happy to support the next steps.`;
 }
 
 export function generateProductDescriptionEn(product: ProductInfo) {
@@ -30,13 +58,11 @@ export function generateProductDescriptionEn(product: ProductInfo) {
 }
 
 export function generateExportNotes(product: ProductInfo) {
-  const details = [
+  return [
     product.hsCode ? `Estimated HS/GTIP code supplied for review: ${product.hsCode}.` : "No estimated HS/GTIP code was supplied.",
     product.packagingDetails ? `Packaging details: ${product.packagingDetails}` : "Packaging details were not supplied.",
     product.notes ? `Additional notes: ${product.notes}` : "",
-  ].filter(Boolean);
-
-  return [...details, HS_GTIP_DISCLAIMER, PLATFORM_DISCLAIMER].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 }
 
 export function createFallbackQuoteContent(company: CompanyInfo, buyer: BuyerInfo, product: ProductInfo): GeneratedQuoteContent {
@@ -54,7 +80,7 @@ function normalizeStoredQuote(quote: QuoteData): QuoteData {
   return {
     ...quote,
     productDescriptionEn: quote.productDescriptionEn || fallback.productDescriptionEn,
-    exportNotes: quote.exportNotes || fallback.exportNotes,
+    exportNotes: stripExportDisclaimers(quote.exportNotes || fallback.exportNotes),
     usedFallback: quote.usedFallback ?? true,
   };
 }

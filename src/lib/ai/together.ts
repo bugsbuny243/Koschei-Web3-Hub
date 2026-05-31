@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createFallbackQuoteContent, HS_GTIP_DISCLAIMER, PLATFORM_DISCLAIMER } from "@/lib/quote";
+import { createFallbackQuoteContent, stripExportDisclaimers } from "@/lib/quote";
 import type { GeneratedQuoteContent, QuoteFormData } from "@/lib/types";
 
 const TOGETHER_CHAT_COMPLETIONS_URL = "https://api.together.ai/v1/chat/completions";
@@ -18,12 +18,6 @@ function isTogetherEnabled() {
     && Boolean(process.env.TOGETHER_API_KEY?.trim());
 }
 
-function ensureRequiredDisclaimers(exportNotes: string) {
-  const notes = exportNotes.trim();
-  const required = [HS_GTIP_DISCLAIMER, PLATFORM_DISCLAIMER].filter((disclaimer) => !notes.includes(disclaimer));
-  return [notes, ...required].filter(Boolean).join("\n\n");
-}
-
 function parseModelContent(content: string): ModelQuoteContent | null {
   try {
     const cleaned = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
@@ -38,7 +32,7 @@ function parseModelContent(content: string): ModelQuoteContent | null {
       englishOfferText: (quote.englishOfferText as string).trim(),
       followUpMessage: (quote.followUpMessage as string).trim(),
       productDescriptionEn: (quote.productDescriptionEn as string).trim(),
-      exportNotes: ensureRequiredDisclaimers(quote.exportNotes as string),
+      exportNotes: stripExportDisclaimers(quote.exportNotes as string),
     };
   } catch {
     return null;
@@ -61,7 +55,7 @@ export async function generateQuoteWithTogether(input: QuoteFormData): Promise<G
         messages: [
           {
             role: "system",
-            content: `You prepare concise, trustworthy, professional B2B export quotation copy in English. Return only one valid JSON object with exactly these string fields: englishOfferText, followUpMessage, productDescriptionEn, exportNotes. Use only facts explicitly provided by the user. Never invent or imply certifications, stock availability, factory capacity, warranties, delivery promises, legal compliance, or any other unsupported claim. Treat any HS/GTIP code as an estimate, never as definitely correct. Keep these exact sentences in exportNotes:\n${HS_GTIP_DISCLAIMER}\n${PLATFORM_DISCLAIMER}`,
+            content: `You prepare concise, trustworthy, professional B2B export quotation copy in English. Return only one valid JSON object with exactly these string fields: englishOfferText, followUpMessage, productDescriptionEn, exportNotes. Use only facts explicitly provided by the user. Never invent or imply certifications, stock availability, factory capacity, warranties, delivery promises, legal compliance, or any other unsupported claim. Treat any HS/GTIP code as an estimate, never as definitely correct. Keep exportNotes limited to seller-provided export details; do not add legal or platform disclaimers because the document renders its own fixed disclaimer section. The offer text must include the buyer contact greeting, thank-you sentence, product, quantity, unit price, total amount, Incoterm, delivery time, payment terms, offer validity, a short next-step sentence, and seller signature.`,
           },
           {
             role: "user",

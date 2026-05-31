@@ -28,6 +28,17 @@ button, a { transition: all 180ms ease; }
     padding: 0 !important;
   }
   .quote-table { min-width: 0 !important; }
-  .avoid-print-break { break-inside: avoid; }
+  .printable-quote header { padding-bottom: 12px !important; }
+  .printable-quote section { padding-top: 12px !important; padding-bottom: 12px !important; }
+  .printable-quote p, .printable-quote td { orphans: 3; widows: 3; }
+  .quote-table, .quote-table tr, .quote-table td, .quote-table th, .avoid-print-break { break-inside: avoid; page-break-inside: avoid; }
   @page { size: A4; margin: 14mm; }
+}
+
+/* Keep long customer-provided values inside the printable document on narrow screens. */
+.printable-quote { overflow-wrap: anywhere; }
+
+@media (max-width: 480px) {
+  .print-shell { padding-block: 1rem; }
+  .printable-quote { min-height: auto; }
 }
