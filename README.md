@@ -76,7 +76,7 @@ SOLANA_RPC_URL=...
 - AI opsiyoneldir. `AI_ENABLED=true`, `AI_PROVIDER=together` ve `TOGETHER_API_KEY` birlikte yoksa veya Together isteği başarısız olursa deterministik fallback metni döner.
 - Chain health için birincil yapılandırma `ALCHEMY_API_KEY` değeridir. Solana için `SOLANA_RPC_URL`, EVM chain'ler için opsiyonel `*_RPC_URL` override'ları kullanılabilir; explicit RPC URL tanımlanırsa ilgili chain için önceliklidir. API key ve RPC URL değerleri yalnızca sunucuda kalır.
 - `DATABASE_URL` yalnızca sunucuda Neon Postgres bağlantısı için kullanılır; `NEXT_PUBLIC_` önekiyle yayınlanmaz. `sql/2026_05_31_koschei_web3_hub_schema.sql` mevcut Web3 Hub şemasını genişletir ve paket seed verilerini ekler.
-- Shopier ödeme doğrulaması şimdilik admin tarafından manuel yapılır. Frontend siparişleri yalnızca `pending` oluşturur; ödeme admin tarafından doğrulanmadan entitlement aktif olmaz.
+- Shopier ödeme doğrulaması şimdilik admin tarafından manuel yapılır. Frontend siparişleri yalnızca `pending` oluşturur; public navigasyonda gösterilmeyen owner-only `/admin` alanında ödeme doğrulanmadan entitlement aktif olmaz.
 
 ## AI Akışı
 
