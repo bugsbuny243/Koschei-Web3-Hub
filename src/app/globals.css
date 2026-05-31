@@ -39,7 +39,7 @@ button, a { transition: all 180ms ease; }
 }
 
 /* Keep long customer-provided values inside the printable document on narrow screens. */
-.printable-quote { overflow-wrap: anywhere; }
+.printable-quote { overflow-wrap: break-word; }
 
 @media (max-width: 480px) {
   .print-shell { padding-block: 1rem; }
