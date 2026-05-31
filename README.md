@@ -76,7 +76,8 @@ SOLANA_RPC_URL=...
 
 - AI opsiyoneldir. `AI_ENABLED=true`, `AI_PROVIDER=together` ve `TOGETHER_API_KEY` birlikte yoksa veya Together isteği başarısız olursa deterministik fallback metni döner.
 - Chain health için birincil yapılandırma `ALCHEMY_API_KEY` değeridir. Solana için `SOLANA_RPC_URL`, EVM chain'ler için opsiyonel `*_RPC_URL` override'ları kullanılabilir; explicit RPC URL tanımlanırsa ilgili chain için önceliklidir. API key ve RPC URL değerleri yalnızca sunucuda kalır.
-- `DATABASE_URL` ve `DIRECT_DATABASE_URL` sonraki persistence katmanı için hazırlanmıştır; ilk asset MVP localStorage kullanır.
+- `DATABASE_URL` yalnızca sunucuda Neon Postgres bağlantısı için kullanılır; `NEXT_PUBLIC_` önekiyle yayınlanmaz. `db/migrations/0001_koschei_web3_hub.sql` ürün seed verilerini ve Hub tablolarını oluşturur.
+- Shopier ödeme doğrulaması şimdilik admin tarafından manuel yapılır. Frontend siparişleri yalnızca `pending` oluşturur; ödeme admin tarafından doğrulanmadan entitlement aktif olmaz.
 - `FEATURE_TOKEN_TRADING`, `FEATURE_CUSTODY` ve `FEATURE_PRIVATE_KEY_DEPLOY` kapalı tutulmalıdır.
 
 ## AI Akışı
@@ -101,7 +102,7 @@ TeklifPilot için mevcut `POST /api/ai/generate-quote` route'u korunmuştur.
 
 1. Daha kapsamlı game asset şemaları ve doğrulama
 2. Launch page çıktılarının genişletilmesi
-3. Opsiyonel veritabanı persistence ve production-grade auth
+3. Shopier webhook desteği ve daha kapsamlı production-grade auth
 4. Ecosystem lead ve project intake workflow'ları
 5. Developer integration örnekleri ve standartlaştırılmış export paketleri
 6. Daha kapsamlı risk transparency kuralları
