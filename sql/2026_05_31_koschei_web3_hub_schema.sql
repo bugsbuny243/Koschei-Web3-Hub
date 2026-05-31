@@ -13,7 +13,8 @@ ALTER TABLE payment_requests
   ADD COLUMN IF NOT EXISTS product_id TEXT,
   ADD COLUMN IF NOT EXISTS amount_try INTEGER,
   ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'TRY',
-  ADD COLUMN IF NOT EXISTS raw_payload JSONB DEFAULT '{}'::jsonb;
+  ADD COLUMN IF NOT EXISTS raw_payload JSONB DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 
 -- Web3 Hub entitlement and generated-output persistence layer.
 CREATE TABLE IF NOT EXISTS entitlements (
@@ -94,6 +95,7 @@ CREATE TABLE IF NOT EXISTS ai_generation_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS entitlements_payment_request_id_idx ON entitlements (payment_request_id);
 CREATE INDEX IF NOT EXISTS entitlements_email_idx ON entitlements (email);
 CREATE INDEX IF NOT EXISTS entitlements_status_idx ON entitlements (status);
 CREATE INDEX IF NOT EXISTS web3_projects_email_idx ON web3_projects (email);

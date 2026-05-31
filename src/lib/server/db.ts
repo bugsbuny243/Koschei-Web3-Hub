@@ -13,6 +13,7 @@ export type Product = {
 };
 export type ManualOrderInput = { email: string; fullName: string; productId: string; rawPayload?: Record<string, unknown> };
 export type OutputInput = { entitlementId: string; projectId?: string; outputType: "game_asset" | "risk_report" | "launch_copy" | "docs_bundle"; title?: string; ecosystem?: string; metadata?: Record<string, unknown>; contentJson?: Record<string, unknown>; contentText?: string; usedAi?: boolean; usedFallback?: boolean };
+export type PaymentRequestStatus = "pending" | "manual_verified" | "paid" | "rejected";
 
 export async function getProducts() {
   return query<Product>(`SELECT id, name, price_try, monthly_credits, pack_type, output_quota, shopier_url, is_active
@@ -31,15 +32,24 @@ RETURNING *`, [input.email.toLowerCase(), input.fullName, input.productId, JSON.
   return rows[0];
 }
 
-export async function createEntitlementFromPaidOrder(paymentRequestId: string) {
-  const rows = await query(`INSERT INTO entitlements (email, payment_request_id, plan_id, outputs_total, outputs_remaining, status)
-SELECT payment.email, payment.id, plan.id, plan.output_quota, plan.output_quota, 'active'
-FROM payment_requests payment
-JOIN plans plan ON plan.id = payment.product_id
-WHERE payment.id = $1 AND payment.status IN ('paid', 'manual_verified')
-ON CONFLICT (payment_request_id) DO UPDATE SET updated_at = now()
-RETURNING *`, [paymentRequestId]);
-  if (!rows[0]) throw new Error("Only verified paid payment requests can create entitlements.");
+export async function reviewPaymentRequest(paymentRequestId: string, status: PaymentRequestStatus) {
+  const rows = await query(`WITH reviewed AS (
+  UPDATE payment_requests
+  SET status = $2, reviewed_at = now()
+  WHERE id = $1 AND status = 'pending'
+  RETURNING *
+), entitlement AS (
+  INSERT INTO entitlements (email, payment_request_id, plan_id, outputs_total, outputs_remaining, status)
+  SELECT reviewed.email, reviewed.id, plans.id, plans.output_quota, plans.output_quota, 'active'
+  FROM reviewed
+  JOIN plans ON plans.id = reviewed.product_id
+  WHERE reviewed.status IN ('paid', 'manual_verified')
+  ON CONFLICT (payment_request_id) DO UPDATE SET updated_at = now()
+  RETURNING id
+)
+SELECT reviewed.*, (SELECT id FROM entitlement) AS entitlement_id
+FROM reviewed`, [paymentRequestId, status]);
+  if (!rows[0]) throw new Error("Pending payment request not found.");
   return rows[0];
 }
 
@@ -71,7 +81,13 @@ RETURNING *`, [input.entitlementId, input.projectId || null, input.outputType, i
   return rows[0];
 }
 
-export async function listAdminOrders() {
+export async function listAdminPlans() {
+  return query<Product>(`SELECT id, name, price_try, monthly_credits, pack_type, output_quota, shopier_url, is_active
+FROM plans
+ORDER BY price_try ASC`);
+}
+
+export async function listAdminPaymentRequests() {
   return query(`SELECT id, email, full_name, plan, product_id, payment_provider, payment_reference, amount_try, currency, status, created_at, reviewed_at
 FROM payment_requests
 ORDER BY created_at DESC
@@ -79,7 +95,7 @@ LIMIT 200`);
 }
 
 export async function listAdminEntitlements() {
-  return query(`SELECT entitlements.id, entitlements.email, plans.name AS plan_name, entitlements.outputs_total, entitlements.outputs_remaining, entitlements.status, entitlements.created_at
+  return query(`SELECT entitlements.id, entitlements.email, plans.name AS plan_name, entitlements.payment_request_id, entitlements.outputs_total, entitlements.outputs_remaining, entitlements.status, entitlements.created_at
 FROM entitlements
 JOIN plans ON entitlements.plan_id = plans.id
 ORDER BY entitlements.created_at DESC
