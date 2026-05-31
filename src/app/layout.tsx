@@ -1,15 +1,4 @@
 import type { Metadata } from "next";
 import "./globals.css";
-
-export const metadata: Metadata = {
-  title: "TeklifPilot | İngilizce İhracat Teklifleri",
-  description: "WhatsApp'tan gelen ürün taleplerini 5 dakikada profesyonel İngilizce ihracat teklifine çevirin.",
-};
-
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <html lang="tr">
-      <body>{children}</body>
-    </html>
-  );
-}
+export const metadata: Metadata = { title: "Koschei Web3 Hub | AI-powered Web3 operating layer", description: "Builder infrastructure for games, assets, metadata, launch pages and ecosystem growth." };
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { return <html lang="en"><body>{children}</body></html>; }
