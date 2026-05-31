@@ -6,7 +6,7 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: hidden; }
 body {
   background: var(--background);
   color: var(--foreground);
@@ -19,6 +19,7 @@ button, a { transition: all 180ms ease; }
   .no-print { display: none !important; }
   .print-shell { padding: 0 !important; background: white !important; }
   .printable-quote {
+    width: 100% !important;
     box-shadow: none !important;
     border: 0 !important;
     margin: 0 !important;
@@ -26,5 +27,7 @@ button, a { transition: all 180ms ease; }
     min-height: auto !important;
     padding: 0 !important;
   }
-  @page { size: A4; margin: 16mm; }
+  .quote-table { min-width: 0 !important; }
+  .avoid-print-break { break-inside: avoid; }
+  @page { size: A4; margin: 14mm; }
 }
