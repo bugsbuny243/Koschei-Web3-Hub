@@ -3,10 +3,25 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Web3Card } from "@/components/Web3Card";
 
 const modules = [
-  ["Game Asset Bridge", "Structure portable game items and NFT-ready asset metadata."],
-  ["AI Metadata Studio", "Generate clear asset, project, lore, pitch and launch copy."],
-  ["Risk & Trust Scanner", "Turn project signals into a transparent risk checklist."],
-  ["ChainOps Dashboard", "Check supported testnet RPC connectivity without exposing keys."],
+  ["Web3 Hub Dashboard", "Open the central workspace for Web3 builder tools and ecosystem outputs.", "/hub"],
+  ["Game Asset Builder", "Structure portable game items and NFT-ready asset metadata.", "/builder"],
+  ["AI Metadata Studio", "Generate clear asset, project, lore, pitch and launch copy.", "/metadata"],
+  ["Risk & Trust Scanner", "Turn project signals into a transparent risk checklist.", "/risk"],
+  ["ChainOps Dashboard", "Check supported testnet RPC connectivity without exposing keys.", "/chains"],
+  ["Ecosystem Layer", "Explore the ecosystem growth layer for builders, chains and communities.", "/ecosystem"],
+  ["Developer Docs", "Review safe architecture, metadata schemas and integration guidance.", "/docs"],
+  ["Admin / Intake", "Open the local MVP intake and feature-flag administration workspace.", "/admin"],
+];
+
+const footerLinks = [
+  ["Hub", "/hub"],
+  ["Builder", "/builder"],
+  ["Metadata", "/metadata"],
+  ["Risk", "/risk"],
+  ["Chains", "/chains"],
+  ["Ecosystem", "/ecosystem"],
+  ["Docs", "/docs"],
+  ["Admin", "/admin"],
 ];
 
 export default function Home() {
@@ -48,7 +63,7 @@ export default function Home() {
           <p className="eyebrow">Core modules</p>
           <h2 className="mt-3 text-3xl font-black text-white">One serious layer for the builder lifecycle.</h2>
           <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            {modules.map(([title, description]) => <Web3Card key={title} title={title} description={description} status="Live MVP" href="/hub" action="Explore hub" />)}
+            {modules.map(([title, description, href]) => <Web3Card key={title} title={title} description={description} status="Live MVP" href={href} />)}
           </div>
         </div>
       </section>
@@ -80,8 +95,11 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-white/10 bg-slate-950/70 px-5 py-6 text-center text-sm font-semibold text-slate-400">
-        No custody. No private keys. No token trading. Builder-ready Web3 outputs only.
+      <footer className="border-t border-white/10 bg-slate-950/70 px-5 py-8 text-sm font-semibold text-slate-400">
+        <nav aria-label="Footer navigation" className="mx-auto flex max-w-7xl flex-wrap justify-center gap-x-5 gap-y-3">
+          {footerLinks.map(([label, href]) => <Link key={href} href={href} className="hover:text-white">{label}</Link>)}
+        </nav>
+        <p className="mt-5 text-center">No custody. No private keys. No token trading. Builder-ready Web3 outputs only.</p>
       </footer>
     </main>
   );
