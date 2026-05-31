@@ -37,12 +37,13 @@ Together AI ile teklif metni üretimini etkinleştirmek için Railway ortam değ
 AI_ENABLED=true
 AI_PROVIDER=together
 TOGETHER_API_KEY=...
-TOGETHER_MODEL=...
+TOGETHER_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507-tput
 ```
 
 - `TOGETHER_API_KEY` yalnızca sunucu tarafında okunur; istemciye açık bir `NEXT_PUBLIC_` anahtarı kullanılmaz.
-- `AI_ENABLED=true`, `TOGETHER_API_KEY` ve `TOGETHER_MODEL` birlikte mevcut değilse deterministik yerel şablon kullanılır.
+- `AI_ENABLED=true`, `AI_PROVIDER=together` ve `TOGETHER_API_KEY` birlikte mevcut değilse deterministik yerel şablon kullanılır. `TOGETHER_MODEL` belirtilmezse varsayılan model kullanılır.
 - Together isteği başarısız olursa teklif oluşturma işlemi kesilmez; deterministik yerel şablona geri dönülür.
+- Form, sunucu tarafındaki `POST /api/ai/generate-quote` route’una gider. API anahtarı tarayıcıya gönderilmez.
 
 ## Önemli MVP Notları
 
