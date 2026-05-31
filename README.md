@@ -94,7 +94,7 @@ TeklifPilot için mevcut `POST /api/ai/generate-quote` route'u korunmuştur.
 4. Build komutu olarak `npm run build`, start komutu olarak `npm run start` kullanın.
 5. Feature flag'leri ihtiyaca göre açın; trading, custody ve private-key deploy flag'lerini kapalı tutun.
 
-## Yol Haritası
+## Yol haritası
 
 1. Daha kapsamlı game asset şemaları ve doğrulama
 2. Launch page çıktılarının genişletilmesi

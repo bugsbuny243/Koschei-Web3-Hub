@@ -1,19 +1,16 @@
 import Link from "next/link";
-import { Button } from "@/components/Button";
+
+const links = [
+  ["Hub", "/hub"], ["Builder", "/builder"], ["Metadata", "/metadata"], ["Risk", "/risk"],
+  ["Chains", "/chains"], ["Ecosystem", "/ecosystem"], ["Docs", "/docs"], ["Admin", "/admin"],
+];
 
 export function Header() {
-  return (
-    <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
-        <Link href="/" className="flex items-center gap-2 text-xl font-black tracking-tight text-slate-950">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-950 text-sm text-cyan-400">TP</span>
-          Teklif<span className="text-cyan-600">Pilot</span>
-        </Link>
-        <nav className="flex items-center gap-2 sm:gap-4">
-          <Link href="/dashboard" className="hidden text-sm font-semibold text-slate-600 hover:text-slate-950 sm:block">Panel</Link>
-          <Button href="/quote/new" className="px-4 py-2.5">Teklif Oluştur <span className="ml-1">→</span></Button>
-        </nav>
-      </div>
-    </header>
-  );
+  return <header className="border-b border-white/10 bg-[#050816]/95 text-white backdrop-blur">
+    <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-4 lg:px-8">
+      <Link href="/" className="flex items-center gap-3 text-lg font-black tracking-tight"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-400 to-violet-500 text-xs text-slate-950">K</span><span>Koschei <span className="text-cyan-400">Web3 Hub</span></span></Link>
+      <nav className="order-3 flex w-full gap-4 overflow-x-auto pb-1 text-xs font-bold text-slate-300 lg:order-2 lg:w-auto lg:pb-0">{links.map(([label, href]) => <Link key={href} href={href} className="whitespace-nowrap hover:text-cyan-300">{label}</Link>)}</nav>
+      <Link href="/quote/new" className="order-2 rounded-lg border border-white/15 px-3 py-2 text-xs font-bold text-slate-300 hover:border-cyan-400/60 hover:text-cyan-300 lg:order-3">TeklifPilot ↗</Link>
+    </div>
+  </header>;
 }
