@@ -26,7 +26,7 @@ export default function Chains() {
     } catch {
       setHealthByChain((current) => ({
         ...current,
-        [chain]: { ok: false, chain, network, provider: "Server-side RPC", error: "Health request failed. Please try again." },
+        [chain]: { ok: false, status: "error", chain, network, provider: "Server-side RPC", error: "Health request failed. Please try again." },
       }));
     } finally {
       setCheckingChains((current) => current.filter((item) => item !== chain));

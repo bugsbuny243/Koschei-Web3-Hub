@@ -61,3 +61,10 @@ button, a { transition: all 180ms ease; }
 
 .web3-break-long { overflow-wrap: anywhere; }
 .web3-page p, .web3-page h1, .web3-page h2, .web3-page h3, .web3-page a, .web3-page button, .web3-page label { word-break: normal; }
+
+/* Keep interactive controls comfortable on touch screens and avoid mid-word wrapping. */
+.web3-page button, .web3-page a { overflow-wrap: normal; word-break: keep-all; }
+.web3-button:disabled, .web3-button-secondary:disabled { cursor: not-allowed; opacity: .62; }
+@media (max-width: 640px) {
+  .web3-button, .web3-button-secondary { min-height: 3rem; }
+}
