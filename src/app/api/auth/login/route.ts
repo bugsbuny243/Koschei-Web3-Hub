@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { authenticateWithNeonAuth, appendNeonAuthCookies } from "@/lib/server/neon-auth";
-import { isValidEmail, isValidPassword, normalizeEmail } from "@/lib/server/user-auth";
+import { upsertUserProfile } from "@/lib/server/db";
+import { authenticateWithNeonAuth, NeonAuthConfigurationError } from "@/lib/server/neon-auth";
+import { isValidEmail, isValidPassword, normalizeEmail, setUserCookie } from "@/lib/server/user-auth";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -8,10 +9,12 @@ export async function POST(request: Request) {
   const email = normalizeEmail(body.email);
   if (!isValidEmail(email) || !isValidPassword(body.password)) return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   try {
-    const { user, cookies: authCookies } = await authenticateWithNeonAuth("login", email, body.password as string);
-    const response = NextResponse.json({ email: user.email });
-    return appendNeonAuthCookies(response, authCookies);
-  } catch {
+    const identity = await authenticateWithNeonAuth("login", email, body.password as string);
+    await upsertUserProfile(identity.sub, identity.email);
+    await setUserCookie(identity.sub, identity.email);
+    return NextResponse.json({ email: identity.email });
+  } catch (error) {
+    if (error instanceof NeonAuthConfigurationError) return NextResponse.json({ error: "Auth service is not configured." }, { status: 503 });
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
 }
