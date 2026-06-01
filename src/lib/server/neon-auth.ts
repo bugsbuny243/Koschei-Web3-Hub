@@ -17,7 +17,6 @@ export class NeonAuthRequestError extends Error {
   constructor(message: string, public readonly status: number) { super(message); }
 }
 export class NeonAuthProviderRequestError extends Error {}
-export class NeonAuthSessionError extends Error {}
 
 function envPresence() {
   return {
