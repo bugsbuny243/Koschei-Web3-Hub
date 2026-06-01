@@ -60,3 +60,25 @@ export async function proxyMemberAuth(request: Request, path: string) {
 
   return jsonResponse(body, response.status, response.headers);
 }
+
+export type MemberSession = { loggedIn: true; sub: string; email: string };
+
+export async function getMemberSession(cookieHeader: string): Promise<MemberSession | null> {
+  const url = authApiUrl("/auth/me");
+  if (!url) throw new Error("Auth API is not configured.");
+
+  let response: Response;
+  try {
+    response = await fetch(url, { headers: { cookie: cookieHeader }, cache: "no-store" });
+  } catch {
+    throw new Error("Auth API request failed.");
+  }
+  if (response.status === 401) return null;
+  if (!response.ok) throw new Error("Auth API request failed.");
+
+  const body = await response.json() as Partial<MemberSession>;
+  if (body.loggedIn !== true || typeof body.sub !== "string" || !body.sub || typeof body.email !== "string" || !body.email) {
+    throw new Error("Auth API returned an invalid member session.");
+  }
+  return { loggedIn: true, sub: body.sub, email: body.email };
+}

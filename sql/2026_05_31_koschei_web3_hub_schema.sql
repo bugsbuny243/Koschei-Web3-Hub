@@ -19,7 +19,8 @@ ALTER TABLE payment_requests
 -- Reuse the existing application profile table for Neon Auth member profiles only.
 -- Password verification remains in Neon Auth; public signup cannot grant an admin role.
 ALTER TABLE app_user_profiles
-ADD COLUMN IF NOT EXISTS auth_subject TEXT;
+  DROP COLUMN IF EXISTS password_hash,
+  ADD COLUMN IF NOT EXISTS auth_subject TEXT;
 
 CREATE UNIQUE INDEX IF NOT EXISTS app_user_profiles_auth_subject_idx ON app_user_profiles (auth_subject);
 CREATE UNIQUE INDEX IF NOT EXISTS app_user_profiles_lower_email_idx ON app_user_profiles (lower(email));
