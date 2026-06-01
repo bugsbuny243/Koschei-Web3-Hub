@@ -118,11 +118,31 @@ export type UserDashboard = {
   saved_outputs: number;
 };
 
-export async function upsertUserProfile(authSubject: string, email: string) {
-  const rows = await query<{ email: string }>(`INSERT INTO app_user_profiles (auth_subject, email, role)
-VALUES ($1, $2, 'user')
-ON CONFLICT (auth_subject) DO UPDATE SET email = EXCLUDED.email, updated_at = now()
-RETURNING email`, [authSubject, email]);
+export async function createUserProfile(email: string, passwordHash: string) {
+  const rows = await query<{ email: string }>(`WITH updated AS (
+  UPDATE app_user_profiles
+  SET password_hash = $2, updated_at = now()
+  WHERE lower(email) = lower($1) AND password_hash IS NULL
+  RETURNING email
+), inserted AS (
+  INSERT INTO app_user_profiles (email, password_hash)
+  SELECT $1, $2
+  WHERE NOT EXISTS (SELECT 1 FROM app_user_profiles WHERE lower(email) = lower($1))
+  RETURNING email
+)
+SELECT email FROM updated
+UNION ALL
+SELECT email FROM inserted
+LIMIT 1`, [email, passwordHash]);
+  if (!rows[0]) throw new Error("Account already exists.");
+  return rows[0];
+}
+
+export async function getUserProfileForLogin(email: string) {
+  const rows = await query<{ email: string; password_hash: string | null }>(`SELECT email, password_hash
+FROM app_user_profiles
+WHERE lower(email) = lower($1)
+LIMIT 1`, [email]);
   return rows[0];
 }
 
