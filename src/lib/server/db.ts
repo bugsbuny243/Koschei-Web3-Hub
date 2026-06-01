@@ -119,12 +119,12 @@ export type UserDashboard = {
 };
 
 export async function upsertUserProfile(authSubject: string, email: string) {
-  const rows = await query<{ auth_subject: string; email: string }>(`INSERT INTO app_user_profiles (auth_subject, email)
+  const rows = await query<{ id: string; email: string; role: string; plan_id: string | null; credits: number }>(`INSERT INTO app_user_profiles (auth_subject, email)
 VALUES ($1, lower($2))
 ON CONFLICT (auth_subject) DO UPDATE
 SET email = EXCLUDED.email,
     updated_at = now()
-RETURNING auth_subject, email`, [authSubject, email]);
+RETURNING id, email, role, plan_id, credits`, [authSubject, email]);
   return rows[0];
 }
 

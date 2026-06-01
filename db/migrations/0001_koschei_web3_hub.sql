@@ -17,7 +17,7 @@ ALTER TABLE payment_requests
   ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 
 -- Reuse the existing application profile table for Neon Auth member profiles only.
--- Password verification remains in Neon Auth; public signup cannot grant an admin or owner role.
+-- Password verification remains in Neon Auth; public signup cannot grant an admin role.
 ALTER TABLE app_user_profiles
 ADD COLUMN IF NOT EXISTS auth_subject TEXT;
 
