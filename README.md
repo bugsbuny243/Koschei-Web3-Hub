@@ -64,17 +64,10 @@ Tüm desteklenen değişkenler `.env.example` dosyasındadır. İlk MVP için ö
 APP_NAME=Koschei Web3 Hub
 APP_ENV=development
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-CORS_ALLOWED_ORIGIN=http://localhost:3000
 ADMIN_EMAIL=...
 ADMIN_PASSWORD=...
+AUTH_API_URL=http://localhost:8080
 USER_SESSION_SECRET=long-random-secret
-# Optional override; preferred when both session secrets exist:
-MEMBER_SESSION_SECRET=...
-EXPO_PUBLIC_NEON_AUTH_URL=...
-# Optional server-side override and JWT validation settings:
-NEON_AUTH_BASE_URL=...
-NEON_AUTH_ISSUER=...
-NEON_AUTH_JWKS_URL=...
 AI_PROVIDER=together
 AI_ENABLED=false
 TOGETHER_API_KEY=...
@@ -86,8 +79,8 @@ SOLANA_RPC_URL=...
 
 - AI opsiyoneldir. `AI_ENABLED=true`, `AI_PROVIDER=together` ve `TOGETHER_API_KEY` birlikte yoksa veya Together isteği başarısız olursa deterministik fallback metni döner.
 - Chain health için birincil yapılandırma `ALCHEMY_API_KEY` değeridir. Solana için `SOLANA_RPC_URL`, EVM chain'ler için opsiyonel `*_RPC_URL` override'ları kullanılabilir; explicit RPC URL tanımlanırsa ilgili chain için önceliklidir. API key ve RPC URL değerleri yalnızca sunucuda kalır.
-- `DATABASE_URL` ve `DIRECT_DATABASE_URL` Railway'deki mevcut Neon bağlantı ENV'leri olarak korunur. `DATABASE_URL` yalnızca sunucuda Neon Postgres bağlantısı için kullanılır; `NEXT_PUBLIC_` önekiyle yayınlanmaz.
-- Standart kullanıcı signup/login akışı Neon Auth `sign-up/email` ve `sign-in/email` endpoint'lerini kullanır. Uygulama yalnızca Neon Auth JWT içindeki `sub` ve `email` profil bilgilerini `app_user_profiles` içine upsert eder; parola hash'i saklamaz veya doğrulamaz. Dashboard oturumu güvenli, httpOnly `koschei_member_session` cookie kullanır. İmzalama için önce `MEMBER_SESSION_SECRET`, tanımlı değilse mevcut `USER_SESSION_SECRET` kullanılır; iki değişken de yoksa güvenli bir yapılandırma hatası gösterilir. `/admin` erişimi tamamen ayrıdır ve yalnızca server-side `ADMIN_EMAIL` ile `ADMIN_PASSWORD` doğrulamasını kullanır.
+- `DATABASE_URL` ve `DIRECT_DATABASE_URL` Railway'deki mevcut Neon bağlantı ENV'leri olarak korunur. `DATABASE_URL`, Go `auth-api` profil upsert işlemleri ve mevcut server-side web veri route'ları için kullanılır; `NEXT_PUBLIC_` önekiyle yayınlanmaz.
+- Standart kullanıcı signup/login akışında Next.js yalnızca Go `auth-api` servisine proxy olur. Go servisi Neon Auth `sign-up/email` ve `sign-in/email` endpoint'lerini çağırır, JWKS ile RS256 veya EdDSA JWT doğrulaması yapar ve yalnızca JWT içindeki `sub` ile `email` profil bilgilerini `app_user_profiles` içine upsert eder. Üye parolası, `password_hash` veya `member_accounts` tablosu kullanılmaz. Dashboard oturumu güvenli, httpOnly `koschei_member_session` cookie kullanır. `/admin` erişimi tamamen ayrıdır ve yalnızca server-side `ADMIN_EMAIL` ile `ADMIN_PASSWORD` doğrulamasını kullanır.
 - Shopier ödeme doğrulaması şimdilik admin tarafından manuel yapılır. Frontend siparişleri yalnızca `pending` oluşturur; public navigasyonda gösterilmeyen admin-only `/admin` alanında ödeme doğrulanmadan entitlement aktif olmaz.
 
 ## AI Akışı
@@ -102,11 +95,14 @@ TeklifPilot için mevcut `POST /api/ai/generate-quote` route'u korunmuştur.
 
 ## Railway Deploy Notları
 
-1. Repository'yi Railway servisine bağlayın.
-2. `.env.example` içindeki gerekli değişkenleri Railway Variables alanında tanımlayın.
-3. Secret değerlerde gerçek key kullanın; hiçbir secret'ı `NEXT_PUBLIC_` ile yayınlamayın.
-4. Kilitli bağımlılıklarla tekrarlanabilir kurulum için install komutu olarak `npm ci` kullanın. Build komutu olarak `npm run build`, start komutu olarak `npm run start` kullanın.
-5. Feature flag'leri ihtiyaca göre açın; trading, custody ve private-key deploy flag'lerini kapalı tutun.
+Railway üzerinde iki ayrı servis kurun:
+
+| Servis | Build / start | Gerekli değişkenler |
+| --- | --- | --- |
+| `web` | `npm ci && npm run build` / `npm run start` | `AUTH_API_URL`, `USER_SESSION_SECRET` ve mevcut admin / uygulama değişkenleri |
+| `auth-api` | `cd services/auth-api && go build -o auth-api .` / `cd services/auth-api && ./auth-api` | `DATABASE_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_ISSUER`, `NEON_AUTH_JWKS_URL`, `USER_SESSION_SECRET`, `CORS_ALLOWED_ORIGIN=https://tradepigloball.co`, `APP_ENV=production` |
+
+`AUTH_API_URL`, Railway içindeki Go servisinin internal URL değeridir. İki servis aynı `USER_SESSION_SECRET` değerini kullanmalıdır. Secret değerleri `NEXT_PUBLIC_` önekiyle yayınlamayın. Normal kullanıcı alanları yalnızca `/signup`, `/login` ve `/dashboard`; admin alanı yalnızca ayrı `/admin` route'udur. Owner Console, dashboard admin bağlantısı, Google Cloud, wallet, token trading veya custody akışı eklenmez.
 
 ## Yol haritası
 

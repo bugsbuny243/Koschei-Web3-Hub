@@ -10,7 +10,7 @@ export function MemberHeaderActions() {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/auth/session", { cache: "no-store" })
+    fetch("/api/auth/me", { cache: "no-store" })
       .then((response) => response.ok ? response.json() as Promise<{ loggedIn?: boolean }> : null)
       .then((payload) => { if (active) setSession(payload?.loggedIn ? "member" : "public"); })
       .catch(() => { if (active) setSession("public"); });
