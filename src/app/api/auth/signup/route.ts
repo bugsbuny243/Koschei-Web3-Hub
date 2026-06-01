@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   let identity: Awaited<ReturnType<typeof authenticateWithNeonAuth>>;
   try {
     assertMemberSessionConfigured();
-    const identity = await authenticateWithNeonAuth("signup", email, body.password as string);
+    identity = await authenticateWithNeonAuth("signup", email, body.password as string);
     try { await upsertUserProfile(identity.sub, identity.email); } catch (error) {
       logSignupIssue("profile upsert failed", error);
       return NextResponse.json({ error: "Could not create user profile." }, { status: 503 });
