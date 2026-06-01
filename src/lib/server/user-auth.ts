@@ -6,10 +6,11 @@ const COOKIE_NAME = "koschei_member_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
 
 export type UserSession = { sub: string; email: string; expiresAt: number };
+export class MemberSessionConfigurationError extends Error {}
 
 export function assertMemberSessionConfigured() {
-  const value = process.env.USER_SESSION_SECRET?.trim();
-  if (!value) throw new Error("USER_SESSION_SECRET is not configured. Set USER_SESSION_SECRET=long-random-secret.");
+  const value = process.env.MEMBER_SESSION_SECRET?.trim() || process.env.USER_SESSION_SECRET?.trim();
+  if (!value) throw new MemberSessionConfigurationError("Auth session secret is not configured.");
   return value;
 }
 
@@ -50,6 +51,7 @@ export async function clearUserCookie() {
 }
 
 export async function getUserSession(): Promise<UserSession | null> {
+  assertMemberSessionConfigured();
   const cookieStore = await cookies();
   const value = cookieStore.get(COOKIE_NAME)?.value;
   if (!value) return null;

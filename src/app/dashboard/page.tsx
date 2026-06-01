@@ -9,7 +9,7 @@ const modules = [["Builder", "/builder", "Create portable game asset concepts."]
 export default async function DashboardPage() {
   let session;
   try { session = await getUserSession(); } catch {
-    return <main className="web3-page"><SiteHeader /><section className="mx-auto max-w-3xl px-5 py-16 lg:px-8"><p className="eyebrow">Member dashboard</p><h1 className="mt-4 text-4xl font-black text-white">Member sessions are unavailable</h1><p className="mt-4 text-sm leading-7 text-rose-200">Set USER_SESSION_SECRET=long-random-secret on the server.</p></section></main>;
+    return <main className="web3-page"><SiteHeader /><section className="mx-auto max-w-3xl px-5 py-16 lg:px-8"><p className="eyebrow">Member dashboard</p><h1 className="mt-4 text-4xl font-black text-white">Member sessions are unavailable</h1><p className="mt-4 text-sm leading-7 text-rose-200">Auth session secret is not configured.</p></section></main>;
   }
   if (!session) redirect("/login");
   let dashboard;
