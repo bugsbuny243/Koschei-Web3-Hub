@@ -121,12 +121,12 @@ export type UserDashboard = {
 export async function createUserProfile(email: string, passwordHash: string) {
   const rows = await query<{ email: string }>(`WITH updated AS (
   UPDATE app_user_profiles
-  SET password_hash = $2, updated_at = now()
+  SET password_hash = $2, role = 'user', updated_at = now()
   WHERE lower(email) = lower($1) AND password_hash IS NULL
   RETURNING email
 ), inserted AS (
-  INSERT INTO app_user_profiles (email, password_hash)
-  SELECT $1, $2
+  INSERT INTO app_user_profiles (email, password_hash, role)
+  SELECT $1, $2, 'user'
   WHERE NOT EXISTS (SELECT 1 FROM app_user_profiles WHERE lower(email) = lower($1))
   RETURNING email
 )
@@ -141,7 +141,7 @@ LIMIT 1`, [email, passwordHash]);
 export async function getUserProfileForLogin(email: string) {
   const rows = await query<{ email: string; password_hash: string | null }>(`SELECT email, password_hash
 FROM app_user_profiles
-WHERE lower(email) = lower($1)
+WHERE lower(email) = lower($1) AND role = 'user'
 LIMIT 1`, [email]);
   return rows[0];
 }
@@ -171,7 +171,7 @@ LEFT JOIN LATERAL (
   FROM web3_outputs
   WHERE lower(web3_outputs.email) = lower(profile.email)
 ) outputs ON true
-WHERE lower(profile.email) = lower($1)
+WHERE lower(profile.email) = lower($1) AND profile.role = 'user'
 LIMIT 1`, [email]);
   return rows[0];
 }
