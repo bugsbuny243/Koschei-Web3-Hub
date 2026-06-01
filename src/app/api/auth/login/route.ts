@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { upsertUserProfile } from "@/lib/server/db";
-import { authenticateWithNeonAuth, NeonAuthConfigurationError } from "@/lib/server/neon-auth";
+import { authenticateWithNeonAuth, isCredentialRejection, NeonAuthConfigurationError, NeonAuthProviderError, NeonAuthRequestError, NeonAuthSessionError, NeonAuthVerificationError } from "@/lib/server/neon-auth";
 import { assertMemberSessionConfigured, isValidEmail, isValidPassword, MemberSessionConfigurationError, normalizeEmail, setUserCookie } from "@/lib/server/user-auth";
+
+function logLoginIssue(event: string, error: unknown) {
+  console.error(`[member-login] ${event}`, { error: error instanceof Error ? error.message : "Unknown login failure." });
+}
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -11,12 +15,18 @@ export async function POST(request: Request) {
   try {
     assertMemberSessionConfigured();
     const identity = await authenticateWithNeonAuth("login", email, body.password as string);
-    await upsertUserProfile(identity.sub, identity.email);
+    try { await upsertUserProfile(identity.sub, identity.email); } catch (error) {
+      logLoginIssue("profile upsert failed", error);
+      return NextResponse.json({ error: "Could not create user profile." }, { status: 503 });
+    }
     await setUserCookie(identity.sub, identity.email);
     return NextResponse.json({ email: identity.email });
   } catch (error) {
-    if (error instanceof MemberSessionConfigurationError) return NextResponse.json({ error: error.message }, { status: 503 });
-    if (error instanceof NeonAuthConfigurationError) return NextResponse.json({ error: "Auth service is not configured." }, { status: 503 });
-    return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+    if (error instanceof MemberSessionConfigurationError || error instanceof NeonAuthConfigurationError) return NextResponse.json({ error: "Auth service is not configured." }, { status: 503 });
+    if (error instanceof NeonAuthRequestError && isCredentialRejection(error)) return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+    if (error instanceof NeonAuthSessionError) return NextResponse.json({ error: "Auth provider did not return a session." }, { status: 502 });
+    if (error instanceof NeonAuthVerificationError) return NextResponse.json({ error: "Auth token verification failed." }, { status: 502 });
+    if (!(error instanceof NeonAuthProviderError || error instanceof NeonAuthRequestError)) logLoginIssue("unexpected auth failure", error);
+    return NextResponse.json({ error: "Auth provider request failed." }, { status: 502 });
   }
 }

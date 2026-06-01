@@ -35,7 +35,7 @@ Koschei; chain'ler, altyapı sağlayıcıları ve geliştirici toplulukları tar
 | `/docs` | Geliştirici dokümantasyonu |
 | `/login`, `/signup` | Standart kullanıcı giriş ve kayıt route'ları |
 | `/dashboard` | Giriş gerektiren kullanıcı paket ve çıktı hakkı paneli |
-| `/admin` | Public navigasyonda gösterilmeyen owner-only operasyon paneli |
+| `/admin` | Public navigasyonda gösterilmeyen admin-only operasyon paneli |
 | `/quote/new`, `/quote/preview` | Mevcut TeklifPilot route'ları |
 
 ## Yerel Çalıştırma
@@ -88,7 +88,7 @@ SOLANA_RPC_URL=...
 - Chain health için birincil yapılandırma `ALCHEMY_API_KEY` değeridir. Solana için `SOLANA_RPC_URL`, EVM chain'ler için opsiyonel `*_RPC_URL` override'ları kullanılabilir; explicit RPC URL tanımlanırsa ilgili chain için önceliklidir. API key ve RPC URL değerleri yalnızca sunucuda kalır.
 - `DATABASE_URL` ve `DIRECT_DATABASE_URL` Railway'deki mevcut Neon bağlantı ENV'leri olarak korunur. `DATABASE_URL` yalnızca sunucuda Neon Postgres bağlantısı için kullanılır; `NEXT_PUBLIC_` önekiyle yayınlanmaz.
 - Standart kullanıcı signup/login akışı Neon Auth `sign-up/email` ve `sign-in/email` endpoint'lerini kullanır. Uygulama yalnızca Neon Auth JWT içindeki `sub` ve `email` profil bilgilerini `app_user_profiles` içine upsert eder; parola hash'i saklamaz veya doğrulamaz. Dashboard oturumu güvenli, httpOnly `koschei_member_session` cookie kullanır. İmzalama için önce `MEMBER_SESSION_SECRET`, tanımlı değilse mevcut `USER_SESSION_SECRET` kullanılır; iki değişken de yoksa güvenli bir yapılandırma hatası gösterilir. `/admin` erişimi tamamen ayrıdır ve yalnızca server-side `ADMIN_EMAIL` ile `ADMIN_PASSWORD` doğrulamasını kullanır.
-- Shopier ödeme doğrulaması şimdilik admin tarafından manuel yapılır. Frontend siparişleri yalnızca `pending` oluşturur; public navigasyonda gösterilmeyen owner-only `/admin` alanında ödeme doğrulanmadan entitlement aktif olmaz.
+- Shopier ödeme doğrulaması şimdilik admin tarafından manuel yapılır. Frontend siparişleri yalnızca `pending` oluşturur; public navigasyonda gösterilmeyen admin-only `/admin` alanında ödeme doğrulanmadan entitlement aktif olmaz.
 
 ## AI Akışı
 
