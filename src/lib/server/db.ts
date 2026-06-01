@@ -118,49 +118,42 @@ export type UserDashboard = {
   saved_outputs: number;
 };
 
-export async function createMemberAccount(email: string, passwordHash: string) {
-  const rows = await query<{ email: string }>(`INSERT INTO member_accounts (email, password_hash, role, status)
-VALUES (lower($1), $2, 'user', 'active')
-ON CONFLICT DO NOTHING
-RETURNING email`, [email, passwordHash]);
-  if (!rows[0]) throw new Error("Account already exists. Please sign in.");
+export async function upsertUserProfile(authSubject: string, email: string) {
+  const rows = await query<{ auth_subject: string; email: string }>(`INSERT INTO app_user_profiles (auth_subject, email)
+VALUES ($1, lower($2))
+ON CONFLICT (auth_subject) DO UPDATE
+SET email = EXCLUDED.email,
+    updated_at = now()
+RETURNING auth_subject, email`, [authSubject, email]);
   return rows[0];
 }
 
-export async function getMemberAccountForLogin(email: string) {
-  const rows = await query<{ email: string; password_hash: string }>(`SELECT email, password_hash
-FROM member_accounts
-WHERE lower(email) = lower($1) AND role = 'user' AND status = 'active'
-LIMIT 1`, [email]);
-  return rows[0];
-}
-
-export async function getUserDashboard(email: string) {
-  const rows = await query<UserDashboard>(`SELECT account.email,
+export async function getUserDashboard(authSubject: string) {
+  const rows = await query<UserDashboard>(`SELECT profile.email,
   latest.plan_name,
   latest.status AS package_status,
   COALESCE(rights.outputs_remaining, 0)::int AS outputs_remaining,
   COALESCE(outputs.saved_outputs, 0)::int AS saved_outputs
-FROM member_accounts account
+FROM app_user_profiles profile
 LEFT JOIN LATERAL (
   SELECT plans.name AS plan_name, entitlements.status
   FROM entitlements
   JOIN plans ON plans.id = entitlements.plan_id
-  WHERE lower(entitlements.email) = lower(account.email)
+  WHERE lower(entitlements.email) = lower(profile.email)
   ORDER BY (entitlements.status = 'active') DESC, entitlements.created_at DESC
   LIMIT 1
 ) latest ON true
 LEFT JOIN LATERAL (
   SELECT SUM(entitlements.outputs_remaining) AS outputs_remaining
   FROM entitlements
-  WHERE lower(entitlements.email) = lower(account.email) AND entitlements.status = 'active'
+  WHERE lower(entitlements.email) = lower(profile.email) AND entitlements.status = 'active'
 ) rights ON true
 LEFT JOIN LATERAL (
   SELECT COUNT(*) AS saved_outputs
   FROM web3_outputs
-  WHERE lower(web3_outputs.email) = lower(account.email)
+  WHERE lower(web3_outputs.email) = lower(profile.email)
 ) outputs ON true
-WHERE lower(account.email) = lower($1) AND account.role = 'user' AND account.status = 'active'
-LIMIT 1`, [email]);
+WHERE profile.auth_subject = $1
+LIMIT 1`, [authSubject]);
   return rows[0];
 }

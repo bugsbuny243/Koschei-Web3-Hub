@@ -2,18 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
 import { getUserDashboard } from "@/lib/server/db";
-import { getNeonAuthSession } from "@/lib/server/neon-auth";
+import { getUserSession } from "@/lib/server/user-auth";
 
 const modules = [["Builder", "/builder", "Create portable game asset concepts."], ["Metadata", "/metadata", "Generate structured Web3 metadata."], ["Risk", "/risk", "Review transparent project signals."], ["Chains", "/chains", "Check supported testnet connectivity."]];
 
 export default async function DashboardPage() {
   let session;
-  try { session = await getNeonAuthSession(); } catch {
-    return <main className="web3-page"><SiteHeader /><section className="mx-auto max-w-3xl px-5 py-16 lg:px-8"><p className="eyebrow">Member dashboard</p><h1 className="mt-4 text-4xl font-black text-white">Member sessions are unavailable</h1><p className="mt-4 text-sm leading-7 text-rose-200">Configure USER_SESSION_SECRET or MEMBER_SESSION_SECRET on the server.</p></section></main>;
+  try { session = await getUserSession(); } catch {
+    return <main className="web3-page"><SiteHeader /><section className="mx-auto max-w-3xl px-5 py-16 lg:px-8"><p className="eyebrow">Member dashboard</p><h1 className="mt-4 text-4xl font-black text-white">Member sessions are unavailable</h1><p className="mt-4 text-sm leading-7 text-rose-200">Set USER_SESSION_SECRET=long-random-secret on the server.</p></section></main>;
   }
   if (!session) redirect("/login");
   let dashboard;
-  try { dashboard = await getUserDashboard(session.email); } catch {
+  try { dashboard = await getUserDashboard(session.sub); } catch {
     return <main className="web3-page"><SiteHeader /><section className="mx-auto max-w-3xl px-5 py-16 lg:px-8"><p className="eyebrow">Member dashboard</p><h1 className="mt-4 text-4xl font-black text-white">Member account data is unavailable</h1><p className="mt-4 text-sm leading-7 text-rose-200">Confirm the member auth migration was applied.</p></section></main>;
   }
   if (!dashboard) redirect("/login");

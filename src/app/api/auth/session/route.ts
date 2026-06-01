@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
-import { getNeonAuthSession } from "@/lib/server/neon-auth";
+import { getUserSession } from "@/lib/server/user-auth";
 
 export async function GET() {
-  const user = await getNeonAuthSession();
-  if (!user) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
-  return NextResponse.json({ email: user.email, id: user.id });
+  try {
+    const session = await getUserSession();
+    if (!session) return NextResponse.json({ loggedIn: false }, { status: 401 });
+    return NextResponse.json({ loggedIn: true, email: session.email });
+  } catch {
+    return NextResponse.json({ loggedIn: false }, { status: 503 });
+  }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { authenticateWithNeonAuth, appendNeonAuthCookies } from "@/lib/server/neon-auth";
-import { isValidEmail, isValidPassword, normalizeEmail } from "@/lib/server/user-auth";
+import { upsertUserProfile } from "@/lib/server/db";
+import { authenticateWithNeonAuth, NeonAuthConfigurationError } from "@/lib/server/neon-auth";
+import { isValidEmail, isValidPassword, normalizeEmail, setUserCookie } from "@/lib/server/user-auth";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -8,10 +9,12 @@ export async function POST(request: Request) {
   const email = normalizeEmail(body.email);
   if (!isValidEmail(email) || !isValidPassword(body.password)) return NextResponse.json({ error: "Enter a valid email and a password with at least 8 characters." }, { status: 400 });
   try {
-    const { user, cookies: authCookies } = await authenticateWithNeonAuth("signup", email, body.password as string);
-    const response = NextResponse.json({ email: user.email }, { status: 201 });
-    return appendNeonAuthCookies(response, authCookies);
-  } catch {
-    return NextResponse.json({ error: "Could not create account. The email may already be registered." }, { status: 400 });
+    const identity = await authenticateWithNeonAuth("signup", email, body.password as string);
+    await upsertUserProfile(identity.sub, identity.email);
+    await setUserCookie(identity.sub, identity.email);
+    return NextResponse.json({ email: identity.email }, { status: 201 });
+  } catch (error) {
+    if (error instanceof NeonAuthConfigurationError) return NextResponse.json({ error: "Auth service is not configured." }, { status: 503 });
+    return NextResponse.json({ error: "Account already exists. Please sign in." }, { status: 400 });
   }
 }
