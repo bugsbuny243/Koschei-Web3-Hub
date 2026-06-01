@@ -51,6 +51,7 @@ npm run dev
 Tarayıcıda [http://localhost:3000](http://localhost:3000) adresini açın. Production kontrolü için:
 
 ```bash
+npm run check:auth-architecture
 npm run lint
 npm run build
 npm run start

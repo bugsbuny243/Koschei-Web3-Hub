@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "check:auth-architecture": "./scripts/check-member-auth-architecture.sh"
   },
   "dependencies": {
     "next": "16.2.6",
