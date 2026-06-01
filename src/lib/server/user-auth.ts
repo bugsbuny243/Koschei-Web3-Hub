@@ -2,13 +2,19 @@ import "server-only";
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
-const COOKIE_NAME = "koschei_user";
+const COOKIE_NAME = "koschei_member_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
 
 type UserSession = { email: string; expiresAt: number };
 
+export function assertMemberSessionConfigured() {
+  const value = process.env.USER_SESSION_SECRET || process.env.MEMBER_SESSION_SECRET;
+  if (!value) throw new Error("USER_SESSION_SECRET or MEMBER_SESSION_SECRET is not configured.");
+  return value;
+}
+
 function sessionSecret() {
-  return process.env.USER_SESSION_SECRET || process.env.ADMIN_PASSWORD || "koschei-local-user-session-secret";
+  return assertMemberSessionConfigured();
 }
 
 function sign(value: string) {
@@ -49,7 +55,7 @@ export async function setUserCookie(email: string) {
   (await cookies()).set(COOKIE_NAME, `${payload}.${sign(payload)}`, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: true,
     path: "/",
     maxAge: SESSION_SECONDS,
   });
@@ -60,7 +66,9 @@ export async function clearUserCookie() {
 }
 
 export async function getUserSession(): Promise<UserSession | null> {
-  const value = (await cookies()).get(COOKIE_NAME)?.value;
+  const cookieStore = await cookies();
+  assertMemberSessionConfigured();
+  const value = cookieStore.get(COOKIE_NAME)?.value;
   if (!value) return null;
   const [payload, signature] = value.split(".");
   if (!payload || !signature || !safeEqual(sign(payload), signature)) return null;
