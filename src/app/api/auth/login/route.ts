@@ -13,6 +13,6 @@ export async function POST(request: Request) {
     await setUserCookie(profile.email.toLowerCase());
     return NextResponse.json({ email: profile.email });
   } catch {
-    return NextResponse.json({ error: "Could not sign in." }, { status: 503 });
+    return NextResponse.json({ error: "Could not sign in. Confirm database migration was applied." }, { status: 503 });
   }
 }

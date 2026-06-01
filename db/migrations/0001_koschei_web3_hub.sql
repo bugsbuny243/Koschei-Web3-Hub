@@ -19,17 +19,8 @@ ALTER TABLE payment_requests
 -- Reuse the existing application profile table for public member authentication.
 -- Public signup always inserts role = 'user'; it cannot grant an admin or owner role.
 -- Admin access remains owner-only through ADMIN_EMAIL / ADMIN_PASSWORD.
-CREATE TABLE IF NOT EXISTS app_user_profiles (
-  email TEXT PRIMARY KEY,
-  password_hash TEXT,
-  role TEXT NOT NULL DEFAULT 'user',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 ALTER TABLE app_user_profiles
-  ADD COLUMN IF NOT EXISTS password_hash TEXT,
-  ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user';
+ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
 CREATE UNIQUE INDEX IF NOT EXISTS app_user_profiles_lower_email_idx ON app_user_profiles (lower(email));
 
