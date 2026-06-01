@@ -12,6 +12,8 @@ export class NeonAuthConfigurationError extends Error {}
 export class NeonAuthRequestError extends Error {
   constructor(message: string, public readonly status: number) { super(message); }
 }
+export class NeonAuthProviderRequestError extends Error {}
+export class NeonAuthSessionError extends Error {}
 
 function authBaseUrl() {
   const value = (process.env.NEON_AUTH_BASE_URL || process.env.EXPO_PUBLIC_NEON_AUTH_URL || "").trim().replace(/\/+$/, "");
@@ -74,18 +76,24 @@ async function identityFromToken(token: string): Promise<NeonAuthIdentity> {
 export async function authenticateWithNeonAuth(mode: "login" | "signup", email: string, password: string) {
   const path = mode === "signup" ? "/sign-up/email" : "/sign-in/email";
   const body = mode === "signup" ? { email, password, name: email.split("@")[0] || "User" } : { email, password };
-  const response = await fetch(`${authBaseUrl()}${path}`, {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    cache: "no-store",
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${authBaseUrl()}${path}`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (error instanceof NeonAuthConfigurationError) throw error;
+    throw new NeonAuthProviderRequestError("Auth provider request failed.");
+  }
   const payload = await response.json().catch(() => ({})) as JsonRecord;
   if (!response.ok) {
     const message = payload.message ?? payload.error ?? `Neon Auth request failed (${response.status})`;
     throw new NeonAuthRequestError(String(message), response.status);
   }
   const token = response.headers.get("set-auth-jwt") || findToken(payload);
-  if (!token) throw new Error("Neon Auth response did not include an auth token.");
+  if (!token) throw new NeonAuthSessionError("Auth provider did not return a session.");
   return identityFromToken(token);
 }
