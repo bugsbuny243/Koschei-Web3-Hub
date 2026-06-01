@@ -89,11 +89,14 @@ func main() {
 		log.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", s.health)
-	mux.HandleFunc("POST /auth/signup", s.signup)
-	mux.HandleFunc("POST /auth/login", s.login)
-	mux.HandleFunc("GET /auth/me", s.me)
-	mux.HandleFunc("POST /auth/logout", s.logout)
+	mux.HandleFunc("/health", jsonMethod(http.MethodGet, s.health))
+	mux.HandleFunc("/auth/signup", jsonMethod(http.MethodPost, s.signup))
+	mux.HandleFunc("/auth/login", jsonMethod(http.MethodPost, s.login))
+	mux.HandleFunc("/auth/me", jsonMethod(http.MethodGet, s.me))
+	mux.HandleFunc("/auth/logout", jsonMethod(http.MethodPost, s.logout))
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		writeError(w, http.StatusNotFound, "Not found.")
+	})
 	addr := envOr("AUTH_API_ADDR", ":8080")
 	log.Printf("auth-api listening on %s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
@@ -457,6 +460,16 @@ func normalizedIssuer(configured, base, jwksURL string) (string, error) {
 		return "", errors.New("NEON_AUTH_JWKS_URL is invalid")
 	}
 	return parsed.Scheme + "://" + parsed.Host, nil
+}
+func jsonMethod(method string, handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != method {
+			w.Header().Set("Allow", method)
+			writeError(w, http.StatusMethodNotAllowed, "Method not allowed.")
+			return
+		}
+		handler(w, r)
+	}
 }
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]any{"error": message})

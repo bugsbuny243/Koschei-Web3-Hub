@@ -17,8 +17,8 @@ export function AuthForm({ mode }: Props) {
     const data = new FormData(event.currentTarget);
     try {
       const response = await fetch(`/api/auth/${mode}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: data.get("email"), password: data.get("password") }) });
-      const payload = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "Authentication failed.");
+      const payload = await response.json() as { error?: string; message?: string };
+      if (!response.ok) throw new Error(payload.error || payload.message || "Authentication failed.");
       router.push("/dashboard"); router.refresh();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Authentication failed."); } finally { setLoading(false); }
   }
