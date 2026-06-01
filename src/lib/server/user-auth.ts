@@ -9,7 +9,7 @@ export type UserSession = { sub: string; email: string; expiresAt: number };
 export class MemberSessionConfigurationError extends Error {}
 
 export function assertMemberSessionConfigured() {
-  const value = process.env.MEMBER_SESSION_SECRET?.trim() || process.env.USER_SESSION_SECRET?.trim();
+  const value = process.env.USER_SESSION_SECRET?.trim();
   if (!value) throw new MemberSessionConfigurationError("Auth session secret is not configured.");
   return value;
 }
