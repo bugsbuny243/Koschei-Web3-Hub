@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
-import { getUserSession } from "@/lib/server/user-auth";
+import { getNeonAuthSession } from "@/lib/server/neon-auth";
 
 export async function GET() {
-  try {
-    const session = await getUserSession();
-    return NextResponse.json({ loggedIn: Boolean(session), email: session?.email });
-  } catch {
-    return NextResponse.json({ error: "Member sessions are unavailable. Configure USER_SESSION_SECRET or MEMBER_SESSION_SECRET." }, { status: 503 });
-  }
+  const user = await getNeonAuthSession();
+  if (!user) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  return NextResponse.json({ email: user.email, id: user.id });
 }
