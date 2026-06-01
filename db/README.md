@@ -1,6 +1,6 @@
 # Neon Postgres setup
 
-Run `sql/2026_05_31_koschei_web3_hub_schema.sql` against the existing Koschei Web3 Hub Neon database before starting the app. The migration is idempotent, extends the existing `plans` and `payment_requests` tables, creates the Web3 Hub persistence tables, and seeds the Starter, Builder, and Studio packs.
+Run `sql/2026_05_31_koschei_web3_hub_schema.sql` and then `sql/2026_06_01_member_accounts.sql` against the existing Koschei Web3 Hub Neon database before starting the app. Both migrations are idempotent. The member-auth migration creates the isolated `member_accounts` table without deleting or reusing `app_user_profiles`.
 
 Set `DATABASE_URL` only in the server environment. Never prefix it with `NEXT_PUBLIC_`. The application uses Neon's server-side SQL-over-HTTP endpoint and does not send the connection string to browser code.
 

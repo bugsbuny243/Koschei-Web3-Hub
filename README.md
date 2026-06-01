@@ -68,6 +68,7 @@ CORS_ALLOWED_ORIGIN=http://localhost:3000
 ADMIN_EMAIL=...
 ADMIN_PASSWORD=...
 USER_SESSION_SECRET=...
+# Alternatively: MEMBER_SESSION_SECRET=...
 AI_PROVIDER=together
 AI_ENABLED=false
 TOGETHER_API_KEY=...
@@ -80,7 +81,7 @@ SOLANA_RPC_URL=...
 - AI opsiyoneldir. `AI_ENABLED=true`, `AI_PROVIDER=together` ve `TOGETHER_API_KEY` birlikte yoksa veya Together isteği başarısız olursa deterministik fallback metni döner.
 - Chain health için birincil yapılandırma `ALCHEMY_API_KEY` değeridir. Solana için `SOLANA_RPC_URL`, EVM chain'ler için opsiyonel `*_RPC_URL` override'ları kullanılabilir; explicit RPC URL tanımlanırsa ilgili chain için önceliklidir. API key ve RPC URL değerleri yalnızca sunucuda kalır.
 - `DATABASE_URL` ve `DIRECT_DATABASE_URL` Railway'deki mevcut Neon bağlantı ENV'leri olarak korunur. `DATABASE_URL` yalnızca sunucuda Neon Postgres bağlantısı için kullanılır; `NEXT_PUBLIC_` önekiyle yayınlanmaz.
-- Standart kullanıcı signup/login akışı `app_user_profiles.password_hash` üzerinden çalışır ve `USER_SESSION_SECRET` ile imzalanmış ayrı bir member cookie kullanır. Owner email aynı zamanda standart kullanıcı hesabı olarak kaydolabilir; `/admin` erişimi ayrıca `ADMIN_EMAIL` ve `ADMIN_PASSWORD` doğrulamasını gerektirir. `sql/2026_05_31_koschei_web3_hub_schema.sql` mevcut Web3 Hub şemasını genişletir ve paket seed verilerini ekler.
+- Standart kullanıcı signup/login akışı yalnızca `member_accounts` tablosu üzerinden çalışır ve `USER_SESSION_SECRET` veya `MEMBER_SESSION_SECRET` ile imzalanmış güvenli, httpOnly `koschei_member_session` cookie kullanır. `app_user_profiles` silinmez ancak public member login için kullanılmaz. `/admin` erişimi tamamen ayrıdır ve yalnızca `ADMIN_EMAIL` ile `ADMIN_PASSWORD` doğrulamasını kullanır. Web3 Hub şemasından sonra `sql/2026_06_01_member_accounts.sql` migration'ını uygulayın.
 - Shopier ödeme doğrulaması şimdilik admin tarafından manuel yapılır. Frontend siparişleri yalnızca `pending` oluşturur; public navigasyonda gösterilmeyen owner-only `/admin` alanında ödeme doğrulanmadan entitlement aktif olmaz.
 
 ## AI Akışı
@@ -112,4 +113,4 @@ TeklifPilot için mevcut `POST /api/ai/generate-quote` route'u korunmuştur.
 
 ## Web3 Hub Database Migration
 
-`sql/2026_05_31_koschei_web3_hub_schema.sql` migration'ı mevcut tabloları silmez. Web3 Hub paketleri mevcut `plans` tablosuna seed edilir. `entitlements`, satın alınan çıktı haklarını tutar; `web3_outputs`, üretilen metadata, risk ve launch çıktılarını saklamak içindir. Shopier ödemeleri ilk aşamada manuel doğrulanır. `DATABASE_URL` yalnızca sunucu tarafında tutulmalıdır; frontend'e açık bir `NEXT_PUBLIC_DATABASE_URL` oluşturulmaz.
+`sql/2026_05_31_koschei_web3_hub_schema.sql` ve ardından `sql/2026_06_01_member_accounts.sql` migration'larını uygulayın. Migration'lar mevcut tabloları silmez. Web3 Hub paketleri mevcut `plans` tablosuna seed edilir. `entitlements`, satın alınan çıktı haklarını tutar; `web3_outputs`, üretilen metadata, risk ve launch çıktılarını saklamak içindir. Shopier ödemeleri ilk aşamada manuel doğrulanır. `DATABASE_URL` yalnızca sunucu tarafında tutulmalıdır; frontend'e açık bir `NEXT_PUBLIC_DATABASE_URL` oluşturulmaz.

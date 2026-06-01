@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { authenticateWithNeonAuth } from "@/lib/server/neon-auth";
-import { isValidEmail, isValidPassword, normalizeEmail, setUserCookie } from "@/lib/server/user-auth";
+import { getMemberAccountForLogin } from "@/lib/server/db";
+import { assertMemberSessionConfigured, isValidEmail, isValidPassword, normalizeEmail, setUserCookie, verifyPassword } from "@/lib/server/user-auth";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -8,10 +8,14 @@ export async function POST(request: Request) {
   const email = normalizeEmail(body.email);
   if (!isValidEmail(email) || !isValidPassword(body.password)) return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   try {
-    const { user } = await authenticateWithNeonAuth("login", email, body.password as string);
-    await setUserCookie(user.email);
-    return NextResponse.json({ email: user.email });
-  } catch {
-    return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+    assertMemberSessionConfigured();
+    const account = await getMemberAccountForLogin(email);
+    if (!account || !verifyPassword(body.password, account.password_hash)) return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+    await setUserCookie(account.email);
+    return NextResponse.json({ email: account.email });
+  } catch (reason) {
+    const message = reason instanceof Error ? reason.message : "";
+    if (message.includes("SESSION_SECRET")) return NextResponse.json({ error: "Could not sign in. Configure USER_SESSION_SECRET or MEMBER_SESSION_SECRET." }, { status: 503 });
+    return NextResponse.json({ error: "Could not sign in. Confirm member auth migration was applied." }, { status: 503 });
   }
 }
