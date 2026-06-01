@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getUserProfileForLogin } from "@/lib/server/db";
-import { isValidEmail, isValidPassword, normalizeEmail, setUserCookie, verifyPassword } from "@/lib/server/user-auth";
+import { authenticateWithNeonAuth } from "@/lib/server/neon-auth";
+import { isValidEmail, isValidPassword, normalizeEmail, setUserCookie } from "@/lib/server/user-auth";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -8,11 +8,10 @@ export async function POST(request: Request) {
   const email = normalizeEmail(body.email);
   if (!isValidEmail(email) || !isValidPassword(body.password)) return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   try {
-    const profile = await getUserProfileForLogin(email);
-    if (!profile?.password_hash || !verifyPassword(body.password, profile.password_hash)) return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
-    await setUserCookie(profile.email.toLowerCase());
-    return NextResponse.json({ email: profile.email });
+    const { user } = await authenticateWithNeonAuth("login", email, body.password as string);
+    await setUserCookie(user.email);
+    return NextResponse.json({ email: user.email });
   } catch {
-    return NextResponse.json({ error: "Could not sign in. Confirm database migration was applied." }, { status: 503 });
+    return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
 }
