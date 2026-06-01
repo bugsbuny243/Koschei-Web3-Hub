@@ -119,29 +119,49 @@ export type UserDashboard = {
 };
 
 export async function createUserProfile(email: string, passwordHash: string) {
-  const rows = await query<{ email: string }>(`WITH updated AS (
-  UPDATE app_user_profiles
-  SET password_hash = $2, role = 'user', updated_at = now()
-  WHERE lower(email) = lower($1) AND password_hash IS NULL
-  RETURNING email
-), inserted AS (
-  INSERT INTO app_user_profiles (email, password_hash, role)
-  SELECT $1, $2, 'user'
-  WHERE NOT EXISTS (SELECT 1 FROM app_user_profiles WHERE lower(email) = lower($1))
-  RETURNING email
+  const updated = await query<{ email: string }>(`UPDATE app_user_profiles
+SET password_hash = $2,
+    role = 'user',
+    plan_id = COALESCE(plan_id, 'free'),
+    credits = COALESCE(credits, 0),
+    updated_at = now()
+WHERE lower(email) = lower($1)
+AND password_hash IS NULL
+RETURNING email`, [email, passwordHash]);
+  if (updated[0]) return updated[0];
+
+  const inserted = await query<{ email: string }>(`INSERT INTO app_user_profiles (
+  id,
+  auth_subject,
+  email,
+  role,
+  plan_id,
+  credits,
+  password_hash,
+  created_at,
+  updated_at
 )
-SELECT email FROM updated
-UNION ALL
-SELECT email FROM inserted
-LIMIT 1`, [email, passwordHash]);
-  if (!rows[0]) throw new Error("Account already exists.");
-  return rows[0];
+VALUES (
+  gen_random_uuid(),
+  'email:' || lower($1),
+  lower($1),
+  'user',
+  'free',
+  0,
+  $2,
+  now(),
+  now()
+)
+ON CONFLICT DO NOTHING
+RETURNING email`, [email, passwordHash]);
+  if (!inserted[0]) throw new Error("Account already exists.");
+  return inserted[0];
 }
 
 export async function getUserProfileForLogin(email: string) {
   const rows = await query<{ email: string; password_hash: string | null }>(`SELECT email, password_hash
 FROM app_user_profiles
-WHERE lower(email) = lower($1) AND role = 'user'
+WHERE lower(email) = lower($1)
 LIMIT 1`, [email]);
   return rows[0];
 }
