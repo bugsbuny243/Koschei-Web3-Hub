@@ -17,20 +17,19 @@ ALTER TABLE payment_requests
   ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 
 -- Reuse the existing application profile table for public member authentication.
--- Public signup is delegated to Neon Auth and only creates a standard user profile.
+-- Public signup only inserts email and password_hash; it cannot grant an admin or owner role.
 -- Admin access remains owner-only through ADMIN_EMAIL / ADMIN_PASSWORD.
 CREATE TABLE IF NOT EXISTS app_user_profiles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  auth_subject TEXT UNIQUE NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user',
-  plan_id TEXT NOT NULL DEFAULT 'free',
-  credits INTEGER NOT NULL DEFAULT 0,
+  email TEXT PRIMARY KEY,
+  password_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS app_user_profiles_lower_email_idx ON app_user_profiles (lower(email));
+ALTER TABLE app_user_profiles
+  ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS app_user_profiles_lower_email_idx ON app_user_profiles (lower(email));
 
 -- Web3 Hub entitlement and generated-output persistence layer.
 CREATE TABLE IF NOT EXISTS entitlements (
