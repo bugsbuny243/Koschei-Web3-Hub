@@ -1,6 +1,6 @@
 # Neon Postgres setup
 
-Run `sql/2026_05_31_koschei_web3_hub_schema.sql` against the existing Koschei Web3 Hub Neon database before starting the app. The migration is idempotent and does not remove legacy columns. Public members authenticate through Neon Auth; `app_user_profiles` stores only the member profile, plan, and credit data keyed by `auth_subject`.
+Run `sql/2026_05_31_koschei_web3_hub_schema.sql` against the existing Koschei Web3 Hub Neon database before starting the app. The migration is idempotent and removes the legacy `password_hash` column because Neon Auth owns password verification. Public members authenticate through Neon Auth; `app_user_profiles` stores only the member profile, plan, and credit data keyed by `auth_subject`.
 
 Set `DATABASE_URL` only in the server environment. Never prefix it with `NEXT_PUBLIC_`. The application uses Neon's server-side SQL-over-HTTP endpoint and does not send the connection string to browser code.
 
