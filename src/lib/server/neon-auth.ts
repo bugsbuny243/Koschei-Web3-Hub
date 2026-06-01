@@ -6,13 +6,18 @@ type AuthPayload = { user?: unknown; data?: { user?: unknown } };
 type HeadersWithSetCookie = Headers & { getSetCookie?: () => string[] };
 
 function authBaseUrl() {
-  const value = process.env.NEON_AUTH_BASE_URL?.trim().replace(/\/+$/, "");
-  if (!value) throw new Error("NEON_AUTH_BASE_URL is not configured.");
+  // Try EXPO_PUBLIC_NEON_AUTH_URL first (the one that was working before)
+  const value = (
+    process.env.EXPO_PUBLIC_NEON_AUTH_URL ||
+    process.env.NEON_AUTH_BASE_URL ||
+    ""
+  ).trim().replace(/\/+$/, "");
+  if (!value) throw new Error("NEON_AUTH_BASE_URL or EXPO_PUBLIC_NEON_AUTH_URL is not configured.");
   return value;
 }
 
 function extractUser(payload: AuthPayload): NeonAuthUser | null {
-  const candidate = payload.user ?? payload.data?.user;
+  const candidate = payload.user ?? (payload.data as Record<string, unknown>)?.user;
   if (!candidate || typeof candidate !== "object") return null;
   const { id, email } = candidate as { id?: unknown; email?: unknown };
   if (typeof id !== "string" || !id.trim() || typeof email !== "string" || !email.trim()) return null;
@@ -41,16 +46,22 @@ async function request(path: string, init: RequestInit = {}) {
   if (currentCookies) headers.set("Cookie", currentCookies);
   const response = await fetch(`${authBaseUrl()}${path}`, { ...init, headers, cache: "no-store" });
   const payload = await response.json().catch(() => ({})) as AuthPayload;
-  if (!response.ok) throw new Error(`Neon Auth request failed (${response.status}).`);
+  if (!response.ok) {
+    const errMsg = (payload as Record<string, unknown>)?.message || (payload as Record<string, unknown>)?.error || `Neon Auth request failed (${response.status})`;
+    throw new Error(String(errMsg));
+  }
   return { user: extractUser(payload), cookies: responseCookies(response.headers) };
 }
 
 export async function authenticateWithNeonAuth(mode: "login" | "signup", email: string, password: string) {
   const path = mode === "signup" ? "/sign-up/email" : "/sign-in/email";
+  const body = mode === "signup"
+    ? { email, password, name: email.split("@")[0] || "User" }  // name field required for signup
+    : { email, password };
   const result = await request(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   });
   if (!result.user) throw new Error("Neon Auth response did not include a user.");
   return { ...result, user: result.user };
@@ -68,3 +79,4 @@ export function appendNeonAuthCookies(response: Response, values: string[]) {
   for (const value of values) response.headers.append("Set-Cookie", value);
   return response;
 }
+
