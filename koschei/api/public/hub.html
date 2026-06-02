@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Member Hub — Koschei</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/koschei.css">
+</head>
+<body>
+  <main class="page">
+    <header style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:32px;">
+      <a href="/" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+        <span style="font-size:22px;font-weight:700;color:var(--accent);">K</span>
+        <span style="font-size:16px;font-weight:600;">Koschei <span style="color:var(--text2);font-weight:400;">Member Hub</span></span>
+      </a>
+      <button class="btn btn-ghost" type="button" onclick="KoscheiAuth.signOut()">Sign out</button>
+    </header>
+
+    <section>
+      <div class="page-title">Your Web3 workspace</div>
+      <div class="page-sub">Manage your account and jump into your core member tools.</div>
+    </section>
+
+    <div class="alert" id="memberMessage"></div>
+
+    <section class="grid-3" style="margin-bottom:24px;">
+      <article class="card">
+        <div class="form-label">Email</div>
+        <div id="email" style="margin-top:8px;font-weight:600;word-break:break-word;">Loading…</div>
+      </article>
+      <article class="card">
+        <div class="form-label">Plan</div>
+        <div id="plan" style="margin-top:8px;font-size:20px;font-weight:700;">—</div>
+      </article>
+      <article class="card">
+        <div class="form-label">Outputs remaining</div>
+        <div id="outputsRemaining" style="margin-top:8px;font-size:20px;font-weight:700;">—</div>
+      </article>
+    </section>
+
+    <section>
+      <div class="page-title" style="font-size:18px;">Quick links</div>
+      <div class="grid-2">
+        <a class="card" href="/hub#metadata" style="text-decoration:none;color:inherit;">
+          <strong>Metadata</strong><div class="auth-sub">Prepare project and publishing metadata.</div>
+        </a>
+        <a class="card" href="/hub#risk" style="text-decoration:none;color:inherit;">
+          <strong>Risk</strong><div class="auth-sub">Review Web3 activity risk signals.</div>
+        </a>
+        <a class="card" href="/hub#chains" style="text-decoration:none;color:inherit;">
+          <strong>Chains</strong><div class="auth-sub">Explore supported blockchain networks.</div>
+        </a>
+        <a class="card" href="/hub#account" style="text-decoration:none;color:inherit;">
+          <strong>Account</strong><div class="auth-sub">View your member account details.</div>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/koschei-auth.js"></script>
+  <script>
+    (async () => {
+      await KoscheiAuth.init();
+      if (!KoscheiAuth.requireAuth('/login.html')) return;
+
+      document.getElementById('email').textContent = KoscheiAuth.getEmail() || 'Member';
+      try {
+        const provision = await KoscheiAuth.apiCall('/api/auth/provision', { method: 'POST' });
+        if (!provision || !provision.ok) throw new Error('Provisioning unavailable');
+
+        const response = await KoscheiAuth.apiCall('/api/member/summary');
+        if (!response || !response.ok) throw new Error('Summary unavailable');
+        const summary = await response.json();
+        document.getElementById('email').textContent = summary.email;
+        document.getElementById('plan').textContent = summary.plan;
+        document.getElementById('outputsRemaining').textContent = summary.outputs_remaining;
+      } catch {
+        const message = document.getElementById('memberMessage');
+        message.textContent = 'Account is active. Member data is being prepared.';
+        message.className = 'alert alert-success show';
+      }
+    })();
+  </script>
+</body>
+</html>

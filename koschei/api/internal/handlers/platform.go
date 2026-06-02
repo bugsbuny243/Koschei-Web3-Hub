@@ -21,10 +21,19 @@ func (h *Handler) Provision(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
+	if !h.RequireDB(w) {
+		return
+	}
+	summary, err := h.provisionMember(r.Context(), claims)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "account provisioning unavailable"})
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{
 		"ok":    "true",
 		"sub":   claims.Sub,
-		"email": claims.Email,
+		"email": summary.Email,
+		"plan":  freePlanID,
 	})
 }
 

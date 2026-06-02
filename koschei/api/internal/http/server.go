@@ -28,6 +28,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/auth/otp/start", method("POST", h.StartOTPLogin))
 	mux.HandleFunc("/api/auth/otp/verify", method("POST", h.VerifyOTPLogin))
 	mux.HandleFunc("/api/me", requiresDB(h, handlers.RequireAuth(method("GET", h.Me))))
+	mux.HandleFunc("/api/member/summary", requiresDB(h, handlers.RequireAuth(method("GET", h.MemberSummary))))
 	mux.HandleFunc("/api/runtime/projects", requiresDB(h, handlers.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.CreateRuntimeProject(w, r)
@@ -79,6 +80,15 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 				if strings.HasPrefix(r.URL.Path, "/api/") || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
 					http.NotFound(w, r)
 					return
+				}
+				cleanRoutes := map[string]string{
+					"/hub":      "/hub.html",
+					"/login":    "/login.html",
+					"/register": "/register.html",
+				}
+				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
+					r = r.Clone(r.Context())
+					r.URL.Path = staticPath
 				}
 				candidate := filepath.Join(staticDir, strings.TrimPrefix(filepath.Clean(r.URL.Path), "/"))
 				if fi, err := os.Stat(candidate); err == nil && !fi.IsDir() {
