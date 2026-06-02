@@ -3,95 +3,85 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hub — Koschei</title>
+  <title>Member Hub — Koschei</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/koschei.css">
-  <style>
-    .user-bar{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2);}
-    .module-card{padding:28px;display:flex;flex-direction:column;gap:12px;cursor:pointer;transition:border-color .2s,transform .15s;text-decoration:none;color:inherit;}
-    .module-card:hover{border-color:var(--accent);transform:translateY(-2px);}
-    .module-icon{font-size:32px;}
-    .module-name{font-size:17px;font-weight:600;}
-    .module-desc{font-size:13px;color:var(--text2);line-height:1.6;}
-    .module-tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;width:fit-content;}
-    .tag-live{background:rgba(0,255,136,.15);color:var(--accent);}
-    .tag-soon{background:rgba(136,136,170,.1);color:var(--text2);}
-  </style>
 </head>
 <body>
-<nav class="nav">
-  <a href="/hub.html" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
-  <div class="nav-links">
-    <div class="user-bar">
-      <span id="userEmail">...</span>
-      <span class="badge badge-green" id="userPlan">free</span>
-      <span style="color:var(--text2);">·</span>
-      <span id="userCredits" style="color:var(--accent);font-weight:600;">0</span>
-      <span style="color:var(--text2);">credits</span>
-    </div>
-    <button class="btn btn-ghost" style="padding:6px 14px;font-size:13px;" onclick="KoscheiAuth.signOut()">Sign out</button>
-  </div>
-</nav>
+  <main class="page">
+    <header style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:32px;">
+      <a href="/" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+        <span style="font-size:22px;font-weight:700;color:var(--accent);">K</span>
+        <span style="font-size:16px;font-weight:600;">Koschei <span style="color:var(--text2);font-weight:400;">Member Hub</span></span>
+      </a>
+      <button class="btn btn-ghost" type="button" onclick="KoscheiAuth.signOut()">Sign out</button>
+    </header>
 
-<div class="page">
-  <div class="page-title">Web3 Hub</div>
-  <div class="page-sub">Your developer toolkit for the Solana ecosystem.</div>
+    <section>
+      <div class="page-title">Your Web3 workspace</div>
+      <div class="page-sub">Manage your account and jump into your core member tools.</div>
+    </section>
 
-  <div class="grid-3">
-    <a href="/chains.html" class="card module-card">
-      <div class="module-icon">📡</div>
-      <div class="module-name">Chain Health</div>
-      <div class="module-desc">Live status monitoring for Solana, Ethereum, Base, Arbitrum, Polygon and Optimism.</div>
-      <div class="module-tag tag-live">● Live</div>
-    </a>
-    <a href="/metadata.html" class="card module-card">
-      <div class="module-icon">🧬</div>
-      <div class="module-name">Metadata Studio</div>
-      <div class="module-desc">AI-powered NFT and game asset metadata generation. Structured JSON output ready to deploy.</div>
-      <div class="module-tag tag-live">● Live</div>
-    </a>
-    <a href="/risk.html" class="card module-card">
-      <div class="module-icon">🛡️</div>
-      <div class="module-name">Risk Scanner</div>
-      <div class="module-desc">On-chain risk transparency for Solana projects. Analyze before you interact.</div>
-      <div class="module-tag tag-soon">Coming soon</div>
-    </a>
-    <a href="/events.html" class="card module-card">
-      <div class="module-icon">🔔</div>
-      <div class="module-name">Event Monitor</div>
-      <div class="module-desc">Track on-chain activity with Alchemy webhooks. Real-time alerts for wallet and contract events.</div>
-      <div class="module-tag tag-soon">Coming soon</div>
-    </a>
-    <a href="/dashboard.html" class="card module-card">
-      <div class="module-icon">👤</div>
-      <div class="module-name">Dashboard</div>
-      <div class="module-desc">Manage your account, view usage history and credit balance.</div>
-      <div class="module-tag tag-live">● Live</div>
-    </a>
-    <div class="card module-card" style="opacity:.5;cursor:default;">
-      <div class="module-icon">🔧</div>
-      <div class="module-name">Builder Tools</div>
-      <div class="module-desc">Advanced Solana program interaction tools. Simulate, debug and deploy.</div>
-      <div class="module-tag tag-soon">Coming soon</div>
-    </div>
-  </div>
-</div>
+    <div class="alert" id="memberMessage"></div>
 
-<script src="/js/koschei-auth.js"></script>
-<script>
-  (async () => {
-    await KoscheiAuth.init();
-    if (!KoscheiAuth.requireAuth()) return;
-    document.getElementById('userEmail').textContent = KoscheiAuth.getEmail() || '';
-    try {
-      const res = await KoscheiAuth.apiCall('/api/me');
-      if (res && res.ok) {
-        const { user } = await res.json();
-        document.getElementById('userPlan').textContent = user.plan_id || 'free';
-        document.getElementById('userCredits').textContent = user.credits ?? 0;
+    <section class="grid-3" style="margin-bottom:24px;">
+      <article class="card">
+        <div class="form-label">Email</div>
+        <div id="email" style="margin-top:8px;font-weight:600;word-break:break-word;">Loading…</div>
+      </article>
+      <article class="card">
+        <div class="form-label">Plan</div>
+        <div id="plan" style="margin-top:8px;font-size:20px;font-weight:700;">—</div>
+      </article>
+      <article class="card">
+        <div class="form-label">Outputs remaining</div>
+        <div id="outputsRemaining" style="margin-top:8px;font-size:20px;font-weight:700;">—</div>
+      </article>
+    </section>
+
+    <section>
+      <div class="page-title" style="font-size:18px;">Quick links</div>
+      <div class="grid-2">
+        <a class="card" href="/hub#metadata" style="text-decoration:none;color:inherit;">
+          <strong>Metadata</strong><div class="auth-sub">Prepare project and publishing metadata.</div>
+        </a>
+        <a class="card" href="/hub#risk" style="text-decoration:none;color:inherit;">
+          <strong>Risk</strong><div class="auth-sub">Review Web3 activity risk signals.</div>
+        </a>
+        <a class="card" href="/hub#chains" style="text-decoration:none;color:inherit;">
+          <strong>Chains</strong><div class="auth-sub">Explore supported blockchain networks.</div>
+        </a>
+        <a class="card" href="/hub#account" style="text-decoration:none;color:inherit;">
+          <strong>Account</strong><div class="auth-sub">View your member account details.</div>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/koschei-auth.js"></script>
+  <script>
+    (async () => {
+      await KoscheiAuth.init();
+      if (!KoscheiAuth.requireAuth('/login.html')) return;
+
+      document.getElementById('email').textContent = KoscheiAuth.getEmail() || 'Member';
+      try {
+        const provision = await KoscheiAuth.apiCall('/api/auth/provision', { method: 'POST' });
+        if (!provision || !provision.ok) throw new Error('Provisioning unavailable');
+
+        const response = await KoscheiAuth.apiCall('/api/member/summary');
+        if (!response || !response.ok) throw new Error('Summary unavailable');
+        const summary = await response.json();
+        document.getElementById('email').textContent = summary.email;
+        document.getElementById('plan').textContent = summary.plan;
+        document.getElementById('outputsRemaining').textContent = summary.outputs_remaining;
+      } catch {
+        const message = document.getElementById('memberMessage');
+        message.textContent = 'Account is active. Member data is being prepared.';
+        message.className = 'alert alert-success show';
       }
-    } catch {}
-  })();
-</script>
+    })();
+  </script>
 </body>
 </html>
