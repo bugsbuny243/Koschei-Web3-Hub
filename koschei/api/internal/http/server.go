@@ -83,9 +83,14 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					return
 				}
 				cleanRoutes := map[string]string{
-					"/hub":      "/hub.html",
-					"/login":    "/login.html",
-					"/register": "/register.html",
+					"/hub":       "/hub.html",
+					"/login":     "/login.html",
+					"/register":  "/register.html",
+					"/metadata":  "/metadata.html",
+					"/risk":      "/risk.html",
+					"/chains":    "/chains.html",
+					"/account":   "/account.html",
+					"/dashboard": "/dashboard.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())

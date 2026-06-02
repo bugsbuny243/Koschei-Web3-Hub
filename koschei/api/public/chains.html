@@ -20,11 +20,13 @@
 </head>
 <body>
 <nav class="nav">
-  <a href="/hub.html" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
   <div class="nav-links">
-    <a href="/hub.html" class="nav-link">Hub</a>
-    <a href="/chains.html" class="nav-link active">Chains</a>
-    <a href="/metadata.html" class="nav-link">Metadata</a>
+    <a href="/hub" class="nav-link">Hub</a>
+    <a href="/metadata" class="nav-link">Metadata</a>
+    <a href="/risk" class="nav-link">Risk</a>
+    <a href="/chains" class="nav-link active">Chains</a>
+    <a href="/account" class="nav-link">Account</a>
   </div>
 </nav>
 
@@ -87,8 +89,12 @@
     document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
   }
 
-  KoscheiAuth.init().then(loadChains);
-  setInterval(loadChains, 30000);
+  (async () => {
+    await KoscheiAuth.init();
+    if (!KoscheiAuth.requireAuth('/login')) return;
+    await loadChains();
+    setInterval(loadChains, 30000);
+  })();
 </script>
 </body>
 </html>
