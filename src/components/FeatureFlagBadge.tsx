@@ -1,1 +1,0 @@
-export function FeatureFlagBadge({ label, enabled }: { label: string; enabled: boolean }) { return <span className={`rounded-lg border px-3 py-2 text-xs font-bold ${enabled ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300" : "border-slate-700 bg-slate-900 text-slate-500"}`}>{label}: {enabled ? "enabled" : "disabled"}</span>; }
