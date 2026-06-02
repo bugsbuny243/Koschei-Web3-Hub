@@ -38,6 +38,7 @@ export async function proxyMemberAuth(request: Request, path: string) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Origin": "https://tradepigloball.co",
         ...(cookieHeader ? { "Cookie": cookieHeader } : {}),
       },
       body: JSON.stringify(body),
@@ -72,7 +73,7 @@ export async function getMemberSession(cookieHeader: string): Promise<MemberSess
   let response: Response;
   try {
     response = await fetch(`${base}/get-session`, {
-      headers: cookieHeader ? { "Cookie": cookieHeader } : {},
+      headers: cookieHeader ? { "Cookie": cookieHeader, "Origin": "https://tradepigloball.co" } : { "Origin": "https://tradepigloball.co" },
       cache: "no-store",
     });
   } catch { throw new Error("Auth request failed."); }
