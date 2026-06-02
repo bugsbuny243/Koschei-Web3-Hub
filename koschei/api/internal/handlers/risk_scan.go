@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -62,43 +63,50 @@ func (h *Handler) ScanRisk(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
+	var entitlementID any
+	if err := tx.QueryRowContext(r.Context(), `
+		SELECT id
+		FROM entitlements
+		WHERE lower(email) = lower($1)
+			AND status = 'active'
+			AND outputs_remaining > 0
+		ORDER BY outputs_remaining DESC, created_at DESC
+		LIMIT 1
+		FOR UPDATE`, email).Scan(&entitlementID); err != nil {
+		if err == sql.ErrNoRows {
+			writeJSON(w, http.StatusPaymentRequired, map[string]string{
+				"error":   "no_outputs_remaining",
+				"message": "No outputs remaining. Please upgrade your plan.",
+			})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+
+	if err := saveRiskOutput(r.Context(), tx, email, entitlementID, target, riskResult, string(resultJSON)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+
+	attemptRiskReportSave(r.Context(), tx, email, target, notes, riskResult, string(resultJSON))
+
 	decrement, err := tx.ExecContext(r.Context(), `
 		UPDATE entitlements
 		SET outputs_remaining = GREATEST(outputs_remaining - 1, 0),
 			updated_at = now()
-		WHERE id = (
-			SELECT id
-			FROM entitlements
-			WHERE lower(email) = lower($1)
-				AND status = 'active'
-				AND outputs_remaining > 0
-			ORDER BY outputs_remaining DESC, created_at DESC
-			LIMIT 1
-		)`, email)
+		WHERE id = $1
+			AND outputs_remaining > 0`, entitlementID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
 	rowsAffected, err := decrement.RowsAffected()
-	if err != nil {
+	if err != nil || rowsAffected != 1 {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
-	if rowsAffected == 0 {
-		writeJSON(w, http.StatusPaymentRequired, map[string]string{"error": "no_outputs_remaining"})
 		return
 	}
 
-	if err := saveRiskReportIfSupported(r.Context(), tx, email, target, notes, riskResult, string(resultJSON)); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
-	if _, err := tx.ExecContext(r.Context(), `
-		INSERT INTO web3_outputs (email, output_type, title, ecosystem, content_json, content_text, used_ai, used_fallback)
-		VALUES ($1, 'risk', $2, 'web3', $3::jsonb, $4, false, true)`, email, target, string(resultJSON), riskResult.summary(target)); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
 	if err := tx.Commit(); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
@@ -131,6 +139,62 @@ func buildRiskScanResult() riskScanResult {
 
 func (result riskScanResult) summary(target string) string {
 	return fmt.Sprintf("Risk scan for %s\nRisk level: %s\nScore: %d\n\nChecklist:\n- %s\n\nRecommended fixes:\n- %s\n\nDisclaimer: %s", target, result.RiskLevel, result.Score, strings.Join(result.Checklist, "\n- "), strings.Join(result.RecommendedFixes, "\n- "), result.Disclaimer)
+}
+
+func saveRiskOutput(ctx context.Context, tx *sql.Tx, email string, entitlementID any, target string, result riskScanResult, resultJSON string) error {
+	var hasEntitlementID bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_schema = 'public'
+				AND table_name = 'web3_outputs'
+				AND column_name = 'entitlement_id'
+		)`).Scan(&hasEntitlementID); err != nil {
+		return err
+	}
+
+	if hasEntitlementID {
+		if _, err := tx.ExecContext(ctx, "SAVEPOINT risk_output_entitlement_id"); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO web3_outputs (email, entitlement_id, output_type, title, ecosystem, content_json, content_text, used_ai, used_fallback)
+			VALUES ($1, $2, 'risk', $3, 'web3', $4::jsonb, $5, false, true)`, email, entitlementID, target, resultJSON, result.summary(target))
+		if err == nil {
+			_, err = tx.ExecContext(ctx, "RELEASE SAVEPOINT risk_output_entitlement_id")
+			return err
+		}
+		if _, rollbackErr := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT risk_output_entitlement_id"); rollbackErr != nil {
+			return rollbackErr
+		}
+		if _, releaseErr := tx.ExecContext(ctx, "RELEASE SAVEPOINT risk_output_entitlement_id"); releaseErr != nil {
+			return releaseErr
+		}
+		log.Printf("risk scan: web3_outputs entitlement_id insert unavailable, retrying compatible insert: %v", err)
+	}
+
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO web3_outputs (email, output_type, title, ecosystem, content_json, content_text, used_ai, used_fallback)
+		VALUES ($1, 'risk', $2, 'web3', $3::jsonb, $4, false, true)`, email, target, resultJSON, result.summary(target))
+	return err
+}
+
+func attemptRiskReportSave(ctx context.Context, tx *sql.Tx, email, target, notes string, result riskScanResult, resultJSON string) {
+	if _, err := tx.ExecContext(ctx, "SAVEPOINT optional_risk_report"); err != nil {
+		log.Printf("risk scan: cannot prepare optional risk_reports insert: %v", err)
+		return
+	}
+	if err := saveRiskReportIfSupported(ctx, tx, email, target, notes, result, resultJSON); err != nil {
+		if _, rollbackErr := tx.ExecContext(ctx, "ROLLBACK TO SAVEPOINT optional_risk_report"); rollbackErr != nil {
+			log.Printf("risk scan: cannot recover from optional risk_reports insert failure: %v (original error: %v)", rollbackErr, err)
+			return
+		}
+		log.Printf("risk scan: optional risk_reports insert skipped: %v", err)
+	}
+	if _, err := tx.ExecContext(ctx, "RELEASE SAVEPOINT optional_risk_report"); err != nil {
+		log.Printf("risk scan: cannot release optional risk_reports savepoint: %v", err)
+	}
 }
 
 // saveRiskReportIfSupported writes a report only when a compatible risk_reports
