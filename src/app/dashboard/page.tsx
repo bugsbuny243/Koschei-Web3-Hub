@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
-import { getUserDashboard, provisionMemberIfNeeded } from "@/lib/server/db";
+import { ensureMemberProfile, getUserDashboard } from "@/lib/server/db";
 import { getMemberSession } from "@/lib/server/auth-api";
 
 const modules = [["Builder", "/builder", "Create portable game asset concepts."], ["Metadata", "/metadata", "Generate structured Web3 metadata."], ["Risk", "/risk", "Review transparent project signals."], ["Chains", "/chains", "Check supported testnet connectivity."]];
@@ -15,7 +15,10 @@ export default async function DashboardPage() {
   if (!session) redirect("/login");
   await provisionMemberIfNeeded(session.sub, session.email ?? "");
   let dashboard;
-  try { dashboard = await getUserDashboard(session.sub); } catch {
+  try {
+    await ensureMemberProfile(session.sub, session.email);
+    dashboard = await getUserDashboard(session.sub, session.email);
+  } catch {
     return <main className="web3-page"><SiteHeader /><section className="mx-auto max-w-3xl px-5 py-16 lg:px-8"><p className="eyebrow">Member dashboard</p><h1 className="mt-4 text-4xl font-black text-white">Member account data is unavailable</h1><p className="mt-4 text-sm leading-7 text-rose-200">Confirm the member auth migration was applied.</p></section></main>;
   }
   if (!dashboard) redirect("/login");
