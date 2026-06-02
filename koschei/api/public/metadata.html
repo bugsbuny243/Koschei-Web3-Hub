@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Metadata Studio — Koschei</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>
+    .result-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;display:none;}
+    .result-box.show{display:block;}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/hub.html" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <div class="nav-links">
+    <a href="/hub.html" class="nav-link">Hub</a>
+    <a href="/metadata.html" class="nav-link active">Metadata</a>
+    <a href="/chains.html" class="nav-link">Chains</a>
+  </div>
+</nav>
+
+<div class="page" style="max-width:700px;">
+  <div class="page-title">AI Metadata Studio</div>
+  <div class="page-sub">Generate structured NFT or game asset metadata using AI.</div>
+
+  <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:20px;">
+    <div class="form-group">
+      <label class="form-label">Asset Name</label>
+      <input class="form-input" type="text" id="assetName" placeholder="e.g. Cosmic Dragon #001">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea class="form-input" id="assetDesc" rows="3" placeholder="Describe your NFT or game asset..." style="resize:vertical;"></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Type</label>
+      <select class="form-input" id="assetType">
+        <option value="nft">NFT</option>
+        <option value="game_asset">Game Asset</option>
+        <option value="collection">Collection</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Traits / Attributes <span style="color:var(--text2);font-weight:400;">(optional, comma separated)</span></label>
+      <input class="form-input" type="text" id="assetTraits" placeholder="e.g. fire, legendary, dragon, 5-star">
+    </div>
+    <button class="btn btn-primary" id="genBtn" onclick="generate()">
+      ✦ Generate Metadata
+    </button>
+  </div>
+
+  <div class="alert" id="alert"></div>
+
+  <div id="resultWrap" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <span style="font-size:14px;font-weight:600;">Generated Metadata</span>
+      <button class="btn btn-ghost" style="padding:4px 12px;font-size:12px;" onclick="copyResult()">Copy JSON</button>
+    </div>
+    <div class="result-box show" id="resultBox"></div>
+  </div>
+</div>
+
+<script src="/js/koschei-auth.js"></script>
+<script>
+  (async () => {
+    await KoscheiAuth.init();
+    KoscheiAuth.requireAuth();
+  })();
+
+  async function generate() {
+    const name = document.getElementById('assetName').value.trim();
+    const desc = document.getElementById('assetDesc').value.trim();
+    const type = document.getElementById('assetType').value;
+    const traits = document.getElementById('assetTraits').value.trim();
+    const btn = document.getElementById('genBtn');
+    clearAlert();
+
+    if (!name) { showError('Asset name is required.'); return; }
+
+    const prompt = `Generate professional ${type} metadata as valid JSON for the following asset:
+Name: ${name}
+Description: ${desc || 'A unique digital asset'}
+Type: ${type}
+${traits ? 'Traits: ' + traits : ''}
+
+Return ONLY a valid JSON object with these fields: name, description, image (use placeholder URL), attributes (array of {trait_type, value} objects), properties (object with type and creators). No extra text.`;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Generating...';
+
+    try {
+      const res = await KoscheiAuth.apiCall('/api/ai/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool: 'text', prompt }),
+      });
+
+      if (!res || !res.ok) {
+        const err = res ? await res.json().catch(() => ({})) : {};
+        throw new Error(err.error || `Request failed (${res?.status})`);
+      }
+
+      const data = await res.json();
+      const output = data.result || data.content || data.output || data.text || JSON.stringify(data, null, 2);
+
+      // Try to extract JSON from response
+      let formatted = output;
+      try {
+        const match = output.match(/\{[\s\S]*\}/);
+        if (match) formatted = JSON.stringify(JSON.parse(match[0]), null, 2);
+      } catch {}
+
+      document.getElementById('resultBox').textContent = formatted;
+      document.getElementById('resultWrap').style.display = 'block';
+    } catch (err) {
+      showError(err.message || 'Generation failed. Check your credits.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '✦ Generate Metadata';
+    }
+  }
+
+  function copyResult() {
+    navigator.clipboard.writeText(document.getElementById('resultBox').textContent);
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('alert');
+    el.textContent = msg;
+    el.className = 'alert alert-error show';
+  }
+  function clearAlert() {
+    const el = document.getElementById('alert');
+    el.className = 'alert';
+  }
+</script>
+</body>
+</html>

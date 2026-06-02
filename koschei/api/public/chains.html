@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chain Health — Koschei</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>
+    .chain-card{padding:24px;display:flex;flex-direction:column;gap:12px;}
+    .chain-header{display:flex;align-items:center;justify-content:space-between;}
+    .chain-name{font-size:16px;font-weight:600;}
+    .chain-network{font-size:12px;color:var(--text2);}
+    .chain-status{font-size:13px;font-weight:500;}
+    .status-online{color:var(--accent);}
+    .status-error{color:var(--danger);}
+    .refresh-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+    .last-updated{font-size:12px;color:var(--text2);}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/hub.html" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <div class="nav-links">
+    <a href="/hub.html" class="nav-link">Hub</a>
+    <a href="/chains.html" class="nav-link active">Chains</a>
+    <a href="/metadata.html" class="nav-link">Metadata</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="refresh-bar">
+    <div>
+      <div class="page-title">Chain Health Monitor</div>
+      <div class="page-sub" style="margin-bottom:0;">Real-time status across 6 networks · Auto-refresh every 30s</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="last-updated" id="lastUpdated">Loading...</span>
+      <button class="btn btn-ghost" style="padding:6px 14px;font-size:13px;" onclick="loadChains()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <div class="grid-3" id="chainGrid">
+    <div class="card chain-card"><div style="color:var(--text2);font-size:13px;">Loading chains...</div></div>
+  </div>
+</div>
+
+<script src="/js/koschei-auth.js"></script>
+<script>
+  const CHAINS = [
+    { id:'solana', name:'Solana', icon:'◎' },
+    { id:'ethereum', name:'Ethereum', icon:'⟠' },
+    { id:'base', name:'Base', icon:'🔵' },
+    { id:'arbitrum', name:'Arbitrum', icon:'🔷' },
+    { id:'polygon', name:'Polygon', icon:'🟣' },
+    { id:'optimism', name:'Optimism', icon:'🔴' },
+  ];
+
+  async function loadChains() {
+    document.getElementById('lastUpdated').textContent = 'Refreshing...';
+    const results = await Promise.allSettled(
+      CHAINS.map(c => fetch(`/api/web3/health?chain=${c.id}`).then(r => r.json()))
+    );
+    const grid = document.getElementById('chainGrid');
+    grid.innerHTML = CHAINS.map((c, i) => {
+      const r = results[i];
+      const ok = r.status === 'fulfilled' && r.value?.ok;
+      const data = r.status === 'fulfilled' ? r.value : {};
+      const statusClass = ok ? 'status-online' : 'status-error';
+      const statusText = ok ? '● Online' : '○ Unavailable';
+      const dot = ok ? 'dot-green' : 'dot-red';
+      return `<div class="card chain-card">
+        <div class="chain-header">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:22px;">${c.icon}</span>
+            <div>
+              <div class="chain-name">${c.name}</div>
+              <div class="chain-network">${data.network || 'devnet/testnet'}</div>
+            </div>
+          </div>
+          <span class="dot ${dot}"></span>
+        </div>
+        <div class="chain-status ${statusClass}">${statusText}</div>
+        <div style="font-size:12px;color:var(--text2);">Provider: ${data.provider || 'Alchemy'}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+  }
+
+  KoscheiAuth.init().then(loadChains);
+  setInterval(loadChains, 30000);
+</script>
+</body>
+</html>
