@@ -101,19 +101,18 @@ const KoscheiAuth = (() => {
       });
     } catch {}
   }
-async function signUp(email, password) {
+
+  async function signIn(email, password) {
+    const data = await _request('/sign-in/email', { email, password });
+    await _provision();
+    return data;
+  }
+
+  async function signUp(email, password) {
     await _request('/sign-up/email', {
       email, password, name: email.split('@')[0] || 'User',
     });
     const data = await _request('/sign-in/email', { email, password });
-    await _provision();
-    return data;
-}
-
-  async function signUp(email, password) {
-    const data = await _request('/sign-up/email', {
-      email, password, name: email.split('@')[0] || 'User',
-    });
     await _provision();
     return data;
   }
@@ -125,10 +124,9 @@ async function signUp(email, password) {
     try {
       const res = await fetch(path, { ...options, headers });
       return res;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
 
-  return { init, signIn, signUp, signOut, isLoggedIn, requireAuth, requireGuest, getEmail, getSub, apiCall, getJwt };
+  return { init, signIn, signUp, signOut, isLoggedIn, requireAuth,
+           requireGuest, getEmail, getSub, apiCall, getJwt };
 })();
