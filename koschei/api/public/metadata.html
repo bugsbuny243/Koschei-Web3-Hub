@@ -94,7 +94,7 @@ Return ONLY a valid JSON object with these fields: name, description, image (use
       const res = await KoscheiAuth.apiCall('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: 'text', prompt }),
+        body: JSON.stringify({ tool: 'chat', prompt }),
       });
 
       if (!res || !res.ok) {
