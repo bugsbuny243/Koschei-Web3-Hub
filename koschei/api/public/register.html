@@ -38,9 +38,9 @@
     <div class="auth-footer">Zaten hesabın var mı? <a href="/login.html">Giriş yap</a></div>
   </div>
 </div>
-<script src="/js/koschei-auth.js?v=3"></script>
+<script src="/js/koschei-auth.js?v=4"></script>
 <script>
-  (async () => { await KoscheiAuth.init(); KoscheiAuth.requireGuest('/hub.html'); })();
+  (async () => { await KoscheiAuth.init(); KoscheiAuth.requireGuest('/hub'); })();
   document.addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister(); });
   async function handleRegister() {
     const email = document.getElementById('email').value.trim();
@@ -56,7 +56,7 @@
     try {
       await KoscheiAuth.signUp(email, password);
       showSuccess('Hesap oluşturuldu! Yönlendiriliyor...');
-      setTimeout(() => window.location.replace('/hub.html'), 1000);
+      setTimeout(() => window.location.replace('/hub'), 1000);
     } catch (err) {
       showError(err.message || 'Kayıt başarısız.');
       btn.disabled = false;

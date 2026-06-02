@@ -21,20 +21,6 @@ var KoscheiAuth = (function() {
     return p.length === 3 && p.every(Boolean);
   }
 
-  function _extractJwt(res, data) {
-    const candidates = [
-      res.headers.get('set-auth-jwt'),
-      data?.__authJwt,
-      data?.data?.session?.access_token,
-      data?.session?.access_token,
-      data?.data?.access_token,
-      data?.access_token,
-      data?.data?.token,
-      data?.token,
-    ];
-    return candidates.find(_isJwt) || null;
-  }
-
   function saveJwt(jwt) { localStorage.setItem('koschei_jwt', jwt); }
   function getJwt() { return localStorage.getItem('koschei_jwt') || null; }
 
@@ -47,19 +33,19 @@ var KoscheiAuth = (function() {
     } catch { return false; }
   }
 
-  function requireAuth(redirectTo = '/login.html') {
+  function requireAuth(redirectTo = '/login') {
     if (!isLoggedIn()) { window.location.replace(redirectTo); return false; }
     return true;
   }
 
-  function requireGuest(redirectTo = '/hub.html') {
+  function requireGuest(redirectTo = '/hub') {
     if (isLoggedIn()) { window.location.replace(redirectTo); return false; }
     return true;
   }
 
   function signOut() {
     localStorage.removeItem('koschei_jwt');
-    window.location.replace('/login.html');
+    window.location.replace('/login');
   }
 
   function getEmail() {
@@ -74,7 +60,7 @@ var KoscheiAuth = (function() {
     try { return JSON.parse(_b64url(jwt.split('.')[1])).sub || null; } catch { return null; }
   }
 
-  async function _request(path, body) {
+  async function _neonRequest(path, body) {
     if (!_neonAuthUrl) throw new Error('Auth yapılandırılmamış. Sayfayı yenileyin.');
     const res = await fetch(`${_neonAuthUrl}${path}`, {
       method: 'POST',
@@ -86,8 +72,31 @@ var KoscheiAuth = (function() {
     if (!res.ok) {
       throw new Error(data?.message || data?.error?.message || data?.error || `Hata (${res.status})`);
     }
-    const jwt = _extractJwt(res, data);
-    if (jwt) saveJwt(jwt);
+    return data;
+  }
+
+  async function _backendLogin(email, password) {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data?.message || data?.error || `Giriş başarısız (${res.status})`);
+    }
+
+    const jwt = data?.access_token || data?.token || data?.data?.access_token;
+    if (!_isJwt(jwt)) {
+      throw new Error('Login succeeded but no auth token was returned.');
+    }
+
+    saveJwt(jwt);
+    if (!isLoggedIn()) {
+      throw new Error('Auth token could not be saved.');
+    }
     return data;
   }
 
@@ -103,18 +112,16 @@ var KoscheiAuth = (function() {
   }
 
   async function signIn(email, password) {
-    const data = await _request('/sign-in/email', { email, password });
+    const data = await _backendLogin(email, password);
     await _provision();
     return data;
   }
 
   async function signUp(email, password) {
-    await _request('/sign-up/email', {
+    await _neonRequest('/sign-up/email', {
       email, password, name: email.split('@')[0] || 'User',
     });
-    const data = await _request('/sign-in/email', { email, password });
-    await _provision();
-    return data;
+    return signIn(email, password);
   }
 
   async function apiCall(path, options = {}) {

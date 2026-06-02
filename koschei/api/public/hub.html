@@ -59,7 +59,7 @@
     </section>
   </main>
 
-  <script src="/js/koschei-auth.js?v=3"></script>
+  <script src="/js/koschei-auth.js?v=4"></script>
   <script>
     (async () => {
       await KoscheiAuth.init();
@@ -67,16 +67,17 @@
       document.getElementById('userEmail').textContent =
         KoscheiAuth.getEmail() || '';
       try {
-        const res = await KoscheiAuth.apiCall('/api/me');
-        if (res && res.ok) {
-          const data = await res.json();
-          const user = data.user || data;
-          document.getElementById('userPlan').textContent =
-            user.plan_id || user.plan || 'free';
-          document.getElementById('userCredits').textContent =
-            user.credits ?? user.credits_remaining ?? 0;
-        }
-      } catch {}
+        const res = await KoscheiAuth.apiCall('/api/member/summary');
+        if (!res || !res.ok) throw new Error('Member summary unavailable');
+        const data = await res.json();
+        document.getElementById('userEmail').textContent = data.email || KoscheiAuth.getEmail() || '';
+        document.getElementById('userPlan').textContent = data.plan || 'free';
+        document.getElementById('userCredits').textContent = data.outputs_remaining ?? 0;
+      } catch {
+        const message = document.getElementById('memberMessage');
+        message.textContent = 'Account is active. Member data is being prepared.';
+        message.className = 'alert alert-success show';
+      }
     })();
   </script>
 </body>
