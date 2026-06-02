@@ -2,55 +2,232 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
+	"time"
 )
 
-type manualPaymentRequest struct {
+const paymentRequestMessage = "Payment request received. Admin review required."
+
+type shopierPack struct {
+	AmountTRY int
+	Outputs   int
+}
+
+var shopierPacks = map[string]shopierPack{
+	"starter": {AmountTRY: 899, Outputs: 1},
+	"builder": {AmountTRY: 2299, Outputs: 3},
+	"studio":  {AmountTRY: 4999, Outputs: 10},
+}
+
+type paymentRequestInput struct {
+	FullName         string `json:"full_name"`
 	Email            string `json:"email"`
-	Plan             string `json:"plan"`
-	PaymentProvider  string `json:"payment_provider"`
+	ProductID        string `json:"product_id"`
 	PaymentReference string `json:"payment_reference"`
 	Note             string `json:"note"`
 }
 
-func (h *Handler) ManualPaymentRequest(w http.ResponseWriter, r *http.Request) {
-	var req manualPaymentRequest
+type paymentRequestReviewInput struct {
+	PaymentRequestID string `json:"payment_request_id"`
+	Reason           string `json:"reason"`
+}
+
+type paymentRequestRecord struct {
+	ID         string         `json:"id"`
+	Email      string         `json:"email"`
+	FullName   string         `json:"full_name"`
+	ProductID  string         `json:"product_id"`
+	AmountTRY  int            `json:"amount_try"`
+	Currency   string         `json:"currency"`
+	Status     string         `json:"status"`
+	RawPayload map[string]any `json:"raw_payload"`
+	CreatedAt  time.Time      `json:"created_at"`
+	ReviewedAt *time.Time     `json:"reviewed_at,omitempty"`
+}
+
+func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
 	if !h.Limiter.allow("billing:"+clientIP(r), 10, 10_000_000_000) {
-		writeJSON(w, 429, map[string]string{"error": "rate limited"})
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate limited"})
 		return
 	}
-	if err := decodeJSON(r, &req); err != nil {
-		writeJSON(w, 400, map[string]string{"error": "invalid body"})
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
 
-	req.Email = strings.TrimSpace(req.Email)
-	req.Plan = strings.TrimSpace(req.Plan)
-	req.PaymentProvider = strings.TrimSpace(req.PaymentProvider)
+	var req paymentRequestInput
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	req.FullName = strings.TrimSpace(req.FullName)
+	req.ProductID = strings.ToLower(strings.TrimSpace(req.ProductID))
 	req.PaymentReference = strings.TrimSpace(req.PaymentReference)
 	req.Note = strings.TrimSpace(req.Note)
-
-	if !validEmail(req.Email) || !validPlan(req.Plan) || req.PaymentProvider == "" || req.PaymentReference == "" {
-		writeJSON(w, 400, map[string]string{"error": "invalid body"})
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
+	pack, ok := shopierPacks[req.ProductID]
+	if email == "" || req.FullName == "" || !ok {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
 
-	var duplicateID string
-	err := h.DB.QueryRow(`SELECT id FROM payment_requests WHERE payment_provider=$1 AND payment_reference=$2 AND status IN ('pending','approved') LIMIT 1`, req.PaymentProvider, req.PaymentReference).Scan(&duplicateID)
-	if err == nil {
-		writeJSON(w, 409, map[string]string{"error": "duplicate payment request: payment_provider + payment_reference already exists with pending/approved status"})
-		return
-	}
-	if err != nil && err != sql.ErrNoRows {
-		writeJSON(w, 500, map[string]string{"error": "db check failed"})
-		return
-	}
-
-	_, err = h.DB.Exec(`INSERT INTO payment_requests (email, plan, payment_provider, payment_reference, note) VALUES ($1,$2,$3,$4,$5)`, req.Email, req.Plan, req.PaymentProvider, req.PaymentReference, req.Note)
+	rawPayload, err := json.Marshal(map[string]string{
+		"payment_reference": req.PaymentReference,
+		"note":              req.Note,
+	})
 	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": "db insert failed"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payload encoding failed"})
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"message": "Payment request created. Your plan will be activated manually after payment confirmation."})
+	if _, err := h.DB.ExecContext(r.Context(), `
+		INSERT INTO payment_requests (email, full_name, product_id, amount_try, currency, status, raw_payload, created_at)
+		VALUES ($1, $2, $3, $4, 'TRY', 'pending', $5::jsonb, now())`, email, req.FullName, req.ProductID, pack.AmountTRY, string(rawPayload)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db insert failed"})
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "status": "pending", "message": paymentRequestMessage})
+}
+
+func (h *Handler) AdminPaymentRequests(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	rows, err := h.DB.QueryContext(r.Context(), `
+		SELECT id::text, email, COALESCE(full_name, ''), COALESCE(product_id, ''), COALESCE(amount_try, 0), COALESCE(currency, 'TRY'), status,
+		       COALESCE(raw_payload, '{}'::jsonb), created_at, reviewed_at
+		FROM payment_requests
+		ORDER BY created_at DESC
+		LIMIT 200`)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
+		return
+	}
+	defer rows.Close()
+
+	requests := make([]paymentRequestRecord, 0)
+	for rows.Next() {
+		var request paymentRequestRecord
+		var rawPayload []byte
+		if err := rows.Scan(&request.ID, &request.Email, &request.FullName, &request.ProductID, &request.AmountTRY, &request.Currency, &request.Status, &rawPayload, &request.CreatedAt, &request.ReviewedAt); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db scan failed"})
+			return
+		}
+		if err := json.Unmarshal(rawPayload, &request.RawPayload); err != nil {
+			request.RawPayload = map[string]any{}
+		}
+		requests = append(requests, request)
+	}
+	if err := rows.Err(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "payment_requests": requests})
+}
+
+func (h *Handler) ApprovePaymentRequest(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	var req paymentRequestReviewInput
+	if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.PaymentRequestID) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+
+	tx, err := h.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db transaction failed"})
+		return
+	}
+	defer tx.Rollback()
+
+	var email, productID, status string
+	if err := tx.QueryRowContext(r.Context(), `
+		SELECT lower(email), product_id, status
+		FROM payment_requests
+		WHERE id = $1
+		FOR UPDATE`, strings.TrimSpace(req.PaymentRequestID)).Scan(&email, &productID, &status); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "payment request not found"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
+		return
+	}
+	pack, ok := shopierPacks[productID]
+	if !ok {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown product_id"})
+		return
+	}
+	if status != "pending" {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "payment request already reviewed"})
+		return
+	}
+
+	var paymentRequestIDColumnExists bool
+	if err := tx.QueryRowContext(r.Context(), `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'entitlements' AND column_name = 'payment_request_id'
+		)`).Scan(&paymentRequestIDColumnExists); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "schema check failed"})
+		return
+	}
+	if paymentRequestIDColumnExists {
+		_, err = tx.ExecContext(r.Context(), `
+			INSERT INTO entitlements (email, plan_id, payment_request_id, outputs_total, outputs_remaining, status)
+			VALUES (lower($1), $2, $3, $4, $4, 'active')`, email, productID, strings.TrimSpace(req.PaymentRequestID), pack.Outputs)
+	} else {
+		_, err = tx.ExecContext(r.Context(), `
+			INSERT INTO entitlements (email, plan_id, outputs_total, outputs_remaining, status)
+			VALUES (lower($1), $2, $3, $3, 'active')`, email, productID, pack.Outputs)
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "entitlement insert failed"})
+		return
+	}
+	if _, err := tx.ExecContext(r.Context(), `UPDATE payment_requests SET status = 'approved', reviewed_at = now() WHERE id = $1`, strings.TrimSpace(req.PaymentRequestID)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment request update failed"})
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db commit failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "approved"})
+}
+
+func (h *Handler) RejectPaymentRequest(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	var req paymentRequestReviewInput
+	if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.PaymentRequestID) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	reason := strings.TrimSpace(req.Reason)
+	result, err := h.DB.ExecContext(r.Context(), `
+		UPDATE payment_requests
+		SET status = 'rejected', reviewed_at = now(),
+		    raw_payload = COALESCE(raw_payload, '{}'::jsonb) || jsonb_build_object('reason', $2::text)
+		WHERE id = $1 AND status = 'pending'`, strings.TrimSpace(req.PaymentRequestID), reason)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment request update failed"})
+		return
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment request update failed"})
+		return
+	}
+	if rowsAffected == 0 {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "payment request not found or already reviewed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "rejected"})
 }

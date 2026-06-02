@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upgrade — Koschei</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>
+    .pack-card{display:flex;flex-direction:column;gap:16px}.pack-price{font-size:28px;font-weight:700}.pack-output{color:var(--accent)}
+    .pack-actions{display:flex;flex-direction:column;gap:8px;margin-top:auto}.payment-form{display:none;margin-top:22px}.payment-form.show{display:block}
+    textarea.form-input{min-height:88px;resize:vertical}.summary{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:20px;color:var(--text2)}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <div class="nav-links"><a href="/hub" class="nav-link">Hub</a><a href="/account" class="nav-link">Account</a><a href="/pricing" class="nav-link active">Upgrade</a></div>
+</nav>
+<main class="page">
+  <div class="page-title">Buy outputs</div>
+  <div class="page-sub">Purchase a pack on Shopier, then report the payment for admin review.</div>
+  <div class="summary"><span>Email: <strong id="memberEmail">Loading…</strong></span><span>Outputs remaining: <strong id="outputsRemaining">—</strong></span></div>
+  <div class="alert" id="pageMessage"></div>
+  <section class="grid-3">
+    <article class="card pack-card"><div><h2>Starter Pack</h2><div class="pack-price">899 TL</div></div><div class="pack-output">+1 output</div><div class="pack-actions"><a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465449" target="_blank" rel="noopener noreferrer">Buy on Shopier</a><button class="btn btn-ghost" type="button" onclick="openPaymentForm('starter')">Report payment</button></div></article>
+    <article class="card pack-card"><div><h2>Builder Pack</h2><div class="pack-price">2299 TL</div></div><div class="pack-output">+3 outputs</div><div class="pack-actions"><a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465484" target="_blank" rel="noopener noreferrer">Buy on Shopier</a><button class="btn btn-ghost" type="button" onclick="openPaymentForm('builder')">Report payment</button></div></article>
+    <article class="card pack-card"><div><h2>Studio Pack</h2><div class="pack-price">4999 TL</div></div><div class="pack-output">+10 outputs</div><div class="pack-actions"><a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465499" target="_blank" rel="noopener noreferrer">Buy on Shopier</a><button class="btn btn-ghost" type="button" onclick="openPaymentForm('studio')">Report payment</button></div></article>
+  </section>
+  <section class="card payment-form" id="paymentFormWrap">
+    <h2 style="margin-top:0">Report Shopier payment</h2>
+    <form id="paymentForm" style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group"><label class="form-label" for="fullName">Full name</label><input class="form-input" id="fullName" required></div>
+      <div class="form-group"><label class="form-label" for="email">Email</label><input class="form-input" id="email" type="email" readonly></div>
+      <div class="form-group"><label class="form-label" for="productID">Pack</label><select class="form-input" id="productID"><option value="starter">Starter</option><option value="builder">Builder</option><option value="studio">Studio</option></select></div>
+      <div class="form-group"><label class="form-label" for="paymentReference">Payment reference (optional)</label><input class="form-input" id="paymentReference"></div>
+      <div class="form-group"><label class="form-label" for="note">Note (optional)</label><textarea class="form-input" id="note"></textarea></div>
+      <button class="btn btn-primary" id="submitPayment" type="submit">Send payment request</button>
+    </form>
+  </section>
+</main>
+<script src="/js/koschei-auth.js?v=4"></script>
+<script>
+  const message = document.getElementById('pageMessage');
+  function showMessage(text, kind) { message.textContent = text; message.className = `alert alert-${kind} show`; }
+  function openPaymentForm(productID) { document.getElementById('productID').value = productID; document.getElementById('paymentFormWrap').classList.add('show'); document.getElementById('fullName').focus(); }
+  (async () => {
+    await KoscheiAuth.init();
+    if (!KoscheiAuth.requireAuth('/login')) return;
+    const email = KoscheiAuth.getEmail() || '';
+    document.getElementById('memberEmail').textContent = email;
+    document.getElementById('email').value = email;
+    try {
+      const res = await KoscheiAuth.apiCall('/api/member/summary');
+      if (!res || !res.ok) throw new Error('Member summary unavailable');
+      const data = await res.json();
+      document.getElementById('memberEmail').textContent = data.email || email;
+      document.getElementById('email').value = data.email || email;
+      document.getElementById('outputsRemaining').textContent = data.outputs_remaining ?? 0;
+    } catch { showMessage('Could not load member details. Please try again.', 'error'); }
+  })();
+  document.getElementById('paymentForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = document.getElementById('submitPayment'); button.disabled = true;
+    try {
+      const res = await KoscheiAuth.apiCall('/api/payments/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: document.getElementById('fullName').value, email: document.getElementById('email').value, product_id: document.getElementById('productID').value, payment_reference: document.getElementById('paymentReference').value, note: document.getElementById('note').value }) });
+      const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Could not send payment request');
+      showMessage(data.message || 'Payment request received. Admin review required.', 'success'); document.getElementById('paymentForm').reset(); document.getElementById('email').value = KoscheiAuth.getEmail() || '';
+    } catch (error) { showMessage(error.message, 'error'); } finally { button.disabled = false; }
+  });
+</script>
+</body>
+</html>
