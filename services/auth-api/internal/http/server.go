@@ -15,6 +15,7 @@ func New() (*Server, error) {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", handlers.JSONMethod(http.MethodGet, handler.Health))
+	mux.HandleFunc("/api/web3/health", handlers.JSONMethod(http.MethodGet, handler.Web3ChainHealth))
 	mux.HandleFunc("/auth/signup", handlers.JSONMethod(http.MethodPost, handler.Signup))
 	mux.HandleFunc("/auth/login", handlers.JSONMethod(http.MethodPost, handler.Login))
 	mux.HandleFunc("/auth/me", handlers.JSONMethod(http.MethodGet, handler.Me))
