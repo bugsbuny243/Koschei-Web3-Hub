@@ -120,9 +120,12 @@ const KoscheiAuth = (() => {
     const jwt = getJwt();
     const headers = { ...(options.headers || {}) };
     if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
-    const res = await fetch(path, { ...options, headers });
-    if (res.status === 401) { signOut(); return null; }
-    return res;
+    try {
+      const res = await fetch(path, { ...options, headers });
+      return res;
+    } catch {
+      return null;
+    }
   }
 
   return { init, signIn, signUp, signOut, isLoggedIn, requireAuth, requireGuest, getEmail, getSub, apiCall, getJwt };
