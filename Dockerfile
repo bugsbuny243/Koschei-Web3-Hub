@@ -10,6 +10,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata
 COPY --from=go-builder /app/koschei-api .
 COPY koschei/api/public ./public
+COPY koschei/api/migrations ./migrations
 ENV STATIC_DIR=/app/public
 EXPOSE 8080
 CMD ["./koschei-api"]

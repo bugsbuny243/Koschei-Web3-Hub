@@ -31,6 +31,10 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/auth/otp/verify", method("POST", h.VerifyOTPLogin))
 	mux.HandleFunc("/api/me", requiresDB(h, handlers.RequireAuth(method("GET", h.Me))))
 	mux.HandleFunc("/api/member/summary", requiresDB(h, handlers.RequireAuth(method("GET", h.MemberSummary))))
+	mux.HandleFunc("/api/payments/request", requiresDB(h, handlers.RequireAuth(method("POST", h.PaymentRequest))))
+	mux.HandleFunc("/api/admin/payment-requests", requiresDB(h, method("GET", h.AdminPaymentRequests)))
+	mux.HandleFunc("/api/admin/payment-requests/approve", requiresDB(h, method("POST", h.ApprovePaymentRequest)))
+	mux.HandleFunc("/api/admin/payment-requests/reject", requiresDB(h, method("POST", h.RejectPaymentRequest)))
 	mux.HandleFunc("/api/runtime/projects", requiresDB(h, handlers.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.CreateRuntimeProject(w, r)
@@ -86,14 +90,16 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					return
 				}
 				cleanRoutes := map[string]string{
-					"/hub":       "/hub.html",
-					"/login":     "/login.html",
-					"/register":  "/register.html",
-					"/metadata":  "/metadata.html",
-					"/risk":      "/risk.html",
-					"/chains":    "/chains.html",
-					"/account":   "/account.html",
-					"/dashboard": "/dashboard.html",
+					"/hub":            "/hub.html",
+					"/login":          "/login.html",
+					"/register":       "/register.html",
+					"/metadata":       "/metadata.html",
+					"/risk":           "/risk.html",
+					"/chains":         "/chains.html",
+					"/account":        "/account.html",
+					"/pricing":        "/pricing.html",
+					"/admin-payments": "/admin-payments.html",
+					"/dashboard":      "/dashboard.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())
