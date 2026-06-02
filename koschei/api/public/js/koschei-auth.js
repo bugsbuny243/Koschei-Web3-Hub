@@ -4,7 +4,7 @@ function _b64url(str) {
   try { return atob(str); } catch { return '{}'; }
 }
 
-const KoscheiAuth = (() => {
+var KoscheiAuth = (function() {
   let _neonAuthUrl = '';
 
   async function init() {
@@ -129,4 +129,4 @@ const KoscheiAuth = (() => {
 
   return { init, signIn, signUp, signOut, isLoggedIn, requireAuth,
            requireGuest, getEmail, getSub, apiCall, getJwt };
-})();
+}());
