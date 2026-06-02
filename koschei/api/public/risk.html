@@ -38,12 +38,12 @@
       <label class="form-label" for="riskNotes">Notes</label>
       <textarea class="form-input" id="riskNotes" rows="4" placeholder="Add public context, concerns, or observed behavior..." style="resize:vertical;"></textarea>
     </div>
-    <button class="btn btn-primary" type="submit">Scan</button>
+    <button class="btn btn-primary" id="riskScanBtn" type="submit">Scan</button>
   </form>
 
   <section class="card" id="riskResult" hidden>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;">
-      <strong>Fallback risk checklist</strong>
+      <strong id="riskResultTitle">Risk scan result</strong>
       <span class="badge badge-blue" id="riskLevel"></span>
     </div>
     <div class="risk-grid">
@@ -56,38 +56,86 @@
         <ul class="result-list" id="riskFixes"></ul>
       </div>
     </div>
-    <p class="auth-sub" style="margin-top:18px;"><strong>disclaimer:</strong> This is informational only, not legal, financial, investment, or security advice.</p>
+    <p class="auth-sub" style="margin-top:18px;"><strong>score:</strong> <span id="riskScore"></span></p>
+    <p class="auth-sub" style="margin-top:8px;"><strong>disclaimer:</strong> <span id="riskDisclaimer"></span></p>
   </section>
 </main>
 
 <script src="/js/koschei-auth.js?v=4"></script>
 <script>
-  const checklist = [
-    'Verify the official project source and the target address independently.',
-    'Review contract verification, permissions, upgrade controls, and transaction history.',
-    'Check for unexpected approvals, signer changes, or high-privilege operations.',
-    'Confirm that public documentation and audit claims are current and authentic.'
-  ];
-  const fixes = [
-    'Use trusted explorers and official links to confirm addresses before interacting.',
-    'Revoke unnecessary token approvals and limit wallet permissions where appropriate.',
-    'Use a separate wallet for testing and request an independent security review for high-value activity.'
-  ];
+  const fallbackResult = {
+    risk_level: 'review_required',
+    score: 65,
+    checklist: [
+      'Verify the official project source and the target address independently.',
+      'Review contract verification, permissions, upgrade controls, and transaction history.',
+      'Check for unexpected approvals, signer changes, or high-privilege operations.',
+      'Confirm that public documentation and audit claims are current and authentic.'
+    ],
+    recommended_fixes: [
+      'Use trusted explorers and official links to confirm addresses before interacting.',
+      'Revoke unnecessary token approvals and limit wallet permissions where appropriate.',
+      'Use a separate wallet for testing and request an independent security review for high-value activity.'
+    ],
+    disclaimer: 'This is informational only, not legal, financial, investment, or security advice.'
+  };
 
   function renderList(id, items) {
-    document.getElementById(id).innerHTML = items.map(item => `<li>${item}</li>`).join('');
+    const list = document.getElementById(id);
+    list.replaceChildren(...items.map(item => {
+      const entry = document.createElement('li');
+      entry.textContent = item;
+      return entry;
+    }));
+  }
+
+  function renderResult(result, usedClientFallback = false) {
+    document.getElementById('riskResultTitle').textContent = usedClientFallback ? 'Fallback risk checklist' : 'Saved risk scan result';
+    document.getElementById('riskLevel').textContent = `risk_level: ${result.risk_level}`;
+    document.getElementById('riskScore').textContent = result.score;
+    document.getElementById('riskDisclaimer').textContent = result.disclaimer;
+    renderList('riskChecklist', result.checklist);
+    renderList('riskFixes', result.recommended_fixes);
+    document.getElementById('riskResult').hidden = false;
   }
 
   (async () => {
     await KoscheiAuth.init();
     if (!KoscheiAuth.requireAuth('/login')) return;
 
-    document.getElementById('riskForm').addEventListener('submit', event => {
+    document.getElementById('riskForm').addEventListener('submit', async event => {
       event.preventDefault();
-      document.getElementById('riskLevel').textContent = 'risk_level: review required';
-      renderList('riskChecklist', checklist);
-      renderList('riskFixes', fixes);
-      document.getElementById('riskResult').hidden = false;
+      const button = document.getElementById('riskScanBtn');
+      const target = document.getElementById('riskTarget').value.trim();
+      const notes = document.getElementById('riskNotes').value.trim();
+      button.disabled = true;
+      button.textContent = 'Scanning...';
+
+      try {
+        const response = await KoscheiAuth.apiCall('/api/risk/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target, notes })
+        });
+        if (!response) {
+          renderResult(fallbackResult, true);
+          return;
+        }
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          throw new Error(error.error || `Request failed (${response.status})`);
+        }
+        renderResult(await response.json());
+      } catch (error) {
+        if (error instanceof TypeError) {
+          renderResult(fallbackResult, true);
+          return;
+        }
+        window.alert(error.message || 'Risk scan failed.');
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Scan';
+      }
     });
   })();
 </script>
