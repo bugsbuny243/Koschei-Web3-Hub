@@ -20,6 +20,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/debug/token", method("GET", h.DebugToken))
 	mux.HandleFunc("/api/auth/provision", method("POST", h.Provision))
 	mux.HandleFunc("/api/web3/health", method("GET", h.Web3Health))
+	mux.HandleFunc("/api/web3/health/logs", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3HealthLogs))))
 	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok"})
