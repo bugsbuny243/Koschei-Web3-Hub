@@ -67,6 +67,11 @@
       document.getElementById('userEmail').textContent =
         KoscheiAuth.getEmail() || '';
       try {
+        try {
+          await KoscheiAuth.apiCall('/api/auth/provision', { method: 'POST' });
+        } catch {
+          // Summary provisioning is also idempotent, so continue if this warm-up fails.
+        }
         const res = await KoscheiAuth.apiCall('/api/member/summary');
         if (!res || !res.ok) throw new Error('Member summary unavailable');
         const data = await res.json();
