@@ -13,6 +13,7 @@ export default async function DashboardPage() {
     return <main className="web3-page"><SiteHeader /><section className="mx-auto max-w-3xl px-5 py-16 lg:px-8"><p className="eyebrow">Member dashboard</p><h1 className="mt-4 text-4xl font-black text-white">Member sessions are unavailable</h1><p className="mt-4 text-sm leading-7 text-rose-200">The auth API is unavailable.</p></section></main>;
   }
   if (!session) redirect("/login");
+  await provisionMemberIfNeeded(session.sub, session.email ?? "");
   let dashboard;
   try {
     await ensureMemberProfile(session.sub, session.email);
