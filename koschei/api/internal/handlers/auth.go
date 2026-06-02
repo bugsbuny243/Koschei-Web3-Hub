@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/mail"
 	"os"
@@ -120,14 +121,37 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) upsertAppProfile(ctx context.Context, subject, email string) (authUser, error) {
-	out := authUser{}
-	q := `INSERT INTO app_user_profiles (auth_subject, email)
-VALUES ($1, $2)
-ON CONFLICT (auth_subject) DO UPDATE SET email=EXCLUDED.email, updated_at=now()
-RETURNING id::text, email, role, plan_id, credits`
+	out := authUser{Role: "user", Plan: "free", Credits: 0}
+	q := `WITH updated_by_subject AS (
+  UPDATE app_user_profiles
+  SET email = lower($2), updated_at = now()
+  WHERE auth_subject = $1
+  RETURNING id::text, email
+),
+updated_by_email AS (
+  UPDATE app_user_profiles
+  SET auth_subject = $1, updated_at = now()
+  WHERE lower(email) = lower($2)
+    AND NOT EXISTS (SELECT 1 FROM updated_by_subject)
+  RETURNING id::text, email
+),
+inserted AS (
+  INSERT INTO app_user_profiles (auth_subject, email)
+  SELECT $1, lower($2)
+  WHERE NOT EXISTS (SELECT 1 FROM updated_by_subject)
+    AND NOT EXISTS (SELECT 1 FROM updated_by_email)
+  RETURNING id::text, email
+)
+SELECT * FROM updated_by_subject
+UNION ALL SELECT * FROM updated_by_email
+UNION ALL SELECT * FROM inserted
+LIMIT 1;`
 	err := h.runWithRetry(ctx, func(inner context.Context) error {
-		return h.DB.QueryRowContext(inner, q, subject, strings.ToLower(strings.TrimSpace(email))).Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
+		return h.DB.QueryRowContext(inner, q, subject, strings.ToLower(strings.TrimSpace(email))).Scan(&out.ID, &out.Email)
 	})
+	if err != nil {
+		log.Printf("upsertAppProfile failed: %v", err)
+	}
 	return out, err
 }
 
