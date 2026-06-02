@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -30,6 +31,7 @@ func (h *Handler) MemberSummary(w http.ResponseWriter, r *http.Request) {
 
 	summary, err := h.provisionMember(r.Context(), claims)
 	if err != nil {
+		log.Printf("member summary failed: sub=%s email=%s err=%v", claims.Sub, claims.Email, err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "member summary unavailable"})
 		return
 	}
@@ -55,26 +57,59 @@ func (h *Handler) provisionMember(ctx context.Context, claims neonJWTClaims) (me
 		return memberSummaryResponse{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO app_user_profiles (auth_subject, email)
-		VALUES ($1, $2)
-		ON CONFLICT (auth_subject) DO UPDATE SET email = EXCLUDED.email`, sub, email); err != nil {
+		WITH updated_by_subject AS (
+			UPDATE app_user_profiles
+			SET email = lower($2), updated_at = now()
+			WHERE auth_subject = $1
+			RETURNING id
+		),
+		updated_by_email AS (
+			UPDATE app_user_profiles
+			SET auth_subject = $1, updated_at = now()
+			WHERE lower(email) = lower($2)
+			  AND NOT EXISTS (SELECT 1 FROM updated_by_subject)
+			RETURNING id
+		),
+		inserted AS (
+			INSERT INTO app_user_profiles (auth_subject, email)
+			SELECT $1, lower($2)
+			WHERE NOT EXISTS (SELECT 1 FROM updated_by_subject)
+			  AND NOT EXISTS (SELECT 1 FROM updated_by_email)
+			RETURNING id
+		)
+		SELECT id FROM updated_by_subject
+		UNION ALL SELECT id FROM updated_by_email
+		UNION ALL SELECT id FROM inserted
+		LIMIT 1`, sub, email); err != nil {
 		return memberSummaryResponse{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO entitlements (email, plan_id, outputs_total, outputs_remaining, status)
-		SELECT $1, $2, $3, $3, 'active'
+		SELECT
+			lower($1),
+			(SELECT id FROM plans WHERE id = 'free' LIMIT 1),
+			100,
+			100,
+			'active'
 		WHERE NOT EXISTS (
-			SELECT 1 FROM entitlements WHERE lower(email) = $1 AND status = 'active'
-		)`, email, freePlanID, freeOutputsIncluded); err != nil {
+			SELECT 1
+			FROM entitlements
+			WHERE lower(email) = lower($1)
+			  AND status = 'active'
+		)`, email); err != nil {
 		return memberSummaryResponse{}, err
 	}
 
 	summary := memberSummaryResponse{OK: true, Email: email}
 	if err := tx.QueryRowContext(ctx, `
-		SELECT plan_id, outputs_total, outputs_remaining
+		SELECT
+			COALESCE(plan_id, 'free') AS plan_id,
+			COALESCE(outputs_total, 100) AS outputs_total,
+			COALESCE(outputs_remaining, 100) AS outputs_remaining
 		FROM entitlements
-		WHERE lower(email) = $1 AND status = 'active'
-		ORDER BY outputs_remaining DESC
+		WHERE lower(email) = lower($1)
+		  AND status = 'active'
+		ORDER BY outputs_remaining DESC, created_at DESC
 		LIMIT 1`, email).Scan(&summary.Plan, &summary.OutputsTotal, &summary.OutputsRemaining); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return memberSummaryResponse{}, errors.New("active entitlement missing after initialization")
