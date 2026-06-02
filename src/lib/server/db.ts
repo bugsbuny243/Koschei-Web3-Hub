@@ -1,6 +1,19 @@
 import "server-only";
 import { query } from "@/lib/server/neon";
 
+await query(`
+  CREATE UNIQUE INDEX IF NOT EXISTS entitlements_member_sub_idx
+  ON entitlements (member_sub)
+`).catch(() => {});
+
+export async function provisionMemberIfNeeded(sub: string, email: string) {
+  await query(`
+    INSERT INTO entitlements (member_sub, plan_id, credits_remaining)
+    VALUES ($1, 'free', 100)
+    ON CONFLICT (member_sub) DO NOTHING
+  `, [sub]);
+}
+
 export type Product = {
   id: string;
   name: string;
