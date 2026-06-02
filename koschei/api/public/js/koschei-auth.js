@@ -101,12 +101,14 @@ const KoscheiAuth = (() => {
       });
     } catch {}
   }
-
-  async function signIn(email, password) {
+async function signUp(email, password) {
+    await _request('/sign-up/email', {
+      email, password, name: email.split('@')[0] || 'User',
+    });
     const data = await _request('/sign-in/email', { email, password });
     await _provision();
     return data;
-  }
+}
 
   async function signUp(email, password) {
     const data = await _request('/sign-up/email', {
