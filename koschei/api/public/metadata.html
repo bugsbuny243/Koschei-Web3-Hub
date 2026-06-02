@@ -39,9 +39,9 @@
     <div class="form-group">
       <label class="form-label">Type</label>
       <select class="form-input" id="assetType">
-        <option value="nft">NFT</option>
-        <option value="game_asset">Game Asset</option>
-        <option value="collection">Collection</option>
+        <option value="NFT">NFT</option>
+        <option value="Game Asset">Game Asset</option>
+        <option value="Collection">Collection</option>
       </select>
     </div>
     <div class="form-group">
@@ -81,22 +81,14 @@
 
     if (!name) { showError('Asset name is required.'); return; }
 
-    const prompt = `Generate professional ${type} metadata as valid JSON for the following asset:
-Name: ${name}
-Description: ${desc || 'A unique digital asset'}
-Type: ${type}
-${traits ? 'Traits: ' + traits : ''}
-
-Return ONLY a valid JSON object with these fields: name, description, image (use placeholder URL), attributes (array of {trait_type, value} objects), properties (object with type and creators). No extra text.`;
-
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Generating...';
 
     try {
-      const res = await KoscheiAuth.apiCall('/api/ai/generate', {
+      const res = await KoscheiAuth.apiCall('/api/metadata/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: 'chat', prompt }),
+        body: JSON.stringify({ asset_name: name, description: desc, asset_type: type, traits }),
       });
 
       if (!res || !res.ok) {
@@ -105,17 +97,9 @@ Return ONLY a valid JSON object with these fields: name, description, image (use
       }
 
       const data = await res.json();
-      const output = data.result || data.content || data.output || data.text || JSON.stringify(data, null, 2);
-
-      // Try to extract JSON from response
-      let formatted = output;
-      try {
-        const match = output.match(/\{[\s\S]*\}/);
-        if (match) formatted = JSON.stringify(JSON.parse(match[0]), null, 2);
-      } catch {}
-
-      document.getElementById('resultBox').textContent = formatted;
+      document.getElementById('resultBox').textContent = JSON.stringify(data.metadata, null, 2);
       document.getElementById('resultWrap').style.display = 'block';
+      showSuccess('Metadata generated');
     } catch (err) {
       showError(err.message || 'Generation failed. Check your credits.');
     } finally {
@@ -128,6 +112,11 @@ Return ONLY a valid JSON object with these fields: name, description, image (use
     navigator.clipboard.writeText(document.getElementById('resultBox').textContent);
   }
 
+  function showSuccess(msg) {
+    const el = document.getElementById('alert');
+    el.textContent = msg;
+    el.className = 'alert alert-success show';
+  }
   function showError(msg) {
     const el = document.getElementById('alert');
     el.textContent = msg;
