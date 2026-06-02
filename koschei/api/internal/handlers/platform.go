@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -43,6 +44,8 @@ type chainHealthResponse struct {
 	Chain    string `json:"chain"`
 	Network  string `json:"network"`
 	Provider string `json:"provider"`
+	Result   string `json:"result"`
+	Error    string `json:"error"`
 }
 
 func (h *Handler) Web3Health(w http.ResponseWriter, r *http.Request) {
@@ -70,22 +73,33 @@ func (h *Handler) Web3Health(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status := "online"
+	errorText := ""
 	if apiKey == "" {
 		status = "no_api_key"
+		errorText = "Alchemy API key is not configured"
 	} else {
 		client := &http.Client{Timeout: 5 * time.Second}
 		req, err := http.NewRequest(http.MethodPost, cfg.url, strings.NewReader(cfg.body))
 		if err != nil {
 			status = "error"
+			errorText = err.Error()
 		} else {
 			req.Header.Set("Content-Type", "application/json")
 			resp, err := client.Do(req)
-			if err != nil || resp.StatusCode >= http.StatusBadRequest {
+			if err != nil {
 				status = "error"
+				errorText = err.Error()
 			} else {
 				resp.Body.Close()
+				if resp.StatusCode >= http.StatusBadRequest {
+					status = "error"
+					errorText = fmt.Sprintf("Alchemy returned HTTP %d", resp.StatusCode)
+				}
 			}
 		}
 	}
-	writeJSON(w, http.StatusOK, chainHealthResponse{OK: status == "online", Status: status, Chain: chain, Network: cfg.network, Provider: "Alchemy"})
+	result := status
+	response := chainHealthResponse{OK: status == "online", Status: status, Chain: chain, Network: cfg.network, Provider: "Alchemy", Result: result, Error: errorText}
+	h.recordChainHealth(chainHealthLog{Chain: chain, Network: cfg.network, Provider: "alchemy", Healthy: response.OK, Result: result, Error: errorText, CheckedAt: time.Now().UTC()})
+	writeJSON(w, http.StatusOK, response)
 }

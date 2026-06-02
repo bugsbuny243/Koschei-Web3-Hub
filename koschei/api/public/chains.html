@@ -16,6 +16,11 @@
     .status-error{color:var(--danger);}
     .refresh-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
     .last-updated{font-size:12px;color:var(--text2);}
+    .recent-checks{margin-top:28px;}
+    .recent-checks-title{font-size:15px;font-weight:600;margin-bottom:12px;}
+    .recent-check-row{display:grid;grid-template-columns:1fr 1fr 1fr 1.4fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px;}
+    .recent-check-row:last-child{border-bottom:0;}
+    .recent-empty{font-size:12px;color:var(--text2);}
   </style>
 </head>
 <body>
@@ -45,6 +50,13 @@
   <div class="grid-3" id="chainGrid">
     <div class="card chain-card"><div style="color:var(--text2);font-size:13px;">Loading chains...</div></div>
   </div>
+
+  <section class="recent-checks">
+    <div class="recent-checks-title">Recent checks</div>
+    <div class="card" id="recentChecks" style="padding:8px 16px;">
+      <div class="recent-empty">Loading recent checks...</div>
+    </div>
+  </section>
 </div>
 
 <script src="/js/koschei-auth.js?v=3"></script>
@@ -57,6 +69,42 @@
     { id:'polygon', name:'Polygon', icon:'🟣' },
     { id:'optimism', name:'Optimism', icon:'🔴' },
   ];
+
+  function escapeHTML(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
+  }
+
+  function formatCheckedAt(value) {
+    const checkedAt = new Date(value);
+    return Number.isNaN(checkedAt.getTime()) ? '—' : checkedAt.toLocaleString();
+  }
+
+  async function loadRecentChecks() {
+    const container = document.getElementById('recentChecks');
+    const response = await KoscheiAuth.apiCall('/api/web3/health/logs');
+    const data = response ? await response.json().catch(() => ({})) : {};
+    if (!response?.ok || !Array.isArray(data.logs)) {
+      container.innerHTML = '<div class="recent-empty">Recent checks are unavailable.</div>';
+      return;
+    }
+    const logs = data.logs.slice(0, 8);
+    if (!logs.length) {
+      container.innerHTML = '<div class="recent-empty">No health checks have been recorded yet.</div>';
+      return;
+    }
+    container.innerHTML = logs.map(log => {
+      const statusClass = log.healthy ? 'status-online' : 'status-error';
+      const status = log.healthy ? '● Online' : '○ Unavailable';
+      return `<div class="recent-check-row">
+        <span>${escapeHTML(log.chain)}</span>
+        <span>${escapeHTML(log.network)}</span>
+        <span class="${statusClass}">${status}</span>
+        <span>${escapeHTML(formatCheckedAt(log.checked_at))}</span>
+      </div>`;
+    }).join('');
+  }
 
   async function loadChains() {
     document.getElementById('lastUpdated').textContent = 'Refreshing...';
@@ -86,7 +134,8 @@
         <div style="font-size:12px;color:var(--text2);">Provider: ${data.provider || 'Alchemy'}</div>
       </div>`;
     }).join('');
-    document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    await loadRecentChecks();
   }
 
   (async () => {
