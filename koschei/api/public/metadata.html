@@ -13,11 +13,13 @@
 </head>
 <body>
 <nav class="nav">
-  <a href="/hub.html" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
   <div class="nav-links">
-    <a href="/hub.html" class="nav-link">Hub</a>
-    <a href="/metadata.html" class="nav-link active">Metadata</a>
-    <a href="/chains.html" class="nav-link">Chains</a>
+    <a href="/hub" class="nav-link">Hub</a>
+    <a href="/metadata" class="nav-link active">Metadata</a>
+    <a href="/risk" class="nav-link">Risk</a>
+    <a href="/chains" class="nav-link">Chains</a>
+    <a href="/account" class="nav-link">Account</a>
   </div>
 </nav>
 
@@ -66,7 +68,7 @@
 <script>
   (async () => {
     await KoscheiAuth.init();
-    KoscheiAuth.requireAuth();
+    if (!KoscheiAuth.requireAuth('/login')) return;
   })();
 
   async function generate() {

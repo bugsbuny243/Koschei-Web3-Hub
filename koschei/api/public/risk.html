@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web3 Risk Scanner — Koschei</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>
+    .result-list{padding-left:20px;color:var(--text2);}
+    .result-list li{margin-top:6px;}
+    .risk-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+    @media (max-width:600px){.risk-grid{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <div class="nav-links">
+    <a href="/hub" class="nav-link">Hub</a>
+    <a href="/metadata" class="nav-link">Metadata</a>
+    <a href="/risk" class="nav-link active">Risk</a>
+    <a href="/chains" class="nav-link">Chains</a>
+    <a href="/account" class="nav-link">Account</a>
+  </div>
+</nav>
+
+<main class="page" style="max-width:800px;">
+  <div class="page-title">Web3 Risk Scanner</div>
+  <div class="page-sub">Run a preliminary checklist for a project, wallet, or contract. Never enter a private key or recovery phrase.</div>
+
+  <form class="card" id="riskForm" style="display:flex;flex-direction:column;gap:16px;margin-bottom:20px;">
+    <div class="form-group">
+      <label class="form-label" for="riskTarget">Project / wallet / contract</label>
+      <input class="form-input" id="riskTarget" type="text" required placeholder="Project name, public wallet address, or contract address">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="riskNotes">Notes</label>
+      <textarea class="form-input" id="riskNotes" rows="4" placeholder="Add public context, concerns, or observed behavior..." style="resize:vertical;"></textarea>
+    </div>
+    <button class="btn btn-primary" type="submit">Scan</button>
+  </form>
+
+  <section class="card" id="riskResult" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;">
+      <strong>Fallback risk checklist</strong>
+      <span class="badge badge-blue" id="riskLevel"></span>
+    </div>
+    <div class="risk-grid">
+      <div>
+        <div class="form-label">checklist</div>
+        <ul class="result-list" id="riskChecklist"></ul>
+      </div>
+      <div>
+        <div class="form-label">recommended_fixes</div>
+        <ul class="result-list" id="riskFixes"></ul>
+      </div>
+    </div>
+    <p class="auth-sub" style="margin-top:18px;"><strong>disclaimer:</strong> This is informational only, not legal, financial, investment, or security advice.</p>
+  </section>
+</main>
+
+<script src="/js/koschei-auth.js?v=4"></script>
+<script>
+  const checklist = [
+    'Verify the official project source and the target address independently.',
+    'Review contract verification, permissions, upgrade controls, and transaction history.',
+    'Check for unexpected approvals, signer changes, or high-privilege operations.',
+    'Confirm that public documentation and audit claims are current and authentic.'
+  ];
+  const fixes = [
+    'Use trusted explorers and official links to confirm addresses before interacting.',
+    'Revoke unnecessary token approvals and limit wallet permissions where appropriate.',
+    'Use a separate wallet for testing and request an independent security review for high-value activity.'
+  ];
+
+  function renderList(id, items) {
+    document.getElementById(id).innerHTML = items.map(item => `<li>${item}</li>`).join('');
+  }
+
+  (async () => {
+    await KoscheiAuth.init();
+    if (!KoscheiAuth.requireAuth('/login')) return;
+
+    document.getElementById('riskForm').addEventListener('submit', event => {
+      event.preventDefault();
+      document.getElementById('riskLevel').textContent = 'risk_level: review required';
+      renderList('riskChecklist', checklist);
+      renderList('riskFixes', fixes);
+      document.getElementById('riskResult').hidden = false;
+    });
+  })();
+</script>
+</body>
+</html>

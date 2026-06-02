@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account — Koschei</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>
+    .account-row{display:flex;justify-content:space-between;gap:20px;padding:14px 0;border-bottom:1px solid var(--border);}
+    .account-row:last-child{border-bottom:none;}
+    .account-value{text-align:right;font-weight:600;word-break:break-word;}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <div class="nav-links">
+    <a href="/hub" class="nav-link">Hub</a>
+    <a href="/metadata" class="nav-link">Metadata</a>
+    <a href="/risk" class="nav-link">Risk</a>
+    <a href="/chains" class="nav-link">Chains</a>
+    <a href="/account" class="nav-link active">Account</a>
+  </div>
+</nav>
+
+<main class="page" style="max-width:700px;">
+  <div class="page-title">Account</div>
+  <div class="page-sub">View your active Koschei member account details.</div>
+
+  <div class="alert" id="accountMessage"></div>
+  <section class="card" style="margin-bottom:20px;">
+    <div class="account-row"><span class="form-label">Email</span><span class="account-value" id="accountEmail">Loading…</span></div>
+    <div class="account-row"><span class="form-label">Plan</span><span class="account-value" id="accountPlan">—</span></div>
+    <div class="account-row"><span class="form-label">Outputs total</span><span class="account-value" id="accountOutputsTotal">—</span></div>
+    <div class="account-row"><span class="form-label">Outputs remaining</span><span class="account-value" id="accountOutputsRemaining">—</span></div>
+    <div class="account-row"><span class="form-label">Status</span><span class="account-value"><span class="badge badge-green">active</span></span></div>
+  </section>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <a href="/hub" class="btn btn-primary">← Back to Hub</a>
+    <button class="btn btn-ghost" type="button" onclick="KoscheiAuth.signOut()">Sign out</button>
+  </div>
+</main>
+
+<script src="/js/koschei-auth.js?v=4"></script>
+<script>
+  (async () => {
+    await KoscheiAuth.init();
+    if (!KoscheiAuth.requireAuth('/login')) return;
+
+    document.getElementById('accountEmail').textContent = KoscheiAuth.getEmail() || '';
+    try {
+      const res = await KoscheiAuth.apiCall('/api/member/summary');
+      if (!res || !res.ok) throw new Error('Member summary unavailable');
+      const data = await res.json();
+      document.getElementById('accountEmail').textContent = data.email || KoscheiAuth.getEmail() || '';
+      document.getElementById('accountPlan').textContent = data.plan || 'free';
+      document.getElementById('accountOutputsTotal').textContent = data.outputs_total ?? 0;
+      document.getElementById('accountOutputsRemaining').textContent = data.outputs_remaining ?? 0;
+    } catch {
+      const message = document.getElementById('accountMessage');
+      message.textContent = 'Could not load member account details. Please try again.';
+      message.className = 'alert alert-error show';
+    }
+  })();
+</script>
+</body>
+</html>
