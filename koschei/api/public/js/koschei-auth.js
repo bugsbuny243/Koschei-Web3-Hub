@@ -1,3 +1,9 @@
+function _b64url(str) {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) str += '=';
+  try { return atob(str); } catch { return '{}'; }
+}
+
 const KoscheiAuth = (() => {
   let _neonAuthUrl = '';
 
@@ -36,7 +42,7 @@ const KoscheiAuth = (() => {
     const jwt = getJwt();
     if (!jwt) return false;
     try {
-      const payload = JSON.parse(atob(jwt.split('.')[1]));
+      const payload = JSON.parse(_b64url(jwt.split('.')[1]));
       return payload.exp > Math.floor(Date.now() / 1000);
     } catch { return false; }
   }
@@ -59,13 +65,13 @@ const KoscheiAuth = (() => {
   function getEmail() {
     const jwt = getJwt();
     if (!jwt) return null;
-    try { return JSON.parse(atob(jwt.split('.')[1])).email || null; } catch { return null; }
+    try { return JSON.parse(_b64url(jwt.split('.')[1])).email || null; } catch { return null; }
   }
 
   function getSub() {
     const jwt = getJwt();
     if (!jwt) return null;
-    try { return JSON.parse(atob(jwt.split('.')[1])).sub || null; } catch { return null; }
+    try { return JSON.parse(_b64url(jwt.split('.')[1])).sub || null; } catch { return null; }
   }
 
   async function _request(path, body) {
