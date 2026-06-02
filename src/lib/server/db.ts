@@ -118,7 +118,38 @@ export type UserDashboard = {
   saved_outputs: number;
 };
 
-export async function getUserDashboard(authSubject: string) {
+export async function ensureMemberProfile(authSubject: string, email: string) {
+  const rows = await query(`WITH existing_by_subject AS (
+  SELECT id FROM app_user_profiles WHERE auth_subject = $1 LIMIT 1
+),
+updated_by_subject AS (
+  UPDATE app_user_profiles
+  SET email = lower($2), updated_at = now()
+  WHERE auth_subject = $1
+  RETURNING id, email, auth_subject
+),
+updated_by_email AS (
+  UPDATE app_user_profiles
+  SET auth_subject = $1, updated_at = now()
+  WHERE lower(email) = lower($2)
+    AND NOT EXISTS (SELECT 1 FROM updated_by_subject)
+  RETURNING id, email, auth_subject
+),
+inserted AS (
+  INSERT INTO app_user_profiles (auth_subject, email)
+  SELECT $1, lower($2)
+  WHERE NOT EXISTS (SELECT 1 FROM updated_by_subject)
+    AND NOT EXISTS (SELECT 1 FROM updated_by_email)
+  RETURNING id, email, auth_subject
+)
+SELECT * FROM updated_by_subject
+UNION ALL SELECT * FROM updated_by_email
+UNION ALL SELECT * FROM inserted
+LIMIT 1`, [authSubject, email.toLowerCase()]);
+  return rows[0];
+}
+
+export async function getUserDashboard(authSubject: string, email: string) {
   const rows = await query<UserDashboard>(`SELECT profile.email,
   latest.plan_name,
   latest.status AS package_status,
@@ -144,6 +175,7 @@ LEFT JOIN LATERAL (
   WHERE lower(web3_outputs.email) = lower(profile.email)
 ) outputs ON true
 WHERE profile.auth_subject = $1
-LIMIT 1`, [authSubject]);
+   OR lower(profile.email) = lower($2)
+LIMIT 1`, [authSubject, email]);
   return rows[0];
 }
