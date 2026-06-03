@@ -41,7 +41,7 @@
 <script src="/js/koschei-auth.js?v=4"></script>
 <script src="/js/koschei-analytics.js?v=1"></script>
 <script>
-  (async () => { await KoscheiAuth.init(); if (KoscheiAuth.requireGuest('/hub')) KoscheiAnalytics.track('register_page_view'); })();
+  (async () => { await KoscheiAuth.init(); KoscheiAuth.requireGuest('/hub'); KoscheiAnalytics.track('register_page_view'); })();
   document.addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister(); });
   async function handleRegister() {
     const email = document.getElementById('email').value.trim();

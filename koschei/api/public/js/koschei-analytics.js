@@ -1,37 +1,33 @@
 var KoscheiAnalytics = (function() {
-  function currentEmail(explicitEmail) {
-    if (explicitEmail) return explicitEmail;
+  function authJwt() {
     try {
-      if (window.KoscheiAuth && typeof window.KoscheiAuth.getEmail === 'function') {
-        return window.KoscheiAuth.getEmail() || null;
-      }
+      if (window.KoscheiAuth && typeof KoscheiAuth.getJwt === 'function') return KoscheiAuth.getJwt();
     } catch {}
     return null;
   }
 
-  function payload(eventName, options = {}) {
-    return {
-      event_name: eventName,
-      email: currentEmail(options.email),
-      path: options.path || `${window.location.pathname}${window.location.search}`,
-      referrer: document.referrer || '',
-      user_agent: navigator.userAgent || '',
-      metadata: options.metadata || {},
-    };
+  function authEmail() {
+    try {
+      if (window.KoscheiAuth && typeof KoscheiAuth.getEmail === 'function') return KoscheiAuth.getEmail();
+    } catch {}
+    return null;
   }
 
-  function track(eventName, options = {}) {
+  function track(eventName, metadata = {}) {
     try {
-      const body = JSON.stringify(payload(eventName, options));
-      if (navigator.sendBeacon) {
-        const sent = navigator.sendBeacon('/api/analytics/event', new Blob([body], { type: 'application/json' }));
-        if (sent) return;
-      }
+      const headers = { 'Content-Type': 'application/json' };
+      const jwt = authJwt();
+      if (jwt) headers.Authorization = `Bearer ${jwt}`;
       fetch('/api/analytics/event', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
+        headers,
         keepalive: true,
+        body: JSON.stringify({
+          event_name: eventName,
+          email: authEmail(),
+          path: window.location.pathname,
+          metadata: metadata || {}
+        })
       }).catch(() => {});
     } catch {}
   }

@@ -40,6 +40,7 @@
   </section>
 </main>
 <script src="/js/koschei-auth.js?v=4"></script>
+<script src="/js/koschei-analytics.js?v=1"></script>
 <script>
   const message = document.getElementById('pageMessage');
   function showMessage(text, kind) { message.textContent = text; message.className = `alert alert-${kind} show`; }
@@ -47,6 +48,7 @@
   (async () => {
     await KoscheiAuth.init();
     if (!KoscheiAuth.requireAuth('/login')) return;
+    KoscheiAnalytics.track('pricing_view');
     const email = KoscheiAuth.getEmail() || '';
     document.getElementById('memberEmail').textContent = email;
     document.getElementById('email').value = email;

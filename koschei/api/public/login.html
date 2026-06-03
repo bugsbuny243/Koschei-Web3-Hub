@@ -37,7 +37,7 @@
 <script src="/js/koschei-auth.js?v=4"></script>
 <script src="/js/koschei-analytics.js?v=1"></script>
 <script>
-  (async () => { await KoscheiAuth.init(); KoscheiAuth.requireGuest('/hub'); })();
+  (async () => { await KoscheiAuth.init(); KoscheiAuth.requireGuest('/hub'); KoscheiAnalytics.track('login_page_view'); })();
   document.addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
   async function handleLogin() {
     const email = document.getElementById('email').value.trim();

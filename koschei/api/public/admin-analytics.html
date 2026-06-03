@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Analytics — Koschei</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>
+    .hidden{display:none}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px}.stat-number{font-size:28px;font-weight:700;margin-top:6px}.table-wrap{overflow:auto}.events-table{width:100%;border-collapse:collapse;font-size:13px}.events-table th,.events-table td{border-bottom:1px solid rgba(148,163,184,.18);padding:10px;text-align:left;vertical-align:top}.events-table th{color:var(--text2);font-weight:600}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px}.muted{color:var(--text2)}
+  </style>
+</head>
+<body>
+<main class="page">
+  <header style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:28px;">
+    <div><div class="page-title">Admin analytics</div><div class="page-sub">Internal visitor and conversion events.</div></div>
+    <a class="btn btn-ghost" href="/hub">Hub</a>
+  </header>
+  <div class="alert" id="message"></div>
+  <section class="card" id="loginBox">
+    <form id="loginForm" style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group"><label class="form-label" for="password">Admin password</label><input class="form-input" id="password" type="password" required autocomplete="current-password"></div>
+      <button class="btn btn-primary" type="submit">Open analytics</button>
+    </form>
+  </section>
+  <section class="hidden" id="analyticsBox">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px"><h2 style="margin:0">Analytics totals</h2><button class="btn btn-ghost" type="button" onclick="loadAnalytics()">Refresh</button></div>
+    <div class="stats" id="stats"></div>
+    <section class="card table-wrap">
+      <h2 style="margin-top:0">Latest 100 events</h2>
+      <table class="events-table"><thead><tr><th>Time</th><th>Event</th><th>Email</th><th>Path</th><th>Referrer</th><th>Metadata</th><th>User agent</th></tr></thead><tbody id="eventsBody"></tbody></table>
+    </section>
+  </section>
+</main>
+<script>
+  const storageKey = 'koschei_admin_password';
+  const password = () => sessionStorage.getItem(storageKey) || '';
+  function escapeHTML(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
+  function showMessage(text, kind) { const el = document.getElementById('message'); el.textContent = text; el.className = `alert alert-${kind} show`; }
+  async function adminCall(path) { return fetch(path, { headers: { 'x-admin-password': password() } }); }
+  function renderStats(counts) {
+    const labels = [
+      ['events_today', 'Total events today'],
+      ['signup_success', 'Signup success'],
+      ['login_success', 'Login success'],
+      ['metadata_generate_success', 'Metadata success'],
+      ['risk_scan_success', 'Risk scan success'],
+    ];
+    document.getElementById('stats').innerHTML = labels.map(([key, label]) => `<article class="card"><div class="form-label">${escapeHTML(label)}</div><div class="stat-number">${escapeHTML(counts?.[key] ?? 0)}</div></article>`).join('');
+  }
+  function renderEvents(events) {
+    const body = document.getElementById('eventsBody');
+    if (!events.length) { body.innerHTML = '<tr><td colspan="7" class="muted">No analytics events found.</td></tr>'; return; }
+    body.innerHTML = events.map(event => `<tr><td>${escapeHTML(new Date(event.created_at).toLocaleString())}</td><td><strong>${escapeHTML(event.event_name)}</strong></td><td>${escapeHTML(event.email || '—')}</td><td>${escapeHTML(event.path || '—')}</td><td>${escapeHTML(event.referrer || '—')}</td><td class="mono">${escapeHTML(JSON.stringify(event.metadata || {}))}</td><td class="muted">${escapeHTML(event.user_agent || '—')}</td></tr>`).join('');
+  }
+  async function loadAnalytics() {
+    try {
+      const res = await adminCall('/api/admin/analytics/events');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not load analytics');
+      document.getElementById('loginBox').classList.add('hidden');
+      document.getElementById('analyticsBox').classList.remove('hidden');
+      renderStats(data.counts || {});
+      renderEvents(data.events || []);
+    } catch (error) { showMessage(error.message, 'error'); }
+  }
+  document.getElementById('loginForm').addEventListener('submit', async (event) => { event.preventDefault(); sessionStorage.setItem(storageKey, document.getElementById('password').value); await loadAnalytics(); });
+  if (password()) loadAnalytics();
+</script>
+</body>
+</html>
