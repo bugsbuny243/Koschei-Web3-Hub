@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -294,14 +295,23 @@ func (h *Handler) Web3Events(w http.ResponseWriter, r *http.Request) {
 
 	events := make([]web3Event, 0, limit)
 	for rows.Next() {
-		event, scanErr := scanWeb3Event(rows)
-		if scanErr != nil {
+		var id string
+		var sourceID, emailVal, chain, network, eventType, address, txHash, blockNumber, direction, assetType, amount sql.NullString
+		var raw []byte
+		var createdAt time.Time
+		if err := rows.Scan(&id, &sourceID, &emailVal, &chain, &network, &eventType, &address, &txHash, &blockNumber, &direction, &assetType, &amount, &raw, &createdAt); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
-		events = append(events, event)
+		var rawPayload any
+		if len(raw) > 0 {
+			_ = json.Unmarshal(raw, &rawPayload)
+		}
+		events = append(events, map[string]any{
+			"id": string(id), "source_id": stringPtrFromNull(sourceID), "email": stringPtrFromNull(emailVal), "chain": stringPtrFromNull(chain), "network": stringPtrFromNull(network), "event_type": stringPtrFromNull(eventType), "address": stringPtrFromNull(address), "tx_hash": stringPtrFromNull(txHash), "block_number": stringPtrFromNull(blockNumber), "direction": stringPtrFromNull(direction), "asset_type": stringPtrFromNull(assetType), "amount": stringPtrFromNull(amount), "raw_payload": rawPayload, "created_at": createdAt,
+		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"events": events})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "events": events})
 }
 
 func (h *Handler) Web3Sources(w http.ResponseWriter, r *http.Request) {
@@ -340,14 +350,14 @@ func (h *Handler) listWeb3Sources(w http.ResponseWriter, r *http.Request) {
 
 	sources := []web3EventSource{}
 	for rows.Next() {
-		source, scanErr := scanWeb3Source(rows)
+		source, scanErr := scanWatchlistSource(rows)
 		if scanErr != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
 		sources = append(sources, source)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"sources": sources})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sources": sources})
 }
 
 type web3SourceRequest struct {
@@ -502,6 +512,231 @@ func scanWeb3Source(scanner web3EventScanner) (web3EventSource, error) {
 	return source, nil
 }
 
+type normalizedAlchemyEvent struct {
+	Chain           string
+	Network         string
+	EventType       string
+	Address         string
+	FromAddress     string
+	ToAddress       string
+	ContractAddress string
+	TxHash          string
+	BlockNumber     string
+	Direction       string
+	AssetType       string
+	Amount          string
+	Raw             any
+}
+
+func verifyAlchemySignature(raw []byte, signingKey, signature string) bool {
+	signature = strings.TrimSpace(strings.TrimPrefix(signature, "sha256="))
+	if signature == "" {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(signingKey))
+	_, _ = mac.Write(raw)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	return subtle.ConstantTimeCompare([]byte(strings.ToLower(signature)), []byte(expected)) == 1
+}
+
+func normalizeAlchemyActivities(payload map[string]any) []normalizedAlchemyEvent {
+	envelopeType := firstNonEmptyString(asString(payload["type"]), asString(payload["webhookType"]), findStringByKeys(payload, "type"))
+	envelopeNetwork := firstNonEmptyString(asString(payload["network"]), findStringByKeys(payload, "network"))
+	activities := activityItems(payload)
+	out := make([]normalizedAlchemyEvent, 0, len(activities))
+	for _, activity := range activities {
+		from := findStringByKeys(activity, "fromAddress", "from")
+		to := findStringByKeys(activity, "toAddress", "to")
+		network := firstNonEmptyString(findStringByKeys(activity, "network"), envelopeNetwork)
+		eventType := firstNonEmptyString(findStringByKeys(activity, "category", "event_type", "eventType", "type"), envelopeType, "alchemy_address_activity")
+		raw := map[string]any{
+			"webhookId": payload["webhookId"],
+			"id":        payload["id"],
+			"createdAt": payload["createdAt"],
+			"type":      envelopeType,
+			"network":   network,
+			"activity":  activity,
+		}
+		out = append(out, normalizedAlchemyEvent{
+			Chain:           chainFromNetwork(network),
+			Network:         network,
+			EventType:       eventType,
+			Address:         firstNonEmptyString(from, to, findStringByKeys(activity, "address")),
+			FromAddress:     from,
+			ToAddress:       to,
+			ContractAddress: findStringByKeys(activity, "contractAddress", "contract", "rawContract"),
+			TxHash:          findStringByKeys(activity, "hash", "tx_hash", "txHash", "transactionHash"),
+			BlockNumber:     findStringByKeys(activity, "blockNum", "blockNumber", "block"),
+			Direction:       inferDirection(from, to),
+			AssetType:       firstNonEmptyString(findStringByKeys(activity, "asset_type", "assetType", "category"), findStringByKeys(activity, "asset")),
+			Amount:          firstNonEmptyString(findStringByKeys(activity, "value", "amount"), findStringByKeys(activity, "rawValue")),
+			Raw:             raw,
+		})
+	}
+	return out
+}
+
+func activityItems(payload map[string]any) []map[string]any {
+	if event, ok := payload["event"].(map[string]any); ok {
+		if activity, ok := event["activity"].([]any); ok {
+			return mapsFromAnySlice(activity)
+		}
+		if activity, ok := event["activities"].([]any); ok {
+			return mapsFromAnySlice(activity)
+		}
+	}
+	if activity, ok := payload["activity"].([]any); ok {
+		return mapsFromAnySlice(activity)
+	}
+	if activity, ok := payload["activities"].([]any); ok {
+		return mapsFromAnySlice(activity)
+	}
+	return nil
+}
+
+func mapsFromAnySlice(items []any) []map[string]any {
+	out := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if m, ok := item.(map[string]any); ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func asString(v any) string {
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case json.Number:
+		return t.String()
+	default:
+		return ""
+	}
+}
+
+func chainFromNetwork(network string) string {
+	n := strings.ToLower(strings.TrimSpace(network))
+	switch {
+	case strings.Contains(n, "base"):
+		return "base"
+	case strings.Contains(n, "arbitrum"):
+		return "arbitrum"
+	case strings.Contains(n, "optimism"):
+		return "optimism"
+	case strings.Contains(n, "polygon") || strings.Contains(n, "amoy"):
+		return "polygon"
+	case strings.Contains(n, "solana"):
+		return "solana"
+	case strings.Contains(n, "eth") || strings.Contains(n, "sepolia"):
+		return "ethereum"
+	default:
+		return n
+	}
+}
+
+func inferDirection(from, to string) string {
+	if strings.TrimSpace(from) != "" && strings.TrimSpace(to) != "" {
+		return "transfer"
+	}
+	if strings.TrimSpace(from) != "" {
+		return "out"
+	}
+	if strings.TrimSpace(to) != "" {
+		return "in"
+	}
+	return ""
+}
+
+func validWatchlistNetwork(chain, network string) bool {
+	combo := strings.ToLower(strings.TrimSpace(chain)) + ":" + strings.ToLower(strings.TrimSpace(network))
+	switch combo {
+	case "ethereum:sepolia", "base:sepolia", "arbitrum:sepolia", "optimism:sepolia", "polygon:amoy", "solana:devnet":
+		return true
+	default:
+		return false
+	}
+}
+
+func validWatchlistSourceType(sourceType string) bool {
+	switch strings.TrimSpace(sourceType) {
+	case "wallet", "contract", "nft_collection":
+		return true
+	default:
+		return false
+	}
+}
+
+func validWatchlistStatus(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "active", "inactive", "paused":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseLimit(raw string, fallback, max int) int {
+	limit, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || limit <= 0 {
+		return fallback
+	}
+	if limit > max {
+		return max
+	}
+	return limit
+}
+
+func web3SourceIDFromPath(path string) string {
+	id := strings.Trim(strings.TrimPrefix(path, "/api/web3/sources/"), "/")
+	if id == "" || strings.Contains(id, "/") {
+		return ""
+	}
+	return id
+}
+
+func nullablePatchString(v *string) any {
+	if v == nil {
+		return nil
+	}
+	return nullIfEmpty(*v)
+}
+
+func (h *Handler) isFreeOnlyUser(email string) (bool, error) {
+	var paidCount int
+	if err := h.DB.QueryRow(`SELECT COUNT(*) FROM entitlements WHERE lower(email)=lower($1) AND status='active' AND COALESCE(plan_id, 'free') <> 'free'`, email).Scan(&paidCount); err != nil {
+		return false, err
+	}
+	return paidCount == 0, nil
+}
+
+func (h *Handler) getWatchlistSourceForUser(id, email string) (web3EventSource, error) {
+	row := h.DB.QueryRow(`
+		SELECT id::text, email, COALESCE(label, name, ''), COALESCE(name, label, ''), COALESCE(provider, 'alchemy'), COALESCE(chain, ''), COALESCE(network, ''), COALESCE(address, ''), COALESCE(source_type, 'wallet'), COALESCE(status, CASE WHEN COALESCE(is_active, true) THEN 'active' ELSE 'inactive' END), notes, webhook_url, COALESCE(is_active, status = 'active'), COALESCE(verification_mode, 'alchemy_signature'), last_event_at, disabled_reason, created_at, updated_at
+		FROM web3_event_sources
+		WHERE id=$1 AND lower(email)=lower($2)`, id, email)
+	return scanWatchlistSource(row)
+}
+
+func scanWatchlistSource(scanner web3EventScanner) (web3EventSource, error) {
+	var source web3EventSource
+	var email, notes, webhookURL, disabledReason sql.NullString
+	var lastEventAt sql.NullTime
+	if err := scanner.Scan(&source.ID, &email, &source.Label, &source.Name, &source.Provider, &source.Chain, &source.Network, &source.Address, &source.SourceType, &source.Status, &notes, &webhookURL, &source.IsActive, &source.VerificationMode, &lastEventAt, &disabledReason, &source.CreatedAt, &source.UpdatedAt); err != nil {
+		return source, err
+	}
+	source.Email = stringPtrFromNull(email)
+	source.UserID = stringPtrFromNull(email)
+	source.Notes = stringPtrFromNull(notes)
+	source.WebhookURL = stringPtrFromNull(webhookURL)
+	if lastEventAt.Valid {
+		source.LastEventAt = &lastEventAt.Time
+	}
+	source.DisabledReason = stringPtrFromNull(disabledReason)
+	return source, nil
+}
 func currentUserID(claims neonJWTClaims) string {
 	if strings.TrimSpace(claims.Sub) != "" {
 		return strings.TrimSpace(claims.Sub)
