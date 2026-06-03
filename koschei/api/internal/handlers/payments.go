@@ -18,9 +18,9 @@ type shopierPack struct {
 }
 
 var shopierPacks = map[string]shopierPack{
-	"starter": {AmountTRY: 899, Outputs: 1},
-	"builder": {AmountTRY: 2299, Outputs: 3},
-	"studio":  {AmountTRY: 4999, Outputs: 10},
+	"starter": {AmountTRY: 899, Outputs: 25},
+	"builder": {AmountTRY: 2299, Outputs: 100},
+	"studio":  {AmountTRY: 4999, Outputs: 300},
 }
 
 type paymentRequestInput struct {

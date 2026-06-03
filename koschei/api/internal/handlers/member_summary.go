@@ -11,7 +11,7 @@ import (
 
 const (
 	freePlanID          = "free"
-	freeOutputsIncluded = 100
+	freeOutputsIncluded = 10
 )
 
 type memberSummaryResponse struct {
@@ -88,8 +88,8 @@ func (h *Handler) provisionMember(ctx context.Context, claims neonJWTClaims) (me
 		SELECT
 			lower($1),
 			(SELECT id FROM plans WHERE id = 'free' LIMIT 1),
-			100,
-			100,
+			$2,
+			$2,
 			'active'
 		WHERE NOT EXISTS (
 			SELECT 1
@@ -97,7 +97,7 @@ func (h *Handler) provisionMember(ctx context.Context, claims neonJWTClaims) (me
 			WHERE lower(email) = lower($1)
 			  AND status = 'active'
 			  AND COALESCE(plan_id, 'free') = 'free'
-		)`, email); err != nil {
+		)`, email, freeOutputsIncluded); err != nil {
 		return memberSummaryResponse{}, err
 	}
 
