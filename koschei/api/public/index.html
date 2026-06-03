@@ -111,7 +111,10 @@
   © 2026 Koschei · Built on Solana · <a href="/login.html" style="color:var(--accent);">Sign in</a>
 </footer>
 
+<script src="/js/koschei-analytics.js?v=1"></script>
 <script>
+  KoscheiAnalytics.track('landing_view');
+
   const chains = ['solana','ethereum','base','arbitrum','polygon','optimism'];
   const labels = { solana:'Solana', ethereum:'Ethereum', base:'Base', arbitrum:'Arbitrum', polygon:'Polygon', optimism:'Optimism' };
 
