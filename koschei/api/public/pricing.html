@@ -63,7 +63,7 @@
     event.preventDefault();
     const button = document.getElementById('submitPayment'); button.disabled = true;
     try {
-      const res = await KoscheiAuth.apiCall('/api/payments/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: document.getElementById('fullName').value, email: document.getElementById('email').value, product_id: document.getElementById('productID').value, payment_reference: document.getElementById('paymentReference').value, note: document.getElementById('note').value }) });
+      const res = await KoscheiAuth.apiCall('/api/payments/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: document.getElementById('fullName').value, product_id: document.getElementById('productID').value, payment_reference: document.getElementById('paymentReference').value, note: document.getElementById('note').value }) });
       const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Could not send payment request');
       showMessage(data.message || 'Payment request received. Admin review required.', 'success'); document.getElementById('paymentForm').reset(); document.getElementById('email').value = KoscheiAuth.getEmail() || '';
     } catch (error) { showMessage(error.message, 'error'); } finally { button.disabled = false; }
