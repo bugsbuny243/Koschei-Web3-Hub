@@ -35,8 +35,9 @@
   </div>
 </div>
 <script src="/js/koschei-auth.js?v=4"></script>
+<script src="/js/koschei-analytics.js?v=1"></script>
 <script>
-  (async () => { await KoscheiAuth.init(); KoscheiAuth.requireGuest('/hub'); })();
+  (async () => { await KoscheiAuth.init(); KoscheiAuth.requireGuest('/hub'); KoscheiAnalytics.track('login_page_view'); })();
   document.addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
   async function handleLogin() {
     const email = document.getElementById('email').value.trim();
@@ -48,6 +49,7 @@
     btn.innerHTML = '<span class="spinner"></span>';
     try {
       await KoscheiAuth.signIn(email, password);
+      KoscheiAnalytics.track('login_success', { email });
       window.location.replace('/hub');
     } catch (err) {
       showError(err.message || 'Giriş başarısız.');

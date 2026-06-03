@@ -21,6 +21,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/auth/provision", method("POST", h.Provision))
 	mux.HandleFunc("/api/web3/health", method("GET", h.Web3Health))
 	mux.HandleFunc("/api/web3/health/logs", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3HealthLogs))))
+	mux.HandleFunc("/api/analytics/event", method("POST", h.AnalyticsEvent))
 	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok"})
@@ -33,6 +34,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/member/summary", requiresDB(h, handlers.RequireAuth(method("GET", h.MemberSummary))))
 	mux.HandleFunc("/api/payments/request", requiresDB(h, handlers.RequireAuth(method("POST", h.PaymentRequest))))
 	mux.HandleFunc("/api/admin/payment-requests", requiresDB(h, method("GET", h.AdminPaymentRequests)))
+	mux.HandleFunc("/api/admin/analytics/events", requiresDB(h, method("GET", h.AdminAnalyticsEvents)))
 	mux.HandleFunc("/api/admin/payment-requests/approve", requiresDB(h, method("POST", h.ApprovePaymentRequest)))
 	mux.HandleFunc("/api/admin/payment-requests/reject", requiresDB(h, method("POST", h.RejectPaymentRequest)))
 	mux.HandleFunc("/api/runtime/projects", requiresDB(h, handlers.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
@@ -90,16 +92,17 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					return
 				}
 				cleanRoutes := map[string]string{
-					"/hub":            "/hub.html",
-					"/login":          "/login.html",
-					"/register":       "/register.html",
-					"/metadata":       "/metadata.html",
-					"/risk":           "/risk.html",
-					"/chains":         "/chains.html",
-					"/account":        "/account.html",
-					"/pricing":        "/pricing.html",
-					"/admin-payments": "/admin-payments.html",
-					"/dashboard":      "/dashboard.html",
+					"/hub":             "/hub.html",
+					"/login":           "/login.html",
+					"/register":        "/register.html",
+					"/metadata":        "/metadata.html",
+					"/risk":            "/risk.html",
+					"/chains":          "/chains.html",
+					"/account":         "/account.html",
+					"/pricing":         "/pricing.html",
+					"/admin-payments":  "/admin-payments.html",
+					"/admin-analytics": "/admin-analytics.html",
+					"/dashboard":       "/dashboard.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())
@@ -119,7 +122,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 
 func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/version" && r.URL.Path != "/api/config" && r.URL.Path != "/api/auth/provision" && r.URL.Path != "/api/web3/health" && db == nil {
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/version" && r.URL.Path != "/api/config" && r.URL.Path != "/api/auth/provision" && r.URL.Path != "/api/web3/health" && r.URL.Path != "/api/analytics/event" && db == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable"})

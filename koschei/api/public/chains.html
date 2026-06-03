@@ -60,6 +60,7 @@
 </div>
 
 <script src="/js/koschei-auth.js?v=3"></script>
+<script src="/js/koschei-analytics.js?v=1"></script>
 <script>
   const CHAINS = [
     { id:'solana', name:'Solana', icon:'◎' },
@@ -136,11 +137,13 @@
     }).join('');
     document.getElementById('lastUpdated').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     await loadRecentChecks();
+    KoscheiAnalytics.track('chains_refresh');
   }
 
   (async () => {
     await KoscheiAuth.init();
     if (!KoscheiAuth.requireAuth('/login')) return;
+    KoscheiAnalytics.track('chains_view');
     await loadChains();
     setInterval(loadChains, 30000);
   })();

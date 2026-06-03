@@ -62,6 +62,7 @@
 </main>
 
 <script src="/js/koschei-auth.js?v=4"></script>
+<script src="/js/koschei-analytics.js?v=1"></script>
 <script>
   const fallbackResult = {
     risk_level: 'review_required',
@@ -102,6 +103,7 @@
   (async () => {
     await KoscheiAuth.init();
     if (!KoscheiAuth.requireAuth('/login')) return;
+    KoscheiAnalytics.track('risk_view');
 
     document.getElementById('riskForm').addEventListener('submit', async event => {
       event.preventDefault();
@@ -126,6 +128,7 @@
           throw new Error(error.error || `Request failed (${response.status})`);
         }
         renderResult(await response.json());
+        KoscheiAnalytics.track('risk_scan_success');
       } catch (error) {
         if (error instanceof TypeError) {
           renderResult(fallbackResult, true);

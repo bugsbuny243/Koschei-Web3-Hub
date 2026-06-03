@@ -60,10 +60,12 @@
   </main>
 
   <script src="/js/koschei-auth.js?v=4"></script>
+  <script src="/js/koschei-analytics.js?v=1"></script>
   <script>
     (async () => {
       await KoscheiAuth.init();
       if (!KoscheiAuth.requireAuth()) return;
+      KoscheiAnalytics.track('hub_view');
       document.getElementById('userEmail').textContent =
         KoscheiAuth.getEmail() || '';
       try {

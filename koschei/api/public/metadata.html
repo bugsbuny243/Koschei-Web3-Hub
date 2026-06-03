@@ -65,10 +65,12 @@
 </div>
 
 <script src="/js/koschei-auth.js?v=3"></script>
+<script src="/js/koschei-analytics.js?v=1"></script>
 <script>
   (async () => {
     await KoscheiAuth.init();
     if (!KoscheiAuth.requireAuth('/login')) return;
+    KoscheiAnalytics.track('metadata_view');
   })();
 
   async function generate() {
@@ -99,6 +101,7 @@
       const data = await res.json();
       document.getElementById('resultBox').textContent = JSON.stringify(data.metadata, null, 2);
       document.getElementById('resultWrap').style.display = 'block';
+      KoscheiAnalytics.track('metadata_generate_success', { asset_type: type });
       showSuccess('Metadata generated');
     } catch (err) {
       showError(err.message || 'Generation failed. Check your credits.');
