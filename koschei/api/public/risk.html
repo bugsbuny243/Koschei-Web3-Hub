@@ -113,6 +113,8 @@
       button.disabled = true;
       button.textContent = 'Scanning...';
 
+      KoscheiAnalytics.track('risk_scan');
+
       try {
         const response = await KoscheiAuth.apiCall('/api/risk/scan', {
           method: 'POST',

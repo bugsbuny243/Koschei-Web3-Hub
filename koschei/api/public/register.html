@@ -54,6 +54,7 @@
     if (password !== password2) { showError('Şifreler eşleşmiyor.'); return; }
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>';
+    KoscheiAnalytics.track('register_submit', { email });
     try {
       await KoscheiAuth.signUp(email, password);
       KoscheiAnalytics.track('signup_success', { email });

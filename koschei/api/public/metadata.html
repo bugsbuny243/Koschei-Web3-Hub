@@ -86,6 +86,8 @@
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Generating...';
 
+    KoscheiAnalytics.track('metadata_generate', { metadata: { asset_type: type } });
+
     try {
       const res = await KoscheiAuth.apiCall('/api/metadata/generate', {
         method: 'POST',
