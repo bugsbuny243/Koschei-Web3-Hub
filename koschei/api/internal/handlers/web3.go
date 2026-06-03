@@ -3,6 +3,8 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
@@ -11,10 +13,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -44,10 +46,15 @@ type web3Event struct {
 	Amount             *string   `json:"amount,omitempty"`
 	WalletAddress      *string   `json:"wallet_address,omitempty"`
 	ContractAddress    *string   `json:"contract_address,omitempty"`
+	TokenID            *string   `json:"token_id,omitempty"`
 	AmountText         *string   `json:"amount_text,omitempty"`
 	RawPayload         any       `json:"raw_payload,omitempty"`
+	AISummary          *string   `json:"ai_summary,omitempty"`
+	RiskLevel          string    `json:"risk_level"`
 	Status             string    `json:"status"`
 	VerificationStatus string    `json:"verification_status"`
+	PayloadHash        *string   `json:"payload_hash,omitempty"`
+	ErrorMessage       *string   `json:"error_message,omitempty"`
 	CreatedAt          time.Time `json:"created_at"`
 }
 
@@ -74,6 +81,14 @@ type web3EventSource struct {
 	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
+type matchedSource struct {
+	ID      string
+	Email   string
+	Chain   string
+	Network string
+	Address string
+}
+
 type webhookSource struct {
 	ID               string
 	UserID           sql.NullString
@@ -91,7 +106,7 @@ func (h *Handler) Web3AlchemyEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	verificationStatus, ok := verifyAlchemySignature(raw, r.Header.Get("X-Alchemy-Signature"))
+	verificationStatus, ok := verifyAlchemyWebhookSignature(raw, r.Header.Get("X-Alchemy-Signature"))
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_signature"})
 		return
@@ -148,22 +163,33 @@ func (h *Handler) Web3AlchemyEvent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "inserted": inserted, "matched": matched, "verification_status": verificationStatus})
 }
 
-func verifyAlchemySignature(raw []byte, signatureHeader string) (string, bool) {
+func verifyAlchemyWebhookSignature(raw []byte, signatureHeader string) (string, bool) {
 	key := strings.TrimSpace(os.Getenv("ALCHEMY_WEBHOOK_SIGNING_KEY"))
 	if key == "" {
 		return "unverified", true
 	}
-	signatureHeader = strings.TrimSpace(signatureHeader)
-	if signatureHeader == "" {
+	if !verifyAlchemySignature(raw, key, signatureHeader) {
 		return "verified", false
+	}
+	return "verified", true
+}
+
+func verifyAlchemySignature(raw []byte, signingKey, signature string) bool {
+	key := strings.TrimSpace(signingKey)
+	if key == "" {
+		return false
+	}
+	signature = strings.TrimSpace(signature)
+	if signature == "" {
+		return false
 	}
 	mac := hmac.New(sha256.New, []byte(key))
 	_, _ = mac.Write(raw)
 	digest := mac.Sum(nil)
 	hexDigest := strings.ToLower(hex.EncodeToString(digest))
 	base64Digest := base64.StdEncoding.EncodeToString(digest)
-	candidates := []string{signatureHeader}
-	for _, part := range strings.Split(signatureHeader, ",") {
+	candidates := []string{signature}
+	for _, part := range strings.Split(signature, ",") {
 		trimmed := strings.TrimSpace(part)
 		candidates = append(candidates, trimmed)
 		if idx := strings.Index(trimmed, "="); idx >= 0 && idx+1 < len(trimmed) {
@@ -172,14 +198,16 @@ func verifyAlchemySignature(raw []byte, signatureHeader string) (string, bool) {
 	}
 	for _, candidate := range candidates {
 		candidate = strings.Trim(candidate, " \t\r\n\"")
+		candidate = strings.TrimPrefix(candidate, "sha256=")
 		if constantTimeStringEqual(strings.ToLower(candidate), hexDigest) || constantTimeStringEqual(candidate, base64Digest) {
-			return "verified", true
+			return true
 		}
 	}
-	return "verified", false
+	return false
 }
 
 type normalizedAlchemyActivity struct {
+	Chain           string
 	EventType       string
 	Network         string
 	Address         string
@@ -195,7 +223,7 @@ type normalizedAlchemyActivity struct {
 	RawJSON         string
 }
 
-func normalizeAlchemyActivities(payload map[string]any, raw []byte) []normalizedAlchemyActivity {
+func normalizeAlchemyActivities(payload map[string]any, raw ...[]byte) []normalizedAlchemyActivity {
 	activitiesAny := findValueByKeys(payload, "activity", "activities")
 	activities, ok := activitiesAny.([]any)
 	if !ok || len(activities) == 0 {
@@ -210,6 +238,7 @@ func normalizeAlchemyActivities(payload map[string]any, raw []byte) []normalized
 		b, _ := json.Marshal(m)
 		activity := normalizeAlchemyActivity(m, string(b))
 		activity.Network = firstNonEmptyString(activity.Network, findStringByKeys(payload, "network", "networkName"))
+		activity.Chain = chainFromNetwork(activity.Network)
 		out = append(out, activity)
 	}
 	return out
@@ -221,6 +250,7 @@ func normalizeAlchemyActivity(m map[string]any, raw string) normalizedAlchemyAct
 	amount := firstNonEmptyString(findStringByKeys(m, "amount", "amount_text", "amountText", "value"), findNestedString(m, "erc721Token", "amount"), findNestedString(m, "erc1155Metadata", "amount"))
 	assetType := firstNonEmptyString(findStringByKeys(m, "asset_type", "assetType", "category"), findNestedString(m, "rawContract", "assetType"))
 	return normalizedAlchemyActivity{
+		Chain:           chainFromNetwork(findStringByKeys(m, "network", "networkName", "chain")),
 		EventType:       eventType,
 		Network:         normalizeNetwork(findStringByKeys(m, "network", "networkName", "chain")),
 		Address:         normalizeAddressForStorage(findStringByKeys(m, "address")),
@@ -312,21 +342,12 @@ func (h *Handler) Web3Events(w http.ResponseWriter, r *http.Request) {
 
 	events := make([]web3Event, 0, limit)
 	for rows.Next() {
-		var id string
-		var sourceID, emailVal, chain, network, eventType, address, txHash, blockNumber, direction, assetType, amount sql.NullString
-		var raw []byte
-		var createdAt time.Time
-		if err := rows.Scan(&id, &sourceID, &emailVal, &chain, &network, &eventType, &address, &txHash, &blockNumber, &direction, &assetType, &amount, &raw, &createdAt); err != nil {
+		event, scanErr := scanWeb3Event(rows)
+		if scanErr != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
-		var rawPayload any
-		if len(raw) > 0 {
-			_ = json.Unmarshal(raw, &rawPayload)
-		}
-		events = append(events, map[string]any{
-			"id": string(id), "source_id": stringPtrFromNull(sourceID), "email": stringPtrFromNull(emailVal), "chain": stringPtrFromNull(chain), "network": stringPtrFromNull(network), "event_type": stringPtrFromNull(eventType), "address": stringPtrFromNull(address), "tx_hash": stringPtrFromNull(txHash), "block_number": stringPtrFromNull(blockNumber), "direction": stringPtrFromNull(direction), "asset_type": stringPtrFromNull(assetType), "amount": stringPtrFromNull(amount), "raw_payload": rawPayload, "created_at": createdAt,
-		})
+		events = append(events, event)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "events": events})
 }
@@ -379,7 +400,7 @@ func (h *Handler) listWeb3Sources(w http.ResponseWriter, r *http.Request) {
 
 	sources := []web3EventSource{}
 	for rows.Next() {
-		source, scanErr := scanWatchlistSource(rows)
+		source, scanErr := scanWeb3Source(rows)
 		if scanErr != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
@@ -436,10 +457,6 @@ func (h *Handler) createWeb3Source(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_source"})
 		return
 	}
-	if err := h.enforceFreeWatchlistLimit(email); err != nil {
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
-		return
-	}
 	if !isSupportedAlchemyNetwork(chain, network) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported_network"})
 		return
@@ -491,54 +508,21 @@ type web3SourcePatchRequest struct {
 	Secret     *string `json:"secret"`
 }
 
-func (h *Handler) getWeb3SourceForEmail(id, email string) (web3EventSource, error) {
-	row := h.DB.QueryRow(`
-		SELECT id, email, label, chain, network, address, source_type, status, provider, webhook_url, provider_setup_status, last_event_at, notes, created_at, updated_at
-		FROM web3_event_sources
-		WHERE id=$1 AND lower(email)=lower($2)`, id, email)
-	return scanWeb3Source(row)
-}
-
-type web3EventScanner interface {
-	Scan(dest ...any) error
-}
-
-func scanWeb3Event(scanner web3EventScanner) (web3Event, error) {
-	var event web3Event
-	var sourceID, email, chain, network, eventType, address, txHash, blockNumber, direction, assetType, amount, walletAddress, contractAddress, amountText sql.NullString
-	var raw []byte
-	if err := scanner.Scan(&event.ID, &sourceID, &email, &event.Provider, &chain, &network, &eventType, &address, &txHash, &blockNumber, &direction, &assetType, &amount, &walletAddress, &contractAddress, &amountText, &raw, &event.Status, &event.VerificationStatus, &event.CreatedAt); err != nil {
-		return event, err
+func (h *Handler) patchWeb3Source(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
 	}
-	event.SourceID = stringPtrFromNull(sourceID)
-	event.Email = stringPtrFromNull(email)
-	event.Chain = stringPtrFromNull(chain)
-	event.Network = stringPtrFromNull(network)
-	event.EventType = stringPtrFromNull(eventType)
-	event.Address = stringPtrFromNull(address)
-	event.TxHash = stringPtrFromNull(txHash)
-	event.BlockNumber = stringPtrFromNull(blockNumber)
-	event.Direction = stringPtrFromNull(direction)
-	event.AssetType = stringPtrFromNull(assetType)
-	event.Amount = stringPtrFromNull(amount)
-	event.WalletAddress = stringPtrFromNull(walletAddress)
-	event.ContractAddress = stringPtrFromNull(contractAddress)
-	event.AmountText = stringPtrFromNull(amountText)
-	if len(raw) > 0 {
-		var payload any
-		if err := json.Unmarshal(raw, &payload); err == nil {
-			event.RawPayload = payload
-		}
+	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/web3/sources/"), "/")
+	if id == "" || strings.Contains(id, "/") {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_source_id"})
+		return
 	}
-	return event, nil
-}
-
-func scanWeb3Source(scanner web3EventScanner) (web3EventSource, error) {
-	var source web3EventSource
-	var lastEventAt sql.NullTime
-	var notes sql.NullString
-	if err := scanner.Scan(&source.ID, &source.Email, &source.Label, &source.Chain, &source.Network, &source.Address, &source.SourceType, &source.Status, &source.Provider, &source.WebhookURL, &source.ProviderSetupStatus, &lastEventAt, &notes, &source.CreatedAt, &source.UpdatedAt); err != nil {
-		return source, err
+	var req web3SourcePatchRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		return
 	}
 	email := normalizedClaimEmail(claims)
 	if email == "" {
@@ -552,9 +536,6 @@ func scanWeb3Source(scanner web3EventScanner) (web3EventSource, error) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	source.Notes = stringPtrFromNull(notes)
-	return source, nil
-}
 
 	if req.Label != nil || req.Name != nil {
 		name := ""
@@ -641,27 +622,32 @@ func (h *Handler) Web3TestEvent(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-}
 
 	event, err := h.getWeb3EventForUser(eventID, normalizedClaimEmail(claims))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
+	writeJSON(w, http.StatusCreated, map[string]any{"event": event})
 }
 
-func inferDirection(from, to string) string {
-	if strings.TrimSpace(from) != "" && strings.TrimSpace(to) != "" {
-		return "transfer"
+func (h *Handler) Web3ExplainEvent(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
 	}
-	if strings.TrimSpace(from) != "" {
-		return "out"
+	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/web3/events/"), "/")
+	if !strings.HasSuffix(path, "/explain") {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
+		return
 	}
-	if strings.TrimSpace(to) != "" {
-		return "in"
+	id := strings.TrimSuffix(path, "/explain")
+	id = strings.Trim(id, "/")
+	if id == "" || strings.Contains(id, "/") {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_event_id"})
+		return
 	}
-	return ""
-}
 
 	email := normalizedClaimEmail(claims)
 	event, err := h.getWeb3EventForUser(id, email)
@@ -673,13 +659,14 @@ func inferDirection(from, to string) string {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-}
 
 	summary := deterministicWeb3Summary(event)
 	if _, err := h.DB.Exec(`UPDATE web3_events SET ai_summary=$2 WHERE id=$1 AND lower(email)=lower($3)`, id, summary, email); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
+	event.AISummary = &summary
+	writeJSON(w, http.StatusOK, map[string]any{"event": event, "summary": summary})
 }
 
 func (h *Handler) getWeb3EventForUser(id, email string) (web3Event, error) {
@@ -698,12 +685,8 @@ func (h *Handler) getWeb3SourceForUser(id, email string) (web3EventSource, error
 	return scanWeb3Source(row)
 }
 
-func web3SourceIDFromPath(path string) string {
-	id := strings.Trim(strings.TrimPrefix(path, "/api/web3/sources/"), "/")
-	if id == "" || strings.Contains(id, "/") {
-		return ""
-	}
-	return id
+type web3EventScanner interface {
+	Scan(dest ...any) error
 }
 
 func scanWeb3Event(scanner web3EventScanner) (web3Event, error) {
@@ -739,18 +722,10 @@ func scanWeb3Event(scanner web3EventScanner) (web3Event, error) {
 			event.RawPayload = payload
 		}
 	}
-	return paidCount == 0, nil
+	return event, nil
 }
 
-func (h *Handler) getWatchlistSourceForUser(id, email string) (web3EventSource, error) {
-	row := h.DB.QueryRow(`
-		SELECT id::text, email, COALESCE(label, name, ''), COALESCE(name, label, ''), COALESCE(provider, 'alchemy'), COALESCE(chain, ''), COALESCE(network, ''), COALESCE(address, ''), COALESCE(source_type, 'wallet'), COALESCE(status, CASE WHEN COALESCE(is_active, true) THEN 'active' ELSE 'inactive' END), notes, webhook_url, COALESCE(is_active, status = 'active'), COALESCE(verification_mode, 'alchemy_signature'), last_event_at, disabled_reason, created_at, updated_at
-		FROM web3_event_sources
-		WHERE id=$1 AND lower(email)=lower($2)`, id, email)
-	return scanWatchlistSource(row)
-}
-
-func scanWatchlistSource(scanner web3EventScanner) (web3EventSource, error) {
+func scanWeb3Source(scanner web3EventScanner) (web3EventSource, error) {
 	var source web3EventSource
 	var userID, notes, webhookURL, disabledReason sql.NullString
 	var lastEventAt sql.NullTime
@@ -1068,6 +1043,20 @@ func normalizeAndValidateSourceAddress(chain, raw string) (string, error) {
 		return "", fmt.Errorf("invalid_evm_address")
 	}
 	return strings.ToLower(address), nil
+}
+
+func chainFromNetwork(network string) string {
+	network = strings.ToLower(strings.TrimSpace(network))
+	switch {
+	case strings.Contains(network, "base"):
+		return "base"
+	case strings.Contains(network, "ethereum"), strings.Contains(network, "eth"):
+		return "ethereum"
+	case strings.Contains(network, "solana"):
+		return "solana"
+	default:
+		return ""
+	}
 }
 
 func normalizeAddressForStorage(raw string) string {
