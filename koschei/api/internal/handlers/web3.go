@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"crypto/subtle"
 	"database/sql"
@@ -8,8 +9,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -39,10 +43,17 @@ type web3Event struct {
 
 type web3EventSource struct {
 	ID               string     `json:"id"`
+	Email            *string    `json:"email,omitempty"`
 	UserID           *string    `json:"user_id,omitempty"`
 	Name             string     `json:"name"`
+	Label            string     `json:"label"`
 	Provider         string     `json:"provider"`
+	Chain            string     `json:"chain"`
 	Network          string     `json:"network"`
+	Address          string     `json:"address"`
+	SourceType       string     `json:"source_type"`
+	Status           string     `json:"status"`
+	Notes            *string    `json:"notes,omitempty"`
 	WebhookURL       *string    `json:"webhook_url,omitempty"`
 	IsActive         bool       `json:"is_active"`
 	VerificationMode string     `json:"verification_mode"`
@@ -53,26 +64,32 @@ type web3EventSource struct {
 }
 
 type webhookSource struct {
-	ID               string
-	UserID           sql.NullString
-	Name             string
-	Provider         string
-	Network          string
-	SecretHash       sql.NullString
-	VerificationMode string
+	ID         string
+	Email      sql.NullString
+	Label      string
+	Chain      string
+	Network    string
+	Address    string
+	SourceType string
+	Status     string
 }
 
 func (h *Handler) Web3AlchemyEvent(w http.ResponseWriter, r *http.Request) {
-	// TODO: Add official Alchemy signature verification when a provider-specific
-	// signature header is configured for this webhook source.
 	raw, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
-	if err != nil {
+	if err != nil || len(strings.TrimSpace(string(raw))) == 0 {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
 		return
 	}
-	if len(strings.TrimSpace(string(raw))) == 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
-		return
+
+	verificationStatus := "unverified_no_signing_key"
+	if signingKey := strings.TrimSpace(os.Getenv("ALCHEMY_WEBHOOK_SIGNING_KEY")); signingKey != "" {
+		if !verifyAlchemySignature(raw, signingKey, r.Header.Get("X-Alchemy-Signature")) {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_signature"})
+			return
+		}
+		verificationStatus = "verified"
+	} else {
+		log.Printf("warning: ALCHEMY_WEBHOOK_SIGNING_KEY is not set; accepting Alchemy webhook without signature verification")
 	}
 
 	var payload map[string]any
@@ -81,72 +98,77 @@ func (h *Handler) Web3AlchemyEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	normalized := normalizeAlchemyActivities(payload)
+	if len(normalized) == 0 {
+		normalized = []normalizedAlchemyEvent{{
+			Chain:     chainFromNetwork(firstNonEmptyString(findStringByKeys(payload, "network"), findStringByKeys(payload, "chain", "blockchain"))),
+			Network:   firstNonEmptyString(findStringByKeys(payload, "network"), findStringByKeys(payload, "chain", "blockchain")),
+			EventType: "alchemy_webhook_unknown",
+			Address:   findStringByKeys(payload, "fromAddress", "toAddress", "from", "to", "address"),
+			TxHash:    findStringByKeys(payload, "hash", "tx_hash", "txHash", "transactionHash"),
+			Raw:       payload,
+		}}
+	}
+
+	created := 0
+	ids := make([]string, 0, len(normalized))
 	payloadHash := sha256Hex(raw)
-	network := firstNonEmptyString(findStringByKeys(payload, "network"), findStringByKeys(payload, "chain", "blockchain"))
-	sourceID := firstNonEmptyString(r.URL.Query().Get("source_id"), r.Header.Get("X-Koschei-Source-Id"))
-	source, status, err := h.findWebhookSource(sourceID)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
-	if status != "verified" {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": status})
-		return
-	}
-
-	providedSecret := webhookSecretFromRequest(r)
-	if !source.SecretHash.Valid || strings.TrimSpace(source.SecretHash.String) == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unconfigured_source"})
-		return
-	}
-	if providedSecret == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing_secret"})
-		return
-	}
-	if !constantTimeEqualSHA256(providedSecret, strings.TrimSpace(source.SecretHash.String)) {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_secret"})
-		return
-	}
-
-	eventID := newID()
-	eventType := firstNonEmptyString(findStringByKeys(payload, "event_type", "eventType"), findStringByKeys(payload, "type", "category"))
-	txHash := findStringByKeys(payload, "tx_hash", "txHash", "transactionHash", "hash")
-	walletAddress := findStringByKeys(payload, "wallet_address", "walletAddress", "fromAddress", "toAddress", "from", "to", "address")
-	contractAddress := findStringByKeys(payload, "contract_address", "contractAddress", "rawContract", "contract")
-	receivedIP := requestIP(r)
-	userAgent := r.UserAgent()
-
-	if _, err := h.DB.Exec(`
-		INSERT INTO web3_events (id, source_id, source_name, user_id, provider, network, event_type, tx_hash, wallet_address, contract_address, raw_payload, risk_level, status, verification_status, received_ip, received_user_agent, payload_hash)
-		VALUES ($1,$2,$3,$4,'alchemy',$5,$6,$7,$8,$9,$10::jsonb,'unknown','received','verified',$11,$12,$13)`,
-		eventID, source.ID, source.Name, nullStringToAny(source.UserID), nullIfEmpty(firstNonEmptyString(network, source.Network)), nullIfEmpty(eventType), nullIfEmpty(txHash), nullIfEmpty(walletAddress), nullIfEmpty(contractAddress), string(raw), nullIfEmpty(receivedIP), nullIfEmpty(userAgent), payloadHash); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
-	if _, err := h.DB.Exec(`UPDATE web3_event_sources SET last_event_at=NOW(), updated_at=NOW() WHERE id=$1`, source.ID); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
+	for _, event := range normalized {
+		source, _ := h.matchWebhookSource(event.FromAddress, event.ToAddress, event.Address)
+		eventID := newID()
+		ids = append(ids, eventID)
+		var sourceID any
+		var email any
+		var sourceName any
+		if strings.TrimSpace(source.ID) != "" {
+			sourceID = source.ID
+			email = nullStringToAny(source.Email)
+			sourceName = source.Label
+		}
+		rawEvent, _ := json.Marshal(event.Raw)
+		chain := firstNonEmptyString(event.Chain, chainFromNetwork(event.Network))
+		address := firstNonEmptyString(event.Address, event.FromAddress, event.ToAddress)
+		if _, err := h.DB.Exec(`
+			INSERT INTO web3_events (id, source_id, email, chain, network, event_type, address, tx_hash, block_number, direction, asset_type, amount, raw_payload, source_name, user_id, provider, wallet_address, contract_address, amount_text, risk_level, status, verification_status, received_ip, received_user_agent, payload_hash)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15,'alchemy',$16,$17,$18,'unknown','received',$19,$20,$21,$22)`,
+			eventID, sourceID, email, nullIfEmpty(chain), nullIfEmpty(event.Network), nullIfEmpty(event.EventType), nullIfEmpty(address), nullIfEmpty(event.TxHash), nullIfEmpty(event.BlockNumber), nullIfEmpty(event.Direction), nullIfEmpty(event.AssetType), nullIfEmpty(event.Amount), string(rawEvent), sourceName, email, nullIfEmpty(address), nullIfEmpty(firstNonEmptyString(event.ContractAddress, event.ToAddress)), nullIfEmpty(event.Amount), verificationStatus, nullIfEmpty(requestIP(r)), nullIfEmpty(r.UserAgent()), payloadHash); err != nil {
+			log.Printf("web3 alchemy event insert failed: %v", err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+			return
+		}
+		if strings.TrimSpace(source.ID) != "" {
+			if _, err := h.DB.Exec(`UPDATE web3_event_sources SET last_event_at=NOW(), updated_at=NOW() WHERE id=$1`, source.ID); err != nil {
+				log.Printf("web3 source last_event_at update failed: %v", err)
+			}
+		}
+		created++
 	}
 
-	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "event_id": eventID, "verification_status": "verified"})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "event_ids": ids, "events_created": created, "verification_status": verificationStatus})
 }
 
-func (h *Handler) findWebhookSource(sourceID string) (webhookSource, string, error) {
+func (h *Handler) matchWebhookSource(addresses ...string) (webhookSource, error) {
 	var source webhookSource
-	if strings.TrimSpace(sourceID) == "" {
-		return source, "unconfigured_source", nil
+	for _, address := range addresses {
+		address = strings.ToLower(strings.TrimSpace(address))
+		if address == "" {
+			continue
+		}
+		err := h.DB.QueryRow(`
+			SELECT id, email, COALESCE(label, name, ''), COALESCE(chain, ''), COALESCE(network, ''), COALESCE(address, ''), COALESCE(source_type, 'wallet'), COALESCE(status, 'active')
+			FROM web3_event_sources
+			WHERE lower(address)=lower($1)
+			  AND COALESCE(status, CASE WHEN COALESCE(is_active, true) THEN 'active' ELSE 'inactive' END) = 'active'
+			ORDER BY created_at DESC
+			LIMIT 1`, address).Scan(&source.ID, &source.Email, &source.Label, &source.Chain, &source.Network, &source.Address, &source.SourceType, &source.Status)
+		if err == nil {
+			return source, nil
+		}
+		if err != sql.ErrNoRows {
+			return source, err
+		}
 	}
-	err := h.DB.QueryRow(`
-		SELECT id, user_id, name, provider, network, secret_hash, verification_mode
-		FROM web3_event_sources
-		WHERE id=$1 AND provider='alchemy' AND is_active=true`, strings.TrimSpace(sourceID)).Scan(&source.ID, &source.UserID, &source.Name, &source.Provider, &source.Network, &source.SecretHash, &source.VerificationMode)
-	if err == sql.ErrNoRows {
-		return source, "unconfigured_source", nil
-	}
-	if err != nil {
-		return source, "", err
-	}
-	return source, "verified", nil
+	return source, nil
 }
 
 func (h *Handler) Web3Events(w http.ResponseWriter, r *http.Request) {
@@ -155,29 +177,50 @@ func (h *Handler) Web3Events(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-	userID := currentUserID(claims)
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
+	if email == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	limit := parseLimit(r.URL.Query().Get("limit"), 50, 100)
+	sourceID := strings.TrimSpace(r.URL.Query().Get("source_id"))
+	args := []any{email, limit}
+	where := "WHERE lower(email)=lower($1)"
+	if sourceID != "" {
+		where += " AND source_id=$3"
+		args = append(args, sourceID)
+	}
 	rows, err := h.DB.Query(`
-		SELECT id, source_id, source_name, user_id, provider, network, event_type, tx_hash, wallet_address, contract_address, token_id, amount_text, raw_payload, ai_summary, risk_level, status, verification_status, payload_hash, error_message, created_at
+		SELECT id::text, source_id::text, email, chain, network, event_type, address, tx_hash, block_number, direction, asset_type, amount, raw_payload, created_at
 		FROM web3_events
-		WHERE user_id=$1
+		`+where+`
 		ORDER BY created_at DESC
-		LIMIT 100`, userID)
+		LIMIT $2`, args...)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
 	defer rows.Close()
 
-	events := make([]web3Event, 0, 100)
+	events := make([]map[string]any, 0, limit)
 	for rows.Next() {
-		event, scanErr := scanWeb3Event(rows)
-		if scanErr != nil {
+		var id string
+		var sourceID, emailVal, chain, network, eventType, address, txHash, blockNumber, direction, assetType, amount sql.NullString
+		var raw []byte
+		var createdAt time.Time
+		if err := rows.Scan(&id, &sourceID, &emailVal, &chain, &network, &eventType, &address, &txHash, &blockNumber, &direction, &assetType, &amount, &raw, &createdAt); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
-		events = append(events, event)
+		var rawPayload any
+		if len(raw) > 0 {
+			_ = json.Unmarshal(raw, &rawPayload)
+		}
+		events = append(events, map[string]any{
+			"id": string(id), "source_id": stringPtrFromNull(sourceID), "email": stringPtrFromNull(emailVal), "chain": stringPtrFromNull(chain), "network": stringPtrFromNull(network), "event_type": stringPtrFromNull(eventType), "address": stringPtrFromNull(address), "tx_hash": stringPtrFromNull(txHash), "block_number": stringPtrFromNull(blockNumber), "direction": stringPtrFromNull(direction), "asset_type": stringPtrFromNull(assetType), "amount": stringPtrFromNull(amount), "raw_payload": rawPayload, "created_at": createdAt,
+		})
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"events": events})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "events": events})
 }
 
 func (h *Handler) Web3Sources(w http.ResponseWriter, r *http.Request) {
@@ -193,11 +236,14 @@ func (h *Handler) Web3Sources(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Web3Source(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPatch {
+	switch r.Method {
+	case http.MethodPatch:
 		h.patchWeb3Source(w, r)
-		return
+	case http.MethodDelete:
+		h.deactivateWeb3Source(w, r)
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
-	w.WriteHeader(http.StatusMethodNotAllowed)
 }
 
 func (h *Handler) listWeb3Sources(w http.ResponseWriter, r *http.Request) {
@@ -206,11 +252,12 @@ func (h *Handler) listWeb3Sources(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
 	rows, err := h.DB.Query(`
-		SELECT id, user_id, name, provider, network, webhook_url, COALESCE(is_active, true), verification_mode, last_event_at, disabled_reason, created_at, updated_at
+		SELECT id::text, email, COALESCE(label, name, ''), COALESCE(name, label, ''), COALESCE(provider, 'alchemy'), COALESCE(chain, ''), COALESCE(network, ''), COALESCE(address, ''), COALESCE(source_type, 'wallet'), COALESCE(status, CASE WHEN COALESCE(is_active, true) THEN 'active' ELSE 'inactive' END), notes, webhook_url, COALESCE(is_active, status = 'active'), COALESCE(verification_mode, 'alchemy_signature'), last_event_at, disabled_reason, created_at, updated_at
 		FROM web3_event_sources
-		WHERE user_id=$1
-		ORDER BY created_at DESC`, currentUserID(claims))
+		WHERE lower(email)=lower($1)
+		ORDER BY created_at DESC`, email)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
@@ -219,20 +266,25 @@ func (h *Handler) listWeb3Sources(w http.ResponseWriter, r *http.Request) {
 
 	sources := []web3EventSource{}
 	for rows.Next() {
-		source, scanErr := scanWeb3Source(rows)
+		source, scanErr := scanWatchlistSource(rows)
 		if scanErr != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
 		sources = append(sources, source)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"sources": sources})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "sources": sources})
 }
 
 type web3SourceRequest struct {
 	Name       string `json:"name"`
+	Label      string `json:"label"`
 	Provider   string `json:"provider"`
+	Chain      string `json:"chain"`
 	Network    string `json:"network"`
+	Address    string `json:"address"`
+	SourceType string `json:"source_type"`
+	Notes      string `json:"notes"`
 	WebhookURL string `json:"webhook_url"`
 	Secret     string `json:"secret"`
 }
@@ -248,43 +300,66 @@ func (h *Handler) createWeb3Source(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
 		return
 	}
-	name := strings.TrimSpace(req.Name)
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
+	label := firstNonEmptyString(req.Label, req.Name)
+	chain := strings.TrimSpace(req.Chain)
 	network := strings.TrimSpace(req.Network)
-	provider := firstNonEmptyString(req.Provider, "alchemy")
-	secret := strings.TrimSpace(req.Secret)
-	if name == "" || network == "" || secret == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name_network_and_secret_required"})
+	address := strings.TrimSpace(req.Address)
+	sourceType := strings.TrimSpace(req.SourceType)
+	if label == "" || address == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "label_and_address_required"})
 		return
 	}
-	if provider != "alchemy" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported_provider"})
+	if !validWatchlistNetwork(chain, network) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported_chain_network"})
 		return
+	}
+	if !validWatchlistSourceType(sourceType) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported_source_type"})
+		return
+	}
+	freeOnly, err := h.isFreeOnlyUser(email)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	if freeOnly {
+		var activeCount int
+		if err := h.DB.QueryRow(`SELECT COUNT(*) FROM web3_event_sources WHERE lower(email)=lower($1) AND COALESCE(status, CASE WHEN COALESCE(is_active, true) THEN 'active' ELSE 'inactive' END)='active'`, email).Scan(&activeCount); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+			return
+		}
+		if activeCount >= 1 {
+			writeJSON(w, http.StatusPaymentRequired, map[string]string{"error": "watchlist_limit_reached", "message": "Free plan includes 1 watchlist source. Upgrade to monitor more addresses."})
+			return
+		}
 	}
 
 	sourceID := newID()
-	_, err := h.DB.Exec(`
-		INSERT INTO web3_event_sources (id, user_id, name, provider, network, webhook_url, is_active, secret_hash, verification_mode)
-		VALUES ($1,$2,$3,$4,$5,$6,true,$7,'shared_secret')`, sourceID, currentUserID(claims), name, provider, network, nullIfEmpty(req.WebhookURL), sha256Hex([]byte(secret)))
+	_, err = h.DB.Exec(`
+		INSERT INTO web3_event_sources (id, email, user_id, label, name, provider, chain, network, address, source_type, status, notes, webhook_url, is_active, verification_mode)
+		VALUES ($1,$2,$2,$3,$3,'alchemy',$4,$5,$6,$7,'active',$8,$9,true,'alchemy_signature')`, sourceID, email, label, chain, network, address, sourceType, nullIfEmpty(req.Notes), nullIfEmpty(req.WebhookURL))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	source, err := h.getWeb3SourceForUser(sourceID, currentUserID(claims))
+	source, err := h.getWatchlistSourceForUser(sourceID, email)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{
-		"source":           source,
-		"setup_hint":       "Configure Alchemy with /api/web3/events/alchemy?source_id=SOURCE_ID and set its Auth Token to this generated secret. If your provider supports custom headers, X-Koschei-Source-Id and X-Koschei-Webhook-Secret are also accepted. Store the secret securely; Koschei will not show it again.",
-		"required_headers": []string{"X-Koschei-Source-Id", "X-Koschei-Webhook-Secret"},
-		"secret_locations": []string{"X-Koschei-Webhook-Secret", "Authorization: Bearer <secret>", "X-Alchemy-Token"},
-	})
+	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "source": source})
 }
 
 type web3SourcePatchRequest struct {
 	Name       *string `json:"name"`
+	Label      *string `json:"label"`
+	Chain      *string `json:"chain"`
 	Network    *string `json:"network"`
+	Address    *string `json:"address"`
+	SourceType *string `json:"source_type"`
+	Status     *string `json:"status"`
+	Notes      *string `json:"notes"`
 	IsActive   *bool   `json:"is_active"`
 	WebhookURL *string `json:"webhook_url"`
 	Secret     *string `json:"secret"`
@@ -296,8 +371,8 @@ func (h *Handler) patchWeb3Source(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/web3/sources/"), "/")
-	if id == "" || strings.Contains(id, "/") {
+	id := web3SourceIDFromPath(r.URL.Path)
+	if id == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_source_id"})
 		return
 	}
@@ -306,66 +381,92 @@ func (h *Handler) patchWeb3Source(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
 		return
 	}
-	userID := currentUserID(claims)
-	if _, err := h.getWeb3SourceForUser(id, userID); err == sql.ErrNoRows {
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
+	existing, err := h.getWatchlistSourceForUser(id, email)
+	if err == sql.ErrNoRows {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
 		return
-	} else if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
 	}
-
-	if req.Name != nil {
-		name := strings.TrimSpace(*req.Name)
-		if name == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_name"})
-			return
-		}
-		if _, err := h.DB.Exec(`UPDATE web3_event_sources SET name=$3, updated_at=NOW() WHERE id=$1 AND user_id=$2`, id, userID, name); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-			return
-		}
-	}
-	if req.Network != nil {
-		network := strings.TrimSpace(*req.Network)
-		if network == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_network"})
-			return
-		}
-		if _, err := h.DB.Exec(`UPDATE web3_event_sources SET network=$3, updated_at=NOW() WHERE id=$1 AND user_id=$2`, id, userID, network); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-			return
-		}
-	}
-	if req.IsActive != nil {
-		if _, err := h.DB.Exec(`UPDATE web3_event_sources SET is_active=$3, updated_at=NOW() WHERE id=$1 AND user_id=$2`, id, userID, *req.IsActive); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-			return
-		}
-	}
-	if req.WebhookURL != nil {
-		if _, err := h.DB.Exec(`UPDATE web3_event_sources SET webhook_url=$3, updated_at=NOW() WHERE id=$1 AND user_id=$2`, id, userID, nullIfEmpty(*req.WebhookURL)); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-			return
-		}
-	}
-	if req.Secret != nil {
-		secret := strings.TrimSpace(*req.Secret)
-		if secret == "" {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_secret"})
-			return
-		}
-		if _, err := h.DB.Exec(`UPDATE web3_event_sources SET secret_hash=$3, updated_at=NOW() WHERE id=$1 AND user_id=$2`, id, userID, sha256Hex([]byte(secret))); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-			return
-		}
-	}
-	source, err := h.getWeb3SourceForUser(id, userID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"source": source})
+	label := existing.Label
+	chain := existing.Chain
+	network := existing.Network
+	address := existing.Address
+	sourceType := existing.SourceType
+	status := existing.Status
+	if req.Label != nil {
+		label = strings.TrimSpace(*req.Label)
+	}
+	if req.Name != nil {
+		label = strings.TrimSpace(*req.Name)
+	}
+	if req.Chain != nil {
+		chain = strings.TrimSpace(*req.Chain)
+	}
+	if req.Network != nil {
+		network = strings.TrimSpace(*req.Network)
+	}
+	if req.Address != nil {
+		address = strings.TrimSpace(*req.Address)
+	}
+	if req.SourceType != nil {
+		sourceType = strings.TrimSpace(*req.SourceType)
+	}
+	if req.Status != nil {
+		status = strings.TrimSpace(*req.Status)
+	}
+	if req.IsActive != nil {
+		if *req.IsActive {
+			status = "active"
+		} else {
+			status = "inactive"
+		}
+	}
+	if label == "" || address == "" || !validWatchlistNetwork(chain, network) || !validWatchlistSourceType(sourceType) || !validWatchlistStatus(status) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_source"})
+		return
+	}
+	_, err = h.DB.Exec(`
+		UPDATE web3_event_sources
+		SET label=$3, name=$3, chain=$4, network=$5, address=$6, source_type=$7, status=$8, is_active=($8='active'), notes=COALESCE($9, notes), webhook_url=COALESCE($10, webhook_url), updated_at=NOW()
+		WHERE id=$1 AND lower(email)=lower($2)`, id, email, label, chain, network, address, sourceType, status, nullablePatchString(req.Notes), nullablePatchString(req.WebhookURL))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	source, err := h.getWatchlistSourceForUser(id, email)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "source": source})
+}
+
+func (h *Handler) deactivateWeb3Source(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	id := web3SourceIDFromPath(r.URL.Path)
+	if id == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_source_id"})
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
+	res, err := h.DB.Exec(`UPDATE web3_event_sources SET status='inactive', is_active=false, updated_at=NOW() WHERE id=$1 AND lower(email)=lower($2)`, id, email)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (h *Handler) Web3TestEvent(w http.ResponseWriter, r *http.Request) {
@@ -375,6 +476,7 @@ func (h *Handler) Web3TestEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	userID := currentUserID(claims)
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
 	eventID := newID()
 	rawPayload := map[string]any{
 		"demo":            true,
@@ -385,9 +487,9 @@ func (h *Handler) Web3TestEvent(w http.ResponseWriter, r *http.Request) {
 	raw, _ := json.Marshal(rawPayload)
 	payloadHash := sha256Hex(raw)
 	if _, err := h.DB.Exec(`
-		INSERT INTO web3_events (id, user_id, provider, network, event_type, tx_hash, wallet_address, contract_address, raw_payload, risk_level, status, verification_status, payload_hash)
-		VALUES ($1,$2,'alchemy','solana-devnet','test_event',$3,$4,$5,$6::jsonb,'low','received','verified',$7)`,
-		eventID, userID, "demo-tx-"+eventID[:8], "demo-wallet-read-only", "demo-contract-read-only", string(raw), payloadHash); err != nil {
+		INSERT INTO web3_events (id, user_id, email, provider, chain, network, event_type, address, tx_hash, wallet_address, contract_address, amount, raw_payload, risk_level, status, verification_status, payload_hash)
+		VALUES ($1,$2,$3,'alchemy','solana','solana-devnet','test_event',$4,$5,$4,$6,'0',$7::jsonb,'low','received','verified',$8)`,
+		eventID, userID, email, "demo-wallet-read-only", "demo-tx-"+eventID[:8], "demo-contract-read-only", string(raw), payloadHash); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
@@ -503,6 +605,231 @@ func scanWeb3Source(scanner web3EventScanner) (web3EventSource, error) {
 	return source, nil
 }
 
+type normalizedAlchemyEvent struct {
+	Chain           string
+	Network         string
+	EventType       string
+	Address         string
+	FromAddress     string
+	ToAddress       string
+	ContractAddress string
+	TxHash          string
+	BlockNumber     string
+	Direction       string
+	AssetType       string
+	Amount          string
+	Raw             any
+}
+
+func verifyAlchemySignature(raw []byte, signingKey, signature string) bool {
+	signature = strings.TrimSpace(strings.TrimPrefix(signature, "sha256="))
+	if signature == "" {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(signingKey))
+	_, _ = mac.Write(raw)
+	expected := hex.EncodeToString(mac.Sum(nil))
+	return subtle.ConstantTimeCompare([]byte(strings.ToLower(signature)), []byte(expected)) == 1
+}
+
+func normalizeAlchemyActivities(payload map[string]any) []normalizedAlchemyEvent {
+	envelopeType := firstNonEmptyString(asString(payload["type"]), asString(payload["webhookType"]), findStringByKeys(payload, "type"))
+	envelopeNetwork := firstNonEmptyString(asString(payload["network"]), findStringByKeys(payload, "network"))
+	activities := activityItems(payload)
+	out := make([]normalizedAlchemyEvent, 0, len(activities))
+	for _, activity := range activities {
+		from := findStringByKeys(activity, "fromAddress", "from")
+		to := findStringByKeys(activity, "toAddress", "to")
+		network := firstNonEmptyString(findStringByKeys(activity, "network"), envelopeNetwork)
+		eventType := firstNonEmptyString(findStringByKeys(activity, "category", "event_type", "eventType", "type"), envelopeType, "alchemy_address_activity")
+		raw := map[string]any{
+			"webhookId": payload["webhookId"],
+			"id":        payload["id"],
+			"createdAt": payload["createdAt"],
+			"type":      envelopeType,
+			"network":   network,
+			"activity":  activity,
+		}
+		out = append(out, normalizedAlchemyEvent{
+			Chain:           chainFromNetwork(network),
+			Network:         network,
+			EventType:       eventType,
+			Address:         firstNonEmptyString(from, to, findStringByKeys(activity, "address")),
+			FromAddress:     from,
+			ToAddress:       to,
+			ContractAddress: findStringByKeys(activity, "contractAddress", "contract", "rawContract"),
+			TxHash:          findStringByKeys(activity, "hash", "tx_hash", "txHash", "transactionHash"),
+			BlockNumber:     findStringByKeys(activity, "blockNum", "blockNumber", "block"),
+			Direction:       inferDirection(from, to),
+			AssetType:       firstNonEmptyString(findStringByKeys(activity, "asset_type", "assetType", "category"), findStringByKeys(activity, "asset")),
+			Amount:          firstNonEmptyString(findStringByKeys(activity, "value", "amount"), findStringByKeys(activity, "rawValue")),
+			Raw:             raw,
+		})
+	}
+	return out
+}
+
+func activityItems(payload map[string]any) []map[string]any {
+	if event, ok := payload["event"].(map[string]any); ok {
+		if activity, ok := event["activity"].([]any); ok {
+			return mapsFromAnySlice(activity)
+		}
+		if activity, ok := event["activities"].([]any); ok {
+			return mapsFromAnySlice(activity)
+		}
+	}
+	if activity, ok := payload["activity"].([]any); ok {
+		return mapsFromAnySlice(activity)
+	}
+	if activity, ok := payload["activities"].([]any); ok {
+		return mapsFromAnySlice(activity)
+	}
+	return nil
+}
+
+func mapsFromAnySlice(items []any) []map[string]any {
+	out := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		if m, ok := item.(map[string]any); ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+func asString(v any) string {
+	switch t := v.(type) {
+	case string:
+		return strings.TrimSpace(t)
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	case json.Number:
+		return t.String()
+	default:
+		return ""
+	}
+}
+
+func chainFromNetwork(network string) string {
+	n := strings.ToLower(strings.TrimSpace(network))
+	switch {
+	case strings.Contains(n, "base"):
+		return "base"
+	case strings.Contains(n, "arbitrum"):
+		return "arbitrum"
+	case strings.Contains(n, "optimism"):
+		return "optimism"
+	case strings.Contains(n, "polygon") || strings.Contains(n, "amoy"):
+		return "polygon"
+	case strings.Contains(n, "solana"):
+		return "solana"
+	case strings.Contains(n, "eth") || strings.Contains(n, "sepolia"):
+		return "ethereum"
+	default:
+		return n
+	}
+}
+
+func inferDirection(from, to string) string {
+	if strings.TrimSpace(from) != "" && strings.TrimSpace(to) != "" {
+		return "transfer"
+	}
+	if strings.TrimSpace(from) != "" {
+		return "out"
+	}
+	if strings.TrimSpace(to) != "" {
+		return "in"
+	}
+	return ""
+}
+
+func validWatchlistNetwork(chain, network string) bool {
+	combo := strings.ToLower(strings.TrimSpace(chain)) + ":" + strings.ToLower(strings.TrimSpace(network))
+	switch combo {
+	case "ethereum:sepolia", "base:sepolia", "arbitrum:sepolia", "optimism:sepolia", "polygon:amoy", "solana:devnet":
+		return true
+	default:
+		return false
+	}
+}
+
+func validWatchlistSourceType(sourceType string) bool {
+	switch strings.TrimSpace(sourceType) {
+	case "wallet", "contract", "nft_collection":
+		return true
+	default:
+		return false
+	}
+}
+
+func validWatchlistStatus(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "active", "inactive", "paused":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseLimit(raw string, fallback, max int) int {
+	limit, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || limit <= 0 {
+		return fallback
+	}
+	if limit > max {
+		return max
+	}
+	return limit
+}
+
+func web3SourceIDFromPath(path string) string {
+	id := strings.Trim(strings.TrimPrefix(path, "/api/web3/sources/"), "/")
+	if id == "" || strings.Contains(id, "/") {
+		return ""
+	}
+	return id
+}
+
+func nullablePatchString(v *string) any {
+	if v == nil {
+		return nil
+	}
+	return nullIfEmpty(*v)
+}
+
+func (h *Handler) isFreeOnlyUser(email string) (bool, error) {
+	var paidCount int
+	if err := h.DB.QueryRow(`SELECT COUNT(*) FROM entitlements WHERE lower(email)=lower($1) AND status='active' AND COALESCE(plan_id, 'free') <> 'free'`, email).Scan(&paidCount); err != nil {
+		return false, err
+	}
+	return paidCount == 0, nil
+}
+
+func (h *Handler) getWatchlistSourceForUser(id, email string) (web3EventSource, error) {
+	row := h.DB.QueryRow(`
+		SELECT id::text, email, COALESCE(label, name, ''), COALESCE(name, label, ''), COALESCE(provider, 'alchemy'), COALESCE(chain, ''), COALESCE(network, ''), COALESCE(address, ''), COALESCE(source_type, 'wallet'), COALESCE(status, CASE WHEN COALESCE(is_active, true) THEN 'active' ELSE 'inactive' END), notes, webhook_url, COALESCE(is_active, status = 'active'), COALESCE(verification_mode, 'alchemy_signature'), last_event_at, disabled_reason, created_at, updated_at
+		FROM web3_event_sources
+		WHERE id=$1 AND lower(email)=lower($2)`, id, email)
+	return scanWatchlistSource(row)
+}
+
+func scanWatchlistSource(scanner web3EventScanner) (web3EventSource, error) {
+	var source web3EventSource
+	var email, notes, webhookURL, disabledReason sql.NullString
+	var lastEventAt sql.NullTime
+	if err := scanner.Scan(&source.ID, &email, &source.Label, &source.Name, &source.Provider, &source.Chain, &source.Network, &source.Address, &source.SourceType, &source.Status, &notes, &webhookURL, &source.IsActive, &source.VerificationMode, &lastEventAt, &disabledReason, &source.CreatedAt, &source.UpdatedAt); err != nil {
+		return source, err
+	}
+	source.Email = stringPtrFromNull(email)
+	source.UserID = stringPtrFromNull(email)
+	source.Notes = stringPtrFromNull(notes)
+	source.WebhookURL = stringPtrFromNull(webhookURL)
+	if lastEventAt.Valid {
+		source.LastEventAt = &lastEventAt.Time
+	}
+	source.DisabledReason = stringPtrFromNull(disabledReason)
+	return source, nil
+}
 func currentUserID(claims neonJWTClaims) string {
 	if strings.TrimSpace(claims.Sub) != "" {
 		return strings.TrimSpace(claims.Sub)

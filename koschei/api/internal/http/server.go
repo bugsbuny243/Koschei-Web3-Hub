@@ -98,6 +98,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/metadata":        "/metadata.html",
 					"/risk":            "/risk.html",
 					"/chains":          "/chains.html",
+					"/watchlist":       "/watchlist.html",
 					"/account":         "/account.html",
 					"/pricing":         "/pricing.html",
 					"/admin-payments":  "/admin-payments.html",
