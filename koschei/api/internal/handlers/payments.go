@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -24,7 +25,6 @@ var shopierPacks = map[string]shopierPack{
 
 type paymentRequestInput struct {
 	FullName         string `json:"full_name"`
-	Email            string `json:"email"`
 	ProductID        string `json:"product_id"`
 	PaymentReference string `json:"payment_reference"`
 	Note             string `json:"note"`
@@ -33,6 +33,26 @@ type paymentRequestInput struct {
 type paymentRequestReviewInput struct {
 	PaymentRequestID string `json:"payment_request_id"`
 	Reason           string `json:"reason"`
+}
+
+func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
+	statements := []string{
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS full_name text NOT NULL DEFAULT ''`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS product_id text`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS amount_try integer`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'TRY'`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'pending'`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS reviewed_at timestamptz`,
+		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS payment_request_id text`,
+	}
+	for _, statement := range statements {
+		if _, err := db.ExecContext(ctx, statement); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type paymentRequestRecord struct {
@@ -49,6 +69,10 @@ type paymentRequestRecord struct {
 }
 
 func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
+	if err := ensurePaymentSchema(r.Context(), h.DB); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment schema unavailable"})
+		return
+	}
 	if !h.Limiter.allow("billing:"+clientIP(r), 10, 10_000_000_000) {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate limited"})
 		return
@@ -96,6 +120,10 @@ func (h *Handler) AdminPaymentRequests(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
 		return
 	}
+	if err := ensurePaymentSchema(r.Context(), h.DB); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment schema unavailable"})
+		return
+	}
 	rows, err := h.DB.QueryContext(r.Context(), `
 		SELECT id::text, email, COALESCE(full_name, ''), COALESCE(product_id, ''), COALESCE(amount_try, 0), COALESCE(currency, 'TRY'), status,
 		       COALESCE(raw_payload, '{}'::jsonb), created_at, reviewed_at
@@ -130,6 +158,10 @@ func (h *Handler) AdminPaymentRequests(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ApprovePaymentRequest(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
+		return
+	}
+	if err := ensurePaymentSchema(r.Context(), h.DB); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment schema unavailable"})
 		return
 	}
 	var req paymentRequestReviewInput
@@ -203,6 +235,10 @@ func (h *Handler) ApprovePaymentRequest(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) RejectPaymentRequest(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
+		return
+	}
+	if err := ensurePaymentSchema(r.Context(), h.DB); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment schema unavailable"})
 		return
 	}
 	var req paymentRequestReviewInput

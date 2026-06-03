@@ -96,21 +96,37 @@ func (h *Handler) provisionMember(ctx context.Context, claims neonJWTClaims) (me
 			FROM entitlements
 			WHERE lower(email) = lower($1)
 			  AND status = 'active'
+			  AND COALESCE(plan_id, 'free') = 'free'
 		)`, email); err != nil {
 		return memberSummaryResponse{}, err
 	}
 
 	summary := memberSummaryResponse{OK: true, Email: email}
 	if err := tx.QueryRowContext(ctx, `
-		SELECT
-			COALESCE(plan_id, 'free') AS plan_id,
-			COALESCE(outputs_total, 100) AS outputs_total,
-			COALESCE(outputs_remaining, 100) AS outputs_remaining
-		FROM entitlements
-		WHERE lower(email) = lower($1)
-		  AND status = 'active'
-		ORDER BY outputs_remaining DESC, created_at DESC
-		LIMIT 1`, email).Scan(&summary.Plan, &summary.OutputsTotal, &summary.OutputsRemaining); err != nil {
+		WITH active_entitlements AS (
+			SELECT COALESCE(plan_id, 'free') AS plan_id,
+			       COALESCE(outputs_total, 0) AS outputs_total,
+			       COALESCE(outputs_remaining, 0) AS outputs_remaining,
+			       created_at
+			FROM entitlements
+			WHERE lower(email) = lower($1)
+			  AND status = 'active'
+		), totals AS (
+			SELECT COALESCE(SUM(outputs_total), 0)::int AS outputs_total,
+			       COALESCE(SUM(outputs_remaining), 0)::int AS outputs_remaining
+			FROM active_entitlements
+		), paid_plan AS (
+			SELECT plan_id
+			FROM active_entitlements
+			WHERE plan_id <> 'free'
+			ORDER BY CASE plan_id WHEN 'studio' THEN 3 WHEN 'builder' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END DESC,
+			         created_at DESC
+			LIMIT 1
+		)
+		SELECT COALESCE((SELECT plan_id FROM paid_plan), 'free') AS plan_id,
+		       outputs_total,
+		       outputs_remaining
+		FROM totals`, email).Scan(&summary.Plan, &summary.OutputsTotal, &summary.OutputsRemaining); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return memberSummaryResponse{}, errors.New("active entitlement missing after initialization")
 		}
