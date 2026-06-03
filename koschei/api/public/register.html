@@ -39,8 +39,9 @@
   </div>
 </div>
 <script src="/js/koschei-auth.js?v=4"></script>
+<script src="/js/koschei-analytics.js?v=1"></script>
 <script>
-  (async () => { await KoscheiAuth.init(); KoscheiAuth.requireGuest('/hub'); })();
+  (async () => { await KoscheiAuth.init(); if (KoscheiAuth.requireGuest('/hub')) KoscheiAnalytics.track('register_page_view'); })();
   document.addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister(); });
   async function handleRegister() {
     const email = document.getElementById('email').value.trim();
@@ -53,8 +54,10 @@
     if (password !== password2) { showError('Şifreler eşleşmiyor.'); return; }
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>';
+    KoscheiAnalytics.track('register_submit', { email });
     try {
       await KoscheiAuth.signUp(email, password);
+      KoscheiAnalytics.track('signup_success', { email });
       showSuccess('Hesap oluşturuldu! Yönlendiriliyor...');
       setTimeout(() => window.location.replace('/hub'), 1000);
     } catch (err) {

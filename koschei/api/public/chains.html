@@ -60,6 +60,7 @@
 </div>
 
 <script src="/js/koschei-auth.js?v=3"></script>
+<script src="/js/koschei-analytics.js?v=1"></script>
 <script>
   const CHAINS = [
     { id:'solana', name:'Solana', icon:'◎' },
@@ -107,6 +108,7 @@
   }
 
   async function loadChains() {
+    KoscheiAnalytics.track('chains_refresh');
     document.getElementById('lastUpdated').textContent = 'Refreshing...';
     const results = await Promise.allSettled(
       CHAINS.map(c => fetch(`/api/web3/health?chain=${c.id}`).then(r => r.json()))
