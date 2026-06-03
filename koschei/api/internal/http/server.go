@@ -75,9 +75,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/web3/events/alchemy", requiresDB(h, method("POST", h.Web3AlchemyEvent)))
 	mux.HandleFunc("/api/web3/sources", requiresDB(h, handlers.RequireAuth(h.Web3Sources)))
 	mux.HandleFunc("/api/web3/sources/", requiresDB(h, handlers.RequireAuth(h.Web3Source)))
-	mux.HandleFunc("/api/web3/events/test", requiresDB(h, handlers.RequireAuth(method("POST", h.Web3TestEvent))))
 	mux.HandleFunc("/api/web3/events", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3Events))))
-	mux.HandleFunc("/api/web3/events/", requiresDB(h, handlers.RequireAuth(method("POST", h.Web3ExplainEvent))))
 	mux.HandleFunc("/api/artifacts/", requiresDB(h, handlers.RequireAuth(h.ArtifactRoute)))
 
 	if staticDir != "" {

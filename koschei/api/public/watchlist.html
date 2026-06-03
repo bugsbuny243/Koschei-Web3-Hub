@@ -3,16 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Watchlist / Webhook Monitor — Koschei</title>
+  <title>Watchlist — Koschei</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/koschei.css">
   <style>
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;word-break:break-all;}
-    .pill{display:inline-flex;border:1px solid var(--border);border-radius:999px;padding:4px 9px;color:var(--text2);font-size:12px;}
-    .source-card,.event-card{display:flex;flex-direction:column;gap:8px;}
-    .row{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;}
-    details.raw{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px;}
-    details.raw pre{white-space:pre-wrap;word-break:break-word;margin:10px 0 0;color:var(--text2);font-size:12px;}
+    .watch-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start;}
+    .stack{display:flex;flex-direction:column;gap:14px;}
+    .copy-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all;color:var(--text);}
+    .source-card{display:flex;flex-direction:column;gap:10px;}
+    .event-row{border-bottom:1px solid var(--border);padding:12px 0;}
+    .event-row:last-child{border-bottom:none;}
+    .small-btn{padding:5px 10px;font-size:12px;}
+    .setup-list{margin-left:18px;color:var(--text2);}
+    .setup-list strong{color:var(--text);}
+    @media (max-width: 850px){.watch-grid{grid-template-columns:1fr;}}
   </style>
 </head>
 <body>
@@ -28,158 +33,233 @@
   </div>
 </nav>
 
-<div class="page" style="max-width:1040px;">
-  <div class="page-title">Watchlist / Webhook Monitor</div>
-  <div class="page-sub">Track public wallet or contract activity using Alchemy webhooks. No wallet connection or private keys required.</div>
+<main class="page">
+  <div class="page-title">Watchlist</div>
+  <div class="page-sub">Add public wallet addresses, configure Alchemy manually, and watch real on-chain activity arrive.</div>
+  <div class="alert" id="watchAlert"></div>
 
-  <div class="alert" id="message" style="display:none;"></div>
+  <div class="watch-grid">
+    <section class="stack">
+      <article class="card stack">
+        <div>
+          <div class="page-title" style="font-size:18px;margin-bottom:4px;">Add public address</div>
+          <div class="auth-sub">Source creation costs 0 outputs. No private key, seed phrase, or wallet connection is required.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="label">Label</label>
+          <input class="form-input" id="label" placeholder="Onur Phantom Base Wallet">
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label" for="chain">Chain</label>
+            <select class="form-input" id="chain">
+              <option value="base">Base</option>
+              <option value="ethereum">Ethereum</option>
+              <option value="solana">Solana</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="network">Network</label>
+            <input class="form-input" id="network" value="base-mainnet" placeholder="base-mainnet">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="address">Public address</label>
+          <input class="form-input" id="address" placeholder="0x...">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="notes">Notes</label>
+          <textarea class="form-input" id="notes" rows="3" placeholder="Optional internal note"></textarea>
+        </div>
+        <button class="btn btn-primary" id="addBtn" type="button" onclick="createSource()">Add watch source</button>
+      </article>
 
-  <section class="grid-2" style="align-items:start;margin-top:24px;">
-    <form class="card" id="sourceForm" style="display:flex;flex-direction:column;gap:14px;">
-      <div class="row"><strong>Add monitored source</strong><span class="pill">0 outputs</span></div>
-      <div class="form-group">
-        <label class="form-label" for="label">Label / name</label>
-        <input class="form-input" id="label" required placeholder="Treasury Wallet">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="network">Chain / network</label>
-        <select class="form-input" id="network" required>
-          <option value="ethereum:sepolia">ethereum-sepolia</option>
-          <option value="base:sepolia">base-sepolia</option>
-          <option value="arbitrum:sepolia">arbitrum-sepolia</option>
-          <option value="optimism:sepolia">optimism-sepolia</option>
-          <option value="polygon:amoy">polygon-amoy</option>
-          <option value="solana:devnet">solana-devnet</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="address">Public wallet or contract address</label>
-        <input class="form-input mono" id="address" required placeholder="0x... or Solana devnet address">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="sourceType">Source type</label>
-        <select class="form-input" id="sourceType" required>
-          <option value="wallet">wallet</option>
-          <option value="contract">contract</option>
-          <option value="nft_collection">nft_collection</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="notes">Notes (optional)</label>
-        <textarea class="form-input" id="notes" rows="3" placeholder="Why this address matters"></textarea>
-      </div>
-      <button class="btn btn-primary" type="submit">Add to Watchlist</button>
-    </form>
+      <article class="card stack">
+        <div>
+          <div class="page-title" style="font-size:18px;margin-bottom:4px;">Alchemy setup instructions</div>
+          <div class="auth-sub">Manual setup only. Koschei does not create Alchemy webhooks for you yet.</div>
+        </div>
+        <ol class="setup-list stack">
+          <li><strong>Open Alchemy → Webhooks → Create Webhook</strong></li>
+          <li>Choose: <strong>Address Activity</strong></li>
+          <li>Select network: <strong>Use the same network shown here.</strong></li>
+          <li>Webhook URL: <strong class="mono" id="globalWebhookUrl">https://tradepigloball.co/api/web3/events/alchemy</strong></li>
+          <li>Address: <strong>Use the public address shown here.</strong></li>
+          <li><strong>Save webhook.</strong></li>
+        </ol>
+        <div class="alert alert-success show">No private key, seed phrase, or wallet connection is required.</div>
+      </article>
+    </section>
 
-    <aside class="card" style="display:flex;flex-direction:column;gap:12px;">
-      <strong>Webhook setup guide</strong>
-      <div class="form-label">Webhook URL</div>
-      <div class="mono" style="padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--bg3);">https://tradepigloball.co/api/web3/events/alchemy</div>
-      <ol style="color:var(--text2);line-height:1.7;margin:0;padding-left:20px;">
-        <li>Create an Address Activity webhook in Alchemy.</li>
-        <li>Use the webhook URL above.</li>
-        <li>Add addresses from your Koschei Watchlist.</li>
-        <li>Copy the Alchemy signing key into Railway env as <span class="mono">ALCHEMY_WEBHOOK_SIGNING_KEY</span>.</li>
-      </ol>
-      <div class="alert">Secrets are never displayed here. Monitoring is read-only: no wallet connection, private keys, custody, or trading.</div>
-    </aside>
-  </section>
+    <section class="stack">
+      <article class="card stack">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div class="page-title" style="font-size:18px;margin-bottom:4px;">My watched sources</div>
+            <div class="auth-sub">Add each address to your Alchemy Address Activity webhook.</div>
+          </div>
+          <button class="btn btn-ghost small-btn" type="button" onclick="loadSources()">Refresh</button>
+        </div>
+        <div id="sources" class="stack"><div class="auth-sub">Loading sources…</div></div>
+      </article>
 
-  <section style="margin-top:24px;">
-    <div class="row" style="margin-bottom:12px;"><div class="page-title" style="font-size:18px;">Saved watchlist sources</div><button class="btn btn-ghost" onclick="refreshAll()">↻ Refresh</button></div>
-    <div class="grid-2" id="sources"><div class="card">Loading sources…</div></div>
-  </section>
-
-  <section style="margin-top:24px;">
-    <div class="page-title" style="font-size:18px;">Latest activity feed</div>
-    <div id="events" style="display:flex;flex-direction:column;gap:12px;margin-top:12px;"><div class="card">Loading events…</div></div>
-  </section>
-</div>
+      <article class="card stack">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div class="page-title" style="font-size:18px;margin-bottom:4px;">Activity feed</div>
+            <div class="auth-sub">Refreshes every 30 seconds after real Alchemy webhook delivery.</div>
+          </div>
+          <button class="btn btn-ghost small-btn" type="button" onclick="loadEvents()">Refresh</button>
+        </div>
+        <div id="events"><div class="auth-sub">Loading activity…</div></div>
+      </article>
+    </section>
+  </div>
+</main>
 
 <script src="/js/koschei-auth.js?v=4"></script>
 <script src="/js/koschei-analytics.js?v=1"></script>
 <script>
-  let latestEvents = [];
-  function short(value) {
-    if (!value) return '—';
-    const text = String(value);
-    return text.length > 18 ? `${text.slice(0, 8)}…${text.slice(-6)}` : text;
-  }
-  function showMessage(text, isError = false) {
-    const message = document.getElementById('message');
-    message.style.display = 'block';
-    message.style.borderColor = isError ? 'rgba(239,68,68,.4)' : 'var(--border)';
-    message.textContent = text;
-  }
-  async function refreshSources() {
-    const data = await KoscheiAuth.apiCall('/api/web3/sources');
-    const eventsBySource = new Map(latestEvents.filter(e => e.source_id).map(e => [e.source_id, e.created_at]));
-    const box = document.getElementById('sources');
-    const sources = data.sources || [];
-    if (!sources.length) {
-      box.innerHTML = '<div class="card">No sources yet. Add a public address to start monitoring.</div>';
-      return;
-    }
-    box.innerHTML = sources.map(source => `
-      <article class="card source-card">
-        <div class="row"><strong>${source.label || source.name || 'Unnamed source'}</strong><span class="pill">${source.status || 'active'}</span></div>
-        <div class="form-label">${source.chain || '—'} / ${source.network || '—'} · ${source.source_type || 'wallet'}</div>
-        <div class="mono">${short(source.address)}</div>
-        <div class="form-label">Latest event: ${eventsBySource.get(source.id) || source.last_event_at || '—'}</div>
-        <button class="btn btn-ghost" onclick="deactivateSource('${source.id}')">Deactivate</button>
-      </article>`).join('');
-  }
-  async function refreshEvents() {
-    const data = await KoscheiAuth.apiCall('/api/web3/events?limit=50');
-    latestEvents = data.events || [];
-    const box = document.getElementById('events');
-    if (!latestEvents.length) {
-      box.innerHTML = '<div class="card">No webhook events yet. Once Alchemy sends activity for a watched address, it appears here.</div>';
-      return;
-    }
-    box.innerHTML = latestEvents.map(event => `
-      <article class="card event-card">
-        <div class="row"><strong>${event.event_type || 'web3_event'}</strong><span class="pill">${event.chain || '—'} / ${event.network || '—'}</span></div>
-        <div class="mono">Address: ${short(event.address)} · Tx: ${short(event.tx_hash)}</div>
-        <div class="form-label">${event.created_at || ''}</div>
-        <details class="raw"><summary>Raw result</summary><pre>${JSON.stringify(event.raw_payload || {}, null, 2)}</pre></details>
-      </article>`).join('');
-  }
-  async function refreshAll() {
-    await refreshEvents();
-    await refreshSources();
-  }
-  async function deactivateSource(id) {
-    await KoscheiAuth.apiCall(`/api/web3/sources/${id}`, { method: 'DELETE' });
-    showMessage('Source deactivated.');
-    await refreshAll();
-  }
-  document.getElementById('sourceForm').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const [chain, network] = document.getElementById('network').value.split(':');
-    const payload = {
-      label: document.getElementById('label').value.trim(),
-      chain,
-      network,
-      address: document.getElementById('address').value.trim(),
-      source_type: document.getElementById('sourceType').value,
-      notes: document.getElementById('notes').value.trim()
-    };
-    try {
-      await KoscheiAuth.apiCall('/api/web3/sources', { method: 'POST', body: JSON.stringify(payload) });
-      event.target.reset();
-      showMessage('Watchlist source saved. Add the same address to your Alchemy Address Activity webhook.');
-      await refreshAll();
-    } catch (err) {
-      showMessage(err.message || 'Could not save watchlist source.', true);
-    }
-  });
+  const FALLBACK_WEBHOOK_URL = 'https://tradepigloball.co/api/web3/events/alchemy';
+  let refreshHandle;
+
   (async () => {
     await KoscheiAuth.init();
     if (!KoscheiAuth.requireAuth('/login')) return;
     KoscheiAnalytics.track('watchlist_view');
-    await refreshAll();
+    document.getElementById('globalWebhookUrl').textContent = FALLBACK_WEBHOOK_URL;
+    await Promise.all([loadSources(), loadEvents()]);
+    refreshHandle = setInterval(loadEvents, 30000);
   })();
+
+  window.addEventListener('beforeunload', () => {
+    if (refreshHandle) clearInterval(refreshHandle);
+  });
+
+  document.getElementById('chain').addEventListener('change', (event) => {
+    const map = { base: 'base-mainnet', ethereum: 'eth-mainnet', solana: 'solana-mainnet' };
+    document.getElementById('network').value = map[event.target.value] || '';
+  });
+
+  async function createSource() {
+    const button = document.getElementById('addBtn');
+    button.disabled = true;
+    button.textContent = 'Adding…';
+    hideAlert();
+    try {
+      const body = {
+        label: document.getElementById('label').value.trim(),
+        chain: document.getElementById('chain').value.trim(),
+        network: document.getElementById('network').value.trim(),
+        address: document.getElementById('address').value.trim(),
+        source_type: 'wallet',
+        notes: document.getElementById('notes').value.trim()
+      };
+      const res = await KoscheiAuth.apiCall('/api/web3/sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Could not create watch source');
+      document.getElementById('globalWebhookUrl').textContent = data.source.webhook_url || FALLBACK_WEBHOOK_URL;
+      document.getElementById('address').value = '';
+      document.getElementById('notes').value = '';
+      showAlert('Watch source saved. Add this address to your Alchemy Address Activity webhook. Events will appear after real on-chain activity.', 'success');
+      await loadSources();
+    } catch (err) {
+      showAlert(err.message || 'Could not create watch source', 'error');
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Add watch source';
+    }
+  }
+
+  async function loadSources() {
+    const target = document.getElementById('sources');
+    try {
+      const res = await KoscheiAuth.apiCall('/api/web3/sources');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not load sources');
+      if (!data.sources || data.sources.length === 0) {
+        target.innerHTML = '<div class="auth-sub">No watched sources yet. Add a public address to begin manual Alchemy setup.</div>';
+        return;
+      }
+      target.innerHTML = data.sources.map(renderSource).join('');
+      const firstURL = data.sources.find(s => s.webhook_url)?.webhook_url;
+      if (firstURL) document.getElementById('globalWebhookUrl').textContent = firstURL;
+    } catch (err) {
+      target.innerHTML = `<div class="alert alert-error show">${escapeHtml(err.message || 'Could not load sources')}</div>`;
+    }
+  }
+
+  function renderSource(source) {
+    const statusBadge = source.status === 'active' ? 'badge-green' : 'badge-blue';
+    const url = source.webhook_url || FALLBACK_WEBHOOK_URL;
+    return `<article class="source-card" style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:var(--bg3);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <strong>${escapeHtml(source.label || 'Untitled source')}</strong>
+        <span class="badge ${statusBadge}">${escapeHtml(source.status || 'waiting_for_setup')}</span>
+      </div>
+      <div class="auth-sub">${escapeHtml(source.chain || '')} / ${escapeHtml(source.network || '')}</div>
+      <div class="copy-row"><span class="mono">${escapeHtml(source.address || '')}</span><button class="btn btn-ghost small-btn" onclick="copyText('${escapeAttr(source.address || '')}')">Copy address</button></div>
+      <div class="copy-row"><span class="mono">${escapeHtml(url)}</span><button class="btn btn-ghost small-btn" onclick="copyText('${escapeAttr(url)}')">Copy webhook URL</button></div>
+      <div class="auth-sub">Provider setup status: <strong>${escapeHtml(source.provider_setup_status || 'manual_required')}</strong></div>
+      <div class="alert alert-success show">Add this address to your Alchemy Address Activity webhook. Waiting for real on-chain activity.</div>
+    </article>`;
+  }
+
+  async function loadEvents() {
+    const target = document.getElementById('events');
+    try {
+      const res = await KoscheiAuth.apiCall('/api/web3/events?limit=50');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not load events');
+      if (!data.events || data.events.length === 0) {
+        target.innerHTML = '<div class="auth-sub">Waiting for first real on-chain activity.</div>';
+        return;
+      }
+      target.innerHTML = data.events.map(renderEvent).join('');
+    } catch (err) {
+      target.innerHTML = `<div class="alert alert-error show">${escapeHtml(err.message || 'Could not load events')}</div>`;
+    }
+  }
+
+  function renderEvent(event) {
+    return `<div class="event-row">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+        <strong>${escapeHtml(event.event_type || 'alchemy_webhook_unknown')}</strong>
+        <span class="badge badge-blue">${escapeHtml(event.verification_status || 'unverified')}</span>
+      </div>
+      <div class="auth-sub">${escapeHtml(event.network || '')} · ${escapeHtml(new Date(event.created_at).toLocaleString())}</div>
+      <div class="mono">Address: ${escapeHtml(event.address || event.wallet_address || '—')}</div>
+      <div class="mono">Tx: ${escapeHtml(event.tx_hash || '—')}</div>
+    </div>`;
+  }
+
+  function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => showAlert('Copied.', 'success'));
+  }
+
+  function showAlert(message, type) {
+    const el = document.getElementById('watchAlert');
+    el.textContent = message;
+    el.className = `alert alert-${type} show`;
+  }
+
+  function hideAlert() {
+    const el = document.getElementById('watchAlert');
+    el.textContent = '';
+    el.className = 'alert';
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  }
+
+  function escapeAttr(value) {
+    return escapeHtml(value).replace(/`/g, '&#96;');
+  }
 </script>
 </body>
 </html>
