@@ -73,6 +73,18 @@ func (h *Handler) RugRadarSubmit(w http.ResponseWriter, r *http.Request) {
 		req.Network = "solana-mainnet"
 	}
 
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
+	const toolCost = 2
+	if !isPrivileged && credits < toolCost {
+		writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": "insufficient_credits", "required": toolCost, "balance": credits})
+		return
+	}
+
 	// Check if already scanned
 	if h.DB != nil {
 		var count int
@@ -215,6 +227,11 @@ func (h *Handler) RugRadarSubmit(w http.ResponseWriter, r *http.Request) {
 		 ON CONFLICT (mint_address) DO NOTHING`,
 			req.MintAddress, req.Network, score, riskLevel, riskSummary,
 			isRenounced, isFrozen, txCount, submittedBy)
+	}
+
+	if !isPrivileged && h.DB != nil {
+		h.DB.Exec(`UPDATE app_user_profiles SET credits=credits-$1,updated_at=now() WHERE auth_subject=$2 AND credits>=$1`, toolCost, claims.Sub)
+		h.DB.Exec(`INSERT INTO credit_events(email,amount,reason,created_at) VALUES($1,-$2,'rug_radar',now())`, claims.Email, toolCost)
 	}
 
 	writeJSON(w, 200, map[string]interface{}{
