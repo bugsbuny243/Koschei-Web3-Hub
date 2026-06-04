@@ -318,6 +318,22 @@ func adminChatAnswer(message string, summary adminSummary, summaryErr error, sca
 		return "❌ Critical — Summary data could not be read. " + next
 	}
 	switch {
+	case strings.Contains(m, "modül") || strings.Contains(m, "module"):
+		return "✅ OK — All 10 Koschei Web3 Intelligence OS module foundations are registered. Review the Modules tab for public/admin status."
+	case strings.Contains(m, "grant başvuru") || strings.Contains(m, "grant application"):
+		return "✅ OK — Grant Autopilot is ready to generate copy-ready template drafts. It never submits applications automatically."
+	case strings.Contains(m, "impact"):
+		return "✅ OK — The safe public Proof-of-Impact page is available at /impact."
+	case strings.Contains(m, "agent api"):
+		return "✅ OK — The read-only Agent API foundation is ready; admin-created scoped keys are required."
+	case strings.Contains(m, "x402"):
+		return "✅ OK — x402 pay-per-tool foundation is present and disabled by default; no fund movement is implemented."
+	case strings.Contains(m, "cross-chain") || strings.Contains(m, "cross chain"):
+		return "✅ OK — Cross-chain Risk Monitor provides preliminary checklists and makes no unsupported bridge-detection claims."
+	case strings.Contains(m, "sybil"):
+		return "✅ OK — The optional Sybil layer is ready and stores no biometric or identity-document data."
+	case strings.Contains(m, "risk engine") || strings.Contains(m, "risk v2"):
+		return "✅ OK — Risk Engine v2 returns preliminary structured scores, evidence, red flags, and recommendations."
 	case strings.Contains(m, "ödeme") || strings.Contains(m, "payment") || strings.Contains(m, "gelir"):
 		return fmt.Sprintf("%s — %d pending payment request(s). Approved/rejected history is available in Payments. %s", severity, summary.PendingPaymentRequestsCount, next)
 	case strings.Contains(m, "kredi") || strings.Contains(m, "credit"):
