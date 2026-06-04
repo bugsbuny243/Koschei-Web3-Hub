@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Docs — Koschei</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>
+    .docs-layout { display: grid; grid-template-columns: 240px 1fr; gap: 24px; align-items: start; }
+    .docs-sidebar { position: sticky; top: 86px; display: flex; flex-direction: column; gap: 8px; }
+    .docs-sidebar a { color: var(--text2); text-decoration: none; font-size: 13px; padding: 8px 10px; border-radius: var(--radius); }
+    .docs-sidebar a:hover { color: var(--text); background: var(--bg3); }
+    .docs-content { display: flex; flex-direction: column; gap: 18px; }
+    .endpoint { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--accent); }
+    .method { color: #000; background: var(--accent); border-radius: 5px; padding: 2px 7px; font-size: 11px; letter-spacing: .4px; }
+    .code-block { overflow-x: auto; background: #050508; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; color: #d6fbe8; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 13px; line-height: 1.5; }
+    .param-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .param-table th, .param-table td { padding: 10px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    .param-table th { color: var(--text2); font-weight: 600; }
+    .section-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    @media (max-width: 780px) { .docs-layout { grid-template-columns: 1fr; } .docs-sidebar { position: static; } }
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <div class="nav-links">
+    <a href="/hub.html" class="nav-link">Hub</a>
+    <a href="/docs.html" class="nav-link active">Docs</a>
+    <a href="/login.html" class="nav-link">Sign in</a>
+    <a href="/register.html" class="btn btn-primary" style="padding:7px 16px;font-size:13px;">Get started</a>
+  </div>
+</nav>
+
+<main class="page">
+  <section style="margin-bottom:28px;">
+    <div class="page-title">Koschei API Docs</div>
+    <div class="page-sub">Reference for the public Web3 endpoints and member tools available in Koschei.</div>
+  </section>
+
+  <div class="docs-layout">
+    <aside class="card docs-sidebar">
+      <a href="#overview">Overview</a>
+      <a href="#auth">Authentication</a>
+      <a href="#chain-health">Chain health</a>
+      <a href="#metadata">Metadata</a>
+      <a href="#risk">Risk scanner</a>
+      <a href="#watchlist">Watchlist</a>
+    </aside>
+
+    <section class="docs-content">
+      <article class="card" id="overview">
+        <div class="section-title">Overview</div>
+        <p class="auth-sub">Koschei exposes REST endpoints for Solana-focused developer workflows, read-only risk checks, live chain health, and member account operations. Responses are JSON unless otherwise noted.</p>
+        <div class="code-block" style="margin-top:14px;">Base URL: https://your-koschei-domain.example</div>
+      </article>
+
+      <article class="card" id="auth">
+        <div class="section-title">Authentication</div>
+        <p class="auth-sub">Public health endpoints can be called directly. Member endpoints require a signed-in Koschei session from the web app.</p>
+        <table class="param-table" style="margin-top:14px;">
+          <thead><tr><th>Area</th><th>Requirement</th></tr></thead>
+          <tbody>
+            <tr><td>Public API</td><td>No private keys, seed phrases, or wallet custody are required.</td></tr>
+            <tr><td>Member tools</td><td>Use your Koschei account session before calling member-only routes.</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card" id="chain-health">
+        <div class="endpoint"><span class="method">GET</span> /api/web3/health?chain=solana</div>
+        <div class="section-title" style="margin-top:12px;">Chain health</div>
+        <p class="auth-sub">Returns the current health status for a supported blockchain network.</p>
+        <table class="param-table" style="margin-top:14px;">
+          <thead><tr><th>Query</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><code>chain</code></td><td>One of <code>solana</code>, <code>ethereum</code>, <code>base</code>, <code>arbitrum</code>, <code>polygon</code>, or <code>optimism</code>.</td></tr>
+          </tbody>
+        </table>
+        <div class="code-block" style="margin-top:14px;">fetch('/api/web3/health?chain=solana')
+  .then((res) =&gt; res.json())
+  .then(console.log);</div>
+      </article>
+
+      <article class="card" id="metadata">
+        <div class="endpoint"><span class="method">POST</span> /api/metadata</div>
+        <div class="section-title" style="margin-top:12px;">Metadata generation</div>
+        <p class="auth-sub">Generate structured project, NFT, or game asset metadata from your prompt and project details.</p>
+        <div class="code-block" style="margin-top:14px;">fetch('/api/metadata', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name: 'Example Collection', chain: 'solana' })
+});</div>
+      </article>
+
+      <article class="card" id="risk">
+        <div class="endpoint"><span class="method">POST</span> /api/risk</div>
+        <div class="section-title" style="margin-top:12px;">Risk scanner</div>
+        <p class="auth-sub">Submit a public project, wallet, or contract reference to review read-only Web3 risk signals.</p>
+        <div class="code-block" style="margin-top:14px;">fetch('/api/risk', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ target: 'public-address-or-project-url' })
+});</div>
+      </article>
+
+      <article class="card" id="watchlist">
+        <div class="endpoint"><span class="method">GET</span> /api/watchlist</div>
+        <div class="section-title" style="margin-top:12px;">Watchlist</div>
+        <p class="auth-sub">Track public wallet or contract activity with Alchemy-powered polling from the Koschei member hub.</p>
+        <div class="code-block" style="margin-top:14px;">fetch('/api/watchlist')
+  .then((res) =&gt; res.json())
+  .then(console.log);</div>
+      </article>
+    </section>
+  </div>
+</main>
+
+<script src="/js/koschei-analytics.js?v=1"></script>
+<script>
+  KoscheiAnalytics.track('docs_view');
+</script>
+</body>
+</html>
