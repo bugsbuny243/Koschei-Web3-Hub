@@ -50,6 +50,19 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/admin/analytics", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "analytics") })))
 	mux.HandleFunc("/api/admin/system-scan", requiresDB(h, method("GET", h.AdminSystemScan)))
 	mux.HandleFunc("/api/admin/chat", requiresDB(h, method("POST", h.AdminChat)))
+	mux.HandleFunc("/api/admin/modules", requiresDB(h, method("GET", h.AdminModules)))
+	mux.HandleFunc("/api/admin/grant-autopilot", requiresDB(h, method("GET", h.GrantAutopilot)))
+	mux.HandleFunc("/api/admin/grant-autopilot/generate", requiresDB(h, method("POST", h.GrantGenerate)))
+	mux.HandleFunc("/api/admin/grant-autopilot/save", requiresDB(h, method("POST", h.GrantSave)))
+	mux.HandleFunc("/api/admin/agent-api-keys", requiresDB(h, method("POST", h.AdminAgentKey)))
+	mux.HandleFunc("/api/admin/tool-usage", requiresDB(h, method("GET", h.AdminToolUsage)))
+	mux.HandleFunc("/api/public/impact", requiresDB(h, method("GET", h.PublicImpact)))
+	mux.HandleFunc("/api/public/tool-prices", requiresDB(h, method("GET", h.ToolPrices)))
+	mux.HandleFunc("/api/agent/health", requiresDB(h, method("GET", h.AgentTool)))
+	mux.HandleFunc("/api/agent/wallet-score", requiresDB(h, method("POST", h.AgentTool)))
+	mux.HandleFunc("/api/agent/risk-summary", requiresDB(h, method("POST", h.AgentTool)))
+	mux.HandleFunc("/api/agent/metadata-template", requiresDB(h, method("POST", h.AgentTool)))
+	mux.HandleFunc("/api/agent/chain-health", requiresDB(h, method("POST", h.AgentTool)))
 	mux.HandleFunc("/api/runtime/projects", requiresDB(h, handlers.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.CreateRuntimeProject(w, r)
@@ -89,6 +102,12 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/web3/sources", requiresDB(h, handlers.RequireAuth(h.Web3Sources)))
 	mux.HandleFunc("/api/web3/sources/", requiresDB(h, handlers.RequireAuth(h.Web3Source)))
 	mux.HandleFunc("/api/web3/events", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3Events))))
+	mux.HandleFunc("/api/web3/intelligence-graph", requiresDB(h, handlers.RequireAuth(h.IntelligenceGraph)))
+	mux.HandleFunc("/api/web3/intelligence-graph/build", requiresDB(h, handlers.RequireAuth(method("POST", h.IntelligenceGraph))))
+	mux.HandleFunc("/api/web3/risk-v2", requiresDB(h, handlers.RequireAuth(method("POST", h.RiskV2))))
+	mux.HandleFunc("/api/web3/tx-decode-pro", requiresDB(h, handlers.RequireAuth(method("POST", h.TXDecodePro))))
+	mux.HandleFunc("/api/web3/cross-chain-risk", requiresDB(h, handlers.RequireAuth(method("POST", h.CrossChainRisk))))
+	mux.HandleFunc("/api/web3/sybil-check", requiresDB(h, handlers.RequireAuth(method("POST", h.SybilCheck))))
 	mux.HandleFunc("/api/artifacts/", requiresDB(h, handlers.RequireAuth(h.ArtifactRoute)))
 
 	if staticDir != "" {
@@ -103,19 +122,28 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					return
 				}
 				cleanRoutes := map[string]string{
-					"/hub":             "/hub.html",
-					"/login":           "/login.html",
-					"/register":        "/register.html",
-					"/metadata":        "/metadata.html",
-					"/risk":            "/risk.html",
-					"/chains":          "/chains.html",
-					"/watchlist":       "/watchlist.html",
-					"/account":         "/account.html",
-					"/pricing":         "/pricing.html",
-					"/admin":           "/admin.html",
-					"/admin-payments":  "/admin-payments.html",
-					"/admin-analytics": "/admin-analytics.html",
-					"/dashboard":       "/dashboard.html",
+					"/hub":              "/hub.html",
+					"/login":            "/login.html",
+					"/register":         "/register.html",
+					"/metadata":         "/metadata.html",
+					"/risk":             "/risk.html",
+					"/chains":           "/chains.html",
+					"/watchlist":        "/watchlist.html",
+					"/account":          "/account.html",
+					"/pricing":          "/pricing.html",
+					"/admin":            "/admin.html",
+					"/admin-payments":   "/admin-payments.html",
+					"/admin-analytics":  "/admin-analytics.html",
+					"/dashboard":        "/dashboard.html",
+					"/impact":           "/impact.html",
+					"/docs":             "/docs.html",
+					"/docs/api":         "/docs-api.html",
+					"/docs/sdk":         "/docs-sdk.html",
+					"/graph":            "/graph.html",
+					"/risk-v2":          "/risk-v2.html",
+					"/tx-decoder-pro":   "/tx-decoder-pro.html",
+					"/cross-chain-risk": "/cross-chain-risk.html",
+					"/sybil-check":      "/sybil-check.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())

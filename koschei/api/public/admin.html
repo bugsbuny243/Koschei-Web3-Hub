@@ -28,7 +28,7 @@
   </section>
 
   <section class="hidden" id="controlCenter">
-    <div class="tabs" role="tablist"><button class="tab active" data-tab="radar" type="button">Grant Radar</button><button class="tab" data-tab="impact" type="button">Proof of Impact</button><button class="tab" data-tab="chat" type="button">Koschei Chat</button></div>
+    <div class="tabs" role="tablist"><button class="tab active" data-tab="radar" type="button">Grant Radar</button><button class="tab" data-tab="impact" type="button">Proof of Impact</button><button class="tab" data-tab="chat" type="button">Koschei Chat</button><button class="tab" data-tab="modules" type="button">Modules</button><button class="tab" data-tab="autopilot" type="button">Grant Autopilot</button><button class="tab" data-tab="tools" type="button">Pay-per-Tool</button><button class="tab" data-tab="health" type="button">System Health</button></div>
     <section id="radarPanel">
       <div class="card" style="margin-bottom:18px">
         <div class="section-head"><div><h2>Add opportunity</h2><p class="muted">Track a grant, bounty, or ecosystem funding program.</p></div></div>
@@ -49,7 +49,7 @@
     </section>
 
     <section class="hidden" id="impactPanel">
-      <div class="section-head"><div><h2>Proof of Impact</h2><p class="muted">Grant-ready evidence generated from existing Koschei activity.</p></div><div class="actions"><button class="btn btn-ghost" id="refreshImpact" type="button">Refresh</button><button class="btn btn-primary" id="copySummary" type="button">Copy grant summary</button><button class="btn btn-primary" id="generateDraft" type="button">Generate application draft</button></div></div>
+      <div class="section-head"><div><h2>Proof of Impact</h2><p class="muted">Grant-ready evidence generated from existing Koschei activity.</p></div><div class="actions"><button class="btn btn-ghost" id="refreshImpact" type="button">Refresh</button><button class="btn btn-primary" id="copySummary" type="button">Copy grant summary</button><a class="btn btn-ghost" href="/impact" target="_blank">Open public impact page</a><a class="btn btn-ghost" href="/docs" target="_blank">Developer docs: /docs</a><button class="btn btn-primary" id="generateDraft" type="button">Generate application draft</button></div></div>
       <div class="stats" id="metrics"></div>
       <div class="impact-grid">
         <section class="card"><h3>Latest outputs</h3><div class="list" id="latestOutputs"></div></section>
@@ -59,12 +59,16 @@
       <section class="card hidden" id="draftCard" style="margin-top:18px"><div class="section-head"><h2>Application draft</h2><button class="btn btn-ghost" id="copyDraft" type="button">Copy draft</button></div><div class="output" id="draftOutput"></div></section>
     </section>
 
+    <section class="hidden" id="modulesPanel"><div class="section-head"><div><h2>Technology Modules</h2><p class="muted">Koschei Web3 Intelligence OS registry and high-level status.</p></div><button class="btn btn-ghost" onclick="loadModules()">Refresh</button></div><div class="card"><div id="moduleList" class="list"></div></div></section>
+    <section class="hidden" id="autopilotPanel"><div class="section-head"><div><h2>Grant Autopilot</h2><p class="muted">Template-based drafts only. Koschei never automatically submits applications.</p></div></div><div class="card"><div class="actions" id="grantButtons"><button class="btn btn-primary">Solana</button><button class="btn btn-primary">Base</button><button class="btn btn-primary">Ethereum ESP</button><button class="btn btn-primary">Superteam</button><button class="btn btn-primary">Optimism</button></div><textarea class="form-input" id="autopilotOutput" style="width:100%;min-height:300px;margin-top:16px" placeholder="Generate a copy-ready draft"></textarea><div class="actions" style="margin-top:12px"><button class="btn btn-ghost" onclick="copyText(el('autopilotOutput').value,'Grant draft')">Copy</button><button class="btn btn-primary" onclick="saveAutopilot()">Save draft</button></div></div></section>
+    <section class="hidden" id="toolsPanel"><div class="section-head"><div><h2>Pay-per-Tool</h2><p class="muted">x402 foundation is disabled by default and never moves funds.</p></div><button class="btn btn-ghost" onclick="loadTools()">Refresh</button></div><div class="card"><div id="toolList" class="list"></div></div></section>
+    <section class="hidden" id="healthPanel"><div class="section-head"><div><h2>System Health</h2><p class="muted">Read-only operational checks; secret values are never displayed.</p></div><button class="btn btn-ghost" onclick="loadHealth()">Run scan</button></div><div class="card"><div id="healthList" class="list"></div></div></section>
     <section class="hidden" id="chatPanel">
       <div class="section-head"><div><h2>Koschei Chat</h2><p class="muted">Read-only operational answers. Chat never changes database records or reveals secret values.</p></div></div>
       <section class="card">
         <div class="actions" id="chatPrompts" style="margin-bottom:14px">
           <button class="btn btn-ghost" type="button">Sistemi tara</button><button class="btn btn-ghost" type="button">Bugün neler olmuş?</button><button class="btn btn-ghost" type="button">Ödeme bekleyen var mı?</button><button class="btn btn-ghost" type="button">Watchlist çalışıyor mu?</button><button class="btn btn-ghost" type="button">Alchemy çalışıyor mu?</button>
-        </div>
+        <button class="btn btn-ghost" type="button">Modülleri listele</button><button class="btn btn-ghost" type="button">Agent API hazır mı?</button><button class="btn btn-ghost" type="button">x402 hazır mı?</button><button class="btn btn-ghost" type="button">Cross-chain modülü ne durumda?</button><button class="btn btn-ghost" type="button">Sybil modülü ne durumda?</button></div>
         <form id="chatForm" class="actions"><input class="form-input" id="chatMessage" style="flex:1;min-width:240px" required placeholder="Ask a read-only operational question"><button class="btn btn-primary" type="submit">Ask Koschei</button></form>
         <div class="output hidden" id="chatOutput" style="margin-top:16px"></div>
       </section>
@@ -109,7 +113,7 @@
   async function refreshAll() { if(!isAdminUnlocked()){showLocked();return;} try { await Promise.all([loadRadar(),loadImpact()]); showUnlocked(); showMessage('All admin sections refreshed.'); } catch(error){handleError(error);} }
   function handleError(error) { if(error.code==='ADMIN_LOCKED'){showLocked();return;} if(error.message.startsWith('Unauthorized:')){lockAdmin();showLocked(error.message);return;} showMessage(error.message,'error'); }
 
-  document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button)); ['radar','impact','chat'].forEach(name=>el(`${name}Panel`).classList.toggle('hidden',name!==button.dataset.tab)); if(button.dataset.tab==='impact'&&!impactData){try{await loadImpact();}catch(error){handleError(error);}}}));
+  document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button)); ['radar','impact','chat','modules','autopilot','tools','health'].forEach(name=>el(`${name}Panel`).classList.toggle('hidden',name!==button.dataset.tab)); if(button.dataset.tab==='impact'&&!impactData){try{await loadImpact();}catch(error){handleError(error);}} if(button.dataset.tab==='modules')loadModules().catch(handleError); if(button.dataset.tab==='tools')loadTools().catch(handleError); if(button.dataset.tab==='health')loadHealth().catch(handleError);}));
   el('loginForm').addEventListener('submit',async event=>{event.preventDefault();try{unlockAdmin(el('password').value);await loadRadar();showUnlocked();}catch(error){handleError(error);}});
   el('grantForm').addEventListener('submit',addGrant);
   el('refreshRadar').addEventListener('click',()=>loadRadar().catch(handleError));
@@ -121,6 +125,13 @@
   el('copyDraft').addEventListener('click',()=>copyText(el('draftOutput').textContent,'Application draft'));
   el('chatForm').addEventListener('submit',event=>{event.preventDefault();askChat(el('chatMessage').value).catch(handleError);});
   el('chatPrompts').addEventListener('click',event=>{if(event.target.tagName!=='BUTTON')return;el('chatMessage').value=event.target.textContent;askChat(event.target.textContent).catch(handleError);});
+
+  async function loadHealth(){const d=await responseData(await adminFetch('/api/admin/system-scan'),'Could not run system scan');el('healthList').innerHTML=`<div class="list-item"><b>Overall: ${d.status}</b></div>`+d.checks.map(c=>`<div class="list-item"><b>${c.name}</b> · ${c.status}<p class="muted">${c.message}</p></div>`).join('')}
+  async function loadModules(){const d=await responseData(await adminFetch('/api/admin/modules'),'Could not load modules');el('moduleList').innerHTML=d.modules.map(m=>`<div class="list-item"><b>${m.title}</b> <span class="badge badge-blue">${m.category}</span> <span class="badge badge-green">${m.status}</span><p class="muted">${m.description} · ${m.is_public?'public':'private'} · ${m.admin_only?'admin-only':'user-ready'}</p></div>`).join('')}
+  async function loadTools(){const [prices,usage]=await Promise.all([fetch('/api/public/tool-prices').then(r=>r.json()),responseData(await adminFetch('/api/admin/tool-usage'),'Could not load usage')]);el('toolList').innerHTML=`<div class="list-item"><b>x402 enabled:</b> ${prices.x402_enabled}</div>`+prices.tools.map(t=>`<div class="list-item"><b>${t.display_name}</b> · $${t.price_usd} · ${t.payment_mode}</div>`).join('')+`<div class="list-item"><b>Recent calls:</b> ${usage.usage.length}</div>`}
+  async function generateAutopilot(ecosystem){const d=await responseData(await adminFetch('/api/admin/grant-autopilot/generate',{method:'POST',body:JSON.stringify({ecosystem,focus:'developer tooling / wallet intelligence / risk scanner'})}),'Could not generate draft');el('autopilotOutput').value=d.generated_text}
+  async function saveAutopilot(){await responseData(await adminFetch('/api/admin/grant-autopilot/save',{method:'POST',body:JSON.stringify({ecosystem:'Draft',title:'Koschei grant application',generated_text:el('autopilotOutput').value})}),'Could not save draft');showMessage('Grant draft saved.')}
+  el('grantButtons').addEventListener('click',e=>{if(e.target.tagName==='BUTTON')generateAutopilot(e.target.textContent).catch(handleError)});
   if(isAdminUnlocked()){loadRadar().then(showUnlocked).catch(handleError);}else{showLocked();}
 </script>
 </body>
