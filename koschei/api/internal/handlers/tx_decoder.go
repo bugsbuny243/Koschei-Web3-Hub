@@ -262,10 +262,3 @@ Respond with this exact JSON (no markdown, no extra text):
 		FeeSol:      feeSol,
 	})
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
