@@ -8,45 +8,6 @@ import (
 	"time"
 )
 
-type adminSummary struct {
-	Users                  int64 `json:"users"`
-	Entitlements           int64 `json:"entitlements"`
-	ActiveOutputsRemaining int64 `json:"active_outputs_remaining"`
-	Web3Outputs            int64 `json:"web3_outputs"`
-	ChainHealthLogs        int64 `json:"chain_health_logs"`
-	Web3EventSources       int64 `json:"web3_event_sources"`
-	Web3Events             int64 `json:"web3_events"`
-	PendingPaymentRequests int64 `json:"pending_payment_requests"`
-	AnalyticsEvents        int64 `json:"analytics_events"`
-}
-
-func (h *Handler) AdminSummary(w http.ResponseWriter, r *http.Request) {
-	if !h.ownerAuth(w, r) {
-		return
-	}
-	var summary adminSummary
-	err := h.DB.QueryRowContext(r.Context(), `
-		SELECT
-			(SELECT count(*) FROM app_user_profiles),
-			(SELECT count(*) FROM entitlements),
-			(SELECT COALESCE(sum(outputs_remaining), 0) FROM entitlements WHERE status = 'active'),
-			(SELECT count(*) FROM web3_outputs),
-			(SELECT count(*) FROM chain_health_logs),
-			(SELECT count(*) FROM web3_event_sources),
-			(SELECT count(*) FROM web3_events),
-			(SELECT count(*) FROM payment_requests WHERE status = 'pending'),
-			(SELECT count(*) FROM analytics_events)`).Scan(
-		&summary.Users, &summary.Entitlements, &summary.ActiveOutputsRemaining,
-		&summary.Web3Outputs, &summary.ChainHealthLogs, &summary.Web3EventSources,
-		&summary.Web3Events, &summary.PendingPaymentRequests, &summary.AnalyticsEvents,
-	)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "summary": summary})
-}
-
 type adminUser struct {
 	Email            string     `json:"email"`
 	CreatedAt        time.Time  `json:"created_at"`
