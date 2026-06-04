@@ -16,3 +16,17 @@ func TestGrantContentIsDraftOnly(t *testing.T) {
 		t.Fatalf("expected an ecosystem-specific copy-ready draft")
 	}
 }
+
+func TestFundingAssistantDraftContainsCopyReadySections(t *testing.T) {
+	draft := fundingAssistantDraft(fundingAssistantInput{
+		ProjectName:      "Builder Tool",
+		Ecosystem:        "Base",
+		ProjectCategory:  "Developer tooling",
+		ShortDescription: "A no-custody builder workflow",
+		MilestoneCount:   2,
+	})
+	milestones, ok := draft["milestones"].([]map[string]string)
+	if !ok || len(milestones) != 2 || draft["copy_ready_application_text"] == "" {
+		t.Fatalf("expected a copy-ready funding draft with two milestones")
+	}
+}

@@ -113,6 +113,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/web3/tx-decode-pro", requiresDB(h, handlers.RequireAuth(method("POST", h.TXDecodePro))))
 	mux.HandleFunc("/api/web3/cross-chain-risk", requiresDB(h, handlers.RequireAuth(method("POST", h.CrossChainRisk))))
 	mux.HandleFunc("/api/web3/sybil-check", requiresDB(h, handlers.RequireAuth(method("POST", h.SybilCheck))))
+	mux.HandleFunc("/api/web3/funding-assistant/generate", requiresDB(h, handlers.RequireAuth(method("POST", h.FundingAssistant))))
 	mux.HandleFunc("/api/artifacts/", requiresDB(h, handlers.RequireAuth(h.ArtifactRoute)))
 
 	if staticDir != "" {
@@ -127,28 +128,31 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					return
 				}
 				cleanRoutes := map[string]string{
-					"/hub":              "/hub.html",
-					"/login":            "/login.html",
-					"/register":         "/register.html",
-					"/metadata":         "/metadata.html",
-					"/risk":             "/risk.html",
-					"/chains":           "/chains.html",
-					"/watchlist":        "/watchlist.html",
-					"/account":          "/account.html",
-					"/pricing":          "/pricing.html",
-					"/admin":            "/admin.html",
-					"/admin-payments":   "/admin-payments.html",
-					"/admin-analytics":  "/admin-analytics.html",
-					"/dashboard":        "/dashboard.html",
-					"/impact":           "/impact.html",
-					"/docs":             "/docs.html",
-					"/docs/api":         "/docs-api.html",
-					"/docs/sdk":         "/docs-sdk.html",
-					"/graph":            "/graph.html",
-					"/risk-v2":          "/risk-v2.html",
-					"/tx-decoder-pro":   "/tx-decoder-pro.html",
-					"/cross-chain-risk": "/cross-chain-risk.html",
-					"/sybil-check":      "/sybil-check.html",
+					"/hub":               "/hub.html",
+					"/login":             "/login.html",
+					"/register":          "/register.html",
+					"/metadata":          "/metadata.html",
+					"/risk":              "/risk.html",
+					"/chains":            "/chains.html",
+					"/watchlist":         "/watchlist.html",
+					"/account":           "/account.html",
+					"/pricing":           "/pricing.html",
+					"/admin":             "/admin.html",
+					"/admin-payments":    "/admin-payments.html",
+					"/admin-analytics":   "/admin-analytics.html",
+					"/dashboard":         "/dashboard.html",
+					"/impact":            "/impact.html",
+					"/docs":              "/docs.html",
+					"/docs/api":          "/docs-api.html",
+					"/docs/sdk":          "/docs-sdk.html",
+					"/graph":             "/graph.html",
+					"/risk-v2":           "/risk-v2.html",
+					"/tx-decoder-pro":    "/tx-decoder-pro.html",
+					"/cross-chain-risk":  "/cross-chain-risk.html",
+					"/sybil-check":       "/sybil-check.html",
+					"/funding-assistant": "/funding-assistant.html",
+					"/agent-api":         "/agent-api.html",
+					"/pay-per-tool":      "/pay-per-tool.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())

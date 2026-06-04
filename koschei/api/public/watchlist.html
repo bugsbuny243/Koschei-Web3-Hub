@@ -33,7 +33,7 @@
 <main class="page">
   <div class="page-title">Watchlist</div>
   <div class="page-sub">Add public wallets or contracts and sync recent on-chain activity.</div>
-  <div class="copy-note">Webhook setup is not required. Koschei checks public activity through Alchemy API. No wallet connection or private keys required.</div>
+  <div class="copy-note">Webhook setup is not required. Watchlist uses Alchemy API polling. No wallet connection or private keys required.</div>
   <div class="alert" id="watchMessage"></div>
 
   <div class="watch-grid">
@@ -163,7 +163,7 @@
       const res = await KoscheiAuth.apiCall('/api/web3/sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error === 'watchlist_source_limit_reached' ? `Source limit reached (${data.limit}).` : 'Could not add source.');
-      ev.target.reset(); showMessage('Source saved. Webhook setup is not required. Koschei checks public activity through Alchemy API.');
+      ev.target.reset(); showMessage('Source saved. Webhook setup is not required. Watchlist uses Alchemy API polling.');
       await loadSources();
     } catch (err) { showMessage(err.message || 'Could not add source.', 'error'); }
     finally { document.getElementById('addBtn').disabled = false; }
