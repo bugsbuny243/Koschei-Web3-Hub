@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TX Decoder — Koschei</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>
+    .risk-safe{background:rgba(0,255,136,.12);border:1px solid var(--accent);border-radius:10px;padding:20px;}
+    .risk-warning{background:rgba(255,170,0,.1);border:1px solid #ffaa00;border-radius:10px;padding:20px;}
+    .risk-danger{background:rgba(255,68,102,.12);border:1px solid var(--danger);border-radius:10px;padding:20px;}
+    .risk-unknown{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:20px;}
+    .risk-label{font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;}
+    .risk-safe .risk-label{color:var(--accent);}
+    .risk-warning .risk-label{color:#ffaa00;}
+    .risk-danger .risk-label{color:var(--danger);}
+    .explanation{font-size:16px;font-weight:500;line-height:1.6;}
+    .mono{font-family:'JetBrains Mono',monospace;font-size:12px;}
+    .program-tag{display:inline-flex;align-items:center;padding:4px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:'JetBrains Mono',monospace;margin:3px;}
+    .action-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;}
+    .action-item:last-child{border-bottom:none;}
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/hub.html" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <div class="nav-links">
+    <a href="/hub.html" class="nav-link">Hub</a>
+    <a href="/tx-decoder.html" class="nav-link active">TX Decoder</a>
+    <a href="/docs.html" class="nav-link">Docs</a>
+  </div>
+</nav>
+
+<div class="page" style="max-width:780px;">
+  <div style="text-align:center;margin-bottom:36px;">
+    <div style="font-size:36px;margin-bottom:12px;">🔍</div>
+    <div class="page-title" style="font-size:28px;">TX Decoder</div>
+    <div style="color:var(--text2);font-size:15px;">Paste any Solana transaction signature — get a plain English explanation + risk analysis.</div>
+  </div>
+
+  <div class="card" style="padding:24px;margin-bottom:20px;">
+    <div class="form-group" style="margin-bottom:14px;">
+      <label class="form-label">Transaction Signature</label>
+      <input class="form-input mono" type="text" id="sigInput"
+        placeholder="5xK9mNr8vJQ3pL2dW7fXhY4kGbNc1oAeRtSuMqZiDwPvE...">
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-end;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Network</label>
+        <select class="form-input" id="networkSelect" style="width:auto;">
+          <option value="solana-devnet">Solana Devnet</option>
+          <option value="solana-mainnet">Solana Mainnet</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="decodeBtn" onclick="decode()" style="padding:10px 24px;">
+        🔍 Decode
+      </button>
+      <button class="btn btn-ghost" onclick="loadExample()" style="padding:10px 16px;font-size:13px;">
+        Load example
+      </button>
+    </div>
+    <div class="alert" id="alert" style="margin-top:12px;"></div>
+  </div>
+
+  <!-- Result -->
+  <div id="result" style="display:none;">
+
+    <!-- Risk card -->
+    <div id="riskCard" class="risk-unknown" style="margin-bottom:20px;">
+      <div class="risk-label" id="riskLabel">Analyzing...</div>
+      <div class="explanation" id="explanation"></div>
+      <div id="riskReason" style="font-size:13px;margin-top:8px;opacity:.8;"></div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="grid-3" style="margin-bottom:20px;">
+      <div class="card" style="padding:16px;text-align:center;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:4px;">Status</div>
+        <div style="font-size:18px;font-weight:700;" id="txStatus">—</div>
+      </div>
+      <div class="card" style="padding:16px;text-align:center;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:4px;">Fee</div>
+        <div style="font-size:18px;font-weight:700;color:var(--accent);" id="txFee">—</div>
+      </div>
+      <div class="card" style="padding:16px;text-align:center;">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:4px;">Network</div>
+        <div style="font-size:15px;font-weight:700;" id="txNetwork">—</div>
+      </div>
+    </div>
+
+    <!-- Programs -->
+    <div class="card" style="padding:20px;margin-bottom:16px;" id="programsCard">
+      <div style="font-size:14px;font-weight:600;margin-bottom:12px;">Programs Involved</div>
+      <div id="programsList"></div>
+    </div>
+
+    <!-- Share -->
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button class="btn btn-ghost" onclick="shareResult()" style="font-size:13px;">
+        🐦 Share on Twitter
+      </button>
+      <button class="btn btn-ghost" onclick="copyLink()" style="font-size:13px;">
+        🔗 Copy link
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/koschei-auth.js?v=3"></script>
+<script>
+  const EXAMPLE_SIGS = [
+    '4hXTCkRzt9WyecNzV1XPgCDfGAZzQKNxLXgynz5QDuWWPSAZBZSHptvWmVs9H9Kz2zE5FP7b1M6Qd3v5M5VKKS',
+  ];
+
+  (async () => {
+    await KoscheiAuth.init();
+    if (!KoscheiAuth.requireAuth()) return;
+    // Check URL params
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('sig')) {
+      document.getElementById('sigInput').value = params.get('sig');
+      if (params.get('net')) document.getElementById('networkSelect').value = params.get('net');
+      decode();
+    }
+  })();
+
+  function loadExample() {
+    document.getElementById('sigInput').value = EXAMPLE_SIGS[0];
+  }
+
+  async function decode() {
+    const sig = document.getElementById('sigInput').value.trim();
+    const network = document.getElementById('networkSelect').value;
+    const btn = document.getElementById('decodeBtn');
+    clearAlert();
+
+    if (!sig) { showAlert('Enter a transaction signature.'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Decoding...';
+    document.getElementById('result').style.display = 'none';
+
+    try {
+      const res = await KoscheiAuth.apiCall('/api/tx/decode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ signature: sig, network }),
+      });
+
+      if (!res || !res.ok) {
+        const err = res ? await res.json().catch(() => ({})) : {};
+        throw new Error(err.error || `Request failed (${res?.status})`);
+      }
+
+      const data = await res.json();
+      displayResult(data);
+
+    } catch (err) {
+      showAlert(err.message || 'Decode failed.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🔍 Decode';
+    }
+  }
+
+  function displayResult(data) {
+    const risk = (data.risk_level || 'UNKNOWN').toUpperCase();
+    const riskCard = document.getElementById('riskCard');
+    const riskLabel = document.getElementById('riskLabel');
+
+    riskCard.className = risk === 'SAFE' ? 'risk-safe' :
+                         risk === 'WARNING' ? 'risk-warning' :
+                         risk === 'DANGER' ? 'risk-danger' : 'risk-unknown';
+
+    const icons = { SAFE: '✅', WARNING: '⚠️', DANGER: '🚨', UNKNOWN: '🔍' };
+    riskLabel.textContent = `${icons[risk] || '🔍'} ${risk}`;
+
+    document.getElementById('explanation').textContent = data.explanation || 'No explanation available.';
+
+    const riskReason = document.getElementById('riskReason');
+    riskReason.textContent = data.risk_reason || '';
+    riskReason.style.display = data.risk_reason ? 'block' : 'none';
+
+    const statusEl = document.getElementById('txStatus');
+    statusEl.textContent = data.status === 'success' ? '✅ Success' : '❌ Failed';
+    statusEl.style.color = data.status === 'success' ? 'var(--accent)' : 'var(--danger)';
+
+    document.getElementById('txFee').textContent = data.fee_sol || '—';
+    document.getElementById('txNetwork').textContent = data.network || '—';
+
+    const programsList = document.getElementById('programsList');
+    if (data.programs && data.programs.length > 0) {
+      programsList.innerHTML = data.programs.map(p =>
+        `<span class="program-tag">${escHtml(p)}</span>`
+      ).join('');
+    } else {
+      programsList.innerHTML = '<span style="font-size:13px;color:var(--text2);">No programs identified</span>';
+    }
+
+    document.getElementById('result').style.display = 'block';
+    document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function shareResult() {
+    const sig = document.getElementById('sigInput').value.trim();
+    const net = document.getElementById('networkSelect').value;
+    const risk = document.getElementById('riskLabel').textContent;
+    const explanation = document.getElementById('explanation').textContent;
+    const url = `https://tradepigloball.co/tx-decoder.html?sig=${encodeURIComponent(sig)}&net=${encodeURIComponent(net)}`;
+    const text = `${risk}\n\n${explanation}\n\nDecoded with @KreatifZihin's Koschei TX Decoder 🔍\n${url}\n\n#Solana #Web3`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+  }
+
+  function copyLink() {
+    const sig = document.getElementById('sigInput').value.trim();
+    const net = document.getElementById('networkSelect').value;
+    const url = `https://tradepigloball.co/tx-decoder.html?sig=${encodeURIComponent(sig)}&net=${encodeURIComponent(net)}`;
+    navigator.clipboard.writeText(url).catch(() => {});
+  }
+
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function showAlert(msg) {
+    const el = document.getElementById('alert');
+    el.textContent = msg;
+    el.className = 'alert alert-error show';
+  }
+  function clearAlert() {
+    document.getElementById('alert').className = 'alert';
+  }
+</script>
+</body>
+</html>
