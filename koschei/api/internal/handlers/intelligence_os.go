@@ -38,7 +38,7 @@ func (h *Handler) useOutput(w http.ResponseWriter, email, tool string) bool {
 	defer tx.Rollback()
 	var id string
 	if e = tx.QueryRow(`SELECT id FROM entitlements WHERE lower(email)=lower($1) AND status='active' AND outputs_remaining>0 ORDER BY outputs_remaining DESC LIMIT 1 FOR UPDATE`, email).Scan(&id); e != nil {
-		writeJSON(w, 402, map[string]string{"error": "no_outputs_remaining"})
+		writeJSON(w, 402, map[string]string{"error": "insufficient_outputs", "message": "You need more outputs to use this tool."})
 		return false
 	}
 	if _, e = tx.Exec(`UPDATE entitlements SET outputs_remaining=outputs_remaining-1,updated_at=now() WHERE id=$1`, id); e != nil {
@@ -82,7 +82,7 @@ func (h *Handler) PublicImpact(w http.ResponseWriter, r *http.Request) {
 			mods = append(mods, map[string]string{"title": t, "description": d, "category": c})
 		}
 	}
-	writeJSON(w, 200, map[string]any{"ok": true, "statement": "Koschei Web3 Hub is a no-custody Web3 intelligence workspace for builders.", "no_custody": "No private keys. No seed phrases. No custody. Read-only intelligence.", "modules_live_count": len(mods), "metadata_outputs_count": count(`SELECT count(*) FROM web3_outputs WHERE output_type='metadata'`), "risk_outputs_count": count(`SELECT count(*) FROM web3_outputs WHERE lower(output_type) IN ('risk','risk_scan')`), "chain_checks_count": count(`SELECT count(*) FROM chain_health_logs`), "watchlist_source_count": count(`SELECT count(*) FROM web3_event_sources`), "web3_event_count": count(`SELECT count(*) FROM web3_events`), "supported_networks_count": count(`SELECT count(DISTINCT network) FROM web3_event_sources WHERE network IS NOT NULL`), "live_modules": mods, "public_roadmap": []string{"Expand evidence-backed cross-chain coverage", "Publish ecosystem integration guides", "Add opt-in agent tool scopes"}})
+	writeJSON(w, 200, map[string]any{"ok": true, "statement": "Koschei Web3 Hub is a no-custody Web3 intelligence workspace for builders.", "no_custody": "No private keys. No seed phrases. No custody. Read-only intelligence.", "modules_live_count": len(mods), "generated_outputs_count": count(`SELECT count(*) FROM web3_outputs`), "metadata_outputs_count": count(`SELECT count(*) FROM web3_outputs WHERE output_type='metadata'`), "risk_outputs_count": count(`SELECT count(*) FROM web3_outputs WHERE lower(output_type) IN ('risk','risk_scan')`), "chain_checks_count": count(`SELECT count(*) FROM chain_health_logs`), "watchlist_source_count": count(`SELECT count(*) FROM web3_event_sources`), "web3_event_count": count(`SELECT count(*) FROM web3_events`), "supported_networks_count": count(`SELECT count(DISTINCT network) FROM web3_event_sources WHERE network IS NOT NULL`), "live_modules": mods, "public_roadmap": []string{"Expand evidence-backed cross-chain coverage", "Publish ecosystem integration guides", "Add opt-in agent tool scopes"}})
 }
 
 type grantRequest struct {
@@ -165,7 +165,7 @@ WHAT KOSCHEI DOES:
 - Wallet Reputation Score: 0-100 trust score for any Solana wallet
 - AI Metadata Studio: generate NFT and game asset metadata
 - On-chain Risk Scanner with behavioral analysis
-- Watchlist: monitor wallets and contracts via Alchemy webhooks
+- Watchlist: monitor wallets and contracts through Alchemy API polling
 - Intelligence Graph: visual on-chain relationship mapping
 - Cross-chain risk analysis and Sybil detection
 - No custody, no private keys, read-only architecture
@@ -262,15 +262,93 @@ func (h *Handler) GrantSave(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 201, map[string]any{"ok": true, "id": id})
 }
 
+type fundingAssistantInput struct {
+	ProjectName      string `json:"project_name"`
+	Ecosystem        string `json:"ecosystem"`
+	ProjectCategory  string `json:"project_category"`
+	ShortDescription string `json:"short_description"`
+	RequestedAmount  string `json:"requested_amount"`
+	MilestoneCount   int    `json:"milestone_count"`
+	Notes            string `json:"notes"`
+}
+
+func fundingAssistantDraft(q fundingAssistantInput) map[string]any {
+	if q.MilestoneCount < 1 {
+		q.MilestoneCount = 3
+	}
+	if q.Ecosystem == "" {
+		q.Ecosystem = "Custom"
+	}
+	milestones := make([]map[string]string, 0, q.MilestoneCount)
+	for i := 1; i <= q.MilestoneCount; i++ {
+		milestones = append(milestones, map[string]string{
+			"title":       fmt.Sprintf("Milestone %d", i),
+			"deliverable": fmt.Sprintf("Deliver and document phase %d of %s", i, q.ProjectName),
+			"evidence":    "Public release notes, usage metrics, and ecosystem feedback",
+		})
+	}
+	amount := q.RequestedAmount
+	if amount == "" {
+		amount = "To be confirmed with the funding program"
+	}
+	problem := fmt.Sprintf("Builders in %s need clearer, accessible tooling in the %s category.", q.Ecosystem, q.ProjectCategory)
+	solution := q.ShortDescription
+	impact := fmt.Sprintf("Provide measurable, no-custody value for %s builders and publish progress evidence.", q.Ecosystem)
+	application := fmt.Sprintf("PROJECT SUMMARY\n%s is a %s project for %s. %s\n\nPROBLEM\n%s\n\nSOLUTION\n%s\n\nIMPACT\n%s\n\nBUDGET DRAFT\nRequested amount: %s\n\nNOTES\n%s", q.ProjectName, q.ProjectCategory, q.Ecosystem, q.ShortDescription, problem, solution, impact, amount, q.Notes)
+	return map[string]any{
+		"project_summary":             fmt.Sprintf("%s — %s", q.ProjectName, q.ShortDescription),
+		"problem":                     problem,
+		"solution":                    solution,
+		"impact":                      impact,
+		"milestones":                  milestones,
+		"budget_draft":                map[string]any{"requested_amount": amount, "status": "draft", "automatic_submission": false},
+		"application_text":            application,
+		"copy_ready_application_text": application,
+		"disclaimer":                  "Draft preparation only. Review program requirements before submitting.",
+	}
+}
+
+func (h *Handler) FundingAssistant(w http.ResponseWriter, r *http.Request) {
+	email, ok := userEmail(w, r)
+	if !ok {
+		return
+	}
+	var q fundingAssistantInput
+	if decodeJSON(r, &q) != nil || strings.TrimSpace(q.ProjectName) == "" || strings.TrimSpace(q.ShortDescription) == "" {
+		writeJSON(w, 400, map[string]string{"error": "project_name_and_short_description_required"})
+		return
+	}
+	if !h.useOutput(w, email, "funding_assistant") {
+		return
+	}
+	draft := fundingAssistantDraft(q)
+	h.logTool(email, "funding_assistant", "completed")
+	h.trackEvent(email, "funding_assistant_generate", r.URL.Path)
+	writeJSON(w, 200, map[string]any{"ok": true, "draft": draft})
+}
+
 func (h *Handler) IntelligenceGraph(w http.ResponseWriter, r *http.Request) {
 	email, ok := userEmail(w, r)
 	if !ok {
 		return
 	}
 	if r.Method == http.MethodPost {
+		var q struct {
+			SourceID string `json:"source_id"`
+			Address  string `json:"address"`
+			Chain    string `json:"chain"`
+			Network  string `json:"network"`
+		}
+		if decodeJSON(r, &q) != nil || (strings.TrimSpace(q.SourceID) == "" && strings.TrimSpace(q.Address) == "") {
+			writeJSON(w, 400, map[string]string{"error": "source_id_or_address_required"})
+			return
+		}
 		_, _ = h.DB.Exec(`DELETE FROM intelligence_graph_edges WHERE lower(email)=lower($1)`, email)
 		_, _ = h.DB.Exec(`DELETE FROM intelligence_graph_nodes WHERE lower(email)=lower($1)`, email)
-		rows, _ := h.DB.Query(`SELECT id,COALESCE(label,name,''),COALESCE(chain,''),COALESCE(network,''),COALESCE(address,'') FROM web3_event_sources WHERE lower(email)=lower($1)`, email)
+		if strings.TrimSpace(q.Address) != "" {
+			_, _ = h.DB.Exec(`INSERT INTO intelligence_graph_nodes(email,node_type,chain,network,address,label,metadata) VALUES($1,'submitted_address',$2,$3,$4,$4,'{}'::jsonb)`, email, q.Chain, q.Network, q.Address)
+		}
+		rows, _ := h.DB.Query(`SELECT id,COALESCE(label,name,''),COALESCE(chain,''),COALESCE(network,''),COALESCE(address,'') FROM web3_event_sources WHERE lower(email)=lower($1) AND id::text=$2`, email, q.SourceID)
 		if rows != nil {
 			defer rows.Close()
 			for rows.Next() {
@@ -322,7 +400,7 @@ func (h *Handler) IntelligenceGraph(w http.ResponseWriter, r *http.Request) {
 			edges = append(edges, map[string]any{"source": source, "target": target, "relationship_type": rel, "chain": chain, "network": network, "tx_hash": hash})
 		}
 	}
-	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "nodes": nodes, "edges": edges})
+	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "nodes": nodes, "edges": edges, "relationship_summary": fmt.Sprintf("Built %d nodes and %d relationships from your submitted address or watchlist activity.", len(nodes), len(edges))})
 }
 
 type riskInput struct {
@@ -374,7 +452,7 @@ func (h *Handler) RiskV2(w http.ResponseWriter, r *http.Request) {
 	_, _ = h.DB.Exec(`INSERT INTO risk_assessments(email,target,chain,network,target_type,risk_score,severity,red_flags,evidence,recommendations,raw_context) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, email, q.Target, q.Chain, q.Network, q.TargetType, score, sev, jsonBytes(f), jsonBytes(e), jsonBytes(rec), jsonBytes(q))
 	h.logTool(email, "risk_v2", "completed")
 	h.trackEvent(email, "risk_v2_scan", r.URL.Path)
-	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "risk_score": score, "severity": sev, "red_flags": f, "evidence": e, "recommendations": rec})
+	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "risk_score": score, "severity": sev, "red_flags": f, "evidence": e, "recommendations": rec, "disclaimer": "Preliminary risk intelligence. Not financial, legal, or security advice."})
 }
 func evmDecode(chain, network, hash string) (map[string]any, bool) {
 	key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY"))
@@ -458,7 +536,7 @@ func (h *Handler) TXDecodePro(w http.ResponseWriter, r *http.Request) {
 	_, _ = h.DB.Exec(`INSERT INTO tx_decodes(email,chain,network,tx_hash,summary,risk_score,decoded) VALUES($1,$2,$3,$4,$5,35,$6)`, email, q.Chain, q.Network, q.TxHash, summary, jsonBytes(d))
 	h.logTool(email, "tx_decode_pro", "completed")
 	h.trackEvent(email, "tx_decode_pro_decode", r.URL.Path)
-	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "summary": summary, "risk_score": 35, "decoded": d})
+	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "human_summary": summary, "summary": summary, "risk_score": 35, "from": d["from"], "to": d["to"], "value": d["value"], "status": d["status"], "logs_count": d["logs_count"], "risk_hints": d["risk_hints"], "raw": d, "decoded": d})
 }
 
 type crossInput struct {
@@ -491,7 +569,7 @@ func (h *Handler) CrossChainRisk(w http.ResponseWriter, r *http.Request) {
 	summary := "Preliminary cross-chain checklist only; no bridge detection is claimed."
 	h.trackEvent(email, "cross_chain_risk_scan", r.URL.Path)
 	_, _ = h.DB.Exec(`INSERT INTO cross_chain_observations(email,source_chain,target_chain,address,tx_hash,bridge_or_protocol,risk_score,observation_type,summary,raw_payload) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted_check',$8,$9)`, email, q.SourceChain, q.TargetChain, q.Address, q.TxHash, q.Bridge, score, summary, jsonBytes(q))
-	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "risk_score": score, "summary": summary, "checklist": checks, "recommendation": "Manual review required before acting."})
+	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "risk_score": score, "observation_type": "submitted_check", "summary": summary, "checklist": checks, "recommendations": []string{"Manual review required before acting.", "Confirm the route and protocol with trusted explorers."}})
 }
 func (h *Handler) SybilCheck(w http.ResponseWriter, r *http.Request) {
 	email, ok := userEmail(w, r)
@@ -608,5 +686,5 @@ func (h *Handler) AgentTool(w http.ResponseWriter, r *http.Request) {
 	var q riskInput
 	_ = decodeJSON(r, &q)
 	score, sev, f, e, rec := riskResult(q)
-	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "risk_score": score, "severity": sev, "red_flags": f, "evidence": e, "recommendations": rec})
+	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "risk_score": score, "severity": sev, "red_flags": f, "evidence": e, "recommendations": rec, "disclaimer": "Preliminary risk intelligence. Not financial, legal, or security advice."})
 }

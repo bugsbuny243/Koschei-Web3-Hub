@@ -22,18 +22,18 @@ CREATE INDEX IF NOT EXISTS cross_chain_observations_email_idx ON cross_chain_obs
 CREATE INDEX IF NOT EXISTS sybil_checks_email_idx ON sybil_checks (lower(email), created_at DESC);
 
 INSERT INTO koschei_modules (module_key,title,description,category,is_public,admin_only) VALUES
-('grant_autopilot','Grant Autopilot','Template-based, copy-ready grant application generator.','Funding',false,true),
+('grant_autopilot','Builder Funding Assistant','Template-based, copy-ready funding application generator.','Funding',false,false),
 ('public_impact','Public Proof of Impact','Safe public evidence and roadmap page.','Public Goods',true,false),
 ('intelligence_graph','Intelligence Graph','Watchlist and event relationship intelligence.','Intelligence',false,false),
 ('risk_engine_v2','AI Risk Engine v2','Preliminary structured risk intelligence.','Risk',false,false),
 ('tx_decoder_pro','TX Decoder Pro','Cross-chain human-readable transaction decoding.','Developer Tools',false,false),
-('agent_api','Koschei Agent API','Read-only API for agents and external tools.','Developer Tools',false,true),
-('x402_pay_per_tool','x402 Pay-per-Tool','Disabled-by-default pay-per-tool foundation.','Monetization',false,true),
+('agent_api','Koschei Agent API','Read-only API for agents and external tools.','Developer Tools',false,false),
+('x402_pay_per_tool','x402 Pay-per-Tool','Disabled-by-default pay-per-tool foundation.','Monetization',false,false),
 ('public_sdk','Public SDK + API Docs','Copyable API and SDK integration documentation.','Developer Tools',true,false),
 ('cross_chain_risk','Cross-chain Risk Monitor','Preliminary bridge and route risk checklist.','Risk',false,false),
 ('sybil_layer','Human / Sybil Resistance','Optional privacy-preserving anti-abuse checklist.','Trust',false,false)
 ON CONFLICT (module_key) DO UPDATE SET title=EXCLUDED.title, description=EXCLUDED.description, category=EXCLUDED.category, is_public=EXCLUDED.is_public, admin_only=EXCLUDED.admin_only, updated_at=now();
 
 INSERT INTO tool_usage_prices(tool_key,display_name,price_usd,payment_mode) VALUES
-('wallet_score','Wallet Score',0,'disabled'),('risk_v2','Risk Engine v2',0,'disabled'),('metadata','Metadata',0,'disabled'),('tx_decode_pro','TX Decoder Pro',0,'disabled'),('intelligence_graph','Intelligence Graph',0,'disabled')
+('wallet_score','Wallet Score',0,'disabled'),('risk_v2','Risk Engine v2',0,'disabled'),('metadata','Metadata',0,'disabled'),('tx_decode_pro','TX Decoder Pro',0,'disabled'),('intelligence_graph','Intelligence Graph',0,'disabled'),('cross_chain_risk','Cross-chain Risk Monitor',0,'disabled'),('sybil_check','Sybil Check',0,'disabled'),('funding_assistant','Builder Funding Assistant',0,'disabled')
 ON CONFLICT (tool_key) DO NOTHING;
