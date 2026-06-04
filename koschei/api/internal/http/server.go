@@ -37,6 +37,17 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/admin/analytics/events", requiresDB(h, method("GET", h.AdminAnalyticsEvents)))
 	mux.HandleFunc("/api/admin/payment-requests/approve", requiresDB(h, method("POST", h.ApprovePaymentRequest)))
 	mux.HandleFunc("/api/admin/payment-requests/reject", requiresDB(h, method("POST", h.RejectPaymentRequest)))
+	mux.HandleFunc("/api/admin/summary", requiresDB(h, method("GET", h.AdminSummary)))
+	mux.HandleFunc("/api/admin/users", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "users") })))
+	mux.HandleFunc("/api/admin/payments", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "payments") })))
+	mux.HandleFunc("/api/admin/entitlements", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "entitlements") })))
+	mux.HandleFunc("/api/admin/outputs", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "outputs") })))
+	mux.HandleFunc("/api/admin/watchlist-sources", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "watchlist-sources") })))
+	mux.HandleFunc("/api/admin/web3-events", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "web3-events") })))
+	mux.HandleFunc("/api/admin/chain-health", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "chain-health") })))
+	mux.HandleFunc("/api/admin/analytics", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "analytics") })))
+	mux.HandleFunc("/api/admin/system-scan", requiresDB(h, method("GET", h.AdminSystemScan)))
+	mux.HandleFunc("/api/admin/chat", requiresDB(h, method("POST", h.AdminChat)))
 	mux.HandleFunc("/api/runtime/projects", requiresDB(h, handlers.RequireAuth(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.CreateRuntimeProject(w, r)
@@ -99,6 +110,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/watchlist":       "/watchlist.html",
 					"/account":         "/account.html",
 					"/pricing":         "/pricing.html",
+					"/admin":           "/admin.html",
 					"/admin-payments":  "/admin-payments.html",
 					"/admin-analytics": "/admin-analytics.html",
 					"/dashboard":       "/dashboard.html",
