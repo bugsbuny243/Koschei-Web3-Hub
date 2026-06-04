@@ -1,126 +1,230 @@
 package handlers
 
 import (
-	"database/sql"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
 
-type rugRadarLaunch struct {
-	ID          string    `json:"id"`
-	MintAddress string    `json:"mint_address"`
-	Network     string    `json:"network"`
-	RiskScore   int       `json:"risk_score"`
-	RiskLevel   string    `json:"risk_level"`
-	RiskSummary string    `json:"risk_summary"`
-	IsRenounced bool      `json:"is_renounced"`
-	IsFrozen    bool      `json:"is_frozen"`
-	TxCount     int       `json:"tx_count"`
-	SubmittedBy string    `json:"submitted_by"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
-type rugRadarSubmitRequest struct {
-	MintAddress string `json:"mint_address"`
-	Network     string `json:"network"`
-	RiskScore   int    `json:"risk_score"`
-	RiskLevel   string `json:"risk_level"`
-	RiskSummary string `json:"risk_summary"`
-	IsRenounced bool   `json:"is_renounced"`
-	IsFrozen    bool   `json:"is_frozen"`
-	TxCount     int    `json:"tx_count"`
-}
-
 func (h *Handler) RugRadarFeed(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.QueryContext(r.Context(), `
-		SELECT id::text, mint_address, network, risk_score, risk_level, risk_summary,
-		       is_renounced, is_frozen, tx_count, submitted_by, created_at
-		FROM token_launches
-		ORDER BY created_at DESC
-		LIMIT 100`)
+	if h.DB == nil {
+		writeJSON(w, 503, map[string]string{"error": "db unavailable"})
+		return
+	}
+	rows, err := h.DB.Query(`
+	 SELECT mint_address, network, risk_score, risk_level,
+	        risk_summary, is_renounced, is_frozen, tx_count,
+	        submitted_by, created_at
+	 FROM token_launches
+	 ORDER BY created_at DESC
+	 LIMIT 50
+	`)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "feed_unavailable"})
+		writeJSON(w, 500, map[string]string{"error": "db error"})
 		return
 	}
 	defer rows.Close()
 
-	launches := make([]rugRadarLaunch, 0)
+	type launch struct {
+		MintAddress string    `json:"mint_address"`
+		Network     string    `json:"network"`
+		RiskScore   int       `json:"risk_score"`
+		RiskLevel   string    `json:"risk_level"`
+		RiskSummary string    `json:"risk_summary"`
+		IsRenounced bool      `json:"is_renounced"`
+		IsFrozen    bool      `json:"is_frozen"`
+		TxCount     int       `json:"tx_count"`
+		SubmittedBy string    `json:"submitted_by"`
+		CreatedAt   time.Time `json:"created_at"`
+	}
+
+	launches := []launch{}
 	for rows.Next() {
-		var launch rugRadarLaunch
-		if err := rows.Scan(&launch.ID, &launch.MintAddress, &launch.Network, &launch.RiskScore, &launch.RiskLevel, &launch.RiskSummary, &launch.IsRenounced, &launch.IsFrozen, &launch.TxCount, &launch.SubmittedBy, &launch.CreatedAt); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "feed_unavailable"})
-			return
+		var l launch
+		if err := rows.Scan(&l.MintAddress, &l.Network, &l.RiskScore,
+			&l.RiskLevel, &l.RiskSummary, &l.IsRenounced, &l.IsFrozen,
+			&l.TxCount, &l.SubmittedBy, &l.CreatedAt); err == nil {
+			launches = append(launches, l)
 		}
-		launches = append(launches, launch)
 	}
-	if err := rows.Err(); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "feed_unavailable"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"launches": launches, "count": len(launches)})
+
+	writeJSON(w, 200, map[string]interface{}{
+		"launches":   launches,
+		"total":      len(launches),
+		"updated_at": time.Now().Format(time.RFC3339),
+	})
 }
 
 func (h *Handler) RugRadarSubmit(w http.ResponseWriter, r *http.Request) {
-	var req rugRadarSubmitRequest
-	if err := decodeJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+	var req struct {
+		MintAddress string `json:"mint_address"`
+		Network     string `json:"network"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.MintAddress == "" {
+		writeJSON(w, 400, map[string]string{"error": "mint_address required"})
 		return
 	}
-	req.MintAddress = strings.TrimSpace(req.MintAddress)
-	if req.MintAddress == "" || len(req.MintAddress) > 64 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "valid mint_address required"})
-		return
-	}
-	req.Network = strings.TrimSpace(req.Network)
 	if req.Network == "" {
 		req.Network = "solana-mainnet"
 	}
-	if len(req.Network) > 64 || req.RiskScore < 0 || req.RiskScore > 100 || req.TxCount < 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid launch data"})
-		return
-	}
-	req.RiskLevel = strings.ToUpper(strings.TrimSpace(req.RiskLevel))
-	if req.RiskLevel == "" {
-		req.RiskLevel = "UNKNOWN"
-	}
-	if len(req.RiskLevel) > 32 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid risk_level"})
-		return
-	}
-	req.RiskSummary = strings.TrimSpace(req.RiskSummary)
-	if len(req.RiskSummary) > 1000 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "risk_summary too long"})
-		return
+
+	// Check if already scanned
+	if h.DB != nil {
+		var count int
+		h.DB.QueryRow(`SELECT COUNT(*) FROM token_launches WHERE mint_address=$1`, req.MintAddress).Scan(&count)
+		if count > 0 {
+			writeJSON(w, 409, map[string]string{"error": "already_scanned", "message": "This token was already analyzed."})
+			return
+		}
 	}
 
-	claims, ok := userFromContext(r.Context())
-	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-		return
-	}
-	submittedBy := normalizedClaimEmail(claims)
-	if submittedBy == "" {
-		submittedBy = currentUserID(claims)
+	// Run token scan
+	apiKey := os.Getenv("ALCHEMY_API_KEY")
+	rpcURL := solanaRPCURL(req.Network, apiKey)
+	client := &http.Client{Timeout: 10 * time.Second}
+	score := 50
+	riskLevel := "UNKNOWN"
+	riskSummary := "Analysis pending."
+	isRenounced := false
+	isFrozen := false
+	txCount := 0
+
+	// getAccountInfo
+	acctBody, _ := json.Marshal(map[string]interface{}{
+		"jsonrpc": "2.0", "id": 1,
+		"method": "getAccountInfo",
+		"params": []interface{}{req.MintAddress, map[string]string{"encoding": "jsonParsed"}},
+	})
+	if resp, err := client.Post(rpcURL, "application/json", bytes.NewReader(acctBody)); err == nil {
+		defer resp.Body.Close()
+		var result struct {
+			Result struct {
+				Value *struct {
+					Data struct {
+						Parsed *struct {
+							Info *struct {
+								MintAuthority   *string `json:"mintAuthority"`
+								FreezeAuthority *string `json:"freezeAuthority"`
+							} `json:"info"`
+							Type string `json:"type"`
+						} `json:"parsed"`
+					} `json:"data"`
+				} `json:"value"`
+			} `json:"result"`
+		}
+		if d, _ := io.ReadAll(resp.Body); json.Unmarshal(d, &result) == nil && result.Result.Value != nil {
+			if p := result.Result.Value.Data.Parsed; p != nil && p.Info != nil {
+				isRenounced = p.Info.MintAuthority == nil
+				isFrozen = p.Info.FreezeAuthority != nil
+			}
+		}
 	}
 
-	var launch rugRadarLaunch
-	err := h.DB.QueryRowContext(r.Context(), `
-		INSERT INTO token_launches
-			(mint_address, network, risk_score, risk_level, risk_summary, is_renounced, is_frozen, tx_count, submitted_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (mint_address) DO NOTHING
-		RETURNING id::text, mint_address, network, risk_score, risk_level, risk_summary,
-		          is_renounced, is_frozen, tx_count, submitted_by, created_at`,
-		req.MintAddress, req.Network, req.RiskScore, req.RiskLevel, req.RiskSummary, req.IsRenounced, req.IsFrozen, req.TxCount, submittedBy,
-	).Scan(&launch.ID, &launch.MintAddress, &launch.Network, &launch.RiskScore, &launch.RiskLevel, &launch.RiskSummary, &launch.IsRenounced, &launch.IsFrozen, &launch.TxCount, &launch.SubmittedBy, &launch.CreatedAt)
-	if err == sql.ErrNoRows {
-		writeJSON(w, http.StatusConflict, map[string]string{"error": "mint_already_submitted"})
-		return
+	// Tx count
+	sigBody, _ := json.Marshal(map[string]interface{}{
+		"jsonrpc": "2.0", "id": 2,
+		"method": "getSignaturesForAddress",
+		"params": []interface{}{req.MintAddress, map[string]interface{}{"limit": 50}},
+	})
+	if resp, err := client.Post(rpcURL, "application/json", bytes.NewReader(sigBody)); err == nil {
+		defer resp.Body.Close()
+		var result struct {
+			Result []struct{} `json:"result"`
+		}
+		if d, _ := io.ReadAll(resp.Body); json.Unmarshal(d, &result) == nil {
+			txCount = len(result.Result)
+		}
 	}
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "submission_failed"})
-		return
+
+	// Score
+	score = 60
+	if isRenounced {
+		score += 20
 	}
-	writeJSON(w, http.StatusCreated, launch)
+	if isFrozen {
+		score -= 25
+	}
+	if txCount == 0 {
+		score -= 20
+	} else if txCount < 5 {
+		score -= 10
+	}
+	if score < 0 {
+		score = 0
+	}
+	if score > 100 {
+		score = 100
+	}
+
+	switch {
+	case score >= 80:
+		riskLevel = "SAFE"
+	case score >= 60:
+		riskLevel = "LOW RISK"
+	case score >= 40:
+		riskLevel = "MEDIUM RISK"
+	case score >= 20:
+		riskLevel = "HIGH RISK"
+	default:
+		riskLevel = "DANGER"
+	}
+
+	// AI summary
+	aiKey := os.Getenv("TOGETHER_API_KEY")
+	if aiKey != "" {
+		model := os.Getenv("TOGETHER_MODEL")
+		if model == "" {
+			model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+		}
+		prompt := fmt.Sprintf(`1 sentence Solana token security summary: score=%d, level=%s, mint_renounced=%v, freeze=%v, txs=%d. Be direct, no markdown.`,
+			score, riskLevel, isRenounced, isFrozen, txCount)
+		aiBody, _ := json.Marshal(map[string]interface{}{"model": model, "max_tokens": 80, "temperature": 0.3, "messages": []map[string]string{{"role": "user", "content": prompt}}})
+		aiReq, _ := http.NewRequest("POST", "https://api.together.xyz/v1/chat/completions", bytes.NewReader(aiBody))
+		aiReq.Header.Set("Authorization", "Bearer "+aiKey)
+		aiReq.Header.Set("Content-Type", "application/json")
+		if aiResp, err := client.Do(aiReq); err == nil {
+			defer aiResp.Body.Close()
+			var aiResult struct {
+				Choices []struct {
+					Message struct {
+						Content string `json:"content"`
+					} `json:"message"`
+				} `json:"choices"`
+			}
+			if d, _ := io.ReadAll(aiResp.Body); json.Unmarshal(d, &aiResult) == nil && len(aiResult.Choices) > 0 {
+				if s := strings.TrimSpace(aiResult.Choices[0].Message.Content); s != "" {
+					riskSummary = s
+				}
+			}
+		}
+	}
+
+	// Save to DB
+	submittedBy := "anonymous"
+	if h.DB != nil {
+		h.DB.Exec(`
+		 INSERT INTO token_launches
+		 (mint_address, network, risk_score, risk_level, risk_summary,
+		  is_renounced, is_frozen, tx_count, submitted_by)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		 ON CONFLICT (mint_address) DO NOTHING`,
+			req.MintAddress, req.Network, score, riskLevel, riskSummary,
+			isRenounced, isFrozen, txCount, submittedBy)
+	}
+
+	writeJSON(w, 200, map[string]interface{}{
+		"mint_address": req.MintAddress,
+		"network":      req.Network,
+		"risk_score":   score,
+		"risk_level":   riskLevel,
+		"risk_summary": riskSummary,
+		"is_renounced": isRenounced,
+		"is_frozen":    isFrozen,
+		"tx_count":     txCount,
+	})
 }
