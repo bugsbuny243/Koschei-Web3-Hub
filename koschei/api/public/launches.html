@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Community-submitted Solana token launch risk signals from Koschei Rug Radar.">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <title>Rug Radar — Koschei</title>
+  <style>
+    .radar-hero{padding:38px;background:radial-gradient(circle at 85% 20%,rgba(56,255,160,.16),transparent 30%),linear-gradient(135deg,#111118,#101e19);border:1px solid #2a2a3a;border-radius:18px;margin-bottom:22px}.radar-hero h1{margin-bottom:8px}.radar-hero p{max-width:720px;color:var(--text2)}.radar-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.75fr);gap:20px;align-items:start}.stack{display:grid;gap:14px}.feed{display:grid;gap:12px}.launch{padding:18px;border:1px solid #2a2a3a;border-radius:14px;background:#111118}.launch-head,.launch-meta,.risk-row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.mint{font-family:monospace;color:#c7f9df;overflow-wrap:anywhere}.launch-meta{justify-content:flex-start;color:var(--text2);font-size:13px;margin-top:10px}.risk{font-weight:700}.risk-high{color:#ff758f}.risk-medium{color:#ffd479}.risk-low{color:#74efad}.risk-unknown{color:var(--text2)}.summary{color:var(--text2);margin:12px 0 0}.empty{padding:32px;text-align:center;color:var(--text2);border:1px dashed #343445;border-radius:14px}.form-help{font-size:12px;color:var(--text2)}.checks{display:grid;grid-template-columns:1fr 1fr;gap:10px}.checks label{display:flex;gap:8px;align-items:center}.sticky{position:sticky;top:20px}@media(max-width:850px){.radar-grid{grid-template-columns:1fr}.sticky{position:static}}
+  </style>
+</head>
+<body>
+  <nav class="nav"><a class="nav-logo" href="/hub">K Koschei</a><div class="nav-links"><a class="nav-link" href="/hub">Hub</a><a class="nav-link" href="/token-scanner.html">Token Scanner</a><a class="nav-link" href="/account">Account</a></div></nav>
+  <main class="page">
+    <section class="radar-hero"><span class="badge badge-green">📡 Community intelligence</span><h1>Rug Radar</h1><p>Track newly submitted Solana token launches and review preliminary community risk signals before doing your own research.</p></section>
+    <div class="radar-grid">
+      <section><div class="launch-head" style="margin-bottom:14px"><div><h2 style="margin:0">Latest launches</h2><span id="count" class="form-help">Loading feed…</span></div><button id="refresh" class="btn">Refresh</button></div><div id="feed" class="feed"><div class="empty">Scanning the radar…</div></div></section>
+      <aside class="card stack sticky"><div><h2 style="margin:0 0 6px">Submit a launch</h2><p class="form-help">Sign in to add public, preliminary token signals.</p></div><form id="submitForm" class="stack">
+        <label class="form-label">Mint address<input class="form-input" name="mint_address" required maxlength="64" placeholder="Solana token mint"></label>
+        <label class="form-label">Network<select class="form-input" name="network"><option value="solana-mainnet">Solana Mainnet</option><option value="solana-devnet">Solana Devnet</option><option value="solana-testnet">Solana Testnet</option></select></label>
+        <div class="risk-row"><label class="form-label" style="flex:1">Risk score<input class="form-input" name="risk_score" type="number" min="0" max="100" value="0"></label><label class="form-label" style="flex:1">Risk level<select class="form-input" name="risk_level"><option>UNKNOWN</option><option>LOW</option><option>MEDIUM</option><option>HIGH</option></select></label></div>
+        <label class="form-label">Risk summary<textarea class="form-input" name="risk_summary" maxlength="1000" rows="4" placeholder="Briefly describe the observed signals"></textarea></label>
+        <label class="form-label">Transaction count<input class="form-input" name="tx_count" type="number" min="0" value="0"></label>
+        <div class="checks"><label><input type="checkbox" name="is_renounced"> Renounced</label><label><input type="checkbox" name="is_frozen"> Frozen</label></div>
+        <button class="btn btn-primary">Submit to radar</button><div id="status" class="form-help">Never submit private keys or seed phrases.</div>
+      </form></aside>
+    </div>
+  </main>
+  <script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=1"></script>
+  <script>
+    const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    const short=v=>v.length>18?v.slice(0,8)+'…'+v.slice(-8):v;
+    const riskClass=v=>['high','medium','low'].includes(String(v).toLowerCase())?'risk-'+String(v).toLowerCase():'risk-unknown';
+    async function loadFeed(){feed.innerHTML='<div class="empty">Scanning the radar…</div>';try{const r=await fetch('/api/rug-radar/feed');const data=await r.json();if(!r.ok)throw new Error(data.error||'Feed unavailable');count.textContent=`${data.count||0} launch${data.count===1?'':'es'} on radar`;feed.innerHTML=data.launches?.length?data.launches.map(x=>`<article class="launch"><div class="launch-head"><strong class="mint" title="${esc(x.mint_address)}">${esc(short(x.mint_address))}</strong><span class="risk ${riskClass(x.risk_level)}">${esc(x.risk_level)} · ${esc(x.risk_score)}/100</span></div><div class="launch-meta"><span>${esc(x.network)}</span><span>•</span><span>${esc(x.tx_count)} txs</span><span>•</span><span>${x.is_renounced?'Renounced':'Not renounced'}</span><span>•</span><span>${x.is_frozen?'Frozen':'Not frozen'}</span></div>${x.risk_summary?`<p class="summary">${esc(x.risk_summary)}</p>`:''}</article>`).join(''):'<div class="empty">No launches submitted yet. Be the first signal on the radar.</div>'}catch(e){count.textContent='Feed unavailable';feed.innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
+    refresh.onclick=loadFeed;
+    submitForm.onsubmit=async e=>{e.preventDefault();status.textContent='Submitting…';const fd=new FormData(submitForm),body=Object.fromEntries(fd);body.risk_score=Number(body.risk_score);body.tx_count=Number(body.tx_count);body.is_renounced=fd.has('is_renounced');body.is_frozen=fd.has('is_frozen');try{const r=await KoscheiAuth.apiCall('/api/rug-radar/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Submission failed');status.textContent='Launch added to Rug Radar.';submitForm.reset();await loadFeed()}catch(e){status.textContent=e.message||'Submission failed'}};
+    (async()=>{await KoscheiAuth.init();loadFeed()})();
+  </script>
+</body>
+</html>
