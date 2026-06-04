@@ -3,134 +3,257 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Koschei — Web3 Developer Hub</title>
+  <title>Koschei — Glass Web3 Developer Hub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/koschei.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    .hero { text-align: center; padding: 80px 24px 60px; }
-    .hero-badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; letter-spacing: .5px; background: rgba(0,255,136,.1); border: 1px solid rgba(0,255,136,.3); color: var(--accent); margin-bottom: 24px; }
-    .hero-title { font-size: clamp(32px, 6vw, 56px); font-weight: 700; line-height: 1.15; margin-bottom: 18px; }
-    .hero-title span { color: var(--accent); }
-    .hero-sub { font-size: 17px; color: var(--text2); max-width: 540px; margin: 0 auto 36px; line-height: 1.7; }
-    .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-    .features { padding: 60px 24px; max-width: 1000px; margin: 0 auto; }
-    .features-title { text-align: center; font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); margin-bottom: 40px; }
-    .feature-card { padding: 24px; display: flex; flex-direction: column; gap: 10px; }
-    .feature-icon { font-size: 28px; }
-    .feature-name { font-size: 16px; font-weight: 600; }
-    .feature-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
-    .chains { padding: 40px 24px; background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-    .chains-inner { max-width: 700px; margin: 0 auto; text-align: center; }
-    .chains-label { font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); margin-bottom: 20px; }
-    .chain-list { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-    .chain-pill { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--bg3); border: 1px solid var(--border); border-radius: 20px; font-size: 13px; font-weight: 500; }
-    .cta { text-align: center; padding: 80px 24px; }
-    .cta-title { font-size: 28px; font-weight: 700; margin-bottom: 12px; }
-    .cta-sub { color: var(--text2); margin-bottom: 32px; font-size: 15px; }
-    footer { text-align: center; padding: 24px; border-top: 1px solid var(--border); color: var(--text2); font-size: 13px; }
+    :root {
+      --bg: #050812;
+      --bg2: #0a1020;
+      --glass: rgba(255, 255, 255, .08);
+      --glass-strong: rgba(255, 255, 255, .13);
+      --line: rgba(255, 255, 255, .16);
+      --line-strong: rgba(255, 255, 255, .28);
+      --text: #f7fbff;
+      --text2: #a9b8d6;
+      --accent: #00ff88;
+      --accent2: #69d8ff;
+      --violet: #a78bfa;
+      --danger: #ff5c7c;
+      --shadow: 0 30px 90px rgba(0, 0, 0, .45);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 15% 8%, rgba(0, 255, 136, .24), transparent 34%),
+        radial-gradient(circle at 86% 12%, rgba(105, 216, 255, .2), transparent 32%),
+        radial-gradient(circle at 58% 78%, rgba(167, 139, 250, .18), transparent 34%),
+        linear-gradient(135deg, #03050b 0%, #07111e 48%, #040811 100%);
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 54px 54px;
+      mask-image: radial-gradient(circle at center, black, transparent 78%);
+    }
+    a { color: inherit; }
+    .shell { width: min(1160px, calc(100% - 32px)); margin: 0 auto; }
+    .glass {
+      background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.045));
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+    .nav {
+      position: sticky;
+      top: 14px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      width: min(1160px, calc(100% - 32px));
+      margin: 14px auto 0;
+      padding: 12px 14px;
+      border-radius: 24px;
+    }
+    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      color: #06120d;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      box-shadow: 0 0 34px rgba(0, 255, 136, .3);
+    }
+    .nav-links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .nav-link { color: var(--text2); font-size: 13px; font-weight: 600; text-decoration: none; padding: 9px 12px; border-radius: 999px; }
+    .nav-link:hover { color: var(--text); background: rgba(255,255,255,.08); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 0 18px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--text);
+      font-weight: 700;
+      font-size: 14px;
+      text-decoration: none;
+      transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+    .btn:hover { transform: translateY(-2px); border-color: var(--line-strong); }
+    .btn-primary { color: #04110b; border: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 18px 42px rgba(0, 255, 136, .22); }
+    .btn-ghost { background: rgba(255,255,255,.06); }
+    .hero { position: relative; padding: 96px 0 58px; }
+    .hero-grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: 28px; align-items: center; }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: max-content;
+      padding: 8px 13px;
+      border-radius: 999px;
+      color: #bfffe2;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      background: rgba(0,255,136,.1);
+      border: 1px solid rgba(0,255,136,.24);
+    }
+    h1 { margin: 22px 0 18px; font-size: clamp(44px, 7vw, 82px); line-height: .96; letter-spacing: -.07em; }
+    .gradient-text { background: linear-gradient(135deg, #fff, #c7fff0 32%, #82ddff 72%, #d9ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hero-sub { max-width: 640px; margin: 0 0 30px; color: var(--text2); font-size: clamp(16px, 2vw, 20px); line-height: 1.75; }
+    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .panel { border-radius: 34px; padding: 24px; }
+    .terminal { min-height: 420px; display: flex; flex-direction: column; gap: 16px; }
+    .terminal-top { display: flex; align-items: center; justify-content: space-between; color: var(--text2); font-size: 12px; font-weight: 700; }
+    .dots { display: flex; gap: 7px; }
+    .dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); opacity: .85; }
+    .dots span:nth-child(2) { background: var(--accent2); }
+    .dots span:nth-child(3) { background: var(--violet); }
+    .metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .metric { padding: 16px; border-radius: 22px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); }
+    .metric small { display:block; color: var(--text2); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    .metric strong { display:block; margin-top: 10px; font-size: 24px; }
+    .chain-strip { margin-top: 16px; padding: 16px; border-radius: 24px; background: rgba(0,0,0,.16); border: 1px solid rgba(255,255,255,.1); }
+    .chain-title { margin-bottom: 12px; color: var(--text2); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .chain-list { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chain-pill { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); color: #dce8ff; font-size: 12px; font-weight: 700; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #77839b; box-shadow: 0 0 18px currentColor; }
+    .dot-green { background: var(--accent); color: var(--accent); }
+    .dot-red { background: var(--danger); color: var(--danger); }
+    .section { padding: 58px 0; }
+    .section-head { max-width: 720px; margin-bottom: 26px; }
+    .section-kicker { color: var(--accent2); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    h2 { margin: 10px 0 0; font-size: clamp(30px, 4vw, 48px); line-height: 1.05; letter-spacing: -.04em; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .card { min-height: 210px; padding: 24px; border-radius: 28px; text-decoration: none; transition: transform .2s ease, border-color .2s ease; }
+    .card:hover { transform: translateY(-4px); border-color: var(--line-strong); }
+    .icon { font-size: 30px; margin-bottom: 18px; }
+    .card h3 { margin: 0 0 10px; font-size: 18px; }
+    .card p { margin: 0; color: var(--text2); font-size: 14px; line-height: 1.65; }
+    .cta { margin: 58px auto 34px; padding: 34px; border-radius: 34px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .cta h2 { margin: 0 0 8px; }
+    .cta p { margin: 0; color: var(--text2); line-height: 1.6; }
+    footer { padding: 26px 0 38px; color: var(--text2); font-size: 13px; text-align: center; }
+    footer a { color: var(--accent); text-decoration: none; }
+    @media (max-width: 900px) {
+      .hero { padding-top: 58px; }
+      .hero-grid, .cards { grid-template-columns: 1fr; }
+      .terminal { min-height: auto; }
+      .cta { align-items: flex-start; flex-direction: column; }
+    }
+    @media (max-width: 560px) {
+      .nav { position: static; }
+      .nav-links { width: 100%; justify-content: flex-start; }
+      .metric-grid { grid-template-columns: 1fr; }
+      h1 { letter-spacing: -.045em; }
+    }
   </style>
 </head>
 <body>
-
-<!-- Nav -->
-<nav class="nav">
-  <a href="/" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
-  <div class="nav-links">
-    <a href="/login.html" class="nav-link">Sign in</a>
-    <a href="/register.html" class="btn btn-primary" style="padding:7px 16px;font-size:13px;">Get started</a>
-  </div>
-</nav>
-
-<!-- Hero -->
-<section class="hero">
-  <div class="hero-badge">⚡ Solana Developer Tooling</div>
-  <h1 class="hero-title">The <span>Web3 Hub</span> for<br>Solana Builders</h1>
-  <p class="hero-sub">AI-powered metadata generation, on-chain risk scanning, and live chain health monitoring. No custody. No private keys. Just tools.</p>
-  <div class="hero-actions">
-    <a href="/register.html" class="btn btn-primary" style="padding:12px 28px;font-size:15px;">Get started free</a>
-    <a href="/hub.html" class="btn btn-ghost" style="padding:12px 28px;font-size:15px;">Explore hub →</a>
-  </div>
-</section>
-
-<!-- Chain status bar -->
-<div class="chains">
-  <div class="chains-inner">
-    <div class="chains-label">Live chain monitoring</div>
-    <div class="chain-list" id="chainList">
-      <div class="chain-pill"><span class="dot dot-gray"></span> Loading...</div>
+  <nav class="nav glass">
+    <a href="/" class="brand" aria-label="Koschei home"><span class="brand-mark">K</span><span>Koschei</span></a>
+    <div class="nav-links">
+      <a href="/docs.html" class="nav-link">Docs</a>
+      <a href="/pricing.html" class="nav-link">Pricing</a>
+      <a href="/login.html" class="nav-link">Sign in</a>
+      <a href="/register.html" class="btn btn-primary">Get started</a>
     </div>
-  </div>
-</div>
+  </nav>
 
-<!-- Features -->
-<section class="features">
-  <div class="features-title">What you get</div>
-  <div class="grid-3">
-    <div class="card feature-card">
-      <div class="feature-icon">🧬</div>
-      <div class="feature-name">AI Metadata Studio</div>
-      <div class="feature-desc">Generate professional NFT and game asset metadata in seconds. Powered by state-of-the-art language models.</div>
-    </div>
-    <div class="card feature-card">
-      <div class="feature-icon">🛡️</div>
-      <div class="feature-name">Risk Scanner</div>
-      <div class="feature-desc">Analyze on-chain risk transparency for any Solana project. Get clear risk scores before you interact.</div>
-    </div>
-    <div class="card feature-card">
-      <div class="feature-icon">📡</div>
-      <div class="feature-name">Chain Health API</div>
-      <div class="feature-desc">Real-time health monitoring for Solana, Ethereum, Base, Arbitrum, Polygon and Optimism via REST API.</div>
-    </div>
-    <div class="card feature-card">
-      <div class="feature-icon">🔔</div>
-      <div class="feature-name">Web3 Event Monitor</div>
-      <div class="feature-desc">Track public wallet and contract activity through Alchemy API.</div>
-    </div>
-    <div class="card feature-card">
-      <div class="feature-icon">🔒</div>
-      <div class="feature-name">No Custody</div>
-      <div class="feature-desc">Read-only architecture. We never ask for private keys. Your assets stay in your wallet, always.</div>
-    </div>
-    <div class="card feature-card">
-      <div class="feature-icon">⚡</div>
-      <div class="feature-name">Developer First</div>
-      <div class="feature-desc">REST API endpoints you can integrate into any project. Built by a builder, for builders.</div>
-    </div>
-  </div>
-</section>
+  <main>
+    <section class="hero shell">
+      <div class="hero-grid">
+        <div>
+          <div class="eyebrow">⚡ Solana developer tooling</div>
+          <h1><span class="gradient-text">Glass-grade Web3 hub</span> for builders.</h1>
+          <p class="hero-sub">AI-powered metadata generation, on-chain risk scanning, event monitoring, and live chain health in a premium no-custody workspace.</p>
+          <div class="hero-actions">
+            <a href="/register.html" class="btn btn-primary">Create free account</a>
+            <a href="/hub.html" class="btn btn-ghost">Explore member hub →</a>
+          </div>
+        </div>
+        <aside class="panel glass terminal" aria-label="Koschei live dashboard preview">
+          <div class="terminal-top"><span>koschei://live-stack</span><div class="dots"><span></span><span></span><span></span></div></div>
+          <div class="metric-grid">
+            <div class="metric"><small>Architecture</small><strong>No custody</strong></div>
+            <div class="metric"><small>Focus</small><strong>Solana</strong></div>
+            <div class="metric"><small>AI Studio</small><strong>Ready</strong></div>
+            <div class="metric"><small>Risk Engine</small><strong>Online</strong></div>
+          </div>
+          <div class="chain-strip">
+            <div class="chain-title">Live chain monitoring</div>
+            <div class="chain-list" id="chainList"><div class="chain-pill"><span class="dot"></span> Loading...</div></div>
+          </div>
+        </aside>
+      </div>
+    </section>
 
-<!-- CTA -->
-<section class="cta">
-  <div class="cta-title">Start building today</div>
-  <div class="cta-sub">Free tier. No credit card. Just tools that work.</div>
-  <a href="/register.html" class="btn btn-primary" style="padding:13px 32px;font-size:15px;">Create free account</a>
-</section>
+    <section class="section shell">
+      <div class="section-head">
+        <div class="section-kicker">Workspace modules</div>
+        <h2>Everything a Web3 operator needs, wrapped in one glass interface.</h2>
+      </div>
+      <div class="cards">
+        <article class="card glass"><div class="icon">🧬</div><h3>AI Metadata Studio</h3><p>Generate professional NFT, game asset, and project metadata in seconds with AI-assisted fallback logic.</p></article>
+        <article class="card glass"><div class="icon">🛡️</div><h3>Risk Scanner</h3><p>Review transparent on-chain risk signals before you interact with a Solana project or wallet.</p></article>
+        <article class="card glass"><div class="icon">📡</div><h3>Chain Health API</h3><p>Monitor Solana, Ethereum, Base, Arbitrum, Polygon, and Optimism health from one REST-friendly surface.</p></article>
+        <article class="card glass"><div class="icon">🔔</div><h3>Web3 Event Monitor</h3><p>Track public wallet and contract activity through Alchemy-powered polling without requesting private keys.</p></article>
+        <article class="card glass"><div class="icon">🔒</div><h3>No Custody</h3><p>Read-only tools by design. Koschei never asks for seed phrases, private keys, or wallet custody.</p></article>
+        <article class="card glass"><div class="icon">⚙️</div><h3>Developer First</h3><p>Practical endpoints, fast member flows, and clear modules designed for builders who ship.</p></article>
+      </div>
+    </section>
 
-<footer>
-  © 2026 Koschei · Built on Solana · <a href="/login.html" style="color:var(--accent);">Sign in</a> · <a href="/docs.html" style="color:var(--accent);">API Docs</a>
-</footer>
+    <section class="cta shell glass">
+      <div>
+        <h2>Start building today.</h2>
+        <p>Free tier. No credit card. Just clean Web3 tooling that works.</p>
+      </div>
+      <a href="/register.html" class="btn btn-primary">Launch Koschei</a>
+    </section>
+  </main>
 
-<script src="/js/koschei-analytics.js?v=1"></script>
-<script>
-  KoscheiAnalytics.track('landing_view');
+  <footer class="shell">© 2026 Koschei · Built on Solana · <a href="/login.html">Sign in</a> · <a href="/docs.html">API Docs</a></footer>
 
-  const chains = ['solana','ethereum','base','arbitrum','polygon','optimism'];
-  const labels = { solana:'Solana', ethereum:'Ethereum', base:'Base', arbitrum:'Arbitrum', polygon:'Polygon', optimism:'Optimism' };
+  <script src="/js/koschei-analytics.js?v=1"></script>
+  <script>
+    KoscheiAnalytics.track('landing_view');
 
-  async function loadChains() {
-    const results = await Promise.allSettled(
-      chains.map(c => fetch(`/api/web3/health?chain=${c}`).then(r => r.json()))
-    );
-    const list = document.getElementById('chainList');
-    list.innerHTML = results.map((r, i) => {
-      const ok = r.status === 'fulfilled' && r.value?.ok;
-      const dot = ok ? 'dot-green' : 'dot-red';
-      return `<div class="chain-pill"><span class="dot ${dot}"></span> ${labels[chains[i]]}</div>`;
-    }).join('');
-  }
+    const chains = ['solana','ethereum','base','arbitrum','polygon','optimism'];
+    const labels = { solana:'Solana', ethereum:'Ethereum', base:'Base', arbitrum:'Arbitrum', polygon:'Polygon', optimism:'Optimism' };
 
-  loadChains();
-</script>
+    async function loadChains() {
+      const results = await Promise.allSettled(
+        chains.map(c => fetch(`/api/web3/health?chain=${c}`).then(r => r.json()))
+      );
+      const list = document.getElementById('chainList');
+      list.innerHTML = results.map((r, i) => {
+        const ok = r.status === 'fulfilled' && r.value?.ok;
+        const dot = ok ? 'dot-green' : 'dot-red';
+        return `<div class="chain-pill"><span class="dot ${dot}"></span> ${labels[chains[i]]}</div>`;
+      }).join('');
+    }
+
+    loadChains();
+  </script>
 </body>
 </html>
