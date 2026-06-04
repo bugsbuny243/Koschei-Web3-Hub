@@ -16,7 +16,7 @@
 <main class="page">
   <header class="admin-head">
     <div><div class="page-title">Koschei Admin Control Center</div><div class="muted">Funding readiness, measurable traction, and grant operations.</div></div>
-    <nav class="admin-nav"><a class="btn btn-ghost" href="/admin-payments">Payments</a><a class="btn btn-ghost" href="/admin-analytics">Analytics</a><a class="btn btn-ghost" href="/hub">Hub</a></nav>
+    <nav class="admin-nav"><button class="btn btn-ghost hidden" id="refreshAll" type="button">Refresh all</button><button class="btn btn-ghost hidden" id="lockAdmin" type="button">Lock admin panel</button><a class="btn btn-ghost" href="/admin-payments">Payments</a><a class="btn btn-ghost" href="/admin-analytics">Analytics</a><a class="btn btn-ghost" href="/hub">Hub</a></nav>
   </header>
   <div class="alert" id="message"></div>
   <section class="card login-card" id="loginBox">
@@ -28,7 +28,7 @@
   </section>
 
   <section class="hidden" id="controlCenter">
-    <div class="tabs" role="tablist"><button class="tab active" data-tab="radar" type="button">Grant Radar</button><button class="tab" data-tab="impact" type="button">Proof of Impact</button></div>
+    <div class="tabs" role="tablist"><button class="tab active" data-tab="radar" type="button">Grant Radar</button><button class="tab" data-tab="impact" type="button">Proof of Impact</button><button class="tab" data-tab="chat" type="button">Koschei Chat</button></div>
     <section id="radarPanel">
       <div class="card" style="margin-bottom:18px">
         <div class="section-head"><div><h2>Add opportunity</h2><p class="muted">Track a grant, bounty, or ecosystem funding program.</p></div></div>
@@ -58,54 +58,70 @@
       </div>
       <section class="card hidden" id="draftCard" style="margin-top:18px"><div class="section-head"><h2>Application draft</h2><button class="btn btn-ghost" id="copyDraft" type="button">Copy draft</button></div><div class="output" id="draftOutput"></div></section>
     </section>
+
+    <section class="hidden" id="chatPanel">
+      <div class="section-head"><div><h2>Koschei Chat</h2><p class="muted">Read-only operational answers. Chat never changes database records or reveals secret values.</p></div></div>
+      <section class="card">
+        <div class="actions" id="chatPrompts" style="margin-bottom:14px">
+          <button class="btn btn-ghost" type="button">Sistemi tara</button><button class="btn btn-ghost" type="button">Bugün neler olmuş?</button><button class="btn btn-ghost" type="button">Ödeme bekleyen var mı?</button><button class="btn btn-ghost" type="button">Watchlist çalışıyor mu?</button><button class="btn btn-ghost" type="button">Alchemy çalışıyor mu?</button>
+        </div>
+        <form id="chatForm" class="actions"><input class="form-input" id="chatMessage" style="flex:1;min-width:240px" required placeholder="Ask a read-only operational question"><button class="btn btn-primary" type="submit">Ask Koschei</button></form>
+        <div class="output hidden" id="chatOutput" style="margin-top:16px"></div>
+      </section>
+    </section>
   </section>
 </main>
+<script src="/js/koschei-admin.js"></script>
 <script>
-  const storageKey = 'koschei_admin_password';
-  const password = () => sessionStorage.getItem(storageKey) || '';
   const el = id => document.getElementById(id);
   let impactData = null;
   const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
-  const showMessage = (text, kind='success') => { const el=document.getElementById('message'); el.textContent=text; el.className=`alert alert-${kind} show`; window.scrollTo({top:0,behavior:'smooth'}); };
-  async function adminCall(path, options={}) { return fetch(path, {...options, headers:{'Content-Type':'application/json','x-admin-password':password(),...(options.headers||{})}}); }
-  async function responseData(res, fallback) { const data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(data.error||fallback); return data; }
-  function unlock() { document.getElementById('loginBox').classList.add('hidden'); document.getElementById('controlCenter').classList.remove('hidden'); }
+  const showMessage = (text, kind='success') => { const node=el('message'); node.textContent=text; node.className=`alert alert-${kind} show`; window.scrollTo({top:0,behavior:'smooth'}); };
+  const clearMessage = () => { el('message').textContent=''; el('message').className='alert'; };
+  function showLocked(message='Enter admin password') { el('loginBox').classList.remove('hidden'); el('controlCenter').classList.add('hidden'); el('refreshAll').classList.add('hidden'); el('lockAdmin').classList.add('hidden'); showMessage(message,'info'); }
+  function showUnlocked() { el('loginBox').classList.add('hidden'); el('controlCenter').classList.remove('hidden'); el('refreshAll').classList.remove('hidden'); el('lockAdmin').classList.remove('hidden'); clearMessage(); }
+  async function responseData(res, fallback) { const data=await res.json().catch(()=>({})); if(res.status===401) throw new Error('Unauthorized: admin password rejected.'); if(!res.ok) throw new Error(data.error||fallback); return data; }
   function dateText(value) { return value ? new Date(value).toLocaleString() : '—'; }
 
-  async function loadRadar() {
-    const data=await responseData(await adminCall('/api/admin/grant-radar'),'Could not load Grant Radar'); unlock(); renderRadar(data.opportunities||[]);
-  }
+  async function loadRadar() { const data=await responseData(await adminFetch('/api/admin/grant-radar'),'Could not load Grant Radar'); renderRadar(data.opportunities||[]); }
   function renderRadar(items) {
-    document.getElementById('grantCount').textContent=`${items.length} tracked`;
-    document.getElementById('grantBody').innerHTML=items.length ? items.map(item=>`<tr><td><span class="fit">${escapeHTML(item.fit_score)}</span>/100</td><td><strong>${escapeHTML(item.title)}</strong>${item.source_url?`<br><a href="${escapeHTML(item.source_url)}" target="_blank" rel="noopener noreferrer">Open source ↗</a>`:''}</td><td>${escapeHTML(item.ecosystem||'—')}<br><span class="muted">${escapeHTML(item.category||'—')}</span></td><td>${escapeHTML(item.reward_range||'—')}<br><span class="muted">${escapeHTML(item.deadline||'—')}</span></td><td><span class="badge badge-blue status-${escapeHTML(item.status)}">${escapeHTML(item.status.replaceAll('_',' '))}</span></td><td>${escapeHTML(item.notes||'—')}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">No opportunities tracked yet.</td></tr>';
+    el('grantCount').textContent=`${items.length} tracked`;
+    el('grantBody').innerHTML=items.length ? items.map(item=>`<tr><td><span class="fit">${escapeHTML(item.fit_score)}</span>/100</td><td><strong>${escapeHTML(item.title)}</strong>${item.source_url?`<br><a href="${escapeHTML(item.source_url)}" target="_blank" rel="noopener noreferrer">Open source ↗</a>`:''}</td><td>${escapeHTML(item.ecosystem||'—')}<br><span class="muted">${escapeHTML(item.category||'—')}</span></td><td>${escapeHTML(item.reward_range||'—')}<br><span class="muted">${escapeHTML(item.deadline||'—')}</span></td><td><span class="badge badge-blue status-${escapeHTML(item.status)}">${escapeHTML(item.status.replaceAll('_',' '))}</span></td><td>${escapeHTML(item.notes||'—')}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">No opportunities tracked yet.</td></tr>';
   }
   async function addGrant(event) {
     event.preventDefault(); const body={title:el('title').value,ecosystem:el('ecosystem').value,source_url:el('sourceUrl').value,category:el('category').value,reward_range:el('rewardRange').value,deadline:el('deadline').value,status:el('status').value,fit_score:Number(el('fitScore').value),notes:el('notes').value};
-    try { await responseData(await adminCall('/api/admin/grant-radar',{method:'POST',body:JSON.stringify(body)}),'Could not add opportunity'); event.target.reset(); el('fitScore').value=50; showMessage('Opportunity added to Grant Radar.'); await loadRadar(); } catch(error){showMessage(error.message,'error');}
+    try { await responseData(await adminFetch('/api/admin/grant-radar',{method:'POST',body:JSON.stringify(body)}),'Could not add opportunity'); event.target.reset(); el('fitScore').value=50; showMessage('Opportunity added to Grant Radar.'); await loadRadar(); } catch(error){handleError(error);}
   }
 
-  async function loadImpact() { impactData=await responseData(await adminCall('/api/admin/proof-of-impact'),'Could not load Proof of Impact'); unlock(); renderImpact(impactData); }
+  async function loadImpact() { impactData=await responseData(await adminFetch('/api/admin/proof-of-impact'),'Could not load Proof of Impact'); renderImpact(impactData); }
   function renderImpact(data) {
     const fields=[['users_count','Users'],['active_users_estimate','Active users (30d)'],['metadata_outputs_count','Metadata outputs'],['risk_outputs_count','Risk outputs'],['watchlist_sources_count','Watchlist sources'],['web3_events_count','Web3 events'],['chain_checks_count','Chain checks'],['payment_requests_count','Payment requests']];
-    document.getElementById('metrics').innerHTML=fields.map(([key,label])=>`<article class="card stat"><div class="form-label">${escapeHTML(label)}</div><div class="stat-value">${escapeHTML(data[key]??0)}</div></article>`).join('');
+    el('metrics').innerHTML=fields.map(([key,label])=>`<article class="card stat"><div class="form-label">${escapeHTML(label)}</div><div class="stat-value">${escapeHTML(data[key]??0)}</div></article>`).join('');
     renderList('latestOutputs',data.latest_outputs,item=>`<strong>${escapeHTML(item.output_type||'Output')}</strong> · ${escapeHTML(item.title||'Untitled')}<br><span class="muted">${escapeHTML(item.ecosystem||'web3')} · ${dateText(item.created_at)}</span>`);
     renderList('latestChains',data.latest_chain_checks,item=>`<strong>${escapeHTML(item.chain)} / ${escapeHTML(item.network)}</strong> · ${item.healthy?'Healthy':'Needs review'}<br><span class="muted">${escapeHTML(item.provider)} · ${dateText(item.checked_at)}</span>`);
     renderList('latestAnalytics',data.latest_analytics,item=>`<strong>${escapeHTML(item.event_name)}</strong><br><span class="muted">${escapeHTML(item.path||'—')} · ${dateText(item.created_at)}</span>`);
   }
-  function renderList(id,items,template){document.getElementById(id).innerHTML=(items||[]).length?(items||[]).map(item=>`<div class="list-item">${template(item)}</div>`).join(''):'<div class="list-item muted">No activity yet.</div>';}
+  function renderList(id,items,template){el(id).innerHTML=(items||[]).length?(items||[]).map(item=>`<div class="list-item">${template(item)}</div>`).join(''):'<div class="list-item muted">No activity yet.</div>';}
   function grantSummary(data=impactData||{}) { return `Project name: Koschei Web3 Hub\nLive URL: https://tradepigloball.co/hub\nCategory: Web3 developer tooling, no-custody wallet intelligence, metadata, risk and monitoring tools\nCurrent modules: Auth, Hub, Metadata, Risk Scanner, Chain Health, Watchlist, Pricing, Admin\nNo private keys, no custody, no wallet connection required for core flows.\n\nProof of impact\nUsers: ${data.users_count??0}\nActive users estimate (last 30 days): ${data.active_users_estimate??0}\nMetadata outputs: ${data.metadata_outputs_count??0}\nRisk outputs: ${data.risk_outputs_count??0}\nWatchlist sources: ${data.watchlist_sources_count??0}\nWeb3 events: ${data.web3_events_count??0}\nChain checks: ${data.chain_checks_count??0}\nPayment requests: ${data.payment_requests_count??0}`; }
   function applicationDraft(data=impactData||{}) { return `Koschei Web3 Hub — Grant Application Draft\n\nPROJECT OVERVIEW\nKoschei Web3 Hub is a live Web3 developer tooling and no-custody wallet intelligence platform. It gives builders and users practical metadata generation, risk scanning, chain health, monitoring, watchlist, pricing, and administration tools without requiring custody, private keys, or a wallet connection for core flows.\n\nLIVE PRODUCT\nhttps://tradepigloball.co/hub\n\nPROBLEM\nWeb3 builders and users often need several disconnected services to create metadata, review risk, monitor addresses, and confirm chain health. This fragmentation adds operational overhead and makes safe workflows harder to adopt.\n\nSOLUTION\nKoschei consolidates these workflows into one accessible hub with a Go backend and lightweight static frontend. The platform focuses on clear outputs, no-custody operation, and practical monitoring.\n\nCURRENT TRACTION\n- ${data.users_count??0} registered users\n- ${data.active_users_estimate??0} active users estimated in the last 30 days\n- ${data.metadata_outputs_count??0} metadata outputs generated\n- ${data.risk_outputs_count??0} risk outputs generated\n- ${data.watchlist_sources_count??0} watchlist sources monitored\n- ${data.web3_events_count??0} Web3 events recorded\n- ${data.chain_checks_count??0} chain health checks completed\n- ${data.payment_requests_count??0} payment requests recorded\n\nCURRENT MODULES\nAuth, Hub, Metadata, Risk Scanner, Chain Health, Watchlist, Pricing, and Admin.\n\nFUNDING USE\nGrant funding will support deeper ecosystem integrations, stronger impact reporting, improved monitoring coverage, product hardening, and onboarding documentation.\n\nSECURITY AND USER PROTECTION\nKoschei never exposes or requests private keys, does not take custody of user assets, and does not require wallet connection for core flows.\n\nMILESTONE DIRECTION\n1. Expand ecosystem-specific chain and watchlist coverage.\n2. Improve evidence-based risk and metadata outputs.\n3. Publish measurable adoption and usage reporting.\n4. Deliver ecosystem onboarding material and live demos.`; }
   async function copyText(text,label){try{await navigator.clipboard.writeText(text);showMessage(`${label} copied.`);}catch(_){showMessage('Clipboard access was blocked. Use the generated text panel to copy manually.','error');}}
+  async function askChat(message) { const data=await responseData(await adminFetch('/api/admin/chat',{method:'POST',body:JSON.stringify({message})}),'Could not load Koschei Chat'); el('chatOutput').textContent=data.answer||'No answer returned.'; el('chatOutput').classList.remove('hidden'); }
+  async function refreshAll() { if(!isAdminUnlocked()){showLocked();return;} try { await Promise.all([loadRadar(),loadImpact()]); showUnlocked(); showMessage('All admin sections refreshed.'); } catch(error){handleError(error);} }
+  function handleError(error) { if(error.code==='ADMIN_LOCKED'){showLocked();return;} if(error.message.startsWith('Unauthorized:')){lockAdmin();showLocked(error.message);return;} showMessage(error.message,'error'); }
 
-  document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button)); const impact=button.dataset.tab==='impact'; el('radarPanel').classList.toggle('hidden',impact); el('impactPanel').classList.toggle('hidden',!impact); if(impact&&!impactData){try{await loadImpact();}catch(error){showMessage(error.message,'error');}}}));
-  document.getElementById('loginForm').addEventListener('submit',async event=>{event.preventDefault();sessionStorage.setItem(storageKey,document.getElementById('password').value);try{await loadRadar();}catch(error){sessionStorage.removeItem(storageKey);showMessage(error.message,'error');}});
-  document.getElementById('grantForm').addEventListener('submit',addGrant);
-  document.getElementById('refreshRadar').addEventListener('click',()=>loadRadar().catch(error=>showMessage(error.message,'error')));
-  document.getElementById('refreshImpact').addEventListener('click',()=>loadImpact().catch(error=>showMessage(error.message,'error')));
-  document.getElementById('copySummary').addEventListener('click',()=>copyText(grantSummary(),'Grant summary'));
-  document.getElementById('generateDraft').addEventListener('click',()=>{const text=applicationDraft();el('draftOutput').textContent=text;el('draftCard').classList.remove('hidden');el('draftCard').scrollIntoView({behavior:'smooth'});});
-  document.getElementById('copyDraft').addEventListener('click',()=>copyText(el('draftOutput').textContent,'Application draft'));
-  if(password()) loadRadar().catch(error=>{sessionStorage.removeItem(storageKey);showMessage(error.message,'error');});
+  document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button)); ['radar','impact','chat'].forEach(name=>el(`${name}Panel`).classList.toggle('hidden',name!==button.dataset.tab)); if(button.dataset.tab==='impact'&&!impactData){try{await loadImpact();}catch(error){handleError(error);}}}));
+  el('loginForm').addEventListener('submit',async event=>{event.preventDefault();try{unlockAdmin(el('password').value);await loadRadar();showUnlocked();}catch(error){handleError(error);}});
+  el('grantForm').addEventListener('submit',addGrant);
+  el('refreshRadar').addEventListener('click',()=>loadRadar().catch(handleError));
+  el('refreshImpact').addEventListener('click',()=>loadImpact().catch(handleError));
+  el('refreshAll').addEventListener('click',refreshAll);
+  el('lockAdmin').addEventListener('click',()=>{lockAdmin();impactData=null;el('password').value='';showLocked();});
+  el('copySummary').addEventListener('click',()=>copyText(grantSummary(),'Grant summary'));
+  el('generateDraft').addEventListener('click',()=>{const text=applicationDraft();el('draftOutput').textContent=text;el('draftCard').classList.remove('hidden');el('draftCard').scrollIntoView({behavior:'smooth'});});
+  el('copyDraft').addEventListener('click',()=>copyText(el('draftOutput').textContent,'Application draft'));
+  el('chatForm').addEventListener('submit',event=>{event.preventDefault();askChat(el('chatMessage').value).catch(handleError);});
+  el('chatPrompts').addEventListener('click',event=>{if(event.target.tagName!=='BUTTON')return;el('chatMessage').value=event.target.textContent;askChat(event.target.textContent).catch(handleError);});
+  if(isAdminUnlocked()){loadRadar().then(showUnlocked).catch(handleError);}else{showLocked();}
 </script>
 </body>
 </html>

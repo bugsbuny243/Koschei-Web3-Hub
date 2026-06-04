@@ -102,8 +102,7 @@ func (h *Handler) AdminChat(w http.ResponseWriter, r *http.Request) {
 	summary, summaryErr := h.adminSummary(r.Context())
 	scan := h.adminSystemScan(r.Context())
 	answer := adminChatAnswer(message, summary, summaryErr, scan)
-	// Chat logging is best-effort and never stores the admin password or secret values.
-	_, _ = h.DB.ExecContext(r.Context(), `INSERT INTO admin_chat_logs (message, answer) VALUES ($1, $2)`, message, answer)
+	// Admin chat is deliberately read-only: it summarizes in-memory results and never writes to the database.
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answer": answer, "actions": []any{}, "used_context": map[string]bool{"summary": summaryErr == nil, "system_scan": true}})
 }
 

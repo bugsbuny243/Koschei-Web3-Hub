@@ -15,7 +15,7 @@
 <main class="page">
   <header style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:28px;">
     <div><div class="page-title">Admin analytics</div><div class="page-sub">Internal visitor and conversion events.</div></div>
-    <a class="btn btn-ghost" href="/hub">Hub</a>
+    <div style="display:flex;gap:8px"><button class="btn btn-ghost hidden" id="refreshAll" type="button">Refresh all</button><button class="btn btn-ghost hidden" id="lockAdmin" type="button">Lock admin panel</button><a class="btn btn-ghost" href="/admin">Admin</a><a class="btn btn-ghost" href="/hub">Hub</a></div>
   </header>
   <div class="alert" id="message"></div>
   <section class="card" id="loginBox">
@@ -25,7 +25,7 @@
     </form>
   </section>
   <section class="hidden" id="analyticsBox">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px"><h2 style="margin:0">Analytics totals</h2><button class="btn btn-ghost" type="button" onclick="loadAnalytics()">Refresh</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px"><h2 style="margin:0">Analytics totals</h2><button class="btn btn-ghost" id="refreshAnalytics" type="button">Refresh</button></div>
     <div class="stats" id="stats"></div>
     <section class="card table-wrap">
       <h2 style="margin-top:0">Latest 100 events</h2>
@@ -33,40 +33,23 @@
     </section>
   </section>
 </main>
+<script src="/js/koschei-admin.js"></script>
 <script>
-  const storageKey = 'koschei_admin_password';
-  const password = () => sessionStorage.getItem(storageKey) || '';
+  const el = id => document.getElementById(id);
   function escapeHTML(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
-  function showMessage(text, kind) { const el = document.getElementById('message'); el.textContent = text; el.className = `alert alert-${kind} show`; }
-  async function adminCall(path) { return fetch(path, { headers: { 'x-admin-password': password() } }); }
-  function renderStats(counts) {
-    const labels = [
-      ['events_today', 'Total events today'],
-      ['signup_success', 'Signup success'],
-      ['login_success', 'Login success'],
-      ['metadata_generate_success', 'Metadata success'],
-      ['risk_scan_success', 'Risk scan success'],
-    ];
-    document.getElementById('stats').innerHTML = labels.map(([key, label]) => `<article class="card"><div class="form-label">${escapeHTML(label)}</div><div class="stat-number">${escapeHTML(counts?.[key] ?? 0)}</div></article>`).join('');
-  }
-  function renderEvents(events) {
-    const body = document.getElementById('eventsBody');
-    if (!events.length) { body.innerHTML = '<tr><td colspan="7" class="muted">No analytics events found.</td></tr>'; return; }
-    body.innerHTML = events.map(event => `<tr><td>${escapeHTML(new Date(event.created_at).toLocaleString())}</td><td><strong>${escapeHTML(event.event_name)}</strong></td><td>${escapeHTML(event.email || '—')}</td><td>${escapeHTML(event.path || '—')}</td><td>${escapeHTML(event.referrer || '—')}</td><td class="mono">${escapeHTML(JSON.stringify(event.metadata || {}))}</td><td class="muted">${escapeHTML(event.user_agent || '—')}</td></tr>`).join('');
-  }
-  async function loadAnalytics() {
-    try {
-      const res = await adminCall('/api/admin/analytics/events');
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not load analytics');
-      document.getElementById('loginBox').classList.add('hidden');
-      document.getElementById('analyticsBox').classList.remove('hidden');
-      renderStats(data.counts || {});
-      renderEvents(data.events || []);
-    } catch (error) { showMessage(error.message, 'error'); }
-  }
-  document.getElementById('loginForm').addEventListener('submit', async (event) => { event.preventDefault(); sessionStorage.setItem(storageKey, document.getElementById('password').value); await loadAnalytics(); });
-  if (password()) loadAnalytics();
+  function showMessage(text, kind) { const node=el('message'); node.textContent=text; node.className=`alert alert-${kind} show`; }
+  function showLocked(text='Enter admin password') { el('loginBox').classList.remove('hidden'); el('analyticsBox').classList.add('hidden'); el('refreshAll').classList.add('hidden'); el('lockAdmin').classList.add('hidden'); showMessage(text,'info'); }
+  function showUnlocked() { el('loginBox').classList.add('hidden'); el('analyticsBox').classList.remove('hidden'); el('refreshAll').classList.remove('hidden'); el('lockAdmin').classList.remove('hidden'); el('message').className='alert'; }
+  function handleError(error) { if(error.code==='ADMIN_LOCKED'){showLocked();return;} if(error.message.startsWith('Unauthorized:')){lockAdmin();showLocked(error.message);return;} showMessage(error.message,'error'); }
+  async function responseData(res,fallback){const data=await res.json().catch(()=>({}));if(res.status===401)throw new Error('Unauthorized: admin password rejected.');if(!res.ok)throw new Error(data.error||fallback);return data;}
+  function renderStats(counts) { const labels=[['events_today','Total events today'],['signup_success','Signup success'],['login_success','Login success'],['metadata_generate_success','Metadata success'],['risk_scan_success','Risk scan success']]; el('stats').innerHTML=labels.map(([key,label])=>`<article class="card"><div class="form-label">${escapeHTML(label)}</div><div class="stat-number">${escapeHTML(counts?.[key]??0)}</div></article>`).join(''); }
+  function renderEvents(events) { const body=el('eventsBody'); if(!events.length){body.innerHTML='<tr><td colspan="7" class="muted">No analytics events found.</td></tr>';return;} body.innerHTML=events.map(event=>`<tr><td>${escapeHTML(new Date(event.created_at).toLocaleString())}</td><td><strong>${escapeHTML(event.event_name)}</strong></td><td>${escapeHTML(event.email||'—')}</td><td>${escapeHTML(event.path||'—')}</td><td>${escapeHTML(event.referrer||'—')}</td><td class="mono">${escapeHTML(JSON.stringify(event.metadata||{}))}</td><td class="muted">${escapeHTML(event.user_agent||'—')}</td></tr>`).join(''); }
+  async function loadAnalytics(){const data=await responseData(await adminFetch('/api/admin/analytics/events'),'Could not load analytics');renderStats(data.counts||{});renderEvents(data.events||[]);showUnlocked();}
+  el('loginForm').addEventListener('submit',async event=>{event.preventDefault();try{unlockAdmin(el('password').value);await loadAnalytics();}catch(error){handleError(error);}});
+  el('refreshAnalytics').addEventListener('click',()=>loadAnalytics().catch(handleError));
+  el('refreshAll').addEventListener('click',()=>loadAnalytics().then(()=>showMessage('Analytics refreshed.','success')).catch(handleError));
+  el('lockAdmin').addEventListener('click',()=>{lockAdmin();el('password').value='';showLocked();});
+  if(isAdminUnlocked())loadAnalytics().catch(handleError);else showLocked();
 </script>
 </body>
 </html>
