@@ -43,6 +43,8 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/admin/analytics", requiresDB(h, method("GET", h.AdminAnalyticsEvents)))
 	mux.HandleFunc("/api/admin/payment-requests", requiresDB(h, method("GET", h.AdminPaymentRequests)))
 	mux.HandleFunc("/api/admin/analytics/events", requiresDB(h, method("GET", h.AdminAnalyticsEvents)))
+	mux.HandleFunc("/api/admin/grant-radar", requiresDB(h, h.GrantRadar))
+	mux.HandleFunc("/api/admin/proof-of-impact", requiresDB(h, method("GET", h.ProofOfImpact)))
 	mux.HandleFunc("/api/admin/payment-requests/approve", requiresDB(h, method("POST", h.ApprovePaymentRequest)))
 	mux.HandleFunc("/api/admin/payment-requests/reject", requiresDB(h, method("POST", h.RejectPaymentRequest)))
 	mux.HandleFunc("/api/admin/summary", requiresDB(h, method("GET", h.AdminSummary)))
@@ -121,6 +123,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/admin":           "/admin.html",
 					"/admin-payments":  "/admin-payments.html",
 					"/admin-analytics": "/admin-analytics.html",
+					"/admin":           "/admin.html",
 					"/dashboard":       "/dashboard.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
