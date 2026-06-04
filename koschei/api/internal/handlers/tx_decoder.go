@@ -37,15 +37,6 @@ var knownPrograms = map[string]string{
 	"So11111111111111111111111111111111111111112":  "Wrapped SOL",
 }
 
-func solanaRPCURL(network, apiKey string) string {
-	switch network {
-	case "solana-mainnet":
-		return "https://solana-mainnet.g.alchemy.com/v2/" + apiKey
-	default:
-		return "https://solana-devnet.g.alchemy.com/v2/" + apiKey
-	}
-}
-
 func (h *Handler) TXDecode(w http.ResponseWriter, r *http.Request) {
 	var req txDecodeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Signature == "" {
