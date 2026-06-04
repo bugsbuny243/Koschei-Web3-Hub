@@ -33,14 +33,6 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/me", requiresDB(h, handlers.RequireAuth(method("GET", h.Me))))
 	mux.HandleFunc("/api/member/summary", requiresDB(h, handlers.RequireAuth(method("GET", h.MemberSummary))))
 	mux.HandleFunc("/api/payments/request", requiresDB(h, handlers.RequireAuth(method("POST", h.PaymentRequest))))
-	mux.HandleFunc("/api/admin/summary", requiresDB(h, method("GET", h.AdminSummary)))
-	mux.HandleFunc("/api/admin/users", requiresDB(h, method("GET", h.AdminUsers)))
-	mux.HandleFunc("/api/admin/entitlements", requiresDB(h, method("GET", h.AdminEntitlements)))
-	mux.HandleFunc("/api/admin/outputs", requiresDB(h, method("GET", h.AdminOutputs)))
-	mux.HandleFunc("/api/admin/watchlist-sources", requiresDB(h, method("GET", h.AdminWatchlistSources)))
-	mux.HandleFunc("/api/admin/web3-events", requiresDB(h, method("GET", h.AdminWeb3Events)))
-	mux.HandleFunc("/api/admin/chain-health", requiresDB(h, method("GET", h.AdminChainHealth)))
-	mux.HandleFunc("/api/admin/analytics", requiresDB(h, method("GET", h.AdminAnalyticsEvents)))
 	mux.HandleFunc("/api/admin/payment-requests", requiresDB(h, method("GET", h.AdminPaymentRequests)))
 	mux.HandleFunc("/api/admin/analytics/events", requiresDB(h, method("GET", h.AdminAnalyticsEvents)))
 	mux.HandleFunc("/api/admin/grant-radar", requiresDB(h, h.GrantRadar))
@@ -123,7 +115,6 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/admin":           "/admin.html",
 					"/admin-payments":  "/admin-payments.html",
 					"/admin-analytics": "/admin-analytics.html",
-					"/admin":           "/admin.html",
 					"/dashboard":       "/dashboard.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
