@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Koschei Admin Control Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>
+    .hidden{display:none!important}.admin-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:24px}.admin-nav{display:flex;gap:8px;flex-wrap:wrap}.tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:12px}.tab{background:transparent;color:var(--text2);border:1px solid transparent;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:600}.tab.active{color:var(--accent);border-color:var(--border);background:var(--bg2)}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}.section-head h2{font-size:18px}.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.span-2{grid-column:span 2}.span-3{grid-column:span 3}.form-input[type=number]{width:100%}textarea.form-input{resize:vertical;min-height:86px}.actions{display:flex;gap:10px;flex-wrap:wrap}.table-wrap{overflow:auto}.data-table{width:100%;border-collapse:collapse;font-size:13px;min-width:880px}.data-table th,.data-table td{border-bottom:1px solid rgba(148,163,184,.16);padding:11px 10px;text-align:left;vertical-align:top}.data-table th{color:var(--text2);font-weight:600}.data-table a{color:var(--accent2)}.fit{font-size:18px;font-weight:700;color:var(--accent)}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px;margin-bottom:20px}.stat{padding:18px}.stat-value{font-size:28px;font-weight:700;margin-top:4px}.impact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.list{display:flex;flex-direction:column;gap:9px}.list-item{padding:10px 0;border-bottom:1px solid rgba(148,163,184,.14);font-size:13px}.list-item:last-child{border:0}.muted{color:var(--text2)}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.output{white-space:pre-wrap;max-height:420px;overflow:auto;background:var(--bg3);padding:16px;border-radius:8px;border:1px solid var(--border);font-size:13px}.login-card{max-width:440px;margin:60px auto}.status-apply_now{color:var(--accent)}.status-won{color:var(--accent2)}.status-rejected,.status-archived{color:var(--text2)}
+    @media(max-width:800px){.form-grid,.impact-grid{grid-template-columns:1fr}.span-2,.span-3{grid-column:span 1}.admin-head{flex-direction:column}}
+  </style>
+</head>
+<body>
+<main class="page">
+  <header class="admin-head">
+    <div><div class="page-title">Koschei Admin Control Center</div><div class="muted">Funding readiness, measurable traction, and grant operations.</div></div>
+    <nav class="admin-nav"><a class="btn btn-ghost" href="/admin-payments">Payments</a><a class="btn btn-ghost" href="/admin-analytics">Analytics</a><a class="btn btn-ghost" href="/hub">Hub</a></nav>
+  </header>
+  <div class="alert" id="message"></div>
+  <section class="card login-card" id="loginBox">
+    <form id="loginForm" style="display:flex;flex-direction:column;gap:14px">
+      <div><h2>Admin access</h2><p class="muted">Enter the server-configured admin password to load funding data.</p></div>
+      <div class="form-group"><label class="form-label" for="password">Admin password</label><input class="form-input" id="password" type="password" required autocomplete="current-password"></div>
+      <button class="btn btn-primary" type="submit">Open control center</button>
+    </form>
+  </section>
+
+  <section class="hidden" id="controlCenter">
+    <div class="tabs" role="tablist"><button class="tab active" data-tab="radar" type="button">Grant Radar</button><button class="tab" data-tab="impact" type="button">Proof of Impact</button></div>
+    <section id="radarPanel">
+      <div class="card" style="margin-bottom:18px">
+        <div class="section-head"><div><h2>Add opportunity</h2><p class="muted">Track a grant, bounty, or ecosystem funding program.</p></div></div>
+        <form id="grantForm" class="form-grid">
+          <div class="form-group span-2"><label class="form-label" for="title">Title *</label><input class="form-input" id="title" required maxlength="300"></div>
+          <div class="form-group"><label class="form-label" for="ecosystem">Ecosystem</label><input class="form-input" id="ecosystem" maxlength="200" placeholder="Base, Ethereum, Solana..."></div>
+          <div class="form-group span-2"><label class="form-label" for="sourceUrl">Source URL</label><input class="form-input" id="sourceUrl" type="url" maxlength="2000" placeholder="https://..."></div>
+          <div class="form-group"><label class="form-label" for="category">Category</label><input class="form-input" id="category" maxlength="200"></div>
+          <div class="form-group"><label class="form-label" for="rewardRange">Reward range</label><input class="form-input" id="rewardRange" maxlength="200" placeholder="$5k–$25k"></div>
+          <div class="form-group"><label class="form-label" for="deadline">Deadline</label><input class="form-input" id="deadline" maxlength="200" placeholder="Rolling or 2026-08-30"></div>
+          <div class="form-group"><label class="form-label" for="status">Status</label><select class="form-input" id="status"><option value="watching">Watching</option><option value="apply_now">Apply now</option><option value="applied">Applied</option><option value="won">Won</option><option value="rejected">Rejected</option><option value="archived">Archived</option></select></div>
+          <div class="form-group"><label class="form-label" for="fitScore">Fit score (0–100)</label><input class="form-input" id="fitScore" type="number" min="0" max="100" value="50" required></div>
+          <div class="form-group span-3"><label class="form-label" for="notes">Notes</label><textarea class="form-input" id="notes" maxlength="5000"></textarea></div>
+          <div class="span-3 actions"><button class="btn btn-primary" type="submit">Add opportunity</button><button class="btn btn-ghost" type="button" id="refreshRadar">Refresh radar</button></div>
+        </form>
+      </div>
+      <section class="card table-wrap"><div class="section-head"><h2>Opportunities</h2><span class="muted" id="grantCount">0 tracked</span></div><table class="data-table"><thead><tr><th>Fit</th><th>Opportunity</th><th>Ecosystem / category</th><th>Reward / deadline</th><th>Status</th><th>Notes</th></tr></thead><tbody id="grantBody"></tbody></table></section>
+    </section>
+
+    <section class="hidden" id="impactPanel">
+      <div class="section-head"><div><h2>Proof of Impact</h2><p class="muted">Grant-ready evidence generated from existing Koschei activity.</p></div><div class="actions"><button class="btn btn-ghost" id="refreshImpact" type="button">Refresh</button><button class="btn btn-primary" id="copySummary" type="button">Copy grant summary</button><button class="btn btn-primary" id="generateDraft" type="button">Generate application draft</button></div></div>
+      <div class="stats" id="metrics"></div>
+      <div class="impact-grid">
+        <section class="card"><h3>Latest outputs</h3><div class="list" id="latestOutputs"></div></section>
+        <section class="card"><h3>Latest chain checks</h3><div class="list" id="latestChains"></div></section>
+        <section class="card"><h3>Latest analytics</h3><div class="list" id="latestAnalytics"></div></section>
+      </div>
+      <section class="card hidden" id="draftCard" style="margin-top:18px"><div class="section-head"><h2>Application draft</h2><button class="btn btn-ghost" id="copyDraft" type="button">Copy draft</button></div><div class="output" id="draftOutput"></div></section>
+    </section>
+  </section>
+</main>
+<script>
+  const storageKey = 'koschei_admin_password';
+  const password = () => sessionStorage.getItem(storageKey) || '';
+  const el = id => document.getElementById(id);
+  let impactData = null;
+  const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[char]);
+  const showMessage = (text, kind='success') => { const el=document.getElementById('message'); el.textContent=text; el.className=`alert alert-${kind} show`; window.scrollTo({top:0,behavior:'smooth'}); };
+  async function adminCall(path, options={}) { return fetch(path, {...options, headers:{'Content-Type':'application/json','x-admin-password':password(),...(options.headers||{})}}); }
+  async function responseData(res, fallback) { const data=await res.json().catch(()=>({})); if(!res.ok) throw new Error(data.error||fallback); return data; }
+  function unlock() { document.getElementById('loginBox').classList.add('hidden'); document.getElementById('controlCenter').classList.remove('hidden'); }
+  function dateText(value) { return value ? new Date(value).toLocaleString() : '—'; }
+
+  async function loadRadar() {
+    const data=await responseData(await adminCall('/api/admin/grant-radar'),'Could not load Grant Radar'); unlock(); renderRadar(data.opportunities||[]);
+  }
+  function renderRadar(items) {
+    document.getElementById('grantCount').textContent=`${items.length} tracked`;
+    document.getElementById('grantBody').innerHTML=items.length ? items.map(item=>`<tr><td><span class="fit">${escapeHTML(item.fit_score)}</span>/100</td><td><strong>${escapeHTML(item.title)}</strong>${item.source_url?`<br><a href="${escapeHTML(item.source_url)}" target="_blank" rel="noopener noreferrer">Open source ↗</a>`:''}</td><td>${escapeHTML(item.ecosystem||'—')}<br><span class="muted">${escapeHTML(item.category||'—')}</span></td><td>${escapeHTML(item.reward_range||'—')}<br><span class="muted">${escapeHTML(item.deadline||'—')}</span></td><td><span class="badge badge-blue status-${escapeHTML(item.status)}">${escapeHTML(item.status.replaceAll('_',' '))}</span></td><td>${escapeHTML(item.notes||'—')}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">No opportunities tracked yet.</td></tr>';
+  }
+  async function addGrant(event) {
+    event.preventDefault(); const body={title:el('title').value,ecosystem:el('ecosystem').value,source_url:el('sourceUrl').value,category:el('category').value,reward_range:el('rewardRange').value,deadline:el('deadline').value,status:el('status').value,fit_score:Number(el('fitScore').value),notes:el('notes').value};
+    try { await responseData(await adminCall('/api/admin/grant-radar',{method:'POST',body:JSON.stringify(body)}),'Could not add opportunity'); event.target.reset(); el('fitScore').value=50; showMessage('Opportunity added to Grant Radar.'); await loadRadar(); } catch(error){showMessage(error.message,'error');}
+  }
+
+  async function loadImpact() { impactData=await responseData(await adminCall('/api/admin/proof-of-impact'),'Could not load Proof of Impact'); unlock(); renderImpact(impactData); }
+  function renderImpact(data) {
+    const fields=[['users_count','Users'],['active_users_estimate','Active users (30d)'],['metadata_outputs_count','Metadata outputs'],['risk_outputs_count','Risk outputs'],['watchlist_sources_count','Watchlist sources'],['web3_events_count','Web3 events'],['chain_checks_count','Chain checks'],['payment_requests_count','Payment requests']];
+    document.getElementById('metrics').innerHTML=fields.map(([key,label])=>`<article class="card stat"><div class="form-label">${escapeHTML(label)}</div><div class="stat-value">${escapeHTML(data[key]??0)}</div></article>`).join('');
+    renderList('latestOutputs',data.latest_outputs,item=>`<strong>${escapeHTML(item.output_type||'Output')}</strong> · ${escapeHTML(item.title||'Untitled')}<br><span class="muted">${escapeHTML(item.ecosystem||'web3')} · ${dateText(item.created_at)}</span>`);
+    renderList('latestChains',data.latest_chain_checks,item=>`<strong>${escapeHTML(item.chain)} / ${escapeHTML(item.network)}</strong> · ${item.healthy?'Healthy':'Needs review'}<br><span class="muted">${escapeHTML(item.provider)} · ${dateText(item.checked_at)}</span>`);
+    renderList('latestAnalytics',data.latest_analytics,item=>`<strong>${escapeHTML(item.event_name)}</strong><br><span class="muted">${escapeHTML(item.path||'—')} · ${dateText(item.created_at)}</span>`);
+  }
+  function renderList(id,items,template){document.getElementById(id).innerHTML=(items||[]).length?(items||[]).map(item=>`<div class="list-item">${template(item)}</div>`).join(''):'<div class="list-item muted">No activity yet.</div>';}
+  function grantSummary(data=impactData||{}) { return `Project name: Koschei Web3 Hub\nLive URL: https://tradepigloball.co/hub\nCategory: Web3 developer tooling, no-custody wallet intelligence, metadata, risk and monitoring tools\nCurrent modules: Auth, Hub, Metadata, Risk Scanner, Chain Health, Watchlist, Pricing, Admin\nNo private keys, no custody, no wallet connection required for core flows.\n\nProof of impact\nUsers: ${data.users_count??0}\nActive users estimate (last 30 days): ${data.active_users_estimate??0}\nMetadata outputs: ${data.metadata_outputs_count??0}\nRisk outputs: ${data.risk_outputs_count??0}\nWatchlist sources: ${data.watchlist_sources_count??0}\nWeb3 events: ${data.web3_events_count??0}\nChain checks: ${data.chain_checks_count??0}\nPayment requests: ${data.payment_requests_count??0}`; }
+  function applicationDraft(data=impactData||{}) { return `Koschei Web3 Hub — Grant Application Draft\n\nPROJECT OVERVIEW\nKoschei Web3 Hub is a live Web3 developer tooling and no-custody wallet intelligence platform. It gives builders and users practical metadata generation, risk scanning, chain health, monitoring, watchlist, pricing, and administration tools without requiring custody, private keys, or a wallet connection for core flows.\n\nLIVE PRODUCT\nhttps://tradepigloball.co/hub\n\nPROBLEM\nWeb3 builders and users often need several disconnected services to create metadata, review risk, monitor addresses, and confirm chain health. This fragmentation adds operational overhead and makes safe workflows harder to adopt.\n\nSOLUTION\nKoschei consolidates these workflows into one accessible hub with a Go backend and lightweight static frontend. The platform focuses on clear outputs, no-custody operation, and practical monitoring.\n\nCURRENT TRACTION\n- ${data.users_count??0} registered users\n- ${data.active_users_estimate??0} active users estimated in the last 30 days\n- ${data.metadata_outputs_count??0} metadata outputs generated\n- ${data.risk_outputs_count??0} risk outputs generated\n- ${data.watchlist_sources_count??0} watchlist sources monitored\n- ${data.web3_events_count??0} Web3 events recorded\n- ${data.chain_checks_count??0} chain health checks completed\n- ${data.payment_requests_count??0} payment requests recorded\n\nCURRENT MODULES\nAuth, Hub, Metadata, Risk Scanner, Chain Health, Watchlist, Pricing, and Admin.\n\nFUNDING USE\nGrant funding will support deeper ecosystem integrations, stronger impact reporting, improved monitoring coverage, product hardening, and onboarding documentation.\n\nSECURITY AND USER PROTECTION\nKoschei never exposes or requests private keys, does not take custody of user assets, and does not require wallet connection for core flows.\n\nMILESTONE DIRECTION\n1. Expand ecosystem-specific chain and watchlist coverage.\n2. Improve evidence-based risk and metadata outputs.\n3. Publish measurable adoption and usage reporting.\n4. Deliver ecosystem onboarding material and live demos.`; }
+  async function copyText(text,label){try{await navigator.clipboard.writeText(text);showMessage(`${label} copied.`);}catch(_){showMessage('Clipboard access was blocked. Use the generated text panel to copy manually.','error');}}
+
+  document.querySelectorAll('.tab').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button)); const impact=button.dataset.tab==='impact'; el('radarPanel').classList.toggle('hidden',impact); el('impactPanel').classList.toggle('hidden',!impact); if(impact&&!impactData){try{await loadImpact();}catch(error){showMessage(error.message,'error');}}}));
+  document.getElementById('loginForm').addEventListener('submit',async event=>{event.preventDefault();sessionStorage.setItem(storageKey,document.getElementById('password').value);try{await loadRadar();}catch(error){sessionStorage.removeItem(storageKey);showMessage(error.message,'error');}});
+  document.getElementById('grantForm').addEventListener('submit',addGrant);
+  document.getElementById('refreshRadar').addEventListener('click',()=>loadRadar().catch(error=>showMessage(error.message,'error')));
+  document.getElementById('refreshImpact').addEventListener('click',()=>loadImpact().catch(error=>showMessage(error.message,'error')));
+  document.getElementById('copySummary').addEventListener('click',()=>copyText(grantSummary(),'Grant summary'));
+  document.getElementById('generateDraft').addEventListener('click',()=>{const text=applicationDraft();el('draftOutput').textContent=text;el('draftCard').classList.remove('hidden');el('draftCard').scrollIntoView({behavior:'smooth'});});
+  document.getElementById('copyDraft').addEventListener('click',()=>copyText(el('draftOutput').textContent,'Application draft'));
+  if(password()) loadRadar().catch(error=>{sessionStorage.removeItem(storageKey);showMessage(error.message,'error');});
+</script>
+</body>
+</html>
