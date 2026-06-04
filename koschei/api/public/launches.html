@@ -1,41 +1,208 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Community-submitted Solana token launch risk signals from Koschei Rug Radar.">
-  <link rel="stylesheet" href="/css/koschei.css">
-  <title>Rug Radar — Koschei</title>
-  <style>
-    .radar-hero{padding:38px;background:radial-gradient(circle at 85% 20%,rgba(56,255,160,.16),transparent 30%),linear-gradient(135deg,#111118,#101e19);border:1px solid #2a2a3a;border-radius:18px;margin-bottom:22px}.radar-hero h1{margin-bottom:8px}.radar-hero p{max-width:720px;color:var(--text2)}.radar-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.75fr);gap:20px;align-items:start}.stack{display:grid;gap:14px}.feed{display:grid;gap:12px}.launch{padding:18px;border:1px solid #2a2a3a;border-radius:14px;background:#111118}.launch-head,.launch-meta,.risk-row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.mint{font-family:monospace;color:#c7f9df;overflow-wrap:anywhere}.launch-meta{justify-content:flex-start;color:var(--text2);font-size:13px;margin-top:10px}.risk{font-weight:700}.risk-high{color:#ff758f}.risk-medium{color:#ffd479}.risk-low{color:#74efad}.risk-unknown{color:var(--text2)}.summary{color:var(--text2);margin:12px 0 0}.empty{padding:32px;text-align:center;color:var(--text2);border:1px dashed #343445;border-radius:14px}.form-help{font-size:12px;color:var(--text2)}.checks{display:grid;grid-template-columns:1fr 1fr;gap:10px}.checks label{display:flex;gap:8px;align-items:center}.sticky{position:sticky;top:20px}@media(max-width:850px){.radar-grid{grid-template-columns:1fr}.sticky{position:static}}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Rug Radar — Live Token Launch Monitor | Koschei</title>
+<meta name="description" content="Real-time Solana token launch monitor. Submit any token for instant rug pull risk analysis. Free, no wallet needed.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/koschei.css">
+<style>
+:root{--accent:#00ff88;--accent2:#00ccff;--danger:#ff4466;--warn:#ffaa00;--text:#f0f0ff;--text2:#8888aa;--bg:#030309;--radius:14px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+.blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.blob{position:absolute;border-radius:50%;filter:blur(90px);animation:bf 10s ease-in-out infinite;}
+.b1{width:500px;height:500px;background:rgba(255,68,102,.1);top:-100px;right:-80px;}
+.b2{width:400px;height:400px;background:rgba(255,170,0,.08);bottom:-80px;left:-60px;animation-delay:-5s;}
+.b3{width:300px;height:300px;background:rgba(0,255,136,.06);top:40%;left:30%;animation-delay:-8s;}
+@keyframes bf{0%,100%{transform:translate(0,0)}50%{transform:translate(15px,-15px)}}
+.glass{background:rgba(255,255,255,.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);}
+.nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:rgba(3,3,9,.85);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.07);}
+.nav-logo{font-size:17px;font-weight:800;color:var(--accent);text-decoration:none;}
+.nav-links{display:flex;gap:6px;}
+.nav-link{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:8px;}
+.nav-link:hover,.nav-link.active{color:var(--accent);}
+.page{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:36px 20px 60px;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .15s;}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;}
+.btn-primary:hover{opacity:.88;transform:translateY(-1px);}
+.btn-ghost{background:rgba(255,255,255,.06);color:var(--text2);border:1px solid rgba(255,255,255,.1);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.form-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:var(--text);font-size:14px;padding:11px 14px;outline:none;width:100%;transition:border-color .15s;font-family:'JetBrains Mono',monospace;}
+.form-input:focus{border-color:var(--accent);}
+.form-input::placeholder{color:var(--text2);}
+.alert{padding:10px 14px;border-radius:10px;font-size:13px;display:none;margin-top:10px;}
+.alert.show{display:block;}
+.alert-error{background:rgba(255,68,102,.12);border:1px solid var(--danger);color:var(--danger);}
+.alert-success{background:rgba(0,255,136,.1);border:1px solid var(--accent);color:var(--accent);}
+.pulse{width:8px;height:8px;border-radius:50%;background:var(--danger);box-shadow:0 0 12px var(--danger);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.2)}}
+.token-row{display:grid;grid-template-columns:1fr auto auto auto;gap:12px;align-items:center;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.05);transition:background .15s;}
+.token-row:hover{background:rgba(255,255,255,.02);}
+.token-row:last-child{border-bottom:none;}
+.token-addr{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);}
+.score-pill{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;min-width:60px;text-align:center;}
+.score-safe{background:rgba(0,255,136,.15);color:var(--accent);}
+.score-low{background:rgba(0,204,255,.15);color:var(--accent2);}
+.score-medium{background:rgba(255,170,0,.15);color:var(--warn);}
+.score-high{background:rgba(255,119,0,.15);color:#ff7700;}
+.score-danger{background:rgba(255,68,102,.15);color:var(--danger);}
+.flag{font-size:11px;padding:2px 7px;border-radius:6px;font-weight:600;}
+.flag-good{background:rgba(0,255,136,.1);color:var(--accent);}
+.flag-bad{background:rgba(255,68,102,.1);color:var(--danger);}
+.summary-text{font-size:12px;color:var(--text2);margin-top:3px;}
+.spinner{width:15px;height:15px;border:2px solid rgba(0,255,136,.2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.stats-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px;}
+.stat-chip{padding:8px 16px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.empty{text-align:center;padding:60px 20px;color:var(--text2);}
+</style>
 </head>
 <body>
-  <nav class="nav"><a class="nav-logo" href="/hub">K Koschei</a><div class="nav-links"><a class="nav-link" href="/hub">Hub</a><a class="nav-link" href="/token-scanner.html">Token Scanner</a><a class="nav-link" href="/account">Account</a></div></nav>
-  <main class="page">
-    <section class="radar-hero"><span class="badge badge-green">📡 Community intelligence</span><h1>Rug Radar</h1><p>Track newly submitted Solana token launches and review preliminary community risk signals before doing your own research.</p></section>
-    <div class="radar-grid">
-      <section><div class="launch-head" style="margin-bottom:14px"><div><h2 style="margin:0">Latest launches</h2><span id="count" class="form-help">Loading feed…</span></div><button id="refresh" class="btn">Refresh</button></div><div id="feed" class="feed"><div class="empty">Scanning the radar…</div></div></section>
-      <aside class="card stack sticky"><div><h2 style="margin:0 0 6px">Submit a launch</h2><p class="form-help">Sign in to add public, preliminary token signals.</p></div><form id="submitForm" class="stack">
-        <label class="form-label">Mint address<input class="form-input" name="mint_address" required maxlength="64" placeholder="Solana token mint"></label>
-        <label class="form-label">Network<select class="form-input" name="network"><option value="solana-mainnet">Solana Mainnet</option><option value="solana-devnet">Solana Devnet</option><option value="solana-testnet">Solana Testnet</option></select></label>
-        <div class="risk-row"><label class="form-label" style="flex:1">Risk score<input class="form-input" name="risk_score" type="number" min="0" max="100" value="0"></label><label class="form-label" style="flex:1">Risk level<select class="form-input" name="risk_level"><option>UNKNOWN</option><option>LOW</option><option>MEDIUM</option><option>HIGH</option></select></label></div>
-        <label class="form-label">Risk summary<textarea class="form-input" name="risk_summary" maxlength="1000" rows="4" placeholder="Briefly describe the observed signals"></textarea></label>
-        <label class="form-label">Transaction count<input class="form-input" name="tx_count" type="number" min="0" value="0"></label>
-        <div class="checks"><label><input type="checkbox" name="is_renounced"> Renounced</label><label><input type="checkbox" name="is_frozen"> Frozen</label></div>
-        <button class="btn btn-primary">Submit to radar</button><div id="status" class="form-help">Never submit private keys or seed phrases.</div>
-      </form></aside>
+<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<nav class="nav">
+  <a href="/hub.html" class="nav-logo">K <span style="color:var(--text);font-weight:500">Koschei</span></a>
+  <div class="nav-links">
+    <a href="/hub.html" class="nav-link">Hub</a>
+    <a href="/launches.html" class="nav-link active">Rug Radar</a>
+    <a href="/token-scanner.html" class="nav-link">Scanner</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div style="text-align:center;margin-bottom:32px;">
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;">
+      <div class="pulse"></div>
+      <span style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--danger);">Live Monitor</span>
     </div>
-  </main>
-  <script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=1"></script>
-  <script>
-    const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-    const short=v=>v.length>18?v.slice(0,8)+'…'+v.slice(-8):v;
-    const riskClass=v=>['high','medium','low'].includes(String(v).toLowerCase())?'risk-'+String(v).toLowerCase():'risk-unknown';
-    async function loadFeed(){feed.innerHTML='<div class="empty">Scanning the radar…</div>';try{const r=await fetch('/api/rug-radar/feed');const data=await r.json();if(!r.ok)throw new Error(data.error||'Feed unavailable');count.textContent=`${data.count||0} launch${data.count===1?'':'es'} on radar`;feed.innerHTML=data.launches?.length?data.launches.map(x=>`<article class="launch"><div class="launch-head"><strong class="mint" title="${esc(x.mint_address)}">${esc(short(x.mint_address))}</strong><span class="risk ${riskClass(x.risk_level)}">${esc(x.risk_level)} · ${esc(x.risk_score)}/100</span></div><div class="launch-meta"><span>${esc(x.network)}</span><span>•</span><span>${esc(x.tx_count)} txs</span><span>•</span><span>${x.is_renounced?'Renounced':'Not renounced'}</span><span>•</span><span>${x.is_frozen?'Frozen':'Not frozen'}</span></div>${x.risk_summary?`<p class="summary">${esc(x.risk_summary)}</p>`:''}</article>`).join(''):'<div class="empty">No launches submitted yet. Be the first signal on the radar.</div>'}catch(e){count.textContent='Feed unavailable';feed.innerHTML=`<div class="empty">${esc(e.message)}</div>`}}
-    refresh.onclick=loadFeed;
-    submitForm.onsubmit=async e=>{e.preventDefault();status.textContent='Submitting…';const fd=new FormData(submitForm),body=Object.fromEntries(fd);body.risk_score=Number(body.risk_score);body.tx_count=Number(body.tx_count);body.is_renounced=fd.has('is_renounced');body.is_frozen=fd.has('is_frozen');try{const r=await KoscheiAuth.apiCall('/api/rug-radar/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Submission failed');status.textContent='Launch added to Rug Radar.';submitForm.reset();await loadFeed()}catch(e){status.textContent=e.message||'Submission failed'}};
-    (async()=>{await KoscheiAuth.init();loadFeed()})();
-  </script>
+    <h1 style="font-size:28px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;background:linear-gradient(135deg,#fff,rgba(255,68,102,.8));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Rug Radar</h1>
+    <p style="color:var(--text2);font-size:14px;max-width:480px;margin:0 auto;">Submit any Solana token for instant AI-powered rug pull risk analysis. Community-driven safety database.</p>
+  </div>
+
+  <!-- Submit form -->
+  <div class="glass" style="padding:20px;margin-bottom:24px;">
+    <div style="font-size:13px;font-weight:600;margin-bottom:12px;">🔍 Submit Token for Analysis</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <input class="form-input" type="text" id="mintInput" placeholder="Token mint address..." style="flex:1;min-width:200px;">
+      <select class="form-input" id="netSelect" style="width:auto;font-family:'Inter',sans-serif;">
+        <option value="solana-mainnet">Mainnet</option>
+        <option value="solana-devnet">Devnet</option>
+      </select>
+      <button class="btn btn-primary" id="submitBtn" onclick="submitToken()">Analyze</button>
+    </div>
+    <div class="alert" id="alert"></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="statsRow">
+    <div class="glass stat-chip"><span style="color:var(--accent);" id="totalCount">0</span> tokens analyzed</div>
+    <div class="glass stat-chip"><span style="color:var(--danger);" id="dangerCount">0</span> dangers</div>
+    <div class="glass stat-chip"><span style="color:var(--warn);" id="riskCount">0</span> risky</div>
+    <div class="glass stat-chip"><span style="color:var(--accent);" id="safeCount">0</span> safe</div>
+    <button class="btn btn-ghost" onclick="loadFeed()" style="padding:6px 14px;font-size:12px;margin-left:auto;">↻ Refresh</button>
+  </div>
+
+  <!-- Feed -->
+  <div class="glass" style="overflow:hidden;" id="feedContainer">
+    <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:13px;font-weight:600;">Recent Token Analyses</div>
+      <div style="font-size:11px;color:var(--text2);" id="updateTime">Loading...</div>
+    </div>
+    <div id="feedList">
+      <div class="empty"><div style="font-size:32px;margin-bottom:12px;">🕵️</div><div>No tokens analyzed yet.</div><div style="font-size:12px;margin-top:6px;">Submit the first token above.</div></div>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-top:20px;">
+    <button class="btn btn-primary" onclick="share()" style="font-size:13px;">🐦 Share Rug Radar</button>
+  </div>
+</div>
+
+<script src="/js/koschei-auth.js?v=3"></script>
+<script>
+const scoreClass={SAFE:'score-safe','LOW RISK':'score-low','MEDIUM RISK':'score-medium','HIGH RISK':'score-high',DANGER:'score-danger',UNKNOWN:'score-medium'};
+
+(async()=>{
+  await KoscheiAuth.init();
+  loadFeed();
+  setInterval(loadFeed,30000);
+})();
+
+async function loadFeed(){
+  try{
+    const res=await fetch('/api/rug-radar/feed');
+    if(!res.ok)return;
+    const data=await res.json();
+    const launches=data.launches||[];
+    document.getElementById('updateTime').textContent=`Updated ${new Date().toLocaleTimeString()}`;
+    document.getElementById('totalCount').textContent=launches.length;
+    document.getElementById('dangerCount').textContent=launches.filter(l=>l.risk_level==='DANGER').length;
+    document.getElementById('riskCount').textContent=launches.filter(l=>['HIGH RISK','MEDIUM RISK'].includes(l.risk_level)).length;
+    document.getElementById('safeCount').textContent=launches.filter(l=>['SAFE','LOW RISK'].includes(l.risk_level)).length;
+    if(!launches.length){
+      document.getElementById('feedList').innerHTML='<div class="empty"><div style="font-size:32px;margin-bottom:12px;">🕵️</div><div>No tokens analyzed yet.</div><div style="font-size:12px;margin-top:6px;">Submit the first token above.</div></div>';
+      return;
+    }
+    document.getElementById('feedList').innerHTML=launches.map(l=>{
+      const addr=l.mint_address;
+      const short=addr.slice(0,8)+'...'+addr.slice(-6);
+      const sc=scoreClass[l.risk_level]||'score-medium';
+      const age=new Date(l.created_at).toLocaleDateString();
+      return `<div class="token-row">
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:2px;">${esc(short)}</div>
+          <div class="summary-text">${esc(l.risk_summary||'—')}</div>
+          <div style="display:flex;gap:4px;margin-top:4px;">
+            <span class="flag ${l.is_renounced?'flag-good':'flag-bad'}">${l.is_renounced?'✓ Renounced':'✗ Mint Active'}</span>
+            ${l.is_frozen?'<span class="flag flag-bad">✗ Freeze Auth</span>':''}
+          </div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:20px;font-weight:800;">${l.risk_score}</div>
+          <div style="font-size:10px;color:var(--text2);">score</div>
+        </div>
+        <div><span class="score-pill ${sc}">${esc(l.risk_level)}</span></div>
+        <div style="font-size:11px;color:var(--text2);text-align:right;">
+          <div>${esc(l.network)}</div>
+          <div>${age}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){console.error(e);}
+}
+
+async function submitToken(){
+  const mint=document.getElementById('mintInput').value.trim();
+  const network=document.getElementById('netSelect').value;
+  const btn=document.getElementById('submitBtn');
+  clearAlert();
+  if(!mint){showAlert('Enter a token mint address.','error');return;}
+  if(!KoscheiAuth.isLoggedIn()){showAlert('Sign in to submit tokens.','error');return;}
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    const res=await KoscheiAuth.apiCall('/api/rug-radar/submit',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mint_address:mint,network})
+    });
+    if(!res)throw new Error('Request failed');
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.message||data.error||'Failed');
+    document.getElementById('mintInput').value='';
+    showAlert(`Analyzed! Score: ${data.risk_score}/100 — ${data.risk_level}`,'success');
+    setTimeout(loadFeed,1000);
+  }catch(e){showAlert(e.message||'Submit failed.','error');}
+  finally{btn.disabled=false;btn.textContent='Analyze';}
+}
+
+function share(){
+  const text=`🚨 Rug Radar — Free Solana Token Safety Monitor\n\nSubmit any token → get instant AI risk score\nCommunity-driven database grows daily\n\ntradepigloball.co/launches.html\n\n#Solana #SolanaSafety #RugPull`;
+  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,'_blank');
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function showAlert(m,t){const e=document.getElementById('alert');e.textContent=m;e.className=`alert alert-${t==='error'?'error':'success'} show`;}
+function clearAlert(){document.getElementById('alert').className='alert';}
+</script>
 </body>
 </html>
