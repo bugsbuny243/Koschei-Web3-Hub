@@ -132,9 +132,118 @@ func (h *Handler) GrantGenerate(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "invalid_body"})
 		return
 	}
+	if q.Ecosystem == "" {
+		q.Ecosystem = "Solana"
+	}
+	if q.Focus == "" {
+		q.Focus = "Web3 developer tooling, security and intelligence"
+	}
+
+	aiKey := os.Getenv("TOGETHER_API_KEY")
+	model := os.Getenv("TOGETHER_MODEL")
+	if model == "" {
+		model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+	}
+
+	if aiKey == "" {
+		h.logTool("", "grant_autopilot", "fallback")
+		writeJSON(w, 200, grantContent(q.Ecosystem, q.Focus))
+		return
+	}
+
+	prompt := fmt.Sprintf(`You are an expert grant writer for Web3 and blockchain projects. Write a compelling, professional grant application for the following project.
+
+PROJECT: Koschei Web3 Intelligence OS
+WEBSITE: https://tradepigloball.co
+TARGET ECOSYSTEM: %s
+FOCUS AREA: %s
+
+WHAT KOSCHEI DOES:
+- AI-powered Solana Program Security Scanner (detect vulnerabilities in smart contracts)
+- Real-time chain health monitoring for 6 networks (Solana, ETH, Base, Arbitrum, Polygon, Optimism)
+- TX Decoder: explains any Solana transaction in plain English with risk scoring
+- Wallet Reputation Score: 0-100 trust score for any Solana wallet
+- AI Metadata Studio: generate NFT and game asset metadata
+- On-chain Risk Scanner with behavioral analysis
+- Watchlist: monitor wallets and contracts via Alchemy webhooks
+- Intelligence Graph: visual on-chain relationship mapping
+- Cross-chain risk analysis and Sybil detection
+- No custody, no private keys, read-only architecture
+- Open REST API (public endpoints, no auth required for chain health)
+- Built with Go backend + static HTML frontend, deployed on Railway
+
+STACK: Go, PostgreSQL (Neon), Neon Auth, Alchemy, Together AI, Railway
+
+Write a grant application with these sections:
+1. EXECUTIVE SUMMARY (2-3 sentences, punchy)
+2. PROBLEM STATEMENT (what problem does this solve for %s developers)
+3. SOLUTION (how Koschei solves it)
+4. ECOSYSTEM VALUE (why this matters for %s specifically)
+5. MILESTONES (3 concrete, measurable milestones with timeframes)
+6. BUDGET JUSTIFICATION (for $25,000 - $50,000 range)
+7. TEAM (solo developer from Turkey, building since 2024)
+
+Be specific, compelling, and avoid generic Web3 jargon. Focus on real impact.
+Write in plain text, no markdown headers, just section titles in CAPS.`, q.Ecosystem, q.Focus, q.Ecosystem, q.Ecosystem)
+
+	reqBody, _ := json.Marshal(map[string]any{
+		"model":       model,
+		"max_tokens":  1200,
+		"temperature": 0.7,
+		"messages":    []map[string]string{{"role": "user", "content": prompt}},
+	})
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	aiReq, _ := http.NewRequest("POST", "https://api.together.xyz/v1/chat/completions", bytes.NewReader(reqBody))
+	aiReq.Header.Set("Authorization", "Bearer "+aiKey)
+	aiReq.Header.Set("Content-Type", "application/json")
+
+	aiResp, err := client.Do(aiReq)
+	if err != nil {
+		h.logTool("", "grant_autopilot", "ai_error")
+		writeJSON(w, 200, grantContent(q.Ecosystem, q.Focus))
+		return
+	}
+	defer aiResp.Body.Close()
+	aiData, _ := io.ReadAll(aiResp.Body)
+
+	var aiResult struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	generatedText := ""
+	if json.Unmarshal(aiData, &aiResult) == nil && len(aiResult.Choices) > 0 {
+		generatedText = strings.TrimSpace(aiResult.Choices[0].Message.Content)
+	}
+
+	if generatedText == "" {
+		h.logTool("", "grant_autopilot", "fallback")
+		writeJSON(w, 200, grantContent(q.Ecosystem, q.Focus))
+		return
+	}
+
+	milestones := []string{
+		"Month 1-2: Ship Program Security Scanner with automated vulnerability detection and public API",
+		"Month 3-4: Launch x402 micropayment integration and SDK for developer adoption",
+		"Month 5-6: Deploy Compliance Dashboard for enterprise users, reach 500+ API users",
+	}
+
 	h.logTool("", "grant_autopilot", "generated")
 	h.trackEvent("", "grant_autopilot_generate", r.URL.Path)
-	writeJSON(w, 200, grantContent(q.Ecosystem, q.Focus))
+
+	writeJSON(w, 200, map[string]any{
+		"ecosystem":           q.Ecosystem,
+		"project_summary":     "Koschei Web3 Intelligence OS: AI-powered, no-custody developer tooling for the Solana ecosystem.",
+		"grant_fit_reasoning": fmt.Sprintf("Koschei provides public-good infrastructure for %s developers with open APIs, security tooling, and AI-powered analysis.", q.Ecosystem),
+		"milestones":          milestones,
+		"estimated_budget":    map[string]any{"currency": "USD", "estimated_total": 25000},
+		"generated_text":      generatedText,
+		"ai_powered":          true,
+	})
 }
 func (h *Handler) GrantSave(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
