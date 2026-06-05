@@ -170,7 +170,6 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/project-radar":     "/project-radar.html",
 					"/agent-api":         "/agent-api.html",
 					"/pay-per-tool":      "/pay-per-tool.html",
-					"/project-radar":     "/project-radar.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())

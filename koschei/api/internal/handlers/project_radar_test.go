@@ -7,8 +7,14 @@ func TestNormalizeProjectRadarRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("normalizeProjectRadarRequest() err = %v", err)
 	}
+	if req.WebsiteURL != "https://example.org" {
+		t.Fatalf("WebsiteURL = %q, want https://example.org", req.WebsiteURL)
+	}
 	if req.TwitterHandle != "demo_project" {
 		t.Fatalf("TwitterHandle = %q, want demo_project", req.TwitterHandle)
+	}
+	if req.Ecosystem != "Solana" {
+		t.Fatalf("Ecosystem = %q, want Solana", req.Ecosystem)
 	}
 	if req.Category != "depin" {
 		t.Fatalf("Category = %q, want depin", req.Category)
@@ -23,16 +29,31 @@ func TestNormalizeProjectRadarRequestRejectsUnsupportedCategory(t *testing.T) {
 }
 
 func TestBuildProjectRadarResultAlwaysNeedsManualReview(t *testing.T) {
-	req, err := normalizeProjectRadarRequest(projectRadarRequest{ProjectName: "Demo", Website: "https://example.org", TwitterHandle: "@demo", ChainEcosystem: "Solana", Category: "security"})
+	req, err := normalizeProjectRadarRequest(projectRadarRequest{
+		ProjectName:      "Demo",
+		Website:          "https://example.org",
+		TwitterHandle:    "@demo",
+		ChainEcosystem:   "Solana",
+		Category:         "security",
+		Description:      "Demo helps builders solve security review needs with public transparency workflows and no-custody safety checks before launch.",
+		KnownTraction:    "Open docs and GitHub prototype.",
+		TokenMintAddress: "",
+	})
 	if err != nil {
 		t.Fatalf("normalizeProjectRadarRequest() err = %v", err)
 	}
-	result := buildProjectRadarResult(req, projectRadarTokenSignals{Hints: []string{"No token mint provided; token-specific risk hints need manual review."}}, projectRadarWalletSignals{Hints: []string{"No wallet address provided; wallet reputation hints need manual review."}})
-	if !result.NeedsManualReview {
-		t.Fatal("NeedsManualReview = false, want true")
+	result := buildProjectRadarResult(req)
+	if !result.ManualReviewNeeded {
+		t.Fatal("ManualReviewNeeded = false, want true")
 	}
-	if result.RiskScore < 0 || result.RiskScore > 100 || result.OpportunityScore < 0 || result.OpportunityScore > 100 || result.PublicGoodScore < 0 || result.PublicGoodScore > 100 {
-		t.Fatalf("scores out of bounds: %#v", result)
+	for label, score := range map[string]int{
+		"risk":        result.RiskScore.Score,
+		"opportunity": result.OpportunityScore.Score,
+		"public_good": result.PublicGoodScore.Score,
+	} {
+		if score < 0 || score > 100 {
+			t.Fatalf("%s score out of bounds: %d", label, score)
+		}
 	}
 	if result.Disclaimer == "" {
 		t.Fatal("Disclaimer is empty")

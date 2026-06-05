@@ -16,11 +16,13 @@ const projectRadarDisclaimer = "Project Radar is informational and not financial
 type projectRadarRequest struct {
 	ProjectName         string `json:"project_name"`
 	WebsiteURL          string `json:"website_url"`
+	Website             string `json:"website"`
 	TwitterHandle       string `json:"twitter_handle"`
 	GitHubURL           string `json:"github_url"`
 	TokenMintAddress    string `json:"token_mint_address"`
 	PublicWalletAddress string `json:"public_wallet_address"`
 	Ecosystem           string `json:"ecosystem"`
+	ChainEcosystem      string `json:"chain_ecosystem"`
 	Category            string `json:"category"`
 	Description         string `json:"description"`
 	KnownTraction       string `json:"known_traction"`
@@ -68,9 +70,17 @@ func (h *Handler) ProjectRadar(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
 		return
 	}
-	req = normalizeProjectRadarRequest(req)
+	req, err := normalizeProjectRadarRequest(req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
 	if req.ProjectName == "" || req.Category == "" || req.Description == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "project_name_category_description_required"})
+		return
+	}
+	if containsSecretPhrase(req.ProjectName + " " + req.Description + " " + req.KnownTraction + " " + req.Notes) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "secrets_not_allowed"})
 		return
 	}
 
@@ -113,19 +123,49 @@ func projectRadarInsufficientOutputsResponse() map[string]string {
 	}
 }
 
-func normalizeProjectRadarRequest(req projectRadarRequest) projectRadarRequest {
+func (h *Handler) ProjectRadarScan(w http.ResponseWriter, r *http.Request) {
+	h.ProjectRadar(w, r)
+}
+
+func normalizeProjectRadarRequest(req projectRadarRequest) (projectRadarRequest, error) {
 	req.ProjectName = strings.TrimSpace(req.ProjectName)
-	req.WebsiteURL = strings.TrimSpace(req.WebsiteURL)
-	req.TwitterHandle = strings.TrimSpace(req.TwitterHandle)
+	req.WebsiteURL = firstNonEmptyString(req.WebsiteURL, req.Website)
+	req.Website = strings.TrimSpace(req.Website)
+	req.TwitterHandle = normalizeProjectRadarTwitterHandle(req.TwitterHandle)
 	req.GitHubURL = strings.TrimSpace(req.GitHubURL)
 	req.TokenMintAddress = strings.TrimSpace(req.TokenMintAddress)
 	req.PublicWalletAddress = strings.TrimSpace(req.PublicWalletAddress)
-	req.Ecosystem = strings.TrimSpace(req.Ecosystem)
+	req.Ecosystem = firstNonEmptyString(req.Ecosystem, req.ChainEcosystem)
+	req.ChainEcosystem = strings.TrimSpace(req.ChainEcosystem)
 	req.Category = strings.ToLower(strings.TrimSpace(req.Category))
 	req.Description = strings.TrimSpace(req.Description)
 	req.KnownTraction = strings.TrimSpace(req.KnownTraction)
 	req.Notes = strings.TrimSpace(req.Notes)
-	return req
+	if req.Category != "" && !validProjectRadarCategory(req.Category) {
+		return req, fmt.Errorf("unsupported_project_category")
+	}
+	return req, nil
+}
+
+func normalizeProjectRadarTwitterHandle(handle string) string {
+	handle = strings.TrimSpace(handle)
+	if handle == "" {
+		return ""
+	}
+	handle = strings.TrimPrefix(handle, "@")
+	if strings.HasPrefix(strings.ToLower(handle), "https://x.com/") || strings.HasPrefix(strings.ToLower(handle), "https://twitter.com/") {
+		parts := strings.SplitN(handle, "/", 4)
+		if len(parts) >= 4 {
+			handle = parts[3]
+		}
+	}
+	handle = strings.SplitN(handle, "?", 2)[0]
+	handle = strings.SplitN(handle, "/", 2)[0]
+	return strings.TrimPrefix(strings.TrimSpace(handle), "@")
+}
+
+func validProjectRadarCategory(category string) bool {
+	return inSet(category, "payments", "depin", "ai agent", "security", "token", "nft", "gaming", "consumer app", "infrastructure", "public good", "developer tool", "education")
 }
 
 func buildProjectRadarResult(req projectRadarRequest) projectRadarResult {
@@ -413,4 +453,8 @@ func containsAny(s string, needles []string) bool {
 		}
 	}
 	return false
+}
+
+func containsSecretPhrase(s string) bool {
+	return containsAny(s, []string{"seed phrase", "secret phrase", "private key", "mnemonic", "recovery phrase"})
 }
