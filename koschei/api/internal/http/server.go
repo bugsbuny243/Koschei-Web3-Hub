@@ -112,6 +112,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/rug-radar/feed", method("GET", h.RugRadarFeed))
 	mux.HandleFunc("/api/rug-radar/submit", requiresDB(h, handlers.RequireAuth(method("POST", h.RugRadarSubmit))))
 	mux.HandleFunc("/api/program/scan", requiresDB(h, handlers.RequireAuth(method("POST", h.ProgramScan))))
+	mux.HandleFunc("/api/project-radar/scan", requiresDB(h, handlers.RequireAuth(method("POST", h.ProjectRadarScan))))
 	mux.HandleFunc("/api/ai/generate", requiresDB(h, handlers.RequireAuth(method("POST", h.AIGenerate))))
 	mux.HandleFunc("/api/ai/jobs", requiresDB(h, handlers.RequireAuth(method("GET", h.AIJobs))))
 	mux.HandleFunc("/api/v1/games", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateGameProject))))
@@ -167,6 +168,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/project-radar":     "/project-radar.html",
 					"/agent-api":         "/agent-api.html",
 					"/pay-per-tool":      "/pay-per-tool.html",
+					"/project-radar":     "/project-radar.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())
