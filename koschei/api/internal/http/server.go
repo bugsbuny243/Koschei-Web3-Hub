@@ -29,6 +29,8 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/web3/health", method("GET", h.Web3Health))
 	mux.HandleFunc("/api/web3/health/logs", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3HealthLogs))))
 	mux.HandleFunc("/api/analytics/event", method("POST", h.AnalyticsEvent))
+	mux.HandleFunc("/ads.txt", method("GET", adsTXT))
+	mux.HandleFunc("/robots.txt", method("GET", robotsTXT))
 	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok"})
@@ -182,6 +184,23 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 		}
 	}
 	return securityHeaders(cors(apiReadiness(db, mux), corsOrigin))
+}
+
+const adsTXTBody = "google.com, pub-6081394144742471, DIRECT, f08c47fec0942fa0"
+
+const robotsTXTBody = "User-agent: *\nAllow: /\n\nSitemap: https://tradepigloball.co/sitemap.xml"
+
+func adsTXT(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("X-Robots-Tag", "all")
+	_, _ = w.Write([]byte(adsTXTBody))
+}
+
+func robotsTXT(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = w.Write([]byte(robotsTXTBody))
 }
 
 func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
