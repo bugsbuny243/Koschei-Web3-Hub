@@ -147,6 +147,8 @@
 
   function loadExample() {
     document.getElementById('sigInput').value = EXAMPLE_SIGS[0];
+    displayResult({ risk_level: 'Demo example', explanation: 'Demo example — no backend execution, no credit decrement, and no paid output saved.', status: 'demo', fee_sol: '0', network: 'solana-devnet', programs: ['Demo program'] });
+    showAlert('Demo example — no credits used.');
   }
 
   async function decode() {
@@ -170,14 +172,14 @@
 
       if (!res || !res.ok) {
         const err = res ? await res.json().catch(() => ({})) : {};
-        throw new Error(err.error || `Request failed (${res?.status})`);
+        throw new Error(err.message || err.error || `Request failed (${res?.status})`);
       }
 
       const data = await res.json();
       displayResult(data);
 
     } catch (err) {
-      showAlert(err.message || 'Decode failed.');
+      showAlert(err.message || 'Real execution requires credits. Demo examples are free.');
     } finally {
       btn.disabled = false;
       btn.textContent = '🔍 Decode';

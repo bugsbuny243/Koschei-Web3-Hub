@@ -63,7 +63,7 @@ func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !isPrivileged && credits <= 0 {
-		writeJSON(w, http.StatusPaymentRequired, map[string]string{"error": "insufficient_credits"})
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
 
@@ -175,19 +175,34 @@ func firstEnv(keys ...string) string {
 	return ""
 }
 
-func isTextTool(tool string) bool { return tool == "game_design" || tool == "game_code" || tool == "build_analyzer" || tool == "concept_art" }
+func isTextTool(tool string) bool {
+	return tool == "game_design" || tool == "game_code" || tool == "build_analyzer" || tool == "concept_art"
+}
+
+func insufficientOutputsResponse() map[string]string {
+	return map[string]string{
+		"error":   "insufficient_outputs",
+		"message": "This tool requires paid credits. Please upgrade to run real scans and generate outputs.",
+	}
+}
 
 func (h *Handler) userCreditsAndRole(authSub string) (bool, int, error) {
-	var role string
-	var credits int
-	if err := h.DB.QueryRow(`SELECT role, credits FROM app_user_profiles WHERE auth_subject=$1`, authSub).Scan(&role, &credits); err != nil {
+	var role, email string
+	if err := h.DB.QueryRow(`SELECT COALESCE(role,''), COALESCE(email,'') FROM app_user_profiles WHERE auth_subject=$1`, authSub).Scan(&role, &email); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, 0, nil
 		}
 		return false, 0, err
 	}
 	role = strings.ToLower(strings.TrimSpace(role))
-	return role == "owner", credits, nil
+	email = strings.ToLower(strings.TrimSpace(email))
+	var outputs int
+	if email != "" {
+		if err := h.DB.QueryRow(`SELECT COALESCE(SUM(outputs_remaining),0)::int FROM entitlements WHERE lower(email)=lower($1) AND status='active'`, email).Scan(&outputs); err != nil {
+			return role == "owner", 0, err
+		}
+	}
+	return role == "owner", outputs, nil
 }
 
 func (h *Handler) insertGenerationJob(email, tool, prompt, route string) (string, error) {
@@ -211,13 +226,26 @@ func (h *Handler) applyCreditChargeTx(tx *sql.Tx, authSub, email string) error {
 }
 
 func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSub, email, reason string) error {
-	res, err := tx.Exec(`UPDATE app_user_profiles SET credits=credits-1, updated_at=now() WHERE auth_subject=$1 AND credits>0`, authSub)
+	res, err := tx.Exec(`
+		UPDATE entitlements
+		SET outputs_remaining = outputs_remaining - 1,
+			updated_at = now()
+		WHERE id = (
+			SELECT id
+			FROM entitlements
+			WHERE lower(email) = lower($1)
+			  AND status = 'active'
+			  AND outputs_remaining > 0
+			ORDER BY outputs_remaining DESC, created_at DESC
+			LIMIT 1
+			FOR UPDATE
+		)`, email)
 	if err != nil {
 		return err
 	}
 	rows, _ := res.RowsAffected()
 	if rows == 0 {
-		return errors.New("insufficient credits")
+		return errors.New("insufficient outputs")
 	}
 	_, err = tx.Exec(`INSERT INTO credit_events (email, amount, reason, created_at) VALUES ($1,-1,$2,now())`, email, reason)
 	return err

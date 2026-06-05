@@ -33,8 +33,6 @@ type artifactAIResponse struct {
 	NextSteps []string `json:"next_steps"`
 }
 
-
-
 type gameStoreMetadataResponse struct {
 	WhatTheGameIs         string         `json:"what_the_game_is"`
 	WhoItIsFor            string         `json:"who_it_is_for"`
@@ -201,7 +199,6 @@ func (h *Handler) failArtifact(artifactID string, errorMessage string, metadata 
 	_, _ = h.DB.Exec(`UPDATE generated_artifacts SET status='failed',error_message=$2,metadata=coalesce(metadata,'{}'::jsonb) || $3::jsonb,updated_at=now() WHERE id=$1`, artifactID, errorMessage, string(metaBytes))
 }
 
-
 func buildGameStoreMetadataResponse(raw string) (gameStoreMetadataResponse, error) {
 	var ai gameStoreMetadataResponse
 	if err := json.Unmarshal([]byte(raw), &ai); err == nil {
@@ -326,7 +323,7 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 		}
 	}
 	if !isPriv && credits < 1 {
-		writeJSON(w, 402, map[string]any{"error": "insufficient_credits", "credits_charged": false})
+		writeJSON(w, 402, insufficientOutputsResponse())
 		return
 	}
 
@@ -475,7 +472,7 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 	if !isPriv {
 		if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, claims.Email, "artifact_generation"); err != nil {
 			rollbackThenFail("insufficient_credits", map[string]any{"credits_charged": false})
-			writeJSON(w, 402, map[string]any{"error": "insufficient_credits", "detail": "insufficient_credits", "artifact_id": artifactID, "credits_charged": false})
+			writeJSON(w, 402, insufficientOutputsResponse())
 			return
 		}
 	}
@@ -494,26 +491,26 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 	txClosed = true
 
 	storeInput, _ := json.Marshal(map[string]any{
-		"project_id": projectID,
-		"artifact_title": ai.ArtifactTitle,
+		"project_id":       projectID,
+		"artifact_title":   ai.ArtifactTitle,
 		"artifact_summary": ai.ArtifactSummary,
-		"warnings": ai.Warnings,
-		"next_steps": ai.NextSteps,
-		"runtime_payload": payload,
+		"warnings":         ai.Warnings,
+		"next_steps":       ai.NextSteps,
+		"runtime_payload":  payload,
 	})
 	storeOut, storeErr := h.callTogetherWithSystemTimeoutAndMaxTokens(firstEnv("TOGETHER_MODEL_GAME_DESIGN", "TOGETHER_MODEL_GAME_CODE"), gameStoreMetadataPrompt, string(storeInput), timeout, 2000)
 	if storeErr == nil {
 		if metaAI, parseErr := buildGameStoreMetadataResponse(storeOut); parseErr == nil {
 			h.persistGameStoreMetadata(projectID, map[string]any{
-				"short_description": metaAI.ShortDescription,
-				"full_description": metaAI.FullDescription,
-				"search_intent_phrases": metaAI.SearchIntentPhrases,
-				"target_audience": metaAI.TargetAudience,
-				"category_suggestions": metaAI.CategorySuggestions,
-				"localization_plan": metaAI.LocalizationPlan,
-				"play_shorts_script": metaAI.PlayShortsScript,
+				"short_description":      metaAI.ShortDescription,
+				"full_description":       metaAI.FullDescription,
+				"search_intent_phrases":  metaAI.SearchIntentPhrases,
+				"target_audience":        metaAI.TargetAudience,
+				"category_suggestions":   metaAI.CategorySuggestions,
+				"localization_plan":      metaAI.LocalizationPlan,
+				"play_shorts_script":     metaAI.PlayShortsScript,
 				"play_shorts_scene_plan": metaAI.PlayShortsScenePlan,
-				"ask_play_summary": metaAI.AskPlaySummary,
+				"ask_play_summary":       metaAI.AskPlaySummary,
 			})
 		}
 	}

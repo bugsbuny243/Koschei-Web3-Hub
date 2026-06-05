@@ -54,9 +54,10 @@
       <label class="form-label">Traits / Attributes <span style="color:var(--text2);font-weight:400;">(optional, comma separated)</span></label>
       <input class="form-input" type="text" id="assetTraits" placeholder="e.g. fire, legendary, dragon, 5-star">
     </div>
-    <button class="btn btn-primary" id="genBtn" onclick="generate()">
-      ✦ Generate Metadata
-    </button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-primary" id="genBtn" onclick="generate()">✦ Generate Metadata</button>
+      <button class="btn btn-ghost" type="button" onclick="loadExample()">Load example</button>
+    </div>
   </div>
 
   <div class="alert" id="alert"></div>
@@ -103,7 +104,7 @@
 
       if (!res || !res.ok) {
         const err = res ? await res.json().catch(() => ({})) : {};
-        throw new Error(err.error || `Request failed (${res?.status})`);
+        throw new Error(err.message || err.error || `Request failed (${res?.status})`);
       }
 
       const data = await res.json();
@@ -112,11 +113,24 @@
       KoscheiAnalytics.track('metadata_generate_success', { asset_type: type });
       showSuccess('Metadata generated');
     } catch (err) {
-      showError(err.message || 'Generation failed. Check your credits.');
+      showError(err.message || 'Real execution requires credits. Demo examples are free.');
     } finally {
       btn.disabled = false;
       btn.innerHTML = '✦ Generate Metadata';
     }
+  }
+
+  function loadExample() {
+    const example = {
+      name: 'Demo example — Cosmic Dragon #001',
+      description: 'Demo example metadata only. No backend execution, no credit decrement, and no paid output saved.',
+      type: 'Game Asset',
+      attributes: [{ trait_type: 'Trait', value: 'demo' }, { trait_type: 'Trait', value: 'legendary' }],
+      properties: { category: 'game_asset', generated_by: 'Koschei Demo example' }
+    };
+    document.getElementById('resultBox').textContent = JSON.stringify(example, null, 2);
+    document.getElementById('resultWrap').style.display = 'block';
+    showSuccess('Demo example — no credits used.');
   }
 
   function copyResult() {

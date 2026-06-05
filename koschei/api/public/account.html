@@ -37,6 +37,7 @@
     <div class="account-row"><span class="form-label">Outputs total</span><span class="account-value" id="accountOutputsTotal">—</span></div>
     <div class="account-row"><span class="form-label">Outputs remaining</span><span class="account-value" id="accountOutputsRemaining">—</span></div>
     <div class="account-row"><span class="form-label">Status</span><span class="account-value"><span class="badge badge-green">active</span></span></div>
+    <p id="planMessage" class="notice" style="margin-top:16px;">Loading entitlement details…</p>
   </section>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -63,6 +64,10 @@
       document.getElementById('accountPlan').textContent = data.plan || 'free';
       document.getElementById('accountOutputsTotal').textContent = data.outputs_total ?? 0;
       document.getElementById('accountOutputsRemaining').textContent = data.outputs_remaining ?? 0;
+      const plan = String(data.plan || 'free').toLowerCase();
+      document.getElementById('planMessage').textContent = plan === 'free'
+        ? 'Free accounts can explore the platform and use demo examples. Buy credits to run real tools.'
+        : 'Paid outputs are active. Total and remaining paid outputs are shown above.';
     } catch {
       const message = document.getElementById('accountMessage');
       message.textContent = 'Could not load member account details. Please try again.';

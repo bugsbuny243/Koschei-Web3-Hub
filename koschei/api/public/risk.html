@@ -44,7 +44,7 @@
       <label class="form-label" for="riskNotes">Notes</label>
       <textarea class="form-input" id="riskNotes" rows="4" placeholder="Add public context, concerns, or observed behavior..." style="resize:vertical;"></textarea>
     </div>
-    <button class="btn btn-primary" id="riskScanBtn" type="submit">Scan</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" id="riskScanBtn" type="submit">Scan</button><button class="btn btn-ghost" id="exampleBtn" type="button">Load example</button></div>
   </form>
 
   <section class="card" id="riskResult" hidden>
@@ -111,6 +111,11 @@
     if (!KoscheiAuth.requireAuth('/login')) return;
     KoscheiAnalytics.track('risk_view');
 
+
+    document.getElementById('exampleBtn').addEventListener('click', () => {
+      renderResult({ risk_level: 'Demo example', score: 65, disclaimer: 'Demo example — no backend execution, no credit decrement, and no paid output saved.', checklist: ['Example signal only'], recommended_fixes: ['Buy credits to run real scans.'] }, true);
+    });
+
     document.getElementById('riskForm').addEventListener('submit', async event => {
       event.preventDefault();
       const button = document.getElementById('riskScanBtn');
@@ -133,7 +138,7 @@
         }
         if (!response.ok) {
           const error = await response.json().catch(() => ({}));
-          throw new Error(error.error || `Request failed (${response.status})`);
+          throw new Error(error.message || error.error || `Request failed (${response.status})`);
         }
         renderResult(await response.json());
         KoscheiAnalytics.track('risk_scan_success');
@@ -142,7 +147,7 @@
           renderResult(fallbackResult, true);
           return;
         }
-        window.alert(error.message || 'Risk scan failed.');
+        window.alert(error.message || 'Real execution requires credits. Demo examples are free.');
       } finally {
         button.disabled = false;
         button.textContent = 'Scan';
