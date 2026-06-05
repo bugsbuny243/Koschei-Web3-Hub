@@ -14,6 +14,19 @@ import (
 
 type adminSummary struct {
 	UsersCount                  int64      `json:"users_count"`
+	TotalRegisteredUsers        int64      `json:"total_registered_users"`
+	ActiveUsersToday            int64      `json:"active_users_today"`
+	ActiveUsers7Days            int64      `json:"active_users_7d"`
+	ActiveUsers30Days           int64      `json:"active_users_30d"`
+	NewUsersToday               int64      `json:"new_users_today"`
+	NewUsers7Days               int64      `json:"new_users_7d"`
+	FreeMembers                 int64      `json:"free_members"`
+	PaidMembers                 int64      `json:"paid_members"`
+	UsersWithZeroOutputs        int64      `json:"users_with_zero_outputs"`
+	UsersWithOutputsRemaining   int64      `json:"users_with_outputs_remaining"`
+	OutputsUsed24h              int64      `json:"outputs_used_24h"`
+	ChainChecks24h              int64      `json:"chain_checks_24h"`
+	FailedChecks24h             int64      `json:"failed_checks_24h"`
 	ActiveEntitlementsCount     int64      `json:"active_entitlements_count"`
 	TotalOutputsRemaining       int64      `json:"total_outputs_remaining"`
 	Web3OutputsCount            int64      `json:"web3_outputs_count"`
@@ -113,9 +126,20 @@ func (h *Handler) adminSummary(ctx context.Context) (adminSummary, error) {
 		query string
 	}{
 		{&s.UsersCount, `SELECT count(*) FROM app_user_profiles`},
+		{&s.TotalRegisteredUsers, `SELECT count(DISTINCT identity) FROM (SELECT lower(email) AS identity FROM app_user_profiles WHERE COALESCE(email, '') <> '' UNION SELECT lower(email) AS identity FROM entitlements WHERE COALESCE(email, '') <> '') u`},
+		{&s.ActiveUsersToday, `SELECT count(DISTINCT COALESCE(NULLIF(lower(email), ''), path)) FROM analytics_events WHERE created_at >= CURRENT_DATE`},
+		{&s.ActiveUsers7Days, `SELECT count(DISTINCT COALESCE(NULLIF(lower(email), ''), path)) FROM analytics_events WHERE created_at >= now()-interval '7 days'`},
+		{&s.ActiveUsers30Days, `SELECT count(DISTINCT COALESCE(NULLIF(lower(email), ''), path)) FROM analytics_events WHERE created_at >= now()-interval '30 days'`},
+		{&s.NewUsersToday, `SELECT count(*) FROM app_user_profiles WHERE created_at >= CURRENT_DATE`},
+		{&s.NewUsers7Days, `SELECT count(*) FROM app_user_profiles WHERE created_at >= now()-interval '7 days'`},
+		{&s.FreeMembers, `SELECT count(*) FROM entitlements WHERE status='active' AND (plan_id IS NULL OR plan_id='free')`},
+		{&s.PaidMembers, `SELECT count(*) FROM entitlements WHERE status='active' AND plan_id IS NOT NULL AND plan_id<>'free'`},
+		{&s.UsersWithZeroOutputs, `SELECT count(DISTINCT lower(email)) FROM entitlements WHERE outputs_remaining <= 0`},
+		{&s.UsersWithOutputsRemaining, `SELECT count(DISTINCT lower(email)) FROM entitlements WHERE outputs_remaining > 0`},
 		{&s.ActiveEntitlementsCount, `SELECT count(*) FROM entitlements WHERE status='active'`},
 		{&s.TotalOutputsRemaining, `SELECT COALESCE(sum(outputs_remaining),0)::bigint FROM entitlements WHERE status='active'`},
 		{&s.Web3OutputsCount, `SELECT count(*) FROM web3_outputs`},
+		{&s.OutputsUsed24h, `SELECT count(*) FROM web3_outputs WHERE created_at >= now()-interval '24 hours'`},
 		{&s.PendingPaymentRequestsCount, `SELECT count(*) FROM payment_requests WHERE status='pending'`},
 		{&s.WatchlistSourcesCount, `SELECT count(*) FROM web3_event_sources`},
 		{&s.Web3EventsCount, `SELECT count(*) FROM web3_events`},
@@ -136,6 +160,22 @@ func (h *Handler) adminSummary(ctx context.Context) (adminSummary, error) {
 		s.LatestChainCheckTime = h.latestTime(ctx, `SELECT max(checked_at) FROM chain_health_logs`)
 	} else if columns["created_at"] {
 		s.LatestChainCheckTime = h.latestTime(ctx, `SELECT max(created_at) FROM chain_health_logs`)
+	}
+	okCol := ""
+	if columns["ok"] {
+		okCol = "ok"
+	} else if columns["healthy"] {
+		okCol = "healthy"
+	}
+	timeCol := ""
+	if columns["checked_at"] {
+		timeCol = "checked_at"
+	} else if columns["created_at"] {
+		timeCol = "created_at"
+	}
+	if okCol != "" && timeCol != "" {
+		_ = h.DB.QueryRowContext(ctx, fmt.Sprintf(`SELECT count(*) FROM chain_health_logs WHERE %s >= now()-interval '24 hours'`, timeCol)).Scan(&s.ChainChecks24h)
+		_ = h.DB.QueryRowContext(ctx, fmt.Sprintf(`SELECT count(*) FROM chain_health_logs WHERE %s=false AND %s >= now()-interval '24 hours'`, okCol, timeCol)).Scan(&s.FailedChecks24h)
 	}
 	return s, nil
 }
