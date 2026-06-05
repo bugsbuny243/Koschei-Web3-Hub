@@ -126,6 +126,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/web3/cross-chain-risk", requiresDB(h, handlers.RequireAuth(method("POST", h.CrossChainRisk))))
 	mux.HandleFunc("/api/web3/sybil-check", requiresDB(h, handlers.RequireAuth(method("POST", h.SybilCheck))))
 	mux.HandleFunc("/api/web3/funding-assistant/generate", requiresDB(h, handlers.RequireAuth(method("POST", h.FundingAssistant))))
+	mux.HandleFunc("/api/web3/project-radar", requiresDB(h, handlers.RequireAuth(method("POST", h.ProjectRadar))))
 	mux.HandleFunc("/api/artifacts/", requiresDB(h, handlers.RequireAuth(h.ArtifactRoute)))
 
 	if staticDir != "" {
@@ -163,6 +164,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/cross-chain-risk":  "/cross-chain-risk.html",
 					"/sybil-check":       "/sybil-check.html",
 					"/funding-assistant": "/funding-assistant.html",
+					"/project-radar":     "/project-radar.html",
 					"/agent-api":         "/agent-api.html",
 					"/pay-per-tool":      "/pay-per-tool.html",
 				}
