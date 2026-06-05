@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Project Radar — Early Solana/Web3 Project Signals | Koschei</title>
+  <meta name="description" content="Discover and evaluate early Solana and Web3 projects with public-data signals, risk hints, opportunity scoring, and manual-review recommendations.">
+  <link rel="canonical" href="https://tradepigloball.co/project-radar">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>
+    .hero{padding:26px;border:1px solid var(--border);border-radius:16px;background:radial-gradient(circle at top left,rgba(0,255,136,.14),transparent 36%),linear-gradient(135deg,#111118,#101725);margin-bottom:18px}.hero h1{font-size:34px;line-height:1.1;margin:10px 0}.pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.input-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.score-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.score-card{padding:18px;border:1px solid var(--border);border-radius:14px;background:var(--bg3)}.score-num{font-size:36px;font-weight:800;color:var(--accent)}.result-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.result-list{padding-left:18px;color:var(--text2)}.result-list li{margin:6px 0}.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.notice{border:1px solid rgba(0,204,255,.35);background:rgba(0,204,255,.08);padding:12px;border-radius:12px;color:var(--accent2);margin-top:12px}@media(max-width:760px){.input-grid,.score-grid,.result-grid{grid-template-columns:1fr}.hero h1{font-size:28px}}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/hub" class="nav-logo">K Koschei</a>
+  <div class="nav-links">
+    <a class="nav-link" href="/hub">Hub</a>
+    <a class="nav-link active" href="/project-radar">Project Radar</a>
+    <a class="nav-link" href="/pricing">Credits</a>
+    <a class="nav-link" href="/account">Account</a>
+  </div>
+</nav>
+<main class="page">
+  <section class="hero">
+    <span class="badge badge-green">Customer-facing module</span>
+    <h1>Project Radar</h1>
+    <p class="page-sub">Discover and evaluate early Solana/Web3 projects using public metadata, safety signals, token risk hints, wallet/activity hints, and opportunity scoring.</p>
+    <div class="pill-row">
+      <span class="badge badge-blue">Demo is free</span><span class="badge badge-red">Real scan requires credits</span><span class="badge badge-blue">No wallet connection</span><span class="badge badge-blue">No private keys</span><span class="badge badge-blue">No seed phrases</span>
+    </div>
+    <div class="notice">Informational signals only — not financial advice. Every result is marked <strong>needs manual review</strong>.</div>
+  </section>
+
+  <form class="card" id="radarForm" style="display:flex;flex-direction:column;gap:14px;margin-bottom:18px;">
+    <div class="input-grid">
+      <div class="form-group"><label class="form-label" for="projectName">Project name</label><input class="form-input" id="projectName" required placeholder="HelioGrid Labs"></div>
+      <div class="form-group"><label class="form-label" for="website">Website</label><input class="form-input" id="website" required placeholder="https://example.org"></div>
+      <div class="form-group"><label class="form-label" for="twitterHandle">X/Twitter handle</label><input class="form-input" id="twitterHandle" required placeholder="@project"></div>
+      <div class="form-group"><label class="form-label" for="chainEcosystem">Chain / ecosystem</label><input class="form-input" id="chainEcosystem" required placeholder="Solana"></div>
+      <div class="form-group"><label class="form-label" for="category">Category</label><select class="form-input" id="category" required><option>payments</option><option>DePIN</option><option>AI agent</option><option>security</option><option>token</option><option>NFT</option><option>gaming</option><option>consumer app</option><option>infra</option></select></div>
+      <div></div>
+      <div class="form-group"><label class="form-label" for="tokenMint">Token mint address <span class="auth-sub">optional</span></label><input class="form-input" id="tokenMint" placeholder="Solana token mint, if public"></div>
+      <div class="form-group"><label class="form-label" for="walletAddress">Wallet address <span class="auth-sub">optional</span></label><input class="form-input" id="walletAddress" placeholder="Public wallet only"></div>
+    </div>
+    <p class="auth-sub">Never enter private keys, seed phrases, recovery phrases, wallet passwords, or connect a wallet. This form only accepts public project data.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" id="scanBtn" type="submit">Run real scan (1 credit)</button><button class="btn btn-ghost" id="demoBtn" type="button">Load free demo</button></div>
+  </form>
+
+  <section class="card" id="result" hidden>
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:16px;">
+      <div><h2 id="resultTitle">Radar result</h2><p class="auth-sub" id="summary"></p></div>
+      <span class="badge badge-red">needs manual review</span>
+    </div>
+    <div class="score-grid">
+      <div class="score-card"><div class="form-label">Risk score</div><div class="score-num" id="riskScore">—</div><p class="auth-sub">0–100 risk hints</p></div>
+      <div class="score-card"><div class="form-label">Opportunity score</div><div class="score-num" id="oppScore">—</div><p class="auth-sub">0–100 signal strength</p></div>
+      <div class="score-card"><div class="form-label">Public-good score</div><div class="score-num" id="publicScore">—</div><p class="auth-sub">0–100 ecosystem value</p></div>
+    </div>
+    <div class="result-grid" style="margin-top:16px;">
+      <div><div class="form-label">Metadata quality</div><p id="metadataQuality"></p></div>
+      <div><div class="form-label">Website/social quality</div><p id="socialQuality"></p></div>
+      <div><div class="form-label">Category trend fit</div><p id="trendFit"></p></div>
+      <div><div class="form-label">Watch this project?</div><p id="recommendation"></p></div>
+      <div><div class="form-label">Signals</div><ul class="result-list" id="signals"></ul></div>
+      <div><div class="form-label">Risk hints</div><ul class="result-list" id="riskHints"></ul></div>
+      <div><div class="form-label">Token risk hints</div><ul class="result-list" id="tokenHints"></ul></div>
+      <div><div class="form-label">Wallet reputation hints</div><ul class="result-list" id="walletHints"></ul></div>
+    </div>
+    <p class="notice" id="disclaimer"></p>
+    <div class="toolbar"><button class="btn btn-ghost" type="button" id="copyBtn">Copy</button><button class="btn btn-ghost" type="button" id="exportBtn">Export JSON</button><button class="btn btn-ghost" type="button" id="shareBtn">Share</button></div>
+  </section>
+</main>
+<script src="/js/koschei-auth.js?v=4"></script>
+<script src="/js/koschei-analytics.js?v=1"></script>
+<script>
+const demoResult={ok:true,project_summary:'HelioGrid Labs is a demo DePIN project in the Solana ecosystem. This free example shows public metadata, safety signals, wallet/activity hints, and opportunity scoring without consuming credits.',risk_score:42,opportunity_score:78,public_good_score:82,metadata_quality:'strong',website_social_quality:'medium — website and social anchors are present; verify ownership and content freshness manually',token_risk_hints:['Demo mint hint: mint authority appears disabled.','Demo mint hint: freeze authority needs explorer review.'],wallet_reputation_hints:['Demo wallet hint: public wallet shows regular activity entries.','Demo wallet hint: needs manual review for counterparties and signer controls.'],category_trend_fit:'Strong trend fit: DePIN remains a high-attention Solana/Web3 category, but execution and real-world utility need manual review.',watch_this_project_recommendation:'Watch this project: yes, with manual review and signal monitoring.',needs_manual_review:true,signals:['Website provided as a public metadata anchor.','X/Twitter handle supplied for social verification.','Solana ecosystem fit: fast settlement, consumer UX, and low-fee experimentation can support early projects.'],risk_hints:['Needs manual review against official channels, explorer data, and independent community context.','Demo result only — no backend execution, no credit decrement, and no paid output saved.'],disclaimer:'Demo example. Informational public-data signals only. Not financial advice. Needs manual review.',used_fallback:true};
+let lastResult=null;
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const list=(id,items)=>{document.getElementById(id).innerHTML=(items||[]).map(x=>`<li>${esc(x)}</li>`).join('')||'<li>Needs manual review.</li>'};
+function payload(){return{project_name:document.getElementById('projectName').value.trim(),website:document.getElementById('website').value.trim(),twitter_handle:document.getElementById('twitterHandle').value.trim(),token_mint_address:document.getElementById('tokenMint').value.trim(),wallet_address:document.getElementById('walletAddress').value.trim(),chain_ecosystem:document.getElementById('chainEcosystem').value.trim(),category:document.getElementById('category').value.trim()}}
+function render(data){lastResult=data;document.getElementById('resultTitle').textContent=data.inputs?.project_name?`${data.inputs.project_name} radar result`:'Project Radar demo result';document.getElementById('summary').textContent=data.project_summary||'';document.getElementById('riskScore').textContent=data.risk_score;document.getElementById('oppScore').textContent=data.opportunity_score;document.getElementById('publicScore').textContent=data.public_good_score;document.getElementById('metadataQuality').textContent=data.metadata_quality||'needs manual review';document.getElementById('socialQuality').textContent=data.website_social_quality||'needs manual review';document.getElementById('trendFit').textContent=data.category_trend_fit||'needs manual review';document.getElementById('recommendation').textContent=data.watch_this_project_recommendation||'Needs manual review.';list('signals',data.signals);list('riskHints',data.risk_hints);list('tokenHints',data.token_risk_hints);list('walletHints',data.wallet_reputation_hints);document.getElementById('disclaimer').textContent=data.disclaimer||'Not financial advice. Needs manual review.';document.getElementById('result').hidden=false;document.getElementById('result').scrollIntoView({behavior:'smooth'})}
+(async()=>{await KoscheiAuth.init();if(!KoscheiAuth.requireAuth('/login'))return;KoscheiAnalytics.track('project_radar_view');document.getElementById('demoBtn').onclick=()=>render(demoResult);document.getElementById('radarForm').onsubmit=async e=>{e.preventDefault();const p=payload();const joined=Object.values(p).join(' ').toLowerCase();if(['private key','seed phrase','recovery phrase','mnemonic','secret key'].some(x=>joined.includes(x))){alert('Do not enter private keys, seed phrases, recovery phrases, or wallet credentials.');return}const btn=document.getElementById('scanBtn');btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Running scan...';try{const res=await KoscheiAuth.apiCall('/api/project-radar/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});if(!res||!res.ok){const err=res?await res.json().catch(()=>({})):{};throw new Error(err.message||err.error||`Request failed (${res?.status})`)}render(await res.json());KoscheiAnalytics.track('project_radar_scan_success')}catch(err){alert(err.message||'Real scan requires credits. Demo examples are free.')}finally{btn.disabled=false;btn.textContent='Run real scan (1 credit)'}};document.getElementById('copyBtn').onclick=async()=>{if(!lastResult)return;await navigator.clipboard.writeText(JSON.stringify(lastResult,null,2));alert('Copied Project Radar result.')};document.getElementById('exportBtn').onclick=()=>{if(!lastResult)return;const blob=new Blob([JSON.stringify(lastResult,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='project-radar-result.json';a.click();URL.revokeObjectURL(a.href)};document.getElementById('shareBtn').onclick=async()=>{const text='Project Radar result: '+(lastResult?.watch_this_project_recommendation||'needs manual review');if(navigator.share){await navigator.share({title:'Project Radar',text,url:location.href})}else{await navigator.clipboard.writeText(text+' '+location.href);alert('Share text copied.')}}})();
+</script>
+</body>
+</html>
