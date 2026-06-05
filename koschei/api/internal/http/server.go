@@ -13,11 +13,21 @@ import (
 )
 
 func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string) http.Handler {
+	if os.Getenv("APP_ENV") == "production" {
+		if strings.TrimSpace(os.Getenv("NEON_AUTH_JWKS_URL")) == "" {
+			log.Print("CRITICAL: NEON_AUTH_JWKS_URL must be set in production")
+		}
+		if strings.TrimSpace(os.Getenv("NEON_AUTH_ISSUER")) == "" {
+			log.Print("CRITICAL: NEON_AUTH_ISSUER should be set in production")
+		}
+	}
 	h := &handlers.Handler{DB: db, DBInitError: dbInitError, AdminPassword: adminPassword, Limiter: handlers.NewLimiter()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", h.Health)
 	mux.HandleFunc("/api/config", method("GET", h.Config))
-	mux.HandleFunc("/api/debug/token", method("GET", h.DebugToken))
+	if os.Getenv("APP_ENV") != "production" {
+		mux.HandleFunc("/api/debug/token", method("GET", h.DebugToken))
+	}
 	mux.HandleFunc("/api/auth/provision", method("POST", h.Provision))
 	mux.HandleFunc("/api/web3/health", method("GET", h.Web3Health))
 	mux.HandleFunc("/api/web3/health/logs", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3HealthLogs))))
@@ -205,7 +215,7 @@ func cors(next http.Handler, origin string) http.Handler {
 		if origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-Koschei-Source-Id")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-Koschei-Source-Id, x-koschei-agent-key")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -220,6 +230,10 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+		if os.Getenv("APP_ENV") == "production" {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

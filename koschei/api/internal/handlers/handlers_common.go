@@ -2,11 +2,14 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -30,9 +33,17 @@ func (h *Handler) dbAvailable(ctx context.Context) error {
 	return h.DB.PingContext(ctx)
 }
 
+func isProduction() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
+}
+
 func (h *Handler) RequireDB(w http.ResponseWriter) bool {
 	if err := h.dbAvailable(context.Background()); err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable", "details": err.Error()})
+		if isProduction() {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable"})
+		} else {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable", "details": err.Error()})
+		}
 		return false
 	}
 	return true
@@ -70,12 +81,28 @@ func decodeJSON(r *http.Request, dst any) error {
 	return json.NewDecoder(r.Body).Decode(dst)
 }
 
-func (h *Handler) ownerAuth(w http.ResponseWriter, r *http.Request) bool {
-	if r.Header.Get("x-admin-password") != h.AdminPassword || h.AdminPassword == "" {
+func (h *Handler) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
+	adminPassword := strings.TrimSpace(h.AdminPassword)
+	if adminPassword == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return false
+	}
+	suppliedHash := sha256.Sum256([]byte(r.Header.Get("x-admin-password")))
+	adminHash := sha256.Sum256([]byte(adminPassword))
+	valid := subtle.ConstantTimeCompare(suppliedHash[:], adminHash[:]) == 1
+	if !valid {
+		if h.Limiter != nil && !h.Limiter.allow("admin-failed:"+clientIP(r), 10, 10*time.Minute) {
+			writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate limited"})
+			return false
+		}
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return false
 	}
 	return true
+}
+
+func (h *Handler) ownerAuth(w http.ResponseWriter, r *http.Request) bool {
+	return h.requireAdmin(w, r)
 }
 
 func (h *Handler) OwnerAuth(w http.ResponseWriter, r *http.Request) bool {
