@@ -1,69 +1,148 @@
-# Koschei API
+# Koschei Web3 Hub
 
-Koschei is a Go backend that serves its static frontend and API from one runtime application.
+No-custody Web3 intelligence tools for Solana builders and users.
+
+## What is Koschei?
+
+Koschei Web3 Hub is a no-custody Web3 intelligence workspace that helps users and builders understand public blockchain activity, wallet reputation, token risk signals, transaction behavior, metadata and project safety signals.
+
+Koschei does not ask for private keys, seed phrases, or custody of funds. Core tools are designed around public/read-only blockchain data.
+
+## Problem
+
+Web3 users often interact with tokens, wallets and transactions without understanding key risk signals such as mint authority, freeze authority, suspicious wallet history, rug pull indicators, fake metadata, unsafe project patterns or confusing transaction behavior.
+
+Many existing tools are too technical, fragmented, or difficult for non-expert users.
+
+## Solution
+
+Koschei turns complex public blockchain data into simple intelligence tools:
+
+- Wallet Score
+- Token Scanner
+- Risk Scanner
+- TX Decoder
+- Metadata Studio
+- Watchlist
+- Chain Health Monitor
+- Funding Assistant
+- Public Impact Dashboard
+
+## Why Solana?
+
+Solana has fast activity, low fees, active builders, token launches, DeFi, NFTs, gaming and consumer apps. This creates both opportunity and risk.
+
+Koschei starts Solana-first because Solana users and builders need fast, readable and no-custody risk intelligence tools.
+
+## Features
+
+### Core Web3 Tools
+
+- Metadata Studio
+- Risk Scanner
+- Watchlist
+- Chain Health
+- TX Decoder
+
+### Solana Intelligence
+
+- Wallet Score
+- Token Scanner
+- Portfolio Tracker
+- Smart Money
+- Airdrop Checker
+
+### Advanced Intelligence
+
+- Risk Engine v2
+- Intelligence Graph
+- Cross-chain Risk Monitor
+- Sybil Check
+- TX Decoder Pro
+
+### Builder Tools
+
+- Funding Assistant
+- Docs
+- Public Impact Page
+- Agent API
+- Pay-per-Tool API
+
+## Public Good Aspect
+
+Koschei improves Web3 safety and education by making on-chain risk signals easier to understand.
+
+It helps users avoid scams, understand transactions, review token safety signals, and learn safer behavior without giving custody of funds.
+
+## Live Demo
+
+Live app:
+https://tradepigloball.co
+
+Docs:
+https://tradepigloball.co/docs
+
+Public Impact:
+https://tradepigloball.co/impact
+
+## Current Status
+
+Koschei is currently an early live MVP with working authentication, admin analytics, credit system, and multiple Web3 intelligence modules.
+
+## Tech Stack
+
+- Go backend
+- Static frontend
+- Neon Postgres
+- Neon Auth
+- Alchemy API
+- Railway hosting
+- Together AI where applicable
 
 ## Architecture
 
-- The runtime application lives in `koschei/api`.
-- Static frontend files live in `koschei/api/public` and are served by the Go HTTP server.
-- Neon Auth signup, login, token verification, and authenticated API access are handled by the Go backend.
-- PostgreSQL data is configured through `DATABASE_URL`.
+Simple flow:
 
-## Local Development
+User opens Koschei
+→ selects a tool
+→ enters public wallet, token, transaction or project data
+→ backend reads public blockchain/API data
+→ Koschei produces readable scores and explanations
+→ no private key or seed phrase is ever requested
 
-Copy the environment template and run the Go application:
+## Roadmap
 
-```bash
-cp .env.example .env
-cd koschei/api
-go run .
-```
+### Next 3 months
 
-The server listens on `PORT`, which defaults to `8080`. Open [http://localhost:8080](http://localhost:8080).
+- Improve premium module UI
+- Add demo examples across tools
+- Improve Solana Wallet Score
+- Improve Token Scanner
+- Improve TX Decoder
+- Improve public impact page
+- Collect structured user feedback
 
-## Environment Variables
+### Next 6 months
 
-The deployment template is documented in `.env.example`. Important values include:
+- Expand Solana intelligence modules
+- Improve risk scoring
+- Add wallet behavior analytics
+- Improve watchlist monitoring
+- Grow Solana builder/user community
 
-- `PORT` and `STATIC_DIR` for the HTTP server and static frontend directory.
-- `DATABASE_URL` for PostgreSQL.
-- `EXPO_PUBLIC_NEON_AUTH_URL`, `NEON_AUTH_BASE_URL`, `NEON_AUTH_ISSUER`, and `NEON_AUTH_JWKS_URL` for Neon Auth.
-- `USER_SESSION_SECRET` for authenticated sessions.
-- `ALCHEMY_API_KEY` for Web3 health checks.
-- `TOGETHER_API_KEY` and `TOGETHER_MODEL` for AI generation.
+### Next 12 months
 
-## API Endpoints
+- Expand advanced intelligence features
+- Add more ecosystem integrations
+- Build stronger public-good safety tooling
+- Improve developer API access
 
-The Go backend includes these public endpoints:
+## Safety Disclaimer
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Service health |
-| `GET` | `/api/config` | Browser-safe runtime configuration |
-| `POST` | `/api/auth/provision` | Provision an authenticated member |
-| `POST` | `/api/auth/register` | Existing member registration route |
-| `POST` | `/api/auth/login` | Existing Neon Auth login route |
-| `GET` | `/api/web3/health` | Web3 provider health |
+Koschei is an informational tool. It does not provide financial advice. Users should always do their own research.
 
-Additional authenticated API endpoints are registered by the Go server under `koschei/api/internal/http`.
+Never enter private keys or seed phrases into any tool.
 
-## Railway Deployment
+## Contributing
 
-Railway uses the repository-root `Dockerfile`. The container build compiles `koschei/api`, copies `koschei/api/public` into `/app/public`, sets `STATIC_DIR=/app/public`, and starts the compiled Go binary on port `8080`.
-
-Configure the required values from `.env.example` in Railway Variables before deployment. `APP_ENV=production` is required on Railway so production checks are enabled and local-only debug routes stay unavailable. Neon Auth is handled directly by the Go backend.
-
-## Validation
-
-Run the Go build check from the backend directory:
-
-```bash
-cd koschei/api
-go build ./...
-```
-
-Build the production container from the repository root:
-
-```bash
-docker build .
-```
+Contributions, feedback and security reports are welcome.
