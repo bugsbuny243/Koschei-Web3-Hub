@@ -207,7 +207,7 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !isPrivileged && credits <= 0 {
-		writeJSON(w, 402, map[string]string{"error": "insufficient_credits"})
+		writeJSON(w, 402, insufficientOutputsResponse())
 		return
 	}
 	projectID := newID()

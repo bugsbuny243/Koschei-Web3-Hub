@@ -493,7 +493,21 @@ func (h *Handler) syncWeb3Source(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_source_id"})
 		return
 	}
+	isPrivileged := false
 	source, err := h.getWeb3SourceForUser(id, email)
+	if err == nil {
+		var outputs int
+		var creditErr error
+		isPrivileged, outputs, creditErr = h.userCreditsAndRole(claims.Sub)
+		if creditErr != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+			return
+		}
+		if !isPrivileged && outputs <= 0 {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			return
+		}
+	}
 	if err == sql.ErrNoRows {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not_found"})
 		return
@@ -526,6 +540,12 @@ func (h *Handler) syncWeb3Source(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
+	}
+	if !isPrivileged {
+		if err := h.spendOutput(email, "watchlist_sync"); err != nil {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			return
+		}
 	}
 	if inserted == 0 {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "inserted": 0, "message": "No activity found yet."})

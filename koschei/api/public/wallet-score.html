@@ -70,9 +70,8 @@
       <button class="btn btn-primary" id="scoreBtn" onclick="getScore()" style="padding:10px 24px;">
         🏆 Get Score
       </button>
-      <button class="btn btn-ghost" onclick="scoreMyWallet()" style="padding:10px 16px;font-size:13px;">
-        Score my wallet
-      </button>
+      <button class="btn btn-ghost" onclick="scoreMyWallet()" style="padding:10px 16px;font-size:13px;">Score my wallet</button>
+      <button class="btn btn-ghost" type="button" onclick="loadExample()" style="padding:10px 16px;font-size:13px;">Load example</button>
     </div>
     <div class="alert" id="alert" style="margin-top:12px;"></div>
   </div>
@@ -171,16 +170,20 @@
       });
       if (!res || !res.ok) {
         const err = res ? await res.json().catch(() => ({})) : {};
-        throw new Error(err.error || `Failed (${res?.status})`);
+        throw new Error(err.message || err.error || `Failed (${res?.status})`);
       }
       const data = await res.json();
       displayScore(data);
     } catch (err) {
-      showAlert(err.message || 'Analysis failed.');
+      showAlert(err.message || 'Real execution requires credits. Demo examples are free.');
     } finally {
       btn.disabled = false;
       btn.textContent = '🏆 Get Score';
     }
+  }
+
+  function loadExample() {
+    displayScore({ address: 'Demo example wallet', network: 'solana-devnet', score: 72, level: 'Demo example', level_color: '#00ccff', summary: 'Demo example — no backend execution, no credit decrement, and no paid output saved.', badges: ['Demo example'], tx_count: 42, balance_sol: '1.2345 SOL', active_days: 120, first_seen: 'Demo', last_seen: 'Demo' });
   }
 
   function displayScore(data) {

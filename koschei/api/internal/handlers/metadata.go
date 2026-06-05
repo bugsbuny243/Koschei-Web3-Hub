@@ -98,10 +98,7 @@ func (h *Handler) GenerateMetadata(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if rowsAffected == 0 {
-		writeJSON(w, http.StatusPaymentRequired, map[string]string{
-			"error":   "no_outputs_remaining",
-			"message": "No outputs remaining. Please upgrade your plan.",
-		})
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
 

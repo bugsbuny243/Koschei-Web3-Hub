@@ -79,9 +79,9 @@ func (h *Handler) RugRadarSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 2
+	const toolCost = 1
 	if !isPrivileged && credits < toolCost {
-		writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": "insufficient_credits", "required": toolCost, "balance": credits})
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
 
@@ -229,9 +229,11 @@ func (h *Handler) RugRadarSubmit(w http.ResponseWriter, r *http.Request) {
 			isRenounced, isFrozen, txCount, submittedBy)
 	}
 
-	if !isPrivileged && h.DB != nil {
-		h.DB.Exec(`UPDATE app_user_profiles SET credits=credits-$1,updated_at=now() WHERE auth_subject=$2 AND credits>=$1`, toolCost, claims.Sub)
-		h.DB.Exec(`INSERT INTO credit_events(email,amount,reason,created_at) VALUES($1,-$2,'rug_radar',now())`, claims.Email, toolCost)
+	if !isPrivileged {
+		if err := h.spendOutput(claims.Email, "rug_radar"); err != nil {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			return
+		}
 	}
 
 	writeJSON(w, 200, map[string]interface{}{

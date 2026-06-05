@@ -85,7 +85,7 @@ func (h *Handler) BuildAndroid(w http.ResponseWriter, r *http.Request) {
 	}
 	creditRows, _ := creditRes.RowsAffected()
 	if creditRows == 0 {
-		writeJSON(w, http.StatusPaymentRequired, map[string]string{"error": "insufficient credits"})
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
 	if _, err := tx.Exec(`INSERT INTO credit_events (email, amount, reason, event_type) VALUES ($1,-1,$2,'android_build')`, claims.Email, "android_build:"+req.ProjectID+":"+taskID); err != nil {

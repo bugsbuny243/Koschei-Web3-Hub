@@ -57,7 +57,7 @@ func ensureCanonicalPlans(db *sql.DB) error {
 		monthlyCredits int
 		isActive       bool
 	}{
-		{id: "free", name: "Free", priceTry: 0, monthlyCredits: 10, isActive: true},
+		{id: "free", name: "Free", priceTry: 0, monthlyCredits: 0, isActive: true},
 		{id: "starter", name: "Starter", priceTry: 899, monthlyCredits: 25, isActive: true},
 		{id: "builder", name: "Builder", priceTry: 2299, monthlyCredits: 100, isActive: true},
 		{id: "pro", name: "Pro", priceTry: 2299, monthlyCredits: 100, isActive: true},

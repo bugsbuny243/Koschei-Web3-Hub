@@ -11,7 +11,7 @@ import (
 
 const (
 	freePlanID          = "free"
-	freeOutputsIncluded = 10
+	freeOutputsIncluded = 0
 )
 
 type memberSummaryResponse struct {

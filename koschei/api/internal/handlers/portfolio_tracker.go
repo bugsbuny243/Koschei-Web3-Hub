@@ -47,6 +47,20 @@ func (h *Handler) PortfolioTrack(w http.ResponseWriter, r *http.Request) {
 	if req.Network == "" {
 		req.Network = "solana-mainnet"
 	}
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	isPrivileged, outputs, err := h.userCreditsAndRole(claims.Sub)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	if !isPrivileged && outputs <= 0 {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
 
 	client := &http.Client{Timeout: 12 * time.Second}
 	rpcURL := solanaRPCURL(req.Network, os.Getenv("ALCHEMY_API_KEY"))
@@ -74,6 +88,12 @@ func (h *Handler) PortfolioTrack(w http.ResponseWriter, r *http.Request) {
 		result.Wallets = append(result.Wallets, wallet)
 	}
 	result.TotalBalanceSOL = roundPercent(result.TotalBalanceSOL)
+	if !isPrivileged {
+		if err := h.spendOutput(claims.Email, "portfolio_tracker"); err != nil {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -90,12 +110,32 @@ type smartMoneyAccount struct {
 }
 
 func (h *Handler) SmartMoney(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	isPrivileged, outputs, err := h.userCreditsAndRole(claims.Sub)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	if !isPrivileged && outputs <= 0 {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
 	accounts := []smartMoneyAccount{
 		{Name: "Jupiter Aggregator v6", Category: "protocol", Address: "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4", Description: "Public protocol account that can provide context for high-volume swap activity."},
 		{Name: "Solana Vote Program", Category: "ecosystem", Address: "Vote111111111111111111111111111111111111111", Description: "Public ecosystem reference account for validator-related activity."},
 	}
 	for i := range accounts {
 		accounts[i].ExplorerURL = "https://solscan.io/account/" + accounts[i].Address
+	}
+	if !isPrivileged {
+		if err := h.spendOutput(claims.Email, "smart_money"); err != nil {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"network": "solana-mainnet", "accounts": accounts, "disclaimer": "Labels are informational watchlist references. Verify identities independently before acting."})
 }

@@ -74,10 +74,7 @@ func (h *Handler) ScanRisk(w http.ResponseWriter, r *http.Request) {
 		LIMIT 1
 		FOR UPDATE`, email).Scan(&entitlementID); err != nil {
 		if err == sql.ErrNoRows {
-			writeJSON(w, http.StatusPaymentRequired, map[string]string{
-				"error":   "no_outputs_remaining",
-				"message": "No outputs remaining. Please upgrade your plan.",
-			})
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 			return
 		}
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})

@@ -30,22 +30,21 @@ func (h *Handler) trackEvent(email, name, path string) {
 	_, _ = h.DB.Exec(`INSERT INTO analytics_events(event_name,email,path,metadata) VALUES($1,NULLIF($2,''),$3,'{}'::jsonb)`, name, email, path)
 }
 
-func (h *Handler) useOutput(w http.ResponseWriter, email, tool string) bool {
+func (h *Handler) spendOutput(email, tool string) error {
 	tx, e := h.DB.Begin()
 	if e != nil {
-		return false
+		return e
 	}
 	defer tx.Rollback()
-	var id string
-	if e = tx.QueryRow(`SELECT id FROM entitlements WHERE lower(email)=lower($1) AND status='active' AND outputs_remaining>0 ORDER BY outputs_remaining DESC LIMIT 1 FOR UPDATE`, email).Scan(&id); e != nil {
-		writeJSON(w, 402, map[string]string{"error": "insufficient_outputs", "message": "You need more outputs to use this tool."})
-		return false
+	if e = h.applyCreditChargeTxWithReason(tx, "", email, tool); e != nil {
+		return e
 	}
-	if _, e = tx.Exec(`UPDATE entitlements SET outputs_remaining=outputs_remaining-1,updated_at=now() WHERE id=$1`, id); e != nil {
-		return false
-	}
-	_, _ = tx.Exec(`INSERT INTO credit_events(email,amount,reason,created_at) VALUES($1,-1,$2,now())`, email, tool)
-	if tx.Commit() != nil {
+	return tx.Commit()
+}
+
+func (h *Handler) useOutput(w http.ResponseWriter, email, tool string) bool {
+	if e := h.spendOutput(email, tool); e != nil {
+		writeJSON(w, 402, insufficientOutputsResponse())
 		return false
 	}
 	return true
@@ -341,6 +340,9 @@ func (h *Handler) IntelligenceGraph(w http.ResponseWriter, r *http.Request) {
 		}
 		if decodeJSON(r, &q) != nil || (strings.TrimSpace(q.SourceID) == "" && strings.TrimSpace(q.Address) == "") {
 			writeJSON(w, 400, map[string]string{"error": "source_id_or_address_required"})
+			return
+		}
+		if !h.useOutput(w, email, "intelligence_graph") {
 			return
 		}
 		_, _ = h.DB.Exec(`DELETE FROM intelligence_graph_edges WHERE lower(email)=lower($1)`, email)
