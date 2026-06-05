@@ -5,64 +5,220 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 )
 
 type adminUser struct {
-	Email            string     `json:"email"`
-	CreatedAt        time.Time  `json:"created_at"`
-	LastLoginAt      *time.Time `json:"last_login_at,omitempty"`
-	PlanSummary      string     `json:"plan_summary"`
-	OutputsRemaining int64      `json:"outputs_remaining"`
+	Email                string     `json:"email"`
+	Plan                 string     `json:"plan"`
+	OutputsTotal         int64      `json:"outputs_total"`
+	OutputsRemaining     int64      `json:"outputs_remaining"`
+	Status               string     `json:"status"`
+	CreatedAt            *time.Time `json:"created_at,omitempty"`
+	LastLoginAt          *time.Time `json:"last_login_at,omitempty"`
+	LastActivityAt       *time.Time `json:"last_activity_at,omitempty"`
+	OutputsUsedCount     int64      `json:"outputs_used_count"`
+	WatchlistSourceCount int64      `json:"watchlist_source_count"`
 }
 
 func (h *Handler) AdminUsers(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
 		return
 	}
-	columns, err := tableColumns(r.Context(), h.DB, "app_user_profiles")
+	users, err := h.adminUsers(r.Context(), strings.TrimSpace(r.URL.Query().Get("q")), strings.TrimSpace(r.URL.Query().Get("filter")))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
 		return
 	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "users": users})
+}
+
+func (h *Handler) adminUsers(ctx context.Context, search, filter string) ([]adminUser, error) {
+	profileColumns, err := tableColumns(ctx, h.DB, "app_user_profiles")
+	if err != nil {
+		return nil, err
+	}
 	lastLoginExpression := "NULL::timestamptz"
 	for _, candidate := range []string{"last_login_at", "last_signed_in_at", "last_sign_in_at"} {
-		if columns[candidate] {
+		if profileColumns[candidate] {
 			lastLoginExpression = "u." + candidate
 			break
 		}
 	}
+	where := []string{"e.email <> ''"}
+	args := []any{}
+	if search != "" {
+		args = append(args, "%"+strings.ToLower(search)+"%")
+		where = append(where, fmt.Sprintf("e.email LIKE $%d", len(args)))
+	}
+	switch filter {
+	case "free":
+		where = append(where, "COALESCE(es.has_paid,false)=false")
+	case "paid":
+		where = append(where, "COALESCE(es.has_paid,false)=true")
+	case "no_outputs":
+		where = append(where, "COALESCE(es.outputs_remaining,0) <= 0")
+	case "active_30d":
+		where = append(where, "la.last_activity_at >= now()-interval '30 days'")
+	}
 	query := fmt.Sprintf(`
-		SELECT COALESCE(u.email, ''), u.created_at, %s,
-		       COALESCE((SELECT string_agg(DISTINCT COALESCE(e.plan_id, 'free'), ', ' ORDER BY COALESCE(e.plan_id, 'free')) FROM entitlements e WHERE lower(e.email)=lower(u.email) AND e.status='active'), 'none'),
-		       COALESCE((SELECT sum(e.outputs_remaining) FROM entitlements e WHERE lower(e.email)=lower(u.email) AND e.status='active'), 0)
-		FROM app_user_profiles u
-		ORDER BY u.created_at DESC
-		LIMIT 500`, lastLoginExpression)
-	rows, err := h.DB.QueryContext(r.Context(), query)
+		WITH emails AS (
+			SELECT lower(email) AS email FROM app_user_profiles WHERE COALESCE(email,'') <> ''
+			UNION
+			SELECT lower(email) AS email FROM entitlements WHERE COALESCE(email,'') <> ''
+		), entitlement_summary AS (
+			SELECT lower(email) AS email,
+			       bool_or(status='active' AND plan_id IS NOT NULL AND plan_id <> 'free') AS has_paid,
+			       COALESCE(string_agg(DISTINCT COALESCE(plan_id,'free'), ', ' ORDER BY COALESCE(plan_id,'free')) FILTER (WHERE status='active'), 'free') AS plan,
+			       COALESCE(sum(outputs_total) FILTER (WHERE status='active'), 0)::bigint AS outputs_total,
+			       COALESCE(sum(outputs_remaining) FILTER (WHERE status='active'), 0)::bigint AS outputs_remaining,
+			       COALESCE(string_agg(DISTINCT status, ', ' ORDER BY status), 'none') AS status
+			FROM entitlements GROUP BY lower(email)
+		), latest_activity AS (
+			SELECT lower(email) AS email, max(created_at) AS last_activity_at FROM analytics_events WHERE COALESCE(email,'') <> '' GROUP BY lower(email)
+		), latest_login AS (
+			SELECT lower(email) AS email, max(created_at) AS last_login_at FROM analytics_events WHERE event_name='login_success' AND COALESCE(email,'') <> '' GROUP BY lower(email)
+		)
+		SELECT e.email,
+		       COALESCE(es.plan,'free'), COALESCE(es.outputs_total,0), COALESCE(es.outputs_remaining,0), COALESCE(es.status,'none'),
+		       u.created_at, COALESCE(%s, ll.last_login_at), la.last_activity_at,
+		       COALESCE((SELECT count(*) FROM web3_outputs o WHERE lower(o.email)=e.email),0)::bigint,
+		       COALESCE((SELECT count(*) FROM web3_event_sources s WHERE lower(s.email)=e.email),0)::bigint
+		FROM emails e
+		LEFT JOIN app_user_profiles u ON lower(u.email)=e.email
+		LEFT JOIN entitlement_summary es ON es.email=e.email
+		LEFT JOIN latest_activity la ON la.email=e.email
+		LEFT JOIN latest_login ll ON ll.email=e.email
+		WHERE %s
+		ORDER BY COALESCE(la.last_activity_at, u.created_at, now()-interval '100 years') DESC
+		LIMIT 500`, lastLoginExpression, strings.Join(where, " AND "))
+	rows, err := h.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
-		return
+		return nil, err
 	}
 	defer rows.Close()
 	users := make([]adminUser, 0)
 	for rows.Next() {
 		var user adminUser
-		var lastLogin sql.NullTime
-		if err := rows.Scan(&user.Email, &user.CreatedAt, &lastLogin, &user.PlanSummary, &user.OutputsRemaining); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db scan failed"})
-			return
+		var created, login, activity sql.NullTime
+		if err := rows.Scan(&user.Email, &user.Plan, &user.OutputsTotal, &user.OutputsRemaining, &user.Status, &created, &login, &activity, &user.OutputsUsedCount, &user.WatchlistSourceCount); err != nil {
+			return nil, err
 		}
-		if lastLogin.Valid {
-			user.LastLoginAt = &lastLogin.Time
+		if created.Valid {
+			user.CreatedAt = &created.Time
+		}
+		if login.Valid {
+			user.LastLoginAt = &login.Time
+		}
+		if activity.Valid {
+			user.LastActivityAt = &activity.Time
 		}
 		users = append(users, user)
 	}
-	if rows.Err() != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
+	return users, rows.Err()
+}
+
+type adminUserActionInput struct {
+	Email  string `json:"email"`
+	Action string `json:"action"`
+	Amount int64  `json:"amount"`
+	PlanID string `json:"plan_id"`
+	Status string `json:"status"`
+}
+
+func (h *Handler) AdminUserAction(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "users": users})
+	var req adminUserActionInput
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	action := strings.TrimSpace(req.Action)
+	if email == "" || action == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email and action required"})
+		return
+	}
+	tx, err := h.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db transaction failed"})
+		return
+	}
+	defer tx.Rollback()
+	switch action {
+	case "add_outputs":
+		if req.Amount <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "positive amount required"})
+			return
+		}
+		if err := ensureActiveEntitlement(r.Context(), tx, email, strings.TrimSpace(req.PlanID)); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "entitlement unavailable"})
+			return
+		}
+		_, err = tx.ExecContext(r.Context(), `UPDATE entitlements SET outputs_total=outputs_total+$2, outputs_remaining=outputs_remaining+$2, updated_at=now() WHERE id=(SELECT id FROM entitlements WHERE lower(email)=$1 AND status='active' ORDER BY outputs_remaining DESC, created_at DESC LIMIT 1)`, email, req.Amount)
+	case "reduce_outputs":
+		if req.Amount <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "positive amount required"})
+			return
+		}
+		_, err = tx.ExecContext(r.Context(), `UPDATE entitlements SET outputs_remaining=GREATEST(outputs_remaining-$2,0), updated_at=now() WHERE id=(SELECT id FROM entitlements WHERE lower(email)=$1 AND status='active' ORDER BY outputs_remaining DESC, created_at DESC LIMIT 1)`, email, req.Amount)
+	case "set_plan":
+		plan := strings.TrimSpace(req.PlanID)
+		if plan == "" {
+			plan = "free"
+		}
+		if err := ensureActiveEntitlement(r.Context(), tx, email, plan); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "entitlement unavailable"})
+			return
+		}
+		_, err = tx.ExecContext(r.Context(), `UPDATE entitlements SET plan_id=$2, updated_at=now() WHERE id=(SELECT id FROM entitlements WHERE lower(email)=$1 AND status='active' ORDER BY created_at DESC LIMIT 1)`, email, plan)
+	case "set_status":
+		status := strings.ToLower(strings.TrimSpace(req.Status))
+		if status != "active" && status != "inactive" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "status must be active or inactive"})
+			return
+		}
+		if status == "active" {
+			if err := ensureActiveEntitlement(r.Context(), tx, email, strings.TrimSpace(req.PlanID)); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "entitlement unavailable"})
+				return
+			}
+		} else {
+			_, err = tx.ExecContext(r.Context(), `UPDATE entitlements SET status='inactive', updated_at=now() WHERE lower(email)=$1 AND status='active'`, email)
+		}
+	default:
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported action"})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "entitlement update failed"})
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db commit failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func ensureActiveEntitlement(ctx context.Context, tx *sql.Tx, email, plan string) error {
+	if plan == "" {
+		plan = "free"
+	}
+	var id string
+	err := tx.QueryRowContext(ctx, `SELECT id::text FROM entitlements WHERE lower(email)=$1 AND status='active' ORDER BY created_at DESC LIMIT 1`, email).Scan(&id)
+	if err == nil {
+		return nil
+	}
+	if err != sql.ErrNoRows {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO entitlements (email, plan_id, outputs_total, outputs_remaining, status) VALUES ($1, $2, 0, 0, 'active')`, email, plan)
+	return err
 }
 
 type adminEntitlement struct {
@@ -238,6 +394,30 @@ func (h *Handler) AdminChainHealth(w http.ResponseWriter, r *http.Request) {
 		items = append(items, map[string]any{"chain": chain, "network": network, "provider": provider, "ok": ok, "result": result, "error": errorText, "checked_at": checkedAt})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "logs": items})
+}
+
+func (h *Handler) AdminSettings(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	present := func(name string) bool { return strings.TrimSpace(getenvForAdmin(name)) != "" }
+	settings := []map[string]any{
+		{"name": "APP_ENV", "present": present("APP_ENV")},
+		{"name": "CORS_ALLOWED_ORIGIN", "present": present("CORS_ALLOWED_ORIGIN")},
+		{"name": "X402_ENABLED", "present": present("X402_ENABLED"), "enabled": parseAdminBool(getenvForAdmin("X402_ENABLED"))},
+		{"name": "PAY_PER_TOOL_ENABLED", "present": present("PAY_PER_TOOL_ENABLED"), "enabled": parseAdminBool(getenvForAdmin("PAY_PER_TOOL_ENABLED"))},
+		{"name": "PUBLIC_DOMAIN", "present": present("PUBLIC_DOMAIN")},
+		{"name": "VERSION", "present": present("VERSION")},
+		{"name": "BUILD_LABEL", "present": present("BUILD_LABEL")},
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": settings})
+}
+
+func getenvForAdmin(name string) string { return strings.TrimSpace(os.Getenv(name)) }
+
+func parseAdminBool(value string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	return value == "true" || value == "1" || value == "yes" || value == "on"
 }
 
 func tableColumns(ctx context.Context, db *sql.DB, table string) (map[string]bool, error) {

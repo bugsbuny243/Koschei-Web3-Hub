@@ -86,6 +86,9 @@ func (h *Handler) AdminAnalyticsEvents(w http.ResponseWriter, r *http.Request) {
 		"login_success":             0,
 		"metadata_generate_success": 0,
 		"risk_scan_success":         0,
+		"metadata_view":             0,
+		"risk_view":                 0,
+		"chains_view":               0,
 	}
 	var eventsToday int64
 	if err := h.DB.QueryRowContext(r.Context(), `
@@ -100,7 +103,7 @@ func (h *Handler) AdminAnalyticsEvents(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.DB.QueryContext(r.Context(), `
 		SELECT event_name, count(*)
 		FROM analytics_events
-		WHERE event_name IN ('signup_success', 'login_success', 'metadata_generate_success', 'risk_scan_success')
+		WHERE event_name IN ('signup_success', 'login_success', 'metadata_generate_success', 'risk_scan_success', 'metadata_view', 'risk_view', 'chains_view')
 		GROUP BY event_name`)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
@@ -119,6 +122,51 @@ func (h *Handler) AdminAnalyticsEvents(w http.ResponseWriter, r *http.Request) {
 	if err := rows.Err(); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
 		return
+	}
+
+	topPageRows, err := h.DB.QueryContext(r.Context(), `
+		SELECT COALESCE(path, ''), count(*)
+		FROM analytics_events
+		WHERE created_at >= now()-interval '7 days' AND COALESCE(path, '') <> ''
+		GROUP BY path
+		ORDER BY count(*) DESC
+		LIMIT 10`)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
+		return
+	}
+	defer topPageRows.Close()
+	topPages := make([]map[string]any, 0)
+	for topPageRows.Next() {
+		var path string
+		var count int64
+		if err := topPageRows.Scan(&path, &count); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db scan failed"})
+			return
+		}
+		topPages = append(topPages, map[string]any{"path": path, "count": count})
+	}
+
+	dailyRows, err := h.DB.QueryContext(r.Context(), `
+		SELECT created_at::date::text, count(*)
+		FROM analytics_events
+		WHERE created_at >= CURRENT_DATE - interval '13 days'
+		GROUP BY created_at::date
+		ORDER BY created_at::date`)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
+		return
+	}
+	defer dailyRows.Close()
+	dailyCounts := make([]map[string]any, 0)
+	for dailyRows.Next() {
+		var day string
+		var count int64
+		if err := dailyRows.Scan(&day, &count); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db scan failed"})
+			return
+		}
+		dailyCounts = append(dailyCounts, map[string]any{"day": day, "count": count})
 	}
 
 	eventRows, err := h.DB.QueryContext(r.Context(), `
@@ -143,6 +191,7 @@ func (h *Handler) AdminAnalyticsEvents(w http.ResponseWriter, r *http.Request) {
 		if err := json.Unmarshal(metadataRaw, &event.Metadata); err != nil {
 			event.Metadata = map[string]any{}
 		}
+		event.Metadata = redactMetadata(event.Metadata)
 		events = append(events, event)
 	}
 	if err := eventRows.Err(); err != nil {
@@ -150,7 +199,7 @@ func (h *Handler) AdminAnalyticsEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "counts": counts, "events": events})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "counts": counts, "top_pages": topPages, "daily_counts": dailyCounts, "events": events})
 }
 
 func verifiedClaimsFromBearer(r *http.Request) (neonJWTClaims, bool) {
@@ -163,4 +212,17 @@ func verifiedClaimsFromBearer(r *http.Request) (neonJWTClaims, bool) {
 		return neonJWTClaims{}, false
 	}
 	return claims, true
+}
+
+func redactMetadata(metadata map[string]any) map[string]any {
+	redacted := map[string]any{}
+	for key, value := range metadata {
+		lower := strings.ToLower(key)
+		if strings.Contains(lower, "token") || strings.Contains(lower, "secret") || strings.Contains(lower, "password") || strings.Contains(lower, "authorization") || strings.Contains(lower, "jwt") {
+			redacted[key] = "[redacted]"
+			continue
+		}
+		redacted[key] = value
+	}
+	return redacted
 }
