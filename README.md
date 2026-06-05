@@ -51,7 +51,7 @@ Additional authenticated API endpoints are registered by the Go server under `ko
 
 Railway uses the repository-root `Dockerfile`. The container build compiles `koschei/api`, copies `koschei/api/public` into `/app/public`, sets `STATIC_DIR=/app/public`, and starts the compiled Go binary on port `8080`.
 
-Configure the required values from `.env.example` in Railway Variables before deployment. Neon Auth is handled directly by the Go backend.
+Configure the required values from `.env.example` in Railway Variables before deployment. `APP_ENV=production` is required on Railway so production checks are enabled and local-only debug routes stay unavailable. Neon Auth is handled directly by the Go backend.
 
 ## Validation
 

@@ -25,9 +25,6 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", h.Health)
 	mux.HandleFunc("/api/config", method("GET", h.Config))
-	if os.Getenv("APP_ENV") != "production" {
-		mux.HandleFunc("/api/debug/token", method("GET", h.DebugToken))
-	}
 	mux.HandleFunc("/api/auth/provision", method("POST", h.Provision))
 	mux.HandleFunc("/api/web3/health", method("GET", h.Web3Health))
 	mux.HandleFunc("/api/web3/health/logs", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3HealthLogs))))
