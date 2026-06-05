@@ -1,156 +1,17 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI NFT Metadata Generator — Solana | Koschei</title>
-<meta name="description" content="Generate professional NFT and game asset metadata using AI. Structured JSON output ready to deploy on Solana. Free, no wallet needed.">
-<meta property="og:title" content="AI Metadata Studio | Koschei">
-<meta property="og:url" content="https://tradepigloball.co/metadata.html">
-<meta name="twitter:card" content="summary_large_image">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/koschei.css">
-  <style>
-    .result-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;display:none;}
-    .result-box.show{display:block;}
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Metadata Studio Premium — Koschei</title>
+  <meta name="description" content="Koschei premium no-custody Web3 intelligence hub: read-only public analysis, demo mode, copy/export/share outputs and safety disclaimers.">
+  <link rel="stylesheet" href="/css/koschei.css?v=premium-web3">
 </head>
 <body>
-<nav class="nav">
-  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
-  <div class="nav-links">
-    <a href="/hub" class="nav-link">Hub</a>
-    <a href="/metadata" class="nav-link active">Metadata</a>
-    <a href="/risk" class="nav-link">Risk</a>
-    <a href="/watchlist" class="nav-link">Watchlist</a>
-    <a href="/chains" class="nav-link">Chains</a>
-    <a href="/watchlist" class="nav-link">Watchlist</a>
-    <a href="/account" class="nav-link">Account</a>
-  </div>
-</nav>
-
-<div class="page" style="max-width:700px;">
-  <div class="page-title">AI Metadata Studio</div>
-  <div class="page-sub">Generate structured NFT or game asset metadata using AI.</div>
-
-  <div class="card" style="display:flex;flex-direction:column;gap:16px;margin-bottom:20px;">
-    <div class="form-group">
-      <label class="form-label">Asset Name</label>
-      <input class="form-input" type="text" id="assetName" placeholder="e.g. Cosmic Dragon #001">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Description</label>
-      <textarea class="form-input" id="assetDesc" rows="3" placeholder="Describe your NFT or game asset..." style="resize:vertical;"></textarea>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Type</label>
-      <select class="form-input" id="assetType">
-        <option value="NFT">NFT</option>
-        <option value="Game Asset">Game Asset</option>
-        <option value="Collection">Collection</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Traits / Attributes <span style="color:var(--text2);font-weight:400;">(optional, comma separated)</span></label>
-      <input class="form-input" type="text" id="assetTraits" placeholder="e.g. fire, legendary, dragon, 5-star">
-    </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">
-      <button class="btn btn-primary" id="genBtn" onclick="generate()">✦ Generate Metadata</button>
-      <button class="btn btn-ghost" type="button" onclick="loadExample()">Load example</button>
-    </div>
-  </div>
-
-  <div class="alert" id="alert"></div>
-
-  <div id="resultWrap" style="display:none;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-      <span style="font-size:14px;font-weight:600;">Generated Metadata</span>
-      <button class="btn btn-ghost" style="padding:4px 12px;font-size:12px;" onclick="copyResult()">Copy JSON</button>
-    </div>
-    <div class="result-box show" id="resultBox"></div>
-  </div>
-</div>
-
-<script src="/js/koschei-auth.js?v=3"></script>
-<script src="/js/koschei-analytics.js?v=1"></script>
-<script>
-  (async () => {
-    await KoscheiAuth.init();
-    if (!KoscheiAuth.requireAuth('/login')) return;
-    KoscheiAnalytics.track('metadata_view');
-  })();
-
-  async function generate() {
-    const name = document.getElementById('assetName').value.trim();
-    const desc = document.getElementById('assetDesc').value.trim();
-    const type = document.getElementById('assetType').value;
-    const traits = document.getElementById('assetTraits').value.trim();
-    const btn = document.getElementById('genBtn');
-    clearAlert();
-
-    if (!name) { showError('Asset name is required.'); return; }
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Generating...';
-
-    KoscheiAnalytics.track('metadata_generate', { metadata: { asset_type: type } });
-
-    try {
-      const res = await KoscheiAuth.apiCall('/api/metadata/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ asset_name: name, description: desc, asset_type: type, traits }),
-      });
-
-      if (!res || !res.ok) {
-        const err = res ? await res.json().catch(() => ({})) : {};
-        throw new Error(err.message || err.error || `Request failed (${res?.status})`);
-      }
-
-      const data = await res.json();
-      document.getElementById('resultBox').textContent = JSON.stringify(data.metadata, null, 2);
-      document.getElementById('resultWrap').style.display = 'block';
-      KoscheiAnalytics.track('metadata_generate_success', { asset_type: type });
-      showSuccess('Metadata generated');
-    } catch (err) {
-      showError(err.message || 'Real execution requires credits. Demo examples are free.');
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = '✦ Generate Metadata';
-    }
-  }
-
-  function loadExample() {
-    const example = {
-      name: 'Demo example — Cosmic Dragon #001',
-      description: 'Demo example metadata only. No backend execution, no credit decrement, and no paid output saved.',
-      type: 'Game Asset',
-      attributes: [{ trait_type: 'Trait', value: 'demo' }, { trait_type: 'Trait', value: 'legendary' }],
-      properties: { category: 'game_asset', generated_by: 'Koschei Demo example' }
-    };
-    document.getElementById('resultBox').textContent = JSON.stringify(example, null, 2);
-    document.getElementById('resultWrap').style.display = 'block';
-    showSuccess('Demo example — no credits used.');
-  }
-
-  function copyResult() {
-    navigator.clipboard.writeText(document.getElementById('resultBox').textContent);
-  }
-
-  function showSuccess(msg) {
-    const el = document.getElementById('alert');
-    el.textContent = msg;
-    el.className = 'alert alert-success show';
-  }
-  function showError(msg) {
-    const el = document.getElementById('alert');
-    el.textContent = msg;
-    el.className = 'alert alert-error show';
-  }
-  function clearAlert() {
-    const el = document.getElementById('alert');
-    el.className = 'alert';
-  }
-</script>
+  <main class="page"><div class="card"><span class="spinner"></span> Loading Koschei premium intelligence module…</div></main>
+  <script src="/js/koschei-auth.js?v=4"></script>
+  <script src="/js/koschei-analytics.js?v=1"></script>
+  <script src="/js/koschei-premium-modules.js?v=1"></script>
+  <script>PremiumModules.init('metadata');</script>
 </body>
 </html>
