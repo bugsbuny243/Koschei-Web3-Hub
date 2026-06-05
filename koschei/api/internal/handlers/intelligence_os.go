@@ -644,6 +644,9 @@ func (h *Handler) AdminAgentKey(w http.ResponseWriter, r *http.Request) {
 		Scopes     []string `json:"scopes"`
 	}
 	_ = decodeJSON(r, &q)
+	if len(q.Scopes) == 0 {
+		q.Scopes = defaultAgentScopes()
+	}
 	b := make([]byte, 24)
 	_, _ = rand.Read(b)
 	key := "ksh_agent_" + hex.EncodeToString(b)
@@ -655,16 +658,80 @@ func (h *Handler) AdminAgentKey(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 201, map[string]any{"ok": true, "id": id, "agent_key": key, "notice": "Shown once. Store securely."})
 }
+func defaultAgentScopes() []string {
+	return []string{"health", "wallet_score", "risk_summary", "metadata_template", "chain_health"}
+}
+
+func agentScopeForPath(path string) string {
+	switch path {
+	case "/api/agent/health":
+		return "health"
+	case "/api/agent/wallet-score":
+		return "wallet_score"
+	case "/api/agent/risk-summary":
+		return "risk_summary"
+	case "/api/agent/metadata-template":
+		return "metadata_template"
+	case "/api/agent/chain-health":
+		return "chain_health"
+	default:
+		return ""
+	}
+}
+
+func hasAgentScope(scopes []string, required string) bool {
+	if len(scopes) == 0 {
+		scopes = defaultAgentScopes()
+	}
+	for _, scope := range scopes {
+		if strings.EqualFold(strings.TrimSpace(scope), required) {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *Handler) logAgentUsage(keyID, endpoint, status string) {
+	_, _ = h.DB.Exec(`INSERT INTO agent_api_logs(key_id,endpoint,status) VALUES(NULLIF($1,'')::uuid,$2,$3)`, keyID, endpoint, status)
+}
+
 func (h *Handler) AgentTool(w http.ResponseWriter, r *http.Request) {
-	key := r.Header.Get("x-koschei-agent-key")
-	sum := sha256.Sum256([]byte(key))
-	var id string
-	if h.DB.QueryRow(`SELECT id FROM agent_api_keys WHERE key_hash=$1 AND status='active'`, hex.EncodeToString(sum[:])).Scan(&id) != nil {
+	key := strings.TrimSpace(r.Header.Get("x-koschei-agent-key"))
+	if key == "" {
 		writeJSON(w, 401, map[string]string{"error": "invalid_agent_key"})
 		return
 	}
+	if h.Limiter != nil && !h.Limiter.allow("agent-ip:"+clientIP(r), 120, time.Minute) {
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate limited"})
+		return
+	}
+	keyFingerprint := sha256.Sum256([]byte(key))
+	if h.Limiter != nil && !h.Limiter.allow("agent-key:"+hex.EncodeToString(keyFingerprint[:]), 60, time.Minute) {
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate limited"})
+		return
+	}
+	sum := sha256.Sum256([]byte(key))
+	var id string
+	var rawScopes []byte
+	if h.DB.QueryRow(`SELECT id, COALESCE(scopes,'[]'::jsonb) FROM agent_api_keys WHERE key_hash=$1 AND status='active'`, hex.EncodeToString(sum[:])).Scan(&id, &rawScopes) != nil {
+		writeJSON(w, 401, map[string]string{"error": "invalid_agent_key"})
+		return
+	}
+	requiredScope := agentScopeForPath(r.URL.Path)
+	if requiredScope == "" {
+		h.logAgentUsage(id, r.URL.Path, "forbidden")
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
+		return
+	}
+	var scopes []string
+	_ = json.Unmarshal(rawScopes, &scopes)
+	if !hasAgentScope(scopes, requiredScope) {
+		h.logAgentUsage(id, r.URL.Path, "forbidden")
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
+		return
+	}
 	_, _ = h.DB.Exec(`UPDATE agent_api_keys SET last_used_at=now() WHERE id=$1`, id)
-	_, _ = h.DB.Exec(`INSERT INTO agent_api_logs(key_id,endpoint,status) VALUES($1,$2,'ok')`, id, r.URL.Path)
+	h.logAgentUsage(id, r.URL.Path, "ok")
 	h.logTool("", "agent_api_call", "ok")
 	h.trackEvent("", "agent_api_call", r.URL.Path)
 	if r.URL.Path == "/api/agent/health" {
@@ -684,6 +751,10 @@ func (h *Handler) AgentTool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var q riskInput
+	if r.URL.Path != "/api/agent/risk-summary" {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
+		return
+	}
 	_ = decodeJSON(r, &q)
 	score, sev, f, e, rec := riskResult(q)
 	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "risk_score": score, "severity": sev, "red_flags": f, "evidence": e, "recommendations": rec, "disclaimer": "Preliminary risk intelligence. Not financial, legal, or security advice."})

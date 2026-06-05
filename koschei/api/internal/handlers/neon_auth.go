@@ -176,7 +176,7 @@ func loadJWKSKey(kid string) (neonJWK, error) {
 	}
 	jwksMu.RUnlock()
 	jwksURL := strings.TrimSpace(os.Getenv("NEON_AUTH_JWKS_URL"))
-	if jwksURL == "" {
+	if jwksURL == "" && !isProduction() {
 		baseURL := strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL"))
 		if baseURL != "" {
 			jwksURL = strings.TrimRight(baseURL, "/") + "/.well-known/jwks.json"

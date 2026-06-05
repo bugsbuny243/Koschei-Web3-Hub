@@ -165,13 +165,13 @@ async function loadFeed(){
           </div>
         </div>
         <div style="text-align:center;">
-          <div style="font-size:20px;font-weight:800;">${l.risk_score}</div>
+          <div style="font-size:20px;font-weight:800;">${esc(l.risk_score)}</div>
           <div style="font-size:10px;color:var(--text2);">score</div>
         </div>
         <div><span class="score-pill ${sc}">${esc(l.risk_level)}</span></div>
         <div style="font-size:11px;color:var(--text2);text-align:right;">
           <div>${esc(l.network)}</div>
-          <div>${age}</div>
+          <div>${esc(age)}</div>
         </div>
       </div>`;
     }).join('');
