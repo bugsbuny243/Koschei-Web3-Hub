@@ -153,6 +153,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/watchlist":         "/watchlist.html",
 					"/account":           "/account.html",
 					"/pricing":           "/pricing.html",
+					"/support":           "/support.html",
 					"/admin":             "/admin.html",
 					"/admin-payments":    "/admin-payments.html",
 					"/admin-analytics":   "/admin-analytics.html",

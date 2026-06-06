@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <title>Support Koschei — Koschei</title>
+  <style>
+    .support-hero{padding:32px;background:linear-gradient(135deg,#111118,#13231d);border:1px solid #2a2a3a;border-radius:16px;margin-bottom:20px}
+    .support-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+    .support-card{display:flex;flex-direction:column;gap:12px;min-height:170px}
+    .support-card h2{margin:0;font-size:19px}
+    .support-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--text2);font-size:13px}
+    .support-actions{margin-top:auto}
+    .status-soon{opacity:.72}
+    .disabled-link{pointer-events:none;opacity:.7}
+    @media (max-width: 700px){.support-grid{grid-template-columns:1fr}.support-hero{padding:24px}}
+  </style>
+</head>
+<body>
+<nav class="nav">
+  <a class="nav-logo" href="/hub">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <div class="nav-links"><a class="nav-link" href="/hub">Hub</a><a class="nav-link" href="/docs">Docs</a><a class="nav-link active" href="/support">Support</a><a class="nav-link" href="/impact">Impact</a></div>
+</nav>
+<main class="page">
+  <section class="support-hero">
+    <span class="badge badge-green">Public-good support</span>
+    <h1>Support Koschei Web3 Hub</h1>
+    <p class="page-sub">Help keep Koschei's no-custody Web3 intelligence tools available for builders, users, and public-good safety workflows.</p>
+    <div class="premium-cta">
+      <a class="btn btn-primary" href="https://giveth.io/project/koschei-web3-hub" target="_blank" rel="noopener noreferrer">Support on Giveth</a>
+      <a class="btn btn-ghost" href="/pricing">Support with Shopier</a>
+    </div>
+  </section>
+
+  <section class="support-grid" aria-label="Support links">
+    <article class="card support-card">
+      <div class="support-meta"><span class="dot dot-green"></span><span class="badge badge-green">Active</span></div>
+      <h2>Shopier</h2>
+      <p class="auth-sub">Buy output packs through the active Shopier checkout flow.</p>
+      <div class="support-actions"><a class="btn btn-primary" href="/pricing">Open Shopier packs</a></div>
+    </article>
+    <article class="card support-card">
+      <div class="support-meta"><span class="dot dot-green"></span><span class="badge badge-green">Active</span></div>
+      <h2>Giveth</h2>
+      <p class="auth-sub">Donate to the active Koschei Web3 Hub project on Giveth.</p>
+      <div class="support-actions"><a class="btn btn-primary" href="https://giveth.io/project/koschei-web3-hub" target="_blank" rel="noopener noreferrer">Open Giveth project</a></div>
+    </article>
+    <article class="card support-card status-soon">
+      <div class="support-meta"><span class="dot dot-gray"></span><span class="badge badge-blue">Coming soon</span></div>
+      <h2>GitHub Sponsors</h2>
+      <p class="auth-sub">GitHub Sponsors support is planned but not active yet.</p>
+      <div class="support-actions"><span class="btn btn-ghost disabled-link" aria-disabled="true">Coming soon</span></div>
+    </article>
+    <article class="card support-card status-soon">
+      <div class="support-meta"><span class="dot dot-gray"></span><span class="badge badge-blue">Coming soon</span></div>
+      <h2>Open Collective</h2>
+      <p class="auth-sub">Open Collective support is planned but not active yet.</p>
+      <div class="support-actions"><span class="btn btn-ghost disabled-link" aria-disabled="true">Coming soon</span></div>
+    </article>
+    <article class="card support-card status-soon">
+      <div class="support-meta"><span class="dot dot-gray"></span><span class="badge badge-blue">Coming soon</span></div>
+      <h2>Drips</h2>
+      <p class="auth-sub">Drips support is planned but not active yet.</p>
+      <div class="support-actions"><span class="btn btn-ghost disabled-link" aria-disabled="true">Coming soon</span></div>
+    </article>
+  </section>
+</main>
+<script src="/js/koschei-analytics.js?v=1"></script>
+<script>KoscheiAnalytics.track('support_view')</script>
+</body>
+</html>
