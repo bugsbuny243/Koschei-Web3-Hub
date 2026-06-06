@@ -143,6 +143,10 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					http.NotFound(w, r)
 					return
 				}
+				if r.URL.Path == "/" {
+					http.ServeFile(w, r, indexPath)
+					return
+				}
 				cleanRoutes := map[string]string{
 					"/hub":               "/hub.html",
 					"/login":             "/login.html",
