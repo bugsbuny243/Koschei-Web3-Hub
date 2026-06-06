@@ -14,8 +14,8 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Koschei — Free Solana Security Tools | Token Scanner, TX Decoder, Wallet Score</title>
-  <meta name="description" content="Free Solana developer tools — token security scanner, TX decoder, wallet reputation score, program scanner, chain health API. No wallet needed. No custody.">
+  <title>Koschei Web3 Hub | Solana Security Tools, Token Scanner, TX Decoder, Wallet Score</title>
+  <meta name="description" content="Koschei Web3 Hub provides no-custody Solana intelligence tools for token scanning, TX decoding, wallet reputation, program scanning, and chain health. No private keys or seed phrases.">
   <meta name="keywords" content="Solana token scanner, Solana security, rug pull detector, Solana wallet score, NFT metadata generator, Solana transaction decoder, Solana developer tools, smart contract scanner, Web3 security">
   <meta name="author" content="Koschei Web3 Hub">
   <meta name="robots" content="index, follow">
@@ -24,15 +24,15 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tradepigloball.co/">
-  <meta property="og:title" content="Koschei — Free Solana Security & Developer Tools">
-  <meta property="og:description" content="Token scanner, TX decoder, wallet score, program security scanner. Free. No wallet needed.">
+  <meta property="og:title" content="Koschei Web3 Hub — Solana Security & Developer Tools">
+  <meta property="og:description" content="No-custody Web3 intelligence for token scanning, TX decoding, wallet scoring, and public blockchain activity.">
   <meta property="og:image" content="https://tradepigloball.co/og-image.svg">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@KreatifZihin">
-  <meta name="twitter:title" content="Koschei — Free Solana Security Tools">
-  <meta name="twitter:description" content="Token scanner, TX decoder, wallet score, program scanner. Free. Try now.">
+  <meta name="twitter:title" content="Koschei Web3 Hub — Solana Security Tools">
+  <meta name="twitter:description" content="Token scanner, TX decoder, wallet score, and program scanner for public/read-only Web3 intelligence.">
   <meta name="twitter:image" content="https://tradepigloball.co/og-image.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -40,8 +40,8 @@
     :root {
       --bg: #050812;
       --bg2: #0a1020;
-      --glass: rgba(255, 255, 255, .08);
-      --glass-strong: rgba(255, 255, 255, .13);
+      --surface: rgba(255, 255, 255, .08);
+      --surface-strong: rgba(255, 255, 255, .13);
       --line: rgba(255, 255, 255, .16);
       --line-strong: rgba(255, 255, 255, .28);
       --text: #f7fbff;
@@ -79,7 +79,7 @@
     }
     a { color: inherit; }
     .shell { width: min(1160px, calc(100% - 32px)); margin: 0 auto; }
-    .glass {
+    .surface {
       background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.045));
       border: 1px solid var(--line);
       box-shadow: var(--shadow);
@@ -150,8 +150,10 @@
     }
     h1 { margin: 22px 0 18px; font-size: clamp(44px, 7vw, 82px); line-height: .96; letter-spacing: -.07em; }
     .gradient-text { background: linear-gradient(135deg, #fff, #c7fff0 32%, #82ddff 72%, #d9ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .hero-sub { max-width: 640px; margin: 0 0 30px; color: var(--text2); font-size: clamp(16px, 2vw, 20px); line-height: 1.75; }
+    .hero-sub { max-width: 640px; margin: 0 0 16px; color: var(--text2); font-size: clamp(16px, 2vw, 20px); line-height: 1.75; }
+    .hero-copy { max-width: 680px; margin: 0 0 30px; color: #dce8ff; font-size: 16px; line-height: 1.75; }
     .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+    .hero-note { flex-basis: 100%; margin: 4px 0 0; color: var(--text2); font-size: 13px; line-height: 1.7; }
     .panel { border-radius: 34px; padding: 24px; }
     .terminal { min-height: 420px; display: flex; flex-direction: column; gap: 16px; }
     .terminal-top { display: flex; align-items: center; justify-content: space-between; color: var(--text2); font-size: 12px; font-weight: 700; }
@@ -200,7 +202,7 @@
   </style>
 </head>
 <body>
-  <nav class="nav glass">
+  <nav class="nav surface">
     <a href="/" class="brand" aria-label="Koschei home"><span class="brand-mark">K</span><span>Koschei</span></a>
     <div class="nav-links">
       <a href="/docs" class="nav-link">Docs</a>
@@ -214,15 +216,17 @@
     <section class="hero shell">
       <div class="hero-grid">
         <div>
-          <div class="eyebrow">⚡ Solana developer tooling</div>
-          <h1><span class="gradient-text">Glass-grade Web3 hub</span> for builders.</h1>
-          <p class="hero-sub">AI-powered metadata generation, on-chain risk scanning, event monitoring, and live chain health in a premium no-custody workspace.</p>
+          <div class="eyebrow">⚡ No-custody Solana intelligence</div>
+          <h1><span class="gradient-text">Koschei Web3 Hub</span></h1>
+          <p class="hero-sub">No-custody Web3 intelligence tools for Solana builders and users.</p>
+          <p class="hero-copy">Analyze wallets, tokens, transactions, metadata, project risk signals and public blockchain activity without private keys or seed phrases.</p>
           <div class="hero-actions">
-            <a href="/register.html" class="btn btn-primary">Create free account</a><p class="hero-note">Create a free account to explore Koschei. Buy credits to run real tools.</p>
-            <a href="/hub.html" class="btn btn-ghost">Explore member hub →</a>
+            <a href="/hub.html" class="btn btn-primary">Open Hub</a>
+            <a href="/docs" class="btn btn-ghost">View Docs</a>
+            <p class="hero-note">No private keys. No seed phrases. Public/read-only Web3 intelligence. Informational only, not financial advice.</p>
           </div>
         </div>
-        <aside class="panel glass terminal" aria-label="Koschei live dashboard preview">
+        <aside class="panel surface terminal" aria-label="Koschei live dashboard preview">
           <div class="terminal-top"><span>koschei://live-stack</span><div class="dots"><span></span><span></span><span></span></div></div>
           <div class="metric-grid">
             <div class="metric"><small>Architecture</small><strong>No custody</strong></div>
@@ -241,24 +245,24 @@
     <section class="section shell">
       <div class="section-head">
         <div class="section-kicker">Workspace modules</div>
-        <h2>Everything a Web3 operator needs, wrapped in one glass interface.</h2>
+        <h2>Everything a Web3 operator needs in one Koschei intelligence workspace.</h2>
       </div>
       <div class="cards">
-        <article class="card glass"><div class="icon">🧬</div><h3>AI Metadata Studio</h3><p>Generate professional NFT, game asset, and project metadata in seconds with AI-assisted fallback logic.</p></article>
-        <article class="card glass"><div class="icon">🛡️</div><h3>Risk Scanner</h3><p>Review transparent on-chain risk signals before you interact with a Solana project or wallet.</p></article>
-        <article class="card glass"><div class="icon">📡</div><h3>Chain Health API</h3><p>Monitor Solana, Ethereum, Base, Arbitrum, Polygon, and Optimism health from one REST-friendly surface.</p></article>
-        <article class="card glass"><div class="icon">🔔</div><h3>Web3 Event Monitor</h3><p>Track public wallet and contract activity through Alchemy-powered polling without requesting private keys.</p></article>
-        <article class="card glass"><div class="icon">🔒</div><h3>No Custody</h3><p>Read-only tools by design. Koschei never asks for seed phrases, private keys, or wallet custody.</p></article>
-        <article class="card glass"><div class="icon">⚙️</div><h3>Developer First</h3><p>Practical endpoints, fast member flows, and clear modules designed for builders who ship.</p></article>
+        <article class="card surface"><div class="icon">🧬</div><h3>AI Metadata Studio</h3><p>Generate professional NFT, game asset, and project metadata in seconds with AI-assisted fallback logic.</p></article>
+        <article class="card surface"><div class="icon">🛡️</div><h3>Risk Scanner</h3><p>Review transparent on-chain risk signals before you interact with a Solana project or wallet.</p></article>
+        <article class="card surface"><div class="icon">📡</div><h3>Chain Health API</h3><p>Monitor Solana, Ethereum, Base, Arbitrum, Polygon, and Optimism health from one REST-friendly surface.</p></article>
+        <article class="card surface"><div class="icon">🔔</div><h3>Web3 Event Monitor</h3><p>Track public wallet and contract activity through Alchemy-powered polling without requesting private keys.</p></article>
+        <article class="card surface"><div class="icon">🔒</div><h3>No Custody</h3><p>Read-only tools by design. Koschei never asks for seed phrases, private keys, or wallet custody.</p></article>
+        <article class="card surface"><div class="icon">⚙️</div><h3>Developer First</h3><p>Practical endpoints, fast member flows, and clear modules designed for builders who ship.</p></article>
       </div>
     </section>
 
-    <section class="cta shell glass">
+    <section class="cta shell surface">
       <div>
         <h2>Start building today.</h2>
-        <p>Free tier. No credit card. Just clean Web3 tooling that works.</p>
+        <p>Explore public/read-only Web3 intelligence tools without private keys or seed phrases.</p>
       </div>
-      <a href="/register.html" class="btn btn-primary">Launch Koschei</a>
+      <a href="/register.html" class="btn btn-primary">Create account</a>
     </section>
   </main>
 
