@@ -85,6 +85,16 @@ https://tradepigloball.co/docs
 Public Impact:
 https://tradepigloball.co/impact
 
+## Support
+
+Koschei Web3 Hub currently accepts support through active Shopier packs and the active Giveth project. Additional public-good funding channels are planned.
+
+- Shopier: active — https://tradepigloball.co/pricing
+- Giveth: active — https://giveth.io/project/koschei-web3-hub
+- GitHub Sponsors: coming soon
+- Open Collective: coming soon
+- Drips: coming soon
+
 ## Current Status
 
 Koschei is currently an early live MVP with working authentication, admin analytics, credit system, and multiple Web3 intelligence modules.
