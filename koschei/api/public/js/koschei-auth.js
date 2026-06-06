@@ -5,13 +5,10 @@ function _b64url(str) {
 }
 
 var KoscheiAuth = (function() {
-  let _neonAuthUrl = '';
-
   async function init() {
     try {
       const res = await fetch('/api/config');
-      const cfg = await res.json();
-      _neonAuthUrl = (cfg.neonAuthUrl || '').replace(/\/+$/, '');
+      await res.json();
     } catch { console.error('Koschei: config yüklenemedi'); }
   }
 
@@ -60,21 +57,6 @@ var KoscheiAuth = (function() {
     try { return JSON.parse(_b64url(jwt.split('.')[1])).sub || null; } catch { return null; }
   }
 
-  async function _neonRequest(path, body) {
-    if (!_neonAuthUrl) throw new Error('Auth yapılandırılmamış. Sayfayı yenileyin.');
-    const res = await fetch(`${_neonAuthUrl}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.message || data?.error?.message || data?.error || `Hata (${res.status})`);
-    }
-    return data;
-  }
-
   async function _backendLogin(email, password) {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
@@ -117,11 +99,44 @@ var KoscheiAuth = (function() {
     return data;
   }
 
+  function _authErrorMessage(data, fallback) {
+    const raw = data?.message || data?.error?.message || data?.error || fallback;
+    if (data?.error === 'email_already_exists' || /already|exists|registered|kayıtlı/i.test(raw)) {
+      return 'Bu e-posta zaten kayıtlı. Giriş yapmayı deneyin.';
+    }
+    if (data?.error === 'auth_not_configured') {
+      return 'Auth yapılandırması eksik.';
+    }
+    if (data?.error === 'signup_endpoint_not_found' || /sign-up endpoint/i.test(raw)) {
+      return 'Neon Auth sign-up endpoint bulunamadı. NEON_AUTH_BASE_URL kontrol edilmeli.';
+    }
+    return raw;
+  }
+
   async function signUp(email, password) {
-    await _neonRequest('/sign-up/email', {
-      email, password, name: email.split('@')[0] || 'User',
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
     });
-    return signIn(email, password);
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(_authErrorMessage(data, `Kayıt başarısız (${res.status})`));
+    }
+
+    const jwt = data?.access_token || data?.token || data?.data?.access_token;
+    if (!_isJwt(jwt)) {
+      throw new Error('Registration succeeded but no auth token was returned.');
+    }
+
+    saveJwt(jwt);
+    if (!isLoggedIn()) {
+      throw new Error('Auth token could not be saved.');
+    }
+    await _provision();
+    return data;
   }
 
   async function apiCall(path, options = {}) {
