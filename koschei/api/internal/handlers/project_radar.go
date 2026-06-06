@@ -123,10 +123,6 @@ func projectRadarInsufficientOutputsResponse() map[string]string {
 	}
 }
 
-func (h *Handler) ProjectRadarScan(w http.ResponseWriter, r *http.Request) {
-	h.ProjectRadar(w, r)
-}
-
 func normalizeProjectRadarRequest(req projectRadarRequest) (projectRadarRequest, error) {
 	req.ProjectName = strings.TrimSpace(req.ProjectName)
 	req.WebsiteURL = firstNonEmptyString(req.WebsiteURL, req.Website)
