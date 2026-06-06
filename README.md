@@ -85,15 +85,14 @@ https://tradepigloball.co/docs
 Public Impact:
 https://tradepigloball.co/impact
 
-## Support
+## Support Koschei
 
-Koschei Web3 Hub currently accepts support through active Shopier packs and the active Giveth project. Additional public-good funding channels are planned.
+Koschei is an early public-good Web3 intelligence project focused on no-custody safety tools for Solana builders and users.
 
-- Shopier: active — https://tradepigloball.co/pricing
-- Giveth: active — https://giveth.io/project/koschei-web3-hub
-- GitHub Sponsors: coming soon
-- Open Collective: coming soon
-- Drips: coming soon
+Support helps cover infrastructure, API costs, documentation, demo examples and continued development.
+
+Support link:
+https://www.shopier.com/TradeVisual/47208457
 
 ## Current Status
 
