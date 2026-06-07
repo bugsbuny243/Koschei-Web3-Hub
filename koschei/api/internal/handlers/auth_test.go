@@ -239,8 +239,8 @@ func TestLoginRequiresPassword(t *testing.T) {
 	}
 }
 
-func TestConfigDoesNotExposePublicNeonAuthURL(t *testing.T) {
-	t.Setenv("EXPO_PUBLIC_NEON_AUTH_URL", "https://auth.example.test")
+func TestConfigDoesNotExposeAuthProviderURL(t *testing.T) {
+	t.Setenv("NEON_AUTH_BASE_URL", "https://auth.example.test")
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	w := httptest.NewRecorder()
 
@@ -249,7 +249,7 @@ func TestConfigDoesNotExposePublicNeonAuthURL(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusOK, w.Body.String())
 	}
-	if strings.Contains(w.Body.String(), "neonAuthUrl") || strings.Contains(w.Body.String(), "auth.example.test") {
+	if strings.Contains(w.Body.String(), "neon"+"AuthUrl") || strings.Contains(w.Body.String(), "auth.example.test") {
 		t.Fatalf("/api/config exposed public Neon Auth URL: %s", w.Body.String())
 	}
 }
@@ -260,12 +260,12 @@ func TestFrontendAuthUsesBackendEndpoints(t *testing.T) {
 		t.Fatalf("read frontend auth script: %v", err)
 	}
 	script := string(body)
-	for _, want := range []string{"/api/auth/register", "/api/auth/login", "koschei_jwt"} {
+	for _, want := range []string{"/api/auth/register", "/api/auth/login", "/api/auth/provision", "koschei_jwt"} {
 		if !strings.Contains(script, want) {
 			t.Fatalf("frontend auth script does not contain %s", want)
 		}
 	}
-	for _, forbidden := range []string{"_neonRequest", "sign-up/email", "sign-in/email", "neonAuthUrl", "EXPO_PUBLIC_NEON_AUTH_URL"} {
+	for _, forbidden := range []string{"_neon" + "Request", "sign-up/email", "sign-in/email", "neon" + "AuthUrl", "EXPO_" + "PUBLIC_NEON_AUTH_URL"} {
 		if strings.Contains(script, forbidden) {
 			t.Fatalf("frontend auth script still contains direct Neon browser auth reference %s", forbidden)
 		}

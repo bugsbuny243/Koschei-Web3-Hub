@@ -63,6 +63,7 @@
       || data?.data?.access_token || data?.data?.token;
     if (!_isJwt(jwt)) throw new Error('Kayıt başarılı fakat token alınamadı.');
     saveJwt(jwt);
+    await _provision();
     return data;
   }
 
@@ -72,6 +73,7 @@
       || data?.data?.access_token || data?.data?.token;
     if (!_isJwt(jwt)) throw new Error('Giriş başarılı fakat token alınamadı.');
     saveJwt(jwt);
+    await _provision();
     return data;
   }
 
