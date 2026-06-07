@@ -272,6 +272,55 @@ func TestFrontendAuthUsesBackendEndpoints(t *testing.T) {
 	}
 }
 
+func TestFrontendLoginRegisterUseEmailPasswordForms(t *testing.T) {
+	cases := []struct {
+		file      string
+		wants     []string
+		forbidden []string
+	}{
+		{
+			file: "../../public/login.html",
+			wants: []string{
+				`id="loginForm"`,
+				`name="email"`,
+				`name="password"`,
+				"KoscheiAuth.signIn",
+			},
+			forbidden: []string{"/api/auth/neon-login", "Continue with Neon Auth", "hosted UI only"},
+		},
+		{
+			file: "../../public/register.html",
+			wants: []string{
+				`id="registerForm"`,
+				`name="email"`,
+				`name="password"`,
+				"KoscheiAuth.signUp",
+			},
+			forbidden: []string{"/api/auth/neon-register", "Continue with Neon Auth", "hosted UI"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.file, func(t *testing.T) {
+			body, err := os.ReadFile(tc.file)
+			if err != nil {
+				t.Fatalf("read frontend page: %v", err)
+			}
+			page := string(body)
+			for _, want := range tc.wants {
+				if !strings.Contains(page, want) {
+					t.Fatalf("frontend page %s does not contain %s", tc.file, want)
+				}
+			}
+			for _, forbidden := range tc.forbidden {
+				if strings.Contains(page, forbidden) {
+					t.Fatalf("frontend page %s still contains hosted auth reference %s", tc.file, forbidden)
+				}
+			}
+		})
+	}
+}
+
 func TestOTPLoginEndpointsAreDisabled(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
