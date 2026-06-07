@@ -55,6 +55,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/admin/summary", requiresDB(h, method("GET", h.AdminSummary)))
 	mux.HandleFunc("/api/admin/users", requiresDB(h, method("GET", h.AdminUsers)))
 	mux.HandleFunc("/api/admin/users/action", requiresDB(h, method("POST", h.AdminUserAction)))
+	mux.HandleFunc("/api/admin/credit-events", requiresDB(h, method("GET", h.AdminCreditEvents)))
 	mux.HandleFunc("/api/admin/payments", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "payments") })))
 	mux.HandleFunc("/api/admin/entitlements", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "entitlements") })))
 	mux.HandleFunc("/api/admin/outputs", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "outputs") })))

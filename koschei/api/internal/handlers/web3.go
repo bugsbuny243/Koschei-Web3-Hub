@@ -503,8 +503,9 @@ func (h *Handler) syncWeb3Source(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
-		if !isPrivileged && outputs <= 0 {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		toolCost := ToolCreditCost("watchlist_sync")
+		if !isPrivileged && outputs < toolCost {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, outputs))
 			return
 		}
 	}

@@ -57,8 +57,9 @@ func (h *Handler) PortfolioTrack(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	if !isPrivileged && outputs <= 0 {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+	toolCost := ToolCreditCost("portfolio_tracker")
+	if !isPrivileged && outputs < toolCost {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, outputs))
 		return
 	}
 
@@ -120,8 +121,9 @@ func (h *Handler) SmartMoney(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	if !isPrivileged && outputs <= 0 {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+	toolCost := ToolCreditCost("smart_money")
+	if !isPrivileged && outputs < toolCost {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, outputs))
 		return
 	}
 	accounts := []smartMoneyAccount{
@@ -133,7 +135,7 @@ func (h *Handler) SmartMoney(w http.ResponseWriter, r *http.Request) {
 	}
 	if !isPrivileged {
 		if err := h.spendOutput(claims.Email, "smart_money"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(ToolCreditCost("smart_money"), 0))
 			return
 		}
 	}

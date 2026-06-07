@@ -70,9 +70,9 @@ func (h *Handler) ProgramScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 1
+	toolCost := ToolCreditCost("program_scanner")
 	if !isPrivileged && credits < toolCost {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 		return
 	}
 
@@ -147,7 +147,7 @@ func (h *Handler) ProgramScan(w http.ResponseWriter, r *http.Request) {
 
 	if !isPrivileged {
 		if err := h.spendOutput(claims.Email, "program_scan"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 			return
 		}
 	}

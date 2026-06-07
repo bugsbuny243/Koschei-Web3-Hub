@@ -206,8 +206,9 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 500, map[string]string{"error": "db_failed"})
 		return
 	}
-	if !isPrivileged && credits <= 0 {
-		writeJSON(w, 402, insufficientOutputsResponse())
+	toolCost := ToolCreditCost("runtime_project")
+	if !isPrivileged && credits < toolCost {
+		writeJSON(w, 402, insufficientOutputsResponse(toolCost, credits))
 		return
 	}
 	projectID := newID()

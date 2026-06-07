@@ -47,9 +47,9 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 1
+	toolCost := ToolCreditCost("wallet_score")
 	if !isPrivileged && credits < toolCost {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 		return
 	}
 
@@ -274,7 +274,7 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 
 	if !isPrivileged {
 		if err := h.spendOutput(claims.Email, "wallet_score"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 			return
 		}
 	}

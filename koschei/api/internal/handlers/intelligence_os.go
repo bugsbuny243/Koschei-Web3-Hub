@@ -30,26 +30,6 @@ func (h *Handler) trackEvent(email, name, path string) {
 	_, _ = h.DB.Exec(`INSERT INTO analytics_events(event_name,email,path,metadata) VALUES($1,NULLIF($2,''),$3,'{}'::jsonb)`, name, email, path)
 }
 
-func (h *Handler) spendOutput(email, tool string) error {
-	tx, e := h.DB.Begin()
-	if e != nil {
-		return e
-	}
-	defer tx.Rollback()
-	if e = h.applyCreditChargeTxWithReason(tx, "", email, tool); e != nil {
-		return e
-	}
-	return tx.Commit()
-}
-
-func (h *Handler) useOutput(w http.ResponseWriter, email, tool string) bool {
-	if e := h.spendOutput(email, tool); e != nil {
-		writeJSON(w, 402, insufficientOutputsResponse())
-		return false
-	}
-	return true
-}
-
 func (h *Handler) AdminModules(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
 		return

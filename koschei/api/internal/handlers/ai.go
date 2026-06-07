@@ -62,8 +62,9 @@ func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	if !isPrivileged && credits <= 0 {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+	toolCost := ToolCreditCost("ai_generate")
+	if !isPrivileged && credits < toolCost {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 		return
 	}
 
@@ -179,32 +180,6 @@ func isTextTool(tool string) bool {
 	return tool == "game_design" || tool == "game_code" || tool == "build_analyzer" || tool == "concept_art"
 }
 
-func insufficientOutputsResponse() map[string]string {
-	return map[string]string{
-		"error":   "insufficient_outputs",
-		"message": "This tool requires paid credits. Please upgrade to run real scans and generate outputs.",
-	}
-}
-
-func (h *Handler) userCreditsAndRole(authSub string) (bool, int, error) {
-	var role, email string
-	if err := h.DB.QueryRow(`SELECT COALESCE(role,''), COALESCE(email,'') FROM app_user_profiles WHERE auth_subject=$1`, authSub).Scan(&role, &email); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return false, 0, nil
-		}
-		return false, 0, err
-	}
-	role = strings.ToLower(strings.TrimSpace(role))
-	email = strings.ToLower(strings.TrimSpace(email))
-	var outputs int
-	if email != "" {
-		if err := h.DB.QueryRow(`SELECT COALESCE(SUM(outputs_remaining),0)::int FROM entitlements WHERE lower(email)=lower($1) AND status='active'`, email).Scan(&outputs); err != nil {
-			return role == "owner", 0, err
-		}
-	}
-	return role == "owner", outputs, nil
-}
-
 func (h *Handler) insertGenerationJob(email, tool, prompt, route string) (string, error) {
 	var id string
 	err := h.DB.QueryRow(`INSERT INTO generation_jobs (email, tool, prompt, status, provider, route, result) VALUES ($1,$2,$3,'running','together',$4,NULL) RETURNING id`, email, tool, prompt, route).Scan(&id)
@@ -222,33 +197,11 @@ func (h *Handler) insertModelRouteLog(email, tool, route, model, prompt, status 
 }
 
 func (h *Handler) applyCreditChargeTx(tx *sql.Tx, authSub, email string) error {
-	return h.applyCreditChargeTxWithReason(tx, authSub, email, "ai_generation")
+	return h.ChargeCreditsTx(context.Background(), tx, email, "ai_generate")
 }
 
 func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSub, email, reason string) error {
-	res, err := tx.Exec(`
-		UPDATE entitlements
-		SET outputs_remaining = outputs_remaining - 1,
-			updated_at = now()
-		WHERE id = (
-			SELECT id
-			FROM entitlements
-			WHERE lower(email) = lower($1)
-			  AND status = 'active'
-			  AND outputs_remaining > 0
-			ORDER BY outputs_remaining DESC, created_at DESC
-			LIMIT 1
-			FOR UPDATE
-		)`, email)
-	if err != nil {
-		return err
-	}
-	rows, _ := res.RowsAffected()
-	if rows == 0 {
-		return errors.New("insufficient outputs")
-	}
-	_, err = tx.Exec(`INSERT INTO credit_events (email, amount, reason, created_at) VALUES ($1,-1,$2,now())`, email, reason)
-	return err
+	return h.ChargeCreditsTx(context.Background(), tx, email, reason)
 }
 
 func (h *Handler) completeGenerationAndCharge(jobID, authSub, email, tool, route, model, prompt, resultText string, isPrivileged bool) error {
@@ -265,7 +218,7 @@ func (h *Handler) completeGenerationAndCharge(jobID, authSub, email, tool, route
 		return err
 	}
 	if !isPrivileged {
-		if err := h.applyCreditChargeTx(tx, authSub, email); err != nil {
+		if err := h.ChargeCreditsTx(context.Background(), tx, email, "ai_generate"); err != nil {
 			return err
 		}
 	}
