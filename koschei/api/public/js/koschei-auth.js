@@ -60,7 +60,7 @@ var KoscheiAuth = (function() {
     const res = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, callbackURL: 'https://tradepigloball.co/hub.html' }),
     });
 
     const data = await res.json().catch(() => ({}));
