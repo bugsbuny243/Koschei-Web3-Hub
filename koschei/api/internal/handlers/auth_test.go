@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -171,23 +172,56 @@ func TestPostBetterAuthEmailPasswordFallbackAll404ReturnsClearError(t *testing.T
 	}
 }
 
-func TestBetterAuthConfigUsesNeonAuthDefaults(t *testing.T) {
+func TestBetterAuthConfigRequiresNeonAuthEnv(t *testing.T) {
 	t.Setenv("NEON_AUTH_BASE_URL", "")
 	t.Setenv("NEON_AUTH_ISSUER", "")
 	t.Setenv("NEON_AUTH_JWKS_URL", "")
 
-	cfg, err := betterAuthConfigFromEnv()
-	if err != nil {
-		t.Fatalf("betterAuthConfigFromEnv returned error: %v", err)
+	_, err := betterAuthConfigFromEnv()
+	if err == nil {
+		t.Fatal("betterAuthConfigFromEnv returned nil error, want missing env error")
 	}
-	if cfg.BaseURL != defaultNeonAuthBaseURL {
-		t.Fatalf("BaseURL = %q, want %q", cfg.BaseURL, defaultNeonAuthBaseURL)
+	msg := err.Error()
+	for _, name := range []string{"NEON_AUTH_BASE_URL", "NEON_AUTH_ISSUER", "NEON_AUTH_JWKS_URL"} {
+		if !strings.Contains(msg, name) {
+			t.Fatalf("missing env error %q does not include %s", msg, name)
+		}
 	}
-	if cfg.IssuerURL != defaultNeonAuthIssuer {
-		t.Fatalf("IssuerURL = %q, want %q", cfg.IssuerURL, defaultNeonAuthIssuer)
-	}
-	if cfg.JWKSURL != defaultNeonAuthJWKSURL {
-		t.Fatalf("JWKSURL = %q, want %q", cfg.JWKSURL, defaultNeonAuthJWKSURL)
+}
+
+func TestLoginAndRegisterReturnJSONWhenNeonEnvMissing(t *testing.T) {
+	t.Setenv("NEON_AUTH_BASE_URL", "")
+	t.Setenv("NEON_AUTH_ISSUER", "")
+	t.Setenv("NEON_AUTH_JWKS_URL", "")
+
+	for _, tc := range []struct {
+		name    string
+		path    string
+		handler func(http.ResponseWriter, *http.Request)
+	}{
+		{name: "login", path: "/api/auth/login", handler: (&Handler{}).Login},
+		{name: "register", path: "/api/auth/register", handler: (&Handler{}).Register},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(`{"email":"user@example.com","password":"secret-password"}`))
+			w := httptest.NewRecorder()
+
+			tc.handler(w, req)
+
+			if w.Code != http.StatusServiceUnavailable {
+				t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusServiceUnavailable, w.Body.String())
+			}
+			if w.Code == http.StatusGone {
+				t.Fatalf("%s returned disabled 410 response", tc.name)
+			}
+			if got := w.Header().Get("Content-Type"); !strings.Contains(got, "application/json") {
+				t.Fatalf("Content-Type = %q, want JSON", got)
+			}
+			body := w.Body.String()
+			if !strings.Contains(body, "auth_not_configured") || !strings.Contains(body, "NEON_AUTH_BASE_URL") {
+				t.Fatalf("response did not clearly explain missing auth env: %s", body)
+			}
+		})
 	}
 }
 
@@ -202,6 +236,38 @@ func TestLoginRequiresPassword(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "missing_password") {
 		t.Fatalf("response did not explain missing password: %s", w.Body.String())
+	}
+}
+
+func TestConfigDoesNotExposeNeonAuthURL(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	w := httptest.NewRecorder()
+
+	(&Handler{}).Config(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "neonAuthUrl") || strings.Contains(w.Body.String(), "neonauth") {
+		t.Fatalf("/api/config leaked Neon Auth details: %s", w.Body.String())
+	}
+}
+
+func TestFrontendAuthUsesBackendEndpoints(t *testing.T) {
+	body, err := os.ReadFile("../../public/js/koschei-auth.js")
+	if err != nil {
+		t.Fatalf("read frontend auth script: %v", err)
+	}
+	script := string(body)
+	for _, want := range []string{"/api/auth/register", "/api/auth/login", "koschei_jwt"} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("frontend auth script does not contain %s", want)
+		}
+	}
+	for _, forbidden := range []string{"_neonRequest", "sign-up/email", "sign-in/email", "neonAuthUrl", "EXPO_PUBLIC_NEON_AUTH_URL"} {
+		if strings.Contains(script, forbidden) {
+			t.Fatalf("frontend auth script still contains direct Neon browser auth reference %s", forbidden)
+		}
 	}
 }
 
