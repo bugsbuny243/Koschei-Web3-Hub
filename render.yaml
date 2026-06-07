@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: koschei-web3-hub
+    env: go
+    rootDir: koschei/api
+    buildCommand: go build -o app .
+    startCommand: ./app
+    envVars:
+      - key: STATIC_DIR
+        value: public
