@@ -16,16 +16,13 @@ func (h *Handler) NeonLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get redirect target after login (default to hub)
 	redirectTo := r.URL.Query().Get("redirect")
 	if redirectTo == "" {
 		redirectTo = "/hub.html"
 	}
 
-	// Build callback URL (where Neon will send the user back)
-	callbackURL := fmt.Sprintf("%s://%s/api/auth/neon-callback", getScheme(r), r.Host)
+	callbackURL := getAbsoluteCallbackURL(r)
 
-	// Neon Auth login URL
 	loginURL := fmt.Sprintf("%s/login?redirect_uri=%s&state=%s",
 		baseURL,
 		url.QueryEscape(callbackURL),
@@ -48,7 +45,7 @@ func (h *Handler) NeonRegister(w http.ResponseWriter, r *http.Request) {
 		redirectTo = "/hub.html"
 	}
 
-	callbackURL := fmt.Sprintf("%s://%s/api/auth/neon-callback", getScheme(r), r.Host)
+	callbackURL := getAbsoluteCallbackURL(r)
 
 	registerURL := fmt.Sprintf("%s/register?redirect_uri=%s&state=%s",
 		baseURL,
@@ -59,10 +56,21 @@ func (h *Handler) NeonRegister(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, registerURL, http.StatusTemporaryRedirect)
 }
 
-// getScheme returns http or https
-func getScheme(r *http.Request) string {
-	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
-		return "https"
+// getAbsoluteCallbackURL builds a reliable full URL using proxy headers
+func getAbsoluteCallbackURL(r *http.Request) string {
+	proto := r.Header.Get("X-Forwarded-Proto")
+	if proto == "" {
+		if r.TLS != nil {
+			proto = "https"
+		} else {
+			proto = "http"
+		}
 	}
-	return "http"
+
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Host
+	}
+
+	return fmt.Sprintf("%s://%s/api/auth/neon-callback", proto, host)
 }
