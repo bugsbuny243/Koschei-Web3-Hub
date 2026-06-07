@@ -239,7 +239,7 @@ func TestLoginRequiresPassword(t *testing.T) {
 	}
 }
 
-func TestConfigExposesPublicNeonAuthURL(t *testing.T) {
+func TestConfigDoesNotExposePublicNeonAuthURL(t *testing.T) {
 	t.Setenv("EXPO_PUBLIC_NEON_AUTH_URL", "https://auth.example.test")
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	w := httptest.NewRecorder()
@@ -249,8 +249,8 @@ func TestConfigExposesPublicNeonAuthURL(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusOK, w.Body.String())
 	}
-	if !strings.Contains(w.Body.String(), `"neonAuthUrl":"https://auth.example.test"`) {
-		t.Fatalf("/api/config did not expose public Neon Auth URL: %s", w.Body.String())
+	if strings.Contains(w.Body.String(), "neonAuthUrl") || strings.Contains(w.Body.String(), "auth.example.test") {
+		t.Fatalf("/api/config exposed public Neon Auth URL: %s", w.Body.String())
 	}
 }
 

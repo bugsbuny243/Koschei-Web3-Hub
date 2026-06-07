@@ -1,6 +1,5 @@
 (function () {
   const KEY = 'koschei_jwt';
-  let _neonAuthUrl = '';
 
   function saveJwt(t) { try { localStorage.setItem(KEY, t); } catch {} }
   function getJwt() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }
@@ -30,9 +29,8 @@
     try { return JSON.parse(_b64url(jwt.split('.')[1])).sub || null; } catch { return null; }
   }
 
-  async function _neonRequest(path, body) {
-    if (!_neonAuthUrl) throw new Error('Auth yapılandırılmamış. Sayfayı yenileyin.');
-    const res = await fetch(_neonAuthUrl + path, {
+  async function _authRequest(path, body) {
+    const res = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -56,45 +54,29 @@
   }
 
   async function init() {
-    try {
-      const res = await fetch('/api/config');
-      const data = await res.json().catch(() => ({}));
-      _neonAuthUrl = (data?.neonAuthUrl || '').replace(/\/$/, '');
-    } catch {}
+    try { await fetch('/api/config'); } catch {}
   }
 
   async function signUp(email, password) {
-    const data = await _neonRequest('/sign-up/email', {
-      email,
-      password,
-      name: email.split('@')[0] || 'User',
-      callbackURL: 'https://tradepigloball.co/hub.html',
-    });
-    const jwt = data?.token || data?.access_token
-      || data?.data?.token || data?.data?.access_token;
+    const data = await _authRequest('/api/auth/register', { email, password });
+    const jwt = data?.access_token || data?.token
+      || data?.data?.access_token || data?.data?.token;
     if (!_isJwt(jwt)) throw new Error('Kayıt başarılı fakat token alınamadı.');
     saveJwt(jwt);
-    await _provision();
     return data;
   }
 
   async function signIn(email, password) {
-    const data = await _neonRequest('/sign-in/email', {
-      email,
-      password,
-      callbackURL: 'https://tradepigloball.co/hub.html',
-    });
-    const jwt = data?.token || data?.access_token
-      || data?.data?.token || data?.data?.access_token;
+    const data = await _authRequest('/api/auth/login', { email, password });
+    const jwt = data?.access_token || data?.token
+      || data?.data?.access_token || data?.data?.token;
     if (!_isJwt(jwt)) throw new Error('Giriş başarılı fakat token alınamadı.');
     saveJwt(jwt);
-    await _provision();
     return data;
   }
 
   async function signOut() {
     clearJwt();
-    try { await _neonRequest('/sign-out', {}); } catch {}
     window.location.href = '/login.html';
   }
 
