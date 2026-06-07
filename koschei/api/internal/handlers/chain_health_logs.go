@@ -26,15 +26,6 @@ func (h *Handler) recordChainHealth(logEntry chainHealthLog) {
 		return
 	}
 
-	_, err := h.DB.Exec(`
-		INSERT INTO chain_health_logs (chain, network, provider, ok, result, error, checked_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-		logEntry.Chain, logEntry.Network, logEntry.Provider, logEntry.Healthy, logEntry.Result, logEntry.Error, logEntry.CheckedAt)
-	if err == nil {
-		return
-	}
-	log.Printf("chain health log canonical insert failed, checking compatible columns: %v", err)
-
 	columns, columnsErr := chainHealthLogColumns(context.Background(), h.DB)
 	if columnsErr != nil {
 		log.Printf("chain health log insert failed: %v", columnsErr)
@@ -48,13 +39,34 @@ func (h *Handler) recordChainHealth(logEntry chainHealthLog) {
 		log.Printf("chain health log insert failed: unsupported chain_health_logs columns")
 		return
 	}
+	if h.hasRecentChainHealthLog(logEntry, checkedAtColumn) {
+		return
+	}
 
 	query := fmt.Sprintf(`
 		INSERT INTO chain_health_logs (chain, network, provider, %s, %s, %s, %s)
 		VALUES ($1,$2,$3,$4,$5,$6,$7)`, okColumn, resultColumn, errorColumn, checkedAtColumn)
 	if _, err := h.DB.Exec(query, logEntry.Chain, logEntry.Network, logEntry.Provider, logEntry.Healthy, logEntry.Result, logEntry.Error, logEntry.CheckedAt); err != nil {
-		log.Printf("chain health log compatible insert failed: %v", err)
+		log.Printf("chain health log insert failed: %v", err)
 	}
+}
+
+func (h *Handler) hasRecentChainHealthLog(logEntry chainHealthLog, checkedAtColumn string) bool {
+	query := fmt.Sprintf(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM chain_health_logs
+			WHERE lower(chain) = lower($1)
+			  AND lower(network) = lower($2)
+			  AND lower(provider) = lower($3)
+			  AND %s >= now() - interval '5 minutes'
+		)`, checkedAtColumn)
+	var exists bool
+	if err := h.DB.QueryRow(query, logEntry.Chain, logEntry.Network, logEntry.Provider).Scan(&exists); err != nil {
+		log.Printf("chain health recent check lookup failed: %v", err)
+		return false
+	}
+	return exists
 }
 
 func (h *Handler) Web3HealthLogs(w http.ResponseWriter, r *http.Request) {
