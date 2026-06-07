@@ -39,8 +39,39 @@ type authProviderTransport interface {
 
 var authProviderHTTPClient authProviderTransport = &http.Client{Timeout: 10 * time.Second}
 
-func (h *Handler) Register(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusGone, map[string]string{"error": "custom_auth_disabled", "message": "Use Neon Auth / Better Auth email and password sign-in"})
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	var in emailPasswordLoginRequest
+	if err := decodeJSON(r, &in); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
+		return
+	}
+	email, err := normalizeEmail(in.Email)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_email"})
+		return
+	}
+	if err := validatePassword(in.Password); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_password", "message": err.Error()})
+		return
+	}
+	cfg, err := betterAuthConfigFromEnv()
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
+		return
+	}
+	payload := map[string]string{
+		"email":       email,
+		"password":    in.Password,
+		"name":        defaultUserName(email),
+		"callbackURL": "/hub",
+	}
+	_, _, signUpBaseURL, err := postBetterAuthEmailPasswordPathWithFallback(r.Context(), cfg, "/sign-up/email", payload)
+	if err != nil {
+		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
+		return
+	}
+	cfg = cfg.withBaseURL(signUpBaseURL)
+	h.finishEmailPasswordAuth(w, r, cfg, email, in.Password, true)
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +94,29 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
 		return
 	}
-	signInResp, setCookies, signInBaseURL, err := postBetterAuthEmailPasswordWithFallback(r.Context(), cfg, map[string]string{"email": email, "password": in.Password})
+	h.finishEmailPasswordAuth(w, r, cfg, email, in.Password, false)
+}
+
+func validatePassword(password string) error {
+	if strings.TrimSpace(password) == "" {
+		return errors.New("Email and password are required.")
+	}
+	if len(password) < 8 {
+		return errors.New("Password must be at least 8 characters.")
+	}
+	return nil
+}
+
+func defaultUserName(email string) string {
+	name := strings.TrimSpace(strings.Split(email, "@")[0])
+	if name == "" {
+		return "User"
+	}
+	return name
+}
+
+func (h *Handler) finishEmailPasswordAuth(w http.ResponseWriter, r *http.Request, cfg betterAuthConfig, email, password string, provision bool) {
+	signInResp, setCookies, signInBaseURL, err := postBetterAuthEmailPasswordWithFallback(r.Context(), cfg, map[string]string{"email": email, "password": password})
 	if err != nil {
 		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
 		return
@@ -89,6 +142,15 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
+	}
+	if provision {
+		summary, err := h.provisionMember(r.Context(), claims)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "account_provisioning_failed"})
+			return
+		}
+		user.Plan = summary.Plan
+		user.Credits = summary.OutputsRemaining
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"access_token": accessToken, "token_type": "Bearer", "user": user})
 }
@@ -222,8 +284,12 @@ func postBetterAuthWithCookies(ctx context.Context, cfg betterAuthConfig, path s
 }
 
 func postBetterAuthEmailPasswordWithFallback(ctx context.Context, cfg betterAuthConfig, payload any) (map[string]any, []string, string, error) {
+	return postBetterAuthEmailPasswordPathWithFallback(ctx, cfg, "/sign-in/email", payload)
+}
+
+func postBetterAuthEmailPasswordPathWithFallback(ctx context.Context, cfg betterAuthConfig, path string, payload any) (map[string]any, []string, string, error) {
 	for _, baseURL := range emailPasswordSignInBaseURLCandidates(cfg.BaseURL) {
-		respBody, setCookies, err := postBetterAuthWithCookiesURL(ctx, baseURL+"/sign-in/email", payload)
+		respBody, setCookies, err := postBetterAuthWithCookiesURL(ctx, baseURL+path, payload)
 		if isAuthProviderNotFound(err) {
 			continue
 		}

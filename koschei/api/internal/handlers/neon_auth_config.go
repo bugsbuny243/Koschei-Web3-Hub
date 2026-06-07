@@ -12,19 +12,15 @@ const (
 )
 
 func configuredNeonAuthBaseURL() string {
-	return envOrDefault("NEON_AUTH_BASE_URL", defaultNeonAuthBaseURL)
+	return strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL"))
 }
 
 func configuredNeonAuthIssuer() string {
-	return envOrDefault("NEON_AUTH_ISSUER", defaultNeonAuthIssuer)
+	return strings.TrimSpace(os.Getenv("NEON_AUTH_ISSUER"))
 }
 
 func configuredNeonAuthJWKSURL() string {
-	return envOrDefault("NEON_AUTH_JWKS_URL", defaultNeonAuthJWKSURL)
-}
-
-func configuredPublicNeonAuthURL() string {
-	return envOrDefault("EXPO_PUBLIC_NEON_AUTH_URL", defaultNeonAuthBaseURL)
+	return strings.TrimSpace(os.Getenv("NEON_AUTH_JWKS_URL"))
 }
 
 func envOrDefault(name string, fallback string) string {
