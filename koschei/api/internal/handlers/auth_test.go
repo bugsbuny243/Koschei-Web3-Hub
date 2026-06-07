@@ -561,7 +561,7 @@ func (s *fakeAuthStore) QueryRowContext(_ context.Context, query string, args ..
 			return fakeRow{err: sql.ErrNoRows}
 		}
 		return fakeRow{values: []any{s.subjectRowID}}
-	case strings.Contains(sq, "returning id::text, email, role, plan_id, credits"):
+	case strings.Contains(sq, "returning id::text, auth_subject, email, role, plan_id, credits"):
 		id := s.profileReturnID
 		if id == "" {
 			id = s.emailRowID
@@ -572,7 +572,7 @@ func (s *fakeAuthStore) QueryRowContext(_ context.Context, query string, args ..
 		if id == "" {
 			id = "new-profile-id"
 		}
-		return fakeRow{values: []any{id, args[1].(string), "user", "free", 0}}
+		return fakeRow{values: []any{id, "neon-sub", args[1].(string), "user", "free", 0}}
 	case strings.Contains(sq, "with active_entitlements"):
 		plan := s.summaryPlan
 		if plan == "" {

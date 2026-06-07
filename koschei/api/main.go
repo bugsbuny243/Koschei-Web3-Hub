@@ -58,9 +58,9 @@ func resolveStaticDir(configured string) string {
 		return configured
 	}
 	for _, candidate := range []string{
-		filepath.Join("koschei", "api", "public"),
 		"public",
 		filepath.Join("/app", "public"),
+		filepath.Join("koschei", "api", "public"),
 	} {
 		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
 			return candidate

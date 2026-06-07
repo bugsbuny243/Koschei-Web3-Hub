@@ -6,11 +6,11 @@ import (
 	"testing"
 )
 
-func TestResolveStaticDirPrefersRepoPublicDirectory(t *testing.T) {
+func TestResolveStaticDirPrefersLocalPublicDirectory(t *testing.T) {
 	root := t.TempDir()
-	publicDir := filepath.Join(root, "koschei", "api", "public")
+	publicDir := filepath.Join(root, "public")
 	if err := os.MkdirAll(publicDir, 0o755); err != nil {
-		t.Fatalf("create repo public dir: %v", err)
+		t.Fatalf("create local public dir: %v", err)
 	}
 	oldWD, err := os.Getwd()
 	if err != nil {
@@ -21,8 +21,8 @@ func TestResolveStaticDirPrefersRepoPublicDirectory(t *testing.T) {
 		t.Fatalf("change working directory: %v", err)
 	}
 
-	if got := resolveStaticDir(""); got != filepath.Join("koschei", "api", "public") {
-		t.Fatalf("resolveStaticDir() = %q, want koschei/api/public", got)
+	if got := resolveStaticDir(""); got != "public" {
+		t.Fatalf("resolveStaticDir() = %q, want public", got)
 	}
 }
 

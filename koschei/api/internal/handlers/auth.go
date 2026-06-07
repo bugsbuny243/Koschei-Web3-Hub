@@ -16,11 +16,12 @@ import (
 )
 
 type authUser struct {
-	ID      string `json:"id"`
-	Email   string `json:"email"`
-	Role    string `json:"role"`
-	Plan    string `json:"plan"`
-	Credits int    `json:"credits"`
+	ID          string `json:"id"`
+	AuthSubject string `json:"auth_subject,omitempty"`
+	Email       string `json:"email"`
+	Role        string `json:"role"`
+	Plan        string `json:"plan"`
+	Credits     int    `json:"credits"`
 }
 
 type emailPasswordLoginRequest struct {
@@ -173,7 +174,11 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := h.upsertAppProfile(r.Context(), claims.Sub, claims.Email)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		log.Printf("/api/me profile sync failed: sub=%s email=%s err=%v", claims.Sub, claims.Email, err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error":   "profile_sync_failed",
+			"message": "Profile could not be synced. Please try again.",
+		})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
@@ -225,7 +230,12 @@ func upsertAppProfileTx(ctx context.Context, store appProfileStore, subject, ema
 	if email == "" || subject == "" {
 		return errors.New("verified token is missing profile identity")
 	}
-	if _, err := store.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, email+":"+subject); err != nil {
+
+	// Serialize every profile sync for the same normalized email. This avoids the
+	// legacy Railway/Neon case where one row owns email and another row owns the
+	// currently verified subject, which can otherwise violate the unique email
+	// constraint when both are upserted concurrently.
+	if _, err := store.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, email); err != nil {
 		return err
 	}
 
@@ -233,7 +243,7 @@ func upsertAppProfileTx(ctx context.Context, store appProfileStore, subject, ema
 	if err := store.QueryRowContext(ctx, `
 		SELECT id::text
 		FROM app_user_profiles
-		WHERE lower(email) = lower($1)
+		WHERE lower(email) = $1
 		ORDER BY updated_at DESC, created_at DESC, id
 		LIMIT 1`, email).Scan(&emailRowID); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
@@ -246,17 +256,16 @@ func upsertAppProfileTx(ctx context.Context, store appProfileStore, subject, ema
 			WHERE auth_subject = $1 AND id::text <> $2`, subject, emailRowID.String); err != nil {
 			return err
 		}
-		return store.QueryRowContext(ctx, `
+		return scanAppProfile(store.QueryRowContext(ctx, `
 			UPDATE app_user_profiles
 			SET auth_subject = $1,
-				email = lower($2),
+				email = $2,
 				role = COALESCE(NULLIF(role, ''), 'user'),
 				plan_id = COALESCE(NULLIF(plan_id, ''), 'free'),
 				credits = COALESCE(credits, 0),
 				updated_at = now()
 			WHERE id::text = $3
-			RETURNING id::text, email, role, plan_id, credits`, subject, email, emailRowID.String).
-			Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
+			RETURNING id::text, auth_subject, email, role, plan_id, credits`, subject, email, emailRowID.String), out)
 	}
 
 	var subjectRowID sql.NullString
@@ -270,23 +279,40 @@ func upsertAppProfileTx(ctx context.Context, store appProfileStore, subject, ema
 	}
 
 	if subjectRowID.Valid {
-		return store.QueryRowContext(ctx, `
+		// Only reached when no row owns the normalized email, so setting email on
+		// the subject row cannot steal another profile's unique email value.
+		return scanAppProfile(store.QueryRowContext(ctx, `
 			UPDATE app_user_profiles
-			SET email = lower($2),
+			SET email = $2,
 				role = COALESCE(NULLIF(role, ''), 'user'),
 				plan_id = COALESCE(NULLIF(plan_id, ''), 'free'),
 				credits = COALESCE(credits, 0),
 				updated_at = now()
-			WHERE auth_subject = $1
-			RETURNING id::text, email, role, plan_id, credits`, subject, email).
-			Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
+			WHERE id::text = $1
+			RETURNING id::text, auth_subject, email, role, plan_id, credits`, subjectRowID.String, email), out)
 	}
 
-	return store.QueryRowContext(ctx, `
+	return scanAppProfile(store.QueryRowContext(ctx, `
 		INSERT INTO app_user_profiles (auth_subject, email, role, plan_id, credits)
-		VALUES ($1, lower($2), 'user', 'free', 0)
-		RETURNING id::text, email, role, plan_id, credits`, subject, email).
-		Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
+		VALUES ($1, $2, 'user', 'free', 0)
+		RETURNING id::text, auth_subject, email, role, plan_id, credits`, subject, email), out)
+}
+
+func scanAppProfile(row rowScanner, out *authUser) error {
+	var role, plan sql.NullString
+	if err := row.Scan(&out.ID, &out.AuthSubject, &out.Email, &role, &plan, &out.Credits); err != nil {
+		return err
+	}
+	out.Email = strings.ToLower(strings.TrimSpace(out.Email))
+	out.Role = strings.TrimSpace(role.String)
+	if out.Role == "" {
+		out.Role = "user"
+	}
+	out.Plan = strings.TrimSpace(plan.String)
+	if out.Plan == "" {
+		out.Plan = "free"
+	}
+	return nil
 }
 
 func (h *Handler) runWithRetry(ctx context.Context, op func(context.Context) error) error {
