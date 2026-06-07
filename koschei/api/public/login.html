@@ -1,68 +1,73 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { Text, View } from 'react-native';
-import { neonAuth } from '@/lib/neonAuth';
-import { Button, ErrorState, Input } from '@/components/ui';
-
-const API_BASE = (process.env.EXPO_PUBLIC_API_URL || '').trim();
-const TOKEN_KEY = 'koschei_token';
-
-async function verifySession(token: string) {
-  const target = API_BASE ? `${API_BASE}/api/me` : '/api/me';
-  const res = await fetch(target, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  const payload: any = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(`api_me_failed_${res.status}: ${payload?.error || payload?.message || 'unknown'}`);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>Login — Koschei Web3 Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--accent:#00ff88;--accent2:#00ccff;--danger:#ff4466;--text:#f0f0ff;--text2:#8888aa;--bg:#030309;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+    .blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+    .blob{position:absolute;border-radius:50%;filter:blur(90px);animation:bf 10s ease-in-out infinite;}
+    .b1{width:400px;height:400px;background:rgba(0,255,136,.08);top:-80px;left:-60px;}
+    .b2{width:350px;height:350px;background:rgba(124,58,237,.1);bottom:-60px;right:-40px;animation-delay:-5s;}
+    @keyframes bf{0%,100%{transform:translate(0,0)}50%{transform:translate(15px,-15px)}}
+    .card{position:relative;z-index:1;background:rgba(255,255,255,.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:36px 32px;width:100%;max-width:400px;margin:20px;}
+    .logo{font-size:22px;font-weight:800;color:var(--accent);text-align:center;margin-bottom:6px;}
+    .title{font-size:22px;font-weight:800;text-align:center;margin-bottom:6px;}
+    .sub{font-size:13px;color:var(--text2);text-align:center;margin-bottom:24px;}
+    .form-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:var(--text);font-size:14px;padding:12px 14px;outline:none;width:100%;transition:border-color .15s;margin-bottom:12px;}
+    .form-input:focus{border-color:var(--accent);}
+    .form-input::placeholder{color:var(--text2);}
+    .btn{display:block;width:100%;padding:12px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;transition:opacity .15s;margin-top:4px;}
+    .btn:hover{opacity:.88;}
+    .btn:disabled{opacity:.4;cursor:not-allowed;}
+    .alert{padding:10px 14px;border-radius:10px;font-size:13px;display:none;margin-bottom:12px;}
+    .alert.show{display:block;}
+    .alert-error{background:rgba(255,68,102,.12);border:1px solid var(--danger);color:var(--danger);}
+    .link{text-align:center;font-size:13px;color:var(--text2);margin-top:16px;}
+    .link a{color:var(--accent);text-decoration:none;}
+    .spinner{width:16px;height:16px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div></div>
+<div class="card">
+  <div class="logo">K Koschei</div>
+  <div class="title">Welcome Back</div>
+  <div class="sub">Sign in to your account</div>
+  <div class="alert" id="alert"></div>
+  <input class="form-input" type="email" id="email" placeholder="Email address" autocomplete="email">
+  <input class="form-input" type="password" id="password" placeholder="Password" autocomplete="current-password">
+  <button class="btn" id="btn" onclick="login()">Sign In</button>
+  <div class="link">Don't have an account? <a href="/register.html">Create one</a></div>
+</div>
+<script src="/js/koschei-auth.js?v=5"></script>
+<script>
+(async()=>{
+  await KoscheiAuth.init();
+  if(KoscheiAuth.isLoggedIn()) window.location.href='/hub.html';
+})();
+async function login(){
+  const email=document.getElementById('email').value.trim();
+  const pw=document.getElementById('password').value;
+  const btn=document.getElementById('btn');
+  clearAlert();
+  if(!email||!pw){showAlert('Email and password are required.');return;}
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    await KoscheiAuth.signIn(email,pw);
+    window.location.href='/hub.html';
+  }catch(e){
+    showAlert(e.message||'Login failed. Check your credentials.');
+  }finally{
+    btn.disabled=false;btn.innerHTML='Sign In';
   }
 }
-
-export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const submit = async () => {
-    setError('');
-    try {
-      const response: any = await neonAuth.signInWithEmail(email.trim(), password);
-      let token = neonAuth.tokenFrom(response);
-      if (!token) {
-        token = await neonAuth.getToken();
-      }
-      if (!token) throw new Error('auth_token_missing');
-      if (token.split('.').length !== 3) throw new Error('auth_token_not_jwt');
-
-      await AsyncStorage.setItem(TOKEN_KEY, token);
-      await verifySession(token);
-      router.replace('/dashboard');
-    } catch (e: any) {
-      console.error('auth error', e);
-      console.error('neon auth url present', Boolean(process.env.EXPO_PUBLIC_NEON_AUTH_URL));
-      setError(String(e?.message || e || 'unknown_error').slice(0, 180));
-    }
-  };
-
-  return (
-    <View className="flex-1 items-center justify-center bg-[#020207] p-6" style={{ backgroundColor: '#020207' }}>
-      <View className="absolute -left-20 top-20 h-64 w-64 rounded-full bg-cyan-500/10" />
-      <View className="absolute -right-24 bottom-16 h-72 w-72 rounded-full bg-violet-500/10" />
-      <View className="w-full max-w-md rounded-3xl border border-emerald-500/20 bg-[#060a13]/95 p-6 shadow-[0_0_30px_rgba(0,255,135,0.15)] gap-3">
-        <Text className="text-3xl font-semibold text-white" style={{ color: '#ffffff' }}>
-          Enter Koschei Runtime
-        </Text>
-        <Text className="mb-2 text-sm text-zinc-400">Secure Neon Auth access</Text>
-        <Input placeholder="Email" autoCapitalize="none" value={email} onChangeText={setEmail} />
-        <Input placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
-        {!!error && <ErrorState text={error} />}
-        <Button label="Login" onPress={submit} />
-      </View>
-    </View>
-  );
-}
+function showAlert(m){const e=document.getElementById('alert');e.textContent=m;e.className='alert alert-error show';}
+function clearAlert(){document.getElementById('alert').className='alert';}
+</script>
+</body>
+</html>
