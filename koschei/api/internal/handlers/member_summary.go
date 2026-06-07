@@ -11,7 +11,7 @@ import (
 
 const (
 	freePlanID          = "free"
-	freeOutputsIncluded = 0
+	freeOutputsIncluded = 10
 )
 
 type memberSummaryResponse struct {
@@ -51,46 +51,27 @@ func (h *Handler) provisionMember(ctx context.Context, claims neonJWTClaims) (me
 	}
 	defer tx.Rollback()
 
-	// Serialize entitlement initialization per normalized email so concurrent
-	// provisioning requests cannot create multiple free entitlements.
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, email); err != nil {
+	summary, err := provisionMemberTx(ctx, sqlTxStore{tx: tx}, sub, email)
+	if err != nil {
 		return memberSummaryResponse{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `
-		WITH updated_by_subject AS (
-			UPDATE app_user_profiles
-			SET email = lower($2), updated_at = now()
-			WHERE auth_subject = $1
-			RETURNING id
-		),
-		updated_by_email AS (
-			UPDATE app_user_profiles
-			SET auth_subject = $1, updated_at = now()
-			WHERE lower(email) = lower($2)
-			  AND NOT EXISTS (SELECT 1 FROM updated_by_subject)
-			RETURNING id
-		),
-		inserted AS (
-			INSERT INTO app_user_profiles (auth_subject, email, role, plan_id, credits)
-			SELECT $1, lower($2), 'user', 'free', 0
-			WHERE NOT EXISTS (SELECT 1 FROM updated_by_subject)
-			  AND NOT EXISTS (SELECT 1 FROM updated_by_email)
-			RETURNING id
-		)
-		SELECT id FROM updated_by_subject
-		UNION ALL SELECT id FROM updated_by_email
-		UNION ALL SELECT id FROM inserted
-		LIMIT 1`, sub, email); err != nil {
+	if err := tx.Commit(); err != nil {
 		return memberSummaryResponse{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `
+	return summary, nil
+}
+
+func provisionMemberTx(ctx context.Context, store appProfileStore, sub, email string) (memberSummaryResponse, error) {
+	// Serialize profile and entitlement initialization per normalized identity so
+	// concurrent provisioning requests cannot create duplicate app profiles or
+	// multiple active free entitlements.
+	profile := authUser{}
+	if err := upsertAppProfileTx(ctx, store, sub, email, &profile); err != nil {
+		return memberSummaryResponse{}, err
+	}
+	if _, err := store.ExecContext(ctx, `
 		INSERT INTO entitlements (email, plan_id, outputs_total, outputs_remaining, status)
-		SELECT
-			lower($1),
-			(SELECT id FROM plans WHERE id = 'free' LIMIT 1),
-			$2,
-			$2,
-			'active'
+		SELECT lower($1), 'free', $2, $2, 'active'
 		WHERE NOT EXISTS (
 			SELECT 1
 			FROM entitlements
@@ -102,7 +83,7 @@ func (h *Handler) provisionMember(ctx context.Context, claims neonJWTClaims) (me
 	}
 
 	summary := memberSummaryResponse{OK: true, Email: email}
-	if err := tx.QueryRowContext(ctx, `
+	if err := store.QueryRowContext(ctx, `
 		WITH active_entitlements AS (
 			SELECT COALESCE(plan_id, 'free') AS plan_id,
 			       COALESCE(outputs_total, 0) AS outputs_total,
@@ -130,9 +111,6 @@ func (h *Handler) provisionMember(ctx context.Context, claims neonJWTClaims) (me
 		if errors.Is(err, sql.ErrNoRows) {
 			return memberSummaryResponse{}, errors.New("active entitlement missing after initialization")
 		}
-		return memberSummaryResponse{}, err
-	}
-	if err := tx.Commit(); err != nil {
 		return memberSummaryResponse{}, err
 	}
 	return summary, nil

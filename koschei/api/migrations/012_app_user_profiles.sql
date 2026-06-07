@@ -3,8 +3,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS app_user_profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    auth_subject TEXT UNIQUE NOT NULL,
-    email TEXT NOT NULL,
+    auth_subject TEXT UNIQUE,
+    email TEXT UNIQUE NOT NULL,
     role TEXT NOT NULL DEFAULT 'user',
     plan_id TEXT NOT NULL DEFAULT 'free',
     credits INTEGER NOT NULL DEFAULT 0,
