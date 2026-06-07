@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -142,6 +143,7 @@ func (h *Handler) finishEmailPasswordAuth(w http.ResponseWriter, r *http.Request
 	if provision {
 		summary, err := h.provisionMember(r.Context(), claims)
 		if err != nil {
+			log.Printf("provisionMember failed: %v", err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "account_provisioning_failed"})
 			return
 		}
@@ -177,20 +179,114 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 
+type rowScanner interface {
+	Scan(...any) error
+}
+
+type appProfileStore interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	QueryRowContext(context.Context, string, ...any) rowScanner
+}
+
+type sqlTxStore struct {
+	tx *sql.Tx
+}
+
+func (s sqlTxStore) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return s.tx.ExecContext(ctx, query, args...)
+}
+
+func (s sqlTxStore) QueryRowContext(ctx context.Context, query string, args ...any) rowScanner {
+	return s.tx.QueryRowContext(ctx, query, args...)
+}
+
 func (h *Handler) upsertAppProfile(ctx context.Context, subject, email string) (authUser, error) {
 	out := authUser{Role: "user", Plan: "free", Credits: 0}
-	q := `INSERT INTO app_user_profiles (auth_subject, email)
-VALUES ($1, lower($2))
-ON CONFLICT (auth_subject)
-DO UPDATE SET email = EXCLUDED.email, updated_at = now()
-RETURNING id::text, email, role, plan_id, credits;`
 	err := h.runWithRetry(ctx, func(inner context.Context) error {
-		return h.DB.QueryRowContext(inner, q, subject, strings.ToLower(strings.TrimSpace(email))).Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
+		tx, err := h.DB.BeginTx(inner, nil)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		if err := upsertAppProfileTx(inner, sqlTxStore{tx: tx}, subject, email, &out); err != nil {
+			return err
+		}
+		return tx.Commit()
 	})
 	if err != nil {
 		log.Printf("upsertAppProfile failed: %v", err)
 	}
 	return out, err
+}
+
+func upsertAppProfileTx(ctx context.Context, store appProfileStore, subject, email string, out *authUser) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	subject = strings.TrimSpace(subject)
+	if email == "" || subject == "" {
+		return errors.New("verified token is missing profile identity")
+	}
+	if _, err := store.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, email+":"+subject); err != nil {
+		return err
+	}
+
+	var emailRowID sql.NullString
+	if err := store.QueryRowContext(ctx, `
+		SELECT id::text
+		FROM app_user_profiles
+		WHERE lower(email) = lower($1)
+		ORDER BY updated_at DESC, created_at DESC, id
+		LIMIT 1`, email).Scan(&emailRowID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	if emailRowID.Valid {
+		if _, err := store.ExecContext(ctx, `
+			UPDATE app_user_profiles
+			SET auth_subject = NULL, updated_at = now()
+			WHERE auth_subject = $1 AND id::text <> $2`, subject, emailRowID.String); err != nil {
+			return err
+		}
+		return store.QueryRowContext(ctx, `
+			UPDATE app_user_profiles
+			SET auth_subject = $1,
+				email = lower($2),
+				role = COALESCE(NULLIF(role, ''), 'user'),
+				plan_id = COALESCE(NULLIF(plan_id, ''), 'free'),
+				credits = COALESCE(credits, 0),
+				updated_at = now()
+			WHERE id::text = $3
+			RETURNING id::text, email, role, plan_id, credits`, subject, email, emailRowID.String).
+			Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
+	}
+
+	var subjectRowID sql.NullString
+	if err := store.QueryRowContext(ctx, `
+		SELECT id::text
+		FROM app_user_profiles
+		WHERE auth_subject = $1
+		ORDER BY updated_at DESC, created_at DESC, id
+		LIMIT 1`, subject).Scan(&subjectRowID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	if subjectRowID.Valid {
+		return store.QueryRowContext(ctx, `
+			UPDATE app_user_profiles
+			SET email = lower($2),
+				role = COALESCE(NULLIF(role, ''), 'user'),
+				plan_id = COALESCE(NULLIF(plan_id, ''), 'free'),
+				credits = COALESCE(credits, 0),
+				updated_at = now()
+			WHERE auth_subject = $1
+			RETURNING id::text, email, role, plan_id, credits`, subject, email).
+			Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
+	}
+
+	return store.QueryRowContext(ctx, `
+		INSERT INTO app_user_profiles (auth_subject, email, role, plan_id, credits)
+		VALUES ($1, lower($2), 'user', 'free', 0)
+		RETURNING id::text, email, role, plan_id, credits`, subject, email).
+		Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
 }
 
 func (h *Handler) runWithRetry(ctx context.Context, op func(context.Context) error) error {

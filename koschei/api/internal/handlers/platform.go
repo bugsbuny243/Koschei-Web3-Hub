@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -27,6 +28,7 @@ func (h *Handler) Provision(w http.ResponseWriter, r *http.Request) {
 	}
 	summary, err := h.provisionMember(r.Context(), claims)
 	if err != nil {
+		log.Printf("provisionMember failed: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "account provisioning unavailable"})
 		return
 	}

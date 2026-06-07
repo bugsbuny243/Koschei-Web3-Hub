@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"crypto/ed25519"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -488,4 +490,147 @@ func setupJWKS(t *testing.T, doc neonJWKSDoc) {
 		jwksMu.Unlock()
 	})
 	t.Setenv("NEON_AUTH_JWKS_URL", server.URL+"/jwks.json")
+}
+
+type fakeSQLResult struct{}
+
+func (fakeSQLResult) LastInsertId() (int64, error) { return 0, nil }
+func (fakeSQLResult) RowsAffected() (int64, error) { return 0, nil }
+
+type fakeRow struct {
+	values []any
+	err    error
+}
+
+func (r fakeRow) Scan(dest ...any) error {
+	if r.err != nil {
+		return r.err
+	}
+	for i := range dest {
+		switch d := dest[i].(type) {
+		case *string:
+			*d = r.values[i].(string)
+		case *int:
+			*d = r.values[i].(int)
+		case *sql.NullString:
+			if r.values[i] == nil {
+				*d = sql.NullString{}
+			} else {
+				*d = sql.NullString{String: r.values[i].(string), Valid: true}
+			}
+		default:
+			return fmt.Errorf("unsupported scan destination %T", dest[i])
+		}
+	}
+	return nil
+}
+
+type fakeAuthStore struct {
+	emailRowID       string
+	subjectRowID     string
+	queries          []string
+	execs            []string
+	freeInsertCount  int
+	freeInsertArgs   []any
+	profileReturnID  string
+	summaryPlan      string
+	summaryTotal     int
+	summaryRemaining int
+}
+
+func (s *fakeAuthStore) ExecContext(_ context.Context, query string, args ...any) (sql.Result, error) {
+	s.execs = append(s.execs, query)
+	if strings.Contains(query, "INSERT INTO entitlements") {
+		s.freeInsertCount++
+		s.freeInsertArgs = append([]any(nil), args...)
+	}
+	return fakeSQLResult{}, nil
+}
+
+func (s *fakeAuthStore) QueryRowContext(_ context.Context, query string, args ...any) rowScanner {
+	s.queries = append(s.queries, query)
+	sq := strings.ToLower(query)
+	switch {
+	case strings.Contains(sq, "select id::text") && strings.Contains(sq, "where lower(email)"):
+		if s.emailRowID == "" {
+			return fakeRow{err: sql.ErrNoRows}
+		}
+		return fakeRow{values: []any{s.emailRowID}}
+	case strings.Contains(sq, "select id::text") && strings.Contains(sq, "where auth_subject"):
+		if s.subjectRowID == "" {
+			return fakeRow{err: sql.ErrNoRows}
+		}
+		return fakeRow{values: []any{s.subjectRowID}}
+	case strings.Contains(sq, "returning id::text, email, role, plan_id, credits"):
+		id := s.profileReturnID
+		if id == "" {
+			id = s.emailRowID
+		}
+		if id == "" {
+			id = s.subjectRowID
+		}
+		if id == "" {
+			id = "new-profile-id"
+		}
+		return fakeRow{values: []any{id, args[1].(string), "user", "free", 0}}
+	case strings.Contains(sq, "with active_entitlements"):
+		plan := s.summaryPlan
+		if plan == "" {
+			plan = "free"
+		}
+		return fakeRow{values: []any{plan, s.summaryTotal, s.summaryRemaining}}
+	default:
+		return fakeRow{err: fmt.Errorf("unexpected query: %s", query)}
+	}
+}
+
+func TestUpsertAppProfileExistingNeonUserMissingLocalProfileInserts(t *testing.T) {
+	store := &fakeAuthStore{}
+	var user authUser
+	if err := upsertAppProfileTx(context.Background(), store, "neon-sub-1", "USER@Example.COM", &user); err != nil {
+		t.Fatalf("upsertAppProfileTx() error = %v", err)
+	}
+	if user.ID != "new-profile-id" || user.Email != "user@example.com" || user.Plan != "free" {
+		t.Fatalf("unexpected user after insert: %#v", user)
+	}
+	if len(store.queries) != 3 || !strings.Contains(store.queries[2], "INSERT INTO app_user_profiles") {
+		t.Fatalf("expected missing local profile path to insert once; queries=%v", store.queries)
+	}
+}
+
+func TestUpsertAppProfileExistingEmailRowWithNewAuthSubjectUpdatesEmailRow(t *testing.T) {
+	store := &fakeAuthStore{emailRowID: "profile-by-email"}
+	var user authUser
+	if err := upsertAppProfileTx(context.Background(), store, "new-neon-sub", "User@Example.com", &user); err != nil {
+		t.Fatalf("upsertAppProfileTx() error = %v", err)
+	}
+	if user.ID != "profile-by-email" || user.Email != "user@example.com" {
+		t.Fatalf("unexpected user after email-row update: %#v", user)
+	}
+	if len(store.queries) != 2 || !strings.Contains(store.queries[1], "WHERE id::text = $3") {
+		t.Fatalf("expected email row update without duplicate insert; queries=%v", store.queries)
+	}
+	if len(store.execs) < 2 || !strings.Contains(store.execs[1], "SET auth_subject = NULL") {
+		t.Fatalf("expected conflicting subject cleanup before email update; execs=%v", store.execs)
+	}
+}
+
+func TestProvisionMemberCreatesFreeEntitlementOnce(t *testing.T) {
+	store := &fakeAuthStore{summaryTotal: 10, summaryRemaining: 10}
+	summary, err := provisionMemberTx(context.Background(), store, "neon-sub-1", "user@example.com")
+	if err != nil {
+		t.Fatalf("provisionMemberTx() error = %v", err)
+	}
+	if summary.Plan != "free" || summary.OutputsTotal != 10 || summary.OutputsRemaining != 10 {
+		t.Fatalf("unexpected summary: %#v", summary)
+	}
+	if store.freeInsertCount != 1 {
+		t.Fatalf("free entitlement insert count = %d, want 1", store.freeInsertCount)
+	}
+	if got := store.freeInsertArgs[1]; got != 10 {
+		t.Fatalf("free entitlement outputs argument = %#v, want 10", got)
+	}
+	if !strings.Contains(store.execs[len(store.execs)-1], "WHERE NOT EXISTS") || !strings.Contains(store.execs[len(store.execs)-1], "COALESCE(plan_id, 'free') = 'free'") {
+		t.Fatalf("free entitlement insert must be idempotent; query=%s", store.execs[len(store.execs)-1])
+	}
 }
