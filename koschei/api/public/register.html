@@ -1,74 +1,69 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kayıt Ol — Koschei</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/koschei.css">
-</head>
-<body>
-<div class="auth-wrap">
-  <div class="auth-box">
-    <div>
-      <a href="/" style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
-        <span style="font-size:22px;font-weight:700;color:var(--accent);">K</span>
-        <span style="font-size:16px;font-weight:600;">Koschei <span style="color:var(--text2);font-weight:400;">Web3 Hub</span></span>
-      </a>
-      <div class="auth-title" style="margin-top:28px;">Hesap Oluştur</div>
-      <div class="auth-sub">Ücretsiz başla. Kredi kartı gerekmez.</div>
-    </div>
-    <div class="alert" id="alert"></div>
-    <div class="card" style="gap:16px;display:flex;flex-direction:column;">
-      <div class="form-group">
-        <label class="form-label">E-posta</label>
-        <input class="form-input" type="email" id="email" placeholder="sen@ornek.com" autocomplete="email">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Şifre</label>
-        <input class="form-input" type="password" id="password" placeholder="En az 8 karakter" autocomplete="new-password">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Şifre Tekrar</label>
-        <input class="form-input" type="password" id="password2" placeholder="••••••••" autocomplete="new-password">
-      </div>
-      <button class="btn btn-primary btn-full" id="regBtn" onclick="handleRegister()">Hesap Oluştur</button>
-    </div>
-    <div class="auth-footer">Zaten hesabın var mı? <a href="/login.html">Giriş yap</a></div>
-  </div>
-</div>
-<script src="/js/koschei-auth.js?v=4"></script>
-<script src="/js/koschei-analytics.js?v=1"></script>
-<script>
-  (async () => { await KoscheiAuth.init(); KoscheiAuth.requireGuest('/hub'); KoscheiAnalytics.track('register_page_view'); })();
-  document.addEventListener('keydown', e => { if (e.key === 'Enter') handleRegister(); });
-  async function handleRegister() {
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-    const password2 = document.getElementById('password2').value;
-    const btn = document.getElementById('regBtn');
-    clearAlert();
-    if (!email || !password) { showError('Tüm alanları doldurun.'); return; }
-    if (password.length < 8) { showError('Şifre en az 8 karakter olmalı.'); return; }
-    if (password !== password2) { showError('Şifreler eşleşmiyor.'); return; }
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>';
-    KoscheiAnalytics.track('register_submit', { email });
-    try {
-      await KoscheiAuth.signUp(email, password);
-      KoscheiAnalytics.track('signup_success', { email });
-      showSuccess('Hesap oluşturuldu! Yönlendiriliyor...');
-      setTimeout(() => window.location.replace('/hub'), 1000);
-    } catch (err) {
-      showError(err.message || 'Kayıt başarısız.');
-      btn.disabled = false;
-      btn.textContent = 'Hesap Oluştur';
-    }
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Text, View } from 'react-native';
+import { neonAuth } from '@/lib/neonAuth';
+import { Button, ErrorState, Input } from '@/components/ui';
+
+const API_BASE = (process.env.EXPO_PUBLIC_API_URL || '').trim();
+const TOKEN_KEY = 'koschei_token';
+
+async function verifySession(token: string) {
+  const target = API_BASE ? `${API_BASE}/api/me` : '/api/me';
+  const res = await fetch(target, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const payload: any = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(`api_me_failed_${res.status}: ${payload?.error || payload?.message || 'unknown'}`);
   }
-  function showError(msg) { const el = document.getElementById('alert'); el.textContent = msg; el.className = 'alert alert-error show'; }
-  function showSuccess(msg) { const el = document.getElementById('alert'); el.textContent = msg; el.className = 'alert alert-success show'; }
-  function clearAlert() { const el = document.getElementById('alert'); el.className = 'alert'; el.textContent = ''; }
-</script>
-</body>
-</html>
+}
+
+export default function Register() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    setError('');
+    try {
+      const response: any = await neonAuth.signUpWithEmail(email.trim(), password);
+      let token = neonAuth.tokenFrom(response);
+      if (!token) {
+        token = await neonAuth.getToken();
+      }
+      if (!token) throw new Error('auth_token_missing');
+      if (token.split('.').length !== 3) throw new Error('auth_token_not_jwt');
+
+      await AsyncStorage.setItem(TOKEN_KEY, token);
+      await verifySession(token);
+      router.replace('/dashboard');
+    } catch (e: any) {
+      console.error('auth error', e);
+      console.error('neon auth url present', Boolean(process.env.EXPO_PUBLIC_NEON_AUTH_URL));
+      setError(String(e?.message || e || 'unknown_error').slice(0, 180));
+    }
+  };
+
+  return (
+    <View className="flex-1 items-center justify-center bg-[#020207] p-6" style={{ backgroundColor: '#020207' }}>
+      <View className="absolute -left-20 top-20 h-64 w-64 rounded-full bg-cyan-500/10" />
+      <View className="absolute -right-24 bottom-16 h-72 w-72 rounded-full bg-violet-500/10" />
+      <View className="w-full max-w-md rounded-3xl border border-emerald-500/20 bg-[#060a13]/95 p-6 shadow-[0_0_30px_rgba(0,255,135,0.15)] gap-3">
+        <Text className="text-3xl font-semibold text-white" style={{ color: '#ffffff' }}>
+          Create Koschei Identity
+        </Text>
+        <Text className="mb-2 text-sm text-zinc-400">Secure Neon Auth access</Text>
+        <Input placeholder="Email" autoCapitalize="none" value={email} onChangeText={setEmail} />
+        <Input placeholder="Password" secureTextEntry value={password} onChangeText={setPassword} />
+        {!!error && <ErrorState text={error} />}
+        <Button label="Create Account" onPress={submit} />
+      </View>
+    </View>
+  );
+}
+
