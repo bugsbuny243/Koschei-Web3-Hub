@@ -111,7 +111,19 @@ var KoscheiAuth = (function() {
   }
 
   async function signIn(email, password) {
-    const data = await _backendLogin(email, password);
+    const data = await _neonRequest('/sign-in/email', {
+      email,
+      password,
+    });
+    const jwt = data?.token || data?.access_token
+      || data?.data?.token || data?.data?.access_token;
+    if (!_isJwt(jwt)) {
+      throw new Error('Giriş başarılı fakat token alınamadı.');
+    }
+    saveJwt(jwt);
+    if (!isLoggedIn()) {
+      throw new Error('Token kaydedilemedi.');
+    }
     await _provision();
     return data;
   }
