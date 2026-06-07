@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"koschei/api/internal/db"
+	"koschei/api/internal/handlers"
 	apihttp "koschei/api/internal/http"
 )
 
@@ -40,7 +41,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	if os.Getenv("NEON_AUTH_JWKS_URL") == "" {
+	if handlers.ConfiguredNeonAuthJWKSURL() == "" {
 		log.Printf("NEON_AUTH_JWKS_URL is not set")
 	}
 	staticDir := resolveStaticDir(os.Getenv("STATIC_DIR"))

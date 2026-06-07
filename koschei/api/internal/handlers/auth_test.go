@@ -171,25 +171,23 @@ func TestPostBetterAuthEmailPasswordFallbackAll404ReturnsClearError(t *testing.T
 	}
 }
 
-func TestLoginRequiresEmailPasswordAuthEnv(t *testing.T) {
+func TestBetterAuthConfigUsesNeonAuthDefaults(t *testing.T) {
 	t.Setenv("NEON_AUTH_BASE_URL", "")
 	t.Setenv("NEON_AUTH_ISSUER", "")
 	t.Setenv("NEON_AUTH_JWKS_URL", "")
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"email":"user@example.com","password":"secret-password"}`))
-	w := httptest.NewRecorder()
 
-	(&Handler{}).Login(w, req)
-
-	if w.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusServiceUnavailable, w.Body.String())
+	cfg, err := betterAuthConfigFromEnv()
+	if err != nil {
+		t.Fatalf("betterAuthConfigFromEnv returned error: %v", err)
 	}
-	for _, name := range []string{"NEON_AUTH_BASE_URL", "NEON_AUTH_ISSUER", "NEON_AUTH_JWKS_URL"} {
-		if !strings.Contains(w.Body.String(), name) {
-			t.Fatalf("response did not explain missing %s env: %s", name, w.Body.String())
-		}
+	if cfg.BaseURL != defaultNeonAuthBaseURL {
+		t.Fatalf("BaseURL = %q, want %q", cfg.BaseURL, defaultNeonAuthBaseURL)
 	}
-	if strings.Contains(w.Body.String(), "secret-password") {
-		t.Fatalf("response must not echo password: %s", w.Body.String())
+	if cfg.IssuerURL != defaultNeonAuthIssuer {
+		t.Fatalf("IssuerURL = %q, want %q", cfg.IssuerURL, defaultNeonAuthIssuer)
+	}
+	if cfg.JWKSURL != defaultNeonAuthJWKSURL {
+		t.Fatalf("JWKSURL = %q, want %q", cfg.JWKSURL, defaultNeonAuthJWKSURL)
 	}
 }
 
