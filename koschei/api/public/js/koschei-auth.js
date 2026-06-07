@@ -119,7 +119,10 @@ var KoscheiAuth = (function() {
 
   async function signUp(email, password) {
     await _neonRequest('/sign-up/email', {
-      email, password, name: email.split('@')[0] || 'User',
+      email,
+      password,
+      name: email.split('@')[0] || 'User',
+      callbackURL: '/hub'
     });
     return signIn(email, password);
   }
