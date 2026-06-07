@@ -65,7 +65,6 @@ var KoscheiAuth = (function() {
     const res = await fetch(`${_neonAuthUrl}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify(body),
     });
     const data = await res.json().catch(() => ({}));
