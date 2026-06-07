@@ -263,7 +263,7 @@ func matchesAudience(v any, target string) bool {
 
 func (h *Handler) upsertProfile(ctx context.Context, subject, email string) (userProfile, error) {
 	var out userProfile
-	q := `INSERT INTO app_user_profiles (auth_subject, email) VALUES ($1, $2)
+	q := `INSERT INTO app_user_profiles (auth_subject, email, role, plan_id, credits) VALUES ($1, lower($2), 'user', 'free', 0)
 ON CONFLICT (auth_subject) DO UPDATE SET email=EXCLUDED.email, updated_at=now()
 RETURNING auth_subject, email, role, plan_id, credits`
 	err := h.runWithRetry(ctx, func(c context.Context) error {
