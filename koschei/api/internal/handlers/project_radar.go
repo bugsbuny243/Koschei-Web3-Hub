@@ -84,6 +84,11 @@ func (h *Handler) ProjectRadar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	creditOK, _, _, isPrivileged := h.RequireCredits(w, r, claims, "project_radar")
+	if !creditOK {
+		return
+	}
+
 	result := buildProjectRadarResult(req)
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
@@ -98,13 +103,15 @@ func (h *Handler) ProjectRadar(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, email, "project_radar"); err != nil {
-		writeJSON(w, http.StatusPaymentRequired, projectRadarInsufficientOutputsResponse())
-		return
-	}
 	if err := saveProjectRadarOutput(r.Context(), tx, email, req, result, string(resultJSON)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
+	}
+	if !isPrivileged {
+		if err := h.ChargeCreditsTx(r.Context(), tx, email, "project_radar"); err != nil {
+			writeJSON(w, http.StatusPaymentRequired, projectRadarInsufficientOutputsResponse())
+			return
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
@@ -116,11 +123,8 @@ func (h *Handler) ProjectRadar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-func projectRadarInsufficientOutputsResponse() map[string]string {
-	return map[string]string{
-		"error":   "insufficient_outputs",
-		"message": "This tool requires paid credits. Demo examples are free.",
-	}
+func projectRadarInsufficientOutputsResponse() map[string]any {
+	return insufficientOutputsResponse(ToolCreditCost("project_radar"), 0)
 }
 
 func normalizeProjectRadarRequest(req projectRadarRequest) (projectRadarRequest, error) {

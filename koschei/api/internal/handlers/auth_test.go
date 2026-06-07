@@ -616,19 +616,19 @@ func TestUpsertAppProfileExistingEmailRowWithNewAuthSubjectUpdatesEmailRow(t *te
 }
 
 func TestProvisionMemberCreatesFreeEntitlementOnce(t *testing.T) {
-	store := &fakeAuthStore{summaryTotal: 10, summaryRemaining: 10}
+	store := &fakeAuthStore{summaryTotal: 0, summaryRemaining: 0}
 	summary, err := provisionMemberTx(context.Background(), store, "neon-sub-1", "user@example.com")
 	if err != nil {
 		t.Fatalf("provisionMemberTx() error = %v", err)
 	}
-	if summary.Plan != "free" || summary.OutputsTotal != 10 || summary.OutputsRemaining != 10 {
+	if summary.Plan != "free" || summary.OutputsTotal != 0 || summary.OutputsRemaining != 0 {
 		t.Fatalf("unexpected summary: %#v", summary)
 	}
 	if store.freeInsertCount != 1 {
 		t.Fatalf("free entitlement insert count = %d, want 1", store.freeInsertCount)
 	}
-	if got := store.freeInsertArgs[1]; got != 10 {
-		t.Fatalf("free entitlement outputs argument = %#v, want 10", got)
+	if got := store.freeInsertArgs[1]; got != 0 {
+		t.Fatalf("free entitlement outputs argument = %#v, want 0", got)
 	}
 	if !strings.Contains(store.execs[len(store.execs)-1], "WHERE NOT EXISTS") || !strings.Contains(store.execs[len(store.execs)-1], "COALESCE(plan_id, 'free') = 'free'") {
 		t.Fatalf("free entitlement insert must be idempotent; query=%s", store.execs[len(store.execs)-1])

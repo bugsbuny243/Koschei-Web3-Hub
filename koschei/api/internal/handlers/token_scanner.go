@@ -63,9 +63,9 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 1
+	toolCost := ToolCreditCost("token_scanner")
 	if !isPrivileged && credits < toolCost {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 		return
 	}
 
@@ -157,7 +157,7 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 
 	if !isPrivileged {
 		if err := h.spendOutput(claims.Email, "token_scan"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 			return
 		}
 	}

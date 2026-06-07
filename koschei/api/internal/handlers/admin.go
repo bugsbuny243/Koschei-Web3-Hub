@@ -160,12 +160,18 @@ func (h *Handler) AdminUserAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, err = tx.ExecContext(r.Context(), `UPDATE entitlements SET outputs_total=outputs_total+$2, outputs_remaining=outputs_remaining+$2, updated_at=now() WHERE id=(SELECT id FROM entitlements WHERE lower(email)=$1 AND status='active' ORDER BY outputs_remaining DESC, created_at DESC LIMIT 1)`, email, req.Amount)
+		if err == nil {
+			_, err = tx.ExecContext(r.Context(), `INSERT INTO credit_events (email, amount, reason, created_at) VALUES (lower($1), $2, 'admin_add_credits', now())`, email, req.Amount)
+		}
 	case "reduce_outputs":
 		if req.Amount <= 0 {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "positive amount required"})
 			return
 		}
 		_, err = tx.ExecContext(r.Context(), `UPDATE entitlements SET outputs_remaining=GREATEST(outputs_remaining-$2,0), updated_at=now() WHERE id=(SELECT id FROM entitlements WHERE lower(email)=$1 AND status='active' ORDER BY outputs_remaining DESC, created_at DESC LIMIT 1)`, email, req.Amount)
+		if err == nil {
+			_, err = tx.ExecContext(r.Context(), `INSERT INTO credit_events (email, amount, reason, created_at) VALUES (lower($1), $2, 'admin_reduce_credits', now())`, email, -req.Amount)
+		}
 	case "set_plan":
 		plan := strings.TrimSpace(req.PlanID)
 		if plan == "" {
@@ -435,4 +441,56 @@ func tableColumns(ctx context.Context, db *sql.DB, table string) (map[string]boo
 		columns[column] = true
 	}
 	return columns, rows.Err()
+}
+
+type adminCreditEvent struct {
+	Email     string    `json:"email"`
+	Amount    int64     `json:"amount"`
+	Reason    string    `json:"reason"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (h *Handler) AdminCreditEvents(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("email")))
+	where := ""
+	args := []any{}
+	if email != "" {
+		where = "WHERE lower(email)=lower($1)"
+		args = append(args, email)
+	}
+	rows, err := h.DB.QueryContext(r.Context(), fmt.Sprintf(`SELECT lower(email), amount, reason, created_at FROM credit_events %s ORDER BY created_at DESC LIMIT 100`, where), args...)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
+		return
+	}
+	defer rows.Close()
+	events := []adminCreditEvent{}
+	for rows.Next() {
+		var event adminCreditEvent
+		if err := rows.Scan(&event.Email, &event.Amount, &event.Reason, &event.CreatedAt); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db scan failed"})
+			return
+		}
+		events = append(events, event)
+	}
+	spentRows, err := h.DB.QueryContext(r.Context(), `SELECT reason, ABS(COALESCE(SUM(amount),0))::bigint AS spent FROM credit_events WHERE amount < 0 GROUP BY reason ORDER BY spent DESC LIMIT 100`)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
+		return
+	}
+	defer spentRows.Close()
+	spent := []map[string]any{}
+	for spentRows.Next() {
+		var reason string
+		var amount int64
+		if err := spentRows.Scan(&reason, &amount); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db scan failed"})
+			return
+		}
+		spent = append(spent, map[string]any{"tool": reason, "credits_spent": amount})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "events": events, "spent_by_tool": spent})
 }

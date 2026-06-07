@@ -79,9 +79,9 @@ func (h *Handler) RugRadarSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 1
+	toolCost := ToolCreditCost("rug_radar")
 	if !isPrivileged && credits < toolCost {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 		return
 	}
 
@@ -231,7 +231,7 @@ func (h *Handler) RugRadarSubmit(w http.ResponseWriter, r *http.Request) {
 
 	if !isPrivileged {
 		if err := h.spendOutput(claims.Email, "rug_radar"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 			return
 		}
 	}

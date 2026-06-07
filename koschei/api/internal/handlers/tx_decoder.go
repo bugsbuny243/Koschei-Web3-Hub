@@ -53,9 +53,9 @@ func (h *Handler) TXDecode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 1
+	toolCost := ToolCreditCost("tx_decoder")
 	if !isPrivileged && credits < toolCost {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 		return
 	}
 
@@ -265,7 +265,7 @@ Respond with this exact JSON (no markdown, no extra text):
 
 	if !isPrivileged {
 		if err := h.spendOutput(claims.Email, "tx_decode"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse(toolCost, credits))
 			return
 		}
 	}

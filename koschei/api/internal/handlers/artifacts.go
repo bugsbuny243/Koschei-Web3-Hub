@@ -322,8 +322,9 @@ func (h *Handler) GenerateArtifact(w http.ResponseWriter, r *http.Request) { /* 
 			return
 		}
 	}
-	if !isPriv && credits < 1 {
-		writeJSON(w, 402, insufficientOutputsResponse())
+	toolCost := ToolCreditCost("artifact_generate")
+	if !isPriv && credits < toolCost {
+		writeJSON(w, 402, insufficientOutputsResponse(toolCost, credits))
 		return
 	}
 
