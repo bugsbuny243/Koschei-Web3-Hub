@@ -71,8 +71,8 @@ func (h *Handler) provisionMember(ctx context.Context, claims neonJWTClaims) (me
 			RETURNING id
 		),
 		inserted AS (
-			INSERT INTO app_user_profiles (auth_subject, email)
-			SELECT $1, lower($2)
+			INSERT INTO app_user_profiles (auth_subject, email, role, plan_id, credits)
+			SELECT $1, lower($2), 'user', 'free', 0
 			WHERE NOT EXISTS (SELECT 1 FROM updated_by_subject)
 			  AND NOT EXISTS (SELECT 1 FROM updated_by_email)
 			RETURNING id

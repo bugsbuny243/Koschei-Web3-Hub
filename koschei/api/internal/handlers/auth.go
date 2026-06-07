@@ -71,6 +71,46 @@ func defaultUserName(email string) string {
 	return name
 }
 
+func absoluteCallbackURL(r *http.Request, path string) string {
+	path = "/" + strings.TrimLeft(strings.TrimSpace(path), "/")
+	if path == "/" {
+		path = "/hub"
+	}
+	scheme := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))
+	if scheme == "" {
+		scheme = "https"
+		if r.TLS != nil {
+			scheme = "https"
+		} else if r.URL != nil && r.URL.Scheme != "" {
+			scheme = r.URL.Scheme
+		}
+	}
+	if strings.Contains(scheme, ",") {
+		scheme = strings.TrimSpace(strings.Split(scheme, ",")[0])
+	}
+	if scheme != "http" && scheme != "https" {
+		scheme = "https"
+	}
+	host := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = strings.TrimSpace(r.Host)
+	}
+	if strings.Contains(host, ",") {
+		host = strings.TrimSpace(strings.Split(host, ",")[0])
+	}
+	if host == "" {
+		if origin := strings.TrimRight(strings.TrimSpace(r.Header.Get("Origin")), "/"); isAbsoluteHTTPURL(origin) {
+			return origin + path
+		}
+		host = "tradepigloball.co"
+	}
+	return scheme + "://" + host + path
+}
+
+func isAbsoluteHTTPURL(value string) bool {
+	return strings.HasPrefix(value, "https://") || strings.HasPrefix(value, "http://")
+}
+
 func (h *Handler) finishEmailPasswordAuth(w http.ResponseWriter, r *http.Request, cfg betterAuthConfig, email, password string, provision bool) {
 	signInResp, setCookies, signInBaseURL, err := postBetterAuthEmailPasswordWithFallback(r.Context(), cfg, map[string]string{"email": email, "password": password})
 	if err != nil {
