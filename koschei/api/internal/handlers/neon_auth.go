@@ -27,8 +27,8 @@ type neonJWTClaims struct {
 }
 
 type userProfile struct {
-	ID, Email, Role, PlanID string
-	Credits                 int
+	ID, AuthSubject, Email, Role, PlanID string
+	Credits                              int
 }
 type neonJWKSDoc struct {
 	Keys []neonJWK `json:"keys"`
@@ -263,15 +263,15 @@ func matchesAudience(v any, target string) bool {
 }
 
 func (h *Handler) upsertProfile(ctx context.Context, subject, email string) (userProfile, error) {
-	var out userProfile
-	q := `INSERT INTO app_user_profiles (auth_subject, email)
-VALUES ($1, lower($2))
-ON CONFLICT (auth_subject)
-DO UPDATE SET email = EXCLUDED.email, updated_at = now()
-RETURNING id::text, email, role, plan_id, credits`
-	err := h.runWithRetry(ctx, func(c context.Context) error {
-		return h.DB.QueryRowContext(c, q, subject, strings.ToLower(strings.TrimSpace(email))).Scan(&out.ID, &out.Email, &out.Role, &out.PlanID, &out.Credits)
-	})
+	profile, err := h.upsertAppProfile(ctx, subject, email)
+	out := userProfile{
+		ID:          profile.ID,
+		AuthSubject: profile.AuthSubject,
+		Email:       profile.Email,
+		Role:        profile.Role,
+		PlanID:      profile.Plan,
+		Credits:     profile.Credits,
+	}
 	if err != nil {
 		log.Printf("upsertProfile failed: %v", err)
 	}
