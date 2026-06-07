@@ -40,45 +40,8 @@ type authProviderTransport interface {
 
 var authProviderHTTPClient authProviderTransport = &http.Client{Timeout: 10 * time.Second}
 
-func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
-	var in emailPasswordLoginRequest
-	if err := decodeJSON(r, &in); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
-		return
-	}
-	email, err := normalizeEmail(in.Email)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_email"})
-		return
-	}
-	if in.Password == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing_password", "message": "Email and password are required."})
-		return
-	}
-	cfg, err := betterAuthConfigFromEnv()
-	if err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
-		return
-	}
-	signUpBaseURL, err := postBetterAuthEmailPasswordSignUpWithFallback(r.Context(), cfg, map[string]string{
-		"email":    email,
-		"password": in.Password,
-		"name":     strings.Split(email, "@")[0],
-	})
-	if err != nil {
-		writeJSON(w, registerAuthProviderStatusCode(err), map[string]string{"error": registerAuthProviderErrorCode(err), "message": publicRegisterAuthProviderError(err)})
-		return
-	}
-	response, err := h.emailPasswordLoginResponse(r.Context(), cfg.withBaseURL(signUpBaseURL), email, in.Password)
-	if err != nil {
-		if isAuthProfileDBError(err) {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-			return
-		}
-		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
-		return
-	}
-	writeJSON(w, http.StatusOK, response)
+func (h *Handler) Register(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusGone, map[string]string{"error": "custom_auth_disabled", "message": "Use Neon Auth / Better Auth email and password sign-in"})
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -101,22 +64,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
 		return
 	}
-	response, err := h.emailPasswordLoginResponse(r.Context(), cfg, email, in.Password)
+	signInResp, setCookies, signInBaseURL, err := postBetterAuthEmailPasswordWithFallback(r.Context(), cfg, map[string]string{"email": email, "password": in.Password})
 	if err != nil {
-		if isAuthProfileDBError(err) {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-			return
-		}
 		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
 		return
-	}
-	writeJSON(w, http.StatusOK, response)
-}
-
-func (h *Handler) emailPasswordLoginResponse(ctx context.Context, cfg betterAuthConfig, email, password string) (map[string]any, error) {
-	signInResp, setCookies, signInBaseURL, err := postBetterAuthEmailPasswordWithFallback(ctx, cfg, map[string]string{"email": email, "password": password})
-	if err != nil {
-		return nil, err
 	}
 	cfg = cfg.withBaseURL(signInBaseURL)
 	accessToken := extractJWTFromAny(signInResp)
@@ -126,19 +77,21 @@ func (h *Handler) emailPasswordLoginResponse(ctx context.Context, cfg betterAuth
 		if accessToken != "" {
 			firstVerifyErr = err
 		}
-		accessToken, claims, err = fetchBetterAuthVerifiedJWT(ctx, cfg, setCookies, extractSessionToken(signInResp))
+		accessToken, claims, err = fetchBetterAuthVerifiedJWT(r.Context(), cfg, setCookies, extractSessionToken(signInResp))
 		if err != nil {
 			if firstVerifyErr != nil {
 				err = firstVerifyErr
 			}
-			return nil, err
+			writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
+			return
 		}
 	}
-	user, err := h.upsertAppProfile(ctx, claims.Sub, claims.Email)
+	user, err := h.upsertAppProfile(r.Context(), claims.Sub, claims.Email)
 	if err != nil {
-		return nil, authProfileDBError{Err: err}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
 	}
-	return map[string]any{"access_token": accessToken, "token_type": "Bearer", "user": user}, nil
+	writeJSON(w, http.StatusOK, map[string]any{"access_token": accessToken, "token_type": "Bearer", "user": user})
 }
 
 func (h *Handler) StartOTPLogin(w http.ResponseWriter, _ *http.Request) {
@@ -278,17 +231,6 @@ func postBetterAuthEmailPasswordWithFallback(ctx context.Context, cfg betterAuth
 		return respBody, setCookies, baseURL, err
 	}
 	return nil, nil, "", authProviderHTTPError{StatusCode: http.StatusNotFound}
-}
-
-func postBetterAuthEmailPasswordSignUpWithFallback(ctx context.Context, cfg betterAuthConfig, payload any) (string, error) {
-	for _, baseURL := range emailPasswordSignInBaseURLCandidates(cfg.BaseURL) {
-		_, _, err := postBetterAuthWithCookiesURL(ctx, baseURL+"/sign-up/email", payload)
-		if isAuthProviderNotFound(err) {
-			continue
-		}
-		return baseURL, err
-	}
-	return "", authProviderHTTPError{StatusCode: http.StatusNotFound}
 }
 
 func emailPasswordSignInBaseURLCandidates(baseURL string) []string {
@@ -492,23 +434,6 @@ func tokenLooksLikeJWT(value string) bool {
 	return len(parts) == 3 && parts[0] != "" && parts[1] != "" && parts[2] != ""
 }
 
-type authProfileDBError struct {
-	Err error
-}
-
-func (e authProfileDBError) Error() string {
-	return e.Err.Error()
-}
-
-func (e authProfileDBError) Unwrap() error {
-	return e.Err
-}
-
-func isAuthProfileDBError(err error) bool {
-	var dbErr authProfileDBError
-	return errors.As(err, &dbErr)
-}
-
 type authProviderHTTPError struct {
 	StatusCode int
 	Body       string
@@ -522,23 +447,6 @@ type authProviderEmailEndpointNotFoundError struct{}
 
 func (e authProviderEmailEndpointNotFoundError) Error() string {
 	return "Neon Auth email/password endpoint not found"
-}
-
-func registerAuthProviderStatusCode(err error) int {
-	if authProviderErrorLooksLikeAlreadyExists(err) {
-		return http.StatusConflict
-	}
-	return authProviderStatusCode(err)
-}
-
-func registerAuthProviderErrorCode(err error) string {
-	if authProviderErrorLooksLikeAlreadyExists(err) {
-		return "email_already_exists"
-	}
-	if isAuthProviderNotFound(err) {
-		return "signup_endpoint_not_found"
-	}
-	return "auth_provider_failed"
 }
 
 func authProviderStatusCode(err error) int {
@@ -556,16 +464,6 @@ func authProviderStatusCode(err error) int {
 		}
 	}
 	return http.StatusBadGateway
-}
-
-func publicRegisterAuthProviderError(err error) string {
-	if authProviderErrorLooksLikeAlreadyExists(err) {
-		return "Bu e-posta zaten kayıtlı. Giriş yapmayı deneyin."
-	}
-	if isAuthProviderNotFound(err) {
-		return "Neon Auth sign-up endpoint bulunamadı. NEON_AUTH_BASE_URL kontrol edilmeli."
-	}
-	return publicAuthProviderError(err)
 }
 
 func publicAuthProviderError(err error) string {
@@ -609,24 +507,6 @@ func publicAuthProviderError(err error) string {
 		return "auth provider did not return a bearer JWT"
 	}
 	return "auth provider is unavailable"
-}
-
-func authProviderErrorLooksLikeAlreadyExists(err error) bool {
-	var httpErr authProviderHTTPError
-	if !errors.As(err, &httpErr) {
-		return false
-	}
-	if httpErr.StatusCode == http.StatusConflict {
-		return true
-	}
-	message := strings.ToLower(httpErr.Body)
-	return strings.Contains(message, "already exists") ||
-		strings.Contains(message, "already registered") ||
-		strings.Contains(message, "email exists") ||
-		strings.Contains(message, "email is taken") ||
-		strings.Contains(message, "user exists") ||
-		strings.Contains(message, "duplicate") ||
-		strings.Contains(message, "unique")
 }
 
 func authProviderMessageLooksLikeInvalidCredentials(message string) bool {
