@@ -1,47 +1,21 @@
-function _b64url(str) {
-  str = str.replace(/-/g, '+').replace(/_/g, '/');
-  while (str.length % 4) str += '=';
-  try { return atob(str); } catch { return '{}'; }
-}
+(function () {
+  const KEY = 'koschei_jwt';
+  let _neonAuthUrl = '';
 
-var KoscheiAuth = (function() {
-  async function init() {
-    try {
-      await fetch('/api/config');
-    } catch { console.error('Koschei: config yüklenemedi'); }
+  function saveJwt(t) { try { localStorage.setItem(KEY, t); } catch {} }
+  function getJwt() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }
+  function clearJwt() { try { localStorage.removeItem(KEY); } catch {} }
+
+  function _isJwt(t) {
+    if (!t || typeof t !== 'string') return false;
+    const p = t.split('.');
+    return p.length === 3 && p.every(s => s.length > 0);
   }
 
-  function _isJwt(val) {
-    if (typeof val !== 'string') return false;
-    const p = val.split('.');
-    return p.length === 3 && p.every(Boolean);
-  }
-
-  function saveJwt(jwt) { localStorage.setItem('koschei_jwt', jwt); }
-  function getJwt() { return localStorage.getItem('koschei_jwt') || null; }
-
-  function isLoggedIn() {
-    const jwt = getJwt();
-    if (!jwt) return false;
-    try {
-      const payload = JSON.parse(_b64url(jwt.split('.')[1]));
-      return payload.exp > Math.floor(Date.now() / 1000);
-    } catch { return false; }
-  }
-
-  function requireAuth(redirectTo = '/login') {
-    if (!isLoggedIn()) { window.location.replace(redirectTo); return false; }
-    return true;
-  }
-
-  function requireGuest(redirectTo = '/hub') {
-    if (isLoggedIn()) { window.location.replace(redirectTo); return false; }
-    return true;
-  }
-
-  function signOut() {
-    localStorage.removeItem('koschei_jwt');
-    window.location.replace('/login');
+  function _b64url(s) {
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    try { return atob(s); } catch { return ''; }
   }
 
   function getEmail() {
@@ -56,27 +30,16 @@ var KoscheiAuth = (function() {
     try { return JSON.parse(_b64url(jwt.split('.')[1])).sub || null; } catch { return null; }
   }
 
-  async function _backendAuth(path, email, password) {
-    const res = await fetch(path, {
+  async function _neonRequest(path, body) {
+    if (!_neonAuthUrl) throw new Error('Auth yapılandırılmamış. Sayfayı yenileyin.');
+    const res = await fetch(_neonAuthUrl + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, callbackURL: 'https://tradepigloball.co/hub.html' }),
+      body: JSON.stringify(body),
     });
-
     const data = await res.json().catch(() => ({}));
-
     if (!res.ok) {
-      throw new Error(data?.message || data?.error || `Giriş başarısız (${res.status})`);
-    }
-
-    const jwt = data?.access_token || data?.token || data?.data?.access_token;
-    if (!_isJwt(jwt)) {
-      throw new Error('Auth succeeded but no auth token was returned.');
-    }
-
-    saveJwt(jwt);
-    if (!isLoggedIn()) {
-      throw new Error('Auth token could not be saved.');
+      throw new Error(data?.message || data?.error || JSON.stringify(data) || `Auth error ${res.status}`);
     }
     return data;
   }
@@ -87,33 +50,73 @@ var KoscheiAuth = (function() {
     try {
       await fetch('/api/auth/provision', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${jwt}` },
+        headers: { 'Authorization': 'Bearer ' + jwt },
       });
     } catch {}
   }
 
-  async function signIn(email, password) {
-    const data = await _backendAuth('/api/auth/login', email, password);
+  async function init() {
+    try {
+      const res = await fetch('/api/config');
+      const data = await res.json().catch(() => ({}));
+      _neonAuthUrl = (data?.neonAuthUrl || '').replace(/\/$/, '');
+    } catch {}
+  }
+
+  async function signUp(email, password) {
+    const data = await _neonRequest('/sign-up/email', {
+      email,
+      password,
+      name: email.split('@')[0] || 'User',
+      callbackURL: 'https://tradepigloball.co/hub.html',
+    });
+    const jwt = data?.token || data?.access_token
+      || data?.data?.token || data?.data?.access_token;
+    if (!_isJwt(jwt)) throw new Error('Kayıt başarılı fakat token alınamadı.');
+    saveJwt(jwt);
     await _provision();
     return data;
   }
 
-  async function signUp(email, password) {
-    const data = await _backendAuth('/api/auth/register', email, password);
+  async function signIn(email, password) {
+    const data = await _neonRequest('/sign-in/email', {
+      email,
+      password,
+      callbackURL: 'https://tradepigloball.co/hub.html',
+    });
+    const jwt = data?.token || data?.access_token
+      || data?.data?.token || data?.data?.access_token;
+    if (!_isJwt(jwt)) throw new Error('Giriş başarılı fakat token alınamadı.');
+    saveJwt(jwt);
     await _provision();
     return data;
+  }
+
+  async function signOut() {
+    clearJwt();
+    try { await _neonRequest('/sign-out', {}); } catch {}
+    window.location.href = '/login.html';
+  }
+
+  function isLoggedIn() { return _isJwt(getJwt()); }
+
+  function requireAuth() {
+    if (!isLoggedIn()) {
+      window.location.href = '/login.html';
+      return false;
+    }
+    return true;
   }
 
   async function apiCall(path, options = {}) {
     const jwt = getJwt();
     const headers = { ...(options.headers || {}) };
-    if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
+    if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
     try {
-      const res = await fetch(path, { ...options, headers });
-      return res;
+      return await fetch(path, { ...options, headers });
     } catch { return null; }
   }
 
-  return { init, signIn, signUp, signOut, isLoggedIn, requireAuth,
-           requireGuest, getEmail, getSub, apiCall, getJwt };
-}());
+  window.KoscheiAuth = { init, signIn, signUp, signOut,
+    isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt };
+})();
