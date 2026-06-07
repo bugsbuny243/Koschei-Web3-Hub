@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log"
 	"math/big"
 	"net/http"
 	"os"
@@ -271,5 +272,8 @@ RETURNING id::text, email, role, plan_id, credits`
 	err := h.runWithRetry(ctx, func(c context.Context) error {
 		return h.DB.QueryRowContext(c, q, subject, strings.ToLower(strings.TrimSpace(email))).Scan(&out.ID, &out.Email, &out.Role, &out.PlanID, &out.Credits)
 	})
+	if err != nil {
+		log.Printf("upsertProfile failed: %v", err)
+	}
 	return out, err
 }

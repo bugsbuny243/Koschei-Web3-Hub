@@ -1,4 +1,6 @@
 -- Migration: Neon Auth-backed customer profiles
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE IF NOT EXISTS app_user_profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     auth_subject TEXT UNIQUE NOT NULL,

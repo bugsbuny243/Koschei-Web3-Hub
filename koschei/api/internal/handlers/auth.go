@@ -171,7 +171,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := h.upsertAppProfile(r.Context(), claims.Sub, claims.Email)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db failed"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
