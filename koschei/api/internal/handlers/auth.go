@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"net/mail"
-	"os"
 	"strings"
 	"time"
 )
@@ -178,9 +177,9 @@ func normalizeEmail(raw string) (string, error) {
 
 func betterAuthConfigFromEnv() (betterAuthConfig, error) {
 	cfg := betterAuthConfig{
-		BaseURL:   strings.TrimRight(strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL")), "/"),
-		IssuerURL: strings.TrimRight(strings.TrimSpace(os.Getenv("NEON_AUTH_ISSUER")), "/"),
-		JWKSURL:   strings.TrimSpace(os.Getenv("NEON_AUTH_JWKS_URL")),
+		BaseURL:   strings.TrimRight(configuredNeonAuthBaseURL(), "/"),
+		IssuerURL: strings.TrimRight(configuredNeonAuthIssuer(), "/"),
+		JWKSURL:   configuredNeonAuthJWKSURL(),
 	}
 	missing := []string{}
 	if cfg.BaseURL == "" {

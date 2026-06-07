@@ -83,7 +83,7 @@ func trimSlash(s string) string {
 }
 
 func configuredIssuer() string {
-	return trimSlash(os.Getenv("NEON_AUTH_ISSUER"))
+	return trimSlash(configuredNeonAuthIssuer())
 }
 
 func jwtVerifyError(category neonJWTFailureCategory, err error) error {
@@ -175,9 +175,9 @@ func loadJWKSKey(kid string) (neonJWK, error) {
 		return k, nil
 	}
 	jwksMu.RUnlock()
-	jwksURL := strings.TrimSpace(os.Getenv("NEON_AUTH_JWKS_URL"))
+	jwksURL := strings.TrimSpace(configuredNeonAuthJWKSURL())
 	if jwksURL == "" && !isProduction() {
-		baseURL := strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL"))
+		baseURL := strings.TrimSpace(configuredNeonAuthBaseURL())
 		if baseURL != "" {
 			jwksURL = strings.TrimRight(baseURL, "/") + "/.well-known/jwks.json"
 		}

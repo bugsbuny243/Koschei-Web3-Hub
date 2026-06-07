@@ -10,7 +10,7 @@ import (
 
 func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{
-		"neonAuthUrl": os.Getenv("EXPO_PUBLIC_NEON_AUTH_URL"),
+		"neonAuthUrl": configuredPublicNeonAuthURL(),
 		"version":     "2.0.0",
 	})
 }
