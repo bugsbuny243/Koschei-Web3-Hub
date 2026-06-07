@@ -189,11 +189,7 @@ func TestBetterAuthConfigRequiresNeonAuthEnv(t *testing.T) {
 	}
 }
 
-func TestLoginAndRegisterReturnJSONWhenNeonEnvMissing(t *testing.T) {
-	t.Setenv("NEON_AUTH_BASE_URL", "")
-	t.Setenv("NEON_AUTH_ISSUER", "")
-	t.Setenv("NEON_AUTH_JWKS_URL", "")
-
+func TestBackendPasswordAuthEndpointsAreDisabled(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		path    string
@@ -208,39 +204,24 @@ func TestLoginAndRegisterReturnJSONWhenNeonEnvMissing(t *testing.T) {
 
 			tc.handler(w, req)
 
-			if w.Code != http.StatusServiceUnavailable {
-				t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusServiceUnavailable, w.Body.String())
-			}
-			if w.Code == http.StatusGone {
-				t.Fatalf("%s returned disabled 410 response", tc.name)
+			if w.Code != http.StatusGone {
+				t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusGone, w.Body.String())
 			}
 			if got := w.Header().Get("Content-Type"); !strings.Contains(got, "application/json") {
 				t.Fatalf("Content-Type = %q, want JSON", got)
 			}
 			body := w.Body.String()
-			if !strings.Contains(body, "auth_not_configured") || !strings.Contains(body, "NEON_AUTH_BASE_URL") {
-				t.Fatalf("response did not clearly explain missing auth env: %s", body)
+			if !strings.Contains(body, "Use direct Neon Auth") {
+				t.Fatalf("response did not explain direct Neon auth mode: %s", body)
 			}
 		})
 	}
 }
 
-func TestLoginRequiresPassword(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", strings.NewReader(`{"email":"user@example.com"}`))
-	w := httptest.NewRecorder()
-
-	(&Handler{}).Login(w, req)
-
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusBadRequest, w.Body.String())
-	}
-	if !strings.Contains(w.Body.String(), "missing_password") {
-		t.Fatalf("response did not explain missing password: %s", w.Body.String())
-	}
-}
-
-func TestConfigDoesNotExposeAuthProviderURL(t *testing.T) {
-	t.Setenv("NEON_AUTH_BASE_URL", "https://auth.example.test")
+func TestConfigExposesOnlyPublicNeonAuthURL(t *testing.T) {
+	t.Setenv("EXPO_PUBLIC_NEON_AUTH_URL", "https://public-auth.example.test/api/auth")
+	t.Setenv("NEON_AUTH_BASE_URL", "https://server-auth.example.test/api/auth")
+	t.Setenv("DATABASE_URL", "postgres://secret@example.test/db")
 	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
 	w := httptest.NewRecorder()
 
@@ -249,25 +230,29 @@ func TestConfigDoesNotExposeAuthProviderURL(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", w.Code, http.StatusOK, w.Body.String())
 	}
-	if strings.Contains(w.Body.String(), "neon"+"AuthUrl") || strings.Contains(w.Body.String(), "auth.example.test") {
-		t.Fatalf("/api/config exposed public Neon Auth URL: %s", w.Body.String())
+	body := w.Body.String()
+	if !strings.Contains(body, "neonAuthUrl") || !strings.Contains(body, "https://public-auth.example.test/api/auth") {
+		t.Fatalf("/api/config did not expose public Neon Auth URL: %s", body)
+	}
+	if strings.Contains(body, "postgres://") || strings.Contains(body, "DATABASE_URL") || strings.Contains(body, "server-auth.example.test") {
+		t.Fatalf("/api/config exposed private config: %s", body)
 	}
 }
 
-func TestFrontendAuthUsesBackendEndpoints(t *testing.T) {
+func TestFrontendAuthUsesDirectNeonEndpoints(t *testing.T) {
 	body, err := os.ReadFile("../../public/js/koschei-auth.js")
 	if err != nil {
 		t.Fatalf("read frontend auth script: %v", err)
 	}
 	script := string(body)
-	for _, want := range []string{"/api/auth/register", "/api/auth/login", "/api/auth/provision", "koschei_jwt"} {
+	for _, want := range []string{"neonAuthUrl", "sign-up/email", "sign-in/email", "set-auth-jwt", "koschei_jwt", "/api/me", "credentials: 'include'"} {
 		if !strings.Contains(script, want) {
 			t.Fatalf("frontend auth script does not contain %s", want)
 		}
 	}
-	for _, forbidden := range []string{"_neon" + "Request", "sign-up/email", "sign-in/email", "neon" + "AuthUrl", "EXPO_" + "PUBLIC_NEON_AUTH_URL"} {
+	for _, forbidden := range []string{"/api/auth/register", "/api/auth/login", "/api/auth/neon-login", "/api/auth/neon-register", "callbackURL", "redirect_uri"} {
 		if strings.Contains(script, forbidden) {
-			t.Fatalf("frontend auth script still contains direct Neon browser auth reference %s", forbidden)
+			t.Fatalf("frontend auth script still contains backend/redirect auth reference %s", forbidden)
 		}
 	}
 }

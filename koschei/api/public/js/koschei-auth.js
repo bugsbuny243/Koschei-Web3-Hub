@@ -1,5 +1,6 @@
 (function () {
   const KEY = 'koschei_jwt';
+  const state = { neonAuthUrl: '' };
 
   function saveJwt(t) { try { localStorage.setItem(KEY, t); } catch {} }
   function getJwt() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }
@@ -29,30 +30,113 @@
     try { return JSON.parse(_b64url(jwt.split('.')[1])).sub || null; } catch { return null; }
   }
 
-  async function _authRequest(path, body) {
-    const res = await fetch(path, {
+  function normalizeBaseUrl(raw) {
+    return String(raw || '').trim().replace(/\/+$/, '');
+  }
+
+  function defaultUserName(email) {
+    const name = String(email || '').split('@')[0].trim();
+    return name || 'User';
+  }
+
+  function errorMessage(data, fallback) {
+    if (!data) return fallback;
+    if (typeof data === 'string') return data || fallback;
+    return data.message || data.error_description || data.error || data.detail || fallback;
+  }
+
+  function findJwt(value) {
+    if (!value || typeof value !== 'object') return '';
+    const candidates = [
+      value.access_token,
+      value.token,
+      value.session && value.session.access_token,
+      value.data && value.data.session && value.data.session.access_token,
+      value.data && value.data.access_token,
+      value.data && value.data.token,
+    ];
+    for (const candidate of candidates) {
+      if (_isJwt(candidate)) return candidate;
+    }
+    return '';
+  }
+
+  async function readJSON(res) {
+    const text = await res.text().catch(() => '');
+    if (!text) return {};
+    try { return JSON.parse(text); } catch { return { message: text }; }
+  }
+
+  async function loadConfig() {
+    const res = await fetch('/api/config', { credentials: 'same-origin' });
+    const data = await readJSON(res);
+    if (res.ok) state.neonAuthUrl = normalizeBaseUrl(data.neonAuthUrl);
+    return data;
+  }
+
+  function requireNeonAuthUrl() {
+    if (!state.neonAuthUrl) {
+      throw new Error('Neon Auth public URL is not configured. Set EXPO_PUBLIC_NEON_AUTH_URL or NEON_AUTH_BASE_URL.');
+    }
+    return state.neonAuthUrl;
+  }
+
+  async function neonRequest(path, body) {
+    const res = await fetch(requireNeonAuthUrl() + path, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    const data = await res.json().catch(() => ({}));
+    const data = await readJSON(res);
     if (!res.ok) {
-      throw new Error(data?.message || data?.error || JSON.stringify(data) || `Auth error ${res.status}`);
+      throw new Error(errorMessage(data, `Neon Auth error ${res.status}`));
+    }
+    return { data, headerJwt: res.headers.get('set-auth-jwt') || '' };
+  }
+
+  async function tokenFollowUp() {
+    const base = requireNeonAuthUrl();
+    for (const path of ['/token', '/get-session']) {
+      for (const method of ['GET', 'POST']) {
+        const res = await fetch(base + path, {
+          method,
+          credentials: 'include',
+          headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {},
+          body: method === 'POST' ? '{}' : undefined,
+        }).catch(() => null);
+        if (!res) continue;
+        const data = await readJSON(res);
+        const headerJwt = res.headers.get('set-auth-jwt') || '';
+        const jwt = _isJwt(headerJwt) ? headerJwt : findJwt(data);
+        if (jwt) return jwt;
+      }
+    }
+    return '';
+  }
+
+  async function verifyMe(jwt) {
+    const res = await fetch('/api/me', {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { 'Authorization': 'Bearer ' + jwt },
+    });
+    const data = await readJSON(res);
+    if (!res.ok) {
+      clearJwt();
+      throw new Error(errorMessage(data, 'Token was received, but /api/me rejected it.'));
     }
     return data;
   }
 
-  async function _provision() {
-    const jwt = getJwt();
-    if (!jwt) return;
-    try {
-      await fetch('/api/auth/provision', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + jwt },
-      });
-    } catch {}
+  async function finishAuth(result) {
+    let jwt = _isJwt(result.headerJwt) ? result.headerJwt : findJwt(result.data);
+    if (!jwt) jwt = await tokenFollowUp();
+    if (!_isJwt(jwt)) throw new Error('Authentication succeeded, but no JWT was returned by Neon Auth.');
+    saveJwt(jwt);
+    const me = await verifyMe(jwt);
+    return { ...result.data, me, access_token: jwt, token_type: 'Bearer' };
   }
-
 
   function consumeAccessTokenFromHash() {
     const hash = window.location.hash || '';
@@ -71,27 +155,23 @@
 
   async function init() {
     consumeAccessTokenFromHash();
-    try { await fetch('/api/config'); } catch {}
+    try { await loadConfig(); } catch {}
   }
 
   async function signUp(email, password) {
-    const data = await _authRequest('/api/auth/register', { email, password });
-    const jwt = data?.access_token || data?.token
-      || data?.data?.access_token || data?.data?.token;
-    if (!_isJwt(jwt)) throw new Error('Kayıt başarılı fakat token alınamadı.');
-    saveJwt(jwt);
-    await _provision();
-    return data;
+    if (!state.neonAuthUrl) await loadConfig();
+    const result = await neonRequest('/sign-up/email', {
+      email,
+      password,
+      name: defaultUserName(email),
+    });
+    return finishAuth(result);
   }
 
   async function signIn(email, password) {
-    const data = await _authRequest('/api/auth/login', { email, password });
-    const jwt = data?.access_token || data?.token
-      || data?.data?.access_token || data?.data?.token;
-    if (!_isJwt(jwt)) throw new Error('Giriş başarılı fakat token alınamadı.');
-    saveJwt(jwt);
-    await _provision();
-    return data;
+    if (!state.neonAuthUrl) await loadConfig();
+    const result = await neonRequest('/sign-in/email', { email, password });
+    return finishAuth(result);
   }
 
   async function signOut() {
@@ -122,4 +202,4 @@
     isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt };
 })();
 
-// Neon Auth callback hashes are consumed here and persisted as koschei_jwt before protected pages run requireAuth().
+// Neon Auth email/password responses are verified through /api/me and persisted as koschei_jwt.

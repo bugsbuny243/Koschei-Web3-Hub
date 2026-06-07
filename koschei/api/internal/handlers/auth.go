@@ -39,62 +39,18 @@ type authProviderTransport interface {
 
 var authProviderHTTPClient authProviderTransport = &http.Client{Timeout: 10 * time.Second}
 
-func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
-	var in emailPasswordLoginRequest
-	if err := decodeJSON(r, &in); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
-		return
-	}
-	email, err := normalizeEmail(in.Email)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_email"})
-		return
-	}
-	if err := validatePassword(in.Password); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_password", "message": err.Error()})
-		return
-	}
-	cfg, err := betterAuthConfigFromEnv()
-	if err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
-		return
-	}
-	payload := map[string]string{
-		"email":       email,
-		"password":    in.Password,
-		"name":        defaultUserName(email),
-		"callbackURL": "/hub",
-	}
-	_, _, signUpBaseURL, err := postBetterAuthEmailPasswordPathWithFallback(r.Context(), cfg, "/sign-up/email", payload)
-	if err != nil {
-		writeJSON(w, authProviderStatusCode(err), map[string]string{"error": "auth_provider_failed", "message": publicAuthProviderError(err)})
-		return
-	}
-	cfg = cfg.withBaseURL(signUpBaseURL)
-	h.finishEmailPasswordAuth(w, r, cfg, email, in.Password, true)
+func (h *Handler) Register(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusGone, map[string]string{
+		"error":   "disabled",
+		"message": "Use direct Neon Auth /sign-up/email from the frontend.",
+	})
 }
 
-func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	var in emailPasswordLoginRequest
-	if err := decodeJSON(r, &in); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_json"})
-		return
-	}
-	email, err := normalizeEmail(in.Email)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_email"})
-		return
-	}
-	if in.Password == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing_password", "message": "Email and password are required."})
-		return
-	}
-	cfg, err := betterAuthConfigFromEnv()
-	if err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "auth_not_configured", "message": err.Error()})
-		return
-	}
-	h.finishEmailPasswordAuth(w, r, cfg, email, in.Password, false)
+func (h *Handler) Login(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusGone, map[string]string{
+		"error":   "disabled",
+		"message": "Use direct Neon Auth /sign-in/email from the frontend.",
+	})
 }
 
 func validatePassword(password string) error {
@@ -183,32 +139,13 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) upsertAppProfile(ctx context.Context, subject, email string) (authUser, error) {
 	out := authUser{Role: "user", Plan: "free", Credits: 0}
-	q := `WITH updated_by_subject AS (
-  UPDATE app_user_profiles
-  SET email = lower($2), updated_at = now()
-  WHERE auth_subject = $1
-  RETURNING id::text, email
-),
-updated_by_email AS (
-  UPDATE app_user_profiles
-  SET auth_subject = $1, updated_at = now()
-  WHERE lower(email) = lower($2)
-    AND NOT EXISTS (SELECT 1 FROM updated_by_subject)
-  RETURNING id::text, email
-),
-inserted AS (
-  INSERT INTO app_user_profiles (auth_subject, email)
-  SELECT $1, lower($2)
-  WHERE NOT EXISTS (SELECT 1 FROM updated_by_subject)
-    AND NOT EXISTS (SELECT 1 FROM updated_by_email)
-  RETURNING id::text, email
-)
-SELECT * FROM updated_by_subject
-UNION ALL SELECT * FROM updated_by_email
-UNION ALL SELECT * FROM inserted
-LIMIT 1;`
+	q := `INSERT INTO app_user_profiles (auth_subject, email)
+VALUES ($1, lower($2))
+ON CONFLICT (auth_subject)
+DO UPDATE SET email = EXCLUDED.email, updated_at = now()
+RETURNING id::text, email, role, plan_id, credits;`
 	err := h.runWithRetry(ctx, func(inner context.Context) error {
-		return h.DB.QueryRowContext(inner, q, subject, strings.ToLower(strings.TrimSpace(email))).Scan(&out.ID, &out.Email)
+		return h.DB.QueryRowContext(inner, q, subject, strings.ToLower(strings.TrimSpace(email))).Scan(&out.ID, &out.Email, &out.Role, &out.Plan, &out.Credits)
 	})
 	if err != nil {
 		log.Printf("upsertAppProfile failed: %v", err)

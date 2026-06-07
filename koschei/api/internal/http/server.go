@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,8 +36,8 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok"})
 	}))
-	mux.HandleFunc("/api/auth/register", requiresDB(h, method("POST", h.Register)))
-	mux.HandleFunc("/api/auth/login", requiresDB(h, method("POST", h.Login)))
+	mux.HandleFunc("/api/auth/register", method("POST", h.Register))
+	mux.HandleFunc("/api/auth/login", method("POST", h.Login))
 	mux.HandleFunc("/api/auth/neon-login", method("GET", h.NeonLogin))
 	mux.HandleFunc("/api/auth/neon-register", method("GET", h.NeonRegister))
 	mux.HandleFunc("/api/auth/neon-callback", method("GET", h.NeonCallback))
@@ -214,7 +215,7 @@ func robotsTXT(w http.ResponseWriter, r *http.Request) {
 
 func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/version" && r.URL.Path != "/api/config" && r.URL.Path != "/api/auth/provision" && r.URL.Path != "/api/auth/neon-login" && r.URL.Path != "/api/auth/neon-register" && r.URL.Path != "/api/auth/neon-callback" && r.URL.Path != "/api/web3/health" && r.URL.Path != "/api/analytics/event" && db == nil {
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/version" && r.URL.Path != "/api/config" && r.URL.Path != "/api/auth/register" && r.URL.Path != "/api/auth/login" && r.URL.Path != "/api/auth/provision" && r.URL.Path != "/api/auth/neon-login" && r.URL.Path != "/api/auth/neon-register" && r.URL.Path != "/api/auth/neon-callback" && r.URL.Path != "/api/web3/health" && r.URL.Path != "/api/analytics/event" && db == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable"})
@@ -260,7 +261,7 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com; frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+		w.Header().Set("Content-Security-Policy", contentSecurityPolicy())
 		if os.Getenv("APP_ENV") == "production" {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
 		}
@@ -268,4 +269,25 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// Neon Auth hosted-UI routes are registered above so login/register/callback work without touching JWT verification middleware.
+func contentSecurityPolicy() string {
+	connectSrc := "'self' https://www.google-analytics.com https://region1.google-analytics.com"
+	if authOrigin := publicNeonAuthOrigin(); authOrigin != "" {
+		connectSrc += " " + authOrigin
+	}
+	return "default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src " + connectSrc + "; frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+}
+
+func publicNeonAuthOrigin() string {
+	raw := strings.TrimSpace(os.Getenv("EXPO_PUBLIC_NEON_AUTH_URL"))
+	if raw == "" {
+		raw = strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL"))
+	}
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
+}
