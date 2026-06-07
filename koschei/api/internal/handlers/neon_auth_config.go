@@ -15,6 +15,13 @@ func configuredNeonAuthBaseURL() string {
 	return strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL"))
 }
 
+func configuredPublicNeonAuthURL() string {
+	if value := strings.TrimSpace(os.Getenv("EXPO_PUBLIC_NEON_AUTH_URL")); value != "" {
+		return strings.TrimRight(value, "/")
+	}
+	return strings.TrimRight(configuredNeonAuthBaseURL(), "/")
+}
+
 func configuredNeonAuthIssuer() string {
 	return strings.TrimSpace(os.Getenv("NEON_AUTH_ISSUER"))
 }

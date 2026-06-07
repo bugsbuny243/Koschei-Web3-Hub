@@ -10,7 +10,8 @@ import (
 
 func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"version": "2.0.0",
+		"version":     "2.0.0",
+		"neonAuthUrl": configuredPublicNeonAuthURL(),
 	})
 }
 
