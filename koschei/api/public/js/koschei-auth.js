@@ -53,7 +53,24 @@
     } catch {}
   }
 
+
+  function consumeAccessTokenFromHash() {
+    const hash = window.location.hash || '';
+    if (!hash || hash.length < 2) return false;
+    const params = new URLSearchParams(hash.slice(1));
+    const jwt = params.get('access_token') || params.get('token') || params.get('id_token') || '';
+    if (!_isJwt(jwt)) return false;
+    saveJwt(jwt);
+    params.delete('access_token');
+    params.delete('token');
+    params.delete('id_token');
+    const cleanUrl = window.location.pathname + window.location.search + (params.toString() ? '#' + params.toString() : '');
+    window.history.replaceState(null, document.title, cleanUrl);
+    return true;
+  }
+
   async function init() {
+    consumeAccessTokenFromHash();
     try { await fetch('/api/config'); } catch {}
   }
 
@@ -99,6 +116,8 @@
     } catch { return null; }
   }
 
-  window.KoscheiAuth = { init, signIn, signUp, signOut,
+  window.KoscheiAuth = { init, signIn, signUp, signOut, consumeAccessTokenFromHash,
     isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt };
 })();
+
+// Neon Auth callback hashes are consumed here and persisted as koschei_jwt before protected pages run requireAuth().
