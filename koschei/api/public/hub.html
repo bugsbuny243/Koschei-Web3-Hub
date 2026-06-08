@@ -1,1 +1,142 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Koschei Member Hub</title><meta name="google-adsense-account" content="ca-pub-6081394144742471"><script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6081394144742471" crossorigin="anonymous"></script><script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-1QFWMJJC3");</script><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>:root{--bg:#050812;--surface:rgba(255,255,255,.08);--line:rgba(255,255,255,.16);--text:#f7fbff;--text2:#a9b8d6;--accent:#00ff88;--accent2:#69d8ff}*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--text);background:linear-gradient(135deg,#03050b,#07111e 50%,#040811)}.container{max-width:1120px;margin:0 auto;padding:24px 20px 64px}.nav{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:46px}.brand{font-weight:900;color:var(--text);text-decoration:none}.links{display:flex;gap:16px;flex-wrap:wrap}.links a{color:var(--text2);text-decoration:none;font-weight:700}.btn{display:inline-block;padding:13px 22px;border-radius:999px;text-decoration:none;font-weight:900}.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b}.hero{padding:54px 0}.eyebrow{display:inline-block;background:rgba(0,255,136,.12);color:#a3ffcc;border-radius:999px;padding:7px 14px;font-size:12px;font-weight:900;margin-bottom:16px}h1{font-size:56px;line-height:1;margin:0 0 18px}.sub{color:var(--text2);font-size:19px;line-height:1.7;max-width:760px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}.card{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:26px;color:inherit;text-decoration:none}.card h3{margin:0 0 9px}.card p,.muted{color:var(--text2);line-height:1.65}.meta{color:#a3ffcc;font-size:12px;font-weight:900;margin-top:14px}.notice{border:1px solid rgba(0,255,136,.32);background:rgba(0,255,136,.08)}@media(max-width:760px){h1{font-size:38px}}</style></head><body><main class="container"><nav class="nav"><a class="brand" href="/">Koschei Web3 Hub</a><div class="links"><a href="/hub">Hub</a><a href="/docs">Docs</a><a href="/pricing">Pricing</a><a href="/login">Sign in</a><a class="btn btn-primary" href="/register">Get started</a></div></nav><section class="hero"><span class="eyebrow">PRO MEMBER WORKSPACE</span><h1>Six critical modules. Production only.</h1><p class="sub">TX Decoder, Token Scanner / Rug Checker, Wallet Score / Reputation, Risk Scanner, Portfolio Tracker and Project Radar are the only active user modules.</p></section><section class="grid"><a class="card" href="/tx-decoder"><h3>TX Decoder</h3><p>İmzalamadan önce transaction’ın ne yaptığını okunabilir adımlarla gösterir.</p><div class="meta">PRO · 2 credits</div></a><a class="card" href="/token-scanner"><h3>Token Scanner / Rug Checker</h3><p>Mint authority, freeze authority, holder yoğunlaşması ve rug risk sinyalleri.</p><div class="meta">PRO · 2 credits</div></a><a class="card" href="/wallet-score"><h3>Wallet Score / Reputation</h3><p>Public wallet geçmişinden cüzdan risk skoru ve itibar sinyalleri.</p><div class="meta">PRO · 2 credits</div></a><a class="card" href="/risk"><h3>Risk Scanner</h3><p>Wallet + token + contract + project için genel risk analizi.</p><div class="meta">PRO · 3 credits</div></a><a class="card" href="/portfolio"><h3>Portfolio Tracker</h3><p>Çok cüzdan takibi, SOL/token miktarları ve dağılım özeti.</p><div class="meta">PRO · 3 credits</div></a><a class="card" href="/project-radar"><h3>Project Radar</h3><p>Proje metadata, sosyal, token ve public wallet sinyallerinden radar.</p><div class="meta">PRO · 4 credits</div></a></section><script>(async()=>{await KoscheiAuth.init();KoscheiAuth.requireAuth("/login");})();</script></main><script src="/js/koschei-auth.js?v=4"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Koschei Pro Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050812;
+      --surface: rgba(255,255,255,.08);
+      --line: rgba(255,255,255,.16);
+      --text: #f7fbff;
+      --text2: #a9b8d6;
+      --accent: #00ff88;
+      --accent2: #69d8ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 20px;
+    }
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+    .brand {
+      font-weight: 900;
+      font-size: 24px;
+    }
+    .pro-badge {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #04110b;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 900;
+    }
+    h1 {
+      font-size: 42px;
+      margin: 0 0 12px;
+    }
+    .sub {
+      color: var(--text2);
+      font-size: 19px;
+      max-width: 720px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    .module-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 28px;
+      transition: all 0.3s;
+    }
+    .module-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+    }
+    .module-card h3 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+    .credit {
+      color: #a3ffcc;
+      font-size: 14px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <nav class="nav">
+      <div class="brand">Koschei Web3 Hub</div>
+      <div><span class="pro-badge">PRO MEMBER WORKSPACE</span></div>
+    </nav>
+
+    <header>
+      <h1>Six critical modules.<br>Production only.</h1>
+      <p class="sub">
+        TX Decoder, Token Scanner, Wallet Score, Risk Scanner, Portfolio Tracker and Project Radar.
+        <br>No demo. No fake data. Every scan requires credits.
+      </p>
+    </header>
+
+    <div class="grid">
+      <a href="/tx-decoder" class="module-card">
+        <h3>TX Decoder</h3>
+        <p>Human-readable transaction decoding with risk insights before signing.</p>
+        <div class="credit">PRO • 1 Credit</div>
+      </a>
+
+      <a href="/token-scanner" class="module-card">
+        <h3>Token Scanner</h3>
+        <p>Rug pull detection, authority checks, liquidity and holder analysis.</p>
+        <div class="credit">PRO • 1 Credit</div>
+      </a>
+
+      <a href="/wallet-score" class="module-card">
+        <h3>Wallet Score</h3>
+        <p>Reputation scoring and risk analysis for any Solana wallet.</p>
+        <div class="credit">PRO • 1 Credit</div>
+      </a>
+
+      <a href="/risk" class="module-card">
+        <h3>Risk Scanner</h3>
+        <p>Comprehensive risk assessment for wallets, tokens and projects.</p>
+        <div class="credit">PRO • 2 Credits</div>
+      </a>
+
+      <a href="/portfolio" class="module-card">
+        <h3>Portfolio Tracker</h3>
+        <p>Track SOL and tokens across multiple wallets.</p>
+        <div class="credit">PRO • 2 Credits</div>
+      </a>
+
+      <a href="/project-radar" class="module-card">
+        <h3>Project Radar</h3>
+        <p>Early risk and opportunity signals for Solana projects.</p>
+        <div class="credit">PRO • 2 Credits</div>
+      </a>
+    </div>
+
+    <div style="margin-top:40px; text-align:center; color:var(--text2); font-size:14px;">
+      All tools are read-only and no-custody. Koschei never asks for private keys or seed phrases.
+    </div>
+  </main>
+</body>
+</html>
