@@ -14,90 +14,50 @@
       --text2: #a9b8d6;
       --accent: #00ff88;
       --accent2: #69d8ff;
-      --violet: #a78bfa;
-      --danger: #ff5c7c;
-      --shadow: 0 30px 90px rgba(0, 0, 0, .45);
     }
-    * { box-sizing: border-box; }
     body {
       margin: 0;
-      min-height: 100vh;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: Inter, system-ui, sans-serif;
       color: var(--text);
       background: linear-gradient(135deg, #03050b 0%, #07111e 48%, #040811 100%);
-      overflow-x: hidden;
     }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
-      background-size: 54px 54px;
-      mask-image: radial-gradient(circle at center, black, transparent 78%);
-    }
-    a { color: inherit; }
-    .page { max-width: 1180px; margin: 0 auto; padding: 24px 20px 60px; }
+    .page { max-width: 1180px; margin: 0 auto; padding: 20px; }
     .surface {
-      background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.045));
+      background: var(--surface);
       border: 1px solid var(--line);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(24px);
+      border-radius: 20px;
     }
     .topbar {
-      position: sticky;
-      top: 16px;
-      z-index: 50;
       display: flex;
-      align-items: center;
       justify-content: space-between;
+      align-items: center;
       padding: 14px 20px;
-      border-radius: 999px;
       margin-bottom: 32px;
     }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; text-decoration: none; }
     .brand-mark {
-      width: 36px; height: 36px;
+      width: 34px; height: 34px;
       background: linear-gradient(135deg, var(--accent), var(--accent2));
       color: #04110b;
-      border-radius: 12px;
+      border-radius: 10px;
       display: grid;
       place-items: center;
       font-weight: 900;
     }
     .nav-links { display: flex; gap: 8px; align-items: center; }
     .nav-link { color: var(--text2); font-size: 14px; font-weight: 600; text-decoration: none; padding: 8px 14px; border-radius: 999px; }
-    .nav-link:hover { color: var(--text); background: rgba(255,255,255,.08); }
     .hero {
       display: grid;
       grid-template-columns: 1.1fr 0.9fr;
       gap: 24px;
-      align-items: center;
       margin-bottom: 40px;
     }
-    .hero-card {
-      padding: 42px;
-      border-radius: 28px;
-    }
-    .eyebrow {
-      display: inline-block;
-      padding: 6px 14px;
-      background: rgba(0,255,136,.1);
-      color: #a3ffcc;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: .5px;
-    }
-    h1 { font-size: 52px; line-height: 1.0; margin: 16px 0 16px; letter-spacing: -.04em; }
+    h1 { font-size: 48px; line-height: 1.0; margin: 0 0 16px; }
     .gradient-text {
       background: linear-gradient(135deg, #fff, #c7fff0);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-    .page-sub { font-size: 17px; color: var(--text2); max-width: 520px; line-height: 1.7; }
     .stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -106,11 +66,10 @@
     }
     .stat {
       padding: 24px;
-      border-radius: 20px;
+      border-radius: 18px;
       text-align: center;
     }
-    .stat-label { font-size: 12px; color: var(--text2); font-weight: 600; }
-    .stat-value { font-size: 32px; font-weight: 800; margin-top: 8px; }
+    .stat-value { font-size: 28px; font-weight: 800; margin-top: 6px; }
     .layer-nav {
       display: flex;
       gap: 8px;
@@ -118,58 +77,49 @@
       flex-wrap: wrap;
     }
     .layer-nav a {
-      padding: 10px 20px;
+      padding: 10px 18px;
       border-radius: 999px;
       font-size: 14px;
       font-weight: 600;
       text-decoration: none;
       border: 1px solid var(--line);
       color: var(--text2);
-      transition: all .2s ease;
     }
-    .layer-nav a:hover, .layer-nav a.active {
+    .layer-nav a.active {
       background: var(--accent);
       color: #04110b;
-      border-color: var(--accent);
     }
-    .layer-section { margin-bottom: 56px; }
-    .section-head { margin-bottom: 20px; }
-    h2 { font-size: 28px; margin: 0 0 6px; }
-    .section-note { color: var(--text2); font-size: 15px; }
     .modules {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: 18px;
     }
     .module-card {
-      padding: 26px;
-      border-radius: 22px;
+      padding: 24px;
+      border-radius: 20px;
       text-decoration: none;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.3s ease;
       border: 1px solid var(--line);
     }
     .module-card:hover {
       transform: translateY(-6px);
-      box-shadow: 0 20px 50px rgba(0,0,0,.3);
       border-color: rgba(255,255,255,.3);
     }
-    .module-icon { font-size: 32px; margin-bottom: 16px; }
-    .module-name { font-size: 19px; font-weight: 700; margin-bottom: 8px; }
+    .module-name { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
     .module-desc { color: var(--text2); font-size: 14.5px; line-height: 1.65; }
-    .module-tag {
-      display: inline-block;
-      margin-top: 16px;
-      padding: 5px 12px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-    }
-    .tag-live { background: rgba(0,255,136,.12); color: #a3ffcc; }
-    .tag-beta { background: rgba(250,204,21,.12); color: #fde047; }
-    .tag-core { background: rgba(167,139,250,.12); color: #c4b5fd; }
-    @media (max-width: 768px) {
+
+    /* Responsive */
+    @media (max-width: 900px) {
       .hero { grid-template-columns: 1fr; }
       .stats { grid-template-columns: 1fr; }
+      .modules { grid-template-columns: 1fr; }
+      h1 { font-size: 38px; }
+    }
+    @media (max-width: 600px) {
+      .topbar { flex-direction: column; gap: 12px; align-items: flex-start; }
+      .nav-links { flex-wrap: wrap; }
+      .layer-nav { gap: 6px; }
+      .layer-nav a { padding: 8px 14px; font-size: 13px; }
     }
   </style>
 </head>
@@ -184,21 +134,25 @@
       <div class="nav-links">
         <a href="/docs" class="nav-link">Docs</a>
         <a href="/pricing.html" class="nav-link">Pricing</a>
-        <button class="btn" onclick="KoscheiAuth.signOut()">Sign out</button>
+        <button onclick="KoscheiAuth.signOut()" class="btn" style="padding:8px 16px; border-radius:999px; background:rgba(255,255,255,.08); border:none; color:var(--text); cursor:pointer;">Sign out</button>
       </div>
     </div>
 
     <!-- Hero -->
     <div class="hero">
-      <div class="hero-card surface">
-        <div class="eyebrow">AUTHENTICATED WORKSPACE</div>
+      <div class="surface" style="padding:40px; border-radius:24px;">
+        <div style="display:inline-block; background:rgba(0,255,136,.1); color:#a3ffcc; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:700; margin-bottom:16px;">
+          AUTHENTICATED WORKSPACE
+        </div>
         <h1><span class="gradient-text">Your Koschei<br>Web3 command center.</span></h1>
-        <p class="page-sub">Manage your workspace across three layers: Security, Intelligence, and Automation & Agents.</p>
+        <p style="color:var(--text2); font-size:17px; max-width:520px; line-height:1.7;">
+          Manage your workspace across three layers: Security, Intelligence, and Automation & Agents.
+        </p>
       </div>
 
-      <div class="surface" style="padding: 28px; border-radius: 24px;">
+      <div class="surface" style="padding:28px; border-radius:24px;">
         <div style="font-size:13px; color:var(--text2); font-weight:600;">SIGNED IN AS</div>
-        <div id="userEmail" style="font-size:22px; font-weight:700; margin-top:6px;">Loading...</div>
+        <div id="userEmail" style="font-size:20px; font-weight:700; margin-top:6px;">Loading...</div>
         <div style="margin-top:20px; font-size:13px; color:var(--text2);">No private keys · Read-only tooling</div>
       </div>
     </div>
@@ -206,163 +160,97 @@
     <!-- Stats -->
     <div class="stats">
       <div class="stat surface">
-        <div class="stat-label">PLAN</div>
+        <div style="font-size:12px; color:var(--text2); font-weight:600;">PLAN</div>
         <div class="stat-value" id="userPlan">free</div>
       </div>
       <div class="stat surface">
-        <div class="stat-label">OUTPUTS REMAINING</div>
+        <div style="font-size:12px; color:var(--text2); font-weight:600;">OUTPUTS LEFT</div>
         <div class="stat-value" id="userCredits">—</div>
       </div>
       <div class="stat surface">
-        <div class="stat-label">WORKSPACE</div>
+        <div style="font-size:12px; color:var(--text2); font-weight:600;">WORKSPACE</div>
         <div class="stat-value" style="color:#22c55e;">Live</div>
       </div>
     </div>
 
     <!-- Layer Navigation -->
     <div class="layer-nav">
-      <a href="#security" class="active">🛡️ Security Layer</a>
-      <a href="#intelligence">🔍 Intelligence Layer</a>
-      <a href="#automation">🤖 Automation & Agents</a>
+      <a href="#security" class="active">🛡️ Security</a>
+      <a href="#intelligence">🔍 Intelligence</a>
+      <a href="#automation">🤖 Automation</a>
       <a href="#account">Account</a>
     </div>
 
     <!-- SECURITY LAYER -->
     <div id="security" class="layer-section">
-      <div class="section-head">
-        <h2>🛡️ Security Layer</h2>
-        <p class="section-note">Quick protection and risk detection tools.</p>
-      </div>
+      <h2 style="margin:0 0 8px; font-size:26px;">🛡️ Security Layer</h2>
+      <p style="color:var(--text2); margin-bottom:20px;">Quick protection and risk detection tools.</p>
+
       <div class="modules">
         <a href="/wallet-score.html" class="module-card surface">
-          <div class="module-icon">🏆</div>
           <div class="module-name">Wallet Score</div>
-          <div class="module-desc">Get an instant reputation score for any Solana wallet based on on-chain activity and trust signals.</div>
-          <span class="module-tag tag-live">● LIVE</span>
+          <div class="module-desc">Get an instant reputation score for any Solana wallet.</div>
+          <span style="display:inline-block; margin-top:14px; padding:4px 10px; background:rgba(0,255,136,.1); color:#a3ffcc; border-radius:999px; font-size:11px; font-weight:700;">LIVE</span>
         </a>
         <a href="/token-scanner.html" class="module-card surface">
-          <div class="module-icon">🪙</div>
           <div class="module-name">Token Scanner</div>
-          <div class="module-desc">Analyze any Solana token for rug pull risks, liquidity health, and security indicators.</div>
-          <span class="module-tag tag-live">● LIVE</span>
-        </a>
-        <a href="/launches.html" class="module-card surface">
-          <div class="module-icon">🚨</div>
-          <div class="module-name">Rug Radar</div>
-          <div class="module-desc">Monitor new token launches in real-time with community-driven rug reports.</div>
-          <span class="module-tag tag-live">● LIVE</span>
+          <div class="module-desc">Analyze any Solana token for rug pull risks and liquidity health.</div>
+          <span style="display:inline-block; margin-top:14px; padding:4px 10px; background:rgba(0,255,136,.1); color:#a3ffcc; border-radius:999px; font-size:11px; font-weight:700;">LIVE</span>
         </a>
         <a href="/risk.html" class="module-card surface">
-          <div class="module-icon">🛡️</div>
           <div class="module-name">Risk Scanner</div>
-          <div class="module-desc">Review on-chain risk signals before interacting with wallets or projects.</div>
-          <span class="module-tag tag-core">CORE</span>
+          <div class="module-desc">Review on-chain risk signals before interacting with projects.</div>
         </a>
       </div>
-    </section>
+    </div>
 
     <!-- INTELLIGENCE LAYER -->
-    <div id="intelligence" class="layer-section">
-      <div class="section-head">
-        <h2>🔍 Intelligence Layer</h2>
-        <p class="section-note">Deep analysis and research tools for builders.</p>
-      </div>
+    <div id="intelligence" class="layer-section" style="margin-top:50px;">
+      <h2 style="margin:0 0 8px; font-size:26px;">🔍 Intelligence Layer</h2>
+      <p style="color:var(--text2); margin-bottom:20px;">Deep analysis and research tools.</p>
+
       <div class="modules">
         <a href="/project-radar.html" class="module-card surface">
-          <div class="module-icon">📡</div>
           <div class="module-name">Project Radar</div>
-          <div class="module-desc">Discover and evaluate early-stage projects using public signals and opportunity scoring.</div>
-          <span class="module-tag tag-beta">BETA</span>
+          <div class="module-desc">Discover and evaluate early-stage projects.</div>
         </a>
         <a href="/tx-decoder.html" class="module-card surface">
-          <div class="module-icon">🧾</div>
           <div class="module-name">TX Decoder</div>
-          <div class="module-desc">Decode complex Solana transactions into clear, human-readable summaries.</div>
-          <span class="module-tag tag-live">● LIVE</span>
+          <div class="module-desc">Decode complex transactions into clear summaries.</div>
+          <span style="display:inline-block; margin-top:14px; padding:4px 10px; background:rgba(0,255,136,.1); color:#a3ffcc; border-radius:999px; font-size:11px; font-weight:700;">LIVE</span>
         </a>
         <a href="/portfolio.html" class="module-card surface">
-          <div class="module-icon">💼</div>
           <div class="module-name">Portfolio Tracker</div>
-          <div class="module-desc">Track SOL and token balances across multiple wallets in one unified dashboard.</div>
-          <span class="module-tag tag-live">● LIVE</span>
-        </a>
-        <a href="/metadata.html" class="module-card surface">
-          <div class="module-icon">🧬</div>
-          <div class="module-name">Metadata Studio</div>
-          <div class="module-desc">Generate professional NFT and project metadata using AI.</div>
-          <span class="module-tag tag-core">CORE</span>
+          <div class="module-desc">Track balances across multiple wallets.</div>
         </a>
       </div>
-    </section>
+    </div>
 
-    <!-- AUTOMATION & AGENT LAYER -->
-    <div id="automation" class="layer-section">
-      <div class="section-head">
-        <h2>🤖 Automation & Agent Layer</h2>
-        <p class="section-note">AI agents and automation tools for advanced users.</p>
-      </div>
+    <!-- AUTOMATION LAYER -->
+    <div id="automation" class="layer-section" style="margin-top:50px;">
+      <h2 style="margin:0 0 8px; font-size:26px;">🤖 Automation & Agent Layer</h2>
+      <p style="color:var(--text2); margin-bottom:20px;">AI agents and automation tools.</p>
+
       <div class="modules">
         <a href="/agent-api.html" class="module-card surface">
-          <div class="module-icon">🤖</div>
           <div class="module-name">Agent API</div>
-          <div class="module-desc">Build and deploy autonomous AI agents on Solana using developer endpoints.</div>
-          <span class="module-tag tag-beta">BETA</span>
+          <div class="module-desc">Build and deploy autonomous AI agents on Solana.</div>
         </a>
         <a href="/watchlist.html" class="module-card surface">
-          <div class="module-icon">🔔</div>
           <div class="module-name">Watchlist & Events</div>
-          <div class="module-desc">Set up real-time monitoring and alerts for wallets and contracts.</div>
-          <span class="module-tag tag-live">● LIVE</span>
-        </a>
-        <a href="/risk-v2.html" class="module-card surface">
-          <div class="module-icon">🧠</div>
-          <div class="module-name">Risk Engine v2</div>
-          <div class="module-desc">Get structured, evidence-based risk analysis for complex scenarios.</div>
-          <span class="module-tag tag-beta">BETA</span>
+          <div class="module-desc">Real-time monitoring and alerts.</div>
         </a>
       </div>
-    </section>
+    </div>
 
-    <!-- Account -->
-    <div id="account" class="layer-section">
-      <div class="section-head">
-        <h2>Account & Settings</h2>
-      </div>
-      <div class="modules">
-        <a href="/account.html" class="module-card surface">
-          <div class="module-icon">👤</div>
-          <div class="module-name">Account</div>
-          <div class="module-desc">View your plan, remaining outputs, and account details.</div>
-          <span class="module-tag tag-core">CORE</span>
-        </a>
-        <a href="/docs" class="module-card surface">
-          <div class="module-icon">📚</div>
-          <div class="module-name">Developer Docs</div>
-          <div class="module-desc">Access API documentation, SDK examples, and integration guides.</div>
-          <span class="module-tag tag-live">● LIVE</span>
-        </a>
-      </div>
-    </section>
+    <script src="/js/koschei-auth.js"></script>
+    <script>
+      (async () => {
+        await KoscheiAuth.init();
+        if (!KoscheiAuth.requireAuth()) return;
+        document.getElementById('userEmail').textContent = KoscheiAuth.getEmail() || '';
+      })();
+    </script>
   </div>
-
-  <script src="/js/koschei-auth.js"></script>
-  <script src="/js/koschei-analytics.js"></script>
-  <script>
-    (async () => {
-      await KoscheiAuth.init();
-      if (!KoscheiAuth.requireAuth()) return;
-
-      document.getElementById('userEmail').textContent = KoscheiAuth.getEmail() || '';
-
-      try {
-        const res = await KoscheiAuth.apiCall('/api/member/summary');
-        if (res && res.ok) {
-          const data = await res.json();
-          document.getElementById('userPlan').textContent = data.plan || 'free';
-          document.getElementById('userCredits').textContent = data.outputs_remaining ?? 0;
-        }
-      } catch {}
-    })();
-  </script>
 </body>
 </html>
