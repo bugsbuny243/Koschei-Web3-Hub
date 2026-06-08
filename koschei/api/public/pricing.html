@@ -4,7 +4,6 @@
   <!-- AdSense verification -->
   <meta name="google-adsense-account" content="ca-pub-6081394144742471">
 
-
   <!-- Google AdSense -->
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6081394144742471"
      crossorigin="anonymous"></script>
@@ -19,73 +18,98 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upgrade — Koschei</title>
+  <title>Pricing — Koschei Web3 Hub</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/koschei.css">
   <style>
-    .pack-card{display:flex;flex-direction:column;gap:16px}.pack-price{font-size:28px;font-weight:700}.pack-output{color:var(--accent)}
-    .pack-actions{display:flex;flex-direction:column;gap:8px;margin-top:auto}.payment-form{display:none;margin-top:22px}.payment-form.show{display:block}
-    textarea.form-input{min-height:88px;resize:vertical}.summary{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:20px;color:var(--text2)}
+    :root {
+      --bg: #050812;
+      --surface: rgba(255,255,255,.08);
+      --line: rgba(255,255,255,.16);
+      --text: #f7fbff;
+      --text2: #a9b8d6;
+      --accent: #00ff88;
+      --accent2: #69d8ff;
+    }
+    body { background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; margin:0; }
+    .nav { display:flex; justify-content:space-between; align-items:center; padding:16px 24px; border-bottom:1px solid var(--line); }
+    .container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+    h1 { font-size: 42px; margin-bottom: 8px; }
+    .subtitle { color: var(--text2); font-size: 18px; max-width: 600px; }
+    .tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 40px; }
+    .tier { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px; }
+    .tier h3 { margin: 0 0 8px; font-size: 24px; }
+    .tier .price { font-size: 36px; font-weight: 800; margin: 12px 0; }
+    .tier ul { padding-left: 20px; color: var(--text2); line-height: 1.8; }
+    .tier .btn { display: block; text-align: center; margin-top: 24px; padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 700; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #04110b; }
+    .layer-label { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; display: inline-block; margin-bottom: 12px; }
+    .security { background: rgba(0,255,136,.1); color: #00ff88; }
+    .intelligence { background: rgba(105,216,255,.1); color: #69d8ff; }
+    .automation { background: rgba(167,139,250,.1); color: #a78bfa; }
   </style>
 </head>
 <body>
-<nav class="nav">
-  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
-  <div class="nav-links"><a href="/hub" class="nav-link">Hub</a><a href="/account" class="nav-link">Account</a><a href="/pricing" class="nav-link active">Upgrade</a></div>
-</nav>
-<main class="page">
-  <div class="page-title">Buy outputs</div>
-  <div class="page-sub">Free: explore pages and demo examples. Paid packs unlock real scans, generations and intelligence outputs.</div>
-  <div class="summary"><span>Email: <strong id="memberEmail">Loading…</strong></span><span>Outputs remaining: <strong id="outputsRemaining">—</strong></span><span>Free: explore pages and demo examples</span></div>
-  <div class="alert" id="pageMessage"></div>
-  <section class="grid-3">
-    <article class="card pack-card"><div><h2>Starter Pack</h2><div class="pack-price">899 TL</div></div><div class="pack-output">+25 outputs</div><div class="pack-actions"><a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465449" target="_blank" rel="noopener noreferrer">Buy on Shopier</a><button class="btn btn-ghost" type="button" onclick="openPaymentForm('starter')">Report payment</button></div></article>
-    <article class="card pack-card"><div><h2>Builder Pack</h2><div class="pack-price">2299 TL</div></div><div class="pack-output">+100 outputs</div><div class="pack-actions"><a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465484" target="_blank" rel="noopener noreferrer">Buy on Shopier</a><button class="btn btn-ghost" type="button" onclick="openPaymentForm('builder')">Report payment</button></div></article>
-    <article class="card pack-card"><div><h2>Studio Pack</h2><div class="pack-price">4999 TL</div></div><div class="pack-output">+300 outputs</div><div class="pack-actions"><a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465499" target="_blank" rel="noopener noreferrer">Buy on Shopier</a><button class="btn btn-ghost" type="button" onclick="openPaymentForm('studio')">Report payment</button></div></article>
-  </section>
-  <section class="card payment-form" id="paymentFormWrap">
-    <h2 style="margin-top:0">Report Shopier payment</h2>
-    <form id="paymentForm" style="display:flex;flex-direction:column;gap:14px">
-      <div class="form-group"><label class="form-label" for="fullName">Full name</label><input class="form-input" id="fullName" required></div>
-      <div class="form-group"><label class="form-label" for="email">Email</label><input class="form-input" id="email" type="email" readonly></div>
-      <div class="form-group"><label class="form-label" for="productID">Pack</label><select class="form-input" id="productID"><option value="starter">Starter</option><option value="builder">Builder</option><option value="studio">Studio</option></select></div>
-      <div class="form-group"><label class="form-label" for="paymentReference">Payment reference (optional)</label><input class="form-input" id="paymentReference"></div>
-      <div class="form-group"><label class="form-label" for="note">Note (optional)</label><textarea class="form-input" id="note"></textarea></div>
-      <button class="btn btn-primary" id="submitPayment" type="submit">Send payment request</button>
-    </form>
-  </section>
-</main>
-<script src="/js/koschei-auth.js?v=4"></script>
-<script src="/js/koschei-analytics.js?v=1"></script>
-<script>
-  const message = document.getElementById('pageMessage');
-  function showMessage(text, kind) { message.textContent = text; message.className = `alert alert-${kind} show`; }
-  function openPaymentForm(productID) { document.getElementById('productID').value = productID; document.getElementById('paymentFormWrap').classList.add('show'); document.getElementById('fullName').focus(); }
-  (async () => {
-    await KoscheiAuth.init();
-    if (!KoscheiAuth.requireAuth('/login')) return;
-    KoscheiAnalytics.track('pricing_view');
-    const email = KoscheiAuth.getEmail() || '';
-    document.getElementById('memberEmail').textContent = email;
-    document.getElementById('email').value = email;
-    try {
-      const res = await KoscheiAuth.apiCall('/api/member/summary');
-      if (!res || !res.ok) throw new Error('Member summary unavailable');
-      const data = await res.json();
-      document.getElementById('memberEmail').textContent = data.email || email;
-      document.getElementById('email').value = data.email || email;
-      document.getElementById('outputsRemaining').textContent = data.outputs_remaining ?? 0;
-    } catch { showMessage('Could not load member details. Please try again.', 'error'); }
-  })();
-  document.getElementById('paymentForm').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const button = document.getElementById('submitPayment'); button.disabled = true;
-    try {
-      const res = await KoscheiAuth.apiCall('/api/payments/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: document.getElementById('fullName').value, product_id: document.getElementById('productID').value, payment_reference: document.getElementById('paymentReference').value, note: document.getElementById('note').value }) });
-      const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Could not send payment request');
-      showMessage(data.message || 'Payment request received. Admin review required.', 'success'); document.getElementById('paymentForm').reset(); document.getElementById('email').value = KoscheiAuth.getEmail() || '';
-    } catch (error) { showMessage(error.message, 'error'); } finally { button.disabled = false; }
-  });
-</script>
+  <nav class="nav">
+    <a href="/" style="font-weight:800; font-size:20px; color:var(--accent); text-decoration:none;">Koschei</a>
+    <div>
+      <a href="/hub.html" style="margin-right:20px; color:var(--text2); text-decoration:none;">Hub</a>
+      <a href="/login.html" style="color:var(--text2); text-decoration:none;">Sign in</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Simple, usage-based pricing</h1>
+    <p class="subtitle">Start free. Pay only when you need more outputs. Higher tiers unlock access to advanced Intelligence and Agent layers.</p>
+
+    <div class="tiers">
+      <!-- Free Tier -->
+      <div class="tier">
+        <span class="layer-label security">Security Layer</span>
+        <h3>Free</h3>
+        <div class="price">0 TL</div>
+        <ul>
+          <li>Access to basic Security tools</li>
+          <li>Limited daily outputs</li>
+          <li>Public tools & demos</li>
+          <li>Community support</li>
+        </ul>
+        <a href="/register.html" class="btn btn-primary">Get started for free</a>
+      </div>
+
+      <!-- Builder Tier -->
+      <div class="tier">
+        <span class="layer-label intelligence">Intelligence Layer</span>
+        <h3>Builder</h3>
+        <div class="price">2.299 TL</div>
+        <p style="color:var(--text2); margin:8px 0 16px;">+100 outputs / month</p>
+        <ul>
+          <li>Full access to Security Layer</li>
+          <li>Intelligence Layer tools unlocked</li>
+          <li>Higher output limits</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="https://www.shopier.com/TradeVisual/47465484" target="_blank" class="btn btn-primary">Buy Builder Pack</a>
+      </div>
+
+      <!-- Studio / Agent Tier -->
+      <div class="tier">
+        <span class="layer-label automation">Automation & Agent</span>
+        <h3>Studio / Agent</h3>
+        <div class="price">4.999 TL</div>
+        <p style="color:var(--text2); margin:8px 0 16px;">+300 outputs / month</p>
+        <ul>
+          <li>Everything in Builder</li>
+          <li>Full Automation & Agent Layer access</li>
+          <li>Agent API & advanced tools</li>
+          <li>Highest priority + early features</li>
+        </ul>
+        <a href="https://www.shopier.com/TradeVisual/47465499" target="_blank" class="btn btn-primary">Buy Studio Pack</a>
+      </div>
+    </div>
+
+    <p style="text-align:center; margin-top:60px; color:var(--text2); font-size:14px;">
+      All plans include no-custody access. You never share private keys.
+    </p>
+  </div>
 </body>
 </html>
