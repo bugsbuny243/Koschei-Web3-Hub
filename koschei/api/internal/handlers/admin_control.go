@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"sort"
@@ -98,25 +100,6 @@ func (h *Handler) AdminSystemScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, h.adminSystemScan(r.Context()))
-}
-
-func (h *Handler) AdminChat(w http.ResponseWriter, r *http.Request) {
-	if !h.ownerAuth(w, r) {
-		return
-	}
-	var req struct {
-		Message string `json:"message"`
-	}
-	if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.Message) == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "message required"})
-		return
-	}
-	message := strings.TrimSpace(req.Message)
-	summary, summaryErr := h.adminSummary(r.Context())
-	scan := h.adminSystemScan(r.Context())
-	answer := adminChatAnswer(message, summary, summaryErr, scan)
-	// Admin chat is deliberately read-only: it summarizes in-memory results and never writes to the database.
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "answer": answer, "actions": []any{}, "used_context": map[string]bool{"summary": summaryErr == nil, "system_scan": true}})
 }
 
 func (h *Handler) adminSummary(ctx context.Context) (adminSummary, error) {
@@ -338,68 +321,100 @@ func (h *Handler) adminSystemScan(ctx context.Context) adminScan {
 	return adminScan{OK: true, Status: status, Checks: checks}
 }
 
-func adminChatAnswer(message string, summary adminSummary, summaryErr error, scan adminScan) string {
-	m := strings.ToLower(message)
-	severity := "✅ OK"
-	if scan.Status == "warning" {
-		severity = "⚠️ Warning"
-	} else if scan.Status == "critical" {
-		severity = "❌ Critical"
+// YENİ EKLENEN YZ ENTEGRASYONU AŞAĞIDADIR
+func (h *Handler) AdminChat(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
 	}
-	problems := make([]string, 0)
-	for _, check := range scan.Checks {
-		if check.Status != "ok" {
-			problems = append(problems, check.Name+": "+check.Message)
-		}
+	var req struct {
+		Message string `json:"message"`
 	}
-	sort.Strings(problems)
-	next := "Next action: review the highlighted checks and refresh the relevant tab."
-	if summaryErr != nil {
-		return "❌ Critical — Summary data could not be read. " + next
+	if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.Message) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "message required"})
+		return
 	}
-	switch {
-	case strings.Contains(m, "modül") || strings.Contains(m, "module"):
-		return "✅ OK — All 10 Koschei Web3 Intelligence OS module foundations are registered. Review the Modules tab for public/admin status."
-	case strings.Contains(m, "grant başvuru") || strings.Contains(m, "grant application"):
-		return "✅ OK — Grant Autopilot is ready to generate copy-ready template drafts. It never submits applications automatically."
-	case strings.Contains(m, "impact"):
-		return "✅ OK — The safe public Proof-of-Impact page is available at /impact."
-	case strings.Contains(m, "agent api"):
-		return "✅ OK — The read-only Agent API foundation is ready; admin-created scoped keys are required."
-	case strings.Contains(m, "x402"):
-		return "✅ OK — x402 pay-per-tool foundation is present and disabled by default; no fund movement is implemented."
-	case strings.Contains(m, "cross-chain") || strings.Contains(m, "cross chain"):
-		return "✅ OK — Cross-chain Risk Monitor provides preliminary checklists and makes no unsupported bridge-detection claims."
-	case strings.Contains(m, "sybil"):
-		return "✅ OK — The optional Sybil layer is ready and stores no biometric or identity-document data."
-	case strings.Contains(m, "risk engine") || strings.Contains(m, "risk v2"):
-		return "✅ OK — Risk Engine v2 returns preliminary structured scores, evidence, red flags, and recommendations."
-	case strings.Contains(m, "ödeme") || strings.Contains(m, "payment") || strings.Contains(m, "gelir"):
-		return fmt.Sprintf("%s — %d pending payment request(s). Approved/rejected history is available in Payments. %s", severity, summary.PendingPaymentRequestsCount, next)
-	case strings.Contains(m, "kredi") || strings.Contains(m, "credit"):
-		return fmt.Sprintf("%s — %d active entitlement(s), %d total outputs remaining. %s", severity, summary.ActiveEntitlementsCount, summary.TotalOutputsRemaining, next)
-	case strings.Contains(m, "watchlist"):
-		return fmt.Sprintf("%s — %d watchlist source(s) and %d web3 event(s) recorded. %s", severity, summary.WatchlistSourcesCount, summary.Web3EventsCount, next)
-	case strings.Contains(m, "alchemy") || strings.Contains(m, "chain"):
-		return fmt.Sprintf("%s — %d chain health log(s); latest check: %s. %s", severity, summary.ChainHealthLogsCount, formatAdminTime(summary.LatestChainCheckTime), next)
-	case strings.Contains(m, "bugün") || strings.Contains(m, "today") || strings.Contains(m, "aktiv") || strings.Contains(m, "activity"):
-		return fmt.Sprintf("%s — Totals: %d analytics events, %d outputs, %d web3 events. Latest login: %s; latest output: %s. %s", severity, summary.AnalyticsEventsCount, summary.Web3OutputsCount, summary.Web3EventsCount, formatAdminTime(summary.LatestLoginTime), formatAdminTime(summary.LatestOutputTime), next)
-	case strings.Contains(m, "hata") || strings.Contains(m, "error") || strings.Contains(m, "tara") || strings.Contains(m, "scan"):
-		if len(problems) == 0 {
-			return "✅ OK — System scan found no warnings or critical issues. Next action: continue monitoring."
-		}
-		if len(problems) > 5 {
-			problems = problems[:5]
-		}
-		return severity + " — " + strings.Join(problems, " | ") + ". " + next
-	default:
-		return fmt.Sprintf("%s — %d users, %d active entitlements, %d pending payments, %d outputs remaining. Ask me to scan the system or summarize payments, credits, watchlist, chains, activity, or errors. %s", severity, summary.UsersCount, summary.ActiveEntitlementsCount, summary.PendingPaymentRequestsCount, summary.TotalOutputsRemaining, next)
+
+	message := strings.TrimSpace(req.Message)
+	summary, summaryErr := h.adminSummary(r.Context())
+	scan := h.adminSystemScan(r.Context())
+
+	// .env dosyasından API anahtarını alıyoruz
+	apiKey := strings.TrimSpace(os.Getenv("TOGETHER_API_KEY"))
+	if apiKey == "" {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok": true,
+			"answer": "Kanka, .env dosyasında TOGETHER_API_KEY bulamadım. Benimle doğal konuşabilmen için anahtarı eklemen lazım. Sistem çalışıyor ama şu an manuel moddayım.",
+			"actions": []any{},
+			"used_context": map[string]bool{"summary": summaryErr == nil, "system_scan": true},
+		})
+		return
 	}
+
+	// Sistemin anlık durumunu LLM'e okutmak için JSON'a çeviriyoruz
+	summaryBytes, _ := json.Marshal(summary)
+	scanBytes, _ := json.Marshal(scan)
+
+	systemPrompt := fmt.Sprintf(`Sen Koschei Web3 Hub'ın sistem yöneticisi asistanısın. Kurucun olan Onur Sel ile konuşuyorsun. 
+Sana selam verdiğinde veya günlük bir şey sorduğunda ona doğal, samimi ve kısa cevaplar ver (örn: 'Kanka', 'Selam' vb. kullanabilirsin). 
+Eğer sistem durumu, kullanıcı sayısı, ödemeler veya hatalar hakkında bilgi isterse, sana aşağıda verilen güncel sistem metriklerini kullanarak cevap ver. Verileri robot gibi sıralama, cümle içine yedirerek sohbet şeklinde aktar.
+
+GÜNCEL SİSTEM ÖZETİ: %s
+SİSTEM TARAMA DURUMU: %s`, string(summaryBytes), string(scanBytes))
+
+	answer := h.askTogetherAI(apiKey, systemPrompt, message)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": true,
+		"answer": answer,
+		"actions": []any{},
+		"used_context": map[string]bool{"summary": summaryErr == nil, "system_scan": true},
+	})
 }
 
-func formatAdminTime(value *time.Time) string {
-	if value == nil {
-		return "not available"
+// LLM'e HTTP isteği atan yardımcı fonksiyon
+func (h *Handler) askTogetherAI(apiKey, systemPrompt, userMessage string) string {
+	url := "https://api.together.xyz/v1/chat/completions"
+
+	payload := map[string]any{
+		"model": "meta-llama/Llama-3-8b-chat-hf", // Chat için hızlı ve hafif model
+		"messages": []map[string]string{
+			{"role": "system", "content": systemPrompt},
+			{"role": "user", "content": userMessage},
+		},
+		"temperature": 0.7,
+		"max_tokens":  250,
 	}
-	return value.UTC().Format(time.RFC3339)
+
+	jsonPayload, _ := json.Marshal(payload)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return "Kanka bir şeyler ters gitti, isteği oluşturamadım (Request Error)."
+	}
+
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "Kanka API'ye bağlanamadım, sunucularda bir sorun olabilir."
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil || len(result.Choices) == 0 {
+		return "Kanka API'den yanıt aldım ama okuyamadım. Beklenmeyen bir veri döndü."
+	}
+
+	return strings.TrimSpace(result.Choices[0].Message.Content)
 }
