@@ -47,6 +47,11 @@ func main() {
 	staticDir := resolveStaticDir(os.Getenv("STATIC_DIR"))
 	log.Printf("static public path: %s", staticDir)
 	srv := apihttp.NewServer(conn, dbInitError, os.Getenv("ADMIN_PASSWORD"), os.Getenv("CORS_ALLOWED_ORIGIN"), staticDir)
+
+	// === NEON AUTH ENDPOINTLERİ ===
+	srv.HandleFunc("/api/auth/neon-signup", srv.NeonSignUp)
+	srv.HandleFunc("/api/auth/neon-signin", srv.NeonSignIn)
+
 	log.Printf("api listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, srv); err != nil {
 		log.Fatal(err)
