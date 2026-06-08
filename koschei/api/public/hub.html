@@ -45,6 +45,16 @@
       font-size: 13px;
       font-weight: 900;
     }
+    .nav-links {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+    .nav-links a {
+      color: var(--text2);
+      text-decoration: none;
+      font-weight: 600;
+    }
     h1 {
       font-size: 42px;
       margin: 0 0 12px;
@@ -85,10 +95,15 @@
   <main class="container">
     <nav class="nav">
       <div class="brand">Koschei Web3 Hub</div>
-      <div><span class="pro-badge">PRO MEMBER WORKSPACE</span></div>
+      <div class="nav-links">
+        <a href="/pricing">Pricing</a>
+        <a href="/login">Sign in</a>
+        <a href="/register" class="pro-badge">Get Started</a>
+      </div>
     </nav>
 
     <header>
+      <div class="pro-badge" style="display:inline-block;margin-bottom:16px;">PRO MEMBER WORKSPACE</div>
       <h1>Six critical modules.<br>Production only.</h1>
       <p class="sub">
         TX Decoder, Token Scanner, Wallet Score, Risk Scanner, Portfolio Tracker and Project Radar.
