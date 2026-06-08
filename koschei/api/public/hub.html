@@ -107,6 +107,16 @@
     }
     .module-name { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
     .module-desc { color: var(--text2); font-size: 14.5px; line-height: 1.65; }
+    .pro-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #00ff88, #69d8ff);
+      color: #04110b;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 999px;
+      margin-left: 8px;
+    }
 
     /* Responsive */
     @media (max-width: 900px) {
@@ -141,18 +151,18 @@
     <div class="hero">
       <div class="surface" style="padding:40px; border-radius:24px;">
         <div style="display:inline-block; background:rgba(0,255,136,.1); color:#a3ffcc; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:700; margin-bottom:16px;">
-          AUTHENTICATED WORKSPACE
+          PRO MEMBER WORKSPACE
         </div>
         <h1><span class="gradient-text">Your Koschei<br>Web3 command center.</span></h1>
         <p style="color:var(--text2); font-size:17px; max-width:520px; line-height:1.7;">
-          Manage your workspace across three layers: Security, Intelligence, and Automation & Agents.
+          Full access to all Security, Intelligence, and Automation layers.
         </p>
       </div>
 
       <div class="surface" style="padding:28px; border-radius:24px;">
         <div style="font-size:13px; color:var(--text2); font-weight:600;">SIGNED IN AS</div>
         <div id="userEmail" style="font-size:20px; font-weight:700; margin-top:6px;">Loading...</div>
-        <div style="margin-top:20px; font-size:13px; color:var(--text2);">No private keys · Read-only tooling</div>
+        <div style="margin-top:20px; font-size:13px; color:var(--text2);">Pro Member · No private keys</div>
       </div>
     </div>
 
@@ -160,7 +170,7 @@
     <div class="stats">
       <div class="stat surface">
         <div style="font-size:12px; color:var(--text2); font-weight:600;">PLAN</div>
-        <div class="stat-value" id="userPlan">free</div>
+        <div class="stat-value" id="userPlan">PRO</div>
       </div>
       <div class="stat surface">
         <div style="font-size:12px; color:var(--text2); font-weight:600;">OUTPUTS LEFT</div>
@@ -182,8 +192,8 @@
 
     <!-- SECURITY LAYER -->
     <div id="security" class="layer-section">
-      <h2 style="margin:0 0 8px; font-size:26px;">🛡️ Security Layer</h2>
-      <p style="color:var(--text2); margin-bottom:20px;">Quick protection and risk detection tools.</p>
+      <h2 style="margin:0 0 8px; font-size:26px;">🛡️ Security Layer <span class="pro-badge">PRO</span></h2>
+      <p style="color:var(--text2); margin-bottom:20px;">Full access to all protection and risk detection tools.</p>
 
       <div class="modules">
         <a href="/wallet-score.html" class="module-card surface">
@@ -207,8 +217,8 @@
 
     <!-- INTELLIGENCE LAYER -->
     <div id="intelligence" class="layer-section" style="margin-top:50px;">
-      <h2 style="margin:0 0 8px; font-size:26px;">🔍 Intelligence Layer</h2>
-      <p style="color:var(--text2); margin-bottom:20px;">Deep analysis and research tools for builders.</p>
+      <h2 style="margin:0 0 8px; font-size:26px;">🔍 Intelligence Layer <span class="pro-badge">PRO</span></h2>
+      <p style="color:var(--text2); margin-bottom:20px;">Deep analysis and research tools for serious builders.</p>
 
       <div class="modules">
         <a href="/project-radar.html" class="module-card surface">
@@ -232,8 +242,8 @@
 
     <!-- AUTOMATION & AGENT LAYER -->
     <div id="automation" class="layer-section" style="margin-top:50px;">
-      <h2 style="margin:0 0 8px; font-size:26px;">🤖 Automation & Agent Layer</h2>
-      <p style="color:var(--text2); margin-bottom:20px;">AI agents and automation tools for advanced users.</p>
+      <h2 style="margin:0 0 8px; font-size:26px;">🤖 Automation & Agent Layer <span class="pro-badge">PRO</span></h2>
+      <p style="color:var(--text2); margin-bottom:20px;">AI agents and advanced automation tools.</p>
 
       <div class="modules">
         <a href="/agent-api.html" class="module-card surface">
@@ -257,6 +267,9 @@
         await KoscheiAuth.init();
         if (!KoscheiAuth.requireAuth()) return;
         document.getElementById('userEmail').textContent = KoscheiAuth.getEmail() || '';
+        // Force Pro plan display
+        const planEl = document.getElementById('userPlan');
+        if (planEl) planEl.textContent = 'PRO';
       })();
     </script>
   </div>
