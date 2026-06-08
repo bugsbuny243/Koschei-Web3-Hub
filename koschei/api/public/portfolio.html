@@ -1,17 +1,76 @@
 <!doctype html>
-<html lang="en"><head>
+<html lang="en">
+<head>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-1QFWMJJC3');
 </script>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/koschei.css"><title>Solana Portfolio Tracker — Multi-wallet | Koschei</title>
-<meta name="description" content="Track SOL and token balances across multiple Solana wallets. Free portfolio overview, no wallet connection needed.">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/css/koschei.css?v=portfolio-pro">
+<title>Solana Portfolio Tracker — Multi-wallet | Koschei</title>
+<meta name="description" content="Track SOL balances, token lists, total portfolio balance, and asset distribution across multiple Solana wallets. Public read-only analysis only.">
 <meta property="og:title" content="Portfolio Tracker | Koschei">
 <meta property="og:url" content="https://tradepigloball.co/portfolio.html">
-<meta name="twitter:card" content="summary_large_image"><style>.hero{padding:32px;background:linear-gradient(135deg,#111118,#13231d);border:1px solid #2a2a3a;border-radius:16px;margin-bottom:20px}.stack{display:grid;gap:16px}textarea.form-input{resize:vertical}pre{white-space:pre-wrap;overflow:auto;color:#c7f9df}.notice{color:var(--text2);font-size:13px}</style></head>
-<body><nav class="nav"><a class="nav-logo" href="/hub">K Koschei</a><div class="nav-links"><a class="nav-link" href="/hub">Hub</a><a class="nav-link" href="/docs">Docs</a><a class="nav-link" href="/account">Account</a></div></nav><main class="page"><section class="hero"><span class="badge badge-green">💼 Solana intelligence</span><h1>Portfolio Tracker</h1><p>Track public SOL balances, token-account counts, and recent activity across up to ten wallets.</p></section><form id="form" class="card stack"><label class="form-label">Wallet addresses<textarea class="form-input" id="addresses" rows="5" required placeholder="One public wallet address per line"></textarea></label><label class="form-label">Network<select class="form-input" name="network"><option value="solana-mainnet">Mainnet</option><option value="solana-devnet">Devnet</option><option value="solana-testnet">Testnet</option></select></label><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary">Track portfolio</button><button type="button" class="btn btn-ghost" id="example">Load example</button></div><p class="notice">Never enter private keys or seed phrases. Results are preliminary and are not financial advice.</p></form><section class="card" style="margin-top:20px"><h2>Result</h2><pre id="out">Submit public on-chain data to begin.</pre></section></main><script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=1"></script><script>(async()=>{await KoscheiAuth.init();if(!KoscheiAuth.requireAuth('/login'))return;example.onclick=()=>{out.textContent=JSON.stringify({demo:true,title:'Demo example',message:'Demo example — no backend execution, no credit decrement, and no paid output saved.'},null,2)};form.onsubmit=async e=>{e.preventDefault();out.textContent='Loading on-chain signals…';let body=Object.fromEntries(new FormData(form));body.addresses=document.getElementById('addresses').value.split(/\n|,/).map(v=>v.trim()).filter(Boolean);try{let r=await KoscheiAuth.apiCall('/api/portfolio/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let data=await r.json();if(!r.ok&&data.error==='insufficient_outputs'){out.innerHTML='Not enough credits. Buy credits to run real tools. <a class="btn btn-ghost" href="/pricing">View Pricing</a>';return}out.textContent=JSON.stringify(data,null,2)}catch(err){out.textContent=JSON.stringify({error:err.message||'Request failed'},null,2)}}})()</script></body></html>
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  .portfolio-hero{padding:32px;background:radial-gradient(circle at 20% 0%,rgba(0,255,136,.2),transparent 32%),linear-gradient(135deg,#111118,#13231d);border:1px solid rgba(0,255,136,.22);border-radius:22px;margin-bottom:20px}
+  .portfolio-hero h1{font-size:clamp(30px,5vw,52px);line-height:1.05;margin:12px 0 8px}.stack{display:grid;gap:16px}textarea.form-input{resize:vertical}pre{white-space:pre-wrap;overflow:auto;color:#c7f9df}.notice{color:var(--text2);font-size:13px}.portfolio-shell{display:grid;grid-template-columns:.85fr 1.15fr;gap:16px}.metric-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.asset-list{display:grid;gap:10px}.asset-row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:12px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.025)}.asset-row small{color:var(--text2);overflow-wrap:anywhere}.distribution-bar{height:10px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.distribution-bar span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}@media(max-width:850px){.portfolio-shell,.metric-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav class="nav"><a class="nav-logo" href="/hub">K Koschei</a><div class="nav-links"><a class="nav-link" href="/hub">Hub</a><a class="nav-link" href="/docs">Docs</a><a class="nav-link" href="/account">Account</a></div></nav>
+<main class="page">
+  <section class="portfolio-hero">
+    <span class="badge badge-green">💼 Solana intelligence</span><span class="badge badge-blue">Portfolio Pro</span>
+    <h1>Portfolio Tracker</h1>
+    <p class="premium-copy">Track public SOL balances, token-account lists, total balance, recent wallet activity, and asset distribution across up to ten wallets.</p>
+  </section>
+  <div class="portfolio-shell">
+    <form id="form" class="card stack">
+      <div class="premium-panel-title"><h2>Wallet input</h2><span class="risk-badge risk-unknown">read-only</span></div>
+      <label class="form-label">Wallet addresses<textarea class="form-input" id="addresses" rows="5" required placeholder="One public wallet address per line"></textarea></label>
+      <label class="form-label">Network<select class="form-input" name="network"><option value="solana-mainnet">Mainnet</option><option value="solana-devnet">Devnet</option><option value="solana-testnet">Testnet</option></select></label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary">Track portfolio</button><button type="button" class="btn btn-ghost" id="example">Load example</button></div>
+      <p class="notice">Never enter private keys or seed phrases. Results are preliminary and are not financial advice.</p>
+    </form>
+    <section class="card stack">
+      <div class="premium-panel-title"><h2>Portfolio intelligence</h2><span id="status" class="risk-badge risk-unknown">Waiting</span></div>
+      <div class="metric-row">
+        <div class="result-item"><b>Total SOL</b><span id="totalSol">—</span></div>
+        <div class="result-item"><b>Assets</b><span id="assetCount">—</span></div>
+        <div class="result-item"><b>Wallets</b><span id="walletCount">—</span></div>
+      </div>
+      <div><h3>SOL + token list</h3><div id="assets" class="asset-list"><p class="premium-note">Submit public wallets or load the demo.</p></div></div>
+      <div><h3>Asset distribution</h3><div id="distribution" class="asset-list"></div></div>
+      <pre id="out">Submit public on-chain data to begin.</pre>
+    </section>
+  </div>
+</main>
+<script src="/js/koschei-auth.js?v=4"></script>
+<script src="/js/koschei-analytics.js?v=1"></script>
+<script>
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function renderPortfolio(data) {
+  status.textContent = data.demo ? 'Demo' : 'Live result';
+  status.className = 'risk-badge risk-low';
+  totalSol.textContent = `${data.total_balance_sol ?? 0} SOL`;
+  assetCount.textContent = data.asset_count ?? (data.assets || []).length;
+  walletCount.textContent = (data.wallets || []).length;
+  assets.innerHTML = (data.assets || []).map(a => `<div class="asset-row"><div><b>${esc(a.symbol || 'Asset')}</b><br><small>${esc(a.mint || '')}</small></div><div>${esc(a.amount_text || a.amount || '0')}</div></div>`).join('') || '<p class="premium-note">No assets returned.</p>';
+  distribution.innerHTML = (data.asset_distribution || []).map(d => `<div class="asset-row"><div><b>${esc(d.label)}</b><div class="distribution-bar"><span style="width:${Math.max(3, Math.min(100, Number(d.share_percent)||0))}%"></span></div></div><div>${esc(d.share_percent)}%</div></div>`).join('') || '<p class="premium-note">Distribution unavailable.</p>';
+  out.textContent = JSON.stringify(data, null, 2);
+}
+(async()=>{
+  await KoscheiAuth.init();
+  if(!KoscheiAuth.requireAuth('/login'))return;
+  example.onclick=()=>renderPortfolio({demo:true,network:'solana-mainnet',total_balance_sol:12.48,asset_count:4,summary:'Demo portfolio with SOL plus three token positions.',wallets:[{address:'DemoWallet111...',balance_sol:12.48,token_count:3,recent_tx_count:18}],assets:[{symbol:'SOL',mint:'native',amount_text:'12.4800 SOL',share_percent:76},{symbol:'JUP',mint:'JUP…Demo',amount_text:'420.00',share_percent:8},{symbol:'BONK',mint:'BONK…Demo',amount_text:'1200000',share_percent:8},{symbol:'USDC',mint:'USDC…Demo',amount_text:'96.50',share_percent:8}],asset_distribution:[{label:'SOL',share_percent:76},{label:'JUP',share_percent:8},{label:'BONK',share_percent:8},{label:'USDC',share_percent:8}]});
+  form.onsubmit=async e=>{e.preventDefault();status.textContent='Loading';status.className='risk-badge risk-medium';out.textContent='Loading on-chain signals…';let body=Object.fromEntries(new FormData(form));body.addresses=document.getElementById('addresses').value.split(/\n|,/).map(v=>v.trim()).filter(Boolean);try{let r=await KoscheiAuth.apiCall('/api/portfolio/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});let data=await r.json();if(!r.ok&&data.error==='insufficient_outputs'){out.innerHTML='Not enough credits. Buy credits to run real tools. <a class="btn btn-ghost" href="/pricing">View Pricing</a>';status.textContent='Credits needed';return}renderPortfolio(data)}catch(err){status.textContent='Error';status.className='risk-badge risk-high';out.textContent=JSON.stringify({error:err.message||'Request failed'},null,2)}};
+})();
+</script>
+</body>
+</html>

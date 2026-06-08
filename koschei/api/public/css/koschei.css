@@ -91,3 +91,19 @@ html, body { background: var(--bg); color: var(--text); font-family: var(--font)
 .premium-table th { color:var(--text2); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
 textarea.form-input { min-height: 110px; resize: vertical; }
 @media (max-width: 850px) { .premium-grid, .premium-form-grid, .result-grid { grid-template-columns: 1fr; } .premium-hero { padding:24px; } .nav-links { flex-wrap:wrap; justify-content:flex-end; } }
+.activity-bars { display:flex; align-items:end; gap:10px; min-height:150px; padding:14px 6px 4px; border:1px solid var(--border); border-radius:14px; background:rgba(255,255,255,.025); }
+.activity-bar { flex:1; min-width:42px; height:124px; display:grid; grid-template-rows:1fr auto auto; align-items:end; text-align:center; color:var(--text2); font-size:11px; }
+.activity-bar span { width:100%; border-radius:10px 10px 4px 4px; background:linear-gradient(180deg,var(--accent),var(--accent2)); box-shadow:0 0 18px rgba(0,255,136,.16); }
+.activity-bar em { font-style:normal; margin-top:6px; }
+.activity-bar strong { color:var(--text); font-size:12px; }
+.chain-status-grid { grid-column:1/-1; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.chain-card { padding:16px; border-radius:16px; border:1px solid var(--border); background:rgba(255,255,255,.03); display:grid; gap:8px; }
+.chain-card div { display:flex; justify-content:space-between; gap:10px; }
+.chain-card b { text-transform:capitalize; }
+.chain-card div span { color:var(--text2); font-size:12px; }
+.chain-card strong { width:max-content; border-radius:999px; padding:4px 9px; font-size:11px; letter-spacing:.06em; }
+.chain-online { border-color:rgba(0,255,136,.28); box-shadow:0 0 24px rgba(0,255,136,.08); }
+.chain-online strong { color:var(--accent); background:rgba(0,255,136,.1); }
+.chain-offline { border-color:rgba(255,68,102,.32); }
+.chain-offline strong { color:var(--danger); background:rgba(255,68,102,.12); }
+@media (max-width: 850px) { .chain-status-grid { grid-template-columns:1fr; } .activity-bars { overflow:auto; } }
