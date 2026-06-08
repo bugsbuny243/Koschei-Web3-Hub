@@ -371,28 +371,39 @@ SİSTEM TARAMA DURUMU: %s`, string(summaryBytes), string(scanBytes))
 }
 
 func adminChatAnswer(message string, summary adminSummary, summaryErr error, scan adminScan) string {
+	lower := strings.ToLower(strings.TrimSpace(message))
 	if summaryErr != nil {
-		return fmt.Sprintf("Manual mode is available, but the admin summary could not be loaded: %v", summaryErr)
+		return fmt.Sprintf("Kanka, summary verisini şu an okuyamadım ama system scan status: %s. Admin panel read-only modda güvenli çalışıyor.", scan.Status)
 	}
-
-	normalized := strings.ToLower(strings.TrimSpace(message))
-	statusLine := fmt.Sprintf("System scan status is %s.", scan.Status)
-	if scan.Status == "healthy" || scan.Status == "" {
-		statusLine = "System scan found no warnings."
+	base := fmt.Sprintf("Kanka canlı admin context açık. Totals: %d analytics events, %d outputs, %d web3 events. System scan status: %s.", summary.AnalyticsEventsCount, summary.Web3OutputsCount, summary.Web3EventsCount, scan.Status)
+	if strings.Contains(lower, "tara") || strings.Contains(lower, "scan") || strings.Contains(lower, "hata") || strings.Contains(lower, "error") {
+		warnings := 0
+		for _, check := range scan.Checks {
+			if check.Status != "ok" {
+				warnings++
+			}
+		}
+		if warnings == 0 {
+			return fmt.Sprintf("System scan found no warnings. Genel durum %s; kritik tablo/env kontrolü temiz görünüyor.", scan.Status)
+		}
+		return fmt.Sprintf("System scan found %d warning(s). Genel durum %s; health sekmesinden detaylara bakmalısın.", warnings, scan.Status)
 	}
-
-	switch {
-	case strings.Contains(normalized, "sistemi tara") || strings.Contains(normalized, "scan"):
-		return statusLine
-	case strings.Contains(normalized, "ödeme") || strings.Contains(normalized, "odeme") || strings.Contains(normalized, "payment"):
-		return fmt.Sprintf("%d pending payment request(s) need review.", summary.PendingPaymentRequestsCount)
-	case strings.Contains(normalized, "watchlist"):
-		return fmt.Sprintf("Watchlist has %d watchlist source(s) and %d web3 event(s).", summary.WatchlistSourcesCount, summary.Web3EventsCount)
-	case strings.Contains(normalized, "alchemy") || strings.Contains(normalized, "chain"):
-		return fmt.Sprintf("Chain monitoring has %d chain health log(s). %s", summary.ChainHealthLogsCount, statusLine)
-	default:
-		return fmt.Sprintf("Totals: %d analytics events, %d outputs, %d web3 events. %s", summary.AnalyticsEventsCount, summary.Web3OutputsCount, summary.Web3EventsCount, statusLine)
+	if strings.Contains(lower, "ödeme") || strings.Contains(lower, "payment") {
+		return fmt.Sprintf("%d pending payment request(s) var. Onay/red işlemi Payments tabından yapılmalı; chat sadece read-only bilgi veriyor.", summary.PendingPaymentRequestsCount)
 	}
+	if strings.Contains(lower, "watchlist") {
+		return fmt.Sprintf("Watchlist tarafında %d watchlist source(s) and %d web3 event(s) kayıtlı. Kaynaklar API polling ile public/read-only veri topluyor.", summary.WatchlistSourcesCount, summary.Web3EventsCount)
+	}
+	if strings.Contains(lower, "alchemy") || strings.Contains(lower, "chain") {
+		return fmt.Sprintf("Alchemy/chain tarafında %d chain health log(s) var. Son 24 saatte %d başarılı, %d failed check görünüyor.", summary.ChainHealthLogsCount, summary.ChainChecks24h, summary.FailedChecks24h)
+	}
+	if strings.Contains(lower, "user") || strings.Contains(lower, "kullanıcı") || strings.Contains(lower, "üye") {
+		return fmt.Sprintf("Kullanıcı tarafı: %d registered, %d paid, %d free, %d active today. Kredi kalan toplam: %d.", summary.TotalRegisteredUsers, summary.PaidMembers, summary.FreeMembers, summary.ActiveUsersToday, summary.TotalOutputsRemaining)
+	}
+	if strings.Contains(lower, "bugün") || strings.Contains(lower, "today") || strings.Contains(lower, "summary") || strings.Contains(lower, "özet") {
+		return base
+	}
+	return base + " İstersen 'system scan', 'payments pending?', 'watchlist working?', 'alchemy working?' veya 'users summary' diye sorabilirsin."
 }
 
 // LLM'e HTTP isteği atan yardımcı fonksiyon
