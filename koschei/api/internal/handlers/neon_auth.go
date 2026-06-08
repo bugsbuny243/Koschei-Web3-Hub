@@ -1,279 +1,147 @@
 package handlers
 
 import (
-	"context"
-	"crypto"
-	"crypto/ed25519"
-	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/base64"
+	"bytes"
 	"encoding/json"
-	"errors"
-	"log"
-	"math/big"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
-type neonJWTClaims struct {
-	Sub   string `json:"sub"`
-	Email string `json:"email"`
-	Iss   string `json:"iss"`
-	Aud   any    `json:"aud"`
-	Exp   int64  `json:"exp"`
-}
-
-type userProfile struct {
-	ID, AuthSubject, Email, Role, PlanID string
-	Credits                              int
-}
-type neonJWKSDoc struct {
-	Keys []neonJWK `json:"keys"`
-}
-type neonJWK struct {
-	Kid string `json:"kid"`
-	Kty string `json:"kty"`
-	Alg string `json:"alg"`
-	N   string `json:"n"`
-	E   string `json:"e"`
-	Crv string `json:"crv"`
-	X   string `json:"x"`
-}
-
-type neonJWTFailureCategory string
-
-const (
-	neonJWTFailureNonJWTToken       neonJWTFailureCategory = "non_jwt_token"
-	neonJWTFailureMissingKID        neonJWTFailureCategory = "missing_kid"
-	neonJWTFailureJWKSKeyNotFound   neonJWTFailureCategory = "jwks_key_not_found"
-	neonJWTFailureIssuerMismatch    neonJWTFailureCategory = "issuer_mismatch"
-	neonJWTFailureExpiredToken      neonJWTFailureCategory = "expired_token"
-	neonJWTFailureMissingEmailClaim neonJWTFailureCategory = "missing_email_claim"
-	neonJWTFailureInvalidSignature  neonJWTFailureCategory = "invalid_signature"
-	neonJWTFailureUnknown           neonJWTFailureCategory = "unknown"
-)
-
-type neonJWTVerificationError struct {
-	Category neonJWTFailureCategory
-	Cause    error
-}
-
-func (e neonJWTVerificationError) Error() string {
-	if e.Cause == nil {
-		return string(e.Category)
+// Neon Auth endpoint'leri
+func (h *Handler) NeonSignUp(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Name     string `json:"name"`
 	}
-	return string(e.Category) + ": " + e.Cause.Error()
-}
-
-func (e neonJWTVerificationError) Unwrap() error { return e.Cause }
-
-var (
-	jwksCache map[string]neonJWK
-	jwksMu    sync.RWMutex
-)
-
-func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
-	return neonClaimsFromToken(token)
-}
-
-func trimSlash(s string) string {
-	return strings.TrimRight(strings.TrimSpace(s), "/")
-}
-
-func configuredIssuer() string {
-	return trimSlash(configuredNeonAuthIssuer())
-}
-
-func jwtVerifyError(category neonJWTFailureCategory, err error) error {
-	return neonJWTVerificationError{Category: category, Cause: err}
-}
-
-func neonClaimsFromToken(token string) (neonJWTClaims, error) {
-	var out neonJWTClaims
-	if !tokenLooksLikeJWT(token) {
-		return out, jwtVerifyError(neonJWTFailureNonJWTToken, errors.New("token is not three JWT segments"))
+	if err := decodeJSON(r, &req); err != nil || req.Email == "" || req.Password == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		return
 	}
-	parts := strings.Split(token, ".")
-	headerRaw, err := base64.RawURLEncoding.DecodeString(parts[0])
+
+	neonURL := strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL"))
+	if neonURL == "" {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "neon_auth_not_configured"})
+		return
+	}
+
+	// Neon Auth'a istek at
+	payload := map[string]any{
+		"email":    req.Email,
+		"password": req.Password,
+		"name":     req.Name,
+	}
+	body, _ := json.Marshal(payload)
+
+	resp, err := http.Post(neonURL+"/sign-up/email", "application/json", bytes.NewReader(body))
 	if err != nil {
-		return out, jwtVerifyError(neonJWTFailureUnknown, err)
-	}
-	var header map[string]any
-	if err := json.Unmarshal(headerRaw, &header); err != nil {
-		return out, jwtVerifyError(neonJWTFailureUnknown, err)
-	}
-	kid, _ := header["kid"].(string)
-	alg, _ := header["alg"].(string)
-	if strings.TrimSpace(kid) == "" {
-		return out, jwtVerifyError(neonJWTFailureMissingKID, errors.New("JWT header missing kid"))
-	}
-	if strings.TrimSpace(alg) == "" {
-		return out, jwtVerifyError(neonJWTFailureUnknown, errors.New("JWT header missing alg"))
-	}
-	jwk, err := loadJWKSKey(kid)
-	if err != nil {
-		return out, jwtVerifyError(neonJWTFailureJWKSKeyNotFound, err)
-	}
-	signingInput := []byte(parts[0] + "." + parts[1])
-	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
-	if err != nil {
-		return out, jwtVerifyError(neonJWTFailureInvalidSignature, err)
-	}
-	switch alg {
-	case "RS256":
-		pub, err := rsaPublicKeyFromJWK(jwk)
-		if err != nil {
-			return out, jwtVerifyError(neonJWTFailureJWKSKeyNotFound, err)
-		}
-		h := sha256.Sum256(signingInput)
-		if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, h[:], sig); err != nil {
-			return out, jwtVerifyError(neonJWTFailureInvalidSignature, err)
-		}
-	case "EdDSA":
-		pub, err := ed25519PublicKeyFromJWK(jwk)
-		if err != nil {
-			return out, jwtVerifyError(neonJWTFailureJWKSKeyNotFound, err)
-		}
-		if !ed25519.Verify(pub, signingInput, sig) {
-			return out, jwtVerifyError(neonJWTFailureInvalidSignature, errors.New("signature verification failed"))
-		}
-	default:
-		return out, jwtVerifyError(neonJWTFailureInvalidSignature, errors.New("unsupported JWT signing algorithm"))
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return out, jwtVerifyError(neonJWTFailureUnknown, err)
-	}
-	if err := json.Unmarshal(payload, &out); err != nil {
-		return out, jwtVerifyError(neonJWTFailureUnknown, err)
-	}
-	if out.Exp < time.Now().Unix() {
-		return out, jwtVerifyError(neonJWTFailureExpiredToken, errors.New("JWT is expired"))
-	}
-	if strings.TrimSpace(out.Email) == "" {
-		return out, jwtVerifyError(neonJWTFailureMissingEmailClaim, errors.New("JWT missing email claim"))
-	}
-	if strings.TrimSpace(out.Sub) == "" {
-		return out, jwtVerifyError(neonJWTFailureUnknown, errors.New("JWT missing sub claim"))
-	}
-	if issuer := configuredIssuer(); issuer != "" && trimSlash(out.Iss) != issuer {
-		return out, jwtVerifyError(neonJWTFailureIssuerMismatch, errors.New("JWT issuer does not match NEON_AUTH_ISSUER"))
-	}
-	aud := trimSlash(os.Getenv("NEON_AUTH_AUDIENCE"))
-	if aud != "" && !matchesAudience(out.Aud, aud) {
-		return out, jwtVerifyError(neonJWTFailureUnknown, errors.New("invalid audience"))
-	}
-	return out, nil
-}
-
-func loadJWKSKey(kid string) (neonJWK, error) {
-	jwksMu.RLock()
-	if k, ok := jwksCache[kid]; ok {
-		jwksMu.RUnlock()
-		return k, nil
-	}
-	jwksMu.RUnlock()
-	jwksURL := strings.TrimSpace(configuredNeonAuthJWKSURL())
-	if jwksURL == "" && !isProduction() {
-		baseURL := strings.TrimSpace(configuredNeonAuthBaseURL())
-		if baseURL != "" {
-			jwksURL = strings.TrimRight(baseURL, "/") + "/.well-known/jwks.json"
-		}
-	}
-	if jwksURL == "" {
-		return neonJWK{}, errors.New("jwks missing")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, jwksURL, nil)
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return neonJWK{}, err
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "neon_auth_request_failed"})
+		return
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode/100 != 2 {
-		return neonJWK{}, errors.New("jwks unavailable")
-	}
-	var doc neonJWKSDoc
-	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
-		return neonJWK{}, err
-	}
-	cache := map[string]neonJWK{}
-	for _, key := range doc.Keys {
-		if key.Kid == "" {
-			continue
-		}
-		cache[key.Kid] = key
-	}
-	jwksMu.Lock()
-	jwksCache = cache
-	k := jwksCache[kid]
-	jwksMu.Unlock()
-	if k.Kid == "" {
-		return neonJWK{}, errors.New("unknown key")
-	}
-	return k, nil
-}
 
-func rsaPublicKeyFromJWK(key neonJWK) (*rsa.PublicKey, error) {
-	if key.Kty != "RSA" || key.N == "" || key.E == "" {
-		return nil, errors.New("invalid rsa jwk")
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": "neon_auth_error", "detail": string(respBody)})
+		return
 	}
-	nBytes, errN := base64.RawURLEncoding.DecodeString(key.N)
-	eBytes, errE := base64.RawURLEncoding.DecodeString(key.E)
-	if errN != nil || errE != nil {
-		return nil, errors.New("invalid rsa jwk")
-	}
-	eInt := 0
-	for _, b := range eBytes {
-		eInt = eInt<<8 + int(b)
-	}
-	if eInt <= 0 {
-		return nil, errors.New("invalid rsa jwk")
-	}
-	return &rsa.PublicKey{N: new(big.Int).SetBytes(nBytes), E: eInt}, nil
-}
 
-func ed25519PublicKeyFromJWK(key neonJWK) (ed25519.PublicKey, error) {
-	if key.Kty != "OKP" || key.Crv != "Ed25519" || key.X == "" {
-		return nil, errors.New("invalid eddsa jwk")
+	// Neon'dan dönen JWT'yi al
+	var neonResp struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
 	}
-	xBytes, err := base64.RawURLEncoding.DecodeString(key.X)
-	if err != nil || len(xBytes) != ed25519.PublicKeySize {
-		return nil, errors.New("invalid eddsa jwk")
+	if err := json.Unmarshal(respBody, &neonResp); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "neon_response_parse_failed"})
+		return
 	}
-	return ed25519.PublicKey(xBytes), nil
-}
 
-func matchesAudience(v any, target string) bool {
-	if s, ok := v.(string); ok {
-		return s == target
-	}
-	if arr, ok := v.([]any); ok {
-		for _, it := range arr {
-			if s, ok := it.(string); ok && s == target {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (h *Handler) upsertProfile(ctx context.Context, subject, email string) (userProfile, error) {
-	profile, err := h.upsertAppProfile(ctx, subject, email)
-	out := userProfile{
-		ID:          profile.ID,
-		AuthSubject: profile.AuthSubject,
-		Email:       profile.Email,
-		Role:        profile.Role,
-		PlanID:      profile.Plan,
-		Credits:     profile.Credits,
-	}
+	// JWT'yi doğrula
+	claims, err := parseAndVerifyNeonJWT(neonResp.AccessToken)
 	if err != nil {
-		log.Printf("upsertProfile failed: %v", err)
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_jwt"})
+		return
 	}
-	return out, err
+
+	// Kullanıcıyı veritabanına kaydet (idempotent)
+	_, _ = h.DB.Exec(`
+		INSERT INTO app_user_profiles (auth_subject, email, role, plan_id, credits)
+		VALUES ($1, $2, 'user', 'free', 10)
+		ON CONFLICT (email) DO NOTHING
+	`, claims.Sub, strings.ToLower(claims.Email))
+
+	_, _ = h.DB.Exec(`
+		INSERT INTO entitlements (email, plan_id, outputs_total, outputs_remaining, status)
+		VALUES ($1, 'free', 10, 10, 'active')
+		ON CONFLICT DO NOTHING
+	`, strings.ToLower(claims.Email))
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":           true,
+		"access_token": neonResp.AccessToken,
+		"token_type":   "Bearer",
+		"email":        claims.Email,
+	})
+}
+
+func (h *Handler) NeonSignIn(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := decodeJSON(r, &req); err != nil || req.Email == "" || req.Password == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		return
+	}
+
+	neonURL := strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL"))
+	if neonURL == "" {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "neon_auth_not_configured"})
+		return
+	}
+
+	payload := map[string]any{
+		"email":    req.Email,
+		"password": req.Password,
+	}
+	body, _ := json.Marshal(payload)
+
+	resp, err := http.Post(neonURL+"/sign-in/email", "application/json", bytes.NewReader(body))
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "neon_auth_request_failed"})
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid_credentials"})
+		return
+	}
+
+	var neonResp struct {
+		AccessToken string `json:"access_token"`
+		TokenType   string `json:"token_type"`
+	}
+	if err := json.Unmarshal(respBody, &neonResp); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "neon_response_parse_failed"})
+		return
+	}
+
+	claims, err := parseAndVerifyNeonJWT(neonResp.AccessToken)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_jwt"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":           true,
+		"access_token": neonResp.AccessToken,
+		"token_type":   "Bearer",
+		"email":        claims.Email,
+	})
 }
