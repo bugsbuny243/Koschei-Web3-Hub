@@ -1,169 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Risk Scanner — Koschei Web3 Hub</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #050812;
-      --surface: rgba(255,255,255,.08);
-      --line: rgba(255,255,255,.16);
-      --text: #f7fbff;
-      --text2: #a9b8d6;
-      --accent: #00ff88;
-      --danger: #ff5c7c;
-      --warning: #facc15;
-      --success: #22c55e;
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Risk Scanner — Koschei Pro</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>
+:root{--bg:#050812;--surface:rgba(255,255,255,.08);--line:rgba(255,255,255,.16);--text:#f7fbff;--text2:#a9b8d6;--accent:#00ff88;--accent2:#69d8ff;--danger:#ff5c7c;--warn:#facc15}*{box-sizing:border-box}body{background:radial-gradient(circle at top left,rgba(0,255,136,.16),transparent 34%),var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;margin:0}.container{max-width:980px;margin:0 auto;padding:32px 20px 64px}.nav{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:32px}.nav a{color:var(--text2);text-decoration:none;font-weight:700}.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:28px;margin-top:18px}h1{font-size:42px;margin:0 0 10px}.badge{display:inline-block;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b;font-size:12px;font-weight:900;padding:5px 12px;border-radius:999px;margin-left:10px}.sub{color:var(--text2);max-width:760px;line-height:1.7}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.field{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}label{font-weight:800;font-size:14px}input,textarea,select{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);font:inherit}textarea{min-height:110px}button,.btn{padding:14px 24px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b;font-weight:900;border:0;cursor:pointer;text-decoration:none;display:inline-block}.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--line)}button:disabled{opacity:.65;cursor:wait}.alert{display:none;padding:14px 16px;border-radius:12px;margin-top:16px}.alert.show{display:block}.alert.error{background:rgba(255,92,124,.12);border:1px solid rgba(255,92,124,.5);color:#ffd6de}.alert.credit{background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.5);color:#fff0aa}.result{white-space:pre-wrap;overflow:auto;background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:16px;padding:18px;max-height:620px;color:#dce8ff}.notice{font-size:13px;color:var(--text2);line-height:1.6}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}@media(max-width:700px){h1{font-size:32px}.nav{flex-direction:column;align-items:flex-start}}
+</style></head>
+<body><main class="container"><nav class="nav"><a href="/hub">← Koschei Hub</a><div><a href="/pricing">Buy credits</a> · <a href="/account">Account</a></div></nav><header><h1>Risk Scanner<span class="badge">PRO</span></h1><p class="sub">Wallet, token, contract veya proje hedefi için genel risk kontrol listesi ve aksiyon önerileri üretir.</p><p class="notice">Production mode: no demo or fabricated data. Every run requires authentication, live backend processing, and module-specific credits. Never enter private keys or seed phrases.</p></header><section class="card"><form id="toolForm"><div class="field"><label for="target">Target</label><input id="target" name="target" type="text" placeholder="Wallet, token, contract, project URL or name"></div><div class="field"><label for="notes">Context / notes</label><textarea id="notes" name="notes" placeholder="Optional context"></textarea></div><button id="submit" type="submit">Run risk scan</button></form><div id="message" class="alert"></div><div id="result" class="result" style="display:none"></div></section><section class="card"><strong>Credit cost:</strong> This module has its own credit gate. If you do not have enough credits, the API returns the required and available credit counts.</section></main><script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=4"></script><script>
+const endpoint = '/api/risk/scan';
+const form = document.getElementById('toolForm');
+const submit = document.getElementById('submit');
+const msg = document.getElementById('message');
+const result = document.getElementById('result');
+function showMessage(text, cls='error'){msg.className='alert show '+cls;msg.textContent=text;}
+function clearMessage(){msg.className='alert';msg.textContent='';}
+(async()=>{await KoscheiAuth.init(); KoscheiAuth.requireAuth('/login'); if(window.KoscheiAnalytics) KoscheiAnalytics.track('risk_view');})();
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault(); clearMessage(); result.style.display='none'; submit.disabled=true; submit.textContent='Working…';
+  try{
+
+      const body = Object.fromEntries(new FormData(form).entries());
+      if (body.addresses) body.addresses = body.addresses.split(/\n|,/).map(v => v.trim()).filter(Boolean);
+    
+    const res = await KoscheiAuth.apiCall(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const data = await res.json().catch(()=>({error:'invalid_response'}));
+    if(!res.ok){
+      if(res.status===402 || data.error==='insufficient_outputs') showMessage(`Insufficient credits. Required: ${data.required_credits ?? '?'}, available: ${data.available_credits ?? 0}.`, 'credit');
+      else showMessage(data.message || data.error || 'Request failed.');
+      return;
     }
-    body { background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; margin:0; }
-    .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
-    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px; }
-    h1 { font-size: 36px; margin-bottom: 8px; }
-    .input-group { display: flex; gap: 12px; margin: 24px 0; }
-    input, textarea { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--text); font-size: 15px; }
-    button { padding: 14px 28px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), #00ccff); color: #04110b; font-weight: 700; border: none; cursor: pointer; }
-    .result { margin-top: 32px; display: none; }
-    .result.show { display: block; }
-    .risk-badge { padding: 6px 16px; border-radius: 999px; font-size: 14px; font-weight: 700; display: inline-block; }
-    .risk-low { background: rgba(34,197,94,.15); color: #22c55e; }
-    .risk-medium { background: rgba(250,204,21,.15); color: #facc15; }
-    .risk-high { background: rgba(239,68,68,.15); color: #ef4444; }
-    .section { margin-top: 24px; }
-    ul { padding-left: 20px; color: var(--text2); line-height: 1.7; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Risk Scanner</h1>
-    <p style="color:var(--text2); max-width:620px;">
-      Analyze any project, wallet, or smart contract for on-chain risk signals.
-    </p>
-
-    <div class="card">
-      <div>
-        <label style="font-weight:600; font-size:14px;">Target (Project name, Wallet, or Contract)</label>
-        <input type="text" id="target" placeholder="Enter project, wallet address, or contract...">
-      </div>
-      <div style="margin-top:16px;">
-        <label style="font-weight:600; font-size:14px;">Additional Notes (optional)</label>
-        <textarea id="notes" rows="3" placeholder="Any context or specific concerns..."></textarea>
-      </div>
-      <div style="margin-top:20px;">
-        <button onclick="runRiskScan()">Scan for Risks</button>
-      </div>
-    </div>
-
-    <div id="result" class="result card">
-      <div style="display:flex; align-items:center; gap:12px;">
-        <h3 style="margin:0;">Risk Assessment</h3>
-        <span id="riskBadge" class="risk-badge"></span>
-      </div>
-
-      <div class="section">
-        <h4>Key Findings</h4>
-        <ul id="findings"></ul>
-      </div>
-
-      <div class="section">
-        <h4>Recommended Actions</h4>
-        <ul id="recommendations"></ul>
-      </div>
-
-      <div style="margin-top:20px; font-size:13px; color:var(--text2);" id="disclaimer"></div>
-    </div>
-  </div>
-
-  <script src="/js/koschei-auth.js"></script>
-  <script>
-    async function runRiskScan() {
-      const target = document.getElementById('target').value.trim();
-      const notes = document.getElementById('notes').value.trim();
-
-      if (!target) {
-        alert('Please enter a target');
-        return;
-      }
-
-      const resultDiv = document.getElementById('result');
-      resultDiv.style.display = 'block';
-
-      document.getElementById('findings').innerHTML = '<li>Analyzing on-chain signals...</li>';
-      document.getElementById('recommendations').innerHTML = '';
-
-      try {
-        const res = await KoscheiAuth.apiCall('/api/risk/scan', {
-          method: 'POST',
-          body: JSON.stringify({ target, notes })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          renderRiskResult(data);
-        } else {
-          renderDemoRiskResult(target);
-        }
-      } catch (e) {
-        renderDemoRiskResult(target);
-      }
-    }
-
-    function renderRiskResult(data) {
-      const badge = document.getElementById('riskBadge');
-      const risk = (data.risk_level || 'medium').toLowerCase();
-      let badgeClass = 'risk-medium';
-
-      if (risk.includes('low') || risk.includes('safe')) badgeClass = 'risk-low';
-      if (risk.includes('high') || risk.includes('danger')) badgeClass = 'risk-high';
-
-      badge.className = `risk-badge ${badgeClass}`;
-      badge.textContent = (data.risk_level || 'MEDIUM').toUpperCase();
-
-      // Findings
-      const findingsEl = document.getElementById('findings');
-      findingsEl.innerHTML = '';
-      (data.checklist || data.findings || []).forEach(item => {
-        const li = document.createElement('li');
-        li.textContent = item;
-        findingsEl.appendChild(li);
-      });
-
-      // Recommendations
-      const recEl = document.getElementById('recommendations');
-      recEl.innerHTML = '';
-      (data.recommended_fixes || data.recommendations || []).forEach(item => {
-        const li = document.createElement('li');
-        li.textContent = item;
-        recEl.appendChild(li);
-      });
-
-      document.getElementById('disclaimer').textContent = data.disclaimer || 'This is informational only.';
-    }
-
-    function renderDemoRiskResult(target) {
-      const badge = document.getElementById('riskBadge');
-      badge.className = 'risk-badge risk-medium';
-      badge.textContent = 'MEDIUM RISK';
-
-      document.getElementById('findings').innerHTML = `
-        <li>Verify the official project source and target address independently.</li>
-        <li>Review contract permissions and upgrade controls.</li>
-        <li>Check for concentrated holdings or recent large transfers.</li>
-      `;
-
-      document.getElementById('recommendations').innerHTML = `
-        <li>Use trusted explorers before interacting.</li>
-        <li>Revoke unnecessary approvals.</li>
-        <li>Start with small test transactions.</li>
-      `;
-
-      document.getElementById('disclaimer').textContent = 'This is informational only, not financial or security advice.';
-    }
-
-    document.getElementById('target').addEventListener('keypress', e => {
-      if (e.key === 'Enter') runRiskScan();
-    });
-  </script>
-</body>
-</html>
+    result.textContent = JSON.stringify(data, null, 2); result.style.display='block';
+    if(window.KoscheiAnalytics) KoscheiAnalytics.track('risk_success');
+  }catch(err){showMessage(err.message || 'Network error.');}
+  finally{submit.disabled=false; submit.textContent='Run risk scan';}
+});
+</script></body></html>

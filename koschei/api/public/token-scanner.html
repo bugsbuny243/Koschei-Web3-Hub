@@ -1,139 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Token Scanner — Koschei Pro</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root { --bg:#050812; --surface:rgba(255,255,255,.08); --line:rgba(255,255,255,.16); --text:#f7fbff; --text2:#a9b8d6; --accent:#00ff88; }
-    body { background:var(--bg); color:var(--text); font-family:Inter, system-ui, sans-serif; margin:0; }
-    .container { max-width:900px; margin:40px auto; padding:0 20px; }
-    .card { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:32px; }
-    h1 { font-size:36px; margin-bottom:8px; }
-    .pro-badge { display:inline-block; background:linear-gradient(135deg,#00ff88,#69d8ff); color:#04110b; font-size:11px; font-weight:800; padding:3px 10px; border-radius:999px; margin-left:12px; }
-    .input-group { display:flex; gap:12px; margin:24px 0; }
-    input { flex:1; padding:14px 18px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.06); color:var(--text); font-size:15px; }
-    button { padding:14px 28px; border-radius:12px; background:linear-gradient(135deg,var(--accent),#00ccff); color:#04110b; font-weight:700; border:none; cursor:pointer; }
-    .result { margin-top:32px; display:none; }
-    .result.show { display:block; }
-    .metric-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-top:24px; }
-    .metric { background:rgba(255,255,255,.05); padding:18px; border-radius:14px; }
-    .metric-label { color:var(--text2); font-size:13px; }
-    .metric-value { font-size:22px; font-weight:700; margin-top:6px; }
-    .risk { padding:6px 14px; border-radius:999px; font-size:13px; font-weight:700; display:inline-block; margin-top:12px; }
-    .risk-low { background:rgba(34,197,94,.15); color:#22c55e; }
-    .risk-medium { background:rgba(250,204,21,.15); color:#facc15; }
-    .risk-high { background:rgba(239,68,68,.15); color:#ef4444; }
-    .pro-footer { margin-top:50px; text-align:center; padding:30px; background:var(--surface); border-radius:20px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Token Scanner <span class="pro-badge">PRO</span></h1>
-    <p style="color:var(--text2); max-width:620px;">Analyze any Solana token for rug pull risks, authorities, supply, and liquidity health. Pro feature.</p>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Token Scanner / Rug Checker — Koschei Pro</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>
+:root{--bg:#050812;--surface:rgba(255,255,255,.08);--line:rgba(255,255,255,.16);--text:#f7fbff;--text2:#a9b8d6;--accent:#00ff88;--accent2:#69d8ff;--danger:#ff5c7c;--warn:#facc15}*{box-sizing:border-box}body{background:radial-gradient(circle at top left,rgba(0,255,136,.16),transparent 34%),var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;margin:0}.container{max-width:980px;margin:0 auto;padding:32px 20px 64px}.nav{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:32px}.nav a{color:var(--text2);text-decoration:none;font-weight:700}.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:28px;margin-top:18px}h1{font-size:42px;margin:0 0 10px}.badge{display:inline-block;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b;font-size:12px;font-weight:900;padding:5px 12px;border-radius:999px;margin-left:10px}.sub{color:var(--text2);max-width:760px;line-height:1.7}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.field{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}label{font-weight:800;font-size:14px}input,textarea,select{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);font:inherit}textarea{min-height:110px}button,.btn{padding:14px 24px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b;font-weight:900;border:0;cursor:pointer;text-decoration:none;display:inline-block}.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--line)}button:disabled{opacity:.65;cursor:wait}.alert{display:none;padding:14px 16px;border-radius:12px;margin-top:16px}.alert.show{display:block}.alert.error{background:rgba(255,92,124,.12);border:1px solid rgba(255,92,124,.5);color:#ffd6de}.alert.credit{background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.5);color:#fff0aa}.result{white-space:pre-wrap;overflow:auto;background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:16px;padding:18px;max-height:620px;color:#dce8ff}.notice{font-size:13px;color:var(--text2);line-height:1.6}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}@media(max-width:700px){h1{font-size:32px}.nav{flex-direction:column;align-items:flex-start}}
+</style></head>
+<body><main class="container"><nav class="nav"><a href="/hub">← Koschei Hub</a><div><a href="/pricing">Buy credits</a> · <a href="/account">Account</a></div></nav><header><h1>Token Scanner / Rug Checker<span class="badge">PRO</span></h1><p class="sub">Token mint authority, freeze authority ve holder yoğunlaşması gibi rug pull sinyallerini canlı RPC verisiyle inceler.</p><p class="notice">Production mode: no demo or fabricated data. Every run requires authentication, live backend processing, and module-specific credits. Never enter private keys or seed phrases.</p></header><section class="card"><form id="toolForm"><div class="field"><label for="mint">Token mint address</label><input id="mint" name="mint" type="text" placeholder="Solana token mint"></div><div class="field"><label for="network">Network</label><select id="network" name="network"><option value="solana-mainnet">solana-mainnet</option><option value="solana-devnet">solana-devnet</option><option value="solana-testnet">solana-testnet</option></select></div><button id="submit" type="submit">Scan token</button></form><div id="message" class="alert"></div><div id="result" class="result" style="display:none"></div></section><section class="card"><strong>Credit cost:</strong> This module has its own credit gate. If you do not have enough credits, the API returns the required and available credit counts.</section></main><script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=4"></script><script>
+const endpoint = '/api/token/scan';
+const form = document.getElementById('toolForm');
+const submit = document.getElementById('submit');
+const msg = document.getElementById('message');
+const result = document.getElementById('result');
+function showMessage(text, cls='error'){msg.className='alert show '+cls;msg.textContent=text;}
+function clearMessage(){msg.className='alert';msg.textContent='';}
+(async()=>{await KoscheiAuth.init(); KoscheiAuth.requireAuth('/login'); if(window.KoscheiAnalytics) KoscheiAnalytics.track('token-scanner_view');})();
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault(); clearMessage(); result.style.display='none'; submit.disabled=true; submit.textContent='Working…';
+  try{
 
-    <div class="card">
-      <div class="input-group">
-        <input type="text" id="tokenAddress" placeholder="Enter Solana token mint address...">
-        <button onclick="scanToken()">Scan Token</button>
-      </div>
-
-      <div id="result" class="result">
-        <h3 id="tokenName" style="margin-top:0;"></h3>
-        <div id="riskBadge"></div>
-
-        <div class="metric-row">
-          <div class="metric">
-            <div class="metric-label">Mint Authority</div>
-            <div class="metric-value" id="mintAuthority">—</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Freeze Authority</div>
-            <div class="metric-value" id="freezeAuthority">—</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Total Supply</div>
-            <div class="metric-value" id="supply">—</div>
-          </div>
-          <div class="metric">
-            <div class="metric-label">Holders</div>
-            <div class="metric-value" id="holders">—</div>
-          </div>
-        </div>
-
-        <div style="margin-top:24px;">
-          <h4>Risk Analysis</h4>
-          <div id="riskAnalysis"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="pro-footer">
-      <p style="color:var(--text2); margin-bottom:16px;">This is a Pro feature with advanced rug risk detection.</p>
-      <a href="https://www.shopier.com/TradeVisual/47465449" target="_blank" style="display:inline-block; padding:14px 32px; background:linear-gradient(135deg,#00ff88,#69d8ff); color:#04110b; font-weight:700; border-radius:12px; text-decoration:none;">Buy Pro Access</a>
-    </div>
-  </div>
-
-  <script src="/js/koschei-auth.js"></script>
-  <script>
-    async function scanToken() {
-      const address = document.getElementById('tokenAddress').value.trim();
-      if (!address) return alert('Please enter a token mint address');
-
-      const resultDiv = document.getElementById('result');
-      resultDiv.style.display = 'block';
-
-      document.getElementById('tokenName').textContent = 'Scanning...';
-      document.getElementById('riskAnalysis').innerHTML = '';
-
-      try {
-        const res = await KoscheiAuth.apiCall('/api/token/scan', {
-          method: 'POST',
-          body: JSON.stringify({ mint: address })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          renderTokenResult(data);
-        } else {
-          renderDemoTokenResult(address);
-        }
-      } catch(e) {
-        renderDemoTokenResult(address);
-      }
+      const body = Object.fromEntries(new FormData(form).entries());
+      if (body.addresses) body.addresses = body.addresses.split(/\n|,/).map(v => v.trim()).filter(Boolean);
+    
+    const res = await KoscheiAuth.apiCall(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const data = await res.json().catch(()=>({error:'invalid_response'}));
+    if(!res.ok){
+      if(res.status===402 || data.error==='insufficient_outputs') showMessage(`Insufficient credits. Required: ${data.required_credits ?? '?'}, available: ${data.available_credits ?? 0}.`, 'credit');
+      else showMessage(data.message || data.error || 'Request failed.');
+      return;
     }
-
-    function renderTokenResult(data) {
-      document.getElementById('tokenName').textContent = data.name || 'Unknown Token';
-      const riskEl = document.getElementById('riskBadge');
-      const risk = (data.risk_level || 'medium').toLowerCase();
-      let riskClass = 'risk-medium';
-      if (risk.includes('low') || risk.includes('safe')) riskClass = 'risk-low';
-      if (risk.includes('high') || risk.includes('danger')) riskClass = 'risk-high';
-      riskEl.innerHTML = `<span class="risk ${riskClass}">${data.risk_level || 'MEDIUM RISK'}</span>`;
-
-      document.getElementById('mintAuthority').textContent = data.mint_authority || 'Revoked';
-      document.getElementById('freezeAuthority').textContent = data.freeze_authority || 'Revoked';
-      document.getElementById('supply').textContent = data.supply || '—';
-      document.getElementById('holders').textContent = data.holders || '—';
-      document.getElementById('riskAnalysis').innerHTML = data.analysis || 'No detailed analysis available.';
-    }
-
-    function renderDemoTokenResult(address) {
-      document.getElementById('tokenName').textContent = 'Example Token (Demo)';
-      document.getElementById('riskBadge').innerHTML = `<span class="risk risk-medium">MEDIUM RISK</span>`;
-      document.getElementById('mintAuthority').textContent = 'Revoked';
-      document.getElementById('freezeAuthority').textContent = 'Active';
-      document.getElementById('supply').textContent = '1,000,000,000';
-      document.getElementById('holders').textContent = '12,847';
-      document.getElementById('riskAnalysis').innerHTML = `<ul style="color:var(--text2); line-height:1.7;"><li>• Mint authority revoked → Positive</li><li>• Freeze authority still active → Caution</li><li>• Liquidity looks decent</li></ul>`;
-    }
-
-    document.getElementById('tokenAddress').addEventListener('keypress', e => {
-      if (e.key === 'Enter') scanToken();
-    });
-
-    window.onload = () => document.getElementById('tokenAddress').focus();
-  </script>
-</body>
-</html>
+    result.textContent = JSON.stringify(data, null, 2); result.style.display='block';
+    if(window.KoscheiAnalytics) KoscheiAnalytics.track('token-scanner_success');
+  }catch(err){showMessage(err.message || 'Network error.');}
+  finally{submit.disabled=false; submit.textContent='Scan token';}
+});
+</script></body></html>

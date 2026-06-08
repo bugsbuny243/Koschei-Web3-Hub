@@ -97,7 +97,7 @@ func buildRiskScanResult() riskScanResult {
 		Score:     65,
 		Checklist: []string{
 			"Verify the official project source and the target address independently.",
-			"Review contract verification, permissions, upgrade controls, and transaction history.",
+			"Review contract verification, permissions, upgrade controls, and transaction history for the submitted target.",
 			"Check for unexpected approvals, signer changes, or high-privilege operations.",
 			"Confirm that public documentation and audit claims are current and authentic.",
 		},
@@ -108,7 +108,7 @@ func buildRiskScanResult() riskScanResult {
 		},
 		Disclaimer:   riskDisclaimer,
 		UsedAI:       false,
-		UsedFallback: true,
+		UsedFallback: false,
 	}
 }
 

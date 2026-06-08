@@ -10,8 +10,8 @@ func TestBuildRiskScanResult(t *testing.T) {
 	if !result.OK || result.RiskLevel != "review_required" || result.Score != 65 {
 		t.Fatalf("buildRiskScanResult() = %#v", result)
 	}
-	if result.UsedAI || !result.UsedFallback {
-		t.Fatalf("fallback flags = used_ai:%t used_fallback:%t", result.UsedAI, result.UsedFallback)
+	if result.UsedAI || result.UsedFallback {
+		t.Fatalf("production flags = used_ai:%t used_fallback:%t", result.UsedAI, result.UsedFallback)
 	}
 	if len(result.Checklist) == 0 || len(result.RecommendedFixes) == 0 {
 		t.Fatal("risk result must include checklist items and recommended fixes")

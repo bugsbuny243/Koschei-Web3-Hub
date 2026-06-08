@@ -1,182 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Portfolio Tracker — Koschei Web3 Hub</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #050812;
-      --surface: rgba(255,255,255,.08);
-      --line: rgba(255,255,255,.16);
-      --text: #f7fbff;
-      --text2: #a9b8d6;
-      --accent: #00ff88;
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Portfolio Tracker — Koschei Pro</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>
+:root{--bg:#050812;--surface:rgba(255,255,255,.08);--line:rgba(255,255,255,.16);--text:#f7fbff;--text2:#a9b8d6;--accent:#00ff88;--accent2:#69d8ff;--danger:#ff5c7c;--warn:#facc15}*{box-sizing:border-box}body{background:radial-gradient(circle at top left,rgba(0,255,136,.16),transparent 34%),var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;margin:0}.container{max-width:980px;margin:0 auto;padding:32px 20px 64px}.nav{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:32px}.nav a{color:var(--text2);text-decoration:none;font-weight:700}.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:28px;margin-top:18px}h1{font-size:42px;margin:0 0 10px}.badge{display:inline-block;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b;font-size:12px;font-weight:900;padding:5px 12px;border-radius:999px;margin-left:10px}.sub{color:var(--text2);max-width:760px;line-height:1.7}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.field{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}label{font-weight:800;font-size:14px}input,textarea,select{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);font:inherit}textarea{min-height:110px}button,.btn{padding:14px 24px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b;font-weight:900;border:0;cursor:pointer;text-decoration:none;display:inline-block}.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--line)}button:disabled{opacity:.65;cursor:wait}.alert{display:none;padding:14px 16px;border-radius:12px;margin-top:16px}.alert.show{display:block}.alert.error{background:rgba(255,92,124,.12);border:1px solid rgba(255,92,124,.5);color:#ffd6de}.alert.credit{background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.5);color:#fff0aa}.result{white-space:pre-wrap;overflow:auto;background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:16px;padding:18px;max-height:620px;color:#dce8ff}.notice{font-size:13px;color:var(--text2);line-height:1.6}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}@media(max-width:700px){h1{font-size:32px}.nav{flex-direction:column;align-items:flex-start}}
+</style></head>
+<body><main class="container"><nav class="nav"><a href="/hub">← Koschei Hub</a><div><a href="/pricing">Buy credits</a> · <a href="/account">Account</a></div></nav><header><h1>Portfolio Tracker<span class="badge">PRO</span></h1><p class="sub">Birden fazla public Solana cüzdanının SOL bakiyesi, token adetleri ve portföy dağılımını takip eder.</p><p class="notice">Production mode: no demo or fabricated data. Every run requires authentication, live backend processing, and module-specific credits. Never enter private keys or seed phrases.</p></header><section class="card"><form id="toolForm"><div class="field"><label for="addresses">Wallet addresses</label><textarea id="addresses" name="addresses" placeholder="One wallet per line"></textarea></div><div class="field"><label for="network">Network</label><select id="network" name="network"><option value="solana-mainnet">solana-mainnet</option><option value="solana-devnet">solana-devnet</option><option value="solana-testnet">solana-testnet</option></select></div><button id="submit" type="submit">Track portfolio</button></form><div id="message" class="alert"></div><div id="result" class="result" style="display:none"></div></section><section class="card"><strong>Credit cost:</strong> This module has its own credit gate. If you do not have enough credits, the API returns the required and available credit counts.</section></main><script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=4"></script><script>
+const endpoint = '/api/portfolio/track';
+const form = document.getElementById('toolForm');
+const submit = document.getElementById('submit');
+const msg = document.getElementById('message');
+const result = document.getElementById('result');
+function showMessage(text, cls='error'){msg.className='alert show '+cls;msg.textContent=text;}
+function clearMessage(){msg.className='alert';msg.textContent='';}
+(async()=>{await KoscheiAuth.init(); KoscheiAuth.requireAuth('/login'); if(window.KoscheiAnalytics) KoscheiAnalytics.track('portfolio_view');})();
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault(); clearMessage(); result.style.display='none'; submit.disabled=true; submit.textContent='Working…';
+  try{
+
+      const body = Object.fromEntries(new FormData(form).entries());
+      if (body.addresses) body.addresses = body.addresses.split(/\n|,/).map(v => v.trim()).filter(Boolean);
+    
+    const res = await KoscheiAuth.apiCall(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const data = await res.json().catch(()=>({error:'invalid_response'}));
+    if(!res.ok){
+      if(res.status===402 || data.error==='insufficient_outputs') showMessage(`Insufficient credits. Required: ${data.required_credits ?? '?'}, available: ${data.available_credits ?? 0}.`, 'credit');
+      else showMessage(data.message || data.error || 'Request failed.');
+      return;
     }
-    body { background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; margin:0; }
-    .container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
-    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 28px; }
-    h1 { font-size: 36px; margin-bottom: 8px; }
-    .input-group { display: flex; gap: 12px; margin: 20px 0; }
-    textarea { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--text); font-size: 14px; resize: vertical; }
-    button { padding: 14px 28px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), #00ccff); color: #04110b; font-weight: 700; border: none; cursor: pointer; }
-    .portfolio-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
-    .total-value { font-size: 42px; font-weight: 800; }
-    .assets-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    .assets-table th, .assets-table td { padding: 14px 12px; text-align: left; border-bottom: 1px solid var(--line); }
-    .assets-table th { color: var(--text2); font-size: 13px; font-weight: 600; }
-    .distribution { margin-top: 32px; }
-    .dist-bar { height: 8px; background: rgba(255,255,255,.1); border-radius: 999px; overflow: hidden; margin-top: 6px; }
-    .dist-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), #00ccff); }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="portfolio-header">
-      <div>
-        <h1>Portfolio Tracker</h1>
-        <p style="color:var(--text2);">Track SOL and token balances across multiple Solana wallets.</p>
-      </div>
-      <div>
-        <div id="totalValue" class="total-value">— SOL</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div>
-        <label style="font-weight:600; font-size:14px; color:var(--text2);">Wallet Addresses (one per line)</label>
-        <textarea id="addresses" rows="4" placeholder="Enter public wallet addresses..."></textarea>
-      </div>
-      <div style="margin-top:16px;">
-        <button onclick="trackPortfolio()">Track Portfolio</button>
-      </div>
-    </div>
-
-    <div id="result" style="display:none; margin-top:30px;">
-      <div class="card">
-        <h3>Assets</h3>
-        <table class="assets-table" id="assetsTable">
-          <thead>
-            <tr>
-              <th>Asset</th>
-              <th>Amount</th>
-              <th>Value (SOL)</th>
-            </tr>
-          </thead>
-          <tbody id="assetsBody"></tbody>
-        </table>
-
-        <div class="distribution">
-          <h3>Asset Distribution</h3>
-          <div id="distribution"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="/js/koschei-auth.js"></script>
-  <script>
-    async function trackPortfolio() {
-      const addressesText = document.getElementById('addresses').value.trim();
-      if (!addressesText) {
-        alert('Please enter at least one wallet address');
-        return;
-      }
-
-      const addresses = addressesText.split(/\n|,/).map(a => a.trim()).filter(Boolean);
-      const resultDiv = document.getElementById('result');
-      resultDiv.style.display = 'block';
-
-      document.getElementById('assetsBody').innerHTML = '<tr><td colspan="3">Loading portfolio...</td></tr>';
-      document.getElementById('distribution').innerHTML = '';
-      document.getElementById('totalValue').textContent = 'Loading...';
-
-      try {
-        const res = await KoscheiAuth.apiCall('/api/portfolio/track', {
-          method: 'POST',
-          body: JSON.stringify({ addresses })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          renderPortfolio(data);
-        } else {
-          renderDemoPortfolio(addresses);
-        }
-      } catch (e) {
-        renderDemoPortfolio(addresses);
-      }
-    }
-
-    function renderPortfolio(data) {
-      document.getElementById('totalValue').textContent = `${data.total_balance_sol || 0} SOL`;
-
-      const tbody = document.getElementById('assetsBody');
-      tbody.innerHTML = '';
-
-      (data.assets || []).forEach(asset => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td><strong>${asset.symbol || 'Unknown'}</strong><br><small style="color:var(--text2);">${asset.mint || ''}</small></td>
-          <td>${asset.amount_text || asset.amount || '0'}</td>
-          <td>${asset.value_in_sol || '—'}</td>
-        `;
-        tbody.appendChild(row);
-      });
-
-      // Distribution
-      const distDiv = document.getElementById('distribution');
-      distDiv.innerHTML = '';
-      (data.asset_distribution || []).forEach(item => {
-        const div = document.createElement('div');
-        div.style.marginBottom = '14px';
-        div.innerHTML = `
-          <div style="display:flex; justify-content:space-between; font-size:14px;">
-            <span>${item.label}</span>
-            <span>${item.share_percent}%</span>
-          </div>
-          <div class="dist-bar"><span style="width:${item.share_percent}%"></span></div>
-        `;
-        distDiv.appendChild(div);
-      });
-    }
-
-    function renderDemoPortfolio(addresses) {
-      document.getElementById('totalValue').textContent = '18.74 SOL';
-
-      const tbody = document.getElementById('assetsBody');
-      tbody.innerHTML = `
-        <tr><td><strong>SOL</strong></td><td>12.48 SOL</td><td>12.48</td></tr>
-        <tr><td><strong>JUP</strong></td><td>420 JUP</td><td>3.12</td></tr>
-        <tr><td><strong>BONK</strong></td><td>1,200,000 BONK</td><td>2.14</td></tr>
-        <tr><td><strong>USDC</strong></td><td>96.50 USDC</td><td>1.00</td></tr>
-      `;
-
-      const distDiv = document.getElementById('distribution');
-      distDiv.innerHTML = `
-        <div style="margin-bottom:14px;">
-          <div style="display:flex; justify-content:space-between; font-size:14px;"><span>SOL</span><span>67%</span></div>
-          <div class="dist-bar"><span style="width:67%"></span></div>
-        </div>
-        <div style="margin-bottom:14px;">
-          <div style="display:flex; justify-content:space-between; font-size:14px;"><span>JUP</span><span>17%</span></div>
-          <div class="dist-bar"><span style="width:17%"></span></div>
-        </div>
-        <div style="margin-bottom:14px;">
-          <div style="display:flex; justify-content:space-between; font-size:14px;"><span>BONK</span><span>11%</span></div>
-          <div class="dist-bar"><span style="width:11%"></span></div>
-        </div>
-        <div>
-          <div style="display:flex; justify-content:space-between; font-size:14px;"><span>USDC</span><span>5%</span></div>
-          <div class="dist-bar"><span style="width:5%"></span></div>
-        </div>
-      `;
-    }
-
-    window.onload = () => {
-      // Optional: prefill with example
-    };
-  </script>
-</body>
-</html>
+    result.textContent = JSON.stringify(data, null, 2); result.style.display='block';
+    if(window.KoscheiAnalytics) KoscheiAnalytics.track('portfolio_success');
+  }catch(err){showMessage(err.message || 'Network error.');}
+  finally{submit.disabled=false; submit.textContent='Track portfolio';}
+});
+</script></body></html>
