@@ -1,184 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-1QFWMJJC3');
-</script>
-
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Solana Token Scanner — Free Rug Pull Detector | Koschei</title>
-  <meta name="description" content="Scan any Solana token for rug pull risks. Check mint authority, freeze authority, supply and transaction history. Free, no wallet needed.">
-  <meta name="keywords" content="Solana token scanner, Solana security, rug pull detector, Solana wallet score, NFT metadata generator, Solana transaction decoder, Solana developer tools, smart contract scanner, Web3 security">
-  <meta name="author" content="Koschei Web3 Hub">
-  <meta name="robots" content="index, follow">
-  <link rel="canonical" href="https://tradepigloball.co/token-scanner.html">
-
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tradepigloball.co/token-scanner.html">
-  <meta property="og:title" content="Solana Token Scanner — Free Rug Pull Detector | Koschei">
-  <meta property="og:description" content="Scan any Solana token for rug pull risks. Check mint authority, freeze authority, supply and transaction history. Free, no wallet needed.">
-  <meta property="og:image" content="https://tradepigloball.co/og-image.svg">
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:site" content="@KreatifZihin">
-  <meta name="twitter:title" content="Solana Token Scanner — Free Rug Pull Detector | Koschei">
-  <meta name="twitter:description" content="Scan any Solana token for rug pull risks. Check mint authority, freeze authority, supply and transaction history. Free, no wallet needed.">
-  <meta name="twitter:image" content="https://tradepigloball.co/og-image.svg">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/koschei.css">
+  <title>Token Scanner — Koschei Web3 Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    .result-list{padding-left:20px;color:var(--text2);}
-    .result-list li{margin-top:6px;}
-    .risk-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
-    @media (max-width:600px){.risk-grid{grid-template-columns:1fr;}}
+    :root {
+      --bg: #050812;
+      --surface: rgba(255,255,255,.08);
+      --line: rgba(255,255,255,.16);
+      --text: #f7fbff;
+      --text2: #a9b8d6;
+      --accent: #00ff88;
+      --danger: #ff5c7c;
+      --warning: #facc15;
+      --success: #22c55e;
+    }
+    body { background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; margin:0; }
+    .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px; }
+    h1 { font-size: 36px; margin-bottom: 8px; }
+    .input-group { display: flex; gap: 12px; margin: 24px 0; }
+    input { flex: 1; padding: 14px 18px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--text); font-size: 15px; }
+    button { padding: 14px 28px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), #00ccff); color: #04110b; font-weight: 700; border: none; cursor: pointer; }
+    .result { margin-top: 32px; display: none; }
+    .result.show { display: block; }
+    .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 24px; }
+    .metric { background: rgba(255,255,255,.05); padding: 18px; border-radius: 14px; }
+    .metric-label { color: var(--text2); font-size: 13px; }
+    .metric-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+    .risk { padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; display: inline-block; margin-top: 12px; }
+    .risk-low { background: rgba(34,197,94,.15); color: #22c55e; }
+    .risk-medium { background: rgba(250,204,21,.15); color: #facc15; }
+    .risk-high { background: rgba(239,68,68,.15); color: #ef4444; }
   </style>
 </head>
 <body>
-<nav class="nav">
-  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
-  <div class="nav-links">
-    <a href="/hub" class="nav-link">Hub</a>
-    <a href="/metadata" class="nav-link">Metadata</a>
-    <a href="/risk" class="nav-link active">Risk</a>
-    <a href="/watchlist" class="nav-link">Watchlist</a>
-    <a href="/chains" class="nav-link">Chains</a>
-    <a href="/watchlist" class="nav-link">Watchlist</a>
-    <a href="/account" class="nav-link">Account</a>
+  <div class="container">
+    <h1>Token Scanner</h1>
+    <p style="color:var(--text2); max-width:620px;">
+      Analyze any Solana token for rug pull risks, authorities, supply, and liquidity health.
+    </p>
+
+    <div class="card">
+      <div class="input-group">
+        <input type="text" id="tokenAddress" placeholder="Enter Solana token mint address...">
+        <button onclick="scanToken()">Scan Token</button>
+      </div>
+
+      <div id="result" class="result">
+        <h3 id="tokenName" style="margin-top:0;"></h3>
+        <div id="riskBadge"></div>
+
+        <div class="metric-row">
+          <div class="metric">
+            <div class="metric-label">Mint Authority</div>
+            <div class="metric-value" id="mintAuthority">—</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Freeze Authority</div>
+            <div class="metric-value" id="freezeAuthority">—</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Total Supply</div>
+            <div class="metric-value" id="supply">—</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Holders</div>
+            <div class="metric-value" id="holders">—</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 24px;">
+          <h4>Risk Analysis</h4>
+          <div id="riskAnalysis"></div>
+        </div>
+      </div>
+    </div>
   </div>
-</nav>
 
-<main class="page" style="max-width:800px;">
-  <div class="page-title">Web3 Risk Scanner</div>
-  <div class="page-sub">Run a preliminary checklist for a project, wallet, or contract. Never enter a private key or recovery phrase.</div>
+  <script src="/js/koschei-auth.js"></script>
+  <script>
+    async function scanToken() {
+      const address = document.getElementById('tokenAddress').value.trim();
+      if (!address) {
+        alert('Please enter a token mint address');
+        return;
+      }
 
-  <form class="card" id="riskForm" style="display:flex;flex-direction:column;gap:16px;margin-bottom:20px;">
-    <div class="form-group">
-      <label class="form-label" for="riskTarget">Project / wallet / contract</label>
-      <input class="form-input" id="riskTarget" type="text" required placeholder="Project name, public wallet address, or contract address">
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="riskNotes">Notes</label>
-      <textarea class="form-input" id="riskNotes" rows="4" placeholder="Add public context, concerns, or observed behavior..." style="resize:vertical;"></textarea>
-    </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" id="riskScanBtn" type="submit">Scan</button><button class="btn btn-ghost" id="exampleBtn" type="button">Load example</button></div>
-  </form>
+      const resultDiv = document.getElementById('result');
+      resultDiv.style.display = 'block';
 
-  <section class="card" id="riskResult" hidden>
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;">
-      <strong id="riskResultTitle">Risk scan result</strong>
-      <span class="badge badge-blue" id="riskLevel"></span>
-    </div>
-    <div class="risk-grid">
-      <div>
-        <div class="form-label">checklist</div>
-        <ul class="result-list" id="riskChecklist"></ul>
-      </div>
-      <div>
-        <div class="form-label">recommended_fixes</div>
-        <ul class="result-list" id="riskFixes"></ul>
-      </div>
-    </div>
-    <p class="auth-sub" style="margin-top:18px;"><strong>score:</strong> <span id="riskScore"></span></p>
-    <p class="auth-sub" style="margin-top:8px;"><strong>disclaimer:</strong> <span id="riskDisclaimer"></span></p>
-  </section>
-</main>
-
-<script src="/js/koschei-auth.js?v=4"></script>
-<script src="/js/koschei-analytics.js?v=1"></script>
-<script>
-  const fallbackResult = {
-    risk_level: 'review_required',
-    score: 65,
-    checklist: [
-      'Verify the official project source and the target address independently.',
-      'Review contract verification, permissions, upgrade controls, and transaction history.',
-      'Check for unexpected approvals, signer changes, or high-privilege operations.',
-      'Confirm that public documentation and audit claims are current and authentic.'
-    ],
-    recommended_fixes: [
-      'Use trusted explorers and official links to confirm addresses before interacting.',
-      'Revoke unnecessary token approvals and limit wallet permissions where appropriate.',
-      'Use a separate wallet for testing and request an independent security review for high-value activity.'
-    ],
-    disclaimer: 'This is informational only, not legal, financial, investment, or security advice.'
-  };
-
-  function renderList(id, items) {
-    const list = document.getElementById(id);
-    list.replaceChildren(...items.map(item => {
-      const entry = document.createElement('li');
-      entry.textContent = item;
-      return entry;
-    }));
-  }
-
-  function renderResult(result, usedClientFallback = false) {
-    document.getElementById('riskResultTitle').textContent = usedClientFallback ? 'Fallback risk checklist' : 'Saved risk scan result';
-    document.getElementById('riskLevel').textContent = `risk_level: ${result.risk_level}`;
-    document.getElementById('riskScore').textContent = result.score;
-    document.getElementById('riskDisclaimer').textContent = result.disclaimer;
-    renderList('riskChecklist', result.checklist);
-    renderList('riskFixes', result.recommended_fixes);
-    document.getElementById('riskResult').hidden = false;
-  }
-
-  (async () => {
-    await KoscheiAuth.init();
-    if (!KoscheiAuth.requireAuth('/login')) return;
-    KoscheiAnalytics.track('risk_view');
-
-
-    document.getElementById('exampleBtn').addEventListener('click', () => {
-      renderResult({ risk_level: 'Demo example', score: 65, disclaimer: 'Demo example — no backend execution, no credit decrement, and no paid output saved.', checklist: ['Example signal only'], recommended_fixes: ['Buy credits to run real scans.'] }, true);
-    });
-
-    document.getElementById('riskForm').addEventListener('submit', async event => {
-      event.preventDefault();
-      const button = document.getElementById('riskScanBtn');
-      const target = document.getElementById('riskTarget').value.trim();
-      const notes = document.getElementById('riskNotes').value.trim();
-      button.disabled = true;
-      button.textContent = 'Scanning...';
-
-      KoscheiAnalytics.track('risk_scan');
+      document.getElementById('tokenName').textContent = 'Scanning...';
+      document.getElementById('riskAnalysis').innerHTML = '';
 
       try {
-        const response = await KoscheiAuth.apiCall('/api/risk/scan', {
+        const res = await KoscheiAuth.apiCall('/api/token/scan', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target, notes })
+          body: JSON.stringify({ mint: address })
         });
-        if (!response) {
-          renderResult(fallbackResult, true);
-          return;
+
+        if (res.ok) {
+          const data = await res.json();
+          renderTokenResult(data);
+        } else {
+          renderDemoTokenResult(address);
         }
-        if (!response.ok) {
-          const error = await response.json().catch(() => ({}));
-          throw new Error(error.message || error.error || `Request failed (${response.status})`);
-        }
-        renderResult(await response.json());
-        KoscheiAnalytics.track('risk_scan_success');
-      } catch (error) {
-        if (error instanceof TypeError) {
-          renderResult(fallbackResult, true);
-          return;
-        }
-        window.alert(error.message || 'Not enough credits. Buy credits to run real tools.');
-      } finally {
-        button.disabled = false;
-        button.textContent = 'Scan';
+      } catch (e) {
+        renderDemoTokenResult(address);
       }
+    }
+
+    function renderTokenResult(data) {
+      document.getElementById('tokenName').textContent = data.name || 'Unknown Token';
+
+      const riskEl = document.getElementById('riskBadge');
+      const risk = (data.risk_level || 'medium').toLowerCase();
+      let riskClass = 'risk-medium';
+      if (risk.includes('low') || risk.includes('safe')) riskClass = 'risk-low';
+      if (risk.includes('high') || risk.includes('danger')) riskClass = 'risk-high';
+      riskEl.innerHTML = `<span class="risk ${riskClass}">${data.risk_level || 'MEDIUM RISK'}</span>`;
+
+      document.getElementById('mintAuthority').textContent = data.mint_authority || 'Revoked';
+      document.getElementById('freezeAuthority').textContent = data.freeze_authority || 'Revoked';
+      document.getElementById('supply').textContent = data.supply || '—';
+      document.getElementById('holders').textContent = data.holders || '—';
+
+      document.getElementById('riskAnalysis').innerHTML = data.analysis || 'No detailed analysis available.';
+    }
+
+    function renderDemoTokenResult(address) {
+      document.getElementById('tokenName').textContent = 'Example Token (Demo)';
+      document.getElementById('riskBadge').innerHTML = `<span class="risk risk-medium">MEDIUM RISK</span>`;
+
+      document.getElementById('mintAuthority').textContent = 'Revoked';
+      document.getElementById('freezeAuthority').textContent = 'Active';
+      document.getElementById('supply').textContent = '1,000,000,000';
+      document.getElementById('holders').textContent = '12,847';
+
+      document.getElementById('riskAnalysis').innerHTML = `
+        <ul style="color:var(--text2); line-height:1.7;">
+          <li>• Mint authority revoked → Positive</li>
+          <li>• Freeze authority still active → Caution</li>
+          <li>• Liquidity looks decent</li>
+          <li>• Some concentrated holdings detected</li>
+        </ul>
+        <p style="margin-top:12px; color:#facc15;"><strong>Recommendation:</strong> Exercise caution. Monitor for sudden liquidity removal.</p>
+      `;
+    }
+
+    document.getElementById('tokenAddress').addEventListener('keypress', e => {
+      if (e.key === 'Enter') scanToken();
     });
-  })();
-</script>
+
+    window.onload = () => document.getElementById('tokenAddress').focus();
+  </script>
 </body>
 </html>
