@@ -3,45 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Token Scanner — Koschei Web3 Hub</title>
+  <title>Token Scanner — Koschei Pro</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg: #050812;
-      --surface: rgba(255,255,255,.08);
-      --line: rgba(255,255,255,.16);
-      --text: #f7fbff;
-      --text2: #a9b8d6;
-      --accent: #00ff88;
-      --danger: #ff5c7c;
-      --warning: #facc15;
-      --success: #22c55e;
-    }
-    body { background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; margin:0; }
-    .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
-    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px; }
-    h1 { font-size: 36px; margin-bottom: 8px; }
-    .input-group { display: flex; gap: 12px; margin: 24px 0; }
-    input { flex: 1; padding: 14px 18px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--text); font-size: 15px; }
-    button { padding: 14px 28px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), #00ccff); color: #04110b; font-weight: 700; border: none; cursor: pointer; }
-    .result { margin-top: 32px; display: none; }
-    .result.show { display: block; }
-    .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 24px; }
-    .metric { background: rgba(255,255,255,.05); padding: 18px; border-radius: 14px; }
-    .metric-label { color: var(--text2); font-size: 13px; }
-    .metric-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
-    .risk { padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; display: inline-block; margin-top: 12px; }
-    .risk-low { background: rgba(34,197,94,.15); color: #22c55e; }
-    .risk-medium { background: rgba(250,204,21,.15); color: #facc15; }
-    .risk-high { background: rgba(239,68,68,.15); color: #ef4444; }
+    :root { --bg:#050812; --surface:rgba(255,255,255,.08); --line:rgba(255,255,255,.16); --text:#f7fbff; --text2:#a9b8d6; --accent:#00ff88; }
+    body { background:var(--bg); color:var(--text); font-family:Inter, system-ui, sans-serif; margin:0; }
+    .container { max-width:900px; margin:40px auto; padding:0 20px; }
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:32px; }
+    h1 { font-size:36px; margin-bottom:8px; }
+    .pro-badge { display:inline-block; background:linear-gradient(135deg,#00ff88,#69d8ff); color:#04110b; font-size:11px; font-weight:800; padding:3px 10px; border-radius:999px; margin-left:12px; }
+    .input-group { display:flex; gap:12px; margin:24px 0; }
+    input { flex:1; padding:14px 18px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.06); color:var(--text); font-size:15px; }
+    button { padding:14px 28px; border-radius:12px; background:linear-gradient(135deg,var(--accent),#00ccff); color:#04110b; font-weight:700; border:none; cursor:pointer; }
+    .result { margin-top:32px; display:none; }
+    .result.show { display:block; }
+    .metric-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-top:24px; }
+    .metric { background:rgba(255,255,255,.05); padding:18px; border-radius:14px; }
+    .metric-label { color:var(--text2); font-size:13px; }
+    .metric-value { font-size:22px; font-weight:700; margin-top:6px; }
+    .risk { padding:6px 14px; border-radius:999px; font-size:13px; font-weight:700; display:inline-block; margin-top:12px; }
+    .risk-low { background:rgba(34,197,94,.15); color:#22c55e; }
+    .risk-medium { background:rgba(250,204,21,.15); color:#facc15; }
+    .risk-high { background:rgba(239,68,68,.15); color:#ef4444; }
+    .pro-footer { margin-top:50px; text-align:center; padding:30px; background:var(--surface); border-radius:20px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Token Scanner</h1>
-    <p style="color:var(--text2); max-width:620px;">
-      Analyze any Solana token for rug pull risks, authorities, supply, and liquidity health.
-    </p>
+    <h1>Token Scanner <span class="pro-badge">PRO</span></h1>
+    <p style="color:var(--text2); max-width:620px;">Analyze any Solana token for rug pull risks, authorities, supply, and liquidity health. Pro feature.</p>
 
     <div class="card">
       <div class="input-group">
@@ -72,11 +62,16 @@
           </div>
         </div>
 
-        <div style="margin-top: 24px;">
+        <div style="margin-top:24px;">
           <h4>Risk Analysis</h4>
           <div id="riskAnalysis"></div>
         </div>
       </div>
+    </div>
+
+    <div class="pro-footer">
+      <p style="color:var(--text2); margin-bottom:16px;">This is a Pro feature with advanced rug risk detection.</p>
+      <a href="https://www.shopier.com/TradeVisual/47465449" target="_blank" style="display:inline-block; padding:14px 32px; background:linear-gradient(135deg,#00ff88,#69d8ff); color:#04110b; font-weight:700; border-radius:12px; text-decoration:none;">Buy Pro Access</a>
     </div>
   </div>
 
@@ -84,10 +79,7 @@
   <script>
     async function scanToken() {
       const address = document.getElementById('tokenAddress').value.trim();
-      if (!address) {
-        alert('Please enter a token mint address');
-        return;
-      }
+      if (!address) return alert('Please enter a token mint address');
 
       const resultDiv = document.getElementById('result');
       resultDiv.style.display = 'block';
@@ -100,21 +92,19 @@
           method: 'POST',
           body: JSON.stringify({ mint: address })
         });
-
         if (res.ok) {
           const data = await res.json();
           renderTokenResult(data);
         } else {
           renderDemoTokenResult(address);
         }
-      } catch (e) {
+      } catch(e) {
         renderDemoTokenResult(address);
       }
     }
 
     function renderTokenResult(data) {
       document.getElementById('tokenName').textContent = data.name || 'Unknown Token';
-
       const riskEl = document.getElementById('riskBadge');
       const risk = (data.risk_level || 'medium').toLowerCase();
       let riskClass = 'risk-medium';
@@ -126,28 +116,17 @@
       document.getElementById('freezeAuthority').textContent = data.freeze_authority || 'Revoked';
       document.getElementById('supply').textContent = data.supply || '—';
       document.getElementById('holders').textContent = data.holders || '—';
-
       document.getElementById('riskAnalysis').innerHTML = data.analysis || 'No detailed analysis available.';
     }
 
     function renderDemoTokenResult(address) {
       document.getElementById('tokenName').textContent = 'Example Token (Demo)';
       document.getElementById('riskBadge').innerHTML = `<span class="risk risk-medium">MEDIUM RISK</span>`;
-
       document.getElementById('mintAuthority').textContent = 'Revoked';
       document.getElementById('freezeAuthority').textContent = 'Active';
       document.getElementById('supply').textContent = '1,000,000,000';
       document.getElementById('holders').textContent = '12,847';
-
-      document.getElementById('riskAnalysis').innerHTML = `
-        <ul style="color:var(--text2); line-height:1.7;">
-          <li>• Mint authority revoked → Positive</li>
-          <li>• Freeze authority still active → Caution</li>
-          <li>• Liquidity looks decent</li>
-          <li>• Some concentrated holdings detected</li>
-        </ul>
-        <p style="margin-top:12px; color:#facc15;"><strong>Recommendation:</strong> Exercise caution. Monitor for sudden liquidity removal.</p>
-      `;
+      document.getElementById('riskAnalysis').innerHTML = `<ul style="color:var(--text2); line-height:1.7;"><li>• Mint authority revoked → Positive</li><li>• Freeze authority still active → Caution</li><li>• Liquidity looks decent</li></ul>`;
     }
 
     document.getElementById('tokenAddress').addEventListener('keypress', e => {
