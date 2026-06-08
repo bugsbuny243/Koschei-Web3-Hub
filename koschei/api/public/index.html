@@ -1,310 +1,197 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- AdSense verification -->
-  <meta name="google-adsense-account" content="ca-pub-6081394144742471">
-
-  <!-- Google AdSense -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6081394144742471"
-     crossorigin="anonymous"></script>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-1QFWMJJC3');
-  </script>
-
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Koschei Web3 Hub | Solana Security, Intelligence & Automation</title>
-  <meta name="description" content="Koschei Web3 Hub — 3 katmanlı no-custody Solana operasyon platformu. Security, Intelligence ve Automation katmanlarıyla güvenli ve akıllı Web3 deneyimi.">
-  <meta name="keywords" content="Solana security, Solana tools, Web3 hub, no-custody tools, Solana intelligence, rug pull protection, on-chain automation, Solana agents">
-  <meta name="author" content="Koschei Web3 Hub">
-  <meta name="robots" content="index, follow">
-  <link rel="canonical" href="https://tradepigloball.co/">
-
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tradepigloball.co/">
-  <meta property="og:title" content="Koschei Web3 Hub — Security, Intelligence & Automation">
-  <meta property="og:description" content="3 katmanlı no-custody Web3 operasyon hub’ı. Güvenlik, derin analiz ve otomasyon araçları.">
-  <meta property="og:image" content="https://tradepigloball.co/og-image.svg">
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:site" content="@KreatifZihin">
-  <meta name="twitter:title" content="Koschei Web3 Hub — 3 Katmanlı Web3 Operasyon Platformu">
-  <meta name="twitter:description" content="Security • Intelligence • Automation">
-  <meta name="twitter:image" content="https://tradepigloball.co/og-image.svg">
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <meta name="description" content="Koschei Web3 Hub — 3 katmanlı no-custody Solana operasyon platformu.">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
   <style>
     :root {
       --bg: #050812;
-      --bg2: #0a1020;
-      --surface: rgba(255, 255, 255, .08);
-      --surface-strong: rgba(255, 255, 255, .13);
-      --line: rgba(255, 255, 255, .16);
-      --line-strong: rgba(255, 255, 255, .28);
+      --surface: rgba(255,255,255,.08);
+      --line: rgba(255,255,255,.16);
       --text: #f7fbff;
       --text2: #a9b8d6;
       --accent: #00ff88;
       --accent2: #69d8ff;
-      --violet: #a78bfa;
-      --danger: #ff5c7c;
-      --shadow: 0 30px 90px rgba(0, 0, 0, .45);
     }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      min-height: 100vh;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: Inter, system-ui, sans-serif;
       color: var(--text);
-      background:
-        radial-gradient(circle at 15% 8%, rgba(0, 255, 136, .24), transparent 34%),
-        radial-gradient(circle at 86% 12%, rgba(105, 216, 255, .2), transparent 32%),
-        radial-gradient(circle at 58% 78%, rgba(167, 139, 250, .18), transparent 34%),
-        linear-gradient(135deg, #03050b 0%, #07111e 48%, #040811 100%);
-      overflow-x: hidden;
+      background: linear-gradient(135deg, #03050b 0%, #07111e 48%, #040811 100%);
     }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
-      background-size: 54px 54px;
-      mask-image: radial-gradient(circle at center, black, transparent 78%);
-    }
-    a { color: inherit; }
-    .shell { width: min(1160px, calc(100% - 32px)); margin: 0 auto; }
-    .surface {
-      background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.045));
-      border: 1px solid var(--line);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(22px);
-      -webkit-backdrop-filter: blur(22px);
-    }
+    .container { max-width: 1140px; margin: 0 auto; padding: 0 20px; }
     .nav {
-      position: sticky;
-      top: 14px;
-      z-index: 20;
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      gap: 16px;
-      width: min(1160px, calc(100% - 32px));
-      margin: 14px auto 0;
-      padding: 12px 14px;
-      border-radius: 24px;
+      align-items: center;
+      padding: 20px 0;
     }
-    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; text-decoration: none; }
     .brand-mark {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #04110b;
+      border-radius: 10px;
       display: grid;
       place-items: center;
-      width: 38px;
-      height: 38px;
-      border-radius: 14px;
-      color: #06120d;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      box-shadow: 0 0 34px rgba(0, 255, 136, .3);
+      font-weight: 900;
     }
-    .nav-links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-    .nav-link { color: var(--text2); font-size: 13px; font-weight: 600; text-decoration: none; padding: 9px 12px; border-radius: 999px; }
-    .nav-link:hover { color: var(--text); background: rgba(255,255,255,.08); }
+    .nav-links { display: flex; gap: 24px; align-items: center; }
+    .nav-link { color: var(--text2); text-decoration: none; font-weight: 600; }
     .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      min-height: 42px;
-      padding: 0 18px;
+      padding: 12px 24px;
       border-radius: 999px;
-      border: 1px solid var(--line);
-      color: var(--text);
       font-weight: 700;
-      font-size: 14px;
       text-decoration: none;
-      transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+      display: inline-block;
     }
-    .btn:hover { transform: translateY(-2px); border-color: var(--line-strong); }
-    .btn-primary { color: #04110b; border: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 18px 42px rgba(0, 255, 136, .22); }
-    .btn-ghost { background: rgba(255,255,255,.06); }
-    .hero { position: relative; padding: 96px 0 58px; }
-    .hero-grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: 28px; align-items: center; }
-    .eyebrow {
-      display: inline-flex;
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #04110b;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 40px;
       align-items: center;
-      gap: 8px;
-      width: max-content;
-      padding: 8px 13px;
-      border-radius: 999px;
-      color: #bfffe2;
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      background: rgba(0,255,136,.1);
-      border: 1px solid rgba(0,255,136,.24);
+      padding: 80px 0 60px;
     }
-    h1 { margin: 22px 0 18px; font-size: clamp(44px, 7vw, 82px); line-height: .96; letter-spacing: -.07em; }
-    .gradient-text { background: linear-gradient(135deg, #fff, #c7fff0 32%, #82ddff 72%, #d9ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .hero-sub { max-width: 640px; margin: 0 0 16px; color: var(--text2); font-size: clamp(16px, 2vw, 20px); line-height: 1.75; }
-    .hero-copy { max-width: 680px; margin: 0 0 30px; color: #dce8ff; font-size: 16px; line-height: 1.75; }
-    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-    .hero-note { flex-basis: 100%; margin: 4px 0 0; color: var(--text2); font-size: 13px; line-height: 1.7; }
-    .panel { border-radius: 34px; padding: 24px; }
-    .terminal { min-height: 420px; display: flex; flex-direction: column; gap: 16px; }
-    .terminal-top { display: flex; align-items: center; justify-content: space-between; color: var(--text2); font-size: 12px; font-weight: 700; }
-    .dots { display: flex; gap: 7px; }
-    .dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); opacity: .85; }
-    .dots span:nth-child(2) { background: var(--accent2); }
-    .dots span:nth-child(3) { background: var(--violet); }
-    .section { padding: 58px 0; }
-    .section-head { max-width: 720px; margin-bottom: 26px; }
-    .section-kicker { color: var(--accent2); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-    h2 { margin: 10px 0 0; font-size: clamp(30px, 4vw, 48px); line-height: 1.05; letter-spacing: -.04em; }
-    footer { padding: 26px 0 38px; color: var(--text2); font-size: 13px; text-align: center; }
-    footer a { color: var(--accent); text-decoration: none; }
-    @media (max-width: 900px) {
-      .hero { padding-top: 58px; }
-      .hero-grid { grid-template-columns: 1fr; }
+    h1 { font-size: 58px; line-height: 1.0; margin: 0 0 20px; letter-spacing: -.04em; }
+    .gradient-text {
+      background: linear-gradient(135deg, #fff, #c7fff0);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-sub { font-size: 20px; color: var(--text2); max-width: 520px; line-height: 1.6; }
+    .hero-actions { margin-top: 32px; display: flex; gap: 12px; }
+    .section { padding: 60px 0; }
+    .section-head { text-align: center; max-width: 620px; margin: 0 auto 40px; }
+    h2 { font-size: 36px; margin: 0 0 12px; }
+    .layers { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+    .layer-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 32px;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.3s ease;
+    }
+    .layer-card:hover {
+      transform: translateY(-8px);
+      border-color: rgba(255,255,255,.3);
+    }
+    .layer-icon { font-size: 36px; margin-bottom: 20px; }
+    .layer-card h3 { margin: 0 0 12px; font-size: 22px; }
+    .layer-card p { color: var(--text2); line-height: 1.7; margin: 0; }
+    .cta {
+      background: var(--surface);
+      border-radius: 24px;
+      padding: 48px;
+      text-align: center;
+      margin: 40px 0;
+    }
+    footer { text-align: center; padding: 40px 0; color: var(--text2); font-size: 14px; }
+    @media (max-width: 768px) {
+      .hero { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <nav class="nav surface">
-    <a href="/" class="brand" aria-label="Koschei home"><span class="brand-mark">K</span><span>Koschei</span></a>
-    <div class="nav-links">
-      <a href="/hub.html" class="nav-link">Hub</a>
-      <a href="/docs" class="nav-link">Docs</a>
-      <a href="/pricing.html" class="nav-link">Pricing</a>
-      <a href="/login.html" class="nav-link">Sign in</a>
-      <a href="/register.html" class="btn btn-primary">Get started</a>
-    </div>
-  </nav>
-
-  <main>
-    <!-- HERO -->
-    <section class="hero shell">
-      <div class="hero-grid">
-        <div>
-          <div class="eyebrow">⚡ No-custody Solana Intelligence</div>
-          <h1><span class="gradient-text">Koschei Web3 Hub</span></h1>
-          <p class="hero-sub">Güvenlikten otomasyona uzanan 3 katmanlı Web3 operasyon hub’ı.</p>
-          <p class="hero-copy">Analyze risk, gain deep intelligence, and automate on-chain actions — without ever sharing private keys or seed phrases.</p>
-          
-          <div class="hero-actions">
-            <a href="/hub.html" class="btn btn-primary">Open Hub</a>
-            <a href="/docs" class="btn btn-ghost">View Docs</a>
-          </div>
-          <p class="hero-note">No private keys. No seed phrases. Public/read-only Web3 intelligence.</p>
-        </div>
-
-        <aside class="panel surface terminal" aria-label="Koschei live dashboard preview">
-          <div class="terminal-top">
-            <span>koschei://live-stack</span>
-            <div class="dots"><span></span><span></span><span></span></div>
-          </div>
-          <div class="metric-grid">
-            <div class="metric"><small>Architecture</small><strong>No custody</strong></div>
-            <div class="metric"><small>Focus</small><strong>Solana + Multi-chain</strong></div>
-            <div class="metric"><small>AI Studio</small><strong>Ready</strong></div>
-            <div class="metric"><small>Risk Engine</small><strong>Online</strong></div>
-          </div>
-          <div class="chain-strip">
-            <div class="chain-title">Live chain monitoring</div>
-            <div class="chain-list" id="chainList">
-              <div class="chain-pill"><span class="dot"></span> Loading...</div>
-            </div>
-          </div>
-        </aside>
+  <div class="container">
+    <!-- Nav -->
+    <nav class="nav">
+      <a href="/" class="brand">
+        <span class="brand-mark">K</span>
+        <span><strong>Koschei</strong></span>
+      </a>
+      <div class="nav-links">
+        <a href="/hub.html" class="nav-link">Hub</a>
+        <a href="/docs" class="nav-link">Docs</a>
+        <a href="/pricing.html" class="nav-link">Pricing</a>
+        <a href="/login.html" class="nav-link">Sign in</a>
+        <a href="/register.html" class="btn btn-primary">Get started</a>
       </div>
-    </section>
+    </nav>
 
-    <!-- 3 KATMAN -->
-    <section class="section shell">
+    <!-- Hero -->
+    <div class="hero">
+      <div>
+        <div style="display:inline-block; background:rgba(0,255,136,.1); color:#a3ffcc; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:700; margin-bottom:16px;">
+          NO-CUSTODY SOLANA INTELLIGENCE
+        </div>
+        <h1><span class="gradient-text">Koschei Web3 Hub</span></h1>
+        <p class="hero-sub">Güvenlikten otomasyona uzanan 3 katmanlı Web3 operasyon hub’ı.</p>
+
+        <div class="hero-actions">
+          <a href="/hub.html" class="btn btn-primary">Open Hub</a>
+          <a href="/docs" class="btn" style="border:1px solid var(--line); color:var(--text);">View Docs</a>
+        </div>
+        <p style="margin-top:16px; font-size:13px; color:var(--text2);">No private keys. No seed phrases. Public/read-only Web3 intelligence.</p>
+      </div>
+
+      <div class="surface" style="padding:32px; border-radius:24px;">
+        <div style="font-size:13px; color:var(--text2); margin-bottom:8px;">LIVE STACK</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <div style="background:rgba(255,255,255,.08); padding:6px 14px; border-radius:999px; font-size:13px;">Solana</div>
+          <div style="background:rgba(255,255,255,.08); padding:6px 14px; border-radius:999px; font-size:13px;">Ethereum</div>
+          <div style="background:rgba(255,255,255,.08); padding:6px 14px; border-radius:999px; font-size:13px;">Base</div>
+          <div style="background:rgba(255,255,255,.08); padding:6px 14px; border-radius:999px; font-size:13px;">Arbitrum</div>
+        </div>
+        <div style="margin-top:20px; font-size:13px; color:var(--text2);">No custody • AI Studio Ready • Risk Engine Online</div>
+      </div>
+    </div>
+
+    <!-- 3 Layers -->
+    <div class="section">
       <div class="section-head">
-        <div class="section-kicker">Product Layers</div>
-        <h2>Three layers. One powerful hub.</h2>
-        <p style="max-width: 620px; color: var(--text2); margin-top: 12px;">
+        <h2>Three layers.<br>One powerful hub.</h2>
+        <p style="color:var(--text2); max-width:520px; margin:12px auto 0;">
           Koschei organizes its capabilities into three clear layers — from everyday protection to advanced automation.
         </p>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
-        
-        <!-- Security Layer -->
-        <a href="/hub.html#security" class="card surface" style="min-height: 240px; text-decoration: none;">
-          <div class="icon">🛡️</div>
+      <div class="layers">
+        <!-- Security -->
+        <a href="/hub.html#security" class="layer-card">
+          <div class="layer-icon">🛡️</div>
           <h3>Security Layer</h3>
           <p>Quick and reliable tools to scan tokens, detect rugs, evaluate wallets, and protect yourself before interacting on-chain.</p>
-          <p style="margin-top: 20px; font-size: 13px; color: var(--accent); font-weight: 600;">Explore Security Tools →</p>
         </a>
 
-        <!-- Intelligence Layer -->
-        <a href="/hub.html#intelligence" class="card surface" style="min-height: 240px; text-decoration: none;">
-          <div class="icon">🔍</div>
+        <!-- Intelligence -->
+        <a href="/hub.html#intelligence" class="layer-card">
+          <div class="layer-icon">🔍</div>
           <h3>Intelligence Layer</h3>
-          <p>Deep research and analysis tools for builders and serious users. Project evaluation, on-chain relationships, metadata, and advanced insights.</p>
-          <p style="margin-top: 20px; font-size: 13px; color: var(--accent); font-weight: 600;">Explore Intelligence Tools →</p>
+          <p>Deep research and analysis tools for builders. Project evaluation, on-chain relationships, metadata, and advanced insights.</p>
         </a>
 
-        <!-- Automation & Agent Layer -->
-        <a href="/hub.html#automation" class="card surface" style="min-height: 240px; text-decoration: none;">
-          <div class="icon">🤖</div>
+        <!-- Automation -->
+        <a href="/hub.html#automation" class="layer-card">
+          <div class="layer-icon">🤖</div>
           <h3>Automation & Agent Layer</h3>
           <p>The most powerful layer. AI agents and automation tools that can monitor, analyze, and execute actions on your behalf.</p>
-          <p style="margin-top: 20px; font-size: 13px; color: var(--accent); font-weight: 600;">Explore Agents & Automation →</p>
         </a>
-
       </div>
-    </section>
+    </div>
 
     <!-- CTA -->
-    <section class="cta shell surface">
-      <div>
-        <h2>Start building today.</h2>
-        <p>Explore public/read-only Web3 intelligence tools without private keys or seed phrases.</p>
-      </div>
-      <a href="/register.html" class="btn btn-primary">Create account</a>
-    </section>
-  </main>
+    <div class="cta surface">
+      <h2 style="margin:0 0 12px;">Start building today.</h2>
+      <p style="color:var(--text2); max-width:420px; margin:0 auto 24px;">
+        Explore public/read-only Web3 intelligence tools without private keys or seed phrases.
+      </p>
+      <a href="/register.html" class="btn btn-primary">Create free account</a>
+    </div>
 
-  <footer class="shell">
-    © 2026 Koschei · Built on Solana · 
-    <a href="/support">Support</a> · 
-    <a href="/login.html">Sign in</a> · 
-    <a href="/docs">API Docs</a>
-  </footer>
-
-  <script src="/js/koschei-analytics.js?v=1"></script>
-  <script>
-    const chains = ['solana','ethereum','base','arbitrum','polygon','optimism'];
-    const labels = { solana:'Solana', ethereum:'Ethereum', base:'Base', arbitrum:'Arbitrum', polygon:'Polygon', optimism:'Optimism' };
-
-    async function loadChains() {
-      const results = await Promise.allSettled(
-        chains.map(c => fetch(`/api/web3/health?chain=${c}`).then(r => r.json()))
-      );
-      const list = document.getElementById('chainList');
-      if (list) {
-        list.innerHTML = results.map((r, i) => {
-          const ok = r.status === 'fulfilled' && r.value?.ok;
-          const dot = ok ? 'dot-green' : 'dot-red';
-          return `<div class="chain-pill"><span class="dot ${dot}"></span> ${labels[chains[i]]}</div>`;
-        }).join('');
-      }
-    }
-
-    loadChains();
-  </script>
+    <footer>
+      © 2026 Koschei · Built on Solana<br>
+      <a href="/docs" style="color:var(--accent); text-decoration:none;">API Docs</a> · 
+      <a href="/pricing.html" style="color:var(--accent); text-decoration:none;">Pricing</a>
+    </footer>
+  </div>
 </body>
 </html>
