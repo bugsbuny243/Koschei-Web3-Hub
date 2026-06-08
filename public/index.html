@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Koschei Hub | Intelligence</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding-top: 100px; }
+        .search-box { width: 500px; padding: 20px; border: 2px solid #333; border-radius: 8px; }
+        input { width: 100%; padding: 10px; font-size: 16px; border: none; outline: none; }
+    </style>
+</head>
+<body>
+    <h1>Koschei Web3 Hub</h1>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Cüzdan adresi, Token veya Hash yapıştır...">
+    </div>
+    <div id="results" style="margin-top: 20px;"></div>
+
+    <script>
+        document.getElementById('searchInput').addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                const val = e.target.value;
+                const res = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: JSON.stringify({ input: val })
+                });
+                const data = await res.json();
+                document.getElementById('results').innerText = JSON.stringify(data);
+            }
+        });
+    </script>
+</body>
+</html>
