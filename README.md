@@ -119,6 +119,11 @@ User opens Koschei
 → Koschei produces readable scores and explanations
 → no private key or seed phrase is ever requested
 
+
+## Investor Readiness
+
+A detailed Turkish investor-readiness roadmap is available at [`docs/INVESTOR_ROADMAP_TR.md`](docs/INVESTOR_ROADMAP_TR.md). It translates the current MVP into a focused 12-month plan for traction, revenue proof, product depth, and a potential $1M fundraising process.
+
 ## Roadmap
 
 ### Next 3 months
