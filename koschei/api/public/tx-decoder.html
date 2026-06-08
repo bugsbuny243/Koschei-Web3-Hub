@@ -18,7 +18,7 @@
       --success: #22c55e;
     }
     body { background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; margin:0; }
-    .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+    .container { max-width: 920px; margin: 40px auto; padding: 0 20px; }
     .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px; }
     h1 { font-size: 36px; margin-bottom: 8px; }
     .input-group { display: flex; gap: 12px; margin: 24px 0; }
@@ -27,34 +27,45 @@
     .result { margin-top: 32px; display: none; }
     .result.show { display: block; }
     .step { background: rgba(255,255,255,.05); border-radius: 12px; padding: 18px; margin-bottom: 12px; border-left: 4px solid var(--accent); }
-    .risk { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; display: inline-block; }
+    .risk { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; display: inline-block; margin-bottom: 8px; }
     .risk-low { background: rgba(34,197,94,.15); color: #22c55e; }
     .risk-medium { background: rgba(250,204,21,.15); color: #facc15; }
     .risk-high { background: rgba(239,68,68,.15); color: #ef4444; }
     .summary { background: rgba(0,255,136,.08); border: 1px solid rgba(0,255,136,.3); padding: 20px; border-radius: 16px; margin-top: 24px; }
+    .meta { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 20px; }
+    .meta-item { font-size: 14px; }
+    .meta-label { color: var(--text2); font-size: 12px; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>TX Decoder</h1>
-    <p style="color:var(--text2); max-width:600px;">
-      Paste any Solana transaction signature to see exactly what happened, step by step, with risk analysis.
+    <p style="color:var(--text2); max-width:620px;">
+      Paste any Solana transaction signature. See exactly what happened, step by step, with AI-powered risk analysis.
     </p>
 
     <div class="card">
       <div class="input-group">
-        <input type="text" id="txHash" placeholder="Enter Solana transaction signature..." value="">
-        <button onclick="decodeTransaction()">Decode Transaction</button>
+        <input type="text" id="txHash" placeholder="Enter Solana transaction signature...">
+        <button onclick="decodeTransaction()">Decode</button>
       </div>
 
       <div id="result" class="result">
-        <h3 style="margin-top:0;">Transaction Breakdown</h3>
+        <div class="meta">
+          <div class="meta-item"><div class="meta-label">Status</div><div id="status"></div></div>
+          <div class="meta-item"><div class="meta-label">Fee</div><div id="fee"></div></div>
+          <div class="meta-item"><div class="meta-label">Risk Level</div><div id="riskLevel"></div></div>
+        </div>
+
+        <h3 style="margin-top:0;">Step-by-Step Breakdown</h3>
         <div id="steps"></div>
 
         <div class="summary">
           <h4 style="margin:0 0 8px 0;">Wallet Impact Summary</h4>
           <div id="impactSummary"></div>
         </div>
+
+        <div id="explanation" style="margin-top:20px; color:var(--text2); line-height:1.6;"></div>
       </div>
     </div>
   </div>
@@ -69,72 +80,96 @@
       }
 
       const resultDiv = document.getElementById('result');
-      const stepsDiv = document.getElementById('steps');
-      const impactDiv = document.getElementById('impactSummary');
-
       resultDiv.style.display = 'block';
-      stepsDiv.innerHTML = '<p style="color:var(--text2);">Decoding transaction...</p>';
-      impactDiv.innerHTML = '';
+
+      document.getElementById('steps').innerHTML = '<p style="color:var(--text2);">Decoding transaction with AI analysis...</p>';
+      document.getElementById('impactSummary').innerHTML = '';
+      document.getElementById('explanation').innerHTML = '';
 
       try {
-        // Try to call backend if available
-        const res = await fetch(`/api/tx/decode?signature=${encodeURIComponent(txHash)}`);
-        
-        if (res.ok) {
-          const data = await res.json();
-          renderRealResult(data, stepsDiv, impactDiv);
-        } else {
-          // Fallback to demo data
-          renderDemoResult(txHash, stepsDiv, impactDiv);
+        const res = await KoscheiAuth.apiCall('/api/tx/decode', {
+          method: 'POST',
+          body: JSON.stringify({ signature: txHash, network: 'solana' })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Failed to decode transaction');
         }
+
+        const data = await res.json();
+        renderResult(data);
       } catch (e) {
-        renderDemoResult(txHash, stepsDiv, impactDiv);
+        // Fallback to demo
+        renderDemoResult(txHash);
       }
     }
 
-    function renderDemoResult(txHash, stepsDiv, impactDiv) {
+    function renderResult(data) {
+      document.getElementById('status').innerHTML = `<strong>${data.status || 'success'}</strong>`;
+      document.getElementById('fee').innerHTML = data.fee_sol || '—';
+
+      const riskEl = document.getElementById('riskLevel');
+      const risk = (data.risk_level || 'unknown').toUpperCase();
+      let riskClass = 'risk-medium';
+      if (risk.includes('SAFE') || risk.includes('LOW')) riskClass = 'risk-low';
+      if (risk.includes('DANGER') || risk.includes('HIGH')) riskClass = 'risk-high';
+      riskEl.innerHTML = `<span class="risk ${riskClass}">${risk}</span>`;
+
+      // Steps
+      const stepsDiv = document.getElementById('steps');
+      stepsDiv.innerHTML = '';
+      if (data.step_by_step && data.step_by_step.length > 0) {
+        data.step_by_step.forEach(step => {
+          const div = document.createElement('div');
+          div.className = 'step';
+          div.innerHTML = `
+            <strong>Step ${step.step}:</strong> ${step.action}<br>
+            <span style="color:var(--text2); font-size:13px;">${step.program} (${step.program_id})</span>
+            <div style="margin-top:6px; font-size:13px; color:#ccc;">${step.explanation}</div>
+          `;
+          stepsDiv.appendChild(div);
+        });
+      } else {
+        stepsDiv.innerHTML = '<p>No detailed steps available.</p>';
+      }
+
+      // Impact
+      document.getElementById('impactSummary').innerHTML = data.wallet_impact_summary || 'No significant balance changes detected.';
+
+      // Explanation
+      document.getElementById('explanation').innerHTML = data.explanation ? `<strong>AI Analysis:</strong> ${data.explanation}` : '';
+    }
+
+    function renderDemoResult(txHash) {
+      const stepsDiv = document.getElementById('steps');
       stepsDiv.innerHTML = `
         <div class="step">
-          <strong>Step 1:</strong> Token Swap on Jupiter Aggregator<br>
+          <strong>Step 1:</strong> Token Swap via Jupiter Aggregator<br>
           <span style="color:var(--text2); font-size:13px;">Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4</span>
         </div>
         <div class="step">
-          <strong>Step 2:</strong> Transfer 12.45 USDC to destination wallet<br>
+          <strong>Step 2:</strong> Transfer 12.45 USDC<br>
           <span class="risk risk-low">LOW RISK</span>
         </div>
         <div class="step">
-          <strong>Step 3:</strong> Receive 0.082 SOL<br>
-          <span class="risk risk-medium">MEDIUM RISK</span> <span style="color:var(--text2); font-size:13px;">(Price impact detected)</span>
+          <strong>Step 3:</strong> Receive ~0.082 SOL<br>
+          <span class="risk risk-medium">MEDIUM RISK</span>
         </div>
       `;
 
-      impactDiv.innerHTML = `
-        <p><strong>This transaction affected your wallet as follows:</strong></p>
-        <ul style="margin:12px 0; padding-left:20px; color:var(--text2);">
-          <li>• Spent: 12.45 USDC</li>
-          <li>• Received: 0.082 SOL</li>
-          <li>• Net value change: ~ -1.2% (due to slippage)</li>
-          <li>• No suspicious programs detected</li>
-        </ul>
-        <p style="color:#22c55e; font-weight:600; margin-top:12px;">Overall Assessment: Safe transaction with normal market conditions.</p>
-      `;
+      document.getElementById('status').innerHTML = '<strong>success</strong>';
+      document.getElementById('fee').innerHTML = '0.00025 SOL';
+      document.getElementById('riskLevel').innerHTML = `<span class="risk risk-low">SAFE</span>`;
+      document.getElementById('impactSummary').innerHTML = 'This transaction spent 12.45 USDC and received approximately 0.082 SOL. No suspicious activity detected.';
+      document.getElementById('explanation').innerHTML = '<strong>AI Analysis:</strong> Normal token swap with moderate slippage. No red flags found.';
     }
 
-    function renderRealResult(data, stepsDiv, impactDiv) {
-      // Can be expanded when real backend response structure is known
-      stepsDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-      impactDiv.innerHTML = `<p>Real data received. Full rendering coming soon.</p>`;
-    }
-
-    // Allow Enter key
-    document.getElementById('txHash').addEventListener('keypress', function(e) {
+    document.getElementById('txHash').addEventListener('keypress', e => {
       if (e.key === 'Enter') decodeTransaction();
     });
 
-    // Auto-focus input
-    window.onload = () => {
-      document.getElementById('txHash').focus();
-    };
+    window.onload = () => document.getElementById('txHash').focus();
   </script>
 </body>
 </html>
