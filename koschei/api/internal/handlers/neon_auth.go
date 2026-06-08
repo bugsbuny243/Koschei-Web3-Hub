@@ -3,12 +3,10 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strings"
-	"time"
 )
 
 // Neon Auth endpoint'leri
