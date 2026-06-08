@@ -1,34 +1,273 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>TX Decoder — Koschei Pro</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>
-:root{--bg:#050812;--surface:rgba(255,255,255,.08);--line:rgba(255,255,255,.16);--text:#f7fbff;--text2:#a9b8d6;--accent:#00ff88;--accent2:#69d8ff;--danger:#ff5c7c;--warn:#facc15}*{box-sizing:border-box}body{background:radial-gradient(circle at top left,rgba(0,255,136,.16),transparent 34%),var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;margin:0}.container{max-width:980px;margin:0 auto;padding:32px 20px 64px}.nav{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:32px}.nav a{color:var(--text2);text-decoration:none;font-weight:700}.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:28px;margin-top:18px}h1{font-size:42px;margin:0 0 10px}.badge{display:inline-block;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b;font-size:12px;font-weight:900;padding:5px 12px;border-radius:999px;margin-left:10px}.sub{color:var(--text2);max-width:760px;line-height:1.7}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.field{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}label{font-weight:800;font-size:14px}input,textarea,select{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);font:inherit}textarea{min-height:110px}button,.btn{padding:14px 24px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b;font-weight:900;border:0;cursor:pointer;text-decoration:none;display:inline-block}.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--line)}button:disabled{opacity:.65;cursor:wait}.alert{display:none;padding:14px 16px;border-radius:12px;margin-top:16px}.alert.show{display:block}.alert.error{background:rgba(255,92,124,.12);border:1px solid rgba(255,92,124,.5);color:#ffd6de}.alert.credit{background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.5);color:#fff0aa}.result{white-space:pre-wrap;overflow:auto;background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:16px;padding:18px;max-height:620px;color:#dce8ff}.notice{font-size:13px;color:var(--text2);line-height:1.6}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}@media(max-width:700px){h1{font-size:32px}.nav{flex-direction:column;align-items:flex-start}}
-</style></head>
-<body><main class="container"><nav class="nav"><a href="/hub">← Koschei Hub</a><div><a href="/pricing">Buy credits</a> · <a href="/account">Account</a></div></nav><header><h1>TX Decoder<span class="badge">PRO</span></h1><p class="sub">İmzalamadan önce transaction imzasını okunabilir adımlara çevirir; programlar, ücret, bakiye etkisi ve risk uyarılarını gösterir.</p><p class="notice">Production mode: no demo or fabricated data. Every run requires authentication, live backend processing, and module-specific credits. Never enter private keys or seed phrases.</p></header><section class="card"><form id="toolForm"><div class="field"><label for="signature">Transaction signature</label><textarea id="signature" name="signature" placeholder="Solana transaction signature"></textarea></div><div class="field"><label for="network">Network</label><select id="network" name="network"><option value="solana-mainnet">solana-mainnet</option><option value="solana-devnet">solana-devnet</option><option value="solana-testnet">solana-testnet</option></select></div><button id="submit" type="submit">Decode transaction</button></form><div id="message" class="alert"></div><div id="result" class="result" style="display:none"></div></section><section class="card"><strong>Credit cost:</strong> This module has its own credit gate. If you do not have enough credits, the API returns the required and available credit counts.</section></main><script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=4"></script><script>
-const endpoint = '/api/tx/decode';
-const form = document.getElementById('toolForm');
-const submit = document.getElementById('submit');
-const msg = document.getElementById('message');
-const result = document.getElementById('result');
-function showMessage(text, cls='error'){msg.className='alert show '+cls;msg.textContent=text;}
-function clearMessage(){msg.className='alert';msg.textContent='';}
-(async()=>{await KoscheiAuth.init(); KoscheiAuth.requireAuth('/login'); if(window.KoscheiAnalytics) KoscheiAnalytics.track('tx-decoder_view');})();
-form.addEventListener('submit', async (e)=>{
-  e.preventDefault(); clearMessage(); result.style.display='none'; submit.disabled=true; submit.textContent='Working…';
-  try{
-
-      const body = Object.fromEntries(new FormData(form).entries());
-      if (body.addresses) body.addresses = body.addresses.split(/\n|,/).map(v => v.trim()).filter(Boolean);
-    
-    const res = await KoscheiAuth.apiCall(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const data = await res.json().catch(()=>({error:'invalid_response'}));
-    if(!res.ok){
-      if(res.status===402 || data.error==='insufficient_outputs') showMessage(`Insufficient credits. Required: ${data.required_credits ?? '?'}, available: ${data.available_credits ?? 0}.`, 'credit');
-      else showMessage(data.message || data.error || 'Request failed.');
-      return;
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TX Decoder — Koschei Pro</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050812;
+      --surface: rgba(255,255,255,.08);
+      --line: rgba(255,255,255,.16);
+      --text: #f7fbff;
+      --text2: #a9b8d6;
+      --accent: #00ff88;
+      --accent2: #69d8ff;
+      --danger: #ff5c7c;
     }
-    result.textContent = JSON.stringify(data, null, 2); result.style.display='block';
-    if(window.KoscheiAnalytics) KoscheiAnalytics.track('tx-decoder_success');
-  }catch(err){showMessage(err.message || 'Network error.');}
-  finally{submit.disabled=false; submit.textContent='Decode transaction';}
-});
-</script></body></html>
+    * { box-sizing: border-box; }
+    body {
+      background: radial-gradient(circle at top left, rgba(0,255,136,.16), transparent 34%), var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, sans-serif;
+      margin: 0;
+    }
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+    .nav a {
+      color: var(--text2);
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 28px;
+      margin-top: 18px;
+    }
+    h1 {
+      font-size: 42px;
+      margin: 0 0 10px;
+    }
+    .badge {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #04110b;
+      font-size: 12px;
+      font-weight: 900;
+      padding: 5px 12px;
+      border-radius: 999px;
+      margin-left: 10px;
+    }
+    .sub {
+      color: var(--text2);
+      max-width: 760px;
+      line-height: 1.7;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    label {
+      font-weight: 800;
+      font-size: 14px;
+    }
+    textarea, select {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      font: inherit;
+    }
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+    button {
+      padding: 14px 24px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #04110b;
+      font-weight: 900;
+      border: 0;
+      cursor: pointer;
+      width: 100%;
+      font-size: 15px;
+    }
+    button:disabled {
+      opacity: .6;
+      cursor: wait;
+    }
+    .alert {
+      display: none;
+      padding: 14px 16px;
+      border-radius: 12px;
+      margin-top: 16px;
+      font-weight: 600;
+    }
+    .alert.show { display: block; }
+    .alert.error {
+      background: rgba(255,92,124,.12);
+      border: 1px solid rgba(255,92,124,.5);
+      color: #ffd6de;
+    }
+    .alert.credit {
+      background: rgba(250,204,21,.12);
+      border: 1px solid rgba(250,204,21,.5);
+      color: #fff0aa;
+    }
+    .result {
+      white-space: pre-wrap;
+      overflow: auto;
+      background: rgba(0,0,0,.25);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      max-height: 620px;
+      color: #dce8ff;
+      font-family: monospace;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+    .notice {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.6;
+      margin-top: 8px;
+    }
+    .credit-box {
+      background: rgba(0,255,136,.08);
+      border: 1px solid rgba(0,255,136,.3);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 24px;
+      font-size: 14px;
+    }
+    .credit-box strong {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <nav class="nav">
+      <a href="/hub">← Koschei Hub</a>
+      <div>
+        <a href="/pricing">Buy Credits</a> · <a href="/account">Account</a>
+      </div>
+    </nav>
+
+    <header>
+      <h1>TX Decoder <span class="badge">PRO</span></h1>
+      <p class="sub">
+        Decode complex Solana transactions into clear, human-readable steps with risk analysis before signing.
+      </p>
+      <p class="notice">
+        Production mode • Real RPC data • No demo or fabricated results. Requires authentication and credits.
+      </p>
+    </header>
+
+    <section class="card">
+      <form id="toolForm">
+        <div class="field">
+          <label for="signature">Transaction Signature</label>
+          <textarea id="signature" name="signature" placeholder="Enter Solana transaction signature" required></textarea>
+        </div>
+
+        <div class="field">
+          <label for="network">Network</label>
+          <select id="network" name="network">
+            <option value="solana-mainnet">solana-mainnet</option>
+            <option value="solana-devnet">solana-devnet</option>
+          </select>
+        </div>
+
+        <button id="submit" type="submit">Decode Transaction</button>
+      </form>
+
+      <div id="message" class="alert"></div>
+      <div id="result" class="result" style="display:none"></div>
+    </section>
+
+    <section class="card credit-box">
+      <strong>Credit Cost:</strong> 1 credit per decode.<br>
+      If you don't have enough credits, you will be notified with the required amount.
+    </section>
+  </main>
+
+  <script src="/js/koschei-auth.js?v=4"></script>
+  <script src="/js/koschei-analytics.js?v=4"></script>
+  <script>
+    const endpoint = '/api/tx/decode';
+    const form = document.getElementById('toolForm');
+    const submitBtn = document.getElementById('submit');
+    const msg = document.getElementById('message');
+    const resultBox = document.getElementById('result');
+
+    function showMessage(text, cls = 'error') {
+      msg.className = 'alert show ' + cls;
+      msg.textContent = text;
+    }
+
+    function clearMessage() {
+      msg.className = 'alert';
+      msg.textContent = '';
+    }
+
+    // Require login
+    (async () => {
+      await KoscheiAuth.init();
+      KoscheiAuth.requireAuth('/login');
+      if (window.KoscheiAnalytics) KoscheiAnalytics.track('tx-decoder_view');
+    })();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearMessage();
+      resultBox.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Decoding...';
+
+      try {
+        const body = Object.fromEntries(new FormData(form).entries());
+
+        const res = await KoscheiAuth.apiCall(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json().catch(() => ({ error: 'invalid_response' }));
+
+        if (!res.ok) {
+          if (res.status === 402 || data.error === 'insufficient_outputs') {
+            showMessage(
+              `Insufficient credits. Required: ${data.required_credits ?? 1}, Available: ${data.available_credits ?? 0}.`,
+              'credit'
+            );
+          } else {
+            showMessage(data.message || data.error || 'Request failed.');
+          }
+          return;
+        }
+
+        resultBox.textContent = JSON.stringify(data, null, 2);
+        resultBox.style.display = 'block';
+
+        if (window.KoscheiAnalytics) KoscheiAnalytics.track('tx-decoder_success');
+
+      } catch (err) {
+        showMessage(err.message || 'Network error.');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Decode Transaction';
+      }
+    });
+  </script>
+</body>
+</html>
