@@ -119,6 +119,32 @@
     .section-head { margin: 36px 0 18px; }
     h2 { margin: 0 0 8px; font-size: clamp(26px, 3vw, 38px); letter-spacing: -.04em; }
     .section-note { color: var(--text2); line-height: 1.6; }
+    .layer-nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .layer-nav a {
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      color: var(--text2);
+      transition: all 0.2s ease;
+    }
+    .layer-nav a:hover {
+      background: rgba(255,255,255,.08);
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .layer-nav a.active {
+      background: var(--accent);
+      color: #04110b;
+      border-color: var(--accent);
+    }
     .layer-section { margin-bottom: 48px; }
     .modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
     .module-card { position: relative; min-height: 200px; padding: 22px; border-radius: 24px; text-decoration: none; transition: transform .2s ease, border-color .2s ease; }
@@ -165,6 +191,14 @@
       <article class="stat surface"><div class="stat-label">Outputs remaining</div><div class="stat-value" id="userCredits">—</div></article>
       <article class="stat surface"><div class="stat-label">Workspace</div><div class="stat-value">Live</div></article>
     </section>
+
+    <!-- LAYER NAVIGATION -->
+    <div class="layer-nav">
+      <a href="#security">🛡️ Security</a>
+      <a href="#intelligence">🔍 Intelligence</a>
+      <a href="#automation">🤖 Automation & Agents</a>
+      <a href="#account">Account</a>
+    </div>
 
     <!-- SECURITY LAYER -->
     <section id="security" class="layer-section">
@@ -316,7 +350,7 @@
       </div>
     </section>
 
-    <section>
+    <section id="account">
       <div class="section-head">
         <div><h2>Account & Settings</h2></div>
       </div>
