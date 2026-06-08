@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"time"
 )
@@ -342,9 +341,9 @@ func (h *Handler) AdminChat(w http.ResponseWriter, r *http.Request) {
 	apiKey := strings.TrimSpace(os.Getenv("TOGETHER_API_KEY"))
 	if apiKey == "" {
 		writeJSON(w, http.StatusOK, map[string]any{
-			"ok": true,
-			"answer": "Kanka, .env dosyasında TOGETHER_API_KEY bulamadım. Benimle doğal konuşabilmen için anahtarı eklemen lazım. Sistem çalışıyor ama şu an manuel moddayım.",
-			"actions": []any{},
+			"ok":           true,
+			"answer":       adminChatAnswer(message, summary, summaryErr, scan),
+			"actions":      []any{},
 			"used_context": map[string]bool{"summary": summaryErr == nil, "system_scan": true},
 		})
 		return
@@ -364,11 +363,36 @@ SİSTEM TARAMA DURUMU: %s`, string(summaryBytes), string(scanBytes))
 	answer := h.askTogetherAI(apiKey, systemPrompt, message)
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true,
-		"answer": answer,
-		"actions": []any{},
+		"ok":           true,
+		"answer":       answer,
+		"actions":      []any{},
 		"used_context": map[string]bool{"summary": summaryErr == nil, "system_scan": true},
 	})
+}
+
+func adminChatAnswer(message string, summary adminSummary, summaryErr error, scan adminScan) string {
+	if summaryErr != nil {
+		return fmt.Sprintf("Manual mode is available, but the admin summary could not be loaded: %v", summaryErr)
+	}
+
+	normalized := strings.ToLower(strings.TrimSpace(message))
+	statusLine := fmt.Sprintf("System scan status is %s.", scan.Status)
+	if scan.Status == "healthy" || scan.Status == "" {
+		statusLine = "System scan found no warnings."
+	}
+
+	switch {
+	case strings.Contains(normalized, "sistemi tara") || strings.Contains(normalized, "scan"):
+		return statusLine
+	case strings.Contains(normalized, "ödeme") || strings.Contains(normalized, "odeme") || strings.Contains(normalized, "payment"):
+		return fmt.Sprintf("%d pending payment request(s) need review.", summary.PendingPaymentRequestsCount)
+	case strings.Contains(normalized, "watchlist"):
+		return fmt.Sprintf("Watchlist has %d watchlist source(s) and %d web3 event(s).", summary.WatchlistSourcesCount, summary.Web3EventsCount)
+	case strings.Contains(normalized, "alchemy") || strings.Contains(normalized, "chain"):
+		return fmt.Sprintf("Chain monitoring has %d chain health log(s). %s", summary.ChainHealthLogsCount, statusLine)
+	default:
+		return fmt.Sprintf("Totals: %d analytics events, %d outputs, %d web3 events. %s", summary.AnalyticsEventsCount, summary.Web3OutputsCount, summary.Web3EventsCount, statusLine)
+	}
 }
 
 // LLM'e HTTP isteği atan yardımcı fonksiyon
