@@ -1,34 +1,319 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Project Radar — Koschei Pro</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>
-:root{--bg:#050812;--surface:rgba(255,255,255,.08);--line:rgba(255,255,255,.16);--text:#f7fbff;--text2:#a9b8d6;--accent:#00ff88;--accent2:#69d8ff;--danger:#ff5c7c;--warn:#facc15}*{box-sizing:border-box}body{background:radial-gradient(circle at top left,rgba(0,255,136,.16),transparent 34%),var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;margin:0}.container{max-width:980px;margin:0 auto;padding:32px 20px 64px}.nav{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:32px}.nav a{color:var(--text2);text-decoration:none;font-weight:700}.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:28px;margin-top:18px}h1{font-size:42px;margin:0 0 10px}.badge{display:inline-block;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b;font-size:12px;font-weight:900;padding:5px 12px;border-radius:999px;margin-left:10px}.sub{color:var(--text2);max-width:760px;line-height:1.7}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.field{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}label{font-weight:800;font-size:14px}input,textarea,select{width:100%;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);font:inherit}textarea{min-height:110px}button,.btn{padding:14px 24px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110b;font-weight:900;border:0;cursor:pointer;text-decoration:none;display:inline-block}.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--line)}button:disabled{opacity:.65;cursor:wait}.alert{display:none;padding:14px 16px;border-radius:12px;margin-top:16px}.alert.show{display:block}.alert.error{background:rgba(255,92,124,.12);border:1px solid rgba(255,92,124,.5);color:#ffd6de}.alert.credit{background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.5);color:#fff0aa}.result{white-space:pre-wrap;overflow:auto;background:rgba(0,0,0,.22);border:1px solid var(--line);border-radius:16px;padding:18px;max-height:620px;color:#dce8ff}.notice{font-size:13px;color:var(--text2);line-height:1.6}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}@media(max-width:700px){h1{font-size:32px}.nav{flex-direction:column;align-items:flex-start}}
-</style></head>
-<body><main class="container"><nav class="nav"><a href="/hub">← Koschei Hub</a><div><a href="/pricing">Buy credits</a> · <a href="/account">Account</a></div></nav><header><h1>Project Radar<span class="badge">PRO</span></h1><p class="sub">Proje adı, açıklama, website, sosyal ve public wallet/token sinyalleriyle proje risk/fırsat radarını çıkarır.</p><p class="notice">Production mode: no demo or fabricated data. Every run requires authentication, live backend processing, and module-specific credits. Never enter private keys or seed phrases.</p></header><section class="card"><form id="toolForm"><div class="field"><label for="project_name">Project name</label><input id="project_name" name="project_name" type="text" placeholder="Project name"></div><div class="field"><label for="category">Category</label><select id="category" name="category"><option value="defi">defi</option><option value="nft">nft</option><option value="dao">dao</option><option value="game">game</option><option value="wallet">wallet</option><option value="infrastructure">infrastructure</option><option value="public_good">public_good</option><option value="other">other</option></select></div><div class="field"><label for="description">Description</label><textarea id="description" name="description" placeholder="What does this project do?"></textarea></div><div class="field"><label for="website_url">Website URL</label><input id="website_url" name="website_url" type="text" placeholder="https://example.org"></div><div class="field"><label for="twitter_handle">X/Twitter</label><input id="twitter_handle" name="twitter_handle" type="text" placeholder="@project"></div><div class="field"><label for="github_url">GitHub URL</label><input id="github_url" name="github_url" type="text" placeholder="https://github.com/org/repo"></div><div class="field"><label for="token_mint_address">Token mint address</label><input id="token_mint_address" name="token_mint_address" type="text" placeholder="Optional Solana mint"></div><div class="field"><label for="public_wallet_address">Public wallet address</label><input id="public_wallet_address" name="public_wallet_address" type="text" placeholder="Optional public wallet"></div><div class="field"><label for="ecosystem">Ecosystem</label><input id="ecosystem" name="ecosystem" type="text" placeholder="Solana"></div><div class="field"><label for="known_traction">Known traction</label><textarea id="known_traction" name="known_traction" placeholder="Users, grants, partners, volume, etc."></textarea></div><div class="field"><label for="notes">Notes</label><textarea id="notes" name="notes" placeholder="Optional review notes"></textarea></div><button id="submit" type="submit">Analyze project</button></form><div id="message" class="alert"></div><div id="result" class="result" style="display:none"></div></section><section class="card"><strong>Credit cost:</strong> This module has its own credit gate. If you do not have enough credits, the API returns the required and available credit counts.</section></main><script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=4"></script><script>
-const endpoint = '/api/project-radar/scan';
-const form = document.getElementById('toolForm');
-const submit = document.getElementById('submit');
-const msg = document.getElementById('message');
-const result = document.getElementById('result');
-function showMessage(text, cls='error'){msg.className='alert show '+cls;msg.textContent=text;}
-function clearMessage(){msg.className='alert';msg.textContent='';}
-(async()=>{await KoscheiAuth.init(); KoscheiAuth.requireAuth('/login'); if(window.KoscheiAnalytics) KoscheiAnalytics.track('project-radar_view');})();
-form.addEventListener('submit', async (e)=>{
-  e.preventDefault(); clearMessage(); result.style.display='none'; submit.disabled=true; submit.textContent='Working…';
-  try{
-
-      const body = Object.fromEntries(new FormData(form).entries());
-      if (body.addresses) body.addresses = body.addresses.split(/\n|,/).map(v => v.trim()).filter(Boolean);
-    
-    const res = await KoscheiAuth.apiCall(endpoint, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const data = await res.json().catch(()=>({error:'invalid_response'}));
-    if(!res.ok){
-      if(res.status===402 || data.error==='insufficient_outputs') showMessage(`Insufficient credits. Required: ${data.required_credits ?? '?'}, available: ${data.available_credits ?? 0}.`, 'credit');
-      else showMessage(data.message || data.error || 'Request failed.');
-      return;
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Radar — Koschei Pro</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050812;
+      --surface: rgba(255,255,255,.08);
+      --line: rgba(255,255,255,.16);
+      --text: #f7fbff;
+      --text2: #a9b8d6;
+      --accent: #00ff88;
+      --accent2: #69d8ff;
+      --danger: #ff5c7c;
     }
-    result.textContent = JSON.stringify(data, null, 2); result.style.display='block';
-    if(window.KoscheiAnalytics) KoscheiAnalytics.track('project-radar_success');
-  }catch(err){showMessage(err.message || 'Network error.');}
-  finally{submit.disabled=false; submit.textContent='Analyze project';}
-});
-</script></body></html>
+    * { box-sizing: border-box; }
+    body {
+      background: radial-gradient(circle at top left, rgba(0,255,136,.16), transparent 34%), var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, sans-serif;
+      margin: 0;
+    }
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+    .nav a {
+      color: var(--text2);
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 28px;
+      margin-top: 18px;
+    }
+    h1 {
+      font-size: 42px;
+      margin: 0 0 10px;
+    }
+    .badge {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #04110b;
+      font-size: 12px;
+      font-weight: 900;
+      padding: 5px 12px;
+      border-radius: 999px;
+      margin-left: 10px;
+    }
+    .sub {
+      color: var(--text2);
+      max-width: 760px;
+      line-height: 1.7;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    label {
+      font-weight: 800;
+      font-size: 14px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      font: inherit;
+    }
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+    button {
+      padding: 14px 24px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #04110b;
+      font-weight: 900;
+      border: 0;
+      cursor: pointer;
+      width: 100%;
+      font-size: 15px;
+    }
+    button:disabled {
+      opacity: .6;
+      cursor: wait;
+    }
+    .alert {
+      display: none;
+      padding: 14px 16px;
+      border-radius: 12px;
+      margin-top: 16px;
+      font-weight: 600;
+    }
+    .alert.show { display: block; }
+    .alert.error {
+      background: rgba(255,92,124,.12);
+      border: 1px solid rgba(255,92,124,.5);
+      color: #ffd6de;
+    }
+    .alert.credit {
+      background: rgba(250,204,21,.12);
+      border: 1px solid rgba(250,204,21,.5);
+      color: #fff0aa;
+    }
+    .result {
+      white-space: pre-wrap;
+      overflow: auto;
+      background: rgba(0,0,0,.25);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+      max-height: 620px;
+      color: #dce8ff;
+      font-family: monospace;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+    .notice {
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.6;
+      margin-top: 8px;
+    }
+    .credit-box {
+      background: rgba(0,255,136,.08);
+      border: 1px solid rgba(0,255,136,.3);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 24px;
+      font-size: 14px;
+    }
+    .credit-box strong {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <nav class="nav">
+      <a href="/hub">← Koschei Hub</a>
+      <div>
+        <a href="/pricing">Buy Credits</a> · <a href="/account">Account</a>
+      </div>
+    </nav>
+
+    <header>
+      <h1>Project Radar <span class="badge">PRO</span></h1>
+      <p class="sub">
+        Analyze new or existing projects for risk and opportunity signals using on-chain and public data.
+      </p>
+      <p class="notice">
+        Production mode • Real data • No demo or fabricated results. Requires authentication and credits.
+      </p>
+    </header>
+
+    <section class="card">
+      <form id="toolForm">
+        <div class="field">
+          <label for="project_name">Project Name</label>
+          <input id="project_name" name="project_name" type="text" placeholder="Project name" required>
+        </div>
+
+        <div class="field">
+          <label for="category">Category</label>
+          <select id="category" name="category">
+            <option value="defi">DeFi</option>
+            <option value="nft">NFT</option>
+            <option value="dao">DAO</option>
+            <option value="game">Game</option>
+            <option value="wallet">Wallet</option>
+            <option value="infrastructure">Infrastructure</option>
+            <option value="public_good">Public Good</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" placeholder="What does this project do?"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="website_url">Website URL</label>
+          <input id="website_url" name="website_url" type="text" placeholder="https://example.com">
+        </div>
+
+        <div class="field">
+          <label for="twitter_handle">X / Twitter</label>
+          <input id="twitter_handle" name="twitter_handle" type="text" placeholder="@project">
+        </div>
+
+        <div class="field">
+          <label for="github_url">GitHub URL</label>
+          <input id="github_url" name="github_url" type="text" placeholder="https://github.com/org/repo">
+        </div>
+
+        <div class="field">
+          <label for="token_mint_address">Token Mint Address (optional)</label>
+          <input id="token_mint_address" name="token_mint_address" type="text" placeholder="Solana mint address">
+        </div>
+
+        <div class="field">
+          <label for="public_wallet_address">Public Wallet Address (optional)</label>
+          <input id="public_wallet_address" name="public_wallet_address" type="text" placeholder="Solana wallet">
+        </div>
+
+        <div class="field">
+          <label for="known_traction">Known Traction</label>
+          <textarea id="known_traction" name="known_traction" placeholder="Users, grants, partners, volume, etc."></textarea>
+        </div>
+
+        <div class="field">
+          <label for="notes">Notes (optional)</label>
+          <textarea id="notes" name="notes" placeholder="Any additional notes..."></textarea>
+        </div>
+
+        <button id="submit" type="submit">Analyze Project</button>
+      </form>
+
+      <div id="message" class="alert"></div>
+      <div id="result" class="result" style="display:none"></div>
+    </section>
+
+    <section class="card credit-box">
+      <strong>Credit Cost:</strong> 1 credit per analysis.<br>
+      If you don't have enough credits, you will be notified with the required amount.
+    </section>
+  </main>
+
+  <script src="/js/koschei-auth.js?v=4"></script>
+  <script src="/js/koschei-analytics.js?v=4"></script>
+  <script>
+    const endpoint = '/api/project-radar/scan';
+    const form = document.getElementById('toolForm');
+    const submitBtn = document.getElementById('submit');
+    const msg = document.getElementById('message');
+    const resultBox = document.getElementById('result');
+
+    function showMessage(text, cls = 'error') {
+      msg.className = 'alert show ' + cls;
+      msg.textContent = text;
+    }
+
+    function clearMessage() {
+      msg.className = 'alert';
+      msg.textContent = '';
+    }
+
+    // Require login
+    (async () => {
+      await KoscheiAuth.init();
+      KoscheiAuth.requireAuth('/login');
+      if (window.KoscheiAnalytics) KoscheiAnalytics.track('project-radar_view');
+    })();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearMessage();
+      resultBox.style.display = 'none';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Analyzing...';
+
+      try {
+        const body = Object.fromEntries(new FormData(form).entries());
+
+        const res = await KoscheiAuth.apiCall(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        const data = await res.json().catch(() => ({ error: 'invalid_response' }));
+
+        if (!res.ok) {
+          if (res.status === 402 || data.error === 'insufficient_outputs') {
+            showMessage(
+              `Insufficient credits. Required: ${data.required_credits ?? 1}, Available: ${data.available_credits ?? 0}.`,
+              'credit'
+            );
+          } else {
+            showMessage(data.message || data.error || 'Request failed.');
+          }
+          return;
+        }
+
+        resultBox.textContent = JSON.stringify(data, null, 2);
+        resultBox.style.display = 'block';
+
+        if (window.KoscheiAnalytics) KoscheiAnalytics.track('project-radar_success');
+
+      } catch (err) {
+        showMessage(err.message || 'Network error.');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Analyze Project';
+      }
+    });
+  </script>
+</body>
+</html>
