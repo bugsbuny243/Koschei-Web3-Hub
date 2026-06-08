@@ -119,7 +119,6 @@
       .topbar { flex-direction: column; gap: 12px; align-items: flex-start; }
       .nav-links { flex-wrap: wrap; }
       .layer-nav { gap: 6px; }
-      .layer-nav a { padding: 8px 14px; font-size: 13px; }
     }
   </style>
 </head>
@@ -175,9 +174,9 @@
 
     <!-- Layer Navigation -->
     <div class="layer-nav">
-      <a href="#security" class="active">🛡️ Security</a>
-      <a href="#intelligence">🔍 Intelligence</a>
-      <a href="#automation">🤖 Automation</a>
+      <a href="#security" class="active">🛡️ Security Layer</a>
+      <a href="#intelligence">🔍 Intelligence Layer</a>
+      <a href="#automation">🤖 Automation & Agents</a>
       <a href="#account">Account</a>
     </div>
 
@@ -189,17 +188,19 @@
       <div class="modules">
         <a href="/wallet-score.html" class="module-card surface">
           <div class="module-name">Wallet Score</div>
-          <div class="module-desc">Get an instant reputation score for any Solana wallet.</div>
-          <span style="display:inline-block; margin-top:14px; padding:4px 10px; background:rgba(0,255,136,.1); color:#a3ffcc; border-radius:999px; font-size:11px; font-weight:700;">LIVE</span>
+          <div class="module-desc">Get an instant reputation score for any Solana wallet based on on-chain activity and trust signals.</div>
         </a>
         <a href="/token-scanner.html" class="module-card surface">
           <div class="module-name">Token Scanner</div>
-          <div class="module-desc">Analyze any Solana token for rug pull risks and liquidity health.</div>
-          <span style="display:inline-block; margin-top:14px; padding:4px 10px; background:rgba(0,255,136,.1); color:#a3ffcc; border-radius:999px; font-size:11px; font-weight:700;">LIVE</span>
+          <div class="module-desc">Analyze any Solana token for rug pull risks, liquidity health before trading.</div>
+        </a>
+        <a href="/launches.html" class="module-card surface">
+          <div class="module-name">Rug Radar</div>
+          <div class="module-desc">Monitor new token launches in real-time with community-driven safety data.</div>
         </a>
         <a href="/risk.html" class="module-card surface">
           <div class="module-name">Risk Scanner</div>
-          <div class="module-desc">Review on-chain risk signals before interacting with projects.</div>
+          <div class="module-desc">Review on-chain risk signals before interacting with wallets or projects.</div>
         </a>
       </div>
     </div>
@@ -207,38 +208,45 @@
     <!-- INTELLIGENCE LAYER -->
     <div id="intelligence" class="layer-section" style="margin-top:50px;">
       <h2 style="margin:0 0 8px; font-size:26px;">🔍 Intelligence Layer</h2>
-      <p style="color:var(--text2); margin-bottom:20px;">Deep analysis and research tools.</p>
+      <p style="color:var(--text2); margin-bottom:20px;">Deep analysis and research tools for builders.</p>
 
       <div class="modules">
         <a href="/project-radar.html" class="module-card surface">
           <div class="module-name">Project Radar</div>
-          <div class="module-desc">Discover and evaluate early-stage projects.</div>
+          <div class="module-desc">Discover and evaluate early-stage projects using public signals and opportunity scoring.</div>
         </a>
         <a href="/tx-decoder.html" class="module-card surface">
           <div class="module-name">TX Decoder</div>
-          <div class="module-desc">Decode complex transactions into clear summaries.</div>
-          <span style="display:inline-block; margin-top:14px; padding:4px 10px; background:rgba(0,255,136,.1); color:#a3ffcc; border-radius:999px; font-size:11px; font-weight:700;">LIVE</span>
+          <div class="module-desc">Decode complex Solana transactions into clear, human-readable summaries and insights.</div>
         </a>
         <a href="/portfolio.html" class="module-card surface">
           <div class="module-name">Portfolio Tracker</div>
-          <div class="module-desc">Track balances across multiple wallets.</div>
+          <div class="module-desc">Track SOL and token balances across multiple wallets in one unified dashboard.</div>
+        </a>
+        <a href="/metadata.html" class="module-card surface">
+          <div class="module-name">Metadata Studio</div>
+          <div class="module-desc">Generate professional NFT and project metadata using AI.</div>
         </a>
       </div>
     </div>
 
-    <!-- AUTOMATION LAYER -->
+    <!-- AUTOMATION & AGENT LAYER -->
     <div id="automation" class="layer-section" style="margin-top:50px;">
       <h2 style="margin:0 0 8px; font-size:26px;">🤖 Automation & Agent Layer</h2>
-      <p style="color:var(--text2); margin-bottom:20px;">AI agents and automation tools.</p>
+      <p style="color:var(--text2); margin-bottom:20px;">AI agents and automation tools for advanced users.</p>
 
       <div class="modules">
         <a href="/agent-api.html" class="module-card surface">
           <div class="module-name">Agent API</div>
-          <div class="module-desc">Build and deploy autonomous AI agents on Solana.</div>
+          <div class="module-desc">Access developer endpoints to build and deploy autonomous AI agents on Solana.</div>
         </a>
         <a href="/watchlist.html" class="module-card surface">
           <div class="module-name">Watchlist & Events</div>
-          <div class="module-desc">Real-time monitoring and alerts.</div>
+          <div class="module-desc">Set up real-time monitoring and alerts for wallet and contract activity.</div>
+        </a>
+        <a href="/risk-v2.html" class="module-card surface">
+          <div class="module-name">Risk Engine</div>
+          <div class="module-desc">Get structured, evidence-based risk analysis and actionable recommendations.</div>
         </a>
       </div>
     </div>
