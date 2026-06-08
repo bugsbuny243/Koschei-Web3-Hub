@@ -20,7 +20,7 @@
     .container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
     h1 { font-size: 42px; margin-bottom: 8px; }
     .subtitle { color: var(--text2); font-size: 18px; max-width: 600px; }
-    .tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-top: 40px; }
+    .tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 40px; }
     .tier { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px; }
     .tier h3 { margin: 0 0 8px; font-size: 24px; }
     .tier .price { font-size: 36px; font-weight: 800; margin: 12px 0; }
@@ -28,6 +28,7 @@
     .tier .btn { display: block; text-align: center; margin-top: 24px; padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 700; }
     .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #04110b; }
     .layer-label { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; display: inline-block; margin-bottom: 12px; }
+    .starter { background: rgba(0,255,136,.1); color: #00ff88; }
     .intelligence { background: rgba(105,216,255,.1); color: #69d8ff; }
     .automation { background: rgba(167,139,250,.1); color: #a78bfa; }
   </style>
@@ -43,9 +44,24 @@
 
   <div class="container">
     <h1>Pro Plans</h1>
-    <p class="subtitle">Unlock full access to Koschei Web3 Hub. No free tier. Pay only for what you need.</p>
+    <p class="subtitle">No free tier. Pay only for what you need. All plans are no-custody.</p>
 
     <div class="tiers">
+      <!-- Starter Pack -->
+      <div class="tier">
+        <span class="layer-label starter">Starter</span>
+        <h3>Starter Pack</h3>
+        <div class="price">899 TL</div>
+        <p style="color:var(--text2); margin:8px 0 16px;">1 proje çıktısı</p>
+        <ul>
+          <li>1 Web3 proje/asset metadata çıktısı</li>
+          <li>JSON metadata formatı</li>
+          <li>Risk & Trust checklist</li>
+          <li>Launch page metin taslağı</li>
+        </ul>
+        <a href="https://www.shopier.com/TradeVisual/47465449" target="_blank" class="btn btn-primary">Buy Starter Pack</a>
+      </div>
+
       <!-- Builder Tier -->
       <div class="tier">
         <span class="layer-label intelligence">Intelligence Layer</span>
