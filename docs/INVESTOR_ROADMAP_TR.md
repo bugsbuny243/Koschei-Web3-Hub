@@ -36,7 +36,77 @@ Yatırımcının görmek isteyeceği 5 kanıt:
 4. **Gelir yolu:** Freemium + pay-per-tool + developer API + ekip planı net fiyatlanmalı.
 5. **Defensibility:** Risk graph, labeled wallet/event dataset, scoring methodology ve ecosystem integrations zamanla veri hendekleri oluşturmalı.
 
-## 3. 12 Aylık Yol Haritası
+
+## 3. Dürüst Fizibilite: Bu Modüllerle $1M Hedef Mümkün mü?
+
+**Kısa cevap:** Evet, mümkün; ama **modül sayısı fazla olduğu için değil**, bu modüller tek bir keskin ürüne dönüştürülürse mümkün. Bugünkü haliyle sadece "çok araçlı Web3 paneli" olarak kalırsa $1M yatırım hedefi zayıf kalır ve zaman kaybı riski yüksektir. Yatırımcı modül listesinden çok şu soruya bakar: **"Bu ürün tekrar tekrar kullanılan, para ödenen ve savunulabilir bir risk intelligence altyapısına dönüşüyor mu?"**
+
+### Go / No-Go Kararı
+
+| Karar | Anlamı |
+| --- | --- |
+| **Devam et** | Token Scanner, Wallet Score, Risk Scanner ve TX Decoder tek bir "Risk Intelligence Core" olarak birleştirilirse. |
+| **Pivot et** | Modüller bağımsız demo araçları olarak kalır, kullanıcı retention ve ödeme niyeti oluşmazsa. |
+| **Durdur / küçült** | 60 gün içinde haftalık scan, kayıtlı kullanıcı, pilot görüşmesi ve ödeme/LOI sinyali gelmezse. |
+
+### Modül Bazında Yatırım Değeri
+
+| Modül | Yatırım Değeri | Neden | Yapılması Gereken |
+| --- | --- | --- | --- |
+| **Token Scanner** | Çok yüksek | Web3 kullanıcılarının acil problemi: sahte token, rug, authority, metadata riski. | Ana demo ürünü yap; evidence, confidence, risk explanation, shareable report ekle. |
+| **Wallet Score** | Çok yüksek | Kullanıcı, proje ve API müşterileri için tekrar kullanılabilir reputation katmanı. | Davranış sinyalleri, wallet age, risky interactions, bot/sybil pattern, segment labels ekle. |
+| **Risk Scanner** | Yüksek | Token + wallet + project sinyallerini tek risk kararına bağlayabilir. | Diğer modüllerin çıktısını birleştiren ana scoring engine yap. |
+| **TX Decoder** | Yüksek | En anlaşılır kullanıcı problemi: "Bu transaction ne yapıyor, riskli mi?" | Human-readable summary, risk warning ve action recommendation ekle. |
+| **Metadata Studio** | Orta | Builder utility olarak faydalı; tek başına VC-grade ana ürün değil. | Token Scanner ile bağla: metadata risk/fake project detection sinyali üret. |
+| **Watchlist** | Yüksek | Retention yaratır; kullanıcıyı bir kez değil sürekli geri getirir. | Alert, webhook, email, API subscription ve team watchlist ekle. |
+| **Chain Health Monitor** | Orta | Güven ve public-good tarafını destekler; ana gelir ürünü olmayabilir. | Public Impact ve API status güven katmanı olarak konumlandır. |
+| **Funding Assistant** | Düşük-Orta | Grant/public-good hikayesini destekler; ana yatırım tezi olmamalı. | Grant pipeline ve ecosystem relationship aracı olarak tut, core ürünü gölgelemesin. |
+| **Public Impact Dashboard** | Yüksek destekleyici | Yatırımcıya traction ve public-good kanıtı gösterir. | Scan count, WAU, API calls, conversion, retention, revenue/LOI metrikleri ekle. |
+
+### Net Odak Önerisi
+
+Bu modülleri yatırımcıya ayrı ayrı sunmak yerine tek ürün cümlesiyle paketlemek gerekir:
+
+**"Koschei Risk Intelligence Core: Token, wallet ve transaction risklerini evidence-backed skor, açıklama, watchlist alert ve API çıktısına dönüştüren no-custody Solana intelligence layer."**
+
+Bu paketleme içinde:
+
+1. **Token Scanner** acquisition/demodur.
+2. **Wallet Score** reputation data layer'dır.
+3. **Risk Scanner** decision engine'dir.
+4. **TX Decoder** kullanıcı güveni ve conversion aracıdır.
+5. **Watchlist** retention motorudur.
+6. **Public Impact Dashboard** yatırımcı/partner kanıt panelidir.
+7. **Metadata Studio, Chain Health, Funding Assistant** destekleyici modüllerdir; ana hikayeyi dağıtmamalıdır.
+
+### 60 Günlük Kanıt Eşiği
+
+Boşa vakit harcamamak için 60 gün sonunda şu eşiklerden en az 4'ü görülmeli:
+
+- [ ] Haftalık **500+ başarılı scan**.
+- [ ] **100+ kayıtlı kullanıcı**.
+- [ ] **%25+ weekly returning user** veya anlamlı tekrar scan davranışı.
+- [ ] **10+ Solana builder/founder pilot görüşmesi**.
+- [ ] **3+ ödeme niyeti / LOI / paid pilot**.
+- [ ] En az **1 partner entegrasyon görüşmesi**: wallet, launchpad, community, security tool veya RPC/API sağlayıcı.
+- [ ] Public Impact Dashboard'da yatırımcıya gösterilecek canlı traction metrikleri.
+
+Bu eşikler tutmazsa hedef küçültülmeli: önce grant + public-good + küçük API geliriyle devam edilmeli, büyük VC turu ertelenmelidir.
+
+### İlk 30 Günlük Ürün Kararı
+
+İlk 30 günün ana işi yeni modül eklemek değil, mevcut modülleri tek risk akışına bağlamaktır:
+
+1. Kullanıcı token/wallet/tx girer.
+2. Koschei public data okur.
+3. Risk Scanner ortak skor üretir.
+4. Token Scanner, Wallet Score ve TX Decoder aynı evidence formatını kullanır.
+5. Sonuç shareable report ve watchlist alert'e dönüşür.
+6. Public Impact Dashboard toplam scan, risk category, API usage ve conversion gösterir.
+
+**Karar:** Bu odakla ilerlenirse $1M hedefi için denemeye değer. Bu odak olmadan sadece modül listesi büyütülürse hedef gerçekçi değildir.
+
+## 4. 12 Aylık Yol Haritası
 
 ### Faz 0 — İlk 2 Hafta: Yatırımcıya Hazır Netlik
 
@@ -93,7 +163,7 @@ Yatırımcının görmek isteyeceği 5 kanıt:
 
 **Başarı kriteri:** $10K+ MRR veya güçlü enterprise/API LOI, 10K+ weekly scans, ölçülebilir retention, partner integration, yatırım görüşmelerinde lead investor.
 
-## 4. Önceliklendirilmiş İş Listesi
+## 5. Önceliklendirilmiş İş Listesi
 
 ### P0 — Hemen Başlanacaklar
 
@@ -119,7 +189,7 @@ Yatırımcının görmek isteyeceği 5 kanıt:
 - Investor CRM ve data room.
 - Partner outreach kit.
 
-## 5. Yatırım Kullanım Planı ($1M Örnek)
+## 6. Yatırım Kullanım Planı ($1M Örnek)
 
 | Alan | Yaklaşık Pay | Amaç |
 | --- | ---: | --- |
@@ -130,7 +200,7 @@ Yatırımcının görmek isteyeceği 5 kanıt:
 | Design & Product | 10% | UX, reporting, onboarding, demo flows |
 | Buffer | 5% | Operasyonel esneklik |
 
-## 6. Haftalık Çalışma Ritmi
+## 7. Haftalık Çalışma Ritmi
 
 - **Pazartesi:** Metrics review + bu haftanın tek ana hedefi.
 - **Salı-Çarşamba:** Ürün geliştirme ve test.
@@ -138,6 +208,6 @@ Yatırımcının görmek isteyeceği 5 kanıt:
 - **Cuma:** Public changelog, investor update draft, demo kaydı.
 - **Hafta sonu:** Grant/pitch materyali ve içerik.
 
-## 7. İlk Çalışma Adımı
+## 8. İlk Çalışma Adımı
 
 Bu PR ile ilk adım olarak yatırım yol haritası dokümante edildi ve README'den erişilebilir hale getirildi. Sıradaki önerilen kod işi: Public Impact/Admin Analytics tarafına haftalık yatırımcı metrik snapshot'ı eklemek ve landing page'de üç ana demo akışını öne çıkarmak.
