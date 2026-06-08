@@ -353,33 +353,33 @@ func adminChatAnswer(message string, summary adminSummary, summaryErr error, sca
 		}
 	}
 	sort.Strings(problems)
-	next := "Next action: review the highlighted checks and refresh the relevant tab."
+	next := "Next action: review Members, Packages, or Koschei Chat in the simplified admin panel."
 	if summaryErr != nil {
 		return "❌ Critical — Summary data could not be read. " + next
 	}
 	switch {
 	case strings.Contains(m, "modül") || strings.Contains(m, "module"):
-		return "✅ OK — All 10 Koschei Web3 Intelligence OS module foundations are registered. Review the Modules tab for public/admin status."
+		return "✅ OK — The public product is locked to six Pro production modules: TX Decoder, Token Scanner / Rug Checker, Wallet Score / Reputation, Risk Scanner, Portfolio Tracker, and Project Radar. Admin module screens are hidden."
 	case strings.Contains(m, "grant başvuru") || strings.Contains(m, "grant application"):
-		return "✅ OK — Grant Autopilot is ready to generate copy-ready template drafts. It never submits applications automatically."
+		return "✅ OK — Grant Autopilot is no longer exposed in the active product surface."
 	case strings.Contains(m, "impact"):
-		return "✅ OK — The safe public Proof-of-Impact page is available at /impact."
+		return "✅ OK — Public impact is no longer an active module page in the simplified product surface."
 	case strings.Contains(m, "agent api"):
-		return "✅ OK — The read-only Agent API foundation is ready; admin-created scoped keys are required."
+		return "✅ OK — Agent API is not exposed in the active six-module product surface."
 	case strings.Contains(m, "x402"):
-		return "✅ OK — x402 pay-per-tool foundation is present and disabled by default; no fund movement is implemented."
+		return "✅ OK — Credit-based Pro access is active; x402 remains disabled."
 	case strings.Contains(m, "cross-chain") || strings.Contains(m, "cross chain"):
-		return "✅ OK — Cross-chain Risk Monitor provides preliminary checklists and makes no unsupported bridge-detection claims."
+		return "✅ OK — Cross-chain Risk Monitor is not exposed; use Risk Scanner for general risk review."
 	case strings.Contains(m, "sybil"):
-		return "✅ OK — The optional Sybil layer is ready and stores no biometric or identity-document data."
+		return "✅ OK — Sybil Check is not exposed in the active product surface."
 	case strings.Contains(m, "risk engine") || strings.Contains(m, "risk v2"):
-		return "✅ OK — Risk Engine v2 returns preliminary structured scores, evidence, red flags, and recommendations."
+		return "✅ OK — Risk Scanner is the active risk module; Risk Engine v2 is not exposed."
 	case strings.Contains(m, "ödeme") || strings.Contains(m, "payment") || strings.Contains(m, "gelir"):
 		return fmt.Sprintf("%s — %d pending payment request(s). Approved/rejected history is available in Payments. %s", severity, summary.PendingPaymentRequestsCount, next)
 	case strings.Contains(m, "kredi") || strings.Contains(m, "credit"):
 		return fmt.Sprintf("%s — %d active entitlement(s), %d total outputs remaining. %s", severity, summary.ActiveEntitlementsCount, summary.TotalOutputsRemaining, next)
-	case strings.Contains(m, "watchlist"):
-		return fmt.Sprintf("%s — %d watchlist source(s) and %d web3 event(s) recorded. %s", severity, summary.WatchlistSourcesCount, summary.Web3EventsCount, next)
+	case strings.Contains(m, "wallet") || strings.Contains(m, "token") || strings.Contains(m, "transaction"):
+		return fmt.Sprintf("%s — Six Pro modules are active and credit-gated. Total generated outputs: %d. %s", severity, summary.Web3OutputsCount, next)
 	case strings.Contains(m, "alchemy") || strings.Contains(m, "chain"):
 		return fmt.Sprintf("%s — %d chain health log(s); latest check: %s. %s", severity, summary.ChainHealthLogsCount, formatAdminTime(summary.LatestChainCheckTime), next)
 	case strings.Contains(m, "bugün") || strings.Contains(m, "today") || strings.Contains(m, "aktiv") || strings.Contains(m, "activity"):

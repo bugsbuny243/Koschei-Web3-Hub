@@ -23,7 +23,7 @@ func TestStaticRootServesWeb3HubIndex(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", res.StatusCode, http.StatusOK, body)
 	}
-	for _, want := range []string{"Koschei Web3 Hub", "Solana Security Tools", "Token Scanner", "TX Decoder", "google-adsense-account", "ca-pub-6081394144742471", "G-1QFWMJJC3"} {
+	for _, want := range []string{"Koschei Web3 Hub", "Pro Web3 Intelligence", "Token Scanner", "TX Decoder", "google-adsense-account", "ca-pub-6081394144742471", "G-1QFWMJJC3"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("root index missing %q", want)
 		}

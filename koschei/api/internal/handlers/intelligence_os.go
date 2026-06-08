@@ -582,20 +582,15 @@ func (h *Handler) SybilCheck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ToolPrices(w http.ResponseWriter, r *http.Request) {
-	rows, e := h.DB.Query(`SELECT tool_key,display_name,price_usd,payment_mode FROM tool_usage_prices ORDER BY tool_key`)
-	if e != nil {
-		writeJSON(w, 500, map[string]string{"error": "db_failed"})
-		return
+	tools := []map[string]any{
+		{"tool_key": "tx_decoder", "display_name": "TX Decoder", "credits": ToolCreditCost("tx_decoder"), "payment_mode": "credits", "enforced": true},
+		{"tool_key": "token_scanner", "display_name": "Token Scanner / Rug Checker", "credits": ToolCreditCost("token_scanner"), "payment_mode": "credits", "enforced": true},
+		{"tool_key": "wallet_score", "display_name": "Wallet Score / Reputation", "credits": ToolCreditCost("wallet_score"), "payment_mode": "credits", "enforced": true},
+		{"tool_key": "risk_scanner", "display_name": "Risk Scanner", "credits": ToolCreditCost("risk_scanner"), "payment_mode": "credits", "enforced": true},
+		{"tool_key": "portfolio_tracker", "display_name": "Portfolio Tracker", "credits": ToolCreditCost("portfolio_tracker"), "payment_mode": "credits", "enforced": true},
+		{"tool_key": "project_radar", "display_name": "Project Radar", "credits": ToolCreditCost("project_radar"), "payment_mode": "credits", "enforced": true},
 	}
-	defer rows.Close()
-	a := []map[string]any{}
-	for rows.Next() {
-		var k, n, m string
-		var p float64
-		_ = rows.Scan(&k, &n, &p, &m)
-		a = append(a, map[string]any{"tool_key": k, "display_name": n, "price_usd": p, "payment_mode": m, "enforced": os.Getenv("KOSCHEI_X402_ENABLED") == "true" && m == "x402_ready"})
-	}
-	writeJSON(w, 200, map[string]any{"ok": true, "x402_enabled": os.Getenv("KOSCHEI_X402_ENABLED") == "true", "tools": a})
+	writeJSON(w, 200, map[string]any{"ok": true, "x402_enabled": false, "tools": tools})
 }
 func (h *Handler) AdminToolUsage(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {

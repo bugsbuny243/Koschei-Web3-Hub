@@ -55,7 +55,7 @@ func TestAdminChatSupportsReadOnlyOperationalPrompts(t *testing.T) {
 		"Sistemi tara":            "System scan found no warnings",
 		"Bugün neler olmuş?":      "Totals: 6 analytics events, 7 outputs, 4 web3 events",
 		"Ödeme bekleyen var mı?":  "2 pending payment request(s)",
-		"Watchlist çalışıyor mu?": "3 watchlist source(s) and 4 web3 event(s)",
+		"Wallet modülü aktif mi?": "six Pro production modules",
 		"Alchemy çalışıyor mu?":   "5 chain health log(s)",
 	}
 	for prompt, want := range tests {

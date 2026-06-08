@@ -21,22 +21,20 @@ func (e insufficientCreditsError) Error() string {
 
 func ToolCreditCost(tool string) int {
 	switch strings.ToLower(strings.TrimSpace(tool)) {
-	case "chain_health":
-		return 0
-	case "watchlist_add_source", "watchlist_sync", "wallet_score":
-		return 1
-	case "token_scanner", "token_scan", "tx_decoder", "tx_decode", "metadata_studio", "metadata", "risk_scanner", "risk_scan", "portfolio_tracker", "airdrop_checker":
+	case "tx_decoder", "tx_decode":
 		return 2
-	case "program_scanner", "program_scan", "smart_money", "rug_radar", "project_radar":
+	case "token_scanner", "token_scan", "rug_checker":
+		return 2
+	case "wallet_score", "wallet_reputation":
+		return 2
+	case "risk_scanner", "risk_scan":
 		return 3
-	case "risk_v2", "cross_chain_risk", "sybil_check", "tx_decoder_pro", "tx_decode_pro":
-		return 4
-	case "intelligence_graph", "funding_assistant", "artifact_generate", "artifact_generation", "runtime_project":
-		return 5
-	case "ai_generate", "ai_generation", "chat", "code", "reason", "build_analyzer", "game_design", "game_code":
+	case "portfolio_tracker":
+		return 3
+	case "project_radar":
 		return 4
 	default:
-		return 1
+		return 0
 	}
 }
 

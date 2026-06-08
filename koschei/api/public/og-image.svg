@@ -1,25 +1,15 @@
-<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1200" height="630" fill="#030309"/>
-  <rect x="0" y="0" width="600" height="630" fill="url(#grad1)" opacity="0.3"/>
-  <defs>
-    <radialGradient id="grad1" cx="0%" cy="0%">
-      <stop offset="0%" style="stop-color:#7c3aed"/>
-      <stop offset="100%" style="stop-color:transparent"/>
-    </radialGradient>
-    <radialGradient id="grad2" cx="100%" cy="100%">
-      <stop offset="0%" style="stop-color:#00ccff"/>
-      <stop offset="100%" style="stop-color:transparent"/>
-    </radialGradient>
-  </defs>
-  <rect x="600" y="0" width="600" height="630" fill="url(#grad2)" opacity="0.2"/>
-  <text x="80" y="200" font-family="Inter,sans-serif" font-size="72" font-weight="800" fill="#00ff88">K</text>
-  <text x="140" y="200" font-family="Inter,sans-serif" font-size="52" font-weight="700" fill="#ffffff">Koschei</text>
-  <text x="80" y="280" font-family="Inter,sans-serif" font-size="32" font-weight="400" fill="#8888aa">Web3 Intelligence Hub for Solana</text>
-  <text x="80" y="370" font-family="Inter,sans-serif" font-size="24" fill="#00ff88">🪙 Token Scanner</text>
-  <text x="80" y="415" font-family="Inter,sans-serif" font-size="24" fill="#00ccff">🔍 TX Decoder</text>
-  <text x="80" y="460" font-family="Inter,sans-serif" font-size="24" fill="#7c3aed">🏆 Wallet Score</text>
-  <text x="600" y="370" font-family="Inter,sans-serif" font-size="24" fill="#ffaa00">🔬 Program Scanner</text>
-  <text x="600" y="415" font-family="Inter,sans-serif" font-size="24" fill="#00ff88">📡 Chain Health API</text>
-  <text x="600" y="460" font-family="Inter,sans-serif" font-size="24" fill="#00ccff">🪂 Airdrop Checker</text>
-  <text x="80" y="570" font-family="Inter,sans-serif" font-size="20" fill="#444466">tradepigloball.co</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#00ff88"/><stop offset="1" stop-color="#69d8ff"/></linearGradient></defs>
+  <rect width="1200" height="630" fill="#050812"/>
+  <circle cx="160" cy="90" r="220" fill="#00ff88" opacity="0.12"/>
+  <circle cx="980" cy="520" r="240" fill="#69d8ff" opacity="0.12"/>
+  <text x="80" y="145" font-family="Inter,Arial,sans-serif" font-size="34" font-weight="800" fill="url(#g)">Koschei Web3 Hub</text>
+  <text x="80" y="225" font-family="Inter,Arial,sans-serif" font-size="64" font-weight="900" fill="#f7fbff">Pro Web3 Intelligence</text>
+  <text x="80" y="285" font-family="Inter,Arial,sans-serif" font-size="28" fill="#a9b8d6">Six production modules. No demo data. No custody.</text>
+  <text x="120" y="380" font-family="Inter,Arial,sans-serif" font-size="25" fill="#00ff88">TX Decoder</text>
+  <text x="120" y="425" font-family="Inter,Arial,sans-serif" font-size="25" fill="#00ff88">Token Scanner / Rug Checker</text>
+  <text x="120" y="470" font-family="Inter,Arial,sans-serif" font-size="25" fill="#00ff88">Wallet Score / Reputation</text>
+  <text x="650" y="380" font-family="Inter,Arial,sans-serif" font-size="25" fill="#69d8ff">Risk Scanner</text>
+  <text x="650" y="425" font-family="Inter,Arial,sans-serif" font-size="25" fill="#69d8ff">Portfolio Tracker</text>
+  <text x="650" y="470" font-family="Inter,Arial,sans-serif" font-size="25" fill="#69d8ff">Project Radar</text>
 </svg>
