@@ -116,21 +116,20 @@
     .stat { min-height: 150px; padding: 22px; border-radius: 28px; }
     .stat-label { color: var(--text2); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
     .stat-value { margin-top: 14px; font-size: clamp(26px, 4vw, 38px); font-weight: 800; letter-spacing: -.04em; }
-    .section-head { margin: 36px 0 18px; display: flex; align-items: end; justify-content: space-between; gap: 16px; }
-    h2 { margin: 0; font-size: clamp(26px, 3vw, 38px); letter-spacing: -.04em; }
-    .section-note { margin: 8px 0 0; color: var(--text2); line-height: 1.6; }
-    .modules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .module-card { position: relative; min-height: 220px; padding: 24px; border-radius: 28px; text-decoration: none; overflow: hidden; transition: transform .2s ease, border-color .2s ease; }
-    .module-card::after { content: ""; position: absolute; inset: auto -30% -45% 30%; height: 120px; background: radial-gradient(circle, rgba(0,255,136,.18), transparent 68%); pointer-events: none; }
+    .section-head { margin: 36px 0 18px; }
+    h2 { margin: 0 0 8px; font-size: clamp(26px, 3vw, 38px); letter-spacing: -.04em; }
+    .section-note { color: var(--text2); line-height: 1.6; }
+    .layer-section { margin-bottom: 48px; }
+    .modules { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .module-card { position: relative; min-height: 200px; padding: 22px; border-radius: 24px; text-decoration: none; transition: transform .2s ease, border-color .2s ease; }
     .module-card:hover { transform: translateY(-4px); border-color: var(--line-strong); }
-    .module-icon { font-size: 32px; margin-bottom: 18px; }
-    .module-name { font-size: 19px; font-weight: 800; margin-bottom: 10px; }
-    .module-desc { color: var(--text2); font-size: 14px; line-height: 1.65; }
-    .module-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; padding: 7px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .module-icon { font-size: 28px; margin-bottom: 14px; }
+    .module-name { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+    .module-desc { color: var(--text2); font-size: 14px; line-height: 1.6; }
+    .module-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; padding: 6px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
     .tag-live { color: #bfffe2; background: rgba(0,255,136,.1); border: 1px solid rgba(0,255,136,.24); }
-    .tag-core { color: #cfeeff; background: rgba(105,216,255,.1); border: 1px solid rgba(105,216,255,.24); }
-    @media (max-width: 930px) { .hero, .stats, .modules { grid-template-columns: 1fr; } }
-    @media (max-width: 560px) { .topbar { position: static; } .nav-links { width: 100%; justify-content: flex-start; } h1 { letter-spacing: -.045em; } }
+    .tag-beta { color: #ffeaa7; background: rgba(255, 193, 7, .1); border: 1px solid rgba(255, 193, 7, .3); }
+    @media (max-width: 768px) { .hero, .stats { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -148,14 +147,14 @@
       <div class="hero-card surface">
         <div class="eyebrow">◈ authenticated workspace</div>
         <h1><span class="gradient-text">Your Koschei Web3 command center.</span></h1>
-        <p class="page-sub">Manage account status, monitor remaining outputs, and jump into Koschei's core no-custody tools from one focused member surface.</p>
+        <p class="page-sub">Manage your workspace across three layers: Security, Intelligence, and Automation.</p>
       </div>
       <aside class="profile-card surface">
         <div>
           <div class="profile-label">Signed in as</div>
           <div class="profile-email" id="userEmail">Loading…</div>
         </div>
-        <div class="profile-label">No private keys · Read-only tooling · Builder first</div>
+        <div class="profile-label">No private keys · Read-only tooling</div>
       </aside>
     </section>
 
@@ -167,59 +166,172 @@
       <article class="stat surface"><div class="stat-label">Workspace</div><div class="stat-value">Live</div></article>
     </section>
 
-    <section>
+    <!-- SECURITY LAYER -->
+    <section id="security" class="layer-section">
       <div class="section-head">
-        <div><h2>Quick links</h2><p class="section-note">Open the module you need and keep shipping.</p></div>
+        <div>
+          <h2>🛡️ Security Layer</h2>
+          <p class="section-note">Quick protection and risk detection tools.</p>
+        </div>
       </div>
       <div class="modules">
-        <a href="/wallet-score.html" class="module-card surface"><div class="module-icon">🏆</div><div class="module-name">Wallet Score</div><div class="module-desc">Instant reputation score for any Solana wallet with trust signals, activity history, and AI analysis.</div><div class="module-tag tag-live">● Live</div></a>
-        <a href="/token-scanner.html" class="surface module-card">
-          <div class="module-top"><div class="module-icon-wrap">🪙</div><div class="live-dot">Live</div></div>
+        <a href="/wallet-score.html" class="module-card surface">
+          <div class="module-icon">🏆</div>
+          <div class="module-name">Wallet Score</div>
+          <div class="module-desc">Instant reputation score and trust signals for any Solana wallet.</div>
+          <div class="module-tag tag-live">● Live</div>
+        </a>
+        <a href="/token-scanner.html" class="module-card surface">
+          <div class="module-icon">🪙</div>
           <div class="module-name">Token Scanner</div>
-          <div class="module-desc">Security analysis for any Solana token. Detect rug risks before you buy.</div>
+          <div class="module-desc">Security analysis and rug risk detection for Solana tokens.</div>
+          <div class="module-tag tag-live">● Live</div>
         </a>
-        <a href="/portfolio.html" class="surface module-card">
-          <div class="module-top"><div class="module-icon-wrap">💼</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Portfolio Tracker</div>
-          <div class="module-desc">Track SOL and token balances across multiple wallets.</div>
-        </a>
-        <a href="/smart-money.html" class="surface module-card">
-          <div class="module-top"><div class="module-icon-wrap">🐋</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Smart Money</div>
-          <div class="module-desc">Track whale wallets and foundation accounts on Solana.</div>
-        </a>
-        <a href="/airdrop-checker.html" class="surface module-card">
-          <div class="module-top"><div class="module-icon-wrap">🪂</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Airdrop Checker</div>
-          <div class="module-desc">Check wallet eligibility for active and upcoming Solana airdrops.</div>
-        </a>
-        <a href="/metadata" class="module-card surface"><div class="module-icon">🧬</div><div class="module-name">Metadata</div><div class="module-desc">Prepare project, NFT, and publishing metadata for your Web3 launch.</div><div class="module-tag tag-core">Core</div></a>
-        <a href="/risk" class="module-card surface"><div class="module-icon">🛡️</div><div class="module-name">Risk</div><div class="module-desc">Review Web3 activity risk signals before interacting with projects or wallets.</div><div class="module-tag tag-core">Core</div></a>
-        <a href="/watchlist" class="module-card surface"><div class="module-icon">🔔</div><div class="module-name">Watchlist</div><div class="module-desc">Track public wallet or contract activity with Alchemy API polling.</div><div class="module-tag tag-live">● Live</div></a>
-        <a href="/chains" class="module-card surface"><div class="module-icon">📡</div><div class="module-name">Chains</div><div class="module-desc">Explore supported blockchain networks and live health surfaces.</div><div class="module-tag tag-core">Core</div></a>
-        <a href="/tx-decoder.html" class="module-card surface"><div class="module-icon">🧾</div><div class="module-name">TX Decoder</div><div class="module-desc">Decode transaction data into clearer human-readable insights.</div><div class="module-tag tag-live">● Live</div></a>
-        <div style="grid-column:1/-1;margin-top:20px"><h2>Advanced Intelligence</h2><p class="section-sub">User-facing intelligence, builder, and developer modules.</p></div>
-        <a href="/project-radar" class="module-card surface"><div class="module-icon">📡</div><div class="module-name">Project Radar</div><div class="module-desc">Discover and evaluate early Solana/Web3 projects using public signals, metadata quality, risk hints and opportunity scoring.</div><div class="module-tag tag-live">BETA / PRO</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/graph" class="module-card surface"><div class="module-icon">🕸️</div><div class="module-name">Intelligence Graph</div><div class="module-desc">Analyze relationships in your public watchlist activity.</div><div class="module-tag tag-live">Live</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/risk-v2" class="module-card surface"><div class="module-icon">🧠</div><div class="module-name">Risk Engine v2</div><div class="module-desc">Get structured preliminary risk evidence and recommendations.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/tx-decoder-pro" class="module-card surface"><div class="module-icon">🔬</div><div class="module-name">TX Decoder Pro</div><div class="module-desc">Turn public transaction hashes into readable summaries.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/cross-chain-risk" class="module-card surface"><div class="module-icon">🌉</div><div class="module-name">Cross-chain Risk Monitor</div><div class="module-desc">Review bridge and route risks with a practical checklist.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/sybil-check" class="module-card surface"><div class="module-icon">🧩</div><div class="module-name">Sybil Check</div><div class="module-desc">Run a privacy-aware anti-abuse signal checklist.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/funding-assistant" class="module-card surface"><div class="module-icon">🚀</div><div class="module-name">Builder Funding Assistant</div><div class="module-desc">Prepare copy-ready grant, bounty, and funding drafts.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/docs" class="module-card surface"><div class="module-icon">📚</div><div class="module-name">Developer Docs</div><div class="module-desc">Integrate Koschei with public API and SDK examples.</div><div class="module-tag tag-live">Live</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/impact" class="module-card surface"><div class="module-icon">🌍</div><div class="module-name">Public Impact Page</div><div class="module-desc">See Koschei’s safe public metrics and roadmap.</div><div class="module-tag tag-live">Live</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/agent-api" class="module-card surface"><div class="module-icon">🤖</div><div class="module-name">Agent API</div><div class="module-desc">Explore developer endpoints for agent workflows.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/pay-per-tool" class="module-card surface"><div class="module-icon">⚡</div><div class="module-name">Pay-per-Tool API</div><div class="module-desc">Preview the disabled-by-default x402 tool foundation.</div><div class="module-tag tag-core">Coming soon</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/account" class="module-card surface"><div class="module-icon">👤</div><div class="module-name">Account</div><div class="module-desc">View your member account details, plan status, and entitlement summary.</div><div class="module-tag tag-core">Core</div></a>
-        <a href="/launches.html" class="surface module-card" style="--hover-gradient:linear-gradient(135deg,rgba(255,68,102,.08),transparent);">
-          <div class="module-top"><div class="module-icon-wrap">🚨</div><div class="live-dot">Live</div></div>
+        <a href="/launches.html" class="module-card surface">
+          <div class="module-icon">🚨</div>
           <div class="module-name">Rug Radar</div>
-          <div class="module-desc">Real-time token launch monitor. Community-driven rug pull safety database.</div>
+          <div class="module-desc">Real-time token launch monitoring and community rug database.</div>
+          <div class="module-tag tag-live">● Live</div>
         </a>
-        <a href="/program-scanner.html" class="surface module-card" style="--hover-gradient:linear-gradient(135deg,rgba(255,68,102,.06),transparent);">
-          <div class="module-top"><div class="module-icon-wrap">🔬</div><div class="live-dot">Live</div></div>
+        <a href="/risk.html" class="module-card surface">
+          <div class="module-icon">🛡️</div>
+          <div class="module-name">Risk Scanner</div>
+          <div class="module-desc">On-chain risk signals before interacting with projects or wallets.</div>
+          <div class="module-tag tag-core">Core</div>
+        </a>
+        <a href="/sybil-check.html" class="module-card surface">
+          <div class="module-icon">🧩</div>
+          <div class="module-name">Sybil Check</div>
+          <div class="module-desc">Privacy-aware anti-abuse and Sybil resistance signals.</div>
+          <div class="module-tag tag-beta">Beta</div>
+        </a>
+        <a href="/airdrop-checker.html" class="module-card surface">
+          <div class="module-icon">🪂</div>
+          <div class="module-name">Airdrop Checker</div>
+          <div class="module-desc">Check eligibility for active and upcoming Solana airdrops.</div>
+          <div class="module-tag tag-live">● Live</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- INTELLIGENCE LAYER -->
+    <section id="intelligence" class="layer-section">
+      <div class="section-head">
+        <div>
+          <h2>🔍 Intelligence Layer</h2>
+          <p class="section-note">Deep analysis and research tools for builders.</p>
+        </div>
+      </div>
+      <div class="modules">
+        <a href="/project-radar.html" class="module-card surface">
+          <div class="module-icon">📡</div>
+          <div class="module-name">Project Radar</div>
+          <div class="module-desc">Evaluate early projects using public signals, metadata, and risk scoring.</div>
+          <div class="module-tag tag-beta">Beta</div>
+        </a>
+        <a href="/graph.html" class="module-card surface">
+          <div class="module-icon">🕸️</div>
+          <div class="module-name">Intelligence Graph</div>
+          <div class="module-desc">Analyze relationships in your watchlist activity.</div>
+          <div class="module-tag tag-live">● Live</div>
+        </a>
+        <a href="/program-scanner.html" class="module-card surface">
+          <div class="module-icon">🔬</div>
           <div class="module-name">Program Scanner</div>
-          <div class="module-desc">AI security analysis for Solana programs. Detect vulnerabilities and upgrade risks.</div>
+          <div class="module-desc">AI-powered security analysis for Solana programs.</div>
+          <div class="module-tag tag-live">● Live</div>
+        </a>
+        <a href="/cross-chain-risk.html" class="module-card surface">
+          <div class="module-icon">🌉</div>
+          <div class="module-name">Cross-chain Risk Monitor</div>
+          <div class="module-desc">Review bridge and cross-chain route risks.</div>
+          <div class="module-tag tag-beta">Beta</div>
+        </a>
+        <a href="/tx-decoder.html" class="module-card surface">
+          <div class="module-icon">🧾</div>
+          <div class="module-name">TX Decoder</div>
+          <div class="module-desc">Decode transactions into human-readable insights.</div>
+          <div class="module-tag tag-live">● Live</div>
+        </a>
+        <a href="/portfolio.html" class="module-card surface">
+          <div class="module-icon">💼</div>
+          <div class="module-name">Portfolio Tracker</div>
+          <div class="module-desc">Track balances across multiple Solana wallets.</div>
+          <div class="module-tag tag-live">● Live</div>
+        </a>
+        <a href="/smart-money.html" class="module-card surface">
+          <div class="module-icon">🐋</div>
+          <div class="module-name">Smart Money</div>
+          <div class="module-desc">Track whale wallets and smart money activity.</div>
+          <div class="module-tag tag-live">● Live</div>
+        </a>
+        <a href="/metadata.html" class="module-card surface">
+          <div class="module-icon">🧬</div>
+          <div class="module-name">Metadata Studio</div>
+          <div class="module-desc">Generate professional NFT and project metadata with AI.</div>
+          <div class="module-tag tag-core">Core</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- AUTOMATION & AGENT LAYER -->
+    <section id="automation" class="layer-section">
+      <div class="section-head">
+        <div>
+          <h2>🤖 Automation & Agent Layer</h2>
+          <p class="section-note">AI agents and automation tools for advanced users.</p>
+        </div>
+      </div>
+      <div class="modules">
+        <a href="/agent-api.html" class="module-card surface">
+          <div class="module-icon">🤖</div>
+          <div class="module-name">Agent API</div>
+          <div class="module-desc">Developer endpoints for building autonomous agents.</div>
+          <div class="module-tag tag-beta">Beta</div>
+        </a>
+        <a href="/watchlist.html" class="module-card surface">
+          <div class="module-icon">🔔</div>
+          <div class="module-name">Watchlist & Events</div>
+          <div class="module-desc">Monitor wallets and contracts with real-time alerts.</div>
+          <div class="module-tag tag-live">● Live</div>
+        </a>
+        <a href="/risk-v2.html" class="module-card surface">
+          <div class="module-icon">🧠</div>
+          <div class="module-name">Risk Engine v2</div>
+          <div class="module-desc">Advanced risk analysis with structured evidence.</div>
+          <div class="module-tag tag-beta">Beta</div>
+        </a>
+        <a href="/funding-assistant.html" class="module-card surface">
+          <div class="module-icon">🚀</div>
+          <div class="module-name">Builder Funding Assistant</div>
+          <div class="module-desc">Generate grant and funding application drafts.</div>
+          <div class="module-tag tag-beta">Beta</div>
+        </a>
+        <a href="/tx-decoder-pro.html" class="module-card surface">
+          <div class="module-icon">🔬</div>
+          <div class="module-name">TX Decoder Pro</div>
+          <div class="module-desc">Advanced transaction summarization.</div>
+          <div class="module-tag tag-beta">Beta</div>
+        </a>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div><h2>Account & Settings</h2></div>
+      </div>
+      <div class="modules">
+        <a href="/account.html" class="module-card surface">
+          <div class="module-icon">👤</div>
+          <div class="module-name">Account</div>
+          <div class="module-desc">View your plan, credits, and account details.</div>
+          <div class="module-tag tag-core">Core</div>
+        </a>
+        <a href="/docs" class="module-card surface">
+          <div class="module-icon">📚</div>
+          <div class="module-name">Developer Docs</div>
+          <div class="module-desc">API documentation and integration guides.</div>
+          <div class="module-tag tag-live">● Live</div>
         </a>
       </div>
     </section>
@@ -232,20 +344,18 @@
       await KoscheiAuth.init();
       if (!KoscheiAuth.requireAuth()) return;
       KoscheiAnalytics.track('hub_view');
-      document.getElementById('userEmail').textContent =
-        KoscheiAuth.getEmail() || '';
+
+      document.getElementById('userEmail').textContent = KoscheiAuth.getEmail() || '';
+
       try {
-        try {
-          await KoscheiAuth.apiCall('/api/auth/provision', { method: 'POST' });
-        } catch {
-          // Summary provisioning is also idempotent, so continue if this warm-up fails.
-        }
+        await KoscheiAuth.apiCall('/api/auth/provision', { method: 'POST' });
         const res = await KoscheiAuth.apiCall('/api/member/summary');
-        if (!res || !res.ok) throw new Error('Member summary unavailable');
-        const data = await res.json();
-        document.getElementById('userEmail').textContent = data.email || KoscheiAuth.getEmail() || '';
-        document.getElementById('userPlan').textContent = data.plan || 'free';
-        document.getElementById('userCredits').textContent = data.outputs_remaining ?? 0;
+        if (res && res.ok) {
+          const data = await res.json();
+          document.getElementById('userEmail').textContent = data.email || KoscheiAuth.getEmail() || '';
+          document.getElementById('userPlan').textContent = data.plan || 'free';
+          document.getElementById('userCredits').textContent = data.outputs_remaining ?? 0;
+        }
       } catch {
         const message = document.getElementById('memberMessage');
         message.textContent = 'Account is active. Member data is being prepared.';
@@ -255,5 +365,3 @@
   </script>
 </body>
 </html>
-
-<!-- Hub loads the updated auth script so Neon callback tokens in the URL hash are saved before auth checks. -->
