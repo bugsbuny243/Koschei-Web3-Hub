@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://tradepigloball.co/sitemap.xml
