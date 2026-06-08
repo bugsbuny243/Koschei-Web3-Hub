@@ -193,6 +193,10 @@
     const jwt = getJwt();
     const headers = { ...(options.headers || {}) };
     if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
+    if (typeof window.adminPassword === 'function') {
+      const adminPassword = window.adminPassword();
+      if (adminPassword && !headers['x-admin-password']) headers['x-admin-password'] = adminPassword;
+    }
     try {
       return await fetch(path, { ...options, headers });
     } catch { return null; }
