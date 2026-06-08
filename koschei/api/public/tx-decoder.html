@@ -3,173 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TX Decoder — Koschei Web3 Hub</title>
+  <title>TX Decoder — Koschei Pro</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg: #050812;
-      --surface: rgba(255,255,255,.08);
-      --line: rgba(255,255,255,.16);
-      --text: #f7fbff;
-      --text2: #a9b8d6;
-      --accent: #00ff88;
-      --danger: #ff5c7c;
-      --warning: #facc15;
-      --success: #22c55e;
-    }
-    body { background: var(--bg); color: var(--text); font-family: Inter, system-ui, sans-serif; margin:0; }
-    .container { max-width: 920px; margin: 40px auto; padding: 0 20px; }
-    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 32px; }
-    h1 { font-size: 36px; margin-bottom: 8px; }
-    .input-group { display: flex; gap: 12px; margin: 24px 0; }
-    input { flex: 1; padding: 14px 18px; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.06); color: var(--text); font-size: 15px; }
-    button { padding: 14px 28px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), #00ccff); color: #04110b; font-weight: 700; border: none; cursor: pointer; }
-    .result { margin-top: 32px; display: none; }
-    .result.show { display: block; }
-    .step { background: rgba(255,255,255,.05); border-radius: 12px; padding: 18px; margin-bottom: 12px; border-left: 4px solid var(--accent); }
-    .risk { padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; display: inline-block; margin-bottom: 8px; }
-    .risk-low { background: rgba(34,197,94,.15); color: #22c55e; }
-    .risk-medium { background: rgba(250,204,21,.15); color: #facc15; }
-    .risk-high { background: rgba(239,68,68,.15); color: #ef4444; }
-    .summary { background: rgba(0,255,136,.08); border: 1px solid rgba(0,255,136,.3); padding: 20px; border-radius: 16px; margin-top: 24px; }
-    .meta { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 20px; }
-    .meta-item { font-size: 14px; }
-    .meta-label { color: var(--text2); font-size: 12px; }
+    :root { --bg:#050812; --surface:rgba(255,255,255,.08); --line:rgba(255,255,255,.16); --text:#f7fbff; --text2:#a9b8d6; --accent:#00ff88; }
+    body { background:var(--bg); color:var(--text); font-family:Inter, system-ui, sans-serif; margin:0; }
+    .container { max-width:900px; margin:40px auto; padding:0 20px; }
+    .card { background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:32px; }
+    h1 { font-size:36px; margin-bottom:8px; }
+    .pro-badge { display:inline-block; background:linear-gradient(135deg,#00ff88,#69d8ff); color:#04110b; font-size:11px; font-weight:800; padding:3px 10px; border-radius:999px; margin-left:12px; }
+    textarea { width:100%; height:120px; padding:16px; border-radius:12px; border:1px solid var(--line); background:rgba(255,255,255,.06); color:var(--text); font-family:monospace; }
+    button { padding:14px 28px; border-radius:12px; background:linear-gradient(135deg,var(--accent),#00ccff); color:#04110b; font-weight:700; border:none; cursor:pointer; }
+    .result { margin-top:30px; padding:24px; background:rgba(255,255,255,.05); border-radius:16px; }
+    .pro-footer { margin-top:50px; text-align:center; padding:30px; background:var(--surface); border-radius:20px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>TX Decoder</h1>
-    <p style="color:var(--text2); max-width:620px;">
-      Paste any Solana transaction signature. See exactly what happened, step by step, with AI-powered risk analysis.
-    </p>
+    <h1>TX Decoder <span class="pro-badge">PRO</span></h1>
+    <p style="color:var(--text2); max-width:620px;">Decode complex Solana transactions into clear, human-readable summaries with AI risk analysis. Pro feature.</p>
 
     <div class="card">
-      <div class="input-group">
-        <input type="text" id="txHash" placeholder="Enter Solana transaction signature...">
-        <button onclick="decodeTransaction()">Decode</button>
-      </div>
+      <textarea id="txInput" placeholder="Paste Solana transaction signature or raw transaction..."></textarea>
+      <button onclick="decodeTX()" style="margin-top:16px;">Decode Transaction</button>
 
-      <div id="result" class="result">
-        <div class="meta">
-          <div class="meta-item"><div class="meta-label">Status</div><div id="status"></div></div>
-          <div class="meta-item"><div class="meta-label">Fee</div><div id="fee"></div></div>
-          <div class="meta-item"><div class="meta-label">Risk Level</div><div id="riskLevel"></div></div>
-        </div>
+      <div id="result" class="result" style="display:none;"></div>
+    </div>
 
-        <h3 style="margin-top:0;">Step-by-Step Breakdown</h3>
-        <div id="steps"></div>
-
-        <div class="summary">
-          <h4 style="margin:0 0 8px 0;">Wallet Impact Summary</h4>
-          <div id="impactSummary"></div>
-        </div>
-
-        <div id="explanation" style="margin-top:20px; color:var(--text2); line-height:1.6;"></div>
-      </div>
+    <div class="pro-footer">
+      <p style="color:var(--text2); margin-bottom:16px;">This is a Pro feature with advanced decoding and risk insights.</p>
+      <a href="https://www.shopier.com/TradeVisual/47465449" target="_blank" style="display:inline-block; padding:14px 32px; background:linear-gradient(135deg,#00ff88,#69d8ff); color:#04110b; font-weight:700; border-radius:12px; text-decoration:none;">Buy Pro Access</a>
     </div>
   </div>
 
   <script src="/js/koschei-auth.js"></script>
   <script>
-    async function decodeTransaction() {
-      const txHash = document.getElementById('txHash').value.trim();
-      if (!txHash) {
-        alert('Please enter a transaction signature');
-        return;
-      }
+    async function decodeTX() {
+      const input = document.getElementById('txInput').value.trim();
+      if (!input) return alert('Please enter a transaction');
 
       const resultDiv = document.getElementById('result');
       resultDiv.style.display = 'block';
-
-      document.getElementById('steps').innerHTML = '<p style="color:var(--text2);">Decoding transaction with AI analysis...</p>';
-      document.getElementById('impactSummary').innerHTML = '';
-      document.getElementById('explanation').innerHTML = '';
+      resultDiv.innerHTML = '<p style="color:var(--text2);">Decoding with AI analysis...</p>';
 
       try {
         const res = await KoscheiAuth.apiCall('/api/tx/decode', {
           method: 'POST',
-          body: JSON.stringify({ signature: txHash, network: 'solana' })
+          body: JSON.stringify({ tx: input })
         });
-
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Failed to decode transaction');
-        }
-
         const data = await res.json();
-        renderResult(data);
-      } catch (e) {
-        // Fallback to demo
-        renderDemoResult(txHash);
+        resultDiv.innerHTML = `<pre style="white-space:pre-wrap; color:#a9b8d6;">${JSON.stringify(data, null, 2)}</pre>`;
+      } catch(e) {
+        resultDiv.innerHTML = `<p style="color:#facc15;">Advanced TX decoding requires Pro access.</p>`;
       }
     }
-
-    function renderResult(data) {
-      document.getElementById('status').innerHTML = `<strong>${data.status || 'success'}</strong>`;
-      document.getElementById('fee').innerHTML = data.fee_sol || '—';
-
-      const riskEl = document.getElementById('riskLevel');
-      const risk = (data.risk_level || 'unknown').toUpperCase();
-      let riskClass = 'risk-medium';
-      if (risk.includes('SAFE') || risk.includes('LOW')) riskClass = 'risk-low';
-      if (risk.includes('DANGER') || risk.includes('HIGH')) riskClass = 'risk-high';
-      riskEl.innerHTML = `<span class="risk ${riskClass}">${risk}</span>`;
-
-      // Steps
-      const stepsDiv = document.getElementById('steps');
-      stepsDiv.innerHTML = '';
-      if (data.step_by_step && data.step_by_step.length > 0) {
-        data.step_by_step.forEach(step => {
-          const div = document.createElement('div');
-          div.className = 'step';
-          div.innerHTML = `
-            <strong>Step ${step.step}:</strong> ${step.action}<br>
-            <span style="color:var(--text2); font-size:13px;">${step.program} (${step.program_id})</span>
-            <div style="margin-top:6px; font-size:13px; color:#ccc;">${step.explanation}</div>
-          `;
-          stepsDiv.appendChild(div);
-        });
-      } else {
-        stepsDiv.innerHTML = '<p>No detailed steps available.</p>';
-      }
-
-      // Impact
-      document.getElementById('impactSummary').innerHTML = data.wallet_impact_summary || 'No significant balance changes detected.';
-
-      // Explanation
-      document.getElementById('explanation').innerHTML = data.explanation ? `<strong>AI Analysis:</strong> ${data.explanation}` : '';
-    }
-
-    function renderDemoResult(txHash) {
-      const stepsDiv = document.getElementById('steps');
-      stepsDiv.innerHTML = `
-        <div class="step">
-          <strong>Step 1:</strong> Token Swap via Jupiter Aggregator<br>
-          <span style="color:var(--text2); font-size:13px;">Program: JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4</span>
-        </div>
-        <div class="step">
-          <strong>Step 2:</strong> Transfer 12.45 USDC<br>
-          <span class="risk risk-low">LOW RISK</span>
-        </div>
-        <div class="step">
-          <strong>Step 3:</strong> Receive ~0.082 SOL<br>
-          <span class="risk risk-medium">MEDIUM RISK</span>
-        </div>
-      `;
-
-      document.getElementById('status').innerHTML = '<strong>success</strong>';
-      document.getElementById('fee').innerHTML = '0.00025 SOL';
-      document.getElementById('riskLevel').innerHTML = `<span class="risk risk-low">SAFE</span>`;
-      document.getElementById('impactSummary').innerHTML = 'This transaction spent 12.45 USDC and received approximately 0.082 SOL. No suspicious activity detected.';
-      document.getElementById('explanation').innerHTML = '<strong>AI Analysis:</strong> Normal token swap with moderate slippage. No red flags found.';
-    }
-
-    document.getElementById('txHash').addEventListener('keypress', e => {
-      if (e.key === 'Enter') decodeTransaction();
-    });
-
-    window.onload = () => document.getElementById('txHash').focus();
   </script>
 </body>
 </html>
