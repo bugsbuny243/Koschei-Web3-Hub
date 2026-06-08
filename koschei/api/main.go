@@ -19,6 +19,11 @@ func main() {
 	http.HandleFunc("/api/tx/decode", handlers.TxDecode)
 	http.HandleFunc("/api/token/scan", handlers.TokenScan)
 
+	// Neon Auth routes
+	http.HandleFunc("/api/auth/neon-callback", handlers.NeonCallback)
+	http.HandleFunc("/api/auth/neon-login", handlers.NeonLogin)
+	http.HandleFunc("/api/auth/neon-register", handlers.NeonRegister)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
