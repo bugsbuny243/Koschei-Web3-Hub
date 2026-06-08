@@ -1,51 +1,68 @@
 package handlers
 
 import (
-	"crypto"
-	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
-func decodeBase64Raw(s string) ([]byte, error) {
-	return base64.RawURLEncoding.DecodeString(s)
+type neonJWTClaims struct {
+	Sub   string `json:"sub"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+	jwt.RegisteredClaims
 }
 
-func decodeBase64JSON(s string, out any) error {
-	b, err := decodeBase64Raw(s)
+var neonJWKS *jwt.JWKSet
+
+func loadNeonJWKS(jwksURL string) error {
+	resp, err := http.Get(jwksURL)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(b, out)
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	return json.Unmarshal(body, &neonJWKS)
 }
 
-func verifyJWTSignatureRS256(token string, pub *rsa.PublicKey) error {
-	parts := splitToken(token)
-	h := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
-	sig, err := decodeBase64Raw(parts[2])
-	if err != nil {
-		return err
-	}
-	return rsa.VerifyPKCS1v15(pub, crypto.SHA256, h[:], sig)
-}
-
-func splitToken(token string) [3]string {
-	var out [3]string
-	idx := 0
-	cur := ""
-	for _, ch := range token {
-		if ch == '.' {
-			out[idx] = cur
-			idx++
-			cur = ""
-			continue
+func parseAndVerifyNeonJWT(tokenString string) (neonJWTClaims, error) {
+	if neonJWKS == nil {
+		jwksURL := strings.TrimSpace(getenv("NEON_AUTH_JWKS_URL"))
+		if jwksURL == "" {
+			return neonJWTClaims{}, errors.New("NEON_AUTH_JWKS_URL is not set")
 		}
-		cur += string(ch)
+		if err := loadNeonJWKS(jwksURL); err != nil {
+			return neonJWTClaims{}, fmt.Errorf("failed to load JWKS: %w", err)
+		}
 	}
-	out[idx] = cur
-	return out
-}
 
-var _ = rand.Reader
+	token, err := jwt.ParseWithClaims(tokenString, &neonJWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		kid, _ := token.Header["kid"].(string)
+		key := neonJWKS.Key(kid)
+		if key == nil {
+			return nil, fmt.Errorf("key not found: %s", kid)
+		}
+		return key.PublicKey, nil
+	})
+
+	if err != nil {
+		return neonJWTClaims{}, err
+	}
+
+	if claims, ok := token.Claims.(*neonJWTClaims); ok && token.Valid {
+		return *claims, nil
+	}
+
+	return neonJWTClaims{}, errors.New("invalid token claims")
+}
