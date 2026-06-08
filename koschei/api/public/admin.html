@@ -91,6 +91,7 @@
 <script src="/js/koschei-admin.js"></script>
 <script>
   const el=id=>document.getElementById(id); let cache={};
+  const chatMessages=[{role:'assistant',content:'Kanka hazırım. Sistem scan, ödemeler, kullanıcılar, hatalar veya gerçek veri durumu hakkında sor; ben admin context ile cevaplayayım.'}];
   const packOutputs={starter:25,builder:100,studio:300};
   function escapeHTML(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);}
   function fmtTime(v){return v?new Date(v).toLocaleString():'—'}
