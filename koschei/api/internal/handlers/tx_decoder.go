@@ -17,15 +17,62 @@ type txDecodeRequest struct {
 }
 
 type txDecodeResponse struct {
-	Signature   string      `json:"signature"`
-	Network     string      `json:"network"`
-	Status      string      `json:"status"`
-	Explanation string      `json:"explanation"`
-	RiskLevel   string      `json:"risk_level"`
-	RiskReason  string      `json:"risk_reason,omitempty"`
-	Programs    []string    `json:"programs"`
-	FeeSol      string      `json:"fee_sol"`
-	Raw         interface{} `json:"raw,omitempty"`
+	Signature           string            `json:"signature"`
+	Network             string            `json:"network"`
+	Status              string            `json:"status"`
+	Explanation         string            `json:"explanation"`
+	RiskLevel           string            `json:"risk_level"`
+	RiskColor           string            `json:"risk_color"`
+	RiskReason          string            `json:"risk_reason,omitempty"`
+	Programs            []string          `json:"programs"`
+	FeeSol              string            `json:"fee_sol"`
+	StepByStep          []txStep          `json:"step_by_step"`
+	WalletImpactSummary string            `json:"wallet_impact_summary"`
+	BalanceChanges      []txBalanceChange `json:"balance_changes"`
+	Raw                 interface{}       `json:"raw,omitempty"`
+}
+
+type txStep struct {
+	Step        int    `json:"step"`
+	Program     string `json:"program"`
+	ProgramID   string `json:"program_id"`
+	Action      string `json:"action"`
+	Explanation string `json:"explanation"`
+}
+
+type txBalanceChange struct {
+	Address   string  `json:"address"`
+	Signer    bool    `json:"signer"`
+	Writable  bool    `json:"writable"`
+	ChangeSOL float64 `json:"change_sol"`
+}
+
+func riskColor(level string) string {
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "safe", "low", "trusted", "good":
+		return "green"
+	case "warning", "medium", "neutral", "unknown":
+		return "yellow"
+	case "danger", "high", "critical", "risky":
+		return "red"
+	default:
+		return "yellow"
+	}
+}
+
+func describeSolanaInstruction(program, programID string, parsed interface{}) string {
+	if parsedMap, ok := parsed.(map[string]interface{}); ok {
+		if typ, ok := parsedMap["type"].(string); ok && typ != "" {
+			return strings.ReplaceAll(typ, "_", " ")
+		}
+	}
+	if program != "" {
+		return program + " instruction"
+	}
+	if name, ok := knownPrograms[programID]; ok {
+		return name + " instruction"
+	}
+	return "Contract/program instruction"
 }
 
 var knownPrograms = map[string]string{
@@ -125,14 +172,22 @@ func (h *Handler) TXDecode(w http.ResponseWriter, r *http.Request) {
 		txStatus = "failed"
 	}
 
-	// Extract programs
+	// Extract programs and build a step-by-step explanation.
 	programSet := map[string]bool{}
 	programNames := []string{}
+	steps := []txStep{}
 	if result.Transaction != nil && result.Transaction.Message != nil {
-		for _, ix := range result.Transaction.Message.Instructions {
+		for i, ix := range result.Transaction.Message.Instructions {
 			pid := ix.ProgramId
 			if pid == "" {
 				pid = ix.Program
+			}
+			programName := ix.Program
+			if name, ok := knownPrograms[pid]; ok {
+				programName = name
+			}
+			if programName == "" {
+				programName = pid
 			}
 			if pid != "" && !programSet[pid] {
 				programSet[pid] = true
@@ -146,6 +201,8 @@ func (h *Handler) TXDecode(w http.ResponseWriter, r *http.Request) {
 					programNames = append(programNames, short)
 				}
 			}
+			action := describeSolanaInstruction(ix.Program, pid, ix.Parsed)
+			steps = append(steps, txStep{Step: i + 1, Program: programName, ProgramID: pid, Action: action, Explanation: fmt.Sprintf("Step %d calls %s to perform %s using public on-chain accounts.", i+1, programName, action)})
 		}
 	}
 
@@ -153,6 +210,29 @@ func (h *Handler) TXDecode(w http.ResponseWriter, r *http.Request) {
 	feeSol := "unknown"
 	if result.Meta != nil {
 		feeSol = fmt.Sprintf("%.6f SOL", float64(result.Meta.Fee)/1e9)
+	}
+
+	// Calculate per-wallet SOL impact.
+	balanceChanges := []txBalanceChange{}
+	impactSummary := "No SOL balance impact detected in the available public RPC response."
+	if result.Meta != nil && result.Transaction != nil && result.Transaction.Message != nil {
+		var positive, negative float64
+		for i, acc := range result.Transaction.Message.AccountKeys {
+			if i < len(result.Meta.PreBalances) && i < len(result.Meta.PostBalances) {
+				diff := float64(result.Meta.PostBalances[i]-result.Meta.PreBalances[i]) / 1e9
+				if diff != 0 {
+					balanceChanges = append(balanceChanges, txBalanceChange{Address: acc.Pubkey, Signer: acc.Signer, Writable: acc.Writable, ChangeSOL: roundPercent(diff)})
+					if diff > 0 {
+						positive += diff
+					} else {
+						negative += diff
+					}
+				}
+			}
+		}
+		if len(balanceChanges) > 0 {
+			impactSummary = fmt.Sprintf("This transaction increased affected accounts by about %.4f SOL and decreased affected accounts by about %.4f SOL, including fees where applicable.", positive, -negative)
+		}
 	}
 
 	// Build context for AI
@@ -271,13 +351,17 @@ Respond with this exact JSON (no markdown, no extra text):
 	}
 
 	writeJSON(w, http.StatusOK, txDecodeResponse{
-		Signature:   req.Signature,
-		Network:     req.Network,
-		Status:      txStatus,
-		Explanation: explanation,
-		RiskLevel:   riskLevel,
-		RiskReason:  riskReason,
-		Programs:    programNames,
-		FeeSol:      feeSol,
+		Signature:           req.Signature,
+		Network:             req.Network,
+		Status:              txStatus,
+		Explanation:         explanation,
+		RiskLevel:           riskLevel,
+		RiskColor:           riskColor(riskLevel),
+		RiskReason:          riskReason,
+		Programs:            programNames,
+		FeeSol:              feeSol,
+		StepByStep:          steps,
+		WalletImpactSummary: impactSummary,
+		BalanceChanges:      balanceChanges,
 	})
 }

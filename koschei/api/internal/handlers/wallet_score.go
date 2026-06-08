@@ -17,18 +17,28 @@ type walletScoreRequest struct {
 }
 
 type walletScoreResponse struct {
-	Address    string   `json:"address"`
-	Network    string   `json:"network"`
-	Score      int      `json:"score"`
-	Level      string   `json:"level"`
-	LevelColor string   `json:"level_color"`
-	Summary    string   `json:"summary"`
-	Badges     []string `json:"badges"`
-	TxCount    int      `json:"tx_count"`
-	BalanceSol string   `json:"balance_sol"`
-	ActiveDays int      `json:"active_days"`
-	FirstSeen  string   `json:"first_seen"`
-	LastSeen   string   `json:"last_seen"`
+	Address                   string                 `json:"address"`
+	Network                   string                 `json:"network"`
+	Score                     int                    `json:"score"`
+	Level                     string                 `json:"level"`
+	LevelColor                string                 `json:"level_color"`
+	Summary                   string                 `json:"summary"`
+	Badges                    []string               `json:"badges"`
+	TxCount                   int                    `json:"tx_count"`
+	FailedTxCount             int                    `json:"failed_tx_count"`
+	FailureRatePercent        float64                `json:"failure_rate_percent"`
+	BalanceSol                string                 `json:"balance_sol"`
+	ActiveDays                int                    `json:"active_days"`
+	FirstSeen                 string                 `json:"first_seen"`
+	LastSeen                  string                 `json:"last_seen"`
+	ActivityGraph             []walletActivityBucket `json:"activity_graph"`
+	SuspiciousBehaviorSignals []string               `json:"suspicious_behavior_signals"`
+	ScoreFactors              map[string]string      `json:"score_factors"`
+}
+
+type walletActivityBucket struct {
+	Label string `json:"label"`
+	Count int    `json:"count"`
 }
 
 func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +110,8 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 	firstSeen := ""
 	lastSeen := ""
 	activeDays := 0
+	latestUnix := int64(0)
+	activityCounts := make([]int, 7)
 
 	if err == nil {
 		defer sigResp.Body.Close()
@@ -123,9 +135,14 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 					if *s.BlockTime > latest {
 						latest = *s.BlockTime
 					}
+					daysAgo := int(time.Since(time.Unix(*s.BlockTime, 0)).Hours() / 24)
+					if daysAgo >= 0 && daysAgo < len(activityCounts) {
+						activityCounts[len(activityCounts)-1-daysAgo]++
+					}
 				}
 			}
 			if earliest > 0 {
+				latestUnix = latest
 				firstSeen = time.Unix(earliest, 0).Format("Jan 2006")
 				lastSeen = time.Unix(latest, 0).Format("Jan 2, 2006")
 				activeDays = int(time.Since(time.Unix(earliest, 0)).Hours() / 24)
@@ -168,8 +185,8 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Recent activity (max 20)
-	if lastSeen != "" && activeDays > 0 {
-		daysSinceLast := int(time.Since(time.Unix(0, 0)).Hours()/24) - activeDays
+	if latestUnix > 0 {
+		daysSinceLast := int(time.Since(time.Unix(latestUnix, 0)).Hours() / 24)
 		if daysSinceLast < 7 {
 			score += 20
 		} else if daysSinceLast < 30 {
@@ -210,6 +227,35 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 		level, levelColor = "RISKY", "#ff7700"
 	default:
 		level, levelColor = "DANGER", "#ff4466"
+	}
+
+	activityGraph := make([]walletActivityBucket, 0, 7)
+	for i, count := range activityCounts {
+		activityGraph = append(activityGraph, walletActivityBucket{Label: fmt.Sprintf("D-%d", len(activityCounts)-1-i), Count: count})
+	}
+	failureRate := 0.0
+	if txCount > 0 {
+		failureRate = float64(failedCount) / float64(txCount) * 100
+	}
+	suspiciousSignals := []string{}
+	if failedCount >= 10 || failureRate >= 30 {
+		suspiciousSignals = append(suspiciousSignals, "High failed-transaction ratio; repeated reverted/failed actions need review.")
+	}
+	if activeDays < 7 && txCount >= 50 {
+		suspiciousSignals = append(suspiciousSignals, "Very new wallet with heavy activity; possible campaign, bot or throwaway-wallet behavior.")
+	}
+	if balanceLamports == 0 && txCount >= 20 {
+		suspiciousSignals = append(suspiciousSignals, "Zero SOL balance despite activity; wallet may have been drained or abandoned.")
+	}
+	if len(suspiciousSignals) == 0 {
+		suspiciousSignals = append(suspiciousSignals, "No strong suspicious pattern detected from the latest public signature sample.")
+	}
+	scoreFactors := map[string]string{
+		"balance_depth":                 balanceSol,
+		"transaction_sample":            fmt.Sprintf("%d recent signatures", txCount),
+		"account_age":                   fmt.Sprintf("%d active days", activeDays),
+		"failed_transaction_ratio":      fmt.Sprintf("%.2f%%", failureRate),
+		"counterparty_interaction_risk": "Manual review recommended for unknown counterparties.",
 	}
 
 	// Badges
@@ -280,18 +326,23 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, walletScoreResponse{
-		Address:    req.Address,
-		Network:    req.Network,
-		Score:      score,
-		Level:      level,
-		LevelColor: levelColor,
-		Summary:    summary,
-		Badges:     badges,
-		TxCount:    txCount,
-		BalanceSol: balanceSol,
-		ActiveDays: activeDays,
-		FirstSeen:  firstSeen,
-		LastSeen:   lastSeen,
+		Address:                   req.Address,
+		Network:                   req.Network,
+		Score:                     score,
+		Level:                     level,
+		LevelColor:                levelColor,
+		Summary:                   summary,
+		Badges:                    badges,
+		TxCount:                   txCount,
+		FailedTxCount:             failedCount,
+		FailureRatePercent:        roundPercent(failureRate),
+		BalanceSol:                balanceSol,
+		ActiveDays:                activeDays,
+		FirstSeen:                 firstSeen,
+		LastSeen:                  lastSeen,
+		ActivityGraph:             activityGraph,
+		SuspiciousBehaviorSignals: suspiciousSignals,
+		ScoreFactors:              scoreFactors,
 	})
 }
 
