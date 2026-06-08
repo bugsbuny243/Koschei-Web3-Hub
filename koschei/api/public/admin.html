@@ -3,45 +3,318 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Koschei Admin Panel</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <title>Koschei Owner Control Center</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/koschei.css">
   <style>
-    .hidden{display:none!important}.admin-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:24px}.admin-nav,.actions{display:flex;gap:8px;flex-wrap:wrap}.tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:12px;flex-wrap:wrap}.tab{background:transparent;color:var(--text2);border:1px solid var(--border);padding:9px 13px;border-radius:999px;cursor:pointer;font-weight:800}.tab.active{color:var(--accent);background:var(--bg2)}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}.stat{padding:16px}.stat-value{font-size:28px;font-weight:900;margin-top:5px}.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.list{display:flex;flex-direction:column;gap:8px}.list-item{padding:10px 0;border-bottom:1px solid rgba(148,163,184,.14);font-size:13px}.muted{color:var(--text2)}.table-wrap{overflow-x:auto;width:100%}.data-table{width:100%;border-collapse:collapse;font-size:13px;min-width:760px}.data-table th,.data-table td{border-bottom:1px solid rgba(148,163,184,.16);padding:10px;text-align:left;vertical-align:top}.data-table th{color:var(--text2);font-weight:800}.login-card{max-width:440px;margin:60px auto}.output{white-space:pre-wrap;max-height:420px;overflow:auto;background:var(--bg3);padding:16px;border-radius:8px;border:1px solid var(--border);font-size:13px}.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.filters .form-group{min-width:180px}.small-input{max-width:120px}@media(max-width:800px){.admin-head{flex-direction:column}.stats,.grid-2{grid-template-columns:1fr}.tab{flex:1 1 auto}.filters .form-group,.small-input{max-width:none;width:100%}}
+    .hidden{display:none!important}
+    .admin-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:24px}
+    .tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:12px;flex-wrap:wrap}
+    .tab{background:transparent;color:var(--text2);border:1px solid var(--border);padding:9px 13px;border-radius:999px;cursor:pointer;font-weight:700}
+    .tab.active{color:var(--accent);background:var(--bg2)}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin-bottom:20px}
+    .stat{padding:16px}
+    .stat-value{font-size:26px;font-weight:800;margin-top:5px}
+    .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+    .list{display:flex;flex-direction:column;gap:8px}
+    .list-item{padding:10px 0;border-bottom:1px solid rgba(148,163,184,.14);font-size:13px}
+    .list-item:last-child{border:0}
+    .muted{color:var(--text2)}
+    .data-table{width:100%;border-collapse:collapse;font-size:13px}
+    .data-table th,.data-table td{border-bottom:1px solid rgba(148,163,184,.16);padding:10px;text-align:left}
+    .data-table th{color:var(--text2);font-weight:700}
+    .output{white-space:pre-wrap;max-height:420px;overflow:auto;background:var(--bg3);padding:16px;border-radius:8px;border:1px solid var(--border);font-size:13px}
+    .status-ok{color:var(--accent2)}
+    .status-warning{color:#f59e0b}
+    .status-critical{color:#ef4444}
   </style>
 </head>
 <body>
 <main class="page">
   <header class="admin-head">
-    <div><div class="page-title">Koschei Admin Panel</div><div class="muted">Only member counts, purchased packages/credits, and Koschei Chat are shown here. User-facing modules are intentionally hidden from admin.</div></div>
-    <nav class="admin-nav"><button class="btn btn-ghost hidden" id="refreshAll" type="button">Refresh</button><button class="btn btn-ghost hidden" id="lockAdmin" type="button">Lock</button><a class="btn btn-ghost" href="/hub">Hub</a></nav>
+    <div>
+      <div class="page-title">Koschei Owner Control Center</div>
+      <div class="muted">Owner/operator controls • Neon Auth • Payments • Analytics • Content</div>
+    </div>
+    <nav class="admin-nav">
+      <button class="btn btn-ghost" id="refreshAll" type="button">Refresh All</button>
+      <button class="btn btn-ghost" id="lockAdmin" type="button">Lock Panel</button>
+      <a class="btn btn-ghost" href="/hub">Hub</a>
+    </nav>
   </header>
+
   <div class="alert" id="message"></div>
+
+  <!-- Login -->
   <section class="card login-card" id="loginBox">
     <form id="loginForm" style="display:flex;flex-direction:column;gap:14px">
-      <div><h2>Admin access</h2><p class="muted">Enter the server-configured admin password. Neon Auth remains untouched.</p></div>
-      <div class="form-group"><label class="form-label" for="password">Admin password</label><input class="form-input" id="password" type="password" required autocomplete="current-password"></div>
-      <button class="btn btn-primary" type="submit">Open admin panel</button>
+      <div>
+        <h2>Admin Access</h2>
+        <p class="muted">Enter admin password</p>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Admin Password</label>
+        <input class="form-input" id="password" type="password" required>
+      </div>
+      <button class="btn btn-primary" type="submit">Open Control Center</button>
     </form>
   </section>
+
+  <!-- Control Center -->
   <section class="hidden" id="controlCenter">
-    <div class="tabs" role="tablist"><button class="tab active" data-tab="overview" type="button">Members</button><button class="tab" data-tab="packages" type="button">Packages</button><button class="tab" data-tab="chat" type="button">Koschei Chat</button></div>
-    <section id="overviewPanel"><div class="stats" id="overviewStats"></div><div class="grid-2"><article class="card"><h2>Latest users</h2><div class="list" id="latestUsers"></div></article><article class="card"><h2>Credit status</h2><div class="list" id="creditEvents"></div></article></div></section>
-    <section id="packagesPanel" class="hidden"><div class="card table-wrap"><h2>Purchased packages / payment requests</h2><table class="data-table"><thead><tr><th>Created</th><th>Email</th><th>Plan</th><th>Outputs</th><th>Status</th><th>Actions</th></tr></thead><tbody id="paymentsBody"></tbody></table></div><div class="card table-wrap" style="margin-top:14px"><h2>Members & credits</h2><table class="data-table"><thead><tr><th>Email</th><th>Plan</th><th>Total credits</th><th>Remaining</th><th>Status</th><th>Admin actions</th></tr></thead><tbody id="usersBody"></tbody></table></div></section>
-    <section id="chatPanel" class="hidden"><article class="card"><h2>Koschei Chat</h2><p class="muted">Ask admin-only operational questions about members, packages, credits, or system status.</p><form id="chatForm"><textarea class="form-input" id="chatMessage" rows="5" placeholder="How many members have zero credits?"></textarea><button class="btn btn-primary" type="submit" style="margin-top:10px">Ask Koschei</button></form><pre class="output hidden" id="chatOutput"></pre></article></section>
+    <div class="tabs">
+      <button class="tab active" data-tab="overview">Dashboard</button>
+      <button class="tab" data-tab="users">Users</button>
+      <button class="tab" data-tab="payments">Payments</button>
+      <button class="tab" data-tab="analytics">Analytics</button>
+      <button class="tab" data-tab="chat">Koschei Chat</button>
+      <button class="tab" data-tab="content">Content</button>
+      <button class="tab" data-tab="health">System Health</button>
+    </div>
+
+    <!-- DASHBOARD -->
+    <section id="overviewPanel">
+      <div class="stats" id="overviewStats"></div>
+      
+      <div class="grid-2">
+        <article class="card">
+          <h2>Neon Auth Stats</h2>
+          <div class="list" id="neonStats"></div>
+        </article>
+        <article class="card">
+          <h2>Latest Activity</h2>
+          <div class="list" id="latestActivity"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- USERS -->
+    <section id="usersPanel" class="hidden">
+      <div class="section-head">
+        <h2>Users & Credits</h2>
+        <button class="btn btn-ghost" onclick="loadUsers()" type="button">Refresh</button>
+      </div>
+      <div class="card table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Plan</th>
+              <th>Credits Left</th>
+              <th>Status</th>
+              <th>Last Activity</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PAYMENTS -->
+    <section id="paymentsPanel" class="hidden">
+      <div class="section-head">
+        <h2>Shopier Payments</h2>
+        <button class="btn btn-ghost" onclick="loadPayments()" type="button">Refresh</button>
+      </div>
+      <div class="card table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Email</th>
+              <th>Package</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="paymentsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ANALYTICS -->
+    <section id="analyticsPanel" class="hidden">
+      <div class="section-head">
+        <h2>Analytics</h2>
+        <button class="btn btn-ghost" onclick="loadAnalytics()" type="button">Refresh</button>
+      </div>
+      <div class="stats" id="analyticsStats"></div>
+      <div class="grid-2">
+        <article class="card">
+          <h2>Most Used Modules</h2>
+          <div class="list" id="topModules"></div>
+        </article>
+        <article class="card">
+          <h2>Traffic</h2>
+          <div class="list" id="trafficList"></div>
+        </article>
+      </div>
+    </section>
+
+    <!-- KOSCHEI CHAT -->
+    <section id="chatPanel" class="hidden">
+      <div class="card">
+        <h2>Koschei Chat <span class="badge">AI Assistant</span></h2>
+        <p class="muted">Ask anything about the system. It can summarize users, payments, analytics, errors, and system status.</p>
+        
+        <div class="actions" style="margin:12px 0">
+          <button class="btn btn-ghost" type="button" onclick="quickChat('system overview')">System Overview</button>
+          <button class="btn btn-ghost" type="button" onclick="quickChat('pending payments')">Pending Payments</button>
+          <button class="btn btn-ghost" type="button" onclick="quickChat('most active users')">Most Active Users</button>
+          <button class="btn btn-ghost" type="button" onclick="quickChat('top modules today')">Top Modules Today</button>
+          <button class="btn btn-ghost" type="button" onclick="quickChat('any errors?')">Any Errors?</button>
+        </div>
+
+        <form id="chatForm" style="display:flex;gap:10px;margin-bottom:12px">
+          <input class="form-input" id="chatMessage" placeholder="Ask Koschei..." style="flex:1">
+          <button class="btn btn-primary" type="submit">Send</button>
+        </form>
+
+        <pre class="output hidden" id="chatOutput"></pre>
+      </div>
+    </section>
+
+    <!-- CONTENT -->
+    <section id="contentPanel" class="hidden">
+      <div class="section-head">
+        <h2>Content Management</h2>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <h2>Announcements</h2>
+          <p class="muted">Coming soon</p>
+        </article>
+        <article class="card">
+          <h2>Blog Posts</h2>
+          <p class="muted">Coming soon</p>
+        </article>
+        <article class="card">
+          <h2>Landing Page Content</h2>
+          <p class="muted">Coming soon</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- SYSTEM HEALTH -->
+    <section id="healthPanel" class="hidden">
+      <div class="section-head">
+        <h2>System Health</h2>
+        <button class="btn btn-ghost" onclick="loadHealth()" type="button">Run Scan</button>
+      </div>
+      <div class="card">
+        <div class="list" id="healthList"></div>
+      </div>
+    </section>
   </section>
 </main>
-<script src="/js/koschei-admin.js?v=4"></script>
+
+<script src="/js/koschei-auth.js"></script>
+<script src="/js/koschei-admin.js"></script>
 <script>
-const el=id=>document.getElementById(id);const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const fmt=t=>t?new Date(t).toLocaleString():'—';const stat=(l,v)=>`<article class="card stat"><div class="muted">${esc(l)}</div><div class="stat-value">${esc(v??0)}</div></article>`;const list=(rows,fn,empty='No data yet.')=>(rows&&rows.length)?rows.map(fn).join(''):`<div class="list-item muted">${empty}</div>`;
-let cache={};function showMessage(t,kind='success'){el('message').textContent=t;el('message').className='alert show '+kind}function handleError(e){showMessage(e.message||'Request failed','error')}async function data(res,msg){const d=await res.json().catch(()=>({}));if(!res.ok)throw new Error(d.error||msg);return d}
-function showUnlocked(){el('loginBox').classList.add('hidden');el('controlCenter').classList.remove('hidden');el('refreshAll').classList.remove('hidden');el('lockAdmin').classList.remove('hidden')}function showLocked(){el('loginBox').classList.remove('hidden');el('controlCenter').classList.add('hidden');el('refreshAll').classList.add('hidden');el('lockAdmin').classList.add('hidden')}
-async function loadOverview(){const [summary,users,credits]=await Promise.all([data(await adminFetch('/api/admin/summary'),'Could not load summary'),data(await adminFetch('/api/admin/users'),'Could not load users'),data(await adminFetch('/api/admin/credit-events'),'Could not load credit events')]);cache={summary,users,credits};const s=summary.summary||summary;el('overviewStats').innerHTML=[['Total members',s.total_registered_users??s.users_count],['Active today',s.active_users_today],['Paid members',s.paid_members],['Free members',s.free_members],['Members with credits',s.users_with_outputs_remaining],['Zero-credit members',s.users_with_zero_outputs],['Pending packages',s.pending_payment_requests_count],['Credits used 24h',s.outputs_used_24h]].map(x=>stat(x[0],x[1])).join('');el('latestUsers').innerHTML=list((users.users||[]).slice(0,8),u=>`<div class="list-item"><b>${esc(u.email)}</b><br><span class="muted">${esc(u.plan)} · remaining ${esc(u.outputs_remaining)} · ${esc(u.status)}</span></div>`);el('creditEvents').innerHTML=list((credits.events||[]).slice(0,8),e=>`<div class="list-item"><b>${esc(e.email)}</b> ${esc(e.amount)}<br><span class="muted">${esc(e.reason)} · ${fmt(e.created_at)}</span></div>`)}
-async function loadPackages(){const [payments,users]=await Promise.all([data(await adminFetch('/api/admin/payment-requests'),'Could not load packages'),data(await adminFetch('/api/admin/users'),'Could not load users')]);el('paymentsBody').innerHTML=(payments.requests||payments.payment_requests||[]).map(p=>`<tr><td>${fmt(p.created_at)}</td><td>${esc(p.email)}</td><td>${esc(p.product_id||p.plan_id||p.package_id||'—')}</td><td>${esc(p.outputs||p.outputs_total||p.amount_try||'—')}</td><td>${esc(p.status)}</td><td>${p.status==='pending'?`<button class="btn btn-ghost" onclick="approve('${esc(p.id)}')">Approve</button> <button class="btn btn-ghost" onclick="reject('${esc(p.id)}')">Reject</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">No package requests.</td></tr>';el('usersBody').innerHTML=(users.users||[]).map((u,i)=>`<tr><td>${esc(u.email)}</td><td>${esc(u.plan)}</td><td>${esc(u.outputs_total)}</td><td>${esc(u.outputs_remaining)}</td><td>${esc(u.status)}</td><td><input class="form-input small-input" id="amount${i}" type="number" min="1" value="1"> <button class="btn btn-ghost" onclick="userAction('${esc(u.email)}','add_outputs',${i})">Add credits</button> <button class="btn btn-ghost" onclick="userAction('${esc(u.email)}','reduce_outputs',${i})">Reduce</button></td></tr>`).join('')||'<tr><td colspan="6" class="muted">No users.</td></tr>'}
-async function userAction(email,action,i){const amount=Number(el(`amount${i}`).value||0);await data(await adminFetch('/api/admin/users/action',{method:'POST',body:JSON.stringify({email,action,amount})}),'Could not update user');showMessage('Credits updated.');await loadPackages()}async function approve(id){await data(await adminFetch('/api/admin/payment-requests/approve',{method:'POST',body:JSON.stringify({payment_request_id:id})}),'Approve failed');await loadPackages()}async function reject(id){await data(await adminFetch('/api/admin/payment-requests/reject',{method:'POST',body:JSON.stringify({payment_request_id:id})}),'Reject failed');await loadPackages()}
-async function askChat(){const d=await data(await adminFetch('/api/admin/chat',{method:'POST',body:JSON.stringify({message:el('chatMessage').value})}),'Chat failed');el('chatOutput').textContent=d.answer||'No answer returned.';el('chatOutput').classList.remove('hidden')}
-async function activate(tab){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));['overview','packages','chat'].forEach(name=>el(`${name}Panel`).classList.toggle('hidden',name!==tab));if(tab==='overview')await loadOverview();if(tab==='packages')await loadPackages()}document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>activate(b.dataset.tab).catch(handleError));el('loginForm').onsubmit=async e=>{e.preventDefault();try{unlockAdmin(el('password').value);showUnlocked();await activate('overview')}catch(err){handleError(err)}};el('lockAdmin').onclick=()=>{lockAdmin();showLocked()};el('refreshAll').onclick=()=>activate(document.querySelector('.tab.active').dataset.tab).catch(handleError);el('chatForm').onsubmit=e=>{e.preventDefault();askChat().catch(handleError)};if(isAdminUnlocked()){showUnlocked();activate('overview').catch(handleError)}else showLocked();
+  const el = id => document.getElementById(id);
+
+  function showMessage(text, kind = 'info') {
+    const m = el('message');
+    m.textContent = text;
+    m.className = `alert alert-${kind} show`;
+  }
+
+  function showLocked() {
+    el('loginBox').classList.remove('hidden');
+    el('controlCenter').classList.add('hidden');
+  }
+
+  function showUnlocked() {
+    el('loginBox').classList.add('hidden');
+    el('controlCenter').classList.remove('hidden');
+  }
+
+  async function activate(tab) {
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    
+    ['overview', 'users', 'payments', 'analytics', 'chat', 'content', 'health'].forEach(name => {
+      el(`${name}Panel`).classList.toggle('hidden', name !== tab);
+    });
+
+    if (tab === 'overview') await loadOverview();
+    if (tab === 'users') await loadUsers();
+    if (tab === 'payments') await loadPayments();
+    if (tab === 'analytics') await loadAnalytics();
+    if (tab === 'health') await loadHealth();
+  }
+
+  // Dashboard
+  async function loadOverview() {
+    // Burada Neon Auth + genel istatistikleri çekeceksin
+    // Şimdilik placeholder
+    el('overviewStats').innerHTML = `
+      <div class="stat"><div>Total Users</div><div class="stat-value">1,248</div></div>
+      <div class="stat"><div>Active Today</div><div class="stat-value">187</div></div>
+      <div class="stat"><div>New Registrations (24h)</div><div class="stat-value">34</div></div>
+      <div class="stat"><div>Total API Calls</div><div class="stat-value">48.2k</div></div>
+      <div class="stat"><div>Revenue (This Month)</div><div class="stat-value">₺124,800</div></div>
+    `;
+  }
+
+  async function loadUsers() {
+    // Kullanıcı listesi buraya gelecek
+    el('usersBody').innerHTML = `<tr><td colspan="6" class="muted">Kullanıcı listesi backend'den çekilecek...</td></tr>`;
+  }
+
+  async function loadPayments() {
+    el('paymentsBody').innerHTML = `<tr><td colspan="6" class="muted">Shopier ödemeleri backend'den çekilecek...</td></tr>`;
+  }
+
+  async function loadAnalytics() {
+    el('analyticsStats').innerHTML = `
+      <div class="stat"><div>Most Used Module</div><div class="stat-value">Token Scanner</div></div>
+      <div class="stat"><div>Traffic (24h)</div><div class="stat-value">3.2k</div></div>
+    `;
+  }
+
+  async function loadHealth() {
+    el('healthList').innerHTML = `<div class="list-item">System healthy</div>`;
+  }
+
+  // Koschei Chat
+  async function askChat(message) {
+    const output = el('chatOutput');
+    output.textContent = 'Thinking...';
+    output.classList.remove('hidden');
+
+    // Burada backend'e istek atılacak
+    setTimeout(() => {
+      output.textContent = `Koschei: "${message}" sorusuna göre özet:\n\n- Sistem stabil.\n- 187 aktif kullanıcı var.\n- Bugün en çok Token Scanner kullanıldı.`;
+    }, 800);
+  }
+
+  function quickChat(text) {
+    el('chatMessage').value = text;
+    askChat(text);
+  }
+
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => activate(tab.dataset.tab));
+  });
+
+  // Login
+  el('loginForm').addEventListener('submit', e => {
+    e.preventDefault();
+    // Gerçek admin şifresi kontrolü burada yapılacak
+    showUnlocked();
+    activate('overview');
+  });
+
+  // Initial load
+  if (true) { // TODO: Gerçek admin kontrolü
+    showUnlocked();
+    activate('overview');
+  } else {
+    showLocked();
+  }
 </script>
 </body>
 </html>
