@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Koschei Web3 Hub | Solana Security, Intelligence & Automation</title>
-  <meta name="description" content="Koschei Web3 Hub — 3 katmanlı no-custody Solana operasyon platformu.">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -28,21 +27,22 @@
       justify-content: space-between;
       align-items: center;
       padding: 20px 0;
+      flex-wrap: wrap;
+      gap: 12px;
     }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; text-decoration: none; }
     .brand-mark {
-      width: 36px; height: 36px;
+      width: 34px; height: 34px;
       background: linear-gradient(135deg, var(--accent), var(--accent2));
       color: #04110b;
       border-radius: 10px;
       display: grid;
       place-items: center;
-      font-weight: 900;
     }
-    .nav-links { display: flex; gap: 24px; align-items: center; }
+    .nav-links { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
     .nav-link { color: var(--text2); text-decoration: none; font-weight: 600; }
     .btn {
-      padding: 12px 24px;
+      padding: 11px 22px;
       border-radius: 999px;
       font-weight: 700;
       text-decoration: none;
@@ -57,46 +57,49 @@
       grid-template-columns: 1.1fr 0.9fr;
       gap: 40px;
       align-items: center;
-      padding: 80px 0 60px;
+      padding: 70px 0 50px;
     }
-    h1 { font-size: 58px; line-height: 1.0; margin: 0 0 20px; letter-spacing: -.04em; }
+    h1 { font-size: 52px; line-height: 1.0; margin: 0 0 18px; }
     .gradient-text {
       background: linear-gradient(135deg, #fff, #c7fff0);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
-    .hero-sub { font-size: 20px; color: var(--text2); max-width: 520px; line-height: 1.6; }
-    .hero-actions { margin-top: 32px; display: flex; gap: 12px; }
-    .section { padding: 60px 0; }
-    .section-head { text-align: center; max-width: 620px; margin: 0 auto 40px; }
-    h2 { font-size: 36px; margin: 0 0 12px; }
-    .layers { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+    .hero-sub { font-size: 19px; color: var(--text2); max-width: 520px; line-height: 1.65; }
+    .layers { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 22px; }
     .layer-card {
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: 24px;
-      padding: 32px;
+      border-radius: 22px;
+      padding: 28px;
       text-decoration: none;
       color: inherit;
       transition: all 0.3s ease;
     }
     .layer-card:hover {
-      transform: translateY(-8px);
-      border-color: rgba(255,255,255,.3);
+      transform: translateY(-6px);
     }
-    .layer-icon { font-size: 36px; margin-bottom: 20px; }
-    .layer-card h3 { margin: 0 0 12px; font-size: 22px; }
+    .layer-icon { font-size: 32px; margin-bottom: 18px; }
+    .layer-card h3 { margin: 0 0 10px; font-size: 21px; }
     .layer-card p { color: var(--text2); line-height: 1.7; margin: 0; }
     .cta {
       background: var(--surface);
-      border-radius: 24px;
-      padding: 48px;
+      border-radius: 22px;
+      padding: 44px;
       text-align: center;
-      margin: 40px 0;
+      margin: 50px 0;
     }
-    footer { text-align: center; padding: 40px 0; color: var(--text2); font-size: 14px; }
-    @media (max-width: 768px) {
-      .hero { grid-template-columns: 1fr; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; padding-top: 50px; }
+      h1 { font-size: 42px; }
+      .layers { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .nav { flex-direction: column; align-items: flex-start; }
+      .nav-links { gap: 12px; }
+      h1 { font-size: 36px; }
     }
   </style>
 </head>
@@ -120,56 +123,47 @@
     <!-- Hero -->
     <div class="hero">
       <div>
-        <div style="display:inline-block; background:rgba(0,255,136,.1); color:#a3ffcc; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:700; margin-bottom:16px;">
+        <div style="display:inline-block; background:rgba(0,255,136,.1); color:#a3ffcc; padding:6px 14px; border-radius:999px; font-size:12px; font-weight:700; margin-bottom:14px;">
           NO-CUSTODY SOLANA INTELLIGENCE
         </div>
         <h1><span class="gradient-text">Koschei Web3 Hub</span></h1>
         <p class="hero-sub">Güvenlikten otomasyona uzanan 3 katmanlı Web3 operasyon hub’ı.</p>
 
-        <div class="hero-actions">
+        <div style="margin-top:28px; display:flex; gap:12px; flex-wrap:wrap;">
           <a href="/hub.html" class="btn btn-primary">Open Hub</a>
           <a href="/docs" class="btn" style="border:1px solid var(--line); color:var(--text);">View Docs</a>
         </div>
-        <p style="margin-top:16px; font-size:13px; color:var(--text2);">No private keys. No seed phrases. Public/read-only Web3 intelligence.</p>
       </div>
 
-      <div class="surface" style="padding:32px; border-radius:24px;">
-        <div style="font-size:13px; color:var(--text2); margin-bottom:8px;">LIVE STACK</div>
+      <div class="surface" style="padding:28px; border-radius:20px;">
+        <div style="font-size:13px; color:var(--text2); margin-bottom:8px;">LIVE ON</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <div style="background:rgba(255,255,255,.08); padding:6px 14px; border-radius:999px; font-size:13px;">Solana</div>
-          <div style="background:rgba(255,255,255,.08); padding:6px 14px; border-radius:999px; font-size:13px;">Ethereum</div>
-          <div style="background:rgba(255,255,255,.08); padding:6px 14px; border-radius:999px; font-size:13px;">Base</div>
-          <div style="background:rgba(255,255,255,.08); padding:6px 14px; border-radius:999px; font-size:13px;">Arbitrum</div>
+          <div style="background:rgba(255,255,255,.08); padding:5px 12px; border-radius:999px; font-size:13px;">Solana</div>
+          <div style="background:rgba(255,255,255,.08); padding:5px 12px; border-radius:999px; font-size:13px;">Ethereum</div>
+          <div style="background:rgba(255,255,255,.08); padding:5px 12px; border-radius:999px; font-size:13px;">Base</div>
         </div>
-        <div style="margin-top:20px; font-size:13px; color:var(--text2);">No custody • AI Studio Ready • Risk Engine Online</div>
+        <div style="margin-top:18px; font-size:13px; color:var(--text2);">No custody • AI Ready • Risk Engine Online</div>
       </div>
     </div>
 
     <!-- 3 Layers -->
-    <div class="section">
-      <div class="section-head">
-        <h2>Three layers.<br>One powerful hub.</h2>
-        <p style="color:var(--text2); max-width:520px; margin:12px auto 0;">
-          Koschei organizes its capabilities into three clear layers — from everyday protection to advanced automation.
-        </p>
+    <div style="padding:50px 0;">
+      <div style="text-align:center; max-width:580px; margin:0 auto 36px;">
+        <h2 style="margin:0 0 10px; font-size:34px;">Three layers.<br>One powerful hub.</h2>
+        <p style="color:var(--text2);">Koschei organizes its capabilities into three clear layers — from everyday protection to advanced automation.</p>
       </div>
 
       <div class="layers">
-        <!-- Security -->
         <a href="/hub.html#security" class="layer-card">
           <div class="layer-icon">🛡️</div>
           <h3>Security Layer</h3>
           <p>Quick and reliable tools to scan tokens, detect rugs, evaluate wallets, and protect yourself before interacting on-chain.</p>
         </a>
-
-        <!-- Intelligence -->
         <a href="/hub.html#intelligence" class="layer-card">
           <div class="layer-icon">🔍</div>
           <h3>Intelligence Layer</h3>
           <p>Deep research and analysis tools for builders. Project evaluation, on-chain relationships, metadata, and advanced insights.</p>
         </a>
-
-        <!-- Automation -->
         <a href="/hub.html#automation" class="layer-card">
           <div class="layer-icon">🤖</div>
           <h3>Automation & Agent Layer</h3>
@@ -181,16 +175,13 @@
     <!-- CTA -->
     <div class="cta surface">
       <h2 style="margin:0 0 12px;">Start building today.</h2>
-      <p style="color:var(--text2); max-width:420px; margin:0 auto 24px;">
-        Explore public/read-only Web3 intelligence tools without private keys or seed phrases.
-      </p>
+      <p style="color:var(--text2); max-width:420px; margin:0 auto 24px;">Explore public/read-only Web3 intelligence tools without private keys or seed phrases.</p>
       <a href="/register.html" class="btn btn-primary">Create free account</a>
     </div>
 
-    <footer>
+    <footer style="text-align:center; padding:30px 0; color:var(--text2); font-size:14px;">
       © 2026 Koschei · Built on Solana<br>
-      <a href="/docs" style="color:var(--accent); text-decoration:none;">API Docs</a> · 
-      <a href="/pricing.html" style="color:var(--accent); text-decoration:none;">Pricing</a>
+      <a href="/docs" style="color:var(--accent); text-decoration:none;">API Docs</a>
     </footer>
   </div>
 </body>
