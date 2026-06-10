@@ -3,7 +3,11 @@ services:
     name: koschei-web3-hub
     env: go
     rootDir: koschei/api
-    buildCommand: go build -o app .
+    buildCommand: |
+      go get golang.org/x/crypto/argon2
+      go get github.com/golang-jwt/jwt/v5
+      go mod tidy
+      go build -o app .
     startCommand: ./app
     envVars:
       - key: STATIC_DIR
