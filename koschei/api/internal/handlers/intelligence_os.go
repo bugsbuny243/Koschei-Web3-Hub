@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -48,26 +47,6 @@ func (h *Handler) useOutput(w http.ResponseWriter, email, tool string) bool {
 		return false
 	}
 	return true
-}
-
-func (h *Handler) AdminModules(w http.ResponseWriter, r *http.Request) {
-	if !h.ownerAuth(w, r) {
-		return
-	}
-	rows, e := h.DB.Query(`SELECT module_key,title,COALESCE(description,''),COALESCE(category,''),status,is_public,admin_only FROM koschei_modules ORDER BY category,title`)
-	if e != nil {
-		writeJSON(w, 500, map[string]string{"error": "db_failed"})
-		return
-	}
-	defer rows.Close()
-	a := []map[string]any{}
-	for rows.Next() {
-		var k, t, d, c, s string
-		var p, ad bool
-		_ = rows.Scan(&k, &t, &d, &c, &s, &p, &ad)
-		a = append(a, map[string]any{"module_key": k, "title": t, "description": d, "category": c, "status": s, "is_public": p, "admin_only": ad})
-	}
-	writeJSON(w, 200, map[string]any{"ok": true, "count": len(a), "modules": a})
 }
 
 type grantRequest struct {
@@ -602,49 +581,6 @@ func (h *Handler) ToolPrices(w http.ResponseWriter, r *http.Request) {
 		a = append(a, map[string]any{"tool_key": k, "display_name": n, "price_usd": p, "payment_mode": m, "enforced": os.Getenv("KOSCHEI_X402_ENABLED") == "true" && m == "x402_ready"})
 	}
 	writeJSON(w, 200, map[string]any{"ok": true, "x402_enabled": os.Getenv("KOSCHEI_X402_ENABLED") == "true", "tools": a})
-}
-func (h *Handler) AdminToolUsage(w http.ResponseWriter, r *http.Request) {
-	if !h.ownerAuth(w, r) {
-		return
-	}
-	rows, e := h.DB.Query(`SELECT tool_key,status,COALESCE(email,''),created_at FROM tool_usage_logs ORDER BY created_at DESC LIMIT 100`)
-	if e != nil {
-		writeJSON(w, 500, map[string]string{"error": "db_failed"})
-		return
-	}
-	defer rows.Close()
-	a := []map[string]any{}
-	for rows.Next() {
-		var k, s, e string
-		var c any
-		_ = rows.Scan(&k, &s, &e, &c)
-		a = append(a, map[string]any{"tool_key": k, "status": s, "email": e, "created_at": c})
-	}
-	writeJSON(w, 200, map[string]any{"usage": a})
-}
-func (h *Handler) AdminAgentKey(w http.ResponseWriter, r *http.Request) {
-	if !h.ownerAuth(w, r) {
-		return
-	}
-	var q struct {
-		OwnerEmail string   `json:"owner_email"`
-		Label      string   `json:"label"`
-		Scopes     []string `json:"scopes"`
-	}
-	_ = decodeJSON(r, &q)
-	if len(q.Scopes) == 0 {
-		q.Scopes = defaultAgentScopes()
-	}
-	b := make([]byte, 24)
-	_, _ = rand.Read(b)
-	key := "ksh_agent_" + hex.EncodeToString(b)
-	sum := sha256.Sum256([]byte(key))
-	var id string
-	if h.DB.QueryRow(`INSERT INTO agent_api_keys(owner_email,key_hash,label,scopes) VALUES(NULLIF($1,''),$2,$3,$4) RETURNING id`, q.OwnerEmail, hex.EncodeToString(sum[:]), q.Label, jsonBytes(q.Scopes)).Scan(&id) != nil {
-		writeJSON(w, 500, map[string]string{"error": "db_failed"})
-		return
-	}
-	writeJSON(w, 201, map[string]any{"ok": true, "id": id, "agent_key": key, "notice": "Shown once. Store securely."})
 }
 func defaultAgentScopes() []string {
 	return []string{"health", "wallet_score", "risk_summary", "metadata_template", "chain_health"}

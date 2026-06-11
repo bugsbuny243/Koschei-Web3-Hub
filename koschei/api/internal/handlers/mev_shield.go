@@ -101,6 +101,10 @@ func (h *Handler) AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 // ProtectedSendMEV forwards an already signed Solana transaction bundle to the
 // Jito Bundle API. Koschei never requests private keys or signs on behalf of a
 // user; the frontend must provide signed, serialized transactions.
+func (h *Handler) ProtectedSend(w http.ResponseWriter, r *http.Request) {
+	h.ProtectedSendMEV(w, r)
+}
+
 func (h *Handler) ProtectedSendMEV(w http.ResponseWriter, r *http.Request) {
 	var req mevProtectedSendRequest
 	if err := decodeJSON(r, &req); err != nil {

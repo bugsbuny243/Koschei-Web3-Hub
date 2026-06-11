@@ -61,6 +61,10 @@ func (h *Handler) GetPublicMetrics(w http.ResponseWriter, r *http.Request) {
 	h.PublicImpact(w, r)
 }
 
+func (h *Handler) ImpactHandler(w http.ResponseWriter, r *http.Request) {
+	h.PublicImpact(w, r)
+}
+
 func (h *Handler) PublicImpact(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var cached publicImpactMetrics
@@ -237,6 +241,15 @@ func safeImpactFloat(ctx context.Context, db *sql.DB, query string) (float64, er
 		return 0, nil
 	}
 	return value, err
+}
+
+func safeImpactCount(ctx context.Context, db *sql.DB, query string) (int64, error) {
+	var count int64
+	err := db.QueryRowContext(ctx, query).Scan(&count)
+	if isUndefinedImpactSource(err) {
+		return 0, nil
+	}
+	return count, err
 }
 
 func latestBiggestPrevention(ctx context.Context, db *sql.DB) (*publicImpactPreventionLog, error) {

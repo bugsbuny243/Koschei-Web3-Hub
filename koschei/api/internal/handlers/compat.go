@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -54,8 +53,6 @@ func generateID() string {
 	return id
 }
 
-var _ = http.MethodGet
-
 func (h *Handler) upsertAppProfile(ctx context.Context, subject, email string) (authUser, error) {
 	profile := authUser{}
 	err := h.DB.QueryRowContext(ctx, `
@@ -92,5 +89,3 @@ func (h *Handler) callTogetherWithSystemTimeoutAndMaxTokens(model, systemPrompt,
 	}
 	return "", errors.New("together client is disabled in test-safe build")
 }
-
-func isAdmin(r *http.Request) bool { _, err := r.Cookie("koschei_admin"); return err == nil }
