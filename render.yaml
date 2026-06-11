@@ -4,8 +4,9 @@ services:
     env: go
     rootDir: .
     buildCommand: |
+      cd koschei/api
       go mod vendor
-      go build -mod=vendor -o app koschei/api/main.go
+      go build -mod=vendor -o ../../app .
     startCommand: ./app
     envVars:
       - key: STATIC_DIR
