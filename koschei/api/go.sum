@@ -1,8 +1,2 @@
-github.com/golang-jwt/jwt/v5 v5.0.0 h1:tGxBWlUCrnxu8BKyXpJNo7DjkvFQhR9cSznURQR5OEU=
-github.com/golang-jwt/jwt/v5 v5.0.0/go.mod h1:9ZkkWGvndIvi7UERjEmKuUszQQlotbmfnqQbuhhiCUk=
-
-github.com/lib/pq v1.10.9 h1:XnV+Lz+VNZ+Hx1YwJ3QSOdcEZntGGlGvv0bgtaCtEds=
-github.com/lib/pq v1.10.9/go.mod h1:
-
-golang.org/x/crypto v0.23.0 h1:GLTRwkaIGixjLrdIPFW0zzDW3hlr/l8GESbcEqPRS/A=
-golang.org/x/crypto v0.23.0/go.mod h1:F9nrCyd/+CFabQZxs8L1PSuwwxpNgJo39htwmIQYooA=
+github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
+github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
