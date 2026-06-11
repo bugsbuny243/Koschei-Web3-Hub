@@ -81,7 +81,16 @@ func (h *Handler) PublicImpact(w http.ResponseWriter, r *http.Request) {
 			mods = append(mods, map[string]string{"title": t, "description": d, "category": c})
 		}
 	}
-	writeJSON(w, 200, map[string]any{"ok": true, "statement": "Koschei Web3 Hub is a no-custody Web3 intelligence workspace for builders.", "no_custody": "No private keys. No seed phrases. No custody. Read-only intelligence.", "modules_live_count": len(mods), "generated_outputs_count": count(`SELECT count(*) FROM web3_outputs`), "metadata_outputs_count": count(`SELECT count(*) FROM web3_outputs WHERE output_type='metadata'`), "risk_outputs_count": count(`SELECT count(*) FROM web3_outputs WHERE lower(output_type) IN ('risk','risk_scan')`), "chain_checks_count": count(`SELECT count(*) FROM chain_health_logs`), "watchlist_source_count": count(`SELECT count(*) FROM web3_event_sources`), "web3_event_count": count(`SELECT count(*) FROM web3_events`), "supported_networks_count": count(`SELECT count(DISTINCT network) FROM web3_event_sources WHERE network IS NOT NULL`), "live_modules": mods, "public_roadmap": []string{"Expand evidence-backed cross-chain coverage", "Publish ecosystem integration guides", "Add opt-in agent tool scopes"}})
+	protected, err := protectedImpactMetrics(r.Context(), h.DB)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "protected_metrics_unavailable"})
+		return
+	}
+	response := map[string]any{"ok": true, "statement": "Koschei Web3 Hub is a no-custody Web3 intelligence workspace for builders.", "no_custody": "No private keys. No seed phrases. No custody. Read-only intelligence.", "modules_live_count": len(mods), "generated_outputs_count": count(`SELECT count(*) FROM web3_outputs`), "metadata_outputs_count": count(`SELECT count(*) FROM web3_outputs WHERE output_type='metadata'`), "risk_outputs_count": count(`SELECT count(*) FROM web3_outputs WHERE lower(output_type) IN ('risk','risk_scan')`), "chain_checks_count": count(`SELECT count(*) FROM chain_health_logs`), "watchlist_source_count": count(`SELECT count(*) FROM web3_event_sources`), "web3_event_count": count(`SELECT count(*) FROM web3_events`), "supported_networks_count": count(`SELECT count(DISTINCT network) FROM web3_event_sources WHERE network IS NOT NULL`), "live_modules": mods, "public_roadmap": []string{"Expand evidence-backed cross-chain coverage", "Publish ecosystem integration guides", "Add opt-in agent tool scopes"}}
+	for key, value := range protected {
+		response[key] = value
+	}
+	writeJSON(w, 200, response)
 }
 
 type grantRequest struct {
