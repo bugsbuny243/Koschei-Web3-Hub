@@ -12,7 +12,7 @@ const (
 )
 
 func configuredNeonAuthBaseURL() string {
-	return strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL"))
+	return envOrDefault("NEON_AUTH_BASE_URL", defaultNeonAuthBaseURL)
 }
 
 func configuredPublicNeonAuthURL() string {
@@ -23,11 +23,11 @@ func configuredPublicNeonAuthURL() string {
 }
 
 func configuredNeonAuthIssuer() string {
-	return strings.TrimSpace(os.Getenv("NEON_AUTH_ISSUER"))
+	return envOrDefault("NEON_AUTH_ISSUER", defaultNeonAuthIssuer)
 }
 
 func configuredNeonAuthJWKSURL() string {
-	return strings.TrimSpace(os.Getenv("NEON_AUTH_JWKS_URL"))
+	return envOrDefault("NEON_AUTH_JWKS_URL", defaultNeonAuthJWKSURL)
 }
 
 func envOrDefault(name string, fallback string) string {
@@ -40,6 +40,10 @@ func envOrDefault(name string, fallback string) string {
 
 func ConfiguredNeonAuthJWKSURL() string {
 	return configuredNeonAuthJWKSURL()
+}
+
+func ConfiguredPublicNeonAuthURL() string {
+	return configuredPublicNeonAuthURL()
 }
 
 func ConfiguredNeonAuthIssuer() string {

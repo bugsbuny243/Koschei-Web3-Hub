@@ -174,11 +174,11 @@
 <body>
 <div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
 <nav class="nav">
-  <a href="/hub.html" class="nav-logo">K Koschei</a>
+  <a href="/hub" class="nav-logo">K Koschei</a>
   <div class="nav-links">
-    <a href="/hub.html" class="nav-link">Hub</a>
+    <a href="/hub" class="nav-link">Hub</a>
     <a href="/metadata.html" class="nav-link">Metadata</a>
-    <a href="/risk.html" class="nav-link">Risk</a>
+    <a href="/risk-v2.html" class="nav-link">Risk</a>
     <a href="/chains.html" class="nav-link">Chains</a>
     <a href="/account.html" class="nav-link">Account</a>
     <button class="btn btn-ghost" style="padding:6px 14px;font-size:13px;" onclick="logout()">Sign out</button>
@@ -211,10 +211,10 @@
     <div class="card-title">Quick Actions</div>
     <div class="actions-grid">
       <a href="/token-scanner.html" class="btn btn-primary">🪙 Scan Token</a>
-      <a href="/tx-decoder.html" class="btn btn-ghost">🔍 Decode TX</a>
+      <a href="/tx-decoder-pro.html" class="btn btn-ghost">🔍 Decode TX</a>
       <a href="/wallet-score.html" class="btn btn-ghost">🏆 Wallet Score</a>
       <a href="/pricing.html" class="btn btn-ghost">💳 Buy Credits</a>
-      <a href="/hub.html" class="btn btn-ghost">← Back to Hub</a>
+      <a href="/hub" class="btn btn-ghost">← Back to Hub</a>
     </div>
   </div>
 </div>
@@ -224,67 +224,17 @@
     if (!(await checkAuth())) return;
     try {
       const res = await fetch('/api/me', { headers: { Authorization: getAuthHeader() }, credentials: 'same-origin' });
-      if (res && res.ok) {
-        const data = await res.json();
-        const user = data.user || data;
-        document.getElementById('userEmailDisplay').textContent = user.email || '';
-        document.getElementById('statCredits').textContent = user.credits ?? user.outputs_remaining ?? 0;
-        document.getElementById('statPlan').textContent = user.plan_id || 'free';
-        document.getElementById('statRole').textContent = user.role || 'member';
-      }
-      renderDashboard(normalizeDashboard(data || {}));
+      if (!res || !res.ok) throw new Error('Account summary unavailable');
+      const data = await res.json();
+      const user = data.user || data;
+      document.getElementById('userEmailDisplay').textContent = user.email || '';
+      document.getElementById('statCredits').textContent = user.credits ?? user.outputs_remaining ?? 0;
+      document.getElementById('statPlan').textContent = user.plan_id || user.plan || 'free';
+      document.getElementById('statRole').textContent = user.role || 'member';
+    } catch (error) {
+      document.getElementById('userEmailDisplay').textContent = error.message || 'Dashboard unavailable';
     }
-
-    async function postJSON(path, body) {
-      const res = await apiFetch(path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      }).catch(() => null);
-      if (!res || !res.ok) return null;
-      return readJSON(res);
-    }
-
-    $('mevForm').addEventListener('submit', async event => {
-      event.preventDefault();
-      $('mevResult').textContent = 'MEV analizi çalışıyor…';
-      const body = { from_token: $('fromToken').value, to_token: $('toToken').value, amount: Number($('swapAmount').value || 0) };
-      const data = await postJSON(ENDPOINTS.mevAnalyze, body);
-      const risk = data?.risk_score ?? data?.score ?? Math.round(35 + Math.random() * 30);
-      $('mevResult').innerHTML = `<strong>Risk skoru:</strong> ${fmtInt(risk)}/100<br><span>${escapeHTML(data?.recommendation || 'Mock: Route iki parçaya bölünürse sandwich riski azalır.')}</span>`;
-    });
-
-    $('tokenForm').addEventListener('submit', async event => {
-      event.preventDefault();
-      $('tokenResult').textContent = 'Token taranıyor…';
-      const mint = $('tokenMint').value.trim() || 'So11111111111111111111111111111111111111112';
-      const data = await postJSON(ENDPOINTS.tokenScan, { mint, token_mint: mint });
-      const score = data?.risk_score ?? data?.score ?? 42;
-      $('tokenResult').innerHTML = `<strong>${escapeHTML(mint.slice(0, 8))}…</strong> risk skoru ${fmtInt(score)}/100.<br>${escapeHTML(data?.summary || 'Mock: Likidite stabil, mint authority ayrıca doğrulanmalı.')}`;
-    });
-
-    $('walletForm').addEventListener('submit', async event => {
-      event.preventDefault();
-      $('walletResult').textContent = 'Wallet health kontrol ediliyor…';
-      const wallet = $('walletAddress').value.trim() || 'demo-wallet';
-      const data = await postJSON(ENDPOINTS.walletScore, { wallet, address: wallet });
-      const score = data?.score ?? data?.wallet_score ?? 88;
-      $('walletResult').innerHTML = `<strong>Health:</strong> ${fmtInt(score)}/100<br>${escapeHTML(data?.summary || 'Mock: Cüzdan aktivitesi sağlıklı; yüksek riskli yeni izin bulunmadı.')}`;
-    });
-
-    $('refreshBtn').addEventListener('click', loadDashboard);
-    $('signOutBtn').addEventListener('click', () => {
-      if (window.KoscheiAuth && KoscheiAuth.signOut) KoscheiAuth.signOut();
-      else window.location.href = '/login.html';
-    });
-
-    (async () => {
-      if (window.KoscheiAuth) {
-        await KoscheiAuth.init();
-        if (!KoscheiAuth.requireAuth()) return;
-      }
-      await loadDashboard();
-    })();
-  </script>
+  })();
+</script>
 </body>
 </html>
