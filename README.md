@@ -1,3 +1,7 @@
+# PUBLIC GOOD INITIATIVE — Koschei Web3 Hub
+
+> Koschei is a public-good Web3 safety initiative. We do not operate as a company, do not custody user funds, and do not ask for private keys or seed phrases. Our focus is ecosystem security: open impact metrics, no-custody intelligence, MEV/rug-pull risk visibility, and safer builder tooling for Solana-first Web3 communities.
+
 # Koschei Web3 Hub
 
 No-custody Web3 intelligence tools for Solana builders and users.
