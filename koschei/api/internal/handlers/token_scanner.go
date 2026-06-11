@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -66,10 +67,90 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.tokenService().ScanToken(r.Context(), req.Network, mint)
-	if err != nil {
+	client := &http.Client{Timeout: 12 * time.Second}
+	rpcURL := solanaRPCURL(req.Network, os.Getenv("ALCHEMY_API_KEY"))
+	var supply struct {
+		Value struct {
+			Amount   string `json:"amount"`
+			Decimals int    `json:"decimals"`
+		} `json:"value"`
+	}
+	if err := h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getTokenSupply", []interface{}{mint}, &supply); err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "token mint not found or RPC request failed"})
 		return
+	}
+
+	var account struct {
+		Value *struct {
+			Data struct {
+				Parsed struct {
+					Info struct {
+						MintAuthority   *string `json:"mintAuthority"`
+						FreezeAuthority *string `json:"freezeAuthority"`
+					} `json:"info"`
+				} `json:"parsed"`
+			} `json:"data"`
+		} `json:"value"`
+	}
+	_ = h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getAccountInfo", []interface{}{mint, map[string]string{"encoding": "jsonParsed"}}, &account)
+
+	var largest struct {
+		Value []struct {
+			Amount string `json:"amount"`
+		} `json:"value"`
+	}
+	_ = h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getTokenLargestAccounts", []interface{}{mint}, &largest)
+
+	total, _ := strconv.ParseFloat(supply.Value.Amount, 64)
+	topOne, topTen := 0.0, 0.0
+	for i, holder := range largest.Value {
+		amount, _ := strconv.ParseFloat(holder.Amount, 64)
+		if total > 0 && i < 10 {
+			topTen += amount / total * 100
+			if i == 0 {
+				topOne = amount / total * 100
+			}
+		}
+	}
+
+	score := 100
+	findings := []string{}
+	mintAuthority, freezeAuthority := "", ""
+	if account.Value != nil {
+		if account.Value.Data.Parsed.Info.MintAuthority != nil {
+			mintAuthority = *account.Value.Data.Parsed.Info.MintAuthority
+			score -= 25
+			findings = append(findings, "Mint authority is active and can create additional supply.")
+		} else {
+			findings = append(findings, "Mint authority is disabled.")
+		}
+		if account.Value.Data.Parsed.Info.FreezeAuthority != nil {
+			freezeAuthority = *account.Value.Data.Parsed.Info.FreezeAuthority
+			score -= 20
+			findings = append(findings, "Freeze authority is active and can freeze token accounts.")
+		} else {
+			findings = append(findings, "Freeze authority is disabled.")
+		}
+	}
+	if topOne >= 50 {
+		score -= 35
+		findings = append(findings, "The largest token account controls at least half of the supply.")
+	} else if topOne >= 20 {
+		score -= 20
+		findings = append(findings, "The largest token account has a significant concentration.")
+	}
+	if topTen >= 80 {
+		score -= 20
+		findings = append(findings, "The ten largest token accounts control most of the supply.")
+	}
+	if score < 0 {
+		score = 0
+	}
+	risk := "low"
+	if score < 40 {
+		risk = "high"
+	} else if score < 70 {
+		risk = "medium"
 	}
 
 	if !isPrivileged {
@@ -86,6 +167,13 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 		freezeAuthority = *result.Token.FreezeAuthority
 	}
 	writeJSON(w, http.StatusOK, tokenScanResponse{Mint: mint, Network: req.Network, Score: result.Score, RiskLevel: result.RiskLevel, Supply: result.Token.SupplyRaw, Decimals: result.Token.Decimals, MintAuthority: mintAuthority, FreezeAuthority: freezeAuthority, LargestHolderPercent: result.Token.LargestHolderPercent, TopTenPercent: result.Token.TopTenPercent, Findings: result.Findings, Disclaimer: result.Disclaimer})
+}
+
+func (h *Handler) callSolanaRPC(ctx context.Context, client *http.Client, rpcURL, network, method string, params interface{}, target interface{}) error {
+	if h != nil && h.SolanaRPC != nil {
+		return h.SolanaRPC.Call(ctx, network, method, params, target, 0)
+	}
+	return callSolanaRPC(client, rpcURL, method, params, target)
 }
 
 func callSolanaRPC(client *http.Client, rpcURL, method string, params interface{}, target interface{}) error {
