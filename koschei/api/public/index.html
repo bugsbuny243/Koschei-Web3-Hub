@@ -1,298 +1,173 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="tr">
 <head>
-  <!-- AdSense verification -->
-  <meta name="google-adsense-account" content="ca-pub-6081394144742471">
-
-
-  <!-- Google AdSense -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6081394144742471"
-     crossorigin="anonymous"></script>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-1QFWMJJC3');
-  </script>
-
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Koschei Web3 Hub | Solana Security Tools, Token Scanner, TX Decoder, Wallet Score</title>
-  <meta name="description" content="Koschei Web3 Hub provides no-custody Solana intelligence tools for token scanning, TX decoding, wallet reputation, program scanning, and chain health. No private keys or seed phrases.">
-  <meta name="keywords" content="Solana token scanner, Solana security, rug pull detector, Solana wallet score, NFT metadata generator, Solana transaction decoder, Solana developer tools, smart contract scanner, Web3 security">
-  <meta name="author" content="Koschei Web3 Hub">
-  <meta name="robots" content="index, follow">
-  <link rel="canonical" href="https://tradepigloball.co/">
-
-  <!-- Open Graph -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://tradepigloball.co/">
-  <meta property="og:title" content="Koschei Web3 Hub — Solana Security & Developer Tools">
-  <meta property="og:description" content="No-custody Web3 intelligence for token scanning, TX decoding, wallet scoring, and public blockchain activity.">
-  <meta property="og:image" content="https://tradepigloball.co/og-image.svg">
-
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:site" content="@KreatifZihin">
-  <meta name="twitter:title" content="Koschei Web3 Hub — Solana Security Tools">
-  <meta name="twitter:description" content="Token scanner, TX decoder, wallet score, and program scanner for public/read-only Web3 intelligence.">
-  <meta name="twitter:image" content="https://tradepigloball.co/og-image.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #050812;
-      --bg2: #0a1020;
-      --surface: rgba(255, 255, 255, .08);
-      --surface-strong: rgba(255, 255, 255, .13);
-      --line: rgba(255, 255, 255, .16);
-      --line-strong: rgba(255, 255, 255, .28);
-      --text: #f7fbff;
-      --text2: #a9b8d6;
-      --accent: #00ff88;
-      --accent2: #69d8ff;
-      --violet: #a78bfa;
-      --danger: #ff5c7c;
-      --shadow: 0 30px 90px rgba(0, 0, 0, .45);
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 15% 8%, rgba(0, 255, 136, .24), transparent 34%),
-        radial-gradient(circle at 86% 12%, rgba(105, 216, 255, .2), transparent 32%),
-        radial-gradient(circle at 58% 78%, rgba(167, 139, 250, .18), transparent 34%),
-        linear-gradient(135deg, #03050b 0%, #07111e 48%, #040811 100%);
-      overflow-x: hidden;
-    }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
-      background-size: 54px 54px;
-      mask-image: radial-gradient(circle at center, black, transparent 78%);
-    }
-    a { color: inherit; }
-    .shell { width: min(1160px, calc(100% - 32px)); margin: 0 auto; }
-    .surface {
-      background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.045));
-      border: 1px solid var(--line);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(22px);
-      -webkit-backdrop-filter: blur(22px);
-    }
-    .nav {
-      position: sticky;
-      top: 14px;
-      z-index: 20;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      width: min(1160px, calc(100% - 32px));
-      margin: 14px auto 0;
-      padding: 12px 14px;
-      border-radius: 24px;
-    }
-    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; }
-    .brand-mark {
-      display: grid;
-      place-items: center;
-      width: 38px;
-      height: 38px;
-      border-radius: 14px;
-      color: #06120d;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      box-shadow: 0 0 34px rgba(0, 255, 136, .3);
-    }
-    .nav-links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-    .nav-link { color: var(--text2); font-size: 13px; font-weight: 600; text-decoration: none; padding: 9px 12px; border-radius: 999px; }
-    .nav-link:hover { color: var(--text); background: rgba(255,255,255,.08); }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      min-height: 42px;
-      padding: 0 18px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      color: var(--text);
-      font-weight: 700;
-      font-size: 14px;
-      text-decoration: none;
-      transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
-    }
-    .btn:hover { transform: translateY(-2px); border-color: var(--line-strong); }
-    .btn-primary { color: #04110b; border: 0; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 18px 42px rgba(0, 255, 136, .22); }
-    .btn-ghost { background: rgba(255,255,255,.06); }
-    .hero { position: relative; padding: 96px 0 58px; }
-    .hero-grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: 28px; align-items: center; }
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      width: max-content;
-      padding: 8px 13px;
-      border-radius: 999px;
-      color: #bfffe2;
-      font-size: 12px;
-      font-weight: 800;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      background: rgba(0,255,136,.1);
-      border: 1px solid rgba(0,255,136,.24);
-    }
-    h1 { margin: 22px 0 18px; font-size: clamp(44px, 7vw, 82px); line-height: .96; letter-spacing: -.07em; }
-    .gradient-text { background: linear-gradient(135deg, #fff, #c7fff0 32%, #82ddff 72%, #d9ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .hero-sub { max-width: 640px; margin: 0 0 16px; color: var(--text2); font-size: clamp(16px, 2vw, 20px); line-height: 1.75; }
-    .hero-copy { max-width: 680px; margin: 0 0 30px; color: #dce8ff; font-size: 16px; line-height: 1.75; }
-    .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-    .hero-note { flex-basis: 100%; margin: 4px 0 0; color: var(--text2); font-size: 13px; line-height: 1.7; }
-    .panel { border-radius: 34px; padding: 24px; }
-    .terminal { min-height: 420px; display: flex; flex-direction: column; gap: 16px; }
-    .terminal-top { display: flex; align-items: center; justify-content: space-between; color: var(--text2); font-size: 12px; font-weight: 700; }
-    .dots { display: flex; gap: 7px; }
-    .dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); opacity: .85; }
-    .dots span:nth-child(2) { background: var(--accent2); }
-    .dots span:nth-child(3) { background: var(--violet); }
-    .metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-    .metric { padding: 16px; border-radius: 22px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); }
-    .metric small { display:block; color: var(--text2); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
-    .metric strong { display:block; margin-top: 10px; font-size: 24px; }
-    .chain-strip { margin-top: 16px; padding: 16px; border-radius: 24px; background: rgba(0,0,0,.16); border: 1px solid rgba(255,255,255,.1); }
-    .chain-title { margin-bottom: 12px; color: var(--text2); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-    .chain-list { display: flex; flex-wrap: wrap; gap: 10px; }
-    .chain-pill { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.1); color: #dce8ff; font-size: 12px; font-weight: 700; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #77839b; box-shadow: 0 0 18px currentColor; }
-    .dot-green { background: var(--accent); color: var(--accent); }
-    .dot-red { background: var(--danger); color: var(--danger); }
-    .section { padding: 58px 0; }
-    .section-head { max-width: 720px; margin-bottom: 26px; }
-    .section-kicker { color: var(--accent2); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-    h2 { margin: 10px 0 0; font-size: clamp(30px, 4vw, 48px); line-height: 1.05; letter-spacing: -.04em; }
-    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .card { min-height: 210px; padding: 24px; border-radius: 28px; text-decoration: none; transition: transform .2s ease, border-color .2s ease; }
-    .card:hover { transform: translateY(-4px); border-color: var(--line-strong); }
-    .icon { font-size: 30px; margin-bottom: 18px; }
-    .card h3 { margin: 0 0 10px; font-size: 18px; }
-    .card p { margin: 0; color: var(--text2); font-size: 14px; line-height: 1.65; }
-    .cta { margin: 58px auto 34px; padding: 34px; border-radius: 34px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-    .cta h2 { margin: 0 0 8px; }
-    .cta p { margin: 0; color: var(--text2); line-height: 1.6; }
-    footer { padding: 26px 0 38px; color: var(--text2); font-size: 13px; text-align: center; }
-    footer a { color: var(--accent); text-decoration: none; }
-    @media (max-width: 900px) {
-      .hero { padding-top: 58px; }
-      .hero-grid, .cards { grid-template-columns: 1fr; }
-      .terminal { min-height: auto; }
-      .cta { align-items: flex-start; flex-direction: column; }
-    }
-    @media (max-width: 560px) {
-      .nav { position: static; }
-      .nav-links { width: 100%; justify-content: flex-start; }
-      .metric-grid { grid-template-columns: 1fr; }
-      h1 { letter-spacing: -.045em; }
-    }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07110f">
+  <meta name="description" content="Koschei Web3 Hub: wallet score, token scanner, MEV Shield, Impact Dashboard, Liquidity Radar ve DAO Guardian modülleri.">
+  <title>Koschei Web3 Hub</title>
+  <link rel="preload" href="/css/koschei-modern.css" as="style">
+  <link rel="stylesheet" href="/css/koschei-modern.css">
 </head>
 <body>
-  <nav class="nav surface">
-    <a href="/" class="brand" aria-label="Koschei home"><span class="brand-mark">K</span><span>Koschei</span></a>
-    <div class="nav-links">
-      <a href="/docs" class="nav-link">Docs</a>
-      <a href="/pricing.html" class="nav-link">Pricing</a>
-      <a href="/login.html" class="nav-link">Sign in</a>
-      <a href="/register.html" class="btn btn-primary">Get started</a>
-    </div>
-  </nav>
+  <a class="skip-link" href="#main">İçeriğe geç</a>
+  <header class="site-header">
+    <nav class="nav" aria-label="Ana navigasyon">
+      <a class="brand" href="#home" data-route="home" aria-label="Koschei Web3 Hub ana sayfa">
+        <span class="brand-mark" aria-hidden="true">K</span>
+        <span><strong>Koschei</strong><small>Web3 Hub</small></span>
+      </a>
+      <button class="nav-toggle" type="button" aria-controls="navLinks" aria-expanded="false">☰<span class="sr-only">Menüyü aç/kapat</span></button>
+      <div id="navLinks" class="nav-links">
+        <a href="#home" data-route="home">Home</a>
+        <a href="#wallet-score" data-route="wallet-score">Wallet Score</a>
+        <a href="#token-scanner" data-route="token-scanner">Token Scanner</a>
+        <a href="#mev-shield" data-route="mev-shield">MEV Shield</a>
+        <a href="#impact" data-route="impact">Impact Dashboard</a>
+        <a href="#liquidity-radar" data-route="liquidity-radar">Liquidity Radar</a>
+        <a href="#dao-guardian" data-route="dao-guardian">DAO Guardian</a>
+        <a class="owner-link" href="/owner">Owner Panel</a>
+      </div>
+    </nav>
+  </header>
 
-  <main>
-    <section class="hero shell">
-      <div class="hero-grid">
-        <div>
-          <div class="eyebrow">⚡ No-custody Solana intelligence</div>
-          <h1><span class="gradient-text">Koschei Web3 Hub</span></h1>
-          <p class="hero-sub">No-custody Web3 intelligence tools for Solana builders and users.</p>
-          <p class="hero-copy">Analyze wallets, tokens, transactions, metadata, project risk signals and public blockchain activity without private keys or seed phrases.</p>
-          <div class="hero-actions">
-            <a href="/hub.html" class="btn btn-primary">Open Hub</a>
-            <a href="/docs" class="btn btn-ghost">View Docs</a>
-            <p class="hero-note">No private keys. No seed phrases. Public/read-only Web3 intelligence. Informational only, not financial advice.</p>
-          </div>
+  <main id="main" class="app-shell">
+    <section class="hero view is-active" id="home" aria-labelledby="homeTitle">
+      <div class="hero-copy">
+        <p class="eyebrow">Dark-first • Mobile-first • API-ready</p>
+        <h1 id="homeTitle">Web3 risk, impact ve owner operasyonları için tek modern hub.</h1>
+        <p class="hero-text">Koschei frontend artık SPA benzeri tek ekran deneyimiyle Wallet Score, Token Scanner, MEV Shield, Impact Dashboard, Liquidity Radar ve DAO Guardian modüllerini güvenli API istemcileriyle birleştirir.</p>
+        <div class="hero-actions">
+          <a class="btn primary" href="#mev-shield" data-route="mev-shield">MEV analizi başlat</a>
+          <a class="btn ghost" href="#impact" data-route="impact">Impact metrikleri</a>
         </div>
-        <aside class="panel surface terminal" aria-label="Koschei live dashboard preview">
-          <div class="terminal-top"><span>koschei://live-stack</span><div class="dots"><span></span><span></span><span></span></div></div>
-          <div class="metric-grid">
-            <div class="metric"><small>Architecture</small><strong>No custody</strong></div>
-            <div class="metric"><small>Focus</small><strong>Solana</strong></div>
-            <div class="metric"><small>AI Studio</small><strong>Ready</strong></div>
-            <div class="metric"><small>Risk Engine</small><strong>Online</strong></div>
-          </div>
-          <div class="chain-strip">
-            <div class="chain-title">Live chain monitoring</div>
-            <div class="chain-list" id="chainList"><div class="chain-pill"><span class="dot"></span> Loading...</div></div>
-          </div>
-        </aside>
       </div>
+      <aside class="status-card" aria-label="Platform durumu">
+        <div class="status-row"><span class="pulse"></span><span id="apiStatus">API durumu kontrol ediliyor…</span></div>
+        <div class="metric-grid compact">
+          <div><b id="heroSaved">$0</b><span>Korunan değer</span></div>
+          <div><b id="heroTools">0</b><span>Aktif modül</span></div>
+          <div><b id="heroAlerts">0</b><span>Radar alarmı</span></div>
+        </div>
+      </aside>
     </section>
 
-    <section class="section shell">
-      <div class="section-head">
-        <div class="section-kicker">Workspace modules</div>
-        <h2>Everything a Web3 operator needs in one Koschei intelligence workspace.</h2>
-      </div>
-      <div class="cards">
-        <article class="card surface"><div class="icon">🧬</div><h3>AI Metadata Studio</h3><p>Generate professional NFT, game asset, and project metadata in seconds with AI-assisted fallback logic.</p></article>
-        <article class="card surface"><div class="icon">🛡️</div><h3>Risk Scanner</h3><p>Review transparent on-chain risk signals before you interact with a Solana project or wallet.</p></article>
-        <article class="card surface"><div class="icon">📡</div><h3>Chain Health API</h3><p>Monitor Solana, Ethereum, Base, Arbitrum, Polygon, and Optimism health from one REST-friendly surface.</p></article>
-        <article class="card surface"><div class="icon">🔔</div><h3>Web3 Event Monitor</h3><p>Track public wallet and contract activity through Alchemy-powered polling without requesting private keys.</p></article>
-        <article class="card surface"><div class="icon">🔒</div><h3>No Custody</h3><p>Read-only tools by design. Koschei never asks for seed phrases, private keys, or wallet custody.</p></article>
-        <article class="card surface"><div class="icon">⚙️</div><h3>Developer First</h3><p>Practical endpoints, fast member flows, and clear modules designed for builders who ship.</p></article>
-      </div>
-    </section>
-
-    <section class="cta shell surface">
+    <section class="panel settings-panel" aria-labelledby="settingsTitle">
       <div>
-        <h2>Start building today.</h2>
-        <p>Explore public/read-only Web3 intelligence tools without private keys or seed phrases.</p>
+        <p class="eyebrow">API Ayarları</p>
+        <h2 id="settingsTitle">Güvenli istemci konfigürasyonu</h2>
+        <p class="muted">JWT veya API key gerekiyorsa tarayıcı localStorage içinde saklanır. Mutating isteklerde otomatik CSRF başlığı gönderilir.</p>
       </div>
-      <a href="/register.html" class="btn btn-primary">Create account</a>
+      <form id="settingsForm" class="settings-grid">
+        <label>Bearer JWT<input id="authToken" type="password" autocomplete="off" placeholder="Wallet/Token Scanner için JWT"></label>
+        <label>B2B API Key<input id="apiKey" type="password" autocomplete="off" placeholder="MEV/Liquidity/DAO v1 API key"></label>
+        <button class="btn primary" type="submit">Kaydet</button>
+      </form>
+    </section>
+
+    <section class="view" id="wallet-score" aria-labelledby="walletTitle">
+      <div class="module-grid">
+        <form class="panel stack" id="walletForm">
+          <p class="eyebrow">Wallet Score</p>
+          <h2 id="walletTitle">Cüzdan sağlık skoru</h2>
+          <label>Cüzdan adresi<input name="address" required placeholder="Solana adresi"></label>
+          <label>Ağ<select name="network"><option value="solana-mainnet">Solana Mainnet</option><option value="solana-devnet">Solana Devnet</option></select></label>
+          <button class="btn primary" type="submit">Skoru hesapla</button>
+          <p class="form-note">Endpoint: <code>/api/wallet/score</code></p>
+        </form>
+        <div class="panel result-panel" id="walletResult" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="view" id="token-scanner" aria-labelledby="tokenTitle">
+      <div class="module-grid">
+        <form class="panel stack" id="tokenForm">
+          <p class="eyebrow">Token Scanner</p>
+          <h2 id="tokenTitle">Token risk taraması</h2>
+          <label>Mint adresi<input name="mint" required placeholder="SPL token mint"></label>
+          <label>Ağ<select name="network"><option value="solana-mainnet">Solana Mainnet</option><option value="solana-devnet">Solana Devnet</option></select></label>
+          <button class="btn primary" type="submit">Token tara</button>
+          <p class="form-note">Endpoint: <code>/api/token/scan</code></p>
+        </form>
+        <div class="panel result-panel" id="tokenResult" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="view" id="mev-shield" aria-labelledby="mevTitle">
+      <div class="module-grid">
+        <form class="panel stack" id="mevForm">
+          <p class="eyebrow">MEV Shield</p>
+          <h2 id="mevTitle">Swap risk analizi</h2>
+          <div class="two-col">
+            <label>Kullanıcı cüzdanı<input name="user_wallet" placeholder="Cüzdan adresi"></label>
+            <label>TX signature<input name="tx_signature" placeholder="İmza veya simülasyon id"></label>
+            <label>Input USD<input name="input_amount_usd" type="number" min="0" step="0.01" value="12500"></label>
+            <label>Slippage BPS<input name="slippage_bps" type="number" min="0" step="1" value="150"></label>
+            <label>Pool Liquidity USD<input name="pool_liquidity_usd" type="number" min="0" step="0.01" value="85000"></label>
+            <label>Route<input name="route" value="Jupiter SOL/USDC"></label>
+          </div>
+          <label>Raw transaction<textarea name="raw_transaction" placeholder="Opsiyonel raw transaction payload"></textarea></label>
+          <button class="btn primary" type="submit">MEV riskini analiz et</button>
+          <p class="form-note">Endpoint: <code>/api/mev/analyze</code></p>
+        </form>
+        <div class="panel result-panel" id="mevResult" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="view" id="impact" aria-labelledby="impactTitle">
+      <div class="panel impact-head">
+        <div><p class="eyebrow">Impact Dashboard</p><h2 id="impactTitle">Canlı metrikler ve grafikler</h2><p class="muted">Public impact endpoint'inden gelen metrikler erişilemezse güvenli boş durum gösterilir.</p></div>
+        <button class="btn ghost" id="refreshImpact" type="button">Yenile</button>
+      </div>
+      <div class="metric-grid" id="impactMetrics" aria-live="polite"></div>
+      <div class="panel chart-card"><h3>Koruma sinyalleri</h3><div class="bars" id="impactBars"></div></div>
+    </section>
+
+    <section class="view" id="liquidity-radar" aria-labelledby="liquidityTitle">
+      <div class="module-grid">
+        <form class="panel stack" id="liquidityForm">
+          <p class="eyebrow">Liquidity Radar</p>
+          <h2 id="liquidityTitle">Real-time alarm simülasyonu</h2>
+          <div class="two-col">
+            <label>Pool adresi<input name="pool_address" placeholder="Pool address"></label>
+            <label>Token mint<input name="token_mint" placeholder="Token mint"></label>
+            <label>Reserve drop %<input name="reserve_drop_pct" type="number" min="0" max="100" step="0.1" value="42"></label>
+            <label>Removed liquidity USD<input name="removed_liquidity_usd" type="number" min="0" step="0.01" value="64000"></label>
+            <label>Block delay<input name="block_delay" type="number" min="0" step="1" value="1"></label>
+            <label>Telegram webhook<input name="telegram_webhook" placeholder="Opsiyonel"></label>
+          </div>
+          <button class="btn primary" type="submit">Alarm üret</button>
+          <p class="form-note">Endpoint: <code>/api/liquidity/analyze</code></p>
+        </form>
+        <div class="panel"><h3>Canlı alarm listesi</h3><div class="alert-list" id="liquidityAlerts" aria-live="polite"></div></div>
+      </div>
+    </section>
+
+    <section class="view" id="dao-guardian" aria-labelledby="daoTitle">
+      <div class="module-grid">
+        <form class="panel stack" id="daoForm">
+          <p class="eyebrow">DAO Guardian</p>
+          <h2 id="daoTitle">Treasury proposal risk</h2>
+          <div class="two-col">
+            <label>DAO ID<input name="dao_id" value="koschei-dao"></label>
+            <label>Treasury adresi<input name="treasury_address" required placeholder="Treasury wallet"></label>
+            <label>Proposal ID<input name="proposal_id" required value="proposal-42"></label>
+            <label>Estimated outflow USD<input name="estimated_outflow_usd" type="number" min="0" step="0.01" value="120000"></label>
+            <label>Signer count<input name="signer_count" type="number" min="0" step="1" value="7"></label>
+            <label>Required signers<input name="required_signers" type="number" min="0" step="1" value="3"></label>
+          </div>
+          <label>Instructions<textarea name="instructions" placeholder="Her satıra bir instruction">transfer treasury funds
+set_authority vault
+withdraw reserve</textarea></label>
+          <button class="btn primary" type="submit">Proposal riskini ölç</button>
+          <p class="form-note">Endpoint: <code>/api/dao/proposal-risk</code></p>
+        </form>
+        <div class="panel result-panel" id="daoResult" aria-live="polite"></div>
+      </div>
     </section>
   </main>
 
-  <footer class="shell">© 2026 Koschei · Built on Solana · <a href="https://tradepigloball.co/support">Support</a> · <a href="/login.html">Sign in</a> · <a href="/docs">API Docs</a></footer>
-
-  <script src="/js/koschei-analytics.js?v=1"></script>
-  <script>
-    KoscheiAnalytics.track('landing_view');
-
-    const chains = ['solana','ethereum','base','arbitrum','polygon','optimism'];
-    const labels = { solana:'Solana', ethereum:'Ethereum', base:'Base', arbitrum:'Arbitrum', polygon:'Polygon', optimism:'Optimism' };
-
-    async function loadChains() {
-      const results = await Promise.allSettled(
-        chains.map(c => fetch(`/api/web3/health?chain=${c}`).then(r => r.json()))
-      );
-      const list = document.getElementById('chainList');
-      list.innerHTML = results.map((r, i) => {
-        const ok = r.status === 'fulfilled' && r.value?.ok;
-        const dot = ok ? 'dot-green' : 'dot-red';
-        return `<div class="chain-pill"><span class="dot ${dot}"></span> ${labels[chains[i]]}</div>`;
-      }).join('');
-    }
-
-    loadChains();
-  </script>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/js/koschei-modern.js" defer></script>
 </body>
 </html>
