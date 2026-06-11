@@ -58,7 +58,7 @@ type ownerRemoveInput struct {
 func (h *Handler) OwnerLogin(w http.ResponseWriter, r *http.Request) {
 	ownerWallet := normalizeWallet(firstEnv("OWNER_WALLET", "KOSCHEI_OWNER_WALLET"))
 	ownerSecret := strings.TrimSpace(firstEnv("OWNER_SECRET", "KOSCHEI_OWNER_SECRET"))
-	if ownerWallet == "" || ownerSecret == "" {
+	if ownerSecret == "" {
 		http.NotFound(w, r)
 		return
 	}
@@ -67,13 +67,18 @@ func (h *Handler) OwnerLogin(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
 		return
 	}
-	if !constantTimeStringEqual(strings.TrimSpace(req.Secret), ownerSecret) || normalizeWallet(req.Wallet) != ownerWallet {
+	if !constantTimeStringEqual(strings.TrimSpace(req.Secret), ownerSecret) {
+		http.NotFound(w, r)
+		return
+	}
+	loginWallet := normalizeWallet(req.Wallet)
+	if ownerWallet != "" && loginWallet != "" && loginWallet != ownerWallet {
 		http.NotFound(w, r)
 		return
 	}
 	secure := strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
 	http.SetCookie(w, &http.Cookie{Name: "koschei_owner_secret", Value: ownerSecret, Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, Expires: time.Now().Add(12 * time.Hour)})
-	http.SetCookie(w, &http.Cookie{Name: "koschei_owner_wallet", Value: ownerWallet, Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, Expires: time.Now().Add(12 * time.Hour)})
+	http.SetCookie(w, &http.Cookie{Name: "koschei_owner_wallet", Value: firstNonEmpty(ownerWallet, loginWallet), Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, Expires: time.Now().Add(12 * time.Hour)})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "Owner oturumu açıldı."})
 }
 

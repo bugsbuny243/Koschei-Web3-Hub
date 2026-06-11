@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"math"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -18,6 +22,26 @@ type mevAnalyzeRequest struct {
 	SlippageBPS      int     `json:"slippage_bps"`
 	PoolLiquidityUSD float64 `json:"pool_liquidity_usd"`
 	Route            string  `json:"route"`
+	ProtectedSend    bool    `json:"protected_send"`
+}
+
+type mevProtectedSendRequest struct {
+	UserWallet     string   `json:"user_wallet"`
+	TXSignature    string   `json:"tx_signature"`
+	RawTransaction string   `json:"raw_transaction"`
+	Transactions   []string `json:"transactions"`
+	Route          string   `json:"route"`
+	InputAmountUSD float64  `json:"input_amount_usd"`
+	SlippageBPS    int      `json:"slippage_bps"`
+}
+
+type jitoRPCResponse struct {
+	JSONRPC string          `json:"jsonrpc"`
+	Result  json.RawMessage `json:"result"`
+	Error   *struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
 }
 
 type mevAnalyzeResponse struct {
@@ -29,6 +53,8 @@ type mevAnalyzeResponse struct {
 	MEVSavedUSD        float64  `json:"mev_saved_usd"`
 	Signals            []string `json:"signals"`
 	EnterpriseReadyAPI bool     `json:"enterprise_ready_api"`
+	JitoBundleID       string   `json:"jito_bundle_id,omitempty"`
+	JitoStatus         string   `json:"jito_status,omitempty"`
 	Message            string   `json:"message"`
 }
 
@@ -57,7 +83,94 @@ func (h *Handler) AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 		rawPayload, _ := json.Marshal(req)
 		_, _ = h.DB.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, mev_saved_usd, jito_tip_used, risk_score, risk_level, route, raw_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(req.RawTransaction)), report.EstimatedLossUSD, report.MEVSavedUSD, report.JitoTipUsed, report.RiskScore, report.RiskLevel, req.Route, string(rawPayload))
 	}
+	if req.ProtectedSend && strings.TrimSpace(req.RawTransaction) != "" {
+		bundleID, status, err := h.submitJitoBundle(r.Context(), []string{req.RawTransaction})
+		report.JitoBundleID = bundleID
+		report.JitoStatus = status
+		if err != nil {
+			report.JitoStatus = "failed"
+			report.Signals = append(report.Signals, "Jito Bundle API gönderimi başarısız: "+err.Error())
+		} else {
+			report.JitoTipUsed = true
+			report.Signals = append(report.Signals, "Korumalı Gönder işlemi Jito Bundle API üzerinden yönlendirildi.")
+		}
+	}
 	writeJSON(w, http.StatusOK, report)
+}
+
+// ProtectedSendMEV forwards an already signed Solana transaction bundle to the
+// Jito Bundle API. Koschei never requests private keys or signs on behalf of a
+// user; the frontend must provide signed, serialized transactions.
+func (h *Handler) ProtectedSendMEV(w http.ResponseWriter, r *http.Request) {
+	var req mevProtectedSendRequest
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		return
+	}
+	txs := make([]string, 0, len(req.Transactions)+1)
+	if strings.TrimSpace(req.RawTransaction) != "" {
+		txs = append(txs, strings.TrimSpace(req.RawTransaction))
+	}
+	for _, tx := range req.Transactions {
+		if strings.TrimSpace(tx) != "" {
+			txs = append(txs, strings.TrimSpace(tx))
+		}
+	}
+	if len(txs) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "signed_transaction_required"})
+		return
+	}
+
+	bundleID, status, err := h.submitJitoBundle(r.Context(), txs)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "jito_bundle_failed", "message": err.Error(), "jito_status": status})
+		return
+	}
+	report := buildMEVRiskReport(mevAnalyzeRequest{InputAmountUSD: req.InputAmountUSD, SlippageBPS: req.SlippageBPS, RawTransaction: txs[0], TXSignature: req.TXSignature, UserWallet: req.UserWallet, Route: req.Route})
+	report.JitoTipUsed = true
+	report.JitoBundleID = bundleID
+	report.JitoStatus = status
+	report.Message = "Korumalı Gönder başarılı: işlem Jito Bundle API üzerinden yönlendirildi."
+	if h.DB != nil && strings.TrimSpace(req.UserWallet) != "" {
+		rawPayload, _ := json.Marshal(req)
+		_, _ = h.DB.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, mev_saved_usd, jito_tip_used, risk_score, risk_level, route, raw_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(txs[0])), report.EstimatedLossUSD, report.MEVSavedUSD, true, report.RiskScore, report.RiskLevel, firstNonEmpty(req.Route, "jito_bundle"), string(rawPayload))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "jito_bundle_id": bundleID, "jito_status": status, "report": report})
+}
+
+func (h *Handler) submitJitoBundle(ctx context.Context, transactions []string) (string, string, error) {
+	url := strings.TrimSpace(os.Getenv("JITO_BUNDLE_URL"))
+	if url == "" {
+		url = "https://mainnet.block-engine.jito.wtf/api/v1/bundles"
+	}
+	payload := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "sendBundle", "params": []any{transactions}}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return "", "request_build_failed", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if auth := strings.TrimSpace(os.Getenv("JITO_AUTH_TOKEN")); auth != "" {
+		req.Header.Set("Authorization", "Bearer "+auth)
+	}
+	client := &http.Client{Timeout: 8 * time.Second}
+	res, err := client.Do(req)
+	if err != nil {
+		return "", "network_error", err
+	}
+	defer res.Body.Close()
+	var rpc jitoRPCResponse
+	if err := json.NewDecoder(res.Body).Decode(&rpc); err != nil {
+		return "", "invalid_response", err
+	}
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return "", "http_error", errors.New(res.Status)
+	}
+	if rpc.Error != nil {
+		return "", "rpc_error", errors.New(rpc.Error.Message)
+	}
+	bundleID := strings.Trim(string(rpc.Result), "\"")
+	return bundleID, "submitted", nil
 }
 
 // MEVAnalyze keeps the v1 route name stable while the module-level handler

@@ -164,6 +164,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, handlers.RequireAuth(method("POST", h.RevokeAPIKey))))
 	mux.HandleFunc("/api/v1/scan/token", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("POST", h.B2BTokenScan)))))
 	mux.HandleFunc("/api/v1/mev/analyze", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("POST", h.MEVAnalyze)))))
+	mux.HandleFunc("/api/v1/mev/protected-send", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("POST", h.ProtectedSendMEV)))))
 	mux.HandleFunc("/api/v1/liquidity/analyze", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("POST", h.LiquidityDrainAnalyze)))))
 	mux.HandleFunc("/api/v1/dao/proposal-risk", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("POST", h.DAOGuardianAnalyze)))))
 	mux.HandleFunc("/api/v1/smart-money/snapshot", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("GET", h.SmartMoneySnapshot)))))
@@ -205,6 +206,17 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 		} else {
 			static := http.FileServer(http.Dir(staticDir))
 			indexPath := filepath.Join(staticDir, "index.html")
+			ownerPath := filepath.Join(staticDir, "owner.html")
+			mux.HandleFunc("/owner", func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet && r.Method != http.MethodHead {
+					w.WriteHeader(http.StatusMethodNotAllowed)
+					return
+				}
+				if !h.OwnerAuth(w, r) {
+					return
+				}
+				http.ServeFile(w, r, ownerPath)
+			})
 			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 				if strings.HasPrefix(r.URL.Path, "/api/") || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
 					http.NotFound(w, r)
@@ -326,7 +338,7 @@ func cors(next http.Handler, origin string) http.Handler {
 		if origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-API-Key, X-Koschei-Source-Id, x-koschei-agent-key")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-API-Key, X-Koschei-Source-Id, x-koschei-agent-key, X-Koschei-Secret, X-Owner-Secret, X-Owner-Wallet, X-CSRF-Token")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
