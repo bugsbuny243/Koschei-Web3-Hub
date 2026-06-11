@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/mr-tron/base58"
 )
 
 type walletScoreRequest struct {
@@ -31,10 +33,19 @@ type walletScoreResponse struct {
 	LastSeen   string   `json:"last_seen"`
 }
 
+func isValidSolanaAddress(addr string) bool {
+	decoded, err := base58.Decode(addr)
+	return err == nil && len(decoded) == 32
+}
+
 func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 	var req walletScoreRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Address == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "address required"})
+		return
+	}
+	if !isValidSolanaAddress(req.Address) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid solana address"})
 		return
 	}
 	if req.Network == "" {
@@ -100,6 +111,7 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 	firstSeen := ""
 	lastSeen := ""
 	activeDays := 0
+	var latestBlockTime int64
 
 	if err == nil {
 		defer sigResp.Body.Close()
@@ -122,6 +134,7 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 					}
 					if *s.BlockTime > latest {
 						latest = *s.BlockTime
+						latestBlockTime = *s.BlockTime
 					}
 				}
 			}
@@ -168,8 +181,8 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Recent activity (max 20)
-	if lastSeen != "" && activeDays > 0 {
-		daysSinceLast := int(time.Since(time.Unix(0, 0)).Hours()/24) - activeDays
+	if lastSeen != "" && activeDays > 0 && latestBlockTime > 0 {
+		daysSinceLast := int(time.Since(time.Unix(latestBlockTime, 0)).Hours() / 24)
 		if daysSinceLast < 7 {
 			score += 20
 		} else if daysSinceLast < 30 {
@@ -242,7 +255,7 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 	if aiKey != "" {
 		model := os.Getenv("TOGETHER_MODEL")
 		if model == "" {
-			model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+			model = "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"
 		}
 		prompt := fmt.Sprintf(`Summarize this Solana wallet reputation in 1-2 sentences for a non-technical user. Be concise and clear. Data: address=%s, score=%d/100, level=%s, tx_count=%d, balance=%s, active_days=%d, badges=%s. No markdown, just plain text.`,
 			req.Address[:min(8, len(req.Address))]+"...", score, level, txCount, balanceSol, activeDays, strings.Join(badges, ", "))
@@ -261,7 +274,7 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 				Choices []struct {
 					Message struct {
 						Content string `json:"content"`
-					} `json:"message"`
+					} `message:"content"`
 				} `json:"choices"`
 			}
 			if d, _ := io.ReadAll(aiResp.Body); json.Unmarshal(d, &aiResult) == nil && len(aiResult.Choices) > 0 {
