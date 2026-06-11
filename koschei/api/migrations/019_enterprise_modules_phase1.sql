@@ -5,12 +5,10 @@ CREATE TABLE IF NOT EXISTS mev_protection_events (
     user_wallet text NOT NULL DEFAULT '',
     tx_signature text NOT NULL DEFAULT '',
     estimated_loss_usd numeric(18, 2) NOT NULL DEFAULT 0,
-    mev_saved_usd numeric(20, 2) NOT NULL DEFAULT 0,
     jito_tip_used boolean NOT NULL DEFAULT false,
     risk_score integer NOT NULL DEFAULT 0,
     risk_level text NOT NULL DEFAULT 'DÜŞÜK',
     route text NOT NULL DEFAULT '',
-    raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_mev_protection_wallet_created ON mev_protection_events (lower(user_wallet), created_at DESC);

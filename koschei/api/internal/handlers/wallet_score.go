@@ -9,8 +9,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/mr-tron/base58"
 )
 
 type walletScoreRequest struct {
@@ -34,8 +32,8 @@ type walletScoreResponse struct {
 }
 
 func isValidSolanaAddress(addr string) bool {
-	decoded, err := base58.Decode(addr)
-	return err == nil && len(decoded) == 32
+	decoded, ok := base58Decode(addr)
+	return ok && len(decoded) == 32
 }
 
 func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
