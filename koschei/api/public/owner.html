@@ -197,24 +197,24 @@
         renderAll();
         $('syncState').textContent = 'Canlı veri senkronize';
       } catch (err) {
-        loadMockData(); renderAll(); $('syncState').textContent = 'Mock görünüm aktif'; toast('API erişilemedi; güvenli mock görünüm açıldı.');
+        loadFallbackData(); renderAll(); $('syncState').textContent = 'Fallback görünüm aktif'; toast('API erişilemedi; güvenli fallback görünüm açıldı.');
       }
     }
-    function loadMockData() {
+    function loadFallbackData() {
       state.metrics = { total_users: 1284, active_users_today: 91, pending_payments: 7, daily_revenue_try: 18450, monthly_revenue_try: 312900, total_saved_usd: 42870, pending_prs: 3, best_selling_package: 'pro' };
       state.users = [
         { email:'ayse@example.com', wallet_address:'7k9...Qp2', credits:42, status:'active', created_at:new Date().toISOString() },
         { email:'mehmet@example.com', wallet_address:'9Ab...Tz1', credits:0, status:'banned', created_at:new Date(Date.now()-86400000).toISOString() }
       ];
       state.payments = [
-        { id:'mock-1', email:'kurumsal@example.com', product_id:'enterprise', amount_try:24900, status:'pending' },
-        { id:'mock-2', email:'builder@example.com', product_id:'pro', amount_try:1490, status:'approved' }
+        { id:'fallback-1', email:'kurumsal@example.com', product_id:'enterprise', amount_try:24900, status:'pending' },
+        { id:'fallback-2', email:'builder@example.com', product_id:'pro', amount_try:1490, status:'approved' }
       ];
       state.grants = [
         { program:'Solana Foundation', deadline:'2026-07-15', status:'Hazırlanıyor', focus:'MEV Shield public-good metrikleri' },
         { program:'Ethereum Grants', deadline:'2026-08-01', status:'Taslak', focus:'Bridge ve PoR risk raporu' }
       ];
-      state.logs = [{ message:'Mock terminal hazır', status:'ok', created_at:new Date().toISOString() }];
+      state.logs = [{ message:'Fallback terminal hazır', status:'ok', created_at:new Date().toISOString() }];
     }
     function renderAll() { renderMetrics(); renderUsers(); renderPayments(); renderGrants(); renderTerminal(); }
     function renderMetrics() {

@@ -1,30 +1,45 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Koschei Web3 Hub, Solana için no-custody MEV Shield, Liquidity Radar, AI Simulator ve DAO Guardian güvenlik katmanı.">
-  <title>Koschei Web3 Hub — Solana İçin Proaktif Güvenlik Katmanı</title>
+  <meta name="description" content="Koschei Web3 Hub is an AI-powered Web3 Security Intelligence and Grant Intelligence platform for Solana builders, projects, grant applicants and ecosystem reviewers.">
+  <title>Koschei Web3 Hub — AI-powered Web3 Security Intelligence for Solana builders</title>
+  <link rel="stylesheet" href="/css/koschei.css">
   <style>
-    :root{--bg:#0f0f1b;--panel:#17172a;--panel2:#101020;--text:#f5f7fb;--muted:#a7b0c2;--accent:#00ffaa;--accent2:#7c5cff;--line:rgba(255,255,255,.12);--danger:#ff5c7a;--shadow:0 24px 90px rgba(0,0,0,.38)}
-    *{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;background:radial-gradient(circle at 15% 0%,rgba(0,255,170,.18),transparent 30%),radial-gradient(circle at 90% 10%,rgba(124,92,255,.20),transparent 32%),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif} a{color:inherit;text-decoration:none}.wrap{width:min(1180px,calc(100% - 32px));margin:0 auto}.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(18px);background:rgba(15,15,27,.72);border-bottom:1px solid var(--line)}.nav-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0}.brand{display:flex;align-items:center;gap:12px;font-weight:900;letter-spacing:-.03em}.mark{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04110d;box-shadow:0 0 34px rgba(0,255,170,.28)}.links{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.links a{padding:10px 12px;border-radius:999px;color:var(--muted);font-weight:700;font-size:14px}.links a:hover,.links .cta{color:#07130f;background:var(--accent)}.hero{display:grid;grid-template-columns:1.08fr .92fr;gap:28px;align-items:center;padding:82px 0 44px}.eyebrow{display:inline-flex;gap:8px;align-items:center;padding:8px 12px;border:1px solid rgba(0,255,170,.38);background:rgba(0,255,170,.09);color:var(--accent);border-radius:999px;font-weight:800;font-size:13px}.hero h1{font-size:clamp(44px,7vw,84px);line-height:.92;letter-spacing:-.075em;margin:18px 0}.hero p{color:var(--muted);font-size:clamp(17px,2vw,21px);line-height:1.65;max-width:720px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:14px 18px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.05);font-weight:900}.btn.primary{background:var(--accent);border-color:var(--accent);color:#07130f}.terminal{background:linear-gradient(180deg,rgba(23,23,42,.96),rgba(16,16,32,.96));border:1px solid var(--line);border-radius:28px;padding:22px;box-shadow:var(--shadow);overflow:hidden}.terminal-top{display:flex;gap:7px;margin-bottom:16px}.dot{width:11px;height:11px;border-radius:999px;background:#ff5c7a}.dot:nth-child(2){background:#ffd166}.dot:nth-child(3){background:var(--accent)}.metric{display:grid;grid-template-columns:1fr auto;gap:10px;padding:14px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:rgba(255,255,255,.035);margin-top:10px}.metric b{color:var(--accent);font-size:22px}.section{padding:42px 0}.section h2{font-size:clamp(30px,4vw,48px);letter-spacing:-.045em;margin:0 0 12px}.section-lead{color:var(--muted);line-height:1.7;max-width:760px}.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:24px}.card{min-height:250px;border:1px solid var(--line);border-radius:24px;background:linear-gradient(180deg,rgba(23,23,42,.92),rgba(16,16,32,.90));padding:22px;box-shadow:0 16px 50px rgba(0,0,0,.18)}.icon{display:grid;place-items:center;width:48px;height:48px;border-radius:16px;background:rgba(0,255,170,.10);color:var(--accent);font-size:24px}.card h3{font-size:21px;margin:18px 0 10px}.card p{color:var(--muted);line-height:1.6}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}.panel{border:1px solid var(--line);border-radius:24px;background:rgba(255,255,255,.04);padding:24px}.panel ul{margin:12px 0 0;padding-left:20px;color:var(--muted);line-height:1.8}.footer{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted)}.footer-inner{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}.social{display:flex;gap:14px;flex-wrap:wrap}.social a{color:var(--accent)}@media (max-width:920px){.hero,.grid2{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.nav-inner{align-items:flex-start;flex-direction:column}}@media (max-width:560px){.wrap{width:min(100% - 22px,1180px)}.links{gap:4px}.links a{font-size:13px;padding:8px 9px}.hero{padding-top:44px}.cards{grid-template-columns:1fr}.terminal{border-radius:22px;padding:16px}}
+    .landing{max-width:1180px;margin:0 auto;padding:34px 18px 64px}.hero{padding:76px 0 42px}.hero h1{font-size:clamp(42px,7vw,82px);line-height:.94;letter-spacing:-.06em;margin:18px 0}.hero p{max-width:850px;color:var(--text2);font-size:20px;line-height:1.65}.actions,.module-grid{display:flex;gap:12px;flex-wrap:wrap}.module-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:24px}.module-card{border:1px solid var(--border);border-radius:18px;background:var(--bg2);padding:20px;min-height:170px}.module-card h3{margin:0 0 8px}.module-card p{color:var(--text2);line-height:1.55}.section{margin-top:42px}.section h2{font-size:34px;margin-bottom:10px}@media(max-width:850px){.module-grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-  <nav class="nav"><div class="wrap nav-inner"><a class="brand" href="/"><span class="mark">K</span><span>Koschei Web3 Hub</span></a><div class="links"><a href="/">Home</a><a href="/dashboard">Dashboard</a><a href="/mev-shield">MEV Shield</a><a href="/radar">Liquidity Radar</a><a href="/impact">Impact Dashboard</a><a href="/docs">Docs</a><a class="cta" href="/login">Login</a></div></div></nav>
-  <main>
-    <section class="wrap hero">
-      <div><span class="eyebrow">● Solana Public Good Security Layer</span><h1>Solana İçin Proaktif Güvenlik Katmanı</h1><p>Koschei; MEV risklerini, likidite drenajlarını, DAO teklif saldırılarını ve şüpheli akıllı para hareketlerini kullanıcı fonlarına dokunmadan, gerçek zamanlı sinyallerle görünür hale getirir.</p><div class="actions"><a class="btn primary" href="/impact">Canlı Demo</a><a class="btn" href="/mev-shield">Swap Riskini Analiz Et</a></div></div>
-      <aside class="terminal" aria-label="Canlı metrik özeti"><div class="terminal-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div><div class="metric"><span>Toplam Kurtarılan USD</span><b id="savedUsd">$128K+</b></div><div class="metric"><span>Engellenen Saldırı</span><b id="blockedCount">320+</b></div><div class="metric"><span>Aktif Cüzdan</span><b id="walletCount">1.8K</b></div><div class="metric"><span>Durum</span><b>LIVE</b></div></aside>
+  <nav class="nav"><a class="nav-logo" href="/">K Koschei</a><div class="nav-links"><a class="nav-link" href="/dashboard">Dashboard</a><a class="nav-link" href="/pricing">Pricing</a><a class="nav-link" href="/tx-decoder">TX Decoder</a><a class="nav-link" href="/token-scanner">Token Scanner</a><a class="nav-link" href="/wallet-score">Wallet Score</a><a class="nav-link" href="/project-radar">Project Radar</a></div></nav>
+  <main class="landing">
+    <section class="hero">
+      <span class="badge badge-green">Production intelligence · Solana/Web3 security · Grant readiness</span>
+      <h1>AI-powered Web3 Security Intelligence for Solana builders.</h1>
+      <p>Koschei Web3 Hub helps builders, grant applicants, ecosystem teams and reviewers analyze wallets, tokens, transactions, projects, sybil risk and grant readiness from connected, evidence-based intelligence workflows.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="/dashboard">Open Dashboard</a>
+        <a class="btn btn-ghost" href="/pricing">View Pricing</a>
+        <a class="btn btn-ghost" href="/wallet-score">Start Wallet Analysis</a>
+        <a class="btn btn-ghost" href="/token-scanner">Scan Token</a>
+        <a class="btn btn-ghost" href="/tx-decoder">Decode Transaction</a>
+        <a class="btn btn-ghost" href="/project-radar">Run Project Radar</a>
+        <a class="btn btn-ghost" href="/funding-assistant">Generate Grant Readiness</a>
+      </div>
     </section>
-    <section class="wrap section" id="modules"><h2>Public-good güvenlik modülleri</h2><p class="section-lead">Vanilla JS ile çalışan hızlı arayüz, Go API ve read-only veri kaynaklarıyla grant komitelerine net ürün kanıtı sunar.</p><div class="cards"><article class="card"><div class="icon">🛡️</div><h3>MEV Shield</h3><p>Swap öncesi slippage, sandwich ve backrun risklerini puanlar; güvenli rota önerisi üretir.</p></article><article class="card"><div class="icon">📡</div><h3>Liquidity Radar</h3><p>Likidite çekilmesi, havuz anomali ve yüksek riskli token alarm akışını izler.</p></article><article class="card"><div class="icon">🧠</div><h3>AI Simulator</h3><p>Tehdit senaryolarını doğal dil ile simüle eder ve geliştiricilere düzeltme rehberi sağlar.</p></article><article class="card"><div class="icon">🏛️</div><h3>DAO Guardian</h3><p>DAO tekliflerinde treasury çıkışı, yetki değişimi ve governance saldırı risklerini işaretler.</p></article></div></section>
-    <section class="wrap section"><div class="grid2"><div class="panel"><h2>Non-custodial by design</h2><p class="section-lead">Koschei hiçbir private key, seed phrase veya kullanıcı fonu saklamaz. Tüm analizler read-only RPC, event ve risk sinyalleri üzerinden yapılır.</p></div><div class="panel"><h2>Grant-ready kanıt</h2><ul><li>Canlı impact endpoint: <code>/api/public/metrics</code></li><li>Owner panel ile operasyon yönetimi</li><li>Solana odaklı proaktif güvenlik roadmap'i</li></ul></div></div></section>
+    <section class="section">
+      <h2>One connected intelligence hub, not disconnected tools.</h2>
+      <p class="page-sub">Start with a wallet, token, transaction, project URL or GitHub repository. Route findings into risk analysis, Intelligence Graph, Sybil Checker and grant readiness workflows without requiring wallet custody or private-key access.</p>
+      <div class="module-grid">
+        <a class="module-card" href="/tx-decoder"><h3>TX Decoder</h3><p>Turn public transaction hashes into transaction purpose, involved programs, risk flags and next checks.</p></a>
+        <a class="module-card" href="/token-scanner"><h3>Token Scanner</h3><p>Review token authorities, supply and concentration signals from public Solana mint data.</p></a>
+        <a class="module-card" href="/wallet-score"><h3>Wallet Score</h3><p>Score wallet activity, recency, trust indicators, red flags and supporting evidence.</p></a>
+        <a class="module-card" href="/risk"><h3>Risk Scanner</h3><p>Run severity, reason, evidence, confidence and recommended-action analysis for public targets.</p></a>
+        <a class="module-card" href="/project-radar"><h3>Project Radar</h3><p>Assess ecosystem fit, credibility signals, technical proof points and grant/investor readiness.</p></a>
+        <a class="module-card" href="/funding-assistant"><h3>Grant Readiness</h3><p>Prepare application structure, milestones, budget logic, public-goods angle and final draft material.</p></a>
+      </div>
+    </section>
   </main>
-  <footer class="footer"><div class="wrap footer-inner"><span>MIT License © Koschei AI — Built with ❤️ for Solana Ecosystem</span><div class="social"><a href="mailto:hello@koschei.ai">İletişim</a><a href="https://github.com/">GitHub</a><a href="https://x.com/">X / Twitter</a></div></div></footer>
-  <script>
-    const fmtUSD = n => new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n||0));
-    const fmt = n => new Intl.NumberFormat('tr-TR').format(Number(n||0));
-    fetch('/api/public/metrics').then(r=>r.ok?r.json():Promise.reject()).then(d=>{document.getElementById('savedUsd').textContent=fmtUSD(d.total_saved_usd||128000);document.getElementById('blockedCount').textContent=fmt((d.mev_events_count||0)+(d.liquidity_alerts_count||0)||320);document.getElementById('walletCount').textContent=fmt(d.active_protected_wallets||1800);}).catch(()=>{});
-  </script>
+  <script src="/js/koschei-analytics.js?v=1"></script>
 </body>
 </html>

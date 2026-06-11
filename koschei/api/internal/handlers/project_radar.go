@@ -119,7 +119,7 @@ func (h *Handler) ProjectRadar(w http.ResponseWriter, r *http.Request) {
 func projectRadarInsufficientOutputsResponse() map[string]string {
 	return map[string]string{
 		"error":   "insufficient_outputs",
-		"message": "This tool requires paid credits. Demo examples are free.",
+		"message": "Analysis requires an active Koschei package.",
 	}
 }
 

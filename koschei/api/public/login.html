@@ -16,33 +16,25 @@
 <div class="card">
   <div class="logo">K Koschei</div>
   <div class="title">Welcome Back</div>
-  <div class="sub">Sign in with email and password, or connect Phantom if wallet auth is enabled.</div>
+  <div class="sub">Sign in with email and password to access Koschei package-protected intelligence modules.</div>
   <div class="alert" id="alert"></div>
   <form class="form" id="loginForm">
     <div class="form-group"><label class="form-label" for="email">Email</label><input class="form-input" id="email" name="email" type="email" autocomplete="email" required></div>
     <div class="form-group"><label class="form-label" for="password">Password</label><input class="form-input" id="password" name="password" type="password" autocomplete="current-password" required></div>
     <button class="btn" id="submitBtn" type="submit">Sign in</button>
   </form>
-  <div class="divider">OR</div>
-  <button class="btn btn-wallet" id="walletBtn" type="button">Connect Wallet (Phantom)</button>
   <div class="link">Don't have an account? <a href="/register">Create one</a></div>
 </div>
 <script src="/js/auth.js"></script>
 <script>
   const form=document.getElementById('loginForm');
   const submitBtn=document.getElementById('submitBtn');
-  const walletBtn=document.getElementById('walletBtn');
   const alertEl=document.getElementById('alert');
   function showAlert(message,type='error'){alertEl.textContent=message;alertEl.className='alert show '+(type==='success'?'alert-success':'alert-error');}
   form.addEventListener('submit',async event=>{
     event.preventDefault();submitBtn.disabled=true;submitBtn.textContent='Signing in…';alertEl.className='alert';
     try{const body=Object.fromEntries(new FormData(form));await login(body.email,body.password);showAlert('Login successful. Redirecting…','success');window.location.href='/dashboard';}
     catch(error){showAlert(error.message||'Login failed.');submitBtn.disabled=false;submitBtn.textContent='Sign in';}
-  });
-  walletBtn.addEventListener('click',async()=>{
-    walletBtn.disabled=true;walletBtn.textContent='Connecting…';alertEl.className='alert';
-    try{await Auth.connectWallet();showAlert('Wallet login successful. Redirecting…','success');window.location.href='/dashboard';}
-    catch(error){showAlert(error.message||'Wallet login failed.');walletBtn.disabled=false;walletBtn.textContent='Connect Wallet (Phantom)';}
   });
 </script>
 </body>
