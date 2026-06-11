@@ -1,17 +1,109 @@
-<!doctype html><html lang="en"><head>
-  <!-- AdSense verification -->
-  <meta name="google-adsense-account" content="ca-pub-6081394144742471">
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Koschei Public Shield live public-good impact dashboard for MEV prevention and liquidity drain alerts.">
+  <link rel="stylesheet" href="/css/koschei.css">
+  <title>Live Impact Dashboard — Koschei Public Shield</title>
+  <style>
+    :root{--impact-bg:#070912;--impact-card:#101522;--impact-card2:#0c111c;--impact-line:#263148;--impact-text:#eef6ff;--impact-muted:#9fb0c8;--impact-green:#5df3a4;--impact-blue:#6aa7ff;--impact-red:#ff7b8a;--impact-yellow:#ffd166}
+    body{background:radial-gradient(circle at 18% 8%,rgba(93,243,164,.12),transparent 32%),radial-gradient(circle at 86% 12%,rgba(106,167,255,.15),transparent 28%),var(--impact-bg);color:var(--impact-text)}
+    .impact-shell{max-width:1180px;margin:0 auto;padding:28px 18px 56px}.impact-hero{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,.7fr);gap:20px;align-items:stretch;margin-top:18px}.impact-panel{background:linear-gradient(180deg,rgba(16,21,34,.94),rgba(12,17,28,.92));border:1px solid var(--impact-line);border-radius:24px;box-shadow:0 24px 80px rgba(0,0,0,.35);padding:28px}.impact-eyebrow{display:inline-flex;gap:8px;align-items:center;border:1px solid rgba(93,243,164,.35);background:rgba(93,243,164,.09);color:var(--impact-green);border-radius:999px;padding:8px 12px;font-size:13px;font-weight:700;letter-spacing:.02em}.impact-hero h1{font-size:clamp(36px,6vw,68px);line-height:.95;margin:18px 0 14px}.impact-sub{color:var(--impact-muted);font-size:18px;line-height:1.65;max-width:780px}.verify{display:flex;gap:12px;align-items:flex-start;margin-top:18px;border:1px solid rgba(106,167,255,.26);background:rgba(106,167,255,.08);border-radius:18px;padding:14px;color:#cfe0ff}.verify strong{color:#fff}.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.status-tile{border:1px solid var(--impact-line);background:rgba(255,255,255,.035);border-radius:16px;padding:14px}.status-value{font-size:24px;font-weight:800;color:var(--impact-green)}.status-label{color:var(--impact-muted);font-size:13px;margin-top:3px}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:18px}.metric-card{position:relative;overflow:hidden;background:linear-gradient(180deg,rgba(16,21,34,.96),rgba(12,17,28,.94));border:1px solid var(--impact-line);border-radius:22px;padding:22px;min-height:154px}.metric-card:before{content:"";position:absolute;inset:auto -20% -40% -20%;height:90px;background:radial-gradient(circle,rgba(93,243,164,.14),transparent 65%)}.metric-label{color:var(--impact-muted);font-size:13px;text-transform:uppercase;letter-spacing:.08em}.metric-value{position:relative;font-size:clamp(28px,4vw,44px);font-weight:900;margin-top:14px}.metric-note{position:relative;color:var(--impact-muted);font-size:13px;line-height:1.45;margin-top:10px}.wide-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:16px;margin-top:16px}.prevention-log{display:grid;gap:12px}.log-row{display:flex;justify-content:space-between;gap:14px;border-bottom:1px solid rgba(255,255,255,.08);padding:10px 0}.log-row:last-child{border-bottom:0}.log-row span:first-child{color:var(--impact-muted)}.log-row span:last-child{text-align:right;font-weight:700}.modules{display:grid;gap:12px;margin-top:14px}.module-item{border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px;background:rgba(255,255,255,.03)}.module-title{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-weight:800}.pill{display:inline-flex;border-radius:999px;padding:5px 9px;background:rgba(106,167,255,.12);color:#bcd3ff;font-size:12px;font-weight:700}.module-desc,.roadmap li{color:var(--impact-muted);line-height:1.55}.roadmap{margin:10px 0 0;padding-left:20px}.skeleton{animation:pulse 1.3s infinite ease-in-out;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.12),rgba(255,255,255,.05));background-size:220% 100%;border-radius:14px;height:36px}@keyframes pulse{0%{background-position:0 0}100%{background-position:-220% 0}}.error{border-color:rgba(255,123,138,.4);color:#ffd4da;background:rgba(255,123,138,.08)}@media (max-width:900px){.impact-hero,.wide-grid{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}@media (max-width:560px){.impact-shell{padding:18px 12px 42px}.impact-panel{padding:20px;border-radius:20px}.metrics,.status-grid{grid-template-columns:1fr}.metric-card{min-height:auto}.nav-links{gap:8px}.nav-link{font-size:13px}}
+  </style>
+</head>
+<body>
+  <nav class="nav"><a class="nav-logo" href="/hub">K Koschei</a><div class="nav-links"><a class="nav-link" href="/hub">Hub</a><a class="nav-link" href="/docs">Docs</a><a class="nav-link" href="/impact">Impact</a><a class="nav-link" href="/account">Account</a></div></nav>
+  <main class="impact-shell">
+    <section class="impact-hero">
+      <div class="impact-panel">
+        <span class="impact-eyebrow">● Live public-good dashboard</span>
+        <h1>Proof that Web3 risk prevention is measurable.</h1>
+        <p class="impact-sub">Koschei Public Shield tracks MEV protection events, liquidity drain alerts, and system analytics so grant committees can evaluate technical traction from live, read-only impact data.</p>
+        <div class="verify"><span>🔎</span><div><strong>These metrics are blockchain-verifiable.</strong><br>Public identifiers are anonymized for user safety, while every prevention event is backed by auditable transaction or pool evidence.</div></div>
+      </div>
+      <aside class="impact-panel">
+        <span class="impact-eyebrow">Read-only access</span>
+        <div class="status-grid">
+          <div class="status-tile"><div class="status-value" id="updatedAt">Loading</div><div class="status-label">Last refreshed</div></div>
+          <div class="status-tile"><div class="status-value" id="cacheTtl">60s</div><div class="status-label">Redis cache TTL</div></div>
+          <div class="status-tile"><div class="status-value" id="mevEvents">—</div><div class="status-label">MEV events</div></div>
+          <div class="status-tile"><div class="status-value" id="liquidityAlerts">—</div><div class="status-label">Liquidity alerts</div></div>
+        </div>
+      </aside>
+    </section>
 
+    <section id="metrics" class="metrics" aria-live="polite">
+      <div class="metric-card"><div class="skeleton"></div></div><div class="metric-card"><div class="skeleton"></div></div><div class="metric-card"><div class="skeleton"></div></div><div class="metric-card"><div class="skeleton"></div></div>
+    </section>
 
-  <!-- Google AdSense -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6081394144742471"
-     crossorigin="anonymous"></script>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
+    <section class="wide-grid">
+      <article class="impact-panel">
+        <h2>Largest prevention in the last 24 hours</h2>
+        <div id="preventionLog" class="prevention-log"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+      </article>
+      <article class="impact-panel">
+        <h2>Public-good modules</h2>
+        <div id="modules" class="modules"><div class="skeleton"></div><div class="skeleton"></div></div>
+      </article>
+    </section>
+
+    <section class="wide-grid">
+      <article class="impact-panel">
+        <h2>Why this matters for grants</h2>
+        <p class="impact-sub">Koschei is optimized for technical proof, community safety, and open-source public-good infrastructure rather than custodial revenue capture.</p>
+        <ul class="roadmap" id="roadmap"></ul>
+      </article>
+      <article class="impact-panel">
+        <h2>Security model</h2>
+        <p class="impact-sub" id="securityModel">No private keys. No seed phrases. No custody. Read-only intelligence.</p>
+        <div class="verify"><span>🛡️</span><div><strong>Public page guarantee:</strong><br>This dashboard calls only <code>GET /api/public/impact</code>. The backend handler uses SELECT-only aggregate queries and cache writes, never database mutations.</div></div>
+      </article>
+    </section>
+  </main>
+  <script src="/js/koschei-analytics.js?v=1"></script>
   <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-1QFWMJJC3');
+    const $=id=>document.getElementById(id);
+    const escapeHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const compact=new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:1});
+    const usd=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+    const usdDetailed=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:2});
+    const dateFmt=new Intl.DateTimeFormat('en-US',{month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    function metric(label,value,note,kind='number'){
+      const rendered=kind==='usd'?usd.format(Number(value||0)):compact.format(Number(value||0));
+      return `<div class="metric-card"><div class="metric-label">${escapeHTML(label)}</div><div class="metric-value">${escapeHTML(rendered)}</div><div class="metric-note">${escapeHTML(note)}</div></div>`;
+    }
+    function row(label,value){return `<div class="log-row"><span>${escapeHTML(label)}</span><span>${escapeHTML(value)}</span></div>`}
+    async function loadImpact(){
+      try{
+        const res=await fetch('/api/public/impact',{headers:{'Accept':'application/json'}});
+        if(!res.ok) throw new Error('Impact API unavailable');
+        const d=await res.json();
+        $('metrics').innerHTML=[
+          metric('Total saved USD',d.total_saved_usd,'MEV loss and liquidity drain prevention combined.','usd'),
+          metric('Rug-pulls prevented',d.rug_pulls_prevented,'High and critical liquidity drain alerts stopped.'),
+          metric('Active protected wallets',d.active_protected_wallets,'Distinct protected wallets plus system active-user floor.'),
+          metric('Prevented in last 7 days',d.last_7d_prevented_usd,'Recent traction for grant committee review.','usd')
+        ].join('');
+        $('updatedAt').textContent=d.updated_at?dateFmt.format(new Date(d.updated_at)):'Live';
+        $('cacheTtl').textContent=(d.cache_ttl_seconds||60)+'s';
+        $('mevEvents').textContent=compact.format(d.mev_events_count||0);
+        $('liquidityAlerts').textContent=compact.format(d.liquidity_alerts_count||0);
+        $('securityModel').textContent=d.no_custody||'No custody. Read-only intelligence.';
+        const log=d.last_24h_biggest_prevention;
+        $('preventionLog').innerHTML=log?[
+          row('Module',log.source),row('Prevented amount',usdDetailed.format(Number(log.amount_usd||0))),row('Anonymized subject',log.anonymized_subject),row('Risk score',`${log.risk_score}/100 · ${log.risk_level}`),row('Occurred at',dateFmt.format(new Date(log.occurred_at))),row('Verification',log.verifiability_status)
+        ].join(''):`<div class="verify"><span>ℹ️</span><div><strong>No prevention event in the last 24 hours yet.</strong><br>The dashboard will update automatically when MEV Shield or Liquidity Radar records a new event.</div></div>`;
+        const mods=(d.live_modules||[]).slice(0,6);
+        $('modules').innerHTML=mods.length?mods.map(m=>`<div class="module-item"><div class="module-title">${escapeHTML(m.title)} <span class="pill">${escapeHTML(m.category||'public good')}</span></div><div class="module-desc">${escapeHTML(m.description||'Read-only Web3 safety module.')}</div></div>`).join(''):'<p class="impact-sub">Module registry is initializing.</p>';
+        $('roadmap').innerHTML=(d.public_roadmap||[]).map(x=>`<li>${escapeHTML(x)}</li>`).join('');
+        if(window.KoscheiAnalytics) KoscheiAnalytics.track('impact_view');
+      }catch(err){
+        $('metrics').innerHTML=`<div class="metric-card error"><div class="metric-label">Dashboard offline</div><div class="metric-note">${escapeHTML(err.message)}. Please retry shortly.</div></div>`;
+        $('preventionLog').innerHTML='<div class="verify error">Impact metrics could not be loaded.</div>';
+      }
+    }
+    loadImpact();
+    setInterval(loadImpact,60000);
   </script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/koschei.css"><title>Public Proof of Impact — Koschei</title><style>.hero{padding:32px;background:linear-gradient(135deg,#111118,#13231d);border:1px solid #2a2a3a;border-radius:16px;margin-bottom:20px}.stack{display:grid;gap:16px}pre{white-space:pre-wrap;overflow:auto;color:#c7f9df}.metric{font-size:28px;color:var(--accent);font-weight:700}textarea{min-height:110px}code{color:var(--accent2)}.chart{display:flex;align-items:end;gap:8px;height:220px;padding:16px;border:1px solid #263244;border-radius:14px;background:#0c1018}.bar{flex:1;min-width:6px;background:linear-gradient(180deg,var(--accent),#2c7a7b);border-radius:8px 8px 0 0}.tweet-draft{white-space:pre-wrap;background:#0c1018;border:1px solid #263244;border-radius:12px;padding:14px;color:#d9ffe8}</style></head><body><nav class="nav"><a class="nav-logo" href="/hub">K Koschei</a><div class="nav-links"><a class="nav-link" href="/hub">Hub</a><a class="nav-link" href="/docs">Docs</a><a class="nav-link" href="/impact">Impact</a><a class="nav-link" href="/account">Account</a></div></nav><main class="page"><section class="hero"><span class="badge badge-green">Live public good</span><h1>Koschei Web3 Intelligence OS</h1><p class="page-sub">Koschei Web3 Hub is a no-custody Web3 intelligence workspace for builders.</p><a class="btn btn-primary" href="/hub">Open Hub</a></section><div id="metrics" class="grid-3"></div><section class="card" style="margin-top:20px"><h2>Total Value Protected</h2><p class="auth-sub">Real-time DB metric aggregated from MEV Shield, Liquidity Radar and DAO Guardian protection events.</p><div id="tvpTotal" class="metric">$0.00</div><div id="tvpChart" class="chart" aria-label="Total Value Protected chart"></div></section><section class="card" style="margin-top:20px"><h2>Daily tweet draft</h2><p class="auth-sub">Automatically regenerated once per day from the same public impact metrics.</p><div id="tweetDraft" class="tweet-draft"></div></section><section class="card" style="margin-top:20px"><h2>Live modules</h2><div id="modules" class="stack" style="margin-top:14px"></div></section><section class="card" style="margin-top:20px"><h2>Security model</h2><p>No private keys. No seed phrases. No custody. Read-only intelligence. Built for developers and ecosystem public-good tooling.</p><h3>Public roadmap</h3><ul id="roadmap"></ul></section><script>const escapeHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const money=v=>Number(v||0).toLocaleString(undefined,{style:'currency',currency:'USD',maximumFractionDigits:2});fetch('/api/public/impact',{cache:'no-store'}).then(r=>r.json()).then(d=>{let items=[['Total Value Protected',money(d.total_value_protected_usd)],['Modules live',d.modules_live_count],['Generated outputs',d.generated_outputs_count],['Supported networks',d.supported_networks_count],['Chain checks',d.chain_checks_count],['Web3 events',d.web3_event_count]];metrics.innerHTML=items.map(x=>`<div class="card"><div class="metric">${escapeHTML(x[1]||0)}</div><div>${escapeHTML(x[0])}</div></div>`).join('');const series=d.series||[];const max=Math.max(1,...series.map(x=>Number(x.total_value_protected_usd||0)));tvpTotal.textContent=money(d.total_value_protected_usd);tvpChart.innerHTML=series.map(x=>`<div class="bar" title="${escapeHTML(x.date)} · ${escapeHTML(money(x.total_value_protected_usd))}" style="height:${Math.max(4,Number(x.total_value_protected_usd||0)/max*100)}%"></div>`).join('');tweetDraft.textContent=(d.tweet_draft&&d.tweet_draft.text)||'Draft unavailable until impact data is available.';modules.innerHTML=(d.live_modules||[]).map(x=>`<div><b>${escapeHTML(x.title)}</b> <span class="badge badge-blue">${escapeHTML(x.category)}</span><p class="auth-sub">${escapeHTML(x.description)}</p></div>`).join('');roadmap.innerHTML=(d.public_roadmap||[]).map(x=>`<li>${escapeHTML(x)}</li>`).join('');KoscheiAnalytics.track('impact_view')})</script></main><script src="/js/koschei-analytics.js?v=1"></script></body></html>
