@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Koschei Owner Paneli</title>
+  <style>
+    :root {
+      --bg: #0f0f1b;
+      --panel: #151528;
+      --panel-2: #1c1c33;
+      --line: rgba(255,255,255,.11);
+      --text: #f4f7fb;
+      --muted: #aab4c6;
+      --accent: #00ffaa;
+      --danger: #ff4d6d;
+      --warn: #ffd166;
+      --ok: #6efacc;
+      --shadow: 0 24px 80px rgba(0,0,0,.35);
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(0,255,170,.16), transparent 30%),
+        radial-gradient(circle at 90% 10%, rgba(92,95,255,.18), transparent 34%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); }
+    .shell { width: min(1440px, calc(100% - 32px)); margin: 0 auto; padding: 30px 0 54px; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 22px; }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .mark { width: 46px; height: 46px; border-radius: 15px; background: linear-gradient(135deg, var(--accent), #6b7cff); box-shadow: 0 0 34px rgba(0,255,170,.3); }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: clamp(26px, 4vw, 44px); letter-spacing: -.04em; }
+    h2 { font-size: 18px; letter-spacing: -.02em; margin-bottom: 14px; }
+    .muted { color: var(--muted); }
+    .pill { display:inline-flex; align-items:center; gap:8px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.04); color:var(--muted); font-size:13px; }
+    .dot { width:8px; height:8px; border-radius:999px; background:var(--accent); box-shadow:0 0 16px var(--accent); }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 18px; }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.025)); border:1px solid var(--line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); backdrop-filter: blur(14px); }
+    .span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; } .span-7 { grid-column: span 7; } .span-12 { grid-column: span 12; }
+    .metric-label { color: var(--muted); font-size: 13px; }
+    .metric-value { font-size: 30px; font-weight: 800; margin-top: 8px; letter-spacing: -.04em; }
+    .metric-foot { color: var(--accent); font-size: 12px; margin-top: 8px; }
+    input, select, textarea, button { font: inherit; }
+    input, textarea {
+      width: 100%; background: rgba(0,0,0,.24); border: 1px solid var(--line); color: var(--text);
+      border-radius: 14px; padding: 12px 13px; outline: none;
+    }
+    textarea { min-height: 92px; resize: vertical; }
+    input:focus, textarea:focus { border-color: rgba(0,255,170,.65); box-shadow: 0 0 0 4px rgba(0,255,170,.08); }
+    button { border:0; border-radius: 14px; padding: 11px 14px; cursor:pointer; color:#07130f; background: var(--accent); font-weight: 800; }
+    button.secondary { color: var(--text); background: rgba(255,255,255,.08); border:1px solid var(--line); }
+    button.danger { background: var(--danger); color: white; }
+    button.warn { background: var(--warn); color: #1e1600; }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px; }
+    .table-wrap { overflow:auto; border:1px solid var(--line); border-radius: 16px; }
+    table { width:100%; border-collapse: collapse; min-width: 760px; }
+    th, td { text-align:left; padding: 12px 13px; border-bottom:1px solid var(--line); font-size: 13px; vertical-align: top; }
+    th { color: var(--muted); background: rgba(255,255,255,.04); position: sticky; top:0; }
+    tr:last-child td { border-bottom: 0; }
+    .status { padding: 5px 9px; border-radius:999px; background:rgba(255,255,255,.08); display:inline-block; }
+    .status.pending { color: var(--warn); } .status.approved, .status.active { color: var(--ok); } .status.rejected, .status.banned, .status.removed { color: var(--danger); }
+    .login { max-width: 520px; margin: 9vh auto; }
+    .login .card { padding: 28px; }
+    .stack { display:grid; gap: 12px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .terminal { background:#070711; border:1px solid rgba(0,255,170,.22); border-radius: 18px; padding: 14px; min-height: 250px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:#d8fff1; overflow:auto; }
+    .log-line { margin: 0 0 8px; white-space: pre-wrap; word-break: break-word; }
+    .toast { position:fixed; right:20px; bottom:20px; max-width:420px; padding:14px 16px; border:1px solid var(--line); border-radius:16px; background:var(--panel-2); color:var(--text); box-shadow:var(--shadow); display:none; z-index:20; }
+    .hidden { display:none !important; }
+    @media (max-width: 1020px) { .span-3, .span-4, .span-5, .span-7 { grid-column: span 12; } .topbar { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section id="loginView" class="login">
+      <div class="card stack">
+        <div class="brand">
+          <div class="mark" aria-hidden="true"></div>
+          <div>
+            <h1>Owner Paneli</h1>
+            <p class="muted">Gizli operasyon ekranı. Cüzdan ve owner sırrı ile giriş yapın.</p>
+          </div>
+        </div>
+        <label class="stack">Owner cüzdanı<input id="loginWallet" autocomplete="username" placeholder="Solana / EVM cüzdan adresi"></label>
+        <label class="stack">Owner sırrı<input id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET"></label>
+        <button id="loginButton">Güvenli giriş yap</button>
+        <p class="muted">Not: Sunucu cookie'leri HttpOnly olarak ayarlar; panel kullanıcı verisini HTML olarak enjekte etmez.</p>
+      </div>
+    </section>
+
+    <section id="appView" class="hidden">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark" aria-hidden="true"></div>
+          <div>
+            <h1>Koschei Owner Komuta Merkezi</h1>
+            <p class="muted">Kullanıcılar, ödemeler, AI komutları ve gerçek zamanlı etki metrikleri.</p>
+          </div>
+        </div>
+        <div class="row">
+          <span class="pill"><span class="dot"></span><span id="syncState">Bağlantı hazırlanıyor</span></span>
+          <button id="refreshButton" class="secondary">Verileri yenile</button>
+        </div>
+      </header>
+
+      <section class="grid" id="metricsGrid" aria-label="Gerçek zamanlı metrikler"></section>
+
+      <section class="grid" style="margin-top:18px">
+        <div class="card span-7">
+          <div class="toolbar">
+            <h2 style="margin-right:auto">Kullanıcı Listesi</h2>
+            <input id="userFilter" style="max-width:260px" placeholder="E-posta, cüzdan veya durum ara">
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>E-posta</th><th>Cüzdan</th><th>Kredi</th><th>Durum</th><th>Oluşturma</th><th>Aksiyon</th></tr></thead><tbody id="usersBody"></tbody></table></div>
+        </div>
+
+        <div class="card span-5">
+          <h2>Ödeme Onay Masası</h2>
+          <div class="table-wrap"><table><thead><tr><th>Müşteri</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>Aksiyon</th></tr></thead><tbody id="paymentsBody"></tbody></table></div>
+        </div>
+
+        <div class="card span-5">
+          <h2>AI Komut Terminali</h2>
+          <div class="stack">
+            <textarea id="commandInput" placeholder="Örn: pending ödemeleri özetle ve riskli kullanıcıları raporla"></textarea>
+            <div class="row"><button id="runCommandButton">Komutu çalıştır</button><button class="secondary" id="clearTerminalButton">Terminali temizle</button></div>
+            <div class="terminal" id="terminal" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <div class="card span-7">
+          <h2>Hibe / Yatırım Radar Özeti</h2>
+          <div class="table-wrap"><table><thead><tr><th>Program</th><th>Son tarih</th><th>Durum</th><th>Odak</th></tr></thead><tbody id="grantsBody"></tbody></table></div>
+        </div>
+      </section>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    'use strict';
+    const state = { users: [], payments: [], grants: [], metrics: {}, logs: [] };
+    const $ = (id) => document.getElementById(id);
+    const formatMoney = (value, currency) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(value || 0));
+    const formatNumber = (value) => new Intl.NumberFormat('tr-TR').format(Number(value || 0));
+    const formatDate = (value) => value ? new Intl.DateTimeFormat('tr-TR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';
+
+    function text(tag, value, className) {
+      const el = document.createElement(tag);
+      if (className) el.className = className;
+      el.textContent = value == null || value === '' ? '—' : String(value);
+      return el;
+    }
+    function toast(message) {
+      const el = $('toast');
+      el.textContent = message;
+      el.style.display = 'block';
+      window.clearTimeout(toast.timer);
+      toast.timer = window.setTimeout(() => { el.style.display = 'none'; }, 4200);
+    }
+    async function api(path, options = {}) {
+      const res = await fetch(path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...options });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'İstek başarısız oldu');
+      return data;
+    }
+    async function login() {
+      $('loginButton').disabled = true;
+      try {
+        await api('/api/owner/login', { method: 'POST', body: JSON.stringify({ wallet: $('loginWallet').value, secret: $('loginSecret').value }) });
+        $('loginView').classList.add('hidden');
+        $('appView').classList.remove('hidden');
+        await refreshAll();
+        toast('Owner oturumu açıldı.');
+      } catch (err) { toast(err.message || 'Giriş reddedildi.'); }
+      finally { $('loginButton').disabled = false; }
+    }
+    async function refreshAll() {
+      $('syncState').textContent = 'Güncelleniyor';
+      try {
+        const [status, users, payments, grants] = await Promise.all([
+          api('/api/owner/status'), api('/api/owner/users'), api('/api/owner/payment-requests'), api('/api/owner/grants')
+        ]);
+        state.metrics = status.metrics || {}; state.logs = status.logs || [];
+        state.users = users.users || users.items || [];
+        state.payments = payments.payment_requests || payments.requests || payments.items || [];
+        state.grants = grants.grants || [];
+        renderAll();
+        $('syncState').textContent = 'Canlı veri senkronize';
+      } catch (err) {
+        loadMockData(); renderAll(); $('syncState').textContent = 'Mock görünüm aktif'; toast('API erişilemedi; güvenli mock görünüm açıldı.');
+      }
+    }
+    function loadMockData() {
+      state.metrics = { total_users: 1284, active_users_today: 91, pending_payments: 7, daily_revenue_try: 18450, monthly_revenue_try: 312900, total_saved_usd: 42870, pending_prs: 3, best_selling_package: 'pro' };
+      state.users = [
+        { email:'ayse@example.com', wallet_address:'7k9...Qp2', credits:42, status:'active', created_at:new Date().toISOString() },
+        { email:'mehmet@example.com', wallet_address:'9Ab...Tz1', credits:0, status:'banned', created_at:new Date(Date.now()-86400000).toISOString() }
+      ];
+      state.payments = [
+        { id:'mock-1', email:'kurumsal@example.com', product_id:'enterprise', amount_try:24900, status:'pending' },
+        { id:'mock-2', email:'builder@example.com', product_id:'pro', amount_try:1490, status:'approved' }
+      ];
+      state.grants = [
+        { program:'Solana Foundation', deadline:'2026-07-15', status:'Hazırlanıyor', focus:'MEV Shield public-good metrikleri' },
+        { program:'Ethereum Grants', deadline:'2026-08-01', status:'Taslak', focus:'Bridge ve PoR risk raporu' }
+      ];
+      state.logs = [{ message:'Mock terminal hazır', status:'ok', created_at:new Date().toISOString() }];
+    }
+    function renderAll() { renderMetrics(); renderUsers(); renderPayments(); renderGrants(); renderTerminal(); }
+    function renderMetrics() {
+      const metrics = [
+        ['Toplam kullanıcı', formatNumber(state.metrics.total_users), 'Kayıtlı profil'],
+        ['Bugün aktif', formatNumber(state.metrics.active_users_today), 'Analitik event'],
+        ['Bekleyen ödeme', formatNumber(state.metrics.pending_payments), 'Onay masası'],
+        ['Günlük gelir', formatMoney(state.metrics.daily_revenue_try, 'TRY'), 'Shopier onaylı'],
+        ['Aylık gelir', formatMoney(state.metrics.monthly_revenue_try, 'TRY'), 'MTD'],
+        ['Korunan değer', formatMoney(state.metrics.total_saved_usd, 'USD'), 'MEV + likidite + DAO'],
+        ['Bekleyen PR', formatNumber(state.metrics.pending_prs), 'AI komut kuyruğu'],
+        ['En çok satan', state.metrics.best_selling_package || '—', 'Paket']
+      ];
+      const grid = $('metricsGrid'); grid.replaceChildren();
+      metrics.forEach(([label, value, foot]) => {
+        const card = document.createElement('article'); card.className = 'card span-3';
+        card.append(text('div', label, 'metric-label'), text('div', value, 'metric-value'), text('div', foot, 'metric-foot'));
+        grid.appendChild(card);
+      });
+    }
+    function renderUsers() {
+      const filter = $('userFilter').value.toLowerCase().trim();
+      const body = $('usersBody'); body.replaceChildren();
+      state.users.filter(u => !filter || JSON.stringify(u).toLowerCase().includes(filter)).forEach((u) => {
+        const tr = document.createElement('tr');
+        tr.append(text('td', u.email), text('td', u.wallet_address), text('td', formatNumber(u.credits)), statusCell(u.status), text('td', formatDate(u.created_at)));
+        const actions = document.createElement('td');
+        const credit = button('Kredi +10', 'secondary', () => mutate('/api/owner/credits/add', { email:u.email, auth_subject:u.auth_subject, wallet_address:u.wallet_address, credits:10, reason:'owner_panel' }));
+        const ban = button(u.status === 'banned' ? 'Ban kaldır' : 'Banla', u.status === 'banned' ? 'secondary' : 'danger', () => mutate('/api/owner/users/ban', { email:u.email, auth_subject:u.auth_subject, ban:u.status !== 'banned', reason:'owner_panel' }));
+        actions.append(credit, document.createTextNode(' '), ban); tr.appendChild(actions); body.appendChild(tr);
+      });
+    }
+    function renderPayments() {
+      const body = $('paymentsBody'); body.replaceChildren();
+      state.payments.forEach((p) => {
+        const tr = document.createElement('tr');
+        tr.append(text('td', p.email), text('td', p.product_id), text('td', formatMoney(p.amount_try, 'TRY')), statusCell(p.status));
+        const actions = document.createElement('td');
+        actions.append(button('Onayla', '', () => mutate('/api/owner/payments/approve', { id:p.id })), document.createTextNode(' '), button('Reddet', 'danger', () => mutate('/api/owner/payments/reject', { id:p.id, reason:'owner_panel' })));
+        tr.appendChild(actions); body.appendChild(tr);
+      });
+    }
+    function renderGrants() {
+      const body = $('grantsBody'); body.replaceChildren();
+      state.grants.forEach((g) => { const tr = document.createElement('tr'); tr.append(text('td', g.program), text('td', g.deadline), text('td', g.status), text('td', g.focus)); body.appendChild(tr); });
+    }
+    function renderTerminal() {
+      const terminal = $('terminal'); terminal.replaceChildren();
+      state.logs.forEach((log) => terminal.append(text('p', `[${formatDate(log.created_at)}] ${log.status || 'bilgi'}: ${log.message || log.event || ''} ${log.output || ''}`, 'log-line')));
+    }
+    function statusCell(value) { const td = document.createElement('td'); td.append(text('span', value || 'bilinmiyor', `status ${String(value || '').toLowerCase()}`)); return td; }
+    function button(label, className, onClick) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; if (className) b.className = className; b.addEventListener('click', onClick); return b; }
+    async function mutate(path, payload) { try { await api(path, { method:'POST', body: JSON.stringify(payload) }); toast('İşlem tamamlandı.'); await refreshAll(); } catch (err) { toast(err.message || 'İşlem yapılamadı.'); } }
+    async function runCommand() {
+      const command = $('commandInput').value.trim(); if (!command) { toast('Komut yazın.'); return; }
+      try { const res = await api('/api/owner/command', { method:'POST', body: JSON.stringify({ command }) }); toast('AI komutu kuyruğa alındı.'); state.logs.unshift({ message: command, status: res.status || 'queued', output: res.output || '', created_at: new Date().toISOString() }); renderTerminal(); $('commandInput').value = ''; }
+      catch (err) { toast(err.message || 'Komut çalışmadı.'); }
+    }
+    $('loginButton').addEventListener('click', login);
+    $('refreshButton').addEventListener('click', refreshAll);
+    $('runCommandButton').addEventListener('click', runCommand);
+    $('clearTerminalButton').addEventListener('click', () => { state.logs = []; renderTerminal(); });
+    $('userFilter').addEventListener('input', renderUsers);
+    window.setInterval(() => { if (!$('appView').classList.contains('hidden')) refreshAll(); }, 30000);
+  </script>
+</body>
+</html>

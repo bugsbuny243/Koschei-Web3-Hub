@@ -279,3 +279,46 @@ func base58Encode(input []byte) string {
 	}
 	return out.String()
 }
+
+func base58Decode(input string) ([]byte, bool) {
+	const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+	if input == "" {
+		return nil, false
+	}
+	indexes := [128]int{}
+	for i := range indexes {
+		indexes[i] = -1
+	}
+	for i := 0; i < len(alphabet); i++ {
+		indexes[alphabet[i]] = i
+	}
+	zeros := 0
+	for zeros < len(input) && input[zeros] == alphabet[0] {
+		zeros++
+	}
+	if zeros == len(input) {
+		return make([]byte, zeros), true
+	}
+	decoded := []byte{0}
+	for i := zeros; i < len(input); i++ {
+		ch := input[i]
+		if ch >= 128 || indexes[ch] < 0 {
+			return nil, false
+		}
+		carry := indexes[ch]
+		for j := 0; j < len(decoded); j++ {
+			carry += int(decoded[j]) * 58
+			decoded[j] = byte(carry & 0xff)
+			carry >>= 8
+		}
+		for carry > 0 {
+			decoded = append(decoded, byte(carry&0xff))
+			carry >>= 8
+		}
+	}
+	out := make([]byte, zeros+len(decoded))
+	for i := 0; i < len(decoded); i++ {
+		out[len(out)-1-i] = decoded[i]
+	}
+	return out, true
+}

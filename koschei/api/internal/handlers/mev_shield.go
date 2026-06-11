@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"math"
 	"net/http"
 	"strings"
@@ -31,11 +32,17 @@ type mevAnalyzeResponse struct {
 	Message            string   `json:"message"`
 }
 
-// MEVAnalyze simulates a Solana swap transaction and returns a sandwich-attack
-// risk report. Phase-1 uses deterministic local heuristics; the next worker
-// will enrich this with Jito bundle density, Jupiter/Raydium route depth and
-// pre-flight RPC simulation before persisting mev_protection_events.
-func (h *Handler) MEVAnalyze(w http.ResponseWriter, r *http.Request) {
+// AnalyzeMEV provides a package-level mock endpoint for minimal integrations
+// that do not instantiate Handler. Production routes should use Handler.AnalyzeMEV
+// so database persistence is available.
+func AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
+	(&Handler{}).AnalyzeMEV(w, r)
+}
+
+// AnalyzeMEV simulates a Solana swap transaction and returns a sandwich-attack
+// risk report. Phase-1 uses deterministic local heuristics and persists the
+// estimated mev_saved_usd metric to mev_protection_events for owner reporting.
+func (h *Handler) AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 	var req mevAnalyzeRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
@@ -47,9 +54,16 @@ func (h *Handler) MEVAnalyze(w http.ResponseWriter, r *http.Request) {
 	}
 	report := buildMEVRiskReport(req)
 	if h.DB != nil && strings.TrimSpace(req.UserWallet) != "" {
-		_, _ = h.DB.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, jito_tip_used, risk_score, risk_level, route, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(req.RawTransaction)), report.EstimatedLossUSD, report.JitoTipUsed, report.RiskScore, report.RiskLevel, req.Route)
+		rawPayload, _ := json.Marshal(req)
+		_, _ = h.DB.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, mev_saved_usd, jito_tip_used, risk_score, risk_level, route, raw_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(req.RawTransaction)), report.EstimatedLossUSD, report.MEVSavedUSD, report.JitoTipUsed, report.RiskScore, report.RiskLevel, req.Route, string(rawPayload))
 	}
 	writeJSON(w, http.StatusOK, report)
+}
+
+// MEVAnalyze keeps the v1 route name stable while the module-level handler
+// adopts the task-oriented AnalyzeMEV name.
+func (h *Handler) MEVAnalyze(w http.ResponseWriter, r *http.Request) {
+	h.AnalyzeMEV(w, r)
 }
 
 // TXDecoderMEVWarning exposes a lightweight warning box payload for the TX

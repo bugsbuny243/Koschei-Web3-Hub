@@ -225,6 +225,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/pricing":           "/pricing.html",
 					"/support":           "/support.html",
 					"/admin":             "/admin.html",
+					"/owner":             "/owner.html",
 					"/admin-payments":    "/admin-payments.html",
 					"/admin-analytics":   "/admin-analytics.html",
 					"/dashboard":         "/dashboard.html",
