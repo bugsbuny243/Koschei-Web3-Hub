@@ -2,78 +2,61 @@ package handlers
 
 import (
 	"net/http"
-	"strings"
 )
 
 func notImplemented(w http.ResponseWriter, name string) {
 	writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "not_implemented", "handler": name})
 }
 
-// Kayıt Olma (Register) 
+// Custom email/password registration is disabled.
+// Users register via Neon Auth directly from the frontend (koschei-auth.js).
+// This endpoint is kept for backward compatibility but does nothing,
+// preventing unauthenticated writes to app_user_profiles without a real
+// Neon Auth identity (auth_subject) or password storage.
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	
-	if err := decodeJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
-		return
-	}
-
-	email := strings.TrimSpace(req.Email)
-	if email == "" || len(req.Password) < 8 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Geçerli bir e-posta ve en az 8 karakterli şifre girin."})
-		return
-	}
-
-	_, err := dbConn.Exec(`
-		INSERT INTO app_user_profiles (id, email, role, plan_id, credits, created_at)
-		VALUES (gen_random_uuid(), $1, 'user', 'free', 10, NOW())
-		ON CONFLICT (email) DO NOTHING
-	`, email)
-
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Kayıt oluşturulurken bir veritabanı hatası oluştu."})
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{
-		"message": "Kayıt başarılı",
-		"email":   email,
+	writeJSON(w, http.StatusGone, map[string]string{
+		"error":   "custom_auth_disabled",
+		"message": "Use Neon Auth email sign-up from the frontend.",
 	})
 }
 
-// Frontend kayıt sonrası otomatik giriş yapmaya çalışırsa hata vermesin diye açtık
+// Şimdilik diğer rotalar kapalı kalmaya devam ediyor, sırayla açarız
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{
-		"message": "Giriş başarılı",
-		"token":   "koschei-gecici-token", 
+	writeJSON(w, http.StatusGone, map[string]string{
+		"error":   "custom_auth_disabled",
+		"message": "Use Neon Auth email sign-in from the frontend.",
 	})
 }
-
-// Frontend oturum açtıktan sonra kullanıcı bilgilerini (Me) sorarsa hata vermesin diye açtık
-func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"id":      "gecici-id",
-		"email":   "test@koschei.com",
-		"role":    "user",
-		"credits": 10,
-	})
-}
-
-// Kalan kullanılmayan rotalar
 func (h *Handler) StartOTPLogin(w http.ResponseWriter, r *http.Request) {
 	notImplemented(w, "StartOTPLogin")
 }
 func (h *Handler) VerifyOTPLogin(w http.ResponseWriter, r *http.Request) {
 	notImplemented(w, "VerifyOTPLogin")
 }
-func (h *Handler) AdminUsers(w http.ResponseWriter, r *http.Request) { UsersHandler(w, r) }
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) { notImplemented(w, "Me") }
+
+// AdminUsers requires the admin password (x-admin-password header),
+// matching every other /api/admin/* endpoint. Previously this only
+// checked for the presence of a "koschei_admin" cookie with no value
+// validation, allowing anyone who set that cookie to read all user
+// emails, roles, plans and credit balances.
+func (h *Handler) AdminUsers(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	UsersHandler(w, r)
+}
+
 func (h *Handler) AdminUserAction(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
 	notImplemented(w, "AdminUserAction")
 }
 func (h *Handler) AdminSettings(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
 	notImplemented(w, "AdminSettings")
 }
 func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) { notImplemented(w, "AIGenerate") }
