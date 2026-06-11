@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -40,6 +41,40 @@ type ownerBanInput struct {
 
 type ownerCommandInput struct {
 	Command string `json:"command"`
+}
+
+type ownerLoginInput struct {
+	Wallet string `json:"wallet"`
+	Secret string `json:"secret"`
+}
+
+type ownerRemoveInput struct {
+	Email         string `json:"email"`
+	AuthSubject   string `json:"auth_subject"`
+	WalletAddress string `json:"wallet_address"`
+	Reason        string `json:"reason"`
+}
+
+func (h *Handler) OwnerLogin(w http.ResponseWriter, r *http.Request) {
+	ownerWallet := normalizeWallet(firstEnv("OWNER_WALLET", "KOSCHEI_OWNER_WALLET"))
+	ownerSecret := strings.TrimSpace(firstEnv("OWNER_SECRET", "KOSCHEI_OWNER_SECRET"))
+	if ownerWallet == "" || ownerSecret == "" {
+		http.NotFound(w, r)
+		return
+	}
+	var req ownerLoginInput
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		return
+	}
+	if !constantTimeStringEqual(strings.TrimSpace(req.Secret), ownerSecret) || normalizeWallet(req.Wallet) != ownerWallet {
+		http.NotFound(w, r)
+		return
+	}
+	secure := strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
+	http.SetCookie(w, &http.Cookie{Name: "koschei_owner_secret", Value: ownerSecret, Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, Expires: time.Now().Add(12 * time.Hour)})
+	http.SetCookie(w, &http.Cookie{Name: "koschei_owner_wallet", Value: ownerWallet, Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, Expires: time.Now().Add(12 * time.Hour)})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "Owner oturumu açıldı."})
 }
 
 func (h *Handler) OwnerUsers(w http.ResponseWriter, r *http.Request) {
@@ -163,6 +198,37 @@ func (h *Handler) OwnerBanUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": status})
 }
 
+func (h *Handler) OwnerRemoveUser(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	if err := ensureOwnerSchema(r.Context(), h.DB); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "owner schema unavailable"})
+		return
+	}
+	var req ownerRemoveInput
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	where, args := ownerIdentityWhere(req.Email, req.AuthSubject, req.WalletAddress)
+	if where == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email, auth_subject, or wallet_address required"})
+		return
+	}
+	res, err := h.DB.ExecContext(r.Context(), `UPDATE app_user_profiles SET status='removed', banned_at=now(), ban_reason=$`+fmt.Sprint(len(args)+1)+`, updated_at=now() `+where, append(args, firstNonEmpty(req.Reason, "owner_removed"))...)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "user remove failed"})
+		return
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "removed"})
+}
+
 func (h *Handler) OwnerPaymentRequests(w http.ResponseWriter, r *http.Request) {
 	h.AdminPaymentRequests(w, r)
 }
@@ -223,6 +289,8 @@ func (h *Handler) OwnerStatus(w http.ResponseWriter, r *http.Request) {
 	count("approved_payments", `SELECT count(*) FROM payment_requests WHERE status='approved'`)
 	money("daily_revenue_try", `SELECT COALESCE(sum(amount_try),0)::float FROM payment_requests WHERE status='approved' AND reviewed_at >= CURRENT_DATE`)
 	money("monthly_revenue_try", `SELECT COALESCE(sum(amount_try),0)::float FROM payment_requests WHERE status='approved' AND reviewed_at >= date_trunc('month', now())`)
+	money("total_saved_usd", `SELECT COALESCE((SELECT sum(estimated_loss_usd) FROM mev_protection_events),0)::float + COALESCE((SELECT sum(loss_prevented_usd) FROM liquidity_drain_alerts),0)::float + COALESCE((SELECT sum(estimated_outflow_usd) FROM proposal_risks WHERE risk_score >= 40),0)::float`)
+	count("pending_prs", `SELECT count(*) FROM ai_command_logs WHERE status IN ('queued','running')`)
 	var best string
 	_ = h.DB.QueryRowContext(r.Context(), `SELECT COALESCE(product_id,'') FROM payment_requests WHERE status='approved' GROUP BY product_id ORDER BY count(*) DESC LIMIT 1`).Scan(&best)
 	metrics["best_selling_package"] = best
@@ -237,6 +305,18 @@ func (h *Handler) OwnerStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "metrics": metrics, "logs": logs})
+}
+
+func (h *Handler) OwnerGrants(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	items := []map[string]any{
+		{"program": "Solana Foundation", "deadline": "2026-07-15", "status": "Hazırlanıyor", "focus": "MEV Shield ve Liquidity Drain public-good metrikleri"},
+		{"program": "Ethereum Grants", "deadline": "2026-08-01", "status": "Taslak", "focus": "Bridge/PoR Monitor ve DAO Guardian risk raporları"},
+		{"program": "Protocol Labs / FIL RetroPGF", "deadline": "2026-09-10", "status": "Araştırma", "focus": "AI Exploit Simulator geliştirici güvenliği"},
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "grants": items})
 }
 
 func (h *Handler) ShopierWebhook(w http.ResponseWriter, r *http.Request) {
@@ -286,6 +366,9 @@ func ensureOwnerSchema(ctx context.Context, db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS credit_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text, amount integer NOT NULL, reason text, event_type text, created_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE TABLE IF NOT EXISTS ai_command_logs (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), command text NOT NULL, output text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'queued', created_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE TABLE IF NOT EXISTS system_analytics (day date PRIMARY KEY DEFAULT CURRENT_DATE, active_users integer NOT NULL DEFAULT 0, revenue_try numeric NOT NULL DEFAULT 0, credits_consumed integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE TABLE IF NOT EXISTS mev_protection_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_wallet text NOT NULL DEFAULT '', tx_signature text NOT NULL DEFAULT '', estimated_loss_usd numeric NOT NULL DEFAULT 0, jito_tip_used boolean NOT NULL DEFAULT false, risk_score integer NOT NULL DEFAULT 0, risk_level text NOT NULL DEFAULT 'DÜŞÜK', route text NOT NULL DEFAULT '', created_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE TABLE IF NOT EXISTS liquidity_drain_alerts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), pool_address text NOT NULL DEFAULT '', token_mint text NOT NULL DEFAULT '', severity text NOT NULL DEFAULT 'DÜŞÜK', risk_score integer NOT NULL DEFAULT 0, removed_liquidity_usd numeric NOT NULL DEFAULT 0, loss_prevented_usd numeric NOT NULL DEFAULT 0, telegram_queued boolean NOT NULL DEFAULT false, sms_queued boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE TABLE IF NOT EXISTS proposal_risks (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), dao_id text NOT NULL DEFAULT '', treasury_address text NOT NULL DEFAULT '', proposal_id text NOT NULL DEFAULT '', risk_score integer NOT NULL DEFAULT 0, risk_level text NOT NULL DEFAULT 'DÜŞÜK', estimated_outflow_usd numeric NOT NULL DEFAULT 0, instruction_count integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now())`,
 	}
 	for _, stmt := range stmts {
 		if _, err := db.ExecContext(ctx, stmt); err != nil {
