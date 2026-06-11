@@ -6,10 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
-	"time"
 )
 
 type tokenScanRequest struct {
@@ -162,8 +159,14 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	writeJSON(w, http.StatusOK, tokenScanResponse{Mint: mint, Network: req.Network, Score: score, RiskLevel: risk, Supply: supply.Value.Amount, Decimals: supply.Value.Decimals, MintAuthority: mintAuthority, FreezeAuthority: freezeAuthority, LargestHolderPercent: roundPercent(topOne), TopTenPercent: roundPercent(topTen), Findings: findings, Disclaimer: "Preliminary on-chain signals only; this is not a security audit or financial advice."})
+	mintAuthority, freezeAuthority := "", ""
+	if result.Token.MintAuthority != nil {
+		mintAuthority = *result.Token.MintAuthority
+	}
+	if result.Token.FreezeAuthority != nil {
+		freezeAuthority = *result.Token.FreezeAuthority
+	}
+	writeJSON(w, http.StatusOK, tokenScanResponse{Mint: mint, Network: req.Network, Score: result.Score, RiskLevel: result.RiskLevel, Supply: result.Token.SupplyRaw, Decimals: result.Token.Decimals, MintAuthority: mintAuthority, FreezeAuthority: freezeAuthority, LargestHolderPercent: result.Token.LargestHolderPercent, TopTenPercent: result.Token.TopTenPercent, Findings: result.Findings, Disclaimer: result.Disclaimer})
 }
 
 func (h *Handler) callSolanaRPC(ctx context.Context, client *http.Client, rpcURL, network, method string, params interface{}, target interface{}) error {

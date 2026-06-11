@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
-	"os/exec"
-	"strings"
 )
 
 type Request struct {
@@ -16,12 +13,12 @@ type Request struct {
 }
 
 type Response struct {
-	Action     string   `json:"action"` // "create", "update", "delete"
-	File       string   `json:"file"`
-	Code       string   `json:"code"`
-	CommitMsg  string   `json:"commit_msg"`
-	IssueTitle string   `json:"issue_title,omitempty"`
-	IssueBody  string   `json:"issue_body,omitempty"`
+	Action     string `json:"action"` // "create", "update", "delete"
+	File       string `json:"file"`
+	Code       string `json:"code"`
+	CommitMsg  string `json:"commit_msg"`
+	IssueTitle string `json:"issue_title,omitempty"`
+	IssueBody  string `json:"issue_body,omitempty"`
 }
 
 // CallAI sends prompt to Together AI and gets structured response

@@ -3,8 +3,9 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 
-	"github.com/bugsbuny243/Koschei-Web3-Hub/koschei/api/pkg/agent"
+	"koschei/api/pkg/agent"
 )
 
 func AIRunHandler(w http.ResponseWriter, r *http.Request) {

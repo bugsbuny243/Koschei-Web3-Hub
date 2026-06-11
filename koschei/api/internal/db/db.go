@@ -155,6 +155,7 @@ func verifySchema(db *sql.DB) error {
 	requiredColumns := map[string][]string{
 		"app_user_profiles": {"id", "auth_subject", "email", "role", "plan_id", "credits", "created_at", "updated_at"},
 		"entitlements":      {"id", "email", "plan_id", "outputs_total", "outputs_remaining", "status", "created_at", "updated_at"},
+		"api_keys":          {"id", "auth_subject", "email", "name", "key_prefix", "key_hash", "status", "monthly_limit", "rate_limit_per_minute", "created_at"},
 	}
 	for table, columns := range requiredColumns {
 		for _, column := range columns {
