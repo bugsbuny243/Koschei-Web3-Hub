@@ -1,37 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-1QFWMJJC3');
-</script>
-
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-1QFWMJJC3');
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard — Koschei</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/koschei.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    .stat{display:flex;flex-direction:column;gap:6px;padding:20px;}
-    .stat-label{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text2);}
-    .stat-value{font-size:28px;font-weight:700;}
-    .stat-sub{font-size:13px;color:var(--text2);}
+    :root{--accent:#00ff88;--accent2:#00ccff;--text:#f0f0ff;--text2:#8888aa;--bg:#030309;--radius:14px;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+    .blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+    .blob{position:absolute;border-radius:50%;filter:blur(100px);animation:bf 12s ease-in-out infinite;}
+    .b1{width:450px;height:450px;background:rgba(0,255,136,.08);top:-100px;left:-80px;}
+    .b2{width:400px;height:400px;background:rgba(0,204,255,.07);bottom:-80px;right:-60px;animation-delay:-5s;}
+    .b3{width:300px;height:300px;background:rgba(124,58,237,.06);top:40%;left:40%;animation-delay:-8s;}
+    @keyframes bf{0%,100%{transform:translate(0,0)}50%{transform:translate(15px,-15px)}}
+    .glass{background:rgba(255,255,255,.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);}
+    .nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:rgba(3,3,9,.85);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.07);}
+    .nav-logo{font-size:18px;font-weight:800;color:var(--accent);text-decoration:none;}
+    .nav-links{display:flex;align-items:center;gap:6px;}
+    .nav-link{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:8px;transition:all .15s;}
+    .nav-link:hover,.nav-link.active{color:var(--accent);}
+    .page{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:36px 20px 60px;}
+    .page-title{font-size:24px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;}
+    .page-sub{font-size:14px;color:var(--text2);margin-bottom:28px;}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;}
+    .stat{padding:20px;display:flex;flex-direction:column;gap:6px;}
+    .stat-label{font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text2);}
+    .stat-value{font-size:28px;font-weight:800;}
+    .stat-sub{font-size:12px;color:var(--text2);}
+    .card{padding:24px;}
+    .card-title{font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text2);margin-bottom:16px;}
+    .actions-grid{display:flex;gap:10px;flex-wrap:wrap;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 20px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;text-decoration:none;transition:all .15s;}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;}
+    .btn-primary:hover{opacity:.88;transform:translateY(-1px);}
+    .btn-ghost{background:rgba(255,255,255,.06);color:var(--text2);border:1px solid rgba(255,255,255,.1);}
+    .btn-ghost:hover{background:rgba(255,255,255,.1);color:var(--text);}
+    @media(max-width:600px){.grid-3{grid-template-columns:1fr;}}
   </style>
 </head>
 <body>
+<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
 <nav class="nav">
-  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
+  <a href="/hub.html" class="nav-logo">K Koschei</a>
   <div class="nav-links">
-    <a href="/hub" class="nav-link">Hub</a>
-    <a href="/metadata" class="nav-link">Metadata</a>
-    <a href="/risk" class="nav-link">Risk</a>
-    <a href="/chains" class="nav-link">Chains</a>
-    <a href="/account" class="nav-link">Account</a>
+    <a href="/hub.html" class="nav-link">Hub</a>
+    <a href="/metadata.html" class="nav-link">Metadata</a>
+    <a href="/risk.html" class="nav-link">Risk</a>
+    <a href="/chains.html" class="nav-link">Chains</a>
+    <a href="/account.html" class="nav-link">Account</a>
     <button class="btn btn-ghost" style="padding:6px 14px;font-size:13px;" onclick="KoscheiAuth.signOut()">Sign out</button>
   </div>
 </nav>
@@ -40,45 +65,48 @@
   <div class="page-title">Dashboard</div>
   <div class="page-sub" id="userEmailDisplay">Loading...</div>
 
-  <div class="grid-3" style="margin-bottom:24px;">
-    <div class="card stat">
+  <div class="grid-3">
+    <div class="glass stat">
       <div class="stat-label">Credits</div>
       <div class="stat-value" id="statCredits" style="color:var(--accent);">—</div>
       <div class="stat-sub">Remaining balance</div>
     </div>
-    <div class="card stat">
+    <div class="glass stat">
       <div class="stat-label">Plan</div>
       <div class="stat-value" id="statPlan" style="font-size:20px;">—</div>
       <div class="stat-sub">Current tier</div>
     </div>
-    <div class="card stat">
+    <div class="glass stat">
       <div class="stat-label">Role</div>
       <div class="stat-value" id="statRole" style="font-size:20px;">—</div>
       <div class="stat-sub">Account type</div>
     </div>
   </div>
 
-  <div class="card" style="padding:24px;">
-    <div style="font-size:15px;font-weight:600;margin-bottom:16px;">Quick Actions</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;">
-      <a href="/metadata" class="btn btn-primary">🧬 Generate Metadata</a>
-      <a href="/chains" class="btn btn-ghost">📡 Check Chains</a>
-      <a href="/hub" class="btn btn-ghost">← Back to Hub</a>
+  <div class="glass card">
+    <div class="card-title">Quick Actions</div>
+    <div class="actions-grid">
+      <a href="/token-scanner.html" class="btn btn-primary">🪙 Scan Token</a>
+      <a href="/tx-decoder.html" class="btn btn-ghost">🔍 Decode TX</a>
+      <a href="/wallet-score.html" class="btn btn-ghost">🏆 Wallet Score</a>
+      <a href="/pricing.html" class="btn btn-ghost">💳 Buy Credits</a>
+      <a href="/hub.html" class="btn btn-ghost">← Back to Hub</a>
     </div>
   </div>
 </div>
 
-<script src="/js/koschei-auth.js?v=3"></script>
+<script src="/js/koschei-auth.js?v=5"></script>
 <script>
   (async () => {
     await KoscheiAuth.init();
-    if (!KoscheiAuth.requireAuth('/login')) return;
+    if (!KoscheiAuth.requireAuth()) return;
     document.getElementById('userEmailDisplay').textContent = KoscheiAuth.getEmail() || '';
     try {
       const res = await KoscheiAuth.apiCall('/api/me');
       if (res && res.ok) {
-        const { user } = await res.json();
-        document.getElementById('statCredits').textContent = user.credits ?? 0;
+        const data = await res.json();
+        const user = data.user || data;
+        document.getElementById('statCredits').textContent = user.credits ?? user.outputs_remaining ?? 0;
         document.getElementById('statPlan').textContent = user.plan_id || 'free';
         document.getElementById('statRole').textContent = user.role || 'member';
       }
