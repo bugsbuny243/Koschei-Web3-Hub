@@ -22,7 +22,7 @@ type SolanaRPC struct {
 	AlchemyAPIKey string
 }
 
-type rpcEnvelope struct {
+type solanaRPCEnvelope struct {
 	Result json.RawMessage `json:"result"`
 	Error  *struct {
 		Message string `json:"message"`
