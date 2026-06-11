@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -14,31 +15,32 @@ const publicImpactCacheKey = "public-impact:v2"
 var publicImpactCacheTTL = 60 * time.Second
 
 type publicImpactMetrics struct {
-	OK                           bool                       `json:"ok"`
-	Statement                    string                     `json:"statement"`
-	VerificationNote             string                     `json:"verification_note"`
-	NoCustody                    string                     `json:"no_custody"`
-	TotalSavedUSD                float64                    `json:"total_saved_usd"`
-	MEVEstimatedLossPreventedUSD float64                    `json:"mev_estimated_loss_prevented_usd"`
-	LiquidityLossPreventedUSD    float64                    `json:"liquidity_loss_prevented_usd"`
-	RugPullsPrevented            int64                      `json:"rug_pulls_prevented"`
-	ActiveProtectedWallets       int64                      `json:"active_protected_wallets"`
-	Last24HBiggestPrevention     *publicImpactPreventionLog `json:"last_24h_biggest_prevention,omitempty"`
-	Last24HPreventedUSD          float64                    `json:"last_24h_prevented_usd"`
-	Last7DPreventedUSD           float64                    `json:"last_7d_prevented_usd"`
-	MEVEventsCount               int64                      `json:"mev_events_count"`
-	LiquidityAlertsCount         int64                      `json:"liquidity_alerts_count"`
-	SystemActiveUsers            int64                      `json:"system_active_users"`
-	GeneratedOutputsCount        int64                      `json:"generated_outputs_count"`
-	ModulesLiveCount             int                        `json:"modules_live_count"`
-	SupportedNetworksCount       int64                      `json:"supported_networks_count"`
-	ChainChecksCount             int64                      `json:"chain_checks_count"`
-	WatchlistSourceCount         int64                      `json:"watchlist_source_count"`
-	Web3EventCount               int64                      `json:"web3_event_count"`
-	LiveModules                  []map[string]string        `json:"live_modules"`
-	PublicRoadmap                []string                   `json:"public_roadmap"`
-	UpdatedAt                    time.Time                  `json:"updated_at"`
-	CacheTTLSeconds              int                        `json:"cache_ttl_seconds"`
+	OK                           bool                        `json:"ok"`
+	Statement                    string                      `json:"statement"`
+	VerificationNote             string                      `json:"verification_note"`
+	NoCustody                    string                      `json:"no_custody"`
+	TotalSavedUSD                float64                     `json:"total_saved_usd"`
+	MEVEstimatedLossPreventedUSD float64                     `json:"mev_estimated_loss_prevented_usd"`
+	LiquidityLossPreventedUSD    float64                     `json:"liquidity_loss_prevented_usd"`
+	RugPullsPrevented            int64                       `json:"rug_pulls_prevented"`
+	ActiveProtectedWallets       int64                       `json:"active_protected_wallets"`
+	Last24HBiggestPrevention     *publicImpactPreventionLog  `json:"last_24h_biggest_prevention,omitempty"`
+	Last24HPreventedUSD          float64                     `json:"last_24h_prevented_usd"`
+	Last7DPreventedUSD           float64                     `json:"last_7d_prevented_usd"`
+	MEVEventsCount               int64                       `json:"mev_events_count"`
+	LiquidityAlertsCount         int64                       `json:"liquidity_alerts_count"`
+	SystemActiveUsers            int64                       `json:"system_active_users"`
+	GeneratedOutputsCount        int64                       `json:"generated_outputs_count"`
+	ModulesLiveCount             int                         `json:"modules_live_count"`
+	SupportedNetworksCount       int64                       `json:"supported_networks_count"`
+	ChainChecksCount             int64                       `json:"chain_checks_count"`
+	WatchlistSourceCount         int64                       `json:"watchlist_source_count"`
+	Web3EventCount               int64                       `json:"web3_event_count"`
+	LiveModules                  []map[string]string         `json:"live_modules"`
+	RecentLogs                   []publicImpactPreventionLog `json:"recent_logs"`
+	PublicRoadmap                []string                    `json:"public_roadmap"`
+	UpdatedAt                    time.Time                   `json:"updated_at"`
+	CacheTTLSeconds              int                         `json:"cache_ttl_seconds"`
 }
 
 type publicImpactPreventionLog struct {
@@ -55,6 +57,10 @@ type publicImpactPreventionLog struct {
 // PublicImpact returns grant-facing, read-only public-good impact metrics.
 // It deliberately uses the read replica handle (DBRead) when available and only
 // executes SELECT statements against public impact tables.
+func (h *Handler) GetPublicMetrics(w http.ResponseWriter, r *http.Request) {
+	h.PublicImpact(w, r)
+}
+
 func (h *Handler) PublicImpact(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	var cached publicImpactMetrics
@@ -72,6 +78,7 @@ func (h *Handler) PublicImpact(w http.ResponseWriter, r *http.Request) {
 	}
 	metrics, err := buildPublicImpactMetrics(ctx, db)
 	if err != nil {
+		log.Printf("public impact metrics failed: %v", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "impact metrics unavailable"})
 		return
 	}
@@ -134,6 +141,10 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 	if err != nil {
 		return publicImpactMetrics{}, err
 	}
+	recentLogs, err := recentImpactPreventionLogs(ctx, db)
+	if err != nil {
+		return publicImpactMetrics{}, err
+	}
 
 	count := func(query string) (int64, error) { return safeImpactCount(ctx, db, query) }
 	mevEvents, err := count(`SELECT COUNT(*) FROM mev_protection_events`)
@@ -192,6 +203,7 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 		WatchlistSourceCount:         watchlistSources,
 		Web3EventCount:               web3Events,
 		LiveModules:                  mods,
+		RecentLogs:                   recentLogs,
 		PublicRoadmap:                []string{"Publish verifiable public-good impact snapshots", "Open-source MEV Shield and Liquidity Radar safety modules", "Add community-maintained risk feeds for Solana and Ethereum"},
 		UpdatedAt:                    time.Now().UTC(),
 		CacheTTLSeconds:              int(publicImpactCacheTTL.Seconds()),
@@ -259,6 +271,40 @@ func latestBiggestPrevention(ctx context.Context, db *sql.DB) (*publicImpactPrev
 		return nil, err
 	}
 	return &publicImpactPreventionLog{Source: source, AmountUSD: roundUSD(amount), RiskScore: score, RiskLevel: level, AnonymizedSubject: anonymizeImpactSubject(subject), TransactionHint: anonymizeImpactSubject(txHint), OccurredAt: occurredAt, VerifiabilityStatus: "Blockchain-verifiable event; public view is anonymized for user safety."}, rows.Err()
+}
+
+func recentImpactPreventionLogs(ctx context.Context, db *sql.DB) ([]publicImpactPreventionLog, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT source, subject, tx_hint, amount_usd::float, risk_score, risk_level, created_at
+		FROM (
+			SELECT 'MEV Shield' AS source, user_wallet AS subject, tx_signature AS tx_hint, estimated_loss_usd AS amount_usd, risk_score, risk_level, created_at
+			FROM mev_protection_events
+			UNION ALL
+			SELECT 'Liquidity Radar' AS source, COALESCE(NULLIF(pool_address,''), token_mint) AS subject, '' AS tx_hint, loss_prevented_usd AS amount_usd, risk_score, severity AS risk_level, created_at
+			FROM liquidity_drain_alerts
+		) recent_preventions
+		ORDER BY created_at DESC
+		LIMIT 10`)
+	if isUndefinedImpactSource(err) {
+		return []publicImpactPreventionLog{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	logs := []publicImpactPreventionLog{}
+	for rows.Next() {
+		var source, subject, txHint, level string
+		var amount float64
+		var score int
+		var occurredAt time.Time
+		if err := rows.Scan(&source, &subject, &txHint, &amount, &score, &level, &occurredAt); err != nil {
+			return nil, err
+		}
+		logs = append(logs, publicImpactPreventionLog{Source: source, AmountUSD: roundUSD(amount), RiskScore: score, RiskLevel: level, AnonymizedSubject: anonymizeImpactSubject(subject), TransactionHint: anonymizeImpactSubject(txHint), OccurredAt: occurredAt, VerifiabilityStatus: "Blockchain-verifiable event; public view is anonymized for user safety."})
+	}
+	return logs, rows.Err()
 }
 
 func isUndefinedImpactSource(err error) bool {

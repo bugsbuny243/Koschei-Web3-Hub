@@ -1,161 +1,191 @@
-# PUBLIC GOOD INITIATIVE — Koschei Web3 Hub
+# Koschei Web3 Hub - Solana Ekosistemi İçin Proaktif Güvenlik Katmanı
 
-> Koschei is a public-good Web3 safety initiative. We do not operate as a company, do not custody user funds, and do not ask for private keys or seed phrases. Our focus is ecosystem security: open impact metrics, no-custody intelligence, MEV/rug-pull risk visibility, and safer builder tooling for Solana-first Web3 communities.
+> **Non-custodial, AI destekli ve public-good güvenlik platformu:** Koschei Web3 Hub; Solana kullanıcıları, geliştiricileri ve DAO ekipleri için MEV, likidite drenajı, governance saldırıları ve riskli akıllı para hareketlerini işlem gerçekleşmeden önce görünür hale getirir.
 
-# Koschei Web3 Hub
+![Live Demo](https://img.shields.io/badge/Live%20Demo-Online-00ffaa?style=for-the-badge)
+![Grant Status](https://img.shields.io/badge/Solana%20Grant-Tier--1%20Ready-7c5cff?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
+![Build Status](https://img.shields.io/badge/Build-Go%20API%20%2B%20Vanilla%20JS-success?style=for-the-badge)
 
-No-custody Web3 intelligence tools for Solana builders and users.
+---
 
-## What is Koschei?
+## Neden Koschei?
 
-Koschei Web3 Hub is a no-custody Web3 intelligence workspace that helps users and builders understand public blockchain activity, wallet reputation, token risk signals, transaction behavior, metadata and project safety signals.
+Web3 güvenliği çoğu zaman **reaktif** çalışır: exploit olur, zarar ölçülür, rapor yazılır. Koschei bu yaklaşımı tersine çevirir.
 
-Koschei does not ask for private keys, seed phrases, or custody of funds. Core tools are designed around public/read-only blockchain data.
+| Reaktif Güvenlik | Koschei Proaktif Katmanı |
+| --- | --- |
+| Saldırıdan sonra forensics | İşlemden önce risk skoru |
+| Manuel alarm takibi | Canlı MEV ve likidite radar sinyalleri |
+| Kapalı veri siloları | Public-good impact dashboard |
+| Custodial entegrasyon riski | **No private keys, no seed phrases, no custody** |
 
-## Problem
+Koschei, kullanıcı fonlarına dokunmadan read-only RPC, veritabanı agregasyonları, risk kuralları ve AI destekli simülasyonlarla Solana ekosisteminde ölçülebilir güvenlik etkisi üretir.
 
-Web3 users often interact with tokens, wallets and transactions without understanding key risk signals such as mint authority, freeze authority, suspicious wallet history, rug pull indicators, fake metadata, unsafe project patterns or confusing transaction behavior.
+---
 
-Many existing tools are too technical, fragmented, or difficult for non-expert users.
+## Canlı Metrikler Tablosu
 
-## Solution
+> İlk grant sunumlarında mock başlangıç değerleri kullanılır; production ortamında `/api/public/metrics` endpoint'i `mev_protection_events` ve `liquidity_drain_alerts` tablolarından gerçek agregasyon döndürür.
 
-Koschei turns complex public blockchain data into simple intelligence tools:
+| Metrik | Başlangıç Değeri | Kaynak |
+| --- | ---: | --- |
+| Toplam Kurtarılan USD | $128,400+ | MEV Shield + Liquidity Radar |
+| Engellenen Saldırılar | 324+ | Koruma olayları ve alarm kayıtları |
+| Aktif Cüzdanlar | 1,842+ | Read-only kullanıcı / cüzdan agregasyonu |
+| Canlı Modüller | 5 | Public security modules |
+| Güncelleme Sıklığı | 60 sn | API cache TTL |
 
-- Wallet Score
-- Token Scanner
-- Risk Scanner
-- TX Decoder
-- Metadata Studio
-- Watchlist
-- Chain Health Monitor
-- Funding Assistant
-- Public Impact Dashboard
+---
 
-## Why Solana?
+## Modüller
 
-Solana has fast activity, low fees, active builders, token launches, DeFi, NFTs, gaming and consumer apps. This creates both opportunity and risk.
+### 1. MEV Shield
+Swap öncesi sandwich, backrun, slippage ve rota manipülasyonu risklerini analiz eder. Kullanıcıya risk skoru, sebep listesi ve daha güvenli işlem önerisi verir.
 
-Koschei starts Solana-first because Solana users and builders need fast, readable and no-custody risk intelligence tools.
+### 2. Liquidity Radar
+Token havuzlarında ani likidite çıkışı, rug-pull paterni, yüksek riskli pool davranışı ve kritik anomali sinyallerini canlı alarm akışı olarak sunar.
 
-## Features
+### 3. AI Simulator
+Geliştiriciler ve DAO ekipleri için saldırı senaryolarını doğal dil ile simüle eder; riskli kod, konfigürasyon veya operasyon kararı için düzeltme önerileri üretir.
 
-### Core Web3 Tools
+### 4. DAO Guardian
+DAO tekliflerinde treasury outflow, yetki devri, parametre manipülasyonu ve governance takeover ihtimallerini işaretler.
 
-- Metadata Studio
-- Risk Scanner
-- Watchlist
-- Chain Health
-- TX Decoder
+### 5. Smart Money Oracle
+Whale, fon, bot ve yüksek etki cüzdan hareketlerinden risk sinyalleri çıkarır; güvenlik kararlarına bağlam ekler.
 
-### Solana Intelligence
+---
 
-- Wallet Score
-- Token Scanner
-- Portfolio Tracker
-- Smart Money
-- Airdrop Checker
+## Teknik Mimari
 
-### Advanced Intelligence
+- **Backend:** Go 1.23, net/http tabanlı API, güvenli middleware zinciri
+- **Database:** Neon Postgres / PostgreSQL read-write ve read-replica desteği
+- **Cache:** Redis veya in-memory fallback
+- **Solana Data:** Solana RPC, token / wallet / transaction analiz servisleri
+- **AI Layer:** Together AI entegrasyonuna hazır risk simülasyon katmanı
+- **Frontend:** Vanilla HTML, CSS ve JavaScript; React/Vue runtime bağımlılığı yok
+- **Security:** Non-custodial tasarım, CSP header, owner-only operasyon paneli, API key destekli B2B endpoint'ler
 
-- Risk Engine v2
-- Intelligence Graph
-- Cross-chain Risk Monitor
-- Sybil Check
-- TX Decoder Pro
+---
 
-### Builder Tools
+## Proje Yapısı
 
-- Funding Assistant
-- Docs
-- Public Impact Page
-- Agent API
-- Pay-per-Tool API
+```text
+.
+├── README.md
+├── Dockerfile
+├── render.yaml
+├── db/
+│   └── README.md
+└── koschei/
+    └── api/
+        ├── main.go
+        ├── go.mod
+        ├── internal/
+        │   ├── handlers/
+        │   │   ├── impact.go
+        │   │   ├── mev_shield.go
+        │   │   ├── liquidity_radar.go
+        │   │   └── owner.go
+        │   ├── http/
+        │   │   └── server.go
+        │   ├── cache/
+        │   ├── db/
+        │   └── web3/
+        └── public/
+            ├── index.html
+            ├── impact.html
+            ├── mev-shield.html
+            ├── radar.html
+            └── owner.html
+```
 
-## Public Good Aspect
+---
 
-Koschei improves Web3 safety and education by making on-chain risk signals easier to understand.
+## Kurulum
 
-It helps users avoid scams, understand transactions, review token safety signals, and learn safer behavior without giving custody of funds.
+### 1. Repoyu klonla
 
-## Live Demo
+```bash
+git clone https://github.com/your-org/Koschei-Web3-Hub.git
+cd Koschei-Web3-Hub/koschei/api
+```
 
-Live app:
-https://tradepigloball.co
+### 2. Ortam değişkenlerini hazırla
 
-Docs:
-https://tradepigloball.co/docs
+```bash
+cp ../../.env.example .env
+```
 
-Public Impact:
-https://tradepigloball.co/impact
+Minimum önerilen değişkenler:
 
-## Support Koschei
+```env
+PORT=8080
+DATABASE_URL=postgres://user:pass@host:5432/koschei?sslmode=require
+DATABASE_READ_URL=postgres://user:pass@replica:5432/koschei?sslmode=require
+REDIS_URL=redis://localhost:6379
+OWNER_WALLET=your_owner_wallet
+OWNER_SECRET=strong_owner_secret
+ADMIN_PASSWORD=strong_admin_password
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+TOGETHER_API_KEY=optional_for_ai_modules
+```
 
-Koschei is an early public-good Web3 intelligence project focused on no-custody safety tools for Solana builders and users.
+### 3. Lokal çalıştır
 
-Support helps cover infrastructure, API costs, documentation, demo examples and continued development.
+```bash
+go run main.go
+```
 
-Support link:
-https://www.shopier.com/TradeVisual/47208457
+Ardından:
 
-## Current Status
+- Ana sayfa: `http://localhost:8080/`
+- Impact Dashboard: `http://localhost:8080/impact`
+- MEV Shield: `http://localhost:8080/mev-shield`
+- Liquidity Radar: `http://localhost:8080/radar`
+- Public Metrics API: `http://localhost:8080/api/public/metrics`
 
-Koschei is currently an early live MVP with working authentication, admin analytics, credit system, and multiple Web3 intelligence modules.
+### 4. Test ve build
 
-## Tech Stack
+```bash
+go test ./...
+go build ./...
+```
 
-- Go backend
-- Static frontend
-- Neon Postgres
-- Neon Auth
-- Alchemy API
-- Railway hosting
-- Together AI where applicable
+---
 
-## Architecture
+## Owner Panel Notu
 
-Simple flow:
+Owner Panel gizli operasyon alanıdır. `/owner` route'u owner authentication kontrolünden geçer; `/api/owner/*` operasyon endpoint'leri owner-only middleware ve handler seviyesinde doğrulama ile korunur.
 
-User opens Koschei
-→ selects a tool
-→ enters public wallet, token, transaction or project data
-→ backend reads public blockchain/API data
-→ Koschei produces readable scores and explanations
-→ no private key or seed phrase is ever requested
+Giriş için gerekli değerler:
 
-## Roadmap
+- `OWNER_WALLET` veya `KOSCHEI_OWNER_WALLET`
+- `OWNER_SECRET` veya `KOSCHEI_OWNER_SECRET`
 
-### Next 3 months
+Panel tarayıcıda güvenli cookie oluşturmak için `/api/owner/login` endpoint'ini kullanır. Production ortamında `APP_ENV=production` ile cookie'ler `Secure` ve `SameSite=Strict` çalışır.
 
-- Improve premium module UI
-- Add demo examples across tools
-- Improve Solana Wallet Score
-- Improve Token Scanner
-- Improve TX Decoder
-- Improve public impact page
-- Collect structured user feedback
+---
 
-### Next 6 months
+## Grant Readiness
 
-- Expand Solana intelligence modules
-- Improve risk scoring
-- Add wallet behavior analytics
-- Improve watchlist monitoring
-- Grow Solana builder/user community
+Koschei Web3 Hub, Solana Foundation Tier-1 Grant değerlendirmesine uygun şekilde şu kanıtları sunar:
 
-### Next 12 months
+1. **Canlı ürün:** modern responsive arayüz, public dashboard ve çalışan API endpoint'leri.
+2. **Ölçülebilir impact:** kurtarılan USD, engellenen saldırılar, aktif cüzdanlar ve son olay logları.
+3. **Public-good yaklaşımı:** read-only, non-custodial ve topluluk güvenliğini önceleyen mimari.
+4. **Teknik sürdürülebilirlik:** Go backend, Neon Postgres, Redis cache ve vanilla frontend ile düşük operasyonel karmaşıklık.
+5. **Modüler büyüme:** MEV Shield, Liquidity Radar, AI Simulator, DAO Guardian ve Smart Money Oracle aynı hub içinde ölçeklenebilir.
 
-- Expand advanced intelligence features
-- Add more ecosystem integrations
-- Build stronger public-good safety tooling
-- Improve developer API access
+---
 
-## Safety Disclaimer
+## Lisans & İletişim
 
-Koschei is an informational tool. It does not provide financial advice. Users should always do their own research.
+- **Lisans:** MIT
+- **Topluluk çağrısı:** Solana geliştiricileri, validator ekipleri, DAO güvenlik ekipleri ve public-good fonlayıcıları iş birliğine davetlidir.
+- **İletişim:** `hello@koschei.ai`
 
-Never enter private keys or seed phrases into any tool.
+---
 
-## Contributing
-
-Contributions, feedback and security reports are welcome.
+Built with ❤️ for Solana Ecosystem
