@@ -94,6 +94,9 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/owner/status", requiresDB(h, method("GET", h.OwnerStatus)))
 	mux.HandleFunc("/api/owner/grants", requiresDB(h, method("GET", h.OwnerGrants)))
 	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, method("GET", h.OwnerDAOGuardianSummary)))
+	mux.HandleFunc("/api/mev/analyze", requiresDB(h, method("POST", h.AnalyzeMEV)))
+	mux.HandleFunc("/api/liquidity/analyze", requiresDB(h, method("POST", h.LiquidityDrainAnalyze)))
+	mux.HandleFunc("/api/dao/proposal-risk", requiresDB(h, method("POST", h.DAOGuardianAnalyze)))
 	mux.HandleFunc("/api/admin/payment-requests", requiresDB(h, method("GET", h.AdminPaymentRequests)))
 	mux.HandleFunc("/api/admin/analytics/events", requiresDB(h, method("GET", h.AdminAnalyticsEvents)))
 	mux.HandleFunc("/api/admin/grant-radar", requiresDB(h, h.GrantRadar))
@@ -206,12 +209,35 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 		} else {
 			static := http.FileServer(http.Dir(staticDir))
 			indexPath := filepath.Join(staticDir, "index.html")
+			ownerPath := filepath.Join(staticDir, "owner.html")
+			mux.HandleFunc("/owner", func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet && r.Method != http.MethodHead {
+					w.WriteHeader(http.StatusMethodNotAllowed)
+					return
+				}
+				if !h.OwnerAuth(w, r) {
+					return
+				}
+				http.ServeFile(w, r, ownerPath)
+			})
 			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 				if strings.HasPrefix(r.URL.Path, "/api/") || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
 					http.NotFound(w, r)
 					return
 				}
 				if r.URL.Path == "/" {
+					http.ServeFile(w, r, indexPath)
+					return
+				}
+				spaRoutes := map[string]bool{
+					"/wallet-score":    true,
+					"/token-scanner":   true,
+					"/mev-shield":      true,
+					"/impact":          true,
+					"/liquidity-radar": true,
+					"/dao-guardian":    true,
+				}
+				if spaRoutes[r.URL.Path] {
 					http.ServeFile(w, r, indexPath)
 					return
 				}
@@ -311,7 +337,7 @@ func cors(next http.Handler, origin string) http.Handler {
 		if origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-API-Key, X-Koschei-Source-Id, x-koschei-agent-key")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-API-Key, X-Koschei-Source-Id, x-koschei-agent-key, X-Koschei-Secret, X-Owner-Secret, X-Owner-Wallet, X-CSRF-Token")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

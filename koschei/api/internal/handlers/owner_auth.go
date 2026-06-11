@@ -12,7 +12,7 @@ import (
 func (h *Handler) ownerAuth(w http.ResponseWriter, r *http.Request) bool {
 	ownerWallet := normalizeWallet(firstEnv("OWNER_WALLET", "KOSCHEI_OWNER_WALLET"))
 	ownerSecret := strings.TrimSpace(firstEnv("OWNER_SECRET", "KOSCHEI_OWNER_SECRET"))
-	if ownerWallet == "" || ownerSecret == "" {
+	if ownerSecret == "" {
 		http.NotFound(w, r)
 		return false
 	}
@@ -43,7 +43,7 @@ func (h *Handler) ownerAuth(w http.ResponseWriter, r *http.Request) bool {
 	if wallet == "" {
 		wallet = walletFromBearer(r)
 	}
-	if wallet == "" || wallet != ownerWallet {
+	if ownerWallet != "" && wallet != "" && wallet != ownerWallet {
 		http.NotFound(w, r)
 		return false
 	}
