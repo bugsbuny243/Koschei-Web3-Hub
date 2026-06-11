@@ -83,17 +83,17 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/payments/request", requiresDB(h, handlers.RequireAuth(method("POST", h.PaymentRequest))))
 	mux.HandleFunc("/api/shopier/webhook", requiresDB(h, method("POST", h.ShopierWebhook)))
 	mux.HandleFunc("/api/owner/login", method("POST", h.OwnerLogin))
-	mux.HandleFunc("/api/owner/users", requiresDB(h, method("GET", h.OwnerUsers)))
-	mux.HandleFunc("/api/owner/credits/add", requiresDB(h, method("POST", h.OwnerAddCredits)))
-	mux.HandleFunc("/api/owner/users/ban", requiresDB(h, method("POST", h.OwnerBanUser)))
-	mux.HandleFunc("/api/owner/users/remove", requiresDB(h, method("POST", h.OwnerRemoveUser)))
-	mux.HandleFunc("/api/owner/payment-requests", requiresDB(h, method("GET", h.OwnerPaymentRequests)))
-	mux.HandleFunc("/api/owner/payments/approve", requiresDB(h, method("POST", h.OwnerApprovePayment)))
-	mux.HandleFunc("/api/owner/payments/reject", requiresDB(h, method("POST", h.OwnerRejectPayment)))
-	mux.HandleFunc("/api/owner/command", requiresDB(h, method("POST", h.OwnerCommand)))
-	mux.HandleFunc("/api/owner/status", requiresDB(h, method("GET", h.OwnerStatus)))
-	mux.HandleFunc("/api/owner/grants", requiresDB(h, method("GET", h.OwnerGrants)))
-	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, method("GET", h.OwnerDAOGuardianSummary)))
+	mux.HandleFunc("/api/owner/users", requiresDB(h, ownerOnly(h, method("GET", h.OwnerUsers))))
+	mux.HandleFunc("/api/owner/credits/add", requiresDB(h, ownerOnly(h, method("POST", h.OwnerAddCredits))))
+	mux.HandleFunc("/api/owner/users/ban", requiresDB(h, ownerOnly(h, method("POST", h.OwnerBanUser))))
+	mux.HandleFunc("/api/owner/users/remove", requiresDB(h, ownerOnly(h, method("POST", h.OwnerRemoveUser))))
+	mux.HandleFunc("/api/owner/payment-requests", requiresDB(h, ownerOnly(h, method("GET", h.OwnerPaymentRequests))))
+	mux.HandleFunc("/api/owner/payments/approve", requiresDB(h, ownerOnly(h, method("POST", h.OwnerApprovePayment))))
+	mux.HandleFunc("/api/owner/payments/reject", requiresDB(h, ownerOnly(h, method("POST", h.OwnerRejectPayment))))
+	mux.HandleFunc("/api/owner/command", requiresDB(h, ownerOnly(h, method("POST", h.OwnerCommand))))
+	mux.HandleFunc("/api/owner/status", requiresDB(h, ownerOnly(h, method("GET", h.OwnerStatus))))
+	mux.HandleFunc("/api/owner/grants", requiresDB(h, ownerOnly(h, method("GET", h.OwnerGrants))))
+	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, ownerOnly(h, method("GET", h.OwnerDAOGuardianSummary))))
 	mux.HandleFunc("/api/admin/payment-requests", requiresDB(h, method("GET", h.AdminPaymentRequests)))
 	mux.HandleFunc("/api/admin/analytics/events", requiresDB(h, method("GET", h.AdminAnalyticsEvents)))
 	mux.HandleFunc("/api/admin/grant-radar", requiresDB(h, h.GrantRadar))
@@ -120,6 +120,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/admin/tool-usage", requiresDB(h, method("GET", h.AdminToolUsage)))
 	mux.HandleFunc("/api/admin/settings", requiresDB(h, method("GET", h.AdminSettings)))
 	mux.HandleFunc("/api/public/impact", requiresDB(h, method("GET", h.PublicImpact)))
+	mux.HandleFunc("/api/public/metrics", requiresDB(h, method("GET", h.GetPublicMetrics)))
 	mux.HandleFunc("/api/public/tool-prices", requiresDB(h, method("GET", h.ToolPrices)))
 	mux.HandleFunc("/api/agent/health", requiresDB(h, method("GET", h.AgentTool)))
 	mux.HandleFunc("/api/agent/wallet-score", requiresDB(h, method("POST", h.AgentTool)))
@@ -213,6 +214,11 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					http.ServeFile(w, r, indexPath)
 					return
 				}
+				if r.URL.Path == "/owner" {
+					if !h.OwnerAuth(w, r) {
+						return
+					}
+				}
 				cleanRoutes := map[string]string{
 					"/hub":               "/hub.html",
 					"/login":             "/login.html",
@@ -242,6 +248,8 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/project-radar":     "/project-radar.html",
 					"/agent-api":         "/agent-api.html",
 					"/pay-per-tool":      "/pay-per-tool.html",
+					"/mev-shield":        "/mev-shield.html",
+					"/radar":             "/radar.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())
@@ -287,6 +295,15 @@ func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+func ownerOnly(h *handlers.Handler, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !h.OwnerAuth(w, r) {
+			return
+		}
+		next(w, r)
+	}
+}
+
 func requiresDB(h *handlers.Handler, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !h.RequireDB(w) {
