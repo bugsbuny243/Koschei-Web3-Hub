@@ -1,16 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- AdSense verification -->
   <meta name="google-adsense-account" content="ca-pub-6081394144742471">
-
-  <!-- Google AdSense -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6081394144742471"
-     crossorigin="anonymous"></script>
-
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/css/koschei.css">
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6081394144742471" crossorigin="anonymous"></script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -18,45 +10,86 @@
     gtag('js', new Date());
     gtag('config', 'G-1QFWMJJC3');
   </script>
-  <title>Support Koschei Web3 Hub — Koschei</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support Koschei Web3 Hub</title>
+  <meta name="description" content="Support Koschei Web3 Hub — free, no-custody Web3 intelligence tools for Solana builders and users.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    .support-hero{padding:32px;background:linear-gradient(135deg,#111118,#13231d);border:1px solid #2a2a3a;border-radius:16px;margin-bottom:20px}
-    .support-copy{max-width:860px;color:var(--text2);line-height:1.75;font-size:16px}
-    .support-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}
-    .support-list{margin:12px 0 0;padding-left:20px;color:var(--text2);line-height:1.9}
-    .support-footer{max-width:1100px;margin:28px auto;padding:0 24px 28px;color:var(--text2);font-size:13px}
-    .support-footer a{color:var(--accent);text-decoration:none}
-    @media (max-width: 700px){.support-hero{padding:24px}.support-actions .btn{width:100%}}
+    :root{--accent:#00ff88;--accent2:#00ccff;--text:#f0f0ff;--text2:#8888aa;--bg:#030309;--radius:14px;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+    .blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+    .blob{position:absolute;border-radius:50%;filter:blur(100px);animation:bf 12s ease-in-out infinite;}
+    .b1{width:450px;height:450px;background:rgba(0,255,136,.08);top:-100px;left:-80px;}
+    .b2{width:400px;height:400px;background:rgba(0,204,255,.07);bottom:-80px;right:-60px;animation-delay:-5s;}
+    @keyframes bf{0%,100%{transform:translate(0,0)}50%{transform:translate(15px,-15px)}}
+    .glass{background:rgba(255,255,255,.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);}
+    .nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:rgba(3,3,9,.85);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.07);}
+    .nav-logo{font-size:18px;font-weight:800;color:var(--accent);text-decoration:none;}
+    .nav-links{display:flex;gap:6px;}
+    .nav-link{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:8px;transition:all .15s;}
+    .nav-link:hover,.nav-link.active{color:var(--accent);}
+    .page{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:36px 20px 60px;}
+    .badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;color:var(--accent);margin-bottom:16px;}
+    .hero{padding:32px;margin-bottom:20px;}
+    .hero h1{font-size:26px;font-weight:800;letter-spacing:-0.5px;margin-bottom:14px;}
+    .hero p{color:var(--text2);line-height:1.75;font-size:15px;margin-bottom:12px;}
+    .actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px;}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;text-decoration:none;transition:all .15s;}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;}
+    .btn-primary:hover{opacity:.88;transform:translateY(-1px);}
+    .btn-ghost{background:rgba(255,255,255,.06);color:var(--text2);border:1px solid rgba(255,255,255,.1);}
+    .btn-ghost:hover{background:rgba(255,255,255,.1);color:var(--text);}
+    .channels-card{padding:24px;}
+    .channels-card h2{font-size:14px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text2);margin-bottom:14px;}
+    .channel-list{list-style:none;display:flex;flex-direction:column;gap:10px;}
+    .channel-item{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text);padding:10px 14px;background:rgba(255,255,255,.03);border-radius:10px;}
+    .channel-item .status{margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,.08);color:var(--text2);}
+    .channel-item .status.active{background:rgba(0,255,136,.12);color:var(--accent);}
+    footer{text-align:center;padding:32px 24px;color:var(--text2);font-size:13px;}
+    footer a{color:var(--accent);text-decoration:none;}
+    @media(max-width:600px){.actions .btn{width:100%;}}
   </style>
 </head>
 <body>
+<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div></div>
 <nav class="nav">
-  <a class="nav-logo" href="/hub">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
-  <div class="nav-links"><a class="nav-link" href="/hub">Hub</a><a class="nav-link" href="/docs">Docs</a><a class="nav-link active" href="/support">Support</a><a class="nav-link" href="/impact">Impact</a></div>
+  <a href="/hub.html" class="nav-logo">K Koschei</a>
+  <div class="nav-links">
+    <a href="/hub.html" class="nav-link">Hub</a>
+    <a href="/docs.html" class="nav-link">Docs</a>
+    <a href="/support.html" class="nav-link active">Support</a>
+    <a href="/impact.html" class="nav-link">Impact</a>
+  </div>
 </nav>
-<main class="page">
-  <section class="support-hero">
-    <span class="badge badge-green">Public-good support</span>
+<div class="page">
+  <section class="glass hero">
+    <div class="badge">💚 Public-good support</div>
     <h1>Support Koschei Web3 Hub</h1>
-    <p class="support-copy">Koschei is building no-custody Web3 intelligence tools for Solana builders and users.</p>
-    <p class="support-copy">Support helps us improve Wallet Score, Token Scanner, TX Decoder, Project Radar, Watchlist monitoring, documentation, demo examples and public-good Web3 safety tooling.</p>
-    <div class="support-actions">
-      <a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47208457" target="_blank" rel="noopener noreferrer">Support on Shopier</a>
+    <p>Koschei builds free, no-custody Web3 intelligence tools for Solana builders and users — Token Scanner, Wallet Score, TX Decoder, Project Radar, Risk Scanner, Portfolio Tracker and more.</p>
+    <p>Your support helps cover infrastructure, API costs, AI inference and continued development of public-good safety tooling.</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47208457" target="_blank" rel="noopener noreferrer">💜 Support on Shopier</a>
+      <a class="btn btn-ghost" href="/pricing.html">View credit packs →</a>
     </div>
   </section>
 
-  <section class="card" aria-label="Future funding channels">
-    <h2>Future funding channels:</h2>
-    <ul class="support-list">
-      <li>GitHub Sponsors — coming soon</li>
-      <li>Open Collective — coming soon</li>
-      <li>Giveth — coming soon</li>
-      <li>Drips — coming soon</li>
+  <section class="glass channels-card">
+    <h2>Funding Channels</h2>
+    <ul class="channel-list">
+      <li class="channel-item">💜 Giveth <span class="status active">Active</span></li>
+      <li class="channel-item">🛍️ Shopier <span class="status active">Active</span></li>
+      <li class="channel-item">💧 Drips <span class="status">Coming soon</span></li>
+      <li class="channel-item">🐙 GitHub Sponsors <span class="status">Coming soon</span></li>
+      <li class="channel-item">🌐 Open Collective <span class="status">Coming soon</span></li>
     </ul>
   </section>
-</main>
-<footer class="support-footer">© 2026 Koschei · <a href="https://tradepigloball.co/support">Support</a> · <a href="/docs">Docs</a> · <a href="/impact">Impact</a></footer>
+</div>
+<footer>
+  © 2026 Koschei · <a href="/docs.html">Docs</a> · <a href="/impact.html">Impact</a> · <a href="https://giveth.io/project/koschei-web3-hub">Giveth</a>
+</footer>
 <script src="/js/koschei-analytics.js?v=1"></script>
-<script>KoscheiAnalytics.track('support_view')</script>
+<script>if(window.KoscheiAnalytics) KoscheiAnalytics.track('support_view')</script>
 </body>
 </html>
