@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
+	"time"
 )
 
 // UsersHandler returns all user profiles

@@ -28,8 +28,8 @@ func (h *Handler) AIVideoStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusNotImplemented, map[string]any{
-		"job_id":         jobID,
-		"status":         "not_implemented",
+		"job_id":          jobID,
+		"status":          "not_implemented",
 		"credits_charged": false,
 	})
 }

@@ -122,7 +122,7 @@ func runMigrations(db *sql.DB) (int, int, error) {
 }
 
 func verifySchema(db *sql.DB) error {
-	required := []string{"schema_migrations", "plans", "app_user_profiles", "entitlements", "payment_requests", "credit_events", "generation_jobs", "model_route_logs", "runtime_projects", "runtime_tasks", "runtime_logs", "owner_client_orders", "owner_order_requirements", "owner_order_assets", "owner_delivery_packages", "owner_revision_requests", "owner_profit_records", "owner_service_templates", "analytics_events", "grant_opportunities", "koschei_modules", "risk_assessments", "tx_decodes"}
+	required := []string{"schema_migrations", "plans", "app_user_profiles", "entitlements", "payment_requests", "credit_events", "generation_jobs", "model_route_logs", "runtime_projects", "runtime_tasks", "runtime_logs", "owner_client_orders", "owner_order_requirements", "owner_order_assets", "owner_delivery_packages", "owner_revision_requests", "owner_profit_records", "owner_service_templates", "analytics_events", "grant_opportunities", "koschei_modules", "risk_assessments", "tx_decodes", "api_keys", "api_usage_events", "api_credit_ledger"}
 	for _, t := range required {
 		var ok bool
 		if err := db.QueryRow(`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name=$1)`, t).Scan(&ok); err != nil || !ok {
@@ -132,6 +132,7 @@ func verifySchema(db *sql.DB) error {
 	requiredColumns := map[string][]string{
 		"app_user_profiles": {"id", "auth_subject", "email", "role", "plan_id", "credits", "created_at", "updated_at"},
 		"entitlements":      {"id", "email", "plan_id", "outputs_total", "outputs_remaining", "status", "created_at", "updated_at"},
+		"api_keys":          {"id", "auth_subject", "email", "name", "key_prefix", "key_hash", "status", "monthly_limit", "rate_limit_per_minute", "created_at"},
 	}
 	for table, columns := range requiredColumns {
 		for _, column := range columns {

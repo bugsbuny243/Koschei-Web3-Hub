@@ -1,15 +1,15 @@
 package handlers
 
 import (
-	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/bugsbuny243/Koschei-Web3-Hub/koschei/api/pkg/audit"
-	"github.com/bugsbuny243/Koschei-Web3-Hub/koschei/api/pkg/utils"
+	"koschei/api/pkg/audit"
+	"koschei/api/pkg/utils"
 )
 
 var (
@@ -47,7 +47,8 @@ func AdminLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rate limiting (simple in-memory version)	clientIP := getClientIP(r)
+	// Rate limiting (simple in-memory version)
+	clientIP := getClientIP(r)
 	if isBlocked(clientIP) {
 		time.Sleep(3 * time.Second) // Slow down brute force
 		http.Error(w, "Çok fazla deneme", http.StatusTooManyRequests)
@@ -95,8 +96,8 @@ func setSessionCookie(w http.ResponseWriter) {
 	expire := time.Now().Add(24 * time.Hour)
 	sessionID := generateSecureToken()
 	cookie := &http.Cookie{
-		Name:     "koschei_admin",
-		Value:    sessionID,		Expires:  expire,
+		Name:  "koschei_admin",
+		Value: sessionID, Expires: expire,
 		HttpOnly: true,
 		Secure:   true,
 		Path:     "/",
