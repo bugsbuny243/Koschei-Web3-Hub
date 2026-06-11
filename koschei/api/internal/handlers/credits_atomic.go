@@ -7,14 +7,12 @@ import (
 )
 
 func (h *Handler) userCreditsAndRole(authSubject string) (bool, int, error) {
-	var role string
 	var credits int
-	err := h.DB.QueryRow(`SELECT COALESCE(role,''), COALESCE(credits,0) FROM app_user_profiles WHERE auth_subject=$1`, authSubject).Scan(&role, &credits)
+	err := h.DB.QueryRow(`SELECT COALESCE(credits,0) FROM app_user_profiles WHERE auth_subject=$1`, authSubject).Scan(&credits)
 	if err != nil {
 		return false, 0, err
 	}
-	role = strings.ToLower(strings.TrimSpace(role))
-	return role == "admin" || role == "owner" || role == "enterprise", credits, nil
+	return false, credits, nil
 }
 
 func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, reason string) error {

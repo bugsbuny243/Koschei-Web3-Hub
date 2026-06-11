@@ -54,7 +54,7 @@ type adminScan struct {
 }
 
 var adminTables = map[string][]string{
-	"users":             {"auth_subject", "email", "role", "credits", "created_at", "updated_at", "last_login_at"},
+	"users":             {"auth_subject", "email", "wallet_address", "credits", "status", "created_at", "updated_at", "last_login_at"},
 	"payments":          {"id", "email", "full_name", "product_id", "amount_try", "currency", "status", "created_at", "reviewed_at"},
 	"entitlements":      {"id", "customer_id", "email", "plan_id", "payment_request_id", "outputs_total", "outputs_remaining", "status", "created_at", "updated_at"},
 	"outputs":           {"id", "email", "entitlement_id", "output_type", "title", "ecosystem", "used_ai", "used_fallback", "created_at"},

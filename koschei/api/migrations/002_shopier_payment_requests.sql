@@ -1,3 +1,9 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE IF NOT EXISTS payment_requests (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+);
+
 ALTER TABLE payment_requests
   ADD COLUMN IF NOT EXISTS email text,
   ADD COLUMN IF NOT EXISTS full_name text NOT NULL DEFAULT '',

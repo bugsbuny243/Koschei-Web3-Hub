@@ -36,8 +36,8 @@ type authUser struct {
 
 func upsertAppProfileTx(ctx context.Context, store appProfileStore, sub, email string, _ *authUser) error {
 	_, err := store.ExecContext(ctx, `
-		INSERT INTO app_user_profiles (auth_subject,email,role,plan_id,credits,created_at,updated_at)
-		VALUES ($1,lower($2),'user','free',0,now(),now())
+		INSERT INTO app_user_profiles (auth_subject,email,plan_id,credits,created_at,updated_at)
+		VALUES ($1,lower($2),'free',0,now(),now())
 		ON CONFLICT (auth_subject) DO UPDATE SET email=lower(EXCLUDED.email), updated_at=now()`, sub, email)
 	return err
 }
@@ -59,10 +59,10 @@ var _ = http.MethodGet
 func (h *Handler) upsertAppProfile(ctx context.Context, subject, email string) (authUser, error) {
 	profile := authUser{}
 	err := h.DB.QueryRowContext(ctx, `
-		INSERT INTO app_user_profiles (auth_subject,email,role,plan_id,credits,created_at,updated_at)
-		VALUES ($1,lower($2),'user','free',0,now(),now())
+		INSERT INTO app_user_profiles (auth_subject,email,plan_id,credits,created_at,updated_at)
+		VALUES ($1,lower($2),'free',0,now(),now())
 		ON CONFLICT (auth_subject) DO UPDATE SET email=lower(EXCLUDED.email), updated_at=now()
-		RETURNING id::text, auth_subject, email, COALESCE(role,''), COALESCE(plan_id,''), COALESCE(credits,0)`, subject, email).Scan(&profile.ID, &profile.AuthSubject, &profile.Email, &profile.Role, &profile.PlanID, &profile.Credits)
+		RETURNING id::text, auth_subject, email, COALESCE(plan_id,''), COALESCE(credits,0)`, subject, email).Scan(&profile.ID, &profile.AuthSubject, &profile.Email, &profile.PlanID, &profile.Credits)
 	profile.Plan = profile.PlanID
 	return profile, err
 }

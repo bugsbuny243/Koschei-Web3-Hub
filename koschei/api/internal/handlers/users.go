@@ -14,7 +14,7 @@ func UsersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := dbConn.Query(`
-		SELECT id, email, role, plan_id, credits, created_at
+		SELECT id, email, plan_id, credits, created_at
 		FROM app_user_profiles
 		ORDER BY created_at DESC
 		LIMIT 100
@@ -28,7 +28,6 @@ func UsersHandler(w http.ResponseWriter, r *http.Request) {
 	type User struct {
 		ID        string    `json:"id"`
 		Email     string    `json:"email"`
-		Role      string    `json:"role"`
 		Plan      string    `json:"plan"`
 		Credits   int       `json:"credits"`
 		CreatedAt time.Time `json:"created_at"`
@@ -37,7 +36,7 @@ func UsersHandler(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var u User
-		rows.Scan(&u.ID, &u.Email, &u.Role, &u.Plan, &u.Credits, &u.CreatedAt)
+		rows.Scan(&u.ID, &u.Email, &u.Plan, &u.Credits, &u.CreatedAt)
 		users = append(users, u)
 	}
 
