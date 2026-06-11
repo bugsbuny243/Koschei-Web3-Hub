@@ -19,11 +19,14 @@ import (
 )
 
 type neonJWTClaims struct {
-	Sub   string `json:"sub"`
-	Email string `json:"email"`
-	Iss   string `json:"iss"`
-	Aud   any    `json:"aud"`
-	Exp   int64  `json:"exp"`
+	Sub           string `json:"sub"`
+	Email         string `json:"email"`
+	Wallet        string `json:"wallet"`
+	WalletAddress string `json:"wallet_address"`
+	PublicAddress string `json:"public_address"`
+	Iss           string `json:"iss"`
+	Aud           any    `json:"aud"`
+	Exp           int64  `json:"exp"`
 }
 
 type userProfile struct {

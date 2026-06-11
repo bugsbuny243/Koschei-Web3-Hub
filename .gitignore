@@ -5,3 +5,7 @@
 # environment files
 .env*
 !.env.example
+
+# Hidden Owner Panel must not be shipped from public static assets
+koschei/api/public/owner.html
+owner.html

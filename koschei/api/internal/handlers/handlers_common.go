@@ -109,11 +109,3 @@ func (h *Handler) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
 	}
 	return true
 }
-
-func (h *Handler) ownerAuth(w http.ResponseWriter, r *http.Request) bool {
-	return h.requireAdmin(w, r)
-}
-
-func (h *Handler) OwnerAuth(w http.ResponseWriter, r *http.Request) bool {
-	return h.ownerAuth(w, r)
-}

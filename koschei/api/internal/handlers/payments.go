@@ -37,6 +37,7 @@ type paymentRequestReviewInput struct {
 
 func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 	statements := []string{
+		`CREATE TABLE IF NOT EXISTS payment_requests (id uuid PRIMARY KEY DEFAULT gen_random_uuid())`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS email text`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS full_name text NOT NULL DEFAULT ''`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS product_id text`,
