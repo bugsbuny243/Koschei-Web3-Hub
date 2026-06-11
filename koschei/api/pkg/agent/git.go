@@ -3,7 +3,6 @@ package agent
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 )
 
 func RunGitCommand(args ...string) error {

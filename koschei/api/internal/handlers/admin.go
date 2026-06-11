@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bugsbuny243/Koschei-Web3-Hub/koschei/api/pkg/audit"
-	"github.com/bugsbuny243/Koschei-Web3-Hub/koschei/api/pkg/utils"
+	"koschei/api/pkg/audit"
+	"koschei/api/pkg/utils"
 )
 
 var (
@@ -96,7 +96,8 @@ func setSessionCookie(w http.ResponseWriter) {
 	sessionID := generateSecureToken()
 	cookie := &http.Cookie{
 		Name:     "koschei_admin",
-		Value:    sessionID,		Expires:  expire,
+		Value:    sessionID,
+		Expires:  expire,
 		HttpOnly: true,
 		Secure:   true,
 		Path:     "/",
