@@ -80,10 +80,10 @@
     return authRequest('/api/auth/register', { email, password, name });
   }
 
-  function connectWallet() {
-    throw new Error('Wallet login is disabled. Sign in with email and password.');
+  function getAuthHeader() {
+    const token = getToken();
+    return token ? `Bearer ${token}` : '';
   }
-
 
   async function checkAuth(options = {}) {
     const redirect = options.redirect !== false;
@@ -113,7 +113,7 @@
     window.location.href = redirectTo;
   }
 
-  window.Auth = { login, register, connectWallet, checkAuth, logout, getAuthHeader, getToken, saveToken, clearToken };
+  window.Auth = { login, register, checkAuth, logout, getAuthHeader, getToken, saveToken, clearToken };
   window.login = login;
   window.checkAuth = checkAuth;
   window.logout = logout;

@@ -76,7 +76,7 @@
       document.getElementById('accountOutputsRemaining').textContent = data.outputs_remaining ?? 0;
       const plan = String(data.plan || 'free').toLowerCase();
       document.getElementById('planMessage').textContent = plan === 'free'
-        ? 'Free accounts can explore the platform and use demo examples. Buy credits to run real tools.'
+        ? 'Accounts without an active package can review settings and pricing. Activate a package to run production intelligence modules.'
         : 'Paid outputs are active. Total and remaining paid outputs are shown above.';
     } catch {
       const message = document.getElementById('accountMessage');
