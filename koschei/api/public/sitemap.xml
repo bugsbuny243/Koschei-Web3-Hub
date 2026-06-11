@@ -1,27 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://tradepigloball.co/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://tradepigloball.co/hub</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://tradepigloball.co/dashboard</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tradepigloball.co/token-scanner</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://tradepigloball.co/tx-decoder</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://tradepigloball.co/wallet-score</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://tradepigloball.co/program-scanner</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://tradepigloball.co/chains</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/account</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://tradepigloball.co/agent-api</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://tradepigloball.co/airdrop-checker</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tradepigloball.co/portfolio</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
-  <url><loc>https://tradepigloball.co/smart-money</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tradepigloball.co/launches</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
-  <url><loc>https://tradepigloball.co/metadata</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tradepigloball.co/risk</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tradepigloball.co/risk-v2</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tradepigloball.co/watchlist</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://tradepigloball.co/project-radar</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://tradepigloball.co/mev-shield</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://tradepigloball.co/radar</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>https://tradepigloball.co/impact</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/chains</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/cross-chain-risk</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/dashboard</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>https://tradepigloball.co/docs</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://tradepigloball.co/docs/api</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
   <url><loc>https://tradepigloball.co/docs/sdk</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://tradepigloball.co/funding-assistant</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/graph</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://tradepigloball.co/hub</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tradepigloball.co/impact</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/launches</loc><changefreq>daily</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tradepigloball.co/login</loc><changefreq>weekly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://tradepigloball.co/metadata</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/mev-shield</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tradepigloball.co/pay-per-tool</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://tradepigloball.co/portfolio</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://tradepigloball.co/pricing</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/program-scanner</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tradepigloball.co/project-radar</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tradepigloball.co/radar</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tradepigloball.co/register</loc><changefreq>weekly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://tradepigloball.co/risk</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/risk-v2</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/smart-money</loc><changefreq>daily</changefreq><priority>0.8</priority></url>
   <url><loc>https://tradepigloball.co/support</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://tradepigloball.co/sybil-check</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://tradepigloball.co/token-scanner</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tradepigloball.co/tx-decoder</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tradepigloball.co/tx-decoder-pro</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tradepigloball.co/wallet-score</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://tradepigloball.co/watchlist</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
 </urlset>
