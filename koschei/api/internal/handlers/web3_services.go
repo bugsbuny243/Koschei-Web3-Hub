@@ -10,20 +10,23 @@ import (
 	"koschei/api/internal/web3"
 )
 
-var tokenServiceMu sync.Mutex
+var (
+	tokenServiceMu     sync.Mutex
+	globalTokenService *web3.TokenService
+)
 
 func (h *Handler) tokenService() *web3.TokenService {
-	if h.TokenService != nil {
-		return h.TokenService
+	if globalTokenService != nil {
+		return globalTokenService
 	}
 	tokenServiceMu.Lock()
 	defer tokenServiceMu.Unlock()
-	if h.TokenService != nil {
-		return h.TokenService
+	if globalTokenService != nil {
+		return globalTokenService
 	}
 	providers := configuredRPCProviders()
-	h.TokenService = web3.NewTokenService(web3.NewRPCManager(&http.Client{Timeout: 12 * time.Second}, providers), web3.NewSmartCache(web3.NewMemoryCache()))
-	return h.TokenService
+	globalTokenService = web3.NewTokenService(web3.NewRPCManager(&http.Client{Timeout: 12 * time.Second}, providers), web3.NewSmartCache(web3.NewMemoryCache()))
+	return globalTokenService
 }
 
 func configuredRPCProviders() []web3.RPCProviderConfig {
