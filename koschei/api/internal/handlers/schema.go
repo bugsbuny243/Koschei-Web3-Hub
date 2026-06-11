@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 )
@@ -26,10 +25,10 @@ func SchemaHandler(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type Column struct {
-		TableName   string `json:"table"`
-		ColumnName  string `json:"column"`
-		DataType    string `json:"type"`
-		IsNullable  string `json:"nullable"`
+		TableName  string `json:"table"`
+		ColumnName string `json:"column"`
+		DataType   string `json:"type"`
+		IsNullable string `json:"nullable"`
 	}
 	var columns []Column
 

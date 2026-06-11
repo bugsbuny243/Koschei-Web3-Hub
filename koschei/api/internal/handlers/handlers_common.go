@@ -12,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/web3"
 )
 
 type Handler struct {
@@ -19,6 +21,7 @@ type Handler struct {
 	AdminPassword string
 	Limiter       *rateLimiter
 	DBInitError   string
+	TokenService  *web3.TokenService
 }
 
 func (h *Handler) dbAvailable(ctx context.Context) error {
