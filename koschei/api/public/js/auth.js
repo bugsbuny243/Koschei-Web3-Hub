@@ -80,21 +80,10 @@
     return authRequest('/api/auth/register', { email, password, name });
   }
 
-  async function connectWallet() {
-    const provider = window.solana;
-    if (!provider || !provider.isPhantom) {
-      throw new Error('Phantom wallet was not found. Please install Phantom and try again.');
-    }
-    const result = await provider.connect();
-    const walletAddress = result && result.publicKey ? result.publicKey.toString() : '';
-    if (!walletAddress) throw new Error('Could not read the connected wallet address.');
-    return authRequest('/api/auth/wallet-login', { wallet_address: walletAddress });
+  function connectWallet() {
+    throw new Error('Wallet login is disabled. Sign in with email and password.');
   }
 
-  function getAuthHeader() {
-    const token = getToken();
-    return token ? `Bearer ${token}` : '';
-  }
 
   async function checkAuth(options = {}) {
     const redirect = options.redirect !== false;
