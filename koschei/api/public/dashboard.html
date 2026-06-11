@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="/js/auth.js"></script>
+  <script>checkAuth();</script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -57,7 +59,7 @@
     <a href="/risk.html" class="nav-link">Risk</a>
     <a href="/chains.html" class="nav-link">Chains</a>
     <a href="/account.html" class="nav-link">Account</a>
-    <button class="btn btn-ghost" style="padding:6px 14px;font-size:13px;" onclick="KoscheiAuth.signOut()">Sign out</button>
+    <button class="btn btn-ghost" style="padding:6px 14px;font-size:13px;" onclick="logout()">Sign out</button>
   </div>
 </nav>
 
@@ -95,17 +97,15 @@
   </div>
 </div>
 
-<script src="/js/koschei-auth.js?v=5"></script>
 <script>
   (async () => {
-    await KoscheiAuth.init();
-    if (!KoscheiAuth.requireAuth()) return;
-    document.getElementById('userEmailDisplay').textContent = KoscheiAuth.getEmail() || '';
+    if (!(await checkAuth())) return;
     try {
-      const res = await KoscheiAuth.apiCall('/api/me');
+      const res = await fetch('/api/me', { headers: { Authorization: getAuthHeader() }, credentials: 'same-origin' });
       if (res && res.ok) {
         const data = await res.json();
         const user = data.user || data;
+        document.getElementById('userEmailDisplay').textContent = user.email || '';
         document.getElementById('statCredits').textContent = user.credits ?? user.outputs_remaining ?? 0;
         document.getElementById('statPlan').textContent = user.plan_id || 'free';
         document.getElementById('statRole').textContent = user.role || 'member';
