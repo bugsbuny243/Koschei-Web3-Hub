@@ -94,9 +94,9 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/owner/status", requiresDB(h, ownerOnly(h, method("GET", h.OwnerStatus))))
 	mux.HandleFunc("/api/owner/grants", requiresDB(h, ownerOnly(h, method("GET", h.OwnerGrants))))
 	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, ownerOnly(h, method("GET", h.OwnerDAOGuardianSummary))))
-	mux.HandleFunc("/impact", method("GET", h.ImpactHandler))
-	mux.HandleFunc("/api/public/impact", requiresDB(h, method("GET", h.PublicImpact)))
-	mux.HandleFunc("/api/public/metrics", requiresDB(h, method("GET", h.GetPublicMetrics)))
+	mux.HandleFunc("/owner", ownerPageHandler(h, staticDir))
+	mux.HandleFunc("/api/public/impact", method("GET", h.PublicImpact))
+	mux.HandleFunc("/api/public/metrics", method("GET", h.GetPublicMetrics))
 	mux.HandleFunc("/api/public/tool-prices", requiresDB(h, method("GET", h.ToolPrices)))
 	mux.HandleFunc("/api/agent/health", requiresDB(h, method("GET", h.AgentTool)))
 	mux.HandleFunc("/api/agent/wallet-score", requiresDB(h, method("POST", h.AgentTool)))
@@ -186,17 +186,6 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 		} else {
 			static := http.FileServer(http.Dir(staticDir))
 			indexPath := filepath.Join(staticDir, "index.html")
-			ownerPath := filepath.Join(staticDir, "owner.html")
-			mux.HandleFunc("/owner", func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != http.MethodGet && r.Method != http.MethodHead {
-					w.WriteHeader(http.StatusMethodNotAllowed)
-					return
-				}
-				if !h.OwnerAuth(w, r) {
-					return
-				}
-				http.ServeFile(w, r, ownerPath)
-			})
 			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 				if strings.HasPrefix(r.URL.Path, "/api/") || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
 					http.NotFound(w, r)
@@ -275,7 +264,7 @@ func robotsTXT(w http.ResponseWriter, r *http.Request) {
 
 func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/version" && r.URL.Path != "/api/config" && r.URL.Path != "/api/auth/register" && r.URL.Path != "/api/auth/login" && r.URL.Path != "/api/auth/provision" && r.URL.Path != "/api/auth/neon-login" && r.URL.Path != "/api/auth/neon-register" && r.URL.Path != "/api/auth/neon-callback" && r.URL.Path != "/api/web3/health" && r.URL.Path != "/api/analytics/event" && db == nil {
+		if strings.HasPrefix(r.URL.Path, "/api/") && r.URL.Path != "/api/version" && r.URL.Path != "/api/config" && r.URL.Path != "/api/auth/register" && r.URL.Path != "/api/auth/login" && r.URL.Path != "/api/auth/provision" && r.URL.Path != "/api/auth/neon-login" && r.URL.Path != "/api/auth/neon-register" && r.URL.Path != "/api/auth/neon-callback" && r.URL.Path != "/api/public/impact" && r.URL.Path != "/api/public/metrics" && r.URL.Path != "/api/web3/health" && r.URL.Path != "/api/analytics/event" && db == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable"})
@@ -284,6 +273,27 @@ func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+func ownerPageHandler(h *handlers.Handler, staticDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if !h.OwnerAuth(w, r) {
+			return
+		}
+		if staticDir != "" {
+			ownerPath := filepath.Join(staticDir, "owner.html")
+			if info, err := os.Stat(ownerPath); err == nil && !info.IsDir() {
+				http.ServeFile(w, r, ownerPath)
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Koschei Owner</title><style>body{margin:0;min-height:100vh;background:#070711;color:#f5f7fb;font-family:Inter,system-ui,sans-serif;display:grid;place-items:center}.card{max-width:720px;padding:32px;border:1px solid rgba(255,255,255,.14);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));box-shadow:0 28px 80px rgba(0,0,0,.35)}h1{margin:0 0 12px;font-size:clamp(30px,5vw,54px)}p{color:#a7b0c2;line-height:1.65}.pill{display:inline-block;color:#00ffaa;border:1px solid rgba(0,255,170,.4);border-radius:999px;padding:8px 12px;font-weight:800}</style></head><body><main class="card"><span class="pill">Owner authenticated</span><h1>Koschei Owner Dashboard</h1><p>Yetkili oturum doğrulandı. Statik owner paneli bulunamadığında bu güvenli fallback ekranı gösterilir. API kontrolleri /api/owner/status ve diğer owner endpointleri üzerinden kullanılabilir.</p></main></body></html>`))
+	}
+}
+
 func ownerOnly(h *handlers.Handler, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !h.OwnerAuth(w, r) {
@@ -311,12 +321,15 @@ func method(m string, next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 func cors(next http.Handler, origin string) http.Handler {
+	allowedOrigins := buildAllowedOrigins(origin)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if origin != "" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
+		if allowed := allowedCORSOrigin(r.Header.Get("Origin"), allowedOrigins); allowed != "" {
+			w.Header().Set("Access-Control-Allow-Origin", allowed)
+			w.Header().Set("Vary", "Origin")
 		}
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-API-Key, X-Koschei-Source-Id, x-koschei-agent-key, X-Koschei-Secret, X-Owner-Secret, X-Owner-Wallet, X-CSRF-Token")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -324,6 +337,36 @@ func cors(next http.Handler, origin string) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+func buildAllowedOrigins(configured string) map[string]struct{} {
+	origins := map[string]struct{}{
+		"https://tradepigloball.co":     {},
+		"https://www.tradepigloball.co": {},
+		"http://tradepigloball.co":      {},
+		"http://www.tradepigloball.co":  {},
+	}
+	for _, item := range strings.Split(configured, ",") {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			origins[strings.TrimRight(item, "/")] = struct{}{}
+		}
+	}
+	return origins
+}
+
+func allowedCORSOrigin(requestOrigin string, allowed map[string]struct{}) string {
+	requestOrigin = strings.TrimRight(strings.TrimSpace(requestOrigin), "/")
+	if requestOrigin == "" {
+		return ""
+	}
+	if _, ok := allowed[requestOrigin]; ok {
+		return requestOrigin
+	}
+	if os.Getenv("APP_ENV") != "production" && os.Getenv("CORS_DEBUG_RELAXED") == "true" {
+		return requestOrigin
+	}
+	return ""
+}
+
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
