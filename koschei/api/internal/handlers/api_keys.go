@@ -156,7 +156,7 @@ func (h *Handler) APIKeyAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		var p apiPrincipal
-		err := h.DB.QueryRowContext(r.Context(), `SELECT id::text,auth_subject,email,rate_limit_per_minute,monthly_limit FROM api_keys WHERE key_hash=$1 AND status='active'`, hashAPIKey(raw)).Scan(&p.KeyID, &p.AuthSubject, &p.Email, &p.RateLimitPerMinute, &p.MonthlyLimit)
+		err := h.DB.QueryRowContext(r.Context(), `SELECT id::text,auth_subject,email,rate_limit_per_minute,COALESCE(monthly_quota, monthly_limit) FROM api_keys WHERE key_hash=$1 AND status='active'`, hashAPIKey(raw)).Scan(&p.KeyID, &p.AuthSubject, &p.Email, &p.RateLimitPerMinute, &p.MonthlyLimit)
 		if err != nil {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_api_key"})
 			return

@@ -1,224 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="google-adsense-account" content="ca-pub-6081394144742471">
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6081394144742471" crossorigin="anonymous"></script>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-1QFWMJJC3');
-  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upgrade — Koschei</title>
-  <meta name="description" content="Buy credit packs for Koschei Web3 Hub. Unlock token scans, wallet scores, TX decoding and more.">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <title>Koschei Web3 Hub Pricing — B2B SaaS</title>
+  <meta name="description" content="Production-grade Web3 intelligence subscriptions for DAOs, funds, and enterprise security teams.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <style>
-    :root{--accent:#00ff88;--accent2:#00ccff;--danger:#ff4466;--warn:#ffaa00;--text:#f0f0ff;--text2:#8888aa;--bg:#030309;--radius:14px;}
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
-    .blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
-    .blob{position:absolute;border-radius:50%;filter:blur(100px);animation:bf 12s ease-in-out infinite;}
-    .b1{width:450px;height:450px;background:rgba(0,255,136,.08);top:-100px;left:-80px;}
-    .b2{width:400px;height:400px;background:rgba(0,204,255,.07);bottom:-80px;right:-60px;animation-delay:-5s;}
-    .b3{width:300px;height:300px;background:rgba(124,58,237,.06);top:40%;left:40%;animation-delay:-8s;}
-    @keyframes bf{0%,100%{transform:translate(0,0)}50%{transform:translate(15px,-15px)}}
-    .glass{background:rgba(255,255,255,.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);}
-    .nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:rgba(3,3,9,.85);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.07);}
-    .nav-logo{font-size:18px;font-weight:800;color:var(--accent);text-decoration:none;}
-    .nav-links{display:flex;gap:6px;}
-    .nav-link{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:8px;transition:all .15s;}
-    .nav-link:hover,.nav-link.active{color:var(--accent);}
-    .page{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:36px 20px 60px;}
-    .page-title{font-size:26px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;text-align:center;}
-    .page-sub{font-size:14px;color:var(--text2);text-align:center;max-width:480px;margin:0 auto 24px;line-height:1.6;}
-    .summary{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;margin-bottom:28px;font-size:13px;color:var(--text2);}
-    .summary strong{color:var(--accent);}
-    .alert{padding:12px 16px;border-radius:10px;font-size:13px;display:none;margin-bottom:20px;}
-    .alert.show{display:block;}
-    .alert-success{background:rgba(0,255,136,.1);border:1px solid var(--accent);color:var(--accent);}
-    .alert-error{background:rgba(255,68,102,.12);border:1px solid var(--danger);color:var(--danger);}
-    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;}
-    .pack-card{padding:24px;display:flex;flex-direction:column;gap:14px;position:relative;transition:all .2s;}
-    .pack-card:hover{border-color:rgba(0,255,136,.25);transform:translateY(-2px);}
-    .pack-card.featured{border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.04);}
-    .featured-badge{position:absolute;top:-10px;right:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-size:10px;font-weight:800;padding:3px 10px;border-radius:8px;letter-spacing:.5px;}
-    .pack-name{font-size:15px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;}
-    .pack-price{font-size:30px;font-weight:800;}
-    .pack-output{color:var(--accent);font-size:14px;font-weight:700;}
-    .pack-per{font-size:11px;color:var(--text2);}
-    .pack-actions{display:flex;flex-direction:column;gap:8px;margin-top:auto;}
-    .btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;text-decoration:none;transition:all .15s;}
-    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;}
-    .btn-primary:hover{opacity:.88;transform:translateY(-1px);}
-    .btn-ghost{background:rgba(255,255,255,.06);color:var(--text2);border:1px solid rgba(255,255,255,.1);}
-    .btn-ghost:hover{background:rgba(255,255,255,.1);color:var(--text);}
-    .btn:disabled{opacity:.4;cursor:not-allowed;}
-    .payment-form{display:none;padding:24px;margin-top:8px;}
-    .payment-form.show{display:block;}
-    .form-group{display:flex;flex-direction:column;gap:6px;}
-    .form-label{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text2);}
-    .form-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:var(--text);font-size:14px;padding:11px 14px;outline:none;width:100%;transition:border-color .15s;font-family:'Inter',sans-serif;}
-    .form-input:focus{border-color:var(--accent);}
-    .form-input:read-only{opacity:.6;}
-    textarea.form-input{min-height:80px;resize:vertical;}
-    .spinner{width:15px;height:15px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .info-note{font-size:12px;color:var(--text2);text-align:center;margin-top:24px;line-height:1.6;}
-    @media(max-width:700px){.grid-3{grid-template-columns:1fr;}}
+    :root{--bg:#030712;--panel:rgba(15,23,42,.72);--panel2:rgba(2,6,23,.88);--line:rgba(148,163,184,.18);--line2:rgba(34,211,238,.36);--text:#f8fafc;--muted:#94a3b8;--cyan:#22d3ee;--green:#34d399;--violet:#a78bfa;--amber:#f59e0b;--danger:#fb7185;--shadow:0 24px 80px rgba(0,0,0,.38);}
+    *{box-sizing:border-box;margin:0;padding:0} body{min-height:100vh;background:radial-gradient(circle at 15% 10%,rgba(34,211,238,.18),transparent 28%),radial-gradient(circle at 82% 18%,rgba(167,139,250,.18),transparent 30%),radial-gradient(circle at 50% 92%,rgba(52,211,153,.12),transparent 26%),var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;} a{color:inherit}.noise{position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:42px 42px;mask-image:linear-gradient(to bottom,#000,transparent 86%)}
+    .nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:16px 5vw;background:rgba(3,7,18,.76);backdrop-filter:blur(18px);border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:900;letter-spacing:-.03em}.brand-mark{width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,var(--cyan),var(--green));box-shadow:0 0 30px rgba(34,211,238,.45)}.nav-links{display:flex;gap:18px;color:var(--muted);font-size:14px}.nav-links a{text-decoration:none}.nav-links a:hover{color:var(--cyan)}
+    main{position:relative;z-index:2;width:min(1180px,92vw);margin:0 auto;padding:72px 0}.hero{text-align:center;margin-bottom:42px}.eyebrow{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line2);border-radius:999px;padding:8px 14px;background:rgba(34,211,238,.08);color:var(--cyan);font:700 12px/1 JetBrains Mono,monospace;text-transform:uppercase;letter-spacing:.12em}.hero h1{font-size:clamp(42px,7vw,82px);line-height:.92;letter-spacing:-.07em;margin:22px auto 18px;max-width:930px}.hero p{max-width:760px;margin:0 auto;color:var(--muted);font-size:18px;line-height:1.7}.hero strong{color:var(--text)}
+    .status{display:none;margin:0 auto 24px;max-width:780px;border-radius:18px;padding:14px 16px;border:1px solid var(--line);background:rgba(15,23,42,.72);color:var(--muted)}.status.show{display:block}.status.ok{border-color:rgba(52,211,153,.42);color:var(--green)}.status.err{border-color:rgba(251,113,133,.42);color:var(--danger)}
+    .pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:stretch}.card{position:relative;display:flex;flex-direction:column;min-height:640px;padding:28px;border:1px solid var(--line);border-radius:28px;background:linear-gradient(180deg,rgba(15,23,42,.82),rgba(2,6,23,.92));box-shadow:var(--shadow);overflow:hidden}.card:before{content:"";position:absolute;inset:-1px;border-radius:28px;padding:1px;background:linear-gradient(135deg,transparent,rgba(34,211,238,.36),transparent);mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude;opacity:0;transition:.2s}.card:hover:before,.card.featured:before{opacity:1}.card.featured{transform:translateY(-12px);border-color:rgba(34,211,238,.42);background:linear-gradient(180deg,rgba(8,47,73,.82),rgba(2,6,23,.94))}.badge{position:absolute;right:22px;top:20px;padding:7px 11px;border-radius:999px;background:linear-gradient(135deg,var(--cyan),var(--green));color:#001018;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.tier{color:var(--cyan);font:800 13px/1 JetBrains Mono,monospace;text-transform:uppercase;letter-spacing:.14em}.card h2{font-size:30px;margin:16px 0 10px;letter-spacing:-.04em}.desc{color:var(--muted);line-height:1.6;min-height:78px}.price{display:flex;align-items:flex-end;gap:8px;margin:24px 0}.price strong{font-size:54px;letter-spacing:-.07em}.price span{color:var(--muted);padding-bottom:10px}.quota{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px}.metric{padding:12px;border-radius:16px;background:rgba(255,255,255,.045);border:1px solid var(--line)}.metric b{display:block;font-size:16px}.metric small{color:var(--muted)}ul{list-style:none;display:grid;gap:13px;margin:0 0 26px}li{display:flex;gap:10px;color:#dbeafe;line-height:1.45}li:before{content:"✓";display:grid;place-items:center;flex:0 0 22px;width:22px;height:22px;border-radius:50%;background:rgba(52,211,153,.14);color:var(--green);font-weight:900}.buy{margin-top:auto;border:0;border-radius:16px;padding:15px 18px;font-weight:900;font-size:15px;cursor:pointer;color:#001018;background:linear-gradient(135deg,var(--cyan),var(--green));box-shadow:0 14px 36px rgba(34,211,238,.22);transition:.15s}.buy:hover{transform:translateY(-2px);filter:saturate(1.08)}.buy.secondary{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--line);box-shadow:none}.buy:disabled{opacity:.55;cursor:not-allowed;transform:none}.fine{margin-top:14px;color:var(--muted);font-size:12px;line-height:1.5}.modal{position:fixed;inset:0;z-index:50;display:none;place-items:center;background:rgba(2,6,23,.72);backdrop-filter:blur(10px);padding:20px}.modal.show{display:grid}.modal-card{width:min(520px,100%);border-radius:26px;border:1px solid var(--line);background:var(--panel2);box-shadow:var(--shadow);padding:26px}.modal-head{display:flex;justify-content:space-between;gap:14px;margin-bottom:18px}.modal h3{font-size:24px;letter-spacing:-.04em}.close{border:0;background:rgba(255,255,255,.08);color:var(--muted);width:36px;height:36px;border-radius:12px;cursor:pointer}.field{display:grid;gap:8px;margin:14px 0}.field label{color:var(--muted);font-size:13px;font-weight:700}.field input{width:100%;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.055);color:var(--text);padding:14px 15px;font:500 15px Inter}.field input:focus{outline:none;border-color:var(--cyan)}.modal-actions{display:flex;gap:10px;margin-top:18px}.modal-actions button{flex:1}.ghost{border:1px solid var(--line);border-radius:16px;padding:14px 16px;background:rgba(255,255,255,.055);color:var(--text);font-weight:800;cursor:pointer}.footer-note{margin:34px auto 0;max-width:880px;text-align:center;color:var(--muted);line-height:1.7}.footer-note code{font-family:JetBrains Mono,monospace;color:var(--green)}
+    @media (max-width:980px){.pricing-grid{grid-template-columns:1fr}.card,.card.featured{transform:none;min-height:auto}.desc{min-height:auto}.nav-links{display:none}}@media (max-width:560px){main{padding:48px 0}.card{padding:22px;border-radius:22px}.price strong{font-size:44px}.quota{grid-template-columns:1fr}.modal-actions{flex-direction:column}}
   </style>
 </head>
 <body>
-<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
-<nav class="nav">
-  <a href="/hub.html" class="nav-logo">K Koschei</a>
-  <div class="nav-links">
-    <a href="/hub.html" class="nav-link">Hub</a>
-    <a href="/account.html" class="nav-link">Account</a>
-    <a href="/pricing.html" class="nav-link active">Upgrade</a>
+  <div class="noise"></div>
+  <nav class="nav">
+    <a class="brand" href="/"><span class="brand-mark"></span><span>Koschei Web3 Hub</span></a>
+    <div class="nav-links"><a href="/docs/api">API Docs</a><a href="/agent-api">Agent API</a><a href="/support">Support</a></div>
+  </nav>
+  <main>
+    <section class="hero">
+      <div class="eyebrow">Paddle-powered B2B SaaS</div>
+      <h1>Web3 risk intelligence for DAOs, funds, and enterprise teams.</h1>
+      <p>Subscribe monthly and receive production API access for token scans, DAO proposal risk, MEV protection, liquidity monitoring, smart-money signals, and incident response workflows.</p>
+    </section>
+    <div id="status" class="status" role="status"></div>
+    <section class="pricing-grid" aria-label="Pricing plans">
+      <article class="card">
+        <div class="tier">starter</div>
+        <h2>Starter</h2>
+        <p class="desc">For lean teams validating Web3 security workflows and monitoring early token or treasury activity.</p>
+        <div class="price"><strong>$299</strong><span>/ month</span></div>
+        <div class="quota"><div class="metric"><b>1,000</b><small>monthly API calls</small></div><div class="metric"><b>100/min</b><small>rate limit</small></div></div>
+        <ul>
+          <li>Token risk scans and rug-radar signals</li><li>Wallet score and smart-money snapshots</li><li>Basic DAO proposal risk checks</li><li>Email support and onboarding checklist</li><li>API key generated after Paddle webhook confirmation</li>
+        </ul>
+        <button class="buy secondary" data-tier="starter" data-product="pro_01ktvdfyd63cnr7x1wp7w1dvhb">Satın Al</button>
+        <p class="fine">Best for pilots, partner demos, and small DAO working groups.</p>
+      </article>
+      <article class="card featured">
+        <span class="badge">Popular</span>
+        <div class="tier">professional</div>
+        <h2>Professional</h2>
+        <p class="desc">For funds and security teams that need higher throughput, automated watchlists, and analyst-ready outputs.</p>
+        <div class="price"><strong>$999</strong><span>/ month</span></div>
+        <div class="quota"><div class="metric"><b>10,000</b><small>monthly API calls</small></div><div class="metric"><b>500/min</b><small>rate limit</small></div></div>
+        <ul>
+          <li>Everything in Starter</li><li>MEV shield analysis and protected-send workflows</li><li>Liquidity drain and emergency radar endpoints</li><li>Cross-chain and sybil-risk intelligence modules</li><li>Priority support for production integration</li>
+        </ul>
+        <button class="buy" data-tier="professional" data-product="pri_01ktvhhg4z91j3wjrts1kzswhm">Satın Al</button>
+        <p class="fine">Recommended for live portfolio monitoring and client-facing reports.</p>
+      </article>
+      <article class="card">
+        <div class="tier">enterprise</div>
+        <h2>Enterprise</h2>
+        <p class="desc">For institutions running mission-critical Web3 intelligence, custom quotas, and operational security programs.</p>
+        <div class="price"><strong>$4,999</strong><span>/ month</span></div>
+        <div class="quota"><div class="metric"><b>100,000</b><small>monthly API calls</small></div><div class="metric"><b>2,000/min</b><small>rate limit</small></div></div>
+        <ul>
+          <li>Everything in Professional</li><li>Enterprise DAO guardian and treasury monitoring</li><li>Dedicated integration channel and SLA planning</li><li>Custom intelligence workflows and source connectors</li><li>Security review support for procurement teams</li>
+        </ul>
+        <button class="buy secondary" data-tier="enterprise" data-product="pro_01ktvhmzq5q9gs0h71pzyy97b2">Satın Al</button>
+        <p class="fine">Designed for funds, foundations, and enterprise risk operations.</p>
+      </article>
+    </section>
+    <p class="footer-note">Checkout is processed by Paddle. After a successful subscription webhook, Koschei provisions an API key with plan quotas. Usage is available at <code>GET /api/v1/b2b/usage</code>.</p>
+  </main>
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-head"><div><div class="tier" id="modalTier">Plan</div><h3>Start your subscription</h3></div><button class="close" id="closeModal" aria-label="Close">×</button></div>
+      <div class="field"><label for="email">Work email</label><input id="email" type="email" autocomplete="email" placeholder="ops@dao.example" required></div>
+      <div class="field"><label for="company">DAO / Fund / Company (optional)</label><input id="company" type="text" autocomplete="organization" placeholder="Koschei Capital DAO"></div>
+      <div class="modal-actions"><button class="ghost" id="cancel">Cancel</button><button class="buy" id="checkout">Continue to Paddle</button></div>
+      <p class="fine">By continuing, you will be redirected to Paddle's secure checkout.</p>
+    </div>
   </div>
-</nav>
-<div class="page">
-  <div class="page-title">Buy Credits</div>
-  <div class="page-sub">Free tier lets you explore. Paid packs unlock real scans, AI analysis and intelligence outputs.</div>
-
-  <div class="summary glass" style="padding:14px 20px;border-radius:12px;">
-    <span>Email: <strong id="memberEmail">Loading…</strong></span>
-    <span>Credits remaining: <strong id="outputsRemaining">—</strong></span>
-  </div>
-
-  <div class="alert" id="pageMessage"></div>
-
-  <section class="grid-3">
-    <article class="glass pack-card">
-      <div class="pack-name">Starter Pack</div>
-      <div class="pack-price">899 ₺</div>
-      <div class="pack-output">+25 credits</div>
-      <div class="pack-per">~36 ₺ per credit</div>
-      <div class="pack-actions">
-        <a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465449" target="_blank" rel="noopener noreferrer">Buy on Shopier</a>
-        <button class="btn btn-ghost" type="button" onclick="openPaymentForm('starter')">Report payment</button>
-      </div>
-    </article>
-
-    <article class="glass pack-card featured">
-      <div class="featured-badge">BEST VALUE</div>
-      <div class="pack-name">Builder Pack</div>
-      <div class="pack-price">2299 ₺</div>
-      <div class="pack-output">+100 credits</div>
-      <div class="pack-per">~23 ₺ per credit</div>
-      <div class="pack-actions">
-        <a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465484" target="_blank" rel="noopener noreferrer">Buy on Shopier</a>
-        <button class="btn btn-ghost" type="button" onclick="openPaymentForm('builder')">Report payment</button>
-      </div>
-    </article>
-
-    <article class="glass pack-card">
-      <div class="pack-name">Studio Pack</div>
-      <div class="pack-price">4999 ₺</div>
-      <div class="pack-output">+300 credits</div>
-      <div class="pack-per">~17 ₺ per credit</div>
-      <div class="pack-actions">
-        <a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465499" target="_blank" rel="noopener noreferrer">Buy on Shopier</a>
-        <button class="btn btn-ghost" type="button" onclick="openPaymentForm('studio')">Report payment</button>
-      </div>
-    </article>
-  </section>
-
-  <section class="glass payment-form" id="paymentFormWrap">
-    <h2 style="margin:0 0 16px;font-size:16px;font-weight:700;">Report Shopier Payment</h2>
-    <form id="paymentForm" style="display:flex;flex-direction:column;gap:14px">
-      <div class="form-group">
-        <label class="form-label" for="fullName">Full name</label>
-        <input class="form-input" id="fullName" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="email">Email</label>
-        <input class="form-input" id="email" type="email" readonly>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="productID">Pack</label>
-        <select class="form-input" id="productID">
-          <option value="starter">Starter — 899 ₺ (+25 credits)</option>
-          <option value="builder">Builder — 2299 ₺ (+100 credits)</option>
-          <option value="studio">Studio — 4999 ₺ (+300 credits)</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="paymentReference">Payment reference (optional)</label>
-        <input class="form-input" id="paymentReference" placeholder="Shopier order number">
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="note">Note (optional)</label>
-        <textarea class="form-input" id="note" placeholder="Anything else we should know?"></textarea>
-      </div>
-      <button class="btn btn-primary" id="submitPayment" type="submit">Send Payment Request</button>
-    </form>
-  </section>
-
-  <div class="info-note">
-    Payments are reviewed manually and credits are added within 24 hours.<br>
-    Need help? <a href="/support.html" style="color:var(--accent);">Contact support</a>
-  </div>
-</div>
-
-<script src="/js/koschei-auth.js?v=5"></script>
-<script src="/js/koschei-analytics.js?v=1"></script>
-<script>
-  const message = document.getElementById('pageMessage');
-  function showMessage(text, kind) { message.textContent = text; message.className = `alert alert-${kind} show`; }
-  function openPaymentForm(productID) {
-    document.getElementById('productID').value = productID;
-    document.getElementById('paymentFormWrap').classList.add('show');
-    document.getElementById('paymentFormWrap').scrollIntoView({behavior:'smooth'});
-    document.getElementById('fullName').focus();
-  }
-  (async () => {
-    await KoscheiAuth.init();
-    if (!KoscheiAuth.requireAuth()) return;
-    if (window.KoscheiAnalytics) KoscheiAnalytics.track('pricing_view');
-    const email = KoscheiAuth.getEmail() || '';
-    document.getElementById('memberEmail').textContent = email;
-    document.getElementById('email').value = email;
-    try {
-      const res = await KoscheiAuth.apiCall('/api/member/summary');
-      if (!res || !res.ok) throw new Error('Member summary unavailable');
-      const data = await res.json();
-      document.getElementById('memberEmail').textContent = data.email || email;
-      document.getElementById('email').value = data.email || email;
-      document.getElementById('outputsRemaining').textContent = data.outputs_remaining ?? data.credits ?? 0;
-    } catch { showMessage('Could not load member details. Please try again.', 'error'); }
-  })();
-  document.getElementById('paymentForm').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const button = document.getElementById('submitPayment');
-    button.disabled = true;
-    button.innerHTML = '<span class="spinner"></span>';
-    try {
-      const res = await KoscheiAuth.apiCall('/api/payments/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          full_name: document.getElementById('fullName').value,
-          product_id: document.getElementById('productID').value,
-          payment_reference: document.getElementById('paymentReference').value,
-          note: document.getElementById('note').value
-        })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not send payment request');
-      showMessage(data.message || 'Payment request received. Admin review required (within 24h).', 'success');
-      document.getElementById('paymentForm').reset();
-      document.getElementById('email').value = KoscheiAuth.getEmail() || '';
-    } catch (error) {
-      showMessage(error.message, 'error');
-    } finally {
-      button.disabled = false;
-      button.textContent = 'Send Payment Request';
-    }
-  });
-</script>
+  <script>
+    const statusEl = document.getElementById('status');
+    const modal = document.getElementById('modal');
+    const modalTier = document.getElementById('modalTier');
+    const emailInput = document.getElementById('email');
+    const checkoutBtn = document.getElementById('checkout');
+    let selected = null;
+    function showStatus(message, type='') { statusEl.textContent = message; statusEl.className = 'status show ' + type; }
+    function openModal(plan) { selected = plan; modalTier.textContent = plan.tier; modal.classList.add('show'); modal.setAttribute('aria-hidden','false'); setTimeout(()=>emailInput.focus(), 50); }
+    function closeModal() { modal.classList.remove('show'); modal.setAttribute('aria-hidden','true'); checkoutBtn.disabled = false; checkoutBtn.textContent = 'Continue to Paddle'; }
+    document.querySelectorAll('.buy[data-tier]').forEach(btn => btn.addEventListener('click', () => openModal({tier: btn.dataset.tier, product_id: btn.dataset.product})));
+    document.getElementById('closeModal').addEventListener('click', closeModal); document.getElementById('cancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', (event) => { if (event.target === modal) closeModal(); });
+    checkoutBtn.addEventListener('click', async () => {
+      if (!selected) return;
+      const email = emailInput.value.trim();
+      if (!email || !email.includes('@')) { showStatus('Please enter a valid work email before opening checkout.', 'err'); return; }
+      checkoutBtn.disabled = true; checkoutBtn.textContent = 'Creating checkout…';
+      try {
+        const res = await fetch('/api/v1/b2b/checkout', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({customer_email: email, plan_tier: selected.tier, product_id: selected.product_id})});
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.checkout_url) throw new Error(data.message || data.error || 'Checkout could not be created.');
+        showStatus('Redirecting to Paddle secure checkout…', 'ok');
+        window.location.assign(data.checkout_url);
+      } catch (err) {
+        showStatus(err.message || 'Checkout failed. Please contact support.', 'err');
+        checkoutBtn.disabled = false; checkoutBtn.textContent = 'Continue to Paddle';
+      }
+    });
+  </script>
 </body>
 </html>
