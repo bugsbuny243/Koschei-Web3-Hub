@@ -19,7 +19,7 @@ func (h *Handler) SmartMoneyStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintf(w, "event: smart-money\ndata: {\"type\":\"whale_cluster_snapshot\",\"wallet\":\"demo\",\"net_flow_usd\":1250000,\"confidence\":0.82,\"b2b_ready\":true,\"ts\":\"%s\"}\n\n", time.Now().UTC().Format(time.RFC3339))
+	_, _ = fmt.Fprintf(w, "event: smart-money\ndata: {\"type\":\"whale_cluster_snapshot\",\"wallet\":\"unavailable\",\"net_flow_usd\":0,\"confidence\":0,\"b2b_ready\":true,\"ts\":\"%s\"}\n\n", time.Now().UTC().Format(time.RFC3339))
 	if f, ok := w.(http.Flusher); ok {
 		f.Flush()
 	}
