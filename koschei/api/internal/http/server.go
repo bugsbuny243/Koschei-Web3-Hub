@@ -212,33 +212,41 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					}
 				}
 				cleanRoutes := map[string]string{
-					"/hub":               "/hub.html",
-					"/login":             "/login.html",
-					"/register":          "/register.html",
-					"/metadata":          "/metadata.html",
-					"/risk":              "/risk.html",
-					"/chains":            "/chains.html",
-					"/watchlist":         "/watchlist.html",
 					"/account":           "/account.html",
-					"/pricing":           "/pricing.html",
-					"/support":           "/support.html",
-					"/owner":             "/owner.html",
+					"/agent-api":         "/agent-api.html",
+					"/airdrop-checker":   "/airdrop-checker.html",
+					"/chains":            "/chains.html",
+					"/cross-chain-risk":  "/cross-chain-risk.html",
 					"/dashboard":         "/dashboard.html",
-					"/impact":            "/impact.html",
 					"/docs":              "/docs.html",
 					"/docs/api":          "/docs-api.html",
 					"/docs/sdk":          "/docs-sdk.html",
-					"/graph":             "/graph.html",
-					"/risk-v2":           "/risk-v2.html",
-					"/tx-decoder-pro":    "/tx-decoder-pro.html",
-					"/cross-chain-risk":  "/cross-chain-risk.html",
-					"/sybil-check":       "/sybil-check.html",
 					"/funding-assistant": "/funding-assistant.html",
-					"/project-radar":     "/project-radar.html",
-					"/agent-api":         "/agent-api.html",
-					"/pay-per-tool":      "/pay-per-tool.html",
+					"/graph":             "/graph.html",
+					"/hub":               "/hub.html",
+					"/impact":            "/impact.html",
+					"/launches":          "/launches.html",
+					"/login":             "/login.html",
+					"/metadata":          "/metadata.html",
 					"/mev-shield":        "/mev-shield.html",
+					"/owner":             "/owner.html",
+					"/pay-per-tool":      "/pay-per-tool.html",
+					"/portfolio":         "/portfolio.html",
+					"/pricing":           "/pricing.html",
+					"/program-scanner":   "/program-scanner.html",
+					"/project-radar":     "/project-radar.html",
 					"/radar":             "/radar.html",
+					"/register":          "/register.html",
+					"/risk":              "/risk-v2.html",
+					"/risk-v2":           "/risk-v2.html",
+					"/smart-money":       "/smart-money.html",
+					"/support":           "/support.html",
+					"/sybil-check":       "/sybil-check.html",
+					"/token-scanner":     "/token-scanner.html",
+					"/tx-decoder":        "/tx-decoder-pro.html",
+					"/tx-decoder-pro":    "/tx-decoder-pro.html",
+					"/wallet-score":      "/wallet-score.html",
+					"/watchlist":         "/watchlist.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())
@@ -347,10 +355,7 @@ func contentSecurityPolicy() string {
 }
 
 func publicNeonAuthOrigin() string {
-	raw := strings.TrimSpace(os.Getenv("EXPO_PUBLIC_NEON_AUTH_URL"))
-	if raw == "" {
-		raw = strings.TrimSpace(os.Getenv("NEON_AUTH_BASE_URL"))
-	}
+	raw := strings.TrimSpace(handlers.ConfiguredPublicNeonAuthURL())
 	if raw == "" {
 		return ""
 	}

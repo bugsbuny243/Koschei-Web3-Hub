@@ -30,7 +30,7 @@ func (h *Handler) NeonRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) redirectToNeonAuth(w http.ResponseWriter, r *http.Request, action string) {
-	baseURL := strings.TrimRight(os.Getenv("NEON_AUTH_BASE_URL"), "/")
+	baseURL := strings.TrimRight(configuredNeonAuthBaseURL(), "/")
 	if baseURL == "" {
 		http.Error(w, "NEON_AUTH_BASE_URL is not configured", http.StatusInternalServerError)
 		return
