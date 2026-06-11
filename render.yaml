@@ -2,12 +2,9 @@ services:
   - type: web
     name: koschei-web3-hub
     env: go
-    rootDir: .
-    buildCommand: |
-      cd koschei/api
-      go mod vendor
-      go build -mod=vendor -o ../../app .
+    rootDir: koschei/api
+    buildCommand: go build -o app .
     startCommand: ./app
     envVars:
       - key: STATIC_DIR
-        value: koschei/api/public
+        value: public
