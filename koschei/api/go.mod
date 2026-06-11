@@ -1,4 +1,4 @@
-module koschei/web3hub
+module koschei/api
 
 go 1.26
 

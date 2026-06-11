@@ -10,10 +10,35 @@ import (
 	"path/filepath"
 	"strings"
 
+	"koschei/api/internal/cache"
 	"koschei/api/internal/handlers"
+	"koschei/api/internal/jobs"
+	"koschei/api/internal/web3"
 )
 
-func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string) http.Handler {
+type serverConfig struct {
+	dbRead    *sql.DB
+	cache     cache.Cache
+	solanaRPC *web3.SolanaRPC
+	jobStore  *jobs.Store
+	jobQueue  jobs.Queue
+}
+
+type Option func(*serverConfig)
+
+func WithReadDB(db *sql.DB) Option { return func(c *serverConfig) { c.dbRead = db } }
+func WithCache(cache cache.Cache) Option {
+	return func(c *serverConfig) {
+		if cache != nil {
+			c.cache = cache
+		}
+	}
+}
+func WithSolanaRPC(rpc *web3.SolanaRPC) Option { return func(c *serverConfig) { c.solanaRPC = rpc } }
+func WithJobStore(store *jobs.Store) Option    { return func(c *serverConfig) { c.jobStore = store } }
+func WithJobQueue(queue jobs.Queue) Option     { return func(c *serverConfig) { c.jobQueue = queue } }
+
+func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string, opts ...Option) http.Handler {
 	if os.Getenv("APP_ENV") == "production" {
 		if strings.TrimSpace(handlers.ConfiguredNeonAuthJWKSURL()) == "" {
 			log.Print("CRITICAL: NEON_AUTH_JWKS_URL must be set in production")
@@ -22,7 +47,17 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 			log.Print("CRITICAL: NEON_AUTH_ISSUER should be set in production")
 		}
 	}
-	h := &handlers.Handler{DB: db, DBInitError: dbInitError, AdminPassword: adminPassword, Limiter: handlers.NewLimiter()}
+	cfg := serverConfig{cache: cache.NewNoop()}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	if cfg.dbRead == nil {
+		cfg.dbRead = db
+	}
+	if cfg.solanaRPC == nil {
+		cfg.solanaRPC = web3.NewSolanaRPC(cfg.cache)
+	}
+	h := &handlers.Handler{DB: db, DBRead: cfg.dbRead, DBInitError: dbInitError, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), Cache: cfg.cache, SolanaRPC: cfg.solanaRPC, JobStore: cfg.jobStore, JobQueue: cfg.jobQueue}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", h.Health)
 	mux.HandleFunc("/api/config", method("GET", h.Config))
@@ -112,6 +147,10 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/wallet/score", requiresDB(h, handlers.RequireAuth(method("POST", h.WalletScore))))
 	mux.HandleFunc("/api/token/scan", requiresDB(h, handlers.RequireAuth(method("POST", h.TokenScan))))
 	mux.HandleFunc("/api/tx/decode", requiresDB(h, handlers.RequireAuth(method("POST", h.TXDecode))))
+	mux.HandleFunc("/api/jobs/token-scan", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateWeb3Job))))
+	mux.HandleFunc("/api/jobs/wallet-score", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateWeb3Job))))
+	mux.HandleFunc("/api/jobs/tx-decode", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateWeb3Job))))
+	mux.HandleFunc("/api/jobs/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetWeb3Job))))
 	mux.HandleFunc("/api/portfolio/track", requiresDB(h, handlers.RequireAuth(method("POST", h.PortfolioTrack))))
 	mux.HandleFunc("/api/smart-money", requiresDB(h, handlers.RequireAuth(method("GET", h.SmartMoney))))
 	mux.HandleFunc("/api/airdrop/check", requiresDB(h, handlers.RequireAuth(method("POST", h.AirdropCheck))))

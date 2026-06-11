@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -77,7 +78,7 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 			Decimals int    `json:"decimals"`
 		} `json:"value"`
 	}
-	if err := callSolanaRPC(client, rpcURL, "getTokenSupply", []interface{}{mint}, &supply); err != nil {
+	if err := h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getTokenSupply", []interface{}{mint}, &supply); err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "token mint not found or RPC request failed"})
 		return
 	}
@@ -94,14 +95,14 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 			} `json:"data"`
 		} `json:"value"`
 	}
-	_ = callSolanaRPC(client, rpcURL, "getAccountInfo", []interface{}{mint, map[string]string{"encoding": "jsonParsed"}}, &account)
+	_ = h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getAccountInfo", []interface{}{mint, map[string]string{"encoding": "jsonParsed"}}, &account)
 
 	var largest struct {
 		Value []struct {
 			Amount string `json:"amount"`
 		} `json:"value"`
 	}
-	_ = callSolanaRPC(client, rpcURL, "getTokenLargestAccounts", []interface{}{mint}, &largest)
+	_ = h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getTokenLargestAccounts", []interface{}{mint}, &largest)
 
 	total, _ := strconv.ParseFloat(supply.Value.Amount, 64)
 	topOne, topTen := 0.0, 0.0
@@ -163,6 +164,13 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, tokenScanResponse{Mint: mint, Network: req.Network, Score: score, RiskLevel: risk, Supply: supply.Value.Amount, Decimals: supply.Value.Decimals, MintAuthority: mintAuthority, FreezeAuthority: freezeAuthority, LargestHolderPercent: roundPercent(topOne), TopTenPercent: roundPercent(topTen), Findings: findings, Disclaimer: "Preliminary on-chain signals only; this is not a security audit or financial advice."})
+}
+
+func (h *Handler) callSolanaRPC(ctx context.Context, client *http.Client, rpcURL, network, method string, params interface{}, target interface{}) error {
+	if h != nil && h.SolanaRPC != nil {
+		return h.SolanaRPC.Call(ctx, network, method, params, target, 0)
+	}
+	return callSolanaRPC(client, rpcURL, method, params, target)
 }
 
 func callSolanaRPC(client *http.Client, rpcURL, method string, params interface{}, target interface{}) error {

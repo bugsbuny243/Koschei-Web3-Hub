@@ -7,9 +7,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"koschei/api/internal/cache"
 	"koschei/api/internal/db"
 	"koschei/api/internal/handlers"
 	apihttp "koschei/api/internal/http"
+	"koschei/api/internal/jobs"
+	"koschei/api/internal/web3"
 )
 
 func main() {
@@ -18,6 +21,7 @@ func main() {
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	var conn *sql.DB
+	var readConn *sql.DB
 	var dbInitError string
 
 	if databaseURL == "" {
@@ -36,6 +40,30 @@ func main() {
 	if conn != nil {
 		defer conn.Close()
 	}
+	readURL := os.Getenv("DATABASE_READ_URL")
+	if readURL != "" && readURL != databaseURL {
+		var err error
+		readConn, err = db.ConnectReplica(readURL)
+		if err != nil {
+			log.Printf("database read replica unavailable, falling back to primary: %v", err)
+			readConn = conn
+		} else {
+			defer readConn.Close()
+			log.Printf("database read replica connected")
+		}
+	} else {
+		readConn = conn
+	}
+
+	appCache := buildCache()
+	defer appCache.Close()
+	solanaRPC := web3.NewSolanaRPC(appCache)
+	jobStore := jobs.NewStore(conn)
+	jobQueue := jobs.Queue(jobs.NoopQueue{})
+	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
+		jobQueue = jobs.NewNATSQueue(natsURL, os.Getenv("NATS_SUBJECT_PREFIX"))
+	}
+	defer jobQueue.Close()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -46,7 +74,7 @@ func main() {
 	}
 	staticDir := resolveStaticDir(os.Getenv("STATIC_DIR"))
 	log.Printf("static public path: %s", staticDir)
-	srv := apihttp.NewServer(conn, dbInitError, os.Getenv("ADMIN_PASSWORD"), os.Getenv("CORS_ALLOWED_ORIGIN"), staticDir)
+	srv := apihttp.NewServer(conn, dbInitError, os.Getenv("ADMIN_PASSWORD"), os.Getenv("CORS_ALLOWED_ORIGIN"), staticDir, apihttp.WithReadDB(readConn), apihttp.WithCache(appCache), apihttp.WithSolanaRPC(solanaRPC), apihttp.WithJobStore(jobStore), apihttp.WithJobQueue(jobQueue))
 	log.Printf("api listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, srv); err != nil {
 		log.Fatal(err)
@@ -67,4 +95,20 @@ func resolveStaticDir(configured string) string {
 		}
 	}
 	return filepath.Join("koschei", "api", "public")
+}
+
+func buildCache() cache.Cache {
+	if os.Getenv("CACHE_ENABLED") == "false" {
+		return cache.NewNoop()
+	}
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		return cache.NewMemory()
+	}
+	redisCache, err := cache.NewRedis(redisURL, os.Getenv("REDIS_TLS") == "true")
+	if err != nil {
+		log.Printf("redis cache unavailable, using in-memory cache: %v", err)
+		return cache.NewMemory()
+	}
+	return redisCache
 }
