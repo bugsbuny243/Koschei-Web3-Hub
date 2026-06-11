@@ -78,10 +78,28 @@ func (h *Handler) emailPasswordAuth(w http.ResponseWriter, r *http.Request, neon
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_token"})
 		return
 	}
-	profile := map[string]any{"auth_subject": claims.Sub, "email": claims.Email, "role": "member", "plan_id": "free", "credits": 0}
+	profile := map[string]any{"auth_subject": claims.Sub, "email": claims.Email, "role": "member", "plan_id": "free", "plan": "free", "credits": 0, "outputs_total": 0, "outputs_remaining": 0}
 	if h.DB != nil {
-		if p, err := h.upsertProfile(r.Context(), claims.Sub, claims.Email); err == nil {
-			profile = map[string]any{"id": p.ID, "auth_subject": p.AuthSubject, "email": p.Email, "role": firstNonEmpty(p.Role, "member"), "plan_id": firstNonEmpty(p.PlanID, "free"), "credits": p.Credits}
+		summary, err := h.provisionMember(r.Context(), claims)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_provision_failed"})
+			return
+		}
+		p, err := h.upsertProfile(r.Context(), claims.Sub, claims.Email)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_provision_failed"})
+			return
+		}
+		profile = map[string]any{
+			"id":                p.ID,
+			"auth_subject":      p.AuthSubject,
+			"email":             p.Email,
+			"role":              firstNonEmpty(p.Role, "member"),
+			"plan_id":           firstNonEmpty(summary.Plan, p.PlanID, "free"),
+			"plan":              firstNonEmpty(summary.Plan, p.PlanID, "free"),
+			"credits":           p.Credits,
+			"outputs_total":     summary.OutputsTotal,
+			"outputs_remaining": summary.OutputsRemaining,
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "token": jwt, "access_token": jwt, "token_type": "Bearer", "user": profile})
@@ -119,14 +137,29 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-	profile := map[string]any{"auth_subject": claims.Sub, "email": claims.Email, "role": "member", "plan_id": "free", "credits": 0}
+	profile := map[string]any{"auth_subject": claims.Sub, "email": claims.Email, "role": "member", "plan_id": "free", "plan": "free", "credits": 0, "outputs_total": 0, "outputs_remaining": 0}
 	if h.DB != nil {
+		summary, err := h.provisionMember(r.Context(), claims)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_unavailable"})
+			return
+		}
 		p, err := h.upsertProfile(r.Context(), claims.Sub, claims.Email)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_unavailable"})
 			return
 		}
-		profile = map[string]any{"id": p.ID, "auth_subject": p.AuthSubject, "email": p.Email, "role": firstNonEmpty(p.Role, "member"), "plan_id": firstNonEmpty(p.PlanID, "free"), "credits": p.Credits}
+		profile = map[string]any{
+			"id":                p.ID,
+			"auth_subject":      p.AuthSubject,
+			"email":             p.Email,
+			"role":              firstNonEmpty(p.Role, "member"),
+			"plan_id":           firstNonEmpty(summary.Plan, p.PlanID, "free"),
+			"plan":              firstNonEmpty(summary.Plan, p.PlanID, "free"),
+			"credits":           p.Credits,
+			"outputs_total":     summary.OutputsTotal,
+			"outputs_remaining": summary.OutputsRemaining,
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "user": profile})
 }

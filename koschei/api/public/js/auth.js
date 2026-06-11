@@ -1,8 +1,16 @@
 (function () {
   'use strict';
 
-  const TOKEN_KEY = 'koschei_token';
-  const LEGACY_TOKEN_KEY = 'koschei_jwt';
+  const TOKEN_KEY = 'koschei_jwt';
+  const LEGACY_TOKEN_KEY = 'koschei_token';
+
+  function safeLocalStorage(action, fallback = '') {
+    try {
+      return action(window.localStorage);
+    } catch {
+      return fallback;
+    }
+  }
 
   function isJWT(value) {
     return typeof value === 'string' && value.split('.').length === 3;
@@ -10,17 +18,27 @@
 
   function saveToken(token) {
     if (!token) return;
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(LEGACY_TOKEN_KEY, token);
+    safeLocalStorage((storage) => {
+      storage.setItem(TOKEN_KEY, token);
+      // Keep the retired key in sync so older pages can read sessions created by auth.js.
+      storage.setItem(LEGACY_TOKEN_KEY, token);
+    });
   }
 
   function getToken() {
-    return localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY) || '';
+    return safeLocalStorage((storage) => storage.getItem(TOKEN_KEY) || storage.getItem(LEGACY_TOKEN_KEY) || '', '');
+  }
+
+  function getAuthHeader() {
+    const token = getToken();
+    return token ? 'Bearer ' + token : '';
   }
 
   function clearToken() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(LEGACY_TOKEN_KEY);
+    safeLocalStorage((storage) => {
+      storage.removeItem(TOKEN_KEY);
+      storage.removeItem(LEGACY_TOKEN_KEY);
+    });
   }
 
   function extractToken(payload) {
@@ -78,11 +96,6 @@
 
   async function register(email, password, name) {
     return authRequest('/api/auth/register', { email, password, name });
-  }
-
-  function getAuthHeader() {
-    const token = getToken();
-    return token ? `Bearer ${token}` : '';
   }
 
   async function checkAuth(options = {}) {

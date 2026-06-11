@@ -39,12 +39,9 @@ func WithJobStore(store *jobs.Store) Option    { return func(c *serverConfig) { 
 func WithJobQueue(queue jobs.Queue) Option     { return func(c *serverConfig) { c.jobQueue = queue } }
 
 func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string, opts ...Option) http.Handler {
-	if os.Getenv("APP_ENV") == "production" {
-		if strings.TrimSpace(handlers.ConfiguredNeonAuthJWKSURL()) == "" {
-			log.Print("CRITICAL: NEON_AUTH_JWKS_URL must be set in production")
-		}
-		if strings.TrimSpace(handlers.ConfiguredNeonAuthIssuer()) == "" {
-			log.Print("CRITICAL: NEON_AUTH_ISSUER should be set in production")
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
+		if missing := handlers.MissingProductionAuthEnv(); len(missing) > 0 {
+			log.Fatalf("CRITICAL: missing required production auth env vars: %s", strings.Join(missing, ", "))
 		}
 	}
 	cfg := serverConfig{cache: cache.NewNoop()}
