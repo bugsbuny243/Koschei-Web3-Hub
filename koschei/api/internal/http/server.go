@@ -186,6 +186,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 		} else {
 			static := http.FileServer(http.Dir(staticDir))
 			indexPath := filepath.Join(staticDir, "index.html")
+			cleanRoutes := publicCleanRoutes(staticDir)
 			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 				if strings.HasPrefix(r.URL.Path, "/api/") || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
 					http.NotFound(w, r)
@@ -199,43 +200,6 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					if !h.OwnerAuth(w, r) {
 						return
 					}
-				}
-				cleanRoutes := map[string]string{
-					"/account":           "/account.html",
-					"/agent-api":         "/agent-api.html",
-					"/airdrop-checker":   "/airdrop-checker.html",
-					"/chains":            "/chains.html",
-					"/cross-chain-risk":  "/cross-chain-risk.html",
-					"/dashboard":         "/dashboard.html",
-					"/docs":              "/docs.html",
-					"/docs/api":          "/docs-api.html",
-					"/docs/sdk":          "/docs-sdk.html",
-					"/funding-assistant": "/funding-assistant.html",
-					"/graph":             "/graph.html",
-					"/hub":               "/hub.html",
-					"/impact":            "/impact.html",
-					"/launches":          "/launches.html",
-					"/login":             "/login.html",
-					"/metadata":          "/metadata.html",
-					"/mev-shield":        "/mev-shield.html",
-					"/owner":             "/owner.html",
-					"/pay-per-tool":      "/pay-per-tool.html",
-					"/portfolio":         "/portfolio.html",
-					"/pricing":           "/pricing.html",
-					"/program-scanner":   "/program-scanner.html",
-					"/project-radar":     "/project-radar.html",
-					"/radar":             "/radar.html",
-					"/register":          "/register.html",
-					"/risk":              "/risk-v2.html",
-					"/risk-v2":           "/risk-v2.html",
-					"/smart-money":       "/smart-money.html",
-					"/support":           "/support.html",
-					"/sybil-check":       "/sybil-check.html",
-					"/token-scanner":     "/token-scanner.html",
-					"/tx-decoder":        "/tx-decoder-pro.html",
-					"/tx-decoder-pro":    "/tx-decoder-pro.html",
-					"/wallet-score":      "/wallet-score.html",
-					"/watchlist":         "/watchlist.html",
 				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())
@@ -256,6 +220,32 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 const adsTXTBody = "google.com, pub-6081394144742471, DIRECT, f08c47fec0942fa0"
 
 const robotsTXTBody = "User-agent: *\nAllow: /\n\nSitemap: https://tradepigloball.co/sitemap.xml"
+
+func publicCleanRoutes(staticDir string) map[string]string {
+	routes := map[string]string{
+		"/docs/api":   "/docs-api.html",
+		"/docs/sdk":   "/docs-sdk.html",
+		"/risk":       "/risk-v2.html",
+		"/tx-decoder": "/tx-decoder-pro.html",
+	}
+
+	entries, err := os.ReadDir(staticDir)
+	if err != nil {
+		return routes
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".html") || name == "index.html" {
+			continue
+		}
+		slug := strings.TrimSuffix(name, ".html")
+		routes["/"+slug] = "/" + name
+	}
+	return routes
+}
 
 func adsTXT(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
