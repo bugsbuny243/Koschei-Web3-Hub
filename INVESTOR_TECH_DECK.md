@@ -280,3 +280,49 @@ Her modül bağımsız PR olacaktır. Her PR açıklamasında Türkçe olarak ş
 Koschei için önerilen altı modül, tek tek özellik değil, birbirini besleyen bir “Web3 Risk Operating System” katmanıdır. MEV Shield ve Liquidity Drain sistemi kullanıcıyı doğrudan korur; Smart Money Oracle ve DAO Guardian ödeme gücü yüksek B2B müşteriler yaratır; AI Exploit Simulator ve PoR / Bridge Monitor ise Koschei'yi derin teknoloji ve şeffaflık oracle'ı olarak konumlandırır.
 
 Bu strateji, grant komitelerine ölçülebilir kamu yararı; VC'lere yüksek marjlı enterprise gelir; kurumsal müşterilere ise para kaybını önleyen, riski azaltan ve karar hızını artıran teknik altyapı sunar.
+
+---
+
+## Sayfa 6 — Faz 1 Teknik Temel Güncellemesi (Owner Merkezi + 6 Enterprise Modül)
+
+### Owner Kontrol Merkezi
+
+Yeni gizli Owner paneli tamamen Türkçe olarak tasarlandı. Panel repoda takip edilmez; `.gitignore` kuralı ile `koschei/api/public/owner.html` gizli kalır. Giriş akışı `OWNER_WALLET` + `OWNER_SECRET` doğrular, backend HTTP-only cookie setler ve frontend tüm `/api/owner/*` çağrılarında `X-Koschei-Secret` header'ını otomatik ekler.
+
+Operasyonel ekranlar:
+
+- Kullanıcı Yönetimi: cüzdan, kayıt tarihi, kredi, aktif/banned/kaldırıldı durumu.
+- Shopier Onay Masası: ödeme ID, kullanıcı, paket, tutar, tarih, onay/red.
+- AI Komut Terminali: branch oluşturma, kod yazma, test, commit ve PR log sözleşmesi.
+- Gerçek Zamanlı Dashboard: aktif kullanıcı, günlük TRY gelir, kurtarılan USD, bekleyen PR.
+- Hibe Takipçisi: Solana Foundation, Ethereum Grants ve Phase-2 güvenlik hibeleri.
+- DAO Guardian: hazine riski, proposal kaybı ve bekleyen inceleme kartları.
+
+### Enterprise modül değerleme ve gelir modeli
+
+| Modül | İlk teknik temel | Ölçülebilir değer | B2B paket | Aylık hedef fiyat |
+|---|---|---:|---|---:|
+| MEV Shield & Sandwich Attack Predictor | `/api/v1/mev/analyze`, `mev_protection_events`, TX Decoder uyarı payload'ı | `mev_saved_usd`, `estimated_loss_usd`, `protected_swap_count` | Wallet, DEX ve trading bot API | 2.500-15.000 USD |
+| Institutional Smart Money Oracle | `/ws/smart-money`, REST snapshot, `whale_clusters`, `cex_flows` | `net_flow_usd`, `cluster_confidence`, `active_institutional_accounts` | Fon/market-maker WebSocket aboneliği | 5.000-25.000 USD |
+| Real-Time Liquidity Drain Radar | `/api/v1/liquidity/analyze`, `liquidity_drain_alerts` | `liquidity_loss_prevented_usd`, `alerts_delivered_before_loss` | Launchpad, DEX ve risk desk webhook'u | 3.000-20.000 USD |
+| DAO Treasury Guardian | `/api/v1/dao/proposal-risk`, `dao_treasuries`, `proposal_risks`, owner DAO sekmesi | `treasury_at_risk_usd`, `proposal_loss_prevented_usd` | DAO ve multisig yıllık lisans | 4.000-30.000 USD |
+| AI Exploit Simulator | Phase-2 DB şeması: `exploit_simulation_runs`, `exploit_findings` | `critical_findings_pre_launch`, `estimated_exploit_loss_prevented_usd` | Protokol audit ön-tarama | 8.000-40.000 USD |
+| Bridge/PoR Monitor | Phase-2 DB şeması: `bridge_risk_events`, `por_monitor_snapshots` | `bridge_outflow_anomaly_usd`, `reserve_ratio_delta` | Fon/CEX risk feed | 6.000-35.000 USD |
+
+### Ekosistem etkisi varsayımları
+
+- MEV Shield ile yüksek slippage ve düşük likidite swap'larında yıllık 500M USD'ye kadar kullanıcı kaybı önlenebilir; Koschei bunu `mev_saved_usd` ve `estimated_loss_usd` üzerinden raporlar.
+- Liquidity Drain Radar ilk blokta alarm verirse launchpad/DEX kullanıcıları için rug-pull etkisinin %20-40'ı azaltılabilir; metrik `liquidity_loss_prevented_usd` olarak izlenir.
+- DAO Treasury Guardian, proposal simülasyonu ile hazine çıkışlarını oylama öncesi görünür kılar; 10 DAO müşteride 100M+ USD izlenen hazine hedeflenir.
+- Smart Money Oracle, kurumsal abonelik tarafında en hızlı nakit akışı üretecek modüldür; WebSocket ve snapshot API aynı veri sözleşmesine bağlanmıştır.
+- AI Exploit Simulator ve Bridge/PoR Monitor şimdilik DB temeliyle hazırlanmıştır; Phase-2'de worker, raporlayıcı ve oracle katmanları eklenecektir.
+
+### İlk 12 ay gelir senaryosu
+
+| Senaryo | Kurumsal müşteri | Ortalama MRR | Yıllık gelir |
+|---|---:|---:|---:|
+| Muhafazakâr | 8 | 4.000 USD | 384.000 USD |
+| Baz | 25 | 7.500 USD | 2.250.000 USD |
+| Agresif | 60 | 10.000 USD | 7.200.000 USD |
+
+Baz senaryo; 10 fon/market-maker Smart Money aboneliği, 6 DAO Guardian lisansı, 5 MEV Shield entegrasyonu ve 4 Liquidity Radar webhook müşterisi varsayar. Bu dağılım 6M USD enterprise modül hedefi için doğrudan yatırım anlatısı sağlar.

@@ -4,21 +4,28 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"net/http"
-	"os"
 	"strings"
 
 	"koschei/api/pkg/utils"
 )
 
 func (h *Handler) ownerAuth(w http.ResponseWriter, r *http.Request) bool {
-	ownerWallet := normalizeWallet(os.Getenv("OWNER_WALLET"))
-	ownerSecret := strings.TrimSpace(os.Getenv("OWNER_SECRET"))
+	ownerWallet := normalizeWallet(firstEnv("OWNER_WALLET", "KOSCHEI_OWNER_WALLET"))
+	ownerSecret := strings.TrimSpace(firstEnv("OWNER_SECRET", "KOSCHEI_OWNER_SECRET"))
 	if ownerWallet == "" || ownerSecret == "" {
 		http.NotFound(w, r)
 		return false
 	}
 
-	suppliedSecret := strings.TrimSpace(r.Header.Get("x-owner-secret"))
+	suppliedSecret := strings.TrimSpace(r.Header.Get("x-koschei-secret"))
+	if suppliedSecret == "" {
+		suppliedSecret = strings.TrimSpace(r.Header.Get("x-owner-secret"))
+	}
+	if suppliedSecret == "" {
+		if c, err := r.Cookie("koschei_owner_secret"); err == nil {
+			suppliedSecret = strings.TrimSpace(c.Value)
+		}
+	}
 	if suppliedSecret == "" {
 		suppliedSecret = strings.TrimSpace(r.Header.Get("x-admin-password"))
 	}
@@ -28,6 +35,11 @@ func (h *Handler) ownerAuth(w http.ResponseWriter, r *http.Request) bool {
 	}
 
 	wallet := normalizeWallet(r.Header.Get("x-owner-wallet"))
+	if wallet == "" {
+		if c, err := r.Cookie("koschei_owner_wallet"); err == nil {
+			wallet = normalizeWallet(c.Value)
+		}
+	}
 	if wallet == "" {
 		wallet = walletFromBearer(r)
 	}
