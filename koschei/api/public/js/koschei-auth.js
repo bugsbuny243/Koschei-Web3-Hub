@@ -1,10 +1,17 @@
 (function () {
   const KEY = 'koschei_jwt';
+  const LEGACY_KEY = 'koschei_token';
   const state = { neonAuthUrl: '' };
 
-  function saveJwt(t) { try { localStorage.setItem(KEY, t); } catch {} }
-  function getJwt() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }
-  function clearJwt() { try { localStorage.removeItem(KEY); } catch {} }
+  function saveJwt(t) {
+    if (!t) return;
+    try {
+      localStorage.setItem(KEY, t);
+      localStorage.setItem(LEGACY_KEY, t);
+    } catch {}
+  }
+  function getJwt() { try { return localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY) || ''; } catch { return ''; } }
+  function clearJwt() { try { localStorage.removeItem(KEY); localStorage.removeItem(LEGACY_KEY); } catch {} }
 
   function _isJwt(t) {
     if (!t || typeof t !== 'string') return false;
@@ -74,45 +81,18 @@
     return data;
   }
 
-  function requireNeonAuthUrl() {
-    if (!state.neonAuthUrl) {
-      throw new Error('Neon Auth public URL is not configured. Set EXPO_PUBLIC_NEON_AUTH_URL or NEON_AUTH_BASE_URL.');
-    }
-    return state.neonAuthUrl;
-  }
-
-  async function neonRequest(path, body) {
-    const res = await fetch(requireNeonAuthUrl() + path, {
+  async function backendAuthRequest(path, body) {
+    const res = await fetch(path, {
       method: 'POST',
-      credentials: 'include',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     const data = await readJSON(res);
     if (!res.ok) {
-      throw new Error(errorMessage(data, `Neon Auth error ${res.status}`));
+      throw new Error(errorMessage(data, `Authentication failed (${res.status})`));
     }
-    return { data, headerJwt: res.headers.get('set-auth-jwt') || '' };
-  }
-
-  async function tokenFollowUp() {
-    const base = requireNeonAuthUrl();
-    for (const path of ['/token', '/get-session']) {
-      for (const method of ['GET', 'POST']) {
-        const res = await fetch(base + path, {
-          method,
-          credentials: 'include',
-          headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {},
-          body: method === 'POST' ? '{}' : undefined,
-        }).catch(() => null);
-        if (!res) continue;
-        const data = await readJSON(res);
-        const headerJwt = res.headers.get('set-auth-jwt') || '';
-        const jwt = _isJwt(headerJwt) ? headerJwt : findJwt(data);
-        if (jwt) return jwt;
-      }
-    }
-    return '';
+    return { data, headerJwt: '' };
   }
 
   async function verifyMe(jwt) {
@@ -130,9 +110,8 @@
   }
 
   async function finishAuth(result) {
-    let jwt = _isJwt(result.headerJwt) ? result.headerJwt : findJwt(result.data);
-    if (!jwt) jwt = await tokenFollowUp();
-    if (!_isJwt(jwt)) throw new Error('Authentication succeeded, but no JWT was returned by Neon Auth.');
+    const jwt = _isJwt(result.headerJwt) ? result.headerJwt : findJwt(result.data);
+    if (!_isJwt(jwt)) throw new Error('Authentication succeeded, but no JWT was returned by the auth server.');
     saveJwt(jwt);
     const me = await verifyMe(jwt);
     return { ...result.data, me, access_token: jwt, token_type: 'Bearer' };
@@ -159,8 +138,7 @@
   }
 
   async function signUp(email, password) {
-    if (!state.neonAuthUrl) await loadConfig();
-    const result = await neonRequest('/sign-up/email', {
+    const result = await backendAuthRequest('/api/auth/register', {
       email,
       password,
       name: defaultUserName(email),
@@ -169,8 +147,7 @@
   }
 
   async function signIn(email, password) {
-    if (!state.neonAuthUrl) await loadConfig();
-    const result = await neonRequest('/sign-in/email', { email, password });
+    const result = await backendAuthRequest('/api/auth/login', { email, password });
     return finishAuth(result);
   }
 
@@ -202,4 +179,4 @@
     isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt };
 })();
 
-// Neon Auth email/password responses are verified through /api/me and persisted as koschei_jwt.
+// Email/password auth goes through the backend Neon proxy, then /api/me verifies the Neon JWT.
