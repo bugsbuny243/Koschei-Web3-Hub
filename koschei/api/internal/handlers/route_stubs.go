@@ -131,29 +131,5 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "user": profile})
 }
 
-// AdminUsers requires the admin password (x-admin-password header),
-// matching every other /api/admin/* endpoint. Previously this only
-// checked for the presence of a "koschei_admin" cookie with no value
-// validation, allowing anyone who set that cookie to read all user
-// emails, roles, plans and credit balances.
-func (h *Handler) AdminUsers(w http.ResponseWriter, r *http.Request) {
-	if !h.ownerAuth(w, r) {
-		return
-	}
-	UsersHandler(w, r)
-}
-
-func (h *Handler) AdminUserAction(w http.ResponseWriter, r *http.Request) {
-	if !h.ownerAuth(w, r) {
-		return
-	}
-	notImplemented(w, "AdminUserAction")
-}
-func (h *Handler) AdminSettings(w http.ResponseWriter, r *http.Request) {
-	if !h.ownerAuth(w, r) {
-		return
-	}
-	notImplemented(w, "AdminSettings")
-}
 func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) { notImplemented(w, "AIGenerate") }
 func (h *Handler) AIJobs(w http.ResponseWriter, r *http.Request)     { notImplemented(w, "AIJobs") }

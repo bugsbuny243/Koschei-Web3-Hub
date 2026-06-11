@@ -235,13 +235,13 @@ func (h *Handler) OwnerRemoveUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) OwnerPaymentRequests(w http.ResponseWriter, r *http.Request) {
-	h.AdminPaymentRequests(w, r)
+	h.OwnerPaymentRequestsList(w, r)
 }
 func (h *Handler) OwnerApprovePayment(w http.ResponseWriter, r *http.Request) {
-	h.ApprovePaymentRequest(w, r)
+	h.OwnerApprovePaymentRequest(w, r)
 }
 func (h *Handler) OwnerRejectPayment(w http.ResponseWriter, r *http.Request) {
-	h.RejectPaymentRequest(w, r)
+	h.OwnerRejectPaymentRequest(w, r)
 }
 
 func (h *Handler) OwnerCommand(w http.ResponseWriter, r *http.Request) {

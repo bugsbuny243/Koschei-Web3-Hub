@@ -35,6 +35,10 @@ type emergencyDispatchResult struct {
 // LiquidityDrainAnalyze scores first-block rug-pull and liquidity drain risk.
 // If risk is above 90%, Emergency Mode automatically notifies configured
 // Telegram/Discord webhooks with the whitehat address list.
+func (h *Handler) EmergencyAlert(w http.ResponseWriter, r *http.Request) {
+	h.LiquidityDrainAnalyze(w, r)
+}
+
 func (h *Handler) LiquidityDrainAnalyze(w http.ResponseWriter, r *http.Request) {
 	var req liquidityRadarRequest
 	if err := decodeJSON(r, &req); err != nil {

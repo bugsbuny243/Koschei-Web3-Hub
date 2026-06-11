@@ -94,31 +94,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/owner/status", requiresDB(h, ownerOnly(h, method("GET", h.OwnerStatus))))
 	mux.HandleFunc("/api/owner/grants", requiresDB(h, ownerOnly(h, method("GET", h.OwnerGrants))))
 	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, ownerOnly(h, method("GET", h.OwnerDAOGuardianSummary))))
-	mux.HandleFunc("/api/admin/payment-requests", requiresDB(h, method("GET", h.AdminPaymentRequests)))
-	mux.HandleFunc("/api/admin/analytics/events", requiresDB(h, method("GET", h.AdminAnalyticsEvents)))
-	mux.HandleFunc("/api/admin/grant-radar", requiresDB(h, h.GrantRadar))
-	mux.HandleFunc("/api/admin/proof-of-impact", requiresDB(h, method("GET", h.ProofOfImpact)))
-	mux.HandleFunc("/api/admin/payment-requests/approve", requiresDB(h, method("POST", h.ApprovePaymentRequest)))
-	mux.HandleFunc("/api/admin/payment-requests/reject", requiresDB(h, method("POST", h.RejectPaymentRequest)))
-	mux.HandleFunc("/api/admin/summary", requiresDB(h, method("GET", h.AdminSummary)))
-	mux.HandleFunc("/api/admin/users", requiresDB(h, method("GET", h.AdminUsers)))
-	mux.HandleFunc("/api/admin/users/action", requiresDB(h, method("POST", h.AdminUserAction)))
-	mux.HandleFunc("/api/admin/payments", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "payments") })))
-	mux.HandleFunc("/api/admin/entitlements", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "entitlements") })))
-	mux.HandleFunc("/api/admin/outputs", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "outputs") })))
-	mux.HandleFunc("/api/admin/watchlist-sources", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "watchlist-sources") })))
-	mux.HandleFunc("/api/admin/web3-events", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "web3-events") })))
-	mux.HandleFunc("/api/admin/chain-health", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "chain-health") })))
-	mux.HandleFunc("/api/admin/analytics", requiresDB(h, method("GET", func(w http.ResponseWriter, r *http.Request) { h.AdminTable(w, r, "analytics") })))
-	mux.HandleFunc("/api/admin/system-scan", requiresDB(h, method("GET", h.AdminSystemScan)))
-	mux.HandleFunc("/api/admin/chat", requiresDB(h, method("POST", h.AdminChat)))
-	mux.HandleFunc("/api/admin/modules", requiresDB(h, method("GET", h.AdminModules)))
-	mux.HandleFunc("/api/admin/grant-autopilot", requiresDB(h, method("GET", h.GrantAutopilot)))
-	mux.HandleFunc("/api/admin/grant-autopilot/generate", requiresDB(h, method("POST", h.GrantGenerate)))
-	mux.HandleFunc("/api/admin/grant-autopilot/save", requiresDB(h, method("POST", h.GrantSave)))
-	mux.HandleFunc("/api/admin/agent-api-keys", requiresDB(h, method("POST", h.AdminAgentKey)))
-	mux.HandleFunc("/api/admin/tool-usage", requiresDB(h, method("GET", h.AdminToolUsage)))
-	mux.HandleFunc("/api/admin/settings", requiresDB(h, method("GET", h.AdminSettings)))
+	mux.HandleFunc("/impact", method("GET", h.ImpactHandler))
 	mux.HandleFunc("/api/public/impact", requiresDB(h, method("GET", h.PublicImpact)))
 	mux.HandleFunc("/api/public/metrics", requiresDB(h, method("GET", h.GetPublicMetrics)))
 	mux.HandleFunc("/api/public/tool-prices", requiresDB(h, method("GET", h.ToolPrices)))
@@ -164,8 +140,9 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, handlers.RequireAuth(method("POST", h.RevokeAPIKey))))
 	mux.HandleFunc("/api/v1/scan/token", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("POST", h.B2BTokenScan)))))
 	mux.HandleFunc("/api/v1/mev/analyze", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.MEVAnalyze))))))
-	mux.HandleFunc("/api/v1/mev/protected-send", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.ProtectedSendMEV))))))
+	mux.HandleFunc("/api/v1/mev/protected-send", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.ProtectedSend))))))
 	mux.HandleFunc("/api/v1/liquidity/analyze", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("POST", h.LiquidityDrainAnalyze)))))
+	mux.HandleFunc("/api/v1/radar/emergency", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("POST", h.EmergencyAlert)))))
 	mux.HandleFunc("/api/v1/dao/proposal-risk", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("POST", h.DAOGuardianAnalyze)))))
 	mux.HandleFunc("/api/v1/smart-money/snapshot", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("GET", h.SmartMoneySnapshot)))))
 	mux.HandleFunc("/api/v1/usage", requiresDB(h, h.APIKeyAuth(method("GET", h.APIUsage))))
@@ -242,10 +219,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					"/account":           "/account.html",
 					"/pricing":           "/pricing.html",
 					"/support":           "/support.html",
-					"/admin":             "/admin.html",
 					"/owner":             "/owner.html",
-					"/admin-payments":    "/admin-payments.html",
-					"/admin-analytics":   "/admin-analytics.html",
 					"/dashboard":         "/dashboard.html",
 					"/impact":            "/impact.html",
 					"/docs":              "/docs.html",

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const paymentRequestMessage = "Payment request received. Admin review required."
+const paymentRequestMessage = "Payment request received. Owner review required."
 
 type shopierPack struct {
 	AmountTRY int
@@ -118,7 +118,7 @@ func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "status": "pending", "message": paymentRequestMessage})
 }
 
-func (h *Handler) AdminPaymentRequests(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) OwnerPaymentRequestsList(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
 		return
 	}
@@ -158,7 +158,7 @@ func (h *Handler) AdminPaymentRequests(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "payment_requests": requests})
 }
 
-func (h *Handler) ApprovePaymentRequest(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
 		return
 	}
@@ -235,7 +235,7 @@ func (h *Handler) ApprovePaymentRequest(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "approved"})
 }
 
-func (h *Handler) RejectPaymentRequest(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) OwnerRejectPaymentRequest(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
 		return
 	}
