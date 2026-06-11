@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/singleflight"
+	"koschei/api/internal/singleflight"
 )
 
 type CacheClient interface {
