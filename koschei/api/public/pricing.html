@@ -1,14 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- AdSense verification -->
   <meta name="google-adsense-account" content="ca-pub-6081394144742471">
-
-
-  <!-- Google AdSense -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6081394144742471"
-     crossorigin="anonymous"></script>
-  <!-- Google tag (gtag.js) -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6081394144742471" crossorigin="anonymous"></script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -16,55 +10,175 @@
     gtag('js', new Date());
     gtag('config', 'G-1QFWMJJC3');
   </script>
-
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Upgrade — Koschei</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/koschei.css">
+  <meta name="description" content="Buy credit packs for Koschei Web3 Hub. Unlock token scans, wallet scores, TX decoding and more.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    .pack-card{display:flex;flex-direction:column;gap:16px}.pack-price{font-size:28px;font-weight:700}.pack-output{color:var(--accent)}
-    .pack-actions{display:flex;flex-direction:column;gap:8px;margin-top:auto}.payment-form{display:none;margin-top:22px}.payment-form.show{display:block}
-    textarea.form-input{min-height:88px;resize:vertical}.summary{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:20px;color:var(--text2)}
+    :root{--accent:#00ff88;--accent2:#00ccff;--danger:#ff4466;--warn:#ffaa00;--text:#f0f0ff;--text2:#8888aa;--bg:#030309;--radius:14px;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+    .blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+    .blob{position:absolute;border-radius:50%;filter:blur(100px);animation:bf 12s ease-in-out infinite;}
+    .b1{width:450px;height:450px;background:rgba(0,255,136,.08);top:-100px;left:-80px;}
+    .b2{width:400px;height:400px;background:rgba(0,204,255,.07);bottom:-80px;right:-60px;animation-delay:-5s;}
+    .b3{width:300px;height:300px;background:rgba(124,58,237,.06);top:40%;left:40%;animation-delay:-8s;}
+    @keyframes bf{0%,100%{transform:translate(0,0)}50%{transform:translate(15px,-15px)}}
+    .glass{background:rgba(255,255,255,.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:var(--radius);}
+    .nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:rgba(3,3,9,.85);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.07);}
+    .nav-logo{font-size:18px;font-weight:800;color:var(--accent);text-decoration:none;}
+    .nav-links{display:flex;gap:6px;}
+    .nav-link{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 12px;border-radius:8px;transition:all .15s;}
+    .nav-link:hover,.nav-link.active{color:var(--accent);}
+    .page{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:36px 20px 60px;}
+    .page-title{font-size:26px;font-weight:800;letter-spacing:-0.5px;margin-bottom:6px;text-align:center;}
+    .page-sub{font-size:14px;color:var(--text2);text-align:center;max-width:480px;margin:0 auto 24px;line-height:1.6;}
+    .summary{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;margin-bottom:28px;font-size:13px;color:var(--text2);}
+    .summary strong{color:var(--accent);}
+    .alert{padding:12px 16px;border-radius:10px;font-size:13px;display:none;margin-bottom:20px;}
+    .alert.show{display:block;}
+    .alert-success{background:rgba(0,255,136,.1);border:1px solid var(--accent);color:var(--accent);}
+    .alert-error{background:rgba(255,68,102,.12);border:1px solid var(--danger);color:var(--danger);}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;}
+    .pack-card{padding:24px;display:flex;flex-direction:column;gap:14px;position:relative;transition:all .2s;}
+    .pack-card:hover{border-color:rgba(0,255,136,.25);transform:translateY(-2px);}
+    .pack-card.featured{border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.04);}
+    .featured-badge{position:absolute;top:-10px;right:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;font-size:10px;font-weight:800;padding:3px 10px;border-radius:8px;letter-spacing:.5px;}
+    .pack-name{font-size:15px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;}
+    .pack-price{font-size:30px;font-weight:800;}
+    .pack-output{color:var(--accent);font-size:14px;font-weight:700;}
+    .pack-per{font-size:11px;color:var(--text2);}
+    .pack-actions{display:flex;flex-direction:column;gap:8px;margin-top:auto;}
+    .btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:11px 18px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;text-decoration:none;transition:all .15s;}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;}
+    .btn-primary:hover{opacity:.88;transform:translateY(-1px);}
+    .btn-ghost{background:rgba(255,255,255,.06);color:var(--text2);border:1px solid rgba(255,255,255,.1);}
+    .btn-ghost:hover{background:rgba(255,255,255,.1);color:var(--text);}
+    .btn:disabled{opacity:.4;cursor:not-allowed;}
+    .payment-form{display:none;padding:24px;margin-top:8px;}
+    .payment-form.show{display:block;}
+    .form-group{display:flex;flex-direction:column;gap:6px;}
+    .form-label{font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--text2);}
+    .form-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:var(--text);font-size:14px;padding:11px 14px;outline:none;width:100%;transition:border-color .15s;font-family:'Inter',sans-serif;}
+    .form-input:focus{border-color:var(--accent);}
+    .form-input:read-only{opacity:.6;}
+    textarea.form-input{min-height:80px;resize:vertical;}
+    .spinner{width:15px;height:15px;border:2px solid rgba(0,0,0,.2);border-top-color:#000;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .info-note{font-size:12px;color:var(--text2);text-align:center;margin-top:24px;line-height:1.6;}
+    @media(max-width:700px){.grid-3{grid-template-columns:1fr;}}
   </style>
 </head>
 <body>
+<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
 <nav class="nav">
-  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
-  <div class="nav-links"><a href="/hub" class="nav-link">Hub</a><a href="/account" class="nav-link">Account</a><a href="/pricing" class="nav-link active">Upgrade</a></div>
+  <a href="/hub.html" class="nav-logo">K Koschei</a>
+  <div class="nav-links">
+    <a href="/hub.html" class="nav-link">Hub</a>
+    <a href="/account.html" class="nav-link">Account</a>
+    <a href="/pricing.html" class="nav-link active">Upgrade</a>
+  </div>
 </nav>
-<main class="page">
-  <div class="page-title">Buy outputs</div>
-  <div class="page-sub">Free: explore pages and demo examples. Paid packs unlock real scans, generations and intelligence outputs.</div>
-  <div class="summary"><span>Email: <strong id="memberEmail">Loading…</strong></span><span>Outputs remaining: <strong id="outputsRemaining">—</strong></span><span>Free: explore pages and demo examples</span></div>
+<div class="page">
+  <div class="page-title">Buy Credits</div>
+  <div class="page-sub">Free tier lets you explore. Paid packs unlock real scans, AI analysis and intelligence outputs.</div>
+
+  <div class="summary glass" style="padding:14px 20px;border-radius:12px;">
+    <span>Email: <strong id="memberEmail">Loading…</strong></span>
+    <span>Credits remaining: <strong id="outputsRemaining">—</strong></span>
+  </div>
+
   <div class="alert" id="pageMessage"></div>
+
   <section class="grid-3">
-    <article class="card pack-card"><div><h2>Starter Pack</h2><div class="pack-price">899 TL</div></div><div class="pack-output">+25 outputs</div><div class="pack-actions"><a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465449" target="_blank" rel="noopener noreferrer">Buy on Shopier</a><button class="btn btn-ghost" type="button" onclick="openPaymentForm('starter')">Report payment</button></div></article>
-    <article class="card pack-card"><div><h2>Builder Pack</h2><div class="pack-price">2299 TL</div></div><div class="pack-output">+100 outputs</div><div class="pack-actions"><a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465484" target="_blank" rel="noopener noreferrer">Buy on Shopier</a><button class="btn btn-ghost" type="button" onclick="openPaymentForm('builder')">Report payment</button></div></article>
-    <article class="card pack-card"><div><h2>Studio Pack</h2><div class="pack-price">4999 TL</div></div><div class="pack-output">+300 outputs</div><div class="pack-actions"><a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465499" target="_blank" rel="noopener noreferrer">Buy on Shopier</a><button class="btn btn-ghost" type="button" onclick="openPaymentForm('studio')">Report payment</button></div></article>
+    <article class="glass pack-card">
+      <div class="pack-name">Starter Pack</div>
+      <div class="pack-price">899 ₺</div>
+      <div class="pack-output">+25 credits</div>
+      <div class="pack-per">~36 ₺ per credit</div>
+      <div class="pack-actions">
+        <a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465449" target="_blank" rel="noopener noreferrer">Buy on Shopier</a>
+        <button class="btn btn-ghost" type="button" onclick="openPaymentForm('starter')">Report payment</button>
+      </div>
+    </article>
+
+    <article class="glass pack-card featured">
+      <div class="featured-badge">BEST VALUE</div>
+      <div class="pack-name">Builder Pack</div>
+      <div class="pack-price">2299 ₺</div>
+      <div class="pack-output">+100 credits</div>
+      <div class="pack-per">~23 ₺ per credit</div>
+      <div class="pack-actions">
+        <a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465484" target="_blank" rel="noopener noreferrer">Buy on Shopier</a>
+        <button class="btn btn-ghost" type="button" onclick="openPaymentForm('builder')">Report payment</button>
+      </div>
+    </article>
+
+    <article class="glass pack-card">
+      <div class="pack-name">Studio Pack</div>
+      <div class="pack-price">4999 ₺</div>
+      <div class="pack-output">+300 credits</div>
+      <div class="pack-per">~17 ₺ per credit</div>
+      <div class="pack-actions">
+        <a class="btn btn-primary" href="https://www.shopier.com/TradeVisual/47465499" target="_blank" rel="noopener noreferrer">Buy on Shopier</a>
+        <button class="btn btn-ghost" type="button" onclick="openPaymentForm('studio')">Report payment</button>
+      </div>
+    </article>
   </section>
-  <section class="card payment-form" id="paymentFormWrap">
-    <h2 style="margin-top:0">Report Shopier payment</h2>
+
+  <section class="glass payment-form" id="paymentFormWrap">
+    <h2 style="margin:0 0 16px;font-size:16px;font-weight:700;">Report Shopier Payment</h2>
     <form id="paymentForm" style="display:flex;flex-direction:column;gap:14px">
-      <div class="form-group"><label class="form-label" for="fullName">Full name</label><input class="form-input" id="fullName" required></div>
-      <div class="form-group"><label class="form-label" for="email">Email</label><input class="form-input" id="email" type="email" readonly></div>
-      <div class="form-group"><label class="form-label" for="productID">Pack</label><select class="form-input" id="productID"><option value="starter">Starter</option><option value="builder">Builder</option><option value="studio">Studio</option></select></div>
-      <div class="form-group"><label class="form-label" for="paymentReference">Payment reference (optional)</label><input class="form-input" id="paymentReference"></div>
-      <div class="form-group"><label class="form-label" for="note">Note (optional)</label><textarea class="form-input" id="note"></textarea></div>
-      <button class="btn btn-primary" id="submitPayment" type="submit">Send payment request</button>
+      <div class="form-group">
+        <label class="form-label" for="fullName">Full name</label>
+        <input class="form-input" id="fullName" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-input" id="email" type="email" readonly>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="productID">Pack</label>
+        <select class="form-input" id="productID">
+          <option value="starter">Starter — 899 ₺ (+25 credits)</option>
+          <option value="builder">Builder — 2299 ₺ (+100 credits)</option>
+          <option value="studio">Studio — 4999 ₺ (+300 credits)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="paymentReference">Payment reference (optional)</label>
+        <input class="form-input" id="paymentReference" placeholder="Shopier order number">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="note">Note (optional)</label>
+        <textarea class="form-input" id="note" placeholder="Anything else we should know?"></textarea>
+      </div>
+      <button class="btn btn-primary" id="submitPayment" type="submit">Send Payment Request</button>
     </form>
   </section>
-</main>
-<script src="/js/koschei-auth.js?v=4"></script>
+
+  <div class="info-note">
+    Payments are reviewed manually and credits are added within 24 hours.<br>
+    Need help? <a href="/support.html" style="color:var(--accent);">Contact support</a>
+  </div>
+</div>
+
+<script src="/js/koschei-auth.js?v=5"></script>
 <script src="/js/koschei-analytics.js?v=1"></script>
 <script>
   const message = document.getElementById('pageMessage');
   function showMessage(text, kind) { message.textContent = text; message.className = `alert alert-${kind} show`; }
-  function openPaymentForm(productID) { document.getElementById('productID').value = productID; document.getElementById('paymentFormWrap').classList.add('show'); document.getElementById('fullName').focus(); }
+  function openPaymentForm(productID) {
+    document.getElementById('productID').value = productID;
+    document.getElementById('paymentFormWrap').classList.add('show');
+    document.getElementById('paymentFormWrap').scrollIntoView({behavior:'smooth'});
+    document.getElementById('fullName').focus();
+  }
   (async () => {
     await KoscheiAuth.init();
-    if (!KoscheiAuth.requireAuth('/login')) return;
-    KoscheiAnalytics.track('pricing_view');
+    if (!KoscheiAuth.requireAuth()) return;
+    if (window.KoscheiAnalytics) KoscheiAnalytics.track('pricing_view');
     const email = KoscheiAuth.getEmail() || '';
     document.getElementById('memberEmail').textContent = email;
     document.getElementById('email').value = email;
@@ -74,17 +188,36 @@
       const data = await res.json();
       document.getElementById('memberEmail').textContent = data.email || email;
       document.getElementById('email').value = data.email || email;
-      document.getElementById('outputsRemaining').textContent = data.outputs_remaining ?? 0;
+      document.getElementById('outputsRemaining').textContent = data.outputs_remaining ?? data.credits ?? 0;
     } catch { showMessage('Could not load member details. Please try again.', 'error'); }
   })();
   document.getElementById('paymentForm').addEventListener('submit', async (event) => {
     event.preventDefault();
-    const button = document.getElementById('submitPayment'); button.disabled = true;
+    const button = document.getElementById('submitPayment');
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner"></span>';
     try {
-      const res = await KoscheiAuth.apiCall('/api/payments/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: document.getElementById('fullName').value, product_id: document.getElementById('productID').value, payment_reference: document.getElementById('paymentReference').value, note: document.getElementById('note').value }) });
-      const data = await res.json(); if (!res.ok) throw new Error(data.error || 'Could not send payment request');
-      showMessage(data.message || 'Payment request received. Admin review required.', 'success'); document.getElementById('paymentForm').reset(); document.getElementById('email').value = KoscheiAuth.getEmail() || '';
-    } catch (error) { showMessage(error.message, 'error'); } finally { button.disabled = false; }
+      const res = await KoscheiAuth.apiCall('/api/payments/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: document.getElementById('fullName').value,
+          product_id: document.getElementById('productID').value,
+          payment_reference: document.getElementById('paymentReference').value,
+          note: document.getElementById('note').value
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not send payment request');
+      showMessage(data.message || 'Payment request received. Admin review required (within 24h).', 'success');
+      document.getElementById('paymentForm').reset();
+      document.getElementById('email').value = KoscheiAuth.getEmail() || '';
+    } catch (error) {
+      showMessage(error.message, 'error');
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Send Payment Request';
+    }
   });
 </script>
 </body>
