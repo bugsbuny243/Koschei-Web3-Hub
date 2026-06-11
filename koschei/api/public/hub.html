@@ -271,7 +271,7 @@
         if (!res || !res.ok) throw new Error('Member summary unavailable');
         const data = await res.json();
         document.getElementById('userEmail').textContent = data.email || KoscheiAuth.getEmail() || '';
-        document.getElementById('userPlan').textContent = data.plan || 'free';
+        document.getElementById('userPlan').textContent = data.plan || 'No active package';
         document.getElementById('userCredits').textContent = data.outputs_remaining ?? 0;
       } catch {
         const message = document.getElementById('memberMessage');

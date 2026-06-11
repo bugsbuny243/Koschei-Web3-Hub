@@ -223,9 +223,12 @@ const robotsTXTBody = "User-agent: *\nAllow: /\n\nSitemap: https://tradepiglobal
 
 func publicCleanRoutes(staticDir string) map[string]string {
 	routes := map[string]string{
+		"/api-docs":   "/docs-api.html",
 		"/docs/api":   "/docs-api.html",
 		"/docs/sdk":   "/docs-sdk.html",
 		"/risk":       "/risk-v2.html",
+		"/sdk":        "/docs-sdk.html",
+		"/tools":      "/hub.html",
 		"/tx-decoder": "/tx-decoder-pro.html",
 	}
 
