@@ -147,9 +147,9 @@ func (h *Handler) APIUsage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) APIKeyAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		raw := bearerToken(r.Header.Get("Authorization"))
+		raw := strings.TrimSpace(r.Header.Get("X-API-Key"))
 		if raw == "" {
-			raw = strings.TrimSpace(r.Header.Get("X-API-Key"))
+			raw = bearerToken(r.Header.Get("Authorization"))
 		}
 		if raw == "" {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing_api_key"})
