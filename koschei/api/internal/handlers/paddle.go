@@ -79,25 +79,28 @@ type billingPeriod struct {
 }
 
 func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
 	var req checkoutRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
 		return
 	}
-	email := strings.TrimSpace(req.CustomerEmail)
-	if email == "" {
-		email = strings.TrimSpace(req.Email)
-	}
-	planTier := normalizePlanTier(req.PlanTier)
-	productID := strings.TrimSpace(req.ProductID)
-	if productID == "" {
-		productID = paddleConfiguredProductID(planTier)
-	}
-	if email == "" || planTier == "" || productID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "customer_email_plan_tier_product_required"})
+	email := strings.ToLower(strings.TrimSpace(claims.Email))
+	planTier := normalizePlanTier(firstNonEmpty(req.PlanTier, req.ProductID))
+	priceID := paddleConfiguredPriceID(planTier)
+	if email == "" || planTier == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "valid_package_required"})
 		return
 	}
-	checkoutURL, err := h.CreateCheckoutSession(productID, email, planTier)
+	if priceID == "" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "paddle_not_configured", "message": "Paddle global payment is not configured for this package."})
+		return
+	}
+	checkoutURL, err := h.CreateCheckoutSession(priceID, email, planTier)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "paddle_checkout_failed", "message": safeError(err)})
 		return
@@ -105,7 +108,7 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "checkout_url": checkoutURL})
 }
 
-func (h *Handler) CreateCheckoutSession(productID, customerEmail, planTier string) (string, error) {
+func (h *Handler) CreateCheckoutSession(priceID, customerEmail, planTier string) (string, error) {
 	apiKey := strings.TrimSpace(os.Getenv("PADDLE_API_KEY"))
 	if apiKey == "" {
 		return "", errors.New("PADDLE_API_KEY is not configured")
@@ -122,11 +125,12 @@ func (h *Handler) CreateCheckoutSession(productID, customerEmail, planTier strin
 		"collection_mode": "automatic",
 		"customer_id":     customerID,
 		"custom_data": map[string]any{
+			"package_id":     planTier,
 			"plan_tier":      planTier,
 			"customer_email": strings.ToLower(strings.TrimSpace(customerEmail)),
 			"source":         "koschei_web3_hub",
 		},
-		"items": []map[string]any{paddleTransactionItem(productID, planTier)},
+		"items": []map[string]any{paddleTransactionItem(priceID, planTier)},
 	}
 	if checkoutURL := strings.TrimSpace(os.Getenv("PADDLE_CHECKOUT_URL")); checkoutURL != "" {
 		payload["checkout"] = map[string]string{"url": checkoutURL}
@@ -275,7 +279,7 @@ func paddleRequest(ctx context.Context, method, path string, payload any, out an
 		return err
 	}
 	base := "https://api.paddle.com"
-	if strings.EqualFold(os.Getenv("PADDLE_ENV"), "sandbox") {
+	if strings.EqualFold(firstEnv("PADDLE_ENVIRONMENT", "PADDLE_ENV"), "sandbox") {
 		base = "https://sandbox-api.paddle.com"
 	}
 	req, err := http.NewRequestWithContext(ctx, method, base+path, bytes.NewReader(body))
@@ -371,6 +375,34 @@ func (h *Handler) markPaddlePaymentSucceeded(ctx context.Context, raw json.RawMe
 	if err := json.Unmarshal(raw, &txData); err != nil {
 		return err
 	}
+	if txData.Status != "" && txData.Status != "completed" && txData.Status != "paid" {
+		return nil
+	}
+	packageID := normalizePlanTier(firstNonEmpty(customDataString(txData.CustomData, "package_id"), customDataString(txData.CustomData, "plan_tier")))
+	email := strings.ToLower(strings.TrimSpace(customDataString(txData.CustomData, "customer_email")))
+	if (email == "" || packageID == "") && txData.SubscriptionID != "" {
+		var storedEmail, storedPlan string
+		_ = h.DB.QueryRowContext(ctx, `
+			SELECT lower(c.email), COALESCE(s.plan_tier, '')
+			FROM paddle_subscriptions s
+			JOIN paddle_customers c ON c.id = s.customer_id
+			WHERE s.paddle_subscription_id = $1`, txData.SubscriptionID).Scan(&storedEmail, &storedPlan)
+		if email == "" {
+			email = storedEmail
+		}
+		if packageID == "" {
+			packageID = normalizePlanTier(storedPlan)
+		}
+	}
+	externalPaymentID := strings.TrimSpace(txData.ID)
+	if externalPaymentID == "" {
+		externalPaymentID = strings.TrimSpace(txData.SubscriptionID)
+	}
+	if email != "" && packageID != "" && externalPaymentID != "" {
+		if _, err := h.activatePackageEntitlement(ctx, email, packageID, "paddle", externalPaymentID); err != nil {
+			return err
+		}
+	}
 	if txData.SubscriptionID == "" {
 		return nil
 	}
@@ -408,34 +440,35 @@ func parsePaddleSignature(header string) (string, []string) {
 	return ts, signatures
 }
 
-func paddleConfiguredProductID(planTier string) string {
+func paddleConfiguredPriceID(planTier string) string {
 	switch normalizePlanTier(planTier) {
 	case "starter":
-		return strings.TrimSpace(os.Getenv("PADDLE_STARTER_PRODUCT_ID"))
-	case "professional":
-		return strings.TrimSpace(os.Getenv("PADDLE_PROFESSIONAL_PRODUCT_ID"))
-	case "enterprise":
-		return strings.TrimSpace(os.Getenv("PADDLE_ENTERPRISE_PRODUCT_ID"))
+		return strings.TrimSpace(firstEnv("PADDLE_STARTER_PRICE_ID", "PADDLE_STARTER_PRODUCT_ID"))
+	case "builder":
+		return strings.TrimSpace(firstEnv("PADDLE_BUILDER_PRICE_ID", "PADDLE_PROFESSIONAL_PRODUCT_ID"))
+	case "studio":
+		return strings.TrimSpace(firstEnv("PADDLE_STUDIO_PRICE_ID", "PADDLE_ENTERPRISE_PRODUCT_ID"))
 	default:
 		return ""
 	}
 }
 
-func paddleTransactionItem(productID, planTier string) map[string]any {
-	if strings.HasPrefix(productID, "pri_") {
-		return map[string]any{"price_id": productID, "quantity": 1}
-	}
-	return map[string]any{"quantity": 1, "price": map[string]any{"product_id": productID, "description": "Koschei Web3 Hub " + planTier, "unit_price": map[string]string{"amount": strconv.Itoa(planMonthlyPriceCents(planTier)), "currency_code": "USD"}, "billing_cycle": map[string]any{"interval": "month", "frequency": 1}, "tax_mode": "account_setting"}}
+func paddleConfiguredProductID(planTier string) string {
+	return paddleConfiguredPriceID(planTier)
+}
+
+func paddleTransactionItem(priceID, planTier string) map[string]any {
+	return map[string]any{"price_id": priceID, "quantity": 1}
 }
 
 func normalizePlanTier(planTier string) string {
 	switch strings.ToLower(strings.TrimSpace(planTier)) {
 	case "starter":
 		return "starter"
-	case "pro", "professional":
-		return "professional"
-	case "enterprise":
-		return "enterprise"
+	case "builder", "pro", "professional":
+		return "builder"
+	case "studio", "enterprise":
+		return "studio"
 	default:
 		return ""
 	}
@@ -460,12 +493,12 @@ func subscriptionProductAndTier(sub paddleSubscriptionData) (string, string) {
 }
 
 func tierFromProductID(productID string) string {
-	for _, tier := range []string{"starter", "professional", "enterprise"} {
+	for _, tier := range []string{"starter", "builder", "studio"} {
 		if productID != "" && productID == paddleConfiguredProductID(tier) {
 			return tier
 		}
 	}
-	return "starter"
+	return ""
 }
 
 func customDataString(data map[string]any, key string) string {
@@ -492,9 +525,9 @@ func planMonthlyPriceCents(planTier string) int {
 	switch normalizePlanTier(planTier) {
 	case "starter":
 		return 29900
-	case "professional":
+	case "builder":
 		return 99900
-	case "enterprise":
+	case "studio":
 		return 499900
 	default:
 		return 29900
@@ -505,9 +538,9 @@ func planMonthlyQuota(planTier string) int {
 	switch normalizePlanTier(planTier) {
 	case "starter":
 		return 1000
-	case "professional":
+	case "builder":
 		return 10000
-	case "enterprise":
+	case "studio":
 		return 100000
 	default:
 		return 1000
@@ -518,9 +551,9 @@ func planRateLimit(planTier string) int {
 	switch normalizePlanTier(planTier) {
 	case "starter":
 		return 100
-	case "professional":
+	case "builder":
 		return 500
-	case "enterprise":
+	case "studio":
 		return 2000
 	default:
 		return 100
