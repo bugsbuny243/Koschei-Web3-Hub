@@ -316,10 +316,34 @@ func (h *Handler) OwnerGrants(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
 		return
 	}
-	items := []map[string]any{
-		{"program": "Solana Foundation", "deadline": "2026-07-15", "status": "Hazırlanıyor", "focus": "MEV Shield ve Liquidity Drain public-good metrikleri"},
-		{"program": "Ethereum Grants", "deadline": "2026-08-01", "status": "Taslak", "focus": "Bridge/PoR Monitor ve DAO Guardian risk raporları"},
-		{"program": "Protocol Labs / FIL RetroPGF", "deadline": "2026-09-10", "status": "Araştırma", "focus": "AI Exploit Simulator geliştirici güvenliği"},
+	rows, err := h.DB.QueryContext(r.Context(), `
+		SELECT title, deadline, status, COALESCE(notes, '')
+		FROM grant_opportunities
+		WHERE status <> 'archived'
+		ORDER BY fit_score DESC, updated_at DESC
+		LIMIT 100`)
+	if isMissingRelation(err) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "grants": []map[string]any{}})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "grants unavailable"})
+		return
+	}
+	defer rows.Close()
+
+	items := make([]map[string]any, 0)
+	for rows.Next() {
+		var program, deadline, status, focus string
+		if err := rows.Scan(&program, &deadline, &status, &focus); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "grants scan failed"})
+			return
+		}
+		items = append(items, map[string]any{"program": program, "deadline": deadline, "status": status, "focus": focus})
+	}
+	if err := rows.Err(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "grants unavailable"})
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "grants": items})
 }

@@ -4,6 +4,15 @@
   const TOKEN_KEY = 'koschei_jwt';
   const LEGACY_TOKEN_KEY = 'koschei_token';
 
+
+  function safeLocalStorage(callback, fallback) {
+    try {
+      return callback(window.localStorage);
+    } catch {
+      return fallback;
+    }
+  }
+
   function isJWT(value) {
     return typeof value === 'string' && value.split('.').length === 3;
   }

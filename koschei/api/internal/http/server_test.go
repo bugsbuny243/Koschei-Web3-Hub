@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestOwnerStaticRouteRequiresSecretOnly(t *testing.T) {
+func TestOwnerStaticRouteServesLoginUI(t *testing.T) {
 	staticDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("index"), 0o644); err != nil {
 		t.Fatalf("write index: %v", err)
@@ -23,27 +23,22 @@ func TestOwnerStaticRouteRequiresSecretOnly(t *testing.T) {
 	srv := httptest.NewServer(NewServer(nil, "", "", "", staticDir))
 	t.Cleanup(srv.Close)
 
-	unauthorized, err := http.Get(srv.URL + "/owner")
+	ownerPage, err := http.Get(srv.URL + "/owner")
 	if err != nil {
-		t.Fatalf("get owner without secret: %v", err)
+		t.Fatalf("get owner page: %v", err)
 	}
-	defer unauthorized.Body.Close()
-	if unauthorized.StatusCode != http.StatusNotFound {
-		t.Fatalf("GET /owner without secret = %d, want %d", unauthorized.StatusCode, http.StatusNotFound)
+	defer ownerPage.Body.Close()
+	if ownerPage.StatusCode != http.StatusOK {
+		t.Fatalf("GET /owner = %d, want %d", ownerPage.StatusCode, http.StatusOK)
 	}
 
-	req, err := http.NewRequest(http.MethodGet, srv.URL+"/owner", nil)
+	apiResp, err := http.Get(srv.URL + "/api/owner/status")
 	if err != nil {
-		t.Fatalf("new request: %v", err)
+		t.Fatalf("get owner api without secret: %v", err)
 	}
-	req.Header.Set("X-Koschei-Secret", "test-secret")
-	authorized, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("get owner with secret: %v", err)
-	}
-	defer authorized.Body.Close()
-	if authorized.StatusCode != http.StatusOK {
-		t.Fatalf("GET /owner with secret = %d, want %d", authorized.StatusCode, http.StatusOK)
+	defer apiResp.Body.Close()
+	if apiResp.StatusCode == http.StatusOK {
+		t.Fatalf("GET /api/owner/status without secret = %d, want a protected non-OK response", apiResp.StatusCode)
 	}
 }
 

@@ -18,8 +18,8 @@ CREATE TABLE IF NOT EXISTS entitlements (
     email TEXT,
     plan_id TEXT,
     payment_request_id UUID,
-    outputs_total INTEGER DEFAULT 10,
-    outputs_remaining INTEGER DEFAULT 10,
+    outputs_total INTEGER DEFAULT 0,
+    outputs_remaining INTEGER DEFAULT 0,
     status TEXT DEFAULT 'active',
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
@@ -102,23 +102,23 @@ ALTER TABLE entitlements
     ADD COLUMN IF NOT EXISTS email TEXT,
     ADD COLUMN IF NOT EXISTS plan_id TEXT,
     ADD COLUMN IF NOT EXISTS payment_request_id UUID,
-    ADD COLUMN IF NOT EXISTS outputs_total INTEGER DEFAULT 10,
-    ADD COLUMN IF NOT EXISTS outputs_remaining INTEGER DEFAULT 10,
+    ADD COLUMN IF NOT EXISTS outputs_total INTEGER DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS outputs_remaining INTEGER DEFAULT 0,
     ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active',
     ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now(),
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
 UPDATE entitlements SET email = lower(trim(email)) WHERE email IS NOT NULL;
 UPDATE entitlements SET plan_id = 'free' WHERE plan_id IS NULL OR trim(plan_id) = '';
-UPDATE entitlements SET outputs_total = 10 WHERE outputs_total IS NULL;
-UPDATE entitlements SET outputs_remaining = 10 WHERE outputs_remaining IS NULL;
+UPDATE entitlements SET outputs_total = 0 WHERE outputs_total IS NULL;
+UPDATE entitlements SET outputs_remaining = 0 WHERE outputs_remaining IS NULL;
 UPDATE entitlements SET status = 'active' WHERE status IS NULL OR trim(status) = '';
 UPDATE entitlements SET created_at = now() WHERE created_at IS NULL;
 UPDATE entitlements SET updated_at = now() WHERE updated_at IS NULL;
 
 ALTER TABLE entitlements
-    ALTER COLUMN outputs_total SET DEFAULT 10,
-    ALTER COLUMN outputs_remaining SET DEFAULT 10,
+    ALTER COLUMN outputs_total SET DEFAULT 0,
+    ALTER COLUMN outputs_remaining SET DEFAULT 0,
     ALTER COLUMN status SET DEFAULT 'active',
     ALTER COLUMN created_at SET DEFAULT now(),
     ALTER COLUMN updated_at SET DEFAULT now();
