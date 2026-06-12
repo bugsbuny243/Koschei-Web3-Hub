@@ -91,7 +91,8 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/owner/status", requiresDB(h, ownerOnly(h, method("GET", h.OwnerStatus))))
 	mux.HandleFunc("/api/owner/grants", requiresDB(h, ownerOnly(h, method("GET", h.OwnerGrants))))
 	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, ownerOnly(h, method("GET", h.OwnerDAOGuardianSummary))))
-	mux.HandleFunc("/owner", ownerPageHandler(h, staticDir))
+	mux.HandleFunc("/owner", ownerPageHandler(staticDir))
+	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
 	mux.HandleFunc("/api/public/impact", method("GET", h.PublicImpact))
 	mux.HandleFunc("/api/public/metrics", method("GET", h.GetPublicMetrics))
 	mux.HandleFunc("/api/public/tool-prices", requiresDB(h, method("GET", h.ToolPrices)))
@@ -196,11 +197,6 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 					http.ServeFile(w, r, indexPath)
 					return
 				}
-				if r.URL.Path == "/owner" {
-					if !h.OwnerAuth(w, r) {
-						return
-					}
-				}
 				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
 					r = r.Clone(r.Context())
 					r.URL.Path = staticPath
@@ -274,13 +270,10 @@ func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-func ownerPageHandler(h *handlers.Handler, staticDir string) http.HandlerFunc {
+func ownerPageHandler(staticDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		if !h.OwnerAuth(w, r) {
 			return
 		}
 		if staticDir != "" {
@@ -291,7 +284,7 @@ func ownerPageHandler(h *handlers.Handler, staticDir string) http.HandlerFunc {
 			}
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Koschei Owner</title><style>body{margin:0;min-height:100vh;background:#070711;color:#f5f7fb;font-family:Inter,system-ui,sans-serif;display:grid;place-items:center}.card{max-width:720px;padding:32px;border:1px solid rgba(255,255,255,.14);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));box-shadow:0 28px 80px rgba(0,0,0,.35)}h1{margin:0 0 12px;font-size:clamp(30px,5vw,54px)}p{color:#a7b0c2;line-height:1.65}.pill{display:inline-block;color:#00ffaa;border:1px solid rgba(0,255,170,.4);border-radius:999px;padding:8px 12px;font-weight:800}</style></head><body><main class="card"><span class="pill">Owner authenticated</span><h1>Koschei Owner Dashboard</h1><p>Yetkili oturum doğrulandı. Statik owner paneli bulunamadığında bu güvenli fallback ekranı gösterilir. API kontrolleri /api/owner/status ve diğer owner endpointleri üzerinden kullanılabilir.</p></main></body></html>`))
+		_, _ = w.Write([]byte(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Koschei Owner</title><style>body{margin:0;min-height:100vh;background:#070711;color:#f5f7fb;font-family:Inter,system-ui,sans-serif;display:grid;place-items:center}.card{max-width:720px;padding:32px;border:1px solid rgba(255,255,255,.14);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));box-shadow:0 28px 80px rgba(0,0,0,.35)}h1{margin:0 0 12px;font-size:clamp(30px,5vw,54px)}p{color:#a7b0c2;line-height:1.65}.pill{display:inline-block;color:#00ffaa;border:1px solid rgba(0,255,170,.4);border-radius:999px;padding:8px 12px;font-weight:800}</style></head><body><main class="card"><span class="pill">Owner login</span><h1>Koschei Owner Dashboard</h1><p>Statik owner paneli bulunamadı. Owner API uçları korumalı kalır; giriş formunu sunmak için /owner sayfası kimlik doğrulaması istemeden servis edilir.</p></main></body></html>`))
 	}
 }
 

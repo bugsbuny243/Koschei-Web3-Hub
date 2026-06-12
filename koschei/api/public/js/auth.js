@@ -4,14 +4,6 @@
   const TOKEN_KEY = 'koschei_jwt';
   const LEGACY_TOKEN_KEY = 'koschei_token';
 
-  function safeLocalStorage(action, fallback = '') {
-    try {
-      return action(window.localStorage);
-    } catch {
-      return fallback;
-    }
-  }
-
   function isJWT(value) {
     return typeof value === 'string' && value.split('.').length === 3;
   }
@@ -39,6 +31,11 @@
       storage.removeItem(TOKEN_KEY);
       storage.removeItem(LEGACY_TOKEN_KEY);
     });
+  }
+
+  function getAuthHeader() {
+    const token = getToken();
+    return token ? `Bearer ${token}` : '';
   }
 
   function extractToken(payload) {

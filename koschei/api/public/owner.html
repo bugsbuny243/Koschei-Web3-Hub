@@ -148,7 +148,7 @@
 
   <script>
     'use strict';
-    const state = { users: [], payments: [], grants: [], metrics: {}, logs: [] };
+    const state = { users: [], payments: [], grants: [], metrics: {}, logs: [], ownerError: '' };
     const $ = (id) => document.getElementById(id);
     const formatMoney = (value, currency) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(value || 0));
     const formatNumber = (value) => new Intl.NumberFormat('tr-TR').format(Number(value || 0));
@@ -194,29 +194,31 @@
         state.users = users.users || users.items || [];
         state.payments = payments.payment_requests || payments.requests || payments.items || [];
         state.grants = grants.grants || [];
+        state.ownerError = '';
         renderAll();
         $('syncState').textContent = 'Canlı veri senkronize';
       } catch (err) {
-        loadFallbackData(); renderAll(); $('syncState').textContent = 'Fallback görünüm aktif'; toast('API erişilemedi; güvenli fallback görünüm açıldı.');
+        state.metrics = {};
+        state.users = [];
+        state.payments = [];
+        state.grants = [];
+        state.logs = [{ message: 'Owner API unavailable or unauthorized. Please login with owner credentials. Database unavailable.', status: 'error', created_at: new Date().toISOString() }];
+        state.ownerError = 'Owner API unavailable or unauthorized. Please login with owner credentials. Database unavailable.';
+        renderAll();
+        $('syncState').textContent = 'Owner API unavailable or unauthorized';
+        toast(state.ownerError);
       }
     }
-    function loadFallbackData() {
-      state.metrics = { total_users: 1284, active_users_today: 91, pending_payments: 7, daily_revenue_try: 18450, monthly_revenue_try: 312900, total_saved_usd: 42870, pending_prs: 3, best_selling_package: 'pro' };
-      state.users = [
-        { email:'ayse@example.com', wallet_address:'7k9...Qp2', credits:42, status:'active', created_at:new Date().toISOString() },
-        { email:'mehmet@example.com', wallet_address:'9Ab...Tz1', credits:0, status:'banned', created_at:new Date(Date.now()-86400000).toISOString() }
-      ];
-      state.payments = [
-        { id:'fallback-1', email:'kurumsal@example.com', product_id:'enterprise', amount_try:24900, status:'pending' },
-        { id:'fallback-2', email:'builder@example.com', product_id:'pro', amount_try:1490, status:'approved' }
-      ];
-      state.grants = [
-        { program:'Solana Foundation', deadline:'2026-07-15', status:'Hazırlanıyor', focus:'MEV Shield public-good metrikleri' },
-        { program:'Ethereum Grants', deadline:'2026-08-01', status:'Taslak', focus:'Bridge ve PoR risk raporu' }
-      ];
-      state.logs = [{ message:'Fallback terminal hazır', status:'ok', created_at:new Date().toISOString() }];
-    }
     function renderAll() { renderMetrics(); renderUsers(); renderPayments(); renderGrants(); renderTerminal(); }
+    function emptyRow(body, columns, message) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = columns;
+      td.textContent = message;
+      td.className = 'muted';
+      tr.appendChild(td);
+      body.appendChild(tr);
+    }
     function renderMetrics() {
       const metrics = [
         ['Toplam kullanıcı', formatNumber(state.metrics.total_users), 'Kayıtlı profil'],
@@ -238,7 +240,10 @@
     function renderUsers() {
       const filter = $('userFilter').value.toLowerCase().trim();
       const body = $('usersBody'); body.replaceChildren();
-      state.users.filter(u => !filter || JSON.stringify(u).toLowerCase().includes(filter)).forEach((u) => {
+      const users = state.users.filter(u => !filter || JSON.stringify(u).toLowerCase().includes(filter));
+      if (state.ownerError) { emptyRow(body, 6, state.ownerError); return; }
+      if (!users.length) { emptyRow(body, 6, 'Kullanıcı bulunamadı.'); return; }
+      users.forEach((u) => {
         const tr = document.createElement('tr');
         tr.append(text('td', u.email), text('td', u.wallet_address), text('td', formatNumber(u.credits)), statusCell(u.status), text('td', formatDate(u.created_at)));
         const actions = document.createElement('td');
@@ -249,6 +254,8 @@
     }
     function renderPayments() {
       const body = $('paymentsBody'); body.replaceChildren();
+      if (state.ownerError) { emptyRow(body, 5, state.ownerError); return; }
+      if (!state.payments.length) { emptyRow(body, 5, 'Bekleyen ödeme bulunamadı.'); return; }
       state.payments.forEach((p) => {
         const tr = document.createElement('tr');
         tr.append(text('td', p.email), text('td', p.product_id), text('td', formatMoney(p.amount_try, 'TRY')), statusCell(p.status));
@@ -259,6 +266,8 @@
     }
     function renderGrants() {
       const body = $('grantsBody'); body.replaceChildren();
+      if (state.ownerError) { emptyRow(body, 4, state.ownerError); return; }
+      if (!state.grants.length) { emptyRow(body, 4, 'Hibe kaydı bulunamadı.'); return; }
       state.grants.forEach((g) => { const tr = document.createElement('tr'); tr.append(text('td', g.program), text('td', g.deadline), text('td', g.status), text('td', g.focus)); body.appendChild(tr); });
     }
     function renderTerminal() {

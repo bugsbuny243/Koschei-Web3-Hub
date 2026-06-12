@@ -3,13 +3,7 @@
   const LEGACY_KEY = 'koschei_token';
   const state = { neonAuthUrl: '' };
 
-  function saveJwt(t) {
-    if (!t) return;
-    try {
-      localStorage.setItem(KEY, t);
-      localStorage.setItem(LEGACY_KEY, t);
-    } catch {}
-  }
+  function saveJwt(t) { try { if (t) { localStorage.setItem(KEY, t); localStorage.setItem(LEGACY_KEY, t); } } catch {} }
   function getJwt() { try { return localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY) || ''; } catch { return ''; } }
   function clearJwt() { try { localStorage.removeItem(KEY); localStorage.removeItem(LEGACY_KEY); } catch {} }
 
@@ -110,8 +104,9 @@
   }
 
   async function finishAuth(result) {
-    const jwt = _isJwt(result.headerJwt) ? result.headerJwt : findJwt(result.data);
-    if (!_isJwt(jwt)) throw new Error('Authentication succeeded, but no JWT was returned by the auth server.');
+    let jwt = _isJwt(result.headerJwt) ? result.headerJwt : findJwt(result.data);
+    if (!jwt && state.neonAuthUrl) jwt = await tokenFollowUp();
+    if (!_isJwt(jwt)) throw new Error('Authentication succeeded, but no JWT was returned by the backend.');
     saveJwt(jwt);
     const me = await verifyMe(jwt);
     return { ...result.data, me, access_token: jwt, token_type: 'Bearer' };
@@ -137,18 +132,30 @@
     try { await loadConfig(); } catch {}
   }
 
+  async function backendAuth(path, body) {
+    const res = await fetch(path, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await readJSON(res);
+    if (!res.ok) {
+      throw new Error(errorMessage(data, `Authentication failed (${res.status})`));
+    }
+    return finishAuth({ data, headerJwt: res.headers.get('set-auth-jwt') || '' });
+  }
+
   async function signUp(email, password) {
-    const result = await backendAuthRequest('/api/auth/register', {
+    return backendAuth('/api/auth/register', {
       email,
       password,
       name: defaultUserName(email),
     });
-    return finishAuth(result);
   }
 
   async function signIn(email, password) {
-    const result = await backendAuthRequest('/api/auth/login', { email, password });
-    return finishAuth(result);
+    return backendAuth('/api/auth/login', { email, password });
   }
 
   async function signOut() {
@@ -179,4 +186,4 @@
     isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt };
 })();
 
-// Email/password auth goes through the backend Neon proxy, then /api/me verifies the Neon JWT.
+// Email/password auth is proxied through /api/auth/login and /api/auth/register, verified through /api/me, and persisted as koschei_jwt.

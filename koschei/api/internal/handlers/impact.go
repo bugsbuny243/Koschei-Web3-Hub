@@ -16,8 +16,8 @@ var publicImpactCacheTTL = 60 * time.Second
 
 type publicImpactMetrics struct {
 	OK                           bool                        `json:"ok"`
-	FallbackMode                 bool                        `json:"fallback_mode"`
-	FallbackNotice               string                      `json:"fallback_notice,omitempty"`
+	Unavailable                  bool                        `json:"unavailable"`
+	Error                        string                      `json:"error,omitempty"`
 	Statement                    string                      `json:"statement"`
 	VerificationNote             string                      `json:"verification_note"`
 	NoCustody                    string                      `json:"no_custody"`
@@ -84,10 +84,13 @@ func (h *Handler) PublicImpact(w http.ResponseWriter, r *http.Request) {
 	}
 	metrics, err := buildPublicImpactMetrics(ctx, db)
 	if err != nil {
-		log.Printf("public impact metrics unavailable; serving metrics-unavailable fallback: %v", err)
+		log.Printf("public impact metrics unavailable: %v", err)
 		metrics = unavailablePublicImpactMetrics()
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, http.StatusServiceUnavailable, metrics)
+		return
 	}
-	if h.Cache != nil && !metrics.FallbackMode {
+	if h.Cache != nil {
 		_ = h.Cache.SetJSON(ctx, publicImpactCacheKey, metrics, publicImpactCacheTTL)
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")
@@ -97,37 +100,17 @@ func (h *Handler) PublicImpact(w http.ResponseWriter, r *http.Request) {
 func unavailablePublicImpactMetrics() publicImpactMetrics {
 	now := time.Now().UTC()
 	return publicImpactMetrics{
-		OK:                           true,
-		FallbackMode:                 true,
-		FallbackNotice:               "Live metrics are unavailable right now.",
-		Statement:                    "Koschei public-good impact dashboard is online; live aggregates are unavailable right now.",
-		VerificationNote:             "No unverifiable impact totals are shown while the metrics backend is unreachable. Live read-only aggregates resume automatically when available.",
-		NoCustody:                    "Koschei never asks for private keys and does not custody user funds.",
-		TotalSavedUSD:                0,
-		MEVEstimatedLossPreventedUSD: 0,
-		LiquidityLossPreventedUSD:    0,
-		RugPullsPrevented:            0,
-		ActiveProtectedWallets:       0,
-		Last24HPreventedUSD:          0,
-		Last7DPreventedUSD:           0,
-		MEVEventsCount:               0,
-		LiquidityAlertsCount:         0,
-		SystemActiveUsers:            0,
-		GeneratedOutputsCount:        0,
-		ModulesLiveCount:             0,
-		SupportedNetworksCount:       0,
-		ChainChecksCount:             0,
-		WatchlistSourceCount:         0,
-		Web3EventCount:               0,
-		LiveModules: []map[string]string{
-			{"name": "MEV Shield", "status": "metrics_unavailable"},
-			{"name": "Liquidity Radar", "status": "metrics_unavailable"},
-			{"name": "DAO Guardian", "status": "metrics_unavailable"},
-		},
-		RecentLogs:      []publicImpactPreventionLog{},
-		PublicRoadmap:   []string{"Reconnect live public metrics", "Publish verification snapshots", "Expand grant-safe reports"},
-		UpdatedAt:       now,
-		CacheTTLSeconds: int(publicImpactCacheTTL.Seconds()),
+		OK:               false,
+		Unavailable:      true,
+		Error:            "Public metrics unavailable. Database unavailable.",
+		Statement:        "Koschei public-good impact metrics are currently unavailable.",
+		VerificationNote: "Live read-only database aggregates are required before public impact values are shown.",
+		NoCustody:        "Koschei never asks for private keys and does not custody user funds.",
+		RecentLogs:       []publicImpactPreventionLog{},
+		LiveModules:      []map[string]string{},
+		PublicRoadmap:    []string{},
+		UpdatedAt:        now,
+		CacheTTLSeconds:  int(publicImpactCacheTTL.Seconds()),
 	}
 }
 
