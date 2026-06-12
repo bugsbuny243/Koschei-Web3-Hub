@@ -11,7 +11,7 @@ import (
 
 const (
 	freePlanID          = "free"
-	freeOutputsIncluded = 10
+	freeOutputsIncluded = 0
 )
 
 type memberSummaryResponse struct {
@@ -64,7 +64,7 @@ func (h *Handler) provisionMember(ctx context.Context, claims neonJWTClaims) (me
 func provisionMemberTx(ctx context.Context, store appProfileStore, sub, email string) (memberSummaryResponse, error) {
 	// Serialize profile and entitlement initialization per normalized identity so
 	// concurrent provisioning requests cannot create duplicate app profiles or
-	// multiple active free entitlements.
+	// multiple active zero-output free records. Premium output access is never granted here.
 	profile := authUser{}
 	if err := upsertAppProfileTx(ctx, store, sub, email, &profile); err != nil {
 		return memberSummaryResponse{}, err
@@ -93,8 +93,8 @@ func provisionMemberTx(ctx context.Context, store appProfileStore, sub, email st
 			WHERE lower(email) = lower($1)
 			  AND status = 'active'
 		), totals AS (
-			SELECT COALESCE(SUM(outputs_total), 0)::int AS outputs_total,
-			       COALESCE(SUM(outputs_remaining), 0)::int AS outputs_remaining
+			SELECT COALESCE(SUM(outputs_total), 0)::int + COALESCE((SELECT credits FROM app_user_profiles WHERE auth_subject = $2), 0) AS outputs_total,
+			       COALESCE(SUM(outputs_remaining), 0)::int + COALESCE((SELECT credits FROM app_user_profiles WHERE auth_subject = $2), 0) AS outputs_remaining
 			FROM active_entitlements
 		), paid_plan AS (
 			SELECT plan_id
@@ -104,10 +104,10 @@ func provisionMemberTx(ctx context.Context, store appProfileStore, sub, email st
 			         created_at DESC
 			LIMIT 1
 		)
-		SELECT COALESCE((SELECT plan_id FROM paid_plan), 'free') AS plan_id,
+		SELECT CASE WHEN (SELECT plan_id FROM paid_plan) IS NOT NULL THEN (SELECT plan_id FROM paid_plan) WHEN COALESCE((SELECT credits FROM app_user_profiles WHERE auth_subject = $2), 0) > 0 THEN 'owner_grant' ELSE 'free' END AS plan_id,
 		       outputs_total,
 		       outputs_remaining
-		FROM totals`, email).Scan(&summary.Plan, &summary.OutputsTotal, &summary.OutputsRemaining); err != nil {
+		FROM totals`, email, sub).Scan(&summary.Plan, &summary.OutputsTotal, &summary.OutputsRemaining); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return memberSummaryResponse{}, errors.New("active entitlement missing after initialization")
 		}

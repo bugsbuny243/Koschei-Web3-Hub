@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestOwnerStaticRouteRequiresSecretOnly(t *testing.T) {
+func TestOwnerStaticRouteShowsLoginPage(t *testing.T) {
 	staticDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("index"), 0o644); err != nil {
 		t.Fatalf("write index: %v", err)
@@ -28,8 +28,8 @@ func TestOwnerStaticRouteRequiresSecretOnly(t *testing.T) {
 		t.Fatalf("get owner without secret: %v", err)
 	}
 	defer unauthorized.Body.Close()
-	if unauthorized.StatusCode != http.StatusNotFound {
-		t.Fatalf("GET /owner without secret = %d, want %d", unauthorized.StatusCode, http.StatusNotFound)
+	if unauthorized.StatusCode != http.StatusOK {
+		t.Fatalf("GET /owner without secret = %d, want %d", unauthorized.StatusCode, http.StatusOK)
 	}
 
 	req, err := http.NewRequest(http.MethodGet, srv.URL+"/owner", nil)

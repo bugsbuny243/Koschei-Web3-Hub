@@ -105,7 +105,6 @@
 
   async function finishAuth(result) {
     let jwt = _isJwt(result.headerJwt) ? result.headerJwt : findJwt(result.data);
-    if (!jwt && state.neonAuthUrl) jwt = await tokenFollowUp();
     if (!_isJwt(jwt)) throw new Error('Authentication succeeded, but no JWT was returned by the backend.');
     saveJwt(jwt);
     const me = await verifyMe(jwt);

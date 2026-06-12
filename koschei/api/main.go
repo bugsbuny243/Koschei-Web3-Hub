@@ -74,11 +74,20 @@ func main() {
 	}
 	staticDir := resolveStaticDir(os.Getenv("STATIC_DIR"))
 	log.Printf("static public path: %s", staticDir)
-	srv := apihttp.NewServer(conn, dbInitError, os.Getenv("ADMIN_PASSWORD"), os.Getenv("CORS_ALLOWED_ORIGIN"), staticDir, apihttp.WithReadDB(readConn), apihttp.WithCache(appCache), apihttp.WithSolanaRPC(solanaRPC), apihttp.WithJobStore(jobStore), apihttp.WithJobQueue(jobQueue))
+	srv := apihttp.NewServer(conn, dbInitError, os.Getenv("ADMIN_PASSWORD"), firstEnv("CORS_ORIGIN", "CORS_ALLOWED_ORIGIN"), staticDir, apihttp.WithReadDB(readConn), apihttp.WithCache(appCache), apihttp.WithSolanaRPC(solanaRPC), apihttp.WithJobStore(jobStore), apihttp.WithJobQueue(jobQueue))
 	log.Printf("api listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, srv); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func firstEnv(keys ...string) string {
+	for _, key := range keys {
+		if value := os.Getenv(key); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func resolveStaticDir(configured string) string {
