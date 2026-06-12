@@ -92,6 +92,11 @@ func provisionMemberTx(ctx context.Context, store appProfileStore, sub, email st
 			FROM entitlements
 			WHERE lower(email) = lower($1)
 			  AND status = 'active'
+			  AND COALESCE(plan_id, 'free') <> 'free'
+		), profile_credits AS (
+			SELECT COALESCE(MAX(credits), 0)::int AS credits
+			FROM app_user_profiles
+			WHERE lower(email) = lower($1)
 		), totals AS (
 			SELECT COALESCE(SUM(outputs_total), 0)::int + COALESCE((SELECT credits FROM app_user_profiles WHERE auth_subject = $2), 0) AS outputs_total,
 			       COALESCE(SUM(outputs_remaining), 0)::int + COALESCE((SELECT credits FROM app_user_profiles WHERE auth_subject = $2), 0) AS outputs_remaining

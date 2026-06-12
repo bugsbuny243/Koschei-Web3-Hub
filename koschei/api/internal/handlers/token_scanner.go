@@ -214,4 +214,3 @@ func callSolanaRPC(client *http.Client, rpcURL, method string, params interface{
 func roundPercent(value float64) float64 {
 	return float64(int(value*100+0.5)) / 100
 }
-

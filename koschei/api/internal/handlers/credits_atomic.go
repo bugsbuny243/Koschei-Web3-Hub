@@ -23,6 +23,9 @@ func (h *Handler) userCreditsAndRole(authSubject string) (bool, int, error) {
 			WHERE p.auth_subject = $1
 		), 0)`, authSubject).Scan(&available)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, 0, nil
+		}
 		return false, 0, err
 	}
 	return false, available, nil
@@ -82,6 +85,6 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 	if rows != 1 {
 		return errors.New("insufficient outputs")
 	}
-	_, err = tx.Exec(`INSERT INTO credit_events (email, amount, reason, event_type) VALUES (lower($1), -1, $2, $3)`, email, reason, reason)
+	_, err = tx.Exec(`INSERT INTO credit_events (email, amount, reason, event_type) VALUES (lower($1), -1, $2, $3)`, normalizedEmail, reason, reason)
 	return err
 }

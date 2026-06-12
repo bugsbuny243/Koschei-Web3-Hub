@@ -21,11 +21,6 @@
     return safeLocalStorage((storage) => storage.getItem(TOKEN_KEY) || storage.getItem(LEGACY_TOKEN_KEY) || '', '');
   }
 
-  function getAuthHeader() {
-    const token = getToken();
-    return token ? 'Bearer ' + token : '';
-  }
-
   function clearToken() {
     safeLocalStorage((storage) => {
       storage.removeItem(TOKEN_KEY);

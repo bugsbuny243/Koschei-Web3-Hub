@@ -32,6 +32,7 @@ type paymentRequestInput struct {
 
 type paymentRequestReviewInput struct {
 	PaymentRequestID string `json:"payment_request_id"`
+	ID               string `json:"id"`
 	Reason           string `json:"reason"`
 }
 
@@ -167,7 +168,12 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	var req paymentRequestReviewInput
-	if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.PaymentRequestID) == "" {
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	paymentRequestID := strings.TrimSpace(firstNonEmpty(req.PaymentRequestID, req.ID))
+	if paymentRequestID == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
@@ -184,7 +190,7 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 		SELECT lower(email), product_id, status
 		FROM payment_requests
 		WHERE id = $1
-		FOR UPDATE`, strings.TrimSpace(req.PaymentRequestID)).Scan(&email, &productID, &status); err != nil {
+		FOR UPDATE`, paymentRequestID).Scan(&email, &productID, &status); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "payment request not found"})
 			return
@@ -214,7 +220,7 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 	if paymentRequestIDColumnExists {
 		_, err = tx.ExecContext(r.Context(), `
 			INSERT INTO entitlements (email, plan_id, payment_request_id, outputs_total, outputs_remaining, status)
-			VALUES (lower($1), $2, $3, $4, $4, 'active')`, email, productID, strings.TrimSpace(req.PaymentRequestID), pack.Outputs)
+			VALUES (lower($1), $2, $3, $4, $4, 'active')`, email, productID, paymentRequestID, pack.Outputs)
 	} else {
 		_, err = tx.ExecContext(r.Context(), `
 			INSERT INTO entitlements (email, plan_id, outputs_total, outputs_remaining, status)
@@ -224,7 +230,7 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "entitlement insert failed"})
 		return
 	}
-	if _, err := tx.ExecContext(r.Context(), `UPDATE payment_requests SET status = 'approved', reviewed_at = now() WHERE id = $1`, strings.TrimSpace(req.PaymentRequestID)); err != nil {
+	if _, err := tx.ExecContext(r.Context(), `UPDATE payment_requests SET status = 'approved', reviewed_at = now() WHERE id = $1`, paymentRequestID); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment request update failed"})
 		return
 	}
@@ -244,7 +250,12 @@ func (h *Handler) OwnerRejectPaymentRequest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	var req paymentRequestReviewInput
-	if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.PaymentRequestID) == "" {
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+	paymentRequestID := strings.TrimSpace(firstNonEmpty(req.PaymentRequestID, req.ID))
+	if paymentRequestID == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
@@ -253,7 +264,7 @@ func (h *Handler) OwnerRejectPaymentRequest(w http.ResponseWriter, r *http.Reque
 		UPDATE payment_requests
 		SET status = 'rejected', reviewed_at = now(),
 		    raw_payload = COALESCE(raw_payload, '{}'::jsonb) || jsonb_build_object('reason', $2::text)
-		WHERE id = $1 AND status = 'pending'`, strings.TrimSpace(req.PaymentRequestID), reason)
+		WHERE id = $1 AND status = 'pending'`, paymentRequestID, reason)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment request update failed"})
 		return
