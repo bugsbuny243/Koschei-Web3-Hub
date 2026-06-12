@@ -216,7 +216,7 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if _, err := activatePackageEntitlementTx(r.Context(), tx, email, productID, "shopier_manual", paymentRequestID, paymentRequestID); err != nil {
+	if _, err := activatePackageEntitlementTx(r.Context(), tx, email, productID, "owner_manual", paymentRequestID, paymentRequestID); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "entitlement activation failed"})
 		return
 	}
@@ -360,6 +360,19 @@ func activatePackageEntitlementTx(ctx context.Context, tx *sql.Tx, email, packag
 		if err != nil {
 			return entitlementActivationResult{}, err
 		}
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE app_user_profiles
+		SET plan_id = CASE
+			WHEN CASE $2 WHEN 'studio' THEN 3 WHEN 'builder' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END >=
+			     CASE COALESCE(plan_id, 'free') WHEN 'studio' THEN 3 WHEN 'builder' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END
+			THEN $2
+			ELSE plan_id
+		END,
+		updated_at = now()
+		WHERE lower(email) = lower($1)`, email, packageID); err != nil {
+		return entitlementActivationResult{}, err
 	}
 
 	return entitlementActivationResult{Activated: true, PackageID: packageID, OutputsTotal: outputs, OutputsRemaining: outputs}, nil

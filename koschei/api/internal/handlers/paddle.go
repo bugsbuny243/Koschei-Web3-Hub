@@ -93,15 +93,16 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	email := strings.ToLower(strings.TrimSpace(claims.Email))
 	planTier := normalizePlanTier(firstNonEmpty(req.Package, req.PlanTier, req.ProductID))
 	priceID := paddleConfiguredPriceID(planTier)
+	apiKeyConfigured := strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != ""
 	if email == "" || planTier == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "valid_package_required"})
 		return
 	}
-	if priceID == "" {
+	if priceID == "" || !apiKeyConfigured {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "paddle_not_configured", "message": "Paddle global checkout is not configured yet."})
 		return
 	}
-	checkoutURL, err := h.CreateCheckoutSession(priceID, email, claims.Sub, planTier)
+	checkoutURL, err := h.CreateCheckoutSession(r.Context(), priceID, email, claims.Sub, planTier)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "paddle_checkout_failed", "message": safeError(err)})
 		return
@@ -109,7 +110,7 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "checkout_url": checkoutURL})
 }
 
-func (h *Handler) CreateCheckoutSession(priceID, customerEmail, authSubject, planTier string) (string, error) {
+func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEmail, authSubject, planTier string) (string, error) {
 	apiKey := strings.TrimSpace(os.Getenv("PADDLE_API_KEY"))
 	if apiKey == "" {
 		return "", errors.New("PADDLE_API_KEY is not configured")
@@ -118,7 +119,7 @@ func (h *Handler) CreateCheckoutSession(priceID, customerEmail, authSubject, pla
 	if planTier == "" {
 		return "", errors.New("invalid plan tier")
 	}
-	customerID, err := h.createPaddleCustomer(context.Background(), customerEmail, planTier)
+	customerID, err := h.createPaddleCustomer(ctx, customerEmail, planTier)
 	if err != nil {
 		return "", err
 	}
@@ -128,6 +129,7 @@ func (h *Handler) CreateCheckoutSession(priceID, customerEmail, authSubject, pla
 		"custom_data": map[string]any{
 			"auth_subject":   strings.TrimSpace(authSubject),
 			"customer_email": strings.ToLower(strings.TrimSpace(customerEmail)),
+			"package":        planTier,
 			"package_id":     planTier,
 			"package_name":   packageName(planTier),
 			"plan_tier":      planTier,
@@ -138,11 +140,8 @@ func (h *Handler) CreateCheckoutSession(priceID, customerEmail, authSubject, pla
 		},
 		"items": []map[string]any{paddleTransactionItem(priceID, planTier)},
 	}
-	if checkoutURL := strings.TrimSpace(os.Getenv("PADDLE_CHECKOUT_URL")); checkoutURL != "" {
-		payload["checkout"] = map[string]string{"url": checkoutURL}
-	}
 	var out paddleAPIResponse
-	if err := paddleRequest(context.Background(), http.MethodPost, "/transactions", payload, &out); err != nil {
+	if err := paddleRequest(ctx, http.MethodPost, "/transactions", payload, &out); err != nil {
 		return "", err
 	}
 	if out.Data.Checkout.URL == "" {
@@ -384,8 +383,8 @@ func (h *Handler) markPaddlePaymentSucceeded(ctx context.Context, raw json.RawMe
 	if txData.Status != "" && txData.Status != "completed" && txData.Status != "paid" {
 		return nil
 	}
-	packageID := normalizePlanTier(firstNonEmpty(customDataString(txData.CustomData, "package_id"), customDataString(txData.CustomData, "plan_tier")))
-	email := strings.ToLower(strings.TrimSpace(customDataString(txData.CustomData, "customer_email")))
+	packageID := normalizePlanTier(firstNonEmpty(customDataString(txData.CustomData, "package"), customDataString(txData.CustomData, "package_id"), customDataString(txData.CustomData, "plan_tier")))
+	email := strings.ToLower(strings.TrimSpace(firstNonEmpty(customDataString(txData.CustomData, "customer_email"), customDataString(txData.CustomData, "user_email"))))
 	if (email == "" || packageID == "") && txData.SubscriptionID != "" {
 		var storedEmail, storedPlan string
 		_ = h.DB.QueryRowContext(ctx, `
