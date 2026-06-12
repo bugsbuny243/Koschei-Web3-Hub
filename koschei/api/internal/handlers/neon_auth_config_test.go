@@ -54,12 +54,12 @@ func TestMissingProductionAuthEnv(t *testing.T) {
 	}
 }
 
-func TestMissingProductionAuthEnvAcceptsFallbackSecretsAndCorsAlias(t *testing.T) {
+func TestMissingProductionAuthEnvDoesNotRequireDedicatedStateSecret(t *testing.T) {
 	t.Setenv("NEON_AUTH_BASE_URL", "https://auth.example")
 	t.Setenv("NEON_AUTH_ISSUER", "issuer")
 	t.Setenv("NEON_AUTH_JWKS_URL", "jwks")
 	t.Setenv("NEON_AUTH_STATE_SECRET", "")
-	t.Setenv("KOSCHEI_AUTH_STATE_SECRET", "secret")
+	t.Setenv("KOSCHEI_AUTH_STATE_SECRET", "")
 	t.Setenv("DATABASE_URL", "postgres://example")
 	t.Setenv("CORS_ORIGIN", "")
 	t.Setenv("CORS_ALLOWED_ORIGIN", "https://example.com")
@@ -79,7 +79,7 @@ func TestMissingProductionAuthEnvReportsAlternativeGroups(t *testing.T) {
 	t.Setenv("CORS_ORIGIN", "")
 	t.Setenv("CORS_ALLOWED_ORIGIN", "")
 
-	want := []string{"NEON_AUTH_STATE_SECRET or KOSCHEI_AUTH_STATE_SECRET", "CORS_ORIGIN or CORS_ALLOWED_ORIGIN"}
+	want := []string{"CORS_ORIGIN or CORS_ALLOWED_ORIGIN"}
 	if got := MissingProductionAuthEnv(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("MissingProductionAuthEnv() = %#v, want %#v", got, want)
 	}
