@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const defaultPublicAppURL = "https://tradepigloball.co"
+
 var requiredProductionAuthEnv = [][]string{
 	{"NEON_AUTH_BASE_URL"},
 	{"NEON_AUTH_ISSUER"},
@@ -27,10 +29,13 @@ func configuredPublicNeonAuthURL() string {
 }
 
 func configuredPublicAppURL() string {
-	for _, name := range []string{"PUBLIC_APP_URL", "APP_BASE_URL", "SITE_URL"} {
+	for _, name := range []string{"PUBLIC_APP_URL", "APP_BASE_URL", "SITE_URL", "CORS_ORIGIN", "CORS_ALLOWED_ORIGIN"} {
 		if value := normalizeAbsoluteBaseURL(trimmedEnv(name)); value != "" {
 			return value
 		}
+	}
+	if isProduction() {
+		return defaultPublicAppURL
 	}
 	return ""
 }

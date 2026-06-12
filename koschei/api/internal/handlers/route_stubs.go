@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -28,6 +29,14 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	h.emailPasswordAuth(w, r, "/sign-in/email")
 }
 
+type neonEmailAuthResult struct {
+	StatusCode int
+	Data       map[string]any
+	Body       []byte
+	Token      string
+	TokenFound bool
+}
+
 func (h *Handler) emailPasswordAuth(w http.ResponseWriter, r *http.Request, neonPath string) {
 	var req emailAuthRequest
 	if err := decodeJSON(r, &req); err != nil {
@@ -39,11 +48,76 @@ func (h *Handler) emailPasswordAuth(w http.ResponseWriter, r *http.Request, neon
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "email_and_password_required"})
 		return
 	}
-	baseURL := strings.TrimRight(strings.TrimSpace(configuredNeonAuthBaseURL()), "/")
-	if baseURL == "" {
+	result, ok := h.callNeonEmailPasswordAuth(r, emailAuthRequest{Email: email, Password: req.Password, Name: req.Name, CallbackURL: req.CallbackURL}, neonPath)
+	if !ok {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "neon_auth_not_configured"})
 		return
 	}
+	endpoint := neonEmailAuthEndpointName(neonPath)
+	if result.StatusCode/100 != 2 {
+		if isNeonCallbackURLError(result.Data) {
+			writeJSON(w, http.StatusBadGateway, map[string]string{
+				"error":   "auth_callback_url_invalid",
+				"message": "Auth callback URL is not configured correctly.",
+			})
+			return
+		}
+		writeJSON(w, result.StatusCode, result.Data)
+		return
+	}
+	jwt := result.Token
+	if jwt == "" && neonPath == "/sign-up/email" {
+		fallback, fallbackOK := h.callNeonEmailPasswordAuth(r, emailAuthRequest{Email: email, Password: req.Password, CallbackURL: req.CallbackURL}, "/sign-in/email")
+		if !fallbackOK {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "neon_auth_not_configured"})
+			return
+		}
+		if fallback.StatusCode/100 != 2 {
+			writeJSON(w, http.StatusBadGateway, map[string]string{
+				"error":   "auth_session_missing",
+				"message": "Account was created, but no session token was returned. Please sign in.",
+			})
+			return
+		}
+		jwt = fallback.Token
+		result = fallback
+		endpoint = "signup_fallback_login"
+	}
+	if jwt == "" {
+		if neonPath == "/sign-in/email" {
+			writeJSON(w, http.StatusBadGateway, map[string]string{
+				"error":   "auth_session_missing",
+				"message": "Login succeeded, but no session token was returned by the auth provider.",
+			})
+			return
+		}
+		writeJSON(w, http.StatusBadGateway, map[string]string{
+			"error":   "auth_session_missing",
+			"message": "Account was created, but no session token was returned. Please sign in.",
+		})
+		return
+	}
+	claims, err := parseAndVerifyNeonJWT(jwt)
+	tokenVerified := err == nil
+	safeAuthDebugLog(endpoint+"_verify", result.StatusCode, result.Body, nil, result.TokenFound, tokenVerified)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_token"})
+		return
+	}
+	profile, err := h.authSuccessProfile(r, claims)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_provision_failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "token": jwt, "access_token": jwt, "token_type": "Bearer", "user": profile})
+}
+
+func (h *Handler) callNeonEmailPasswordAuth(r *http.Request, req emailAuthRequest, neonPath string) (neonEmailAuthResult, bool) {
+	baseURL := strings.TrimRight(strings.TrimSpace(configuredNeonAuthBaseURL()), "/")
+	if baseURL == "" {
+		return neonEmailAuthResult{}, false
+	}
+	email := strings.ToLower(strings.TrimSpace(req.Email))
 	payload := map[string]string{"email": email, "password": req.Password, "callbackURL": absoluteEmailAuthCallbackURL(r, req.CallbackURL)}
 	if strings.TrimSpace(req.Name) != "" {
 		payload["name"] = strings.TrimSpace(req.Name)
@@ -52,8 +126,7 @@ func (h *Handler) emailPasswordAuth(w http.ResponseWriter, r *http.Request, neon
 	client := &http.Client{Timeout: 10 * time.Second}
 	neonReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, baseURL+neonPath, bytes.NewReader(body))
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "auth_request_failed"})
-		return
+		return neonEmailAuthResult{StatusCode: http.StatusInternalServerError, Data: map[string]any{"error": "auth_request_failed"}}, true
 	}
 	neonReq.Header.Set("Content-Type", "application/json")
 	if origin := publicBaseURL(r); origin != "" {
@@ -61,60 +134,53 @@ func (h *Handler) emailPasswordAuth(w http.ResponseWriter, r *http.Request, neon
 	}
 	resp, err := client.Do(neonReq)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "neon_auth_unavailable"})
-		return
+		return neonEmailAuthResult{StatusCode: http.StatusBadGateway, Data: map[string]any{"error": "neon_auth_unavailable"}}, true
 	}
 	defer resp.Body.Close()
-	var data map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		data = map[string]any{}
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	data := map[string]any{}
+	if len(respBody) > 0 {
+		_ = json.Unmarshal(respBody, &data)
 	}
-	if resp.StatusCode/100 != 2 {
-		if isNeonCallbackURLError(data) {
-			writeJSON(w, http.StatusBadGateway, map[string]string{
-				"error":   "auth_callback_url_invalid",
-				"message": "Auth callback URL is not configured correctly.",
-			})
-			return
-		}
-		writeJSON(w, resp.StatusCode, data)
-		return
-	}
-	jwt := firstJWT(resp.Header.Get("set-auth-jwt"), data)
-	if jwt == "" {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "token_missing"})
-		return
-	}
-	claims, err := parseAndVerifyNeonJWT(jwt)
-	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_token"})
-		return
-	}
+	jwt, tokenFound := extractAuthToken(resp, respBody)
+	safeAuthDebugLog(neonEmailAuthEndpointName(neonPath), resp.StatusCode, respBody, resp.Cookies(), tokenFound, false)
+	return neonEmailAuthResult{StatusCode: resp.StatusCode, Data: data, Body: respBody, Token: jwt, TokenFound: tokenFound}, true
+}
+
+func (h *Handler) authSuccessProfile(r *http.Request, claims neonJWTClaims) (map[string]any, error) {
 	profile := map[string]any{"auth_subject": claims.Sub, "email": claims.Email, "role": "member", "plan_id": "free", "plan": "free", "credits": 0, "outputs_total": 0, "outputs_remaining": 0}
-	if h.DB != nil {
-		summary, err := h.provisionMember(r.Context(), claims)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_provision_failed"})
-			return
-		}
-		p, err := h.upsertProfile(r.Context(), claims.Sub, claims.Email)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_provision_failed"})
-			return
-		}
-		profile = map[string]any{
-			"id":                p.ID,
-			"auth_subject":      p.AuthSubject,
-			"email":             p.Email,
-			"role":              firstNonEmpty(p.Role, "member"),
-			"plan_id":           firstNonEmpty(summary.Plan, p.PlanID, "free"),
-			"plan":              firstNonEmpty(summary.Plan, p.PlanID, "free"),
-			"credits":           p.Credits,
-			"outputs_total":     summary.OutputsTotal,
-			"outputs_remaining": summary.OutputsRemaining,
-		}
+	if h.DB == nil {
+		return profile, nil
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "token": jwt, "access_token": jwt, "token_type": "Bearer", "user": profile})
+	summary, err := h.provisionMember(r.Context(), claims)
+	if err != nil {
+		return nil, err
+	}
+	p, err := h.upsertProfile(r.Context(), claims.Sub, claims.Email)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"id":                p.ID,
+		"auth_subject":      p.AuthSubject,
+		"email":             p.Email,
+		"role":              firstNonEmpty(p.Role, "member"),
+		"plan_id":           firstNonEmpty(summary.Plan, p.PlanID, "free"),
+		"plan":              firstNonEmpty(summary.Plan, p.PlanID, "free"),
+		"credits":           p.Credits,
+		"outputs_total":     summary.OutputsTotal,
+		"outputs_remaining": summary.OutputsRemaining,
+	}, nil
+}
+
+func neonEmailAuthEndpointName(neonPath string) string {
+	if neonPath == "/sign-up/email" {
+		return "signup"
+	}
+	if neonPath == "/sign-in/email" {
+		return "login"
+	}
+	return strings.Trim(strings.ReplaceAll(neonPath, "/", "_"), "_")
 }
 
 func absoluteEmailAuthCallbackURL(r *http.Request, requested string) string {

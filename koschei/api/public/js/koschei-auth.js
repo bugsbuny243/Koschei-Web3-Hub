@@ -1,8 +1,6 @@
 (function () {
   const KEY = 'koschei_jwt';
   const LEGACY_KEY = 'koschei_token';
-  const state = { neonAuthUrl: '' };
-
   function saveJwt(t) { try { if (t) { localStorage.setItem(KEY, t); localStorage.setItem(LEGACY_KEY, t); } } catch {} }
   function getJwt() { try { return localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY) || ''; } catch { return ''; } }
   function clearJwt() { try { localStorage.removeItem(KEY); localStorage.removeItem(LEGACY_KEY); } catch {} }
@@ -31,10 +29,6 @@
     try { return JSON.parse(_b64url(jwt.split('.')[1])).sub || null; } catch { return null; }
   }
 
-  function normalizeBaseUrl(raw) {
-    return String(raw || '').trim().replace(/\/+$/, '');
-  }
-
   function defaultUserName(email) {
     const name = String(email || '').split('@')[0].trim();
     return name || 'User';
@@ -47,18 +41,29 @@
   function errorMessage(data, fallback) {
     if (!data) return fallback;
     if (typeof data === 'string') return data || fallback;
+    if (data.error === 'token_missing') return 'Account was created, but no login session was returned. Please try signing in.';
+    if (data.error === 'auth_session_missing' || data.error === 'auth_verification_required') {
+      return data.message || 'Account was created, but no login session was returned. Please try signing in.';
+    }
     return data.message || data.error_description || data.error || data.detail || fallback;
   }
 
   function findJwt(value) {
     if (!value || typeof value !== 'object') return '';
     const candidates = [
-      value.access_token,
       value.token,
-      value.session && value.session.access_token,
-      value.data && value.data.session && value.data.session.access_token,
-      value.data && value.data.access_token,
+      value.jwt,
+      value.access_token,
+      value.id_token,
+      value.auth_token,
       value.data && value.data.token,
+      value.data && value.data.jwt,
+      value.data && value.data.access_token,
+      value.data && value.data.id_token,
+      value.session && value.session.token,
+      value.session && value.session.jwt,
+      value.session && value.session.access_token,
+      value.session && value.session.id_token,
     ];
     for (const candidate of candidates) {
       if (_isJwt(candidate)) return candidate;
@@ -74,9 +79,7 @@
 
   async function loadConfig() {
     const res = await fetch('/api/config', { credentials: 'same-origin' });
-    const data = await readJSON(res);
-    if (res.ok) state.neonAuthUrl = normalizeBaseUrl(data.neonAuthUrl);
-    return data;
+    return readJSON(res);
   }
 
   async function verifyMe(jwt) {
