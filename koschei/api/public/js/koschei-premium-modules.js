@@ -2,8 +2,11 @@ const PremiumModules = (() => {
   const safe = 'Özel anahtar veya seed phrase girmeyin. Yalnızca açık cüzdan, token, işlem, proje, repository ve sosyal verileri kullanın. Koschei salt-okunur istihbarat sağlar; finansal, hukuki, yatırım veya güvenlik tavsiyesi değildir.';
   const positioning = 'Koschei işlem istihbaratı, cüzdan istihbaratı, token analizi, proje istihbaratı, risk analizi, hibe hazırlığı ve ilişki haritalamayı tek bir Solana/Web3 istihbarat akışında birleştirir.';
   const $ = id => document.getElementById(id);
-  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const nice = k => String(k).replaceAll('_',' ').replace(/\b\w/g, c => c.toUpperCase());
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const technicalMessage = 'Koschei sadece herkese açık veriyi analiz eder. Özel anahtar, seed phrase veya gizli müşteri verisi girmeyin.';
+  const networks = [['solana-mainnet','Solana Mainnet'], ['solana-devnet','Solana Devnet'], ['solana-testnet','Solana Testnet']];
+  const targetTypes = [['wallet','Cüzdan'], ['token','Token'], ['tx','İşlem'], ['project','Proje']];
+  const entityTypes = [['wallet','Cüzdan'], ['token','Token'], ['tx','İşlem'], ['project','Proje']];
 
   const configs = {
     tx: { title:'TX Decoder', badge:['TRANSACTION INTELLIGENCE','PACKAGE ACCESS'], desc:'Açık Solana işlem imzasını işlem amacı, ilgili programlar, risk bayrakları, kanıt notları ve önerilen sonraki kontroller olarak çözün.', endpoint:'/api/tx/decode', method:'POST', button:'İşlemi Çöz', inputLabel:'Transaction signature', fields:[['sig','Transaction signature','text','Paste a Solana transaction signature'],['network','Network','select','solana-mainnet|solana-devnet|solana-testnet']], build:f=>({signature:f.sig, network:f.network}), next:[['Cüzdan Analizini Başlat','/wallet-score'],['Risk Analizi Başlat','/risk']] },
@@ -23,11 +26,13 @@ const PremiumModules = (() => {
   function field([name,label,type,placeholder]) { if (type === 'select') return `<label class="form-label">${esc(label)}<select class="form-input" name="${esc(name)}">${placeholder.split('|').map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></label>`; if (type === 'textarea') return `<label class="form-label">${esc(label)}<textarea class="form-input" name="${esc(name)}" placeholder="${esc(placeholder)}"></textarea></label>`; return `<label class="form-label">${esc(label)}<input class="form-input" name="${esc(name)}" placeholder="${esc(placeholder)}"></label>`; }
   function formValues(form) { return Object.fromEntries(new FormData(form)); }
 
-  function normalizeResult(key, data, vals) {
-    const d = data && data.draft ? data.draft : data;
-    if (key === 'risk') {
-      const flags = d.red_flags || [];
-      return {...d, findings: flags.length ? flags.map(reason => ({severity:d.severity || 'medium', reason, evidence:(d.evidence || ['Submitted public target and notes'])[0], confidence:d.preliminary ? 'medium' : 'high', recommended_action:(d.recommendations || ['Review manually'])[0]})) : [{severity:d.severity || 'low', reason:'No risk signals found yet from available inputs.', evidence:'No additional red flags returned by this analysis run.', confidence:'medium', recommended_action:'Continue with wallet, token, transaction and project-level checks.'}]};
+  function inputMarkup(item) {
+    const common = `name="${esc(item.name)}" id="${esc(item.id || item.name)}" class="form-input"`;
+    if (item.type === 'select') {
+      return `<label class="form-group ${esc(item.className || '')}"><span class="form-label">${esc(item.label)}</span><select ${common}>${item.options.map(([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`).join('')}</select></label>`;
+    }
+    if (item.type === 'textarea') {
+      return `<label class="form-group ${esc(item.className || '')}"><span class="form-label">${esc(item.label)}</span><textarea ${common} placeholder="${esc(item.placeholder)}"></textarea></label>`;
     }
     if (key === 'txpro' || key === 'tx') return {...d, transaction_purpose:d.human_summary || d.summary || d.explanation || 'Transaction decoded from available public data.', involved_wallets_or_programs:d.programs || [d.from, d.to].filter(Boolean), risk_flags:d.risk_hints || (d.risk_reason ? [d.risk_reason] : []), evidence_notes:['Provider response and decoded transaction fields from the backend endpoint.'], suggested_next_checks:['Score involved wallets', 'Risk Analizi Başlat', 'Open related entities in Intelligence Graph']};
     if (key === 'wallet') return {...d, score_breakdown:{activity:d.tx_count || d.TxCount || 'available in response', trust_level:d.level || d.label, active_days:d.active_days, balance:d.balance_sol}, red_flags:(d.score < 40 ? ['Low score based on available activity signals'] : []), evidence:['Public Solana RPC account, balance and signature history signals.'], suggested_next_analysis:['Track portfolio exposure', 'Risk Analizi Başlat', 'İstihbarat Grafını Aç']};
@@ -68,7 +73,7 @@ const PremiumModules = (() => {
   }
 
   async function run(key) {
-    const c = configs[key];
+    const config = configs[key];
     const submit = $('submit');
     submit.disabled = true;
     submit.innerHTML = '<span class="spinner"></span> Çalışıyor…';
@@ -89,10 +94,16 @@ const PremiumModules = (() => {
       render({message:'Analiz tamamlanamadı. Lütfen girdiyi kontrol edip tekrar deneyin.', action:'Daha sonra tekrar deneyin veya açık girdiyi doğrulayın.'}, 'Analiz tamamlanamadı.');
     } finally {
       submit.disabled = false;
-      submit.textContent = c.button;
+      submit.textContent = config.button;
     }
   }
 
-  async function init(key) { await KoscheiAuth.init(); shell(key); if (!KoscheiAuth.isLoggedIn()) { showSignInRequired(); return; } if (window.KoscheiAnalytics) KoscheiAnalytics.track(`${key}_module_view`); }
-  return { init };
+  async function init(key) {
+    shell(key);
+    await KoscheiAuth.init();
+    if (!KoscheiAuth.isLoggedIn()) showSignInRequired();
+    if (window.KoscheiAnalytics) KoscheiAnalytics.track(`${key}_module_view`);
+  }
+
+  return {init};
 })();
