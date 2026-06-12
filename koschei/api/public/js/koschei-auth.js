@@ -45,7 +45,7 @@
     if (!value) return fallback;
     if (['unauthorized', 'token_missing', 'auth_session_missing', 'auth_verification_required'].includes(normalized) || normalized.includes('401')) return 'Giriş yapmanız gerekiyor.';
     if (['forbidden', 'insufficient_outputs'].includes(normalized) || normalized.includes('active package')) return 'Bu işlem için aktif Koschei paketi gerekli.';
-    if (normalized.includes('paddle')) return 'Paddle ödeme bağlantısı şu anda yapılandırılmamış.';
+    if (normalized.includes('paddle')) return value;
     if (normalized.includes('shopier')) return 'Shopier bağlantısı açılamadı.';
     return value || fallback;
   }

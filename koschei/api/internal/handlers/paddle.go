@@ -23,6 +23,8 @@ import (
 
 const paddleWebhookMaxSkew = 5 * time.Minute
 
+var errPaddleCheckoutURLMissing = errors.New("paddle_checkout_url_missing")
+
 type checkoutRequest struct {
 	Package       string `json:"package"`
 	ProductID     string `json:"product_id"`
@@ -33,11 +35,18 @@ type checkoutRequest struct {
 
 type paddleAPIResponse struct {
 	Data struct {
-		ID       string `json:"id"`
-		Checkout struct {
+		ID          string `json:"id"`
+		URL         string `json:"url"`
+		CheckoutURL string `json:"checkout_url"`
+		Checkout    struct {
 			URL string `json:"url"`
 		} `json:"checkout"`
 	} `json:"data"`
+	CheckoutURL string `json:"checkout_url"`
+	URL         string `json:"url"`
+	Checkout    struct {
+		URL string `json:"url"`
+	} `json:"checkout"`
 	Error any `json:"error"`
 }
 
@@ -108,17 +117,22 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	planTier := normalizePlanTier(firstNonEmpty(req.Package, req.PlanTier, req.ProductID))
 	priceID := paddleConfiguredPriceID(planTier)
 	apiKeyConfigured := strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != ""
-	log.Printf("paddle checkout request: package=%q price_id_configured=%t environment=%q", planTier, priceID != "", paddleEnvironment())
+	appURLConfigured := publicAppURL() != ""
+	log.Printf("paddle checkout request: package=%q environment=%q price_id_found=%t", planTier, paddleEnvironment(), priceID != "")
 	if email == "" || planTier == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "valid_package_required", "message": "Choose a valid Paddle package."})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "valid_package_required", "message": "Geçerli bir Paddle paketi seçin."})
 		return
 	}
-	if priceID == "" || !apiKeyConfigured {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "paddle_config_missing", "message": "Paddle global checkout is not configured yet."})
+	if priceID == "" || !apiKeyConfigured || !appURLConfigured {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "paddle_config_missing", "message": "Paddle ödeme yapılandırması eksik. Lütfen destek ekibiyle iletişime geçin."})
 		return
 	}
 	checkoutURL, err := h.CreateCheckoutSession(r.Context(), priceID, email, claims.Sub, planTier)
 	if err != nil {
+		if errors.Is(err, errPaddleCheckoutURLMissing) {
+			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "paddle_checkout_url_missing", "message": "Paddle ödeme bağlantısı oluşturulamadı. Lütfen Paddle ayarlarını kontrol edin."})
+			return
+		}
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "paddle_checkout_failed", "message": safeError(err)})
 		return
 	}
@@ -128,12 +142,18 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEmail, authSubject, planTier string) (string, error) {
 	apiKey := strings.TrimSpace(os.Getenv("PADDLE_API_KEY"))
 	if apiKey == "" {
-		return "", errors.New("PADDLE_API_KEY is not configured")
+		return "", errors.New("PADDLE_API_KEY is missing")
 	}
 	planTier = normalizePlanTier(planTier)
 	if planTier == "" {
 		return "", errors.New("invalid plan tier")
 	}
+	appURL := publicAppURL()
+	if appURL == "" {
+		return "", errors.New("PUBLIC_APP_URL is missing")
+	}
+	successURL := appURL + "/hub.html"
+	cancelURL := appURL + "/pricing.html"
 	customerID, err := h.createPaddleCustomer(ctx, customerEmail, planTier)
 	if err != nil {
 		return "", err
@@ -150,6 +170,8 @@ func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEm
 			"plan_tier":      planTier,
 			"provider":       "paddle",
 			"source":         "koschei_web3_hub",
+			"success_url":    successURL,
+			"cancel_url":     cancelURL,
 			"user_email":     strings.ToLower(strings.TrimSpace(customerEmail)),
 			"user_id":        strings.TrimSpace(authSubject),
 		},
@@ -159,12 +181,24 @@ func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEm
 	if err := paddleRequest(ctx, http.MethodPost, "/transactions", payload, &out); err != nil {
 		return "", err
 	}
-	checkoutURLFound := out.Data.Checkout.URL != ""
-	log.Printf("paddle checkout transaction response: package=%q checkout_url_found=%t", planTier, checkoutURLFound)
+	checkoutURL := paddleCheckoutURL(out)
+	checkoutURLFound := checkoutURL != ""
+	log.Printf("paddle checkout transaction response: package=%q environment=%q price_id_found=%t checkout_url_found=%t", planTier, paddleEnvironment(), priceID != "", checkoutURLFound)
 	if !checkoutURLFound {
-		return "", errors.New("Paddle response did not include checkout.url. Confirm the Paddle default payment link and approved checkout domain are configured.")
+		return "", errPaddleCheckoutURLMissing
 	}
-	return out.Data.Checkout.URL, nil
+	return checkoutURL, nil
+}
+
+func (h *Handler) PaddleStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"paddle_api_key":   strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "",
+		"environment":      paddleEnvironment(),
+		"starter_price_id": paddleConfiguredPriceID("starter") != "",
+		"builder_price_id": paddleConfiguredPriceID("builder") != "",
+		"studio_price_id":  paddleConfiguredPriceID("studio") != "",
+		"public_app_url":   publicAppURL() != "",
+	})
 }
 
 func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
@@ -522,6 +556,26 @@ func paddleMessageFromValue(value any) string {
 		}
 	}
 	return ""
+}
+
+func paddleCheckoutURL(out paddleAPIResponse) string {
+	for _, value := range []string{
+		out.Data.Checkout.URL,
+		out.Data.CheckoutURL,
+		out.Data.URL,
+		out.Checkout.URL,
+		out.CheckoutURL,
+		out.URL,
+	} {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func publicAppURL() string {
+	return strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_APP_URL")), "/")
 }
 
 func paddleConfiguredPriceID(planTier string) string {

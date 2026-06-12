@@ -148,6 +148,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/v1/smart-money/snapshot", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("GET", h.SmartMoneySnapshot)))))
 	mux.HandleFunc("/api/v1/usage", requiresDB(h, h.APIKeyAuth(method("GET", h.APIUsage))))
 	mux.HandleFunc("/api/paddle/checkout", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateCheckout))))
+	mux.HandleFunc("/api/paddle/status", handlers.RequireAuth(method("GET", h.PaddleStatus)))
 	mux.HandleFunc("/api/v1/paddle/checkout", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateCheckout))))
 	mux.HandleFunc("/api/v1/b2b/checkout", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateCheckout))))
 	mux.HandleFunc("/api/paddle/webhook", requiresDB(h, method("POST", h.HandleWebhook)))
