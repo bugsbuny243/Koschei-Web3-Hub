@@ -218,7 +218,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 
 const adsTXTBody = "google.com, pub-6081394144742471, DIRECT, f08c47fec0942fa0"
 
-const robotsTXTBody = "User-agent: *\nAllow: /\n\nSitemap: https://tradepigloball.co/sitemap.xml"
+const robotsTXTBody = "User-agent: *\nAllow: /\nSitemap: https://tradepigloball.co/sitemap.xml"
 
 func publicCleanRoutes(staticDir string) map[string]string {
 	routes := map[string]string{
