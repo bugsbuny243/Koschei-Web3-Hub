@@ -1,8 +1,8 @@
 (function () {
   'use strict';
 
-  const TOKEN_KEY = 'koschei_token';
-  const LEGACY_TOKEN_KEY = 'koschei_jwt';
+  const TOKEN_KEY = 'koschei_jwt';
+  const LEGACY_TOKEN_KEY = 'koschei_token';
 
   function isJWT(value) {
     return typeof value === 'string' && value.split('.').length === 3;
@@ -21,6 +21,11 @@
   function clearToken() {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(LEGACY_TOKEN_KEY);
+  }
+
+  function getAuthHeader() {
+    const token = getToken();
+    return token ? `Bearer ${token}` : '';
   }
 
   function extractToken(payload) {

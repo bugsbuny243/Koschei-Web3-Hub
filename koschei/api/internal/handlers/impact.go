@@ -16,8 +16,8 @@ var publicImpactCacheTTL = 60 * time.Second
 
 type publicImpactMetrics struct {
 	OK                           bool                        `json:"ok"`
-	DemoMode                     bool                        `json:"demo_mode"`
-	DemoNotice                   string                      `json:"demo_notice,omitempty"`
+	Unavailable                  bool                        `json:"unavailable"`
+	Error                        string                      `json:"error,omitempty"`
 	Statement                    string                      `json:"statement"`
 	VerificationNote             string                      `json:"verification_note"`
 	NoCustody                    string                      `json:"no_custody"`
@@ -84,53 +84,33 @@ func (h *Handler) PublicImpact(w http.ResponseWriter, r *http.Request) {
 	}
 	metrics, err := buildPublicImpactMetrics(ctx, db)
 	if err != nil {
-		log.Printf("public impact metrics unavailable; serving demo fallback: %v", err)
-		metrics = demoPublicImpactMetrics()
+		log.Printf("public impact metrics unavailable: %v", err)
+		metrics = unavailablePublicImpactMetrics()
+		w.Header().Set("Cache-Control", "no-store")
+		writeJSON(w, http.StatusServiceUnavailable, metrics)
+		return
 	}
-	if h.Cache != nil && !metrics.DemoMode {
+	if h.Cache != nil {
 		_ = h.Cache.SetJSON(ctx, publicImpactCacheKey, metrics, publicImpactCacheTTL)
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")
 	writeJSON(w, http.StatusOK, metrics)
 }
 
-func demoPublicImpactMetrics() publicImpactMetrics {
+func unavailablePublicImpactMetrics() publicImpactMetrics {
 	now := time.Now().UTC()
 	return publicImpactMetrics{
-		OK:                           true,
-		DemoMode:                     true,
-		DemoNotice:                   "Veriler şu an Demo modundadır.",
-		Statement:                    "Koschei public-good impact dashboard is online in safe demo mode while live metrics are unavailable.",
-		VerificationNote:             "Demo metrics are non-production placeholders. Live read-only aggregates resume automatically when the metrics backend is reachable.",
-		NoCustody:                    "Koschei never asks for private keys and does not custody user funds.",
-		TotalSavedUSD:                128400,
-		MEVEstimatedLossPreventedUSD: 78200,
-		LiquidityLossPreventedUSD:    50200,
-		RugPullsPrevented:            0,
-		ActiveProtectedWallets:       1842,
-		Last24HPreventedUSD:          20650,
-		Last7DPreventedUSD:           89700,
-		MEVEventsCount:               184,
-		LiquidityAlertsCount:         140,
-		SystemActiveUsers:            91,
-		GeneratedOutputsCount:        0,
-		ModulesLiveCount:             3,
-		SupportedNetworksCount:       1,
-		ChainChecksCount:             324,
-		WatchlistSourceCount:         2,
-		Web3EventCount:               324,
-		LiveModules: []map[string]string{
-			{"name": "MEV Shield", "status": "demo"},
-			{"name": "Liquidity Radar", "status": "demo"},
-			{"name": "DAO Guardian", "status": "demo"},
-		},
-		RecentLogs: []publicImpactPreventionLog{
-			{Source: "MEV Shield", RiskLevel: "HIGH", RiskScore: 86, AmountUSD: 8250, AnonymizedSubject: "7xK…9Qp", OccurredAt: now.Add(-18 * time.Minute), VerifiabilityStatus: "demo"},
-			{Source: "Liquidity Radar", RiskLevel: "CRITICAL", RiskScore: 94, AmountUSD: 12400, AnonymizedSubject: "pool…4n2", OccurredAt: now.Add(-42 * time.Minute), VerifiabilityStatus: "demo"},
-		},
-		PublicRoadmap:   []string{"Reconnect live public metrics", "Publish verification snapshots", "Expand grant-safe reports"},
-		UpdatedAt:       now,
-		CacheTTLSeconds: int(publicImpactCacheTTL.Seconds()),
+		OK:               false,
+		Unavailable:      true,
+		Error:            "Public metrics unavailable. Database unavailable.",
+		Statement:        "Koschei public-good impact metrics are currently unavailable.",
+		VerificationNote: "Live read-only database aggregates are required before public impact values are shown.",
+		NoCustody:        "Koschei never asks for private keys and does not custody user funds.",
+		RecentLogs:       []publicImpactPreventionLog{},
+		LiveModules:      []map[string]string{},
+		PublicRoadmap:    []string{},
+		UpdatedAt:        now,
+		CacheTTLSeconds:  int(publicImpactCacheTTL.Seconds()),
 	}
 }
 
