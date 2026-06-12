@@ -48,6 +48,11 @@
     return data.message || data.error_description || data.error || data.detail || fallback;
   }
 
+  function jwtFromHeader(value) {
+    const token = String(value || '').replace(/^Bearer\s+/i, '').trim();
+    return _isJwt(token) ? token : '';
+  }
+
   function findJwt(value) {
     if (!value || typeof value !== 'object') return '';
     const candidates = [
@@ -77,9 +82,25 @@
     try { return JSON.parse(text); } catch { return { message: text }; }
   }
 
+  let configPromise;
+
   async function loadConfig() {
-    const res = await fetch('/api/config', { credentials: 'same-origin' });
-    return readJSON(res);
+    if (!configPromise) {
+      configPromise = fetch('/api/config', { credentials: 'same-origin' })
+        .then(async (res) => {
+          const data = await readJSON(res);
+          if (!res.ok) throw new Error(errorMessage(data, 'Auth configuration is unavailable.'));
+          return data;
+        });
+    }
+    return configPromise;
+  }
+
+  async function neonAuthBaseURL() {
+    const cfg = await loadConfig();
+    const baseURL = String(cfg.neonAuthUrl || '').trim().replace(/\/+$/, '');
+    if (!baseURL) throw new Error('Neon Auth is not configured.');
+    return baseURL;
   }
 
   async function verifyMe(jwt) {
@@ -97,8 +118,8 @@
   }
 
   async function finishAuth(result) {
-    let jwt = _isJwt(result.headerJwt) ? result.headerJwt : findJwt(result.data);
-    if (!_isJwt(jwt)) throw new Error('Authentication succeeded, but no JWT was returned by the backend.');
+    const jwt = jwtFromHeader(result.headerJwt) || findJwt(result.data);
+    if (!_isJwt(jwt)) throw new Error('Authentication succeeded, but no JWT was returned by Neon Auth.');
     saveJwt(jwt);
     const me = await verifyMe(jwt);
     return { ...result.data, me, access_token: jwt, token_type: 'Bearer' };
@@ -124,22 +145,53 @@
     try { await loadConfig(); } catch {}
   }
 
-  async function backendAuth(path, body) {
-    const res = await fetch(path, {
+  async function parseNeonResponse(res) {
+    const data = await readJSON(res);
+    return { data, headerJwt: res.headers.get('set-auth-jwt') || res.headers.get('authorization') || '' };
+  }
+
+  async function fetchNeonJSON(baseURL, path, options = {}) {
+    const res = await fetch(baseURL + path, { credentials: 'include', ...options });
+    const result = await parseNeonResponse(res);
+    if (!res.ok) throw new Error(errorMessage(result.data, `Neon Auth failed (${res.status})`));
+    return result;
+  }
+
+  async function fetchNeonSession(baseURL) {
+    const attempts = [
+      ['GET', '/token'],
+      ['GET', '/get-session'],
+      ['POST', '/token'],
+      ['POST', '/get-session'],
+    ];
+    for (const [method, path] of attempts) {
+      try {
+        const result = await fetchNeonJSON(baseURL, path, {
+          method,
+          headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
+          body: method === 'POST' ? '{}' : undefined,
+        });
+        if (jwtFromHeader(result.headerJwt) || findJwt(result.data)) return result;
+      } catch {}
+    }
+    return null;
+  }
+
+  async function neonEmailAuth(path, body) {
+    const baseURL = await neonAuthBaseURL();
+    const result = await fetchNeonJSON(baseURL, path, {
       method: 'POST',
-      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    const data = await readJSON(res);
-    if (!res.ok) {
-      throw new Error(errorMessage(data, `Authentication failed (${res.status})`));
-    }
-    return finishAuth({ data, headerJwt: res.headers.get('set-auth-jwt') || '' });
+    if (jwtFromHeader(result.headerJwt) || findJwt(result.data)) return finishAuth(result);
+    const session = await fetchNeonSession(baseURL);
+    if (session) return finishAuth(session);
+    return finishAuth(result);
   }
 
   async function signUp(email, password) {
-    return backendAuth('/api/auth/register', {
+    return neonEmailAuth('/sign-up/email', {
       email,
       password,
       name: defaultUserName(email),
@@ -148,7 +200,7 @@
   }
 
   async function signIn(email, password) {
-    return backendAuth('/api/auth/login', { email, password, callbackURL: successCallbackURL() });
+    return neonEmailAuth('/sign-in/email', { email, password, callbackURL: successCallbackURL() });
   }
 
   async function signOut() {
@@ -179,4 +231,4 @@
     isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt };
 })();
 
-// Email/password auth is proxied through /api/auth/login and /api/auth/register, verified through /api/me, and persisted as koschei_jwt.
+// Email/password auth calls Neon Auth directly through /api/config -> neonAuthUrl, verifies through /api/me, and persists as koschei_jwt.
