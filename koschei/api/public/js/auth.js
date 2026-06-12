@@ -10,17 +10,27 @@
 
   function saveToken(token) {
     if (!token) return;
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(LEGACY_TOKEN_KEY, token);
+    safeLocalStorage((storage) => {
+      storage.setItem(TOKEN_KEY, token);
+      // Keep the retired key in sync so older pages can read sessions created by auth.js.
+      storage.setItem(LEGACY_TOKEN_KEY, token);
+    });
   }
 
   function getToken() {
-    return localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY) || '';
+    return safeLocalStorage((storage) => storage.getItem(TOKEN_KEY) || storage.getItem(LEGACY_TOKEN_KEY) || '', '');
+  }
+
+  function getAuthHeader() {
+    const token = getToken();
+    return token ? 'Bearer ' + token : '';
   }
 
   function clearToken() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(LEGACY_TOKEN_KEY);
+    safeLocalStorage((storage) => {
+      storage.removeItem(TOKEN_KEY);
+      storage.removeItem(LEGACY_TOKEN_KEY);
+    });
   }
 
   function getAuthHeader() {
@@ -85,11 +95,6 @@
     return authRequest('/api/auth/register', { email, password, name });
   }
 
-  function connectWallet() {
-    throw new Error('Wallet login is disabled. Sign in with email and password.');
-  }
-
-
   async function checkAuth(options = {}) {
     const redirect = options.redirect !== false;
     const loginPath = options.loginPath || '/login';
@@ -118,7 +123,7 @@
     window.location.href = redirectTo;
   }
 
-  window.Auth = { login, register, connectWallet, checkAuth, logout, getAuthHeader, getToken, saveToken, clearToken };
+  window.Auth = { login, register, checkAuth, logout, getAuthHeader, getToken, saveToken, clearToken };
   window.login = login;
   window.checkAuth = checkAuth;
   window.logout = logout;

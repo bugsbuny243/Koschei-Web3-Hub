@@ -58,14 +58,14 @@ type mevAnalyzeResponse struct {
 	Message            string   `json:"message"`
 }
 
-// AnalyzeMEV provides a package-level mock endpoint for minimal integrations
+// AnalyzeMEV provides a package-level compatibility endpoint for minimal integrations
 // that do not instantiate Handler. Production routes should use Handler.AnalyzeMEV
 // so database persistence is available.
 func AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 	(&Handler{}).AnalyzeMEV(w, r)
 }
 
-// AnalyzeMEV simulates a Solana swap transaction and returns a sandwich-attack
+// AnalyzeMEV analyzes a submitted Solana swap transaction with deterministic heuristics and returns a sandwich-attack
 // risk report. Phase-1 uses deterministic local heuristics and persists the
 // estimated mev_saved_usd metric to mev_protection_events for owner reporting.
 func (h *Handler) AnalyzeMEV(w http.ResponseWriter, r *http.Request) {

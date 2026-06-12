@@ -75,45 +75,18 @@
     return data;
   }
 
-  function requireNeonAuthUrl() {
-    if (!state.neonAuthUrl) {
-      throw new Error('Neon Auth public URL is not configured. Set EXPO_PUBLIC_NEON_AUTH_URL or NEON_AUTH_BASE_URL.');
-    }
-    return state.neonAuthUrl;
-  }
-
-  async function neonRequest(path, body) {
-    const res = await fetch(requireNeonAuthUrl() + path, {
+  async function backendAuthRequest(path, body) {
+    const res = await fetch(path, {
       method: 'POST',
-      credentials: 'include',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     const data = await readJSON(res);
     if (!res.ok) {
-      throw new Error(errorMessage(data, `Neon Auth error ${res.status}`));
+      throw new Error(errorMessage(data, `Authentication failed (${res.status})`));
     }
-    return { data, headerJwt: res.headers.get('set-auth-jwt') || '' };
-  }
-
-  async function tokenFollowUp() {
-    const base = requireNeonAuthUrl();
-    for (const path of ['/token', '/get-session']) {
-      for (const method of ['GET', 'POST']) {
-        const res = await fetch(base + path, {
-          method,
-          credentials: 'include',
-          headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {},
-          body: method === 'POST' ? '{}' : undefined,
-        }).catch(() => null);
-        if (!res) continue;
-        const data = await readJSON(res);
-        const headerJwt = res.headers.get('set-auth-jwt') || '';
-        const jwt = _isJwt(headerJwt) ? headerJwt : findJwt(data);
-        if (jwt) return jwt;
-      }
-    }
-    return '';
+    return { data, headerJwt: '' };
   }
 
   async function verifyMe(jwt) {

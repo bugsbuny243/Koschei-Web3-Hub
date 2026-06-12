@@ -1,246 +1,34 @@
-<!DOCTYPE html>
-<html lang="tr">
+<!doctype html>
+<html lang="en">
 <head>
-  <script src="/js/auth.js"></script>
-  <script>checkAuth();</script>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-1QFWMJJC3');
-  </script>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>User Dashboard — Koschei</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #03050d;
-      --panel: rgba(255, 255, 255, .07);
-      --panel-strong: rgba(255, 255, 255, .11);
-      --line: rgba(255, 255, 255, .14);
-      --line-strong: rgba(255, 255, 255, .26);
-      --text: #f7fbff;
-      --muted: #9fb0d3;
-      --accent: #00ff88;
-      --accent-2: #69d8ff;
-      --violet: #a78bfa;
-      --danger: #ff5c7c;
-      --warning: #ffd166;
-      --radius: 26px;
-      --shadow: 0 26px 90px rgba(0, 0, 0, .42);
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      color: var(--text);
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at 8% 0%, rgba(0, 255, 136, .24), transparent 34%),
-        radial-gradient(circle at 88% 6%, rgba(105, 216, 255, .18), transparent 30%),
-        radial-gradient(circle at 50% 90%, rgba(167, 139, 250, .16), transparent 36%),
-        linear-gradient(135deg, #03050d 0%, #071226 58%, #040710 100%);
-      overflow-x: hidden;
-    }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
-      background-size: 56px 56px;
-      mask-image: radial-gradient(circle at center, black, transparent 78%);
-    }
-    a { color: inherit; }
-    button, input, select { font: inherit; }
-    .page { position: relative; z-index: 1; width: min(1200px, calc(100% - 32px)); margin: 0 auto; padding: 22px 0 64px; }
-    .surface {
-      background: linear-gradient(135deg, rgba(255,255,255,.11), rgba(255,255,255,.045));
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(22px);
-      -webkit-backdrop-filter: blur(22px);
-    }
-    .topbar {
-      position: sticky;
-      top: 14px;
-      z-index: 20;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 24px;
-      padding: 12px 14px;
-      border-radius: 24px;
-    }
-    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 900; letter-spacing: -.03em; }
-    .brand-mark { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 15px; color: #06120d; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 0 34px rgba(0, 255, 136, .3); }
-    .nav-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-    .nav-link { color: var(--muted); font-size: 13px; font-weight: 800; text-decoration: none; padding: 9px 12px; border-radius: 999px; }
-    .nav-link:hover, .nav-link.active { color: #06120d; background: var(--accent); }
-    .header-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-    .pill { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 13px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.055); color: var(--muted); font-size: 13px; font-weight: 800; }
-    .pill strong { color: var(--text); }
-    .credit-pill strong { color: var(--accent); font-family: "JetBrains Mono", monospace; }
-    .avatar { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 14px; background: linear-gradient(135deg, rgba(0,255,136,.24), rgba(105,216,255,.18)); color: var(--accent); font-weight: 900; border: 1px solid rgba(0,255,136,.28); }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      min-height: 44px;
-      padding: 0 18px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      color: var(--text);
-      font-weight: 900;
-      font-size: 14px;
-      text-decoration: none;
-      cursor: pointer;
-      background: rgba(255,255,255,.06);
-      transition: transform .2s ease, border-color .2s ease, background .2s ease;
-    }
-    .btn:hover { transform: translateY(-2px); border-color: var(--line-strong); background: rgba(255,255,255,.1); }
-    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); border: 0; color: #04110d; }
-    .btn-danger { color: #ffdce4; border-color: rgba(255,92,124,.28); background: rgba(255,92,124,.08); }
-    .hero { display: grid; grid-template-columns: 1.05fr .95fr; gap: 18px; align-items: stretch; margin-bottom: 18px; }
-    .hero-main { padding: clamp(24px, 4vw, 42px); }
-    .eyebrow { display: inline-flex; align-items: center; gap: 8px; width: max-content; max-width: 100%; padding: 8px 13px; border-radius: 999px; color: #bfffe2; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; background: rgba(0,255,136,.1); border: 1px solid rgba(0,255,136,.24); }
-    h1 { margin: 20px 0 12px; font-size: clamp(38px, 6vw, 68px); line-height: .98; letter-spacing: -.06em; }
-    .gradient-text { background: linear-gradient(135deg, #fff, #c7fff0 32%, #82ddff 72%, #d9ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .lead { margin: 0; max-width: 660px; color: var(--muted); font-size: 17px; line-height: 1.75; }
-    .hero-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
-    .metric-card { min-height: 158px; padding: 20px; border-radius: 24px; background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.1); }
-    .metric-label { color: var(--muted); font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-    .metric-value { margin-top: 14px; font-size: clamp(28px, 4vw, 42px); font-weight: 900; letter-spacing: -.04em; }
-    .metric-sub { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.45; }
-    .safe { color: var(--accent); }
-    .warn { color: var(--warning); }
-    .info { color: var(--accent-2); }
-    .side-panel { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
-    .panel-title { margin: 0; font-size: 20px; letter-spacing: -.03em; }
-    .risk-list { display: grid; gap: 10px; margin-top: 4px; }
-    .risk-item { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 13px; border-radius: 18px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); }
-    .risk-dot { width: 10px; height: 10px; border-radius: 99px; background: var(--accent); box-shadow: 0 0 20px currentColor; }
-    .risk-dot.medium { background: var(--warning); }
-    .risk-dot.high { background: var(--danger); }
-    .risk-name { font-weight: 800; }
-    .risk-note { margin-top: 2px; color: var(--muted); font-size: 12px; }
-    .risk-score { color: var(--muted); font-family: "JetBrains Mono", monospace; font-size: 12px; }
-    .tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 18px 0; }
-    .tool-card { padding: 22px; min-height: 310px; display: flex; flex-direction: column; gap: 14px; }
-    .tool-icon { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; background: rgba(0,255,136,.1); color: var(--accent); font-size: 24px; }
-    .tool-card h2 { margin: 0; font-size: 22px; letter-spacing: -.04em; }
-    .tool-card p { margin: 0; color: var(--muted); line-height: 1.6; font-size: 14px; }
-    label { display: block; color: var(--muted); font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
-    input, select {
-      width: 100%;
-      min-height: 46px;
-      border: 1px solid rgba(255,255,255,.14);
-      border-radius: 15px;
-      color: var(--text);
-      background: rgba(3, 5, 13, .72);
-      outline: none;
-      padding: 0 13px;
-    }
-    input:focus, select:focus { border-color: rgba(0,255,136,.5); box-shadow: 0 0 0 3px rgba(0,255,136,.1); }
-    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .result-box { margin-top: auto; padding: 13px; min-height: 64px; border-radius: 17px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.09); color: var(--muted); font-size: 13px; line-height: 1.55; }
-    .result-box strong { color: var(--text); }
-    .activity-card { padding: 22px; overflow: hidden; }
-    .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
-    .section-head h2 { margin: 0; font-size: 26px; letter-spacing: -.04em; }
-    .section-head p { margin: 6px 0 0; color: var(--muted); }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 15px 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,.09); }
-    th { color: var(--muted); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
-    td { color: #dfe8ff; font-size: 14px; }
-    .status { display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 900; }
-    .status.ok { color: #bfffe2; background: rgba(0,255,136,.1); border: 1px solid rgba(0,255,136,.22); }
-    .status.review { color: #ffefbe; background: rgba(255,209,102,.1); border: 1px solid rgba(255,209,102,.22); }
-    .status.blocked { color: #ffdce4; background: rgba(255,92,124,.1); border: 1px solid rgba(255,92,124,.22); }
-    .mono { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--muted); }
-    .muted { color: var(--muted); }
-    @media (max-width: 980px) { .hero, .tool-grid { grid-template-columns: 1fr; } .hero-stats { grid-template-columns: repeat(3, 1fr); } }
-    @media (max-width: 720px) { .topbar { position: static; align-items: flex-start; flex-direction: column; } .header-meta { justify-content: flex-start; } .hero-stats, .form-row { grid-template-columns: 1fr; } .activity-card { padding: 16px; } table, thead, tbody, th, td, tr { display: block; } thead { display: none; } tr { padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.09); } td { border: 0; padding: 6px 0; } td::before { content: attr(data-label); display: block; color: var(--muted); font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 3px; } }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Koschei Web3 Hub dashboard for Solana/Web3 transaction, token, wallet, risk, project, graph, sybil and grant intelligence.">
+  <title>Dashboard — Koschei Web3 Hub</title>
+  <link rel="stylesheet" href="/css/koschei.css">
+  <style>.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.module{display:flex;flex-direction:column;gap:12px;min-height:210px}.module p{color:var(--text2);line-height:1.55}.module .meta{margin-top:auto;color:var(--accent2);font-size:13px;font-weight:700}.hero{padding:32px;background:linear-gradient(135deg,#111118,#13231d);border:1px solid #2a2a3a;border-radius:16px;margin-bottom:20px}.quick{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}@media(max-width:900px){.grid{grid-template-columns:1fr}}</style>
 </head>
 <body>
-<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
-<nav class="nav">
-  <a href="/hub" class="nav-logo">K Koschei</a>
-  <div class="nav-links">
-    <a href="/hub" class="nav-link">Hub</a>
-    <a href="/metadata.html" class="nav-link">Metadata</a>
-    <a href="/risk-v2.html" class="nav-link">Risk</a>
-    <a href="/chains.html" class="nav-link">Chains</a>
-    <a href="/account.html" class="nav-link">Account</a>
-    <button class="btn btn-ghost" style="padding:6px 14px;font-size:13px;" onclick="logout()">Sign out</button>
-  </div>
-</nav>
-
-<div class="page">
-  <div class="page-title">Dashboard</div>
-  <div class="page-sub" id="userEmailDisplay">Loading...</div>
-
-  <div class="grid-3">
-    <div class="glass stat">
-      <div class="stat-label">Credits</div>
-      <div class="stat-value" id="statCredits" style="color:var(--accent);">—</div>
-      <div class="stat-sub">Remaining balance</div>
-    </div>
-    <div class="glass stat">
-      <div class="stat-label">Plan</div>
-      <div class="stat-value" id="statPlan" style="font-size:20px;">—</div>
-      <div class="stat-sub">Current tier</div>
-    </div>
-    <div class="glass stat">
-      <div class="stat-label">Role</div>
-      <div class="stat-value" id="statRole" style="font-size:20px;">—</div>
-      <div class="stat-sub">Account type</div>
-    </div>
-  </div>
-
-  <div class="glass card">
-    <div class="card-title">Quick Actions</div>
-    <div class="actions-grid">
-      <a href="/tx-decoder" class="btn btn-primary">🔍 TX Decoder</a>
-      <a href="/token-scanner" class="btn btn-ghost">🪙 Token Scanner</a>
-      <a href="/wallet-score" class="btn btn-ghost">🏆 Wallet Score</a>
-      <a href="/portfolio" class="btn btn-ghost">📊 Portfolio Tracker</a>
-      <a href="/risk-v2" class="btn btn-ghost">🛡️ Risk Scanner</a>
-      <a href="/project-radar" class="btn btn-ghost">📡 Project Radar</a>
-      <a href="/funding-assistant" class="btn btn-ghost">✍️ Grant Writer</a>
-      <a href="/graph" class="btn btn-ghost">🕸️ Intelligence Graph</a>
-      <a href="/sybil-check" class="btn btn-ghost">🧩 Sybil Checker</a>
-      <a href="/pricing" class="btn btn-ghost">💳 Purchase Package</a>
-      <a href="/hub" class="btn btn-ghost">← Back to Hub</a>
-    </div>
-  </div>
-</div>
-
-<script>
-  (async () => {
-    if (!(await checkAuth())) return;
-    try {
-      const res = await fetch('/api/me', { headers: { Authorization: getAuthHeader() }, credentials: 'same-origin' });
-      if (!res || !res.ok) throw new Error('Account summary unavailable');
-      const data = await res.json();
-      const user = data.user || data;
-      document.getElementById('userEmailDisplay').textContent = user.email || '';
-      document.getElementById('statCredits').textContent = user.credits ?? user.outputs_remaining ?? 0;
-      document.getElementById('statPlan').textContent = user.plan_id || user.plan || 'free';
-      document.getElementById('statRole').textContent = user.role || 'member';
-    } catch (error) {
-      document.getElementById('userEmailDisplay').textContent = error.message || 'Dashboard unavailable';
-    }
-  })();
-</script>
+  <nav class="nav"><a class="nav-logo" href="/">K Koschei</a><div class="nav-links"><a class="nav-link" href="/dashboard">Dashboard</a><a class="nav-link" href="/pricing">Pricing</a><a class="nav-link" href="/account">Account</a><a class="nav-link" href="/docs">Docs</a></div></nav>
+  <main class="page">
+    <section class="hero">
+      <span class="badge badge-green">Command center</span>
+      <h1>Koschei Web3 Intelligence Dashboard</h1>
+      <p class="page-sub">A connected command center for Solana/Web3 security intelligence, grant intelligence, wallet analysis, token analysis, transaction decoding, project readiness and reviewer workflows.</p>
+      <div class="quick"><a class="btn btn-primary" href="/wallet-score">Start Wallet Analysis</a><a class="btn btn-ghost" href="/token-scanner">Scan Token</a><a class="btn btn-ghost" href="/tx-decoder">Decode Transaction</a><a class="btn btn-ghost" href="/pricing">View Pricing</a></div>
+    </section>
+    <section class="grid" aria-label="Koschei modules">
+      <a class="card module" href="/tx-decoder"><h2>TX Decoder</h2><p>Decode a public Solana/Web3 transaction into purpose, involved wallets/programs, risk flags, evidence notes and next checks.</p><span class="meta">Transaction intelligence</span></a>
+      <a class="card module" href="/token-scanner"><h2>Token Scanner</h2><p>Review token metadata/security checks, mint and freeze authority, supply, concentration and evidence-based token risk.</p><span class="meta">Token intelligence</span></a>
+      <a class="card module" href="/wallet-score"><h2>Wallet Score</h2><p>Score a wallet with activity, trust indicators, red flags, evidence and suggested follow-up analysis.</p><span class="meta">Wallet intelligence</span></a>
+      <a class="card module" href="/portfolio"><h2>Portfolio Tracker</h2><p>Track public wallet portfolios, token-account exposure, suspicious-asset review queues and recommended checks.</p><span class="meta">Portfolio intelligence</span></a>
+      <a class="card module" href="/risk"><h2>Risk Scanner</h2><p>Produce severity, reason, evidence, confidence and recommended action for wallet, token, transaction, contract or project findings.</p><span class="meta">Risk analysis</span></a>
+      <a class="card module" href="/project-radar"><h2>Project Radar</h2><p>Analyze ecosystem fit, builder credibility signals, proof points, risks, missing evidence and grant/investor readiness.</p><span class="meta">Project intelligence</span></a>
+      <a class="card module" href="/funding-assistant"><h2>Grant Writer</h2><p>Generate grant readiness and application material: problem, Solana value, architecture, milestones, budget, risks and final draft.</p><span class="meta">Grant readiness</span></a>
+      <a class="card module" href="/graph"><h2>Intelligence Graph</h2><p>Centralize wallets, tokens, transactions, projects, risk signals, sybil links and grant/project relationships from real analysis data.</p><span class="meta">Relationship intelligence</span></a>
+      <a class="card module" href="/sybil-check"><h2>Sybil Checker</h2><p>Review cluster indicators, repeated patterns, shared-source signals when supported, evidence, confidence and recommended action.</p><span class="meta">Sybil intelligence</span></a>
+    </section>
+  </main>
+  <script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=1"></script><script>(async()=>{await KoscheiAuth.init();if(!KoscheiAuth.requireAuth('/login'))return;if(window.KoscheiAnalytics)KoscheiAnalytics.track('dashboard_command_center_view');})()</script>
 </body>
 </html>
