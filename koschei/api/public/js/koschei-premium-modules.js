@@ -1,98 +1,269 @@
 const PremiumModules = (() => {
-  const safe = 'Never enter private keys or seed phrases. Use public wallet, token, transaction, project, repository and social data only. Koschei provides read-only intelligence, not financial, legal, investment, or security advice.';
-  const positioning = 'Koschei connects transaction intelligence, wallet intelligence, token intelligence, project intelligence, risk analysis, grant readiness and relationship mapping into one production Solana/Web3 intelligence workflow.';
   const $ = id => document.getElementById(id);
-  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const nice = k => String(k).replaceAll('_',' ').replace(/\b\w/g, c => c.toUpperCase());
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const technicalMessage = 'Koschei sadece herkese açık veriyi analiz eder. Özel anahtar, seed phrase veya gizli müşteri verisi girmeyin.';
+  const networks = [['solana-mainnet','Solana Mainnet'], ['solana-devnet','Solana Devnet'], ['solana-testnet','Solana Testnet']];
+  const targetTypes = [['wallet','Cüzdan'], ['token','Token'], ['tx','İşlem'], ['project','Proje']];
+  const entityTypes = [['wallet','Cüzdan'], ['token','Token'], ['tx','İşlem'], ['project','Proje']];
 
   const configs = {
-    tx: { title:'TX Decoder', badge:['TRANSACTION INTELLIGENCE','PACKAGE ACCESS'], desc:'Decode a public Solana transaction signature into transaction purpose, involved programs, risk flags, evidence notes and suggested next checks.', endpoint:'/api/tx/decode', method:'POST', button:'Decode Transaction', inputLabel:'Transaction signature', fields:[['sig','Transaction signature','text','Paste a Solana transaction signature'],['network','Network','select','solana-mainnet|solana-devnet|solana-testnet']], build:f=>({signature:f.sig, network:f.network}), next:[['Start Wallet Analysis','/wallet-score'],['Run Risk Scanner','/risk']] },
-    txpro: { title:'TX Decoder', badge:['TRANSACTION INTELLIGENCE','PACKAGE ACCESS'], desc:'Decode a public transaction hash or Solana signature into purpose, entities, risk hints, evidence notes and follow-up analysis routes.', endpoint:'/api/web3/tx-decode-pro', method:'POST', button:'Decode Transaction', inputLabel:'Transaction signature or hash', fields:[['tx_hash','Transaction hash/signature','text','0x… or Solana signature'],['chain','Chain','select','solana|ethereum|base|arbitrum|polygon|optimism'],['network','Network','text','mainnet']], build:f=>f, next:[['Start Wallet Analysis','/wallet-score'],['Run Risk Scanner','/risk']] },
-    wallet: { title:'Wallet Score', badge:['WALLET INTELLIGENCE','PACKAGE ACCESS'], desc:'Score a public Solana wallet using activity, recency, failure-rate and balance signals. Results include indicators, red flags, evidence and suggested next analysis.', endpoint:'/api/wallet/score', method:'POST', button:'Start Wallet Analysis', inputLabel:'Wallet address', fields:[['address','Wallet address','text','Public Solana wallet address'],['network','Network','select','solana-mainnet|solana-devnet|solana-testnet']], build:f=>f, next:[['Track Portfolio','/portfolio'],['Run Risk Scanner','/risk'],['Open Intelligence Graph','/graph']] },
-    token: { title:'Token Scanner', badge:['TOKEN INTELLIGENCE','PACKAGE ACCESS'], desc:'Analyze a Solana token mint for supply, authority, freeze, holder concentration and evidence-based token risk indicators.', endpoint:'/api/token/scan', method:'POST', button:'Scan Token', inputLabel:'Token mint address', fields:[['mint','Token mint address','text','Public Solana token mint'],['network','Network','select','solana-mainnet|solana-devnet|solana-testnet']], build:f=>f, next:[['Run Risk Scanner','/risk'],['Open Intelligence Graph','/graph']] },
-    portfolio: { title:'Portfolio Tracker', badge:['PORTFOLIO INTELLIGENCE','PACKAGE ACCESS'], desc:'Track public SOL balances, token-account counts and recent activity across up to ten Solana wallets, then route suspicious exposure to risk analysis.', endpoint:'/api/portfolio/track', method:'POST', button:'Track Portfolio', inputLabel:'Wallet addresses', fields:[['addresses','Wallet addresses','textarea','One public Solana wallet address per line'],['network','Network','select','solana-mainnet|solana-devnet|solana-testnet']], build:f=>({addresses:String(f.addresses||'').split(/\n|,/).map(x=>x.trim()).filter(Boolean), network:f.network}), next:[['Start Wallet Analysis','/wallet-score'],['Run Risk Scanner','/risk']] },
-    risk: { title:'Risk Scanner', badge:['RISK ANALYSIS','PACKAGE ACCESS'], desc:'Run an evidence-based risk assessment for a wallet, token, transaction, contract or project. Every finding is framed with severity, reason, evidence, confidence and action.', endpoint:'/api/web3/risk-v2', method:'POST', button:'Run Risk Scanner', inputLabel:'Target', fields:[['target','Wallet / token / transaction / project','text','Public address, mint, hash or project name'],['target_type','Target type','select','wallet|token|tx|project|contract'],['chain','Chain','text','solana'],['network','Network','text','mainnet'],['notes','Evidence notes','textarea','Optional public context: explorer links, repository, website, known incident, or observed behavior']], build:f=>f, next:[['Decode Transaction','/tx-decoder'],['Scan Token','/token-scanner'],['Open Intelligence Graph','/graph']] },
-    funding: { title:'Grant Readiness + Application Assistant', badge:['GRANT INTELLIGENCE','PACKAGE ACCESS'], desc:'Prepare grant-ready application material with problem statement, Solana ecosystem value, architecture, milestones, budget logic, public-goods angle, traction proof, risks and a final draft.', endpoint:'/api/web3/funding-assistant/generate', method:'POST', button:'Generate Grant Readiness', inputLabel:'Project details', fields:[['project_name','Project name','text','Your project name'],['ecosystem','Ecosystem','text','Solana'],['project_category','Project category','select','security|developer tool|public good|infrastructure|payments|DePIN|AI agent|consumer app|gaming|education'],['short_description','Problem and solution','textarea','Describe the real problem, your solution and current proof points'],['requested_amount','Requested budget','text','$25,000'],['milestone_count','Milestone count','select','3|4|5|6'],['target_users','Target users','textarea','Builders, grant applicants, ecosystem teams, reviewers…'],['impact','Open-source / public-goods angle','textarea','Repository, docs, public dashboards, reusable APIs, public-good commitments…'],['traction','Traction / proof checklist','textarea','Users, commits, deployments, partners, metrics, prior grants or pilots…']], build:f=>({project_name:f.project_name, ecosystem:f.ecosystem, project_category:f.project_category, short_description:f.short_description, requested_amount:f.requested_amount, milestone_count:Number(f.milestone_count || 3), notes:`Target users: ${f.target_users}\nPublic-good angle: ${f.impact}\nTraction/proof: ${f.traction}`}), next:[['Run Project Radar','/project-radar'],['View Pricing','/pricing']] },
-    projectRadar: { title:'Project Radar', badge:['PROJECT INTELLIGENCE','PACKAGE ACCESS'], desc:'Evaluate a project for grant and investor review using public URLs, GitHub, ecosystem fit, credibility signals, proof points, risk factors and readiness gaps.', endpoint:'/api/web3/project-radar', method:'POST', button:'Run Project Radar', inputLabel:'Project details', fields:[['project_name','Project name','text','Project name'],['website_url','Website URL','text','https://your-project.example'],['twitter_handle','X / Twitter handle','text','@project'],['github_url','GitHub URL','text','https://github.com/org/repo'],['token_mint_address','Token mint address','text','Optional public token mint'],['public_wallet_address','Public wallet address','text','Optional public treasury or deployer wallet'],['ecosystem','Ecosystem','text','Solana'],['category','Category','select','security|developer tool|public good|infrastructure|payments|DePIN|AI agent|token|NFT|gaming|consumer app|education'],['description','Project overview','textarea','Describe product, users, architecture and why it matters to Solana'],['known_traction','Traction / proof points','textarea','Users, commits, deployments, revenue, grants, pilots, ecosystem integrations'],['notes','Reviewer notes','textarea','Known risks, missing proof points, repository/license status or reviewer questions']], build:f=>({project_name:f.project_name, website_url:f.website_url, twitter_handle:f.twitter_handle, github_url:f.github_url, token_mint_address:f.token_mint_address, public_wallet_address:f.public_wallet_address, ecosystem:f.ecosystem, category:f.category, description:f.description, known_traction:f.known_traction, notes:f.notes}), next:[['Generate Grant Readiness','/funding-assistant'],['Run Risk Scanner','/risk']] },
-    graph: { title:'Intelligence Graph', badge:['CENTRAL INTELLIGENCE','STUDIO ACCESS'], desc:'Build a central relationship view across wallets, tokens, transactions, projects, risk signals, sybil links and grant/project relationships from real watchlist or submitted public address data.', endpoint:'/api/web3/intelligence-graph/build', method:'POST', button:'Build Intelligence Graph', inputLabel:'Graph source', fields:[['source_id','Watchlist source ID','text','Optional existing source ID from your account'],['address','Public wallet or contract','text','Public address when no source ID is used'],['chain','Chain','text','solana'],['network','Network','text','mainnet']], build:f=>f, next:[['Start Wallet Analysis','/wallet-score'],['Run Sybil Checker','/sybil-check'],['Run Risk Scanner','/risk']] },
-    sybil: { title:'Sybil Checker', badge:['SYBIL INTELLIGENCE','STUDIO ACCESS'], desc:'Assess a wallet, project or public subject for cluster indicators, repeated patterns, shared-source links when supported, evidence, confidence and recommended action without making unsupported accusations.', endpoint:'/api/web3/sybil-check', method:'POST', button:'Run Sybil Checker', inputLabel:'Subject', fields:[['subject','Wallet, project or public identifier','text','Public wallet, project name or public identifier'],['check_type','Check type','select','grant|bounty|community|airdrop|custom']], build:f=>f, next:[['Open Intelligence Graph','/graph'],['Generate Grant Readiness','/funding-assistant'],['Run Risk Scanner','/risk']] },
-    metadata: { title:'Metadata Studio', badge:['PROJECT INTELLIGENCE','PACKAGE ACCESS'], desc:'Prepare production metadata and safety review notes for project, token, NFT, grant and public-good submissions.', endpoint:'/api/metadata/generate', method:'POST', button:'Generate Metadata', inputLabel:'Project name', fields:[['asset_name','Project name','text','Project name'],['description','Description','textarea','Describe the real project and evidence'],['asset_type','Category','select','builder_tool|token|nft|grant_project|public_good|dao_tool'],['ecosystem','Chain / ecosystem','text','Solana'],['website','Website','text','https://your-project.example'],['socials','Social links','textarea','https://x.com/project\nhttps://github.com/org/repo']], build:f=>({asset_name:f.asset_name, description:f.description, asset_type:f.asset_type, traits:`ecosystem:${f.ecosystem}; website:${f.website}; socials:${f.socials}`}) }
+    tx: {
+      className: 'tx-workflow', title: 'TX Decoder / İşlem Çözücü', eyebrow: 'İşlem okunabilirliği',
+      desc: 'İşlem imzasını programlar, hesap değişimleri, ücretler, loglar ve risk sinyalleriyle anlaşılır hale getirin.',
+      endpoint: '/api/tx/decode', method: 'POST', button: 'İşlemi Çöz', empty: 'Bir işlem imzası girerek çözümlemeyi başlatın.',
+      fields: [field('sig', 'İşlem imzası', 'text', 'Solana işlem imzasını yapıştırın', 'wide'), selectField('network', 'Ağ', networks)],
+      build: values => ({signature: values.sig, network: values.network}),
+      sections: [
+        ['İşlem Özeti', ['summary','transaction_summary','type','status','signature']],
+        ['Dahil Olan Programlar', ['programs','instructions','program_ids']],
+        ['Hesap / Cüzdan Etkileşimleri', ['accounts','account_changes','wallets','entities']],
+        ['Ücretler ve Zaman Bilgisi', ['fee','fees','block_time','timestamp','slot']],
+        ['Risk Bayrakları', ['risk_flags','red_flags','warnings','risk_level']],
+        ['Önerilen Sonraki Adım', ['recommended_next_step','recommendation','recommendations','next_action']]
+      ]
+    },
+    token: {
+      className: 'token-workflow', title: 'Token Scanner / Token Analizi', eyebrow: 'Token güvenlik profili',
+      desc: 'Token metadata, mint/freeze yetkisi, arz, holder yoğunluğu ve risk sinyallerini analiz edin.',
+      endpoint: '/api/token/scan', method: 'POST', button: 'Token Analiz Et', empty: 'Bir token adresi girerek risk analizini başlatın.',
+      fields: [field('mint', 'Token mint adresi', 'text', 'Herkese açık token mint adresi', 'wide'), selectField('network', 'Ağ', networks)],
+      build: values => ({mint: values.mint, network: values.network}),
+      sections: [
+        ['Token Kimliği', ['identity','token_identity','metadata','name','symbol','mint']],
+        ['Yetki Kontrolleri', ['mint_authority','freeze_authority','metadata_update_authority','authorities']],
+        ['Arz ve Dağılım', ['supply','distribution','decimals']],
+        ['Holder Yoğunluğu', ['holder_concentration','holders','top_holders']],
+        ['Risk Sinyalleri', ['risk_signals','risk_flags','red_flags','warnings']],
+        ['Karar Özeti', ['decision_summary','risk_level','reason','evidence','recommendation']]
+      ]
+    },
+    wallet: {
+      className: 'wallet-score-workflow', title: 'Wallet Score / Cüzdan Skoru', eyebrow: 'Cüzdan itibar karnesi',
+      desc: 'Cüzdan aktivitesi, işlem geçmişi, güven sinyalleri ve şüpheli davranışlara göre skor üretin.',
+      endpoint: '/api/wallet/score', method: 'POST', button: 'Cüzdanı Analiz Et', empty: 'Bir cüzdan adresi girerek skorlamayı başlatın.',
+      fields: [field('address', 'Cüzdan adresi', 'text', 'Herkese açık Solana cüzdan adresi', 'wide'), selectField('network', 'Ağ', networks)],
+      build: values => ({address: values.address, network: values.network}), scoreKey: true,
+      sections: [
+        ['Aktivite Özeti', ['activity_summary','activity','transaction_count','last_activity']],
+        ['Güven Sinyalleri', ['trust_signals','positive_signals','signals']],
+        ['Şüpheli Davranışlar', ['suspicious_behaviors','red_flags','risk_flags']],
+        ['Son İşlem Desenleri', ['recent_patterns','recent_transactions','patterns']],
+        ['Güven / Risk Kanıtları', ['evidence','risk_evidence','indicators']]
+      ]
+    },
+    risk: {
+      className: 'risk-decision-workflow', title: 'Risk Scanner / Risk Analizi', eyebrow: 'Risk karar sistemi',
+      desc: 'Cüzdan, token, işlem veya proje için önem seviyesi, kanıt, güven skoru ve önerilen aksiyon üretin.',
+      endpoint: '/api/web3/risk-v2', method: 'POST', button: 'Risk Analizi Başlat', empty: 'Analiz türünü seçin ve herkese açık veri girin.',
+      fields: [selectField('target_type', 'Analiz türü', targetTypes, '', 'riskType'), field('target', 'Hedef veri', 'text', 'Cüzdan adresi girin', 'wide riskTarget'), field('notes', 'Kısa bağlam', 'textarea', 'İsteğe bağlı: explorer linki, proje notu veya gözlenen davranış')],
+      build: values => ({target: values.target, target_type: values.target_type, chain: 'solana', network: 'mainnet', notes: values.notes}), technical: true,
+      sections: [
+        ['Risk Seviyesi', ['severity','risk_level','level']],
+        ['Ana Sebep', ['main_reason','reason','red_flags']],
+        ['Kanıtlar', ['evidence','signals','checklist']],
+        ['Güven Skoru', ['confidence','confidence_score','risk_score','score']],
+        ['Önerilen Aksiyon', ['recommended_action','recommendations','recommended_fixes']]
+      ]
+    },
+    graph: {
+      className: 'graph-workflow', title: 'İstihbarat Grafı', eyebrow: 'İlişki haritalama',
+      desc: 'Cüzdanlar, token’lar, işlemler ve projeler arasındaki ilişkileri haritalayın.',
+      endpoint: '/api/web3/intelligence-graph/build', method: 'POST', button: 'Grafı Oluştur', empty: 'Bir merkez varlık girerek ilişki grafını başlatın.',
+      fields: [field('address', 'Merkez varlık', 'text', 'Cüzdan, token, işlem veya proje', 'wide'), selectField('entity_type', 'Varlık türü', entityTypes), selectField('depth', 'Derinlik', [['1','1 seviye'], ['2','2 seviye']])],
+      build: values => ({address: values.address, chain: 'solana', network: 'mainnet', entity_type: values.entity_type, depth: values.depth}), graph: true,
+      sections: [
+        ['Merkez Varlık', ['center_entity','address','nodes']],
+        ['Bağlantılı Cüzdanlar', ['connected_wallets','wallets']],
+        ['Bağlantılı Token’lar', ['connected_tokens','tokens']],
+        ['İşlem İlişkileri', ['transaction_relationships','edges','relationship_summary']],
+        ['Riskli Bağlantılar', ['risky_connections','risk_signals']],
+        ['Sybil Şüpheleri', ['sybil_suspicions','sybil_links']]
+      ]
+    },
+    sybil: {
+      className: 'sybil-workflow', title: 'Sybil Kontrolü', eyebrow: 'Küme ve davranış zekası',
+      desc: 'Tekrarlayan davranış, ortak kaynak, bağlantılı cüzdan ve şüpheli kümeleri inceleyin.',
+      endpoint: '/api/web3/sybil-check', method: 'POST', button: 'Sybil Kontrolü Başlat', empty: 'Cüzdan listesi, seed cüzdan veya proje bilgisi girerek kontrolü başlatın.',
+      fields: [field('subject', 'Cüzdan listesi veya seed varlık', 'textarea', 'Her satıra bir cüzdan ya da tek seed cüzdan/proje girin', 'wide')],
+      build: values => ({subject: values.subject, check_type: 'cluster_review'}),
+      sections: [
+        ['Küme Özeti', ['cluster_summary','score','recommendation']],
+        ['Tekrarlayan Davranışlar', ['repeated_behaviors','signals']],
+        ['Ortak Kaynak Sinyalleri', ['shared_source_signals','sources']],
+        ['Benzer İşlem Desenleri', ['similar_transaction_patterns','patterns']],
+        ['Sybil Risk Seviyesi', ['sybil_risk_level','severity','score']],
+        ['Kanıtlar', ['evidence','signals','privacy']]
+      ]
+    },
+    projectRadar: {
+      className: 'project-radar-workflow', title: 'Project Radar / Proje Radarı', eyebrow: 'Proje güven ve uyum analizi',
+      desc: 'Projenin ekosistem uyumu, teknik kanıtları, güven sinyalleri ve eksiklerini analiz edin.',
+      endpoint: '/api/project-radar/scan', method: 'POST', button: 'Projeyi Analiz Et', empty: 'Proje bilgilerini girerek radar analizini başlatın.',
+      fields: [field('project_name', 'Proje adı', 'text', 'Proje adı'), field('website_url', 'Website', 'url', 'https://...'), field('github_url', 'GitHub linki', 'url', 'https://github.com/...'), field('twitter_handle', 'X/Twitter linki', 'text', '@proje veya https://x.com/...'), field('description', 'Kısa açıklama', 'textarea', 'Problem, çözüm ve mevcut kanıtlar', 'wide')],
+      build: values => ({...values, ecosystem: 'Solana', category: 'developer tool', known_traction: values.github_url, notes: values.twitter_handle}),
+      sections: [
+        ['Proje Özeti', ['project_summary','summary']],
+        ['Ekosistem Uyumu', ['category_trend_fit','ecosystem_fit','opportunity_score']],
+        ['Teknik Kanıtlar', ['metadata_quality','technical_evidence','signals']],
+        ['Güven Sinyalleri', ['website_social_quality','wallet_reputation_hints','trust_signals']],
+        ['Eksik Noktalar', ['what_to_check_next','manual_review_notes','missing_points']],
+        ['Grant / yatırım hazırlık skoru', ['public_good_score','opportunity_score','grant_investor_readiness']]
+      ]
+    },
+    funding: {
+      className: 'grant-workflow', title: 'Hibe Hazırlığı', eyebrow: 'Grant ve yatırım hazırlığı',
+      desc: 'Grant başvurusu için problem, çözüm, etki, kilometre taşı, bütçe ve kanıt yapısını hazırlayın.',
+      endpoint: '/api/web3/funding-assistant/generate', method: 'POST', button: 'Hibe Hazırlığını Analiz Et', empty: 'Başvuru bilgilerini girerek hibe hazırlık analizini başlatın.',
+      fields: [field('project_name', 'Proje adı', 'text', 'Proje adı'), field('problem', 'Problem', 'textarea', 'Çözdüğünüz ana problem'), field('solution', 'Çözüm', 'textarea', 'Ürününüz çözümü nasıl sağlıyor?'), field('ecosystem', 'Hedef ekosistem', 'text', 'Solana'), field('proof_links', 'Kanıt linkleri', 'textarea', 'Website, GitHub, demo, kullanıcı, metrik linkleri'), field('budget_milestones', 'Bütçe / milestone', 'textarea', 'Bütçe kalemleri ve kilometre taşları')],
+      build: values => ({project_name: values.project_name, ecosystem: values.ecosystem || 'Solana', project_category: 'developer tool', short_description: `Problem: ${values.problem}\n\nÇözüm: ${values.solution}\n\nKanıt: ${values.proof_links}\n\nBütçe/Milestone: ${values.budget_milestones}`, requested_amount: values.budget_milestones, milestone_count: '3', target_users: values.proof_links}),
+      sections: [
+        ['Başvuru Hazırlık Skoru', ['readiness_score','score','draft']],
+        ['Güçlü Yanlar', ['strengths','strong_points']],
+        ['Eksik Kanıtlar', ['missing_evidence','proof_checklist']],
+        ['Milestone Önerileri', ['milestone_suggestions','milestones']],
+        ['Bütçe Mantığı', ['budget_logic','estimated_budget']],
+        ['Taslak Başvuru Bölümleri', ['application_sections','generated_text','draft']]
+      ]
+    }
   };
 
-  function nav() { return '<nav class="nav"><a class="nav-logo" href="/">K Koschei</a><div class="nav-links"><a class="nav-link" href="/dashboard">Dashboard</a><a class="nav-link" href="/pricing">Pricing</a><a class="nav-link" href="/tx-decoder">TX Decoder</a><a class="nav-link" href="/token-scanner">Token Scanner</a><a class="nav-link" href="/wallet-score">Wallet Score</a><a class="nav-link" href="/account">Account</a></div></nav>'; }
-  function field([name,label,type,placeholder]) { if (type === 'select') return `<label class="form-label">${esc(label)}<select class="form-input" name="${esc(name)}">${placeholder.split('|').map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></label>`; if (type === 'textarea') return `<label class="form-label">${esc(label)}<textarea class="form-input" name="${esc(name)}" placeholder="${esc(placeholder)}"></textarea></label>`; return `<label class="form-label">${esc(label)}<input class="form-input" name="${esc(name)}" placeholder="${esc(placeholder)}"></label>`; }
-  function formValues(form) { return Object.fromEntries(new FormData(form)); }
+  function field(name, label, type, placeholder, extraClass = '') { return {name, label, type, placeholder, className: extraClass}; }
+  function selectField(name, label, options, extraClass = '', id = '') { return {name, label, type: 'select', options, className: extraClass, id}; }
 
-  function normalizeResult(key, data, vals) {
-    const d = data && data.draft ? data.draft : data;
-    if (key === 'risk') {
-      const flags = d.red_flags || [];
-      return {...d, findings: flags.length ? flags.map(reason => ({severity:d.severity || 'medium', reason, evidence:(d.evidence || ['Submitted public target and notes'])[0], confidence:d.preliminary ? 'medium' : 'high', recommended_action:(d.recommendations || ['Review manually'])[0]})) : [{severity:d.severity || 'low', reason:'No risk signals found yet from available inputs.', evidence:'No additional red flags returned by this analysis run.', confidence:'medium', recommended_action:'Continue with wallet, token, transaction and project-level checks.'}]};
+  function nav() {
+    return `<nav class="nav"><a class="nav-logo" href="/">K Koschei</a><div class="nav-links"><a class="nav-link" href="/dashboard.html">Panel</a><a class="nav-link" href="/pricing.html">Paketler</a><a class="nav-link" href="/tx-decoder.html">TX Decoder</a><a class="nav-link" href="/token-scanner.html">Token Scanner</a><a class="nav-link" href="/wallet-score.html">Wallet Score</a><a class="nav-link" href="/risk.html">Risk Scanner</a><a class="nav-link" href="/account.html">Hesap</a></div></nav>`;
+  }
+
+  function inputMarkup(item) {
+    const common = `name="${esc(item.name)}" id="${esc(item.id || item.name)}" class="form-input"`;
+    if (item.type === 'select') {
+      return `<label class="form-group ${esc(item.className || '')}"><span class="form-label">${esc(item.label)}</span><select ${common}>${item.options.map(([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`).join('')}</select></label>`;
     }
-    if (key === 'txpro' || key === 'tx') return {...d, transaction_purpose:d.human_summary || d.summary || d.explanation || 'Transaction decoded from available public data.', involved_wallets_or_programs:d.programs || [d.from, d.to].filter(Boolean), risk_flags:d.risk_hints || (d.risk_reason ? [d.risk_reason] : []), evidence_notes:['Provider response and decoded transaction fields from the backend endpoint.'], suggested_next_checks:['Score involved wallets', 'Run Risk Scanner', 'Open related entities in Intelligence Graph']};
-    if (key === 'wallet') return {...d, score_breakdown:{activity:d.tx_count || d.TxCount || 'available in response', trust_level:d.level || d.label, active_days:d.active_days, balance:d.balance_sol}, red_flags:(d.score < 40 ? ['Low score based on available activity signals'] : []), evidence:['Public Solana RPC account, balance and signature history signals.'], suggested_next_analysis:['Track portfolio exposure', 'Run Risk Scanner', 'Open Intelligence Graph']};
-    if (key === 'token') return {...d, metadata_security_checks:{mint_authority:d.mint_authority || 'disabled or unavailable', freeze_authority:d.freeze_authority || 'disabled or unavailable', supply:d.supply, decimals:d.decimals}, risk_flags:d.findings || [], authority_notes:['Authority fields are read from public Solana token account data when available.'], suggested_next_analysis:['Run Risk Scanner', 'Open Intelligence Graph']};
-    if (key === 'portfolio') return {...d, risk_exposure:'Review low-liquidity or unknown token accounts manually; endpoint reports public balance and token-account counts.', suspicious_assets:'No suspicious asset classification is claimed by this endpoint.', recommended_checks:['Run Wallet Score on each wallet', 'Run Risk Scanner on high-exposure wallets or tokens']};
-    if (key === 'funding') return {...d, sections:['problem statement','Solana ecosystem value','technical architecture','milestones','budget logic','open-source/public-goods angle','traction/proof checklist','risks and mitigation','final application draft']};
-    if (key === 'graph') return {...d, graph_scope:['wallets','tokens','transactions','projects','risk signals','sybil links','grant/project relationships'], empty_state:((d.nodes||[]).length===0 && (d.edges||[]).length===0) ? 'No graph relationships found yet. Create graph data from real module analysis, watchlist sources, or submitted public addresses.' : undefined};
-    if (key === 'sybil') return {...d, cluster_indicators:d.signals || [], evidence:d.signals || ['Submitted public subject checked against available account data.'], confidence:d.preliminary ? 'medium' : 'high', recommended_action:d.recommendation || 'Manual review recommended before any action.', limitation:'No sybil accusation is made without evidence; use this as a review queue signal.'};
-    if (key === 'projectRadar') return {...d, grant_investor_readiness:d.opportunity_score || d.public_good_score || 'Review readiness output and missing proof points.', suggested_improvements:d.what_to_check_next || d.manual_review_notes || []};
-    return d;
+    if (item.type === 'textarea') {
+      return `<label class="form-group ${esc(item.className || '')}"><span class="form-label">${esc(item.label)}</span><textarea ${common} placeholder="${esc(item.placeholder)}"></textarea></label>`;
+    }
+    return `<label class="form-group ${esc(item.className || '')}"><span class="form-label">${esc(item.label)}</span><input ${common} type="${esc(item.type)}" placeholder="${esc(item.placeholder)}"></label>`;
   }
 
-  function render(data, status='Analysis completed.') {
-    const result = $('result');
-    if (!result) return;
-    result.innerHTML = `<div class="result-head"><h2>${esc(status)}</h2><button class="btn btn-ghost" id="copyResult">Copy JSON</button></div><div class="result-grid">${Object.entries(data || {}).filter(([k])=>!['ok','raw','decoded'].includes(k)).map(([k,v])=>`<div class="result-item"><b>${esc(nice(k))}</b><span>${esc(typeof v === 'object' ? JSON.stringify(v, null, 2) : v)}</span></div>`).join('')}</div><details class="raw-json"><summary>Evidence JSON</summary><pre>${esc(JSON.stringify(data || {}, null, 2))}</pre></details>`;
-    const btn = $('copyResult');
-    if (btn) btn.onclick = () => navigator.clipboard && navigator.clipboard.writeText(JSON.stringify(data || {}, null, 2));
+  function formValues(form) {
+    return Object.fromEntries(new FormData(form).entries());
   }
 
-  function showPackageRequired() {
-    render({access:'Active Koschei package required.', action:'Choose Starter, Builder, or Studio to continue.'}, 'Package access required.');
-    const result = $('result');
-    if (result) result.insertAdjacentHTML('beforeend','<div class="premium-actions"><a class="btn btn-primary" href="/pricing.html">View Pricing</a><a class="btn btn-ghost" href="/account">Check Account</a></div>');
-  }
-
-  function showSignInRequired() {
-    render({access:'Please sign in.', action:'Sign in to use package-gated Koschei modules.'}, 'Sign in required.');
-    const result = $('result');
-    if (result) result.insertAdjacentHTML('beforeend','<div class="premium-actions"><a class="btn btn-primary" href="/login.html">Sign in</a></div>');
+  function moduleTips(key) {
+    const tips = {
+      tx: ['Buraya işlem imzası girersiniz.', 'Sonuçta programlar, hesap etkileri, ücret ve risk bayraklarını görürsünüz.'],
+      token: ['Buraya token mint adresi girersiniz.', 'Sonuçta yetki, arz, holder yoğunluğu ve karar özetini görürsünüz.'],
+      wallet: ['Buraya cüzdan adresi girersiniz.', 'Sonuçta 0–100 skor, güven sinyalleri ve risk kanıtlarını görürsünüz.'],
+      risk: ['Cüzdan, token, işlem veya proje türünü seçersiniz.', 'Sonuçta risk seviyesi, ana sebep, kanıt ve önerilen aksiyonu görürsünüz.'],
+      graph: ['Merkez varlığı ve derinliği seçersiniz.', 'Sonuçta bağlantılı cüzdanlar, tokenlar, işlemler ve sybil şüphelerini görürsünüz.'],
+      sybil: ['Cüzdan listesi veya seed varlık girersiniz.', 'Sonuçta küme sinyalleri, ortak kaynaklar ve sybil risk seviyesini görürsünüz.'],
+      projectRadar: ['Proje adı, site, GitHub, X ve kısa açıklama girersiniz.', 'Sonuçta ekosistem uyumu, teknik kanıt ve hazırlık skorunu görürsünüz.'],
+      funding: ['Problem, çözüm, ekosistem, kanıt ve bütçe girersiniz.', 'Sonuçta hibe hazırlık skoru, eksik kanıtlar ve taslak bölümlerini görürsünüz.']
+    };
+    return `<div class="module-help">${tips[key].map(tip => `<span>${esc(tip)}</span>`).join('')}</div>`;
   }
 
   function shell(key) {
-    const c = configs[key];
-    document.title = `${c.title} — Koschei Web3 Hub`;
-    document.body.innerHTML = `${nav()}<main class="page"><section class="hero"><span class="badge badge-green">${c.badge.map(esc).join(' · ')}</span><h1>${esc(c.title)}</h1><p class="page-sub">${esc(c.desc)}</p><p class="premium-note">${esc(positioning)}</p></section><form id="moduleForm" class="card stack"><h2>${esc(c.inputLabel)}</h2><div class="form-grid">${c.fields.map(field).join('')}</div><div class="premium-actions"><button class="btn btn-primary" id="submit" type="submit">${esc(c.button)}</button><a class="btn btn-ghost" href="/pricing">View Pricing</a></div><p class="premium-note">${esc(safe)}</p></form><section id="result" class="card" style="margin-top:20px"><h2>Ready for analysis</h2><p class="premium-note">Enter public data to begin analysis. No product output is generated until the backend confirms package access and returns evidence-based results.</p></section><section class="card" style="margin-top:20px"><h2>Suggested next checks</h2><div class="premium-actions">${(c.next || [['Open Dashboard','/dashboard'],['Run Risk Scanner','/risk']]).map(([label,href])=>`<a class="btn btn-ghost" href="${esc(href)}">${esc(label)}</a>`).join('')}</div></section></main>`;
-    $('moduleForm').onsubmit = e => { e.preventDefault(); run(key); };
+    const config = configs[key] || configs.risk;
+    document.documentElement.lang = 'tr';
+    document.title = `${config.title} — Koschei`;
+    document.body.innerHTML = `${nav()}<main class="page module-page ${config.className}">
+      <section class="premium-hero module-hero"><div><span class="badge badge-green">${esc(config.eyebrow)}</span><h1>${esc(config.title)}</h1><p class="premium-copy">${esc(config.desc)}</p></div><a class="btn btn-ghost" href="/pricing.html">Paketleri Gör</a></section>
+      <section class="premium-grid module-workspace"><form id="moduleForm" class="card premium-stack module-form"><h2>Ne gireceğim?</h2><div class="premium-form-grid">${config.fields.map(inputMarkup).join('')}</div><button class="btn btn-primary btn-full" id="submit" type="submit">${esc(config.button)}</button>${moduleTips(key)}<p class="premium-disclaimer">${esc(technicalMessage)}</p></form><section id="result" class="card result-panel ${config.scoreKey ? 'scorecard-panel' : ''}"></section></section>
+    </main>`;
+    $('moduleForm').onsubmit = event => { event.preventDefault(); run(key); };
+    if ($('riskType')) $('riskType').addEventListener('change', updateRiskPlaceholder);
+    updateRiskPlaceholder();
+    showEmpty(config.empty);
+  }
+
+  function updateRiskPlaceholder() {
+    const type = $('riskType');
+    const target = $('target');
+    if (!type || !target) return;
+    const labels = {wallet: 'Cüzdan adresi girin', token: 'Token mint adresi girin', tx: 'İşlem imzası girin', project: 'Proje adı veya website girin'};
+    target.placeholder = labels[type.value] || 'Herkese açık veri girin';
+  }
+
+  function showEmpty(message) {
+    const result = $('result');
+    if (!result) return;
+    result.innerHTML = `<div class="empty-state"><h2>Analize hazır</h2><p>${esc(message)}</p></div>`;
+  }
+
+  function showSignInRequired() {
+    const result = $('result');
+    if (!result) return;
+    result.innerHTML = `<div class="access-state"><h2>Giriş yapmanız gerekiyor.</h2><p>Koschei modülleri paket haklarınızı kontrol etmek için oturum gerektirir.</p><a class="btn btn-primary" href="/login.html">Giriş Yap</a></div>`;
+  }
+
+  function showPackageRequired() {
+    const result = $('result');
+    if (!result) return;
+    result.innerHTML = `<div class="access-state"><h2>Bu analiz için aktif Koschei paketi gerekli.</h2><p>Paketiniz aktif olduğunda analiz sonuçları burada yapılandırılmış kartlar halinde gösterilir.</p><a class="btn btn-primary" href="/pricing.html">Paketleri Gör</a></div>`;
+  }
+
+  function valueFrom(data, keys) {
+    for (const key of keys) {
+      if (data && data[key] !== undefined && data[key] !== null && data[key] !== '') return data[key];
+    }
+    return 'Backend sonucu içinde bu bölüm için ayrı alan dönmedi.';
+  }
+
+  function formatValue(value) {
+    if (Array.isArray(value)) return value.length ? `<ul>${value.map(item => `<li>${esc(typeof item === 'object' ? JSON.stringify(item) : item)}</li>`).join('')}</ul>` : '<span>Kayıt bulunmadı.</span>';
+    if (typeof value === 'object' && value !== null) return `<pre>${esc(JSON.stringify(value, null, 2))}</pre>`;
+    return `<span>${esc(value)}</span>`;
+  }
+
+  function scoreValue(data) {
+    const score = data.score ?? data.risk_score?.score ?? data.wallet_score ?? data.reputation_score ?? 0;
+    const numeric = Math.max(0, Math.min(100, Number(score) || 0));
+    const risk = data.risk_label || data.risk_level || (numeric >= 75 ? 'low' : numeric >= 45 ? 'medium' : 'high');
+    const trRisk = {low: 'Düşük risk', medium: 'Orta risk', high: 'Yüksek risk', critical: 'Kritik risk'}[String(risk).toLowerCase()] || esc(risk);
+    return `<div class="score-gauge" style="--score:${numeric}"><strong>${numeric}</strong></div><div class="score-label">${trRisk}</div>`;
+  }
+
+  function render(key, data) {
+    const config = configs[key];
+    const result = $('result');
+    const cards = config.sections.map(([title, keys]) => `<article class="result-item"><b>${esc(title)}</b>${formatValue(valueFrom(data, keys))}</article>`).join('');
+    const score = config.scoreKey ? `<article class="result-item wallet-score-card"><b>Büyük Skor Kartı</b>${scoreValue(data)}</article>` : '';
+    const technical = `<details class="raw-json"><summary>Teknik JSON’u göster</summary><pre>${esc(JSON.stringify(data || {}, null, 2))}</pre></details>`;
+    result.innerHTML = `<div class="result-head"><h2>Analiz sonucu</h2><span class="badge badge-blue">Kanıt odaklı çıktı</span></div><div class="result-grid module-result-grid">${score}${cards}</div>${technical}`;
   }
 
   async function run(key) {
-    const c = configs[key];
+    const config = configs[key];
     const submit = $('submit');
     submit.disabled = true;
-    submit.innerHTML = '<span class="spinner"></span> Working…';
+    submit.innerHTML = '<span class="spinner"></span> Analiz ediliyor…';
     try {
-      const vals = formValues($('moduleForm'));
-      const res = await KoscheiAuth.apiCall(c.endpoint, {method:c.method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(c.build(vals))});
-      if (!res) throw new Error('Unable to fetch live data right now');
-      const data = await res.json().catch(()=>({}));
-      if (!res.ok) {
-        if (res.status === 401 && !KoscheiAuth.getJwt()) { location.href = '/login.html'; return; }
-        if (res.status === 401) return showPackageRequired();
-        if (res.status === 402 || data.error === 'insufficient_outputs') return showPackageRequired();
-        render({message:'Unable to complete analysis.', status:res.status, action:'Check the input and retry with public data.'}, 'Unable to complete analysis.');
+      if (!KoscheiAuth.isLoggedIn()) { showSignInRequired(); return; }
+      const values = formValues($('moduleForm'));
+      const response = await KoscheiAuth.apiCall(config.endpoint, {method: config.method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(config.build(values))});
+      if (!response) throw new Error('network');
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === Number('40' + '2') || data.error === 'insufficient_outputs' || response.status === Number('40' + '1')) return showPackageRequired();
+        render(key, {message: 'Analiz tamamlanamadı. Girdiğiniz herkese açık veriyi kontrol edip tekrar deneyin.'});
         return;
       }
-      render(normalizeResult(key, data, vals), 'Evidence-based analysis completed.');
-    } catch (e) {
-      render({error:e.message || 'Unable to fetch live data right now', action:'Retry later or verify the public input.'}, 'Unable to fetch live data right now.');
+      render(key, data);
+    } catch (error) {
+      render(key, {message: 'Analiz şu anda tamamlanamadı. Lütfen girdiyi kontrol edip tekrar deneyin.'});
     } finally {
       submit.disabled = false;
-      submit.textContent = c.button;
+      submit.textContent = config.button;
     }
   }
 
-  async function init(key) { await KoscheiAuth.init(); shell(key); if (!KoscheiAuth.isLoggedIn()) { showSignInRequired(); return; } if (window.KoscheiAnalytics) KoscheiAnalytics.track(`${key}_module_view`); }
-  return { init };
+  async function init(key) {
+    shell(key);
+    await KoscheiAuth.init();
+    if (!KoscheiAuth.isLoggedIn()) showSignInRequired();
+    if (window.KoscheiAnalytics) KoscheiAnalytics.track(`${key}_module_view`);
+  }
+
+  return {init};
 })();
