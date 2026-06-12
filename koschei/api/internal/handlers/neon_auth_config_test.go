@@ -11,8 +11,10 @@ func TestNeonAuthConfigMissingByDefault(t *testing.T) {
 	t.Setenv("NEON_AUTH_ISSUER", "")
 	t.Setenv("NEON_AUTH_JWKS_URL", "")
 	t.Setenv("NEON_AUTH_STATE_SECRET", "")
+	t.Setenv("KOSCHEI_AUTH_STATE_SECRET", "")
 	t.Setenv("DATABASE_URL", "")
 	t.Setenv("CORS_ORIGIN", "")
+	t.Setenv("CORS_ALLOWED_ORIGIN", "")
 
 	if got := configuredNeonAuthBaseURL(); got != "" {
 		t.Fatalf("configuredNeonAuthBaseURL() = %q, want empty", got)
@@ -42,10 +44,43 @@ func TestMissingProductionAuthEnv(t *testing.T) {
 	t.Setenv("NEON_AUTH_ISSUER", "issuer")
 	t.Setenv("NEON_AUTH_JWKS_URL", "jwks")
 	t.Setenv("NEON_AUTH_STATE_SECRET", "secret")
+	t.Setenv("KOSCHEI_AUTH_STATE_SECRET", "")
 	t.Setenv("DATABASE_URL", "postgres://example")
 	t.Setenv("CORS_ORIGIN", "https://example.com")
+	t.Setenv("CORS_ALLOWED_ORIGIN", "")
 
 	if got, want := MissingProductionAuthEnv(), []string{"NEON_AUTH_BASE_URL"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("MissingProductionAuthEnv() = %#v, want %#v", got, want)
+	}
+}
+
+func TestMissingProductionAuthEnvAcceptsFallbackSecretsAndCorsAlias(t *testing.T) {
+	t.Setenv("NEON_AUTH_BASE_URL", "https://auth.example")
+	t.Setenv("NEON_AUTH_ISSUER", "issuer")
+	t.Setenv("NEON_AUTH_JWKS_URL", "jwks")
+	t.Setenv("NEON_AUTH_STATE_SECRET", "")
+	t.Setenv("KOSCHEI_AUTH_STATE_SECRET", "secret")
+	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("CORS_ORIGIN", "")
+	t.Setenv("CORS_ALLOWED_ORIGIN", "https://example.com")
+
+	if got := MissingProductionAuthEnv(); len(got) != 0 {
+		t.Fatalf("MissingProductionAuthEnv() = %#v, want empty", got)
+	}
+}
+
+func TestMissingProductionAuthEnvReportsAlternativeGroups(t *testing.T) {
+	t.Setenv("NEON_AUTH_BASE_URL", "https://auth.example")
+	t.Setenv("NEON_AUTH_ISSUER", "issuer")
+	t.Setenv("NEON_AUTH_JWKS_URL", "jwks")
+	t.Setenv("NEON_AUTH_STATE_SECRET", "")
+	t.Setenv("KOSCHEI_AUTH_STATE_SECRET", "")
+	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("CORS_ORIGIN", "")
+	t.Setenv("CORS_ALLOWED_ORIGIN", "")
+
+	want := []string{"NEON_AUTH_STATE_SECRET or KOSCHEI_AUTH_STATE_SECRET", "CORS_ORIGIN or CORS_ALLOWED_ORIGIN"}
+	if got := MissingProductionAuthEnv(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("MissingProductionAuthEnv() = %#v, want %#v", got, want)
 	}
 }
