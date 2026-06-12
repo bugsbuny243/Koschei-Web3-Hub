@@ -85,6 +85,20 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 	if rows != 1 {
 		return errors.New("insufficient outputs")
 	}
-	_, err = tx.Exec(`INSERT INTO credit_events (email, amount, reason, event_type) VALUES (lower($1), -1, $2, $3)`, normalizedEmail, reason, reason)
+	_, err = tx.Exec(`INSERT INTO credit_events (email, amount, reason, event_type) VALUES (lower($1), -1, $2, $3)`, email, reason, reason)
 	return err
+}
+
+func (h *Handler) requirePremiumOutput(authSubject string) (int, error) {
+	if h.DB == nil {
+		return 0, errors.New("database unavailable")
+	}
+	_, available, err := h.userCreditsAndRole(authSubject)
+	if err != nil {
+		return 0, err
+	}
+	if available <= 0 {
+		return available, errors.New("insufficient outputs")
+	}
+	return available, nil
 }

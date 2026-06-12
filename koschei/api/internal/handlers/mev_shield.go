@@ -69,6 +69,16 @@ func AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 // risk report. Phase-1 uses deterministic local heuristics and persists the
 // estimated mev_saved_usd metric to mev_protection_events for owner reporting.
 func (h *Handler) AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
+
 	var req mevAnalyzeRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
@@ -79,10 +89,6 @@ func (h *Handler) AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	report := buildMEVRiskReport(req)
-	if h.DB != nil && strings.TrimSpace(req.UserWallet) != "" {
-		rawPayload, _ := json.Marshal(req)
-		_, _ = h.DB.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, mev_saved_usd, jito_tip_used, risk_score, risk_level, route, raw_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(req.RawTransaction)), report.EstimatedLossUSD, report.MEVSavedUSD, report.JitoTipUsed, report.RiskScore, report.RiskLevel, req.Route, string(rawPayload))
-	}
 	if req.ProtectedSend && strings.TrimSpace(req.RawTransaction) != "" {
 		bundleID, status, err := h.submitJitoBundle(r.Context(), []string{req.RawTransaction})
 		report.JitoBundleID = bundleID
@@ -95,6 +101,27 @@ func (h *Handler) AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 			report.Signals = append(report.Signals, "Korumalı Gönder işlemi Jito Bundle API üzerinden yönlendirildi.")
 		}
 	}
+	tx, err := h.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	defer tx.Rollback()
+	if strings.TrimSpace(req.UserWallet) != "" {
+		rawPayload, _ := json.Marshal(req)
+		if _, err := tx.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, mev_saved_usd, jito_tip_used, risk_score, risk_level, route, raw_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(req.RawTransaction)), report.EstimatedLossUSD, report.MEVSavedUSD, report.JitoTipUsed, report.RiskScore, report.RiskLevel, req.Route, string(rawPayload)); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+			return
+		}
+	}
+	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, claims.Email, "mev_shield"); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
 	writeJSON(w, http.StatusOK, report)
 }
 
@@ -106,6 +133,16 @@ func (h *Handler) ProtectedSend(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ProtectedSendMEV(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
+
 	var req mevProtectedSendRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
@@ -135,9 +172,26 @@ func (h *Handler) ProtectedSendMEV(w http.ResponseWriter, r *http.Request) {
 	report.JitoBundleID = bundleID
 	report.JitoStatus = status
 	report.Message = "Korumalı Gönder başarılı: işlem Jito Bundle API üzerinden yönlendirildi."
-	if h.DB != nil && strings.TrimSpace(req.UserWallet) != "" {
+	tx, err := h.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	defer tx.Rollback()
+	if strings.TrimSpace(req.UserWallet) != "" {
 		rawPayload, _ := json.Marshal(req)
-		_, _ = h.DB.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, mev_saved_usd, jito_tip_used, risk_score, risk_level, route, raw_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(txs[0])), report.EstimatedLossUSD, report.MEVSavedUSD, true, report.RiskScore, report.RiskLevel, firstNonEmpty(req.Route, "jito_bundle"), string(rawPayload))
+		if _, err := tx.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, mev_saved_usd, jito_tip_used, risk_score, risk_level, route, raw_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(txs[0])), report.EstimatedLossUSD, report.MEVSavedUSD, true, report.RiskScore, report.RiskLevel, firstNonEmpty(req.Route, "jito_bundle"), string(rawPayload)); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+			return
+		}
+	}
+	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, claims.Email, "mev_protected_send"); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "jito_bundle_id": bundleID, "jito_status": status, "report": report})
 }
