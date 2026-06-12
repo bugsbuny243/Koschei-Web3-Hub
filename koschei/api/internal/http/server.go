@@ -279,16 +279,6 @@ func ownerPageHandler(staticDir string) http.HandlerFunc {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		if secret := strings.TrimSpace(os.Getenv("OWNER_SECRET")); secret != "" {
-			provided := strings.TrimSpace(r.Header.Get("X-Koschei-Secret"))
-			if provided == "" {
-				provided = strings.TrimSpace(r.URL.Query().Get("secret"))
-			}
-			if provided != secret {
-				http.NotFound(w, r)
-				return
-			}
-		}
 		if staticDir != "" {
 			ownerPath := filepath.Join(staticDir, "owner.html")
 			if info, err := os.Stat(ownerPath); err == nil && !info.IsDir() {
