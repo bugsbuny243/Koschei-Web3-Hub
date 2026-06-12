@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <meta name="description" content="Sign in to Koschei Web3 Hub for Alchemy-first Web3 Security Intelligence and Solana security tools.">
-  <title>Login — Koschei Web3 Hub</title>
+  <meta name="description" content="Koschei Web3 Hub hesabınıza giriş yapın; premium araçlar aktif paket gerektirir.">
+  <title>Giriş Yap — Koschei Web3 Hub</title>
   <link rel="canonical" href="https://tradepigloball.co/login.html">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -17,15 +17,15 @@
 <div class="blobs"><div class="blob b1"></div><div class="blob b2"></div></div>
 <div class="card">
   <div class="logo">K Koschei</div>
-  <div class="title">Welcome Back</div>
-  <div class="sub">Sign in to continue. Premium tools require an active package.</div>
+  <div class="title">Giriş Yap</div>
+  <div class="sub">Devam etmek için giriş yapın. Premium araçlar aktif paket gerektirir.</div>
   <div class="alert" id="alert" role="alert" aria-live="polite"></div>
   <form class="form" id="loginForm">
-    <div class="form-group"><label class="form-label" for="email">Email</label><input class="form-input" id="email" name="email" type="email" autocomplete="email" required></div>
-    <div class="form-group"><label class="form-label" for="password">Password</label><input class="form-input" id="password" name="password" type="password" autocomplete="current-password" required></div>
-    <button class="btn" id="submitBtn" type="submit">Sign in</button>
+    <div class="form-group"><label class="form-label" for="email">E-posta</label><input class="form-input" id="email" name="email" type="email" autocomplete="email" required></div>
+    <div class="form-group"><label class="form-label" for="password">Şifre</label><input class="form-input" id="password" name="password" type="password" autocomplete="current-password" required></div>
+    <button class="btn" id="submitBtn" type="submit">Giriş Yap</button>
   </form>
-  <div class="link">Don't have an account? <a href="/register.html">Create one</a></div>
+  <div class="link">Hesabınız yok mu? <a href="/register.html">Hesap oluştur</a></div>
 </div>
 <script src="/js/koschei-auth.js?v=6"></script>
 <script>
@@ -52,17 +52,17 @@
     form.addEventListener('submit', async event => {
       event.preventDefault();
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Signing in…';
+      submitBtn.textContent = 'Giriş yapılıyor…';
       alertEl.className = 'alert';
       try {
         const body = Object.fromEntries(new FormData(form));
         await KoscheiAuth.signIn(String(body.email || '').trim(), String(body.password || ''));
-        showAlert('Login successful. Redirecting…', 'success');
+        showAlert('Giriş başarılı. Yönlendiriliyorsunuz…', 'success');
         window.location.href = '/hub.html';
       } catch (error) {
-        showAlert(cleanError(error, 'Login failed. Please check your email and password.'));
+        showAlert(cleanError(error, 'Giriş yapılamadı. Lütfen e-posta ve şifrenizi kontrol edin.'));
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Sign in';
+        submitBtn.textContent = 'Giriş Yap';
       }
     });
   })();

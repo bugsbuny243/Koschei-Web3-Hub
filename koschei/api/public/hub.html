@@ -1,4 +1,222 @@
-<!doctype html>
-<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Sadece 6 amiral gemisi Koschei modülü: işlem çözümleme, token analizi, cüzdan skoru, risk kararı, ilişki/sybil zekası ve proje/hibe hazırlığı."><title>Koschei Modül Hub’ı</title><link rel="stylesheet" href="/css/koschei.css"><style>
-.flagship-hero{padding:34px;background:radial-gradient(circle at 15% 10%,rgba(0,255,136,.18),transparent 32%),linear-gradient(135deg,#111118,#0d211d);border:1px solid var(--border);border-radius:22px;margin-bottom:20px}.flagship-hero h1{font-size:clamp(34px,6vw,62px);line-height:1;margin:12px 0}.flagship-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.flagship-card{display:flex;flex-direction:column;gap:12px;min-height:260px;color:var(--text);text-decoration:none;border-color:rgba(0,255,136,.16);background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02))}.flagship-card:hover{border-color:rgba(0,255,136,.42);transform:translateY(-2px)}.flagship-card h2{font-size:20px}.flagship-card p{color:var(--text2)}.flagship-card b{color:var(--accent2);font-size:12px;text-transform:uppercase;letter-spacing:.06em}.flagship-card .btn{margin-top:auto}.account-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.account-strip .card{padding:16px}.account-strip span{display:block;color:var(--text2);font-size:12px}.quick{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}@media(max-width:900px){.flagship-grid,.account-strip{grid-template-columns:1fr}.nav{align-items:flex-start;gap:10px;flex-direction:column}.nav-links{flex-wrap:wrap;justify-content:flex-start}.flagship-hero{padding:24px}}
-</style></head><body><nav class="nav"><a class="nav-logo" href="/">K Koschei</a><div class="nav-links"><a class="nav-link" href="/dashboard.html">Panel</a><a class="nav-link" href="/pricing.html">Paketler</a><a class="nav-link" href="/tx-decoder.html">TX Decoder</a><a class="nav-link" href="/token-scanner.html">Token Scanner</a><a class="nav-link" href="/wallet-score.html">Wallet Score</a><a class="nav-link" href="/risk.html">Risk Scanner</a><a class="nav-link" href="/account.html">Hesap</a></div></nav><main class="page"><section class="flagship-hero"><span class="badge badge-green">Koschei Alchemy-first</span><h1>Koschei Modül Hub’ı</h1><p class="page-sub">Sadece 6 amiral gemisi Koschei modülü: işlem çözümleme, token analizi, cüzdan skoru, risk kararı, ilişki/sybil zekası ve proje/hibe hazırlığı.</p><div class="quick"><a class="btn btn-primary" href="/pricing.html">Paketleri Gör</a><a class="btn btn-ghost" href="/account.html">Hesap</a></div></section><section class="account-strip"><div class="card"><span>Hesap</span><strong id="userEmail">Kontrol ediliyor</strong></div><div class="card"><span>Paket</span><strong id="userPlan">Kontrol ediliyor</strong></div><div class="card"><span>Kalan analiz</span><strong id="userCredits">—</strong></div></section><div id="memberMessage" class="alert"></div><section class="flagship-grid" aria-label="6 Koschei amiral gemisi modülü"><a class="card flagship-card" href="/tx-decoder.html"><h2>TX Decoder / İşlem Çözücü</h2><div><b>Ne girerim?</b><p>İşlem imzası girersiniz.</p></div><div><b>Ne sonuç alırım?</b><p>Programlar, hesap etkileşimleri, ücretler, loglar ve risk bayraklarıyla okunabilir işlem özeti alırsınız.</p></div><span class="btn btn-primary">Aç</span></a><a class="card flagship-card" href="/token-scanner.html"><h2>Token Scanner / Token Analizi</h2><div><b>Ne girerim?</b><p>Token mint adresi girersiniz.</p></div><div><b>Ne sonuç alırım?</b><p>Token kimliği, yetki kontrolleri, arz/dağılım, holder yoğunluğu ve karar özeti alırsınız.</p></div><span class="btn btn-primary">Aç</span></a><a class="card flagship-card" href="/wallet-score.html"><h2>Wallet Score / Cüzdan Skoru</h2><div><b>Ne girerim?</b><p>Cüzdan adresi girersiniz.</p></div><div><b>Ne sonuç alırım?</b><p>0–100 skor, düşük/orta/yüksek risk etiketi, güven sinyalleri ve kanıt kartları alırsınız.</p></div><span class="btn btn-primary">Aç</span></a><a class="card flagship-card" href="/risk.html"><h2>Risk Scanner / Risk Analizi</h2><div><b>Ne girerim?</b><p>Cüzdan, token, işlem veya proje hedefi seçip herkese açık veri girersiniz.</p></div><div><b>Ne sonuç alırım?</b><p>Risk seviyesi, ana sebep, kanıtlar, güven skoru ve önerilen aksiyon alırsınız.</p></div><span class="btn btn-primary">Aç</span></a><a class="card flagship-card" href="/intelligence-graph.html"><h2>İstihbarat Grafı ve Sybil</h2><div><b>Ne girerim?</b><p>Merkez varlık, varlık türü veya cüzdan listesi girersiniz.</p></div><div><b>Ne sonuç alırım?</b><p>Bağlantılı cüzdanlar, tokenlar, işlem ilişkileri, riskli bağlantılar ve sybil şüpheleri alırsınız.</p></div><span class="btn btn-primary">Aç</span></a><a class="card flagship-card" href="/project-radar.html"><h2>Project Radar ve Hibe Hazırlığı</h2><div><b>Ne girerim?</b><p>Proje adı, site, GitHub/X, açıklama veya grant bilgileri girersiniz.</p></div><div><b>Ne sonuç alırım?</b><p>Ekosistem uyumu, teknik kanıtlar, eksikler, hazırlık skoru ve başvuru bölümleri alırsınız.</p></div><span class="btn btn-primary">Aç</span></a></section></main><script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=1"></script><script>(async()=>{await KoscheiAuth.init();if(!KoscheiAuth.requireAuth('/login.html'))return;if(window.KoscheiAnalytics)KoscheiAnalytics.track('flagship_hub_view');try{await KoscheiAuth.apiCall('/api/auth/provision',{method:'POST'}).catch(()=>{});const res=await KoscheiAuth.apiCall('/api/member/summary');if(!res||!res.ok)throw new Error();const data=await res.json();document.getElementById('userEmail').textContent=data.email||KoscheiAuth.getEmail()||'—';document.getElementById('userPlan').textContent=data.plan||'Aktif paket yok';document.getElementById('userCredits').textContent=data.outputs_remaining??0;}catch{const message=document.getElementById('memberMessage');message.textContent='Hesap aktif. Paket bilgisi hazırlanıyor.';message.className='alert alert-info show';}})()</script></body></html>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-1QFWMJJC3');
+  </script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Koschei Web3 Hub member dashboard for Alchemy-first Web3 Security Intelligence, Solana tools, premium modules and package-gated analysis.">
+  <title>Koschei Web3 Hub — Member Hub</title>
+  <link rel="canonical" href="https://tradepigloball.co/hub.html">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050812;
+      --surface: rgba(255, 255, 255, .08);
+      --line: rgba(255, 255, 255, .16);
+      --line-strong: rgba(255, 255, 255, .28);
+      --text: #f7fbff;
+      --text2: #a9b8d6;
+      --accent: #00ff88;
+      --accent2: #69d8ff;
+      --violet: #a78bfa;
+      --danger: #ff5c7c;
+      --success-bg: rgba(0, 255, 136, .12);
+      --success-border: rgba(0, 255, 136, .3);
+      --shadow: 0 30px 90px rgba(0, 0, 0, .45);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 4%, rgba(0, 255, 136, .24), transparent 34%),
+        radial-gradient(circle at 88% 8%, rgba(105, 216, 255, .2), transparent 30%),
+        radial-gradient(circle at 55% 88%, rgba(167, 139, 250, .2), transparent 36%),
+        linear-gradient(135deg, #03050b 0%, #081221 52%, #040811 100%);
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 54px 54px;
+      mask-image: radial-gradient(circle at center, black, transparent 78%);
+    }
+    a { color: inherit; }
+    .page { position: relative; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 54px; }
+    .surface {
+      background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.045));
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+    .topbar {
+      position: sticky;
+      top: 14px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 42px;
+      padding: 12px 14px;
+      border-radius: 24px;
+    }
+    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; }
+    .brand-mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 14px; color: #06120d; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 0 34px rgba(0, 255, 136, .3); }
+    .brand-sub { color: var(--text2); font-weight: 500; }
+    .nav-links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .nav-link { color: var(--text2); font-size: 13px; font-weight: 700; text-decoration: none; padding: 9px 12px; border-radius: 999px; }
+    .nav-link:hover { color: var(--text); background: rgba(255,255,255,.08); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 0 18px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--text);
+      font-weight: 800;
+      font-size: 14px;
+      font-family: inherit;
+      text-decoration: none;
+      cursor: pointer;
+      background: rgba(255,255,255,.06);
+      transition: transform .2s ease, border-color .2s ease;
+    }
+    .btn:hover { transform: translateY(-2px); border-color: var(--line-strong); }
+    .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; align-items: stretch; margin-bottom: 18px; }
+    .hero-card { border-radius: 34px; padding: clamp(24px, 4vw, 42px); }
+    .eyebrow { display: inline-flex; align-items: center; gap: 8px; width: max-content; padding: 8px 13px; border-radius: 999px; color: #bfffe2; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; background: rgba(0,255,136,.1); border: 1px solid rgba(0,255,136,.24); }
+    h1 { margin: 20px 0 12px; font-size: clamp(38px, 6vw, 68px); line-height: .98; letter-spacing: -.06em; }
+    .gradient-text { background: linear-gradient(135deg, #fff, #c7fff0 32%, #82ddff 72%, #d9ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .page-sub { margin: 0; max-width: 650px; color: var(--text2); font-size: 17px; line-height: 1.75; }
+    .profile-card { border-radius: 34px; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 18px; }
+    .profile-label { color: var(--text2); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .profile-email { margin-top: 10px; font-size: 20px; font-weight: 800; word-break: break-word; }
+    .alert { display: none; margin: 18px 0; padding: 14px 16px; border-radius: 18px; color: #d9ffe9; background: var(--success-bg); border: 1px solid var(--success-border); font-weight: 700; }
+    .alert.show { display: block; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 18px 0; }
+    .stat { min-height: 150px; padding: 22px; border-radius: 28px; }
+    .stat-label { color: var(--text2); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .stat-value { margin-top: 14px; font-size: clamp(26px, 4vw, 38px); font-weight: 800; letter-spacing: -.04em; }
+    .section-head { margin: 36px 0 18px; display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+    h2 { margin: 0; font-size: clamp(26px, 3vw, 38px); letter-spacing: -.04em; }
+    .section-note { margin: 8px 0 0; color: var(--text2); line-height: 1.6; }
+    .modules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .module-card { position: relative; display: flex; flex-direction: column; gap: 10px; min-height: 220px; padding: 24px; border-radius: 28px; color: var(--text); text-decoration: none; overflow: hidden; transition: transform .2s ease, border-color .2s ease; }
+    .module-card:visited { color: var(--text); }
+    .module-card * { text-decoration: none; }
+    .module-card::after { content: ""; position: absolute; inset: auto -30% -45% 30%; height: 120px; background: radial-gradient(circle, rgba(0,255,136,.18), transparent 68%); pointer-events: none; }
+    .module-card:hover { transform: translateY(-4px); border-color: var(--line-strong); }
+    .module-icon { font-size: 32px; margin-bottom: 18px; }
+    .module-name { font-size: 19px; font-weight: 800; margin-bottom: 10px; color: #f7fbff; }
+    .module-desc { color: var(--text2); font-size: 14px; line-height: 1.65; }
+    .module-card .btn { width: max-content; }
+    .module-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; padding: 7px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .tag-live { color: #bfffe2; background: rgba(0,255,136,.1); border: 1px solid rgba(0,255,136,.24); }
+    .tag-core { color: #cfeeff; background: rgba(105,216,255,.1); border: 1px solid rgba(105,216,255,.24); }
+    @media (max-width: 930px) { .hero, .stats, .modules { grid-template-columns: 1fr; } }
+    @media (max-width: 560px) { .topbar { position: static; } .nav-links { width: 100%; justify-content: flex-start; } h1 { letter-spacing: -.045em; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar surface">
+      <a href="/" class="brand" aria-label="Koschei home"><span class="brand-mark">K</span><span>Koschei <span class="brand-sub">Panel</span></span></a>
+      <div class="nav-links">
+        <a href="/dashboard" class="nav-link">Panel</a>
+        <a href="/docs" class="nav-link">Dokümanlar</a>
+        <a href="/pricing.html" class="nav-link">Paketler</a>
+        <button class="btn" type="button" onclick="KoscheiAuth.signOut()">Çıkış Yap</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div class="hero-card surface">
+        <div class="eyebrow">◈ aktif çalışma alanı</div>
+        <h1><span class="gradient-text">Koschei Web3 Komuta Merkezi</span></h1>
+        <p class="page-sub">Hesap durumunu yönetin, kalan çıktı hakkını izleyin ve Koschei’nin saklama gerektirmeyen çekirdek araçlarına tek panelden geçin.</p>
+      </div>
+      <aside class="profile-card surface">
+        <div>
+          <div class="profile-label">Giriş yapan hesap</div>
+          <div class="profile-email" id="userEmail">Yükleniyor…</div>
+        </div>
+        <div class="profile-label">Özel anahtar yok · Salt-okunur araçlar · Geliştirici odaklı</div>
+      </aside>
+    </section>
+
+    <div class="alert" id="memberMessage"></div>
+
+    <section class="stats" aria-label="Member summary">
+      <article class="stat surface"><div class="stat-label">Plan</div><div class="stat-value" id="userPlan">—</div></article>
+      <article class="stat surface"><div class="stat-label">Kalan çıktı hakkı</div><div class="stat-value" id="userCredits">—</div></article>
+      <article class="stat surface"><div class="stat-label">Aktif çalışma alanı</div><div class="stat-value">Aktif</div></article>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div><h2>Hızlı erişim</h2><p class="section-note">Premium modüller aktif paket gerektirir.</p></div>
+      </div>
+      <div class="modules">
+        <a href="/tx-decoder" class="module-card surface"><div class="module-icon">🧾</div><div class="module-name">TX Decoder / İşlem Çözücü</div><div class="module-desc">Solana işlemlerini program, hesap, log ve risk bağlamına çözün.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">İşlemi Çöz</span></a>
+        <a href="/token-scanner" class="module-card surface"><div class="module-icon">🪙</div><div class="module-name">Token Scanner / Token Analizi</div><div class="module-desc">Token metadata, yetki, arz ve holder yoğunluğu sinyallerini analiz edin.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">Token Analiz Et</span></a>
+        <a href="/wallet-score" class="module-card surface"><div class="module-icon">🏆</div><div class="module-name">Wallet Score / Cüzdan Skoru</div><div class="module-desc">Açık Solana cüzdanlarını aktivite, güven ve risk göstergeleriyle skorlayın.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">Cüzdan Analizini Başlat</span></a>
+        <a href="/risk" class="module-card surface"><div class="module-icon">🛡️</div><div class="module-name">Risk Scanner / Risk Analizi</div><div class="module-desc">Cüzdan, token, işlem, kontrat veya proje için kanıt temelli risk değerlendirmesi çalıştırın.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">Risk Analizi Başlat</span></a>
+        <a href="/graph" class="module-card surface"><div class="module-icon">🕸️</div><div class="module-name">İstihbarat Grafı & Sybil Kontrolü</div><div class="module-desc">Bağlı varlıkları, tekrar eden örüntüleri ve sybil risk sinyallerini inceleyin.</div><div class="module-tag tag-live">Studio</div><span class="btn btn-primary" style="margin-top:16px">İstihbarat Grafını Aç</span></a>
+        <a href="/project-radar" class="module-card surface"><div class="module-icon">🚀</div><div class="module-name">Project Radar & Hibe Hazırlığı</div><div class="module-desc">Proje kanıtlarını, ekosistem uyumunu ve hibe hazırlığı boşluklarını analiz edin.</div><div class="module-tag tag-live">Builder</div><span class="btn btn-primary" style="margin-top:16px">Proje Radarını Aç</span></a>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/koschei-auth.js?v=6"></script>
+  <script src="/js/koschei-analytics.js?v=1"></script>
+  <script>
+    (async () => {
+      await KoscheiAuth.init();
+      if (!KoscheiAuth.requireAuth()) return;
+      KoscheiAnalytics.track('hub_view');
+      document.getElementById('userEmail').textContent =
+        KoscheiAuth.getEmail() || '';
+      try {
+        try {
+          await KoscheiAuth.apiCall('/api/auth/provision', { method: 'POST' });
+        } catch {
+          // Summary provisioning is also idempotent, so continue if this warm-up fails.
+        }
+        const res = await KoscheiAuth.apiCall('/api/member/summary');
+        if (!res || !res.ok) throw new Error('Member summary unavailable');
+        const data = await res.json();
+        document.getElementById('userEmail').textContent = data.email || KoscheiAuth.getEmail() || '';
+        document.getElementById('userPlan').textContent = data.plan || 'Aktif paket yok';
+        document.getElementById('userCredits').textContent = data.outputs_remaining ?? 0;
+      } catch {
+        const message = document.getElementById('memberMessage');
+        message.textContent = 'Hesap aktif. Üye verileri hazırlanıyor.';
+        message.className = 'alert show';
+      }
+    })();
+  </script>
+</body>
+</html>
+
+<!-- Hub loads the updated auth script so Neon callback tokens in the URL hash are saved before auth checks. -->

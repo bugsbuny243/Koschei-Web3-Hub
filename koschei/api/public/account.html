@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
@@ -13,7 +13,7 @@
 
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Account — Koschei</title>
+  <title>Hesap — Koschei</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/koschei.css">
   <style>
@@ -26,34 +26,34 @@
 <nav class="nav">
   <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
   <div class="nav-links">
-    <a href="/hub" class="nav-link">Hub</a>
+    <a href="/hub" class="nav-link">Panel</a>
     <a href="/metadata" class="nav-link">Metadata</a>
     <a href="/risk" class="nav-link">Risk</a>
     <a href="/watchlist" class="nav-link">Watchlist</a>
     <a href="/chains" class="nav-link">Chains</a>
     <a href="/watchlist" class="nav-link">Watchlist</a>
-    <a href="/account" class="nav-link active">Account</a>
+    <a href="/account" class="nav-link active">Hesap</a>
   </div>
 </nav>
 
 <main class="page" style="max-width:700px;">
-  <div class="page-title">Account</div>
-  <div class="page-sub">View your active Koschei member account details.</div>
+  <div class="page-title">Hesap</div>
+  <div class="page-sub">Aktif Koschei üye hesap detaylarınızı görüntüleyin.</div>
 
   <div class="alert" id="accountMessage"></div>
   <section class="card" style="margin-bottom:20px;">
-    <div class="account-row"><span class="form-label">Email</span><span class="account-value" id="accountEmail">Loading…</span></div>
+    <div class="account-row"><span class="form-label">Email</span><span class="account-value" id="accountEmail">Yükleniyor…</span></div>
     <div class="account-row"><span class="form-label">Plan</span><span class="account-value" id="accountPlan">—</span></div>
-    <div class="account-row"><span class="form-label">Outputs total</span><span class="account-value" id="accountOutputsTotal">—</span></div>
-    <div class="account-row"><span class="form-label">Outputs remaining</span><span class="account-value" id="accountOutputsRemaining">—</span></div>
-    <div class="account-row"><span class="form-label">Status</span><span class="account-value"><span class="badge badge-green">active</span></span></div>
-    <p id="planMessage" class="notice" style="margin-top:16px;">Loading entitlement details…</p>
+    <div class="account-row"><span class="form-label">Toplam çıktı hakkı</span><span class="account-value" id="accountOutputsTotal">—</span></div>
+    <div class="account-row"><span class="form-label">Kalan çıktı hakkı</span><span class="account-value" id="accountOutputsRemaining">—</span></div>
+    <div class="account-row"><span class="form-label">Durum</span><span class="account-value"><span class="badge badge-green">aktif</span></span></div>
+    <p id="planMessage" class="notice" style="margin-top:16px;">Paket yetkisi yükleniyor…</p>
   </section>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;">
-    <a href="/hub" class="btn btn-primary">← Back to Hub</a>
-    <a href="/pricing" class="btn btn-primary">Upgrade / Buy outputs</a>
-    <button class="btn btn-ghost" type="button" onclick="KoscheiAuth.signOut()">Sign out</button>
+    <a href="/hub" class="btn btn-primary">← Panele Dön</a>
+    <a href="/pricing" class="btn btn-primary">Paketleri Gör / Çıktı Al</a>
+    <button class="btn btn-ghost" type="button" onclick="KoscheiAuth.signOut()">Çıkış Yap</button>
   </div>
 </main>
 
@@ -71,16 +71,16 @@
       if (!res || !res.ok) throw new Error('Member summary unavailable');
       const data = await res.json();
       document.getElementById('accountEmail').textContent = data.email || KoscheiAuth.getEmail() || '';
-      document.getElementById('accountPlan').textContent = data.plan || 'free';
+      document.getElementById('accountPlan').textContent = data.plan || 'aktif paket yok';
       document.getElementById('accountOutputsTotal').textContent = data.outputs_total ?? 0;
       document.getElementById('accountOutputsRemaining').textContent = data.outputs_remaining ?? 0;
-      const plan = String(data.plan || 'free').toLowerCase();
-      document.getElementById('planMessage').textContent = plan === 'free'
-        ? 'Accounts without an active package can review settings and pricing. Activate a package to run production intelligence modules.'
-        : 'Paid outputs are active. Total and remaining paid outputs are shown above.';
+      const plan = String(data.plan || 'aktif paket yok').toLowerCase();
+      document.getElementById('planMessage').textContent = plan === 'free' || plan === 'aktif paket yok'
+        ? 'Aktif paketi olmayan hesaplar ayarları ve paketleri görüntüleyebilir. Üretim istihbarat modüllerini çalıştırmak için paket aktifleştirin.'
+        : 'Ücretli çıktılar aktif. Toplam ve kalan çıktı hakları yukarıda gösterilir.';
     } catch {
       const message = document.getElementById('accountMessage');
-      message.textContent = 'Could not load member account details. Please try again.';
+      message.textContent = 'Hesap detayları yüklenemedi. Lütfen tekrar deneyin.';
       message.className = 'alert alert-error show';
     }
   })();
