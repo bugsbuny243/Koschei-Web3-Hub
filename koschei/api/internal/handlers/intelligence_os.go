@@ -110,8 +110,8 @@ func (h *Handler) GrantGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if aiKey == "" {
-		h.logTool("", "grant_autopilot", "fallback")
-		writeJSON(w, 200, grantContent(q.Ecosystem, q.Focus))
+		h.logTool("", "grant_autopilot", "unavailable")
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "ai_unavailable", "message": "Unable to fetch live data right now."})
 		return
 	}
 
@@ -165,7 +165,7 @@ Write in plain text, no markdown headers, just section titles in CAPS.`, q.Ecosy
 	aiResp, err := client.Do(aiReq)
 	if err != nil {
 		h.logTool("", "grant_autopilot", "ai_error")
-		writeJSON(w, 200, grantContent(q.Ecosystem, q.Focus))
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "ai_unavailable", "message": "Unable to fetch live data right now."})
 		return
 	}
 	defer aiResp.Body.Close()
@@ -185,8 +185,8 @@ Write in plain text, no markdown headers, just section titles in CAPS.`, q.Ecosy
 	}
 
 	if generatedText == "" {
-		h.logTool("", "grant_autopilot", "fallback")
-		writeJSON(w, 200, grantContent(q.Ecosystem, q.Focus))
+		h.logTool("", "grant_autopilot", "empty_ai_response")
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "ai_empty_response", "message": "Unable to fetch live data right now."})
 		return
 	}
 
