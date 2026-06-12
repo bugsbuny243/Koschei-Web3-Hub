@@ -66,6 +66,17 @@ func envInt(name string, fallback int) int {
 }
 
 func ensureCanonicalPlans(db *sql.DB) error {
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS plans (
+		id text PRIMARY KEY,
+		name text NOT NULL,
+		price_try integer NOT NULL DEFAULT 0,
+		monthly_credits integer NOT NULL DEFAULT 0,
+		is_active boolean NOT NULL DEFAULT true,
+		created_at timestamptz NOT NULL DEFAULT now(),
+		updated_at timestamptz NOT NULL DEFAULT now()
+	)`); err != nil {
+		return err
+	}
 	if _, err := db.Exec(`ALTER TABLE plans ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`); err != nil {
 		return err
 	}
@@ -153,7 +164,7 @@ func verifySchema(db *sql.DB) error {
 		}
 	}
 	requiredColumns := map[string][]string{
-		"app_user_profiles": {"id", "auth_subject", "email", "role", "plan_id", "credits", "created_at", "updated_at"},
+		"app_user_profiles": {"id", "auth_subject", "email", "plan_id", "credits", "created_at", "updated_at"},
 		"entitlements":      {"id", "email", "plan_id", "outputs_total", "outputs_remaining", "status", "created_at", "updated_at"},
 		"api_keys":          {"id", "auth_subject", "email", "name", "key_prefix", "key_hash", "status", "monthly_limit", "rate_limit_per_minute", "created_at"},
 	}

@@ -40,6 +40,16 @@ func (h *Handler) EmergencyAlert(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) LiquidityDrainAnalyze(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
+
 	var req liquidityRadarRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
@@ -59,8 +69,23 @@ func (h *Handler) LiquidityDrainAnalyze(w http.ResponseWriter, r *http.Request) 
 	lossPrevented := math.Round(req.RemovedLiquidity*float64(score)/100*100) / 100
 	emergency := dispatchEmergencyLiquidityAlert(r.Context(), req, score, severity, lossPrevented)
 	alertPayload, _ := json.Marshal(map[string]any{"emergency": emergency, "whitehat_addresses": emergency.WhitehatAddresses})
-	if h.DB != nil {
-		_, _ = h.DB.ExecContext(r.Context(), `INSERT INTO liquidity_drain_alerts (pool_address, token_mint, severity, risk_score, removed_liquidity_usd, loss_prevented_usd, telegram_queued, sms_queued, alert_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.PoolAddress, req.TokenMint, severity, score, req.RemovedLiquidity, lossPrevented, emergency.TelegramSent || req.TelegramWebhook != "", req.TwilioPhoneNumber != "", string(alertPayload))
+	tx, err := h.DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(r.Context(), `INSERT INTO liquidity_drain_alerts (pool_address, token_mint, severity, risk_score, removed_liquidity_usd, loss_prevented_usd, telegram_queued, sms_queued, alert_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.PoolAddress, req.TokenMint, severity, score, req.RemovedLiquidity, lossPrevented, emergency.TelegramSent || req.TelegramWebhook != "", req.TwilioPhoneNumber != "", string(alertPayload)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, claims.Email, "liquidity_radar"); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "risk_score": score, "severity": severity, "liquidity_loss_prevented_usd": lossPrevented, "telegram_queued": emergency.TelegramSent || req.TelegramWebhook != "", "discord_queued": emergency.DiscordSent || req.DiscordWebhook != "", "sms_queued": req.TwilioPhoneNumber != "", "emergency": emergency, "message": "Likidite boşaltma radarı alarmı üretildi."})
 }
