@@ -283,6 +283,14 @@ func packageOutputCount(packageID string) (int, bool) {
 	return pack.Outputs, ok
 }
 
+func packageName(packageID string) string {
+	pack, ok := koscheiPackages[strings.ToLower(strings.TrimSpace(packageID))]
+	if !ok {
+		return ""
+	}
+	return pack.Name
+}
+
 func normalizePaymentProvider(provider string) string {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "shopier", "shopier_manual", "paddle", "owner_manual":

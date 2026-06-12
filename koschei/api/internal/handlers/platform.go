@@ -10,9 +10,23 @@ import (
 )
 
 func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
+	shopierURLs := map[string]string{
+		"starter": strings.TrimSpace(os.Getenv("SHOPIER_STARTER_URL")),
+		"builder": strings.TrimSpace(os.Getenv("SHOPIER_BUILDER_URL")),
+		"studio":  strings.TrimSpace(os.Getenv("SHOPIER_STUDIO_URL")),
+	}
+	paddleConfigured := map[string]bool{
+		"starter": strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "" && paddleConfiguredPriceID("starter") != "",
+		"builder": strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "" && paddleConfiguredPriceID("builder") != "",
+		"studio":  strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "" && paddleConfiguredPriceID("studio") != "",
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"version":     "2.0.0",
 		"neonAuthUrl": configuredPublicNeonAuthURL(),
+		"payments": map[string]any{
+			"shopierUrls":      shopierURLs,
+			"paddleConfigured": paddleConfigured,
+		},
 	})
 }
 

@@ -22,6 +22,7 @@ import (
 const paddleWebhookMaxSkew = 5 * time.Minute
 
 type checkoutRequest struct {
+	Package       string `json:"package"`
 	ProductID     string `json:"product_id"`
 	CustomerEmail string `json:"customer_email"`
 	Email         string `json:"email"`
@@ -90,7 +91,7 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(claims.Email))
-	planTier := normalizePlanTier(firstNonEmpty(req.PlanTier, req.ProductID))
+	planTier := normalizePlanTier(firstNonEmpty(req.Package, req.PlanTier, req.ProductID))
 	priceID := paddleConfiguredPriceID(planTier)
 	if email == "" || planTier == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "valid_package_required"})
@@ -100,7 +101,7 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "paddle_not_configured", "message": "Paddle global payment is not configured for this package."})
 		return
 	}
-	checkoutURL, err := h.CreateCheckoutSession(priceID, email, planTier)
+	checkoutURL, err := h.CreateCheckoutSession(priceID, email, claims.Sub, planTier)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "paddle_checkout_failed", "message": safeError(err)})
 		return
@@ -108,7 +109,7 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "checkout_url": checkoutURL})
 }
 
-func (h *Handler) CreateCheckoutSession(priceID, customerEmail, planTier string) (string, error) {
+func (h *Handler) CreateCheckoutSession(priceID, customerEmail, authSubject, planTier string) (string, error) {
 	apiKey := strings.TrimSpace(os.Getenv("PADDLE_API_KEY"))
 	if apiKey == "" {
 		return "", errors.New("PADDLE_API_KEY is not configured")
@@ -125,10 +126,15 @@ func (h *Handler) CreateCheckoutSession(priceID, customerEmail, planTier string)
 		"collection_mode": "automatic",
 		"customer_id":     customerID,
 		"custom_data": map[string]any{
-			"package_id":     planTier,
-			"plan_tier":      planTier,
+			"auth_subject":   strings.TrimSpace(authSubject),
 			"customer_email": strings.ToLower(strings.TrimSpace(customerEmail)),
+			"package_id":     planTier,
+			"package_name":   packageName(planTier),
+			"plan_tier":      planTier,
+			"provider":       "paddle",
 			"source":         "koschei_web3_hub",
+			"user_email":     strings.ToLower(strings.TrimSpace(customerEmail)),
+			"user_id":        strings.TrimSpace(authSubject),
 		},
 		"items": []map[string]any{paddleTransactionItem(priceID, planTier)},
 	}
@@ -258,7 +264,7 @@ func (h *Handler) B2BUsage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) createPaddleCustomer(ctx context.Context, email, planTier string) (string, error) {
-	payload := map[string]any{"email": strings.ToLower(strings.TrimSpace(email)), "custom_data": map[string]string{"plan_tier": planTier, "source": "koschei_web3_hub"}}
+	payload := map[string]any{"email": strings.ToLower(strings.TrimSpace(email)), "custom_data": map[string]string{"package_id": planTier, "package_name": packageName(planTier), "plan_tier": planTier, "provider": "paddle", "source": "koschei_web3_hub"}}
 	var out struct {
 		Data struct {
 			ID string `json:"id"`
