@@ -11,7 +11,7 @@ import (
 
 const (
 	freePlanID          = "free"
-	freeOutputsIncluded = 10
+	freeOutputsIncluded = 0
 )
 
 type memberSummaryResponse struct {
@@ -92,9 +92,14 @@ func provisionMemberTx(ctx context.Context, store appProfileStore, sub, email st
 			FROM entitlements
 			WHERE lower(email) = lower($1)
 			  AND status = 'active'
+			  AND COALESCE(plan_id, 'free') <> 'free'
+		), profile_credits AS (
+			SELECT COALESCE(MAX(credits), 0)::int AS credits
+			FROM app_user_profiles
+			WHERE lower(email) = lower($1)
 		), totals AS (
-			SELECT COALESCE(SUM(outputs_total), 0)::int AS outputs_total,
-			       COALESCE(SUM(outputs_remaining), 0)::int AS outputs_remaining
+			SELECT (COALESCE(SUM(outputs_total), 0)::int + (SELECT credits FROM profile_credits)) AS outputs_total,
+			       (COALESCE(SUM(outputs_remaining), 0)::int + (SELECT credits FROM profile_credits)) AS outputs_remaining
 			FROM active_entitlements
 		), paid_plan AS (
 			SELECT plan_id

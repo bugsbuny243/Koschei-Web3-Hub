@@ -260,7 +260,7 @@
         const tr = document.createElement('tr');
         tr.append(text('td', p.email), text('td', p.product_id), text('td', formatMoney(p.amount_try, 'TRY')), statusCell(p.status));
         const actions = document.createElement('td');
-        actions.append(button('Onayla', '', () => mutate('/api/owner/payments/approve', { id:p.id })), document.createTextNode(' '), button('Reddet', 'danger', () => mutate('/api/owner/payments/reject', { id:p.id, reason:'owner_panel' })));
+        actions.append(button('Onayla', '', () => mutate('/api/owner/payments/approve', { payment_request_id:p.id })), document.createTextNode(' '), button('Reddet', 'danger', () => mutate('/api/owner/payments/reject', { payment_request_id:p.id, reason:'owner_panel' })));
         tr.appendChild(actions); body.appendChild(tr);
       });
     }
