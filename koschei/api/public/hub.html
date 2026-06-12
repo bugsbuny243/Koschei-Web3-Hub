@@ -122,12 +122,15 @@
     h2 { margin: 0; font-size: clamp(26px, 3vw, 38px); letter-spacing: -.04em; }
     .section-note { margin: 8px 0 0; color: var(--text2); line-height: 1.6; }
     .modules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .module-card { position: relative; min-height: 220px; padding: 24px; border-radius: 28px; text-decoration: none; overflow: hidden; transition: transform .2s ease, border-color .2s ease; }
+    .module-card { position: relative; display: flex; flex-direction: column; gap: 10px; min-height: 220px; padding: 24px; border-radius: 28px; color: var(--text); text-decoration: none; overflow: hidden; transition: transform .2s ease, border-color .2s ease; }
+    .module-card:visited { color: var(--text); }
+    .module-card * { text-decoration: none; }
     .module-card::after { content: ""; position: absolute; inset: auto -30% -45% 30%; height: 120px; background: radial-gradient(circle, rgba(0,255,136,.18), transparent 68%); pointer-events: none; }
     .module-card:hover { transform: translateY(-4px); border-color: var(--line-strong); }
     .module-icon { font-size: 32px; margin-bottom: 18px; }
-    .module-name { font-size: 19px; font-weight: 800; margin-bottom: 10px; }
+    .module-name { font-size: 19px; font-weight: 800; margin-bottom: 10px; color: #f7fbff; }
     .module-desc { color: var(--text2); font-size: 14px; line-height: 1.65; }
+    .module-card .btn { width: max-content; }
     .module-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; padding: 7px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
     .tag-live { color: #bfffe2; background: rgba(0,255,136,.1); border: 1px solid rgba(0,255,136,.24); }
     .tag-core { color: #cfeeff; background: rgba(105,216,255,.1); border: 1px solid rgba(105,216,255,.24); }

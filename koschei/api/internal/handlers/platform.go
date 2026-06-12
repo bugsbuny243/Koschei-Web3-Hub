@@ -11,9 +11,9 @@ import (
 
 func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 	shopierURLs := map[string]string{
-		"starter": strings.TrimSpace(os.Getenv("SHOPIER_STARTER_URL")),
-		"builder": strings.TrimSpace(os.Getenv("SHOPIER_BUILDER_URL")),
-		"studio":  strings.TrimSpace(os.Getenv("SHOPIER_STUDIO_URL")),
+		"starter": configuredURL("SHOPIER_STARTER_URL", "https://www.shopier.com/TradeVisual/46531862"),
+		"builder": configuredURL("SHOPIER_BUILDER_URL", "https://www.shopier.com/TradeVisual/46531900"),
+		"studio":  configuredURL("SHOPIER_STUDIO_URL", "https://www.shopier.com/TradeVisual/46531961"),
 	}
 	paddleConfigured := map[string]bool{
 		"starter": strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "" && paddleConfiguredPriceID("starter") != "",
@@ -28,6 +28,13 @@ func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 			"paddleConfigured": paddleConfigured,
 		},
 	})
+}
+
+func configuredURL(envKey, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(envKey)); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func (h *Handler) Provision(w http.ResponseWriter, r *http.Request) {

@@ -98,7 +98,7 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if priceID == "" {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "paddle_not_configured", "message": "Paddle global payment is not configured for this package."})
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "paddle_not_configured", "message": "Paddle global checkout is not configured yet."})
 		return
 	}
 	checkoutURL, err := h.CreateCheckoutSession(priceID, email, claims.Sub, planTier)
