@@ -75,14 +75,37 @@ func (h *Handler) GenerateMetadata(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, email, "metadata"); err != nil {
+	result, err := tx.ExecContext(r.Context(), `
+		UPDATE entitlements
+		SET outputs_remaining = GREATEST(outputs_remaining - 1, 0),
+			updated_at = now()
+		WHERE id = (
+			SELECT id
+			FROM entitlements
+			WHERE lower(email) = lower($1)
+				AND status = 'active'
+				AND COALESCE(plan_id, '') <> 'free'
+				AND outputs_remaining > 0
+			ORDER BY outputs_remaining DESC, created_at DESC
+			LIMIT 1
+		)`, email)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	if rowsAffected == 0 {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
 
 	if _, err := tx.ExecContext(r.Context(), `
 		INSERT INTO web3_outputs (email, output_type, title, ecosystem, content_json, content_text, used_ai, used_fallback)
-		VALUES ($1, 'metadata', $2, 'web3', $3::jsonb, $4, false, true)`, email, assetName, string(metadataJSON), string(prettyJSON)); err != nil {
+		VALUES ($1, 'metadata', $2, 'web3', $3::jsonb, $4, false, false)`, email, assetName, string(metadataJSON), string(prettyJSON)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
@@ -95,7 +118,7 @@ func (h *Handler) GenerateMetadata(w http.ResponseWriter, r *http.Request) {
 		"ok":            true,
 		"metadata":      metadata,
 		"used_ai":       false,
-		"used_fallback": true,
+		"used_fallback": false,
 	})
 }
 

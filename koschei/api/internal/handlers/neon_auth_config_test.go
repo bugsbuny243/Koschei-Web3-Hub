@@ -12,6 +12,7 @@ func TestNeonAuthConfigMissingByDefault(t *testing.T) {
 	t.Setenv("NEON_AUTH_JWKS_URL", "")
 	t.Setenv("NEON_AUTH_STATE_SECRET", "")
 	t.Setenv("DATABASE_URL", "")
+	t.Setenv("CORS_ORIGIN", "")
 
 	if got := configuredNeonAuthBaseURL(); got != "" {
 		t.Fatalf("configuredNeonAuthBaseURL() = %q, want empty", got)
@@ -42,6 +43,7 @@ func TestMissingProductionAuthEnv(t *testing.T) {
 	t.Setenv("NEON_AUTH_JWKS_URL", "jwks")
 	t.Setenv("NEON_AUTH_STATE_SECRET", "secret")
 	t.Setenv("DATABASE_URL", "postgres://example")
+	t.Setenv("CORS_ORIGIN", "https://example.com")
 
 	if got, want := MissingProductionAuthEnv(), []string{"NEON_AUTH_BASE_URL"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("MissingProductionAuthEnv() = %#v, want %#v", got, want)

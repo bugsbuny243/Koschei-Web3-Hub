@@ -2,7 +2,7 @@
 
 > **Non-custodial, AI destekli ve public-good güvenlik platformu:** Koschei Web3 Hub; Solana kullanıcıları, geliştiricileri ve DAO ekipleri için MEV, likidite drenajı, governance saldırıları ve riskli akıllı para hareketlerini işlem gerçekleşmeden önce görünür hale getirir.
 
-![Live Demo](https://img.shields.io/badge/Live%20Demo-Online-00ffaa?style=for-the-badge)
+![Production](https://img.shields.io/badge/Production-Online-00ffaa?style=for-the-badge)
 ![Grant Status](https://img.shields.io/badge/Solana%20Grant-Tier--1%20Ready-7c5cff?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
 ![Build Status](https://img.shields.io/badge/Build-Go%20API%20%2B%20Vanilla%20JS-success?style=for-the-badge)
@@ -26,7 +26,7 @@ Koschei, kullanıcı fonlarına dokunmadan read-only RPC, veritabanı agregasyon
 
 ## Canlı Metrikler Tablosu
 
-> İlk grant sunumlarında mock başlangıç değerleri kullanılır; production ortamında `/api/public/metrics` endpoint'i `mev_protection_events` ve `liquidity_drain_alerts` tablolarından gerçek agregasyon döndürür.
+> `/api/public/metrics` endpoint'i production ortamında `mev_protection_events` ve `liquidity_drain_alerts` tablolarından gerçek agregasyon döndürür; veri yoksa ciddi boş durum döner.
 
 | Metrik | Başlangıç Değeri | Kaynak |
 | --- | ---: | --- |
@@ -61,7 +61,7 @@ Whale, fon, bot ve yüksek etki cüzdan hareketlerinden risk sinyalleri çıkar�
 
 - **Backend:** Go 1.23, net/http tabanlı API, güvenli middleware zinciri
 - **Database:** Neon Postgres / PostgreSQL read-write ve read-replica desteği
-- **Cache:** Redis veya in-memory fallback
+- **Cache:** Redis veya in-memory cache
 - **Solana Data:** Solana RPC, token / wallet / transaction analiz servisleri
 - **AI Layer:** Together AI entegrasyonuna hazır risk simülasyon katmanı
 - **Frontend:** Vanilla HTML, CSS ve JavaScript; React/Vue runtime bağımlılığı yok

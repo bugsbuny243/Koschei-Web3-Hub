@@ -70,7 +70,7 @@ func (h *Handler) ScanRisk(w http.ResponseWriter, r *http.Request) {
 		FROM entitlements
 		WHERE lower(email) = lower($1)
 			AND status = 'active'
-			AND COALESCE(plan_id, 'free') <> 'free'
+			AND COALESCE(plan_id, '') <> 'free'
 			AND outputs_remaining > 0
 		ORDER BY outputs_remaining DESC, created_at DESC
 		LIMIT 1
@@ -117,7 +117,7 @@ func buildRiskScanResult() riskScanResult {
 		},
 		Disclaimer:   riskDisclaimer,
 		UsedAI:       false,
-		UsedFallback: true,
+		UsedFallback: false,
 	}
 }
 

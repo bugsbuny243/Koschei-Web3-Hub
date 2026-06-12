@@ -11,6 +11,7 @@ var requiredProductionAuthEnv = []string{
 	"NEON_AUTH_JWKS_URL",
 	"NEON_AUTH_STATE_SECRET",
 	"DATABASE_URL",
+	"CORS_ORIGIN",
 }
 
 func configuredNeonAuthBaseURL() string {
