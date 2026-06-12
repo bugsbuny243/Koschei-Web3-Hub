@@ -40,6 +40,10 @@
     return name || 'User';
   }
 
+  function successCallbackURL() {
+    return window.location.origin.replace(/\/+$/, '') + '/hub.html';
+  }
+
   function errorMessage(data, fallback) {
     if (!data) return fallback;
     if (typeof data === 'string') return data || fallback;
@@ -136,11 +140,12 @@
       email,
       password,
       name: defaultUserName(email),
+      callbackURL: successCallbackURL(),
     });
   }
 
   async function signIn(email, password) {
-    return backendAuth('/api/auth/login', { email, password });
+    return backendAuth('/api/auth/login', { email, password, callbackURL: successCallbackURL() });
   }
 
   async function signOut() {
