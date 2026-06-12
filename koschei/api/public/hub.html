@@ -1,277 +1,48 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-1QFWMJJC3');
-  </script>
-
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Koschei Web3 Hub member dashboard for Alchemy-first Web3 Security Intelligence, Solana tools, premium modules and package-gated analysis.">
-  <title>Koschei Web3 Hub — Member Hub</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Koschei member hub with exactly six flagship Web3 security intelligence workflows.">
+  <title>Member Hub — Koschei Web3 Hub</title>
   <link rel="canonical" href="https://tradepigloball.co/hub.html">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg: #050812;
-      --surface: rgba(255, 255, 255, .08);
-      --line: rgba(255, 255, 255, .16);
-      --line-strong: rgba(255, 255, 255, .28);
-      --text: #f7fbff;
-      --text2: #a9b8d6;
-      --accent: #00ff88;
-      --accent2: #69d8ff;
-      --violet: #a78bfa;
-      --danger: #ff5c7c;
-      --success-bg: rgba(0, 255, 136, .12);
-      --success-border: rgba(0, 255, 136, .3);
-      --shadow: 0 30px 90px rgba(0, 0, 0, .45);
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(circle at 12% 4%, rgba(0, 255, 136, .24), transparent 34%),
-        radial-gradient(circle at 88% 8%, rgba(105, 216, 255, .2), transparent 30%),
-        radial-gradient(circle at 55% 88%, rgba(167, 139, 250, .2), transparent 36%),
-        linear-gradient(135deg, #03050b 0%, #081221 52%, #040811 100%);
-      overflow-x: hidden;
-    }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
-      background-size: 54px 54px;
-      mask-image: radial-gradient(circle at center, black, transparent 78%);
-    }
-    a { color: inherit; }
-    .page { position: relative; width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 54px; }
-    .surface {
-      background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.045));
-      border: 1px solid var(--line);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(22px);
-      -webkit-backdrop-filter: blur(22px);
-    }
-    .topbar {
-      position: sticky;
-      top: 14px;
-      z-index: 20;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin-bottom: 42px;
-      padding: 12px 14px;
-      border-radius: 24px;
-    }
-    .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 800; }
-    .brand-mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 14px; color: #06120d; background: linear-gradient(135deg, var(--accent), var(--accent2)); box-shadow: 0 0 34px rgba(0, 255, 136, .3); }
-    .brand-sub { color: var(--text2); font-weight: 500; }
-    .nav-links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-    .nav-link { color: var(--text2); font-size: 13px; font-weight: 700; text-decoration: none; padding: 9px 12px; border-radius: 999px; }
-    .nav-link:hover { color: var(--text); background: rgba(255,255,255,.08); }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      min-height: 42px;
-      padding: 0 18px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      color: var(--text);
-      font-weight: 800;
-      font-size: 14px;
-      font-family: inherit;
-      text-decoration: none;
-      cursor: pointer;
-      background: rgba(255,255,255,.06);
-      transition: transform .2s ease, border-color .2s ease;
-    }
-    .btn:hover { transform: translateY(-2px); border-color: var(--line-strong); }
-    .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; align-items: stretch; margin-bottom: 18px; }
-    .hero-card { border-radius: 34px; padding: clamp(24px, 4vw, 42px); }
-    .eyebrow { display: inline-flex; align-items: center; gap: 8px; width: max-content; padding: 8px 13px; border-radius: 999px; color: #bfffe2; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; background: rgba(0,255,136,.1); border: 1px solid rgba(0,255,136,.24); }
-    h1 { margin: 20px 0 12px; font-size: clamp(38px, 6vw, 68px); line-height: .98; letter-spacing: -.06em; }
-    .gradient-text { background: linear-gradient(135deg, #fff, #c7fff0 32%, #82ddff 72%, #d9ccff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-    .page-sub { margin: 0; max-width: 650px; color: var(--text2); font-size: 17px; line-height: 1.75; }
-    .profile-card { border-radius: 34px; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; gap: 18px; }
-    .profile-label { color: var(--text2); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-    .profile-email { margin-top: 10px; font-size: 20px; font-weight: 800; word-break: break-word; }
-    .alert { display: none; margin: 18px 0; padding: 14px 16px; border-radius: 18px; color: #d9ffe9; background: var(--success-bg); border: 1px solid var(--success-border); font-weight: 700; }
-    .alert.show { display: block; }
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 18px 0; }
-    .stat { min-height: 150px; padding: 22px; border-radius: 28px; }
-    .stat-label { color: var(--text2); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-    .stat-value { margin-top: 14px; font-size: clamp(26px, 4vw, 38px); font-weight: 800; letter-spacing: -.04em; }
-    .section-head { margin: 36px 0 18px; display: flex; align-items: end; justify-content: space-between; gap: 16px; }
-    h2 { margin: 0; font-size: clamp(26px, 3vw, 38px); letter-spacing: -.04em; }
-    .section-note { margin: 8px 0 0; color: var(--text2); line-height: 1.6; }
-    .modules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .module-card { position: relative; display: flex; flex-direction: column; gap: 10px; min-height: 220px; padding: 24px; border-radius: 28px; color: var(--text); text-decoration: none; overflow: hidden; transition: transform .2s ease, border-color .2s ease; }
-    .module-card:visited { color: var(--text); }
-    .module-card * { text-decoration: none; }
-    .module-card::after { content: ""; position: absolute; inset: auto -30% -45% 30%; height: 120px; background: radial-gradient(circle, rgba(0,255,136,.18), transparent 68%); pointer-events: none; }
-    .module-card:hover { transform: translateY(-4px); border-color: var(--line-strong); }
-    .module-icon { font-size: 32px; margin-bottom: 18px; }
-    .module-name { font-size: 19px; font-weight: 800; margin-bottom: 10px; color: #f7fbff; }
-    .module-desc { color: var(--text2); font-size: 14px; line-height: 1.65; }
-    .module-card .btn { width: max-content; }
-    .module-tag { display: inline-flex; align-items: center; gap: 6px; margin-top: 18px; padding: 7px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-    .tag-live { color: #bfffe2; background: rgba(0,255,136,.1); border: 1px solid rgba(0,255,136,.24); }
-    .tag-core { color: #cfeeff; background: rgba(105,216,255,.1); border: 1px solid rgba(105,216,255,.24); }
-    @media (max-width: 930px) { .hero, .stats, .modules { grid-template-columns: 1fr; } }
-    @media (max-width: 560px) { .topbar { position: static; } .nav-links { width: 100%; justify-content: flex-start; } h1 { letter-spacing: -.045em; } }
-  </style>
+    :root{--bg:#050812;--surface:rgba(255,255,255,.08);--line:rgba(255,255,255,.16);--line-strong:rgba(255,255,255,.28);--text:#f7fbff;--text2:#a9b8d6;--accent:#00ff88;--accent2:#69d8ff;--violet:#a78bfa;--shadow:0 30px 90px rgba(0,0,0,.45)}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 12% 4%,rgba(0,255,136,.24),transparent 34%),radial-gradient(circle at 88% 8%,rgba(105,216,255,.2),transparent 30%),radial-gradient(circle at 55% 88%,rgba(167,139,250,.2),transparent 36%),linear-gradient(135deg,#03050b 0%,#081221 52%,#040811 100%);overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:54px 54px;mask-image:radial-gradient(circle at center,black,transparent 78%)}a{color:inherit}.page{position:relative;width:min(1180px,calc(100% - 32px));margin:0 auto;padding:24px 0 58px}.surface{background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.045));border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+    .topbar{position:sticky;top:14px;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:42px;padding:12px 14px;border-radius:24px}.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-weight:900}.brand-mark{display:grid;place-items:center;width:38px;height:38px;border-radius:14px;color:#06120d;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 34px rgba(0,255,136,.3)}.brand-sub{color:var(--text2);font-weight:500}.nav-links{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.nav-link{color:var(--text2);font-size:13px;font-weight:800;text-decoration:none;padding:9px 12px;border-radius:999px}.nav-link:hover{color:var(--text);background:rgba(255,255,255,.08)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 18px;border-radius:999px;border:1px solid var(--line);color:var(--text);font-weight:900;font-size:14px;font-family:inherit;text-decoration:none;cursor:pointer;background:rgba(255,255,255,.06);transition:transform .2s ease,border-color .2s ease}.btn:hover{transform:translateY(-2px);border-color:var(--line-strong)}.btn-primary{border:0;color:#06120d;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 32px rgba(0,255,136,.22)}.btn-ghost{background:rgba(255,255,255,.06)}
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;align-items:stretch;margin-bottom:18px}.hero-card{border-radius:34px;padding:clamp(24px,4vw,42px);position:relative;overflow:hidden}.hero-card:after{content:"";position:absolute;right:-18%;bottom:-35%;width:420px;height:420px;border-radius:50%;background:linear-gradient(135deg,rgba(0,255,136,.16),rgba(105,216,255,.13));filter:blur(16px);pointer-events:none}.hero-copy{position:relative;z-index:1}.eyebrow{display:inline-flex;align-items:center;gap:8px;width:max-content;padding:8px 13px;border-radius:999px;color:#bfffe2;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.24)}h1{margin:20px 0 12px;font-size:clamp(38px,6vw,70px);line-height:.98;letter-spacing:-.06em}.gradient-text{background:linear-gradient(135deg,#fff,#c7fff0 32%,#82ddff 72%,#d9ccff);-webkit-background-clip:text;background-clip:text;color:transparent}.page-sub{margin:0;max-width:720px;color:var(--text2);font-size:17px;line-height:1.75}.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}.signal-stack{border-radius:34px;padding:24px;display:grid;gap:14px}.signal-card{border:1px solid var(--line);border-radius:22px;background:rgba(0,0,0,.18);padding:18px}.signal-card strong{display:block;font-size:22px;letter-spacing:-.04em}.signal-card span{display:block;color:var(--text2);line-height:1.55;margin-top:6px}.section{margin-top:22px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:16px}.section h2{margin:0;font-size:clamp(30px,4vw,48px);letter-spacing:-.05em}.workflow-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.workflow-card{display:flex;flex-direction:column;min-height:282px;padding:24px;border-radius:28px;text-decoration:none;position:relative;overflow:hidden;transition:transform .2s ease,border-color .2s ease}.workflow-card:hover{transform:translateY(-4px);border-color:rgba(0,255,136,.36)}.workflow-card:after{content:"";position:absolute;inset:auto -30% -45% 20%;height:180px;border-radius:50%;background:linear-gradient(135deg,rgba(0,255,136,.12),rgba(105,216,255,.1));filter:blur(18px)}.workflow-icon{width:46px;height:46px;border-radius:16px;display:grid;place-items:center;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.22);font-size:22px}.workflow-card h3{margin:18px 0 10px;font-size:22px;letter-spacing:-.04em}.workflow-card p{margin:0;color:var(--text2);line-height:1.65}.workflow-card .btn{margin-top:auto;align-self:flex-start;position:relative;z-index:1}.secondary-links{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;position:relative;z-index:1}.secondary-links a{color:#c7fff0;text-decoration:none;font-weight:800;font-size:13px}.cta-band,.trust-note{border-radius:30px;padding:26px;margin-top:18px}.cta-band{display:flex;align-items:center;justify-content:space-between;gap:18px}.trust-note{color:var(--text2);line-height:1.7}.profile-card{border-radius:34px;padding:24px;display:flex;flex-direction:column;justify-content:space-between;gap:18px}.profile-label{color:var(--text2);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.profile-email{margin-top:10px;font-size:20px;font-weight:800;word-break:break-word}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:18px 0}.stat{border-radius:24px;padding:20px}.stat-value{font-size:28px;font-weight:900;color:var(--accent)}.stat-label{color:var(--text2);font-weight:700;margin-top:4px}.alert{display:none;margin:18px 0;padding:14px 16px;border-radius:18px;color:#d9ffe9;background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.3);font-weight:700}.alert.show{display:block}@media(max-width:960px){.hero,.workflow-grid{grid-template-columns:1fr}.cta-band{align-items:flex-start;flex-direction:column}.topbar{align-items:flex-start;flex-direction:column}.stats{grid-template-columns:1fr}}@media(max-width:560px){.page{width:min(100% - 22px,1180px);padding-top:12px}.nav-links{gap:6px}.nav-link{padding:8px 9px}.workflow-card{min-height:0}.hero-actions{flex-direction:column}.hero-actions .btn{width:100%}}
+</style>
 </head>
 <body>
   <main class="page">
-    <header class="topbar surface">
-      <a href="/" class="brand" aria-label="Koschei home"><span class="brand-mark">K</span><span>Koschei <span class="brand-sub">Member Hub</span></span></a>
-      <div class="nav-links">
-        <a href="/dashboard" class="nav-link">Dashboard</a>
-        <a href="/docs" class="nav-link">Docs</a>
-        <a href="/pricing.html" class="nav-link">Pricing</a>
-        <button class="btn" type="button" onclick="KoscheiAuth.signOut()">Sign out</button>
-      </div>
-    </header>
-
+    <header class="topbar surface"><a href="/" class="brand"><span class="brand-mark">K</span><span>Koschei <span class="brand-sub">Web3 Hub</span></span></a><nav class="nav-links" aria-label="Main navigation"><a class="nav-link" href="/hub.html">Dashboard</a><a class="nav-link" href="/pricing.html">Pricing</a><a class="nav-link" href="/tx-decoder.html">TX Decoder</a><a class="nav-link" href="/token-scanner.html">Token Scanner</a><a class="nav-link" href="/wallet-score.html">Wallet Score</a><a class="nav-link" href="/risk.html">Risk Scanner</a><a class="nav-link" href="/account.html">Account</a></nav></header>
     <section class="hero">
-      <div class="hero-card surface">
-        <div class="eyebrow">◈ authenticated workspace</div>
-        <h1><span class="gradient-text">Your Koschei Web3 command center.</span></h1>
-        <p class="page-sub">Manage account status, monitor remaining outputs, and jump into Koschei's core no-custody tools from one focused member surface.</p>
-      </div>
-      <aside class="profile-card surface">
-        <div>
-          <div class="profile-label">Signed in as</div>
-          <div class="profile-email" id="userEmail">Loading…</div>
-        </div>
-        <div class="profile-label">No private keys · Read-only tooling · Builder first</div>
-      </aside>
+      <div class="hero-card surface"><span class="eyebrow">Member dashboard</span><h1><span class="gradient-text">Koschei command center</span></h1><p class="page-sub">Access the six flagship Koschei workflows for transaction, token, wallet, risk, relationship, sybil and project readiness intelligence.</p><div class="hero-actions"><a class="btn btn-primary" href="/tx-decoder.html">Start with TX Decoder</a><a class="btn btn-ghost" href="/pricing.html">Manage Package Access</a></div></div>
+      <aside class="profile-card surface"><div><div class="profile-label">Signed in as</div><div id="userEmail" class="profile-email">Loading…</div></div><div><div class="profile-label">Package</div><div id="userPlan" class="profile-email">Loading…</div></div><div><div class="profile-label">Outputs remaining</div><div id="userCredits" class="profile-email">—</div></div></aside>
     </section>
-
-    <div class="alert" id="memberMessage"></div>
-
-    <section class="stats" aria-label="Member summary">
-      <article class="stat surface"><div class="stat-label">Plan</div><div class="stat-value" id="userPlan">—</div></article>
-      <article class="stat surface"><div class="stat-label">Outputs remaining</div><div class="stat-value" id="userCredits">—</div></article>
-      <article class="stat surface"><div class="stat-label">Workspace</div><div class="stat-value">Live</div></article>
-    </section>
-
-    <section>
-      <div class="section-head">
-        <div><h2>Quick links</h2><p class="section-note">Open the module you need and keep shipping.</p></div>
-      </div>
-      <div class="modules">
-        <a href="/wallet-score" class="module-card surface"><div class="module-icon">🏆</div><div class="module-name">Wallet Score</div><div class="module-desc">Instant reputation score for any Solana wallet with trust signals, activity history, and AI analysis.</div><div class="module-tag tag-live">● Live</div></a>
-        <a href="/token-scanner" class="surface module-card">
-          <div class="module-top"><div class="module-icon-wrap">🪙</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Token Scanner</div>
-          <div class="module-desc">Security analysis for any Solana token. Detect rug risks before you buy.</div>
-        </a>
-        <a href="/portfolio" class="surface module-card">
-          <div class="module-top"><div class="module-icon-wrap">💼</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Portfolio Tracker</div>
-          <div class="module-desc">Track SOL and token balances across multiple wallets.</div>
-        </a>
-        <a href="/smart-money" class="surface module-card">
-          <div class="module-top"><div class="module-icon-wrap">🐋</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Smart Money</div>
-          <div class="module-desc">Track whale wallets and foundation accounts on Solana.</div>
-        </a>
-        <a href="/airdrop-checker" class="surface module-card">
-          <div class="module-top"><div class="module-icon-wrap">🪂</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Airdrop Checker</div>
-          <div class="module-desc">Check wallet eligibility for active and upcoming Solana airdrops.</div>
-        </a>
-        <a href="/metadata" class="module-card surface"><div class="module-icon">🧬</div><div class="module-name">Metadata</div><div class="module-desc">Prepare project, NFT, and publishing metadata for your Web3 launch.</div><div class="module-tag tag-core">Core</div></a>
-        <a href="/risk" class="module-card surface"><div class="module-icon">🛡️</div><div class="module-name">Risk</div><div class="module-desc">Review Web3 activity risk signals before interacting with projects or wallets.</div><div class="module-tag tag-core">Core</div></a>
-        <a href="/watchlist" class="module-card surface"><div class="module-icon">🔔</div><div class="module-name">Watchlist</div><div class="module-desc">Track public wallet or contract activity with Alchemy API polling.</div><div class="module-tag tag-live">● Live</div></a>
-        <a href="/chains" class="module-card surface"><div class="module-icon">📡</div><div class="module-name">Chains</div><div class="module-desc">Explore supported blockchain networks and live health surfaces.</div><div class="module-tag tag-core">Core</div></a>
-        <a href="/tx-decoder" class="module-card surface"><div class="module-icon">🧾</div><div class="module-name">TX Decoder</div><div class="module-desc">Decode transaction data into clearer human-readable insights.</div><div class="module-tag tag-live">● Live</div></a>
-        <div style="grid-column:1/-1;margin-top:20px"><h2>Advanced Intelligence</h2><p class="section-sub">User-facing intelligence, builder, and developer modules.</p></div>
-        <a href="/project-radar" class="module-card surface"><div class="module-icon">📡</div><div class="module-name">Project Radar</div><div class="module-desc">Discover and evaluate early Solana/Web3 projects using public signals, metadata quality, risk hints and opportunity scoring.</div><div class="module-tag tag-live">BETA / PRO</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/graph" class="module-card surface"><div class="module-icon">🕸️</div><div class="module-name">Intelligence Graph</div><div class="module-desc">Analyze relationships in your public watchlist activity.</div><div class="module-tag tag-live">Live</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/risk-v2" class="module-card surface"><div class="module-icon">🧠</div><div class="module-name">Risk Engine v2</div><div class="module-desc">Get structured preliminary risk evidence and recommendations.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/tx-decoder-pro" class="module-card surface"><div class="module-icon">🔬</div><div class="module-name">TX Decoder Pro</div><div class="module-desc">Turn public transaction hashes into readable summaries.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/cross-chain-risk" class="module-card surface"><div class="module-icon">🌉</div><div class="module-name">Cross-chain Risk Monitor</div><div class="module-desc">Review bridge and route risks with a practical checklist.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/sybil-check" class="module-card surface"><div class="module-icon">🧩</div><div class="module-name">Sybil Check</div><div class="module-desc">Run a privacy-aware anti-abuse signal checklist.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/funding-assistant" class="module-card surface"><div class="module-icon">🚀</div><div class="module-name">Builder Funding Assistant</div><div class="module-desc">Prepare copy-ready grant, bounty, and funding drafts.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/docs" class="module-card surface"><div class="module-icon">📚</div><div class="module-name">Developer Docs</div><div class="module-desc">Integrate Koschei with public API and SDK examples.</div><div class="module-tag tag-live">Live</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/impact" class="module-card surface"><div class="module-icon">🌍</div><div class="module-name">Public Impact Page</div><div class="module-desc">See Koschei’s safe public metrics and roadmap.</div><div class="module-tag tag-live">Live</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/agent-api" class="module-card surface"><div class="module-icon">🤖</div><div class="module-name">Agent API</div><div class="module-desc">Explore developer endpoints for agent workflows.</div><div class="module-tag tag-live">Beta</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/pay-per-tool" class="module-card surface"><div class="module-icon">⚡</div><div class="module-name">Pay-per-Tool API</div><div class="module-desc">Preview the disabled-by-default x402 tool foundation.</div><div class="module-tag tag-core">Planned support channel</div><span class="btn btn-primary" style="margin-top:16px">Open</span></a>
-        <a href="/dashboard" class="module-card surface"><div class="module-icon">📊</div><div class="module-name">User Dashboard</div><div class="module-desc">Monitor credits, security score, active risks, protected value, and quick security actions.</div><div class="module-tag tag-live">Live</div></a>
-        <a href="/account" class="module-card surface"><div class="module-icon">👤</div><div class="module-name">Account</div><div class="module-desc">View your member account details, plan status, and entitlement summary.</div><div class="module-tag tag-core">Core</div></a>
-        <a href="/launches" class="surface module-card" style="--hover-gradient:linear-gradient(135deg,rgba(255,68,102,.08),transparent);">
-          <div class="module-top"><div class="module-icon-wrap">🚨</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Rug Radar</div>
-          <div class="module-desc">Real-time token launch monitor. Community-driven rug pull safety database.</div>
-        </a>
-        <a href="/program-scanner" class="surface module-card" style="--hover-gradient:linear-gradient(135deg,rgba(255,68,102,.06),transparent);">
-          <div class="module-top"><div class="module-icon-wrap">🔬</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Program Scanner</div>
-          <div class="module-desc">AI security analysis for Solana programs. Detect vulnerabilities and upgrade risks.</div>
-        </a>
-        <a href="/chains" class="surface module-card" style="--hover-gradient:linear-gradient(135deg,rgba(0,255,136,.06),transparent);">
-          <div class="module-top"><div class="module-icon-wrap">📡</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Chain Health</div>
-          <div class="module-desc">Real-time status for 6 networks. Public REST API, no auth needed.</div>
-        </a>
-        <a href="/metadata" class="surface module-card" style="--hover-gradient:linear-gradient(135deg,rgba(0,255,136,.06),transparent);">
-          <div class="module-top"><div class="module-icon-wrap">🧬</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Metadata Studio</div>
-          <div class="module-desc">AI-powered NFT and game asset metadata generation. Production-ready JSON.</div>
-        </a>
-        <a href="/risk-v2" class="surface module-card" style="--hover-gradient:linear-gradient(135deg,rgba(255,68,102,.06),transparent);">
-          <div class="module-top"><div class="module-icon-wrap">🛡️</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Risk Scanner</div>
-          <div class="module-desc">On-chain risk signals for Solana projects. Detect patterns before interacting.</div>
-        </a>
-        <a href="/watchlist" class="surface module-card" style="--hover-gradient:linear-gradient(135deg,rgba(0,204,255,.06),transparent);">
-          <div class="module-top"><div class="module-icon-wrap">👁️</div><div class="live-dot">Live</div></div>
-          <div class="module-name">Watchlist</div>
-          <div class="module-desc">Monitor wallets and contracts through Alchemy API polling. Webhook setup is not required.</div>
-        </a>
-        <a href="/docs" class="surface module-card" style="--hover-gradient:linear-gradient(135deg,rgba(0,204,255,.05),transparent);">
-          <div class="module-top"><div class="module-icon-wrap">📖</div><div class="live-dot">Live</div></div>
-          <div class="module-name">API Docs</div>
-          <div class="module-desc">Full REST API reference with live examples and curl snippets.</div>
-        </a>
-      </div>
-    </section>
+    <div id="memberMessage" class="alert"></div>
+    <section class="section" aria-labelledby="modules-title"><div class="section-head"><div><span class="eyebrow">Six flagship modules</span><h2 id="modules-title">Focused product dashboard</h2></div></div><div class="workflow-grid" data-visible-module-count="6">
+        <article class="workflow-card surface" onclick="location.href='/tx-decoder.html'" role="link" tabindex="0" onkeydown="if(event.key==='Enter') location.href='/tx-decoder.html'"><div class="workflow-icon">🔎</div><h3>TX Decoder</h3><p>Decode public Solana/Web3 transactions into involved programs, account changes, fees, logs, risk flags and next checks.</p><a class="btn btn-primary" href="/tx-decoder.html" onclick="event.stopPropagation()">Open TX Decoder</a></article>
+        <article class="workflow-card surface" onclick="location.href='/token-scanner.html'" role="link" tabindex="0" onkeydown="if(event.key==='Enter') location.href='/token-scanner.html'"><div class="workflow-icon">🪙</div><h3>Token Scanner</h3><p>Analyze token metadata, authorities, supply concentration, holder patterns and evidence-based risk indicators.</p><a class="btn btn-primary" href="/token-scanner.html" onclick="event.stopPropagation()">Scan Token</a></article>
+        <article class="workflow-card surface" onclick="location.href='/wallet-score.html'" role="link" tabindex="0" onkeydown="if(event.key==='Enter') location.href='/wallet-score.html'"><div class="workflow-icon">👛</div><h3>Wallet Score</h3><p>Score public wallets using activity, recency, trust indicators, suspicious behavior and risk evidence.</p><a class="btn btn-primary" href="/wallet-score.html" onclick="event.stopPropagation()">Score Wallet</a></article>
+        <article class="workflow-card surface" onclick="location.href='/risk.html'" role="link" tabindex="0" onkeydown="if(event.key==='Enter') location.href='/risk.html'"><div class="workflow-icon">🛡️</div><h3>Risk Scanner</h3><p>Produce severity, reason, evidence, confidence and recommended actions for wallet, token, transaction or project risk.</p><a class="btn btn-primary" href="/risk.html" onclick="event.stopPropagation()">Run Risk Scanner</a></article>
+        <article class="workflow-card surface" onclick="location.href='/intelligence-graph.html'" role="link" tabindex="0" onkeydown="if(event.key==='Enter') location.href='/intelligence-graph.html'"><div class="workflow-icon">🧠</div><h3>Intelligence Graph & Sybil</h3><p>Connect wallets, tokens, transactions, projects and repeated behavior patterns into one relationship intelligence view.</p><div class="secondary-links"><a href="/sybil-checker.html">Sybil Checker</a></div><a class="btn btn-primary" href="/intelligence-graph.html" onclick="event.stopPropagation()">Open Intelligence Graph</a></article>
+        <article class="workflow-card surface" onclick="location.href='/project-radar.html'" role="link" tabindex="0" onkeydown="if(event.key==='Enter') location.href='/project-radar.html'"><div class="workflow-icon">🚀</div><h3>Project Radar & Grant Readiness</h3><p>Review ecosystem fit, builder credibility, technical proof points, missing evidence and grant/investor readiness.</p><div class="secondary-links"><a href="/grant-writer.html">Grant Readiness</a></div><a class="btn btn-primary" href="/project-radar.html" onclick="event.stopPropagation()">Run Project Radar</a></article>
+      </div></section>
   </main>
-
   <script src="/js/koschei-auth.js?v=6"></script>
   <script src="/js/koschei-analytics.js?v=1"></script>
   <script>
     (async () => {
       await KoscheiAuth.init();
       if (!KoscheiAuth.requireAuth()) return;
-      KoscheiAnalytics.track('hub_view');
-      document.getElementById('userEmail').textContent =
-        KoscheiAuth.getEmail() || '';
+      if (window.KoscheiAnalytics) KoscheiAnalytics.track('hub_focus_view');
+      document.getElementById('userEmail').textContent = KoscheiAuth.getEmail() || '';
       try {
-        try {
-          await KoscheiAuth.apiCall('/api/auth/provision', { method: 'POST' });
-        } catch {
-          // Summary provisioning is also idempotent, so continue if this warm-up fails.
-        }
+        try { await KoscheiAuth.apiCall('/api/auth/provision', { method: 'POST' }); } catch {}
         const res = await KoscheiAuth.apiCall('/api/member/summary');
         if (!res || !res.ok) throw new Error('Member summary unavailable');
         const data = await res.json();
@@ -287,5 +58,3 @@
   </script>
 </body>
 </html>
-
-<!-- Hub loads the updated auth script so Neon callback tokens in the URL hash are saved before auth checks. -->
