@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -77,6 +78,101 @@ var (
 	jwksCache map[string]neonJWK
 	jwksMu    sync.RWMutex
 )
+
+func extractAuthToken(resp *http.Response, body []byte) (string, bool) {
+	if resp != nil {
+		for _, header := range []string{"set-auth-jwt", "authorization", "x-auth-token"} {
+			if token := authTokenFromString(resp.Header.Get(header)); token != "" {
+				return token, true
+			}
+		}
+	}
+	var data map[string]any
+	if len(body) == 0 || json.Unmarshal(body, &data) != nil {
+		return "", false
+	}
+	paths := [][]string{
+		{"token"},
+		{"jwt"},
+		{"access_token"},
+		{"id_token"},
+		{"auth_token"},
+		{"data", "token"},
+		{"data", "jwt"},
+		{"data", "access_token"},
+		{"data", "id_token"},
+		{"session", "token"},
+		{"session", "jwt"},
+		{"session", "access_token"},
+		{"session", "id_token"},
+	}
+	for _, path := range paths {
+		if token := authTokenAtPath(data, path); token != "" {
+			return token, true
+		}
+	}
+	return "", false
+}
+
+func authTokenFromString(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if strings.HasPrefix(strings.ToLower(value), "bearer ") {
+		value = strings.TrimSpace(value[7:])
+	}
+	if tokenLooksLikeJWT(value) {
+		return value
+	}
+	return ""
+}
+
+func authTokenAtPath(data map[string]any, path []string) string {
+	var current any = data
+	for _, key := range path {
+		object, ok := current.(map[string]any)
+		if !ok {
+			return ""
+		}
+		current = object[key]
+	}
+	if value, ok := current.(string); ok {
+		return authTokenFromString(value)
+	}
+	return ""
+}
+
+func safeAuthDebugLog(endpoint string, status int, body []byte, cookies []*http.Cookie, tokenFound bool, tokenVerified bool) {
+	log.Printf("neon_auth endpoint=%s status=%d json_keys=%v token_found=%t token_verified=%t cookie_names=%v", endpoint, status, topLevelJSONKeys(body), tokenFound, tokenVerified, cookieNames(cookies))
+}
+
+func topLevelJSONKeys(body []byte) []string {
+	var data map[string]any
+	if len(body) == 0 || json.Unmarshal(body, &data) != nil {
+		return nil
+	}
+	keys := make([]string, 0, len(data))
+	for key := range data {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func cookieNames(cookies []*http.Cookie) []string {
+	if len(cookies) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(cookies))
+	for _, cookie := range cookies {
+		if cookie != nil && strings.TrimSpace(cookie.Name) != "" {
+			names = append(names, cookie.Name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
 
 func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
 	return neonClaimsFromToken(token)
