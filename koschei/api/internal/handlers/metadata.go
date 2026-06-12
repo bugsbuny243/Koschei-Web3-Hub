@@ -75,29 +75,7 @@ func (h *Handler) GenerateMetadata(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	result, err := tx.ExecContext(r.Context(), `
-		UPDATE entitlements
-		SET outputs_remaining = GREATEST(outputs_remaining - 1, 0),
-			updated_at = now()
-		WHERE id = (
-			SELECT id
-			FROM entitlements
-			WHERE lower(email) = lower($1)
-				AND status = 'active'
-				AND outputs_remaining > 0
-			ORDER BY outputs_remaining DESC, created_at DESC
-			LIMIT 1
-		)`, email)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
-	if rowsAffected == 0 {
+	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, email, "metadata"); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}

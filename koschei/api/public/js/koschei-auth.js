@@ -75,20 +75,6 @@
     return data;
   }
 
-  async function backendAuthRequest(path, body) {
-    const res = await fetch(path, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await readJSON(res);
-    if (!res.ok) {
-      throw new Error(errorMessage(data, `Authentication failed (${res.status})`));
-    }
-    return { data, headerJwt: '' };
-  }
-
   async function verifyMe(jwt) {
     const res = await fetch('/api/me', {
       method: 'GET',
@@ -105,7 +91,6 @@
 
   async function finishAuth(result) {
     let jwt = _isJwt(result.headerJwt) ? result.headerJwt : findJwt(result.data);
-    if (!jwt && state.neonAuthUrl) jwt = await tokenFollowUp();
     if (!_isJwt(jwt)) throw new Error('Authentication succeeded, but no JWT was returned by the backend.');
     saveJwt(jwt);
     const me = await verifyMe(jwt);

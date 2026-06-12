@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -69,14 +70,11 @@ func (h *Handler) ScanRisk(w http.ResponseWriter, r *http.Request) {
 		FROM entitlements
 		WHERE lower(email) = lower($1)
 			AND status = 'active'
+			AND COALESCE(plan_id, 'free') <> 'free'
 			AND outputs_remaining > 0
 		ORDER BY outputs_remaining DESC, created_at DESC
 		LIMIT 1
-		FOR UPDATE`, email).Scan(&entitlementID); err != nil {
-		if err == sql.ErrNoRows {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-			return
-		}
+		FOR UPDATE`, email).Scan(&entitlementID); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
@@ -88,19 +86,8 @@ func (h *Handler) ScanRisk(w http.ResponseWriter, r *http.Request) {
 
 	attemptRiskReportSave(r.Context(), tx, email, target, notes, riskResult, string(resultJSON))
 
-	decrement, err := tx.ExecContext(r.Context(), `
-		UPDATE entitlements
-		SET outputs_remaining = GREATEST(outputs_remaining - 1, 0),
-			updated_at = now()
-		WHERE id = $1
-			AND outputs_remaining > 0`, entitlementID)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
-	rowsAffected, err := decrement.RowsAffected()
-	if err != nil || rowsAffected != 1 {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, email, "risk_scan"); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
 
