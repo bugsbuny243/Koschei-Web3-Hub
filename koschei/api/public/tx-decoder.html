@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-1QFWMJJC3');
+</script>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TX Decoder Premium — Koschei</title>
+  <meta name="description" content="Koschei package-gated transaction decoder. Analysis requires an active Koschei package.">
+  <link rel="stylesheet" href="/css/koschei.css?v=premium-web3">
+</head>
+<body>
+  <main class="page">
+    <section class="premium-hero">
+      <div class="premium-kicker"><span class="badge badge-green">Premium intelligence</span></div>
+      <h1>TX Decoder</h1>
+      <p>Decode a transaction with Koschei package-gated intelligence. Analysis requires an active Koschei package.</p>
+    </section>
+    <section class="premium-grid">
+      <form class="card premium-stack" id="txForm">
+        <h2>Transaction decode</h2>
+        <label class="form-label" for="signature">Transaction signature/hash</label>
+        <input class="form-input" id="signature" name="signature" type="text" autocomplete="off" placeholder="Signature or transaction hash" required>
+        <label class="form-label" for="network">Network</label>
+        <select class="form-input" id="network" name="network" required>
+          <option value="solana">Solana</option>
+          <option value="ethereum">Ethereum</option>
+          <option value="base">Base</option>
+          <option value="bsc">BNB Chain</option>
+          <option value="polygon">Polygon</option>
+        </select>
+        <button class="btn btn-primary" id="submitBtn" type="submit">Decode transaction</button>
+      </form>
+      <article class="card">
+        <h2>Result</h2>
+        <div class="premium-note" id="status">Sign in and submit a transaction to request live analysis.</div>
+        <pre id="output" style="white-space:pre-wrap;overflow:auto"></pre>
+      </article>
+    </section>
+  </main>
+  <script src="/js/koschei-auth.js?v=5"></script>
+  <script>
+    const form = document.getElementById('txForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const statusEl = document.getElementById('status');
+    const outputEl = document.getElementById('output');
+
+    function display(message, data) {
+      statusEl.textContent = message;
+      outputEl.textContent = data ? JSON.stringify(data, null, 2) : '';
+    }
+
+    async function readResponse(response) {
+      const text = await response.text().catch(() => '');
+      if (!text) return {};
+      try { return JSON.parse(text); } catch { return { message: text }; }
+    }
+
+    function errorMessage(data, fallback) {
+      return data && (data.message || data.error || data.detail) ? (data.message || data.error || data.detail) : fallback;
+    }
+
+    (async () => {
+      await KoscheiAuth.init();
+      if (!KoscheiAuth.requireAuth()) return;
+
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const signature = document.getElementById('signature').value.trim();
+        const network = document.getElementById('network').value;
+        if (!signature) {
+          display('Enter a transaction signature or hash to decode.');
+          return;
+        }
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Decoding…';
+        display('Live decode requested. Package access required.');
+        try {
+          const response = await KoscheiAuth.apiCall('/api/tx/decode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ signature, network })
+          });
+          if (!response) throw new Error('Unable to reach the transaction decoder.');
+          const data = await readResponse(response);
+          if (!response.ok) throw new Error(errorMessage(data, 'Transaction decode unavailable. Active package required.'));
+          display('Transaction decode complete.', data);
+        } catch (error) {
+          display(error && error.message ? error.message : 'Transaction decode unavailable. Active package required.');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Decode transaction';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
