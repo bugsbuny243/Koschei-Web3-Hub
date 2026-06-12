@@ -9,7 +9,6 @@ var requiredProductionAuthEnv = [][]string{
 	{"NEON_AUTH_BASE_URL"},
 	{"NEON_AUTH_ISSUER"},
 	{"NEON_AUTH_JWKS_URL"},
-	{"NEON_AUTH_STATE_SECRET", "KOSCHEI_AUTH_STATE_SECRET"},
 	{"DATABASE_URL"},
 	{"CORS_ORIGIN", "CORS_ALLOWED_ORIGIN"},
 }

@@ -112,6 +112,9 @@ func (h *Handler) neonAuthStateSecret() string {
 	for _, value := range []string{
 		os.Getenv("NEON_AUTH_STATE_SECRET"),
 		os.Getenv("KOSCHEI_AUTH_STATE_SECRET"),
+		os.Getenv("USER_SESSION_SECRET"),
+		os.Getenv("OWNER_SECRET"),
+		os.Getenv("KOSCHEI_OWNER_SECRET"),
 		h.AdminPassword,
 		os.Getenv("DATABASE_URL"),
 	} {
