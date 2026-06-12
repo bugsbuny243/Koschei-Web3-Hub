@@ -5,13 +5,13 @@ import (
 	"strings"
 )
 
-var requiredProductionAuthEnv = []string{
-	"NEON_AUTH_BASE_URL",
-	"NEON_AUTH_ISSUER",
-	"NEON_AUTH_JWKS_URL",
-	"NEON_AUTH_STATE_SECRET",
-	"DATABASE_URL",
-	"CORS_ORIGIN",
+var requiredProductionAuthEnv = [][]string{
+	{"NEON_AUTH_BASE_URL"},
+	{"NEON_AUTH_ISSUER"},
+	{"NEON_AUTH_JWKS_URL"},
+	{"NEON_AUTH_STATE_SECRET", "KOSCHEI_AUTH_STATE_SECRET"},
+	{"DATABASE_URL"},
+	{"CORS_ORIGIN", "CORS_ALLOWED_ORIGIN"},
 }
 
 func configuredNeonAuthBaseURL() string {
@@ -39,9 +39,16 @@ func trimmedEnv(name string) string {
 
 func MissingProductionAuthEnv() []string {
 	missing := []string{}
-	for _, name := range requiredProductionAuthEnv {
-		if trimmedEnv(name) == "" {
-			missing = append(missing, name)
+	for _, alternatives := range requiredProductionAuthEnv {
+		found := false
+		for _, name := range alternatives {
+			if trimmedEnv(name) != "" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			missing = append(missing, strings.Join(alternatives, " or "))
 		}
 	}
 	return missing
