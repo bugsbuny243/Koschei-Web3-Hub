@@ -23,6 +23,12 @@ import (
 
 const paddleWebhookMaxSkew = 5 * time.Minute
 
+const (
+	paddleStarterPriceID = "pri_01ktvdpq7fr4gknbr4wtavrfrb"
+	paddleBuilderPriceID = "pri_01ktvhhg4z9j3wjrts1kzswhm"
+	paddleStudioPriceID  = "pri_01ktvhqya0rj2y8850yvd37d92"
+)
+
 var errPaddleCheckoutURLMissing = errors.New("paddle_checkout_url_missing")
 
 type checkoutRequest struct {
@@ -162,18 +168,19 @@ func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEm
 		"collection_mode": "automatic",
 		"customer_id":     customerID,
 		"custom_data": map[string]any{
-			"auth_subject":   strings.TrimSpace(authSubject),
-			"customer_email": strings.ToLower(strings.TrimSpace(customerEmail)),
-			"package":        planTier,
-			"package_id":     planTier,
-			"package_name":   packageName(planTier),
-			"plan_tier":      planTier,
-			"provider":       "paddle",
-			"source":         "koschei_web3_hub",
-			"success_url":    successURL,
-			"cancel_url":     cancelURL,
-			"user_email":     strings.ToLower(strings.TrimSpace(customerEmail)),
-			"user_id":        strings.TrimSpace(authSubject),
+			"auth_subject":        strings.TrimSpace(authSubject),
+			"customer_email":      strings.ToLower(strings.TrimSpace(customerEmail)),
+			"package":             planTier,
+			"package_id":          planTier,
+			"package_name":        packageName(planTier),
+			"paddle_product_name": paddleProductName(planTier),
+			"plan_tier":           planTier,
+			"provider":            "paddle",
+			"source":              "koschei_web3_hub",
+			"success_url":         successURL,
+			"cancel_url":          cancelURL,
+			"user_email":          strings.ToLower(strings.TrimSpace(customerEmail)),
+			"user_id":             strings.TrimSpace(authSubject),
 		},
 		"items": []map[string]any{paddleTransactionItem(priceID, planTier)},
 	}
@@ -314,7 +321,7 @@ func (h *Handler) B2BUsage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) createPaddleCustomer(ctx context.Context, email, planTier string) (string, error) {
-	payload := map[string]any{"email": strings.ToLower(strings.TrimSpace(email)), "custom_data": map[string]string{"package_id": planTier, "package_name": packageName(planTier), "plan_tier": planTier, "provider": "paddle", "source": "koschei_web3_hub"}}
+	payload := map[string]any{"email": strings.ToLower(strings.TrimSpace(email)), "custom_data": map[string]string{"package_id": planTier, "package_name": packageName(planTier), "paddle_product_name": paddleProductName(planTier), "plan_tier": planTier, "provider": "paddle", "source": "koschei_web3_hub"}}
 	var out struct {
 		Data struct {
 			ID string `json:"id"`
@@ -496,7 +503,7 @@ func parsePaddleSignature(header string) (string, []string) {
 }
 
 func paddleEnvironment() string {
-	env := strings.ToLower(strings.TrimSpace(firstEnv("PADDLE_ENVIRONMENT", "PADDLE_ENV")))
+	env := strings.ToLower(strings.TrimSpace(os.Getenv("PADDLE_ENVIRONMENT")))
 	if env == "sandbox" {
 		return "sandbox"
 	}
@@ -578,21 +585,30 @@ func publicAppURL() string {
 	return strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_APP_URL")), "/")
 }
 
-func paddleConfiguredPriceID(planTier string) string {
+func paddleProductName(planTier string) string {
 	switch normalizePlanTier(planTier) {
 	case "starter":
-		return strings.TrimSpace(firstEnv("PADDLE_STARTER_PRICE_ID", "PADDLE_STARTER_PRODUCT_ID"))
+		return "Koschei Starter"
 	case "builder":
-		return strings.TrimSpace(firstEnv("PADDLE_BUILDER_PRICE_ID", "PADDLE_PROFESSIONAL_PRODUCT_ID"))
+		return "Koschei Professional"
 	case "studio":
-		return strings.TrimSpace(firstEnv("PADDLE_STUDIO_PRICE_ID", "PADDLE_ENTERPRISE_PRODUCT_ID"))
+		return "Koschei Enterprise"
 	default:
 		return ""
 	}
 }
 
-func paddleConfiguredProductID(planTier string) string {
-	return paddleConfiguredPriceID(planTier)
+func paddleConfiguredPriceID(planTier string) string {
+	switch normalizePlanTier(planTier) {
+	case "starter":
+		return firstNonEmpty(strings.TrimSpace(os.Getenv("PADDLE_STARTER_PRICE_ID")), paddleStarterPriceID)
+	case "builder":
+		return firstNonEmpty(strings.TrimSpace(os.Getenv("PADDLE_BUILDER_PRICE_ID")), paddleBuilderPriceID)
+	case "studio":
+		return firstNonEmpty(strings.TrimSpace(os.Getenv("PADDLE_STUDIO_PRICE_ID")), paddleStudioPriceID)
+	default:
+		return ""
+	}
 }
 
 func paddleTransactionItem(priceID, planTier string) map[string]any {
@@ -614,25 +630,29 @@ func normalizePlanTier(planTier string) string {
 
 func subscriptionProductAndTier(sub paddleSubscriptionData) (string, string) {
 	var productID string
+	var priceID string
 	for _, item := range sub.Items {
-		if item.Price.ProductID != "" {
-			productID = item.Price.ProductID
-			break
+		if priceID == "" {
+			priceID = strings.TrimSpace(item.Price.ID)
 		}
-		if item.Price.ID != "" {
-			productID = item.Price.ID
+		if productID == "" {
+			productID = strings.TrimSpace(item.Price.ProductID)
+		}
+		if priceID != "" && productID != "" {
+			break
 		}
 	}
 	planTier := normalizePlanTier(customDataString(sub.CustomData, "plan_tier"))
 	if planTier == "" {
-		planTier = tierFromProductID(productID)
+		planTier = tierFromPriceID(priceID)
 	}
-	return productID, planTier
+	return firstNonEmpty(productID, priceID), planTier
 }
 
-func tierFromProductID(productID string) string {
+func tierFromPriceID(priceID string) string {
+	priceID = strings.TrimSpace(priceID)
 	for _, tier := range []string{"starter", "builder", "studio"} {
-		if productID != "" && productID == paddleConfiguredProductID(tier) {
+		if priceID != "" && priceID == paddleConfiguredPriceID(tier) {
 			return tier
 		}
 	}
