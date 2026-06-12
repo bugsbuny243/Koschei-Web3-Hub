@@ -12,8 +12,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +39,18 @@ type paddleAPIResponse struct {
 		} `json:"checkout"`
 	} `json:"data"`
 	Error any `json:"error"`
+}
+
+type paddleAPIError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e paddleAPIError) Error() string {
+	if e.Message == "" {
+		return fmt.Sprintf("Paddle API returned %d", e.StatusCode)
+	}
+	return e.Message
 }
 
 type paddleEvent struct {
@@ -94,12 +108,13 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	planTier := normalizePlanTier(firstNonEmpty(req.Package, req.PlanTier, req.ProductID))
 	priceID := paddleConfiguredPriceID(planTier)
 	apiKeyConfigured := strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != ""
+	log.Printf("paddle checkout request: package=%q price_id_configured=%t environment=%q", planTier, priceID != "", paddleEnvironment())
 	if email == "" || planTier == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "valid_package_required"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "valid_package_required", "message": "Choose a valid Paddle package."})
 		return
 	}
 	if priceID == "" || !apiKeyConfigured {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "paddle_not_configured", "message": "Paddle global checkout is not configured yet."})
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "paddle_config_missing", "message": "Paddle global checkout is not configured yet."})
 		return
 	}
 	checkoutURL, err := h.CreateCheckoutSession(r.Context(), priceID, email, claims.Sub, planTier)
@@ -107,7 +122,7 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "paddle_checkout_failed", "message": safeError(err)})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "checkout_url": checkoutURL})
+	writeJSON(w, http.StatusOK, map[string]string{"checkout_url": checkoutURL})
 }
 
 func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEmail, authSubject, planTier string) (string, error) {
@@ -144,8 +159,10 @@ func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEm
 	if err := paddleRequest(ctx, http.MethodPost, "/transactions", payload, &out); err != nil {
 		return "", err
 	}
-	if out.Data.Checkout.URL == "" {
-		return "", errors.New("Paddle response did not include checkout.url")
+	checkoutURLFound := out.Data.Checkout.URL != ""
+	log.Printf("paddle checkout transaction response: package=%q checkout_url_found=%t", planTier, checkoutURLFound)
+	if !checkoutURLFound {
+		return "", errors.New("Paddle response did not include checkout.url. Confirm the Paddle default payment link and approved checkout domain are configured.")
 	}
 	return out.Data.Checkout.URL, nil
 }
@@ -283,10 +300,7 @@ func paddleRequest(ctx context.Context, method, path string, payload any, out an
 	if err != nil {
 		return err
 	}
-	base := "https://api.paddle.com"
-	if strings.EqualFold(firstEnv("PADDLE_ENVIRONMENT", "PADDLE_ENV"), "sandbox") {
-		base = "https://sandbox-api.paddle.com"
-	}
+	base := paddleAPIBaseURL()
 	req, err := http.NewRequestWithContext(ctx, method, base+path, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -300,8 +314,10 @@ func paddleRequest(ctx context.Context, method, path string, payload any, out an
 	}
 	defer resp.Body.Close()
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	keys := jsonTopLevelKeys(respBody)
+	log.Printf("paddle api response: method=%s path=%s environment=%q status=%d top_level_keys=%v", method, path, paddleEnvironment(), resp.StatusCode, keys)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("Paddle API returned %d: %s", resp.StatusCode, string(respBody))
+		return paddleAPIError{StatusCode: resp.StatusCode, Message: paddleErrorMessage(resp.StatusCode, respBody)}
 	}
 	if out != nil && len(respBody) > 0 {
 		return json.Unmarshal(respBody, out)
@@ -443,6 +459,69 @@ func parsePaddleSignature(header string) (string, []string) {
 		}
 	}
 	return ts, signatures
+}
+
+func paddleEnvironment() string {
+	env := strings.ToLower(strings.TrimSpace(firstEnv("PADDLE_ENVIRONMENT", "PADDLE_ENV")))
+	if env == "sandbox" {
+		return "sandbox"
+	}
+	return "production"
+}
+
+func paddleAPIBaseURL() string {
+	if paddleEnvironment() == "sandbox" {
+		return "https://sandbox-api.paddle.com"
+	}
+	return "https://api.paddle.com"
+}
+
+func jsonTopLevelKeys(body []byte) []string {
+	var raw map[string]json.RawMessage
+	if len(body) == 0 || json.Unmarshal(body, &raw) != nil {
+		return nil
+	}
+	keys := make([]string, 0, len(raw))
+	for key := range raw {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func paddleErrorMessage(statusCode int, body []byte) string {
+	fallback := fmt.Sprintf("Paddle API returned %d.", statusCode)
+	var raw map[string]any
+	if len(body) == 0 || json.Unmarshal(body, &raw) != nil {
+		return fallback
+	}
+	if msg := paddleMessageFromValue(raw["error"]); msg != "" {
+		return msg
+	}
+	if msg := paddleMessageFromValue(raw["message"]); msg != "" {
+		return msg
+	}
+	return fallback
+}
+
+func paddleMessageFromValue(value any) string {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case map[string]any:
+		for _, key := range []string{"detail", "message", "description", "type"} {
+			if msg := paddleMessageFromValue(v[key]); msg != "" {
+				return msg
+			}
+		}
+	case []any:
+		for _, item := range v {
+			if msg := paddleMessageFromValue(item); msg != "" {
+				return msg
+			}
+		}
+	}
+	return ""
 }
 
 func paddleConfiguredPriceID(planTier string) string {
