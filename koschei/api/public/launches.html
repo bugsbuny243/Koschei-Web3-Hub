@@ -80,7 +80,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 <nav class="nav">
   <a href="/hub.html" class="nav-logo">K <span style="color:var(--text);font-weight:500">Koschei</span></a>
   <div class="nav-links">
-    <a href="/hub.html" class="nav-link">Hub</a>
+    <a href="/hub.html" class="nav-link">Panel</a>
     <a href="/launches.html" class="nav-link active">Rug Radar</a>
     <a href="/token-scanner.html" class="nav-link">Scanner</a>
   </div>
@@ -201,7 +201,7 @@ async function submitToken(){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({mint_address:mint,network})
     });
-    if(!res)throw new Error('Request failed');
+    if(!res)throw new Error('Analiz tamamlanamadı. Lütfen girdiyi kontrol edip tekrar deneyin.');
     const data=await res.json();
     if(!res.ok)throw new Error(data.message||data.error||'Failed');
     document.getElementById('mintInput').value='';

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <meta name="description" content="Create your Koschei Web3 Hub account for Alchemy-first Web3 Security Intelligence and Solana security tools.">
-  <title>Create Account — Koschei Web3 Hub</title>
+  <meta name="description" content="Koschei Web3 Hub hesabı oluşturun; premium araçlar aktif paket gerektirir.">
+  <title>Hesap Oluştur — Koschei Web3 Hub</title>
   <link rel="canonical" href="https://tradepigloball.co/register.html">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -14,16 +14,16 @@
 <div class="blobs"><div class="blob b1"></div><div class="blob b2"></div></div>
 <div class="card">
   <div class="logo">K Koschei</div>
-  <div class="title">Create Account</div>
-  <div class="sub">Create your Koschei account. Premium tools require an active package.</div>
+  <div class="title">Hesap Oluştur</div>
+  <div class="sub">Koschei hesabınızı oluşturun. Premium araçlar aktif paket gerektirir.</div>
   <div class="alert" id="alert" role="alert" aria-live="polite"></div>
   <form class="form" id="registerForm">
-    <div class="form-group"><label class="form-label" for="email">Email</label><input class="form-input" id="email" name="email" type="email" autocomplete="email" required></div>
-    <div class="form-group"><label class="form-label" for="password">Password</label><input class="form-input" id="password" name="password" type="password" autocomplete="new-password" minlength="8" required></div>
-    <div class="form-group"><label class="form-label" for="confirmPassword">Confirm password</label><input class="form-input" id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required></div>
-    <button class="btn" id="submitBtn" type="submit">Create account</button>
+    <div class="form-group"><label class="form-label" for="email">E-posta</label><input class="form-input" id="email" name="email" type="email" autocomplete="email" required></div>
+    <div class="form-group"><label class="form-label" for="password">Şifre</label><input class="form-input" id="password" name="password" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div class="form-group"><label class="form-label" for="confirmPassword">Şifreyi onayla</label><input class="form-input" id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required></div>
+    <button class="btn" id="submitBtn" type="submit">Hesap Oluştur</button>
   </form>
-  <div class="link">Already have an account? <a href="/login.html">Sign in</a></div>
+  <div class="link">Zaten hesabınız var mı? <a href="/login.html">Giriş Yap</a></div>
 </div>
 <script src="/js/koschei-auth.js?v=6"></script>
 <script>
@@ -37,9 +37,9 @@
   }
 
   function validate(email, password, confirmPassword) {
-    if (!email || !email.includes('@')) return 'Enter a valid email address.';
-    if (!password || password.length < 8) return 'Password must be at least 8 characters.';
-    if (password !== confirmPassword) return 'Passwords do not match.';
+    if (!email || !email.includes('@')) return 'Geçerli bir e-posta adresi girin.';
+    if (!password || password.length < 8) return 'Şifre en az 8 karakter olmalı.';
+    if (password !== confirmPassword) return 'Şifreler eşleşmiyor.';
     return '';
   }
 
@@ -53,7 +53,7 @@
     form.addEventListener('submit', async event => {
       event.preventDefault();
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Creating…';
+      submitBtn.textContent = 'Hesap oluşturuluyor…';
       alertEl.className = 'alert';
       const body = Object.fromEntries(new FormData(form));
       const email = String(body.email || '').trim();
@@ -63,17 +63,17 @@
       if (validationError) {
         showAlert(validationError);
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Create account';
+        submitBtn.textContent = 'Hesap Oluştur';
         return;
       }
       try {
         await KoscheiAuth.signUp(email, password);
-        showAlert('Account created. Redirecting…', 'success');
+        showAlert('Hesap oluşturuldu. Yönlendiriliyorsunuz…', 'success');
         window.location.href = '/hub.html';
       } catch (error) {
-        showAlert(error && error.message ? error.message : 'Registration failed. Please try again.');
+        showAlert(error && error.message ? error.message : 'Hesap oluşturulamadı. Lütfen tekrar deneyin.');
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Create account';
+        submitBtn.textContent = 'Hesap Oluştur';
       }
     });
   })();

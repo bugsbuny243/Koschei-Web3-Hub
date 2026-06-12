@@ -31,21 +31,33 @@
 
   function defaultUserName(email) {
     const name = String(email || '').split('@')[0].trim();
-    return name || 'User';
+    return name || 'Kullanıcı';
   }
 
   function successCallbackURL() {
     return window.location.origin.replace(/\/+$/, '') + '/hub.html';
   }
 
+
+  function publicErrorMessage(raw, fallback) {
+    const value = String(raw || '').trim();
+    const normalized = value.toLowerCase();
+    if (!value) return fallback;
+    if (['unauthorized', 'token_missing', 'auth_session_missing', 'auth_verification_required'].includes(normalized) || normalized.includes('401')) return 'Giriş yapmanız gerekiyor.';
+    if (['forbidden', 'insufficient_outputs'].includes(normalized) || normalized.includes('active package')) return 'Bu işlem için aktif Koschei paketi gerekli.';
+    if (normalized.includes('paddle')) return 'Paddle ödeme bağlantısı şu anda yapılandırılmamış.';
+    if (normalized.includes('shopier')) return 'Shopier bağlantısı açılamadı.';
+    return value || fallback;
+  }
+
   function errorMessage(data, fallback) {
     if (!data) return fallback;
-    if (typeof data === 'string') return data || fallback;
-    if (data.error === 'token_missing') return 'Account was created, but no login session was returned. Please try signing in.';
+    if (typeof data === 'string') return publicErrorMessage(data, fallback);
+    if (data.error === 'token_missing') return 'Giriş oturumu alınamadı. Lütfen tekrar giriş yapın.';
     if (data.error === 'auth_session_missing' || data.error === 'auth_verification_required') {
-      return data.message || 'Account was created, but no login session was returned. Please try signing in.';
+      return publicErrorMessage(data.message, 'Giriş oturumu alınamadı. Lütfen tekrar giriş yapın.');
     }
-    return data.message || data.error_description || data.error || data.detail || fallback;
+    return publicErrorMessage(data.message || data.error_description || data.error || data.detail, fallback);
   }
 
   function jwtFromHeader(value) {
@@ -89,7 +101,7 @@
       configPromise = fetch('/api/config', { credentials: 'same-origin' })
         .then(async (res) => {
           const data = await readJSON(res);
-          if (!res.ok) throw new Error(errorMessage(data, 'Auth configuration is unavailable.'));
+          if (!res.ok) throw new Error(errorMessage(data, 'Kimlik doğrulama yapılandırması şu anda kullanılamıyor.'));
           return data;
         });
     }
@@ -99,7 +111,7 @@
   async function neonAuthBaseURL() {
     const cfg = await loadConfig();
     const baseURL = String(cfg.neonAuthUrl || '').trim().replace(/\/+$/, '');
-    if (!baseURL) throw new Error('Neon Auth is not configured.');
+    if (!baseURL) throw new Error('Neon Auth yapılandırılmamış.');
     return baseURL;
   }
 
@@ -112,14 +124,14 @@
     const data = await readJSON(res);
     if (!res.ok) {
       clearJwt();
-      throw new Error(errorMessage(data, 'Token was received, but /api/me rejected it.'));
+      throw new Error(errorMessage(data, 'Giriş yapmanız gerekiyor.'));
     }
     return data;
   }
 
   async function finishAuth(result) {
     const jwt = jwtFromHeader(result.headerJwt) || findJwt(result.data);
-    if (!_isJwt(jwt)) throw new Error('Authentication succeeded, but no JWT was returned by Neon Auth.');
+    if (!_isJwt(jwt)) throw new Error('Giriş oturumu alınamadı. Lütfen tekrar giriş yapın.');
     saveJwt(jwt);
     const me = await verifyMe(jwt);
     return { ...result.data, me, access_token: jwt, token_type: 'Bearer' };
