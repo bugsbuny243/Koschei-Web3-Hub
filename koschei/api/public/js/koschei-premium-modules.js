@@ -48,10 +48,16 @@ const PremiumModules = (() => {
     if (btn) btn.onclick = () => navigator.clipboard && navigator.clipboard.writeText(JSON.stringify(data || {}, null, 2));
   }
 
-  function showCredit(data) {
-    render({access:'Analysis requires an active Koschei package.', package_required:data && (data.package || data.required_package || data.message) || 'Upgrade or activate Starter, Builder, or Studio package.', action:'View Pricing to continue.'}, 'Package access required.');
+  function showPackageRequired() {
+    render({access:'Active Koschei package required.', action:'Choose Starter, Builder, or Studio to continue.'}, 'Package access required.');
     const result = $('result');
-    if (result) result.insertAdjacentHTML('beforeend','<div class="premium-actions"><a class="btn btn-primary" href="/pricing">View Pricing</a><a class="btn btn-ghost" href="/account">Check Account</a></div>');
+    if (result) result.insertAdjacentHTML('beforeend','<div class="premium-actions"><a class="btn btn-primary" href="/pricing.html">View Pricing</a><a class="btn btn-ghost" href="/account">Check Account</a></div>');
+  }
+
+  function showSignInRequired() {
+    render({access:'Please sign in.', action:'Sign in to use package-gated Koschei modules.'}, 'Sign in required.');
+    const result = $('result');
+    if (result) result.insertAdjacentHTML('beforeend','<div class="premium-actions"><a class="btn btn-primary" href="/login.html">Sign in</a></div>');
   }
 
   function shell(key) {
@@ -72,8 +78,10 @@ const PremiumModules = (() => {
       if (!res) throw new Error('Unable to fetch live data right now');
       const data = await res.json().catch(()=>({}));
       if (!res.ok) {
-        if (res.status === 402 || data.error === 'insufficient_outputs') return showCredit(data);
-        render({error:data.message || data.error || 'Request failed', status:res.status, action:'Check the input and retry with public data.'}, 'Unable to complete analysis.');
+        if (res.status === 401 && !KoscheiAuth.getJwt()) { location.href = '/login.html'; return; }
+        if (res.status === 401) return showPackageRequired();
+        if (res.status === 402 || data.error === 'insufficient_outputs') return showPackageRequired();
+        render({message:'Unable to complete analysis.', status:res.status, action:'Check the input and retry with public data.'}, 'Unable to complete analysis.');
         return;
       }
       render(normalizeResult(key, data, vals), 'Evidence-based analysis completed.');
@@ -85,6 +93,6 @@ const PremiumModules = (() => {
     }
   }
 
-  async function init(key) { await KoscheiAuth.init(); if (!KoscheiAuth.requireAuth('/login')) return; shell(key); if (window.KoscheiAnalytics) KoscheiAnalytics.track(`${key}_module_view`); }
+  async function init(key) { await KoscheiAuth.init(); shell(key); if (!KoscheiAuth.isLoggedIn()) { showSignInRequired(); return; } if (window.KoscheiAnalytics) KoscheiAnalytics.track(`${key}_module_view`); }
   return { init };
 })();

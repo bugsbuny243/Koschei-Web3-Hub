@@ -28,14 +28,14 @@
         <div class="hero-copy">
           <span class="eyebrow">Package access</span>
           <h1><span class="gradient-text">Choose the output package</span> for your intelligence workflow.</h1>
-          <p class="page-sub">Premium modules stay gated behind active paid packages. Shopier Turkey and Paddle Global both activate the same entitlement and output system.</p>
+          <p class="page-sub">Premium modules stay gated behind active paid packages. Shopier is available for Turkey-based users. Paddle is available for global checkout. Both payment paths activate the same Koschei package entitlement system.</p>
           <div class="hero-actions"><a class="btn btn-primary" href="#packages">Compare packages</a><a class="btn btn-ghost" href="/hub.html">Back to Member Hub</a></div>
         </div>
       </article>
       <aside class="checkout-card surface" aria-label="Payment and entitlement notes">
-        <div class="checkout-row"><strong>Shopier for Turkey</strong><span>Use the Turkey payment path or submit a Shopier payment request for owner confirmation.</span></div>
-        <div class="checkout-row"><strong>Paddle for global users</strong><span>The Paddle button starts the real backend checkout endpoint when Paddle credentials and price IDs are configured.</span></div>
-        <div class="checkout-row"><strong>One activation system</strong><span>Owner approval, Shopier webhook confirmation and Paddle webhook confirmation feed the same package entitlement/output records.</span></div>
+        <div class="checkout-row"><strong>Shopier for Turkey</strong><span>Shopier opens the package product page directly for Turkey-based checkout.</span></div>
+        <div class="checkout-row"><strong>Paddle for global users</strong><span>Paddle starts global checkout when the backend endpoint and package price are configured.</span></div>
+        <div class="checkout-row"><strong>One activation system</strong><span>Shopier and Paddle confirmations feed the same package entitlement/output records.</span></div>
       </aside>
     </section>
 
@@ -67,25 +67,25 @@
         <div class="payment-actions"><button class="btn btn-primary choose-shopier" data-product="studio" data-title="Koschei Studio Pack">Pay with Shopier (Turkey)</button><button class="btn btn-paddle choose-paddle" data-product="studio">Pay with Paddle (Global)</button><p class="provider-note">Turkey users can use Shopier; global users can use Paddle.</p></div>
       </article>
     </section>
-    <p class="notice">Owner approval, Shopier webhook confirmation, and Paddle webhook confirmation all activate the same backend entitlement and output system with the package output totals shown above.</p>
+    <p class="notice">Shopier is available for Turkey-based users. Paddle is available for global checkout. Both payment paths activate the same Koschei package entitlement system.</p>
     <div id="status" class="surface" style="display:none;margin-top:18px"></div>
   </main>
 
-  <div id="modal" class="modal"><div class="card modal-card"><h2 id="modalTitle">Shopier Turkey payment</h2><p class="page-sub">Submit a Shopier Turkey payment request for owner review. Sign in first so the package can be attached to your account. Activation may require owner confirmation.</p><form id="paymentForm" class="stack"><div class="form-grid"><label class="form-label">Full name<input class="form-input" name="full_name" required></label><label class="form-label">Shopier payment reference<input class="form-input" name="payment_reference" placeholder="Receipt, transaction ID or note"></label></div><label class="form-label">Note<textarea class="form-input" name="note" placeholder="Company, project, grant program, or reviewer workflow context"></textarea></label><div class="premium-actions"><button class="btn btn-primary" id="submitPayment">Submit Shopier Turkey payment</button><button class="btn btn-ghost" type="button" id="closeModal">Cancel</button></div></form></div></div>
+  <div id="modal" class="modal"><div class="card modal-card"><h2 id="modalTitle">Shopier Turkey fallback</h2><p class="page-sub">The direct Shopier product link is not configured for this package. Sign in to send a fallback payment activation request.</p><form id="paymentForm" class="stack"><div class="form-grid"><label class="form-label">Full name<input class="form-input" name="full_name" required></label><label class="form-label">Payment receipt or transaction ID<input class="form-input" name="payment_reference" placeholder="Receipt or transaction ID"></label></div><label class="form-label">Activation note<textarea class="form-input" name="note" placeholder="Company, project, or account context"></textarea></label><div class="premium-actions"><button class="btn btn-primary" id="submitPayment">Submit fallback request</button><button class="btn btn-ghost" type="button" id="closeModal">Cancel</button></div></form></div></div>
 
   <script src="/js/koschei-auth.js?v=4"></script><script src="/js/koschei-analytics.js?v=1"></script><script>
     (async()=>{
       await KoscheiAuth.init();
       let selected='starter';
-      let paymentConfig={shopierUrls:{},paddleConfigured:{}};
+      let paymentConfig={shopierUrls:{starter:'https://www.shopier.com/TradeVisual/46531862',builder:'https://www.shopier.com/TradeVisual/46531900',studio:'https://www.shopier.com/TradeVisual/46531961'},paddleConfigured:{}};
       const modal=document.getElementById('modal'),status=document.getElementById('status'),modalTitle=document.getElementById('modalTitle'),paymentForm=document.getElementById('paymentForm'),submitPayment=document.getElementById('submitPayment'),closeModal=document.getElementById('closeModal');
       function showStatus(message){status.style.display='block';status.textContent=message}
-      async function loadPaymentConfig(){try{const r=await fetch('/api/config',{credentials:'same-origin'});const d=await r.json();paymentConfig=d.payments||paymentConfig}catch{}}
+      async function loadPaymentConfig(){try{const r=await fetch('/api/config',{credentials:'same-origin'});const d=await r.json();const incoming=d.payments||{};paymentConfig={...paymentConfig,...incoming,shopierUrls:{...paymentConfig.shopierUrls,...(incoming.shopierUrls||{})}}}catch{}}
       await loadPaymentConfig();
-      document.querySelectorAll('.choose-shopier').forEach(btn=>btn.onclick=()=>{selected=btn.dataset.product;const url=(paymentConfig.shopierUrls||{})[selected];if(url){window.open(url,'_blank','noopener,noreferrer');showStatus('Shopier Turkey payment opened. Submit a request after payment if owner confirmation is required.');return}modalTitle.textContent=`Shopier Turkey payment — ${btn.dataset.title}`;modal.classList.add('show')});
-      document.querySelectorAll('.choose-paddle').forEach(btn=>btn.onclick=async()=>{if(!KoscheiAuth.isLoggedIn()){location.href='/login.html';return}btn.disabled=true;try{const r=await KoscheiAuth.apiCall('/api/paddle/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({package:btn.dataset.product})});const d=await (r?r.json().catch(()=>({})):Promise.resolve({}));if(r&&r.ok&&d.checkout_url){location.href=d.checkout_url;return}showStatus(d.message||d.error||'Unable to start Paddle global payment for this package.')}finally{btn.disabled=false}});
+      document.querySelectorAll('.choose-shopier').forEach(btn=>btn.onclick=()=>{selected=btn.dataset.product;const url=(paymentConfig.shopierUrls||{})[selected];if(url){window.open(url,'_blank','noopener,noreferrer');showStatus('Shopier Turkey checkout opened for '+btn.dataset.title+'.');return}modalTitle.textContent=`Shopier Turkey fallback — ${btn.dataset.title}`;modal.classList.add('show')});
+      document.querySelectorAll('.choose-paddle').forEach(btn=>btn.onclick=async()=>{if(!KoscheiAuth.isLoggedIn()){location.href='/login.html';return}btn.disabled=true;try{const r=await KoscheiAuth.apiCall('/api/paddle/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({package:btn.dataset.product})});const d=await (r?r.json().catch(()=>({})):Promise.resolve({}));if(r&&r.ok&&d.checkout_url){location.href=d.checkout_url;return}showStatus(d.message||'Paddle global checkout is not configured yet.')}finally{btn.disabled=false}});
       closeModal.onclick=()=>modal.classList.remove('show');
-      paymentForm.onsubmit=async e=>{e.preventDefault();if(!KoscheiAuth.isLoggedIn()){location.href='/login.html';return}submitPayment.disabled=true;try{const body=Object.fromEntries(new FormData(paymentForm));body.product_id=selected;const r=await KoscheiAuth.apiCall('/api/payments/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await (r?r.json().catch(()=>({})):Promise.resolve({}));showStatus(r&&r.ok?(d.message||'Shopier Turkey payment request received. Owner review required.'):(d.message||d.error||'Unable to submit Shopier Turkey payment request.'));if(r&&r.ok)modal.classList.remove('show')}finally{submitPayment.disabled=false}};
+      paymentForm.onsubmit=async e=>{e.preventDefault();if(!KoscheiAuth.isLoggedIn()){location.href='/login.html';return}submitPayment.disabled=true;try{const body=Object.fromEntries(new FormData(paymentForm));body.product_id=selected;const r=await KoscheiAuth.apiCall('/api/payments/request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await (r?r.json().catch(()=>({})):Promise.resolve({}));showStatus(r&&r.ok?(d.message||'Fallback payment activation request received.'):(d.message||'Unable to submit fallback payment activation request.'));if(r&&r.ok)modal.classList.remove('show')}finally{submitPayment.disabled=false}};
       if(window.KoscheiAnalytics)KoscheiAnalytics.track('pricing_view');
     })();
   </script>

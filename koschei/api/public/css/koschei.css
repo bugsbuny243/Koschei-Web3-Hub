@@ -21,6 +21,9 @@ html, body { background: var(--bg); color: var(--text); font-family: var(--font)
 .btn-full { width: 100%; }
 .btn:disabled { opacity: .4; cursor: not-allowed; }
 .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+a.card, .card a:not(.btn) { color: inherit; text-decoration: none; }
+a.card:hover { border-color: rgba(0,255,136,.35); }
+a.card h1, a.card h2, a.card h3 { color: var(--text); }
 .form-group { display: flex; flex-direction: column; gap: 6px; }
 .form-label { font-size: 13px; color: var(--text2); font-weight: 500; }
 .form-input { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; padding: 10px 14px; outline: none; transition: border-color .15s; }
