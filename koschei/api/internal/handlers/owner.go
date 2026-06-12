@@ -374,13 +374,30 @@ func (h *Handler) ShopierWebhook(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown product_id"})
 		return
 	}
+	externalPaymentID := ""
+	for _, key := range []string{"payment_id", "order_id", "id"} {
+		if value, ok := payload[key]; ok {
+			if candidate := strings.TrimSpace(fmt.Sprint(value)); candidate != "" && candidate != "<nil>" {
+				externalPaymentID = candidate
+				break
+			}
+		}
+	}
+	if externalPaymentID == "" {
+		externalPaymentID = "shopier:" + email + ":" + productID + ":" + fmt.Sprint(payload["created_at"])
+	}
 	raw, _ := json.Marshal(payload)
-	_, err := h.DB.ExecContext(r.Context(), `INSERT INTO payment_requests (email, full_name, product_id, amount_try, currency, status, raw_payload, created_at) VALUES ($1,$2,$3,$4,'TRY','pending',$5::jsonb,now())`, email, strings.TrimSpace(fmt.Sprint(payload["full_name"])), productID, pack.AmountTRY, string(raw))
+	_, err := h.DB.ExecContext(r.Context(), `INSERT INTO payment_requests (email, full_name, product_id, amount_try, currency, status, raw_payload, payment_provider, external_payment_id, reviewed_at, created_at) VALUES ($1,$2,$3,$4,'TRY','approved',$5::jsonb,'shopier',$6,now(),now())`, email, strings.TrimSpace(fmt.Sprint(payload["full_name"])), productID, pack.AmountTRY, string(raw), externalPaymentID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "webhook insert failed"})
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "status": "pending"})
+	result, err := h.activatePackageEntitlement(r.Context(), email, productID, "shopier", externalPaymentID)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "entitlement activation failed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "approved", "activated": result.Activated})
 }
 
 func ensureOwnerSchema(ctx context.Context, db *sql.DB) error {
