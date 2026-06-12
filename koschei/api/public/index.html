@@ -10,49 +10,67 @@
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Koschei Web3 Hub","applicationCategory":"SecurityApplication","operatingSystem":"Web","url":"https://tradepigloball.co/","description":"Alchemy-first Web3 security intelligence for Solana builders: TX decoder, wallet risk score, token scanner, sybil checker, project radar, and grant readiness.","publisher":{"@type":"Organization","name":"Koschei Web3 Hub","url":"https://tradepigloball.co/"}}</script>
 
   <style>
-    .landing{max-width:1180px;margin:0 auto;padding:34px 18px 64px}.hero{padding:76px 0 42px}.hero h1{font-size:clamp(42px,7vw,82px);line-height:.94;letter-spacing:-.06em;margin:18px 0}.hero p{max-width:850px;color:var(--text2);font-size:20px;line-height:1.65}.actions,.module-grid{display:flex;gap:12px;flex-wrap:wrap}.module-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:24px}.module-card{border:1px solid var(--border);border-radius:18px;background:var(--bg2);padding:20px;min-height:170px}.module-card h3{margin:0 0 8px}.module-card p{color:var(--text2);line-height:1.55}.section{margin-top:42px}.section h2{font-size:34px;margin-bottom:10px}@media(max-width:850px){.module-grid{grid-template-columns:1fr}}
+    .landing{width:min(1180px,calc(100% - 36px));margin:0 auto;padding:38px 0 72px}
+    .landing a{color:inherit;text-decoration:none}
+    .landing-hero{position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:32px;background:radial-gradient(circle at 20% 0%,rgba(0,255,170,.2),transparent 34%),radial-gradient(circle at 100% 20%,rgba(126,87,255,.18),transparent 32%),linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.025));box-shadow:0 28px 90px rgba(0,0,0,.35);padding:clamp(28px,6vw,72px);display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);gap:28px;align-items:center}
+    .landing-hero:after{content:"";position:absolute;inset:auto -10% -45% 20%;height:360px;background:linear-gradient(90deg,rgba(0,255,170,.12),rgba(126,87,255,.16));filter:blur(70px);pointer-events:none}
+    .hero-copy,.hero-panel{position:relative;z-index:1}.hero-kicker{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(0,255,170,.28);background:rgba(0,255,170,.08);color:var(--accent);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.landing h1{font-size:clamp(42px,7vw,86px);line-height:.95;letter-spacing:-.065em;margin:20px 0 18px}.hero-lede{max-width:850px;color:var(--text2);font-size:clamp(17px,2.1vw,22px);line-height:1.65}.hero-actions,.quick-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:26px}.landing .btn{border-radius:16px;box-shadow:0 12px 34px rgba(0,0,0,.24)}.hero-panel{display:grid;gap:14px}.signal-card{border:1px solid rgba(255,255,255,.12);border-radius:22px;background:rgba(0,0,0,.22);padding:18px;backdrop-filter:blur(14px)}.signal-card strong{display:block;font-size:28px;letter-spacing:-.04em}.signal-card span{display:block;color:var(--text2);line-height:1.55;margin-top:6px}.section{margin-top:46px}.section-head{display:flex;justify-content:space-between;gap:18px;align-items:end;margin-bottom:20px}.section h2{font-size:clamp(30px,4.2vw,48px);letter-spacing:-.05em;margin:0}.section p{color:var(--text2);line-height:1.65}.workflow-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.workflow-card{display:flex;flex-direction:column;gap:14px;min-height:320px;border:1px solid rgba(255,255,255,.12);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.025));padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.24);transition:transform .18s ease,border-color .18s ease,background .18s ease}.workflow-card:hover{transform:translateY(-3px);border-color:rgba(0,255,170,.35);background:linear-gradient(180deg,rgba(0,255,170,.08),rgba(255,255,255,.025))}.workflow-card h3{font-size:22px;margin:0}.workflow-card ul{display:grid;gap:9px;margin:0;padding-left:18px;color:var(--text2);line-height:1.48}.workflow-links{display:flex;gap:10px;flex-wrap:wrap;margin-top:auto}.mini-link{display:inline-flex;align-items:center;justify-content:center;min-height:40px;border-radius:999px;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);font-weight:850}.mini-link.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#04100c;border:0}.trust-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.trust-strip div{border:1px solid rgba(255,255,255,.1);border-radius:20px;background:rgba(255,255,255,.04);padding:18px}.trust-strip b{display:block;color:var(--accent);font-size:13px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}.landing-footer{margin-top:48px;border-top:1px solid rgba(255,255,255,.1);padding-top:20px;color:var(--text2);display:flex;gap:12px;flex-wrap:wrap}.landing-footer a{color:var(--text2);font-size:14px}.landing-footer a:hover{color:var(--accent)}@media(max-width:940px){.landing-hero,.workflow-grid,.trust-strip{grid-template-columns:1fr}.section-head{display:block}.workflow-card{min-height:auto}}@media(max-width:560px){.landing{width:calc(100% - 22px);padding-top:18px}.landing-hero{border-radius:24px;padding:24px 18px}.hero-actions .btn,.quick-actions .btn,.workflow-links .mini-link{width:100%}.workflow-card{padding:18px}.landing h1{font-size:clamp(38px,13vw,56px)}}
   </style>
 </head>
 <body>
   <nav class="nav"><a class="nav-logo" href="/">K Koschei</a><div class="nav-links"><a class="nav-link" href="/dashboard">Dashboard</a><a class="nav-link" href="/pricing">Pricing</a><a class="nav-link" href="/tx-decoder">TX Decoder</a><a class="nav-link" href="/token-scanner">Token Scanner</a><a class="nav-link" href="/wallet-score">Wallet Score</a><a class="nav-link" href="/project-radar">Project Radar</a></div></nav>
   <main class="landing">
-    <section class="hero">
-      <span class="badge badge-green">Production intelligence · Solana/Web3 security · Grant readiness</span>
-      <h1>Alchemy-powered Web3 Security Intelligence for Solana builders.</h1>
-      <p>Koschei Web3 Hub helps builders, grant applicants, ecosystem teams and reviewers analyze wallets, tokens, transactions, projects, sybil risk and grant readiness through Alchemy-first Web3 Security Intelligence workflows.</p>
-      <div class="actions">
-        <a class="btn btn-primary" href="/dashboard">Open Dashboard</a>
-        <a class="btn btn-ghost" href="/pricing">View Pricing</a>
-        <a class="btn btn-ghost" href="/wallet-score">Start Wallet Analysis</a>
-        <a class="btn btn-ghost" href="/token-scanner">Scan Token</a>
-        <a class="btn btn-ghost" href="/tx-decoder">Decode Transaction</a>
-        <a class="btn btn-ghost" href="/project-radar">Run Project Radar</a>
-        <a class="btn btn-ghost" href="/funding-assistant">Generate Grant Readiness</a>
+    <section class="landing-hero">
+      <div class="hero-copy">
+        <span class="hero-kicker">Koschei Web3 Hub · Alchemy-first intelligence</span>
+        <h1>Alchemy-powered Web3 Security Intelligence for Solana builders.</h1>
+        <p class="hero-lede">Analyze wallets, tokens, transactions, projects, sybil risk and grant readiness from one connected intelligence hub.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="/hub.html">Open Dashboard</a>
+          <a class="btn btn-ghost" href="/pricing.html">View Packages</a>
+          <a class="btn btn-ghost" href="/tx-decoder.html">Decode Transaction</a>
+          <a class="btn btn-ghost" href="/token-scanner.html">Scan Token</a>
+          <a class="btn btn-ghost" href="/risk.html">Run Risk Scanner</a>
+        </div>
       </div>
+      <aside class="hero-panel" aria-label="Koschei platform signals">
+        <div class="signal-card"><strong>Alchemy-powered</strong><span>Solana/Web3 intelligence built around public-chain evidence, not wallet custody or private-key access.</span></div>
+        <div class="signal-card"><strong>Package-gated</strong><span>Premium modules require an active paid package before execution and consume the same entitlement/output system.</span></div>
+        <div class="signal-card"><strong>Connected workflow</strong><span>Route transaction, token, wallet, sybil and project signals into reviewer-ready outputs.</span></div>
+      </aside>
     </section>
+
     <section class="section">
-      <h2>One connected intelligence hub, not disconnected tools.</h2>
-      <p class="page-sub">Start with a wallet, token, transaction, project URL or GitHub repository. Route findings into risk analysis, Intelligence Graph, Sybil Checker and grant readiness workflows without requiring wallet custody or private-key access.</p>
-      <div class="module-grid">
-        <a class="module-card" href="/tx-decoder"><h3>TX Decoder</h3><p>Turn public transaction hashes into transaction purpose, involved programs, risk flags and next checks.</p></a>
-        <a class="module-card" href="/token-scanner"><h3>Token Scanner</h3><p>Review token authorities, supply and concentration signals from public Solana mint data.</p></a>
-        <a class="module-card" href="/wallet-score"><h3>Wallet Score</h3><p>Score wallet activity, recency, trust indicators, red flags and supporting evidence.</p></a>
-        <a class="module-card" href="/risk"><h3>Risk Scanner</h3><p>Run severity, reason, evidence, confidence and recommended-action analysis for public targets.</p></a>
-        <a class="module-card" href="/project-radar"><h3>Project Radar</h3><p>Assess ecosystem fit, credibility signals, technical proof points and grant/investor readiness.</p></a>
-        <a class="module-card" href="/funding-assistant"><h3>Grant Readiness</h3><p>Prepare application structure, milestones, budget logic, public-goods angle and final draft material.</p></a>
+      <div class="section-head">
+        <div>
+          <h2>Connected intelligence workflows</h2>
+          <p class="page-sub">Start from a public wallet, token, transaction, project URL or grant context and move across the Koschei security workflow without raw link blocks or disconnected tools.</p>
+        </div>
+        <div class="quick-actions"><a class="btn btn-ghost" href="/pricing.html">Choose package</a></div>
       </div>
-    </section>
-    <section class="section">
-      <h2>Solana security SEO guides</h2>
-      <p class="page-sub">Use these public landing pages to understand Koschei's Alchemy-first Solana security workflows before starting package-gated analysis.</p>
-      <div class="module-grid">
-        <a class="module-card" href="/solana-security-tools.html"><h3>Solana Security Tools</h3><p>Explore TX decoding, wallet risk, token scanning, sybil checks, Project Radar and grant readiness.</p></a>
-        <a class="module-card" href="/solana-tx-decoder.html"><h3>Solana TX Decoder</h3><p>Learn how Koschei helps explain signatures, programs, fees, account changes, logs and risk signals.</p></a>
-        <a class="module-card" href="/solana-risk-scanner.html"><h3>Solana Risk Scanner</h3><p>Review wallet, project and token risk analysis concepts for Solana security workflows.</p></a>
-        <a class="module-card" href="/solana-token-scanner.html"><h3>Solana Token Scanner</h3><p>Understand token metadata, authority risks, supply and holder signals, and project risk.</p></a>
+      <div class="workflow-grid">
+        <article class="workflow-card"><h3>Transaction Intelligence</h3><ul><li>TX Decoder</li><li>Risk signals</li><li>Program/log/account change explanation</li></ul><div class="workflow-links"><a class="mini-link primary" href="/tx-decoder.html">Open TX Decoder</a></div></article>
+        <article class="workflow-card"><h3>Token Intelligence</h3><ul><li>Token metadata</li><li>Authority and supply signals</li><li>Holder/project risk</li></ul><div class="workflow-links"><a class="mini-link primary" href="/token-scanner.html">Scan Token</a></div></article>
+        <article class="workflow-card"><h3>Wallet Risk Intelligence</h3><ul><li>Wallet score</li><li>Activity signals</li><li>Suspicious behavior</li></ul><div class="workflow-links"><a class="mini-link primary" href="/wallet-score.html">Score Wallet</a></div></article>
+        <article class="workflow-card"><h3>Project &amp; Grant Readiness</h3><ul><li>Project radar</li><li>Ecosystem fit</li><li>Grant readiness</li></ul><div class="workflow-links"><a class="mini-link primary" href="/project-radar.html">Project Radar</a><a class="mini-link" href="/grant-writer.html">Grant Writer</a></div></article>
+        <article class="workflow-card"><h3>Sybil &amp; Graph Intelligence</h3><ul><li>Sybil patterns</li><li>Intelligence graph</li><li>Connected relationship analysis</li></ul><div class="workflow-links"><a class="mini-link primary" href="/sybil-checker.html">Sybil Checker</a><a class="mini-link" href="/intelligence-graph.html">Graph</a></div></article>
+        <article class="workflow-card"><h3>Package Access</h3><ul><li>Active package required</li><li>Shopier Turkey / Paddle Global</li><li>Shared entitlement and output activation</li></ul><div class="workflow-links"><a class="mini-link primary" href="/pricing.html">View Packages</a></div></article>
       </div>
     </section>
 
+    <section class="section trust-strip" aria-label="Koschei product principles">
+      <div><b>Alchemy-first</b><span>Built for Solana/Web3 analysis with Alchemy as the primary infrastructure path.</span></div>
+      <div><b>No custody</b><span>Analyze public signals without requesting private keys or wallet custody.</span></div>
+      <div><b>Reviewer-ready</b><span>Translate raw chain activity into evidence, explanations and next actions.</span></div>
+      <div><b>Paid packages</b><span>Premium analysis stays behind active paid package access.</span></div>
+    </section>
+
+    <footer class="landing-footer" aria-label="Additional Solana security resources">
+      <a href="/solana-security-tools.html">Solana Security Tools</a>
+      <a href="/solana-tx-decoder.html">Solana TX Decoder</a>
+      <a href="/solana-risk-scanner.html">Solana Risk Scanner</a>
+      <a href="/solana-token-scanner.html">Solana Token Scanner</a>
+    </footer>
   </main>
   <script src="/js/koschei-analytics.js?v=1"></script>
 </body>
