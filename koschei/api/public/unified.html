@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Koschei Enterprise Unified Intelligence dashboard: TX Decoder, Token Scanner, Wallet Score, Risk Scanner, Sybil Graph ve Project Radar tek analiz akışında." />
+  <title>Koschei — Enterprise Unified Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#050812;--surface:rgba(255,255,255,.08);--surface2:rgba(255,255,255,.12);--line:rgba(255,255,255,.16);--text:#f7fbff;--muted:#9fb0d0;--green:#00ff88;--blue:#69d8ff;--violet:#a78bfa;--yellow:#ffcc66;--orange:#ff8a3d;--red:#ff4d6d;--shadow:0 30px 90px rgba(0,0,0,.45)}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,system-ui,sans-serif;color:var(--text);background:radial-gradient(circle at 15% 8%,rgba(0,255,136,.22),transparent 32%),radial-gradient(circle at 86% 10%,rgba(105,216,255,.18),transparent 30%),radial-gradient(circle at 50% 88%,rgba(167,139,250,.18),transparent 34%),linear-gradient(135deg,#03050b,#081221 54%,#040811);overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:54px 54px;mask-image:radial-gradient(circle at center,#000,transparent 78%)}
+    .page{position:relative;width:min(1180px,calc(100% - 32px));margin:0 auto;padding:24px 0 54px}.surface{background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.045));border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+    .topbar{position:sticky;top:14px;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:34px;padding:12px 14px;border-radius:24px}.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:inherit;font-weight:900}.brand-mark{display:grid;place-items:center;width:38px;height:38px;border-radius:14px;color:#06120d;background:linear-gradient(135deg,var(--green),var(--blue));box-shadow:0 0 34px rgba(0,255,136,.3)}.nav{display:flex;gap:10px;flex-wrap:wrap}.nav a,.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border-radius:999px;border:1px solid var(--line);color:var(--text);font-weight:800;font-size:14px;text-decoration:none;background:rgba(255,255,255,.06);cursor:pointer}.btn.primary{color:#04120d;background:linear-gradient(135deg,var(--green),var(--blue));border:0}.btn:disabled{opacity:.55;cursor:not-allowed}.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:stretch}.hero-card,.control-card,.score-card{border-radius:34px;padding:clamp(24px,4vw,42px)}.eyebrow{display:inline-flex;width:max-content;padding:8px 13px;border-radius:999px;color:#bfffe2;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.24)}h1{margin:18px 0 12px;font-size:clamp(38px,6vw,68px);line-height:.98;letter-spacing:-.06em}.gradient{background:linear-gradient(135deg,#fff,#c7fff0 35%,#82ddff 75%,#d9ccff);-webkit-background-clip:text;background-clip:text;color:transparent}.sub{margin:0;color:var(--muted);font-size:17px;line-height:1.75}.control-card{display:grid;gap:14px}label{display:block;color:#c6d6f4;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:18px;background:rgba(3,7,18,.66);color:var(--text);font:inherit;padding:14px 15px;outline:none}textarea{min-height:82px;resize:vertical}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.progress-wrap{display:none;margin-top:4px}.progress-wrap.show{display:block}.progress{height:12px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;border:1px solid var(--line)}.bar{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--blue),var(--violet));transition:width .35s ease}.progress-text{margin-top:10px;color:#cfe0ff;font-weight:800;font-size:13px}.alert{display:none;padding:14px 16px;border-radius:18px;border:1px solid rgba(255,77,109,.35);background:rgba(255,77,109,.1);color:#ffd7df;font-weight:700}.alert.show{display:block}.results{display:none;margin-top:18px}.results.show{display:block}.score-card{display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:center}.score-ring{width:190px;height:190px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green) calc(var(--score)*1%),rgba(255,255,255,.12) 0);box-shadow:0 0 60px rgba(0,255,136,.14)}.score-inner{width:146px;height:146px;border-radius:50%;display:grid;place-items:center;text-align:center;background:#07111f;border:1px solid var(--line)}.score-num{font-size:44px;font-weight:900;letter-spacing:-.06em}.risk-pill{display:inline-flex;width:max-content;padding:10px 14px;border-radius:999px;font-weight:900;letter-spacing:.08em}.risk-LOW{background:rgba(0,255,136,.13);color:#bfffe2;border:1px solid rgba(0,255,136,.35)}.risk-MEDIUM{background:rgba(255,204,102,.14);color:#ffe6ad;border:1px solid rgba(255,204,102,.35)}.risk-HIGH{background:rgba(255,138,61,.14);color:#ffd4ba;border:1px solid rgba(255,138,61,.35)}.risk-CRITICAL{background:rgba(255,77,109,.14);color:#ffd7df;border:1px solid rgba(255,77,109,.35)}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}.module{border-radius:24px;padding:18px;border:1px solid var(--line);background:rgba(255,255,255,.06)}.module-head{display:flex;justify-content:space-between;gap:12px;align-items:start}.module h3{margin:0 0 4px;font-size:16px}.status{font-size:11px;font-weight:900;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.1);text-transform:uppercase}.module-score{font-size:30px;font-weight:900;margin:12px 0}.findings{margin:10px 0 0;padding-left:18px;color:#d7e4ff;line-height:1.55;font-size:13px}.raw{margin-top:12px}.raw summary{cursor:pointer;color:var(--blue);font-weight:800}.raw pre{white-space:pre-wrap;word-break:break-word;color:#b8c7e6;font-size:12px;max-height:240px;overflow:auto}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.recommendations{color:#dbe7ff;line-height:1.7}.muted{color:var(--muted)}@media(max-width:900px){.hero,.score-card{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.score-ring{margin:auto}.topbar{position:relative;top:0;align-items:flex-start;flex-direction:column}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="topbar surface">
+      <a class="brand" href="/hub.html"><span class="brand-mark">K</span><span>Koschei <span class="muted">Web3 Hub</span></span></a>
+      <nav class="nav"><a href="/hub.html">Hub</a><a href="/pricing.html">Pricing</a><a href="/docs-api.html">API Docs</a><button class="btn" id="logoutBtn" type="button">Çıkış</button></nav>
+    </header>
+
+    <section class="hero">
+      <div class="hero-card surface">
+        <span class="eyebrow">Enterprise Unified Intelligence</span>
+        <h1><span class="gradient">6 modül.</span><br>Tek karar ekranı.</h1>
+        <p class="sub">TX Decoder, Token Scanner, Wallet Score, Risk Scanner, Sybil Graph ve Project Radar aynı anda çalışır; gerçek Solana RPC sonuçları tek skor ve aksiyon listesine dönüştürülür.</p>
+      </div>
+      <form id="analyzeForm" class="control-card surface">
+        <div class="grid2">
+          <div><label for="targetType">Hedef Tipi</label><select id="targetType" required><option value="tx">TX Hash</option><option value="wallet">Wallet</option><option value="token">Token Mint</option><option value="project">Project URL</option></select></div>
+          <div><label for="network">Network</label><select id="network"><option value="solana-mainnet">Solana Mainnet</option><option value="solana-devnet">Solana Devnet</option><option value="solana-testnet">Solana Testnet</option></select></div>
+        </div>
+        <div><label for="targetId">Hedef ID / URL</label><input id="targetId" placeholder="Signature, wallet address, token mint veya https://project.xyz" required></div>
+        <div><label for="notes">Analist Notu (opsiyonel)</label><textarea id="notes" placeholder="Bilinen risk, bağlam veya manuel kontrol notu..."></textarea></div>
+        <button id="submitBtn" class="btn primary" type="submit">Unified Analiz Başlat</button>
+        <div id="progressWrap" class="progress-wrap"><div class="progress"><div id="bar" class="bar"></div></div><div id="progressText" class="progress-text">Modül 1/6 hazırlanıyor...</div></div>
+        <div id="errorBox" class="alert"></div>
+      </form>
+    </section>
+
+    <section id="results" class="results">
+      <div class="score-card surface">
+        <div class="score-ring" id="scoreRing" style="--score:0"><div class="score-inner"><div><div id="scoreNum" class="score-num">0</div><div class="muted">Overall Score</div></div></div></div>
+        <div>
+          <div id="riskPill" class="risk-pill risk-LOW">LOW</div>
+          <h2 id="resultTitle">Unified report ready</h2>
+          <p id="resultMeta" class="muted"></p>
+          <ul id="recommendations" class="recommendations"></ul>
+          <div class="actions"><button class="btn" id="downloadJson" type="button">Raporu İndir (JSON)</button><button class="btn" id="printReport" type="button">Raporu Yazdır / PDF</button></div>
+        </div>
+      </div>
+      <div id="moduleCards" class="cards"></div>
+    </section>
+  </main>
+
+  <script src="/js/koschei-auth.js"></script>
+  <script>
+    const modules = ['tx_decoder','token_scanner','wallet_score','risk_scanner','sybil_graph','project_radar'];
+    const moduleNames = { tx_decoder:'TX Decoder', token_scanner:'Token Scanner', wallet_score:'Wallet Score', risk_scanner:'Risk Scanner', sybil_graph:'Sybil Graph', project_radar:'Project Radar' };
+    let latestReport = null;
+    const $ = (id) => document.getElementById(id);
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (!window.KoscheiAuth || !KoscheiAuth.requireAuth()) return;
+      $('logoutBtn').addEventListener('click', () => KoscheiAuth.signOut());
+      $('analyzeForm').addEventListener('submit', analyze);
+      $('downloadJson').addEventListener('click', downloadJSON);
+      $('printReport').addEventListener('click', () => window.print());
+    });
+
+    function setError(message){ $('errorBox').textContent = message || ''; $('errorBox').classList.toggle('show', Boolean(message)); }
+    function startProgress(){
+      $('progressWrap').classList.add('show'); $('bar').style.width='5%'; $('progressText').textContent='Modül 1/6 başlatılıyor...';
+      let step=0; return setInterval(()=>{ step=(step+1)%modules.length; const pct=Math.min(92, 10 + step*14 + Math.random()*8); $('bar').style.width=pct+'%'; $('progressText').textContent=`Modül ${step+1}/6 işleniyor: ${moduleNames[modules[step]]}`; }, 900);
+    }
+    function stopProgress(timer){ clearInterval(timer); $('bar').style.width='100%'; $('progressText').textContent='Analiz tamamlandı.'; setTimeout(()=>$('progressWrap').classList.remove('show'), 900); }
+
+    async function analyze(e){
+      e.preventDefault(); setError(''); $('submitBtn').disabled=true; const timer=startProgress();
+      try{
+        const payload={ target_type:$('targetType').value, target_id:$('targetId').value.trim(), network:$('network').value, notes:$('notes').value.trim() };
+        const res = await KoscheiAuth.apiCall('/api/v1/unified/analyze', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        if (!res) throw new Error('API bağlantısı kurulamadı.');
+        const data = await res.json().catch(()=>({}));
+        if (!res.ok) throw new Error(data.message || data.error || 'Unified analiz başarısız oldu.');
+        latestReport = data.result; render(latestReport, data.report_saved);
+      }catch(err){ setError(err.message || 'Beklenmeyen hata oluştu.'); }
+      finally{ stopProgress(timer); $('submitBtn').disabled=false; }
+    }
+
+    function render(report, saved){
+      $('results').classList.add('show'); $('scoreNum').textContent=report.overall_score; $('scoreRing').style.setProperty('--score', report.overall_score);
+      const risk = report.risk_level || 'UNKNOWN'; $('riskPill').textContent=risk; $('riskPill').className='risk-pill risk-'+risk;
+      $('resultTitle').textContent = `${risk} risk — ${report.partial_success ? 'partial success' : 'full success'}`;
+      $('resultMeta').textContent = `Request ${report.request_id} • ${report.target_type}:${report.target_id} • ${report.network} • ${saved ? 'DB loglandı' : 'DB log beklemede'}`;
+      $('recommendations').innerHTML = (report.recommendations || []).map(x=>`<li>${escapeHTML(x)}</li>`).join('');
+      $('moduleCards').innerHTML = modules.map(name => moduleCard(name, report.module_results && report.module_results[name])).join('');
+      $('results').scrollIntoView({behavior:'smooth', block:'start'});
+    }
+
+    function moduleCard(name, result){
+      result = result || {status:'missing', summary:'Module did not return a result.'};
+      const score = typeof result.score === 'number' ? result.score : '—';
+      const findings = (result.findings || []).slice(0,4).map(x=>`<li>${escapeHTML(x)}</li>`).join('') || `<li>${escapeHTML(result.summary || result.error || 'No findings.')}</li>`;
+      return `<article class="module"><div class="module-head"><div><h3>${moduleNames[name]}</h3><div class="muted">${escapeHTML(result.risk_level || 'UNKNOWN')}</div></div><span class="status">${escapeHTML(result.status || 'unknown')}</span></div><div class="module-score">${score}</div><ul class="findings">${findings}</ul><details class="raw"><summary>Ham JSON</summary><pre>${escapeHTML(JSON.stringify(result, null, 2))}</pre></details></article>`;
+    }
+
+    function downloadJSON(){
+      if (!latestReport) return;
+      const blob = new Blob([JSON.stringify(latestReport, null, 2)], {type:'application/json'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`koschei-unified-${latestReport.request_id}.json`; a.click(); URL.revokeObjectURL(a.href);
+    }
+    function escapeHTML(value){ return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+  </script>
+</body>
+</html>
