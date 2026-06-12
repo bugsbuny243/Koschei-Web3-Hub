@@ -184,7 +184,7 @@ Koschei Web3 Hub, Solana Foundation Tier-1 Grant değerlendirmesine uygun şekil
 
 - **Lisans:** MIT
 - **Topluluk çağrısı:** Solana geliştiricileri, validator ekipleri, DAO güvenlik ekipleri ve public-good fonlayıcıları iş birliğine davetlidir.
-- **İletişim:** `hello@koschei.ai`
+- **İletişim:** `onur24sel@gmail.com`
 
 ---
 
