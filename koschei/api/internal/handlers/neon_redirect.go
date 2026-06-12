@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -47,7 +46,7 @@ func (h *Handler) redirectToNeonAuth(w http.ResponseWriter, r *http.Request, act
 		return
 	}
 
-	callbackURL := fmt.Sprintf("%s://%s/api/auth/neon-callback", getScheme(r), getHost(r))
+	callbackURL := absolutePublicURL(r, "/api/auth/neon-callback")
 	authURL, err := url.Parse(baseURL + "/" + action)
 	if err != nil {
 		http.Error(w, "NEON_AUTH_BASE_URL is invalid", http.StatusInternalServerError)

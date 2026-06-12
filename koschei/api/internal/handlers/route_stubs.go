@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -13,9 +14,10 @@ func notImplemented(w http.ResponseWriter, name string) {
 }
 
 type emailAuthRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	Name        string `json:"name"`
+	CallbackURL string `json:"callbackURL"`
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +44,7 @@ func (h *Handler) emailPasswordAuth(w http.ResponseWriter, r *http.Request, neon
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "neon_auth_not_configured"})
 		return
 	}
-	payload := map[string]string{"email": email, "password": req.Password}
+	payload := map[string]string{"email": email, "password": req.Password, "callbackURL": absoluteEmailAuthCallbackURL(r, req.CallbackURL)}
 	if strings.TrimSpace(req.Name) != "" {
 		payload["name"] = strings.TrimSpace(req.Name)
 	}
@@ -54,6 +56,9 @@ func (h *Handler) emailPasswordAuth(w http.ResponseWriter, r *http.Request, neon
 		return
 	}
 	neonReq.Header.Set("Content-Type", "application/json")
+	if origin := publicBaseURL(r); origin != "" {
+		neonReq.Header.Set("Origin", origin)
+	}
 	resp, err := client.Do(neonReq)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "neon_auth_unavailable"})
@@ -65,6 +70,13 @@ func (h *Handler) emailPasswordAuth(w http.ResponseWriter, r *http.Request, neon
 		data = map[string]any{}
 	}
 	if resp.StatusCode/100 != 2 {
+		if isNeonCallbackURLError(data) {
+			writeJSON(w, http.StatusBadGateway, map[string]string{
+				"error":   "auth_callback_url_invalid",
+				"message": "Auth callback URL is not configured correctly.",
+			})
+			return
+		}
 		writeJSON(w, resp.StatusCode, data)
 		return
 	}
@@ -103,6 +115,55 @@ func (h *Handler) emailPasswordAuth(w http.ResponseWriter, r *http.Request, neon
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "token": jwt, "access_token": jwt, "token_type": "Bearer", "user": profile})
+}
+
+func absoluteEmailAuthCallbackURL(r *http.Request, requested string) string {
+	requested = strings.TrimSpace(requested)
+	fallback := absolutePublicURL(r, "/hub.html")
+	if requested == "" || strings.ContainsAny(requested, "\r\n") {
+		return fallback
+	}
+	if parsed, err := url.Parse(requested); err == nil && parsed.IsAbs() && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https") {
+		baseURL, baseErr := url.Parse(publicBaseURL(r))
+		if baseErr != nil || baseURL.Host == "" || strings.EqualFold(parsed.Host, baseURL.Host) {
+			return strings.TrimRight(parsed.String(), "/")
+		}
+		return fallback
+	}
+	if strings.HasPrefix(requested, "/") && !strings.HasPrefix(requested, "//") {
+		return absolutePublicURL(r, requested)
+	}
+	return fallback
+}
+
+func isNeonCallbackURLError(data map[string]any) bool {
+	message := strings.ToLower(authErrorText(data))
+	return strings.Contains(message, "origin header is required") ||
+		(strings.Contains(message, "callbackurl") && strings.Contains(message, "absolute url")) ||
+		(strings.Contains(message, "callback url") && strings.Contains(message, "absolute url"))
+}
+
+func authErrorText(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return ""
+	case string:
+		return v
+	case map[string]any:
+		parts := make([]string, 0, len(v))
+		for _, nested := range v {
+			parts = append(parts, authErrorText(nested))
+		}
+		return strings.Join(parts, " ")
+	case []any:
+		parts := make([]string, 0, len(v))
+		for _, nested := range v {
+			parts = append(parts, authErrorText(nested))
+		}
+		return strings.Join(parts, " ")
+	default:
+		return ""
+	}
 }
 
 func firstJWT(header string, data map[string]any) string {
