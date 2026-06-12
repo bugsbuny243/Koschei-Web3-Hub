@@ -15,21 +15,68 @@
 <div class="card">
   <div class="logo">K Koschei</div>
   <div class="title">Create Account</div>
-  <div class="sub">Register to protect your dashboard and start using Koschei Web3 tools.</div>
-  <div class="alert" id="alert"></div>
+  <div class="sub">Create your Koschei account. Premium tools require an active package.</div>
+  <div class="alert" id="alert" role="alert" aria-live="polite"></div>
   <form class="form" id="registerForm">
-    <div class="form-group"><label class="form-label" for="name">Name</label><input class="form-input" id="name" name="name" type="text" autocomplete="name"></div>
     <div class="form-group"><label class="form-label" for="email">Email</label><input class="form-input" id="email" name="email" type="email" autocomplete="email" required></div>
     <div class="form-group"><label class="form-label" for="password">Password</label><input class="form-input" id="password" name="password" type="password" autocomplete="new-password" minlength="8" required></div>
+    <div class="form-group"><label class="form-label" for="confirmPassword">Confirm password</label><input class="form-input" id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required></div>
     <button class="btn" id="submitBtn" type="submit">Create account</button>
   </form>
-  <div class="link">Already have an account? <a href="/login">Sign in</a></div>
+  <div class="link">Already have an account? <a href="/login.html">Sign in</a></div>
 </div>
-<script src="/js/auth.js"></script>
+<script src="/js/koschei-auth.js?v=5"></script>
 <script>
-  const form=document.getElementById('registerForm');const submitBtn=document.getElementById('submitBtn');const alertEl=document.getElementById('alert');
-  function showAlert(message,type='error'){alertEl.textContent=message;alertEl.className='alert show '+(type==='success'?'alert-success':'alert-error');}
-  form.addEventListener('submit',async event=>{event.preventDefault();submitBtn.disabled=true;submitBtn.textContent='Creating…';alertEl.className='alert';try{const body=Object.fromEntries(new FormData(form));await Auth.register(body.email,body.password,body.name);showAlert('Account created. Redirecting…','success');window.location.href='/dashboard';}catch(error){showAlert(error.message||'Registration failed.');submitBtn.disabled=false;submitBtn.textContent='Create account';}});
+  const form = document.getElementById('registerForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const alertEl = document.getElementById('alert');
+
+  function showAlert(message, type = 'error') {
+    alertEl.textContent = message;
+    alertEl.className = 'alert show ' + (type === 'success' ? 'alert-success' : 'alert-error');
+  }
+
+  function validate(email, password, confirmPassword) {
+    if (!email || !email.includes('@')) return 'Enter a valid email address.';
+    if (!password || password.length < 8) return 'Password must be at least 8 characters.';
+    if (password !== confirmPassword) return 'Passwords do not match.';
+    return '';
+  }
+
+  (async () => {
+    await KoscheiAuth.init();
+    if (KoscheiAuth.isLoggedIn()) {
+      window.location.href = '/hub.html';
+      return;
+    }
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating…';
+      alertEl.className = 'alert';
+      const body = Object.fromEntries(new FormData(form));
+      const email = String(body.email || '').trim();
+      const password = String(body.password || '');
+      const confirmPassword = String(body.confirmPassword || '');
+      const validationError = validate(email, password, confirmPassword);
+      if (validationError) {
+        showAlert(validationError);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create account';
+        return;
+      }
+      try {
+        await KoscheiAuth.signUp(email, password);
+        showAlert('Account created. Redirecting…', 'success');
+        window.location.href = '/hub.html';
+      } catch (error) {
+        showAlert(error && error.message ? error.message : 'Registration failed. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create account';
+      }
+    });
+  })();
 </script>
 </body>
 </html>
