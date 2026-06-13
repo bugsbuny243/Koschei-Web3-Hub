@@ -3,10 +3,11 @@ package handlers
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/router"
 )
 
 type appProfileStore interface {
@@ -42,7 +43,7 @@ func upsertAppProfileTx(ctx context.Context, store appProfileStore, sub, email s
 }
 
 func insufficientOutputsResponse() map[string]any {
-	return map[string]any{"error": "insufficient_credits", "message": "Yetersiz kredi. Lütfen kredi paketinizi yükseltin."}
+	return map[string]any{"error": "active_entitlement_required", "message": "Active Koschei package entitlement is required."}
 }
 
 func generateID() string {
@@ -84,8 +85,9 @@ func firstEnv(keys ...string) string {
 }
 
 func (h *Handler) callTogetherWithSystemTimeoutAndMaxTokens(model, systemPrompt, userPrompt string, timeout time.Duration, maxTokens int) (string, error) {
-	if strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {
-		return "", errors.New("together api key is not configured")
+	resp, err := router.Chat(context.Background(), router.ChatRequest{System: systemPrompt, Prompt: userPrompt, Model: model, Timeout: timeout, MaxTokens: maxTokens, Temperature: 0.2})
+	if err != nil {
+		return "", err
 	}
-	return "", errors.New("together client is disabled in test-safe build")
+	return resp.Content, nil
 }

@@ -72,7 +72,7 @@ func (h *Handler) ProjectRadar(w http.ResponseWriter, r *http.Request) {
 	}
 	req, err := normalizeProjectRadarRequest(req)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidCategory, "Invalid project category", map[string]any{"allowed_categories": allowedProjectRadarCategories()})
 		return
 	}
 	if req.ProjectName == "" || req.Category == "" || req.Description == "" {
@@ -98,10 +98,6 @@ func (h *Handler) ProjectRadar(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, email, "project_radar"); err != nil {
-		writeJSON(w, http.StatusPaymentRequired, projectRadarInsufficientOutputsResponse())
-		return
-	}
 	if err := saveProjectRadarOutput(r.Context(), tx, email, req, result, string(resultJSON)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
@@ -133,7 +129,7 @@ func normalizeProjectRadarRequest(req projectRadarRequest) (projectRadarRequest,
 	req.PublicWalletAddress = strings.TrimSpace(req.PublicWalletAddress)
 	req.Ecosystem = firstNonEmptyString(req.Ecosystem, req.ChainEcosystem)
 	req.ChainEcosystem = strings.TrimSpace(req.ChainEcosystem)
-	req.Category = strings.ToLower(strings.TrimSpace(req.Category))
+	req.Category = normalizeProjectRadarCategory(req.Category)
 	req.Description = strings.TrimSpace(req.Description)
 	req.KnownTraction = strings.TrimSpace(req.KnownTraction)
 	req.Notes = strings.TrimSpace(req.Notes)
@@ -161,7 +157,38 @@ func normalizeProjectRadarTwitterHandle(handle string) string {
 }
 
 func validProjectRadarCategory(category string) bool {
-	return inSet(category, "payments", "depin", "ai agent", "security", "token", "nft", "gaming", "consumer app", "infrastructure", "public good", "developer tool", "education")
+	return inSet(category, allowedProjectRadarCategories()...)
+}
+
+func allowedProjectRadarCategories() []string {
+	return []string{"defi", "nft", "dao", "game", "wallet", "infrastructure", "public_good", "other"}
+}
+
+func normalizeProjectRadarCategory(category string) string {
+	c := strings.ToLower(strings.TrimSpace(category))
+	c = strings.ReplaceAll(c, "ı", "i")
+	c = strings.ReplaceAll(c, "İ", "i")
+	c = strings.Join(strings.Fields(strings.ReplaceAll(c, "_", " ")), " ")
+	switch c {
+	case "defi", "de fi", "merkeziyetsiz finans", "merkezsiz finans":
+		return "defi"
+	case "nft", "koleksiyon", "koleksiyonlar":
+		return "nft"
+	case "dao", "topluluk", "yonetisim", "yönetisim", "yönetim":
+		return "dao"
+	case "game", "gaming", "oyun":
+		return "game"
+	case "wallet", "cuzdan", "cüzdan":
+		return "wallet"
+	case "infrastructure", "infra", "altyapi", "altyapı":
+		return "infrastructure"
+	case "public good", "public goods", "publicgood", "kamu yarari", "kamu yararı":
+		return "public_good"
+	case "other", "diger", "diğer":
+		return "other"
+	default:
+		return c
+	}
 }
 
 func buildProjectRadarResult(req projectRadarRequest) projectRadarResult {

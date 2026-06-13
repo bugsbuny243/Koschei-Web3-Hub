@@ -56,6 +56,9 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	}
 	h := &handlers.Handler{DB: db, DBRead: cfg.dbRead, DBInitError: dbInitError, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), Cache: cfg.cache, SolanaRPC: cfg.solanaRPC, JobStore: cfg.jobStore, JobQueue: cfg.jobQueue}
 	mux := http.NewServeMux()
+	premium := func(next http.HandlerFunc) http.HandlerFunc {
+		return handlers.RequireAuth(h.RequireActiveEntitlement(next))
+	}
 	mux.HandleFunc("/health", h.Health)
 	mux.HandleFunc("/api/config", method("GET", h.Config))
 	mux.HandleFunc("/api/auth/provision", method("POST", h.Provision))
@@ -89,13 +92,18 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/owner/payments/approve", requiresDB(h, ownerOnly(h, method("POST", h.OwnerApprovePayment))))
 	mux.HandleFunc("/api/owner/payments/reject", requiresDB(h, ownerOnly(h, method("POST", h.OwnerRejectPayment))))
 	mux.HandleFunc("/api/owner/command", requiresDB(h, ownerOnly(h, method("POST", h.OwnerCommand))))
+	mux.HandleFunc("/api/owner/brain", requiresDB(h, ownerOnly(h, method("POST", h.OwnerBrain))))
+	mux.HandleFunc("/api/owner/health", requiresDB(h, ownerOnly(h, method("GET", h.OwnerHealth))))
 	mux.HandleFunc("/api/owner/status", requiresDB(h, ownerOnly(h, method("GET", h.OwnerStatus))))
+	mux.HandleFunc("/api/owner/health", ownerOnly(h, method("GET", h.OwnerBackendHealth)))
+	mux.HandleFunc("/api/owner/brain", ownerOnly(h, method("POST", h.OwnerBrain)))
+	mux.HandleFunc("/api/owner/emergency", ownerOnly(h, method("POST", h.OwnerEmergencyControl)))
 	mux.HandleFunc("/api/owner/grants", requiresDB(h, ownerOnly(h, method("GET", h.OwnerGrants))))
 	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, ownerOnly(h, method("GET", h.OwnerDAOGuardianSummary))))
 	mux.HandleFunc("/owner", ownerPageHandler(staticDir))
 	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
-	mux.HandleFunc("/jarvis", jarvisPageHandler(staticDir))
-	mux.HandleFunc("/jarvis.html", jarvisPageHandler(staticDir))
+	mux.HandleFunc("/jarvis", redirectToDashboard)
+	mux.HandleFunc("/jarvis.html", redirectToDashboard)
 	registerLegacyDashboardRedirects(mux)
 	mux.HandleFunc("/api/public/impact", method("GET", h.PublicImpact))
 	mux.HandleFunc("/api/public/metrics", method("GET", h.GetPublicMetrics))
@@ -135,16 +143,16 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/runtime/tasks/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetRuntimeTask))))
 	mux.HandleFunc("/api/runtime/logs/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetRuntimeLogs))))
 	mux.HandleFunc("/api/metadata/generate", requiresDB(h, handlers.RequireAuth(method("POST", h.GenerateMetadata))))
-	mux.HandleFunc("/api/risk/scan", requiresDB(h, handlers.RequireAuth(method("POST", h.ScanRisk))))
+	mux.HandleFunc("/api/risk/scan", requiresDB(h, premium(method("POST", h.ScanRisk))))
 	mux.HandleFunc("/api/mev/analyze", requiresDB(h, handlers.RequireAuth(method("POST", h.AnalyzeMEV))))
 	mux.HandleFunc("/api/liquidity/analyze", requiresDB(h, handlers.RequireAuth(method("POST", h.LiquidityDrainAnalyze))))
 	mux.HandleFunc("/api/dao/proposal-risk", requiresDB(h, handlers.RequireAuth(method("POST", h.DAOGuardianAnalyze))))
-	mux.HandleFunc("/api/wallet/score", requiresDB(h, handlers.RequireAuth(method("POST", h.WalletScore))))
-	mux.HandleFunc("/api/token/scan", requiresDB(h, handlers.RequireAuth(method("POST", h.TokenScan))))
+	mux.HandleFunc("/api/wallet/score", requiresDB(h, premium(method("POST", h.WalletScore))))
+	mux.HandleFunc("/api/token/scan", requiresDB(h, premium(method("POST", h.TokenScan))))
 	mux.HandleFunc("/api/account/api-keys", requiresDB(h, handlers.RequireAuth(h.APIKeysCollection)))
 	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, handlers.RequireAuth(method("POST", h.RevokeAPIKey))))
 	mux.HandleFunc("/api/v1/scan/token", requiresDB(h, h.APIKeyAuth(h.CheckB2BQuota(method("POST", h.B2BTokenScan)))))
-	mux.HandleFunc("/api/v1/unified/analyze", requiresDB(h, handlers.RequireAuth(method("POST", h.UnifiedIntelligenceHandler))))
+	mux.HandleFunc("/api/v1/unified/analyze", requiresDB(h, premium(method("POST", h.UnifiedIntelligenceHandler))))
 	mux.HandleFunc("/api/v1/mev/analyze", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.MEVAnalyze))))))
 	mux.HandleFunc("/api/v1/mev/protected-send", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.ProtectedSend))))))
 	mux.HandleFunc("/api/v1/liquidity/analyze", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.LiquidityDrainAnalyze))))))
@@ -159,20 +167,20 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/paddle/webhook", requiresDB(h, method("POST", h.HandleWebhook)))
 	mux.HandleFunc("/api/v1/paddle/webhook", requiresDB(h, method("POST", h.HandleWebhook)))
 	mux.HandleFunc("/api/v1/b2b/usage", requiresDB(h, h.APIKeyAuth(method("GET", h.B2BUsage))))
-	mux.HandleFunc("/api/tx/decode", requiresDB(h, handlers.RequireAuth(method("POST", h.TXDecode))))
+	mux.HandleFunc("/api/tx/decode", requiresDB(h, premium(method("POST", h.TXDecode))))
 	mux.HandleFunc("/api/tx/mev-warning", requiresDB(h, handlers.RequireAuth(method("POST", h.TXDecoderMEVWarning))))
 	mux.HandleFunc("/api/jobs/token-scan", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateWeb3Job))))
 	mux.HandleFunc("/api/jobs/wallet-score", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateWeb3Job))))
 	mux.HandleFunc("/api/jobs/tx-decode", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateWeb3Job))))
 	mux.HandleFunc("/api/jobs/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetWeb3Job))))
-	mux.HandleFunc("/api/portfolio/track", requiresDB(h, handlers.RequireAuth(method("POST", h.PortfolioTrack))))
+	mux.HandleFunc("/api/portfolio/track", requiresDB(h, premium(method("POST", h.PortfolioTrack))))
 	mux.HandleFunc("/api/smart-money", requiresDB(h, handlers.RequireAuth(method("GET", h.SmartMoney))))
 	mux.HandleFunc("/ws/smart-money", method("GET", h.SmartMoneyStream))
 	mux.HandleFunc("/api/airdrop/check", requiresDB(h, handlers.RequireAuth(method("POST", h.AirdropCheck))))
 	mux.HandleFunc("/api/rug-radar/feed", method("GET", h.RugRadarFeed))
 	mux.HandleFunc("/api/rug-radar/submit", requiresDB(h, handlers.RequireAuth(method("POST", h.RugRadarSubmit))))
 	mux.HandleFunc("/api/program/scan", requiresDB(h, handlers.RequireAuth(method("POST", h.ProgramScan))))
-	mux.HandleFunc("/api/project-radar/scan", requiresDB(h, handlers.RequireAuth(method("POST", h.ProjectRadar))))
+	mux.HandleFunc("/api/project-radar/scan", requiresDB(h, premium(method("POST", h.ProjectRadar))))
 	mux.HandleFunc("/api/ai/generate", requiresDB(h, handlers.RequireAuth(method("POST", h.AIGenerate))))
 	mux.HandleFunc("/api/ai/jobs", requiresDB(h, handlers.RequireAuth(method("GET", h.AIJobs))))
 	mux.HandleFunc("/api/v1/games", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateGameProject))))
@@ -180,17 +188,17 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/web3/sources", requiresDB(h, handlers.RequireAuth(h.Web3Sources)))
 	mux.HandleFunc("/api/web3/sources/", requiresDB(h, handlers.RequireAuth(h.Web3Source)))
 	mux.HandleFunc("/api/web3/events", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3Events))))
-	mux.HandleFunc("/api/web3/intelligence-graph", requiresDB(h, handlers.RequireAuth(h.IntelligenceGraph)))
-	mux.HandleFunc("/api/web3/intelligence-graph/build", requiresDB(h, handlers.RequireAuth(method("POST", h.IntelligenceGraph))))
-	mux.HandleFunc("/api/web3/risk-v2", requiresDB(h, handlers.RequireAuth(method("POST", h.RiskV2))))
-	mux.HandleFunc("/api/web3/tx-decode-pro", requiresDB(h, handlers.RequireAuth(method("POST", h.TXDecodePro))))
-	mux.HandleFunc("/api/web3/cross-chain-risk", requiresDB(h, handlers.RequireAuth(method("POST", h.CrossChainRisk))))
-	mux.HandleFunc("/api/web3/sybil-check", requiresDB(h, handlers.RequireAuth(method("POST", h.SybilCheck))))
-	mux.HandleFunc("/api/web3/funding-assistant/generate", requiresDB(h, handlers.RequireAuth(method("POST", h.FundingAssistant))))
-	mux.HandleFunc("/api/web3/project-radar", requiresDB(h, handlers.RequireAuth(method("POST", h.ProjectRadar))))
-	mux.HandleFunc("/api/grants/readiness", requiresDB(h, handlers.RequireAuth(method("POST", h.FundingAssistant))))
-	mux.HandleFunc("/api/graph/build", requiresDB(h, handlers.RequireAuth(method("POST", h.IntelligenceGraph))))
-	mux.HandleFunc("/api/sybil/check", requiresDB(h, handlers.RequireAuth(method("POST", h.SybilCheck))))
+	mux.HandleFunc("/api/web3/intelligence-graph", requiresDB(h, premium(h.IntelligenceGraph)))
+	mux.HandleFunc("/api/web3/intelligence-graph/build", requiresDB(h, premium(method("POST", h.IntelligenceGraph))))
+	mux.HandleFunc("/api/web3/risk-v2", requiresDB(h, premium(method("POST", h.RiskV2))))
+	mux.HandleFunc("/api/web3/tx-decode-pro", requiresDB(h, premium(method("POST", h.TXDecodePro))))
+	mux.HandleFunc("/api/web3/cross-chain-risk", requiresDB(h, premium(method("POST", h.CrossChainRisk))))
+	mux.HandleFunc("/api/web3/sybil-check", requiresDB(h, premium(method("POST", h.SybilCheck))))
+	mux.HandleFunc("/api/web3/funding-assistant/generate", requiresDB(h, premium(method("POST", h.FundingAssistant))))
+	mux.HandleFunc("/api/web3/project-radar", requiresDB(h, premium(method("POST", h.ProjectRadar))))
+	mux.HandleFunc("/api/grants/readiness", requiresDB(h, premium(method("POST", h.FundingAssistant))))
+	mux.HandleFunc("/api/graph/build", requiresDB(h, premium(method("POST", h.IntelligenceGraph))))
+	mux.HandleFunc("/api/sybil/check", requiresDB(h, premium(method("POST", h.SybilCheck))))
 	mux.HandleFunc("/api/artifacts/", requiresDB(h, handlers.RequireAuth(h.ArtifactRoute)))
 
 	if staticDir != "" {
@@ -303,7 +311,12 @@ func jarvisPageHandler(staticDir string) http.HandlerFunc {
 func registerLegacyDashboardRedirects(mux *http.ServeMux) {
 	legacyDashboards := []string{
 		"/airdrop-checker",
+		"/cross-chain-risk",
+		"/funding-assistant",
+		"/grant",
+		"/grant-writer",
 		"/graph",
+		"/hub",
 		"/intelligence-graph",
 		"/liquidity-radar",
 		"/mev-shield",
@@ -322,6 +335,7 @@ func registerLegacyDashboardRedirects(mux *http.ServeMux) {
 		"/token-scanner",
 		"/tx-decoder",
 		"/tx-decoder-pro",
+		"/unified",
 		"/wallet-score",
 	}
 	for _, route := range legacyDashboards {
