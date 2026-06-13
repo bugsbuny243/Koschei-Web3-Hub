@@ -21,10 +21,23 @@ type unifiedAnalyzeHTTPInput struct {
 }
 
 type unifiedAnalyzeHTTPResponse struct {
+	Success         bool                          `json:"success"`
 	OK              bool                          `json:"ok"`
+	Code            string                        `json:"code,omitempty"`
+	Message         string                        `json:"message,omitempty"`
 	ReportSaved     bool                          `json:"report_saved"`
 	ReportSaveError string                        `json:"report_save_error,omitempty"`
-	Result          services.UnifiedAnalyzeResult `json:"result"`
+	Result          services.UnifiedAnalyzeResult `json:"result,omitempty"`
+}
+
+type unifiedReportListItem struct {
+	RequestID     string          `json:"request_id"`
+	TargetType    string          `json:"target_type"`
+	TargetID      string          `json:"target_id"`
+	OverallScore  int             `json:"overall_score"`
+	RiskLevel     string          `json:"risk_level"`
+	ModuleResults json.RawMessage `json:"module_results,omitempty"`
+	CreatedAt     time.Time       `json:"created_at"`
 }
 
 // UnifiedIntelligenceHandler runs the six enterprise intelligence modules in
@@ -33,13 +46,13 @@ type unifiedAnalyzeHTTPResponse struct {
 func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		writeUnifiedError(w, http.StatusUnauthorized, "INVALID_INPUT", "Authentication required")
 		return
 	}
 
 	var input unifiedAnalyzeHTTPInput
 	if err := decodeJSON(r, &input); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		writeUnifiedError(w, http.StatusBadRequest, "INVALID_INPUT", "Invalid JSON request body")
 		return
 	}
 	input.Target = strings.TrimSpace(input.Target)
@@ -54,20 +67,24 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		input.TargetType = inferUnifiedTargetType(input.TargetID)
 	}
 	if input.TargetType == "" || input.TargetID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "target_required", "message": "Wallet address, token mint, transaction hash, project URL, or project name is required."})
+		writeUnifiedError(w, http.StatusBadRequest, "INVALID_INPUT", "Wallet address, token mint, transaction hash, project URL, or project name is required.")
 		return
 	}
 	if input.Network == "" {
 		input.Network = "solana-mainnet"
 	}
+	if !isSupportedUnifiedTargetType(input.TargetType) {
+		writeUnifiedError(w, http.StatusBadRequest, "INVALID_CATEGORY", "Unsupported analysis category")
+		return
+	}
 
 	activePackage, err := h.hasActivePaidPackage(claims.Sub, normalizedClaimEmail(claims))
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Package access could not be verified."})
+		writeUnifiedError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Package access could not be verified")
 		return
 	}
 	if !activePackage {
-		writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_active_package", "An active Koschei package is required to access the A.R.V.I.S Command Center."))
+		writeUnifiedError(w, http.StatusPaymentRequired, "PACKAGE_REQUIRED", "Active Koschei package required")
 		return
 	}
 	requestID := newRequestID()
@@ -80,12 +97,12 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		Notes:      input.Notes,
 	})
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeUnifiedError(w, http.StatusBadRequest, "INVALID_INPUT", "Analysis input could not be processed")
 		return
 	}
 
 	if !unifiedHasCompletedModule(result) {
-		writeJSON(w, http.StatusBadGateway, unifiedAnalyzeHTTPResponse{OK: false, Result: result})
+		writeUnifiedError(w, http.StatusBadGateway, "INTEGRATION_ERROR", "Real data unavailable")
 		return
 	}
 
@@ -101,7 +118,7 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 
 	h.logTool(normalizedClaimEmail(claims), "unified_intelligence", "completed")
 	h.trackEvent(normalizedClaimEmail(claims), "unified_intelligence_run", r.URL.Path)
-	writeJSON(w, http.StatusOK, unifiedAnalyzeHTTPResponse{OK: true, ReportSaved: saved, ReportSaveError: saveErr, Result: result})
+	writeJSON(w, http.StatusOK, unifiedAnalyzeHTTPResponse{Success: true, OK: true, ReportSaved: saved, ReportSaveError: saveErr, Result: result})
 }
 
 func (h *Handler) saveUnifiedReport(ctx context.Context, userID string, result services.UnifiedAnalyzeResult) error {
@@ -116,6 +133,37 @@ func (h *Handler) saveUnifiedReport(ctx context.Context, userID string, result s
 		VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, now())`,
 		result.RequestID, nullIfEmpty(userID), result.TargetType, result.TargetID, result.OverallScore, result.RiskLevel, string(moduleResults))
 	return err
+}
+
+// UnifiedReportsHandler returns only the authenticated customer's persisted unified reports.
+func (h *Handler) UnifiedReportsHandler(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"success": false, "code": "INVALID_INPUT", "message": "Authentication required"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+	defer cancel()
+	rows, err := h.DB.QueryContext(ctx, `
+		SELECT request_id, target_type, target_id, overall_score, risk_level, module_results, created_at
+		FROM unified_reports
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+		LIMIT 25`, claims.Sub)
+	if err != nil {
+		writeJSON(w, http.StatusOK, map[string]any{"success": true, "reports": []unifiedReportListItem{}})
+		return
+	}
+	defer rows.Close()
+	reports := []unifiedReportListItem{}
+	for rows.Next() {
+		var item unifiedReportListItem
+		if err := rows.Scan(&item.RequestID, &item.TargetType, &item.TargetID, &item.OverallScore, &item.RiskLevel, &item.ModuleResults, &item.CreatedAt); err != nil {
+			continue
+		}
+		reports = append(reports, item)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "reports": reports})
 }
 
 func inferUnifiedTargetType(target string) string {
@@ -139,12 +187,16 @@ func inferUnifiedTargetType(target string) string {
 	return "project"
 }
 
-func unifiedAccessError(code, message string) map[string]any {
-	return map[string]any{
-		"ok":                   false,
-		"error":                code,
-		"message":              message,
-		"entitlement_required": true,
+func writeUnifiedError(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, map[string]any{"success": false, "code": code, "message": message})
+}
+
+func isSupportedUnifiedTargetType(targetType string) bool {
+	switch strings.ToLower(strings.TrimSpace(targetType)) {
+	case "wallet", "address", "token", "mint", "tx", "transaction", "project", "url":
+		return true
+	default:
+		return false
 	}
 }
 
