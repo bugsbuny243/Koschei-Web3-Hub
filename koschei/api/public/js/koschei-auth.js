@@ -65,13 +65,26 @@
     window.__koscheiDatabaseFallbackFetchInstalled = true;
     const nativeFetch = window.fetch.bind(window);
     window.fetch = async function(input, init) {
-      const res = await nativeFetch(input, init);
       let path = '';
+      let sameOrigin = false;
       try {
         const raw = typeof input === 'string' ? input : (input && input.url) || '';
         const url = new URL(raw, window.location.origin);
         path = url.pathname;
+        sameOrigin = url.origin === window.location.origin;
       } catch {}
+
+      let requestInit = init;
+      if (sameOrigin && path.startsWith('/api/')) {
+        const jwt = getJwt();
+        if (_isJwt(jwt)) {
+          const headers = new Headers((requestInit && requestInit.headers) || (input && input.headers) || {});
+          if (!headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + jwt);
+          requestInit = { ...(requestInit || {}), headers };
+        }
+      }
+
+      const res = await nativeFetch(input, requestInit);
       if (!path.startsWith('/api/')) return res;
       if (res.status !== 503) return res;
       const clone = res.clone();
@@ -315,8 +328,8 @@
 
   async function apiCall(path, options = {}) {
     const jwt = getJwt();
-    const headers = { ...(options.headers || {}) };
-    if (jwt) headers['Authorization'] = 'Bearer ' + jwt;
+    const headers = new Headers(options.headers || {});
+    if (jwt && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + jwt);
     try {
       return await fetch(path, { ...options, headers });
     } catch { return null; }
