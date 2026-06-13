@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>Koschei A.R.V.I.S Owner Command Center</title>
+  <title>Koschei Central Brain</title>
   <style>
     :root {
       --bg: #070812;
@@ -246,6 +246,25 @@
       overflow: auto;
     }
     .log-line { margin: 0 0 8px; white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
+    .quick-commands { display: flex; flex-wrap: wrap; gap: 8px; }
+    .quick-commands button { padding: 8px 10px; font-size: 12px; }
+    .brain-chat {
+      display: grid;
+      gap: 10px;
+      min-height: 260px;
+      max-height: 430px;
+      overflow: auto;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(0,0,0,.18);
+    }
+    .bubble { max-width: 86%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 18px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+    .bubble.owner { justify-self: end; background: rgba(0,255,170,.12); border-color: rgba(0,255,170,.24); }
+    .bubble.koschei { justify-self: start; background: rgba(97,217,255,.10); border-color: rgba(97,217,255,.23); }
+    .bubble.error { border-color: rgba(255,77,109,.36); background: rgba(255,77,109,.10); }
+    .bubble-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--muted); font-size: 12px; font-weight: 800; }
+    .brain-state { min-height: 22px; color: var(--muted); font-size: 13px; }
     .health-grid { display: grid; gap: 10px; }
     .health {
       display: flex; justify-content: space-between; gap: 12px; align-items: center;
@@ -281,23 +300,18 @@
   </style>
 </head>
 <body>
-  <main class="shell">
-    <section id="loginView" class="login">
-      <div class="card stack">
-        <div class="brand">
-          <div class="mark" aria-hidden="true"></div>
-          <div>
-            <div class="eyebrow">Owner Access</div>
-            <h1>A.R.V.I.S Owner</h1>
-            <p class="muted">Gizli operasyon ekranı. ENV içinde tanımlı owner kimliği ve owner sırrı ile giriş yap.</p>
-          </div>
-        </div>
-        <label class="stack">Owner kimliği / cüzdanı / e-posta<input id="loginWallet" autocomplete="username" placeholder="OWNER_WALLET değeri"></label>
-        <label class="stack">Owner sırrı<input id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET değeri"></label>
-        <button id="loginButton">Owner Command Center'a gir</button>
-        <p class="tiny">Sunucu cookie'leri HttpOnly ayarlar. Bu panel kullanıcı verisini HTML içine enjekte etmez.</p>
+  <main id="login" class="login">
+    <section class="card">
+      <span class="eyebrow"><i class="orb"></i> Owner only</span>
+      <h1>Koschei Central Brain</h1>
+      <p class="muted">Bu ekran customer dashboard değildir. Github, Neon, Paddle, OpenAI, Alchemy, emergency controls ve sistem sağlığı sadece owner oturumunda açılır.</p>
+      <div style="display:grid;gap:12px;margin-top:18px">
+        <input id="loginWallet" autocomplete="username" placeholder="OWNER_WALLET / owner kimliği">
+        <input id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET">
+        <button id="loginButton" class="primary">Central Brain'e gir</button>
       </div>
     </section>
+  </main>
 
     <section id="appView" class="hidden">
       <header class="topbar">
@@ -339,13 +353,21 @@
         </aside>
       </section>
 
-      <section id="overview" class="grid" aria-label="Gerçek zamanlı metrikler">
-        <div class="card span-12">
-          <div class="toolbar">
-            <h2>Overview</h2>
-            <span class="pill">Gerçek veri: /api/owner/status</span>
-          </div>
-          <section class="grid" id="metricsGrid"></section>
+    <section class="grid">
+      <article class="card brain span-8">
+        <h2>Koschei ile konuş</h2>
+        <div id="chat" class="chat" aria-live="polite"></div>
+        <div class="composer">
+          <textarea id="command" placeholder="KOSCHEI'ye sor...
+
+Örnek:
+Son hataları göster
+Github deploy başlat
+Neon backup al
+Kullanıcı ara
+OpenAI maliyetini göster
+Paddle durumunu kontrol et"></textarea>
+          <button id="send" class="primary">Gönder</button>
         </div>
       </section>
 
@@ -413,7 +435,8 @@
             <span class="pill">OpenAI primary · Together fallback</span>
           </div>
           <div class="stack">
-            <textarea id="commandInput" placeholder="Owner komutu yaz. Örn: Son 24 saatteki hataları özetle, bekleyen ödemeleri raporla..."></textarea>
+            <div class="quick-commands" id="quickCommands" aria-label="Hızlı owner komutları"></div>
+            <div class="brain-chat" id="brainChat" aria-live="polite"></div>
             <div class="row">
               <button id="runCommandButton">Koschei’ye sor</button>
               <button class="secondary" id="clearTerminalButton">Terminali temizle</button>
@@ -463,6 +486,9 @@
       grants: [],
       metrics: {},
       logs: [],
+      services: {},
+      brainMessages: [{ role: 'koschei', status: 'ready', text: 'Koschei Central Brain hazır. Gerçek owner komutlarını çalıştırabilirim.' }],
+      brainLoading: false,
       ownerError: '',
       apiHealth: {
         status: 'unknown',
@@ -589,6 +615,8 @@
       renderPayments();
       renderHealth();
       renderGrants();
+      renderBrain();
+      renderQuickCommands();
       renderTerminal();
     }
 
@@ -754,7 +782,7 @@
       terminal.replaceChildren();
 
       if (!state.logs.length) {
-        terminal.append(text('p', 'Henüz operasyon logu yok.', 'log-line'));
+        terminal.append(text('p', 'Henüz gerçek operasyon kaydı yok.', 'log-line'));
         return;
       }
 
@@ -776,8 +804,8 @@
     function statusBadge(value) {
       const v = String(value || 'unknown').toLowerCase();
       const badge = text('span', value || 'unknown', `status ${v.replaceAll(' ', '-')}`);
-      if (v.includes('error') || v.includes('failed') || v.includes('banned') || v.includes('removed')) badge.className = 'status error';
-      else if (v.includes('active') || v.includes('connected') || v.includes('approved') || v === 'ok') badge.className = 'status active';
+      if (v.includes('error') || v.includes('failed') || v.includes('banned') || v.includes('removed') || v.includes('missing')) badge.className = 'status error';
+      else if (v.includes('active') || v.includes('connected') || v.includes('configured') || v.includes('approved') || v === 'ok') badge.className = 'status active';
       else if (v.includes('pending') || v.includes('queued') || v.includes('unknown') || v.includes('gerekli')) badge.className = 'status pending';
       return badge;
     }
@@ -801,9 +829,44 @@
       }
     }
 
+    const quickCommandLabels = ['Son 24 saat hataları', 'Kullanıcı ara', 'Bekleyen ödemeler', 'Paddle durumu', 'OpenAI durumu', 'Alchemy durumu', 'GitHub durumu', 'Neon durumu'];
+
+    function renderQuickCommands() {
+      const wrap = $('quickCommands');
+      if (!wrap || wrap.childElementCount) return;
+      quickCommandLabels.forEach((label) => {
+        wrap.appendChild(button(label, 'secondary', () => {
+          $('commandInput').value = label === 'Kullanıcı ara' ? 'kullanıcı ara onur24sel@gmail.com' : label.toLowerCase();
+          $('commandInput').focus();
+        }));
+      });
+    }
+
+    function renderBrain() {
+      const chat = $('brainChat');
+      if (!chat) return;
+      chat.replaceChildren();
+      state.brainMessages.forEach((msg) => {
+        const bubble = document.createElement('div');
+        bubble.className = `bubble ${msg.role === 'owner' ? 'owner' : 'koschei'}${msg.error ? ' error' : ''}`;
+        const head = document.createElement('div');
+        head.className = 'bubble-head';
+        head.append(text('span', msg.role === 'owner' ? 'Owner' : 'Koschei'), statusBadge(msg.status || 'ok'));
+        bubble.append(head, text('div', msg.text));
+        if (msg.data) bubble.append(text('pre', JSON.stringify(msg.data, null, 2), 'tiny'));
+        chat.appendChild(bubble);
+      });
+      $('brainState').textContent = state.brainLoading ? 'Koschei komutu çalıştırıyor...' : '';
+      chat.scrollTop = chat.scrollHeight;
+    }
+
     async function runCommand() {
       const command = $('commandInput').value.trim();
       if (!command) { toast('Komut yazın.'); return; }
+      state.brainMessages.push({ role: 'owner', status: 'sent', text: command });
+      state.brainLoading = true;
+      $('runCommandButton').disabled = true;
+      renderBrain();
 
       try {
         const res = await api('/api/owner/brain', {
@@ -817,8 +880,9 @@
           output: res.answer || 'Real data unavailable.',
           created_at: new Date().toISOString()
         });
-        renderTerminal();
+        state.logs.unshift({ message: command, status: res.success ? 'completed' : res.code, output: res.message, created_at: new Date().toISOString() });
         $('commandInput').value = '';
+        renderTerminal();
       } catch (err) {
         toast(err.message || 'Koschei yanıt veremedi.');
       }
@@ -827,7 +891,7 @@
     $('loginButton').addEventListener('click', login);
     $('refreshButton').addEventListener('click', refreshAll);
     $('runCommandButton').addEventListener('click', runCommand);
-    $('clearTerminalButton').addEventListener('click', () => { state.logs = []; renderTerminal(); });
+    $('commandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') runCommand(); });
     $('userFilter').addEventListener('input', renderUsers);
     document.querySelectorAll('[data-control]').forEach((btn) => btn.addEventListener('click', () => mutate('/api/owner/emergency', { control: btn.dataset.control, enabled: true, reason: 'owner_panel_check' })));
 
