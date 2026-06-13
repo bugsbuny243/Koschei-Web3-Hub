@@ -230,13 +230,11 @@ const robotsTXTBody = "User-agent: *\nAllow: /\nSitemap: https://tradepigloball.
 
 func publicCleanRoutes(staticDir string) map[string]string {
 	routes := map[string]string{
-		"/api-docs":   "/docs-api.html",
-		"/docs/api":   "/docs-api.html",
-		"/docs/sdk":   "/docs-sdk.html",
-		"/risk":       "/risk-v2.html",
-		"/sdk":        "/docs-sdk.html",
-		"/tools":      "/hub.html",
-		"/tx-decoder": "/tx-decoder-pro.html",
+		"/api-docs": "/docs-api.html",
+		"/docs/api": "/docs-api.html",
+		"/docs/sdk": "/docs-sdk.html",
+		"/sdk":      "/docs-sdk.html",
+		"/tools":    "/dashboard.html",
 	}
 
 	entries, err := os.ReadDir(staticDir)
@@ -326,17 +324,17 @@ func registerLegacyDashboardRedirects(mux *http.ServeMux) {
 		"/wallet-score",
 	}
 	for _, route := range legacyDashboards {
-		mux.HandleFunc(route, redirectToJarvis)
-		mux.HandleFunc(route+".html", redirectToJarvis)
+		mux.HandleFunc(route, redirectToDashboard)
+		mux.HandleFunc(route+".html", redirectToDashboard)
 	}
 }
 
-func redirectToJarvis(w http.ResponseWriter, r *http.Request) {
+func redirectToDashboard(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	http.Redirect(w, r, "/jarvis", http.StatusFound)
+	http.Redirect(w, r, "/dashboard", http.StatusFound)
 }
 
 func ownerPageHandler(staticDir string) http.HandlerFunc {
