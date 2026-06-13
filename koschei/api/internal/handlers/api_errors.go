@@ -21,11 +21,12 @@ type apiEnvelope struct {
 	Data    any    `json:"data"`
 }
 
-func writeAPIError(w http.ResponseWriter, status int, code, message string, data any) {
-	if data == nil {
-		data = nil
+func writeAPIError(w http.ResponseWriter, status int, code, message string, data ...any) {
+	payload := any(nil)
+	if len(data) > 0 {
+		payload = data[0]
 	}
-	writeJSON(w, status, apiEnvelope{Success: false, Code: code, Message: message, Data: data})
+	writeJSON(w, status, apiEnvelope{Success: false, Code: code, Message: message, Data: payload})
 }
 
 func writeAPISuccess(w http.ResponseWriter, message string, data any) {
