@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/router"
 )
 
 type txDecodeRequest struct {
@@ -192,13 +195,6 @@ func (h *Handler) TXDecode(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Call Together AI
-	aiKey := os.Getenv("TOGETHER_API_KEY")
-	model := os.Getenv("TOGETHER_MODEL")
-	if model == "" {
-		model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-	}
-
 	prompt := fmt.Sprintf(`You are a Solana blockchain security expert. Analyze this transaction and respond ONLY with a valid JSON object.
 
 Transaction data:
@@ -212,54 +208,30 @@ Respond with this exact JSON (no markdown, no extra text):
   "risk_reason": "only if WARNING or DANGER, explain why"
 }`, sb.String())
 
-	aiBody, _ := json.Marshal(map[string]interface{}{
-		"model":       model,
-		"max_tokens":  400,
-		"messages":    []map[string]string{{"role": "user", "content": prompt}},
-		"temperature": 0.2,
-	})
-
-	aiReq, _ := http.NewRequest("POST", "https://api.together.xyz/v1/chat/completions", bytes.NewReader(aiBody))
-	aiReq.Header.Set("Authorization", "Bearer "+aiKey)
-	aiReq.Header.Set("Content-Type", "application/json")
-
-	aiResp, err := client.Do(aiReq)
-
 	explanation := "Transaction fetched successfully. AI explanation unavailable."
 	riskLevel := "UNKNOWN"
 	riskReason := ""
 
-	if err == nil && aiResp != nil {
-		defer aiResp.Body.Close()
-		aiData, _ := io.ReadAll(aiResp.Body)
-		var aiResult struct {
-			Choices []struct {
-				Message struct {
-					Content string `json:"content"`
-				} `json:"message"`
-			} `json:"choices"`
+	if ai, err := router.Chat(context.Background(), router.ChatRequest{Prompt: prompt, MaxTokens: 400, Temperature: 0.2, Timeout: 12 * time.Second}); err == nil {
+		content := strings.TrimSpace(ai.Content)
+		content = strings.TrimPrefix(content, "```json")
+		content = strings.TrimPrefix(content, "```")
+		content = strings.TrimSuffix(content, "```")
+		content = strings.TrimSpace(content)
+		var aiParsed struct {
+			Explanation string   `json:"explanation"`
+			Actions     []string `json:"actions"`
+			RiskLevel   string   `json:"risk_level"`
+			RiskReason  string   `json:"risk_reason"`
 		}
-		if json.Unmarshal(aiData, &aiResult) == nil && len(aiResult.Choices) > 0 {
-			content := strings.TrimSpace(aiResult.Choices[0].Message.Content)
-			content = strings.TrimPrefix(content, "```json")
-			content = strings.TrimPrefix(content, "```")
-			content = strings.TrimSuffix(content, "```")
-			content = strings.TrimSpace(content)
-			var aiParsed struct {
-				Explanation string   `json:"explanation"`
-				Actions     []string `json:"actions"`
-				RiskLevel   string   `json:"risk_level"`
-				RiskReason  string   `json:"risk_reason"`
+		if json.Unmarshal([]byte(content), &aiParsed) == nil {
+			if aiParsed.Explanation != "" {
+				explanation = aiParsed.Explanation
 			}
-			if json.Unmarshal([]byte(content), &aiParsed) == nil {
-				if aiParsed.Explanation != "" {
-					explanation = aiParsed.Explanation
-				}
-				if aiParsed.RiskLevel != "" {
-					riskLevel = aiParsed.RiskLevel
-				}
-				riskReason = aiParsed.RiskReason
+			if aiParsed.RiskLevel != "" {
+				riskLevel = aiParsed.RiskLevel
 			}
+			riskReason = aiParsed.RiskReason
 		}
 	}
 

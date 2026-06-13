@@ -197,7 +197,7 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 401, map[string]string{"error": "unauthorized"})
 		return
 	}
-	if !togetherAIEnabled() || strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {
+	if !aiProviderConfigured() {
 		writeJSON(w, 503, map[string]any{"error": "ai_provider_not_configured", "credits_charged": false})
 		return
 	}
@@ -242,8 +242,9 @@ func (h *Handler) CreateRuntimeProject(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 201, map[string]any{"project_id": projectID, "status": "running", "message": "Runtime project queued", "credits_charged": false})
 }
 
-func togetherAIEnabled() bool {
-	return strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) != ""
+func togetherAIEnabled() bool { return aiProviderConfigured() }
+func aiProviderConfigured() bool {
+	return strings.TrimSpace(os.Getenv("OPENAI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) != ""
 }
 func normalizeRuntimeTitle(title, prompt string) string {
 	clean := strings.TrimSpace(title)

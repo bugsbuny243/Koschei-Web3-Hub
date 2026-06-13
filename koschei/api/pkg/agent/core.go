@@ -1,11 +1,13 @@
 package agent
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"os"
+	"strings"
+	"time"
+
+	"koschei/api/internal/router"
 )
 
 type Request struct {
@@ -21,39 +23,27 @@ type Response struct {
 	IssueBody  string `json:"issue_body,omitempty"`
 }
 
-// CallAI sends prompt to Together AI and gets structured response
+// CallAI sends prompts through Koschei's single AI router. OpenAI is tried first; Together is used only as fallback.
 func CallAI(prompt string) (*Response, error) {
-	apiKey := os.Getenv("TOGETHER_API_KEY")
-	model := os.Getenv("TOGETHER_MODEL")
-
-	payload := map[string]interface{}{
-		"model":      model,
-		"prompt":     buildSystemPrompt(prompt),
-		"max_tokens": 2048,
-		"response_format": map[string]string{
-			"type": "json_object",
-		},
-	}
-
-	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", "https://api.together.xyz/inference", bytes.NewBuffer(body))
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	ai, err := router.Chat(context.Background(), router.ChatRequest{
+		System:      "You are Koschei AI. Return only the requested JSON object.",
+		Prompt:      buildSystemPrompt(prompt),
+		MaxTokens:   2048,
+		Temperature: 0.2,
+		Timeout:     30 * time.Second,
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
-	var result map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&result)
-
-	output := result["output"].(map[string]interface{})["choices"].([]interface{})[0].(map[string]interface{})["text"].(string)
-
+	content := strings.TrimSpace(ai.Content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
 	var res Response
-	json.Unmarshal([]byte(output), &res)
+	if err := json.Unmarshal([]byte(content), &res); err != nil {
+		return nil, err
+	}
 	return &res, nil
 }
 

@@ -306,7 +306,7 @@
           <div>
             <div class="eyebrow">Koschei Control Layer</div>
             <h1>A.R.V.I.S Owner Command Center</h1>
-            <p class="muted">Kullanıcı, ödeme, paket, AI router, sistem sağlığı ve operasyon logları.</p>
+            <p class="muted">Kullanıcı, GitHub repo durumu, Neon kullanıcıları/veritabanı, Paddle ödemeleri, OpenAI kullanımı, Alchemy/RPC sağlığı, sistem hataları ve acil durum kontrolleri.</p>
           </div>
         </div>
         <div class="row">
@@ -325,7 +325,7 @@
               <a href="#users">Users</a>
               <a href="#payments">Payments</a>
               <a href="#packages">Packages</a>
-              <a href="#ai">AI Router</a>
+              <a href="#ai">Central Brain</a>
               <a href="#health">System Health</a>
               <a href="#grants">Radar</a>
             </nav>
@@ -335,8 +335,7 @@
           <h2>Operasyon Durumu</h2>
           <div class="health"><span>Owner Session</span><span class="status active">active</span></div>
           <div class="health"><span>Package Model</span><span class="status active">entitlement first</span></div>
-          <div class="health"><span>Credit System</span><span class="status pending">legacy read-only</span></div>
-          <div class="health"><span>AI Terminal</span><span class="status pending">command log only</span></div>
+          <div class="health"><span>Central Brain</span><span class="status active">owner only</span></div>
         </aside>
       </section>
 
@@ -356,7 +355,7 @@
             <h2>Kullanıcı Yönetimi</h2>
             <input id="userFilter" style="max-width:300px" placeholder="E-posta, auth subject veya wallet ara">
           </div>
-          <p class="tiny" style="margin-bottom:12px">Kredi butonu kaldırıldı. Credits alanı sadece legacy veri olarak gösterilir. Yeni erişim modeli paket/entitlement olmalı.</p>
+          <p class="tiny" style="margin-bottom:12px">Yeni erişim modeli paket/entitlement temellidir; kredi bazlı müşteri erişimi bu panelde gösterilmez.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -364,7 +363,6 @@
                   <th>E-posta</th>
                   <th>Owner/Auth ID</th>
                   <th>Paket</th>
-                  <th>Legacy Kredi</th>
                   <th>Durum</th>
                   <th>Oluşturma</th>
                   <th>Aksiyon</th>
@@ -403,24 +401,24 @@
         <article class="card span-5" id="health">
           <div class="toolbar">
             <h2>Sistem Sağlığı</h2>
-            <span class="pill">Frontend gözlemi</span>
+            <span class="pill">Real backend checks</span>
           </div>
           <div class="health-grid" id="healthGrid"></div>
-          <p class="tiny" style="margin-top:12px">Not: Gerçek provider ping için backend'e ayrı health endpoint eklenmeli.</p>
+          <p class="tiny" style="margin-top:12px">Bu alan /api/owner/health endpointinden gerçek provider durumlarını okur.</p>
         </article>
 
         <article class="card span-7" id="ai">
           <div class="toolbar">
-            <h2>AI Router / Komut Terminali</h2>
+            <h2>Koschei Central Brain</h2>
             <span class="pill">OpenAI primary · Together fallback</span>
           </div>
           <div class="stack">
             <textarea id="commandInput" placeholder="Owner komutu yaz. Örn: Son 24 saatteki hataları özetle, bekleyen ödemeleri raporla..."></textarea>
             <div class="row">
-              <button id="runCommandButton">Komutu logla</button>
+              <button id="runCommandButton">Koschei’ye sor</button>
               <button class="secondary" id="clearTerminalButton">Terminali temizle</button>
             </div>
-            <p class="tiny">Mevcut backend komutu sadece ai_command_logs tablosuna kaydediyor. Gerçek ajan çalıştırma ayrı backend işi.</p>
+            <p class="tiny">Owner-only beyin OpenAI primary / Together fallback AI router üzerinden çalışır. Customer dashboard bu özellikleri asla çağırmaz.</p>
             <div class="terminal" id="terminal" aria-live="polite"></div>
           </div>
         </article>
@@ -428,13 +426,13 @@
         <aside class="card span-5 danger-zone">
           <div class="toolbar">
             <h2>Acil Durum Paneli</h2>
-            <span class="pill">Backend gerekli</span>
+            <span class="pill">Env-backed safety</span>
           </div>
           <div class="stack">
-            <button class="warn" disabled>Bakım modunu aç</button>
-            <button class="danger" disabled>Yeni satışları durdur</button>
-            <button class="danger" disabled>Premium API erişimini durdur</button>
-            <p class="tiny">Bu butonlar bilinçli olarak pasif. Gerçek endpoint eklenmeden üretim sistemine müdahale etmez.</p>
+            <button class="warn" data-control="maintenance">Bakım modu durumunu kontrol et</button>
+            <button class="danger" data-control="sales_pause">Satış durdurma durumunu kontrol et</button>
+            <button class="danger" data-control="premium_pause">Premium erişim durdurma durumunu kontrol et</button>
+            <p class="tiny">Güvenli üretim davranışı: endpoint istekleri kaydeder ve env-backed effective state döner; kalıcı değişiklik deploy environment üzerinden yapılır.</p>
           </div>
         </aside>
 
@@ -471,7 +469,8 @@
         users: 'unknown',
         payments: 'unknown',
         grants: 'unknown'
-      }
+      },
+      backendHealth: []
     };
 
     const $ = (id) => document.getElementById(id);
@@ -551,11 +550,12 @@
       $('syncDot').className = 'dot warn';
 
       try {
-        const [status, users, payments, grants] = await Promise.all([
+        const [status, users, payments, grants, health] = await Promise.all([
           safeLoad('status', () => api('/api/owner/status')),
           safeLoad('users', () => api('/api/owner/users')),
           safeLoad('payments', () => api('/api/owner/payment-requests')),
-          safeLoad('grants', () => api('/api/owner/grants'))
+          safeLoad('grants', () => api('/api/owner/grants')),
+          safeLoad('health', () => api('/api/owner/health'))
         ]);
 
         state.metrics = status.metrics || {};
@@ -563,6 +563,7 @@
         state.users = users.users || users.items || [];
         state.payments = payments.payment_requests || payments.requests || payments.items || [];
         state.grants = grants.grants || [];
+        state.backendHealth = health.checks || [];
         state.ownerError = '';
 
         renderAll();
@@ -639,8 +640,8 @@
 
       const users = state.users.filter((u) => !filter || JSON.stringify(u).toLowerCase().includes(filter));
 
-      if (state.ownerError) { emptyRow(body, 7, state.ownerError); return; }
-      if (!users.length) { emptyRow(body, 7, 'Kullanıcı bulunamadı.'); return; }
+      if (state.ownerError) { emptyRow(body, 6, state.ownerError); return; }
+      if (!users.length) { emptyRow(body, 6, 'Kullanıcı bulunamadı.'); return; }
 
       users.forEach((u) => {
         const tr = document.createElement('tr');
@@ -649,7 +650,6 @@
           text('td', u.email),
           text('td', u.auth_subject || u.wallet_address || '—'),
           text('td', inferUserPlan(u)),
-          text('td', formatNumber(u.credits)),
           statusCell(u.status),
           text('td', formatDate(u.created_at))
         );
@@ -713,21 +713,19 @@
       const grid = $('healthGrid');
       grid.replaceChildren();
 
-      const items = [
-        ['Owner Status API', state.apiHealth.status],
-        ['Users API', state.apiHealth.users],
-        ['Payments API', state.apiHealth.payments],
-        ['Grants API', state.apiHealth.grants],
-        ['OpenAI API', 'backend health gerekli'],
-        ['Paddle API', 'backend health gerekli'],
-        ['Alchemy RPC', 'backend health gerekli'],
-        ['Database', state.ownerError ? 'error' : 'connected']
+      const items = state.backendHealth.length ? state.backendHealth.map((h) => [h.name, h.status, h.message]) : [
+        ['Owner Status API', state.apiHealth.status, 'owner status endpoint'],
+        ['Users API', state.apiHealth.users, 'owner users endpoint'],
+        ['Payments API', state.apiHealth.payments, 'owner payments endpoint'],
+        ['Grants API', state.apiHealth.grants, 'owner grants endpoint']
       ];
 
-      items.forEach(([label, value]) => {
+      items.forEach(([label, value, message]) => {
         const row = document.createElement('div');
         row.className = 'health';
-        row.append(text('span', label), statusBadge(value));
+        const left = text('span', label);
+        left.title = message || '';
+        row.append(left, statusBadge(value));
         grid.appendChild(row);
       });
     }
@@ -808,21 +806,21 @@
       if (!command) { toast('Komut yazın.'); return; }
 
       try {
-        const res = await api('/api/owner/command', {
+        const res = await api('/api/owner/brain', {
           method: 'POST',
-          body: JSON.stringify({ command })
+          body: JSON.stringify({ message: command })
         });
-        toast('AI komutu loglandı.');
+        toast('Koschei Central Brain yanıtladı.');
         state.logs.unshift({
           message: command,
-          status: res.status || 'queued',
-          output: res.output || '',
+          status: res.provider || 'ai',
+          output: res.answer || 'Real data unavailable.',
           created_at: new Date().toISOString()
         });
         renderTerminal();
         $('commandInput').value = '';
       } catch (err) {
-        toast(err.message || 'Komut çalışmadı.');
+        toast(err.message || 'Koschei yanıt veremedi.');
       }
     }
 
@@ -831,6 +829,7 @@
     $('runCommandButton').addEventListener('click', runCommand);
     $('clearTerminalButton').addEventListener('click', () => { state.logs = []; renderTerminal(); });
     $('userFilter').addEventListener('input', renderUsers);
+    document.querySelectorAll('[data-control]').forEach((btn) => btn.addEventListener('click', () => mutate('/api/owner/emergency', { control: btn.dataset.control, enabled: true, reason: 'owner_panel_check' })));
 
     window.setInterval(() => {
       if (!$('appView').classList.contains('hidden')) refreshAll();

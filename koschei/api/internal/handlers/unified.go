@@ -70,14 +70,6 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_active_package", "An active Koschei package is required to access the A.R.V.I.S Command Center."))
 		return
 	}
-	if _, available, err := h.userCreditsAndRole(claims.Sub); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Credit access could not be verified."})
-		return
-	} else if available <= 0 {
-		writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_credits", "No intelligence scan credits remain on the active package."))
-		return
-	}
-
 	requestID := newRequestID()
 	engine := services.NewUnifiedEngine(h.SolanaRPC)
 	result, err := engine.Analyze(r.Context(), services.UnifiedAnalyzeRequest{
@@ -95,23 +87,6 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 	if !unifiedHasCompletedModule(result) {
 		writeJSON(w, http.StatusBadGateway, unifiedAnalyzeHTTPResponse{OK: false, Result: result})
 		return
-	}
-
-	if h.DB != nil {
-		tx, err := h.DB.BeginTx(r.Context(), nil)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Credit charge could not be started."})
-			return
-		}
-		if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, normalizedClaimEmail(claims), "unified_intelligence:"+requestID); err != nil {
-			_ = tx.Rollback()
-			writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_credits", "No intelligence scan credits remain on the active package."))
-			return
-		}
-		if err := tx.Commit(); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Credit charge could not be committed."})
-			return
-		}
 	}
 
 	saved := false
@@ -166,10 +141,10 @@ func inferUnifiedTargetType(target string) string {
 
 func unifiedAccessError(code, message string) map[string]any {
 	return map[string]any{
-		"ok":              false,
-		"error":           code,
-		"message":         message,
-		"credits_charged": false,
+		"ok":                   false,
+		"error":                code,
+		"message":              message,
+		"entitlement_required": true,
 	}
 }
 

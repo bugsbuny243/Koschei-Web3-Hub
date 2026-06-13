@@ -3,121 +3,72 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Koschei A.R.V.I.S Command Center: Autonomous Risk & Verification Intelligence System for Web3 wallets, tokens, transactions, projects and funding readiness.">
-  <title>Koschei A.R.V.I.S Command Center</title>
+  <meta name="description" content="Koschei unified AI-powered Web3 intelligence dashboard.">
+  <title>Koschei Intelligence Dashboard</title>
   <link rel="stylesheet" href="/css/koschei.css">
   <style>
-    :root{--arvis-bg:#020510;--arvis-panel:rgba(7,16,35,.78);--arvis-panel2:rgba(12,28,55,.62);--arvis-line:rgba(112,240,255,.18);--arvis-text:#eefbff;--arvis-muted:#8da4c5;--arvis-cyan:#68e8ff;--arvis-green:#00ff9d;--arvis-violet:#a991ff;--arvis-amber:#ffd166;--arvis-red:#ff4d6d;--arvis-shadow:0 30px 100px rgba(0,0,0,.48)}
-    *{box-sizing:border-box}body{min-height:100vh;margin:0;color:var(--arvis-text);background:radial-gradient(circle at 12% 12%,rgba(0,255,157,.18),transparent 28%),radial-gradient(circle at 86% 8%,rgba(104,232,255,.18),transparent 31%),radial-gradient(circle at 50% 96%,rgba(169,145,255,.16),transparent 34%),linear-gradient(145deg,#01030a,#061327 54%,#020510);overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(104,232,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(104,232,255,.045) 1px,transparent 1px);background-size:58px 58px;mask-image:radial-gradient(circle at center,#000,transparent 78%)}body:after{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(transparent 50%,rgba(104,232,255,.025) 51%);background-size:100% 4px;mix-blend-mode:screen}.arvis-shell{position:relative;width:min(1280px,calc(100% - 32px));margin:0 auto;padding:18px 0 56px}.nav.command-nav{position:sticky;top:14px;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:26px;padding:12px 14px;border:1px solid var(--arvis-line);border-radius:24px;background:rgba(3,10,24,.72);backdrop-filter:blur(20px);box-shadow:0 20px 70px rgba(0,0,0,.34)}.nav-logo{display:inline-flex;align-items:center;gap:10px;font-weight:950;letter-spacing:.08em;text-decoration:none;color:var(--arvis-text)}.nav-logo:before{content:"K";display:grid;place-items:center;width:38px;height:38px;border-radius:14px;color:#02100b;background:linear-gradient(135deg,var(--arvis-green),var(--arvis-cyan));box-shadow:0 0 36px rgba(0,255,157,.28)}.nav-links{display:flex;gap:8px;flex-wrap:wrap}.nav-link{color:#c7d7f2;text-decoration:none;font-size:13px;font-weight:850;padding:10px 14px;border:1px solid transparent;border-radius:999px}.nav-link:hover,.nav-link.active{color:var(--arvis-cyan);border-color:rgba(104,232,255,.22);background:rgba(104,232,255,.08)}.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(340px,.85fr);gap:18px;align-items:stretch}.panel{position:relative;border:1px solid var(--arvis-line);background:linear-gradient(145deg,var(--arvis-panel),rgba(7,16,35,.38));box-shadow:var(--arvis-shadow),inset 0 1px 0 rgba(255,255,255,.07);backdrop-filter:blur(22px);border-radius:30px;overflow:hidden}.panel:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(135deg,rgba(104,232,255,.12),transparent 34%,rgba(0,255,157,.08));opacity:.72}.panel>*{position:relative}.hero-copy{padding:clamp(26px,4vw,48px)}.eyebrow{display:inline-flex;width:max-content;align-items:center;gap:8px;color:#bffff0;background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.28);padding:8px 12px;border-radius:999px;font-size:12px;font-weight:950;letter-spacing:.11em;text-transform:uppercase}.hero h1{margin:18px 0 12px;font-size:clamp(40px,6vw,76px);line-height:.92;letter-spacing:-.065em}.gradient{background:linear-gradient(135deg,#fff 4%,#cbfff1 28%,#78e9ff 64%,#d8ccff);-webkit-background-clip:text;background-clip:text;color:transparent}.subtitle{max-width:790px;margin:0;color:#a9bbda;font-size:17px;line-height:1.75}.system-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:26px}.metric{padding:14px;border:1px solid rgba(104,232,255,.16);border-radius:18px;background:rgba(3,10,24,.48)}.metric b{display:block;color:#f4feff;font-size:20px}.metric span{color:var(--arvis-muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.command-input{padding:24px;display:grid;gap:14px}.field-label{display:flex;justify-content:space-between;gap:10px;color:#cde0ff;font-size:12px;font-weight:950;text-transform:uppercase;letter-spacing:.08em}.field-label small{color:var(--arvis-muted);letter-spacing:0;text-transform:none}input{width:100%;border:1px solid rgba(104,232,255,.22);border-radius:20px;background:rgba(1,5,13,.72);color:var(--arvis-text);font:inherit;padding:17px 16px;outline:none;box-shadow:inset 0 0 24px rgba(104,232,255,.035)}input:focus{border-color:rgba(0,255,157,.55);box-shadow:0 0 0 4px rgba(0,255,157,.08),inset 0 0 24px rgba(104,232,255,.045)}.btn-primary{min-height:54px;border:0;border-radius:18px;color:#02120d;background:linear-gradient(135deg,var(--arvis-green),var(--arvis-cyan));font-weight:950;letter-spacing:.02em;cursor:pointer;box-shadow:0 0 32px rgba(0,255,157,.2)}.btn-primary:disabled{opacity:.58;cursor:not-allowed}.access{display:grid;grid-template-columns:1fr 1fr;gap:10px}.access-card{padding:12px;border:1px solid rgba(104,232,255,.15);border-radius:16px;background:rgba(255,255,255,.045)}.access-card span{display:block;color:var(--arvis-muted);font-size:11px;text-transform:uppercase;font-weight:950}.access-card b{font-size:15px}.notice{display:none;padding:13px 14px;border-radius:16px;border:1px solid rgba(255,209,102,.34);background:rgba(255,209,102,.08);color:#ffe9b4;font-weight:750;line-height:1.45}.notice.show{display:block}.command-grid{display:grid;grid-template-columns:1fr 360px;gap:18px;margin-top:18px}.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px}.section-title h2{margin:0;font-size:18px;letter-spacing:-.02em}.section-title span{color:var(--arvis-cyan);font-size:12px;font-weight:950;text-transform:uppercase;letter-spacing:.1em}.timeline{padding:22px}.timeline-list{display:grid;gap:10px}.timeline-item{display:grid;grid-template-columns:26px 1fr auto;gap:12px;align-items:center;padding:13px;border:1px solid rgba(104,232,255,.14);border-radius:18px;background:rgba(1,5,13,.42)}.dot{width:13px;height:13px;border-radius:50%;background:#33415e;box-shadow:0 0 0 5px rgba(104,232,255,.05)}.timeline-item.active .dot{background:var(--arvis-cyan);box-shadow:0 0 24px rgba(104,232,255,.7)}.timeline-item.done .dot{background:var(--arvis-green);box-shadow:0 0 20px rgba(0,255,157,.45)}.timeline-item strong{font-size:14px}.timeline-item p{margin:3px 0 0;color:var(--arvis-muted);font-size:12px}.status{font-size:11px;color:#93a9cb;text-transform:uppercase;font-weight:950}.radar{padding:22px}.risk-ring{--score:0;width:238px;height:238px;margin:10px auto 18px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--arvis-green) calc(var(--score)*1%),rgba(255,255,255,.08) 0);box-shadow:0 0 70px rgba(104,232,255,.13)}.risk-core{width:178px;height:178px;border-radius:50%;display:grid;place-items:center;text-align:center;border:1px solid rgba(104,232,255,.18);background:#041024}.risk-score{display:block;font-size:52px;font-weight:950;letter-spacing:-.07em}.risk-label{color:#9fb4d5;text-transform:uppercase;font-size:12px;font-weight:950;letter-spacing:.12em}.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}.intel-card{min-height:210px;padding:18px;border:1px solid rgba(104,232,255,.14);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025));box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}.intel-card h3{margin:0 0 10px;font-size:16px}.intel-card .score{display:inline-flex;padding:7px 10px;border-radius:999px;background:rgba(104,232,255,.09);border:1px solid rgba(104,232,255,.18);color:#dffaff;font-weight:950;font-size:12px}.intel-card p{color:#a7bad8;line-height:1.55;font-size:13px}.intel-card ul{margin:12px 0 0;padding-left:18px;color:#d5e4fb;font-size:13px;line-height:1.5}.terminal{margin-top:18px;padding:18px;border-radius:24px;background:#020813;border:1px solid rgba(0,255,157,.18);font-family:"SFMono-Regular",Consolas,monospace;box-shadow:inset 0 0 40px rgba(0,255,157,.035)}.terminal h3{margin:0 0 12px;color:#9dffcf;font-size:13px;text-transform:uppercase;letter-spacing:.1em}.feed{display:grid;gap:8px;max-height:230px;overflow:auto}.feed div{color:#a8ffcf;font-size:12px;line-height:1.45}.report{margin-top:18px;padding:22px}.report-body{color:#d2e4fb;line-height:1.65}.report-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.ghost{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 14px;border-radius:999px;border:1px solid rgba(104,232,255,.22);color:#dffaff;text-decoration:none;background:rgba(104,232,255,.06);font-weight:850}.muted{color:var(--arvis-muted)}.hidden{display:none!important}@media(max-width:1000px){.hero,.command-grid{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.system-strip,.access{grid-template-columns:1fr}.nav.command-nav{position:relative;top:0}}@media(max-width:620px){.arvis-shell{width:min(100% - 18px,1280px)}.nav.command-nav,.nav-links{align-items:stretch}.nav.command-nav{flex-direction:column}.nav-links{width:100%;display:grid;grid-template-columns:1fr 1fr}.hero h1{font-size:42px}.timeline-item{grid-template-columns:20px 1fr}.timeline-item .status{grid-column:2}}
+    :root{--bg:#020510;--panel:rgba(8,16,34,.82);--line:rgba(105,232,255,.18);--text:#f1fbff;--muted:#94a8c8;--green:#00ff9d;--cyan:#68e8ff;--red:#ff4d6d;--amber:#ffd166}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 12% 8%,rgba(0,255,157,.16),transparent 30%),radial-gradient(circle at 88% 12%,rgba(104,232,255,.16),transparent 34%),linear-gradient(145deg,#01030a,#061327 58%,#020510)}.shell{width:min(1120px,calc(100% - 28px));margin:0 auto;padding:20px 0 56px}.nav{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:22px;padding:12px 14px;border:1px solid var(--line);border-radius:22px;background:rgba(3,10,24,.72);backdrop-filter:blur(18px)}.brand{color:var(--text);font-weight:950;text-decoration:none;letter-spacing:.08em}.nav a{color:#c7d7f2;text-decoration:none;font-weight:800;font-size:13px;padding:9px 11px;border-radius:999px}.nav a:hover,.nav a.active{color:var(--cyan);background:rgba(104,232,255,.08)}.hero{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(300px,.9fr);gap:18px}.card{border:1px solid var(--line);border-radius:28px;background:linear-gradient(145deg,var(--panel),rgba(7,16,35,.48));box-shadow:0 28px 90px rgba(0,0,0,.42);padding:24px}.eyebrow{display:inline-flex;color:#bcfff0;background:rgba(0,255,157,.09);border:1px solid rgba(0,255,157,.24);padding:7px 10px;border-radius:999px;font-size:11px;font-weight:950;letter-spacing:.12em;text-transform:uppercase}h1{margin:16px 0 10px;font-size:clamp(38px,6vw,72px);line-height:.92;letter-spacing:-.065em}.gradient{background:linear-gradient(135deg,#fff,#bffff0 38%,#68e8ff 72%);-webkit-background-clip:text;background-clip:text;color:transparent}.subtitle{color:var(--muted);font-size:17px;line-height:1.72;max-width:740px}.command{display:grid;gap:12px}.command label{color:#cde0ff;font-size:12px;font-weight:950;text-transform:uppercase;letter-spacing:.08em}textarea{width:100%;min-height:156px;resize:vertical;border:1px solid rgba(104,232,255,.22);border-radius:20px;background:rgba(1,5,13,.72);color:var(--text);font:inherit;padding:16px;outline:none}textarea:focus{border-color:rgba(0,255,157,.55);box-shadow:0 0 0 4px rgba(0,255,157,.08)}button{min-height:52px;border:0;border-radius:18px;color:#02120d;background:linear-gradient(135deg,var(--green),var(--cyan));font-weight:950;cursor:pointer}button:disabled{opacity:.58;cursor:not-allowed}.notice{display:none;padding:13px 14px;border-radius:16px;border:1px solid rgba(255,209,102,.34);background:rgba(255,209,102,.08);color:#ffe9b4;font-weight:750;line-height:1.45}.notice.show{display:block}.access{display:grid;grid-template-columns:1fr 1fr;gap:10px}.access div{padding:12px;border:1px solid rgba(104,232,255,.15);border-radius:16px;background:rgba(255,255,255,.045)}.access span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;font-weight:950}.grid{display:grid;grid-template-columns:1fr 340px;gap:18px;margin-top:18px}.score{display:grid;place-items:center;width:180px;height:180px;border-radius:999px;margin:8px auto 16px;background:conic-gradient(var(--green) calc(var(--score,0)*1%),rgba(255,255,255,.08) 0);position:relative}.score:after{content:"";position:absolute;inset:14px;border-radius:999px;background:#071024}.score b{position:relative;z-index:1;font-size:48px}.muted{color:var(--muted)}.result-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.badge{display:inline-flex;padding:7px 10px;border-radius:999px;border:1px solid var(--line);color:var(--cyan);font-weight:900;font-size:12px;text-transform:uppercase}.findings{display:grid;gap:10px;margin-top:16px}.finding{border:1px solid rgba(104,232,255,.14);border-radius:16px;padding:13px;background:rgba(255,255,255,.035)}.feed{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.6;white-space:pre-wrap;max-height:260px;overflow:auto}.empty{color:var(--muted);border:1px dashed rgba(104,232,255,.2);border-radius:16px;padding:18px;text-align:center}@media(max-width:900px){.hero,.grid{grid-template-columns:1fr}.access{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-  <div class="arvis-shell">
-    <nav class="nav command-nav" aria-label="Koschei A.R.V.I.S navigation">
-      <a class="nav-logo" href="/dashboard">Koschei A.R.V.I.S</a>
-      <div class="nav-links">
-        <a class="nav-link active" href="/dashboard">Command Center</a>
-        <a class="nav-link" href="/reports">Reports</a>
-        <a class="nav-link" href="/pricing">Packages</a>
-        <a class="nav-link" href="/account">Account</a>
-      </div>
-    </nav>
+  <main class="shell">
+    <header class="nav">
+      <a href="/" class="brand">KOSCHEI</a>
+      <nav><a href="/dashboard" class="active">Dashboard</a><a href="/reports.html">Reports</a><a href="/pricing.html">Packages</a><a href="/account.html">Account</a></nav>
+    </header>
 
-    <main>
-      <section class="hero" aria-labelledby="command-title">
-        <div class="panel hero-copy">
-          <span class="eyebrow">Autonomous Risk & Verification Intelligence System</span>
-          <h1 id="command-title"><span class="gradient">Koschei A.R.V.I.S</span><br>Command Center</h1>
-          <p class="subtitle">One cinematic Web3 intelligence cockpit for wallet, token, transaction, sybil graph, project and funding-readiness analysis. Old modules now operate as internal report sections, not separate products.</p>
-          <div class="system-strip" aria-label="System capabilities">
-            <div class="metric"><b>01</b><span>Unified scan</span></div>
-            <div class="metric"><b>09</b><span>Intel sections</span></div>
-            <div class="metric"><b>1 credit</b><span>Per operation</span></div>
-          </div>
+    <section class="hero">
+      <article class="card">
+        <span class="eyebrow">Unified real-data intelligence</span>
+        <h1><span class="gradient">One request. One Koschei answer.</span></h1>
+        <p class="subtitle">Paste a wallet, token mint, transaction hash, project URL, or normal Web3 question. Koschei routes it through the unified backend analysis layer. No separate module picker is shown to customers.</p>
+      </article>
+      <aside class="card command">
+        <label for="targetInput">Ask Koschei</label>
+        <textarea id="targetInput" placeholder="Wallet, token, tx hash, project URL, or a normal Web3 intelligence question..."></textarea>
+        <button id="analyzeButton">Run premium analysis</button>
+        <div class="access">
+          <div><span>Package</span><b id="packageStatus">Checking…</b></div>
+          <div><span>Access</span><b id="accessStatus">Checking…</b></div>
         </div>
+        <div id="notice" class="notice"></div>
+      </aside>
+    </section>
 
-        <form id="scan-form" class="panel command-input" aria-label="Command Input">
-          <div class="section-title"><h2>Command Input</h2><span>Primary public API</span></div>
-          <label class="field-label" for="target-input">Wallet address, token mint, transaction hash, project URL, or project name <small>Solana/Web3 public data only</small></label>
-          <input id="target-input" name="target" autocomplete="off" required>
-          <button id="scan-button" class="btn-primary" type="submit">Start Intelligence Scan</button>
-          <div class="access" aria-live="polite">
-            <div class="access-card"><span>Package</span><b id="package-status">Checking…</b></div>
-            <div class="access-card"><span>Credits</span><b id="credit-status">Checking…</b></div>
-          </div>
-          <div id="access-notice" class="notice"></div>
-        </form>
-      </section>
+    <section class="grid">
+      <article class="card">
+        <div class="result-head"><h2>Koschei Analysis</h2><span class="badge" id="reportState">Waiting</span></div>
+        <div id="resultBody" class="empty">Submit one request to generate a real-data report. If live provider data is unavailable, Koschei will show “Real data unavailable.”</div>
+      </article>
+      <aside class="card">
+        <div class="score" id="scoreRing" style="--score:0"><b id="scoreValue">—</b></div>
+        <h3 id="riskLevel" style="text-align:center">No report yet</h3>
+        <p class="muted" id="riskSummary" style="text-align:center">Premium analysis requires an active package entitlement.</p>
+        <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+        <h3>Live trace</h3>
+        <div class="feed" id="feed">Ready.</div>
+      </aside>
+    </section>
+  </main>
 
-      <section class="command-grid">
-        <div>
-          <section class="panel timeline" aria-label="Live Scan Timeline">
-            <div class="section-title"><h2>Live Scan Timeline</h2><span id="timeline-state">Standby</span></div>
-            <div id="timeline" class="timeline-list"></div>
-          </section>
-
-          <section class="cards" aria-label="Intelligence report sections">
-            <article class="intel-card" data-module="wallet_score"><h3>Wallet Intelligence</h3><span class="score">Awaiting scan</span><p>Wallet reputation, activity posture and behavioral trust signals will appear here.</p></article>
-            <article class="intel-card" data-module="token_scanner"><h3>Token Intelligence</h3><span class="score">Awaiting scan</span><p>Mint authority, supply, holder concentration and token verification signals will appear here.</p></article>
-            <article class="intel-card" data-module="tx_decoder"><h3>Transaction Intelligence</h3><span class="score">Awaiting scan</span><p>Transaction intent, touched programs, signers, fee signals and execution status will appear here.</p></article>
-            <article class="intel-card" data-module="sybil_graph"><h3>Sybil / Graph Signals</h3><span class="score">Awaiting scan</span><p>Cluster, reuse, relationship and graph-risk signals will appear here.</p></article>
-            <article class="intel-card" data-module="project_radar"><h3>Project Radar</h3><span class="score">Awaiting scan</span><p>Project credibility, public footprint and ecosystem fit signals will appear here.</p></article>
-            <article class="intel-card" data-module="funding_readiness"><h3>Funding Readiness</h3><span class="score">Awaiting scan</span><p>Grant and investor readiness will be synthesized from project and verification signals.</p></article>
-          </section>
-
-          <section class="panel terminal" aria-label="Terminal-style activity feed">
-            <h3>Terminal Activity Feed</h3>
-            <div id="activity-feed" class="feed"><div>&gt; A.R.V.I.S kernel online. Awaiting command input.</div></div>
-          </section>
-
-          <section class="panel report" aria-label="Final Intelligence Report">
-            <div class="section-title"><h2>Final Intelligence Report</h2><span id="report-state">Not generated</span></div>
-            <div id="report-body" class="report-body muted">Run a unified intelligence scan to generate the final report.</div>
-            <div class="report-actions"><a class="ghost" href="/reports">Open Reports</a><a class="ghost" href="/pricing">Manage Package</a></div>
-          </section>
-        </div>
-
-        <aside class="panel radar" aria-label="Risk Radar">
-          <div class="section-title"><h2>Risk Radar</h2><span id="risk-level">Idle</span></div>
-          <div id="risk-ring" class="risk-ring"><div class="risk-core"><div><span id="risk-score" class="risk-score">--</span><span class="risk-label">Risk score</span></div></div></div>
-          <p id="risk-summary" class="muted">Risk radar will lock onto the submitted target after a successful intelligence scan.</p>
-        </aside>
-      </section>
-    </main>
-  </div>
-
-  <script src="/js/koschei-auth.js?v=4"></script>
+  <script src="/js/koschei-auth.js?v=6"></script>
   <script src="/js/koschei-analytics.js?v=1"></script>
   <script>
     (async()=>{
       await KoscheiAuth.init();
-      if(!KoscheiAuth.requireAuth('/login'))return;
-      const stages=[
-        ['command','Command Input','Target normalized and queued for the unified public API.'],
-        ['radar','Risk Radar','Aggregate risk score and severity classification.'],
-        ['wallet_score','Wallet Intelligence','Wallet posture and behavioral signals.'],
-        ['token_scanner','Token Intelligence','Mint, supply and holder-risk indicators.'],
-        ['tx_decoder','Transaction Intelligence','Transaction intent, execution and program touchpoints.'],
-        ['sybil_graph','Sybil / Graph Signals','Cluster, relationship and sybil indicators.'],
-        ['project_radar','Project Radar','Project credibility and ecosystem positioning.'],
-        ['funding_readiness','Funding Readiness','Grant and investor readiness synthesis.'],
-        ['report','Final Intelligence Report','Executive intelligence summary and next actions.']
-      ];
-      const timeline=document.getElementById('timeline'),feed=document.getElementById('activity-feed'),notice=document.getElementById('access-notice'),form=document.getElementById('scan-form'),btn=document.getElementById('scan-button');
-      const packageStatus=document.getElementById('package-status'),creditStatus=document.getElementById('credit-status');
-      const escapeHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-      const addFeed=msg=>{const line=document.createElement('div');line.textContent='> '+msg;feed.prepend(line)};
-      const setNotice=(msg,show=true)=>{notice.innerHTML=msg;notice.classList.toggle('show',show)};
-      const renderTimeline=(active=-1,done=-1)=>{timeline.innerHTML=stages.map((s,i)=>`<div class="timeline-item ${i<=done?'done':''} ${i===active?'active':''}"><span class="dot"></span><div><strong>${s[1]}</strong><p>${s[2]}</p></div><span class="status">${i<=done?'Complete':i===active?'Scanning':'Queued'}</span></div>`).join('')};
-      const inferTargetType=value=>{const v=String(value||'').trim();if(/^https?:\/\//i.test(v)||/\.[a-z]{2,}(\/|$)/i.test(v))return 'project';if(/^[1-9A-HJ-NP-Za-km-z]{87,88}$/.test(v)||/^0x[a-fA-F0-9]{64}$/.test(v))return 'tx';if(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v))return 'address';return 'project'};
-      const updateAccess=async()=>{try{const r=await KoscheiAuth.apiCall('/api/member/summary',{method:'GET'});const d=await r.json();if(!r.ok)throw new Error(d.error||'member summary unavailable');packageStatus.textContent=d.plan&&d.plan!=='free'?d.plan:'No active package';creditStatus.textContent=String(d.outputs_remaining??0);const blocked=!d.plan||d.plan==='free'||Number(d.outputs_remaining||0)<=0;if(blocked){const why=(!d.plan||d.plan==='free')?'Active package required.':'No credits remaining.';setNotice(`${escapeHTML(why)} <a class="ghost" href="/pricing" style="min-height:32px;margin-left:8px">View Packages</a>`)}else{setNotice('',false)}}catch(e){packageStatus.textContent='Unavailable';creditStatus.textContent='Unavailable';setNotice('Unable to verify package access right now. Refresh or open Account.')}};
-      const moduleTitle={wallet_score:'Wallet Intelligence',token_scanner:'Token Intelligence',tx_decoder:'Transaction Intelligence',sybil_graph:'Sybil / Graph Signals',project_radar:'Project Radar',risk_scanner:'Risk Radar'};
-      const cardFor=(module)=>document.querySelector(`[data-module="${module}"]`);
-      const renderModule=(module,result)=>{const card=cardFor(module);if(!card)return;const findings=(result.findings||[]).slice(0,4).map(x=>`<li>${escapeHTML(x)}</li>`).join('');card.innerHTML=`<h3>${escapeHTML(moduleTitle[module]||module)}</h3><span class="score">${escapeHTML(result.status||'ready')} · ${Number(result.score||0)}/100</span><p>${escapeHTML(result.summary||'No summary returned for this section.')}</p>${findings?`<ul>${findings}</ul>`:''}`};
-      const renderFunding=(result)=>{const project=result.module_results?.project_radar||{};const risk=result.risk_level||'UNKNOWN';const score=Number(project.score||result.overall_score||0);let readiness='Monitor';if(score>=76&&['LOW','MEDIUM'].includes(risk))readiness='Ready';else if(score>=55)readiness='Needs evidence';const card=cardFor('funding_readiness');card.innerHTML=`<h3>Funding Readiness</h3><span class="score">${escapeHTML(readiness)} · ${score}/100</span><p>Funding posture is synthesized from Project Radar, Risk Radar and verification coverage.</p><ul><li>Risk classification: ${escapeHTML(risk)}</li><li>Recommended next action: ${escapeHTML((result.recommendations||[])[0]||'Prepare evidence, traction and security notes.')}</li></ul>`};
-      const renderResult=(result)=>{document.getElementById('risk-score').textContent=String(result.overall_score??'--');document.getElementById('risk-ring').style.setProperty('--score',String(Math.max(0,Math.min(100,Number(result.overall_score||0)))));document.getElementById('risk-level').textContent=result.risk_level||'Unknown';document.getElementById('risk-summary').textContent=`${result.target_type} target analyzed on ${result.network}. Partial success: ${result.partial_success?'yes':'no'}.`;Object.entries(result.module_results||{}).forEach(([m,r])=>renderModule(m,r));renderFunding(result);document.getElementById('report-state').textContent='Generated';document.getElementById('report-body').innerHTML=`<p><strong>${escapeHTML(result.target_id)}</strong> completed with an overall intelligence score of <strong>${Number(result.overall_score||0)}/100</strong> and risk level <strong>${escapeHTML(result.risk_level||'UNKNOWN')}</strong>.</p><ul>${(result.recommendations||[]).map(x=>`<li>${escapeHTML(x)}</li>`).join('')}</ul><p class="muted">Report ID: ${escapeHTML(result.request_id)} · Completed: ${escapeHTML(result.completed_at||new Date().toISOString())}</p>`};
-      renderTimeline();await updateAccess();if(window.KoscheiAnalytics)KoscheiAnalytics.track('arvis_command_center_view');
-      form.onsubmit=async e=>{e.preventDefault();const target=document.getElementById('target-input').value.trim();if(!target)return;btn.disabled=true;setNotice('',false);feed.innerHTML='';document.getElementById('timeline-state').textContent='Scanning';document.getElementById('report-state').textContent='Generating';stages.forEach((s,i)=>setTimeout(()=>renderTimeline(i,i-1),i*230));addFeed('POST /api/v1/unified/analyze');addFeed('Target classification: '+inferTargetType(target));try{const r=await KoscheiAuth.apiCall('/api/v1/unified/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target,target_type:inferTargetType(target),target_id:target,network:'solana-mainnet'})});const d=r?await r.json():{error:'network_error'};if(!r||!r.ok){const msg=d.message||d.error||'Intelligence scan failed.';setNotice(`${escapeHTML(msg)} <a class="ghost" href="/pricing" style="min-height:32px;margin-left:8px">View Packages</a>`);addFeed('Scan blocked: '+msg);document.getElementById('timeline-state').textContent='Blocked';return}renderTimeline(-1,stages.length-1);document.getElementById('timeline-state').textContent='Complete';renderResult(d.result);addFeed('Unified intelligence report generated: '+d.result.request_id);if(window.KoscheiAnalytics)KoscheiAnalytics.track('arvis_unified_scan_completed')}catch(err){setNotice('Intelligence scan failed. Please retry with a valid public target.');addFeed('Scan error: '+(err.message||'unknown'))}finally{btn.disabled=false;await updateAccess()}}
+      if(!KoscheiAuth.requireAuth()) return;
+      const $=id=>document.getElementById(id);
+      const escapeHTML=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+      const notice=(msg,show=true)=>{$('notice').innerHTML=msg;$('notice').classList.toggle('show',show)};
+      const trace=msg=>{$('feed').textContent='['+new Date().toLocaleTimeString()+'] '+msg+'\n'+$('feed').textContent};
+      const infer=value=>{const v=String(value||'').trim();if(/^https?:\/\//i.test(v)||/\.[a-z]{2,}(\/|$)/i.test(v))return 'project';if(/^[1-9A-HJ-NP-Za-km-z]{87,88}$/.test(v)||/^0x[a-fA-F0-9]{64}$/.test(v))return 'tx';if(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v))return 'address';return 'project'};
+      async function refreshAccess(){try{const r=await KoscheiAuth.apiCall('/api/member/summary',{method:'GET'});const d=await r.json();if(!r.ok)throw new Error(d.error||'summary unavailable');const active=d.plan&&d.plan!=='free';$('packageStatus').textContent=active?d.plan:'No active package';$('accessStatus').textContent=active?'Premium enabled':'Premium blocked';if(!active)notice('Koschei is not free. Active package entitlement is required. <a href="/pricing.html">View packages</a>');else notice('',false);return active}catch(e){$('packageStatus').textContent='Unavailable';$('accessStatus').textContent='Blocked';notice('Real data unavailable. Package access could not be verified.');return false}}
+      function render(result){$('reportState').textContent='Generated';$('scoreValue').textContent=String(result.overall_score??0);$('scoreRing').style.setProperty('--score',String(Math.max(0,Math.min(100,Number(result.overall_score||0)))));$('riskLevel').textContent=result.risk_level||'UNKNOWN';$('riskSummary').textContent=`${result.target_type||'target'} analyzed on ${result.network||'default network'}.`;
+        const modules=Object.values(result.module_results||{});const findings=modules.flatMap(m=>(m.findings||[]).map(f=>({module:m.module,status:m.status,score:m.score,summary:m.summary,finding:f}))).slice(0,10);
+        const unavailable=modules.filter(m=>m.status!=='ok');
+        $('resultBody').className='';$('resultBody').innerHTML=`<p><strong>${escapeHTML(result.target_id)}</strong></p><p>Overall risk: <strong>${escapeHTML(result.risk_level||'UNKNOWN')}</strong>. Report ID: <span class="muted">${escapeHTML(result.request_id)}</span></p><div class="findings">${findings.map(f=>`<div class="finding"><strong>${escapeHTML(f.module)} · ${escapeHTML(f.status)} · ${Number(f.score||0)}/100</strong><p>${escapeHTML(f.finding)}</p></div>`).join('')||'<div class="finding">Real data unavailable.</div>'}</div>${unavailable.length?`<p class="muted">${unavailable.length} check(s): Real data unavailable.</p>`:''}<h3>Recommendations</h3><ul>${(result.recommendations||['Real data unavailable.']).map(x=>`<li>${escapeHTML(x)}</li>`).join('')}</ul>`}
+      await refreshAccess(); if(window.KoscheiAnalytics) KoscheiAnalytics.track('unified_dashboard_view');
+      $('analyzeButton').onclick=async()=>{const target=$('targetInput').value.trim();if(!target)return; $('analyzeButton').disabled=true; notice('',false); $('reportState').textContent='Running'; trace('Submitting unified analysis'); try{const type=infer(target);const r=await KoscheiAuth.apiCall('/api/v1/unified/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target,target_id:target,target_type:type,network:'solana-mainnet'})});const d=await r.json().catch(()=>({}));if(!r.ok){notice(escapeHTML(d.message||d.error||'Real data unavailable.'));$('reportState').textContent='Blocked';trace('Blocked: '+(d.message||d.error||r.status));return}render(d.result);trace('Report generated: '+d.result.request_id);if(window.KoscheiAnalytics)KoscheiAnalytics.track('unified_dashboard_completed')}catch(e){notice('Real data unavailable.');$('reportState').textContent='Error';trace('Error: '+(e.message||'unknown'))}finally{$('analyzeButton').disabled=false;await refreshAccess()}}
     })();
   </script>
 </body>

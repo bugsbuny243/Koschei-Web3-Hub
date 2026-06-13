@@ -41,20 +41,39 @@ func ResolveModelRoute(tool string) ModelRoute {
 }
 
 func providerFromEnv() string {
-	if strings.EqualFold(strings.TrimSpace(getEnv("CLAUDE_API_KEY")), "") == false {
-		return "claude"
+	if strings.TrimSpace(getEnv("OPENAI_API_KEY")) != "" {
+		return "openai"
 	}
-	if strings.EqualFold(strings.TrimSpace(getEnv("LLAMA_API_KEY")), "") == false {
-		return "llama"
+	if strings.TrimSpace(getEnv("TOGETHER_API_KEY")) != "" {
+		return "together"
 	}
-	return "llama"
+	return "unconfigured"
 }
 
 func defaultModel(provider string) string {
-	if provider == "claude" {
-		return "claude-sonnet-4"
+	switch provider {
+	case "openai":
+		return firstNonEmptyEnv("OPENAI_MODEL", "OPENAI_CHAT_MODEL", "gpt-4.1-mini")
+	case "together":
+		return firstNonEmptyEnv("TOGETHER_MODEL", "TOGETHER_MODEL_CHAT", "meta-llama/Llama-3.3-70B-Instruct-Turbo")
+	default:
+		return "unconfigured"
 	}
-	return "llama-4.1-70b"
 }
 
 var getEnv = os.Getenv
+
+func firstNonEmptyEnv(keys ...string) string {
+	for _, key := range keys {
+		if strings.HasPrefix(key, "OPENAI_") || strings.HasPrefix(key, "TOGETHER_") {
+			if value := strings.TrimSpace(getEnv(key)); value != "" {
+				return value
+			}
+			continue
+		}
+		if strings.TrimSpace(key) != "" {
+			return key
+		}
+	}
+	return ""
+}
