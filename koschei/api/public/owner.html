@@ -90,8 +90,8 @@
             <p class="muted">Gizli operasyon ekranı. Cüzdan ve owner sırrı ile giriş yapın.</p>
           </div>
         </div>
-        <label class="stack">Owner cüzdanı<input id="loginWallet" autocomplete="username" placeholder="Solana / EVM cüzdan adresi"></label>
-        <label class="stack">Owner sırrı<input id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET"></label>
+        <label class="stack">Owner cüzdanı<input id="loginWallet" autocomplete="username"></label>
+        <label class="stack">Owner sırrı<input id="loginSecret" type="password" autocomplete="current-password"></label>
         <button id="loginButton">Güvenli giriş yap</button>
         <p class="muted">Not: Sunucu cookie'leri HttpOnly olarak ayarlar; panel kullanıcı verisini HTML olarak enjekte etmez.</p>
       </div>
@@ -118,7 +118,7 @@
         <div class="card span-7">
           <div class="toolbar">
             <h2 style="margin-right:auto">Kullanıcı Listesi</h2>
-            <input id="userFilter" style="max-width:260px" placeholder="E-posta, cüzdan veya durum ara">
+            <input id="userFilter" style="max-width:260px">
           </div>
           <div class="table-wrap"><table><thead><tr><th>E-posta</th><th>Cüzdan</th><th>Kredi</th><th>Durum</th><th>Oluşturma</th><th>Aksiyon</th></tr></thead><tbody id="usersBody"></tbody></table></div>
         </div>
@@ -131,7 +131,7 @@
         <div class="card span-5">
           <h2>AI Komut Terminali</h2>
           <div class="stack">
-            <textarea id="commandInput" placeholder="Örn: pending ödemeleri özetle ve riskli kullanıcıları raporla"></textarea>
+            <textarea id="commandInput"></textarea>
             <div class="row"><button id="runCommandButton">Komutu çalıştır</button><button class="secondary" id="clearTerminalButton">Terminali temizle</button></div>
             <div class="terminal" id="terminal" aria-live="polite"></div>
           </div>

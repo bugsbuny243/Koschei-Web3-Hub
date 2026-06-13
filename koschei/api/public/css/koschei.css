@@ -28,7 +28,7 @@ a.card h1, a.card h2, a.card h3 { color: var(--text); }
 .form-label { font-size: 13px; color: var(--text2); font-weight: 500; }
 .form-input { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; padding: 10px 14px; outline: none; transition: border-color .15s; }
 .form-input:focus { border-color: var(--accent); }
-.form-input::placeholder { color: var(--text2); }
+
 .alert { padding: 10px 14px; border-radius: var(--radius); font-size: 13px; display: none; }
 .alert.show { display: block; }
 .alert-info { background: rgba(59,130,246,.1); border: 1px solid var(--accent2); color: var(--accent2); }

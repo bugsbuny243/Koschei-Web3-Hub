@@ -64,7 +64,7 @@ func grantContent(ec, focus string) map[string]any {
 	if focus == "" {
 		focus = "Web3 intelligence and developer tooling"
 	}
-	m := []string{"Ship ecosystem-specific read-only intelligence workflows", "Publish measurable public proof-of-impact metrics", "Deliver developer docs and integration examples"}
+	m := []string{"Ship ecosystem-specific read-only intelligence workflows", "Publish measurable public proof-of-impact metrics", "Deliver developer docs and integration references"}
 	text := fmt.Sprintf("%s Grant Application — Koschei Web3 Intelligence OS\n\nPROJECT SUMMARY\nKoschei is an AI-powered, no-custody, read-only Web3 intelligence and developer tooling platform focused on %s.\n\nGRANT FIT\nReusable public-good infrastructure and transparent impact metrics for %s.\n\nMILESTONES\n1. %s\n2. %s\n3. %s\n\nESTIMATED BUDGET\n$25,000 preliminary request. No automatic submission is performed.", ec, focus, ec, m[0], m[1], m[2])
 	return map[string]any{"ecosystem": ec, "project_summary": "Koschei Web3 Intelligence OS: no-custody intelligence for builders.", "grant_fit_reasoning": "Reusable developer tooling and ecosystem-aligned safety workflows.", "milestones": m, "estimated_budget": map[string]any{"currency": "USD", "estimated_total": 25000}, "generated_text": text}
 }
@@ -662,16 +662,8 @@ func (h *Handler) AgentTool(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "service": "Koschei Agent API", "mode": "read-only"})
 		return
 	}
-	if r.URL.Path == "/api/agent/wallet-score" {
-		writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "score": 50, "signals": []string{"Public activity requires independent verification", "No private user data was accessed"}})
-		return
-	}
-	if r.URL.Path == "/api/agent/metadata-template" {
-		writeJSON(w, 200, map[string]any{"ok": true, "template": map[string]any{"name": "Example asset", "description": "Safe metadata template", "attributes": []any{}}})
-		return
-	}
-	if r.URL.Path == "/api/agent/chain-health" {
-		writeJSON(w, 200, map[string]any{"ok": true, "status": "preliminary", "recommendation": "Verify using configured chain provider."})
+	if r.URL.Path == "/api/agent/wallet-score" || r.URL.Path == "/api/agent/metadata-template" || r.URL.Path == "/api/agent/chain-health" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "real_data_unavailable", "message": "Real data unavailable. Analysis could not be completed."})
 		return
 	}
 	var q riskInput

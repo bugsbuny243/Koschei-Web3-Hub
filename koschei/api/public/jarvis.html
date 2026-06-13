@@ -503,7 +503,7 @@
             <option value="project">Project URL</option>
           </select>
 
-          <input type="text" id="targetInput" class="input-field" placeholder="Enter target ID..." autocomplete="off" />
+          <input type="text" id="targetInput" class="input-field" autocomplete="off" />
 
           <button id="analyzeBtn" class="analyze-btn" type="submit">🚀 Initiate</button>
         </form>
@@ -633,13 +633,13 @@
           const findings = Array.isArray(moduleData.findings) && moduleData.findings.length
             ? '\n\n' + moduleData.findings.slice(0, 3).map(item => `• ${item}`).join('\n')
             : '';
-          const preview = `${summary}${findings}\n\n${JSON.stringify(moduleData.data || moduleData, null, 2)}`.slice(0, 460);
+          const moduleExcerpt = `${summary}${findings}\n\n${JSON.stringify(moduleData.data || moduleData, null, 2)}`.slice(0, 460);
           card.innerHTML = `
             <div class="module-head">
               <h3>${name}</h3>
               <span class="module-score">${escapeHTML(moduleData.score ?? '--')}</span>
             </div>
-            <pre>${escapeHTML(preview)}${preview.length >= 460 ? '…' : ''}</pre>
+            <pre>${escapeHTML(moduleExcerpt)}${moduleExcerpt.length >= 460 ? '…' : ''}</pre>
           `;
         }
         modulesGrid.appendChild(card);

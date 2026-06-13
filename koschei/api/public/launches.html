@@ -47,7 +47,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 .btn:disabled{opacity:.4;cursor:not-allowed;}
 .form-input{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;color:var(--text);font-size:14px;padding:11px 14px;outline:none;width:100%;transition:border-color .15s;font-family:'JetBrains Mono',monospace;}
 .form-input:focus{border-color:var(--accent);}
-.form-input::placeholder{color:var(--text2);}
+
 .alert{padding:10px 14px;border-radius:10px;font-size:13px;display:none;margin-top:10px;}
 .alert.show{display:block;}
 .alert-error{background:rgba(255,68,102,.12);border:1px solid var(--danger);color:var(--danger);}
@@ -100,7 +100,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
   <div class="surface" style="padding:20px;margin-bottom:24px;">
     <div style="font-size:13px;font-weight:600;margin-bottom:12px;">🔍 Submit Token for Analysis</div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
-      <input class="form-input" type="text" id="mintInput" placeholder="Token mint address..." style="flex:1;min-width:200px;">
+      <input class="form-input" type="text" id="mintInput" style="flex:1;min-width:200px;">
       <select class="form-input" id="netSelect" style="width:auto;font-family:'Inter',sans-serif;">
         <option value="solana-mainnet">Mainnet</option>
         <option value="solana-devnet">Devnet</option>

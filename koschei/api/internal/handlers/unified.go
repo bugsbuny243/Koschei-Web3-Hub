@@ -92,6 +92,11 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	if !unifiedHasCompletedModule(result) {
+		writeJSON(w, http.StatusBadGateway, unifiedAnalyzeHTTPResponse{OK: false, Result: result})
+		return
+	}
+
 	if h.DB != nil {
 		tx, err := h.DB.BeginTx(r.Context(), nil)
 		if err != nil {
@@ -174,4 +179,13 @@ func newRequestID() string {
 		return hex.EncodeToString([]byte(time.Now().UTC().Format(time.RFC3339Nano)))
 	}
 	return hex.EncodeToString(b[:])
+}
+
+func unifiedHasCompletedModule(result services.UnifiedAnalyzeResult) bool {
+	for _, module := range result.ModuleResults {
+		if module.Status == "ok" {
+			return true
+		}
+	}
+	return false
 }

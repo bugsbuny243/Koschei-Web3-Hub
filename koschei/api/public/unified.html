@@ -39,7 +39,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 .scan-select{font-family:'JetBrains Mono',monospace;background:rgba(0,204,255,.06);border:1px solid rgba(0,204,255,.25);border-radius:10px;color:var(--accent2);font-size:12px;padding:13px 12px;outline:none;letter-spacing:1px;text-transform:uppercase;flex:0 0 150px;}
 .scan-input{flex:1;min-width:200px;background:rgba(255,255,255,.03);border:1px solid rgba(0,204,255,.18);border-radius:10px;color:var(--text);font-size:14px;padding:13px 16px;outline:none;font-family:'JetBrains Mono',monospace;transition:border-color .15s;}
 .scan-input:focus{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(0,204,255,.08);}
-.scan-input::placeholder{color:var(--text2);}
+
 .scan-btn{font-family:'JetBrains Mono',monospace;letter-spacing:2px;font-size:13px;font-weight:700;text-transform:uppercase;background:linear-gradient(135deg,var(--accent2),var(--accent));color:#001018;border:none;border-radius:10px;padding:13px 28px;cursor:pointer;transition:all .15s;white-space:nowrap;}
 .scan-btn:hover{opacity:.88;transform:translateY(-1px);box-shadow:0 0 24px rgba(0,204,255,.35);}
 .scan-btn:disabled{opacity:.4;cursor:not-allowed;}
@@ -106,7 +106,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
         <option value="tx">TRANSACTION</option>
         <option value="project">PROJECT</option>
       </select>
-      <input class="scan-input" id="targetInput" placeholder="Enter Solana address, mint, signature or project name…">
+      <input class="scan-input" id="targetInput">
       <button class="scan-btn" id="scanBtn" onclick="runScan()">▶ Initiate Scan</button>
     </div>
     <div class="scan-hint" id="scanHint">// WALLET MODE — runs Wallet Score, Portfolio Tracker &amp; Risk Engine v2</div>
@@ -151,23 +151,16 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 <script src="/js/koschei-auth.js?v=5"></script>
 <script>
 const HINTS = {
-  wallet:  '// WALLET MODE — runs Wallet Score, Portfolio Tracker & Risk Engine v2',
-  token:   '// TOKEN MODE — runs Token Scanner, Project Radar & Risk Engine v2',
-  tx:      '// TRANSACTION MODE — runs TX Decoder, Risk Engine v2',
-  project: '// PROJECT MODE — runs Project Radar, Risk Engine v2'
-};
-const PLACEHOLDERS = {
-  wallet:  'Enter a public Solana wallet address…',
-  token:   'Enter a Solana token mint address…',
-  tx:      'Enter a Solana transaction signature…',
-  project: 'Enter a project name, website or GitHub URL…'
+  wallet:  '// WALLET MODE — runs production wallet modules only',
+  token:   '// TOKEN MODE — runs production token modules only',
+  tx:      '// TRANSACTION MODE — runs production transaction modules only',
+  project: '// PROJECT MODE — runs production project modules only'
 };
 
 const typeSel = document.getElementById('targetType');
 const input = document.getElementById('targetInput');
 typeSel.addEventListener('change', () => {
   document.getElementById('scanHint').textContent = HINTS[typeSel.value];
-  input.placeholder = PLACEHOLDERS[typeSel.value];
   document.getElementById('modulesGrid').classList.remove('show');
   document.getElementById('scorePanel').classList.remove('show');
 });
@@ -181,53 +174,49 @@ function setCard(mod, name, status, body) {
   st.textContent = status.toUpperCase();
   const b = card.querySelector('[data-body]');
   if (status === 'loading') {
-    b.innerHTML = 'Scanning…<div class="scan-line"></div>';
+    b.innerHTML = 'Requesting production data…<div class="scan-line"></div>';
   } else {
     b.textContent = body;
   }
 }
 
-function setRing(score) {
+function setRing(score, riskLevel) {
   const ring = document.getElementById('scoreRing');
   const circumference = 2 * Math.PI * 78;
-  const offset = circumference - (score / 100) * circumference;
-  let color = '#00ccff', verdict = 'ANALYZING';
-  if (score >= 70) { color = '#00ff88'; verdict = 'LOW RISK'; }
-  else if (score >= 40) { color = '#ffaa00'; verdict = 'CAUTION'; }
-  else { color = '#ff4466'; verdict = 'HIGH RISK'; }
+  const valid = Number.isFinite(score) && score > 0;
+  const offset = valid ? circumference - (score / 100) * circumference : circumference;
+  let color = '#7d93b2', verdict = 'UNKNOWN';
+  if (valid) {
+    if (riskLevel === 'LOW' || score >= 80) { color = '#00ff88'; verdict = 'LOW RISK'; }
+    else if (riskLevel === 'MEDIUM' || score >= 60) { color = '#ffaa00'; verdict = 'CAUTION'; }
+    else { color = '#ff4466'; verdict = 'HIGH RISK'; }
+  }
   ring.setAttribute('stroke-dasharray', circumference);
   ring.style.stroke = color;
   setTimeout(() => { ring.style.strokeDashoffset = offset; }, 60);
-  document.getElementById('scoreNum').textContent = isFinite(score) ? score : '--';
+  document.getElementById('scoreNum').textContent = valid ? score : '--';
   document.getElementById('scoreNum').style.color = color;
   document.getElementById('scoreVerdict').textContent = verdict;
   document.getElementById('scoreVerdict').style.color = color;
 }
 
-function summarize(data, fallback) {
-  if (!data || typeof data !== 'object') return fallback;
+function summarizeModule(module) {
+  if (!module || typeof module !== 'object') return 'Real data unavailable. Analysis could not be completed.';
+  if (module.status !== 'ok') {
+    const reason = module.error || module.summary || 'Real data unavailable. Analysis could not be completed.';
+    return `Status: ${module.status}\n${reason}`;
+  }
   const lines = [];
-  const keys = ['score','risk_level','overall_score','status','holders','supply','mint_authority','freeze_authority','message','summary'];
-  for (const k of keys) {
-    if (data[k] !== undefined && data[k] !== null) lines.push(`${k}: ${JSON.stringify(data[k])}`);
-  }
-  if (lines.length === 0) {
-    const text = JSON.stringify(data);
-    return text.length > 220 ? text.slice(0, 220) + '…' : text;
-  }
-  return lines.slice(0,6).join('\n');
+  if (module.score !== undefined) lines.push(`score: ${module.score}`);
+  if (module.risk_level) lines.push(`risk_level: ${module.risk_level}`);
+  if (module.summary) lines.push(`summary: ${module.summary}`);
+  if (Array.isArray(module.findings) && module.findings.length) lines.push(`findings: ${module.findings.slice(0,3).join(' | ')}`);
+  if (module.data) lines.push(`data: ${JSON.stringify(module.data).slice(0, 260)}`);
+  return lines.join('\n') || 'Completed with production data.';
 }
 
-function extractScore(data) {
-  if (!data || typeof data !== 'object') return null;
-  for (const k of ['overall_score','score','risk_score','wallet_score','trust_score']) {
-    if (typeof data[k] === 'number') return Math.max(0, Math.min(100, Math.round(data[k])));
-  }
-  return null;
-}
-
-async function callApi(endpoint, body) {
-  const res = await KoscheiAuth.apiCall(endpoint, {
+async function callUnified(body) {
+  const res = await KoscheiAuth.apiCall('/api/v1/unified/analyze', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify(body)
@@ -237,9 +226,17 @@ async function callApi(endpoint, body) {
   if (!res.ok) {
     if (res.status === 401) throw new Error('auth_required');
     if (res.status === 402 || data.error === 'insufficient_outputs') throw new Error('insufficient_credits');
-    throw new Error(data.error || `error_${res.status}`);
+    const partial = data.result ? ` Partial result: ${JSON.stringify(data.result.module_results || {})}` : '';
+    throw new Error((data.message || data.error || `error_${res.status}`) + partial);
   }
   return data;
+}
+
+function moduleCardsFor(type) {
+  if (type === 'wallet') return [['primary','⬡ Wallet Score','wallet_score'],['secondary','◎ Sybil Graph','sybil_graph'],['risk','⚠ Risk Engine','risk_scanner']];
+  if (type === 'token') return [['primary','🪙 Token Scanner','token_scanner'],['risk','⚠ Risk Engine','risk_scanner']];
+  if (type === 'tx') return [['primary','🔍 TX Decoder','tx_decoder'],['risk','⚠ Risk Engine','risk_scanner']];
+  return [['primary','📡 Project Radar','project_radar'],['risk','⚠ Risk Engine','risk_scanner']];
 }
 
 async function runScan() {
@@ -250,6 +247,7 @@ async function runScan() {
   const target = input.value.trim();
   const errBox = document.getElementById('scanError');
   errBox.className = 'alert alert-error';
+  errBox.textContent = '';
   if (!target) { errBox.textContent = 'Please enter a target value.'; errBox.classList.add('show'); return; }
 
   const btn = document.getElementById('scanBtn');
@@ -257,96 +255,41 @@ async function runScan() {
   document.getElementById('modulesGrid').classList.add('show');
   document.getElementById('scorePanel').classList.add('show');
   document.getElementById('scoreTarget').textContent = target;
+  setRing(NaN, 'UNKNOWN');
 
-  const allCards = {
-    wallet:  [['primary','⬡ Wallet Score'],['secondary','💼 Portfolio Tracker']],
-    token:   [['primary','🪙 Token Scanner'],['secondary','📡 Project Radar']],
-    tx:      [['primary','🔍 TX Decoder'],['secondary','— ']],
-    project: [['primary','📡 Project Radar'],['secondary','— ']]
-  };
-  document.querySelectorAll('[data-mod]').forEach(c => {
-    const mod = c.dataset.mod;
-    if (mod === 'risk') { setCard('risk', null, 'loading', ''); return; }
-    if (mod === 'radar' && type !== 'token' && type !== 'project') { c.style.display='none'; }
-    else c.style.display='';
-  });
-  const [p1, p2] = allCards[type];
-  setCard('primary', p1[1], 'loading', '');
-  setCard('secondary', p2[1], type==='tx'||type==='project' ? 'pending' : 'loading', type==='tx'||type==='project' ? 'Not applicable for this target type.' : '');
-  if (type === 'token' || type === 'project') setCard('radar', null, 'loading', '');
+  document.querySelectorAll('[data-mod]').forEach(c => { c.style.display = 'none'; });
+  const cards = moduleCardsFor(type);
+  cards.forEach(([slot, label]) => { const c = document.querySelector(`[data-mod="${slot}"]`); if (c) { c.style.display = ''; setCard(slot, label, 'loading', ''); } });
 
-  const calls = [];
-
-  // Risk Engine v2 — always runs
-  calls.push(
-    callApi('/api/web3/risk-v2', { target, target_type: type, chain: 'solana', network: 'mainnet' })
-      .then(d => {
-        const score = extractScore(d);
-        setCard('risk', null, 'ok', summarize(d, 'No risk data returned.'));
-        return { key: 'risk', score, weight: 1 };
-      })
-      .catch(e => { setCard('risk', null, e.message==='insufficient_credits'?'warn':'err', errMsg(e)); return {key:'risk',score:null,weight:0}; })
-  );
-
-  if (type === 'wallet') {
-    calls.push(
-      callApi('/api/wallet/score', { address: target, network: 'mainnet' })
-        .then(d => { const s=extractScore(d); setCard('primary', null, 'ok', summarize(d,'No data.')); return {key:'primary',score:s,weight:1}; })
-        .catch(e => { setCard('primary', null, e.message==='insufficient_credits'?'warn':'err', errMsg(e)); return {key:'primary',score:null,weight:0}; })
-    );
-    calls.push(
-      callApi('/api/portfolio/track', { addresses: [target], network: 'mainnet' })
-        .then(d => { setCard('secondary', null, 'ok', summarize(d,'No portfolio data.')); return {key:'secondary',score:null,weight:0}; })
-        .catch(e => { setCard('secondary', null, e.message==='insufficient_credits'?'warn':'err', errMsg(e)); return {key:'secondary',score:null,weight:0}; })
-    );
-  } else if (type === 'token') {
-    calls.push(
-      callApi('/api/token/scan', { mint: target, network: 'solana-mainnet' })
-        .then(d => { const s=extractScore(d); setCard('primary', null, 'ok', summarize(d,'No data.')); return {key:'primary',score:s,weight:1}; })
-        .catch(e => { setCard('primary', null, e.message==='insufficient_credits'?'warn':'err', errMsg(e)); return {key:'primary',score:null,weight:0}; })
-    );
-    setCard('secondary', null, 'pending', 'Not applicable for token scans.');
-    calls.push(
-      callApi('/api/web3/project-radar', { project_name: target, token_mint_address: target, ecosystem: 'Solana', category: 'token' })
-        .then(d => { setCard('radar', null, 'ok', summarize(d,'No project data.')); return {key:'radar',score:null,weight:0}; })
-        .catch(e => { setCard('radar', null, e.message==='insufficient_credits'?'warn':'err', errMsg(e)); return {key:'radar',score:null,weight:0}; })
-    );
-  } else if (type === 'tx') {
-    calls.push(
-      callApi('/api/tx/decode', { signature: target, network: 'mainnet' })
-        .then(d => { setCard('primary', null, 'ok', summarize(d,'No data.')); return {key:'primary',score:null,weight:0}; })
-        .catch(e => { setCard('primary', null, e.message==='insufficient_credits'?'warn':'err', errMsg(e)); return {key:'primary',score:null,weight:0}; })
-    );
-    setCard('secondary', null, 'pending', 'Not applicable for transaction scans.');
-  } else { // project
-    calls.push(
-      callApi('/api/web3/project-radar', { project_name: target, website_url: target.startsWith('http')?target:undefined, github_url: target.includes('github')?target:undefined, ecosystem: 'Solana', category: 'public good' })
-        .then(d => { const s=extractScore(d); setCard('primary', null, 'ok', summarize(d,'No data.')); return {key:'primary',score:s,weight:1}; })
-        .catch(e => { setCard('primary', null, e.message==='insufficient_credits'?'warn':'err', errMsg(e)); return {key:'primary',score:null,weight:0}; })
-    );
-    setCard('secondary', null, 'pending', 'Not applicable for project scans.');
-    setCard('radar', null, 'pending', 'Same as primary scan for project targets.');
-    document.querySelector('[data-mod="radar"]').style.display = 'none';
-  }
-
-  const results = await Promise.allSettled(calls);
-  let total = 0, weight = 0;
-  results.forEach(r => {
-    if (r.status === 'fulfilled' && r.value && r.value.score !== null && r.value.weight) {
-      total += r.value.score; weight += r.value.weight;
+  try {
+    const payload = await callUnified({ target, target_id: target, target_type: type, network: 'solana-mainnet' });
+    const result = payload.result || {};
+    const modules = result.module_results || {};
+    cards.forEach(([slot, label, key]) => {
+      const module = modules[key];
+      const status = !module ? 'err' : module.status === 'ok' ? 'ok' : (module.status === 'timeout' ? 'warn' : 'err');
+      setCard(slot, label, status, summarizeModule(module));
+    });
+    if (result.partial_success) {
+      errBox.textContent = 'Partial report: one or more sections could not retrieve production data.';
+      errBox.classList.add('show');
     }
-  });
-  const overall = weight > 0 ? Math.round(total / weight) : NaN;
-  setRing(overall);
-
-  btn.disabled = false; btn.textContent = '▶ Initiate Scan';
+    setRing(Number(result.overall_score), result.risk_level);
+  } catch (e) {
+    cards.forEach(([slot, label]) => setCard(slot, label, 'err', errMsg(e)));
+    errBox.textContent = errMsg(e);
+    errBox.classList.add('show');
+    setRing(NaN, 'UNKNOWN');
+  } finally {
+    btn.disabled = false; btn.textContent = '▶ Initiate Scan';
+  }
 }
 
 function errMsg(e) {
   if (e.message === 'auth_required') return 'AUTH REQUIRED — please sign in again.';
   if (e.message === 'insufficient_credits') return 'INSUFFICIENT CREDITS — visit /pricing.html to top up.';
   if (e.message === 'network_error') return 'NETWORK ERROR — request failed.';
-  return 'ERROR: ' + e.message;
+  return e.message || 'Real data unavailable. Analysis could not be completed.';
 }
 
 (async () => { await KoscheiAuth.init(); })();
