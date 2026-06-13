@@ -47,9 +47,9 @@ type partialFailure struct {
 	Message string `json:"message"`
 }
 
-// UnifiedIntelligenceHandler runs the six enterprise intelligence modules in
-// parallel and aggregates them into one persisted report. It intentionally uses
-// the existing RequireAuth middleware and does not alter auth/login/session flow.
+// UnifiedIntelligenceHandler runs the enterprise intelligence modules and
+// aggregates them into one persisted report. Premium access is enforced by the
+// route middleware; this handler must not reintroduce credit-based gates.
 func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
 	if !ok {
@@ -74,17 +74,6 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 	inputType = h.resolveUnifiedInputType(r.Context(), rawInput, input.Network, inputType)
 	if inputType == "unknown" {
 		inputType = "question"
-	}
-	if !activePackage {
-		writeAPIError(w, http.StatusPaymentRequired, "PACKAGE_REQUIRED", "Active Koschei package required")
-		return
-	}
-	if _, available, err := h.userCreditsAndRole(claims.Sub); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Credit access could not be verified."})
-		return
-	} else if available <= 0 {
-		writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_credits", "No intelligence scan credits remain on the active package."))
-		return
 	}
 
 	requestID := newRequestID()
