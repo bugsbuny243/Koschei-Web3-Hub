@@ -19,6 +19,7 @@ type ownerUserRecord struct {
 	WalletAddress string     `json:"wallet_address,omitempty"`
 	Credits       int        `json:"credits"`
 	Status        string     `json:"status"`
+	PlanID        string     `json:"plan_id"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
 	BannedAt      *time.Time `json:"banned_at,omitempty"`
@@ -41,6 +42,10 @@ type ownerBanInput struct {
 
 type ownerCommandInput struct {
 	Command string `json:"command"`
+}
+
+type ownerBrainInput struct {
+	Message string `json:"message"`
 }
 
 type ownerLoginInput struct {
@@ -97,7 +102,7 @@ func (h *Handler) OwnerUsers(w http.ResponseWriter, r *http.Request) {
 		where = `WHERE lower(email) LIKE $1 OR lower(COALESCE(wallet_address,'')) LIKE $1 OR lower(COALESCE(auth_subject,'')) LIKE $1`
 		args = append(args, "%"+q+"%")
 	}
-	rows, err := h.DB.QueryContext(r.Context(), `SELECT id::text, COALESCE(auth_subject,''), email, COALESCE(wallet_address,''), COALESCE(credits,0), COALESCE(status,'active'), created_at, updated_at, banned_at FROM app_user_profiles `+where+` ORDER BY created_at DESC LIMIT 500`, args...)
+	rows, err := h.DB.QueryContext(r.Context(), `SELECT id::text, COALESCE(auth_subject,''), email, COALESCE(wallet_address,''), COALESCE(credits,0), COALESCE(status,'active'), COALESCE(plan_id,''), created_at, updated_at, banned_at FROM app_user_profiles `+where+` ORDER BY created_at DESC LIMIT 500`, args...)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
 		return
@@ -106,7 +111,7 @@ func (h *Handler) OwnerUsers(w http.ResponseWriter, r *http.Request) {
 	users := []ownerUserRecord{}
 	for rows.Next() {
 		var u ownerUserRecord
-		if err := rows.Scan(&u.ID, &u.AuthSubject, &u.Email, &u.WalletAddress, &u.Credits, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.BannedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.AuthSubject, &u.Email, &u.WalletAddress, &u.Credits, &u.Status, &u.PlanID, &u.CreatedAt, &u.UpdatedAt, &u.BannedAt); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db scan failed"})
 			return
 		}
@@ -265,6 +270,210 @@ func (h *Handler) OwnerCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "status": status, "output": output})
+}
+
+func (h *Handler) OwnerBrain(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	if err := ensureOwnerSchema(r.Context(), h.DB); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"success": false, "code": "OWNER_SCHEMA_UNAVAILABLE", "message": "Owner schema unavailable.", "data": nil})
+		return
+	}
+	var req ownerBrainInput
+	if err := decodeJSON(r, &req); err != nil || strings.TrimSpace(req.Message) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"success": false, "code": "MESSAGE_REQUIRED", "message": "Komut mesajı gerekli.", "data": nil})
+		return
+	}
+	message := strings.TrimSpace(req.Message)
+	intent, result, humanMessage, ok := h.routeOwnerBrainCommand(r.Context(), message)
+	status := "completed"
+	code := "OK"
+	if !ok {
+		status = "unsupported"
+		code = "COMMAND_UNSUPPORTED"
+		humanMessage = "Bu komut henüz desteklenmiyor."
+	}
+	_, _ = h.DB.ExecContext(r.Context(), `INSERT INTO ai_command_logs (command, output, status, created_at) VALUES ($1,$2,$3,now())`, message, humanMessage, status)
+	if !ok {
+		writeJSON(w, http.StatusOK, map[string]any{"success": false, "code": code, "message": humanMessage, "data": nil})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "code": code, "message": humanMessage, "data": map[string]any{"intent": intent, "result": result}})
+}
+
+func (h *Handler) OwnerHealth(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	dbStatus := "connected"
+	if err := h.DB.PingContext(r.Context()); err != nil {
+		dbStatus = "error"
+	}
+	services := map[string]any{
+		"database": map[string]string{"status": dbStatus},
+		"openai":   map[string]string{"status": configuredStatus("OPENAI_API_KEY")},
+		"paddle":   map[string]string{"status": configuredStatus("PADDLE_API_KEY", "PADDLE_WEBHOOK_SECRET", "PADDLE_ENV")},
+		"alchemy":  map[string]string{"status": configuredStatusAny("ALCHEMY_API_KEY", "SOLANA_RPC_URL")},
+		"github":   map[string]string{"status": configuredStatus("GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO")},
+		"neon":     map[string]string{"status": configuredStatus("DATABASE_URL")},
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "services": services})
+}
+
+func (h *Handler) routeOwnerBrainCommand(ctx context.Context, message string) (string, map[string]any, string, bool) {
+	cmd := strings.ToLower(strings.TrimSpace(message))
+	cmd = strings.Join(strings.Fields(cmd), " ")
+	switch {
+	case strings.Contains(cmd, "son 24 saat") && strings.Contains(cmd, "hata"):
+		result := h.ownerRecentErrors(ctx)
+		return "recent_errors_24h", result, "Son 24 saat hata özeti hazır.", true
+	case strings.HasPrefix(cmd, "kullanıcı ara") || strings.HasPrefix(cmd, "kullanici ara"):
+		email := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(cmd, "kullanıcı ara"), "kullanici ara"))
+		result := h.ownerSearchUser(ctx, email)
+		return "user_search", result, "Kullanıcı arama sonucu hazır.", true
+	case strings.Contains(cmd, "bekleyen ödeme") || strings.Contains(cmd, "bekleyen odeme"):
+		result := h.ownerPendingPayments(ctx)
+		return "pending_payments", result, "Bekleyen ödemeler listelendi.", true
+	case strings.Contains(cmd, "paddle") && strings.Contains(cmd, "durum"):
+		return "paddle_status", envConfiguredResult([]string{"PADDLE_API_KEY", "PADDLE_WEBHOOK_SECRET", "PADDLE_ENV"}, false), "Paddle yapılandırma durumu hazır.", true
+	case strings.Contains(cmd, "openai") && strings.Contains(cmd, "durum"):
+		return "openai_status", envConfiguredResult([]string{"OPENAI_API_KEY"}, false), "OpenAI yapılandırma durumu hazır.", true
+	case strings.Contains(cmd, "alchemy") && strings.Contains(cmd, "durum"):
+		return "alchemy_status", envConfiguredResult([]string{"ALCHEMY_API_KEY", "SOLANA_RPC_URL"}, true), "Alchemy / Solana RPC yapılandırma durumu hazır.", true
+	case strings.Contains(cmd, "github") && strings.Contains(cmd, "durum"):
+		return "github_status", envConfiguredResult([]string{"GITHUB_TOKEN", "GITHUB_OWNER", "GITHUB_REPO"}, false), "GitHub yapılandırma durumu hazır.", true
+	case strings.Contains(cmd, "neon") && strings.Contains(cmd, "durum"):
+		return "neon_status", envConfiguredResult([]string{"DATABASE_URL"}, false), "Neon veritabanı yapılandırma durumu hazır.", true
+	default:
+		return "unsupported", nil, "", false
+	}
+}
+
+func (h *Handler) ownerRecentErrors(ctx context.Context) map[string]any {
+	result := map[string]any{}
+	if ownerTableExists(ctx, h.DB, "runtime_logs") {
+		result["runtime_logs"] = ownerQueryRows(ctx, h.DB, `SELECT created_at, level, message FROM runtime_logs WHERE created_at >= now() - interval '24 hours' AND lower(level) IN ('error','fatal','warn','warning') ORDER BY created_at DESC LIMIT 50`, []string{"created_at", "level", "message"})
+	}
+	if ownerTableExists(ctx, h.DB, "model_route_logs") {
+		result["api_logs"] = ownerQueryRows(ctx, h.DB, `SELECT created_at, provider, model, status, tool FROM model_route_logs WHERE created_at >= now() - interval '24 hours' AND lower(COALESCE(status,'')) NOT IN ('ok','success','completed') ORDER BY created_at DESC LIMIT 50`, []string{"created_at", "provider", "model", "status", "tool"})
+	}
+	if ownerTableExists(ctx, h.DB, "generation_jobs") {
+		result["failed_jobs"] = ownerQueryRows(ctx, h.DB, `SELECT created_at, updated_at, email, tool, provider, status FROM generation_jobs WHERE updated_at >= now() - interval '24 hours' AND lower(status) IN ('failed','error') ORDER BY updated_at DESC LIMIT 50`, []string{"created_at", "updated_at", "email", "tool", "provider", "status"})
+	}
+	if ownerTableExists(ctx, h.DB, "web3_jobs") {
+		result["failed_web3_jobs"] = ownerQueryRows(ctx, h.DB, `SELECT queued_at, updated_at, email, job_type, status, error_code, error_message FROM web3_jobs WHERE updated_at >= now() - interval '24 hours' AND lower(status) IN ('failed','error') ORDER BY updated_at DESC LIMIT 50`, []string{"queued_at", "updated_at", "email", "job_type", "status", "error_code", "error_message"})
+	}
+	if ownerTableExists(ctx, h.DB, "payment_requests") {
+		result["failed_payments"] = ownerQueryRows(ctx, h.DB, `SELECT created_at, reviewed_at, email, product_id, amount_try, currency, status FROM payment_requests WHERE created_at >= now() - interval '24 hours' AND lower(status) IN ('failed','rejected','error') ORDER BY created_at DESC LIMIT 50`, []string{"created_at", "reviewed_at", "email", "product_id", "amount_try", "currency", "status"})
+	}
+	return result
+}
+
+func (h *Handler) ownerSearchUser(ctx context.Context, email string) map[string]any {
+	result := map[string]any{"email": email, "user": nil, "entitlement": map[string]any{"active": false}}
+	if email == "" || !ownerTableExists(ctx, h.DB, "app_user_profiles") {
+		return result
+	}
+	rows := ownerQueryRows(ctx, h.DB, `SELECT email, COALESCE(auth_subject,''), COALESCE(status,'active'), COALESCE(plan_id,''), COALESCE(credits,0), created_at, updated_at FROM app_user_profiles WHERE lower(email)=lower($1) LIMIT 1`, []string{"email", "auth_subject", "status", "plan_id", "credits_legacy", "created_at", "updated_at"}, email)
+	if len(rows) > 0 {
+		result["user"] = rows[0]
+	}
+	if ownerTableExists(ctx, h.DB, "entitlements") {
+		rows = ownerQueryRows(ctx, h.DB, `SELECT plan_id, status, created_at AS starts_at, NULL::timestamptz AS expires_at FROM entitlements WHERE lower(email)=lower($1) AND status='active' ORDER BY updated_at DESC, created_at DESC LIMIT 1`, []string{"plan_id", "status", "starts_at", "expires_at"}, email)
+		if len(rows) > 0 {
+			rows[0]["active"] = true
+			result["entitlement"] = rows[0]
+		}
+	}
+	return result
+}
+
+func (h *Handler) ownerPendingPayments(ctx context.Context) map[string]any {
+	if !ownerTableExists(ctx, h.DB, "payment_requests") {
+		return map[string]any{"payment_requests": []map[string]any{}, "table_exists": false}
+	}
+	rows := ownerQueryRows(ctx, h.DB, `SELECT id::text, email, COALESCE(full_name,''), COALESCE(product_id,''), COALESCE(amount_try,0), COALESCE(currency,'TRY'), status, created_at FROM payment_requests WHERE status='pending' ORDER BY created_at DESC LIMIT 100`, []string{"id", "email", "full_name", "product_id", "amount_try", "currency", "status", "created_at"})
+	return map[string]any{"payment_requests": rows, "count": len(rows), "table_exists": true}
+}
+
+func configuredStatus(keys ...string) string {
+	for _, key := range keys {
+		if strings.TrimSpace(os.Getenv(key)) == "" {
+			return "missing"
+		}
+	}
+	return "configured"
+}
+
+func configuredStatusAny(keys ...string) string {
+	for _, key := range keys {
+		if strings.TrimSpace(os.Getenv(key)) != "" {
+			return "configured"
+		}
+	}
+	return "missing"
+}
+
+func envConfiguredResult(keys []string, anyMode bool) map[string]any {
+	items := map[string]bool{}
+	configuredCount := 0
+	for _, key := range keys {
+		ok := strings.TrimSpace(os.Getenv(key)) != ""
+		items[key] = ok
+		if ok {
+			configuredCount++
+		}
+	}
+	status := "missing"
+	if (!anyMode && configuredCount == len(keys)) || (anyMode && configuredCount > 0) {
+		status = "configured"
+	}
+	return map[string]any{"status": status, "configured": items}
+}
+
+func ownerTableExists(ctx context.Context, db *sql.DB, table string) bool {
+	var exists bool
+	_ = db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = ANY (current_schemas(false)) AND table_name = $1)`, table).Scan(&exists)
+	return exists
+}
+
+func ownerQueryRows(ctx context.Context, db *sql.DB, query string, keys []string, args ...any) []map[string]any {
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return []map[string]any{}
+	}
+	defer rows.Close()
+	items := []map[string]any{}
+	vals := make([]any, len(keys))
+	ptrs := make([]any, len(keys))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	for rows.Next() {
+		if err := rows.Scan(ptrs...); err != nil {
+			continue
+		}
+		item := map[string]any{}
+		for i, key := range keys {
+			item[key] = ownerJSONValue(vals[i])
+		}
+		items = append(items, item)
+	}
+	return items
+}
+
+func ownerJSONValue(v any) any {
+	switch t := v.(type) {
+	case nil:
+		return nil
+	case []byte:
+		return string(t)
+	case time.Time:
+		return t
+	default:
+		return t
+	}
 }
 
 func (h *Handler) OwnerStatus(w http.ResponseWriter, r *http.Request) {

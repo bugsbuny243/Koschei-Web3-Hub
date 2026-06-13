@@ -246,6 +246,25 @@
       overflow: auto;
     }
     .log-line { margin: 0 0 8px; white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
+    .quick-commands { display: flex; flex-wrap: wrap; gap: 8px; }
+    .quick-commands button { padding: 8px 10px; font-size: 12px; }
+    .brain-chat {
+      display: grid;
+      gap: 10px;
+      min-height: 260px;
+      max-height: 430px;
+      overflow: auto;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(0,0,0,.18);
+    }
+    .bubble { max-width: 86%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 18px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+    .bubble.owner { justify-self: end; background: rgba(0,255,170,.12); border-color: rgba(0,255,170,.24); }
+    .bubble.koschei { justify-self: start; background: rgba(97,217,255,.10); border-color: rgba(97,217,255,.23); }
+    .bubble.error { border-color: rgba(255,77,109,.36); background: rgba(255,77,109,.10); }
+    .bubble-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--muted); font-size: 12px; font-weight: 800; }
+    .brain-state { min-height: 22px; color: var(--muted); font-size: 13px; }
     .health-grid { display: grid; gap: 10px; }
     .health {
       display: flex; justify-content: space-between; gap: 12px; align-items: center;
@@ -306,7 +325,7 @@
           <div>
             <div class="eyebrow">Koschei Control Layer</div>
             <h1>A.R.V.I.S Owner Command Center</h1>
-            <p class="muted">Kullanıcı, ödeme, paket, AI router, sistem sağlığı ve operasyon logları.</p>
+            <p class="muted">Kullanıcı, ödeme, paket, Koschei Central Brain, gerçek sistem sağlığı ve operasyon logları.</p>
           </div>
         </div>
         <div class="row">
@@ -325,7 +344,7 @@
               <a href="#users">Users</a>
               <a href="#payments">Payments</a>
               <a href="#packages">Packages</a>
-              <a href="#ai">AI Router</a>
+              <a href="#ai">Central Brain</a>
               <a href="#health">System Health</a>
               <a href="#grants">Radar</a>
             </nav>
@@ -336,7 +355,7 @@
           <div class="health"><span>Owner Session</span><span class="status active">active</span></div>
           <div class="health"><span>Package Model</span><span class="status active">entitlement first</span></div>
           <div class="health"><span>Credit System</span><span class="status pending">legacy read-only</span></div>
-          <div class="health"><span>AI Terminal</span><span class="status pending">command log only</span></div>
+          <div class="health"><span>Central Brain</span><span class="status active">owner-only router</span></div>
         </aside>
       </section>
 
@@ -356,7 +375,7 @@
             <h2>Kullanıcı Yönetimi</h2>
             <input id="userFilter" style="max-width:300px" placeholder="E-posta, auth subject veya wallet ara">
           </div>
-          <p class="tiny" style="margin-bottom:12px">Kredi butonu kaldırıldı. Credits alanı sadece legacy veri olarak gösterilir. Yeni erişim modeli paket/entitlement olmalı.</p>
+          <p class="tiny" style="margin-bottom:12px">Credits alanı yalnızca Legacy credit balance olarak gösterilir. Yeni erişim modeli paket/entitlement merkezlidir.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -364,7 +383,7 @@
                   <th>E-posta</th>
                   <th>Owner/Auth ID</th>
                   <th>Paket</th>
-                  <th>Legacy Kredi</th>
+                  <th>Legacy credit balance</th>
                   <th>Durum</th>
                   <th>Oluşturma</th>
                   <th>Aksiyon</th>
@@ -403,24 +422,26 @@
         <article class="card span-5" id="health">
           <div class="toolbar">
             <h2>Sistem Sağlığı</h2>
-            <span class="pill">Frontend gözlemi</span>
+            <span class="pill">/api/owner/health</span>
           </div>
           <div class="health-grid" id="healthGrid"></div>
-          <p class="tiny" style="margin-top:12px">Not: Gerçek provider ping için backend'e ayrı health endpoint eklenmeli.</p>
+          <p class="tiny" style="margin-top:12px">Secret değerleri gösterilmez; sadece yapılandırma durumu listelenir.</p>
         </article>
 
         <article class="card span-7" id="ai">
           <div class="toolbar">
-            <h2>AI Router / Komut Terminali</h2>
-            <span class="pill">OpenAI primary · Together fallback</span>
+            <h2>KOSCHEI CENTRAL BRAIN</h2>
+            <span class="pill">Owner-only command router</span>
           </div>
           <div class="stack">
-            <textarea id="commandInput" placeholder="Owner komutu yaz. Örn: Son 24 saatteki hataları özetle, bekleyen ödemeleri raporla..."></textarea>
+            <div class="quick-commands" id="quickCommands" aria-label="Hızlı owner komutları"></div>
+            <div class="brain-chat" id="brainChat" aria-live="polite"></div>
             <div class="row">
-              <button id="runCommandButton">Komutu logla</button>
-              <button class="secondary" id="clearTerminalButton">Terminali temizle</button>
+              <input id="commandInput" placeholder="Koschei'ye komut ver: kullanıcı ara, hataları özetle, ödeme kontrol et, GitHub durumu, Neon sorgusu...">
+              <button id="runCommandButton">Gönder</button>
             </div>
-            <p class="tiny">Mevcut backend komutu sadece ai_command_logs tablosuna kaydediyor. Gerçek ajan çalıştırma ayrı backend işi.</p>
+            <div class="brain-state" id="brainState"></div>
+            <h3>Canlı Operasyon Akışı</h3>
             <div class="terminal" id="terminal" aria-live="polite"></div>
           </div>
         </article>
@@ -431,10 +452,10 @@
             <span class="pill">Backend gerekli</span>
           </div>
           <div class="stack">
-            <button class="warn" disabled>Bakım modunu aç</button>
-            <button class="danger" disabled>Yeni satışları durdur</button>
-            <button class="danger" disabled>Premium API erişimini durdur</button>
-            <p class="tiny">Bu butonlar bilinçli olarak pasif. Gerçek endpoint eklenmeden üretim sistemine müdahale etmez.</p>
+            <button class="warn" disabled>Bakım modu — Backend endpoint gerekli</button>
+            <button class="danger" disabled>Satışları durdur — Backend endpoint gerekli</button>
+            <button class="danger" disabled>Premium API erişimi — Backend endpoint gerekli</button>
+            <p class="tiny">Backend endpoint gerekli. Bu panel gerçek endpoint olmadan acil durum işlemini çalışmış gibi göstermez.</p>
           </div>
         </aside>
 
@@ -465,12 +486,16 @@
       grants: [],
       metrics: {},
       logs: [],
+      services: {},
+      brainMessages: [{ role: 'koschei', status: 'ready', text: 'Koschei Central Brain hazır. Gerçek owner komutlarını çalıştırabilirim.' }],
+      brainLoading: false,
       ownerError: '',
       apiHealth: {
         status: 'unknown',
         users: 'unknown',
         payments: 'unknown',
-        grants: 'unknown'
+        grants: 'unknown',
+        health: 'unknown'
       }
     };
 
@@ -551,11 +576,12 @@
       $('syncDot').className = 'dot warn';
 
       try {
-        const [status, users, payments, grants] = await Promise.all([
+        const [status, users, payments, grants, health] = await Promise.all([
           safeLoad('status', () => api('/api/owner/status')),
           safeLoad('users', () => api('/api/owner/users')),
           safeLoad('payments', () => api('/api/owner/payment-requests')),
-          safeLoad('grants', () => api('/api/owner/grants'))
+          safeLoad('grants', () => api('/api/owner/grants')),
+          safeLoad('health', () => api('/api/owner/health'))
         ]);
 
         state.metrics = status.metrics || {};
@@ -563,6 +589,7 @@
         state.users = users.users || users.items || [];
         state.payments = payments.payment_requests || payments.requests || payments.items || [];
         state.grants = grants.grants || [];
+        state.services = health.services || {};
         state.ownerError = '';
 
         renderAll();
@@ -588,6 +615,8 @@
       renderPayments();
       renderHealth();
       renderGrants();
+      renderBrain();
+      renderQuickCommands();
       renderTerminal();
     }
 
@@ -649,7 +678,7 @@
           text('td', u.email),
           text('td', u.auth_subject || u.wallet_address || '—'),
           text('td', inferUserPlan(u)),
-          text('td', formatNumber(u.credits)),
+          text('td', `Legacy credit balance: ${formatNumber(u.credits)}`),
           statusCell(u.status),
           text('td', formatDate(u.created_at))
         );
@@ -713,15 +742,14 @@
       const grid = $('healthGrid');
       grid.replaceChildren();
 
+      const serviceStatus = (name) => (state.services[name] && state.services[name].status) || (state.apiHealth.health === 'error' ? 'Bu işlem için backend endpoint gerekli.' : 'unknown');
       const items = [
-        ['Owner Status API', state.apiHealth.status],
-        ['Users API', state.apiHealth.users],
-        ['Payments API', state.apiHealth.payments],
-        ['Grants API', state.apiHealth.grants],
-        ['OpenAI API', 'backend health gerekli'],
-        ['Paddle API', 'backend health gerekli'],
-        ['Alchemy RPC', 'backend health gerekli'],
-        ['Database', state.ownerError ? 'error' : 'connected']
+        ['Database', serviceStatus('database')],
+        ['OpenAI API', serviceStatus('openai')],
+        ['Paddle API', serviceStatus('paddle')],
+        ['Alchemy / Solana RPC', serviceStatus('alchemy')],
+        ['GitHub API', serviceStatus('github')],
+        ['Neon Database URL', serviceStatus('neon')]
       ];
 
       items.forEach(([label, value]) => {
@@ -756,7 +784,7 @@
       terminal.replaceChildren();
 
       if (!state.logs.length) {
-        terminal.append(text('p', 'Henüz operasyon logu yok.', 'log-line'));
+        terminal.append(text('p', 'Henüz gerçek operasyon kaydı yok.', 'log-line'));
         return;
       }
 
@@ -778,8 +806,8 @@
     function statusBadge(value) {
       const v = String(value || 'unknown').toLowerCase();
       const badge = text('span', value || 'unknown', `status ${v.replaceAll(' ', '-')}`);
-      if (v.includes('error') || v.includes('failed') || v.includes('banned') || v.includes('removed')) badge.className = 'status error';
-      else if (v.includes('active') || v.includes('connected') || v.includes('approved') || v === 'ok') badge.className = 'status active';
+      if (v.includes('error') || v.includes('failed') || v.includes('banned') || v.includes('removed') || v.includes('missing')) badge.className = 'status error';
+      else if (v.includes('active') || v.includes('connected') || v.includes('configured') || v.includes('approved') || v === 'ok') badge.className = 'status active';
       else if (v.includes('pending') || v.includes('queued') || v.includes('unknown') || v.includes('gerekli')) badge.className = 'status pending';
       return badge;
     }
@@ -803,33 +831,74 @@
       }
     }
 
+    const quickCommandLabels = ['Son 24 saat hataları', 'Kullanıcı ara', 'Bekleyen ödemeler', 'Paddle durumu', 'OpenAI durumu', 'Alchemy durumu', 'GitHub durumu', 'Neon durumu'];
+
+    function renderQuickCommands() {
+      const wrap = $('quickCommands');
+      if (!wrap || wrap.childElementCount) return;
+      quickCommandLabels.forEach((label) => {
+        wrap.appendChild(button(label, 'secondary', () => {
+          $('commandInput').value = label === 'Kullanıcı ara' ? 'kullanıcı ara onur24sel@gmail.com' : label.toLowerCase();
+          $('commandInput').focus();
+        }));
+      });
+    }
+
+    function renderBrain() {
+      const chat = $('brainChat');
+      if (!chat) return;
+      chat.replaceChildren();
+      state.brainMessages.forEach((msg) => {
+        const bubble = document.createElement('div');
+        bubble.className = `bubble ${msg.role === 'owner' ? 'owner' : 'koschei'}${msg.error ? ' error' : ''}`;
+        const head = document.createElement('div');
+        head.className = 'bubble-head';
+        head.append(text('span', msg.role === 'owner' ? 'Owner' : 'Koschei'), statusBadge(msg.status || 'ok'));
+        bubble.append(head, text('div', msg.text));
+        if (msg.data) bubble.append(text('pre', JSON.stringify(msg.data, null, 2), 'tiny'));
+        chat.appendChild(bubble);
+      });
+      $('brainState').textContent = state.brainLoading ? 'Koschei komutu çalıştırıyor...' : '';
+      chat.scrollTop = chat.scrollHeight;
+    }
+
     async function runCommand() {
       const command = $('commandInput').value.trim();
       if (!command) { toast('Komut yazın.'); return; }
+      state.brainMessages.push({ role: 'owner', status: 'sent', text: command });
+      state.brainLoading = true;
+      $('runCommandButton').disabled = true;
+      renderBrain();
 
       try {
-        const res = await api('/api/owner/command', {
+        const res = await api('/api/owner/brain', {
           method: 'POST',
-          body: JSON.stringify({ command })
+          body: JSON.stringify({ message: command })
         });
-        toast('AI komutu loglandı.');
-        state.logs.unshift({
-          message: command,
-          status: res.status || 'queued',
-          output: res.output || '',
-          created_at: new Date().toISOString()
+        state.brainMessages.push({
+          role: 'koschei',
+          status: res.success ? res.code : 'error',
+          text: res.message || 'Komut tamamlandı.',
+          data: res.data || null,
+          error: !res.success
         });
-        renderTerminal();
+        state.logs.unshift({ message: command, status: res.success ? 'completed' : res.code, output: res.message, created_at: new Date().toISOString() });
         $('commandInput').value = '';
+        renderTerminal();
       } catch (err) {
+        state.brainMessages.push({ role: 'koschei', status: 'error', text: err.message || 'Bu işlem için backend endpoint gerekli.', error: true });
         toast(err.message || 'Komut çalışmadı.');
+      } finally {
+        state.brainLoading = false;
+        $('runCommandButton').disabled = false;
+        renderBrain();
       }
     }
 
     $('loginButton').addEventListener('click', login);
     $('refreshButton').addEventListener('click', refreshAll);
     $('runCommandButton').addEventListener('click', runCommand);
-    $('clearTerminalButton').addEventListener('click', () => { state.logs = []; renderTerminal(); });
+    $('commandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') runCommand(); });
     $('userFilter').addEventListener('input', renderUsers);
 
     window.setInterval(() => {
