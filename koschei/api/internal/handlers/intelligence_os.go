@@ -25,9 +25,15 @@ func userEmail(w http.ResponseWriter, r *http.Request) (string, bool) {
 	return normalizedClaimEmail(c), true
 }
 func (h *Handler) logTool(email, tool, status string) {
+	if h.DB == nil {
+		return
+	}
 	_, _ = h.DB.Exec(`INSERT INTO tool_usage_logs(email,tool_key,status) VALUES(NULLIF($1,''),$2,$3)`, email, tool, status)
 }
 func (h *Handler) trackEvent(email, name, path string) {
+	if h.DB == nil {
+		return
+	}
 	_, _ = h.DB.Exec(`INSERT INTO analytics_events(event_name,email,path,metadata) VALUES($1,NULLIF($2,''),$3,'{}'::jsonb)`, name, email, path)
 }
 
