@@ -89,6 +89,28 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 	return err
 }
 
+func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) {
+	if h.DB == nil {
+		return false, errors.New("database unavailable")
+	}
+	authSubject = strings.TrimSpace(authSubject)
+	email = strings.ToLower(strings.TrimSpace(email))
+	var active bool
+	err := h.DB.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM entitlements e
+			LEFT JOIN app_user_profiles p ON lower(p.email) = lower(e.email)
+			WHERE e.status = 'active'
+			  AND COALESCE(e.plan_id, '') <> 'free'
+			  AND (
+				($1 <> '' AND p.auth_subject = $1)
+				OR ($2 <> '' AND lower(e.email) = lower($2))
+			  )
+		)`, authSubject, email).Scan(&active)
+	return active, err
+}
+
 func (h *Handler) requirePremiumOutput(authSubject string) (int, error) {
 	if h.DB == nil {
 		return 0, errors.New("database unavailable")

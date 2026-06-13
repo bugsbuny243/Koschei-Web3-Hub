@@ -13,6 +13,7 @@ import (
 )
 
 type unifiedAnalyzeHTTPInput struct {
+	Target     string `json:"target"`
 	TargetType string `json:"target_type"`
 	TargetID   string `json:"target_id"`
 	Network    string `json:"network"`
@@ -41,16 +42,40 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
 		return
 	}
+	input.Target = strings.TrimSpace(input.Target)
 	input.TargetType = strings.TrimSpace(input.TargetType)
 	input.TargetID = strings.TrimSpace(input.TargetID)
 	input.Network = strings.TrimSpace(input.Network)
 	input.Notes = strings.TrimSpace(input.Notes)
+	if input.TargetID == "" {
+		input.TargetID = input.Target
+	}
+	if input.TargetType == "" {
+		input.TargetType = inferUnifiedTargetType(input.TargetID)
+	}
 	if input.TargetType == "" || input.TargetID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "target_type_and_target_id_required"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "target_required", "message": "Wallet address, token mint, transaction hash, project URL, or project name is required."})
 		return
 	}
 	if input.Network == "" {
 		input.Network = "solana-mainnet"
+	}
+
+	activePackage, err := h.hasActivePaidPackage(claims.Sub, normalizedClaimEmail(claims))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Package access could not be verified."})
+		return
+	}
+	if !activePackage {
+		writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_active_package", "An active Koschei package is required to access the A.R.V.I.S Command Center."))
+		return
+	}
+	if _, available, err := h.userCreditsAndRole(claims.Sub); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Credit access could not be verified."})
+		return
+	} else if available <= 0 {
+		writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_credits", "No intelligence scan credits remain on the active package."))
+		return
 	}
 
 	requestID := newRequestID()
@@ -65,6 +90,23 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
+	}
+
+	if h.DB != nil {
+		tx, err := h.DB.BeginTx(r.Context(), nil)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Credit charge could not be started."})
+			return
+		}
+		if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, normalizedClaimEmail(claims), "unified_intelligence:"+requestID); err != nil {
+			_ = tx.Rollback()
+			writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_credits", "No intelligence scan credits remain on the active package."))
+			return
+		}
+		if err := tx.Commit(); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Credit charge could not be committed."})
+			return
+		}
 	}
 
 	saved := false
@@ -94,6 +136,36 @@ func (h *Handler) saveUnifiedReport(ctx context.Context, userID string, result s
 		VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, now())`,
 		result.RequestID, nullIfEmpty(userID), result.TargetType, result.TargetID, result.OverallScore, result.RiskLevel, string(moduleResults))
 	return err
+}
+
+func inferUnifiedTargetType(target string) string {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return ""
+	}
+	lower := strings.ToLower(target)
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.Contains(lower, ".") && !strings.Contains(lower, " ") {
+		return "project"
+	}
+	if strings.HasPrefix(lower, "0x") && len(lower) == 66 {
+		return "tx"
+	}
+	if len(target) >= 87 {
+		return "tx"
+	}
+	if len(target) >= 32 && len(target) <= 44 && !strings.Contains(target, " ") {
+		return "address"
+	}
+	return "project"
+}
+
+func unifiedAccessError(code, message string) map[string]any {
+	return map[string]any{
+		"ok":              false,
+		"error":           code,
+		"message":         message,
+		"credits_charged": false,
+	}
 }
 
 func newRequestID() string {
