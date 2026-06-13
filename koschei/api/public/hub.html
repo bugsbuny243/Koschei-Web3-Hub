@@ -122,7 +122,9 @@
     h2 { margin: 0; font-size: clamp(26px, 3vw, 38px); letter-spacing: -.04em; }
     .section-note { margin: 8px 0 0; color: var(--text2); line-height: 1.6; }
     .modules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-    .module-card { position: relative; display: flex; flex-direction: column; gap: 10px; min-height: 220px; padding: 24px; border-radius: 28px; color: var(--text); text-decoration: none; overflow: hidden; transition: transform .2s ease, border-color .2s ease; }
+    .module-card { position: relative; display: flex; flex-direction: column; gap: 10px; min-height: 220px; padding: 24px; border: 1px solid var(--line); border-radius: 28px; color: var(--text); text-decoration: none; overflow: hidden; background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.045)); box-shadow: var(--shadow); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); transition: transform .2s ease, border-color .2s ease; }
+    .module-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .live-dot { display: inline-flex; align-items: center; justify-content: center; min-height: 24px; padding: 0 9px; border-radius: 999px; color: #8eeeff; background: rgba(0,204,255,.12); border: 1px solid rgba(0,204,255,.3); font-size: 11px; font-weight: 800; letter-spacing: .08em; }
     .module-card:visited { color: var(--text); }
     .module-card * { text-decoration: none; }
     .module-card::after { content: ""; position: absolute; inset: auto -30% -45% 30%; height: 120px; background: radial-gradient(circle, rgba(0,255,136,.18), transparent 68%); pointer-events: none; }
@@ -178,6 +180,11 @@
         <div><h2>Hızlı erişim</h2><p class="section-note">Premium modüller aktif paket gerektirir.</p></div>
       </div>
       <div class="modules">
+        <a href="/unified.html" class="module-card" style="border-color:rgba(0,204,255,.3);">
+          <div class="module-top"><div class="module-icon">🤖</div><div class="live-dot">NEW</div></div>
+          <div class="module-name">ARVIS — Unified Scan</div>
+          <div class="module-desc">One target, six modules, one verdict. AI-powered unified intelligence dashboard.</div>
+        </a>
         <a href="/tx-decoder" class="module-card surface"><div class="module-icon">🧾</div><div class="module-name">TX Decoder / İşlem Çözücü</div><div class="module-desc">Solana işlemlerini program, hesap, log ve risk bağlamına çözün.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">İşlemi Çöz</span></a>
         <a href="/token-scanner" class="module-card surface"><div class="module-icon">🪙</div><div class="module-name">Token Scanner / Token Analizi</div><div class="module-desc">Token metadata, yetki, arz ve holder yoğunluğu sinyallerini analiz edin.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">Token Analiz Et</span></a>
         <a href="/wallet-score" class="module-card surface"><div class="module-icon">🏆</div><div class="module-name">Wallet Score / Cüzdan Skoru</div><div class="module-desc">Açık Solana cüzdanlarını aktivite, güven ve risk göstergeleriyle skorlayın.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">Cüzdan Analizini Başlat</span></a>
