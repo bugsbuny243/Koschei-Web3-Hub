@@ -67,7 +67,7 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if !activePackage {
-		writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_active_package", "An active Koschei package is required to access the A.R.V.I.S Command Center."))
+		writeAPIError(w, http.StatusPaymentRequired, "PACKAGE_REQUIRED", "Active Koschei package required")
 		return
 	}
 	if _, available, err := h.userCreditsAndRole(claims.Sub); err != nil {

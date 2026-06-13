@@ -103,6 +103,7 @@ func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) 
 			LEFT JOIN app_user_profiles p ON lower(p.email) = lower(e.email)
 			WHERE e.status = 'active'
 			  AND COALESCE(e.plan_id, '') <> 'free'
+			  AND (e.expires_at IS NULL OR e.expires_at > now())
 			  AND (
 				($1 <> '' AND p.auth_subject = $1)
 				OR ($2 <> '' AND lower(e.email) = lower($2))

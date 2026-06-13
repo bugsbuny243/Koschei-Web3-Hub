@@ -85,6 +85,14 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+func writeAPIData(w http.ResponseWriter, status int, data any) {
+	writeJSON(w, status, map[string]any{"success": true, "code": "OK", "data": data})
+}
+
+func writeAPIError(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, map[string]any{"success": false, "code": code, "message": message, "data": nil})
+}
+
 func decodeJSON(r *http.Request, dst any) error {
 	r.Body = http.MaxBytesReader(nil, r.Body, 1<<20)
 	return json.NewDecoder(r.Body).Decode(dst)

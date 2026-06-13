@@ -20,12 +20,19 @@ type koscheiPackage struct {
 }
 
 var koscheiPackages = map[string]koscheiPackage{
-	"starter": {ID: "starter", Name: "Koschei Starter Pack", AmountTRY: 899, Outputs: 25},
-	"builder": {ID: "builder", Name: "Koschei Builder Pack", AmountTRY: 2299, Outputs: 100},
-	"studio":  {ID: "studio", Name: "Koschei Studio Pack", AmountTRY: 4999, Outputs: 300},
+	"starter":      {ID: "starter", Name: "Koschei Starter", AmountTRY: 899, Outputs: 25},
+	"professional": {ID: "professional", Name: "Koschei Professional", AmountTRY: 2299, Outputs: 100},
+	"enterprise":   {ID: "enterprise", Name: "Koschei Enterprise", AmountTRY: 4999, Outputs: 300},
 }
 
-var shopierPacks = koscheiPackages
+var shopierPacks = map[string]koscheiPackage{
+	"starter":      koscheiPackages["starter"],
+	"professional": koscheiPackages["professional"],
+	"enterprise":   koscheiPackages["enterprise"],
+	// Legacy Shopier package IDs are still accepted and normalized when entitlements are written.
+	"builder": koscheiPackages["professional"],
+	"studio":  koscheiPackages["enterprise"],
+}
 
 type paymentRequestInput struct {
 	FullName         string `json:"full_name"`
@@ -57,6 +64,27 @@ func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS payment_request_id uuid`,
 		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS payment_provider text`,
 		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS external_payment_id text`,
+		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS starts_at timestamptz`,
+		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS expires_at timestamptz`,
+		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS order_id uuid`,
+		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS product_id text`,
+		`CREATE TABLE IF NOT EXISTS products (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text UNIQUE NOT NULL, name text NOT NULL, pack_type text NOT NULL, description text NOT NULL DEFAULT '', price numeric(20,2) NOT NULL DEFAULT 0, output_quota integer NOT NULL DEFAULT 0, shopier_url text NOT NULL DEFAULT '', paddle_price_id text, is_active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE TABLE IF NOT EXISTS orders (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id text, product_id text, provider text NOT NULL DEFAULT 'paddle', provider_order_id text, provider_payment_id text, amount numeric(20,2) NOT NULL DEFAULT 0, currency text NOT NULL DEFAULT 'USD', status text NOT NULL DEFAULT 'pending', raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb, purchased_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id text`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_id text`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'paddle'`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider_order_id text`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider_payment_id text`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS amount numeric(20,2) NOT NULL DEFAULT 0`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'USD'`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'pending'`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS purchased_at timestamptz`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS products_slug_unique_idx ON products (slug)`,
+		`CREATE INDEX IF NOT EXISTS orders_provider_order_idx ON orders (provider, provider_order_id)`,
+		`CREATE INDEX IF NOT EXISTS orders_provider_payment_idx ON orders (provider, provider_payment_id)`,
+		`CREATE INDEX IF NOT EXISTS entitlements_email_status_expires_idx ON entitlements (lower(email), status, expires_at)`,
+		`INSERT INTO products (slug, name, pack_type, description, price, output_quota, is_active) VALUES ('starter','Starter','starter','Koschei Starter package',899,25,true), ('professional','Professional','professional','Koschei Professional package',2299,100,true), ('enterprise','Enterprise','enterprise','Koschei Enterprise package',4999,300,true) ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, pack_type=EXCLUDED.pack_type, is_active=true, updated_at=now()`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS entitlements_external_payment_once_idx ON entitlements (payment_provider, external_payment_id) WHERE external_payment_id IS NOT NULL AND external_payment_id <> ''`,
 	}
 	for _, statement := range statements {
@@ -278,13 +306,26 @@ type entitlementActivationResult struct {
 	OutputsRemaining int
 }
 
+func normalizePackageID(packageID string) string {
+	switch strings.ToLower(strings.TrimSpace(packageID)) {
+	case "starter":
+		return "starter"
+	case "builder", "pro", "professional":
+		return "professional"
+	case "studio", "enterprise":
+		return "enterprise"
+	default:
+		return ""
+	}
+}
+
 func packageOutputCount(packageID string) (int, bool) {
-	pack, ok := koscheiPackages[strings.ToLower(strings.TrimSpace(packageID))]
+	pack, ok := koscheiPackages[normalizePackageID(packageID)]
 	return pack.Outputs, ok
 }
 
 func packageName(packageID string) string {
-	pack, ok := koscheiPackages[strings.ToLower(strings.TrimSpace(packageID))]
+	pack, ok := koscheiPackages[normalizePackageID(packageID)]
 	if !ok {
 		return ""
 	}
@@ -320,53 +361,91 @@ func (h *Handler) activatePackageEntitlement(ctx context.Context, email, package
 }
 
 func activatePackageEntitlementTx(ctx context.Context, tx *sql.Tx, email, packageID, paymentProvider, externalPaymentID, paymentRequestID string) (entitlementActivationResult, error) {
+	return activatePackageEntitlementDetailedTx(ctx, tx, email, packageID, paymentProvider, externalPaymentID, paymentRequestID, "", "", nil)
+}
+
+func activatePackageEntitlementDetailedTx(ctx context.Context, tx *sql.Tx, email, packageID, paymentProvider, externalPaymentID, paymentRequestID, orderID, productID string, expiresAt any) (entitlementActivationResult, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
-	packageID = strings.ToLower(strings.TrimSpace(packageID))
+	packageID = normalizePackageID(packageID)
 	provider := normalizePaymentProvider(paymentProvider)
 	externalPaymentID = strings.TrimSpace(externalPaymentID)
 	paymentRequestID = strings.TrimSpace(paymentRequestID)
+	orderID = strings.TrimSpace(orderID)
+	productID = normalizePackageID(firstNonEmpty(productID, packageID))
 	outputs, ok := packageOutputCount(packageID)
 	if email == "" || !ok || outputs <= 0 {
 		return entitlementActivationResult{}, errors.New("invalid entitlement activation input")
 	}
 
 	if externalPaymentID != "" {
-		var existingPackage string
+		var existingID, existingPackage string
 		var existingTotal, existingRemaining int
 		err := tx.QueryRowContext(ctx, `
-			SELECT COALESCE(plan_id,''), COALESCE(outputs_total,0), COALESCE(outputs_remaining,0)
+			SELECT id::text, COALESCE(plan_id,''), COALESCE(outputs_total,0), COALESCE(outputs_remaining,0)
 			FROM entitlements
 			WHERE payment_provider = $1 AND external_payment_id = $2
-			LIMIT 1`, provider, externalPaymentID).Scan(&existingPackage, &existingTotal, &existingRemaining)
+			LIMIT 1`, provider, externalPaymentID).Scan(&existingID, &existingPackage, &existingTotal, &existingRemaining)
 		if err == nil {
-			return entitlementActivationResult{Activated: false, PackageID: existingPackage, OutputsTotal: existingTotal, OutputsRemaining: existingRemaining}, nil
+			_, err = tx.ExecContext(ctx, `
+				UPDATE entitlements
+				SET email=lower($1), plan_id=$2, status='active', starts_at=COALESCE(starts_at, now()), expires_at=$3,
+				    product_id=NULLIF($4,''), order_id=NULLIF($5,'')::uuid, outputs_total=GREATEST(COALESCE(outputs_total,0), $6),
+				    outputs_remaining=GREATEST(COALESCE(outputs_remaining,0), $6), updated_at=now()
+				WHERE id=$7::uuid`, email, packageID, expiresAt, productID, orderID, outputs, existingID)
+			if err != nil {
+				return entitlementActivationResult{}, err
+			}
+			return entitlementActivationResult{Activated: false, PackageID: normalizePackageID(existingPackage), OutputsTotal: maxInt(existingTotal, outputs), OutputsRemaining: maxInt(existingRemaining, outputs)}, nil
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
 			return entitlementActivationResult{}, err
 		}
 	}
 
-	if paymentRequestID != "" {
-		_, err := tx.ExecContext(ctx, `
-			INSERT INTO entitlements (email, plan_id, payment_request_id, payment_provider, external_payment_id, outputs_total, outputs_remaining, status, created_at, updated_at)
-			VALUES (lower($1), $2, $3::uuid, $4, NULLIF($5, ''), $6, $6, 'active', now(), now())`, email, packageID, paymentRequestID, provider, externalPaymentID, outputs)
+	var activeID string
+	err := tx.QueryRowContext(ctx, `
+		SELECT id::text
+		FROM entitlements
+		WHERE lower(email)=lower($1)
+		  AND status='active'
+		  AND COALESCE(plan_id, '') <> ''
+		  AND COALESCE(plan_id, '') <> 'free'
+		ORDER BY updated_at DESC, created_at DESC
+		LIMIT 1
+		FOR UPDATE`, email).Scan(&activeID)
+	if err == nil {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE entitlements
+			SET plan_id=$2, payment_request_id=COALESCE(NULLIF($3,'')::uuid, payment_request_id), payment_provider=$4,
+			    external_payment_id=NULLIF($5,''), outputs_total=GREATEST(COALESCE(outputs_total,0), $6),
+			    outputs_remaining=GREATEST(COALESCE(outputs_remaining,0), $6), starts_at=COALESCE(starts_at, now()),
+			    expires_at=$7, order_id=NULLIF($8,'')::uuid, product_id=NULLIF($9,''), updated_at=now()
+			WHERE id=$1::uuid`, activeID, packageID, paymentRequestID, provider, externalPaymentID, outputs, expiresAt, orderID, productID)
+		if err != nil {
+			return entitlementActivationResult{}, err
+		}
+	} else if errors.Is(err, sql.ErrNoRows) {
+		if paymentRequestID != "" {
+			_, err = tx.ExecContext(ctx, `
+				INSERT INTO entitlements (email, plan_id, payment_request_id, payment_provider, external_payment_id, outputs_total, outputs_remaining, status, starts_at, expires_at, order_id, product_id, created_at, updated_at)
+				VALUES (lower($1), $2, $3::uuid, $4, NULLIF($5, ''), $6, $6, 'active', now(), $7, NULLIF($8,'')::uuid, NULLIF($9,''), now(), now())`, email, packageID, paymentRequestID, provider, externalPaymentID, outputs, expiresAt, orderID, productID)
+		} else {
+			_, err = tx.ExecContext(ctx, `
+				INSERT INTO entitlements (email, plan_id, payment_provider, external_payment_id, outputs_total, outputs_remaining, status, starts_at, expires_at, order_id, product_id, created_at, updated_at)
+				VALUES (lower($1), $2, $3, NULLIF($4, ''), $5, $5, 'active', now(), $6, NULLIF($7,'')::uuid, NULLIF($8,''), now(), now())`, email, packageID, provider, externalPaymentID, outputs, expiresAt, orderID, productID)
+		}
 		if err != nil {
 			return entitlementActivationResult{}, err
 		}
 	} else {
-		_, err := tx.ExecContext(ctx, `
-			INSERT INTO entitlements (email, plan_id, payment_provider, external_payment_id, outputs_total, outputs_remaining, status, created_at, updated_at)
-			VALUES (lower($1), $2, $3, NULLIF($4, ''), $5, $5, 'active', now(), now())`, email, packageID, provider, externalPaymentID, outputs)
-		if err != nil {
-			return entitlementActivationResult{}, err
-		}
+		return entitlementActivationResult{}, err
 	}
 
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE app_user_profiles
 		SET plan_id = CASE
-			WHEN CASE $2 WHEN 'studio' THEN 3 WHEN 'builder' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END >=
-			     CASE COALESCE(plan_id, 'free') WHEN 'studio' THEN 3 WHEN 'builder' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END
+			WHEN CASE $2 WHEN 'enterprise' THEN 3 WHEN 'professional' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END >=
+			     CASE COALESCE(plan_id, 'free') WHEN 'enterprise' THEN 3 WHEN 'studio' THEN 3 WHEN 'professional' THEN 2 WHEN 'builder' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END
 			THEN $2
 			ELSE plan_id
 		END,

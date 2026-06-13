@@ -23,12 +23,6 @@ import (
 
 const paddleWebhookMaxSkew = 5 * time.Minute
 
-const (
-	paddleStarterPriceID = "pri_01ktvdpq7fr4gknbr4wtavrfrb"
-	paddleBuilderPriceID = "pri_01ktvhhg4z9j3wjrts1kzswhm"
-	paddleStudioPriceID  = "pri_01ktvhqya0rj2y8850yvd37d92"
-)
-
 var errPaddleCheckoutURLMissing = errors.New("paddle_checkout_url_missing")
 
 type checkoutRequest struct {
@@ -101,6 +95,12 @@ type paddleTransactionData struct {
 	CreatedAt      string         `json:"created_at"`
 	Details        map[string]any `json:"details"`
 	CustomData     map[string]any `json:"custom_data"`
+	Items          []struct {
+		Price struct {
+			ID        string `json:"id"`
+			ProductID string `json:"product_id"`
+		} `json:"price"`
+	} `json:"items"`
 }
 
 type billingPeriod struct {
@@ -111,12 +111,12 @@ type billingPeriod struct {
 func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		writeAPIError(w, http.StatusUnauthorized, "PAYMENT_REQUIRED", "Authentication required")
 		return
 	}
 	var req checkoutRequest
 	if err := decodeJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		writeAPIError(w, http.StatusBadRequest, "INVALID_PACKAGE", "Invalid checkout request")
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(claims.Email))
@@ -126,23 +126,27 @@ func (h *Handler) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	appURLConfigured := publicAppURL() != ""
 	log.Printf("paddle checkout request: package=%q environment=%q price_id_found=%t", planTier, paddleEnvironment(), priceID != "")
 	if email == "" || planTier == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "valid_package_required", "message": "Geçerli bir Paddle paketi seçin."})
+		writeAPIError(w, http.StatusBadRequest, "INVALID_PACKAGE", "Valid Starter, Professional, or Enterprise package required")
 		return
 	}
 	if priceID == "" || !apiKeyConfigured || !appURLConfigured {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "paddle_config_missing", "message": "Paddle ödeme yapılandırması eksik. Lütfen destek ekibiyle iletişime geçin."})
+		writeAPIError(w, http.StatusServiceUnavailable, "INTERNAL_ERROR", "Paddle payment configuration is unavailable")
+		return
+	}
+	if err := ensurePaymentSchema(r.Context(), h.DB); err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Payment schema unavailable")
 		return
 	}
 	checkoutURL, err := h.CreateCheckoutSession(r.Context(), priceID, email, claims.Sub, planTier)
 	if err != nil {
 		if errors.Is(err, errPaddleCheckoutURLMissing) {
-			writeJSON(w, http.StatusBadGateway, map[string]string{"error": "paddle_checkout_url_missing", "message": "Paddle ödeme bağlantısı oluşturulamadı. Lütfen Paddle ayarlarını kontrol edin."})
+			writeAPIError(w, http.StatusBadGateway, "INTERNAL_ERROR", "Paddle checkout URL was not returned")
 			return
 		}
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "paddle_checkout_failed", "message": safeError(err)})
+		writeAPIError(w, http.StatusBadGateway, "INTERNAL_ERROR", "Paddle checkout failed")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"checkout_url": checkoutURL})
+	writeAPIData(w, http.StatusOK, map[string]any{"checkout_url": checkoutURL})
 }
 
 func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEmail, authSubject, planTier string) (string, error) {
@@ -194,28 +198,32 @@ func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEm
 	if !checkoutURLFound {
 		return "", errPaddleCheckoutURLMissing
 	}
+	if h.DB != nil {
+		raw, _ := json.Marshal(out)
+		_, _ = h.DB.ExecContext(ctx, `INSERT INTO orders (customer_id, product_id, provider, provider_order_id, provider_payment_id, amount, currency, status, raw_payload, created_at, updated_at) VALUES ($1, $2, 'paddle', NULLIF($3,''), NULLIF($3,''), $4, 'USD', 'pending', $5::jsonb, now(), now())`, strings.ToLower(strings.TrimSpace(customerEmail)), planTier, out.Data.ID, float64(planMonthlyPriceCents(planTier))/100, string(raw))
+	}
 	return checkoutURL, nil
 }
 
 func (h *Handler) PaddleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"paddle_api_key":   strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "",
-		"environment":      paddleEnvironment(),
-		"starter_price_id": paddleConfiguredPriceID("starter") != "",
-		"builder_price_id": paddleConfiguredPriceID("builder") != "",
-		"studio_price_id":  paddleConfiguredPriceID("studio") != "",
-		"public_app_url":   publicAppURL() != "",
+		"paddle_api_key":        strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "",
+		"environment":           paddleEnvironment(),
+		"starter_price_id":      paddleConfiguredPriceID("starter") != "",
+		"professional_price_id": paddleConfiguredPriceID("professional") != "",
+		"enterprise_price_id":   paddleConfiguredPriceID("enterprise") != "",
+		"public_app_url":        publicAppURL() != "",
 	})
 }
 
 func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	if !h.ValidateWebhookSignature(r) {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_signature"})
+		writeAPIError(w, http.StatusUnauthorized, "WEBHOOK_INVALID", "Invalid webhook")
 		return
 	}
 	var event paddleEvent
 	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_webhook"})
+		writeAPIError(w, http.StatusBadRequest, "WEBHOOK_INVALID", "Invalid webhook")
 		return
 	}
 	eventType := event.EventType
@@ -224,20 +232,25 @@ func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	var err error
 	switch eventType {
-	case "subscription.created", "subscription.updated":
+	case "subscription.created", "subscription.activated", "subscription.updated", "subscription.resumed":
 		err = h.upsertPaddleSubscription(r.Context(), event.Data, false)
+	case "subscription.canceled", "subscription.cancelled", "subscription.paused":
+		err = h.upsertPaddleSubscription(r.Context(), event.Data, true)
 	case "payment.succeeded", "transaction.completed", "transaction.paid":
 		err = h.markPaddlePaymentSucceeded(r.Context(), event.Data)
+	case "transaction.updated":
+		err = h.recordPaddleTransaction(r.Context(), event.Data, false)
 	case "payment.failed", "transaction.payment_failed", "transaction.past_due":
 		err = h.markPaddlePaymentFailed(r.Context(), event.Data)
-	case "subscription.canceled", "subscription.cancelled":
-		err = h.upsertPaddleSubscription(r.Context(), event.Data, true)
-	}
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "webhook_processing_failed"})
+	default:
+		writeAPIError(w, http.StatusOK, "WEBHOOK_UNSUPPORTED", "Webhook event ignored")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Webhook processing failed")
+		return
+	}
+	writeAPIData(w, http.StatusOK, map[string]any{"received": true})
 }
 
 func (h *Handler) ValidateWebhookSignature(r *http.Request) bool {
@@ -366,7 +379,10 @@ func paddleRequest(ctx context.Context, method, path string, payload any, out an
 	return nil
 }
 
-func (h *Handler) upsertPaddleSubscription(ctx context.Context, raw json.RawMessage, canceled bool) error {
+func (h *Handler) upsertPaddleSubscription(ctx context.Context, raw json.RawMessage, inactive bool) error {
+	if err := ensurePaymentSchema(ctx, h.DB); err != nil {
+		return err
+	}
 	var sub paddleSubscriptionData
 	if err := json.Unmarshal(raw, &sub); err != nil {
 		return err
@@ -375,13 +391,18 @@ func (h *Handler) upsertPaddleSubscription(ctx context.Context, raw json.RawMess
 		return errors.New("missing subscription or customer id")
 	}
 	productID, planTier := subscriptionProductAndTier(sub)
-	email := customDataString(sub.CustomData, "customer_email")
-	if email == "" {
-		email = sub.CustomerID + "@paddle.local"
+	email := strings.ToLower(strings.TrimSpace(firstNonEmpty(customDataString(sub.CustomData, "customer_email"), customDataString(sub.CustomData, "user_email"))))
+	status := strings.ToLower(strings.TrimSpace(sub.Status))
+	if inactive {
+		switch status {
+		case "paused":
+			status = "paused"
+		default:
+			status = "canceled"
+		}
 	}
-	status := sub.Status
-	if canceled {
-		status = "cancelled"
+	if status == "" {
+		status = "active"
 	}
 	periodEnd := parsePaddleTime("")
 	if sub.CurrentBillingPeriod != nil {
@@ -393,18 +414,26 @@ func (h *Handler) upsertPaddleSubscription(ctx context.Context, raw json.RawMess
 	}
 	defer tx.Rollback()
 	var customerPK int
-	if err := tx.QueryRowContext(ctx, `INSERT INTO paddle_customers (paddle_customer_id,email) VALUES ($1,lower($2)) ON CONFLICT (paddle_customer_id) DO UPDATE SET email=EXCLUDED.email RETURNING id`, sub.CustomerID, email).Scan(&customerPK); err != nil {
+	customerEmail := email
+	if customerEmail == "" {
+		customerEmail = sub.CustomerID + "@paddle.local"
+	}
+	if err := tx.QueryRowContext(ctx, `INSERT INTO paddle_customers (paddle_customer_id,email) VALUES ($1,lower($2)) ON CONFLICT (paddle_customer_id) DO UPDATE SET email=EXCLUDED.email RETURNING id`, sub.CustomerID, customerEmail).Scan(&customerPK); err != nil {
 		return err
 	}
 	var subscriptionPK int
-	if err := tx.QueryRowContext(ctx, `INSERT INTO paddle_subscriptions (paddle_subscription_id,customer_id,product_id,plan_tier,status,current_period_end,cancel_at_period_end,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,now()) ON CONFLICT (paddle_subscription_id) DO UPDATE SET customer_id=EXCLUDED.customer_id,product_id=EXCLUDED.product_id,plan_tier=EXCLUDED.plan_tier,status=EXCLUDED.status,current_period_end=EXCLUDED.current_period_end,cancel_at_period_end=EXCLUDED.cancel_at_period_end,updated_at=now() RETURNING id`, sub.ID, customerPK, productID, planTier, status, periodEnd, sub.ScheduledChange != nil && sub.ScheduledChange.Action == "cancel").Scan(&subscriptionPK); err != nil {
+	if err := tx.QueryRowContext(ctx, `INSERT INTO paddle_subscriptions (paddle_subscription_id,customer_id,product_id,plan_tier,status,current_period_end,cancel_at_period_end,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,now()) ON CONFLICT (paddle_subscription_id) DO UPDATE SET customer_id=EXCLUDED.customer_id,product_id=EXCLUDED.product_id,plan_tier=EXCLUDED.plan_tier,status=EXCLUDED.status,current_period_end=EXCLUDED.current_period_end,cancel_at_period_end=EXCLUDED.cancel_at_period_end,updated_at=now() RETURNING id`, sub.ID, customerPK, firstNonEmpty(productID, paddleConfiguredProductID(planTier), planTier), planTier, status, periodEnd, sub.ScheduledChange != nil && sub.ScheduledChange.Action == "cancel").Scan(&subscriptionPK); err != nil {
 		return err
 	}
-	if status == "active" || status == "trialing" {
+	if (status == "active" || status == "trialing") && email != "" && planTier != "" {
+		if _, err := activatePackageEntitlementDetailedTx(ctx, tx, email, planTier, "paddle", sub.ID, "", "", firstNonEmpty(productID, planTier), periodEnd); err != nil {
+			return err
+		}
 		if err := h.ensureSubscriptionAPIKey(ctx, tx, subscriptionPK, sub.ID, email, planTier); err != nil {
 			return err
 		}
-	} else if canceled {
+	} else if email != "" {
+		_, _ = tx.ExecContext(ctx, `UPDATE entitlements SET status=$2, expires_at=COALESCE(expires_at, now()), updated_at=now() WHERE lower(email)=lower($1) AND payment_provider='paddle' AND (external_payment_id=$3 OR status='active')`, email, status, sub.ID)
 		_, _ = tx.ExecContext(ctx, `UPDATE api_keys SET status='revoked', revoked_at=now() WHERE subscription_id=$1 AND status='active'`, subscriptionPK)
 	}
 	return tx.Commit()
@@ -432,47 +461,83 @@ func (h *Handler) ensureSubscriptionAPIKey(ctx context.Context, tx *sql.Tx, subs
 	return err
 }
 
+func (h *Handler) recordPaddleTransaction(ctx context.Context, raw json.RawMessage, grantEntitlement bool) error {
+	if err := ensurePaymentSchema(ctx, h.DB); err != nil {
+		return err
+	}
+	var txData paddleTransactionData
+	if err := json.Unmarshal(raw, &txData); err != nil {
+		return err
+	}
+	packageID := normalizePlanTier(firstNonEmpty(customDataString(txData.CustomData, "package"), customDataString(txData.CustomData, "package_id"), customDataString(txData.CustomData, "plan_tier")))
+	email := strings.ToLower(strings.TrimSpace(firstNonEmpty(customDataString(txData.CustomData, "customer_email"), customDataString(txData.CustomData, "user_email"))))
+	productID, priceID := transactionProductAndPrice(txData)
+	if packageID == "" {
+		packageID = tierFromPriceID(priceID)
+	}
+	if (email == "" || packageID == "") && txData.SubscriptionID != "" {
+		var storedEmail, storedPlan, storedProduct string
+		_ = h.DB.QueryRowContext(ctx, `
+			SELECT lower(c.email), COALESCE(s.plan_tier, ''), COALESCE(s.product_id, '')
+			FROM paddle_subscriptions s
+			JOIN paddle_customers c ON c.id = s.customer_id
+			WHERE s.paddle_subscription_id = $1`, txData.SubscriptionID).Scan(&storedEmail, &storedPlan, &storedProduct)
+		if email == "" && !strings.HasSuffix(storedEmail, "@paddle.local") {
+			email = storedEmail
+		}
+		if packageID == "" {
+			packageID = normalizePlanTier(storedPlan)
+		}
+		if productID == "" {
+			productID = storedProduct
+		}
+	}
+	status := strings.ToLower(strings.TrimSpace(txData.Status))
+	if status == "" {
+		status = "updated"
+	}
+	amount, currency := paddleTransactionAmount(txData)
+	purchasedAt := parsePaddleTime(firstNonEmpty(txData.BilledAt, txData.CreatedAt))
+	rawPayload := string(raw)
+	tx, err := h.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var orderID string
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO orders (customer_id, product_id, provider, provider_order_id, provider_payment_id, amount, currency, status, raw_payload, purchased_at, created_at, updated_at)
+		VALUES (NULLIF($1,''), NULLIF($2,''), 'paddle', NULLIF($3,''), NULLIF($4,''), $5, $6, $7, $8::jsonb, $9, now(), now())
+		RETURNING id::text`, firstNonEmpty(txData.CustomerID, email), firstNonEmpty(productID, packageID), txData.ID, txData.ID, amount, currency, status, rawPayload, purchasedAt).Scan(&orderID)
+	if err != nil {
+		return err
+	}
+	if grantEntitlement && email != "" && packageID != "" && txData.ID != "" {
+		if _, err := activatePackageEntitlementDetailedTx(ctx, tx, email, packageID, "paddle", txData.ID, "", orderID, firstNonEmpty(productID, packageID), nil); err != nil {
+			return err
+		}
+	}
+	if txData.SubscriptionID != "" && (status == "completed" || status == "paid") {
+		_, _ = tx.ExecContext(ctx, `UPDATE paddle_subscriptions SET status='active', current_period_end=COALESCE(current_period_end, now() + interval '1 month'), updated_at=now() WHERE paddle_subscription_id=$1`, txData.SubscriptionID)
+	}
+	return tx.Commit()
+}
+
 func (h *Handler) markPaddlePaymentSucceeded(ctx context.Context, raw json.RawMessage) error {
 	var txData paddleTransactionData
 	if err := json.Unmarshal(raw, &txData); err != nil {
 		return err
 	}
 	if txData.Status != "" && txData.Status != "completed" && txData.Status != "paid" {
-		return nil
+		return h.recordPaddleTransaction(ctx, raw, false)
 	}
-	packageID := normalizePlanTier(firstNonEmpty(customDataString(txData.CustomData, "package"), customDataString(txData.CustomData, "package_id"), customDataString(txData.CustomData, "plan_tier")))
-	email := strings.ToLower(strings.TrimSpace(firstNonEmpty(customDataString(txData.CustomData, "customer_email"), customDataString(txData.CustomData, "user_email"))))
-	if (email == "" || packageID == "") && txData.SubscriptionID != "" {
-		var storedEmail, storedPlan string
-		_ = h.DB.QueryRowContext(ctx, `
-			SELECT lower(c.email), COALESCE(s.plan_tier, '')
-			FROM paddle_subscriptions s
-			JOIN paddle_customers c ON c.id = s.customer_id
-			WHERE s.paddle_subscription_id = $1`, txData.SubscriptionID).Scan(&storedEmail, &storedPlan)
-		if email == "" {
-			email = storedEmail
-		}
-		if packageID == "" {
-			packageID = normalizePlanTier(storedPlan)
-		}
-	}
-	externalPaymentID := strings.TrimSpace(txData.ID)
-	if externalPaymentID == "" {
-		externalPaymentID = strings.TrimSpace(txData.SubscriptionID)
-	}
-	if email != "" && packageID != "" && externalPaymentID != "" {
-		if _, err := h.activatePackageEntitlement(ctx, email, packageID, "paddle", externalPaymentID); err != nil {
-			return err
-		}
-	}
-	if txData.SubscriptionID == "" {
-		return nil
-	}
-	_, err := h.DB.ExecContext(ctx, `UPDATE paddle_subscriptions SET status='active', current_period_end=COALESCE(current_period_end, now() + interval '1 month'), updated_at=now() WHERE paddle_subscription_id=$1`, txData.SubscriptionID)
-	return err
+	return h.recordPaddleTransaction(ctx, raw, true)
 }
 
 func (h *Handler) markPaddlePaymentFailed(ctx context.Context, raw json.RawMessage) error {
+	if err := h.recordPaddleTransaction(ctx, raw, false); err != nil {
+		return err
+	}
 	var txData paddleTransactionData
 	if err := json.Unmarshal(raw, &txData); err != nil {
 		return err
@@ -480,7 +545,7 @@ func (h *Handler) markPaddlePaymentFailed(ctx context.Context, raw json.RawMessa
 	if txData.SubscriptionID == "" {
 		return nil
 	}
-	_, err := h.DB.ExecContext(ctx, `UPDATE paddle_subscriptions SET status='expired', updated_at=now() WHERE paddle_subscription_id=$1`, txData.SubscriptionID)
+	_, err := h.DB.ExecContext(ctx, `UPDATE paddle_subscriptions SET status='past_due', updated_at=now() WHERE paddle_subscription_id=$1`, txData.SubscriptionID)
 	return err
 }
 
@@ -503,7 +568,7 @@ func parsePaddleSignature(header string) (string, []string) {
 }
 
 func paddleEnvironment() string {
-	env := strings.ToLower(strings.TrimSpace(os.Getenv("PADDLE_ENVIRONMENT")))
+	env := strings.ToLower(strings.TrimSpace(firstNonEmpty(os.Getenv("PADDLE_ENV"), os.Getenv("PADDLE_ENVIRONMENT"))))
 	if env == "sandbox" {
 		return "sandbox"
 	}
@@ -589,9 +654,9 @@ func paddleProductName(planTier string) string {
 	switch normalizePlanTier(planTier) {
 	case "starter":
 		return "Koschei Starter"
-	case "builder":
+	case "professional":
 		return "Koschei Professional"
-	case "studio":
+	case "enterprise":
 		return "Koschei Enterprise"
 	default:
 		return ""
@@ -601,11 +666,24 @@ func paddleProductName(planTier string) string {
 func paddleConfiguredPriceID(planTier string) string {
 	switch normalizePlanTier(planTier) {
 	case "starter":
-		return firstNonEmpty(strings.TrimSpace(os.Getenv("PADDLE_STARTER_PRICE_ID")), paddleStarterPriceID)
-	case "builder":
-		return firstNonEmpty(strings.TrimSpace(os.Getenv("PADDLE_BUILDER_PRICE_ID")), paddleBuilderPriceID)
-	case "studio":
-		return firstNonEmpty(strings.TrimSpace(os.Getenv("PADDLE_STUDIO_PRICE_ID")), paddleStudioPriceID)
+		return strings.TrimSpace(os.Getenv("PADDLE_STARTER_PRICE_ID"))
+	case "professional":
+		return firstNonEmpty(strings.TrimSpace(os.Getenv("PADDLE_PROFESSIONAL_PRICE_ID")), strings.TrimSpace(os.Getenv("PADDLE_BUILDER_PRICE_ID")))
+	case "enterprise":
+		return firstNonEmpty(strings.TrimSpace(os.Getenv("PADDLE_ENTERPRISE_PRICE_ID")), strings.TrimSpace(os.Getenv("PADDLE_STUDIO_PRICE_ID")))
+	default:
+		return ""
+	}
+}
+
+func paddleConfiguredProductID(planTier string) string {
+	switch normalizePlanTier(planTier) {
+	case "starter":
+		return strings.TrimSpace(os.Getenv("PADDLE_STARTER_PRODUCT_ID"))
+	case "professional":
+		return firstNonEmpty(strings.TrimSpace(os.Getenv("PADDLE_PROFESSIONAL_PRODUCT_ID")), strings.TrimSpace(os.Getenv("PADDLE_BUILDER_PRODUCT_ID")))
+	case "enterprise":
+		return firstNonEmpty(strings.TrimSpace(os.Getenv("PADDLE_ENTERPRISE_PRODUCT_ID")), strings.TrimSpace(os.Getenv("PADDLE_STUDIO_PRODUCT_ID")))
 	default:
 		return ""
 	}
@@ -616,16 +694,7 @@ func paddleTransactionItem(priceID, planTier string) map[string]any {
 }
 
 func normalizePlanTier(planTier string) string {
-	switch strings.ToLower(strings.TrimSpace(planTier)) {
-	case "starter":
-		return "starter"
-	case "builder", "pro", "professional":
-		return "builder"
-	case "studio", "enterprise":
-		return "studio"
-	default:
-		return ""
-	}
+	return normalizePackageID(planTier)
 }
 
 func subscriptionProductAndTier(sub paddleSubscriptionData) (string, string) {
@@ -649,9 +718,70 @@ func subscriptionProductAndTier(sub paddleSubscriptionData) (string, string) {
 	return firstNonEmpty(productID, priceID), planTier
 }
 
+func transactionProductAndPrice(txData paddleTransactionData) (string, string) {
+	var productID, priceID string
+	for _, item := range txData.Items {
+		if productID == "" {
+			productID = strings.TrimSpace(item.Price.ProductID)
+		}
+		if priceID == "" {
+			priceID = strings.TrimSpace(item.Price.ID)
+		}
+	}
+	return productID, priceID
+}
+
+func paddleTransactionAmount(txData paddleTransactionData) (float64, string) {
+	currency := strings.ToUpper(strings.TrimSpace(stringFromNested(txData.Details, "totals", "currency_code")))
+	if currency == "" {
+		currency = strings.ToUpper(strings.TrimSpace(stringFromNested(txData.Details, "currency_code")))
+	}
+	if currency == "" {
+		currency = "USD"
+	}
+	amountText := firstNonEmpty(
+		stringFromNested(txData.Details, "totals", "total"),
+		stringFromNested(txData.Details, "totals", "subtotal"),
+		stringFromNested(txData.Details, "total"),
+	)
+	amountText = strings.TrimSpace(amountText)
+	if amountText == "" {
+		return 0, currency
+	}
+	amount, err := strconv.ParseFloat(amountText, 64)
+	if err != nil {
+		return 0, currency
+	}
+	if amount >= 100 && !strings.Contains(amountText, ".") {
+		amount = amount / 100
+	}
+	return amount, currency
+}
+
+func stringFromNested(data map[string]any, path ...string) string {
+	var current any = data
+	for _, key := range path {
+		m, ok := current.(map[string]any)
+		if !ok || m == nil {
+			return ""
+		}
+		current = m[key]
+	}
+	switch v := current.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case int:
+		return strconv.Itoa(v)
+	default:
+		return ""
+	}
+}
+
 func tierFromPriceID(priceID string) string {
 	priceID = strings.TrimSpace(priceID)
-	for _, tier := range []string{"starter", "builder", "studio"} {
+	for _, tier := range []string{"starter", "professional", "enterprise"} {
 		if priceID != "" && priceID == paddleConfiguredPriceID(tier) {
 			return tier
 		}
@@ -683,9 +813,9 @@ func planMonthlyPriceCents(planTier string) int {
 	switch normalizePlanTier(planTier) {
 	case "starter":
 		return 29900
-	case "builder":
+	case "professional":
 		return 99900
-	case "studio":
+	case "enterprise":
 		return 499900
 	default:
 		return 29900
@@ -696,9 +826,9 @@ func planMonthlyQuota(planTier string) int {
 	switch normalizePlanTier(planTier) {
 	case "starter":
 		return 1000
-	case "builder":
+	case "professional":
 		return 10000
-	case "studio":
+	case "enterprise":
 		return 100000
 	default:
 		return 1000
@@ -709,9 +839,9 @@ func planRateLimit(planTier string) int {
 	switch normalizePlanTier(planTier) {
 	case "starter":
 		return 100
-	case "builder":
+	case "professional":
 		return 500
-	case "studio":
+	case "enterprise":
 		return 2000
 	default:
 		return 100
