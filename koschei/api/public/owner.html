@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>Koschei A.R.V.I.S Owner Command Center</title>
+  <title>Koschei Central Brain</title>
   <style>
     :root {
       --bg: #070812;
@@ -300,23 +300,18 @@
   </style>
 </head>
 <body>
-  <main class="shell">
-    <section id="loginView" class="login">
-      <div class="card stack">
-        <div class="brand">
-          <div class="mark" aria-hidden="true"></div>
-          <div>
-            <div class="eyebrow">Owner Access</div>
-            <h1>A.R.V.I.S Owner</h1>
-            <p class="muted">Gizli operasyon ekranı. ENV içinde tanımlı owner kimliği ve owner sırrı ile giriş yap.</p>
-          </div>
-        </div>
-        <label class="stack">Owner kimliği / cüzdanı / e-posta<input id="loginWallet" autocomplete="username" placeholder="OWNER_WALLET değeri"></label>
-        <label class="stack">Owner sırrı<input id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET değeri"></label>
-        <button id="loginButton">Owner Command Center'a gir</button>
-        <p class="tiny">Sunucu cookie'leri HttpOnly ayarlar. Bu panel kullanıcı verisini HTML içine enjekte etmez.</p>
+  <main id="login" class="login">
+    <section class="card">
+      <span class="eyebrow"><i class="orb"></i> Owner only</span>
+      <h1>Koschei Central Brain</h1>
+      <p class="muted">Bu ekran customer dashboard değildir. Github, Neon, Paddle, OpenAI, Alchemy, emergency controls ve sistem sağlığı sadece owner oturumunda açılır.</p>
+      <div style="display:grid;gap:12px;margin-top:18px">
+        <input id="loginWallet" autocomplete="username" placeholder="OWNER_WALLET / owner kimliği">
+        <input id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET">
+        <button id="loginButton" class="primary">Central Brain'e gir</button>
       </div>
     </section>
+  </main>
 
     <section id="appView" class="hidden">
       <header class="topbar">
@@ -359,13 +354,21 @@
         </aside>
       </section>
 
-      <section id="overview" class="grid" aria-label="Gerçek zamanlı metrikler">
-        <div class="card span-12">
-          <div class="toolbar">
-            <h2>Overview</h2>
-            <span class="pill">Gerçek veri: /api/owner/status</span>
-          </div>
-          <section class="grid" id="metricsGrid"></section>
+    <section class="grid">
+      <article class="card brain span-8">
+        <h2>Koschei ile konuş</h2>
+        <div id="chat" class="chat" aria-live="polite"></div>
+        <div class="composer">
+          <textarea id="command" placeholder="KOSCHEI'ye sor...
+
+Örnek:
+Son hataları göster
+Github deploy başlat
+Neon backup al
+Kullanıcı ara
+OpenAI maliyetini göster
+Paddle durumunu kontrol et"></textarea>
+          <button id="send" class="primary">Gönder</button>
         </div>
       </section>
 
