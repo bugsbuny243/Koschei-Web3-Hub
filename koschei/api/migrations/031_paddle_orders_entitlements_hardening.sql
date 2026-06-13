@@ -88,7 +88,7 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFA
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 CREATE INDEX IF NOT EXISTS orders_provider_order_idx ON orders (provider, provider_order_id);
 CREATE INDEX IF NOT EXISTS orders_provider_payment_idx ON orders (provider, provider_payment_id);
-CREATE INDEX IF NOT EXISTS orders_customer_created_idx ON orders (lower(customer_id), created_at DESC);
+CREATE INDEX IF NOT EXISTS orders_customer_created_idx ON orders (lower(customer_id::text), created_at DESC);
 
 ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS starts_at timestamptz;
 ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS expires_at timestamptz;
