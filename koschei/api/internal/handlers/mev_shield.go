@@ -238,9 +238,17 @@ func (h *Handler) MEVAnalyze(w http.ResponseWriter, r *http.Request) {
 }
 
 // TXDecoderMEVWarning exposes a lightweight warning box payload for the TX
-// Decoder frontend so consumer flows can reuse the same MEV score without
-// buying the full enterprise API.
+// Decoder frontend so consumer flows can reuse the same MEV score.
 func (h *Handler) TXDecoderMEVWarning(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
 	var req mevAnalyzeRequest
 	_ = decodeJSON(r, &req)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "warning": buildMEVRiskReport(req)})
