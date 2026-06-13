@@ -12,22 +12,101 @@
   }
 
   function _b64url(s) {
-    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    s = String(s || '').replace(/-/g, '+').replace(/_/g, '/');
     while (s.length % 4) s += '=';
     try { return atob(s); } catch { return ''; }
+  }
+
+  function jwtPayload(jwt) {
+    try { return JSON.parse(_b64url(String(jwt || '').split('.')[1] || '')); } catch { return {}; }
   }
 
   function getEmail() {
     const jwt = getJwt();
     if (!jwt) return null;
-    try { return JSON.parse(_b64url(jwt.split('.')[1])).email || null; } catch { return null; }
+    return jwtPayload(jwt).email || null;
   }
 
   function getSub() {
     const jwt = getJwt();
     if (!jwt) return null;
-    try { return JSON.parse(_b64url(jwt.split('.')[1])).sub || null; } catch { return null; }
+    return jwtPayload(jwt).sub || null;
   }
+
+  function fallbackMeFromJwt(jwt) {
+    const payload = jwtPayload(jwt);
+    const email = payload.email || '';
+    const sub = payload.sub || email;
+    return {
+      ok: true,
+      user: {
+        auth_subject: sub,
+        email,
+        role: 'member',
+        plan_id: 'free',
+        plan: 'free',
+        credits: 0,
+        outputs_total: 0,
+        outputs_remaining: 0,
+      },
+      warning: 'profile_database_unavailable',
+    };
+  }
+
+  function jsonResponse(body, status) {
+    return new Response(JSON.stringify(body), {
+      status: status || 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  function installDatabaseFallbackFetch() {
+    if (window.__koscheiDatabaseFallbackFetchInstalled) return;
+    window.__koscheiDatabaseFallbackFetchInstalled = true;
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async function(input, init) {
+      const res = await nativeFetch(input, init);
+      let path = '';
+      try {
+        const raw = typeof input === 'string' ? input : (input && input.url) || '';
+        const url = new URL(raw, window.location.origin);
+        path = url.pathname;
+      } catch {}
+      if (!path.startsWith('/api/')) return res;
+      if (res.status !== 503) return res;
+      const clone = res.clone();
+      let data = {};
+      try { data = await clone.json(); } catch {}
+      const rawError = String(data.error || data.message || '').toLowerCase();
+      if (!rawError.includes('database unavailable')) return res;
+      if (path === '/api/me/package') {
+        return jsonResponse({
+          success: true,
+          code: 'OK',
+          data: { has_active_package: false, plan_id: null, status: 'none', expires_at: null, warning: 'package_database_unavailable' },
+        }, 200);
+      }
+      if (path === '/api/me') {
+        return jsonResponse(fallbackMeFromJwt(getJwt()), 200);
+      }
+      if (path === '/api/v1/unified/analyze') {
+        return jsonResponse({
+          success: false,
+          code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
+          message: 'Koschei analiz servisi şu an veritabanı bağlantısını bekliyor. Ekran çalışıyor; analiz için backend DB bağlantısı aktif olmalı.',
+          data: null,
+        }, 503);
+      }
+      return jsonResponse({
+        success: false,
+        code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
+        message: 'Koschei servisi şu an veritabanı bağlantısını bekliyor.',
+        data: null,
+      }, 503);
+    };
+  }
+
+  installDatabaseFallbackFetch();
 
   function defaultUserName(email) {
     const name = String(email || '').split('@')[0].trim();
@@ -38,13 +117,13 @@
     return window.location.origin.replace(/\/+$/, '') + '/hub.html';
   }
 
-
   function publicErrorMessage(raw, fallback) {
     const value = String(raw || '').trim();
     const normalized = value.toLowerCase();
     if (!value) return fallback;
     if (['unauthorized', 'token_missing', 'auth_session_missing', 'auth_verification_required'].includes(normalized) || normalized.includes('401')) return 'Giriş yapmanız gerekiyor.';
-    if (['forbidden', 'insufficient_outputs'].includes(normalized) || normalized.includes('active package')) return 'Bu işlem için aktif Koschei paketi gerekli.';
+    if (['forbidden', 'insufficient_outputs'].includes(normalized) || normalized.includes('active package') || normalized.includes('active_entitlement_required')) return 'Bu işlem için aktif Koschei paketi gerekli.';
+    if (normalized.includes('database unavailable')) return 'Koschei veritabanı bağlantısı geçici olarak beklemede.';
     if (normalized.includes('paddle')) return value;
     if (normalized.includes('shopier')) return 'Shopier bağlantısı açılamadı.';
     return value || fallback;
@@ -123,6 +202,10 @@
     });
     const data = await readJSON(res);
     if (!res.ok) {
+      const raw = String(data.error || data.message || '').toLowerCase();
+      if (res.status === 503 && raw.includes('database unavailable')) {
+        return fallbackMeFromJwt(jwt);
+      }
       clearJwt();
       throw new Error(errorMessage(data, 'Giriş yapmanız gerekiyor.'));
     }
@@ -243,4 +326,4 @@
     isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt };
 })();
 
-// Email/password auth calls Neon Auth directly through /api/config -> neonAuthUrl, verifies through /api/me, and persists as koschei_jwt.
+// Email/password auth calls Neon Auth directly through /api/config -> neonAuthUrl, tolerates temporary app database outages, and persists as koschei_jwt.
