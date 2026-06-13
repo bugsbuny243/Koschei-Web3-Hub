@@ -1,6 +1,9 @@
 package handlers
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+)
 
 func notImplemented(w http.ResponseWriter, name string) {
 	writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "not_implemented", "handler": name})
@@ -50,24 +53,21 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	if h.DB != nil {
 		summary, err := h.provisionMember(r.Context(), claims)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_unavailable"})
-			return
-		}
-		p, err := h.upsertProfile(r.Context(), claims.Sub, claims.Email)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_unavailable"})
-			return
-		}
-		profile = map[string]any{
-			"id":                p.ID,
-			"auth_subject":      p.AuthSubject,
-			"email":             p.Email,
-			"role":              firstNonEmpty(p.Role, "member"),
-			"plan_id":           firstNonEmpty(summary.Plan, p.PlanID, "free"),
-			"plan":              firstNonEmpty(summary.Plan, p.PlanID, "free"),
-			"credits":           p.Credits,
-			"outputs_total":     summary.OutputsTotal,
-			"outputs_remaining": summary.OutputsRemaining,
+			log.Printf("profile provision failed: sub=%s email=%s err=%v", claims.Sub, claims.Email, err)
+		} else if p, err := h.upsertProfile(r.Context(), claims.Sub, claims.Email); err != nil {
+			log.Printf("profile upsert failed: sub=%s email=%s err=%v", claims.Sub, claims.Email, err)
+		} else {
+			profile = map[string]any{
+				"id":                p.ID,
+				"auth_subject":      p.AuthSubject,
+				"email":             p.Email,
+				"role":              firstNonEmpty(p.Role, "member"),
+				"plan_id":           firstNonEmpty(summary.Plan, p.PlanID, "free"),
+				"plan":              firstNonEmpty(summary.Plan, p.PlanID, "free"),
+				"credits":           p.Credits,
+				"outputs_total":     summary.OutputsTotal,
+				"outputs_remaining": summary.OutputsRemaining,
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "user": profile})
