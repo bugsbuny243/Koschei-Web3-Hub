@@ -21,6 +21,13 @@
     try { return JSON.parse(_b64url(String(jwt || '').split('.')[1] || '')); } catch { return {}; }
   }
 
+  function isJwtExpired(jwt) {
+    const payload = jwtPayload(jwt);
+    const exp = Number(payload.exp || 0);
+    if (!exp) return false;
+    return exp <= Math.floor(Date.now() / 1000) + 15;
+  }
+
   function getEmail() {
     const jwt = getJwt();
     if (!jwt) return null;
@@ -77,14 +84,17 @@
       let requestInit = init;
       if (sameOrigin && path.startsWith('/api/')) {
         const jwt = getJwt();
-        if (_isJwt(jwt)) {
+        if (_isJwt(jwt) && isJwtExpired(jwt)) clearJwt();
+        const freshJwt = getJwt();
+        if (_isJwt(freshJwt)) {
           const headers = new Headers((requestInit && requestInit.headers) || (input && input.headers) || {});
-          if (!headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + jwt);
+          if (!headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + freshJwt);
           requestInit = { ...(requestInit || {}), headers };
         }
       }
 
       const res = await nativeFetch(input, requestInit);
+      if (path.startsWith('/api/') && (res.status === 401 || res.status === 403)) clearJwt();
       if (!path.startsWith('/api/')) return res;
       if (res.status !== 503) return res;
       const clone = res.clone();
@@ -134,7 +144,7 @@
     const value = String(raw || '').trim();
     const normalized = value.toLowerCase();
     if (!value) return fallback;
-    if (['unauthorized', 'token_missing', 'auth_session_missing', 'auth_verification_required'].includes(normalized) || normalized.includes('401')) return 'Giriş yapmanız gerekiyor.';
+    if (['unauthorized', 'token_missing', 'auth_session_missing', 'auth_verification_required', 'expired_token'].includes(normalized) || normalized.includes('401') || normalized.includes('expired')) return 'Giriş oturumu süresi doldu. Lütfen tekrar giriş yapın.';
     if (['forbidden', 'insufficient_outputs'].includes(normalized) || normalized.includes('active package') || normalized.includes('active_entitlement_required')) return 'Bu işlem için aktif Koschei paketi gerekli.';
     if (normalized.includes('database unavailable')) return 'Koschei veritabanı bağlantısı geçici olarak beklemede.';
     if (normalized.includes('paddle')) return value;
@@ -146,8 +156,8 @@
     if (!data) return fallback;
     if (typeof data === 'string') return publicErrorMessage(data, fallback);
     if (data.error === 'token_missing') return 'Giriş oturumu alınamadı. Lütfen tekrar giriş yapın.';
-    if (data.error === 'auth_session_missing' || data.error === 'auth_verification_required') {
-      return publicErrorMessage(data.message, 'Giriş oturumu alınamadı. Lütfen tekrar giriş yapın.');
+    if (data.error === 'auth_session_missing' || data.error === 'auth_verification_required' || data.error === 'expired_token') {
+      return publicErrorMessage(data.message || data.error, 'Giriş oturumu alınamadı. Lütfen tekrar giriş yapın.');
     }
     return publicErrorMessage(data.message || data.error_description || data.error || data.detail, fallback);
   }
@@ -250,6 +260,8 @@
 
   async function init() {
     consumeAccessTokenFromHash();
+    const jwt = getJwt();
+    if (_isJwt(jwt) && isJwtExpired(jwt)) clearJwt();
     try { await loadConfig(); } catch {}
   }
 
@@ -316,7 +328,15 @@
     window.location.href = '/login.html';
   }
 
-  function isLoggedIn() { return _isJwt(getJwt()); }
+  function isLoggedIn() {
+    const jwt = getJwt();
+    if (!_isJwt(jwt)) return false;
+    if (isJwtExpired(jwt)) {
+      clearJwt();
+      return false;
+    }
+    return true;
+  }
 
   function requireAuth() {
     if (!isLoggedIn()) {
@@ -329,14 +349,16 @@
   async function apiCall(path, options = {}) {
     const jwt = getJwt();
     const headers = new Headers(options.headers || {});
-    if (jwt && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + jwt);
+    if (_isJwt(jwt) && !isJwtExpired(jwt) && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + jwt);
     try {
-      return await fetch(path, { ...options, headers });
+      const res = await fetch(path, { ...options, headers });
+      if (res && (res.status === 401 || res.status === 403)) clearJwt();
+      return res;
     } catch { return null; }
   }
 
   window.KoscheiAuth = { init, signIn, signUp, signOut, consumeAccessTokenFromHash,
-    isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt };
+    isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt, clearJwt, isJwtExpired };
 })();
 
-// Email/password auth calls Neon Auth directly through /api/config -> neonAuthUrl, tolerates temporary app database outages, and persists as koschei_jwt.
+// Email/password auth calls Neon Auth directly through /api/config -> neonAuthUrl, tolerates temporary app database outages by falling back to JWT claims for local UI bootstrap.
