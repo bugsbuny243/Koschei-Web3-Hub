@@ -162,8 +162,8 @@ func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEm
 	if appURL == "" {
 		return "", errors.New("PUBLIC_APP_URL is missing")
 	}
-	successURL := appURL + "/hub.html"
-	cancelURL := appURL + "/pricing.html"
+	successURL := appURL + "/dashboard"
+	cancelURL := appURL + "/pricing"
 	customerID, err := h.createPaddleCustomer(ctx, customerEmail, planTier)
 	if err != nil {
 		return "", err
@@ -200,20 +200,15 @@ func (h *Handler) CreateCheckoutSession(ctx context.Context, priceID, customerEm
 	}
 	if h.DB != nil {
 		raw, _ := json.Marshal(out)
-		_, _ = h.DB.ExecContext(ctx, `INSERT INTO orders (customer_id, product_id, provider, provider_order_id, provider_payment_id, amount, currency, status, raw_payload, created_at, updated_at) VALUES ($1, $2, 'paddle', NULLIF($3,''), NULLIF($3,''), $4, 'USD', 'pending', $5::jsonb, now(), now())`, strings.ToLower(strings.TrimSpace(customerEmail)), planTier, out.Data.ID, float64(planMonthlyPriceCents(planTier))/100, string(raw))
+		_, _ = h.DB.ExecContext(ctx, `
+			INSERT INTO orders (provider, provider_order_id, provider_payment_id, amount_try_cents, currency, status, raw_payload, created_at)
+			VALUES ('paddle', NULLIF($1,''), NULLIF($1,''), $2, 'USD', 'pending', $3::jsonb, now())`, out.Data.ID, planMonthlyPriceCents(planTier), string(raw))
 	}
 	return checkoutURL, nil
 }
 
 func (h *Handler) PaddleStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{
-		"paddle_api_key":        strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "",
-		"environment":           paddleEnvironment(),
-		"starter_price_id":      paddleConfiguredPriceID("starter") != "",
-		"professional_price_id": paddleConfiguredPriceID("professional") != "",
-		"enterprise_price_id":   paddleConfiguredPriceID("enterprise") != "",
-		"public_app_url":        publicAppURL() != "",
-	})
+	writeJSON(w, http.StatusOK, map[string]any{"paddle_api_key": strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "", "environment": paddleEnvironment(), "starter_price_id": paddleConfiguredPriceID("starter") != "", "professional_price_id": paddleConfiguredPriceID("professional") != "", "enterprise_price_id": paddleConfiguredPriceID("enterprise") != "", "public_app_url": publicAppURL() != ""})
 }
 
 func (h *Handler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
@@ -310,8 +305,7 @@ func (h *Handler) CheckB2BQuota(next http.HandlerFunc) http.HandlerFunc {
 			quota = 1000
 		}
 		var used int
-		start := time.Now().UTC().Format("2006-01-02")
-		monthStart := start[:8] + "01"
+		monthStart := time.Now().UTC().Format("2006-01-") + "01"
 		_ = h.DB.QueryRowContext(r.Context(), `SELECT COALESCE(SUM(GREATEST(credits_reserved, credits_charged)),0) FROM api_usage_events WHERE api_key_id=$1 AND created_at >= $2::date`, p.KeyID, monthStart).Scan(&used)
 		if used >= quota {
 			writeJSON(w, http.StatusPaymentRequired, map[string]any{"error": "monthly_quota_exceeded", "monthly_quota": quota, "used": used})
@@ -335,11 +329,7 @@ func (h *Handler) B2BUsage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) createPaddleCustomer(ctx context.Context, email, planTier string) (string, error) {
 	payload := map[string]any{"email": strings.ToLower(strings.TrimSpace(email)), "custom_data": map[string]string{"package_id": planTier, "package_name": packageName(planTier), "paddle_product_name": paddleProductName(planTier), "plan_tier": planTier, "provider": "paddle", "source": "koschei_web3_hub"}}
-	var out struct {
-		Data struct {
-			ID string `json:"id"`
-		} `json:"data"`
-	}
+	var out struct{ Data struct{ ID string `json:"id"` } `json:"data"` }
 	if err := paddleRequest(ctx, http.MethodPost, "/customers", payload, &out); err != nil {
 		return "", err
 	}
@@ -354,8 +344,7 @@ func paddleRequest(ctx context.Context, method, path string, payload any, out an
 	if err != nil {
 		return err
 	}
-	base := paddleAPIBaseURL()
-	req, err := http.NewRequestWithContext(ctx, method, base+path, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, method, paddleAPIBaseURL()+path, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -394,10 +383,9 @@ func (h *Handler) upsertPaddleSubscription(ctx context.Context, raw json.RawMess
 	email := strings.ToLower(strings.TrimSpace(firstNonEmpty(customDataString(sub.CustomData, "customer_email"), customDataString(sub.CustomData, "user_email"))))
 	status := strings.ToLower(strings.TrimSpace(sub.Status))
 	if inactive {
-		switch status {
-		case "paused":
+		if status == "paused" {
 			status = "paused"
-		default:
+		} else {
 			status = "canceled"
 		}
 	}
@@ -426,7 +414,7 @@ func (h *Handler) upsertPaddleSubscription(ctx context.Context, raw json.RawMess
 		return err
 	}
 	if (status == "active" || status == "trialing") && email != "" && planTier != "" {
-		if _, err := activatePackageEntitlementDetailedTx(ctx, tx, email, planTier, "paddle", sub.ID, "", "", firstNonEmpty(productID, planTier), periodEnd); err != nil {
+		if _, err := activatePackageEntitlementDetailedTx(ctx, tx, email, planTier, "paddle", sub.ID, "", "", productID, periodEnd); err != nil {
 			return err
 		}
 		if err := h.ensureSubscriptionAPIKey(ctx, tx, subscriptionPK, sub.ID, email, planTier); err != nil {
@@ -477,11 +465,7 @@ func (h *Handler) recordPaddleTransaction(ctx context.Context, raw json.RawMessa
 	}
 	if (email == "" || packageID == "") && txData.SubscriptionID != "" {
 		var storedEmail, storedPlan, storedProduct string
-		_ = h.DB.QueryRowContext(ctx, `
-			SELECT lower(c.email), COALESCE(s.plan_tier, ''), COALESCE(s.product_id, '')
-			FROM paddle_subscriptions s
-			JOIN paddle_customers c ON c.id = s.customer_id
-			WHERE s.paddle_subscription_id = $1`, txData.SubscriptionID).Scan(&storedEmail, &storedPlan, &storedProduct)
+		_ = h.DB.QueryRowContext(ctx, `SELECT lower(c.email), COALESCE(s.plan_tier, ''), COALESCE(s.product_id, '') FROM paddle_subscriptions s JOIN paddle_customers c ON c.id = s.customer_id WHERE s.paddle_subscription_id = $1`, txData.SubscriptionID).Scan(&storedEmail, &storedPlan, &storedProduct)
 		if email == "" && !strings.HasSuffix(storedEmail, "@paddle.local") {
 			email = storedEmail
 		}
@@ -506,14 +490,14 @@ func (h *Handler) recordPaddleTransaction(ctx context.Context, raw json.RawMessa
 	defer tx.Rollback()
 	var orderID string
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO orders (customer_id, product_id, provider, provider_order_id, provider_payment_id, amount, currency, status, raw_payload, purchased_at, created_at, updated_at)
-		VALUES (NULLIF($1,''), NULLIF($2,''), 'paddle', NULLIF($3,''), NULLIF($4,''), $5, $6, $7, $8::jsonb, $9, now(), now())
-		RETURNING id::text`, firstNonEmpty(txData.CustomerID, email), firstNonEmpty(productID, packageID), txData.ID, txData.ID, amount, currency, status, rawPayload, purchasedAt).Scan(&orderID)
+		INSERT INTO orders (provider, provider_order_id, provider_payment_id, amount_try_cents, currency, status, raw_payload, purchased_at, created_at)
+		VALUES ('paddle', NULLIF($1,''), NULLIF($2,''), $3, $4, $5, $6::jsonb, $7, now())
+		RETURNING id::text`, txData.ID, txData.ID, int(amount*100), currency, status, rawPayload, purchasedAt).Scan(&orderID)
 	if err != nil {
 		return err
 	}
 	if grantEntitlement && email != "" && packageID != "" && txData.ID != "" {
-		if _, err := activatePackageEntitlementDetailedTx(ctx, tx, email, packageID, "paddle", txData.ID, "", orderID, firstNonEmpty(productID, packageID), nil); err != nil {
+		if _, err := activatePackageEntitlementDetailedTx(ctx, tx, email, packageID, "paddle", txData.ID, "", orderID, productID, nil); err != nil {
 			return err
 		}
 	}
@@ -631,14 +615,7 @@ func paddleMessageFromValue(value any) string {
 }
 
 func paddleCheckoutURL(out paddleAPIResponse) string {
-	for _, value := range []string{
-		out.Data.Checkout.URL,
-		out.Data.CheckoutURL,
-		out.Data.URL,
-		out.Checkout.URL,
-		out.CheckoutURL,
-		out.URL,
-	} {
+	for _, value := range []string{out.Data.Checkout.URL, out.Data.CheckoutURL, out.Data.URL, out.Checkout.URL, out.CheckoutURL, out.URL} {
 		if trimmed := strings.TrimSpace(value); trimmed != "" {
 			return trimmed
 		}
@@ -646,9 +623,7 @@ func paddleCheckoutURL(out paddleAPIResponse) string {
 	return ""
 }
 
-func publicAppURL() string {
-	return strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_APP_URL")), "/")
-}
+func publicAppURL() string { return strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_APP_URL")), "/") }
 
 func paddleProductName(planTier string) string {
 	switch normalizePlanTier(planTier) {
@@ -689,72 +664,40 @@ func paddleConfiguredProductID(planTier string) string {
 	}
 }
 
-func paddleTransactionItem(priceID, planTier string) map[string]any {
-	return map[string]any{"price_id": priceID, "quantity": 1}
-}
-
-func normalizePlanTier(planTier string) string {
-	return normalizePackageID(planTier)
-}
+func paddleTransactionItem(priceID, planTier string) map[string]any { return map[string]any{"price_id": priceID, "quantity": 1} }
+func normalizePlanTier(planTier string) string { return normalizePackageID(planTier) }
 
 func subscriptionProductAndTier(sub paddleSubscriptionData) (string, string) {
-	var productID string
-	var priceID string
+	var productID, priceID string
 	for _, item := range sub.Items {
-		if priceID == "" {
-			priceID = strings.TrimSpace(item.Price.ID)
-		}
-		if productID == "" {
-			productID = strings.TrimSpace(item.Price.ProductID)
-		}
-		if priceID != "" && productID != "" {
-			break
-		}
+		if priceID == "" { priceID = strings.TrimSpace(item.Price.ID) }
+		if productID == "" { productID = strings.TrimSpace(item.Price.ProductID) }
+		if priceID != "" && productID != "" { break }
 	}
 	planTier := normalizePlanTier(customDataString(sub.CustomData, "plan_tier"))
-	if planTier == "" {
-		planTier = tierFromPriceID(priceID)
-	}
+	if planTier == "" { planTier = tierFromPriceID(priceID) }
 	return firstNonEmpty(productID, priceID), planTier
 }
 
 func transactionProductAndPrice(txData paddleTransactionData) (string, string) {
 	var productID, priceID string
 	for _, item := range txData.Items {
-		if productID == "" {
-			productID = strings.TrimSpace(item.Price.ProductID)
-		}
-		if priceID == "" {
-			priceID = strings.TrimSpace(item.Price.ID)
-		}
+		if productID == "" { productID = strings.TrimSpace(item.Price.ProductID) }
+		if priceID == "" { priceID = strings.TrimSpace(item.Price.ID) }
 	}
 	return productID, priceID
 }
 
 func paddleTransactionAmount(txData paddleTransactionData) (float64, string) {
 	currency := strings.ToUpper(strings.TrimSpace(stringFromNested(txData.Details, "totals", "currency_code")))
-	if currency == "" {
-		currency = strings.ToUpper(strings.TrimSpace(stringFromNested(txData.Details, "currency_code")))
-	}
-	if currency == "" {
-		currency = "USD"
-	}
-	amountText := firstNonEmpty(
-		stringFromNested(txData.Details, "totals", "total"),
-		stringFromNested(txData.Details, "totals", "subtotal"),
-		stringFromNested(txData.Details, "total"),
-	)
+	if currency == "" { currency = strings.ToUpper(strings.TrimSpace(stringFromNested(txData.Details, "currency_code"))) }
+	if currency == "" { currency = "USD" }
+	amountText := firstNonEmpty(stringFromNested(txData.Details, "totals", "total"), stringFromNested(txData.Details, "totals", "subtotal"), stringFromNested(txData.Details, "total"))
 	amountText = strings.TrimSpace(amountText)
-	if amountText == "" {
-		return 0, currency
-	}
+	if amountText == "" { return 0, currency }
 	amount, err := strconv.ParseFloat(amountText, 64)
-	if err != nil {
-		return 0, currency
-	}
-	if amount >= 100 && !strings.Contains(amountText, ".") {
-		amount = amount / 100
-	}
+	if err != nil { return 0, currency }
+	if amount >= 100 && !strings.Contains(amountText, ".") { amount = amount / 100 }
 	return amount, currency
 }
 
@@ -762,9 +705,7 @@ func stringFromNested(data map[string]any, path ...string) string {
 	var current any = data
 	for _, key := range path {
 		m, ok := current.(map[string]any)
-		if !ok || m == nil {
-			return ""
-		}
+		if !ok || m == nil { return "" }
 		current = m[key]
 	}
 	switch v := current.(type) {
@@ -782,30 +723,20 @@ func stringFromNested(data map[string]any, path ...string) string {
 func tierFromPriceID(priceID string) string {
 	priceID = strings.TrimSpace(priceID)
 	for _, tier := range []string{"starter", "professional", "enterprise"} {
-		if priceID != "" && priceID == paddleConfiguredPriceID(tier) {
-			return tier
-		}
+		if priceID != "" && priceID == paddleConfiguredPriceID(tier) { return tier }
 	}
 	return ""
 }
 
 func customDataString(data map[string]any, key string) string {
-	if data == nil {
-		return ""
-	}
-	if v, ok := data[key].(string); ok {
-		return strings.TrimSpace(v)
-	}
+	if data == nil { return "" }
+	if v, ok := data[key].(string); ok { return strings.TrimSpace(v) }
 	return ""
 }
 
 func parsePaddleTime(raw string) any {
-	if strings.TrimSpace(raw) == "" {
-		return nil
-	}
-	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
-		return t
-	}
+	if strings.TrimSpace(raw) == "" { return nil }
+	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil { return t }
 	return nil
 }
 
@@ -849,19 +780,10 @@ func planRateLimit(planTier string) int {
 }
 
 func safeError(err error) string {
-	if err == nil {
-		return ""
-	}
+	if err == nil { return "" }
 	msg := err.Error()
-	if len(msg) > 240 {
-		return msg[:240]
-	}
+	if len(msg) > 240 { return msg[:240] }
 	return msg
 }
 
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
+func maxInt(a, b int) int { if a > b { return a }; return b }
