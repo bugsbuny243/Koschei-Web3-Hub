@@ -46,6 +46,8 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 				WHERE lower(email) = lower($1)
 				  AND status = 'active'
 				  AND COALESCE(plan_id, '') <> 'free'
+				  AND COALESCE(outputs_remaining, 0) > 0
+				  AND (expires_at IS NULL OR expires_at > now())
 				ORDER BY outputs_remaining DESC, created_at DESC
 				LIMIT 1
 				FOR UPDATE
@@ -61,7 +63,22 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 		}
 	}
 
-	return errors.New("active package required")
+	return errors.New("active package output required")
+}
+
+func (h *Handler) consumePremiumOutput(authSubject, email, reason string) error {
+	if h.DB == nil {
+		return errors.New("database unavailable")
+	}
+	tx, err := h.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := h.applyCreditChargeTxWithReason(tx, authSubject, email, reason); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) {
@@ -101,6 +118,9 @@ func (h *Handler) requirePremiumOutput(authSubject string) (int, error) {
 	_, available, err := h.userCreditsAndRole(authSubject)
 	if err != nil {
 		return 0, err
+	}
+	if available <= 0 {
+		return 0, errors.New("active package output required")
 	}
 	return available, nil
 }
