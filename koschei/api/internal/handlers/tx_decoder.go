@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"koschei/api/internal/router"
@@ -48,18 +47,6 @@ func (h *Handler) TXDecode(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Network == "" {
 		req.Network = "solana-devnet"
-	}
-
-	claims, ok := userFromContext(r.Context())
-	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-		return
-	}
-	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 1
-	if !isPrivileged && credits < toolCost {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-		return
 	}
 
 	apiKey := os.Getenv("ALCHEMY_API_KEY")
@@ -158,88 +145,15 @@ func (h *Handler) TXDecode(w http.ResponseWriter, r *http.Request) {
 		feeSol = fmt.Sprintf("%.6f SOL", float64(result.Meta.Fee)/1e9)
 	}
 
-	// Build context for AI
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Solana Transaction Analysis\nSignature: %s\nNetwork: %s\nStatus: %s\nFee: %s\n",
-		req.Signature, req.Network, txStatus, feeSol))
-
-	if len(programNames) > 0 {
-		sb.WriteString("Programs involved: " + strings.Join(programNames, ", ") + "\n")
-	}
-
-	if result.Transaction != nil && result.Transaction.Message != nil {
-		sb.WriteString(fmt.Sprintf("Instruction count: %d\n", len(result.Transaction.Message.Instructions)))
-		sb.WriteString(fmt.Sprintf("Account count: %d\n", len(result.Transaction.Message.AccountKeys)))
-
-		// Balance changes
-		if result.Meta != nil && len(result.Meta.PreBalances) > 0 {
-			sb.WriteString("Balance changes:\n")
-			for i, acc := range result.Transaction.Message.AccountKeys {
-				if i < len(result.Meta.PreBalances) && i < len(result.Meta.PostBalances) {
-					diff := result.Meta.PostBalances[i] - result.Meta.PreBalances[i]
-					if diff != 0 {
-						sb.WriteString(fmt.Sprintf("  %s: %+.6f SOL\n", acc.Pubkey[:min(8, len(acc.Pubkey))], float64(diff)/1e9))
-					}
-				}
-			}
-		}
-
-		if result.Meta != nil && len(result.Meta.LogMessages) > 0 {
-			sb.WriteString("Logs (first 3):\n")
-			for i, log := range result.Meta.LogMessages {
-				if i >= 3 {
-					break
-				}
-				sb.WriteString("  " + log + "\n")
-			}
-		}
-	}
-
-	prompt := fmt.Sprintf(`You are a Solana blockchain security expert. Analyze this transaction and respond ONLY with a valid JSON object.
-
-Transaction data:
-%s
-
-Respond with this exact JSON (no markdown, no extra text):
-{
-  "explanation": "1-2 sentence plain English explanation of what happened",
-  "actions": ["list", "of", "key", "actions"],
-  "risk_level": "SAFE or WARNING or DANGER",
-  "risk_reason": "only if WARNING or DANGER, explain why"
-}`, sb.String())
-
-	explanation := "Transaction fetched successfully. AI explanation unavailable."
-	riskLevel := "UNKNOWN"
+	explanation := fmt.Sprintf("Transaction fetched from Solana RPC with status %s, fee %s, and %d involved programs.", txStatus, feeSol, len(programNames))
+	riskLevel := "SAFE"
 	riskReason := ""
-
-	if ai, err := router.Chat(context.Background(), router.ChatRequest{Prompt: prompt, MaxTokens: 400, Temperature: 0.2, Timeout: 12 * time.Second}); err == nil {
-		content := strings.TrimSpace(ai.Content)
-		content = strings.TrimPrefix(content, "```json")
-		content = strings.TrimPrefix(content, "```")
-		content = strings.TrimSuffix(content, "```")
-		content = strings.TrimSpace(content)
-		var aiParsed struct {
-			Explanation string   `json:"explanation"`
-			Actions     []string `json:"actions"`
-			RiskLevel   string   `json:"risk_level"`
-			RiskReason  string   `json:"risk_reason"`
-		}
-		if json.Unmarshal([]byte(content), &aiParsed) == nil {
-			if aiParsed.Explanation != "" {
-				explanation = aiParsed.Explanation
-			}
-			if aiParsed.RiskLevel != "" {
-				riskLevel = aiParsed.RiskLevel
-			}
-			riskReason = aiParsed.RiskReason
-		}
-	}
-
-	if !isPrivileged {
-		if err := h.spendOutput(claims.Email, "tx_decode"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-			return
-		}
+	if txStatus == "failed" {
+		riskLevel = "WARNING"
+		riskReason = "The transaction execution reported an on-chain error."
+	} else if len(programNames) >= 6 {
+		riskLevel = "WARNING"
+		riskReason = "The transaction touches many programs; inspect routed or composite execution carefully."
 	}
 
 	writeJSON(w, http.StatusOK, txDecodeResponse{

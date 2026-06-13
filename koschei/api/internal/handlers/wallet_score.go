@@ -52,18 +52,6 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 		req.Network = "solana-devnet"
 	}
 
-	claims, ok := userFromContext(r.Context())
-	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-		return
-	}
-	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 1
-	if !isPrivileged && credits < toolCost {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-		return
-	}
-
 	apiKey := os.Getenv("ALCHEMY_API_KEY")
 	rpcURL := solanaRPCURL(req.Network, apiKey)
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -248,20 +236,8 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 		badges = append(badges, "👤 Standard Account")
 	}
 
-	// ── 4. AI Summary ──
-	summary := fmt.Sprintf("Wallet with %d transactions, balance of %s, active for %d days. Score: %d/100 (%s).", txCount, balanceSol, activeDays, score, level)
-	prompt := fmt.Sprintf(`Summarize this Solana wallet reputation in 1-2 sentences for a non-technical user. Be concise and clear. Data: address=%s, score=%d/100, level=%s, tx_count=%d, balance=%s, active_days=%d, badges=%s. No markdown, just plain text.`,
-		req.Address[:min(8, len(req.Address))]+"...", score, level, txCount, balanceSol, activeDays, strings.Join(badges, ", "))
-	if ai, err := router.Chat(r.Context(), router.ChatRequest{Prompt: prompt, MaxTokens: 150, Temperature: 0.3, Timeout: 10 * time.Second}); err == nil && strings.TrimSpace(ai.Content) != "" {
-		summary = strings.TrimSpace(ai.Content)
-	}
-
-	if !isPrivileged {
-		if err := h.spendOutput(claims.Email, "wallet_score"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-			return
-		}
-	}
+	// ── 4. Real-data summary (AI summaries are centralized in the unified router) ──
+	summary := fmt.Sprintf("Wallet with %d fetched transactions, balance of %s, active for %d days. Score: %d/100 (%s).", txCount, balanceSol, activeDays, score, level)
 
 	writeJSON(w, http.StatusOK, walletScoreResponse{
 		Address:    req.Address,
