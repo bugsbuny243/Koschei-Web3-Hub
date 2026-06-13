@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	RealDataUnavailableMessage = "Real data unavailable. Analysis could not be completed."
+	RealDataUnavailableMessage = "Real data unavailable."
 	ModuleTXDecoder            = "tx_decoder"
 	ModuleTokenScanner         = "token_scanner"
 	ModuleWalletScore          = "wallet_score"

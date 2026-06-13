@@ -75,7 +75,6 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 	if inputType == "unknown" {
 		inputType = "question"
 	}
-
 	requestID := newRequestID()
 	sections := unifiedAnalyzeSections{Recommendations: []string{}}
 	partialFailures := []partialFailure{}

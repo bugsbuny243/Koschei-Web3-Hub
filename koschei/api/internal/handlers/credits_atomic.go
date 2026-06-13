@@ -17,10 +17,6 @@ func (h *Handler) userCreditsAndRole(authSubject string) (bool, int, error) {
 			  AND e.status = 'active'
 			  AND COALESCE(e.plan_id, '') <> 'free'
 			  AND COALESCE(e.outputs_remaining, 0) > 0
-		), 0) + COALESCE((
-			SELECT p.credits
-			FROM app_user_profiles p
-			WHERE p.auth_subject = $1
 		), 0)`, authSubject).Scan(&available)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -66,27 +62,7 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 		}
 	}
 
-	var res sql.Result
-	var err error
-	if authSubject != "" {
-		res, err = tx.Exec(`UPDATE app_user_profiles SET credits = credits - 1, updated_at = now() WHERE auth_subject=$1 AND credits > 0`, authSubject)
-	} else if email != "" {
-		res, err = tx.Exec(`UPDATE app_user_profiles SET credits = credits - 1, updated_at = now() WHERE lower(email)=lower($1) AND credits > 0`, email)
-	} else {
-		return errors.New("insufficient outputs")
-	}
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows != 1 {
-		return errors.New("insufficient outputs")
-	}
-	_, err = tx.Exec(`INSERT INTO credit_events (email, amount, reason, event_type) VALUES (lower($1), -1, $2, $3)`, email, reason, reason)
-	return err
+	return errors.New("active entitlement output required")
 }
 
 func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) {

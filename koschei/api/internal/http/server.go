@@ -91,13 +91,18 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/owner/payments/approve", requiresDB(h, ownerOnly(h, method("POST", h.OwnerApprovePayment))))
 	mux.HandleFunc("/api/owner/payments/reject", requiresDB(h, ownerOnly(h, method("POST", h.OwnerRejectPayment))))
 	mux.HandleFunc("/api/owner/command", requiresDB(h, ownerOnly(h, method("POST", h.OwnerCommand))))
+	mux.HandleFunc("/api/owner/brain", requiresDB(h, ownerOnly(h, method("POST", h.OwnerBrain))))
+	mux.HandleFunc("/api/owner/health", requiresDB(h, ownerOnly(h, method("GET", h.OwnerHealth))))
 	mux.HandleFunc("/api/owner/status", requiresDB(h, ownerOnly(h, method("GET", h.OwnerStatus))))
+	mux.HandleFunc("/api/owner/health", ownerOnly(h, method("GET", h.OwnerBackendHealth)))
+	mux.HandleFunc("/api/owner/brain", ownerOnly(h, method("POST", h.OwnerBrain)))
+	mux.HandleFunc("/api/owner/emergency", ownerOnly(h, method("POST", h.OwnerEmergencyControl)))
 	mux.HandleFunc("/api/owner/grants", requiresDB(h, ownerOnly(h, method("GET", h.OwnerGrants))))
 	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, ownerOnly(h, method("GET", h.OwnerDAOGuardianSummary))))
 	mux.HandleFunc("/owner", ownerPageHandler(staticDir))
 	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
-	mux.HandleFunc("/jarvis", jarvisPageHandler(staticDir))
-	mux.HandleFunc("/jarvis.html", jarvisPageHandler(staticDir))
+	mux.HandleFunc("/jarvis", redirectToDashboard)
+	mux.HandleFunc("/jarvis.html", redirectToDashboard)
 	registerLegacyDashboardRedirects(mux)
 	mux.HandleFunc("/api/public/impact", method("GET", h.PublicImpact))
 	mux.HandleFunc("/api/public/metrics", method("GET", h.GetPublicMetrics))
@@ -305,7 +310,12 @@ func jarvisPageHandler(staticDir string) http.HandlerFunc {
 func registerLegacyDashboardRedirects(mux *http.ServeMux) {
 	legacyDashboards := []string{
 		"/airdrop-checker",
+		"/cross-chain-risk",
+		"/funding-assistant",
+		"/grant",
+		"/grant-writer",
 		"/graph",
+		"/hub",
 		"/intelligence-graph",
 		"/liquidity-radar",
 		"/mev-shield",
@@ -324,6 +334,7 @@ func registerLegacyDashboardRedirects(mux *http.ServeMux) {
 		"/token-scanner",
 		"/tx-decoder",
 		"/tx-decoder-pro",
+		"/unified",
 		"/wallet-score",
 	}
 	for _, route := range legacyDashboards {

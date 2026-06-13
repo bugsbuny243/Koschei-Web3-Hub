@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/router"
 )
 
 func jsonBytes(v any) []byte { b, _ := json.Marshal(v); return b }
@@ -103,18 +105,6 @@ func (h *Handler) GrantGenerate(w http.ResponseWriter, r *http.Request) {
 		q.Focus = "Web3 developer tooling, security and intelligence"
 	}
 
-	aiKey := os.Getenv("TOGETHER_API_KEY")
-	model := os.Getenv("TOGETHER_MODEL")
-	if model == "" {
-		model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-	}
-
-	if aiKey == "" {
-		h.logTool("", "grant_autopilot", "unavailable")
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "ai_unavailable", "message": "Unable to fetch live data right now."})
-		return
-	}
-
 	prompt := fmt.Sprintf(`You are an expert grant writer for Web3 and blockchain projects. Write a compelling, professional grant application for the following project.
 
 PROJECT: Koschei Web3 Intelligence OS
@@ -150,40 +140,13 @@ Write a grant application with these sections:
 Be specific, compelling, and avoid generic Web3 jargon. Focus on real impact.
 Write in plain text, no markdown headers, just section titles in CAPS.`, q.Ecosystem, q.Focus, q.Ecosystem, q.Ecosystem)
 
-	reqBody, _ := json.Marshal(map[string]any{
-		"model":       model,
-		"max_tokens":  1200,
-		"temperature": 0.7,
-		"messages":    []map[string]string{{"role": "user", "content": prompt}},
-	})
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	aiReq, _ := http.NewRequest("POST", "https://api.together.xyz/v1/chat/completions", bytes.NewReader(reqBody))
-	aiReq.Header.Set("Authorization", "Bearer "+aiKey)
-	aiReq.Header.Set("Content-Type", "application/json")
-
-	aiResp, err := client.Do(aiReq)
+	ai, err := router.Chat(r.Context(), router.ChatRequest{Prompt: prompt, MaxTokens: 1200, Temperature: 0.7, Timeout: 30 * time.Second})
 	if err != nil {
 		h.logTool("", "grant_autopilot", "ai_error")
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "ai_unavailable", "message": "Unable to fetch live data right now."})
 		return
 	}
-	defer aiResp.Body.Close()
-	aiData, _ := io.ReadAll(aiResp.Body)
-
-	var aiResult struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-
-	generatedText := ""
-	if json.Unmarshal(aiData, &aiResult) == nil && len(aiResult.Choices) > 0 {
-		generatedText = strings.TrimSpace(aiResult.Choices[0].Message.Content)
-	}
-
+	generatedText := strings.TrimSpace(ai.Content)
 	if generatedText == "" {
 		h.logTool("", "grant_autopilot", "empty_ai_response")
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "ai_empty_response", "message": "Unable to fetch live data right now."})
