@@ -1,21 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://tradepigloball.co/</loc></url>
-  <url><loc>https://tradepigloball.co/hub.html</loc></url>
+  <url><loc>https://tradepigloball.co/dashboard</loc></url>
   <url><loc>https://tradepigloball.co/pricing.html</loc></url>
-  <url><loc>https://tradepigloball.co/login.html</loc></url>
-  <url><loc>https://tradepigloball.co/register.html</loc></url>
-  <url><loc>https://tradepigloball.co/tx-decoder.html</loc></url>
-  <url><loc>https://tradepigloball.co/risk.html</loc></url>
-  <url><loc>https://tradepigloball.co/token-scanner.html</loc></url>
-  <url><loc>https://tradepigloball.co/wallet-score.html</loc></url>
-  <url><loc>https://tradepigloball.co/portfolio.html</loc></url>
-  <url><loc>https://tradepigloball.co/project-radar.html</loc></url>
-  <url><loc>https://tradepigloball.co/grant-writer.html</loc></url>
-  <url><loc>https://tradepigloball.co/intelligence-graph.html</loc></url>
-  <url><loc>https://tradepigloball.co/sybil-checker.html</loc></url>
+  <url><loc>https://tradepigloball.co/reports.html</loc></url>
+  <url><loc>https://tradepigloball.co/account.html</loc></url>
+  <url><loc>https://tradepigloball.co/docs.html</loc></url>
+  <url><loc>https://tradepigloball.co/docs-api.html</loc></url>
+  <url><loc>https://tradepigloball.co/docs-sdk.html</loc></url>
   <url><loc>https://tradepigloball.co/solana-security-tools.html</loc></url>
-  <url><loc>https://tradepigloball.co/solana-tx-decoder.html</loc></url>
-  <url><loc>https://tradepigloball.co/solana-risk-scanner.html</loc></url>
-  <url><loc>https://tradepigloball.co/solana-token-scanner.html</loc></url>
+  <url><loc>https://tradepigloball.co/support.html</loc></url>
 </urlset>
