@@ -69,7 +69,7 @@ func (h *Handler) CreateGameProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	model := strings.TrimSpace(os.Getenv("TOGETHER_MODEL_GAME_DESIGN"))
-	if strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" || model == "" {
+	if !aiProviderConfigured() {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "ai_provider_not_configured"})
 		return
 	}

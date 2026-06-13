@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/router"
 )
 
 func (h *Handler) RugRadarFeed(w http.ResponseWriter, r *http.Request) {
@@ -186,34 +188,11 @@ func (h *Handler) RugRadarSubmit(w http.ResponseWriter, r *http.Request) {
 		riskLevel = "DANGER"
 	}
 
-	// AI summary
-	aiKey := os.Getenv("TOGETHER_API_KEY")
-	if aiKey != "" {
-		model := os.Getenv("TOGETHER_MODEL")
-		if model == "" {
-			model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-		}
-		prompt := fmt.Sprintf(`1 sentence Solana token security summary: score=%d, level=%s, mint_renounced=%v, freeze=%v, txs=%d. Be direct, no markdown.`,
-			score, riskLevel, isRenounced, isFrozen, txCount)
-		aiBody, _ := json.Marshal(map[string]interface{}{"model": model, "max_tokens": 80, "temperature": 0.3, "messages": []map[string]string{{"role": "user", "content": prompt}}})
-		aiReq, _ := http.NewRequest("POST", "https://api.together.xyz/v1/chat/completions", bytes.NewReader(aiBody))
-		aiReq.Header.Set("Authorization", "Bearer "+aiKey)
-		aiReq.Header.Set("Content-Type", "application/json")
-		if aiResp, err := client.Do(aiReq); err == nil {
-			defer aiResp.Body.Close()
-			var aiResult struct {
-				Choices []struct {
-					Message struct {
-						Content string `json:"content"`
-					} `json:"message"`
-				} `json:"choices"`
-			}
-			if d, _ := io.ReadAll(aiResp.Body); json.Unmarshal(d, &aiResult) == nil && len(aiResult.Choices) > 0 {
-				if s := strings.TrimSpace(aiResult.Choices[0].Message.Content); s != "" {
-					riskSummary = s
-				}
-			}
-		}
+	// AI summary through the central router.
+	prompt := fmt.Sprintf(`1 sentence Solana token security summary: score=%d, level=%s, mint_renounced=%v, freeze=%v, txs=%d. Be direct, no markdown.`,
+		score, riskLevel, isRenounced, isFrozen, txCount)
+	if ai, err := router.Chat(r.Context(), router.ChatRequest{Prompt: prompt, MaxTokens: 80, Temperature: 0.3, Timeout: 10 * time.Second}); err == nil && strings.TrimSpace(ai.Content) != "" {
+		riskSummary = strings.TrimSpace(ai.Content)
 	}
 
 	// Save to DB
