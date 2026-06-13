@@ -6,6 +6,19 @@ func notImplemented(w http.ResponseWriter, name string) {
 	writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "not_implemented", "handler": name})
 }
 
+func (h *Handler) premiumStub(w http.ResponseWriter, r *http.Request, name string) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		return
+	}
+	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
+	notImplemented(w, name)
+}
+
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusGone, map[string]string{
 		"error":   "backend_auth_disabled",
@@ -60,5 +73,5 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "user": profile})
 }
 
-func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) { notImplemented(w, "AIGenerate") }
-func (h *Handler) AIJobs(w http.ResponseWriter, r *http.Request)     { notImplemented(w, "AIJobs") }
+func (h *Handler) AIGenerate(w http.ResponseWriter, r *http.Request) { h.premiumStub(w, r, "AIGenerate") }
+func (h *Handler) AIJobs(w http.ResponseWriter, r *http.Request)     { h.premiumStub(w, r, "AIJobs") }
