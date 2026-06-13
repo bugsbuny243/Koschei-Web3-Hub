@@ -115,6 +115,11 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		}
 	}
 
+	if err := h.consumePremiumOutput(claims.Sub, normalizedClaimEmail(claims), "unified_analyze"); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
+
 	data := unifiedAnalyzeData{InputType: inputType, Summary: summary, Sections: sections, Sources: sources, PartialFailures: partialFailures}
 	h.logUnifiedAnalysis(normalizedClaimEmail(claims), inputType, APICodeOK, provider, partialFailures)
 	h.logTool(normalizedClaimEmail(claims), "unified_analyze", "completed")
