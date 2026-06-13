@@ -93,6 +93,9 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, ownerOnly(h, method("GET", h.OwnerDAOGuardianSummary))))
 	mux.HandleFunc("/owner", ownerPageHandler(staticDir))
 	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
+	mux.HandleFunc("/jarvis", jarvisPageHandler(staticDir))
+	mux.HandleFunc("/jarvis.html", jarvisPageHandler(staticDir))
+	registerLegacyDashboardRedirects(mux)
 	mux.HandleFunc("/api/public/impact", method("GET", h.PublicImpact))
 	mux.HandleFunc("/api/public/metrics", method("GET", h.GetPublicMetrics))
 	mux.HandleFunc("/api/public/tool-prices", requiresDB(h, method("GET", h.ToolPrices)))
@@ -278,6 +281,64 @@ func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+func jarvisPageHandler(staticDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if staticDir != "" {
+			jarvisPath := filepath.Join(staticDir, "jarvis.html")
+			if info, err := os.Stat(jarvisPath); err == nil && !info.IsDir() {
+				http.ServeFile(w, r, jarvisPath)
+				return
+			}
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Koschei JARVIS</title></head><body><h1>Koschei JARVIS dashboard not found</h1></body></html>`))
+	}
+}
+
+func registerLegacyDashboardRedirects(mux *http.ServeMux) {
+	legacyDashboards := []string{
+		"/airdrop-checker",
+		"/graph",
+		"/intelligence-graph",
+		"/liquidity-radar",
+		"/mev-shield",
+		"/portfolio",
+		"/program-scanner",
+		"/project-radar",
+		"/radar",
+		"/risk",
+		"/risk-v2",
+		"/smart-money",
+		"/solana-risk-scanner",
+		"/solana-token-scanner",
+		"/solana-tx-decoder",
+		"/sybil-check",
+		"/sybil-checker",
+		"/token-scanner",
+		"/tx-decoder",
+		"/tx-decoder-pro",
+		"/wallet-score",
+	}
+	for _, route := range legacyDashboards {
+		mux.HandleFunc(route, redirectToJarvis)
+		mux.HandleFunc(route+".html", redirectToJarvis)
+	}
+}
+
+func redirectToJarvis(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	http.Redirect(w, r, "/jarvis", http.StatusFound)
+}
+
 func ownerPageHandler(staticDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
