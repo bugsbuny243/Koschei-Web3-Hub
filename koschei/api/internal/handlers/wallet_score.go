@@ -9,8 +9,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"koschei/api/internal/router"
 )
 
 type walletScoreRequest struct {
