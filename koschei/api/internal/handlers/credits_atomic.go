@@ -38,7 +38,7 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 	if email != "" {
 		res, err := tx.Exec(`
 			UPDATE entitlements
-			SET outputs_remaining = outputs_remaining - 1,
+			SET outputs_remaining = GREATEST(outputs_remaining - 1, 0),
 			    updated_at = now()
 			WHERE id = (
 				SELECT id
@@ -46,7 +46,6 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 				WHERE lower(email) = lower($1)
 				  AND status = 'active'
 				  AND COALESCE(plan_id, '') <> 'free'
-				  AND outputs_remaining > 0
 				ORDER BY outputs_remaining DESC, created_at DESC
 				LIMIT 1
 				FOR UPDATE
@@ -62,7 +61,7 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 		}
 	}
 
-	return errors.New("active entitlement output required")
+	return errors.New("active package required")
 }
 
 func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) {
@@ -92,12 +91,16 @@ func (h *Handler) requirePremiumOutput(authSubject string) (int, error) {
 	if h.DB == nil {
 		return 0, errors.New("database unavailable")
 	}
-	_, available, err := h.userCreditsAndRole(authSubject)
+	active, err := h.hasActivePaidPackage(authSubject, "")
 	if err != nil {
 		return 0, err
 	}
-	if available <= 0 {
-		return available, errors.New("insufficient outputs")
+	if !active {
+		return 0, errors.New("active package required")
+	}
+	_, available, err := h.userCreditsAndRole(authSubject)
+	if err != nil {
+		return 0, err
 	}
 	return available, nil
 }
