@@ -69,9 +69,7 @@ func (h *Handler) ProgramScan(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 1
-	if !isPrivileged && credits < toolCost {
+	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
@@ -145,11 +143,9 @@ func (h *Handler) ProgramScan(w http.ResponseWriter, r *http.Request) {
 		riskLevel = "medium"
 	}
 
-	if !isPrivileged {
-		if err := h.spendOutput(claims.Email, "program_scan"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-			return
-		}
+	if err := h.spendOutput(claims.Email, "program_scan"); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
 	}
 
 	writeJSON(w, http.StatusOK, programScanResponse{
