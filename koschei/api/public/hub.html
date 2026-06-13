@@ -156,7 +156,7 @@
       <div class="hero-card surface">
         <div class="eyebrow">◈ aktif çalışma alanı</div>
         <h1><span class="gradient-text">Koschei Web3 Komuta Merkezi</span></h1>
-        <p class="page-sub">Hesap durumunu yönetin, kalan çıktı hakkını izleyin ve Koschei’nin saklama gerektirmeyen çekirdek araçlarına tek panelden geçin.</p>
+        <p class="page-sub">Hesap durumunu yönetin ve Koschei’nin saklama gerektirmeyen birleşik istihbarat paneline tek yerden geçin.</p>
       </div>
       <aside class="profile-card surface">
         <div>
@@ -171,22 +171,16 @@
 
     <section class="stats" aria-label="Member summary">
       <article class="stat surface"><div class="stat-label">Plan</div><div class="stat-value" id="userPlan">—</div></article>
-      <article class="stat surface"><div class="stat-label">Kalan çıktı hakkı</div><div class="stat-value" id="userCredits">—</div></article>
+      <article class="stat surface"><div class="stat-label">Paket erişimi</div><div class="stat-value" id="userAccess">—</div></article>
       <article class="stat surface"><div class="stat-label">Aktif çalışma alanı</div><div class="stat-value">Aktif</div></article>
     </section>
 
     <section>
       <div class="section-head">
-        <div><h2>Hızlı erişim</h2><p class="section-note">Premium modüller aktif paket gerektirir.</p></div>
+        <div><h2>Hızlı erişim</h2><p class="section-note">Tek Koschei dashboard aktif paket/entitlement gerektirir.</p></div>
       </div>
       <div class="modules">
-        <a href="/dashboard" class="module-card surface"><div class="module-icon">🚀</div><div class="module-name">A.R.V.I.S Dashboard</div><div class="module-desc">Wallet, token, TX veya proje girdisini tek A.R.V.I.S komuta merkezinde birleşik analiz edin.</div><div class="module-tag tag-live">Süper Analiz</div><span class="btn btn-primary" style="margin-top:16px">A.R.V.I.S Dashboard Aç</span></a>
-        <a href="/dashboard" class="module-card surface"><div class="module-icon">🧾</div><div class="module-name">TX Decoder / İşlem Çözücü</div><div class="module-desc">Solana işlemlerini program, hesap, log ve risk bağlamına çözün.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">İşlemi Çöz</span></a>
-        <a href="/dashboard" class="module-card surface"><div class="module-icon">🪙</div><div class="module-name">Token Scanner / Token Analizi</div><div class="module-desc">Token metadata, yetki, arz ve holder yoğunluğu sinyallerini analiz edin.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">Token Analiz Et</span></a>
-        <a href="/dashboard" class="module-card surface"><div class="module-icon">🏆</div><div class="module-name">Wallet Score / Cüzdan Skoru</div><div class="module-desc">Açık Solana cüzdanlarını aktivite, güven ve risk göstergeleriyle skorlayın.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">Cüzdan Analizini Başlat</span></a>
-        <a href="/dashboard" class="module-card surface"><div class="module-icon">🛡️</div><div class="module-name">Risk Scanner / Risk Analizi</div><div class="module-desc">Cüzdan, token, işlem, kontrat veya proje için kanıt temelli risk değerlendirmesi çalıştırın.</div><div class="module-tag tag-live">Aktif</div><span class="btn btn-primary" style="margin-top:16px">Risk Analizi Başlat</span></a>
-        <a href="/dashboard" class="module-card surface"><div class="module-icon">🕸️</div><div class="module-name">İstihbarat Grafı & Sybil Kontrolü</div><div class="module-desc">Bağlı varlıkları, tekrar eden örüntüleri ve sybil risk sinyallerini inceleyin.</div><div class="module-tag tag-live">Studio</div><span class="btn btn-primary" style="margin-top:16px">İstihbarat Grafını Aç</span></a>
-        <a href="/dashboard" class="module-card surface"><div class="module-icon">🚀</div><div class="module-name">Project Radar & Hibe Hazırlığı</div><div class="module-desc">Proje kanıtlarını, ekosistem uyumunu ve hibe hazırlığı boşluklarını analiz edin.</div><div class="module-tag tag-live">Builder</div><span class="btn btn-primary" style="margin-top:16px">Proje Radarını Aç</span></a>
+        <a href="/dashboard" class="module-card surface"><div class="module-icon">🧠</div><div class="module-name">Koschei Unified Dashboard</div><div class="module-desc">Wallet, token, TX hash, project URL veya normal soruyu tek istek olarak yazın. Koschei gerçek backend analizini çalıştırır.</div><div class="module-tag tag-live">Tek panel</div><span class="btn btn-primary" style="margin-top:16px">Dashboard Aç</span></a>
       </div>
     </section>
   </main>
@@ -211,7 +205,7 @@
         const data = await res.json();
         document.getElementById('userEmail').textContent = data.email || KoscheiAuth.getEmail() || '';
         document.getElementById('userPlan').textContent = data.plan || 'Aktif paket yok';
-        document.getElementById('userCredits').textContent = data.outputs_remaining ?? 0;
+        document.getElementById('userAccess').textContent = data.plan && data.plan !== 'free' ? 'Premium aktif' : 'Paket gerekli';
       } catch {
         const message = document.getElementById('memberMessage');
         message.textContent = 'Hesap aktif. Üye verileri hazırlanıyor.';

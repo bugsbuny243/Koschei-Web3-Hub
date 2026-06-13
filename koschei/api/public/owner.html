@@ -320,7 +320,7 @@
           <div>
             <div class="eyebrow">Koschei Control Layer</div>
             <h1>A.R.V.I.S Owner Command Center</h1>
-            <p class="muted">Kullanıcı, ödeme, paket, Koschei Central Brain, gerçek sistem sağlığı ve operasyon logları.</p>
+            <p class="muted">Kullanıcı, GitHub repo durumu, Neon kullanıcıları/veritabanı, Paddle ödemeleri, OpenAI kullanımı, Alchemy/RPC sağlığı, sistem hataları ve acil durum kontrolleri.</p>
           </div>
         </div>
         <div class="row">
@@ -349,8 +349,7 @@
           <h2>Operasyon Durumu</h2>
           <div class="health"><span>Owner Session</span><span class="status active">active</span></div>
           <div class="health"><span>Package Model</span><span class="status active">entitlement first</span></div>
-          <div class="health"><span>Credit System</span><span class="status pending">legacy read-only</span></div>
-          <div class="health"><span>Central Brain</span><span class="status active">owner-only router</span></div>
+          <div class="health"><span>Central Brain</span><span class="status active">owner only</span></div>
         </aside>
       </section>
 
@@ -378,7 +377,7 @@ Paddle durumunu kontrol et"></textarea>
             <h2>Kullanıcı Yönetimi</h2>
             <input id="userFilter" style="max-width:300px" placeholder="E-posta, auth subject veya wallet ara">
           </div>
-          <p class="tiny" style="margin-bottom:12px">Credits alanı yalnızca Legacy credit balance olarak gösterilir. Yeni erişim modeli paket/entitlement merkezlidir.</p>
+          <p class="tiny" style="margin-bottom:12px">Yeni erişim modeli paket/entitlement temellidir; kredi bazlı müşteri erişimi bu panelde gösterilmez.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -386,7 +385,6 @@ Paddle durumunu kontrol et"></textarea>
                   <th>E-posta</th>
                   <th>Owner/Auth ID</th>
                   <th>Paket</th>
-                  <th>Legacy credit balance</th>
                   <th>Durum</th>
                   <th>Oluşturma</th>
                   <th>Aksiyon</th>
@@ -425,26 +423,25 @@ Paddle durumunu kontrol et"></textarea>
         <article class="card span-5" id="health">
           <div class="toolbar">
             <h2>Sistem Sağlığı</h2>
-            <span class="pill">/api/owner/health</span>
+            <span class="pill">Real backend checks</span>
           </div>
           <div class="health-grid" id="healthGrid"></div>
-          <p class="tiny" style="margin-top:12px">Secret değerleri gösterilmez; sadece yapılandırma durumu listelenir.</p>
+          <p class="tiny" style="margin-top:12px">Bu alan /api/owner/health endpointinden gerçek provider durumlarını okur.</p>
         </article>
 
         <article class="card span-7" id="ai">
           <div class="toolbar">
-            <h2>KOSCHEI CENTRAL BRAIN</h2>
-            <span class="pill">Owner-only command router</span>
+            <h2>Koschei Central Brain</h2>
+            <span class="pill">OpenAI primary · Together fallback</span>
           </div>
           <div class="stack">
             <div class="quick-commands" id="quickCommands" aria-label="Hızlı owner komutları"></div>
             <div class="brain-chat" id="brainChat" aria-live="polite"></div>
             <div class="row">
-              <input id="commandInput" placeholder="Koschei'ye komut ver: kullanıcı ara, hataları özetle, ödeme kontrol et, GitHub durumu, Neon sorgusu...">
-              <button id="runCommandButton">Gönder</button>
+              <button id="runCommandButton">Koschei’ye sor</button>
+              <button class="secondary" id="clearTerminalButton">Terminali temizle</button>
             </div>
-            <div class="brain-state" id="brainState"></div>
-            <h3>Canlı Operasyon Akışı</h3>
+            <p class="tiny">Owner-only beyin OpenAI primary / Together fallback AI router üzerinden çalışır. Customer dashboard bu özellikleri asla çağırmaz.</p>
             <div class="terminal" id="terminal" aria-live="polite"></div>
           </div>
         </article>
@@ -452,13 +449,13 @@ Paddle durumunu kontrol et"></textarea>
         <aside class="card span-5 danger-zone">
           <div class="toolbar">
             <h2>Acil Durum Paneli</h2>
-            <span class="pill">Backend gerekli</span>
+            <span class="pill">Env-backed safety</span>
           </div>
           <div class="stack">
-            <button class="warn" disabled>Bakım modu — Backend endpoint gerekli</button>
-            <button class="danger" disabled>Satışları durdur — Backend endpoint gerekli</button>
-            <button class="danger" disabled>Premium API erişimi — Backend endpoint gerekli</button>
-            <p class="tiny">Backend endpoint gerekli. Bu panel gerçek endpoint olmadan acil durum işlemini çalışmış gibi göstermez.</p>
+            <button class="warn" data-control="maintenance">Bakım modu durumunu kontrol et</button>
+            <button class="danger" data-control="sales_pause">Satış durdurma durumunu kontrol et</button>
+            <button class="danger" data-control="premium_pause">Premium erişim durdurma durumunu kontrol et</button>
+            <p class="tiny">Güvenli üretim davranışı: endpoint istekleri kaydeder ve env-backed effective state döner; kalıcı değişiklik deploy environment üzerinden yapılır.</p>
           </div>
         </aside>
 
@@ -497,9 +494,9 @@ Paddle durumunu kontrol et"></textarea>
         status: 'unknown',
         users: 'unknown',
         payments: 'unknown',
-        grants: 'unknown',
-        health: 'unknown'
-      }
+        grants: 'unknown'
+      },
+      backendHealth: []
     };
 
     const $ = (id) => document.getElementById(id);
@@ -592,7 +589,7 @@ Paddle durumunu kontrol et"></textarea>
         state.users = users.users || users.items || [];
         state.payments = payments.payment_requests || payments.requests || payments.items || [];
         state.grants = grants.grants || [];
-        state.services = health.services || {};
+        state.backendHealth = health.checks || [];
         state.ownerError = '';
 
         renderAll();
@@ -671,8 +668,8 @@ Paddle durumunu kontrol et"></textarea>
 
       const users = state.users.filter((u) => !filter || JSON.stringify(u).toLowerCase().includes(filter));
 
-      if (state.ownerError) { emptyRow(body, 7, state.ownerError); return; }
-      if (!users.length) { emptyRow(body, 7, 'Kullanıcı bulunamadı.'); return; }
+      if (state.ownerError) { emptyRow(body, 6, state.ownerError); return; }
+      if (!users.length) { emptyRow(body, 6, 'Kullanıcı bulunamadı.'); return; }
 
       users.forEach((u) => {
         const tr = document.createElement('tr');
@@ -681,7 +678,6 @@ Paddle durumunu kontrol et"></textarea>
           text('td', u.email),
           text('td', u.auth_subject || u.wallet_address || '—'),
           text('td', inferUserPlan(u)),
-          text('td', `Legacy credit balance: ${formatNumber(u.credits)}`),
           statusCell(u.status),
           text('td', formatDate(u.created_at))
         );
@@ -745,20 +741,19 @@ Paddle durumunu kontrol et"></textarea>
       const grid = $('healthGrid');
       grid.replaceChildren();
 
-      const serviceStatus = (name) => (state.services[name] && state.services[name].status) || (state.apiHealth.health === 'error' ? 'Bu işlem için backend endpoint gerekli.' : 'unknown');
-      const items = [
-        ['Database', serviceStatus('database')],
-        ['OpenAI API', serviceStatus('openai')],
-        ['Paddle API', serviceStatus('paddle')],
-        ['Alchemy / Solana RPC', serviceStatus('alchemy')],
-        ['GitHub API', serviceStatus('github')],
-        ['Neon Database URL', serviceStatus('neon')]
+      const items = state.backendHealth.length ? state.backendHealth.map((h) => [h.name, h.status, h.message]) : [
+        ['Owner Status API', state.apiHealth.status, 'owner status endpoint'],
+        ['Users API', state.apiHealth.users, 'owner users endpoint'],
+        ['Payments API', state.apiHealth.payments, 'owner payments endpoint'],
+        ['Grants API', state.apiHealth.grants, 'owner grants endpoint']
       ];
 
-      items.forEach(([label, value]) => {
+      items.forEach(([label, value, message]) => {
         const row = document.createElement('div');
         row.className = 'health';
-        row.append(text('span', label), statusBadge(value));
+        const left = text('span', label);
+        left.title = message || '';
+        row.append(left, statusBadge(value));
         grid.appendChild(row);
       });
     }
@@ -878,23 +873,18 @@ Paddle durumunu kontrol et"></textarea>
           method: 'POST',
           body: JSON.stringify({ message: command })
         });
-        state.brainMessages.push({
-          role: 'koschei',
-          status: res.success ? res.code : 'error',
-          text: res.message || 'Komut tamamlandı.',
-          data: res.data || null,
-          error: !res.success
+        toast('Koschei Central Brain yanıtladı.');
+        state.logs.unshift({
+          message: command,
+          status: res.provider || 'ai',
+          output: res.answer || 'Real data unavailable.',
+          created_at: new Date().toISOString()
         });
         state.logs.unshift({ message: command, status: res.success ? 'completed' : res.code, output: res.message, created_at: new Date().toISOString() });
         $('commandInput').value = '';
         renderTerminal();
       } catch (err) {
-        state.brainMessages.push({ role: 'koschei', status: 'error', text: err.message || 'Bu işlem için backend endpoint gerekli.', error: true });
-        toast(err.message || 'Komut çalışmadı.');
-      } finally {
-        state.brainLoading = false;
-        $('runCommandButton').disabled = false;
-        renderBrain();
+        toast(err.message || 'Koschei yanıt veremedi.');
       }
     }
 
@@ -903,6 +893,7 @@ Paddle durumunu kontrol et"></textarea>
     $('runCommandButton').addEventListener('click', runCommand);
     $('commandInput').addEventListener('keydown', (event) => { if (event.key === 'Enter') runCommand(); });
     $('userFilter').addEventListener('input', renderUsers);
+    document.querySelectorAll('[data-control]').forEach((btn) => btn.addEventListener('click', () => mutate('/api/owner/emergency', { control: btn.dataset.control, enabled: true, reason: 'owner_panel_check' })));
 
     window.setInterval(() => {
       if (!$('appView').classList.contains('hidden')) refreshAll();

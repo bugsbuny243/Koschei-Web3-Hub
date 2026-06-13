@@ -85,31 +85,27 @@ func provisionMemberTx(ctx context.Context, store appProfileStore, sub, email st
 	summary := memberSummaryResponse{OK: true, Email: email}
 	if err := store.QueryRowContext(ctx, `
 		WITH active_entitlements AS (
-			SELECT COALESCE(plan_id, 'free') AS plan_id,
-			       COALESCE(outputs_total, 0) AS outputs_total,
-			       COALESCE(outputs_remaining, 0) AS outputs_remaining,
-			       created_at
-			FROM entitlements
-			WHERE lower(email) = lower($1)
-			  AND status = 'active'
-			  AND COALESCE(plan_id, 'free') <> 'free'
-		), profile_credits AS (
-			SELECT COALESCE(MAX(credits), 0)::int AS credits
-			FROM app_user_profiles
-			WHERE lower(email) = lower($1)
-		), totals AS (
-			SELECT COALESCE(SUM(outputs_total), 0)::int + COALESCE((SELECT credits FROM app_user_profiles WHERE auth_subject = $2), 0) AS outputs_total,
-			       COALESCE(SUM(outputs_remaining), 0)::int + COALESCE((SELECT credits FROM app_user_profiles WHERE auth_subject = $2), 0) AS outputs_remaining
-			FROM active_entitlements
-		), paid_plan AS (
-			SELECT plan_id
-			FROM active_entitlements
-			WHERE plan_id <> 'free'
-			ORDER BY CASE plan_id WHEN 'studio' THEN 3 WHEN 'builder' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END DESC,
-			         created_at DESC
-			LIMIT 1
-		)
-		SELECT CASE WHEN (SELECT plan_id FROM paid_plan) IS NOT NULL THEN (SELECT plan_id FROM paid_plan) WHEN COALESCE((SELECT credits FROM app_user_profiles WHERE auth_subject = $2), 0) > 0 THEN 'owner_grant' ELSE 'free' END AS plan_id,
+				SELECT COALESCE(plan_id, 'free') AS plan_id,
+				       COALESCE(outputs_total, 0) AS outputs_total,
+				       COALESCE(outputs_remaining, 0) AS outputs_remaining,
+				       created_at
+				FROM entitlements
+				WHERE lower(email) = lower($1)
+				  AND status = 'active'
+				  AND COALESCE(plan_id, 'free') <> 'free'
+			), totals AS (
+				SELECT COALESCE(SUM(outputs_total), 0)::int AS outputs_total,
+				       COALESCE(SUM(outputs_remaining), 0)::int AS outputs_remaining
+				FROM active_entitlements
+			), paid_plan AS (
+				SELECT plan_id
+				FROM active_entitlements
+				WHERE plan_id <> 'free'
+				ORDER BY CASE plan_id WHEN 'studio' THEN 3 WHEN 'builder' THEN 2 WHEN 'starter' THEN 1 ELSE 0 END DESC,
+				         created_at DESC
+				LIMIT 1
+			)
+			SELECT CASE WHEN (SELECT plan_id FROM paid_plan) IS NOT NULL THEN (SELECT plan_id FROM paid_plan) ELSE 'free' END AS plan_id,
 		       outputs_total,
 		       outputs_remaining
 		FROM totals`, email, sub).Scan(&summary.Plan, &summary.OutputsTotal, &summary.OutputsRemaining); err != nil {

@@ -19,7 +19,7 @@ type ownerUserRecord struct {
 	AuthSubject   string     `json:"auth_subject"`
 	Email         string     `json:"email"`
 	WalletAddress string     `json:"wallet_address,omitempty"`
-	Credits       int        `json:"credits"`
+	PlanID        string     `json:"plan_id"`
 	Status        string     `json:"status"`
 	PlanID        string     `json:"plan_id"`
 	CreatedAt     time.Time  `json:"created_at"`
@@ -108,10 +108,10 @@ func (h *Handler) OwnerUsers(w http.ResponseWriter, r *http.Request) {
 	where := ""
 	args := []any{}
 	if q != "" {
-		where = `WHERE lower(email) LIKE $1 OR lower(COALESCE(wallet_address,'')) LIKE $1 OR lower(COALESCE(auth_subject,'')) LIKE $1`
+		where = `WHERE lower(p.email) LIKE $1 OR lower(COALESCE(p.wallet_address,'')) LIKE $1 OR lower(COALESCE(p.auth_subject,'')) LIKE $1`
 		args = append(args, "%"+q+"%")
 	}
-	rows, err := h.DB.QueryContext(r.Context(), `SELECT id::text, COALESCE(auth_subject,''), email, COALESCE(wallet_address,''), COALESCE(credits,0), COALESCE(status,'active'), COALESCE(plan_id,''), created_at, updated_at, banned_at FROM app_user_profiles `+where+` ORDER BY created_at DESC LIMIT 500`, args...)
+	rows, err := h.DB.QueryContext(r.Context(), `SELECT p.id::text, COALESCE(p.auth_subject,''), p.email, COALESCE(p.wallet_address,''), COALESCE((SELECT e.plan_id FROM entitlements e WHERE lower(e.email)=lower(p.email) AND e.status='active' AND COALESCE(e.plan_id,'free') <> 'free' ORDER BY e.created_at DESC LIMIT 1),'free'), COALESCE(p.status,'active'), p.created_at, p.updated_at, p.banned_at FROM app_user_profiles p `+where+` ORDER BY p.created_at DESC LIMIT 500`, args...)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
 		return
@@ -120,7 +120,7 @@ func (h *Handler) OwnerUsers(w http.ResponseWriter, r *http.Request) {
 	users := []ownerUserRecord{}
 	for rows.Next() {
 		var u ownerUserRecord
-		if err := rows.Scan(&u.ID, &u.AuthSubject, &u.Email, &u.WalletAddress, &u.Credits, &u.Status, &u.PlanID, &u.CreatedAt, &u.UpdatedAt, &u.BannedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.AuthSubject, &u.Email, &u.WalletAddress, &u.PlanID, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.BannedAt); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db scan failed"})
 			return
 		}
