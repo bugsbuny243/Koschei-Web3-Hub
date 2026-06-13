@@ -3,46 +3,52 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Koschei Enterprise Unified Intelligence dashboard: TX Decoder, Token Scanner, Wallet Score, Risk Scanner, Portfolio ve Project Radar tek analiz akışında." />
-  <title>Koschei — Enterprise Unified Intelligence</title>
+  <meta name="description" content="Koschei Süper Analiz dashboard: tek input ile token, wallet, tx, risk, portfolio ve proje radar sonuçlarını paralel çalıştırır." />
+  <title>Koschei — Süper Analiz Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#050812;--surface:rgba(255,255,255,.08);--surface2:rgba(255,255,255,.12);--line:rgba(255,255,255,.16);--text:#f7fbff;--muted:#9fb0d0;--green:#00ff88;--blue:#69d8ff;--violet:#a78bfa;--yellow:#ffcc66;--orange:#ff8a3d;--red:#ff4d6d;--shadow:0 30px 90px rgba(0,0,0,.45)}
-    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,system-ui,sans-serif;color:var(--text);background:radial-gradient(circle at 15% 8%,rgba(0,255,136,.22),transparent 32%),radial-gradient(circle at 86% 10%,rgba(105,216,255,.18),transparent 30%),radial-gradient(circle at 50% 88%,rgba(167,139,250,.18),transparent 34%),linear-gradient(135deg,#03050b,#081221 54%,#040811);overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:54px 54px;mask-image:radial-gradient(circle at center,#000,transparent 78%)}
-    .page{position:relative;width:min(1180px,calc(100% - 32px));margin:0 auto;padding:24px 0 54px}.surface{background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.045));border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
-    .topbar{position:sticky;top:14px;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:34px;padding:12px 14px;border-radius:24px}.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:inherit;font-weight:900}.brand-mark{display:grid;place-items:center;width:38px;height:38px;border-radius:14px;color:#06120d;background:linear-gradient(135deg,var(--green),var(--blue));box-shadow:0 0 34px rgba(0,255,136,.3)}.nav{display:flex;gap:10px;flex-wrap:wrap}.nav a,.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border-radius:999px;border:1px solid var(--line);color:var(--text);font-weight:800;font-size:14px;text-decoration:none;background:rgba(255,255,255,.06);cursor:pointer}.btn.primary{color:#04120d;background:linear-gradient(135deg,var(--green),var(--blue));border:0}.btn:disabled{opacity:.55;cursor:not-allowed}.hero{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:stretch}.hero-card,.control-card,.score-card{border-radius:34px;padding:clamp(24px,4vw,42px)}.eyebrow{display:inline-flex;width:max-content;padding:8px 13px;border-radius:999px;color:#bfffe2;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.24)}h1{margin:18px 0 12px;font-size:clamp(38px,6vw,68px);line-height:.98;letter-spacing:-.06em}.gradient{background:linear-gradient(135deg,#fff,#c7fff0 35%,#82ddff 75%,#d9ccff);-webkit-background-clip:text;background-clip:text;color:transparent}.sub{margin:0;color:var(--muted);font-size:17px;line-height:1.75}.control-card{display:grid;gap:14px}label{display:block;color:#c6d6f4;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:18px;background:rgba(3,7,18,.66);color:var(--text);font:inherit;padding:14px 15px;outline:none}textarea{min-height:82px;resize:vertical}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.progress-wrap{display:none;margin-top:4px}.progress-wrap.show{display:block}.progress{height:12px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;border:1px solid var(--line)}.bar{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--blue),var(--violet));transition:width .35s ease}.progress-text{margin-top:10px;color:#cfe0ff;font-weight:800;font-size:13px}.alert{display:none;padding:14px 16px;border-radius:18px;border:1px solid rgba(255,77,109,.35);background:rgba(255,77,109,.1);color:#ffd7df;font-weight:700}.alert.show{display:block}.results{display:none;margin-top:18px}.results.show{display:block}.score-card{display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:center}.score-ring{width:190px;height:190px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--green) calc(var(--score)*1%),rgba(255,255,255,.12) 0);box-shadow:0 0 60px rgba(0,255,136,.14)}.score-inner{width:146px;height:146px;border-radius:50%;display:grid;place-items:center;text-align:center;background:#07111f;border:1px solid var(--line)}.score-num{font-size:44px;font-weight:900;letter-spacing:-.06em}.risk-pill{display:inline-flex;width:max-content;padding:10px 14px;border-radius:999px;font-weight:900;letter-spacing:.08em}.risk-LOW{background:rgba(0,255,136,.13);color:#bfffe2;border:1px solid rgba(0,255,136,.35)}.risk-MEDIUM{background:rgba(255,204,102,.14);color:#ffe6ad;border:1px solid rgba(255,204,102,.35)}.risk-HIGH{background:rgba(255,138,61,.14);color:#ffd4ba;border:1px solid rgba(255,138,61,.35)}.risk-CRITICAL{background:rgba(255,77,109,.14);color:#ffd7df;border:1px solid rgba(255,77,109,.35)}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}.module{border-radius:24px;padding:18px;border:1px solid var(--line);background:rgba(255,255,255,.06)}.module-head{display:flex;justify-content:space-between;gap:12px;align-items:start}.module h3{margin:0 0 4px;font-size:16px}.status{font-size:11px;font-weight:900;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.1);text-transform:uppercase}.module-score{font-size:30px;font-weight:900;margin:12px 0}.findings{margin:10px 0 0;padding-left:18px;color:#d7e4ff;line-height:1.55;font-size:13px}.raw{margin-top:12px}.raw summary{cursor:pointer;color:var(--blue);font-weight:800}.raw pre{white-space:pre-wrap;word-break:break-word;color:#b8c7e6;font-size:12px;max-height:240px;overflow:auto}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.recommendations{color:#dbe7ff;line-height:1.7}.muted{color:var(--muted)}@media(max-width:900px){.hero,.score-card{grid-template-columns:1fr}.cards{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}.score-ring{margin:auto}.topbar{position:relative;top:0;align-items:flex-start;flex-direction:column}}
+    :root{--bg:#050812;--surface:rgba(255,255,255,.08);--line:rgba(255,255,255,.16);--line-strong:rgba(255,255,255,.28);--text:#f7fbff;--muted:#9fb0d0;--green:#00ff88;--blue:#69d8ff;--violet:#a78bfa;--yellow:#ffcc66;--orange:#ff8a3d;--red:#ff4d6d;--shadow:0 30px 90px rgba(0,0,0,.45)}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 12% 4%,rgba(0,255,136,.24),transparent 34%),radial-gradient(circle at 88% 8%,rgba(105,216,255,.2),transparent 30%),radial-gradient(circle at 55% 88%,rgba(167,139,250,.2),transparent 36%),linear-gradient(135deg,#03050b 0%,#081221 52%,#040811 100%);overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:54px 54px;mask-image:radial-gradient(circle at center,#000,transparent 78%)}
+    a{color:inherit}.page{position:relative;width:min(1180px,calc(100% - 32px));margin:0 auto;padding:24px 0 54px}.surface{background:linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.045));border:1px solid var(--line);box-shadow:var(--shadow);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+    .topbar{position:sticky;top:14px;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:34px;padding:12px 14px;border-radius:24px}.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-weight:900}.brand-mark{display:grid;place-items:center;width:38px;height:38px;border-radius:14px;color:#06120d;background:linear-gradient(135deg,var(--green),var(--blue));box-shadow:0 0 34px rgba(0,255,136,.3)}.brand-sub{color:var(--muted);font-weight:600}.nav{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}.nav a,.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border-radius:999px;border:1px solid var(--line);color:var(--text);font-weight:800;font-size:14px;text-decoration:none;background:rgba(255,255,255,.06);cursor:pointer;font-family:inherit;transition:transform .2s ease,border-color .2s ease}.nav a:hover,.btn:hover{transform:translateY(-2px);border-color:var(--line-strong)}.btn.primary{color:#04120d;background:linear-gradient(135deg,var(--green),var(--blue));border:0}.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+    .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:stretch}.hero-card,.control-card,.score-card{border-radius:34px;padding:clamp(24px,4vw,42px)}.eyebrow{display:inline-flex;width:max-content;padding:8px 13px;border-radius:999px;color:#bfffe2;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.24)}h1{margin:18px 0 12px;font-size:clamp(38px,6vw,68px);line-height:.98;letter-spacing:-.06em}.gradient{background:linear-gradient(135deg,#fff,#c7fff0 35%,#82ddff 75%,#d9ccff);-webkit-background-clip:text;background-clip:text;color:transparent}.sub{margin:0;color:var(--muted);font-size:17px;line-height:1.75}.control-card{display:grid;gap:14px}label{display:block;color:#c6d6f4;font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px}input,select{width:100%;border:1px solid var(--line);border-radius:18px;background:rgba(3,7,18,.66);color:var(--text);font:inherit;padding:14px 15px;outline:none}.grid2{display:grid;grid-template-columns:.8fr 1.2fr;gap:12px}.hint{margin:0;color:var(--muted);font-size:13px;line-height:1.6}.progress-wrap{display:none;margin-top:4px}.progress-wrap.show{display:block}.progress{height:12px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;border:1px solid var(--line)}.bar{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--blue),var(--violet));transition:width .35s ease}.progress-text{margin-top:10px;color:#cfe0ff;font-weight:800;font-size:13px}.alert{display:none;padding:14px 16px;border-radius:18px;border:1px solid rgba(255,77,109,.35);background:rgba(255,77,109,.1);color:#ffd7df;font-weight:700}.alert.show{display:block}
+    .results{display:none;margin-top:18px}.results.show{display:block}.score-card{display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:center}.score-ring{width:190px;height:190px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--score-color) calc(var(--score)*1%),rgba(255,255,255,.12) 0);box-shadow:0 0 60px rgba(0,255,136,.14)}.score-inner{width:146px;height:146px;border-radius:50%;display:grid;place-items:center;text-align:center;background:#07111f;border:1px solid var(--line)}.score-num{font-size:44px;font-weight:900;letter-spacing:-.06em}.score-label{color:var(--muted);font-weight:800}.risk-pill{display:inline-flex;width:max-content;padding:10px 14px;border-radius:999px;font-weight:900;letter-spacing:.08em}.risk-LOW{background:rgba(0,255,136,.13);color:#bfffe2;border:1px solid rgba(0,255,136,.35)}.risk-MEDIUM{background:rgba(255,204,102,.14);color:#ffe6ad;border:1px solid rgba(255,204,102,.35)}.risk-HIGH{background:rgba(255,77,109,.14);color:#ffd7df;border:1px solid rgba(255,77,109,.35)}.muted{color:var(--muted);line-height:1.6}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}.module{border-radius:24px;padding:18px;border:1px solid var(--line);background:rgba(255,255,255,.06);min-height:250px}.module-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.module h3{margin:0 0 6px;font-size:17px}.status{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.status-loading{background:rgba(105,216,255,.12);border:1px solid rgba(105,216,255,.32);color:#cfeeff}.status-success{background:rgba(0,255,136,.12);border:1px solid rgba(0,255,136,.32);color:#bfffe2}.status-error{background:rgba(255,77,109,.12);border:1px solid rgba(255,77,109,.32);color:#ffd7df}.module-score{margin:16px 0 8px;font-size:38px;font-weight:900;letter-spacing:-.05em}.findings{margin:10px 0 0;padding-left:18px;color:#d9e7ff;line-height:1.65}.raw{margin-top:14px}.raw summary{cursor:pointer;color:#cfe0ff;font-weight:800}.raw pre{max-height:220px;overflow:auto;padding:12px;border-radius:14px;background:rgba(0,0,0,.28);white-space:pre-wrap;color:#dbeafe}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+    @media(max-width:980px){.hero,.score-card{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}}@media(max-width:640px){.topbar{position:static}.nav{width:100%;justify-content:flex-start}.grid2,.cards{grid-template-columns:1fr}.score-ring{width:170px;height:170px}.score-inner{width:130px;height:130px}}
   </style>
 </head>
 <body>
   <main class="page">
     <header class="topbar surface">
-      <a class="brand" href="/hub.html"><span class="brand-mark">K</span><span>Koschei <span class="muted">Web3 Hub</span></span></a>
-      <nav class="nav"><a href="/hub.html">Hub</a><a href="/pricing.html">Pricing</a><a href="/docs-api.html">API Docs</a><button class="btn" id="logoutBtn" type="button">Çıkış</button></nav>
+      <a href="/hub.html" class="brand" aria-label="Koschei Hub"><span class="brand-mark">K</span><span>Koschei <span class="brand-sub">Süper Analiz</span></span></a>
+      <nav class="nav" aria-label="Ana navigasyon"><a href="/hub.html">Hub</a><a href="/pricing.html">Paketler</a><a href="/docs-api.html">API Docs</a><button class="btn" id="logoutBtn" type="button">Çıkış</button></nav>
     </header>
 
     <section class="hero">
       <div class="hero-card surface">
-        <span class="eyebrow">Enterprise Unified Intelligence</span>
-        <h1><span class="gradient">6 modül.</span><br>Tek karar ekranı.</h1>
-        <p class="sub">TX Decoder, Token Scanner, Wallet Score, Risk Scanner, Portfolio ve Project Radar aynı anda client-side JavaScript ile paralel çalışır; sonuçlar tek skor ve kart grid'inde birleşir.</p>
+        <span class="eyebrow">🚀 Unified Dashboard</span>
+        <h1><span class="gradient">Süper Analiz.</span><br>Tek input, 6 paralel sonuç.</h1>
+        <p class="sub">Wallet, token, TX veya proje bilgisini seçili tipe göre gönderin. Koschei, altı mevcut endpoint'i yeni route eklemeden Promise.allSettled ile paralel çağırır ve başarılı kartlardan Genel Risk Skoru üretir.</p>
       </div>
       <form id="analyzeForm" class="control-card surface">
-        <div><label for="targetInput">Wallet / Token / TX Adresi</label><input id="targetInput" placeholder="Wallet address, token mint veya transaction signature" autocomplete="off" required></div>
+        <div class="grid2">
+          <div><label for="targetType">Tip</label><select id="targetType" required><option value="wallet">Wallet</option><option value="token">Token</option><option value="tx">TX</option><option value="project">Project</option></select></div>
+          <div><label for="targetInput">Wallet / Token / TX / Project</label><input id="targetInput" placeholder="Adres, imza, token mint veya proje adı/URL" autocomplete="off" required></div>
+        </div>
+        <p class="hint">Analiz Et butonu; Token Scan, Wallet Score, TX Decode, Risk v2, Portfolio Track ve Project Radar kartlarını aynı anda çalıştırır.</p>
         <button id="submitBtn" class="btn primary" type="submit">Analiz Et</button>
-        <div id="progressWrap" class="progress-wrap"><div class="progress"><div id="bar" class="bar"></div></div><div id="progressText" class="progress-text">Modül 1/6 hazırlanıyor...</div></div>
+        <div id="progressWrap" class="progress-wrap"><div class="progress"><div id="bar" class="bar"></div></div><div id="progressText" class="progress-text">Modüller hazırlanıyor...</div></div>
         <div id="errorBox" class="alert"></div>
       </form>
     </section>
 
-    <section id="results" class="results">
+    <section id="results" class="results" aria-live="polite">
       <div class="score-card surface">
-        <div class="score-ring" id="scoreRing" style="--score:0"><div class="score-inner"><div><div id="scoreNum" class="score-num">0</div><div class="muted">Overall Score</div></div></div></div>
+        <div class="score-ring" id="scoreRing" style="--score:0;--score-color:var(--green)"><div class="score-inner"><div><div id="scoreNum" class="score-num">—</div><div class="score-label">Genel Risk Skoru</div></div></div></div>
         <div>
-          <div id="riskPill" class="risk-pill risk-LOW">LOW</div>
-          <h2 id="resultTitle">Unified report ready</h2>
-          <p id="resultMeta" class="muted"></p>
-          <ul id="recommendations" class="recommendations"></ul>
+          <div id="riskPill" class="risk-pill risk-LOW">HAZIR</div>
+          <h2 id="resultTitle">Analiz bekleniyor</h2>
+          <p id="resultMeta" class="muted">Başarılı endpoint kartlarının skor ortalaması burada 0-100 arası renk kodlu gösterilir.</p>
           <div class="actions"><button class="btn" id="downloadJson" type="button">Raporu İndir (JSON)</button><button class="btn" id="printReport" type="button">Raporu Yazdır / PDF</button></div>
         </div>
       </div>
@@ -50,95 +56,77 @@
     </section>
   </main>
 
-  <script src="/js/koschei-auth.js"></script>
+  <script src="/js/koschei-auth.js?v=6"></script>
   <script>
     const NETWORK = 'solana-mainnet';
     const modules = [
-      {
-        key: 'token_scan',
-        name: 'Token Scanner',
-        endpoint: '/api/token/scan',
-        build: (target) => ({ mint: target, address: target, network: NETWORK })
-      },
-      {
-        key: 'risk_scan',
-        name: 'Risk Scanner',
-        endpoint: '/api/risk/scan',
-        build: (target) => ({ target, notes: 'Unified client-side parallel analysis' })
-      },
-      {
-        key: 'wallet_score',
-        name: 'Wallet Score',
-        endpoint: '/api/wallet/score',
-        build: (target) => ({ address: target, network: NETWORK })
-      },
-      {
-        key: 'tx_decode',
-        name: 'TX Decoder',
-        endpoint: '/api/tx/decode',
-        build: (target) => ({ signature: target, network: NETWORK })
-      },
-      {
-        key: 'web3_portfolio',
-        name: 'Web3 Portfolio',
-        endpoint: '/api/web3/portfolio',
-        build: (target) => ({ address: target, addresses: [target], network: NETWORK })
-      },
-      {
-        key: 'project_radar',
-        name: 'Project Radar',
-        endpoint: '/api/web3/project-radar',
-        build: (target) => ({
-          project_name: target,
-          website_url: looksLikeURL(target) ? target : '',
-          token_mint_address: target,
-          public_wallet_address: target,
-          ecosystem: 'Solana',
-          category: 'security',
-          description: `Unified single-input analysis target: ${target}`,
-          known_traction: '',
-          notes: 'Generated by unified.html client-side analyzer.'
-        })
-      }
+      { key: 'token_scan', name: 'Token Scanner', endpoint: '/api/token/scan', build: buildTokenPayload },
+      { key: 'wallet_score', name: 'Wallet Score', endpoint: '/api/wallet/score', build: buildWalletPayload },
+      { key: 'tx_decode', name: 'TX Decoder', endpoint: '/api/tx/decode', build: buildTxPayload },
+      { key: 'risk_v2', name: 'Risk v2', endpoint: '/api/web3/risk-v2', build: buildRiskPayload },
+      { key: 'portfolio_track', name: 'Portfolio Track', endpoint: '/api/portfolio/track', build: buildPortfolioPayload },
+      { key: 'project_radar', name: 'Project Radar', endpoint: '/api/web3/project-radar', build: buildProjectPayload }
     ];
     let latestReport = null;
     const $ = (id) => document.getElementById(id);
 
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (window.KoscheiAuth?.init) await KoscheiAuth.init();
       if (!window.KoscheiAuth || !KoscheiAuth.requireAuth()) return;
       $('logoutBtn').addEventListener('click', () => KoscheiAuth.signOut());
       $('analyzeForm').addEventListener('submit', analyze);
       $('downloadJson').addEventListener('click', downloadJSON);
       $('printReport').addEventListener('click', () => window.print());
+      renderModuleCards(modules.map((module) => ({ module: module.key, name: module.name, endpoint: module.endpoint, status: 'waiting', ok: null })));
     });
+
+    function buildBase(target, targetType){ return { target, target_type: targetType, type: targetType, network: NETWORK, chain: 'solana' }; }
+    function buildTokenPayload(target, targetType){ return { ...buildBase(target, targetType), mint: target, address: target, token: target }; }
+    function buildWalletPayload(target, targetType){ return { ...buildBase(target, targetType), address: target, wallet: target }; }
+    function buildTxPayload(target, targetType){ return { ...buildBase(target, targetType), signature: target, tx: target, transaction: target }; }
+    function buildRiskPayload(target, targetType){ return { ...buildBase(target, targetType), notes: 'Unified dashboard parallel Süper Analiz' }; }
+    function buildPortfolioPayload(target, targetType){ return { ...buildBase(target, targetType), address: target, wallet: target, addresses: [target] }; }
+    function buildProjectPayload(target, targetType){ return { ...buildBase(target, targetType), project_name: target, website_url: looksLikeURL(target) ? target : '', token_mint_address: targetType === 'token' ? target : '', public_wallet_address: targetType === 'wallet' ? target : '', ecosystem: 'Solana', category: 'security', description: `Unified dashboard analysis target (${targetType}): ${target}`, known_traction: '', notes: 'Generated by unified.html Süper Analiz.' }; }
 
     function setError(message){ $('errorBox').textContent = message || ''; $('errorBox').classList.toggle('show', Boolean(message)); }
     function startProgress(){
-      $('progressWrap').classList.add('show'); $('bar').style.width='5%'; $('progressText').textContent='6 endpoint paralel başlatılıyor...';
-      let step=0; return setInterval(()=>{ step=(step+1)%modules.length; const pct=Math.min(92, 10 + step*14 + Math.random()*8); $('bar').style.width=pct+'%'; $('progressText').textContent=`Endpoint ${step+1}/6 bekleniyor: ${modules[step].name}`; }, 900);
+      $('progressWrap').classList.add('show'); $('bar').style.width='8%'; $('progressText').textContent='6 endpoint Promise.allSettled ile paralel başlatılıyor...';
+      let step=0; return setInterval(() => { step=(step+1)%modules.length; $('bar').style.width = Math.min(92, 12 + step*14 + Math.random()*8) + '%'; $('progressText').textContent = `Yükleniyor: ${modules[step].name}`; }, 700);
     }
-    function stopProgress(timer){ clearInterval(timer); $('bar').style.width='100%'; $('progressText').textContent='Analiz tamamlandı.'; setTimeout(()=>$('progressWrap').classList.remove('show'), 900); }
+    function stopProgress(timer, message){ clearInterval(timer); $('bar').style.width='100%'; $('progressText').textContent=message || 'Analiz tamamlandı.'; setTimeout(() => $('progressWrap').classList.remove('show'), 900); }
 
-    async function analyze(e){
-      e.preventDefault();
+    async function analyze(event){
+      event.preventDefault();
       setError('');
-      $('submitBtn').disabled=true;
-      const timer=startProgress();
-      try{
-        const target = $('targetInput').value.trim();
-        if (!target) throw new Error('Wallet, token veya tx adresi girin.');
-        const settled = await Promise.allSettled(modules.map((module) => callModule(module, target)));
+      const target = $('targetInput').value.trim();
+      const targetType = $('targetType').value;
+      if (!target) { setError('Wallet / Token / TX / Project alanı zorunludur.'); return; }
+      $('submitBtn').disabled = true;
+      $('results').classList.add('show');
+      $('scoreNum').textContent = '…';
+      $('resultTitle').textContent = 'Süper Analiz çalışıyor';
+      $('resultMeta').textContent = `${targetType.toUpperCase()} hedefi için 6 endpoint paralel çağrılıyor.`;
+      $('riskPill').textContent = 'YÜKLENİYOR';
+      renderModuleCards(modules.map((module) => ({ module: module.key, name: module.name, endpoint: module.endpoint, status: 'loading', ok: null })));
+      const timer = startProgress();
+      try {
+        const settled = await Promise.allSettled(modules.map((module) => callModule(module, target, targetType)));
         const moduleResults = settled.map((settledResult, index) => normalizeSettledResult(modules[index], settledResult));
-        latestReport = buildReport(target, moduleResults);
-        render(latestReport);
-      }catch(err){ setError(err.message || 'Beklenmeyen hata oluştu.'); }
-      finally{ stopProgress(timer); $('submitBtn').disabled=false; }
+        latestReport = buildReport(target, targetType, moduleResults);
+        renderReport(latestReport);
+        stopProgress(timer, 'Analiz tamamlandı.');
+      } catch (error) {
+        setError(error.message || 'Beklenmeyen hata oluştu.');
+        stopProgress(timer, 'Analiz hata ile durdu.');
+      } finally {
+        $('submitBtn').disabled = false;
+      }
     }
 
-    async function callModule(module, target){
-      const res = await KoscheiAuth.apiCall(module.endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(module.build(target)) });
+    async function callModule(module, target, targetType){
+      const res = await KoscheiAuth.apiCall(module.endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(module.build(target, targetType)) });
       if (!res) throw new Error('API bağlantısı kurulamadı.');
-      const data = await res.json().catch(()=>({}));
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || data.error || `${res.status} ${res.statusText}`.trim());
       return data;
     }
@@ -146,57 +134,44 @@
     function normalizeSettledResult(module, settledResult){
       if (settledResult.status === 'fulfilled') {
         const data = settledResult.value || {};
-        const score = extractScore(data);
-        return { module: module.key, name: module.name, endpoint: module.endpoint, status: 'fulfilled', ok: true, score, data };
+        return { module: module.key, name: module.name, endpoint: module.endpoint, status: 'success', ok: true, score: extractScore(data), data };
       }
-      return { module: module.key, name: module.name, endpoint: module.endpoint, status: 'rejected', ok: false, score: 0, error: settledResult.reason?.message || 'Endpoint hata verdi.' };
+      return { module: module.key, name: module.name, endpoint: module.endpoint, status: 'error', ok: false, score: null, error: settledResult.reason?.message || 'Endpoint hata verdi.' };
     }
 
-    function buildReport(target, moduleResults){
-      const overallScore = Math.round(moduleResults.reduce((sum, result) => sum + normalizeScore(result.score), 0) / modules.length);
-      const failedCount = moduleResults.filter(result => !result.ok).length;
-      return {
-        request_id: `client-${Date.now()}`,
-        target,
-        network: NETWORK,
-        overall_score: overallScore,
-        risk_level: riskLevelFromScore(overallScore, failedCount),
-        partial_success: failedCount > 0,
-        module_results: moduleResults,
-        recommendations: buildRecommendations(moduleResults, failedCount),
-        created_at: new Date().toISOString()
-      };
+    function buildReport(target, targetType, moduleResults){
+      const successfulScores = moduleResults.filter((result) => result.ok).map((result) => normalizeScore(result.score));
+      const overallScore = successfulScores.length ? Math.round(successfulScores.reduce((sum, score) => sum + score, 0) / successfulScores.length) : 0;
+      return { request_id: `unified-${Date.now()}`, target, target_type: targetType, network: NETWORK, overall_score: overallScore, risk_level: riskLevelFromScore(overallScore), successful_count: successfulScores.length, failed_count: moduleResults.filter((result) => !result.ok).length, module_results: moduleResults, created_at: new Date().toISOString() };
     }
 
-    function render(report){
-      $('results').classList.add('show');
-      $('scoreNum').textContent=report.overall_score;
+    function renderReport(report){
+      const color = scoreColor(report.overall_score);
+      $('scoreNum').textContent = report.successful_count ? report.overall_score : '0';
       $('scoreRing').style.setProperty('--score', report.overall_score);
-      const risk = report.risk_level || 'UNKNOWN';
-      $('riskPill').textContent=risk;
-      $('riskPill').className='risk-pill risk-'+risk;
-      $('resultTitle').textContent = `${risk} risk — ${report.partial_success ? 'partial success' : 'full success'}`;
-      $('resultMeta').textContent = `Request ${report.request_id} • ${report.target} • ${report.network} • Ortalama skor 6 client-side sonuçtan hesaplandı`;
-      $('recommendations').innerHTML = report.recommendations.map(x=>`<li>${escapeHTML(x)}</li>`).join('');
-      $('moduleCards').innerHTML = report.module_results.map(moduleCard).join('');
-      $('results').scrollIntoView({behavior:'smooth', block:'start'});
+      $('scoreRing').style.setProperty('--score-color', color);
+      $('riskPill').textContent = report.risk_level;
+      $('riskPill').className = `risk-pill risk-${report.risk_level}`;
+      $('resultTitle').textContent = `${report.successful_count}/6 başarılı kart ile Genel Risk Skoru`;
+      $('resultMeta').textContent = `Request ${report.request_id} • ${report.target_type.toUpperCase()} • ${report.target} • ${report.failed_count} başarısız endpoint`;
+      renderModuleCards(report.module_results);
+      $('results').scrollIntoView({ behavior:'smooth', block:'start' });
     }
 
+    function renderModuleCards(results){ $('moduleCards').innerHTML = results.map(moduleCard).join(''); }
     function moduleCard(result){
-      const score = Number.isFinite(result.score) ? result.score : '—';
-      const findings = result.ok ? summarizeResult(result.data) : [result.error || 'Endpoint hata verdi.'];
-      return `<article class="module"><div class="module-head"><div><h3>${escapeHTML(result.name)}</h3><div class="muted">${escapeHTML(result.endpoint)}</div></div><span class="status">${escapeHTML(result.status)}</span></div><div class="module-score">${score}</div><ul class="findings">${findings.map(x=>`<li>${escapeHTML(x)}</li>`).join('')}</ul><details class="raw"><summary>Ham JSON</summary><pre>${escapeHTML(JSON.stringify(result.ok ? result.data : {error: result.error}, null, 2))}</pre></details></article>`;
+      const state = result.status === 'loading' ? 'loading' : result.status === 'success' ? 'success' : result.status === 'error' ? 'error' : 'loading';
+      const statusText = result.status === 'waiting' ? 'hazır' : result.status === 'loading' ? 'yükleniyor' : result.status === 'success' ? 'başarılı' : 'başarısız';
+      const score = result.ok ? normalizeScore(result.score) : '—';
+      const findings = result.ok ? summarizeResult(result.data) : result.status === 'error' ? [result.error || 'Endpoint hata verdi.'] : ['Analiz Et butonuna basılınca bu kart paralel olarak çalışacak.'];
+      const raw = result.ok || result.status === 'error' ? `<details class="raw"><summary>Ham JSON</summary><pre>${escapeHTML(JSON.stringify(result.ok ? result.data : { error: result.error }, null, 2))}</pre></details>` : '';
+      return `<article class="module"><div class="module-head"><div><h3>${escapeHTML(result.name)}</h3><div class="muted">${escapeHTML(result.endpoint)}</div></div><span class="status status-${state}">${escapeHTML(statusText)}</span></div><div class="module-score">${score}</div><ul class="findings">${findings.map((item) => `<li>${escapeHTML(item)}</li>`).join('')}</ul>${raw}</article>`;
     }
 
     function summarizeResult(data){
-      const preferredArrays = ['findings', 'checklist', 'recommended_fixes', 'badges', 'signals', 'what_to_check_next', 'manual_review_notes'];
       const lines = [];
-      ['summary', 'explanation', 'risk_reason', 'risk_level', 'level', 'status', 'project_summary'].forEach((key) => {
-        if (data && data[key]) lines.push(`${labelize(key)}: ${data[key]}`);
-      });
-      preferredArrays.forEach((key) => {
-        if (Array.isArray(data?.[key])) data[key].slice(0, 3).forEach((value) => lines.push(`${labelize(key)}: ${value}`));
-      });
+      ['summary','explanation','risk_reason','risk_level','level','status','project_summary','recommendation'].forEach((key) => { if (data?.[key]) lines.push(`${labelize(key)}: ${data[key]}`); });
+      ['findings','checklist','recommended_fixes','badges','signals','what_to_check_next','manual_review_notes','warnings','risks'].forEach((key) => { if (Array.isArray(data?.[key])) data[key].slice(0, 3).forEach((value) => lines.push(`${labelize(key)}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)); });
       if (data?.risk_score?.label) lines.push(`Risk Score: ${data.risk_score.label}`);
       if (data?.opportunity_score?.label) lines.push(`Opportunity Score: ${data.opportunity_score.label}`);
       if (Array.isArray(data?.wallets)) lines.push(`Wallets: ${data.wallets.length} tracked`);
@@ -204,28 +179,18 @@
     }
 
     function extractScore(data){
-      const candidates = [data?.score, data?.overall_score, data?.risk_score?.score, data?.opportunity_score?.score, data?.public_good_score?.score];
-      const numeric = candidates.map(Number).find(Number.isFinite);
+      const candidates = [data?.score, data?.overall_score, data?.risk_score, data?.risk_score?.score, data?.risk?.score, data?.wallet_score, data?.trust_score, data?.opportunity_score?.score, data?.public_good_score?.score];
+      const numeric = candidates.map((candidate) => typeof candidate === 'object' ? candidate?.score : candidate).map(Number).find(Number.isFinite);
       return Number.isFinite(numeric) ? Math.max(0, Math.min(100, Math.round(numeric))) : 0;
     }
 
-    function normalizeScore(score){ return Number.isFinite(Number(score)) ? Math.max(0, Math.min(100, Number(score))) : 0; }
-    function riskLevelFromScore(score, failedCount){ if (failedCount >= 3 || score < 35) return 'CRITICAL'; if (failedCount >= 2 || score < 55) return 'HIGH'; if (failedCount >= 1 || score < 75) return 'MEDIUM'; return 'LOW'; }
-    function buildRecommendations(results, failedCount){
-      const recs = [`${results.length} endpoint Promise.allSettled ile paralel çalıştırıldı.`];
-      if (failedCount) recs.push(`${failedCount} endpoint hata verdi; başarılı sonuçlar yine de gösterildi.`);
-      recs.push('Genel skor frontend JavaScript içinde 6 modül skorunun ortalaması olarak hesaplandı.');
-      return recs;
-    }
+    function normalizeScore(score){ return Number.isFinite(Number(score)) ? Math.max(0, Math.min(100, Math.round(Number(score)))) : 0; }
+    function riskLevelFromScore(score){ if (score < 34) return 'LOW'; if (score < 67) return 'MEDIUM'; return 'HIGH'; }
+    function scoreColor(score){ if (score < 34) return 'var(--green)'; if (score < 67) return 'var(--yellow)'; return 'var(--red)'; }
     function looksLikeURL(value){ return /^https?:\/\//i.test(value); }
-    function labelize(value){ return String(value).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
-
-    function downloadJSON(){
-      if (!latestReport) return;
-      const blob = new Blob([JSON.stringify(latestReport, null, 2)], {type:'application/json'});
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`koschei-unified-${latestReport.request_id}.json`; a.click(); URL.revokeObjectURL(a.href);
-    }
-    function escapeHTML(value){ return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c])); }
+    function labelize(value){ return String(value).replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()); }
+    function downloadJSON(){ if (!latestReport) return; const blob = new Blob([JSON.stringify(latestReport, null, 2)], { type:'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `koschei-unified-${latestReport.request_id}.json`; a.click(); URL.revokeObjectURL(a.href); }
+    function escapeHTML(value){ return String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char])); }
   </script>
 </body>
 </html>

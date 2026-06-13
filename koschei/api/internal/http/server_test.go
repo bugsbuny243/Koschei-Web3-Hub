@@ -72,6 +72,7 @@ func TestCleanRoutesExposeAllPublicModules(t *testing.T) {
 		"project-radar.html":     "project-radar",
 		"radar.html":             "radar",
 		"register.html":          "register",
+		"reports.html":           "reports",
 		"risk-v2.html":           "risk-v2",
 		"smart-money.html":       "smart-money",
 		"support.html":           "support",
