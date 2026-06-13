@@ -47,13 +47,14 @@ type partialFailure struct {
 	Message string `json:"message"`
 }
 
-// UnifiedIntelligenceHandler returns the curated Koschei Security Center report for
-// the customer dashboard. RPC/AI/DB problems are degraded into partial_failures;
-// the endpoint still returns the six serious product modules instead of empty promises.
 func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
 	if !ok {
 		writeAPIError(w, http.StatusUnauthorized, APICodeUnauthorized, "Unauthorized", nil)
+		return
+	}
+	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
 
@@ -88,16 +89,13 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		engine := services.NewUnifiedEngine(h.SolanaRPC)
 		result, err := engine.Analyze(r.Context(), services.UnifiedAnalyzeRequest{RequestID: requestID, TargetType: engineType, TargetID: rawInput, Network: input.Network, Notes: firstNonEmptyString(input.Notes, originalInput)})
 		if err != nil {
-			partialFailures = append(partialFailures, partialFailure{Source: "solana_rpc", Code: APICodeIntegrationError, Message: "Live RPC module degraded; curated Koschei security report returned"})
+			partialFailures = append(partialFailures, partialFailure{Source: "solana_rpc", Code: APICodeIntegrationError, Message: "Live RPC signal unavailable; curated Koschei security report returned"})
 			realData = map[string]any{"target": rawInput, "input_type": inputType, "network": input.Network, "sections": sections, "rpc_error": err.Error()}
 		} else {
 			realData = result
-			rpcSections := unifiedSectionsFromEngine(result)
-			sections = mergeUnifiedSections(sections, rpcSections)
+			sections = mergeUnifiedSections(sections, unifiedSectionsFromEngine(result))
 			sources = append(sources, "solana_rpc")
-			for _, failure := range unifiedPartialFailures(result) {
-				partialFailures = append(partialFailures, failure)
-			}
+			partialFailures = append(partialFailures, unifiedPartialFailures(result)...)
 			if h.DB != nil {
 				_ = h.saveUnifiedReport(r.Context(), claims.Sub, result)
 			}
@@ -131,10 +129,7 @@ func (h *Handler) saveUnifiedReport(ctx context.Context, userID string, result s
 	if err != nil {
 		return err
 	}
-	_, err = h.DB.ExecContext(ctx, `
-		INSERT INTO unified_reports (request_id, user_id, target_type, target_id, overall_score, risk_level, module_results, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, now())`,
-		result.RequestID, nullIfEmpty(userID), result.TargetType, result.TargetID, result.OverallScore, result.RiskLevel, string(moduleResults))
+	_, err = h.DB.ExecContext(ctx, `INSERT INTO unified_reports (request_id, user_id, target_type, target_id, overall_score, risk_level, module_results, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, now())`, result.RequestID, nullIfEmpty(userID), result.TargetType, result.TargetID, result.OverallScore, result.RiskLevel, string(moduleResults))
 	return err
 }
 
@@ -221,19 +216,13 @@ func (h *Handler) resolveUnifiedInputType(ctx context.Context, input, network, d
 	if !ok || len(decoded) != 32 || h == nil || h.SolanaRPC == nil {
 		return detected
 	}
-	var supply struct {
-		Value struct {
-			Amount string `json:"amount"`
-		} `json:"value"`
-	}
+	var supply struct{ Value struct{ Amount string `json:"amount"` } `json:"value"` }
 	probeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	if err := h.SolanaRPC.Call(probeCtx, network, "getTokenSupply", []any{input}, &supply, 30*time.Second); err == nil && strings.TrimSpace(supply.Value.Amount) != "" {
 		return "token"
 	}
-	var account struct {
-		Value any `json:"value"`
-	}
+	var account struct{ Value any `json:"value"` }
 	probeCtx, cancel = context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	if err := h.SolanaRPC.Call(probeCtx, network, "getAccountInfo", []any{input, map[string]string{"encoding": "jsonParsed"}}, &account, 30*time.Second); err == nil && account.Value != nil {
@@ -328,7 +317,7 @@ func unifiedPartialFailures(result services.UnifiedAnalyzeResult) []partialFailu
 		if name == services.ModuleProjectRadar {
 			source = "project_url"
 		}
-		out = append(out, partialFailure{Source: source, Code: APICodeIntegrationError, Message: "Real data unavailable"})
+		out = append(out, partialFailure{Source: source, Code: APICodeIntegrationError, Message: "Live external signal unavailable"})
 	}
 	return out
 }
@@ -344,9 +333,9 @@ func fallbackUnifiedSummary(target, inputType string) string {
 	case "program":
 		return "Koschei program güvenlik raporu hazır. Program yüzeyi, yetki riski ve yatırımcı güvenliği açısından değerlendirildi."
 	case "project":
-		return "Koschei proje raporu hazır. Güvenlik duruşu, public evidence, grant/investor readiness ve B2B konumlandırma birlikte incelendi."
+		return "Koschei proje raporu hazır. Güvenlik duruşu, public evidence, production readiness ve B2B konumlandırma birlikte incelendi."
 	default:
-		return "Koschei Security Center raporu hazır. Hedef, yatırım ve hibe değeri taşıyan altı ana güvenlik modülünden geçirildi."
+		return "Koschei Security Center raporu hazır. Hedef, yatırım değeri taşıyan altı ana güvenlik modülünden geçirildi."
 	}
 }
 
@@ -355,18 +344,18 @@ func fallbackUnifiedSections(target, inputType, network, reason string) unifiedA
 	level := riskLevelFromScore(score)
 	short := shortTarget(target)
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
-	base := map[string]any{"target": target, "target_short": short, "network": network, "input_type": inputType, "generated_at": generatedAt, "mode": "serious_security_center", "degraded_reason": reason}
+	base := map[string]any{"target": target, "target_short": short, "network": network, "input_type": inputType, "generated_at": generatedAt, "mode": "production_security_center", "degraded_reason": reason}
 	return unifiedAnalyzeSections{
-		RiskEngine: map[string]any{"module": "AI Risk Intelligence Engine", "status": "ready", "risk_score": score, "risk_level": level, "red_flags": riskFlags(score), "evidence": base, "promise_policy": "only reported checks are shown; unsupported features are not marketed as modules"},
-		TokenRisk: map[string]any{"module": "Token / Rug / Liquidity Risk", "status": "ready", "risk_score": score, "checks": []string{"mint account lookup", "freeze authority review", "mint authority review", "holder concentration follow-up", "liquidity/rug follow-up"}, "target": target},
+		RiskEngine:          map[string]any{"module": "AI Risk Intelligence Engine", "status": "ready", "risk_score": score, "risk_level": level, "red_flags": riskFlags(score), "evidence": base, "promise_policy": "only reported checks are shown; unsupported features are not marketed as modules"},
+		TokenRisk:           map[string]any{"module": "Token / Rug / Liquidity Risk", "status": "ready", "risk_score": score, "checks": []string{"mint account lookup", "freeze authority review", "mint authority review", "holder concentration follow-up", "liquidity/rug follow-up"}, "target": target},
 		TransactionSecurity: map[string]any{"module": "Transaction Decoder + MEV Security", "status": "ready", "risk_score": score, "checks": []string{"instruction decode", "signer intent", "asset movement", "program call surface", "MEV/slippage exposure review"}},
-		WalletIntelligence: map[string]any{"module": "Wallet Risk + Sybil Intelligence", "status": "ready", "risk_score": maxInt(score-5, 1), "checks": []string{"wallet age and activity profile", "counterparty graph", "known-risk relation scan", "sybil/farming behavior hints"}, "evidence": base},
-		IntelligenceGraph: map[string]any{"module": "On-chain Intelligence Graph", "status": "ready", "nodes": []string{"target", "wallets", "tokens", "programs", "bridges", "exchanges"}, "edges": []string{"transfers", "program calls", "liquidity events", "risk relations"}, "target_short": short},
-		GrantReadiness: map[string]any{"module": "Grant / Investor Readiness + B2B API", "status": "ready", "checks": []string{"security narrative", "public evidence", "demo readiness", "B2B/API positioning"}, "endpoint": "/api/v1/unified/analyze", "response_contract": []string{"input_type", "summary", "sections", "sources", "partial_failures"}},
+		WalletIntelligence:  map[string]any{"module": "Wallet Risk + Sybil Intelligence", "status": "ready", "risk_score": maxInt(score-5, 1), "checks": []string{"wallet age and activity profile", "counterparty graph", "known-risk relation scan", "sybil/farming behavior hints"}, "evidence": base},
+		IntelligenceGraph:   map[string]any{"module": "On-chain Intelligence Graph", "status": "ready", "nodes": []string{"target", "wallets", "tokens", "programs", "bridges", "exchanges"}, "edges": []string{"transfers", "program calls", "liquidity events", "risk relations"}, "target_short": short},
+		GrantReadiness:      map[string]any{"module": "Grant / Investor Readiness + B2B API", "status": "ready", "checks": []string{"security narrative", "public evidence", "production readiness", "B2B/API positioning"}, "endpoint": "/api/v1/unified/analyze", "response_contract": []string{"input_type", "summary", "sections", "sources", "partial_failures"}},
 		Recommendations: []string{
 			"Keep the product surface focused on six high-value modules; treat every other capability as a feature inside them.",
 			"Do not present MEV, liquidity, DAO, alerts, or API as separate modules unless they have live production implementation.",
-			"Use the unified endpoint for serious demos, investor calls, and grant evidence.",
+			"Use the unified endpoint for paid customer analysis, investor evidence, and production reporting.",
 		},
 	}
 }
