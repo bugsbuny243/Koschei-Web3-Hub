@@ -282,9 +282,6 @@ func (h *Handler) FundingAssistant(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "project_name_and_short_description_required"})
 		return
 	}
-	if !h.useOutput(w, email, "funding_assistant") {
-		return
-	}
 	draft := fundingAssistantDraft(q)
 	h.logTool(email, "funding_assistant", "completed")
 	h.trackEvent(email, "funding_assistant_generate", r.URL.Path)
@@ -305,9 +302,6 @@ func (h *Handler) IntelligenceGraph(w http.ResponseWriter, r *http.Request) {
 		}
 		if decodeJSON(r, &q) != nil || (strings.TrimSpace(q.SourceID) == "" && strings.TrimSpace(q.Address) == "") {
 			writeJSON(w, 400, map[string]string{"error": "source_id_or_address_required"})
-			return
-		}
-		if !h.useOutput(w, email, "intelligence_graph") {
 			return
 		}
 		_, _ = h.DB.Exec(`DELETE FROM intelligence_graph_edges WHERE lower(email)=lower($1)`, email)
@@ -551,19 +545,19 @@ func (h *Handler) SybilCheck(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "subject_required"})
 		return
 	}
-	if !h.useOutput(w, email, "sybil_check") {
+	h.trackEvent(email, "sybil_check_scan", r.URL.Path)
+	sig := []string{}
+	var accountCount int
+	if err := h.DB.QueryRow(`SELECT count(DISTINCT lower(email)) FROM web3_event_sources WHERE lower(address)=lower($1)`, q.Subject).Scan(&accountCount); err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "partial_failures": []map[string]string{{"source": "database", "code": APICodeIntegrationError, "message": "Real data unavailable"}}})
 		return
 	}
-	h.trackEvent(email, "sybil_check_scan", r.URL.Path)
-	sig := []string{"Fresh-account risk should be reviewed", "Public activity may be missing", "Repeated-wallet patterns require manual review"}
-	var accountCount int
-	_ = h.DB.QueryRow(`SELECT count(DISTINCT lower(email)) FROM web3_event_sources WHERE lower(address)=lower($1)`, q.Subject).Scan(&accountCount)
 	if accountCount > 1 {
 		sig = append(sig, "The same public wallet appears across multiple accounts")
 	}
-	rec := "Optional lightweight anti-abuse result: manual review recommended. No biometric or identity-document data used."
-	_, _ = h.DB.Exec(`INSERT INTO sybil_checks(email,subject,check_type,score,signals,recommendation) VALUES($1,$2,$3,45,$4,$5)`, email, q.Subject, q.CheckType, jsonBytes(sig), rec)
-	writeJSON(w, 200, map[string]any{"ok": true, "preliminary": true, "score": 45, "signals": sig, "recommendation": rec, "privacy": "No biometric data. No identity documents. No private keys."})
+	rec := "No Sybil conclusion is produced without real linked activity signals; review public activity manually."
+	_, _ = h.DB.Exec(`INSERT INTO sybil_checks(email,subject,check_type,score,signals,recommendation) VALUES($1,$2,$3,NULL,$4,$5)`, email, q.Subject, q.CheckType, jsonBytes(sig), rec)
+	writeJSON(w, 200, map[string]any{"ok": true, "signals": sig, "linked_account_count": accountCount, "recommendation": rec, "privacy": "No biometric data. No identity documents. No private keys."})
 }
 
 func (h *Handler) ToolPrices(w http.ResponseWriter, r *http.Request) {

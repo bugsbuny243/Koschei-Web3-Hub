@@ -47,21 +47,6 @@ func (h *Handler) PortfolioTrack(w http.ResponseWriter, r *http.Request) {
 	if req.Network == "" {
 		req.Network = "solana-mainnet"
 	}
-	claims, ok := userFromContext(r.Context())
-	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-		return
-	}
-	isPrivileged, outputs, err := h.userCreditsAndRole(claims.Sub)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
-	if !isPrivileged && outputs <= 0 {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-		return
-	}
-
 	client := &http.Client{Timeout: 12 * time.Second}
 	rpcURL := solanaRPCURL(req.Network, os.Getenv("ALCHEMY_API_KEY"))
 	result := portfolioTrackResponse{Network: req.Network, Wallets: []portfolioWallet{}, TrackedAt: time.Now().UTC().Format(time.RFC3339)}
@@ -88,12 +73,6 @@ func (h *Handler) PortfolioTrack(w http.ResponseWriter, r *http.Request) {
 		result.Wallets = append(result.Wallets, wallet)
 	}
 	result.TotalBalanceSOL = roundPercent(result.TotalBalanceSOL)
-	if !isPrivileged {
-		if err := h.spendOutput(claims.Email, "portfolio_tracker"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-			return
-		}
-	}
 	writeJSON(w, http.StatusOK, result)
 }
 

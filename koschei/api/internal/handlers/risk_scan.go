@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"koschei/api/internal/services"
 )
 
 const riskDisclaimer = "This is informational only, not legal, financial, investment, or security advice."
@@ -50,7 +52,18 @@ func (h *Handler) ScanRisk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	riskResult := buildRiskScanResult()
+	inputType := detectUnifiedInputType(target, "", nil)
+	if inputType == "question" || inputType == "unknown" {
+		writeAPIError(w, http.StatusBadGateway, APICodeIntegrationError, "Real data unavailable", nil)
+		return
+	}
+	engine := services.NewUnifiedEngine(h.SolanaRPC)
+	module := engine.ScanRisk(r.Context(), services.UnifiedAnalyzeRequest{TargetType: mapUnifiedInputTypeToEngine(inputType), TargetID: target, Network: "solana-mainnet", Notes: notes})
+	if module.Status != "ok" {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"success": false, "code": APICodeIntegrationError, "message": "Real data unavailable", "data": nil, "partial_failures": []partialFailure{{Source: "solana_rpc", Code: APICodeIntegrationError, Message: "Real data unavailable"}}})
+		return
+	}
+	riskResult := riskScanResult{OK: true, RiskLevel: module.RiskLevel, Score: module.Score, Checklist: module.Findings, RecommendedFixes: servicesRecommendations(module.RiskLevel), Disclaimer: riskDisclaimer, UsedAI: false, UsedFallback: false}
 	resultJSON, err := json.Marshal(riskResult)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "risk_scan_failed"})
@@ -70,9 +83,8 @@ func (h *Handler) ScanRisk(w http.ResponseWriter, r *http.Request) {
 		FROM entitlements
 		WHERE lower(email) = lower($1)
 			AND status = 'active'
-			AND COALESCE(plan_id, '') <> 'free'
-			AND outputs_remaining > 0
-		ORDER BY outputs_remaining DESC, created_at DESC
+			AND (expires_at IS NULL OR expires_at > now())
+		ORDER BY created_at DESC
 		LIMIT 1
 		FOR UPDATE`, email).Scan(&entitlementID); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
@@ -86,39 +98,12 @@ func (h *Handler) ScanRisk(w http.ResponseWriter, r *http.Request) {
 
 	attemptRiskReportSave(r.Context(), tx, email, target, notes, riskResult, string(resultJSON))
 
-	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, email, "risk_scan"); err != nil {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-		return
-	}
-
 	if err := tx.Commit(); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, riskResult)
-}
-
-func buildRiskScanResult() riskScanResult {
-	return riskScanResult{
-		OK:        true,
-		RiskLevel: "review_required",
-		Score:     65,
-		Checklist: []string{
-			"Verify the official project source and the target address independently.",
-			"Review contract verification, permissions, upgrade controls, and transaction history.",
-			"Check for unexpected approvals, signer changes, or high-privilege operations.",
-			"Confirm that public documentation and audit claims are current and authentic.",
-		},
-		RecommendedFixes: []string{
-			"Use trusted explorers and official links to confirm addresses before interacting.",
-			"Revoke unnecessary token approvals and limit wallet permissions where appropriate.",
-			"Use a separate wallet for testing and request an independent security review for high-value activity.",
-		},
-		Disclaimer:   riskDisclaimer,
-		UsedAI:       false,
-		UsedFallback: false,
-	}
 }
 
 func (result riskScanResult) summary(target string) string {
@@ -235,4 +220,15 @@ func saveRiskReportIfSupported(ctx context.Context, tx *sql.Tx, email, target, n
 func mustJSON(value any) string {
 	encoded, _ := json.Marshal(value)
 	return string(encoded)
+}
+
+func servicesRecommendations(level string) []string {
+	switch strings.ToUpper(level) {
+	case "CRITICAL", "HIGH":
+		return []string{"Pause until the on-chain risk findings are manually reviewed."}
+	case "MEDIUM":
+		return []string{"Proceed only with reduced exposure and additional verification."}
+	default:
+		return []string{"No critical automated flags were produced by completed real-data checks."}
+	}
 }

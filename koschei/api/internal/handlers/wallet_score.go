@@ -50,18 +50,6 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 		req.Network = "solana-devnet"
 	}
 
-	claims, ok := userFromContext(r.Context())
-	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-		return
-	}
-	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 1
-	if !isPrivileged && credits < toolCost {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-		return
-	}
-
 	apiKey := os.Getenv("ALCHEMY_API_KEY")
 	rpcURL := solanaRPCURL(req.Network, apiKey)
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -246,49 +234,8 @@ func (h *Handler) WalletScore(w http.ResponseWriter, r *http.Request) {
 		badges = append(badges, "👤 Standard Account")
 	}
 
-	// ── 4. AI Summary ──
-	summary := fmt.Sprintf("Wallet with %d transactions, balance of %s, active for %d days. Score: %d/100 (%s).", txCount, balanceSol, activeDays, score, level)
-
-	aiKey := os.Getenv("TOGETHER_API_KEY")
-	if aiKey != "" {
-		model := os.Getenv("TOGETHER_MODEL")
-		if model == "" {
-			model = "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"
-		}
-		prompt := fmt.Sprintf(`Summarize this Solana wallet reputation in 1-2 sentences for a non-technical user. Be concise and clear. Data: address=%s, score=%d/100, level=%s, tx_count=%d, balance=%s, active_days=%d, badges=%s. No markdown, just plain text.`,
-			req.Address[:min(8, len(req.Address))]+"...", score, level, txCount, balanceSol, activeDays, strings.Join(badges, ", "))
-
-		aiBody, _ := json.Marshal(map[string]interface{}{
-			"model": model, "max_tokens": 150,
-			"messages":    []map[string]string{{"role": "user", "content": prompt}},
-			"temperature": 0.3,
-		})
-		aiReq, _ := http.NewRequest("POST", "https://api.together.xyz/v1/chat/completions", bytes.NewReader(aiBody))
-		aiReq.Header.Set("Authorization", "Bearer "+aiKey)
-		aiReq.Header.Set("Content-Type", "application/json")
-		if aiResp, err := client.Do(aiReq); err == nil {
-			defer aiResp.Body.Close()
-			var aiResult struct {
-				Choices []struct {
-					Message struct {
-						Content string `json:"content"`
-					} `message:"content"`
-				} `json:"choices"`
-			}
-			if d, _ := io.ReadAll(aiResp.Body); json.Unmarshal(d, &aiResult) == nil && len(aiResult.Choices) > 0 {
-				if s := strings.TrimSpace(aiResult.Choices[0].Message.Content); s != "" {
-					summary = s
-				}
-			}
-		}
-	}
-
-	if !isPrivileged {
-		if err := h.spendOutput(claims.Email, "wallet_score"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-			return
-		}
-	}
+	// ── 4. Real-data summary (AI summaries are centralized in the unified router) ──
+	summary := fmt.Sprintf("Wallet with %d fetched transactions, balance of %s, active for %d days. Score: %d/100 (%s).", txCount, balanceSol, activeDays, score, level)
 
 	writeJSON(w, http.StatusOK, walletScoreResponse{
 		Address:    req.Address,

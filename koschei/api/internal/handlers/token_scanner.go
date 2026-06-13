@@ -58,18 +58,6 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 		req.Network = "solana-mainnet"
 	}
 
-	claims, ok := userFromContext(r.Context())
-	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-		return
-	}
-	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	const toolCost = 1
-	if !isPrivileged && credits < toolCost {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-		return
-	}
-
 	client := &http.Client{Timeout: 12 * time.Second}
 	rpcURL := solanaRPCURL(req.Network, os.Getenv("ALCHEMY_API_KEY"))
 	var supply struct {
@@ -154,13 +142,6 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 		risk = "high"
 	} else if score < 70 {
 		risk = "medium"
-	}
-
-	if !isPrivileged {
-		if err := h.spendOutput(claims.Email, "token_scan"); err != nil {
-			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-			return
-		}
 	}
 
 	disclaimer := "Koschei provides read-only risk signals based on public on-chain data. This is not financial advice."

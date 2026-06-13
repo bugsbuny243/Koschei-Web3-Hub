@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -13,18 +14,37 @@ import (
 )
 
 type unifiedAnalyzeHTTPInput struct {
-	Target     string `json:"target"`
-	TargetType string `json:"target_type"`
-	TargetID   string `json:"target_id"`
-	Network    string `json:"network"`
-	Notes      string `json:"notes"`
+	Input      string         `json:"input"`
+	Context    map[string]any `json:"context"`
+	Target     string         `json:"target"`
+	TargetType string         `json:"target_type"`
+	TargetID   string         `json:"target_id"`
+	Network    string         `json:"network"`
+	Notes      string         `json:"notes"`
 }
 
-type unifiedAnalyzeHTTPResponse struct {
-	OK              bool                          `json:"ok"`
-	ReportSaved     bool                          `json:"report_saved"`
-	ReportSaveError string                        `json:"report_save_error,omitempty"`
-	Result          services.UnifiedAnalyzeResult `json:"result"`
+type unifiedAnalyzeData struct {
+	InputType       string                 `json:"input_type"`
+	Summary         string                 `json:"summary"`
+	Sections        unifiedAnalyzeSections `json:"sections"`
+	Sources         []string               `json:"sources"`
+	PartialFailures []partialFailure       `json:"partial_failures"`
+}
+
+type unifiedAnalyzeSections struct {
+	Wallet          any      `json:"wallet"`
+	Token           any      `json:"token"`
+	Transaction     any      `json:"transaction"`
+	Risk            any      `json:"risk"`
+	Project         any      `json:"project"`
+	Sybil           any      `json:"sybil"`
+	Recommendations []string `json:"recommendations"`
+}
+
+type partialFailure struct {
+	Source  string `json:"source"`
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 // UnifiedIntelligenceHandler runs the six enterprise intelligence modules in
@@ -33,100 +53,82 @@ type unifiedAnalyzeHTTPResponse struct {
 func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		writeAPIError(w, http.StatusUnauthorized, APICodeUnauthorized, "Unauthorized", nil)
 		return
 	}
 
 	var input unifiedAnalyzeHTTPInput
 	if err := decodeJSON(r, &input); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Invalid request body", nil)
 		return
 	}
-	input.Target = strings.TrimSpace(input.Target)
-	input.TargetType = strings.TrimSpace(input.TargetType)
-	input.TargetID = strings.TrimSpace(input.TargetID)
-	input.Network = strings.TrimSpace(input.Network)
-	input.Notes = strings.TrimSpace(input.Notes)
-	if input.TargetID == "" {
-		input.TargetID = input.Target
-	}
-	if input.TargetType == "" {
-		input.TargetType = inferUnifiedTargetType(input.TargetID)
-	}
-	if input.TargetType == "" || input.TargetID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "target_required", "message": "Wallet address, token mint, transaction hash, project URL, or project name is required."})
+	rawInput := strings.TrimSpace(firstNonEmptyString(input.Input, input.TargetID, input.Target))
+	if rawInput == "" {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Input is required", nil)
 		return
 	}
 	if input.Network == "" {
 		input.Network = "solana-mainnet"
 	}
-
-	activePackage, err := h.hasActivePaidPackage(claims.Sub, normalizedClaimEmail(claims))
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Package access could not be verified."})
-		return
-	}
-	if !activePackage {
-		writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_active_package", "An active Koschei package is required to access the A.R.V.I.S Command Center."))
-		return
-	}
-	if _, available, err := h.userCreditsAndRole(claims.Sub); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Credit access could not be verified."})
-		return
-	} else if available <= 0 {
-		writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_credits", "No intelligence scan credits remain on the active package."))
-		return
+	inputType := detectUnifiedInputType(rawInput, input.TargetType, input.Context)
+	inputType = h.resolveUnifiedInputType(r.Context(), rawInput, input.Network, inputType)
+	if inputType == "unknown" {
+		inputType = "question"
 	}
 
 	requestID := newRequestID()
-	engine := services.NewUnifiedEngine(h.SolanaRPC)
-	result, err := engine.Analyze(r.Context(), services.UnifiedAnalyzeRequest{
-		RequestID:  requestID,
-		TargetType: input.TargetType,
-		TargetID:   input.TargetID,
-		Network:    input.Network,
-		Notes:      input.Notes,
-	})
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return
-	}
+	sections := unifiedAnalyzeSections{Recommendations: []string{}}
+	partialFailures := []partialFailure{}
+	sources := []string{}
+	var realData any
 
-	if !unifiedHasCompletedModule(result) {
-		writeJSON(w, http.StatusBadGateway, unifiedAnalyzeHTTPResponse{OK: false, Result: result})
-		return
-	}
-
-	if h.DB != nil {
-		tx, err := h.DB.BeginTx(r.Context(), nil)
+	if inputType == "question" {
+		realData = map[string]any{"question": rawInput}
+	} else {
+		engineType := mapUnifiedInputTypeToEngine(inputType)
+		engine := services.NewUnifiedEngine(h.SolanaRPC)
+		result, err := engine.Analyze(r.Context(), services.UnifiedAnalyzeRequest{RequestID: requestID, TargetType: engineType, TargetID: rawInput, Network: input.Network, Notes: input.Notes})
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Credit charge could not be started."})
+			writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Invalid input", nil)
 			return
 		}
-		if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, normalizedClaimEmail(claims), "unified_intelligence:"+requestID); err != nil {
-			_ = tx.Rollback()
-			writeJSON(w, http.StatusPaymentRequired, unifiedAccessError("no_credits", "No intelligence scan credits remain on the active package."))
-			return
+		realData = result
+		sections = unifiedSectionsFromEngine(result)
+		sources = append(sources, "solana_rpc")
+		for _, failure := range unifiedPartialFailures(result) {
+			partialFailures = append(partialFailures, failure)
 		}
-		if err := tx.Commit(); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed", "message": "Credit charge could not be committed."})
-			return
+		if h.DB != nil {
+			_ = h.saveUnifiedReport(r.Context(), claims.Sub, result)
 		}
 	}
 
-	saved := false
-	saveErr := ""
-	if h.DB != nil {
-		if err := h.saveUnifiedReport(r.Context(), claims.Sub, result); err != nil {
-			saveErr = err.Error()
-		} else {
-			saved = true
+	summary := "Real data analysis completed. AI summary unavailable."
+	if inputType == "question" {
+		summary = "AI answer unavailable."
+	}
+	provider := "none"
+	ai, err := h.GenerateIntelligenceSummary(r.Context(), normalizedClaimEmail(claims), rawInput, realData)
+	if err != nil {
+		partialFailures = append(partialFailures, partialFailure{Source: "ai_router", Code: APICodeIntegrationError, Message: "Real data unavailable"})
+		if inputType == "question" {
+			h.logUnifiedAnalysis(normalizedClaimEmail(claims), inputType, APICodeIntegrationError, provider, partialFailures)
+			writeAPIError(w, http.StatusBadGateway, APICodeIntegrationError, "AI provider unavailable", nil)
+			return
+		}
+	} else {
+		summary = ai.Summary
+		provider = ai.Provider
+		if len(ai.Recommendations) > 0 {
+			sections.Recommendations = ai.Recommendations
 		}
 	}
 
-	h.logTool(normalizedClaimEmail(claims), "unified_intelligence", "completed")
-	h.trackEvent(normalizedClaimEmail(claims), "unified_intelligence_run", r.URL.Path)
-	writeJSON(w, http.StatusOK, unifiedAnalyzeHTTPResponse{OK: true, ReportSaved: saved, ReportSaveError: saveErr, Result: result})
+	data := unifiedAnalyzeData{InputType: inputType, Summary: summary, Sections: sections, Sources: sources, PartialFailures: partialFailures}
+	h.logUnifiedAnalysis(normalizedClaimEmail(claims), inputType, APICodeOK, provider, partialFailures)
+	h.logTool(normalizedClaimEmail(claims), "unified_analyze", "completed")
+	h.trackEvent(normalizedClaimEmail(claims), "unified_analyze", r.URL.Path)
+	writeAPISuccess(w, "Analysis completed", data)
 }
 
 func (h *Handler) saveUnifiedReport(ctx context.Context, userID string, result services.UnifiedAnalyzeResult) error {
@@ -143,36 +145,6 @@ func (h *Handler) saveUnifiedReport(ctx context.Context, userID string, result s
 	return err
 }
 
-func inferUnifiedTargetType(target string) string {
-	target = strings.TrimSpace(target)
-	if target == "" {
-		return ""
-	}
-	lower := strings.ToLower(target)
-	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.Contains(lower, ".") && !strings.Contains(lower, " ") {
-		return "project"
-	}
-	if strings.HasPrefix(lower, "0x") && len(lower) == 66 {
-		return "tx"
-	}
-	if len(target) >= 87 {
-		return "tx"
-	}
-	if len(target) >= 32 && len(target) <= 44 && !strings.Contains(target, " ") {
-		return "address"
-	}
-	return "project"
-}
-
-func unifiedAccessError(code, message string) map[string]any {
-	return map[string]any{
-		"ok":              false,
-		"error":           code,
-		"message":         message,
-		"credits_charged": false,
-	}
-}
-
 func newRequestID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
@@ -181,11 +153,140 @@ func newRequestID() string {
 	return hex.EncodeToString(b[:])
 }
 
-func unifiedHasCompletedModule(result services.UnifiedAnalyzeResult) bool {
-	for _, module := range result.ModuleResults {
-		if module.Status == "ok" {
-			return true
+func detectUnifiedInputType(input, explicit string, ctx map[string]any) string {
+	hint := strings.ToLower(strings.TrimSpace(explicit))
+	if hint == "" && ctx != nil {
+		for _, key := range []string{"input_type", "target_type", "type"} {
+			if v, ok := ctx[key].(string); ok {
+				hint = strings.ToLower(strings.TrimSpace(v))
+				break
+			}
 		}
 	}
-	return false
+	switch hint {
+	case "wallet", "wallet_address":
+		return "wallet"
+	case "token", "mint", "token_mint":
+		return "token"
+	case "tx", "transaction", "signature", "hash":
+		return "transaction"
+	case "project", "url", "project_url":
+		return "project"
+	case "question":
+		return "question"
+	}
+	trimmed := strings.TrimSpace(input)
+	lower := strings.ToLower(trimmed)
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
+		if u, err := url.Parse(trimmed); err == nil && u.Host != "" {
+			return "project"
+		}
+	}
+	if strings.Contains(trimmed, " ") || strings.Contains(trimmed, "?") {
+		return "question"
+	}
+	if decoded, ok := base58Decode(trimmed); ok {
+		if len(decoded) == 64 || len(trimmed) >= 87 {
+			return "transaction"
+		}
+		if len(decoded) == 32 {
+			return "question"
+		}
+	}
+	if strings.Contains(trimmed, ".") {
+		return "project"
+	}
+	return "question"
+}
+
+func (h *Handler) resolveUnifiedInputType(ctx context.Context, input, network, detected string) string {
+	if detected != "question" && detected != "unknown" {
+		return detected
+	}
+	decoded, ok := base58Decode(strings.TrimSpace(input))
+	if !ok || len(decoded) != 32 || h == nil || h.SolanaRPC == nil {
+		return detected
+	}
+	var supply struct {
+		Value struct {
+			Amount string `json:"amount"`
+		} `json:"value"`
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if err := h.SolanaRPC.Call(probeCtx, network, "getTokenSupply", []any{input}, &supply, 30*time.Second); err == nil && strings.TrimSpace(supply.Value.Amount) != "" {
+		return "token"
+	}
+	var account struct {
+		Value any `json:"value"`
+	}
+	probeCtx, cancel = context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if err := h.SolanaRPC.Call(probeCtx, network, "getAccountInfo", []any{input, map[string]string{"encoding": "jsonParsed"}}, &account, 30*time.Second); err == nil && account.Value != nil {
+		return "wallet"
+	}
+	return detected
+}
+
+func mapUnifiedInputTypeToEngine(inputType string) string {
+	switch inputType {
+	case "transaction":
+		return "tx"
+	case "token":
+		return "token"
+	case "wallet":
+		return "wallet"
+	case "project":
+		return "project"
+	default:
+		return inputType
+	}
+}
+
+func unifiedSectionsFromEngine(result services.UnifiedAnalyzeResult) unifiedAnalyzeSections {
+	sections := unifiedAnalyzeSections{Recommendations: result.Recommendations}
+	for name, module := range result.ModuleResults {
+		if module.Status != "ok" {
+			continue
+		}
+		switch name {
+		case services.ModuleWalletScore:
+			sections.Wallet = module
+		case services.ModuleTokenScanner:
+			sections.Token = module
+		case services.ModuleTXDecoder:
+			sections.Transaction = module
+		case services.ModuleRiskScanner:
+			sections.Risk = module
+		case services.ModuleProjectRadar:
+			sections.Project = module
+		case services.ModuleSybilGraph:
+			sections.Sybil = module
+		}
+	}
+	return sections
+}
+
+func unifiedPartialFailures(result services.UnifiedAnalyzeResult) []partialFailure {
+	out := []partialFailure{}
+	for name, module := range result.ModuleResults {
+		if module.Status == "ok" || module.Status == "skipped" {
+			continue
+		}
+		source := "solana_rpc"
+		if name == services.ModuleProjectRadar {
+			source = "project_url"
+		}
+		out = append(out, partialFailure{Source: source, Code: APICodeIntegrationError, Message: "Real data unavailable"})
+	}
+	return out
+}
+
+func (h *Handler) logUnifiedAnalysis(email, inputType, status, provider string, failures []partialFailure) {
+	if h == nil || h.DB == nil {
+		return
+	}
+	payload, _ := json.Marshal(map[string]any{"input_type": inputType, "provider": provider, "partial_failures": failures})
+	_, _ = h.DB.Exec(`INSERT INTO tool_usage_logs(email,tool_key,status) VALUES(NULLIF($1,''),$2,$3)`, email, "unified_analyze", status)
+	_, _ = h.DB.Exec(`INSERT INTO model_route_logs(email,tool,route,model,provider,prompt,status) VALUES(NULLIF($1,''),$2,$3,$4,$5,$6,$7)`, email, "unified_analyze", inputType, "", provider, string(payload), status)
 }
