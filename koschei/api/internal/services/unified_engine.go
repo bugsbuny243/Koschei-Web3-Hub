@@ -216,8 +216,8 @@ func (e *UnifiedEngine) AnalyzeTX(ctx context.Context, req UnifiedAnalyzeRequest
 
 func (e *UnifiedEngine) ScanToken(ctx context.Context, req UnifiedAnalyzeRequest) ModuleResult {
 	started := time.Now()
-	if req.TargetType != "token" && req.TargetType != "mint" {
-		return skipped(ModuleTokenScanner, "Token scanner requires target_type=token", started)
+	if req.TargetType != "token" && req.TargetType != "mint" && req.TargetType != "address" {
+		return skipped(ModuleTokenScanner, "Token scanner requires target_type=token or address", started)
 	}
 	var supply tokenSupplyRPC
 	if err := e.RPC.Call(ctx, req.Network, "getTokenSupply", []any{req.TargetID}, &supply, time.Minute); err != nil {
@@ -494,8 +494,10 @@ func normalizeTargetType(t string) string {
 		return "tx"
 	case "mint", "token_mint":
 		return "token"
-	case "address", "wallet_address":
+	case "wallet_address":
 		return "wallet"
+	case "address":
+		return "address"
 	case "url", "website", "project_url":
 		return "project"
 	default:
