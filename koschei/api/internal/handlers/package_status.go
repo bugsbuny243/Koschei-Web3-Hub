@@ -15,6 +15,7 @@ type customerPackageStatus struct {
 	Status           string     `json:"status"`
 	StartsAt         *time.Time `json:"starts_at,omitempty"`
 	ExpiresAt        *time.Time `json:"expires_at"`
+	Warning          string     `json:"warning,omitempty"`
 }
 
 func (h *Handler) MePackage(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +26,7 @@ func (h *Handler) MePackage(w http.ResponseWriter, r *http.Request) {
 	}
 	status, err := h.customerPackageStatus(r.Context(), claims.Sub, normalizedClaimEmail(claims))
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Package status unavailable")
+		writeAPIData(w, http.StatusOK, customerPackageStatus{HasActivePackage: false, PlanID: nil, Status: "none", ExpiresAt: nil, Warning: "package_database_unavailable"})
 		return
 	}
 	writeAPIData(w, http.StatusOK, status)
@@ -33,10 +34,10 @@ func (h *Handler) MePackage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) customerPackageStatus(ctx context.Context, authSubject, email string) (customerPackageStatus, error) {
 	if h.DB == nil {
-		return customerPackageStatus{}, errors.New("database unavailable")
+		return customerPackageStatus{HasActivePackage: false, PlanID: nil, Status: "none", ExpiresAt: nil, Warning: "package_database_unavailable"}, nil
 	}
 	if err := ensurePaymentSchema(ctx, h.DB); err != nil {
-		return customerPackageStatus{}, err
+		return customerPackageStatus{HasActivePackage: false, PlanID: nil, Status: "none", ExpiresAt: nil, Warning: "package_database_unavailable"}, nil
 	}
 	authSubject = strings.TrimSpace(authSubject)
 	email = strings.ToLower(strings.TrimSpace(email))
@@ -51,13 +52,13 @@ func (h *Handler) customerPackageStatus(ctx context.Context, authSubject, email 
 		  AND COALESCE(e.plan_id, '') <> 'free'
 		  AND (e.expires_at IS NULL OR e.expires_at > now())
 		  AND (($1 <> '' AND p.auth_subject = $1) OR ($2 <> '' AND lower(e.email) = lower($2)))
-		ORDER BY e.updated_at DESC, e.created_at DESC
+		ORDER BY e.updated_at DESC NULLS LAST, e.created_at DESC
 		LIMIT 1`, authSubject, email).Scan(&planID, &status, &startsAt, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return customerPackageStatus{HasActivePackage: false, PlanID: nil, Status: "none", ExpiresAt: nil}, nil
 	}
 	if err != nil {
-		return customerPackageStatus{}, err
+		return customerPackageStatus{HasActivePackage: false, PlanID: nil, Status: "none", ExpiresAt: nil, Warning: "package_database_unavailable"}, nil
 	}
 	planID = normalizePackageID(planID)
 	return customerPackageStatus{HasActivePackage: true, PlanID: &planID, Status: firstNonEmpty(status, "active"), StartsAt: nullTimePtr(startsAt), ExpiresAt: nullTimePtr(expiresAt)}, nil
