@@ -687,7 +687,7 @@ func (h *Handler) executeOwnerBrainCommand(ctx context.Context, command string, 
 	lc := strings.ToLower(strings.TrimSpace(command))
 	switch {
 	case strings.Contains(lc, "son 24") && strings.Contains(lc, "hata"):
-		return h.ownerRecentErrors(ctx)
+		return h.ownerRecentErrorsCommand(ctx)
 	case strings.Contains(lc, "github") && strings.Contains(lc, "son commit"):
 		return ownerGitHubLatestCommit(ctx)
 	case strings.Contains(lc, "github") && strings.Contains(lc, "deploy"):
@@ -736,7 +736,7 @@ func (h *Handler) executeOwnerBrainCommand(ctx context.Context, command string, 
 	}
 }
 
-func (h *Handler) ownerRecentErrors(ctx context.Context) (string, string, map[string]any) {
+func (h *Handler) ownerRecentErrorsCommand(ctx context.Context) (string, string, map[string]any) {
 	items := []map[string]any{}
 	rows, err := h.DB.QueryContext(ctx, `SELECT command, output, status, created_at FROM ai_command_logs WHERE status IN ('error','failed','rejected') AND created_at >= now() - interval '24 hours' ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
