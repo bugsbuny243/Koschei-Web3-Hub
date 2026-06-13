@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -40,7 +42,14 @@ type ownerBanInput struct {
 }
 
 type ownerCommandInput struct {
-	Command string `json:"command"`
+	Command string         `json:"command"`
+	Args    map[string]any `json:"args"`
+}
+
+type ownerEmergencyInput struct {
+	Key     string `json:"key"`
+	Enabled bool   `json:"enabled"`
+	Reason  string `json:"reason"`
 }
 
 type ownerLoginInput struct {
@@ -258,13 +267,47 @@ func (h *Handler) OwnerCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	command := strings.TrimSpace(req.Command)
-	status := "queued"
-	output := "Komut kaydedildi. GitHub/Together AI otomasyonu yapılandırıldığında bu kayıt iş kuyruğuna yönlendirilecek."
+	status, output, result := h.executeOwnerBrainCommand(r.Context(), command, req.Args)
 	if _, err := h.DB.ExecContext(r.Context(), `INSERT INTO ai_command_logs (command, output, status, created_at) VALUES ($1,$2,$3,now())`, command, output, status); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "command log failed"})
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "status": status, "output": output})
+	_ = h.recordOwnerBrainEvent(r.Context(), "brain_command", command+" → "+status, status, result)
+	code := http.StatusOK
+	if status == "error" || status == "unsupported" {
+		code = http.StatusBadRequest
+	}
+	writeJSON(w, code, map[string]any{"ok": status != "error" && status != "unsupported", "status": status, "output": output, "result": result})
+}
+
+func (h *Handler) OwnerEmergencyControl(w http.ResponseWriter, r *http.Request) {
+	if !h.ownerAuth(w, r) {
+		return
+	}
+	if err := ensureOwnerSchema(r.Context(), h.DB); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "owner schema unavailable"})
+		return
+	}
+	var req ownerEmergencyInput
+	if err := decodeJSON(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
+		return
+	}
+	key := normalizeOwnerControlKey(req.Key)
+	if key == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown_control"})
+		return
+	}
+	_, err := h.DB.ExecContext(r.Context(), `
+		INSERT INTO owner_system_controls (key, enabled, reason, updated_at)
+		VALUES ($1,$2,$3,now())
+		ON CONFLICT (key) DO UPDATE SET enabled=EXCLUDED.enabled, reason=EXCLUDED.reason, updated_at=now()`, key, req.Enabled, strings.TrimSpace(req.Reason))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "control update failed"})
+		return
+	}
+	_ = h.recordOwnerBrainEvent(r.Context(), "emergency_control", fmt.Sprintf("%s set to %t", key, req.Enabled), "active", map[string]any{"key": key, "enabled": req.Enabled})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "key": key, "enabled": req.Enabled})
 }
 
 func (h *Handler) OwnerStatus(w http.ResponseWriter, r *http.Request) {
@@ -309,7 +352,10 @@ func (h *Handler) OwnerStatus(w http.ResponseWriter, r *http.Request) {
 			logs = append(logs, map[string]any{"event": "ai_command", "message": c, "status": s, "output": o, "created_at": t})
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "metrics": metrics, "logs": logs})
+	controls := h.ownerSystemControls(r.Context())
+	events := h.ownerLiveEvents(r.Context())
+	services := h.ownerServiceStatuses(r.Context())
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "metrics": metrics, "logs": logs, "services": services, "controls": controls, "events": events})
 }
 
 func (h *Handler) OwnerGrants(w http.ResponseWriter, r *http.Request) {
@@ -400,6 +446,477 @@ func (h *Handler) ShopierWebhook(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "approved", "activated": result.Activated})
 }
 
+func (h *Handler) executeOwnerBrainCommand(ctx context.Context, command string, args map[string]any) (string, string, map[string]any) {
+	lc := strings.ToLower(strings.TrimSpace(command))
+	switch {
+	case strings.Contains(lc, "son 24") && strings.Contains(lc, "hata"):
+		return h.ownerRecentErrors(ctx)
+	case strings.Contains(lc, "github") && strings.Contains(lc, "son commit"):
+		return ownerGitHubLatestCommit(ctx)
+	case strings.Contains(lc, "github") && strings.Contains(lc, "deploy"):
+		return ownerTriggerDeploy(ctx)
+	case strings.Contains(lc, "github") && strings.Contains(lc, "branch"):
+		branch := firstNonEmpty(stringArg(args, "branch"), lastField(command))
+		if branch == "oluştur" || branch == "olustur" || branch == "branch" {
+			branch = ""
+		}
+		return ownerGitHubCreateBranch(ctx, branch)
+	case strings.Contains(lc, "github") && (strings.Contains(lc, "pr") || strings.Contains(lc, "pull request")):
+		return ownerGitHubCreatePR(ctx, stringArg(args, "title"), stringArg(args, "branch"), stringArg(args, "body"))
+	case strings.Contains(lc, "kullanıcı ara") || strings.Contains(lc, "kullanici ara"):
+		email := firstNonEmpty(stringArg(args, "email"), afterColon(command))
+		return h.ownerFindUser(ctx, email)
+	case strings.Contains(lc, "banlı kullanıcı") || strings.Contains(lc, "banli kullanıcı") || strings.Contains(lc, "banli kullanici"):
+		return h.ownerListBannedUsers(ctx)
+	case strings.Contains(lc, "banla"):
+		email := firstNonEmpty(stringArg(args, "email"), afterColon(command), lastField(command))
+		if email == "banla" || !strings.Contains(email, "@") {
+			email = stringArg(args, "email")
+		}
+		return h.ownerSetUserStatus(ctx, email, true)
+	case strings.Contains(lc, "kredi ekle"):
+		email := stringArg(args, "email")
+		credits := intArg(args, "credits")
+		return h.ownerAddCreditsCommand(ctx, email, credits)
+	case strings.Contains(lc, "paketi değiştir") || strings.Contains(lc, "paketi degistir"):
+		return h.ownerChangePackage(ctx, stringArg(args, "email"), stringArg(args, "package"))
+	case strings.Contains(lc, "kullanıcı olarak giriş") || strings.Contains(lc, "kullanici olarak giris"):
+		return h.ownerCreateImpersonationToken(ctx, stringArg(args, "email"))
+	case strings.Contains(lc, "bugünkü gelir") || strings.Contains(lc, "bugunku gelir"):
+		return h.ownerRevenue(ctx, "today")
+	case strings.Contains(lc, "aylık gelir") || strings.Contains(lc, "aylik gelir"):
+		return h.ownerRevenue(ctx, "month")
+	case strings.Contains(lc, "paddle") && strings.Contains(lc, "webhook"):
+		return h.ownerPaddleSummary(ctx)
+	case strings.Contains(lc, "openai") && strings.Contains(lc, "maliyet"):
+		return h.ownerOpenAISummary(ctx)
+	case strings.Contains(lc, "alchemy"):
+		return ownerAlchemyStatus(ctx)
+	case strings.Contains(lc, "neon") && strings.Contains(lc, "backup"):
+		return h.ownerCreateNeonBackupMarker(ctx)
+	default:
+		return "unsupported", "Bu owner komutu için güvenli argümanlar eksik veya komut tanınmadı. Desteklenen komutlardan birini ve gerekli e-posta/branch/paket bilgisini gönder.", map[string]any{"command": command}
+	}
+}
+
+func (h *Handler) ownerRecentErrors(ctx context.Context) (string, string, map[string]any) {
+	items := []map[string]any{}
+	rows, err := h.DB.QueryContext(ctx, `SELECT command, output, status, created_at FROM ai_command_logs WHERE status IN ('error','failed','rejected') AND created_at >= now() - interval '24 hours' ORDER BY created_at DESC LIMIT 50`)
+	if err != nil {
+		return "error", "Son hata kayıtları okunamadı: " + err.Error(), nil
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var c, o, s string
+		var t time.Time
+		_ = rows.Scan(&c, &o, &s, &t)
+		items = append(items, map[string]any{"message": c, "detail": o, "status": s, "created_at": t})
+	}
+	return "completed", fmt.Sprintf("Son 24 saatte %d hata kaydı bulundu.", len(items)), map[string]any{"errors": items}
+}
+
+func (h *Handler) ownerFindUser(ctx context.Context, email string) (string, string, map[string]any) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return "error", "Kullanıcı aramak için mail gerekli.", nil
+	}
+	rows, err := h.DB.QueryContext(ctx, `SELECT id::text, COALESCE(auth_subject,''), email, COALESCE(wallet_address,''), COALESCE(credits,0), COALESCE(status,'active'), created_at, updated_at, banned_at FROM app_user_profiles WHERE lower(email) LIKE lower($1) ORDER BY created_at DESC LIMIT 20`, "%"+email+"%")
+	if err != nil {
+		return "error", "Kullanıcı araması başarısız: " + err.Error(), nil
+	}
+	defer rows.Close()
+	users := []ownerUserRecord{}
+	for rows.Next() {
+		var u ownerUserRecord
+		_ = rows.Scan(&u.ID, &u.AuthSubject, &u.Email, &u.WalletAddress, &u.Credits, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.BannedAt)
+		users = append(users, u)
+	}
+	return "completed", fmt.Sprintf("%d kullanıcı bulundu.", len(users)), map[string]any{"users": users}
+}
+
+func (h *Handler) ownerSetUserStatus(ctx context.Context, email string, ban bool) (string, string, map[string]any) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return "error", "Ban işlemi için email gerekli.", nil
+	}
+	status := "active"
+	bannedAt := "NULL"
+	if ban {
+		status = "banned"
+		bannedAt = "now()"
+	}
+	res, err := h.DB.ExecContext(ctx, `UPDATE app_user_profiles SET status=$1, banned_at=`+bannedAt+`, ban_reason='central_brain', updated_at=now() WHERE lower(email)=lower($2)`, status, email)
+	if err != nil {
+		return "error", "Kullanıcı durumu güncellenemedi: " + err.Error(), nil
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return "error", "Kullanıcı bulunamadı.", nil
+	}
+	return "completed", "Kullanıcı durumu güncellendi: " + status, map[string]any{"email": email, "status": status}
+}
+
+func (h *Handler) ownerAddCreditsCommand(ctx context.Context, email string, credits int) (string, string, map[string]any) {
+	if strings.TrimSpace(email) == "" || credits <= 0 {
+		return "error", "Kredi eklemek için email ve pozitif credits gerekli.", nil
+	}
+	res, err := h.DB.ExecContext(ctx, `UPDATE app_user_profiles SET credits=COALESCE(credits,0)+$1, updated_at=now() WHERE lower(email)=lower($2)`, credits, email)
+	if err != nil {
+		return "error", "Kredi güncellemesi başarısız: " + err.Error(), nil
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return "error", "Kullanıcı bulunamadı.", nil
+	}
+	_, _ = h.DB.ExecContext(ctx, `INSERT INTO credit_events (email, amount, reason, event_type) VALUES ($1,$2,'central_brain','owner_credit')`, email, credits)
+	return "completed", fmt.Sprintf("%s kullanıcısına %d kredi eklendi.", email, credits), map[string]any{"email": email, "credits": credits}
+}
+
+func (h *Handler) ownerChangePackage(ctx context.Context, email, pack string) (string, string, map[string]any) {
+	email = strings.TrimSpace(email)
+	pack = normalizePlanTier(pack)
+	if email == "" || pack == "" {
+		return "error", "Paket değiştirmek için email ve package gerekli.", nil
+	}
+	res, err := h.activatePackageEntitlement(ctx, email, pack, "owner_manual", "central-brain-"+fmt.Sprint(time.Now().UnixNano()))
+	if err != nil {
+		return "error", "Paket değiştirilemedi: " + err.Error(), nil
+	}
+	return "completed", "Kullanıcı paketi güncellendi: " + pack, map[string]any{"email": email, "package": pack, "activated": res.Activated}
+}
+
+func (h *Handler) ownerCreateImpersonationToken(ctx context.Context, email string) (string, string, map[string]any) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return "error", "Kullanıcı olarak giriş için email gerekli.", nil
+	}
+	token := generateID() + generateID() + generateID()
+	_, err := h.DB.ExecContext(ctx, `INSERT INTO owner_impersonation_tokens (token, email, expires_at, created_at) VALUES ($1,$2,now()+interval '10 minutes',now())`, token, email)
+	if err != nil {
+		return "error", "Impersonation token oluşturulamadı: " + err.Error(), nil
+	}
+	return "completed", "10 dakika geçerli owner impersonation token üretildi. Customer dashboard bunu görmez; sadece owner akışında kullanılmalıdır.", map[string]any{"email": email, "token": token, "expires_in_seconds": 600}
+}
+
+func (h *Handler) ownerRevenue(ctx context.Context, period string) (string, string, map[string]any) {
+	query := `SELECT COALESCE(count(*),0), COALESCE(sum(amount_try),0)::float FROM payment_requests WHERE status='approved' AND reviewed_at >= CURRENT_DATE`
+	if period == "month" {
+		query = `SELECT COALESCE(count(*),0), COALESCE(sum(amount_try),0)::float FROM payment_requests WHERE status='approved' AND reviewed_at >= date_trunc('month', now())`
+	}
+	var count int64
+	var total float64
+	if err := h.DB.QueryRowContext(ctx, query).Scan(&count, &total); err != nil {
+		return "error", "Gelir okunamadı: " + err.Error(), nil
+	}
+	return "completed", fmt.Sprintf("%s gelir: %.2f TRY / %d ödeme", period, total, count), map[string]any{"period": period, "payments": count, "revenue_try": total}
+}
+
+func (h *Handler) ownerPaddleSummary(ctx context.Context) (string, string, map[string]any) {
+	var pending int64
+	var total float64
+	_ = h.DB.QueryRowContext(ctx, `SELECT count(*) FROM payment_requests WHERE payment_provider='paddle' AND status='pending'`).Scan(&pending)
+	_ = h.DB.QueryRowContext(ctx, `SELECT COALESCE(sum(amount_try),0)::float FROM payment_requests WHERE payment_provider='paddle' AND status='approved'`).Scan(&total)
+	configured := strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != ""
+	webhook := strings.TrimSpace(os.Getenv("PADDLE_WEBHOOK_SECRET")) != ""
+	return "completed", "Paddle durumu üretildi.", map[string]any{"api_configured": configured, "webhook_secret_configured": webhook, "pending_payments": pending, "total_revenue_try": total, "entitlements": "database-backed"}
+}
+
+func (h *Handler) ownerOpenAISummary(ctx context.Context) (string, string, map[string]any) {
+	status := ownerHTTPHealth(ctx, "https://api.openai.com/v1/models", "OPENAI_API_KEY")
+	return "completed", "OpenAI canlı durum kontrolü tamamlandı. Maliyet detayları OpenAI usage/cost endpoint yetkisi yapılandırıldığında provider API'den genişletilir.", map[string]any{"status": status, "daily_cost": "provider_usage_scope_required", "monthly_cost": "provider_usage_scope_required"}
+}
+
+func ownerAlchemyStatus(ctx context.Context) (string, string, map[string]any) {
+	status := ownerHTTPHealth(ctx, "https://solana-devnet.g.alchemy.com/v2/"+os.Getenv("ALCHEMY_API_KEY"), "ALCHEMY_API_KEY")
+	return "completed", "Alchemy RPC durumu kontrol edildi.", map[string]any{"alchemy": status}
+}
+
+func (h *Handler) ownerCreateNeonBackupMarker(ctx context.Context) (string, string, map[string]any) {
+	id := "neon-backup-" + fmt.Sprint(time.Now().Unix())
+	_, err := h.DB.ExecContext(ctx, `INSERT INTO owner_central_brain_events (event_type, message, status, payload, created_at) VALUES ('neon_backup',$1,'requested',$2::jsonb,now())`, "Neon backup requested", `{"provider":"neon"}`)
+	if err != nil {
+		return "error", "Neon backup isteği kaydedilemedi: " + err.Error(), nil
+	}
+	return "completed", "Neon backup isteği kaydedildi. NEON_API_KEY/Project API bağlandığında fiziksel snapshot tetiklenir.", map[string]any{"backup_request_id": id, "status": "requested"}
+}
+
+func (h *Handler) ownerListBannedUsers(ctx context.Context) (string, string, map[string]any) {
+	rows, err := h.DB.QueryContext(ctx, `SELECT id::text, COALESCE(auth_subject,''), email, COALESCE(wallet_address,''), COALESCE(credits,0), COALESCE(status,'active'), created_at, updated_at, banned_at FROM app_user_profiles WHERE status='banned' ORDER BY banned_at DESC NULLS LAST LIMIT 100`)
+	if err != nil {
+		return "error", "Banlı kullanıcılar okunamadı: " + err.Error(), nil
+	}
+	defer rows.Close()
+	users := []ownerUserRecord{}
+	for rows.Next() {
+		var u ownerUserRecord
+		_ = rows.Scan(&u.ID, &u.AuthSubject, &u.Email, &u.WalletAddress, &u.Credits, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.BannedAt)
+		users = append(users, u)
+	}
+	return "completed", fmt.Sprintf("%d banlı kullanıcı listelendi.", len(users)), map[string]any{"users": users}
+}
+
+func ownerGitHubLatestCommit(ctx context.Context) (string, string, map[string]any) {
+	repo := strings.TrimSpace(os.Getenv("GITHUB_REPO"))
+	if repo == "" {
+		return "error", "GITHUB_REPO yapılandırılmamış.", nil
+	}
+	body, code, err := ownerGitHubRequest(ctx, http.MethodGet, "/repos/"+repo+"/commits?per_page=1", nil)
+	if err != nil {
+		return "error", err.Error(), nil
+	}
+	if code >= 300 {
+		return "error", fmt.Sprintf("GitHub HTTP %d: %s", code, string(body)), nil
+	}
+	var commits []map[string]any
+	_ = json.Unmarshal(body, &commits)
+	return "completed", "Github son commit alındı.", map[string]any{"commits": commits}
+}
+
+func ownerGitHubCreateBranch(ctx context.Context, branch string) (string, string, map[string]any) {
+	repo := strings.TrimSpace(os.Getenv("GITHUB_REPO"))
+	branch = strings.TrimSpace(branch)
+	if repo == "" || branch == "" {
+		return "error", "Branch oluşturmak için GITHUB_REPO ve branch adı gerekli.", nil
+	}
+	body, code, err := ownerGitHubRequest(ctx, http.MethodGet, "/repos/"+repo+"/git/ref/heads/main", nil)
+	if err != nil {
+		return "error", err.Error(), nil
+	}
+	if code >= 300 {
+		return "error", fmt.Sprintf("GitHub ref HTTP %d: %s", code, string(body)), nil
+	}
+	var ref struct {
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+	_ = json.Unmarshal(body, &ref)
+	payload := map[string]any{"ref": "refs/heads/" + branch, "sha": ref.Object.SHA}
+	out, code, err := ownerGitHubRequest(ctx, http.MethodPost, "/repos/"+repo+"/git/refs", payload)
+	if err != nil {
+		return "error", err.Error(), nil
+	}
+	if code >= 300 {
+		return "error", fmt.Sprintf("GitHub branch HTTP %d: %s", code, string(out)), nil
+	}
+	return "completed", "GitHub branch oluşturuldu: " + branch, map[string]any{"branch": branch}
+}
+
+func ownerGitHubCreatePR(ctx context.Context, title, branch, body string) (string, string, map[string]any) {
+	repo := strings.TrimSpace(os.Getenv("GITHUB_REPO"))
+	if repo == "" || strings.TrimSpace(branch) == "" {
+		return "error", "PR açmak için GITHUB_REPO ve branch gerekli.", nil
+	}
+	if strings.TrimSpace(title) == "" {
+		title = "Koschei Central Brain PR"
+	}
+	if strings.TrimSpace(body) == "" {
+		body = "Opened by Koschei Central Brain."
+	}
+	payload := map[string]any{"title": title, "head": branch, "base": "main", "body": body}
+	out, code, err := ownerGitHubRequest(ctx, http.MethodPost, "/repos/"+repo+"/pulls", payload)
+	if err != nil {
+		return "error", err.Error(), nil
+	}
+	if code >= 300 {
+		return "error", fmt.Sprintf("GitHub PR HTTP %d: %s", code, string(out)), nil
+	}
+	var res map[string]any
+	_ = json.Unmarshal(out, &res)
+	return "completed", "GitHub PR açıldı.", res
+}
+
+func ownerTriggerDeploy(ctx context.Context) (string, string, map[string]any) {
+	url := strings.TrimSpace(firstEnv("RENDER_DEPLOY_HOOK_URL", "DEPLOY_HOOK_URL"))
+	if url == "" {
+		return "error", "Render deploy hook URL yapılandırılmamış.", nil
+	}
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	if err != nil {
+		return "error", "Deploy tetiklenemedi: " + err.Error(), nil
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode >= 300 {
+		return "error", fmt.Sprintf("Deploy hook HTTP %d: %s", resp.StatusCode, string(b)), nil
+	}
+	return "completed", "Github/Render deploy başlatıldı.", map[string]any{"status_code": resp.StatusCode, "response": string(b)}
+}
+
+func ownerGitHubRequest(ctx context.Context, method, path string, payload any) ([]byte, int, error) {
+	token := strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
+	if token == "" {
+		return nil, 0, errors.New("GITHUB_TOKEN yapılandırılmamış")
+	}
+	var body io.Reader
+	if payload != nil {
+		b, _ := json.Marshal(payload)
+		body = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, "https://api.github.com"+path, body)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := (&http.Client{Timeout: 12 * time.Second}).Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	return b, resp.StatusCode, nil
+}
+
+func (h *Handler) ownerServiceStatuses(ctx context.Context) []map[string]any {
+	services := []map[string]any{
+		{"name": "OPENAI", "status": ownerHTTPHealth(ctx, "https://api.openai.com/v1/models", "OPENAI_API_KEY")},
+		{"name": "GITHUB", "status": ownerGitHubHealth(ctx)},
+		{"name": "NEON", "status": ownerEnvHealth("NEON_API_KEY")},
+		{"name": "DATABASE", "status": ownerDBHealth(ctx, h.DB)},
+		{"name": "PADDLE", "status": ownerEnvHealth("PADDLE_API_KEY")},
+		{"name": "ALCHEMY", "status": ownerEnvHealth("ALCHEMY_API_KEY")},
+		{"name": "RENDER", "status": ownerEnvHealth("RENDER_DEPLOY_HOOK_URL")},
+	}
+	return services
+}
+
+func ownerHTTPHealth(ctx context.Context, endpoint, envKey string) map[string]any {
+	if strings.TrimSpace(os.Getenv(envKey)) == "" {
+		return map[string]any{"state": "Disconnected", "detail": envKey + " missing"}
+	}
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req.Header.Set("Authorization", "Bearer "+os.Getenv(envKey))
+	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+	if err != nil {
+		return map[string]any{"state": "Timeout", "detail": err.Error()}
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 429 {
+		return map[string]any{"state": "Rate Limited", "detail": "HTTP 429"}
+	}
+	if resp.StatusCode >= 400 {
+		return map[string]any{"state": "Disconnected", "detail": fmt.Sprintf("HTTP %d", resp.StatusCode)}
+	}
+	return map[string]any{"state": "Connected", "detail": fmt.Sprintf("HTTP %d", resp.StatusCode)}
+}
+func ownerGitHubHealth(ctx context.Context) map[string]any {
+	if strings.TrimSpace(os.Getenv("GITHUB_TOKEN")) == "" || strings.TrimSpace(os.Getenv("GITHUB_REPO")) == "" {
+		return map[string]any{"state": "Disconnected", "detail": "GITHUB_TOKEN or GITHUB_REPO missing"}
+	}
+	_, code, err := ownerGitHubRequest(ctx, http.MethodGet, "/repos/"+os.Getenv("GITHUB_REPO"), nil)
+	if err != nil {
+		return map[string]any{"state": "Timeout", "detail": err.Error()}
+	}
+	if code == 429 || code == 403 {
+		return map[string]any{"state": "Rate Limited", "detail": fmt.Sprintf("HTTP %d", code)}
+	}
+	if code >= 400 {
+		return map[string]any{"state": "Disconnected", "detail": fmt.Sprintf("HTTP %d", code)}
+	}
+	return map[string]any{"state": "Connected", "detail": fmt.Sprintf("HTTP %d", code)}
+}
+func ownerEnvHealth(key string) map[string]any {
+	if strings.TrimSpace(os.Getenv(key)) == "" {
+		return map[string]any{"state": "Disconnected", "detail": key + " missing"}
+	}
+	return map[string]any{"state": "Connected", "detail": "configured"}
+}
+func ownerDBHealth(ctx context.Context, db *sql.DB) map[string]any {
+	if db == nil {
+		return map[string]any{"state": "Disconnected", "detail": "db nil"}
+	}
+	c, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if err := db.PingContext(c); err != nil {
+		return map[string]any{"state": "Timeout", "detail": err.Error()}
+	}
+	return map[string]any{"state": "Connected", "detail": "ping ok"}
+}
+
+func (h *Handler) ownerSystemControls(ctx context.Context) []map[string]any {
+	rows, err := h.DB.QueryContext(ctx, `SELECT key, enabled, COALESCE(reason,''), updated_at FROM owner_system_controls ORDER BY key`)
+	if err != nil {
+		return []map[string]any{}
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var k, r string
+		var e bool
+		var t time.Time
+		_ = rows.Scan(&k, &e, &r, &t)
+		out = append(out, map[string]any{"key": k, "enabled": e, "reason": r, "updated_at": t})
+	}
+	return out
+}
+func (h *Handler) ownerLiveEvents(ctx context.Context) []map[string]any {
+	rows, err := h.DB.QueryContext(ctx, `SELECT event_type, message, status, payload, created_at FROM owner_central_brain_events ORDER BY created_at DESC LIMIT 50`)
+	if err != nil {
+		return []map[string]any{}
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var typ, msg, st, payload string
+		var t time.Time
+		_ = rows.Scan(&typ, &msg, &st, &payload, &t)
+		out = append(out, map[string]any{"event_type": typ, "message": msg, "status": st, "payload": payload, "created_at": t})
+	}
+	return out
+}
+func (h *Handler) recordOwnerBrainEvent(ctx context.Context, typ, msg, status string, payload any) error {
+	b, _ := json.Marshal(payload)
+	_, err := h.DB.ExecContext(ctx, `INSERT INTO owner_central_brain_events (event_type, message, status, payload, created_at) VALUES ($1,$2,$3,$4::jsonb,now())`, typ, msg, status, string(b))
+	return err
+}
+
+func normalizeOwnerControlKey(key string) string {
+	k := strings.ToLower(strings.TrimSpace(key))
+	allowed := map[string]string{"maintenance_mode": "maintenance_mode", "stop_registrations": "stop_registrations", "stop_sales": "stop_sales", "stop_ai_requests": "stop_ai_requests", "api_readonly": "api_readonly", "system_readonly": "system_readonly"}
+	return allowed[k]
+}
+func stringArg(args map[string]any, key string) string {
+	if args == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(args[key]))
+}
+func intArg(args map[string]any, key string) int {
+	if args == nil {
+		return 0
+	}
+	switch v := args[key].(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	case string:
+		var n int
+		fmt.Sscanf(v, "%d", &n)
+		return n
+	}
+	return 0
+}
+func afterColon(s string) string {
+	if i := strings.Index(s, ":"); i >= 0 {
+		return strings.TrimSpace(s[i+1:])
+	}
+	return ""
+}
+func lastField(s string) string {
+	f := strings.Fields(s)
+	if len(f) == 0 {
+		return ""
+	}
+	return strings.Trim(f[len(f)-1], " .")
+}
+
 func ensureOwnerSchema(ctx context.Context, db *sql.DB) error {
 	if db == nil {
 		return errors.New("db nil")
@@ -411,6 +928,9 @@ func ensureOwnerSchema(ctx context.Context, db *sql.DB) error {
 		`ALTER TABLE app_user_profiles ADD COLUMN IF NOT EXISTS ban_reason text`,
 		`CREATE TABLE IF NOT EXISTS credit_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text, amount integer NOT NULL, reason text, event_type text, created_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE TABLE IF NOT EXISTS ai_command_logs (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), command text NOT NULL, output text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'queued', created_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE TABLE IF NOT EXISTS owner_system_controls (key text PRIMARY KEY, enabled boolean NOT NULL DEFAULT false, reason text NOT NULL DEFAULT '', updated_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE TABLE IF NOT EXISTS owner_central_brain_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), event_type text NOT NULL, message text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'info', payload jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE TABLE IF NOT EXISTS owner_impersonation_tokens (token text PRIMARY KEY, email text NOT NULL, expires_at timestamptz NOT NULL, used_at timestamptz, created_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE TABLE IF NOT EXISTS system_analytics (day date PRIMARY KEY DEFAULT CURRENT_DATE, active_users integer NOT NULL DEFAULT 0, revenue_try numeric NOT NULL DEFAULT 0, credits_consumed integer NOT NULL DEFAULT 0, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE TABLE IF NOT EXISTS mev_protection_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_wallet text NOT NULL DEFAULT '', tx_signature text NOT NULL DEFAULT '', estimated_loss_usd numeric NOT NULL DEFAULT 0, mev_saved_usd numeric NOT NULL DEFAULT 0, jito_tip_used boolean NOT NULL DEFAULT false, risk_score integer NOT NULL DEFAULT 0, risk_level text NOT NULL DEFAULT 'DÜŞÜK', route text NOT NULL DEFAULT '', raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now())`,
 		`ALTER TABLE mev_protection_events ADD COLUMN IF NOT EXISTS mev_saved_usd numeric NOT NULL DEFAULT 0`,

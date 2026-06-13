@@ -4,837 +4,105 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>Koschei A.R.V.I.S Owner Command Center</title>
+  <title>Koschei Central Brain</title>
   <style>
-    :root {
-      --bg: #070812;
-      --bg-2: #0b1020;
-      --panel: rgba(18, 24, 44, .74);
-      --panel-2: rgba(28, 34, 58, .72);
-      --line: rgba(180, 255, 232, .14);
-      --line-strong: rgba(0, 255, 170, .32);
-      --text: #f4f7fb;
-      --muted: #aab4c6;
-      --muted-2: #718097;
-      --accent: #00ffaa;
-      --accent-2: #61d9ff;
-      --danger: #ff4d6d;
-      --warn: #ffd166;
-      --ok: #6efacc;
-      --violet: #8c7dff;
-      --shadow: 0 24px 90px rgba(0,0,0,.42);
-      --radius: 24px;
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at 12% 2%, rgba(0,255,170,.18), transparent 29%),
-        radial-gradient(circle at 88% 6%, rgba(97,217,255,.14), transparent 31%),
-        radial-gradient(circle at 50% 95%, rgba(140,125,255,.16), transparent 36%),
-        linear-gradient(135deg, var(--bg), var(--bg-2));
-      overflow-x: hidden;
-    }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background-image:
-        linear-gradient(rgba(255,255,255,.026) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.026) 1px, transparent 1px);
-      background-size: 56px 56px;
-      mask-image: radial-gradient(circle at center, black 0%, transparent 76%);
-      opacity: .55;
-    }
-    body::after {
-      content: "";
-      position: fixed;
-      inset: -30%;
-      pointer-events: none;
-      background: conic-gradient(from 180deg, transparent, rgba(0,255,170,.08), transparent, rgba(97,217,255,.06), transparent);
-      animation: drift 24s linear infinite;
-      opacity: .55;
-    }
-    @keyframes drift { to { transform: rotate(360deg); } }
-    h1, h2, h3, p { margin: 0; }
-    a { color: var(--accent); }
-    button, input, textarea, select { font: inherit; }
-    button {
-      border: 0;
-      border-radius: 14px;
-      padding: 11px 14px;
-      cursor: pointer;
-      color: #04110d;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      font-weight: 850;
-      box-shadow: 0 12px 32px rgba(0,255,170,.13);
-    }
-    button.secondary {
-      color: var(--text);
-      background: rgba(255,255,255,.075);
-      border: 1px solid var(--line);
-      box-shadow: none;
-    }
-    button.danger {
-      color: #fff;
-      background: linear-gradient(135deg, var(--danger), #ff7a8f);
-    }
-    button.warn {
-      color: #241b00;
-      background: linear-gradient(135deg, var(--warn), #ffe39a);
-    }
-    button.ghost {
-      color: var(--muted);
-      background: transparent;
-      border: 1px solid var(--line);
-      box-shadow: none;
-    }
-    button:disabled { opacity: .46; cursor: not-allowed; }
-    input, textarea, select {
-      width: 100%;
-      background: rgba(0,0,0,.25);
-      border: 1px solid var(--line);
-      color: var(--text);
-      border-radius: 14px;
-      padding: 12px 13px;
-      outline: none;
-    }
-    textarea { min-height: 108px; resize: vertical; }
-    input:focus, textarea:focus, select:focus {
-      border-color: var(--line-strong);
-      box-shadow: 0 0 0 4px rgba(0,255,170,.07);
-    }
-    .shell { position: relative; z-index: 1; width: min(1480px, calc(100% - 28px)); margin: 0 auto; padding: 28px 0 56px; }
-    .hidden { display: none !important; }
-    .muted { color: var(--muted); }
-    .tiny { color: var(--muted-2); font-size: 12px; }
-    .login { max-width: 540px; margin: 8vh auto; }
-    .login .card { padding: 30px; }
-    .stack { display: grid; gap: 12px; }
-    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .topbar {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 18px;
-      align-items: center;
-      margin-bottom: 18px;
-    }
-    .brand { display: flex; gap: 14px; align-items: center; min-width: 0; }
-    .mark {
-      width: 50px; height: 50px; border-radius: 17px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2), var(--violet));
-      box-shadow: 0 0 34px rgba(0,255,170,.22), inset 0 0 18px rgba(255,255,255,.16);
-      flex: 0 0 auto;
-    }
-    .eyebrow {
-      display: inline-flex;
-      width: fit-content;
-      align-items: center;
-      gap: 8px;
-      color: var(--accent);
-      background: rgba(0,255,170,.08);
-      border: 1px solid rgba(0,255,170,.16);
-      border-radius: 999px;
-      padding: 7px 10px;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: .14em;
-      font-weight: 800;
-      margin-bottom: 9px;
-    }
-    h1 { font-size: clamp(28px, 5vw, 56px); letter-spacing: -.06em; line-height: .94; }
-    h2 { font-size: 18px; letter-spacing: -.025em; }
-    h3 { font-size: 15px; letter-spacing: -.015em; }
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.028));
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 20px;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(16px);
-    }
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
-      gap: 18px;
-      margin-bottom: 18px;
-    }
-    .hero-main { min-height: 230px; position: relative; overflow: hidden; }
-    .hero-main::after {
-      content: "";
-      position: absolute;
-      width: 300px; height: 300px; border-radius: 999px;
-      right: -120px; top: -120px;
-      border: 1px solid rgba(0,255,170,.18);
-      box-shadow: 0 0 70px rgba(0,255,170,.12), inset 0 0 60px rgba(97,217,255,.08);
-    }
-    .hero-title { max-width: 760px; position: relative; z-index: 1; }
-    .hero-copy { max-width: 760px; margin-top: 14px; color: var(--muted); font-size: 15px; line-height: 1.7; position: relative; z-index: 1; }
-    .nav {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 20px;
-      position: relative;
-      z-index: 1;
-    }
-    .nav a {
-      color: var(--muted);
-      text-decoration: none;
-      border: 1px solid var(--line);
-      background: rgba(255,255,255,.052);
-      border-radius: 999px;
-      padding: 9px 12px;
-      font-size: 13px;
-    }
-    .nav a:hover { color: var(--text); border-color: var(--line-strong); }
-    .status-panel { display: grid; gap: 12px; }
-    .pill {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 9px 12px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: rgba(255,255,255,.04);
-      color: var(--muted);
-      font-size: 13px;
-    }
-    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--accent); box-shadow: 0 0 16px var(--accent); }
-    .dot.warn { background: var(--warn); box-shadow: 0 0 16px var(--warn); }
-    .dot.danger { background: var(--danger); box-shadow: 0 0 16px var(--danger); }
-    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 18px; }
-    .span-3 { grid-column: span 3; }
-    .span-4 { grid-column: span 4; }
-    .span-5 { grid-column: span 5; }
-    .span-6 { grid-column: span 6; }
-    .span-7 { grid-column: span 7; }
-    .span-8 { grid-column: span 8; }
-    .span-12 { grid-column: span 12; }
-    .metric-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .10em; font-weight: 800; }
-    .metric-value { font-size: clamp(25px, 4vw, 38px); font-weight: 900; margin-top: 8px; letter-spacing: -.055em; }
-    .metric-foot { color: var(--accent); font-size: 12px; margin-top: 8px; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
-    .toolbar h2 { margin-right: auto; }
-    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 18px; background: rgba(0,0,0,.11); }
-    table { width: 100%; border-collapse: collapse; min-width: 780px; }
-    th, td { text-align: left; padding: 12px 13px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: top; }
-    th { color: var(--muted); background: rgba(255,255,255,.045); position: sticky; top: 0; z-index: 1; }
-    tr:last-child td { border-bottom: 0; }
-    .status {
-      padding: 5px 9px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.08);
-      display: inline-block;
-      white-space: nowrap;
-    }
-    .status.pending, .status.queued, .status.running { color: var(--warn); }
-    .status.approved, .status.active, .status.ok, .status.connected { color: var(--ok); }
-    .status.rejected, .status.banned, .status.removed, .status.error { color: var(--danger); }
-    .terminal {
-      background: #050711;
-      border: 1px solid rgba(0,255,170,.22);
-      border-radius: 18px;
-      padding: 14px;
-      min-height: 260px;
-      max-height: 420px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      color: #d8fff1;
-      overflow: auto;
-    }
-    .log-line { margin: 0 0 8px; white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
-    .health-grid { display: grid; gap: 10px; }
-    .health {
-      display: flex; justify-content: space-between; gap: 12px; align-items: center;
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: rgba(255,255,255,.035);
-    }
-    .package-grid { display: grid; gap: 12px; }
-    .package {
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 14px;
-      background: rgba(255,255,255,.035);
-    }
-    .package strong { display: block; margin-bottom: 6px; }
-    .toast {
-      position: fixed; right: 20px; bottom: 20px; max-width: 440px;
-      padding: 14px 16px; border: 1px solid var(--line);
-      border-radius: 16px; background: rgba(28,34,58,.95);
-      color: var(--text); box-shadow: var(--shadow); display: none; z-index: 20;
-    }
-    .danger-zone {
-      border-color: rgba(255,77,109,.28);
-      background: linear-gradient(180deg, rgba(255,77,109,.06), rgba(255,255,255,.025));
-    }
-    @media (max-width: 1020px) {
-      .hero, .topbar { grid-template-columns: 1fr; }
-      .span-3, .span-4, .span-5, .span-6, .span-7, .span-8 { grid-column: span 12; }
-      .shell { width: min(100% - 20px, 1480px); padding-top: 18px; }
-      table { min-width: 720px; }
-    }
+    :root{--bg:#05070d;--panel:rgba(255,255,255,.065);--panel2:rgba(255,255,255,.035);--line:rgba(255,255,255,.13);--line2:rgba(105,216,255,.32);--text:#f6fbff;--muted:#9aa8ba;--muted2:#69778a;--ok:#00ffaa;--blue:#69d8ff;--violet:#8a7cff;--warn:#ffd166;--danger:#ff5470;--shadow:0 30px 90px rgba(0,0,0,.48);--radius:28px}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 15% -10%,rgba(105,216,255,.18),transparent 32%),radial-gradient(circle at 85% 0,rgba(138,124,255,.16),transparent 30%),linear-gradient(180deg,#070b14 0%,#05070d 58%,#030409 100%);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body:before{content:"";position:fixed;inset:0;pointer-events:none;background:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.8),transparent 78%)}.shell{width:min(1500px,calc(100% - 32px));margin:0 auto;padding:28px 0 42px}.card{border:1px solid var(--line);background:linear-gradient(180deg,var(--panel),var(--panel2));box-shadow:var(--shadow);backdrop-filter:blur(20px);border-radius:var(--radius)}.login{min-height:100vh;display:grid;place-items:center;padding:20px}.login .card{width:min(560px,100%);padding:32px}.hidden{display:none!important}.eyebrow{display:inline-flex;align-items:center;gap:9px;color:var(--ok);border:1px solid rgba(0,255,170,.2);background:rgba(0,255,170,.07);border-radius:999px;padding:8px 12px;font-weight:900;font-size:11px;letter-spacing:.16em;text-transform:uppercase}.orb{width:10px;height:10px;border-radius:50%;background:var(--ok);box-shadow:0 0 20px var(--ok)}h1{font-size:clamp(34px,5.8vw,82px);line-height:.88;letter-spacing:-.075em;margin:14px 0 14px}h2{font-size:18px;margin:0;letter-spacing:-.02em}.muted{color:var(--muted);line-height:1.65}.tiny{color:var(--muted2);font-size:12px}.top{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:start;margin-bottom:18px}.hero{padding:26px;position:relative;overflow:hidden}.hero:after{content:"";position:absolute;right:-160px;top:-170px;width:430px;height:430px;border-radius:50%;border:1px solid rgba(105,216,255,.22);box-shadow:inset 0 0 70px rgba(105,216,255,.1),0 0 90px rgba(0,255,170,.1)}.hero p{max-width:860px}.session{padding:18px;min-width:260px}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}.span-12{grid-column:span 12}.span-8{grid-column:span 8}.span-7{grid-column:span 7}.span-5{grid-column:span 5}.span-4{grid-column:span 4}.span-3{grid-column:span 3}.service-grid{display:grid;grid-template-columns:repeat(7,minmax(130px,1fr));gap:10px;margin-top:18px}.service{padding:14px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.04);min-height:112px}.service strong{display:block;font-size:13px;letter-spacing:.09em}.status{display:inline-flex;align-items:center;gap:7px;margin-top:10px;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.06);font-size:12px;color:var(--muted)}.status:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted2)}.Connected{color:var(--ok)}.Connected:before{background:var(--ok);box-shadow:0 0 15px var(--ok)}.Disconnected,.Timeout{color:var(--danger)}.Disconnected:before,.Timeout:before{background:var(--danger);box-shadow:0 0 15px var(--danger)}.RateLimited{color:var(--warn)}.RateLimited:before{background:var(--warn)}button,.btn{border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--text);border-radius:999px;padding:11px 15px;font-weight:900;cursor:pointer;transition:.18s ease;font-family:inherit}button:hover{transform:translateY(-1px);border-color:var(--line2)}button.primary{border:0;color:#03120d;background:linear-gradient(135deg,var(--ok),var(--blue));box-shadow:0 0 30px rgba(0,255,170,.2)}button.danger{color:#fff;border-color:rgba(255,84,112,.32);background:rgba(255,84,112,.12)}input,textarea,select{width:100%;border:1px solid var(--line);border-radius:18px;background:rgba(0,0,0,.18);color:var(--text);padding:13px 14px;outline:none;font:inherit}textarea{resize:vertical;min-height:148px}.brain{padding:20px}.chat{height:430px;overflow:auto;border:1px solid var(--line);border-radius:24px;background:rgba(0,0,0,.18);padding:16px;display:flex;flex-direction:column;gap:12px}.msg{max-width:86%;padding:14px 15px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.055);line-height:1.55;white-space:pre-wrap}.msg.owner{margin-left:auto;border-color:rgba(105,216,255,.25);background:rgba(105,216,255,.08)}.msg.brain{border-color:rgba(0,255,170,.2);box-shadow:0 0 25px rgba(0,255,170,.04)}.composer{display:grid;grid-template-columns:1fr auto;gap:12px;margin-top:14px}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.chip{font-size:12px;padding:8px 10px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.metric{padding:16px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.04)}.metric span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.12em;font-weight:900}.metric strong{display:block;margin-top:8px;font-size:26px;letter-spacing:-.04em}.controls{display:grid;gap:10px}.control{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.035)}.events{max-height:330px;overflow:auto;display:grid;gap:9px}.event{display:grid;grid-template-columns:62px 1fr auto;gap:10px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:16px;background:rgba(255,255,255,.035)}.tables{overflow:auto;border:1px solid var(--line);border-radius:20px}table{border-collapse:collapse;width:100%;min-width:760px}th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top}th{color:var(--muted);background:rgba(255,255,255,.04)}tr:last-child td{border-bottom:0}.toast{position:fixed;right:18px;bottom:18px;max-width:420px;padding:14px 16px;border:1px solid var(--line2);border-radius:18px;background:rgba(8,12,22,.92);box-shadow:var(--shadow);z-index:10}@media(max-width:1100px){.top,.grid{display:block}.card{margin-bottom:18px}.service-grid{grid-template-columns:repeat(2,1fr)}.metrics{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.service-grid,.metrics,.composer{grid-template-columns:1fr}.shell{width:min(100% - 18px,1500px)}.event{grid-template-columns:1fr}.session{min-width:0}}
   </style>
 </head>
 <body>
-  <main class="shell">
-    <section id="loginView" class="login">
-      <div class="card stack">
-        <div class="brand">
-          <div class="mark" aria-hidden="true"></div>
-          <div>
-            <div class="eyebrow">Owner Access</div>
-            <h1>A.R.V.I.S Owner</h1>
-            <p class="muted">Gizli operasyon ekranı. ENV içinde tanımlı owner kimliği ve owner sırrı ile giriş yap.</p>
-          </div>
-        </div>
-        <label class="stack">Owner kimliği / cüzdanı / e-posta<input id="loginWallet" autocomplete="username" placeholder="OWNER_WALLET değeri"></label>
-        <label class="stack">Owner sırrı<input id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET değeri"></label>
-        <button id="loginButton">Owner Command Center'a gir</button>
-        <p class="tiny">Sunucu cookie'leri HttpOnly ayarlar. Bu panel kullanıcı verisini HTML içine enjekte etmez.</p>
+  <main id="login" class="login">
+    <section class="card">
+      <span class="eyebrow"><i class="orb"></i> Owner only</span>
+      <h1>Koschei Central Brain</h1>
+      <p class="muted">Bu ekran customer dashboard değildir. Github, Neon, Paddle, OpenAI, Alchemy, emergency controls ve sistem sağlığı sadece owner oturumunda açılır.</p>
+      <div style="display:grid;gap:12px;margin-top:18px">
+        <input id="loginWallet" autocomplete="username" placeholder="OWNER_WALLET / owner kimliği">
+        <input id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET">
+        <button id="loginButton" class="primary">Central Brain'e gir</button>
       </div>
-    </section>
-
-    <section id="appView" class="hidden">
-      <header class="topbar">
-        <div class="brand">
-          <div class="mark" aria-hidden="true"></div>
-          <div>
-            <div class="eyebrow">Koschei Control Layer</div>
-            <h1>A.R.V.I.S Owner Command Center</h1>
-            <p class="muted">Kullanıcı, ödeme, paket, AI router, sistem sağlığı ve operasyon logları.</p>
-          </div>
-        </div>
-        <div class="row">
-          <span class="pill"><span class="dot" id="syncDot"></span><span id="syncState">Bağlantı hazırlanıyor</span></span>
-          <button id="refreshButton" class="secondary">Verileri yenile</button>
-        </div>
-      </header>
-
-      <section class="hero">
-        <article class="card hero-main">
-          <div class="hero-title">
-            <h1>Tek yerden sistemi yönet.</h1>
-            <p class="hero-copy">Bu panel kredi odaklı eski admin ekranı değil. Yeni hedef: paket/entitlement merkezli üretim kontrolü, gerçek ödeme akışı, gerçek API sağlığı ve canlı operasyon izleme.</p>
-            <nav class="nav" aria-label="Owner navigation">
-              <a href="#overview">Overview</a>
-              <a href="#users">Users</a>
-              <a href="#payments">Payments</a>
-              <a href="#packages">Packages</a>
-              <a href="#ai">AI Router</a>
-              <a href="#health">System Health</a>
-              <a href="#grants">Radar</a>
-            </nav>
-          </div>
-        </article>
-        <aside class="card status-panel">
-          <h2>Operasyon Durumu</h2>
-          <div class="health"><span>Owner Session</span><span class="status active">active</span></div>
-          <div class="health"><span>Package Model</span><span class="status active">entitlement first</span></div>
-          <div class="health"><span>Credit System</span><span class="status pending">legacy read-only</span></div>
-          <div class="health"><span>AI Terminal</span><span class="status pending">command log only</span></div>
-        </aside>
-      </section>
-
-      <section id="overview" class="grid" aria-label="Gerçek zamanlı metrikler">
-        <div class="card span-12">
-          <div class="toolbar">
-            <h2>Overview</h2>
-            <span class="pill">Gerçek veri: /api/owner/status</span>
-          </div>
-          <section class="grid" id="metricsGrid"></section>
-        </div>
-      </section>
-
-      <section class="grid" style="margin-top:18px">
-        <article class="card span-8" id="users">
-          <div class="toolbar">
-            <h2>Kullanıcı Yönetimi</h2>
-            <input id="userFilter" style="max-width:300px" placeholder="E-posta, auth subject veya wallet ara">
-          </div>
-          <p class="tiny" style="margin-bottom:12px">Kredi butonu kaldırıldı. Credits alanı sadece legacy veri olarak gösterilir. Yeni erişim modeli paket/entitlement olmalı.</p>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>E-posta</th>
-                  <th>Owner/Auth ID</th>
-                  <th>Paket</th>
-                  <th>Legacy Kredi</th>
-                  <th>Durum</th>
-                  <th>Oluşturma</th>
-                  <th>Aksiyon</th>
-                </tr>
-              </thead>
-              <tbody id="usersBody"></tbody>
-            </table>
-          </div>
-        </article>
-
-        <aside class="card span-4" id="packages">
-          <div class="toolbar">
-            <h2>Paket Kontrolü</h2>
-            <span class="pill">Paddle + entitlements</span>
-          </div>
-          <div class="package-grid">
-            <div class="package"><strong>Starter</strong><p class="muted">Giriş paketi. Kullanıcı erişimi entitlement üzerinden doğrulanmalı.</p></div>
-            <div class="package"><strong>Professional</strong><p class="muted">Orta seviye paket. Paddle price/product ID eşleşmesi kontrol edilmeli.</p></div>
-            <div class="package"><strong>Enterprise</strong><p class="muted">Üst paket. Owner panelde manuel entitlement yönetimi sonraki backend PR konusu.</p></div>
-          </div>
-        </aside>
-
-        <article class="card span-7" id="payments">
-          <div class="toolbar">
-            <h2>Ödeme Onay Masası</h2>
-            <span class="pill">Pending → Approve/Reject</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Müşteri</th><th>Paket / Ürün</th><th>Tutar</th><th>Durum</th><th>Aksiyon</th></tr></thead>
-              <tbody id="paymentsBody"></tbody>
-            </table>
-          </div>
-        </article>
-
-        <article class="card span-5" id="health">
-          <div class="toolbar">
-            <h2>Sistem Sağlığı</h2>
-            <span class="pill">Frontend gözlemi</span>
-          </div>
-          <div class="health-grid" id="healthGrid"></div>
-          <p class="tiny" style="margin-top:12px">Not: Gerçek provider ping için backend'e ayrı health endpoint eklenmeli.</p>
-        </article>
-
-        <article class="card span-7" id="ai">
-          <div class="toolbar">
-            <h2>AI Router / Komut Terminali</h2>
-            <span class="pill">OpenAI primary · Together fallback</span>
-          </div>
-          <div class="stack">
-            <textarea id="commandInput" placeholder="Owner komutu yaz. Örn: Son 24 saatteki hataları özetle, bekleyen ödemeleri raporla..."></textarea>
-            <div class="row">
-              <button id="runCommandButton">Komutu logla</button>
-              <button class="secondary" id="clearTerminalButton">Terminali temizle</button>
-            </div>
-            <p class="tiny">Mevcut backend komutu sadece ai_command_logs tablosuna kaydediyor. Gerçek ajan çalıştırma ayrı backend işi.</p>
-            <div class="terminal" id="terminal" aria-live="polite"></div>
-          </div>
-        </article>
-
-        <aside class="card span-5 danger-zone">
-          <div class="toolbar">
-            <h2>Acil Durum Paneli</h2>
-            <span class="pill">Backend gerekli</span>
-          </div>
-          <div class="stack">
-            <button class="warn" disabled>Bakım modunu aç</button>
-            <button class="danger" disabled>Yeni satışları durdur</button>
-            <button class="danger" disabled>Premium API erişimini durdur</button>
-            <p class="tiny">Bu butonlar bilinçli olarak pasif. Gerçek endpoint eklenmeden üretim sistemine müdahale etmez.</p>
-          </div>
-        </aside>
-
-        <article class="card span-12" id="grants">
-          <div class="toolbar">
-            <h2>Hibe / Yatırım Radar Özeti</h2>
-            <span class="pill">Gerçek kayıt varsa gösterilir</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Program</th><th>Son tarih</th><th>Durum</th><th>Odak</th></tr></thead>
-              <tbody id="grantsBody"></tbody>
-            </table>
-          </div>
-        </article>
-      </section>
     </section>
   </main>
 
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <main id="app" class="shell hidden">
+    <section class="top">
+      <article class="card hero">
+        <span class="eyebrow"><i class="orb"></i> KOSCHEI CENTRAL BRAIN</span>
+        <h1>Owner yazar. Koschei düşünür. Sistem işi yapar.</h1>
+        <p class="muted">Eski pasif terminal yaklaşımı kaldırıldı. Bu owner-only komuta merkezi gerçek backend endpointlerine, provider durumlarına, veritabanı operasyonlarına ve emergency control kayıtlarına bağlıdır.</p>
+        <div id="services" class="service-grid"></div>
+      </article>
+      <aside class="card session">
+        <h2>Owner Session</h2>
+        <p id="syncState" class="muted">Bağlanıyor…</p>
+        <button id="refresh" class="primary">Yeniden bağlan</button>
+      </aside>
+    </section>
 
-  <script>
-    'use strict';
+    <section class="grid">
+      <article class="card brain span-8">
+        <h2>Koschei ile konuş</h2>
+        <div id="chat" class="chat" aria-live="polite"></div>
+        <div class="composer">
+          <textarea id="command" placeholder="KOSCHEI'ye sor...
 
-    const state = {
-      users: [],
-      payments: [],
-      grants: [],
-      metrics: {},
-      logs: [],
-      ownerError: '',
-      apiHealth: {
-        status: 'unknown',
-        users: 'unknown',
-        payments: 'unknown',
-        grants: 'unknown'
-      }
-    };
+Örnek:
+Son hataları göster
+Github deploy başlat
+Neon backup al
+Kullanıcı ara
+OpenAI maliyetini göster
+Paddle durumunu kontrol et"></textarea>
+          <button id="send" class="primary">Gönder</button>
+        </div>
+        <div class="chips" id="chips"></div>
+      </article>
 
-    const $ = (id) => document.getElementById(id);
+      <aside class="card brain span-4">
+        <h2>Canlı metrikler</h2>
+        <div id="metrics" class="metrics" style="margin-top:14px"></div>
+        <p class="tiny">Veriler /api/owner/status üzerinden owner-only çekilir.</p>
+      </aside>
 
-    const formatMoney = (value, currency) => {
-      const num = Number(value || 0);
-      try {
-        return new Intl.NumberFormat('tr-TR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(num);
-      } catch (_) {
-        return `${formatNumber(num)} ${currency}`;
-      }
-    };
+      <article class="card brain span-5">
+        <h2>Acil Durum Paneli</h2>
+        <p class="muted">Bu anahtarlar dekoratif değildir; /api/owner/emergency endpoint'i ile owner_system_controls tablosuna yazılır.</p>
+        <div id="controls" class="controls"></div>
+      </article>
 
-    const formatNumber = (value) => new Intl.NumberFormat('tr-TR').format(Number(value || 0));
-    const formatDate = (value) => value ? new Intl.DateTimeFormat('tr-TR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';
+      <article class="card brain span-7">
+        <h2>Canlı olay akışı</h2>
+        <div id="events" class="events" style="margin-top:14px"></div>
+      </article>
 
-    function text(tag, value, className) {
-      const el = document.createElement(tag);
-      if (className) el.className = className;
-      el.textContent = value == null || value === '' ? '—' : String(value);
-      return el;
-    }
-
-    function toast(message) {
-      const el = $('toast');
-      el.textContent = message;
-      el.style.display = 'block';
-      window.clearTimeout(toast.timer);
-      toast.timer = window.setTimeout(() => { el.style.display = 'none'; }, 4200);
-    }
-
-    async function api(path, options = {}) {
-      const res = await fetch(path, {
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        ...options
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || data.message || 'İstek başarısız oldu');
-      return data;
-    }
-
-    async function login() {
-      $('loginButton').disabled = true;
-      try {
-        await api('/api/owner/login', {
-          method: 'POST',
-          body: JSON.stringify({
-            wallet: $('loginWallet').value.trim(),
-            secret: $('loginSecret').value
-          })
-        });
-        $('loginView').classList.add('hidden');
-        $('appView').classList.remove('hidden');
-        await refreshAll();
-        toast('Owner oturumu açıldı.');
-      } catch (err) {
-        toast(err.message || 'Giriş reddedildi.');
-      } finally {
-        $('loginButton').disabled = false;
-      }
-    }
-
-    async function safeLoad(key, promiseFactory) {
-      try {
-        const data = await promiseFactory();
-        state.apiHealth[key] = 'connected';
-        return data;
-      } catch (err) {
-        state.apiHealth[key] = 'error';
-        throw err;
-      }
-    }
-
-    async function refreshAll() {
-      $('syncState').textContent = 'Güncelleniyor';
-      $('syncDot').className = 'dot warn';
-
-      try {
-        const [status, users, payments, grants] = await Promise.all([
-          safeLoad('status', () => api('/api/owner/status')),
-          safeLoad('users', () => api('/api/owner/users')),
-          safeLoad('payments', () => api('/api/owner/payment-requests')),
-          safeLoad('grants', () => api('/api/owner/grants'))
-        ]);
-
-        state.metrics = status.metrics || {};
-        state.logs = status.logs || [];
-        state.users = users.users || users.items || [];
-        state.payments = payments.payment_requests || payments.requests || payments.items || [];
-        state.grants = grants.grants || [];
-        state.ownerError = '';
-
-        renderAll();
-        $('syncState').textContent = 'Canlı veri senkronize';
-        $('syncDot').className = 'dot';
-      } catch (err) {
-        state.ownerError = err.message || 'Owner API unavailable or unauthorized';
-        state.logs = [{
-          message: state.ownerError,
-          status: 'error',
-          created_at: new Date().toISOString()
-        }];
-        renderAll();
-        $('syncState').textContent = 'Owner API hatası';
-        $('syncDot').className = 'dot danger';
-        toast(state.ownerError);
-      }
-    }
-
-    function renderAll() {
-      renderMetrics();
-      renderUsers();
-      renderPayments();
-      renderHealth();
-      renderGrants();
-      renderTerminal();
-    }
-
-    function emptyRow(body, columns, message) {
-      const tr = document.createElement('tr');
-      const td = document.createElement('td');
-      td.colSpan = columns;
-      td.textContent = message;
-      td.className = 'muted';
-      tr.appendChild(td);
-      body.appendChild(tr);
-    }
-
-    function renderMetrics() {
-      const metrics = [
-        ['Toplam kullanıcı', formatNumber(state.metrics.total_users), 'Kayıtlı profil'],
-        ['Bugün aktif', formatNumber(state.metrics.active_users_today), 'Analitik event'],
-        ['Bekleyen ödeme', formatNumber(state.metrics.pending_payments), 'Onay masası'],
-        ['Onaylı ödeme', formatNumber(state.metrics.approved_payments), 'Tamamlanan ödeme'],
-        ['Günlük gelir', formatMoney(state.metrics.daily_revenue_try, 'TRY'), 'Bugün'],
-        ['Aylık gelir', formatMoney(state.metrics.monthly_revenue_try, 'TRY'), 'MTD'],
-        ['AI komut kuyruğu', formatNumber(state.metrics.pending_prs), 'queued/running'],
-        ['En çok satan', state.metrics.best_selling_package || '—', 'Paket']
-      ];
-
-      const grid = $('metricsGrid');
-      grid.replaceChildren();
-
-      metrics.forEach(([label, value, foot]) => {
-        const card = document.createElement('article');
-        card.className = 'card span-3';
-        card.append(
-          text('div', label, 'metric-label'),
-          text('div', value, 'metric-value'),
-          text('div', foot, 'metric-foot')
-        );
-        grid.appendChild(card);
-      });
-    }
-
-    function inferUserPlan(user) {
-      return user.plan_id || user.plan || user.package || user.product_id || 'entitlement kontrol gerekli';
-    }
-
-    function renderUsers() {
-      const filter = $('userFilter').value.toLowerCase().trim();
-      const body = $('usersBody');
-      body.replaceChildren();
-
-      const users = state.users.filter((u) => !filter || JSON.stringify(u).toLowerCase().includes(filter));
-
-      if (state.ownerError) { emptyRow(body, 7, state.ownerError); return; }
-      if (!users.length) { emptyRow(body, 7, 'Kullanıcı bulunamadı.'); return; }
-
-      users.forEach((u) => {
-        const tr = document.createElement('tr');
-
-        tr.append(
-          text('td', u.email),
-          text('td', u.auth_subject || u.wallet_address || '—'),
-          text('td', inferUserPlan(u)),
-          text('td', formatNumber(u.credits)),
-          statusCell(u.status),
-          text('td', formatDate(u.created_at))
-        );
-
-        const actions = document.createElement('td');
-        const ban = button(
-          u.status === 'banned' ? 'Ban kaldır' : 'Banla',
-          u.status === 'banned' ? 'secondary' : 'danger',
-          () => mutate('/api/owner/users/ban', {
-            email: u.email,
-            auth_subject: u.auth_subject,
-            ban: u.status !== 'banned',
-            reason: 'owner_panel'
-          })
-        );
-        const remove = button('Kaldır', 'ghost', () => {
-          if (!confirm(`${u.email} removed durumuna alınsın mı?`)) return;
-          mutate('/api/owner/users/remove', {
-            email: u.email,
-            auth_subject: u.auth_subject,
-            wallet_address: u.wallet_address,
-            reason: 'owner_panel'
-          });
-        });
-
-        actions.append(ban, document.createTextNode(' '), remove);
-        tr.appendChild(actions);
-        body.appendChild(tr);
-      });
-    }
-
-    function renderPayments() {
-      const body = $('paymentsBody');
-      body.replaceChildren();
-
-      if (state.ownerError) { emptyRow(body, 5, state.ownerError); return; }
-      if (!state.payments.length) { emptyRow(body, 5, 'Bekleyen ödeme bulunamadı.'); return; }
-
-      state.payments.forEach((p) => {
-        const tr = document.createElement('tr');
-        tr.append(
-          text('td', p.email || p.customer_email || p.full_name),
-          text('td', p.product_id || p.plan || p.package || '—'),
-          text('td', formatMoney(p.amount_try || p.amount || 0, p.currency || 'TRY')),
-          statusCell(p.status)
-        );
-
-        const actions = document.createElement('td');
-        actions.append(
-          button('Onayla', '', () => mutate('/api/owner/payments/approve', { payment_request_id: p.id })),
-          document.createTextNode(' '),
-          button('Reddet', 'danger', () => mutate('/api/owner/payments/reject', { payment_request_id: p.id, reason: 'owner_panel' }))
-        );
-
-        tr.appendChild(actions);
-        body.appendChild(tr);
-      });
-    }
-
-    function renderHealth() {
-      const grid = $('healthGrid');
-      grid.replaceChildren();
-
-      const items = [
-        ['Owner Status API', state.apiHealth.status],
-        ['Users API', state.apiHealth.users],
-        ['Payments API', state.apiHealth.payments],
-        ['Grants API', state.apiHealth.grants],
-        ['OpenAI API', 'backend health gerekli'],
-        ['Paddle API', 'backend health gerekli'],
-        ['Alchemy RPC', 'backend health gerekli'],
-        ['Database', state.ownerError ? 'error' : 'connected']
-      ];
-
-      items.forEach(([label, value]) => {
-        const row = document.createElement('div');
-        row.className = 'health';
-        row.append(text('span', label), statusBadge(value));
-        grid.appendChild(row);
-      });
-    }
-
-    function renderGrants() {
-      const body = $('grantsBody');
-      body.replaceChildren();
-
-      if (state.ownerError) { emptyRow(body, 4, state.ownerError); return; }
-      if (!state.grants.length) { emptyRow(body, 4, 'Hibe kaydı bulunamadı.'); return; }
-
-      state.grants.forEach((g) => {
-        const tr = document.createElement('tr');
-        tr.append(
-          text('td', g.program || g.title),
-          text('td', g.deadline),
-          text('td', g.status),
-          text('td', g.focus || g.notes)
-        );
-        body.appendChild(tr);
-      });
-    }
-
-    function renderTerminal() {
-      const terminal = $('terminal');
-      terminal.replaceChildren();
-
-      if (!state.logs.length) {
-        terminal.append(text('p', 'Henüz operasyon logu yok.', 'log-line'));
-        return;
-      }
-
-      state.logs.forEach((log) => {
-        terminal.append(text(
-          'p',
-          `[${formatDate(log.created_at)}] ${log.status || 'bilgi'}: ${log.message || log.event || ''} ${log.output || ''}`,
-          'log-line'
-        ));
-      });
-    }
-
-    function statusCell(value) {
-      const td = document.createElement('td');
-      td.append(statusBadge(value || 'bilinmiyor'));
-      return td;
-    }
-
-    function statusBadge(value) {
-      const v = String(value || 'unknown').toLowerCase();
-      const badge = text('span', value || 'unknown', `status ${v.replaceAll(' ', '-')}`);
-      if (v.includes('error') || v.includes('failed') || v.includes('banned') || v.includes('removed')) badge.className = 'status error';
-      else if (v.includes('active') || v.includes('connected') || v.includes('approved') || v === 'ok') badge.className = 'status active';
-      else if (v.includes('pending') || v.includes('queued') || v.includes('unknown') || v.includes('gerekli')) badge.className = 'status pending';
-      return badge;
-    }
-
-    function button(label, className, onClick) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = label;
-      if (className) b.className = className;
-      b.addEventListener('click', onClick);
-      return b;
-    }
-
-    async function mutate(path, payload) {
-      try {
-        await api(path, { method: 'POST', body: JSON.stringify(payload) });
-        toast('İşlem tamamlandı.');
-        await refreshAll();
-      } catch (err) {
-        toast(err.message || 'İşlem yapılamadı.');
-      }
-    }
-
-    async function runCommand() {
-      const command = $('commandInput').value.trim();
-      if (!command) { toast('Komut yazın.'); return; }
-
-      try {
-        const res = await api('/api/owner/command', {
-          method: 'POST',
-          body: JSON.stringify({ command })
-        });
-        toast('AI komutu loglandı.');
-        state.logs.unshift({
-          message: command,
-          status: res.status || 'queued',
-          output: res.output || '',
-          created_at: new Date().toISOString()
-        });
-        renderTerminal();
-        $('commandInput').value = '';
-      } catch (err) {
-        toast(err.message || 'Komut çalışmadı.');
-      }
-    }
-
-    $('loginButton').addEventListener('click', login);
-    $('refreshButton').addEventListener('click', refreshAll);
-    $('runCommandButton').addEventListener('click', runCommand);
-    $('clearTerminalButton').addEventListener('click', () => { state.logs = []; renderTerminal(); });
-    $('userFilter').addEventListener('input', renderUsers);
-
-    window.setInterval(() => {
-      if (!$('appView').classList.contains('hidden')) refreshAll();
-    }, 30000);
-  </script>
+      <article class="card brain span-12">
+        <h2>Owner kullanıcı görünümü</h2>
+        <div class="chips"><input id="userSearch" placeholder="Mail / cüzdan / auth id ara"><button id="userSearchButton">Kullanıcı ara</button></div>
+        <div class="tables" style="margin-top:14px"><table><thead><tr><th>Email</th><th>Status</th><th>Kredi</th><th>Wallet/Auth</th><th>İşlem</th></tr></thead><tbody id="users"></tbody></table></div>
+      </article>
+    </section>
+  </main>
+  <div id="toast" class="toast hidden"></div>
+<script>
+const $=id=>document.getElementById(id);const state={status:null,users:[],messages:[]};
+const commands=['Son 24 saatteki hataları göster','Github son commit','Github deploy başlat','Github branch oluştur','Github PR aç','Kullanıcı ara: mail','Kullanıcıyı banla','Kredi ekle','Paketi değiştir','Kullanıcı olarak giriş yap','Bugünkü gelir','Aylık gelir','Paddle webhook durumu','OpenAI maliyeti','Alchemy RPC durumu','Neon backup oluştur','Banlı kullanıcıları listele'];
+function toast(m){$('toast').textContent=m;$('toast').classList.remove('hidden');setTimeout(()=>$('toast').classList.add('hidden'),4200)}
+async function api(url,opt={}){const r=await fetch(url,{credentials:'include',headers:{'Content-Type':'application/json',...(opt.headers||{})},...opt});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||d.message||r.statusText);return d}
+$('loginButton').onclick=async()=>{try{await api('/api/owner/login',{method:'POST',body:JSON.stringify({wallet:$('loginWallet').value,secret:$('loginSecret').value})});$('login').classList.add('hidden');$('app').classList.remove('hidden');addMsg('brain','Owner doğrulandı. Central Brain canlı.');await load()}catch(e){toast(e.message)}};
+$('refresh').onclick=load;$('send').onclick=sendCommand;$('command').addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter')sendCommand()});
+$('userSearchButton').onclick=async()=>{await loadUsers($('userSearch').value)};
+function init(){commands.forEach(c=>{const b=document.createElement('button');b.className='chip';b.textContent=c;b.onclick=()=>{$('command').value=c};$('chips').appendChild(b)});renderControls([]);addMsg('brain','KOSCHEI Central Brain hazır. Komut bekliyorum.')}init();
+async function load(){try{const [st,us]=await Promise.all([api('/api/owner/status'),api('/api/owner/users')]);state.status=st;state.users=us.users||[];renderAll();$('syncState').textContent='Bağlı · '+new Date().toLocaleTimeString('tr-TR')}catch(e){$('syncState').textContent='Owner API hatası';toast(e.message)}}
+async function loadUsers(q=''){try{const us=await api('/api/owner/users'+(q?'?q='+encodeURIComponent(q):''));state.users=us.users||[];renderUsers()}catch(e){toast(e.message)}}
+async function sendCommand(){const command=$('command').value.trim();if(!command)return;const args=collectArgs(command);addMsg('owner',command);$('command').value='';try{const res=await api('/api/owner/command',{method:'POST',body:JSON.stringify({command,args})});addMsg('brain',(res.output||'Tamamlandı')+(res.result?'\n\n'+JSON.stringify(res.result,null,2):''));await load()}catch(e){addMsg('brain','Komut tamamlanamadı: '+e.message);toast(e.message)}}
+function collectArgs(command){const args={};const email=(command.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)||[])[0];if(email)args.email=email;const credits=(command.match(/(\d+)\s*kredi/i)||[])[1];if(credits)args.credits=Number(credits);const branch=(command.match(/branch(?: oluştur)?\s+([a-z0-9._\/-]+)/i)||[])[1];if(branch)args.branch=branch;const pack=(command.match(/(starter|builder|studio|professional|enterprise|free)/i)||[])[1];if(pack)args.package=pack;return args}
+function addMsg(role,text){const el=document.createElement('div');el.className='msg '+role;el.textContent=text;$('chat').appendChild(el);$('chat').scrollTop=$('chat').scrollHeight}
+function renderAll(){renderServices();renderMetrics();renderControls(state.status.controls||[]);renderEvents();renderUsers()}
+function renderServices(){const box=$('services');box.innerHTML='';(state.status.services||[]).forEach(s=>{const st=s.status||{};const cls=(st.state||'Disconnected').replace(/\s+/g,'');const div=document.createElement('div');div.className='service';div.innerHTML=`<strong>${s.name}</strong><span class="status ${cls}">${st.state||'Disconnected'}</span><p class="tiny">${st.detail||''}</p>${st.state&&st.state!=='Connected'?'<button class="chip">Yeniden bağlan</button>':''}`;div.querySelector('button')?.addEventListener('click',load);box.appendChild(div)})}
+function renderMetrics(){const m=state.status.metrics||{};const items=[['Kullanıcı',m.total_users||0],['Bugünkü gelir',(m.daily_revenue_try||0)+' TRY'],['Aylık gelir',(m.monthly_revenue_try||0)+' TRY'],['Bekleyen ödeme',m.pending_payments||0],['Onaylı ödeme',m.approved_payments||0],['En çok satan',m.best_selling_package||'—'],['Aktif bugün',m.active_users_today||0],['Public impact','$'+(m.total_saved_usd||0)]];$('metrics').innerHTML=items.map(i=>`<div class="metric"><span>${i[0]}</span><strong>${i[1]}</strong></div>`).join('')}
+function renderControls(current){const active=Object.fromEntries((current||[]).map(c=>[c.key,c.enabled]));const labels={maintenance_mode:'Bakım Modu Aç',stop_registrations:'Yeni Kayıtları Durdur',stop_sales:'Yeni Satışları Durdur',stop_ai_requests:'AI İsteklerini Durdur',api_readonly:'APIleri Readonly Yap',system_readonly:'Tüm Sistemi Readonly Yap'};$('controls').innerHTML='';Object.entries(labels).forEach(([key,label])=>{const row=document.createElement('div');row.className='control';row.innerHTML=`<div><strong>${label}</strong><div class="tiny">${key}</div></div><button class="${active[key]?'danger':'primary'}">${active[key]?'Açık':'Kapalı'}</button>`;row.querySelector('button').onclick=async()=>{try{await api('/api/owner/emergency',{method:'POST',body:JSON.stringify({key,enabled:!active[key],reason:'owner_panel'})});await load()}catch(e){toast(e.message)}};$('controls').appendChild(row)})}
+function renderEvents(){const ev=state.status.events||[];$('events').innerHTML=ev.length?ev.map(e=>`<div class="event"><span class="tiny">${new Date(e.created_at).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}</span><div><strong>${e.message}</strong><div class="tiny">${e.event_type}</div></div><span class="status Connected">${e.status}</span></div>`).join(''):'<p class="muted">Henüz canlı olay yok.</p>'}
+function renderUsers(){const rows=state.users||[];$('users').innerHTML=rows.length?rows.map(u=>`<tr><td>${u.email}</td><td><span class="status ${u.status==='banned'?'Disconnected':'Connected'}">${u.status}</span></td><td>${u.credits}</td><td><div>${u.wallet_address||'—'}</div><div class="tiny">${u.auth_subject||''}</div></td><td><button data-email="${u.email}" class="ban danger">Banla</button><button data-email="${u.email}" class="credit">+10 kredi</button></td></tr>`).join(''):'<tr><td colspan="5" class="muted">Kullanıcı yok.</td></tr>';document.querySelectorAll('.ban').forEach(b=>b.onclick=()=>api('/api/owner/users/ban',{method:'POST',body:JSON.stringify({email:b.dataset.email,ban:true,reason:'central_brain'})}).then(load).catch(e=>toast(e.message)));document.querySelectorAll('.credit').forEach(b=>b.onclick=()=>api('/api/owner/credits/add',{method:'POST',body:JSON.stringify({email:b.dataset.email,credits:10,reason:'central_brain'})}).then(load).catch(e=>toast(e.message)))}
+setInterval(()=>{if(!$('app').classList.contains('hidden'))load()},15000);
+</script>
 </body>
 </html>
