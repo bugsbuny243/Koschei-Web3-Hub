@@ -93,8 +93,8 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, ownerOnly(h, method("GET", h.OwnerDAOGuardianSummary))))
 	mux.HandleFunc("/owner", ownerPageHandler(staticDir))
 	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
-	mux.HandleFunc("/jarvis", jarvisPageHandler(staticDir))
-	mux.HandleFunc("/jarvis.html", jarvisPageHandler(staticDir))
+	mux.HandleFunc("/jarvis", redirectToDashboard)
+	mux.HandleFunc("/jarvis.html", redirectToDashboard)
 	registerLegacyDashboardRedirects(mux)
 	mux.HandleFunc("/api/public/impact", method("GET", h.PublicImpact))
 	mux.HandleFunc("/api/public/metrics", method("GET", h.GetPublicMetrics))
@@ -144,6 +144,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, handlers.RequireAuth(method("POST", h.RevokeAPIKey))))
 	mux.HandleFunc("/api/v1/scan/token", requiresDB(h, h.APIKeyAuth(h.CheckB2BQuota(method("POST", h.B2BTokenScan)))))
 	mux.HandleFunc("/api/v1/unified/analyze", requiresDB(h, handlers.RequireAuth(method("POST", h.UnifiedIntelligenceHandler))))
+	mux.HandleFunc("/api/v1/unified/reports", requiresDB(h, handlers.RequireAuth(method("GET", h.UnifiedReportsHandler))))
 	mux.HandleFunc("/api/v1/mev/analyze", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.MEVAnalyze))))))
 	mux.HandleFunc("/api/v1/mev/protected-send", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.ProtectedSend))))))
 	mux.HandleFunc("/api/v1/liquidity/analyze", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.LiquidityDrainAnalyze))))))
@@ -302,7 +303,12 @@ func jarvisPageHandler(staticDir string) http.HandlerFunc {
 func registerLegacyDashboardRedirects(mux *http.ServeMux) {
 	legacyDashboards := []string{
 		"/airdrop-checker",
+		"/cross-chain-risk",
+		"/funding-assistant",
+		"/grant",
+		"/grant-writer",
 		"/graph",
+		"/hub",
 		"/intelligence-graph",
 		"/liquidity-radar",
 		"/mev-shield",
@@ -321,6 +327,7 @@ func registerLegacyDashboardRedirects(mux *http.ServeMux) {
 		"/token-scanner",
 		"/tx-decoder",
 		"/tx-decoder-pro",
+		"/unified",
 		"/wallet-score",
 	}
 	for _, route := range legacyDashboards {
