@@ -58,8 +58,7 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "target required"})
 		return
 	}
-	isPrivileged, credits, _ := h.userCreditsAndRole(claims.Sub)
-	if !isPrivileged && credits < 1 {
+	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
@@ -71,7 +70,7 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 	if h.JobQueue != nil {
 		_ = h.JobQueue.Publish(job)
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"job_id": job.ID, "status": job.Status, "poll_url": "/api/jobs/" + job.ID, "credits_reserved": 1})
+	writeJSON(w, http.StatusCreated, map[string]any{"job_id": job.ID, "status": job.Status, "poll_url": "/api/jobs/" + job.ID, "package_required": true})
 }
 
 func (h *Handler) GetWeb3Job(w http.ResponseWriter, r *http.Request) {
