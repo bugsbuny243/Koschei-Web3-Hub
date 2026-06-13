@@ -18,6 +18,18 @@ type daoProposalRiskRequest struct {
 // DAOGuardianAnalyze simulates DAO/multisig proposal outflow risk and creates
 // the backend contract needed for the Turkish Owner Panel DAO Guardian tab.
 func (h *Handler) DAOGuardianAnalyze(w http.ResponseWriter, r *http.Request) {
+	if _, apiOK := apiPrincipalFromContext(r.Context()); !apiOK {
+		claims, ok := userFromContext(r.Context())
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			return
+		}
+	}
+
 	var req daoProposalRiskRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_body"})
