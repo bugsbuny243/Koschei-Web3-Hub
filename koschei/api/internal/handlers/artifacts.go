@@ -105,7 +105,7 @@ Rules:
 - Generate 3 to 10 safe files maximum.
 - Use only safe project paths.
 - Include README content in readme.
-- Use placeholders like YOUR_API_KEY_HERE, never real secrets.
+- Use redacted configuration names such as YOUR_API_KEY_HERE, never real secrets.
 - Keep code skeleton/MVP-safe.
 - Do not include destructive shell commands.
 - Do not include code that attempts unauthorized access.
@@ -582,7 +582,7 @@ func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 500, map[string]string{"error": "db_failed"})
 			return
 		}
-		files = append(files, map[string]any{"id": i, "path": p, "language": l, "purpose": pu, "action": a, "content_preview": c})
+		files = append(files, map[string]any{"id": i, "path": p, "language": l, "purpose": pu, "action": a, "content_excerpt": c})
 	}
 	if err := rows.Err(); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "db_failed"})

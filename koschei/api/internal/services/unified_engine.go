@@ -19,14 +19,15 @@ import (
 )
 
 const (
-	ModuleTXDecoder    = "tx_decoder"
-	ModuleTokenScanner = "token_scanner"
-	ModuleWalletScore  = "wallet_score"
-	ModuleRiskScanner  = "risk_scanner"
-	ModuleSybilGraph   = "sybil_graph"
-	ModuleProjectRadar = "project_radar"
-	moduleTimeout      = 10 * time.Second
-	defaultSolanaNet   = "solana-mainnet"
+	RealDataUnavailableMessage = "Real data unavailable. Analysis could not be completed."
+	ModuleTXDecoder            = "tx_decoder"
+	ModuleTokenScanner         = "token_scanner"
+	ModuleWalletScore          = "wallet_score"
+	ModuleRiskScanner          = "risk_scanner"
+	ModuleSybilGraph           = "sybil_graph"
+	ModuleProjectRadar         = "project_radar"
+	moduleTimeout              = 10 * time.Second
+	defaultSolanaNet           = "solana-mainnet"
 )
 
 type UnifiedEngine struct {
@@ -140,14 +141,7 @@ func (e *UnifiedEngine) Analyze(ctx context.Context, req UnifiedAnalyzeRequest) 
 		return UnifiedAnalyzeResult{}, errors.New("target_type and target_id are required")
 	}
 
-	modules := map[string]func(context.Context, UnifiedAnalyzeRequest) ModuleResult{
-		ModuleTXDecoder:    e.AnalyzeTX,
-		ModuleTokenScanner: e.ScanToken,
-		ModuleWalletScore:  e.ScoreWallet,
-		ModuleRiskScanner:  e.ScanRisk,
-		ModuleSybilGraph:   e.CheckSybil,
-		ModuleProjectRadar: e.ScanProject,
-	}
+	modules := e.applicableModules(req.TargetType)
 	out := make(map[string]ModuleResult, len(modules))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -188,6 +182,23 @@ func (e *UnifiedEngine) Analyze(ctx context.Context, req UnifiedAnalyzeRequest) 
 		PartialSuccess:  partial(out),
 		CompletedAt:     time.Now().UTC(),
 	}, nil
+}
+
+func (e *UnifiedEngine) applicableModules(targetType string) map[string]func(context.Context, UnifiedAnalyzeRequest) ModuleResult {
+	switch targetType {
+	case "tx", "transaction":
+		return map[string]func(context.Context, UnifiedAnalyzeRequest) ModuleResult{ModuleTXDecoder: e.AnalyzeTX, ModuleRiskScanner: e.ScanRisk}
+	case "token", "mint":
+		return map[string]func(context.Context, UnifiedAnalyzeRequest) ModuleResult{ModuleTokenScanner: e.ScanToken, ModuleRiskScanner: e.ScanRisk}
+	case "wallet":
+		return map[string]func(context.Context, UnifiedAnalyzeRequest) ModuleResult{ModuleWalletScore: e.ScoreWallet, ModuleSybilGraph: e.CheckSybil, ModuleRiskScanner: e.ScanRisk}
+	case "address":
+		return map[string]func(context.Context, UnifiedAnalyzeRequest) ModuleResult{ModuleWalletScore: e.ScoreWallet, ModuleSybilGraph: e.CheckSybil, ModuleTokenScanner: e.ScanToken, ModuleRiskScanner: e.ScanRisk}
+	case "project", "url":
+		return map[string]func(context.Context, UnifiedAnalyzeRequest) ModuleResult{ModuleProjectRadar: e.ScanProject, ModuleRiskScanner: e.ScanRisk}
+	default:
+		return map[string]func(context.Context, UnifiedAnalyzeRequest) ModuleResult{ModuleRiskScanner: e.ScanRisk}
+	}
 }
 
 func (e *UnifiedEngine) AnalyzeTX(ctx context.Context, req UnifiedAnalyzeRequest) ModuleResult {
@@ -264,7 +275,7 @@ func (e *UnifiedEngine) ScoreWallet(ctx context.Context, req UnifiedAnalyzeReque
 		return failed(ModuleWalletScore, err, started)
 	}
 	score, findings := walletScore(account, sigs)
-	return moduleOK(ModuleWalletScore, score, findings, map[string]any{"balance_sol": float64(account.Value.Lamports) / 1e9, "tx_count_sample": len(sigs), "failed_tx_sample": failedCount(sigs), "account_owner": account.Value.Owner, "executable": account.Value.Executable}, started)
+	return moduleOK(ModuleWalletScore, score, findings, map[string]any{"balance_sol": float64(account.Value.Lamports) / 1e9, "recent_tx_count": len(sigs), "recent_failed_tx_count": failedCount(sigs), "account_owner": account.Value.Owner, "executable": account.Value.Executable}, started)
 }
 
 func (e *UnifiedEngine) ScanRisk(ctx context.Context, req UnifiedAnalyzeRequest) ModuleResult {
@@ -337,7 +348,7 @@ func (e *UnifiedEngine) CheckSybil(ctx context.Context, req UnifiedAnalyzeReques
 		score -= 15
 		findings = append(findings, "High failed-transaction ratio in recent activity.")
 	}
-	return moduleOK(ModuleSybilGraph, clamp(score), findings, map[string]any{"sampled_transactions": len(sigs), "failed_transactions": failedCount(sigs), "burst_activity_detected": burstyActivity(sigs)}, started)
+	return moduleOK(ModuleSybilGraph, clamp(score), findings, map[string]any{"recent_transactions_checked": len(sigs), "failed_transactions": failedCount(sigs), "burst_activity_detected": burstyActivity(sigs)}, started)
 }
 
 func (e *UnifiedEngine) ScanProject(ctx context.Context, req UnifiedAnalyzeRequest) ModuleResult {
@@ -381,13 +392,13 @@ func (e *UnifiedEngine) ScanProject(ctx context.Context, req UnifiedAnalyzeReque
 	}
 	if !strings.Contains(text, "github") && !strings.Contains(text, "docs") && !strings.Contains(text, "whitepaper") {
 		score -= 10
-		findings = append(findings, "Website does not expose obvious docs, GitHub, or whitepaper links in the sampled page.")
+		findings = append(findings, "Website does not expose obvious docs, GitHub, or whitepaper links in the fetched page.")
 	}
 	if strings.Contains(text, "guaranteed") || strings.Contains(text, "100x") || strings.Contains(text, "risk-free") {
 		score -= 20
 		findings = append(findings, "Website copy contains high-risk promotional language.")
 	}
-	return moduleOK(ModuleProjectRadar, clamp(score), findings, map[string]any{"url": u.String(), "status_code": resp.StatusCode, "content_type": resp.Header.Get("Content-Type"), "sampled_bytes": len(body)}, started)
+	return moduleOK(ModuleProjectRadar, clamp(score), findings, map[string]any{"url": u.String(), "status_code": resp.StatusCode, "content_type": resp.Header.Get("Content-Type"), "fetched_bytes": len(body)}, started)
 }
 
 func (e *UnifiedEngine) loadAccountAndSignatures(ctx context.Context, network, address string, limit int) (accountInfoRPC, signaturesRPC, error) {
@@ -414,7 +425,7 @@ func failed(module string, err error, started time.Time) ModuleResult {
 	if errors.Is(err, context.DeadlineExceeded) || strings.Contains(strings.ToLower(err.Error()), "deadline") || strings.Contains(strings.ToLower(err.Error()), "timeout") {
 		status = "timeout"
 	}
-	return ModuleResult{Module: module, Status: status, Error: err.Error(), RiskLevel: "UNKNOWN", DurationMS: time.Since(started).Milliseconds(), CompletedAt: time.Now().UTC()}
+	return ModuleResult{Module: module, Status: status, Summary: RealDataUnavailableMessage, Error: err.Error(), RiskLevel: "UNKNOWN", DurationMS: time.Since(started).Milliseconds(), CompletedAt: time.Now().UTC()}
 }
 
 func moduleOK(module string, score int, findings []string, data map[string]any, started time.Time) ModuleResult {
@@ -444,12 +455,15 @@ func aggregateScore(results map[string]ModuleResult) (int, string) {
 
 func recommendations(level string, results map[string]ModuleResult) []string {
 	recs := []string{}
+	if level == "UNKNOWN" {
+		return []string{RealDataUnavailableMessage}
+	}
 	if level == "CRITICAL" || level == "HIGH" {
 		recs = append(recs, "Pause execution until flagged findings are manually reviewed.")
 	} else if level == "MEDIUM" {
 		recs = append(recs, "Proceed only with reduced exposure and additional verification.")
 	} else {
-		recs = append(recs, "No critical automated flags; continue normal monitoring.")
+		recs = append(recs, "No critical automated flags were produced by completed real-data checks.")
 	}
 	for _, key := range sortedKeys(results) {
 		r := results[key]
@@ -506,7 +520,7 @@ func normalizeTargetType(t string) string {
 }
 
 func summaryFor(module string, score int) string {
-	return fmt.Sprintf("%s completed with %s risk posture.", module, riskLevelFromScore(score))
+	return fmt.Sprintf("%s completed using retrieved production data with %s risk posture.", module, riskLevelFromScore(score))
 }
 func clamp(v int) int {
 	if v < 0 {
@@ -596,7 +610,7 @@ func walletScore(account accountInfoRPC, sigs signaturesRPC) (int, []string) {
 	} else if len(sigs) > 0 {
 		score += 8
 	} else {
-		findings = append(findings, "No recent transactions were found in the sampled range.")
+		findings = append(findings, "No recent transactions were found in the fetched range.")
 	}
 	failed := failedCount(sigs)
 	if len(sigs) > 0 {
