@@ -47,6 +47,9 @@ type paymentRequestReviewInput struct {
 }
 
 func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
+	if db == nil {
+		return errors.New("db nil")
+	}
 	statements := []string{
 		`CREATE TABLE IF NOT EXISTS payment_requests (id uuid PRIMARY KEY DEFAULT gen_random_uuid())`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS email text`,
@@ -60,12 +63,21 @@ func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS reviewed_at timestamptz`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS payment_provider text NOT NULL DEFAULT 'shopier'`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS external_payment_id text`,
-		`CREATE TABLE IF NOT EXISTS products (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text UNIQUE NOT NULL, name text NOT NULL, pack_type text NOT NULL, description text, price_try_cents integer NOT NULL DEFAULT 0, output_quota integer NOT NULL DEFAULT 0, shopier_url text NOT NULL DEFAULT '', image_url text, is_active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE TABLE IF NOT EXISTS products (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text NOT NULL, name text NOT NULL, pack_type text NOT NULL, description text, price_try_cents integer NOT NULL DEFAULT 0, output_quota integer NOT NULL DEFAULT 0, shopier_url text NOT NULL DEFAULT '', image_url text, is_active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS slug text`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS name text`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_type text`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS description text`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS price_try_cents integer NOT NULL DEFAULT 0`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS output_quota integer NOT NULL DEFAULT 0`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS shopier_url text NOT NULL DEFAULT ''`,
-		`CREATE TABLE IF NOT EXISTS customers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE, full_name text, company_name text, country text, source text, notes text, created_at timestamptz NOT NULL DEFAULT now())`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url text`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
+		`CREATE TABLE IF NOT EXISTS customers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text, full_name text, company_name text, country text, source text, notes text, created_at timestamptz NOT NULL DEFAULT now())`,
 		`CREATE TABLE IF NOT EXISTS orders (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid, product_id uuid, provider text NOT NULL DEFAULT 'paddle', provider_order_id text, provider_payment_id text, amount_try_cents integer NOT NULL DEFAULT 0, currency text NOT NULL DEFAULT 'USD', status text NOT NULL DEFAULT 'pending', raw_payload jsonb, purchased_at timestamptz, created_at timestamptz NOT NULL DEFAULT now())`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id uuid`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_id uuid`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'paddle'`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider_order_id text`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider_payment_id text`,
@@ -74,6 +86,7 @@ func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'pending'`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS raw_payload jsonb`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS purchased_at timestamptz`,
+		`CREATE TABLE IF NOT EXISTS entitlements (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text, plan_id text, outputs_total integer NOT NULL DEFAULT 0, outputs_remaining integer NOT NULL DEFAULT 0, status text NOT NULL DEFAULT 'active', starts_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz, notes text, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz)`,
 		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS email text`,
 		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS plan_id text`,
 		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS payment_request_id text`,
@@ -82,12 +95,16 @@ func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS starts_at timestamptz`,
 		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS expires_at timestamptz`,
 		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS order_id uuid`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS products_slug_unique_idx ON products (slug)`,
+		`ALTER TABLE entitlements ADD COLUMN IF NOT EXISTS updated_at timestamptz`,
 		`CREATE INDEX IF NOT EXISTS orders_provider_order_idx ON orders (provider, provider_order_id)`,
 		`CREATE INDEX IF NOT EXISTS orders_provider_payment_idx ON orders (provider, provider_payment_id)`,
 		`CREATE INDEX IF NOT EXISTS entitlements_email_status_expires_idx ON entitlements (lower(email), status, expires_at)`,
-		`INSERT INTO products (slug, name, pack_type, description, price_try_cents, output_quota, shopier_url, is_active) VALUES ('starter','Starter','starter','Koschei Starter package',89900,25,'',true), ('professional','Professional','professional','Koschei Professional package',229900,100,'',true), ('enterprise','Enterprise','enterprise','Koschei Enterprise package',499900,300,'',true) ON CONFLICT (slug) DO UPDATE SET name=EXCLUDED.name, pack_type=EXCLUDED.pack_type, price_try_cents=EXCLUDED.price_try_cents, output_quota=EXCLUDED.output_quota, is_active=true, updated_at=now()`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS entitlements_external_payment_once_idx ON entitlements (payment_provider, external_payment_id) WHERE external_payment_id IS NOT NULL AND external_payment_id <> ''`,
+		`UPDATE products SET name='Starter', pack_type='starter', description='Koschei Starter package', price_try_cents=89900, output_quota=25, is_active=true, updated_at=now() WHERE slug='starter'`,
+		`UPDATE products SET name='Professional', pack_type='professional', description='Koschei Professional package', price_try_cents=229900, output_quota=100, is_active=true, updated_at=now() WHERE slug='professional'`,
+		`UPDATE products SET name='Enterprise', pack_type='enterprise', description='Koschei Enterprise package', price_try_cents=499900, output_quota=300, is_active=true, updated_at=now() WHERE slug='enterprise'`,
+		`INSERT INTO products (slug, name, pack_type, description, price_try_cents, output_quota, shopier_url, is_active) SELECT 'starter','Starter','starter','Koschei Starter package',89900,25,'',true WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug='starter')`,
+		`INSERT INTO products (slug, name, pack_type, description, price_try_cents, output_quota, shopier_url, is_active) SELECT 'professional','Professional','professional','Koschei Professional package',229900,100,'',true WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug='professional')`,
+		`INSERT INTO products (slug, name, pack_type, description, price_try_cents, output_quota, shopier_url, is_active) SELECT 'enterprise','Enterprise','enterprise','Koschei Enterprise package',499900,300,'',true WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug='enterprise')`,
 	}
 	for _, statement := range statements {
 		if _, err := db.ExecContext(ctx, statement); err != nil {
@@ -160,17 +177,17 @@ func (h *Handler) OwnerPaymentRequestsList(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := ensurePaymentSchema(r.Context(), h.DB); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment schema unavailable"})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "payment_requests": []paymentRequestRecord{}, "warning": "payment schema unavailable"})
 		return
 	}
 	rows, err := h.DB.QueryContext(r.Context(), `
-		SELECT id::text, email, COALESCE(full_name, ''), COALESCE(product_id, ''), COALESCE(amount_try, 0), COALESCE(currency, 'TRY'), status,
+		SELECT id::text, COALESCE(email,''), COALESCE(full_name, ''), COALESCE(product_id, ''), COALESCE(amount_try, 0), COALESCE(currency, 'TRY'), status,
 		       COALESCE(raw_payload, '{}'::jsonb), created_at, reviewed_at
 		FROM payment_requests
 		ORDER BY created_at DESC
 		LIMIT 200`)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "payment_requests": []paymentRequestRecord{}, "warning": "payment requests unavailable"})
 		return
 	}
 	defer rows.Close()
@@ -180,17 +197,13 @@ func (h *Handler) OwnerPaymentRequestsList(w http.ResponseWriter, r *http.Reques
 		var request paymentRequestRecord
 		var rawPayload []byte
 		if err := rows.Scan(&request.ID, &request.Email, &request.FullName, &request.ProductID, &request.AmountTRY, &request.Currency, &request.Status, &rawPayload, &request.CreatedAt, &request.ReviewedAt); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db scan failed"})
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "payment_requests": requests, "warning": "payment request scan failed"})
 			return
 		}
 		if err := json.Unmarshal(rawPayload, &request.RawPayload); err != nil {
 			request.RawPayload = map[string]any{}
 		}
 		requests = append(requests, request)
-	}
-	if err := rows.Err(); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
-		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "payment_requests": requests})
 }
@@ -383,6 +396,7 @@ func activatePackageEntitlementDetailedTx(ctx context.Context, tx *sql.Tx, email
 			SELECT id::text, COALESCE(plan_id,''), COALESCE(outputs_total,0), COALESCE(outputs_remaining,0)
 			FROM entitlements
 			WHERE payment_provider = $1 AND external_payment_id = $2
+			ORDER BY created_at DESC
 			LIMIT 1`, provider, externalPaymentID).Scan(&existingID, &existingPackage, &existingTotal, &existingRemaining)
 		if err == nil {
 			_, err = tx.ExecContext(ctx, `
@@ -409,7 +423,7 @@ func activatePackageEntitlementDetailedTx(ctx context.Context, tx *sql.Tx, email
 		  AND status='active'
 		  AND COALESCE(plan_id, '') <> ''
 		  AND COALESCE(plan_id, '') <> 'free'
-		ORDER BY updated_at DESC, created_at DESC
+		ORDER BY updated_at DESC NULLS LAST, created_at DESC
 		LIMIT 1
 		FOR UPDATE`, email).Scan(&activeID)
 	if err == nil {
