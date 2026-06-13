@@ -15,16 +15,19 @@ import (
 )
 
 type ownerUserRecord struct {
-	ID            string     `json:"id"`
-	AuthSubject   string     `json:"auth_subject"`
-	Email         string     `json:"email"`
-	WalletAddress string     `json:"wallet_address,omitempty"`
-	PlanID        string     `json:"plan_id"`
-	Status        string     `json:"status"`
-	PlanID        string     `json:"plan_id"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	BannedAt      *time.Time `json:"banned_at,omitempty"`
+	ID                      string     `json:"id"`
+	AuthSubject             string     `json:"auth_subject"`
+	Email                   string     `json:"email"`
+	WalletAddress           string     `json:"wallet_address,omitempty"`
+	Credits                 int        `json:"credits"`
+	Status                  string     `json:"status"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
+	BannedAt                *time.Time `json:"banned_at,omitempty"`
+	PlanID                  *string    `json:"plan_id"`
+	ActiveEntitlementStatus string     `json:"active_entitlement_status"`
+	EntitlementExpiresAt    *time.Time `json:"entitlement_expires_at"`
+	LegacyCredits           int        `json:"legacy_credits"`
 }
 
 type ownerCreditInput struct {
@@ -111,7 +114,22 @@ func (h *Handler) OwnerUsers(w http.ResponseWriter, r *http.Request) {
 		where = `WHERE lower(p.email) LIKE $1 OR lower(COALESCE(p.wallet_address,'')) LIKE $1 OR lower(COALESCE(p.auth_subject,'')) LIKE $1`
 		args = append(args, "%"+q+"%")
 	}
-	rows, err := h.DB.QueryContext(r.Context(), `SELECT p.id::text, COALESCE(p.auth_subject,''), p.email, COALESCE(p.wallet_address,''), COALESCE((SELECT e.plan_id FROM entitlements e WHERE lower(e.email)=lower(p.email) AND e.status='active' AND COALESCE(e.plan_id,'free') <> 'free' ORDER BY e.created_at DESC LIMIT 1),'free'), COALESCE(p.status,'active'), p.created_at, p.updated_at, p.banned_at FROM app_user_profiles p `+where+` ORDER BY p.created_at DESC LIMIT 500`, args...)
+	rows, err := h.DB.QueryContext(r.Context(), `
+		SELECT p.id::text, COALESCE(p.auth_subject,''), p.email, COALESCE(p.wallet_address,''), COALESCE(p.credits,0), COALESCE(p.status,'active'), p.created_at, p.updated_at, p.banned_at,
+		       ent.plan_id, COALESCE(ent.status, 'No active package'), ent.expires_at
+		FROM app_user_profiles p
+		LEFT JOIN LATERAL (
+			SELECT normalize_plan.plan_id, e.status, e.expires_at
+			FROM entitlements e
+			CROSS JOIN LATERAL (SELECT CASE COALESCE(e.plan_id,'') WHEN 'builder' THEN 'professional' WHEN 'studio' THEN 'enterprise' ELSE COALESCE(e.plan_id,'') END AS plan_id) normalize_plan
+			WHERE lower(e.email)=lower(p.email)
+			  AND e.status='active'
+			  AND COALESCE(e.plan_id,'') <> ''
+			  AND COALESCE(e.plan_id,'') <> 'free'
+			  AND (e.expires_at IS NULL OR e.expires_at > now())
+			ORDER BY e.updated_at DESC, e.created_at DESC
+			LIMIT 1
+		) ent ON true `+where+` ORDER BY p.created_at DESC LIMIT 500`, args...)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
 		return
@@ -120,10 +138,20 @@ func (h *Handler) OwnerUsers(w http.ResponseWriter, r *http.Request) {
 	users := []ownerUserRecord{}
 	for rows.Next() {
 		var u ownerUserRecord
-		if err := rows.Scan(&u.ID, &u.AuthSubject, &u.Email, &u.WalletAddress, &u.PlanID, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.BannedAt); err != nil {
+		var planID sql.NullString
+		var entitlementStatus string
+		var expiresAt sql.NullTime
+		if err := rows.Scan(&u.ID, &u.AuthSubject, &u.Email, &u.WalletAddress, &u.Credits, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.BannedAt, &planID, &entitlementStatus, &expiresAt); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db scan failed"})
 			return
 		}
+		u.LegacyCredits = u.Credits
+		if planID.Valid && strings.TrimSpace(planID.String) != "" {
+			plan := normalizePackageID(planID.String)
+			u.PlanID = &plan
+		}
+		u.ActiveEntitlementStatus = entitlementStatus
+		u.EntitlementExpiresAt = nullTimePtr(expiresAt)
 		users = append(users, u)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "users": users})

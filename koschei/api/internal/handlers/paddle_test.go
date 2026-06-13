@@ -4,18 +4,20 @@ import "testing"
 
 func TestPaddleConfiguredPriceIDUsesActiveBillingPriceIDs(t *testing.T) {
 	t.Setenv("PADDLE_STARTER_PRICE_ID", "")
+	t.Setenv("PADDLE_PROFESSIONAL_PRICE_ID", "pri_professional")
+	t.Setenv("PADDLE_ENTERPRISE_PRICE_ID", "pri_enterprise")
 	t.Setenv("PADDLE_BUILDER_PRICE_ID", "")
 	t.Setenv("PADDLE_STUDIO_PRICE_ID", "")
 
 	cases := map[string]string{
-		"starter": "pri_01ktvdpq7fr4gknbr4wtavrfrb",
-		"builder": "pri_01ktvhhg4z9j3wjrts1kzswhm",
-		"studio":  "pri_01ktvhqya0rj2y8850yvd37d92",
+		"starter":      "",
+		"professional": "pri_professional",
+		"enterprise":   "pri_enterprise",
 	}
 	productNames := map[string]string{
-		"starter": "Koschei Starter",
-		"builder": "Koschei Professional",
-		"studio":  "Koschei Enterprise",
+		"starter":      "Koschei Starter",
+		"professional": "Koschei Professional",
+		"enterprise":   "Koschei Enterprise",
 	}
 	for tier, want := range cases {
 		if got := paddleProductName(tier); got != productNames[tier] {
@@ -32,14 +34,19 @@ func TestPaddleConfiguredPriceIDUsesActiveBillingPriceIDs(t *testing.T) {
 
 func TestPaddleConfiguredPriceIDAllowsExistingEnvOverride(t *testing.T) {
 	t.Setenv("PADDLE_STARTER_PRICE_ID", "pri_custom_starter")
+	t.Setenv("PADDLE_BUILDER_PRICE_ID", "pri_legacy_builder")
 
 	if got := paddleConfiguredPriceID("starter"); got != "pri_custom_starter" {
 		t.Fatalf("paddleConfiguredPriceID starter override = %q, want pri_custom_starter", got)
+	}
+	if got := paddleConfiguredPriceID("builder"); got != "pri_legacy_builder" {
+		t.Fatalf("paddleConfiguredPriceID legacy builder override = %q, want pri_legacy_builder", got)
 	}
 }
 
 func TestSubscriptionProductAndTierMapsFromPriceID(t *testing.T) {
 	t.Setenv("PADDLE_STARTER_PRICE_ID", "")
+	t.Setenv("PADDLE_PROFESSIONAL_PRICE_ID", "pri_professional")
 	t.Setenv("PADDLE_BUILDER_PRICE_ID", "")
 	t.Setenv("PADDLE_STUDIO_PRICE_ID", "")
 
@@ -54,7 +61,7 @@ func TestSubscriptionProductAndTierMapsFromPriceID(t *testing.T) {
 				Price: struct {
 					ID        string `json:"id"`
 					ProductID string `json:"product_id"`
-				}{ID: "pri_01ktvhhg4z9j3wjrts1kzswhm", ProductID: "pro_active_professional"},
+				}{ID: "pri_professional", ProductID: "pro_active_professional"},
 			},
 		},
 	}
@@ -63,7 +70,7 @@ func TestSubscriptionProductAndTierMapsFromPriceID(t *testing.T) {
 	if productID != "pro_active_professional" {
 		t.Fatalf("subscriptionProductAndTier productID = %q, want pro_active_professional", productID)
 	}
-	if tier != "builder" {
-		t.Fatalf("subscriptionProductAndTier tier = %q, want builder", tier)
+	if tier != "professional" {
+		t.Fatalf("subscriptionProductAndTier tier = %q, want professional", tier)
 	}
 }

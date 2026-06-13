@@ -79,6 +79,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/auth/otp/start", method("POST", h.StartOTPLogin))
 	mux.HandleFunc("/api/auth/otp/verify", method("POST", h.VerifyOTPLogin))
 	mux.HandleFunc("/api/me", requiresDB(h, handlers.RequireAuth(method("GET", h.Me))))
+	mux.HandleFunc("/api/me/package", requiresDB(h, handlers.RequireAuth(method("GET", h.MePackage))))
 	mux.HandleFunc("/api/member/summary", requiresDB(h, handlers.RequireAuth(method("GET", h.MemberSummary))))
 	mux.HandleFunc("/api/payments/request", requiresDB(h, handlers.RequireAuth(method("POST", h.PaymentRequest))))
 	mux.HandleFunc("/api/shopier/webhook", requiresDB(h, method("POST", h.ShopierWebhook)))
