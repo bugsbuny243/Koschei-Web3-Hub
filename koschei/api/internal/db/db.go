@@ -121,13 +121,12 @@ func runMigrations(db *sql.DB) (int, int, error) {
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`); err != nil {
 		return 0, 0, err
 	}
-	files, err := filepath.Glob("migrations/*.sql")
+	files, err := migrationSQLFiles()
 	if err != nil {
 		return 0, 0, err
 	}
-	sort.Strings(files)
 	if len(files) == 0 {
-		log.Printf("warning: no migrations found at %s; continuing with schema verification", filepath.Join("migrations", "*.sql"))
+		log.Printf("warning: no migrations found in known paths; continuing with schema verification")
 	}
 	for _, f := range files {
 		v := filepath.Base(f)
@@ -153,6 +152,36 @@ func runMigrations(db *sql.DB) (int, int, error) {
 		applied++
 	}
 	return applied, skipped, nil
+}
+
+func migrationSQLFiles() ([]string, error) {
+	candidates := []string{
+		"migrations",
+		filepath.Join("/app", "migrations"),
+		filepath.Join("koschei", "api", "migrations"),
+	}
+	if configured := strings.TrimSpace(os.Getenv("MIGRATIONS_DIR")); configured != "" {
+		candidates = append([]string{configured}, candidates...)
+	}
+	seen := map[string]bool{}
+	for _, dir := range candidates {
+		dir = strings.TrimSpace(dir)
+		if dir == "" || seen[dir] {
+			continue
+		}
+		seen[dir] = true
+		files, err := filepath.Glob(filepath.Join(dir, "*.sql"))
+		if err != nil {
+			return nil, err
+		}
+		if len(files) == 0 {
+			continue
+		}
+		sort.Strings(files)
+		log.Printf("migrations path selected: %s (%d files)", dir, len(files))
+		return files, nil
+	}
+	return nil, nil
 }
 
 func verifySchema(db *sql.DB) error {
