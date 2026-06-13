@@ -2,15 +2,12 @@ package handlers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"time"
-
-	"koschei/api/internal/router"
 )
 
 type txDecodeRequest struct {
