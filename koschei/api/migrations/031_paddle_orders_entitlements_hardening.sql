@@ -26,6 +26,22 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS paddle_price_id text;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'products_pack_type_check'
+      AND conrelid = 'products'::regclass
+  ) THEN
+    ALTER TABLE products DROP CONSTRAINT products_pack_type_check;
+  END IF;
+END $$;
+
+ALTER TABLE products
+  ADD CONSTRAINT products_pack_type_check
+  CHECK (pack_type IN ('tool', 'agent', 'subscription', 'starter', 'professional', 'enterprise', 'builder', 'pro', 'studio'));
+
 CREATE UNIQUE INDEX IF NOT EXISTS products_slug_unique_idx ON products (slug);
 CREATE INDEX IF NOT EXISTS products_active_pack_type_idx ON products (is_active, pack_type);
 
