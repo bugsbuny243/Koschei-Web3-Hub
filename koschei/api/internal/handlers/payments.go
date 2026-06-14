@@ -53,10 +53,12 @@ func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 		return errors.New("db nil")
 	}
 	statements := []string{
+		`CREATE EXTENSION IF NOT EXISTS pgcrypto`,
 		`CREATE TABLE IF NOT EXISTS payment_requests (id uuid PRIMARY KEY DEFAULT gen_random_uuid())`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS email text`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS full_name text NOT NULL DEFAULT ''`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS product_id text`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS product_slug text`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS amount_try integer`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'TRY'`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'pending'`,
@@ -131,7 +133,7 @@ type paymentRequestRecord struct {
 
 func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
 	if err := ensurePaymentSchema(r.Context(), h.DB); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment schema unavailable"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment schema unavailable", "message": err.Error()})
 		return
 	}
 	if !h.Limiter.allow("billing:"+clientIP(r), 10, 10_000_000_000) {
@@ -150,7 +152,7 @@ func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.FullName = strings.TrimSpace(req.FullName)
-	req.ProductID = strings.ToLower(strings.TrimSpace(req.ProductID))
+	req.ProductID = normalizePackageID(req.ProductID)
 	req.PaymentReference = strings.TrimSpace(req.PaymentReference)
 	req.RegisteredEmail = strings.ToLower(strings.TrimSpace(req.RegisteredEmail))
 	req.CustomerEmail = strings.ToLower(strings.TrimSpace(req.CustomerEmail))
@@ -162,15 +164,15 @@ func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	declaredEmail := firstNonEmpty(req.RegisteredEmail, req.CustomerEmail, email)
-	rawPayload, err := json.Marshal(map[string]string{"payment_reference": req.PaymentReference, "registered_email": email, "declared_email": declaredEmail, "note": req.Note})
+	rawPayload, err := json.Marshal(map[string]string{"payment_reference": req.PaymentReference, "registered_email": email, "declared_email": declaredEmail, "product_id": req.ProductID, "note": req.Note})
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payload encoding failed"})
 		return
 	}
 	if _, err := h.DB.ExecContext(r.Context(), `
-		INSERT INTO payment_requests (email, full_name, product_id, amount_try, currency, status, raw_payload, payment_provider, created_at)
-		VALUES ($1, $2, $3, $4, 'TRY', 'pending', $5::jsonb, 'shopier', now())`, email, req.FullName, normalizePackageID(req.ProductID), pack.AmountTRY, string(rawPayload)); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db insert failed"})
+		INSERT INTO payment_requests (email, full_name, product_slug, amount_try, currency, status, raw_payload, payment_provider, created_at)
+		VALUES ($1, $2, $3, $4, 'TRY', 'pending', $5::jsonb, 'shopier', now())`, email, req.FullName, req.ProductID, pack.AmountTRY, string(rawPayload)); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db insert failed", "message": err.Error()})
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "status": "pending", "message": paymentRequestMessage})
@@ -185,13 +187,13 @@ func (h *Handler) OwnerPaymentRequestsList(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	rows, err := h.DB.QueryContext(r.Context(), `
-		SELECT id::text, COALESCE(email,''), COALESCE(full_name, ''), COALESCE(product_id, ''), COALESCE(amount_try, 0), COALESCE(currency, 'TRY'), status,
+		SELECT id::text, COALESCE(email,''), COALESCE(full_name, ''), COALESCE(NULLIF(product_slug,''), raw_payload->>'product_id', product_id::text, ''), COALESCE(amount_try, 0), COALESCE(currency, 'TRY'), status,
 		       COALESCE(raw_payload, '{}'::jsonb), created_at, reviewed_at
 		FROM payment_requests
 		ORDER BY created_at DESC
 		LIMIT 200`)
 	if err != nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "payment_requests": []paymentRequestRecord{}, "warning": "payment requests unavailable"})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "payment_requests": []paymentRequestRecord{}, "warning": "payment requests unavailable", "message": err.Error()})
 		return
 	}
 	defer rows.Close()
@@ -240,7 +242,7 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 
 	var email, productID, status string
 	if err := tx.QueryRowContext(r.Context(), `
-		SELECT lower(email), product_id, status
+		SELECT lower(email), COALESCE(NULLIF(product_slug,''), raw_payload->>'product_id', product_id::text, ''), status
 		FROM payment_requests
 		WHERE id = $1
 		FOR UPDATE`, paymentRequestID).Scan(&email, &productID, &status); err != nil {
@@ -248,7 +250,7 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "payment request not found"})
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db query failed", "message": err.Error()})
 		return
 	}
 	productID = normalizePackageID(productID)
