@@ -59,6 +59,7 @@ func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS full_name text NOT NULL DEFAULT ''`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS product_id text`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS product_slug text`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS plan text`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS amount_try integer`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'TRY'`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'pending'`,
@@ -67,6 +68,9 @@ func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS reviewed_at timestamptz`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS payment_provider text NOT NULL DEFAULT 'shopier'`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS external_payment_id text`,
+		`UPDATE payment_requests SET plan = COALESCE(NULLIF(plan, ''), NULLIF(product_slug, ''), raw_payload->>'product_id', 'starter') WHERE plan IS NULL OR plan = ''`,
+		`ALTER TABLE payment_requests ALTER COLUMN plan SET DEFAULT 'starter'`,
+		`ALTER TABLE payment_requests ALTER COLUMN plan SET NOT NULL`,
 		`CREATE TABLE IF NOT EXISTS products (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text NOT NULL, name text NOT NULL, pack_type text NOT NULL, description text, price_try_cents integer NOT NULL DEFAULT 0, output_quota integer NOT NULL DEFAULT 0, shopier_url text NOT NULL DEFAULT '', image_url text, is_active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS slug text`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS name text`,
@@ -170,8 +174,8 @@ func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := h.DB.ExecContext(r.Context(), `
-		INSERT INTO payment_requests (email, full_name, product_slug, amount_try, currency, status, raw_payload, payment_provider, created_at)
-		VALUES ($1, $2, $3, $4, 'TRY', 'pending', $5::jsonb, 'shopier', now())`, email, req.FullName, req.ProductID, pack.AmountTRY, string(rawPayload)); err != nil {
+		INSERT INTO payment_requests (email, full_name, product_slug, plan, amount_try, currency, status, raw_payload, payment_provider, created_at)
+		VALUES ($1, $2, $3, $3, $4, 'TRY', 'pending', $5::jsonb, 'shopier', now())`, email, req.FullName, req.ProductID, pack.AmountTRY, string(rawPayload)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db insert failed", "message": err.Error()})
 		return
 	}
@@ -187,7 +191,7 @@ func (h *Handler) OwnerPaymentRequestsList(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	rows, err := h.DB.QueryContext(r.Context(), `
-		SELECT id::text, COALESCE(email,''), COALESCE(full_name, ''), COALESCE(NULLIF(product_slug,''), raw_payload->>'product_id', product_id::text, ''), COALESCE(amount_try, 0), COALESCE(currency, 'TRY'), status,
+		SELECT id::text, COALESCE(email,''), COALESCE(full_name, ''), COALESCE(NULLIF(product_slug,''), raw_payload->>'product_id', product_id::text, plan, ''), COALESCE(amount_try, 0), COALESCE(currency, 'TRY'), status,
 		       COALESCE(raw_payload, '{}'::jsonb), created_at, reviewed_at
 		FROM payment_requests
 		ORDER BY created_at DESC
@@ -242,7 +246,7 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 
 	var email, productID, status string
 	if err := tx.QueryRowContext(r.Context(), `
-		SELECT lower(email), COALESCE(NULLIF(product_slug,''), raw_payload->>'product_id', product_id::text, ''), status
+		SELECT lower(email), COALESCE(NULLIF(product_slug,''), raw_payload->>'product_id', product_id::text, plan, ''), status
 		FROM payment_requests
 		WHERE id = $1
 		FOR UPDATE`, paymentRequestID).Scan(&email, &productID, &status); err != nil {
