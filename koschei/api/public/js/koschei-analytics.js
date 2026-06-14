@@ -153,13 +153,55 @@ var KoscheiAnalytics = (function() {
     } catch {}
   }
 
+  async function syncDashboardPackage() {
+    try {
+      if (!/\/dashboard/.test(window.location.pathname)) return;
+      const jwt = authJwt();
+      if (!jwt) return;
+      const response = await fetch('/api/me/package', {
+        method: 'GET',
+        headers: { 'Authorization': 'Bearer ' + jwt, 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      const data = await response.json().catch(() => ({}));
+      const pack = data && (data.data || data);
+      if (!pack || !pack.has_active_package) return;
+      const plan = pack.plan_id || pack.plan || pack.package || 'starter';
+      const remaining = pack.outputs_remaining ?? pack.remaining_outputs ?? pack.remaining ?? null;
+      const total = pack.outputs_total ?? pack.total_outputs ?? null;
+      const planName = document.getElementById('planName');
+      const planInfo = document.getElementById('planInfo');
+      const remainingOutputs = document.getElementById('remainingOutputs');
+      const report = document.getElementById('report');
+      const send = document.getElementById('sendBtn');
+      const planBar = document.getElementById('planBar');
+      if (planName) planName.textContent = String(plan).replace(/^./, c => c.toUpperCase()) + ' Plan';
+      if (planInfo) planInfo.textContent = 'Paket aktif';
+      if (remainingOutputs && remaining !== null && remaining !== undefined) remainingOutputs.textContent = String(remaining);
+      if (send) send.disabled = false;
+      if (planBar && total && remaining !== null && remaining !== undefined) {
+        const pct = Math.max(4, Math.min(100, Math.round((Number(remaining) / Number(total)) * 100)));
+        planBar.style.width = pct + '%';
+      }
+      if (report && /aktif paket gerekir/i.test(report.textContent || '')) {
+        report.innerHTML = '<div class="section"><h3>Analiz hazır</h3><p>Aktif paket bulundu. Token, wallet, transaction veya proje gir; Koschei 6 modüllü risk intelligence raporu üretsin.</p></div>';
+      }
+    } catch {}
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', ensurePricingEmailField);
+    document.addEventListener('DOMContentLoaded', function() {
+      ensurePricingEmailField();
+      syncDashboardPackage();
+    });
   } else {
     ensurePricingEmailField();
+    syncDashboardPackage();
   }
   setTimeout(ensurePricingEmailField, 400);
   setTimeout(ensurePricingEmailField, 1200);
+  setTimeout(syncDashboardPackage, 500);
+  setTimeout(syncDashboardPackage, 1500);
 
-  return { track, ensurePricingEmailField };
+  return { track, ensurePricingEmailField, syncDashboardPackage };
 }());
