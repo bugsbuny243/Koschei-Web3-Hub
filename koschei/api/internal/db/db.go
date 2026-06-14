@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -40,6 +41,7 @@ func ConnectReplica(databaseURL string) (*sql.DB, error) {
 }
 
 func open(databaseURL string) (*sql.DB, error) {
+	databaseURL = normalizeDatabaseURL(databaseURL)
 	db, err := sql.Open("postgres", databaseURL)
 	if err != nil {
 		return nil, err
@@ -54,6 +56,28 @@ func open(databaseURL string) (*sql.DB, error) {
 		return nil, fmt.Errorf("db ping failed: %w", err)
 	}
 	return db, nil
+}
+
+func normalizeDatabaseURL(databaseURL string) string {
+	if strings.TrimSpace(os.Getenv("DATABASE_URL_ALLOW_POOLER")) == "1" {
+		return databaseURL
+	}
+	parsed, err := url.Parse(strings.TrimSpace(databaseURL))
+	if err != nil || parsed.Host == "" {
+		return databaseURL
+	}
+	host := parsed.Hostname()
+	if !strings.Contains(host, "-pooler.") {
+		return databaseURL
+	}
+	directHost := strings.Replace(host, "-pooler.", ".", 1)
+	if port := parsed.Port(); port != "" {
+		parsed.Host = directHost + ":" + port
+	} else {
+		parsed.Host = directHost
+	}
+	log.Printf("database host normalized from neon pooler to direct connection")
+	return parsed.String()
 }
 
 func envInt(name string, fallback int) int {
