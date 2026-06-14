@@ -1,0 +1,21 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://koschei-web3-hub-production.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://koschei-web3-hub-production.up.railway.app/health"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/home",
+      "destination": "/",
+      "permanent": true
+    }
+  ]
+}
