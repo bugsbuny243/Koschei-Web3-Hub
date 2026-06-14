@@ -6,11 +6,29 @@ import (
 	"strings"
 )
 
+func entitlementEmailFromSubject(authSubject string) string {
+	subject := strings.TrimSpace(authSubject)
+	if subject == "" {
+		return ""
+	}
+	lower := strings.ToLower(subject)
+	if strings.HasPrefix(lower, "local:") {
+		return strings.ToLower(strings.TrimSpace(subject[len("local:"):]))
+	}
+	if strings.Contains(subject, "@") {
+		return strings.ToLower(subject)
+	}
+	return ""
+}
+
 func (h *Handler) userCreditsAndRole(authSubject string, emails ...string) (bool, int, error) {
 	authSubject = strings.TrimSpace(authSubject)
 	email := ""
 	if len(emails) > 0 {
 		email = strings.ToLower(strings.TrimSpace(emails[0]))
+	}
+	if email == "" {
+		email = entitlementEmailFromSubject(authSubject)
 	}
 
 	var available int
@@ -41,6 +59,9 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 	email = strings.ToLower(strings.TrimSpace(email))
 	authSubject = strings.TrimSpace(authSubject)
 
+	if email == "" {
+		email = entitlementEmailFromSubject(authSubject)
+	}
 	if email == "" && authSubject != "" {
 		_ = tx.QueryRow(`SELECT lower(email) FROM app_user_profiles WHERE auth_subject=$1`, authSubject).Scan(&email)
 	}
@@ -97,6 +118,9 @@ func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) 
 	}
 	authSubject = strings.TrimSpace(authSubject)
 	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		email = entitlementEmailFromSubject(authSubject)
+	}
 	var active bool
 	err := h.DB.QueryRow(`
 		SELECT EXISTS (
@@ -121,6 +145,9 @@ func (h *Handler) requirePremiumOutput(authSubject string, emails ...string) (in
 	email := ""
 	if len(emails) > 0 {
 		email = strings.ToLower(strings.TrimSpace(emails[0]))
+	}
+	if email == "" {
+		email = entitlementEmailFromSubject(authSubject)
 	}
 	active, err := h.hasActivePaidPackage(authSubject, email)
 	if err != nil {
