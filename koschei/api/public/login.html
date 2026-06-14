@@ -27,11 +27,12 @@
   </form>
   <div class="link">Hesabınız yok mu? <a href="/register.html">Hesap oluştur</a></div>
 </div>
-<script src="/js/koschei-auth.js?v=6"></script>
+<script src="/js/koschei-auth.js?v=13"></script>
 <script>
   const form = document.getElementById('loginForm');
   const submitBtn = document.getElementById('submitBtn');
   const alertEl = document.getElementById('alert');
+  const HOME_URL = '/';
 
   function showAlert(message, type = 'error') {
     alertEl.textContent = message;
@@ -45,7 +46,7 @@
   (async () => {
     await KoscheiAuth.init();
     if (KoscheiAuth.isLoggedIn()) {
-      window.location.href = '/hub.html';
+      window.location.href = HOME_URL;
       return;
     }
 
@@ -57,8 +58,8 @@
       try {
         const body = Object.fromEntries(new FormData(form));
         await KoscheiAuth.signIn(String(body.email || '').trim(), String(body.password || ''));
-        showAlert('Giriş başarılı. Yönlendiriliyorsunuz…', 'success');
-        window.location.href = '/hub.html';
+        showAlert('Giriş başarılı. Ana sayfaya yönlendiriliyorsunuz…', 'success');
+        window.location.href = HOME_URL;
       } catch (error) {
         showAlert(cleanError(error, 'Giriş yapılamadı. Lütfen e-posta ve şifrenizi kontrol edin.'));
         submitBtn.disabled = false;
