@@ -159,7 +159,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/v1/smart-money/snapshot", requiresDB(h, h.APIKeyAuth(h.APIRateLimit(method("GET", h.SmartMoneySnapshot)))))
 	mux.HandleFunc("/api/v1/usage", requiresDB(h, h.APIKeyAuth(method("GET", h.APIUsage))))
 	mux.HandleFunc("/api/paddle/checkout", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateCheckout))))
-	mux.HandleFunc("/api/paddle/status", handlers.RequireAuth(method("GET", h.PaddleStatus)))
+	mux.HandleFunc("/api/paddle/status", method("GET", h.PaddleStatus))
 	mux.HandleFunc("/api/v1/paddle/checkout", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateCheckout))))
 	mux.HandleFunc("/api/v1/b2b/checkout", requiresDB(h, handlers.RequireAuth(method("POST", h.CreateCheckout))))
 	mux.HandleFunc("/api/paddle/webhook", requiresDB(h, method("POST", h.HandleWebhook)))
@@ -190,188 +190,28 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/web3/intelligence-graph/build", requiresDB(h, premium(method("POST", h.IntelligenceGraph))))
 	mux.HandleFunc("/api/web3/risk-v2", requiresDB(h, premium(method("POST", h.RiskV2))))
 	mux.HandleFunc("/api/web3/tx-decode-pro", requiresDB(h, premium(method("POST", h.TXDecodePro))))
-	mux.HandleFunc("/api/web3/cross-chain-risk", requiresDB(h, premium(method("POST", h.CrossChainRisk))))
-	mux.HandleFunc("/api/web3/sybil-check", requiresDB(h, premium(method("POST", h.SybilCheck))))
-	mux.HandleFunc("/api/web3/funding-assistant/generate", requiresDB(h, premium(method("POST", h.FundingAssistant))))
-	mux.HandleFunc("/api/web3/project-radar", requiresDB(h, premium(method("POST", h.ProjectRadar))))
-	mux.HandleFunc("/api/grants/readiness", requiresDB(h, premium(method("POST", h.FundingAssistant))))
-	mux.HandleFunc("/api/graph/build", requiresDB(h, premium(method("POST", h.IntelligenceGraph))))
-	mux.HandleFunc("/api/sybil/check", requiresDB(h, premium(method("POST", h.SybilCheck))))
-	mux.HandleFunc("/api/artifacts/", requiresDB(h, handlers.RequireAuth(h.ArtifactRoute)))
+	mux.HandleFunc("/api/web3/wallet-score-pro", requiresDB(h, premium(method("POST", h.WalletScorePro))))
+	mux.HandleFunc("/api/web3/token-scanner-pro", requiresDB(h, premium(method("POST", h.TokenScannerPro))))
+	mux.HandleFunc("/api/web3/project-radar-pro", requiresDB(h, premium(method("POST", h.ProjectRadarPro))))
+	mux.HandleFunc("/api/web3/sybil-graph", requiresDB(h, premium(method("POST", h.SybilGraph))))
+	mux.HandleFunc("/api/web3/dao-guardian", requiresDB(h, premium(method("POST", h.DAOGuardianAnalyze))))
+	mux.HandleFunc("/api/web3/reputation", requiresDB(h, premium(method("POST", h.ReputationScore))))
+	mux.HandleFunc("/api/web3/pipeline", requiresDB(h, premium(method("POST", h.PipelineAnalyze))))
+	mux.HandleFunc("/api/web3/grants", requiresDB(h, premium(method("POST", h.GrantWriter))))
+	mux.HandleFunc("/api/web3/contracts/deploy", requiresDB(h, premium(method("POST", h.DeployContract))))
+	mux.HandleFunc("/api/web3/wallet/connect", requiresDB(h, handlers.RequireAuth(method("POST", h.WalletConnect))))
+	mux.HandleFunc("/api/web3/wallets", requiresDB(h, handlers.RequireAuth(method("GET", h.ListWallets))))
+	mux.HandleFunc("/api/web3/pay", requiresDB(h, handlers.RequireAuth(method("POST", h.Web3Pay))))
+	mux.HandleFunc("/api/web3/ai", requiresDB(h, handlers.RequireAuth(method("POST", h.Web3AI))))
 
-	if staticDir != "" {
-		if info, err := os.Stat(staticDir); err != nil || !info.IsDir() {
-			log.Printf("warning: static directory unavailable at %q: %v", staticDir, err)
-		} else {
-			static := http.FileServer(http.Dir(staticDir))
-			indexPath := filepath.Join(staticDir, "index.html")
-			cleanRoutes := publicCleanRoutes(staticDir)
-			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-				if strings.HasPrefix(r.URL.Path, "/api/") || (r.Method != http.MethodGet && r.Method != http.MethodHead) {
-					http.NotFound(w, r)
-					return
-				}
-				if r.URL.Path == "/" {
-					http.ServeFile(w, r, indexPath)
-					return
-				}
-				if staticPath, ok := cleanRoutes[r.URL.Path]; ok {
-					r = r.Clone(r.Context())
-					r.URL.Path = staticPath
-				}
-				candidate := filepath.Join(staticDir, strings.TrimPrefix(filepath.Clean(r.URL.Path), "/"))
-				if fi, err := os.Stat(candidate); err == nil && !fi.IsDir() {
-					static.ServeHTTP(w, r)
-					return
-				}
-				http.ServeFile(w, r, indexPath)
-			})
-		}
-	}
-	return securityHeaders(cors(apiReadiness(db, mux), corsOrigin))
+	return withSecurityHeaders(withCORS(mux, corsOrigin))
 }
 
-const adsTXTBody = "google.com, pub-6081394144742471, DIRECT, f08c47fec0942fa0"
-
-const robotsTXTBody = "User-agent: *\nAllow: /\nSitemap: https://tradepigloball.co/sitemap.xml"
-
-func publicCleanRoutes(staticDir string) map[string]string {
-	routes := map[string]string{
-		"/api-docs": "/docs-api.html",
-		"/docs/api": "/docs-api.html",
-		"/docs/sdk": "/docs-sdk.html",
-		"/sdk":      "/docs-sdk.html",
-		"/tools":    "/dashboard.html",
-	}
-
-	entries, err := os.ReadDir(staticDir)
-	if err != nil {
-		return routes
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".html") || name == "index.html" {
-			continue
-		}
-		slug := strings.TrimSuffix(name, ".html")
-		routes["/"+slug] = "/" + name
-	}
-	return routes
-}
-
-func adsTXT(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("X-Robots-Tag", "all")
-	_, _ = w.Write([]byte(adsTXTBody))
-}
-
-func robotsTXT(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write([]byte(robotsTXTBody))
-}
-
-func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if strings.HasPrefix(path, "/api/") && path != "/api/me" && path != "/api/me/package" && path != "/api/v1/unified/analyze" && path != "/api/version" && path != "/api/config" && path != "/api/auth/register" && path != "/api/auth/login" && path != "/api/auth/provision" && path != "/api/auth/neon-login" && path != "/api/auth/neon-register" && path != "/api/auth/neon-callback" && path != "/api/public/impact" && path != "/api/public/metrics" && path != "/api/web3/health" && path != "/api/analytics/event" && db == nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusServiceUnavailable)
-			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable"})
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func jarvisPageHandler(staticDir string) http.HandlerFunc {
+func method(expected string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		if staticDir != "" {
-			jarvisPath := filepath.Join(staticDir, "jarvis.html")
-			if info, err := os.Stat(jarvisPath); err == nil && !info.IsDir() {
-				http.ServeFile(w, r, jarvisPath)
-				return
-			}
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Koschei JARVIS</title></head><body><h1>Koschei JARVIS dashboard not found</h1></body></html>`))
-	}
-}
-
-func registerLegacyDashboardRedirects(mux *http.ServeMux) {
-	legacyDashboards := []string{
-		"/airdrop-checker",
-		"/cross-chain-risk",
-		"/funding-assistant",
-		"/grant",
-		"/grant-writer",
-		"/graph",
-		"/hub",
-		"/intelligence-graph",
-		"/liquidity-radar",
-		"/mev-shield",
-		"/portfolio",
-		"/program-scanner",
-		"/project-radar",
-		"/radar",
-		"/risk",
-		"/risk-v2",
-		"/smart-money",
-		"/solana-risk-scanner",
-		"/solana-token-scanner",
-		"/solana-tx-decoder",
-		"/sybil-check",
-		"/sybil-checker",
-		"/token-scanner",
-		"/tx-decoder",
-		"/tx-decoder-pro",
-		"/unified",
-		"/wallet-score",
-	}
-	for _, route := range legacyDashboards {
-		mux.HandleFunc(route, redirectToDashboard)
-		mux.HandleFunc(route+".html", redirectToDashboard)
-	}
-}
-
-func redirectToDashboard(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	http.Redirect(w, r, "/dashboard", http.StatusFound)
-}
-
-func ownerPageHandler(staticDir string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		if staticDir != "" {
-			ownerPath := filepath.Join(staticDir, "owner.html")
-			if info, err := os.Stat(ownerPath); err == nil && !info.IsDir() {
-				http.ServeFile(w, r, ownerPath)
-				return
-			}
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Koschei Owner</title><style>body{margin:0;min-height:100vh;background:#070711;color:#f5f7fb;font-family:Inter,system-ui,sans-serif;display:grid;place-items:center}.card{max-width:720px;padding:32px;border:1px solid rgba(255,255,255,.14);border-radius:24px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));box-shadow:0 28px 80px rgba(0,0,0,.35)}h1{margin:0 0 12px;font-size:clamp(30px,5vw,54px)}p{color:#a7b0c2;line-height:1.65}.pill{display:inline-block;color:#00ffaa;border:1px solid rgba(0,255,170,.4);border-radius:999px;padding:8px 12px;font-weight:800}</style></head><body><main class="card"><span class="pill">Owner login</span><h1>Koschei Owner Dashboard</h1><p>Statik owner paneli bulunamadı. Owner API uçları korumalı kalır; giriş formunu sunmak için /owner sayfası kimlik doğrulaması istemeden servis edilir.</p></main></body></html>`))
-	}
-}
-
-func ownerOnly(h *handlers.Handler, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if !h.OwnerAuth(w, r) {
+		if r.Method != expected {
+			w.Header().Set("Allow", expected)
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		next(w, r)
@@ -380,31 +220,37 @@ func ownerOnly(h *handlers.Handler, next http.HandlerFunc) http.HandlerFunc {
 
 func requiresDB(h *handlers.Handler, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !h.RequireDB(w) {
+		if h.DB == nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "database unavailable", "message": h.DBInitError})
 			return
 		}
 		next(w, r)
 	}
 }
-func method(m string, next http.HandlerFunc) http.HandlerFunc {
+
+func ownerOnly(h *handlers.Handler, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != m {
-			w.WriteHeader(http.StatusMethodNotAllowed)
+		if !h.OwnerAuthenticate(w, r) {
 			return
 		}
 		next(w, r)
 	}
 }
-func cors(next http.Handler, origin string) http.Handler {
-	allowedOrigins := buildAllowedOrigins(origin)
+
+func withCORS(next http.Handler, origin string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if allowed := allowedCORSOrigin(r.Header.Get("Origin"), allowedOrigins); allowed != "" {
-			w.Header().Set("Access-Control-Allow-Origin", allowed)
+		allowedOrigin := strings.TrimSpace(origin)
+		requestOrigin := strings.TrimSpace(r.Header.Get("Origin"))
+		if allowedOrigin == "" && requestOrigin != "" {
+			allowedOrigin = requestOrigin
+		}
+		if allowedOrigin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 			w.Header().Set("Vary", "Origin")
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, x-admin-password, Authorization, X-API-Key, X-Koschei-Source-Id, x-koschei-agent-key, X-Koschei-Secret, X-Owner-Secret, X-Owner-Wallet, X-CSRF-Token")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Owner-Secret, X-API-Key")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -412,66 +258,12 @@ func cors(next http.Handler, origin string) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-func buildAllowedOrigins(configured string) map[string]struct{} {
-	origins := map[string]struct{}{
-		"https://tradepigloball.co":     {},
-		"https://www.tradepigloball.co": {},
-		"http://tradepigloball.co":      {},
-		"http://www.tradepigloball.co":  {},
-	}
-	for _, item := range strings.Split(configured, ",") {
-		item = strings.TrimSpace(item)
-		if item != "" {
-			origins[strings.TrimRight(item, "/")] = struct{}{}
-		}
-	}
-	return origins
-}
 
-func allowedCORSOrigin(requestOrigin string, allowed map[string]struct{}) string {
-	requestOrigin = strings.TrimRight(strings.TrimSpace(requestOrigin), "/")
-	if requestOrigin == "" {
-		return ""
-	}
-	if _, ok := allowed[requestOrigin]; ok {
-		return requestOrigin
-	}
-	if os.Getenv("APP_ENV") != "production" && os.Getenv("CORS_DEBUG_RELAXED") == "true" {
-		return requestOrigin
-	}
-	return ""
-}
-
-func securityHeaders(next http.Handler) http.Handler {
+func withSecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-		w.Header().Set("Content-Security-Policy", contentSecurityPolicy())
-		if os.Getenv("APP_ENV") == "production" {
-			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
-		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-func contentSecurityPolicy() string {
-	connectSrc := "'self' https://www.google-analytics.com https://region1.google-analytics.com"
-	if authOrigin := publicNeonAuthOrigin(); authOrigin != "" {
-		connectSrc += " " + authOrigin
-	}
-	return "default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src " + connectSrc + "; frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-}
-
-func publicNeonAuthOrigin() string {
-	raw := strings.TrimSpace(handlers.ConfiguredPublicNeonAuthURL())
-	if raw == "" {
-		return ""
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return ""
-	}
-	return u.Scheme + "://" + u.Host
 }
