@@ -44,6 +44,9 @@ func (h *Handler) customerPackageStatus(ctx context.Context, authSubject, email 
 	}
 	authSubject = strings.TrimSpace(authSubject)
 	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		email = entitlementEmailFromSubject(authSubject)
+	}
 	var planID, status string
 	var startsAt, expiresAt sql.NullTime
 	var outputsTotal, outputsRemaining int
@@ -54,6 +57,7 @@ func (h *Handler) customerPackageStatus(ctx context.Context, authSubject, email 
 		WHERE e.status = 'active'
 		  AND COALESCE(e.plan_id, '') <> ''
 		  AND COALESCE(e.plan_id, '') <> 'free'
+		  AND COALESCE(e.outputs_remaining, 0) > 0
 		  AND (e.expires_at IS NULL OR e.expires_at > now())
 		  AND (($1 <> '' AND p.auth_subject = $1) OR ($2 <> '' AND lower(e.email) = lower($2)))
 		ORDER BY e.updated_at DESC NULLS LAST, e.created_at DESC
