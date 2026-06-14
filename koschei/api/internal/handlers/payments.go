@@ -37,6 +37,8 @@ type paymentRequestInput struct {
 	FullName         string `json:"full_name"`
 	ProductID        string `json:"product_id"`
 	PaymentReference string `json:"payment_reference"`
+	RegisteredEmail  string `json:"registered_email"`
+	CustomerEmail    string `json:"customer_email"`
 	Note             string `json:"note"`
 }
 
@@ -150,6 +152,8 @@ func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
 	req.FullName = strings.TrimSpace(req.FullName)
 	req.ProductID = strings.ToLower(strings.TrimSpace(req.ProductID))
 	req.PaymentReference = strings.TrimSpace(req.PaymentReference)
+	req.RegisteredEmail = strings.ToLower(strings.TrimSpace(req.RegisteredEmail))
+	req.CustomerEmail = strings.ToLower(strings.TrimSpace(req.CustomerEmail))
 	req.Note = strings.TrimSpace(req.Note)
 	email := strings.ToLower(strings.TrimSpace(claims.Email))
 	pack, ok := shopierPacks[req.ProductID]
@@ -157,8 +161,8 @@ func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
-
-	rawPayload, err := json.Marshal(map[string]string{"payment_reference": req.PaymentReference, "note": req.Note})
+	declaredEmail := firstNonEmpty(req.RegisteredEmail, req.CustomerEmail, email)
+	rawPayload, err := json.Marshal(map[string]string{"payment_reference": req.PaymentReference, "registered_email": email, "declared_email": declaredEmail, "note": req.Note})
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payload encoding failed"})
 		return
