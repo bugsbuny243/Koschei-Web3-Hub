@@ -91,21 +91,7 @@ func extractAuthToken(resp *http.Response, body []byte) (string, bool) {
 	if len(body) == 0 || json.Unmarshal(body, &data) != nil {
 		return "", false
 	}
-	paths := [][]string{
-		{"token"},
-		{"jwt"},
-		{"access_token"},
-		{"id_token"},
-		{"auth_token"},
-		{"data", "token"},
-		{"data", "jwt"},
-		{"data", "access_token"},
-		{"data", "id_token"},
-		{"session", "token"},
-		{"session", "jwt"},
-		{"session", "access_token"},
-		{"session", "id_token"},
-	}
+	paths := [][]string{{"token"}, {"jwt"}, {"access_token"}, {"id_token"}, {"auth_token"}, {"data", "token"}, {"data", "jwt"}, {"data", "access_token"}, {"data", "id_token"}, {"session", "token"}, {"session", "jwt"}, {"session", "access_token"}, {"session", "id_token"}}
 	for _, path := range paths {
 		if token := authTokenAtPath(data, path); token != "" {
 			return token, true
@@ -175,16 +161,15 @@ func cookieNames(cookies []*http.Cookie) []string {
 }
 
 func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
+	if claims, ok, err := tryLocalJWT(token); ok {
+		return claims, err
+	}
 	return neonClaimsFromToken(token)
 }
 
-func trimSlash(s string) string {
-	return strings.TrimRight(strings.TrimSpace(s), "/")
-}
+func trimSlash(s string) string { return strings.TrimRight(strings.TrimSpace(s), "/") }
 
-func configuredIssuer() string {
-	return trimSlash(configuredNeonAuthIssuer())
-}
+func configuredIssuer() string { return trimSlash(configuredNeonAuthIssuer()) }
 
 func jwtVerifyError(category neonJWTFailureCategory, err error) error {
 	return neonJWTVerificationError{Category: category, Cause: err}
@@ -363,14 +348,7 @@ func matchesAudience(v any, target string) bool {
 
 func (h *Handler) upsertProfile(ctx context.Context, subject, email string) (userProfile, error) {
 	profile, err := h.upsertAppProfile(ctx, subject, email)
-	out := userProfile{
-		ID:          profile.ID,
-		AuthSubject: profile.AuthSubject,
-		Email:       profile.Email,
-		Role:        profile.Role,
-		PlanID:      profile.Plan,
-		Credits:     profile.Credits,
-	}
+	out := userProfile{ID: profile.ID, AuthSubject: profile.AuthSubject, Email: profile.Email, Role: profile.Role, PlanID: profile.Plan, Credits: profile.Credits}
 	if err != nil {
 		log.Printf("upsertProfile failed: %v", err)
 	}
