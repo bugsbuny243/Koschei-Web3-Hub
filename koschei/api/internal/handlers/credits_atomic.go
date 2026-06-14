@@ -6,18 +6,28 @@ import (
 	"strings"
 )
 
-func (h *Handler) userCreditsAndRole(authSubject string) (bool, int, error) {
+func (h *Handler) userCreditsAndRole(authSubject string, emails ...string) (bool, int, error) {
+	authSubject = strings.TrimSpace(authSubject)
+	email := ""
+	if len(emails) > 0 {
+		email = strings.ToLower(strings.TrimSpace(emails[0]))
+	}
+
 	var available int
 	err := h.DB.QueryRow(`
 		SELECT COALESCE((
 			SELECT SUM(e.outputs_remaining)::int
 			FROM entitlements e
-			JOIN app_user_profiles p ON lower(p.email) = lower(e.email)
-			WHERE p.auth_subject = $1
-			  AND e.status = 'active'
+			LEFT JOIN app_user_profiles p ON lower(p.email) = lower(e.email)
+			WHERE e.status = 'active'
 			  AND COALESCE(e.plan_id, '') <> 'free'
 			  AND COALESCE(e.outputs_remaining, 0) > 0
-		), 0)`, authSubject).Scan(&available)
+			  AND (e.expires_at IS NULL OR e.expires_at > now())
+			  AND (
+				($1 <> '' AND p.auth_subject = $1)
+				OR ($2 <> '' AND lower(e.email) = lower($2))
+			  )
+		), 0)`, authSubject, email).Scan(&available)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, 0, nil
@@ -104,18 +114,22 @@ func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) 
 	return active, err
 }
 
-func (h *Handler) requirePremiumOutput(authSubject string) (int, error) {
+func (h *Handler) requirePremiumOutput(authSubject string, emails ...string) (int, error) {
 	if h.DB == nil {
 		return 0, errors.New("database unavailable")
 	}
-	active, err := h.hasActivePaidPackage(authSubject, "")
+	email := ""
+	if len(emails) > 0 {
+		email = strings.ToLower(strings.TrimSpace(emails[0]))
+	}
+	active, err := h.hasActivePaidPackage(authSubject, email)
 	if err != nil {
 		return 0, err
 	}
 	if !active {
 		return 0, errors.New("active package required")
 	}
-	_, available, err := h.userCreditsAndRole(authSubject)
+	_, available, err := h.userCreditsAndRole(authSubject, email)
 	if err != nil {
 		return 0, err
 	}
