@@ -23,17 +23,11 @@ func (h *Handler) premiumStub(w http.ResponseWriter, r *http.Request, name strin
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusGone, map[string]string{
-		"error":   "backend_auth_disabled",
-		"message": "Use /api/config neonAuthUrl and Neon /sign-up/email from the frontend.",
-	})
+	h.LocalRegister(w, r)
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusGone, map[string]string{
-		"error":   "backend_auth_disabled",
-		"message": "Use /api/config neonAuthUrl and Neon /sign-in/email from the frontend.",
-	})
+	h.LocalLogin(w, r)
 }
 
 func (h *Handler) StartOTPLogin(w http.ResponseWriter, r *http.Request) {
