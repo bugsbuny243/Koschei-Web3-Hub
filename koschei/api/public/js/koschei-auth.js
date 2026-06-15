@@ -76,6 +76,7 @@
     if (raw === 'invalid credentials') return 'E-posta veya şifre hatalı.';
     if (raw === 'database unavailable') return 'Veritabanı bağlantısı hazır değil.';
     if (raw === 'token signing failed') return 'Oturum anahtarı eksik. USER_SESSION_SECRET veya JWT_SECRET ekleyin.';
+    if (raw === 'backend_auth_disabled') return 'Kayıt ve giriş Neon Auth üzerinden yapılır.';
     return raw;
   }
 
@@ -101,9 +102,28 @@
     return { ...data, access_token: token, token_type: 'Bearer' };
   }
 
+  function consumeAccessTokenFromHash() {
+    const hash = String(window.location.hash || '');
+    if (!hash || hash.length < 2) return false;
+    const params = new URLSearchParams(hash.slice(1));
+    const token = params.get('access_token') || params.get('token') || params.get('id_token') || '';
+    if (!isJwt(token)) return false;
+    saveJwt(token);
+    params.delete('access_token');
+    params.delete('token');
+    params.delete('id_token');
+    const cleanHash = params.toString();
+    const cleanURL = window.location.pathname + window.location.search + (cleanHash ? '#' + cleanHash : '');
+    window.history.replaceState(null, document.title, cleanURL);
+    verifyMe(token).catch(() => null);
+    return true;
+  }
+
   async function init() {
+    consumeAccessTokenFromHash();
     const token = getJwt();
     if (isJwt(token) && isJwtExpired(token)) clearJwt();
+    if (isJwt(getJwt())) await verifyMe(getJwt()).catch(() => null);
   }
 
   async function signUp(email, password) {
@@ -149,8 +169,6 @@
       return null;
     }
   }
-
-  function consumeAccessTokenFromHash() { return false; }
 
   window.KoscheiAuth = { init, signIn, signUp, signOut, consumeAccessTokenFromHash, isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt, clearJwt, isJwtExpired };
 })();
