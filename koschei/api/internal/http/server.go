@@ -94,6 +94,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/owner/brain", requiresDB(h, ownerOnly(h, method("POST", h.OwnerBrain))))
 	mux.HandleFunc("/api/owner/health", requiresDB(h, ownerOnly(h, method("GET", h.OwnerHealth))))
 	mux.HandleFunc("/api/owner/status", requiresDB(h, ownerOnly(h, method("GET", h.OwnerStatus))))
+	mux.HandleFunc("/api/owner/radar/summary", requiresDB(h, ownerOnly(h, method("GET", h.OwnerRadarSummary))))
 	mux.HandleFunc("/api/owner/emergency", ownerOnly(h, method("POST", h.OwnerEmergencyControl)))
 	mux.HandleFunc("/api/owner/grants", requiresDB(h, ownerOnly(h, method("GET", h.OwnerGrants))))
 	mux.HandleFunc("/api/owner/dao-guardian", requiresDB(h, ownerOnly(h, method("GET", h.OwnerDAOGuardianSummary))))
@@ -150,6 +151,9 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, handlers.RequireAuth(method("POST", h.RevokeAPIKey))))
 	mux.HandleFunc("/api/v1/scan/token", requiresDB(h, h.APIKeyAuth(h.CheckB2BQuota(method("POST", h.B2BTokenScan)))))
 	mux.HandleFunc("/api/v1/unified/analyze", handlers.RequireAuth(method("POST", h.UnifiedIntelligenceHandler)))
+	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, handlers.RequireAuth(h.RequireActiveEntitlement(method("GET", h.SecurityRadarFeed)))))
+	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, handlers.RequireAuth(h.RequireActiveEntitlement(method("POST", h.SecurityRadarCheck)))))
+	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
 	mux.HandleFunc("/api/v1/mev/analyze", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.MEVAnalyze))))))
 	mux.HandleFunc("/api/v1/mev/protected-send", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.ProtectedSend))))))
 	mux.HandleFunc("/api/v1/liquidity/analyze", requiresDB(h, handlers.RequireAuth(h.APIKeyAuth(h.APIRateLimit(method("POST", h.LiquidityDrainAnalyze))))))
@@ -277,7 +281,7 @@ func robotsTXT(w http.ResponseWriter, r *http.Request) {
 func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if strings.HasPrefix(path, "/api/") && path != "/api/me" && path != "/api/me/package" && path != "/api/v1/unified/analyze" && path != "/api/version" && path != "/api/config" && path != "/api/auth/register" && path != "/api/auth/login" && path != "/api/auth/provision" && path != "/api/auth/neon-login" && path != "/api/auth/neon-register" && path != "/api/auth/neon-callback" && path != "/api/public/impact" && path != "/api/public/metrics" && path != "/api/web3/health" && path != "/api/analytics/event" && db == nil {
+		if strings.HasPrefix(path, "/api/") && path != "/api/me" && path != "/api/me/package" && path != "/api/v1/unified/analyze" && path != "/api/v1/risk/badge" && path != "/api/version" && path != "/api/config" && path != "/api/auth/register" && path != "/api/auth/login" && path != "/api/auth/provision" && path != "/api/auth/neon-login" && path != "/api/auth/neon-register" && path != "/api/auth/neon-callback" && path != "/api/public/impact" && path != "/api/public/metrics" && path != "/api/web3/health" && path != "/api/analytics/event" && db == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable"})
