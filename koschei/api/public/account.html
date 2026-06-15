@@ -1,89 +1,21 @@
-<!DOCTYPE html>
-<html lang="tr">
+<!doctype html>
+<html lang="en">
 <head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-1QFWMJJC3');
-</script>
-
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hesap — Koschei</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/koschei.css">
+  <title>Account — Koschei Security Center</title>
   <style>
-    .account-row{display:flex;justify-content:space-between;gap:20px;padding:14px 0;border-bottom:1px solid var(--border);}
-    .account-row:last-child{border-bottom:none;}
-    .account-value{text-align:right;font-weight:600;word-break:break-word;}
+    :root{--bg:#04070d;--line:#24eaff30;--text:#f4fbff;--muted:#9aabb8;--green:#18ffb2;--cyan:#24eaff;--amber:#ffcc66;--red:#ff4d6d;--shadow:0 30px 95px #000b}*{box-sizing:border-box}body{min-height:100vh;margin:0;color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at 12% 8%,#18ffb226,transparent 30%),radial-gradient(circle at 88% 14%,#24eaff20,transparent 30%),linear-gradient(145deg,#020409,#071522 58%,#02040a)}.shell{width:min(920px,calc(100% - 28px));margin:0 auto;padding:18px 0 64px}.nav,.panel,.card{border:1px solid var(--line);background:linear-gradient(145deg,#ffffff15,#071421c9);box-shadow:var(--shadow),inset 0 0 38px #24eaff08;backdrop-filter:blur(20px)}.nav{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:22px;padding:12px 14px;border-radius:24px}.brand{display:inline-flex;align-items:center;gap:10px;font-weight:950;letter-spacing:.06em;text-decoration:none;color:#eefbff}.brand:before{content:"K";display:grid;place-items:center;width:40px;height:40px;border-radius:14px;color:#03110d;background:linear-gradient(135deg,var(--green),var(--cyan))}.links{display:flex;gap:8px;flex-wrap:wrap}.links a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:850;padding:10px 14px;border:1px solid transparent;border-radius:999px}.links a:hover,.links a.active{color:#eaffff;border-color:#24eaff2e;background:#ffffff0d}.panel{border-radius:32px;padding:clamp(24px,4vw,44px)}.eyebrow{display:inline-flex;color:#bffff0;background:#18ffb215;border:1px solid #18ffb23a;padding:8px 12px;border-radius:999px;font-size:12px;font-weight:950;letter-spacing:.11em;text-transform:uppercase}h1{margin:18px 0 10px;font-size:clamp(38px,6vw,64px);line-height:.95;letter-spacing:-.06em}.sub{max-width:760px;color:var(--muted);line-height:1.75}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:20px}.card{border-radius:24px;padding:18px}.card label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}.card b{display:block;font-size:24px;color:#eaffff;margin-top:7px;word-break:break-word}.wide{grid-column:1/-1}.notice{border:1px solid #18ffb245;background:#18ffb215;color:#d9ffe9;border-radius:20px;padding:15px 16px;line-height:1.6;margin-top:18px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 18px;border-radius:999px;text-decoration:none;font-weight:950;border:1px solid var(--line);background:#ffffff0f;color:var(--text);cursor:pointer}.primary{border:0;color:#03110d;background:linear-gradient(135deg,var(--green),var(--cyan));box-shadow:0 16px 45px #18ffb223}.badge{display:inline-flex;width:max-content;border-radius:999px;padding:7px 10px;background:#18ffb217;color:var(--green);font-size:12px;font-weight:950;text-transform:uppercase;margin-top:7px}.bar{height:10px;border-radius:999px;background:#ffffff14;overflow:hidden;margin-top:12px}.bar span{display:block;height:100%;width:5%;background:linear-gradient(90deg,var(--green),var(--cyan))}@media(max-width:680px){.nav{flex-direction:column;align-items:flex-start}.links{width:100%;display:grid;grid-template-columns:1fr 1fr}.links a{text-align:center}.grid{grid-template-columns:1fr}.panel{border-radius:24px}.btn{width:100%}}
   </style>
 </head>
 <body>
-<nav class="nav">
-  <a href="/hub" class="nav-logo">K <span style="color:var(--text);font-weight:500;font-size:15px;">Koschei</span></a>
-  <div class="nav-links">
-    <a href="/hub" class="nav-link">Panel</a>
-    <a href="/metadata" class="nav-link">Metadata</a>
-    <a href="/dashboard" class="nav-link">Risk</a>
-    <a href="/watchlist" class="nav-link">Watchlist</a>
-    <a href="/chains" class="nav-link">Chains</a>
-    <a href="/watchlist" class="nav-link">Watchlist</a>
-    <a href="/account" class="nav-link active">Hesap</a>
+  <div class="shell">
+    <nav class="nav"><a href="/dashboard" class="brand">Koschei</a><div class="links"><a href="/dashboard">Dashboard</a><a href="/pricing">Plans</a><a href="/reports">Reports</a><a href="/account" class="active">Account</a></div></nav>
+    <main class="panel"><span class="eyebrow">Customer account</span><h1>Account & outputs</h1><p class="sub">View your active Koschei plan, output quota and customer email. Premium analysis is only available while a paid entitlement is active.</p><div class="grid"><div class="card wide"><label>Email</label><b id="accountEmail">Loading…</b></div><div class="card"><label>Plan</label><b id="accountPlan">—</b><span class="badge" id="accountStatus">active</span></div><div class="card"><label>Remaining outputs</label><b id="accountOutputsRemaining">—</b><div class="bar"><span id="outputBar"></span></div></div><div class="card"><label>Total outputs</label><b id="accountOutputsTotal">—</b></div><div class="card"><label>Access model</label><b>Paid gate</b></div></div><p id="planMessage" class="notice">Loading package authorization…</p><div class="actions"><a href="/dashboard" class="btn primary">Run Analysis</a><a href="/pricing" class="btn">Buy Outputs</a><button class="btn" type="button" onclick="KoscheiAuth.signOut()">Sign out</button></div></main>
   </div>
-</nav>
-
-<main class="page" style="max-width:700px;">
-  <div class="page-title">Hesap</div>
-  <div class="page-sub">Aktif Koschei üye hesap detaylarınızı görüntüleyin.</div>
-
-  <div class="alert" id="accountMessage"></div>
-  <section class="card" style="margin-bottom:20px;">
-    <div class="account-row"><span class="form-label">Email</span><span class="account-value" id="accountEmail">Yükleniyor…</span></div>
-    <div class="account-row"><span class="form-label">Plan</span><span class="account-value" id="accountPlan">—</span></div>
-    <div class="account-row"><span class="form-label">Toplam çıktı hakkı</span><span class="account-value" id="accountOutputsTotal">—</span></div>
-    <div class="account-row"><span class="form-label">Kalan çıktı hakkı</span><span class="account-value" id="accountOutputsRemaining">—</span></div>
-    <div class="account-row"><span class="form-label">Durum</span><span class="account-value"><span class="badge badge-green">aktif</span></span></div>
-    <p id="planMessage" class="notice" style="margin-top:16px;">Paket yetkisi yükleniyor…</p>
-  </section>
-
-  <div style="display:flex;gap:10px;flex-wrap:wrap;">
-    <a href="/hub" class="btn btn-primary">← Panele Dön</a>
-    <a href="/pricing" class="btn btn-primary">Paketleri Gör / Çıktı Al</a>
-    <button class="btn btn-ghost" type="button" onclick="KoscheiAuth.signOut()">Çıkış Yap</button>
-  </div>
-</main>
-
-<script src="/js/koschei-auth.js?v=4"></script>
-<script src="/js/koschei-analytics.js?v=1"></script>
-<script>
-  (async () => {
-    await KoscheiAuth.init();
-    if (!KoscheiAuth.requireAuth('/login')) return;
-    KoscheiAnalytics.track('account_view');
-
-    document.getElementById('accountEmail').textContent = KoscheiAuth.getEmail() || '';
-    try {
-      const res = await KoscheiAuth.apiCall('/api/member/summary');
-      if (!res || !res.ok) throw new Error('Member summary unavailable');
-      const data = await res.json();
-      document.getElementById('accountEmail').textContent = data.email || KoscheiAuth.getEmail() || '';
-      document.getElementById('accountPlan').textContent = data.plan || 'aktif paket yok';
-      document.getElementById('accountOutputsTotal').textContent = data.outputs_total ?? 0;
-      document.getElementById('accountOutputsRemaining').textContent = data.outputs_remaining ?? 0;
-      const plan = String(data.plan || 'aktif paket yok').toLowerCase();
-      document.getElementById('planMessage').textContent = plan === 'free' || plan === 'aktif paket yok'
-        ? 'Aktif paketi olmayan hesaplar ayarları ve paketleri görüntüleyebilir. Üretim istihbarat modüllerini çalıştırmak için paket aktifleştirin.'
-        : 'Ücretli çıktılar aktif. Toplam ve kalan çıktı hakları yukarıda gösterilir.';
-    } catch {
-      const message = document.getElementById('accountMessage');
-      message.textContent = 'Hesap detayları yüklenemedi. Lütfen tekrar deneyin.';
-      message.className = 'alert alert-error show';
-    }
-  })();
-</script>
+  <script src="/js/koschei-auth.js?v=14"></script><script src="/js/koschei-analytics.js?v=1"></script>
+  <script>
+    (async()=>{await KoscheiAuth.init();if(!KoscheiAuth.requireAuth('/login'))return;if(window.KoscheiAnalytics)KoscheiAnalytics.track('account_view');const email=KoscheiAuth.getEmail()||'';document.getElementById('accountEmail').textContent=email;try{let res=await KoscheiAuth.apiCall('/api/member/summary');let data={};if(res&&res.ok)data=await res.json();if(!data.plan){res=await KoscheiAuth.apiCall('/api/me/package');const p=await res.json().catch(()=>({}));const v=p.data||p||{};data={email:email,plan:v.plan_id||'no active plan',outputs_total:v.outputs_total||0,outputs_remaining:v.outputs_remaining||0,status:v.status||'none'}}document.getElementById('accountEmail').textContent=data.email||email;const plan=String(data.plan||'no active plan');document.getElementById('accountPlan').textContent=plan;document.getElementById('accountOutputsTotal').textContent=data.outputs_total??0;document.getElementById('accountOutputsRemaining').textContent=data.outputs_remaining??0;document.getElementById('accountStatus').textContent=(data.status||'active');const total=Number(data.outputs_total||0),remaining=Number(data.outputs_remaining||0);document.getElementById('outputBar').style.width=total>0?Math.max(4,Math.min(100,Math.round(remaining/total*100)))+'%':'4%';const inactive=plan.toLowerCase()==='free'||plan.toLowerCase()==='no active plan'||plan.toLowerCase()==='none';document.getElementById('planMessage').textContent=inactive?'No active paid package. You can browse the account and pricing pages, but premium analysis requires an active entitlement.':'Paid outputs are active. Total and remaining output rights are shown above.'}catch(e){document.getElementById('planMessage').textContent='Account summary could not be loaded yet.'}})();
+  </script>
 </body>
 </html>
