@@ -295,11 +295,6 @@ go build ./...
 
 ---
 
-## Contact
-
-- Owner: Onur Sel
-- Email: `onur24sel@gmail.com`
-
 ---
 
 Built for Solana security intelligence.
