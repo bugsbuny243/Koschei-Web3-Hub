@@ -70,7 +70,8 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusUnauthorized, APICodeUnauthorized, "Unauthorized")
 		return
 	}
-	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+	claimEmail := normalizedClaimEmail(claims)
+	if _, err := h.requirePremiumOutput(claims.Sub, claimEmail); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
@@ -89,12 +90,12 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	bundle := services.AnalyzeSecurityRadars(services.SecurityRadarRequest{Target: target, Network: input.Network, Mode: firstNonEmptyString(input.Mode, "manual_dashboard_check")})
 	_ = h.saveSecurityRadarBundle(r.Context(), claims.Sub, "manual_check", bundle)
-	if err := h.consumePremiumOutput(claims.Sub, normalizedClaimEmail(claims), "security_radar_check"); err != nil {
+	if err := h.consumePremiumOutput(claims.Sub, claimEmail, "security_radar_check"); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
-	h.logTool(normalizedClaimEmail(claims), "security_radar_check", "completed")
-	h.trackEvent(normalizedClaimEmail(claims), "security_radar_check", r.URL.Path)
+	h.logTool(claimEmail, "security_radar_check", "completed")
+	h.trackEvent(claimEmail, "security_radar_check", r.URL.Path)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "bundle": bundle, "final_verdict": services.FinalSecurityRadarVerdict(bundle)})
 }
 
