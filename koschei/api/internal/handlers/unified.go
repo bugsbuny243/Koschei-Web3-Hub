@@ -42,7 +42,8 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		writeAPIError(w, http.StatusUnauthorized, APICodeUnauthorized, "Unauthorized", nil)
 		return
 	}
-	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+	claimEmail := normalizedClaimEmail(claims)
+	if _, err := h.requirePremiumOutput(claims.Sub, claimEmail); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
@@ -88,7 +89,7 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 	}
 	partialFailures := []partialFailure{}
 	_ = h.saveSecurityRadarBundle(r.Context(), claims.Sub, "unified_analyze", radars)
-	if err := h.consumePremiumOutput(claims.Sub, normalizedClaimEmail(claims), "unified_analyze"); err != nil {
+	if err := h.consumePremiumOutput(claims.Sub, claimEmail, "unified_analyze"); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
@@ -101,9 +102,9 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		Sources:         []string{"koschei_security_rules", "alchemy_solana_rpc"},
 		PartialFailures: partialFailures,
 	}
-	h.logUnifiedAnalysis(normalizedClaimEmail(claims), inputType, APICodeOK, "deterministic_signed", partialFailures)
-	h.logTool(normalizedClaimEmail(claims), "unified_analyze", "completed")
-	h.trackEvent(normalizedClaimEmail(claims), "unified_analyze", r.URL.Path)
+	h.logUnifiedAnalysis(claimEmail, inputType, APICodeOK, "deterministic_signed", partialFailures)
+	h.logTool(claimEmail, "unified_analyze", "completed")
+	h.trackEvent(claimEmail, "unified_analyze", r.URL.Path)
 	writeAPISuccess(w, "Analysis completed", data)
 }
 
