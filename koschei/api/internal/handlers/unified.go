@@ -22,10 +22,11 @@ type unifiedAnalyzeHTTPInput struct {
 }
 
 type unifiedAnalyzeData struct {
-	InputType       string         `json:"input_type"`
-	Summary         string         `json:"summary"`
-	Sections        map[string]any `json:"sections"`
-	Sources         []string       `json:"sources"`
+	InputType       string           `json:"input_type"`
+	Summary         string           `json:"summary"`
+	Sections        map[string]any   `json:"sections"`
+	SecurityRadars  any              `json:"security_radars,omitempty"`
+	Sources         []string         `json:"sources"`
 	PartialFailures []partialFailure `json:"partial_failures"`
 }
 
@@ -66,30 +67,40 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		inputType = "token"
 	}
 
-	bundle := services.AnalyzeSecurityRadars(services.SecurityRadarRequest{Target: rawInput, Network: input.Network, Mode: "unified_analyze"})
-	final := services.FinalSecurityRadarVerdict(bundle)
+	radars := services.AnalyzeSecurityRadars(services.SecurityRadarRequest{
+		Target:  rawInput,
+		Network: input.Network,
+		Mode:    "polling",
+	})
+	final := services.FinalSecurityRadarVerdict(radars)
 	sections := map[string]any{
-		"pump_sybil_radar":       bundle.PumpSybilRadar,
-		"raydium_pool_guardian":  bundle.RaydiumPoolGuardian,
-		"walletless_claim_shield": bundle.WalletlessClaimShield,
+		"pump_sybil_radar":        radars.PumpSybilRadar,
+		"raydium_pool_guardian":   radars.RaydiumPoolGuardian,
+		"walletless_claim_shield": radars.WalletlessClaimShield,
 		"final_verdict": map[string]any{
 			"grade":          final.Grade,
 			"risk_index":     final.RiskIndex,
 			"risk_level":     final.RiskLevel,
-			"verdict":        final.Verdict,
 			"recommendation": final.Recommendation,
 			"rule_version":   final.RuleVersion,
 			"signed":         final.Signed,
 		},
 	}
 	partialFailures := []partialFailure{}
-	_ = h.saveSecurityRadarBundle(r.Context(), claims.Sub, "unified_analyze", bundle)
+	_ = h.saveSecurityRadarBundle(r.Context(), claims.Sub, "unified_analyze", radars)
 	if err := h.consumePremiumOutput(claims.Sub, normalizedClaimEmail(claims), "unified_analyze"); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
 
-	data := unifiedAnalyzeData{InputType: inputType, Summary: bundle.CustomerSummary, Sections: sections, Sources: []string{"koschei_security_rules", "alchemy_solana_rpc"}, PartialFailures: partialFailures}
+	data := unifiedAnalyzeData{
+		InputType:       inputType,
+		Summary:         radars.CustomerSummary,
+		Sections:        sections,
+		SecurityRadars:  radars,
+		Sources:         []string{"koschei_security_rules", "alchemy_solana_rpc"},
+		PartialFailures: partialFailures,
+	}
 	h.logUnifiedAnalysis(normalizedClaimEmail(claims), inputType, APICodeOK, "deterministic_signed", partialFailures)
 	h.logTool(normalizedClaimEmail(claims), "unified_analyze", "completed")
 	h.trackEvent(normalizedClaimEmail(claims), "unified_analyze", r.URL.Path)
