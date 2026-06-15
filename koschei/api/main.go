@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"koschei/api/internal/handlers"
 	apihttp "koschei/api/internal/http"
 	"koschei/api/internal/jobs"
+	"koschei/api/internal/services"
 	"koschei/api/internal/web3"
 )
 
@@ -58,6 +60,8 @@ func main() {
 	appCache := buildCache()
 	defer appCache.Close()
 	solanaRPC := web3.NewSolanaRPC(appCache)
+	stopSecurityRadars := services.StartSecurityRadarWatcher(context.Background(), conn, solanaRPC)
+	defer stopSecurityRadars()
 	jobStore := jobs.NewStore(conn)
 	jobQueue := jobs.Queue(jobs.NoopQueue{})
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
