@@ -84,7 +84,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux.HandleFunc("/api/payments/request", requiresDB(h, handlers.RequireAuth(method("POST", h.PaymentRequest))))
 	mux.HandleFunc("/api/shopier/webhook", requiresDB(h, method("POST", h.ShopierWebhook)))
 	mux.HandleFunc("/api/owner/login", method("POST", h.OwnerLogin))
-	mux.HandleFunc("/api/owner/users", requiresDB(h, ownerOnly(h, method("GET", h.OwnerUsers))))
+	mux.HandleFunc("/api/owner/users", requiresDB(h, ownerOnly(h, method("GET", h.OwnerUsersV2))))
 	mux.HandleFunc("/api/owner/credits/add", requiresDB(h, ownerOnly(h, method("POST", h.OwnerAddCredits))))
 	mux.HandleFunc("/api/owner/users/ban", requiresDB(h, ownerOnly(h, method("POST", h.OwnerBanUser))))
 	mux.HandleFunc("/api/owner/users/remove", requiresDB(h, ownerOnly(h, method("POST", h.OwnerRemoveUser))))
@@ -426,52 +426,4 @@ func buildAllowedOrigins(configured string) map[string]struct{} {
 		}
 	}
 	return origins
-}
-
-func allowedCORSOrigin(requestOrigin string, allowed map[string]struct{}) string {
-	requestOrigin = strings.TrimRight(strings.TrimSpace(requestOrigin), "/")
-	if requestOrigin == "" {
-		return ""
-	}
-	if _, ok := allowed[requestOrigin]; ok {
-		return requestOrigin
-	}
-	if os.Getenv("APP_ENV") != "production" && os.Getenv("CORS_DEBUG_RELAXED") == "true" {
-		return requestOrigin
-	}
-	return ""
-}
-
-func securityHeaders(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-		w.Header().Set("Content-Security-Policy", contentSecurityPolicy())
-		if os.Getenv("APP_ENV") == "production" {
-			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func contentSecurityPolicy() string {
-	connectSrc := "'self' https://www.google-analytics.com https://region1.google-analytics.com"
-	if authOrigin := publicNeonAuthOrigin(); authOrigin != "" {
-		connectSrc += " " + authOrigin
-	}
-	return "default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src " + connectSrc + "; frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-}
-
-func publicNeonAuthOrigin() string {
-	raw := strings.TrimSpace(handlers.ConfiguredPublicNeonAuthURL())
-	if raw == "" {
-		return ""
-	}
-	u, err := url.Parse(raw)
-	if err != nil || u.Scheme == "" || u.Host == "" {
-		return ""
-	}
-	return u.Scheme + "://" + u.Host
 }
