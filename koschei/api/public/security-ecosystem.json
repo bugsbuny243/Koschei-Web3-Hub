@@ -1,8 +1,9 @@
 {
   "ok": true,
-  "product": "Koschei Solana Security Ecosystem Center",
+  "product": "Koschei Web3 Hub",
+  "surface": "Security Radar Ecosystem",
   "version": "security-ecosystem-v1",
-  "positioning": "Koschei watches Solana, detects risk, signs verdicts, and lets customers consume security intelligence before they click.",
+  "positioning": "Koschei Web3 Hub watches Solana, detects risk, signs verdicts, and lets customers consume security intelligence before they click.",
   "provider_mode": "alchemy_first",
   "model_policy": {
     "external_model_access": false,
@@ -126,6 +127,7 @@
   ],
   "customer_surfaces": [
     "/dashboard",
+    "/security-radar",
     "/api/v1/unified/analyze",
     "/api/v1/risk/badge",
     "/widget.js",
