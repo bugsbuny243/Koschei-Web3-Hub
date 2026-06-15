@@ -1,152 +1,263 @@
-# Koschei Web3 Hub - Solana Ekosistemi İçin Proaktif Güvenlik Katmanı
+# Koschei Web3 Hub
 
-> **Non-custodial, AI destekli ve public-good güvenlik platformu:** Koschei Web3 Hub; Solana kullanıcıları, geliştiricileri ve DAO ekipleri için MEV, likidite drenajı, governance saldırıları ve riskli akıllı para hareketlerini işlem gerçekleşmeden önce görünür hale getirir.
+> **Alchemy-first automatic Solana security radar.** Koschei watches Solana activity, detects early risk patterns, signs deterministic verdicts, and gives customers a clear A-F risk grade before they interact.
 
 ![Production](https://img.shields.io/badge/Production-Online-00ffaa?style=for-the-badge)
-![Grant Status](https://img.shields.io/badge/Solana%20Grant-Tier--1%20Ready-7c5cff?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)
-![Build Status](https://img.shields.io/badge/Build-Go%20API%20%2B%20Vanilla%20JS-success?style=for-the-badge)
+![Solana](https://img.shields.io/badge/Solana-Mainnet-24eaff?style=for-the-badge)
+![Provider](https://img.shields.io/badge/Data-Alchemy%20HTTPS-7c5cff?style=for-the-badge)
+![Build](https://img.shields.io/badge/Build-Go%20API%20%2B%20Vanilla%20JS-success?style=for-the-badge)
 
 ---
 
-## Neden Koschei?
+## Product Direction
 
-Web3 güvenliği çoğu zaman **reaktif** çalışır: exploit olur, zarar ölçülür, rapor yazılır. Koschei bu yaklaşımı tersine çevirir.
-
-| Reaktif Güvenlik | Koschei Proaktif Katmanı |
-| --- | --- |
-| Saldırıdan sonra forensics | İşlemden önce risk skoru |
-| Manuel alarm takibi | Canlı MEV ve likidite radar sinyalleri |
-| Kapalı veri siloları | Public-good impact dashboard |
-| Custodial entegrasyon riski | **No private keys, no seed phrases, no custody** |
-
-Koschei, kullanıcı fonlarına dokunmadan read-only RPC, veritabanı agregasyonları, risk kuralları ve AI destekli simülasyonlarla Solana ekosisteminde ölçülebilir güvenlik etkisi üretir.
-
----
-
-## Canlı Metrikler Tablosu
-
-> `/api/public/metrics` endpoint'i production ortamında `mev_protection_events` ve `liquidity_drain_alerts` tablolarından gerçek agregasyon döndürür; veri yoksa ciddi boş durum döner.
-
-| Metrik | Başlangıç Değeri | Kaynak |
-| --- | ---: | --- |
-| Toplam Kurtarılan USD | $128,400+ | MEV Shield + Liquidity Radar |
-| Engellenen Saldırılar | 324+ | Koruma olayları ve alarm kayıtları |
-| Aktif Cüzdanlar | 1,842+ | Read-only kullanıcı / cüzdan agregasyonu |
-| Canlı Modüller | 5 | Public security modules |
-| Güncelleme Sıklığı | 60 sn | API cache TTL |
-
----
-
-## Modüller
-
-### 1. MEV Shield
-Swap öncesi sandwich, backrun, slippage ve rota manipülasyonu risklerini analiz eder. Kullanıcıya risk skoru, sebep listesi ve daha güvenli işlem önerisi verir.
-
-### 2. Liquidity Radar
-Token havuzlarında ani likidite çıkışı, rug-pull paterni, yüksek riskli pool davranışı ve kritik anomali sinyallerini canlı alarm akışı olarak sunar.
-
-### 3. AI Simulator
-Geliştiriciler ve DAO ekipleri için saldırı senaryolarını doğal dil ile simüle eder; riskli kod, konfigürasyon veya operasyon kararı için düzeltme önerileri üretir.
-
-### 4. DAO Guardian
-DAO tekliflerinde treasury outflow, yetki devri, parametre manipülasyonu ve governance takeover ihtimallerini işaretler.
-
-### 5. Smart Money Oracle
-Whale, fon, bot ve yüksek etki cüzdan hareketlerinden risk sinyalleri çıkarır; güvenlik kararlarına bağlam ekler.
-
----
-
-## Teknik Mimari
-
-- **Backend:** Go 1.23, net/http tabanlı API, güvenli middleware zinciri
-- **Database:** Neon Postgres / PostgreSQL read-write ve read-replica desteği
-- **Cache:** Redis veya in-memory cache
-- **Solana Data:** Solana RPC, token / wallet / transaction analiz servisleri
-- **AI Layer:** Together AI entegrasyonuna hazır risk simülasyon katmanı
-- **Frontend:** Vanilla HTML, CSS ve JavaScript; React/Vue runtime bağımlılığı yok
-- **Security:** Non-custodial tasarım, CSP header, owner-only operasyon paneli, API key destekli B2B endpoint'ler
-
----
-
-## Proje Yapısı
+Koschei is not a generic chatbot and it is not a manual-only scanner. The product direction is:
 
 ```text
-.
-├── README.md
-├── Dockerfile
-├── render.yaml
-├── db/
-│   └── README.md
-└── koschei/
-    └── api/
-        ├── main.go
-        ├── go.mod
-        ├── internal/
-        │   ├── handlers/
-        │   │   ├── impact.go
-        │   │   ├── mev_shield.go
-        │   │   ├── liquidity_radar.go
-        │   │   └── owner.go
-        │   ├── http/
-        │   │   └── server.go
-        │   ├── cache/
-        │   ├── db/
-        │   └── web3/
-        └── public/
-            ├── index.html
-            ├── impact.html
-            ├── mev-shield.html
-            ├── radar.html
-            └── owner.html
+Koschei watches Solana.
+Koschei detects risk.
+Koschei signs verdicts.
+Customers consume the intelligence through dashboard, API, widget and badge.
+```
+
+The first production security surface is focused on three core radars:
+
+1. **Pump.fun Sybil Radar**
+2. **Raydium Pool Guardian**
+3. **Walletless Claim Shield**
+
+The model layer is private. Customers cannot change prompts, verdict thresholds, rule weights or scoring behavior. AI can explain findings, but the final grade belongs to the deterministic Koschei rule engine.
+
+---
+
+## Core Radars
+
+### 1. Pump.fun Sybil Radar
+
+Detects coordinated launch behavior around new Pump.fun-style token launches.
+
+Koschei tracks and scores:
+
+```text
+new token launch activity
+creator wallet
+first 10 / 25 / 50 / 100 buyers
+shared funding-source clusters
+creator-linked buyer relations
+early holder concentration
+sniper-like timing patterns
+```
+
+Customer output:
+
+```json
+{
+  "module": "pump_sybil_radar",
+  "grade": "F",
+  "risk_index": 91,
+  "risk_level": "critical",
+  "verdict": "Coordinated launch behavior suspected",
+  "recommendation": "avoid"
+}
+```
+
+### 2. Raydium Pool Guardian
+
+Detects risky Raydium pool behavior, unsafe authority state and liquidity concentration.
+
+Koschei tracks and scores:
+
+```text
+new Raydium pools
+liquidity added events
+token mint account
+mint authority
+freeze authority
+pool creator
+LP concentration
+top holder concentration
+liquidity movement signals
+```
+
+Customer output:
+
+```json
+{
+  "module": "raydium_pool_guardian",
+  "grade": "D",
+  "risk_index": 74,
+  "risk_level": "high",
+  "verdict": "High risk pool or unsafe authority state",
+  "recommendation": "manual_review"
+}
+```
+
+### 3. Walletless Claim Shield
+
+Lets users check claim pages, program IDs and suspicious Solana targets before connecting a wallet.
+
+Koschei tracks and scores:
+
+```text
+claim URLs
+claim program IDs
+claim token accounts
+known-risk relations
+unsafe transaction patterns
+pre-connect warning signals
+```
+
+Customer output:
+
+```json
+{
+  "module": "walletless_claim_shield",
+  "grade": "F",
+  "risk_index": 92,
+  "risk_level": "critical",
+  "verdict": "Do not connect wallet before review",
+  "recommendation": "avoid"
+}
 ```
 
 ---
 
-## Kurulum
+## Live Product Surfaces
 
-### 1. Repoyu klonla
-
-```bash
-git clone https://github.com/your-org/Koschei-Web3-Hub.git
-cd Koschei-Web3-Hub/koschei/api
+```text
+/                       Landing page
+/dashboard              Paid customer dashboard
+/security-radar         Focused 3-radar command panel
+/security-ecosystem     Public ecosystem/module overview
+/security-ecosystem.json Machine-readable radar manifest
+/widget.js              Embeddable Koschei risk badge
+/owner-production.html  Owner operations panel
+/api/v1/unified/analyze Paid unified analyzer
 ```
 
-### 2. Ortam değişkenlerini hazırla
+Widget example:
 
-```bash
-cp ../../.env.example .env
+```html
+<script src="https://tradepigloball.co/widget.js" data-token="TOKEN_MINT"></script>
 ```
 
-Minimum önerilen değişkenler:
+---
+
+## Data Provider Strategy
+
+Current production direction is **Alchemy-first**.
+
+```text
+Solana HTTPS RPC  -> required
+Solana WebSocket  -> optional, not required
+Helius            -> optional future data acceleration, not required
+Other chains      -> disabled for this Solana-first radar surface
+```
+
+The automatic radar can run with polling over Solana HTTPS RPC.
+
+```text
+SOLANA_RPC_URL
+↓
+Polling watcher
+↓
+Pump.fun / Raydium / claim activity detection
+↓
+Koschei deterministic rule engine
+↓
+Signed customer verdict
+```
+
+---
+
+## Required Environment Variables
+
+Minimum production variables:
 
 ```env
 PORT=8080
-DATABASE_URL=postgres://user:pass@host:5432/koschei?sslmode=require
-DATABASE_READ_URL=postgres://user:pass@replica:5432/koschei?sslmode=require
-REDIS_URL=redis://localhost:6379
-OWNER_WALLET=your_owner_wallet
-OWNER_SECRET=strong_owner_secret
-ADMIN_PASSWORD=strong_admin_password
-SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-TOGETHER_API_KEY=optional_for_ai_modules
+DATABASE_URL=postgres://...
+SOLANA_RPC_URL=https://solana-mainnet.g.alchemy.com/v2/...
+ALCHEMY_API_KEY=...
+WEB3_PROVIDER=alchemy
+TOGETHER_API_KEY=...
+TOGETHER_AI_ENABLED=1
+TOGETHER_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507-tput
 ```
 
-### 3. Lokal çalıştır
+Security radar flags:
+
+```env
+KOSCHEI_SECURITY_MODULES=pump_sybil,raydium_guardian,claim_shield
+KOSCHEI_SECURITY_PROVIDER=alchemy
+KOSCHEI_AUTO_RADAR_ENABLED=1
+KOSCHEI_SOLANA_WATCH_MODE=polling
+KOSCHEI_RADAR_POLL_SECONDS=10
+KOSCHEI_MODEL_ROUTER_ENABLED=1
+KOSCHEI_VERDICT_MODE=deterministic_signed
+KOSCHEI_PUBLIC_BADGE_ENABLED=1
+```
+
+Owner/auth/payment variables are configured separately in production hosting and are not documented with secret values in this repository.
+
+---
+
+## Architecture
+
+```text
+Customer / Partner Surface
+  ├─ /security-radar
+  ├─ /dashboard
+  ├─ /widget.js
+  └─ API consumers
+
+Go API
+  ├─ auth + entitlement checks
+  ├─ unified analyzer
+  ├─ deterministic security rules
+  ├─ model explanation layer
+  └─ owner-only operations
+
+Data Layer
+  ├─ Alchemy Solana HTTPS RPC
+  ├─ Neon Postgres
+  └─ optional cache
+
+Verdict Layer
+  ├─ Pump.fun Sybil Radar
+  ├─ Raydium Pool Guardian
+  ├─ Walletless Claim Shield
+  ├─ A-F grade
+  ├─ risk index
+  ├─ evidence summary
+  └─ signed rule version
+```
+
+---
+
+## Security Rules
+
+Koschei follows strict product boundaries:
+
+```text
+Customers cannot alter verdict thresholds.
+External projects cannot prompt models to change grades.
+AI summaries cannot override deterministic final grade.
+Owner controls rule versions and model routing.
+Raw prompts, rule weights and God Mode stay private.
+```
+
+---
+
+## Local Development
 
 ```bash
+git clone https://github.com/bugsbuny243/Koschei-Web3-Hub.git
+cd Koschei-Web3-Hub/koschei/api
 go run main.go
 ```
 
-Ardından:
-
-- Ana sayfa: `http://localhost:8080/`
-- Impact Dashboard: `http://localhost:8080/impact`
-- MEV Shield: `http://localhost:8080/mev-shield`
-- Liquidity Radar: `http://localhost:8080/radar`
-- Public Metrics API: `http://localhost:8080/api/public/metrics`
-
-### 4. Test ve build
+Build check:
 
 ```bash
 go test ./...
@@ -155,37 +266,40 @@ go build ./...
 
 ---
 
-## Owner Panel Notu
+## Project Structure
 
-Owner Panel gizli operasyon alanıdır. `/owner` route'u owner authentication kontrolünden geçer; `/api/owner/*` operasyon endpoint'leri owner-only middleware ve handler seviyesinde doğrulama ile korunur.
-
-Giriş için gerekli değerler:
-
-- `OWNER_WALLET` veya `KOSCHEI_OWNER_WALLET`
-- `OWNER_SECRET` veya `KOSCHEI_OWNER_SECRET`
-
-Panel tarayıcıda güvenli cookie oluşturmak için `/api/owner/login` endpoint'ini kullanır. Production ortamında `APP_ENV=production` ile cookie'ler `Secure` ve `SameSite=Strict` çalışır.
-
----
-
-## Grant Readiness
-
-Koschei Web3 Hub, Solana Foundation Tier-1 Grant değerlendirmesine uygun şekilde şu kanıtları sunar:
-
-1. **Canlı ürün:** modern responsive arayüz, public dashboard ve çalışan API endpoint'leri.
-2. **Ölçülebilir impact:** kurtarılan USD, engellenen saldırılar, aktif cüzdanlar ve son olay logları.
-3. **Public-good yaklaşımı:** read-only, non-custodial ve topluluk güvenliğini önceleyen mimari.
-4. **Teknik sürdürülebilirlik:** Go backend, Neon Postgres, Redis cache ve vanilla frontend ile düşük operasyonel karmaşıklık.
-5. **Modüler büyüme:** MEV Shield, Liquidity Radar, AI Simulator, DAO Guardian ve Smart Money Oracle aynı hub içinde ölçeklenebilir.
-
----
-
-## Lisans & İletişim
-
-- **Lisans:** MIT
-- **Topluluk çağrısı:** Solana geliştiricileri, validator ekipleri, DAO güvenlik ekipleri ve public-good fonlayıcıları iş birliğine davetlidir.
-- **İletişim:** `onur24sel@gmail.com`
+```text
+.
+├── README.md
+├── Dockerfile
+├── db/
+└── koschei/
+    └── api/
+        ├── main.go
+        ├── internal/
+        │   ├── handlers/
+        │   ├── http/
+        │   ├── services/
+        │   └── db/
+        └── public/
+            ├── index.html
+            ├── dashboard.html
+            ├── security-radar.html
+            ├── security-ecosystem.html
+            ├── security-ecosystem.json
+            ├── widget.js
+            ├── pricing.html
+            ├── reports.html
+            └── owner-production.html
+```
 
 ---
 
-Built with ❤️ for Solana Ecosystem
+## Contact
+
+- Owner: Onur Sel
+- Email: `onur24sel@gmail.com`
+
+---
+
+Built for Solana security intelligence.
