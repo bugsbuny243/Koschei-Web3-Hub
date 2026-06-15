@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE IF NOT EXISTS security_radar_targets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     target TEXT NOT NULL,
