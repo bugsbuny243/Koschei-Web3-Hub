@@ -42,26 +42,27 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 	profile := map[string]any{"auth_subject": claims.Sub, "email": claims.Email, "role": "member", "plan_id": "free", "plan": "free", "credits": 0, "outputs_total": 0, "outputs_remaining": 0}
 	if h.DB != nil {
+		_ = ensureOwnerSchema(r.Context(), h.DB)
 		summary, err := h.provisionMember(r.Context(), claims)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_unavailable"})
-			return
+			summary = memberSummaryResponse{OK: true, Email: claims.Email, Plan: "free", OutputsTotal: 0, OutputsRemaining: 0}
+			profile["profile_warning"] = "profile provisioning fallback"
 		}
 		p, err := h.upsertProfile(r.Context(), claims.Sub, claims.Email)
 		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "profile_unavailable"})
-			return
-		}
-		profile = map[string]any{
-			"id":                p.ID,
-			"auth_subject":      p.AuthSubject,
-			"email":             p.Email,
-			"role":              firstNonEmpty(p.Role, "member"),
-			"plan_id":           firstNonEmpty(summary.Plan, p.PlanID, "free"),
-			"plan":              firstNonEmpty(summary.Plan, p.PlanID, "free"),
-			"credits":           p.Credits,
-			"outputs_total":     summary.OutputsTotal,
-			"outputs_remaining": summary.OutputsRemaining,
+			profile["profile_warning"] = "profile provisioning fallback"
+		} else {
+			profile = map[string]any{
+				"id":                p.ID,
+				"auth_subject":      p.AuthSubject,
+				"email":             p.Email,
+				"role":              firstNonEmpty(p.Role, "member"),
+				"plan_id":           firstNonEmpty(summary.Plan, p.PlanID, "free"),
+				"plan":              firstNonEmpty(summary.Plan, p.PlanID, "free"),
+				"credits":           p.Credits,
+				"outputs_total":     summary.OutputsTotal,
+				"outputs_remaining": summary.OutputsRemaining,
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "user": profile})
