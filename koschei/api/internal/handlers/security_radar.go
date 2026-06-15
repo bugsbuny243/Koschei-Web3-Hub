@@ -17,51 +17,21 @@ type securityRadarInput struct {
 	Mode    string `json:"mode"`
 }
 
-type radarDBRow struct {
-	Target         string
-	TargetType     string
-	ModuleID       string
-	Signature      string
-	RiskIndex      int
-	RiskLevel      string
-	Grade          string
-	Verdict        string
-	Recommendation string
-	Evidence       json.RawMessage
-	Signals        json.RawMessage
-	RuleVersion    string
-	CreatedAt      time.Time
-}
-
 func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
 	if h == nil || h.DBRead == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "results": []any{}, "source": "deterministic_runtime"})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "items": []any{}, "source": "koschei_security_radar", "provider": services.SecurityRadarProvider, "watch_mode": services.SecurityRadarWatchMode})
 		return
 	}
-	limit := 50
-	rows, err := h.DBRead.QueryContext(r.Context(), `
-		SELECT target, COALESCE(target_type,''), module_id, COALESCE(signature,''), risk_index, risk_level, grade, verdict, recommendation, evidence, signals, rule_version, created_at
-		FROM security_radar_verdicts
-		ORDER BY created_at DESC
-		LIMIT $1`, limit)
+	items, err := services.NewSecurityRadarStore(h.DBRead).LatestVerdicts(r.Context(), 50)
 	if isMissingRelation(err) {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "results": []any{}, "source": "schema_pending"})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "items": []any{}, "source": "schema_pending", "provider": services.SecurityRadarProvider, "watch_mode": services.SecurityRadarWatchMode})
 		return
 	}
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, APICodeIntegrationError, "Radar feed unavailable")
 		return
 	}
-	defer rows.Close()
-	items := []map[string]any{}
-	for rows.Next() {
-		var row radarDBRow
-		if err := rows.Scan(&row.Target, &row.TargetType, &row.ModuleID, &row.Signature, &row.RiskIndex, &row.RiskLevel, &row.Grade, &row.Verdict, &row.Recommendation, &row.Evidence, &row.Signals, &row.RuleVersion, &row.CreatedAt); err != nil {
-			continue
-		}
-		items = append(items, map[string]any{"target": row.Target, "target_type": row.TargetType, "module_id": row.ModuleID, "signature": row.Signature, "risk_index": row.RiskIndex, "risk_level": row.RiskLevel, "grade": row.Grade, "verdict": row.Verdict, "recommendation": row.Recommendation, "evidence": jsonRaw(row.Evidence), "signals": jsonRaw(row.Signals), "rule_version": row.RuleVersion, "created_at": row.CreatedAt})
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "results": items, "source": "security_radar_verdicts"})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "items": items, "source": "koschei_security_radar", "provider": services.SecurityRadarProvider, "watch_mode": services.SecurityRadarWatchMode})
 }
 
 func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +104,7 @@ func (h *Handler) OwnerRadarSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	count("radar_events", `SELECT count(*) FROM security_radar_events`)
 	count("radar_verdicts", `SELECT count(*) FROM security_radar_verdicts`)
-	count("badge_consumers", `SELECT count(DISTINCT target) FROM security_radar_events WHERE source='public_badge'`)
+	count("badge_consumers", `SELECT count(DISTINCT target) FROM security_radar_events WHERE COALESCE(source,'')='public_badge'`)
 	count("critical_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE risk_level='critical'`)
 	count("high_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE risk_level='high'`)
 	count("module_usage", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts`)
@@ -157,10 +127,37 @@ func (h *Handler) saveSecurityRadarBundle(ctx context.Context, userID, source st
 }
 
 func (h *Handler) saveSecurityRadarVerdict(ctx context.Context, userID, source string, verdict services.SecurityRadarVerdict) error {
-	evidence, _ := json.Marshal(verdict.Evidence)
-	signals, _ := json.Marshal(verdict.Signals)
-	_, _ = h.DB.ExecContext(ctx, `INSERT INTO security_radar_events (target, target_type, module_id, source, signature, signals, evidence, created_at, updated_at) VALUES ($1,'token',$2,$3,$4,$5::jsonb,$6::jsonb,now(),now()) ON CONFLICT DO NOTHING`, verdict.Target, verdict.ModuleID, nullIfEmpty(source), verdict.Signature, string(signals), string(evidence))
-	_, err := h.DB.ExecContext(ctx, `INSERT INTO security_radar_verdicts (target, target_type, module_id, signature, risk_index, risk_level, grade, verdict, recommendation, evidence, signals, rule_version, user_id, source, created_at, updated_at) VALUES ($1,'token',$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,NULLIF($12,''),NULLIF($13,''),now(),now()) ON CONFLICT (signature,module_id) DO UPDATE SET risk_index=EXCLUDED.risk_index, risk_level=EXCLUDED.risk_level, grade=EXCLUDED.grade, verdict=EXCLUDED.verdict, recommendation=EXCLUDED.recommendation, evidence=EXCLUDED.evidence, signals=EXCLUDED.signals, updated_at=now()`, verdict.Target, verdict.ModuleID, verdict.Signature, verdict.RiskIndex, verdict.RiskLevel, verdict.Grade, verdict.Verdict, verdict.Recommendation, string(evidence), string(signals), verdict.RuleVersion, userID, source)
+	store := services.NewSecurityRadarStore(h.DB)
+	eventID, err := store.InsertEvent(ctx, services.SecurityRadarEventRecord{
+		ModuleID:   verdict.ModuleID,
+		Target:     verdict.Target,
+		TargetType: "token",
+		Network:    verdict.Network,
+		Signature:  verdict.Signature,
+		EventType:  firstNonEmptyString(source, "manual_verdict"),
+		Signals:    verdict.Signals,
+		RawSummary: map[string]any{"source": source, "user_id": userID},
+	})
+	if err != nil {
+		return err
+	}
+	_, err = store.InsertVerdict(ctx, services.SecurityRadarVerdictRecord{
+		EventID:        eventID,
+		ModuleID:       verdict.ModuleID,
+		Target:         verdict.Target,
+		TargetType:     "token",
+		Network:        verdict.Network,
+		Grade:          verdict.Grade,
+		RiskIndex:      verdict.RiskIndex,
+		RiskLevel:      verdict.RiskLevel,
+		Verdict:        verdict.Verdict,
+		Recommendation: verdict.Recommendation,
+		Evidence:       verdict.Evidence,
+		Signals:        verdict.Signals,
+		RuleVersion:    verdict.RuleVersion,
+		Signed:         verdict.Signed,
+		Signature:      verdict.Signature,
+	})
 	return err
 }
 
