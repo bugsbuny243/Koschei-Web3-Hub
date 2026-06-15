@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -24,21 +22,11 @@ type unifiedAnalyzeHTTPInput struct {
 }
 
 type unifiedAnalyzeData struct {
-	InputType       string                 `json:"input_type"`
-	Summary         string                 `json:"summary"`
-	Sections        unifiedAnalyzeSections `json:"sections"`
-	Sources         []string               `json:"sources"`
-	PartialFailures []partialFailure       `json:"partial_failures"`
-}
-
-type unifiedAnalyzeSections struct {
-	RiskEngine          any      `json:"risk_engine"`
-	TokenRisk           any      `json:"token_rug_liquidity"`
-	TransactionSecurity any      `json:"transaction_mev_security"`
-	WalletIntelligence  any      `json:"wallet_sybil_intelligence"`
-	IntelligenceGraph   any      `json:"intelligence_graph"`
-	GrantReadiness      any      `json:"grant_investor_readiness"`
-	Recommendations     []string `json:"recommendations"`
+	InputType       string         `json:"input_type"`
+	Summary         string         `json:"summary"`
+	Sections        map[string]any `json:"sections"`
+	Sources         []string       `json:"sources"`
+	PartialFailures []partialFailure `json:"partial_failures"`
 }
 
 type partialFailure struct {
@@ -74,76 +62,38 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 	}
 	inputType := detectUnifiedInputType(rawInput, input.TargetType, input.Context)
 	inputType = h.resolveUnifiedInputType(r.Context(), rawInput, input.Network, inputType)
-	if inputType == "unknown" || inputType == "" {
+	if inputType == "unknown" || inputType == "" || inputType == "question" {
 		inputType = "token"
 	}
 
-	requestID := newRequestID()
-	sections := fallbackUnifiedSections(rawInput, inputType, input.Network, "baseline_security_center")
+	bundle := services.AnalyzeSecurityRadars(services.SecurityRadarRequest{Target: rawInput, Network: input.Network, Mode: "unified_analyze"})
+	final := services.FinalSecurityRadarVerdict(bundle)
+	sections := map[string]any{
+		"pump_sybil_radar":       bundle.PumpSybilRadar,
+		"raydium_pool_guardian":  bundle.RaydiumPoolGuardian,
+		"walletless_claim_shield": bundle.WalletlessClaimShield,
+		"final_verdict": map[string]any{
+			"grade":          final.Grade,
+			"risk_index":     final.RiskIndex,
+			"risk_level":     final.RiskLevel,
+			"verdict":        final.Verdict,
+			"recommendation": final.Recommendation,
+			"rule_version":   final.RuleVersion,
+			"signed":         final.Signed,
+		},
+	}
 	partialFailures := []partialFailure{}
-	sources := []string{"koschei_security_rules", "solana_security_center"}
-	var realData any = map[string]any{"target": rawInput, "input_type": inputType, "network": input.Network, "sections": sections}
-
-	if inputType != "question" {
-		engineType := mapUnifiedInputTypeToEngine(inputType)
-		engine := services.NewUnifiedEngine(h.SolanaRPC)
-		result, err := engine.Analyze(r.Context(), services.UnifiedAnalyzeRequest{RequestID: requestID, TargetType: engineType, TargetID: rawInput, Network: input.Network, Notes: firstNonEmptyString(input.Notes, originalInput)})
-		if err != nil {
-			partialFailures = append(partialFailures, partialFailure{Source: "solana_rpc", Code: APICodeIntegrationError, Message: "Live RPC signal unavailable; curated Koschei security report returned"})
-			realData = map[string]any{"target": rawInput, "input_type": inputType, "network": input.Network, "sections": sections, "rpc_error": err.Error()}
-		} else {
-			realData = result
-			sections = mergeUnifiedSections(sections, unifiedSectionsFromEngine(result))
-			sources = append(sources, "solana_rpc")
-			partialFailures = append(partialFailures, unifiedPartialFailures(result)...)
-			if h.DB != nil {
-				_ = h.saveUnifiedReport(r.Context(), claims.Sub, result)
-			}
-		}
-	}
-
-	summary := fallbackUnifiedSummary(rawInput, inputType)
-	provider := "deterministic"
-	ai, err := h.GenerateIntelligenceSummary(r.Context(), normalizedClaimEmail(claims), firstNonEmptyString(originalInput, rawInput), realData)
-	if err != nil {
-		partialFailures = append(partialFailures, partialFailure{Source: "ai_router", Code: APICodeIntegrationError, Message: "AI summary degraded; deterministic security summary returned"})
-	} else {
-		summary = ai.Summary
-		provider = ai.Provider
-		if len(ai.Recommendations) > 0 {
-			sections.Recommendations = ai.Recommendations
-		}
-	}
-
+	_ = h.saveSecurityRadarBundle(r.Context(), claims.Sub, "unified_analyze", bundle)
 	if err := h.consumePremiumOutput(claims.Sub, normalizedClaimEmail(claims), "unified_analyze"); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
 
-	data := unifiedAnalyzeData{InputType: inputType, Summary: summary, Sections: sections, Sources: sources, PartialFailures: partialFailures}
-	h.logUnifiedAnalysis(normalizedClaimEmail(claims), inputType, APICodeOK, provider, partialFailures)
+	data := unifiedAnalyzeData{InputType: inputType, Summary: bundle.CustomerSummary, Sections: sections, Sources: []string{"koschei_security_rules", "alchemy_solana_rpc"}, PartialFailures: partialFailures}
+	h.logUnifiedAnalysis(normalizedClaimEmail(claims), inputType, APICodeOK, "deterministic_signed", partialFailures)
 	h.logTool(normalizedClaimEmail(claims), "unified_analyze", "completed")
 	h.trackEvent(normalizedClaimEmail(claims), "unified_analyze", r.URL.Path)
 	writeAPISuccess(w, "Analysis completed", data)
-}
-
-func (h *Handler) saveUnifiedReport(ctx context.Context, userID string, result services.UnifiedAnalyzeResult) error {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-	moduleResults, err := json.Marshal(result.ModuleResults)
-	if err != nil {
-		return err
-	}
-	_, err = h.DB.ExecContext(ctx, `INSERT INTO unified_reports (request_id, user_id, target_type, target_id, overall_score, risk_level, module_results, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, now())`, result.RequestID, nullIfEmpty(userID), result.TargetType, result.TargetID, result.OverallScore, result.RiskLevel, string(moduleResults))
-	return err
-}
-
-func newRequestID() string {
-	var b [16]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return hex.EncodeToString([]byte(time.Now().UTC().Format(time.RFC3339Nano)))
-	}
-	return hex.EncodeToString(b[:])
 }
 
 func extractUnifiedTarget(input string) string {
@@ -184,7 +134,7 @@ func detectUnifiedInputType(input, explicit string, ctx map[string]any) string {
 		return "transaction"
 	case "program", "contract", "smart_contract":
 		return "program"
-	case "project", "url", "project_url":
+	case "project", "url", "project_url", "claim_url":
 		return "project"
 	case "question":
 		return "question"
@@ -251,180 +201,11 @@ func mapUnifiedInputTypeToEngine(inputType string) string {
 	}
 }
 
-func unifiedSectionsFromEngine(result services.UnifiedAnalyzeResult) unifiedAnalyzeSections {
-	sections := unifiedAnalyzeSections{Recommendations: result.Recommendations}
-	for name, module := range result.ModuleResults {
-		if module.Status != "ok" {
-			continue
-		}
-		switch name {
-		case services.ModuleWalletScore, services.ModuleSybilGraph:
-			sections.WalletIntelligence = groupedModuleSection(sections.WalletIntelligence, "Wallet Risk + Sybil Intelligence", module)
-		case services.ModuleTokenScanner:
-			sections.TokenRisk = groupedModuleSection(sections.TokenRisk, "Token / Rug / Liquidity Risk", module)
-		case services.ModuleTXDecoder:
-			sections.TransactionSecurity = groupedModuleSection(sections.TransactionSecurity, "Transaction Decoder + MEV Security", module)
-		case services.ModuleRiskScanner:
-			sections.RiskEngine = groupedModuleSection(sections.RiskEngine, "AI Risk Intelligence Engine", module)
-		case services.ModuleProjectRadar:
-			sections.GrantReadiness = groupedModuleSection(sections.GrantReadiness, "Grant / Investor Readiness + B2B API", module)
-		}
-	}
-	return sections
-}
-
-func groupedModuleSection(existing any, title string, module services.ModuleResult) map[string]any {
-	section, ok := existing.(map[string]any)
-	if !ok || section == nil {
-		section = map[string]any{"module": title, "status": "live", "real_checks": map[string]any{}}
-	}
-	checks, ok := section["real_checks"].(map[string]any)
-	if !ok || checks == nil {
-		checks = map[string]any{}
-	}
-	checks[module.Module] = module
-	section["real_checks"] = checks
-	return section
-}
-
-func mergeUnifiedSections(base, extra unifiedAnalyzeSections) unifiedAnalyzeSections {
-	if extra.RiskEngine != nil {
-		base.RiskEngine = extra.RiskEngine
-	}
-	if extra.TokenRisk != nil {
-		base.TokenRisk = extra.TokenRisk
-	}
-	if extra.TransactionSecurity != nil {
-		base.TransactionSecurity = extra.TransactionSecurity
-	}
-	if extra.WalletIntelligence != nil {
-		base.WalletIntelligence = extra.WalletIntelligence
-	}
-	if extra.IntelligenceGraph != nil {
-		base.IntelligenceGraph = extra.IntelligenceGraph
-	}
-	if extra.GrantReadiness != nil {
-		base.GrantReadiness = extra.GrantReadiness
-	}
-	if len(extra.Recommendations) > 0 {
-		base.Recommendations = extra.Recommendations
-	}
-	return base
-}
-
-func unifiedPartialFailures(result services.UnifiedAnalyzeResult) []partialFailure {
-	out := []partialFailure{}
-	for name, module := range result.ModuleResults {
-		if module.Status == "ok" || module.Status == "skipped" {
-			continue
-		}
-		source := "solana_rpc"
-		if name == services.ModuleProjectRadar {
-			source = "project_url"
-		}
-		out = append(out, partialFailure{Source: source, Code: APICodeIntegrationError, Message: "Live external signal unavailable"})
-	}
-	return out
-}
-
-func fallbackUnifiedSummary(target, inputType string) string {
-	switch inputType {
-	case "token":
-		return "Koschei token güvenlik raporu hazır. Token, rug, liquidity, authority ve yatırımcı risk sinyalleri tek ciddi risk modülünde toplandı."
-	case "wallet":
-		return "Koschei cüzdan istihbarat raporu hazır. Wallet risk, sybil davranışı ve bağlantılı on-chain ilişki sinyalleri tek modülde değerlendirildi."
-	case "transaction":
-		return "Koschei transaction güvenlik raporu hazır. İmza, instruction, varlık hareketi ve MEV riski tek güvenlik modülünde incelendi."
-	case "program":
-		return "Koschei program güvenlik raporu hazır. Program yüzeyi, yetki riski ve yatırımcı güvenliği açısından değerlendirildi."
-	case "project":
-		return "Koschei proje raporu hazır. Güvenlik duruşu, public evidence, production readiness ve B2B konumlandırma birlikte incelendi."
-	default:
-		return "Koschei Security Center raporu hazır. Hedef, yatırım değeri taşıyan altı ana güvenlik modülünden geçirildi."
-	}
-}
-
-func fallbackUnifiedSections(target, inputType, network, reason string) unifiedAnalyzeSections {
-	score := deterministicRiskScore(target, inputType)
-	level := riskLevelFromScore(score)
-	short := shortTarget(target)
-	generatedAt := time.Now().UTC().Format(time.RFC3339)
-	base := map[string]any{"target": target, "target_short": short, "network": network, "input_type": inputType, "generated_at": generatedAt, "mode": "production_security_center", "degraded_reason": reason}
-	return unifiedAnalyzeSections{
-		RiskEngine:          map[string]any{"module": "AI Risk Intelligence Engine", "status": "ready", "risk_score": score, "risk_level": level, "red_flags": riskFlags(score), "evidence": base, "promise_policy": "only reported checks are shown; unsupported features are not marketed as modules"},
-		TokenRisk:           map[string]any{"module": "Token / Rug / Liquidity Risk", "status": "ready", "risk_score": score, "checks": []string{"mint account lookup", "freeze authority review", "mint authority review", "holder concentration follow-up", "liquidity/rug follow-up"}, "target": target},
-		TransactionSecurity: map[string]any{"module": "Transaction Decoder + MEV Security", "status": "ready", "risk_score": score, "checks": []string{"instruction decode", "signer intent", "asset movement", "program call surface", "MEV/slippage exposure review"}},
-		WalletIntelligence:  map[string]any{"module": "Wallet Risk + Sybil Intelligence", "status": "ready", "risk_score": maxInt(score-5, 1), "checks": []string{"wallet age and activity profile", "counterparty graph", "known-risk relation scan", "sybil/farming behavior hints"}, "evidence": base},
-		IntelligenceGraph:   map[string]any{"module": "On-chain Intelligence Graph", "status": "ready", "nodes": []string{"target", "wallets", "tokens", "programs", "bridges", "exchanges"}, "edges": []string{"transfers", "program calls", "liquidity events", "risk relations"}, "target_short": short},
-		GrantReadiness:      map[string]any{"module": "Grant / Investor Readiness + B2B API", "status": "ready", "checks": []string{"security narrative", "public evidence", "production readiness", "B2B/API positioning"}, "endpoint": "/api/v1/unified/analyze", "response_contract": []string{"input_type", "summary", "sections", "sources", "partial_failures"}},
-		Recommendations: []string{
-			"Keep the product surface focused on six high-value modules; treat every other capability as a feature inside them.",
-			"Do not present MEV, liquidity, DAO, alerts, or API as separate modules unless they have live production implementation.",
-			"Use the unified endpoint for paid customer analysis, investor evidence, and production reporting.",
-		},
-	}
-}
-
-func deterministicRiskScore(target, inputType string) int {
-	score := 38 + len(strings.TrimSpace(target))%37
-	switch inputType {
-	case "transaction":
-		score += 8
-	case "program":
-		score += 10
-	case "project":
-		score += 6
-	case "wallet":
-		score += 4
-	}
-	if strings.Contains(strings.ToLower(target), "111111") {
-		score -= 8
-	}
-	if score < 1 {
-		return 1
-	}
-	if score > 99 {
-		return 99
-	}
-	return score
-}
-
-func riskLevelFromScore(score int) string {
-	switch {
-	case score >= 80:
-		return "critical"
-	case score >= 60:
-		return "high"
-	case score >= 35:
-		return "medium"
-	default:
-		return "low"
-	}
-}
-
-func riskFlags(score int) []string {
-	if score >= 60 {
-		return []string{"high-risk behavior requires manual review", "do not interact before transaction decoding", "watch liquidity/authority state"}
-	}
-	if score >= 35 {
-		return []string{"medium risk profile", "authority/liquidity checks recommended", "monitor related wallet activity"}
-	}
-	return []string{"low immediate risk", "continue monitoring", "verify with live RPC before large value interaction"}
-}
-
-func shortTarget(target string) string {
-	target = strings.TrimSpace(target)
-	if len(target) <= 14 {
-		return target
-	}
-	return target[:7] + "…" + target[len(target)-6:]
-}
-
 func (h *Handler) logUnifiedAnalysis(email, inputType, status, provider string, failures []partialFailure) {
 	if h == nil || h.DB == nil {
 		return
 	}
-	payload, _ := json.Marshal(map[string]any{"input_type": inputType, "provider": provider, "partial_failures": failures})
+	payload, _ := json.Marshal(map[string]any{"input_type": inputType, "provider": provider, "partial_failures": failures, "surface": "Koschei Web3 Hub Security Radar"})
 	_, _ = h.DB.Exec(`INSERT INTO tool_usage_logs(email,tool_key,status) VALUES(NULLIF($1,''),$2,$3)`, email, "unified_analyze", status)
 	_, _ = h.DB.Exec(`INSERT INTO model_route_logs(email,tool,route,model,provider,prompt,status) VALUES(NULLIF($1,''),$2,$3,$4,$5,$6,$7)`, email, "unified_analyze", inputType, "", provider, string(payload), status)
 }
