@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -173,11 +172,4 @@ func jsonRaw(raw json.RawMessage) any {
 		return string(raw)
 	}
 	return v
-}
-
-func isMissingRelation(err error) bool {
-	if err == nil {
-		return false
-	}
-	return err == sql.ErrNoRows || strings.Contains(strings.ToLower(err.Error()), "does not exist")
 }
