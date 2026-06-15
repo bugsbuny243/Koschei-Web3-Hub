@@ -113,7 +113,7 @@ func (s *SecurityRadarStore) InsertVerdict(ctx context.Context, verdict Security
 	err := s.DB.QueryRowContext(ctx, `
 		INSERT INTO security_radar_verdicts (event_id,module_id,target,target_type,network,grade,risk_index,risk_level,verdict,recommendation,evidence,signals,rule_version,signed,signature,source,created_at,updated_at)
 		VALUES (NULLIF($1,'')::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14,NULLIF($15,''),'alchemy_polling',now(),now())
-		ON CONFLICT (signature,module_id) DO UPDATE SET
+		ON CONFLICT (signature,module_id) WHERE signature IS NOT NULL DO UPDATE SET
 			event_id=COALESCE(EXCLUDED.event_id, security_radar_verdicts.event_id),
 			target=EXCLUDED.target,
 			target_type=EXCLUDED.target_type,
