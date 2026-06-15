@@ -1,0 +1,140 @@
+{
+  "ok": true,
+  "product": "Koschei Solana Security Ecosystem Center",
+  "version": "security-ecosystem-v1",
+  "positioning": "Koschei watches Solana, detects risk, signs verdicts, and lets customers consume security intelligence before they click.",
+  "provider_mode": "alchemy_first",
+  "model_policy": {
+    "external_model_access": false,
+    "final_verdict_owner": "koschei_rule_engine",
+    "ai_role": "explanation_and_evidence_summary_only",
+    "god_mode": "owner_only"
+  },
+  "modules": [
+    {
+      "id": "pump_sybil_radar",
+      "name": "Pump.fun Sybil Radar",
+      "status": "core",
+      "customer_value": "Detect coordinated launch behavior, early buyer clusters, bot-like activity, and unsafe early holder concentration before retail users enter.",
+      "auto_watch_targets": [
+        "new Pump.fun token launches",
+        "creator wallet",
+        "first 10 buyers",
+        "first 25 buyers",
+        "first 50 buyers",
+        "first 100 buyers",
+        "funding source clusters",
+        "early holder concentration",
+        "sniper timing patterns"
+      ],
+      "verdict_fields": [
+        "grade",
+        "risk_index",
+        "risk_level",
+        "sybil_score",
+        "insider_risk",
+        "early_buyer_cluster",
+        "top_holder_concentration",
+        "recommendation"
+      ],
+      "critical_signals": [
+        "early buyers share same funding source",
+        "creator wallet linked to early buyer cluster",
+        "top holders control unsafe supply share",
+        "synchronized buying pattern",
+        "cluster holds material supply"
+      ],
+      "customer_output": {
+        "badge": "Pump.fun Risk",
+        "example_verdict": "Coordinated launch behavior suspected",
+        "recommendations": ["avoid", "watch", "manual review", "safe to monitor"]
+      }
+    },
+    {
+      "id": "raydium_pool_guardian",
+      "name": "Raydium Pool Guardian",
+      "status": "core",
+      "customer_value": "Detect dangerous new pools, authority risk, LP concentration, and liquidity pull risk as soon as a Raydium market appears.",
+      "auto_watch_targets": [
+        "new Raydium pools",
+        "liquidity added events",
+        "token mint account",
+        "freeze authority",
+        "mint authority",
+        "pool creator",
+        "LP concentration",
+        "top holder concentration",
+        "liquidity removal signals"
+      ],
+      "verdict_fields": [
+        "grade",
+        "risk_index",
+        "risk_level",
+        "authority_risk",
+        "pool_risk",
+        "liquidity_risk",
+        "recommendation"
+      ],
+      "critical_signals": [
+        "mint authority active",
+        "freeze authority active",
+        "LP controlled by related wallet",
+        "unsafe top holder concentration",
+        "rapid liquidity removal"
+      ],
+      "customer_output": {
+        "badge": "Raydium Pool Risk",
+        "example_verdict": "High risk pool or unsafe authority state",
+        "recommendations": ["avoid", "manual review", "monitor liquidity", "safe to monitor"]
+      }
+    },
+    {
+      "id": "walletless_claim_shield",
+      "name": "Walletless Claim Shield",
+      "status": "core",
+      "customer_value": "Let users check claim pages, program IDs, and suspicious airdrop infrastructure before connecting a wallet.",
+      "auto_watch_targets": [
+        "claim URLs",
+        "claim program IDs",
+        "claim token accounts",
+        "known risk relations",
+        "unsafe transaction patterns",
+        "domain and URL risk",
+        "risky wallet interactions"
+      ],
+      "verdict_fields": [
+        "grade",
+        "risk_index",
+        "risk_level",
+        "claim_status",
+        "risk_relation",
+        "unsafe_instruction_risk",
+        "recommendation"
+      ],
+      "critical_signals": [
+        "program interacted with known risk cluster",
+        "claim flow requests unsafe authority",
+        "domain or URL resembles unsafe infrastructure",
+        "linked wallet has prior high-risk interactions"
+      ],
+      "customer_output": {
+        "badge": "Claim Shield",
+        "example_verdict": "Do not connect wallet",
+        "recommendations": ["do not connect", "review first", "safe to monitor"]
+      }
+    }
+  ],
+  "customer_surfaces": [
+    "/dashboard",
+    "/api/v1/unified/analyze",
+    "/api/v1/risk/badge",
+    "/widget.js",
+    "/security-ecosystem"
+  ],
+  "immutable_rules": [
+    "Customers cannot alter verdict thresholds",
+    "External projects cannot prompt models to change grades",
+    "AI summaries cannot override deterministic final grade",
+    "Owner controls rule versions and model routing"
+  ]
+}
