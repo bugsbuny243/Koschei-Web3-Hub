@@ -1,6 +1,21 @@
 package handlers
 
-import "time"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"strings"
+	"time"
+)
+
+type unifiedAnalyzeSections struct {
+	RiskEngine          any      `json:"risk_engine"`
+	TokenRisk           any      `json:"token_rug_liquidity"`
+	TransactionSecurity any      `json:"transaction_mev_security"`
+	WalletIntelligence  any      `json:"wallet_sybil_intelligence"`
+	IntelligenceGraph   any      `json:"intelligence_graph"`
+	GrantReadiness      any      `json:"grant_investor_readiness"`
+	Recommendations     []string `json:"recommendations"`
+}
 
 func securityEcosystemSections(target, inputType, network, reason string) unifiedAnalyzeSections {
 	baseScore := deterministicRiskScore(target, inputType)
@@ -115,6 +130,40 @@ func securityEcosystemSections(target, inputType, network, reason string) unifie
 	}
 }
 
+func deterministicRiskScore(target, inputType string) int {
+	seed := strings.ToLower(strings.TrimSpace(target + ":" + inputType))
+	if seed == ":" {
+		seed = "koschei-security-radar"
+	}
+	h := sha256.Sum256([]byte(seed))
+	risk := 25 + int(h[0]+h[7])%55
+	if strings.Contains(seed, "pump") || strings.Contains(seed, "claim") || strings.Contains(seed, "airdrop") {
+		risk += 8
+	}
+	return clampSecurityRisk(risk)
+}
+
+func riskLevelFromScore(score int) string {
+	switch {
+	case score >= 80:
+		return "critical"
+	case score >= 60:
+		return "high"
+	case score >= 35:
+		return "medium"
+	default:
+		return "low"
+	}
+}
+
+func shortTarget(target string) string {
+	target = strings.TrimSpace(target)
+	if len(target) <= 14 {
+		return target
+	}
+	return target[:7] + "…" + target[len(target)-6:]
+}
+
 func clampSecurityRisk(score int) int {
 	if score < 1 {
 		return 1
@@ -149,4 +198,9 @@ func verdictFromRisk(scope string, score int) string {
 	default:
 		return scope + " low immediate risk; continue monitoring"
 	}
+}
+
+func signaturePreview(input string) string {
+	h := sha256.Sum256([]byte(strings.TrimSpace(input)))
+	return hex.EncodeToString(h[:])[:16]
 }
