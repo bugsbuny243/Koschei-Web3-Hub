@@ -6,9 +6,10 @@ CREATE TABLE IF NOT EXISTS security_radar_targets (
     status TEXT NOT NULL DEFAULT 'active',
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (target, COALESCE(module_id, ''))
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_security_radar_targets_unique ON security_radar_targets (target, COALESCE(module_id, ''));
 
 CREATE TABLE IF NOT EXISTS security_radar_sources (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
