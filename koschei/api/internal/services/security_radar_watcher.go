@@ -71,9 +71,11 @@ func NewSecurityRadarWatcher(db *sql.DB, rpc *web3.SolanaRPC) *SecurityRadarWatc
 }
 
 func defaultSecurityRadarSources() []SecurityRadarSource {
+	pumpProgram := envWithDefault("6EF8rrecthR5Dk3SJLDEsy7M1H7MxuR6cWt98YVYgKED", "KOSCHEI_PUMPFUN_PROGRAM_ID", "PUMPFUN_PROGRAM_ID")
+	raydiumProgram := envWithDefault("675kPX9MHTjS2zt1qfr1NY5Wwrzj4mWjU7VtXv9syS2", "KOSCHEI_RAYDIUM_PROGRAM_ID", "RAYDIUM_PROGRAM_ID")
 	sources := []SecurityRadarSource{
-		{ModuleID: ModulePumpSybilRadar, Name: "Pump.fun Sybil Radar", Target: firstEnvValue("KOSCHEI_PUMPFUN_PROGRAM_ID", "PUMPFUN_PROGRAM_ID", "6EF8rrecthR5Dk3SJLDEsy7M1H7MxuR6cWt98YVYgKED"), TargetType: "program"},
-		{ModuleID: ModuleRaydiumPoolGuardian, Name: "Raydium Pool Guardian", Target: firstEnvValue("KOSCHEI_RAYDIUM_PROGRAM_ID", "RAYDIUM_PROGRAM_ID", "675kPX9MHTjS2zt1qfr1NY5Wwrzj4mWjU7VtXv9syS2"), TargetType: "program"},
+		{ModuleID: ModulePumpSybilRadar, Name: "Pump.fun Sybil Radar", Target: pumpProgram, TargetType: "program"},
+		{ModuleID: ModuleRaydiumPoolGuardian, Name: "Raydium Pool Guardian", Target: raydiumProgram, TargetType: "program"},
 	}
 	for _, target := range splitEnvList(firstEnvValue("KOSCHEI_CLAIM_PROGRAM_IDS", "KOSCHEI_CLAIM_TARGETS")) {
 		sources = append(sources, SecurityRadarSource{ModuleID: ModuleWalletlessClaimShield, Name: "Walletless Claim Shield", Target: target, TargetType: "program"})
@@ -130,11 +132,26 @@ func (w *SecurityRadarWatcher) pollSource(ctx context.Context, source SecurityRa
 		}
 		bundle := AnalyzeSecurityRadars(SecurityRadarRequest{Target: sig, Network: w.Network, Mode: "alchemy_polling"})
 		verdict := moduleVerdict(bundle, source.ModuleID)
+		if verdict.Signals == nil {
+			verdict.Signals = map[string]any{}
+		}
+		verdict.Signals["transaction_loaded"] = w.fetchTransaction(ctx, sig)
 		_ = w.storeEvent(ctx, source, sig, sigs[i], verdict)
 		_ = w.storeVerdict(ctx, source, sig, verdict)
 		_ = w.updateCheckpoint(ctx, source, sig, sigs[i].Slot)
 	}
 	return nil
+}
+
+func (w *SecurityRadarWatcher) fetchTransaction(ctx context.Context, signature string) bool {
+	if w == nil || w.RPC == nil || strings.TrimSpace(signature) == "" {
+		return false
+	}
+	txCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+	var tx json.RawMessage
+	err := w.RPC.Call(txCtx, w.Network, "getTransaction", []any{signature, map[string]any{"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}}, &tx, 24*time.Hour)
+	return err == nil && len(tx) > 0
 }
 
 func moduleVerdict(bundle SecurityRadarBundle, moduleID string) SecurityRadarVerdict {
@@ -199,6 +216,13 @@ func firstEnvValue(keys ...string) string {
 		}
 	}
 	return ""
+}
+
+func envWithDefault(defaultValue string, keys ...string) string {
+	if value := firstEnvValue(keys...); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 func minDuration(a, b time.Duration) time.Duration {
