@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"koschei/api/internal/cache"
 	"koschei/api/internal/db"
@@ -20,6 +21,9 @@ import (
 func main() {
 	log.Printf("koschei api starting")
 	log.Printf("migrations path: /app/migrations")
+	if missing := services.MissingProductionSecurityEnv(); len(missing) > 0 {
+		log.Fatalf("CRITICAL: missing required production security env vars: %s", strings.Join(missing, ", "))
+	}
 
 	databaseURL := os.Getenv("DATABASE_URL")
 	var conn *sql.DB
@@ -101,11 +105,7 @@ func resolveStaticDir(configured string) string {
 	if configured != "" {
 		return configured
 	}
-	for _, candidate := range []string{
-		"public",
-		filepath.Join("/app", "public"),
-		filepath.Join("koschei", "api", "public"),
-	} {
+	for _, candidate := range []string{"public", filepath.Join("/app", "public"), filepath.Join("koschei", "api", "public")} {
 		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
 			return candidate
 		}
