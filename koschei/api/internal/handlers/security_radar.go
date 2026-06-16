@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -49,11 +50,15 @@ func (h *Handler) SecurityRiskBadge(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) OwnerRadarSummary(w http.ResponseWriter, r *http.Request) {
 	if h == nil || h.DBRead == nil { writeJSON(w, http.StatusOK, map[string]any{"ok": true, "radar": map[string]any{}}); return }
-	metrics := map[string]any{"rule_version": services.SecurityRadarRuleVersion}
+	metrics := map[string]any{"rule_version": services.SecurityRadarRuleVersion, "sbx1_stream_enabled": streamEnvEnabled(), "sbx1_wss_configured": strings.TrimSpace(firstNonEmptyString(os.Getenv("SOLANA_WSS_URL"), os.Getenv("ALCHEMY_SOLANA_WSS_URL"), os.Getenv("HELIUS_SOLANA_WSS_URL"), os.Getenv("QUICKNODE_SOLANA_WSS_URL"))) != ""}
 	count := func(key, query string) { var v int64; if err := h.DBRead.QueryRowContext(r.Context(), query).Scan(&v); err == nil { metrics[key] = v } }
+	text := func(key, query string) { var v string; if err := h.DBRead.QueryRowContext(r.Context(), query).Scan(&v); err == nil { metrics[key] = v } }
 	count("radar_events", `SELECT count(*) FROM security_radar_events`); count("radar_verdicts", `SELECT count(*) FROM security_radar_verdicts`); count("badge_consumers", `SELECT count(DISTINCT target) FROM security_radar_events WHERE COALESCE(source,'')='public_badge'`); count("critical_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE risk_level='critical' AND module_id <> 'walletless_claim_shield'`); count("high_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE risk_level='high' AND module_id <> 'walletless_claim_shield'`); count("module_usage", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'walletless_claim_shield'`)
+	count("sbx1_stream_events", `SELECT count(*) FROM security_radar_stream_events`); count("sbx1_recognized_events", `SELECT count(*) FROM security_radar_stream_events WHERE module_id <> 'unknown'`); text("sbx1_last_event_at", `SELECT COALESCE(max(created_at)::text,'') FROM security_radar_stream_events`)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "radar": metrics})
 }
+
+func streamEnvEnabled() bool { v := strings.TrimSpace(os.Getenv("RADAR_STREAM_ENABLED")); return strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") }
 
 func (h *Handler) saveSecurityRadarBundle(ctx context.Context, userID, source string, bundle services.SecurityRadarBundle) error {
 	if h == nil || h.DB == nil { return nil }
