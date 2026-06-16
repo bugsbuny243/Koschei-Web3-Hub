@@ -1,9 +1,26 @@
 (function () {
   const KEY = 'koschei_jwt';
   const LEGACY_KEY = 'koschei_token';
-  function saveJwt(t) { try { if (t) { localStorage.setItem(KEY, t); localStorage.setItem(LEGACY_KEY, t); } } catch {} }
-  function getJwt() { try { return localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY) || ''; } catch { return ''; } }
-  function clearJwt() { try { localStorage.removeItem(KEY); localStorage.removeItem(LEGACY_KEY); } catch {} }
+
+  function saveJwt(t) {
+    try {
+      if (t) {
+        localStorage.setItem(KEY, t);
+        localStorage.setItem(LEGACY_KEY, t);
+      }
+    } catch {}
+  }
+
+  function getJwt() {
+    try { return localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY) || ''; } catch { return ''; }
+  }
+
+  function clearJwt() {
+    try {
+      localStorage.removeItem(KEY);
+      localStorage.removeItem(LEGACY_KEY);
+    } catch {}
+  }
 
   function _isJwt(t) {
     if (!t || typeof t !== 'string') return false;
@@ -19,6 +36,14 @@
 
   function jwtPayload(jwt) {
     try { return JSON.parse(_b64url(String(jwt || '').split('.')[1] || '')); } catch { return {}; }
+  }
+
+  function jwtIsUsable(jwt) {
+    if (!_isJwt(jwt)) return false;
+    const payload = jwtPayload(jwt);
+    const exp = Number(payload.exp || 0);
+    if (!exp) return true;
+    return exp > Math.floor(Date.now() / 1000) + 20;
   }
 
   function getEmail() {
@@ -77,7 +102,7 @@
       let requestInit = init;
       if (sameOrigin && path.startsWith('/api/')) {
         const jwt = getJwt();
-        if (_isJwt(jwt)) {
+        if (jwtIsUsable(jwt)) {
           const headers = new Headers((requestInit && requestInit.headers) || (input && input.headers) || {});
           if (!headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + jwt);
           requestInit = { ...(requestInit || {}), headers };
@@ -124,6 +149,33 @@
   function defaultUserName(email) {
     const name = String(email || '').split('@')[0].trim();
     return name || 'Kullanıcı';
+  }
+
+  function cleanInternalPath(value, fallback) {
+    const raw = String(value || '').trim();
+    if (!raw || !raw.startsWith('/')) return fallback || '/';
+    if (raw.startsWith('//')) return fallback || '/';
+    if (/^\/\/[a-z0-9]/i.test(raw)) return fallback || '/';
+    if (raw.startsWith('/login')) return fallback || '/';
+    return raw;
+  }
+
+  function currentReturnPath() {
+    return cleanInternalPath(window.location.pathname + window.location.search + window.location.hash, '/');
+  }
+
+  function nextPath(fallback) {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      return cleanInternalPath(params.get('next'), fallback || '/');
+    } catch { return fallback || '/'; }
+  }
+
+  function loginURL(base) {
+    const loginPath = String(base || '/login.html').trim() || '/login.html';
+    const normalized = loginPath === '/login' ? '/login.html' : loginPath;
+    const sep = normalized.includes('?') ? '&' : '?';
+    return normalized + sep + 'next=' + encodeURIComponent(currentReturnPath());
   }
 
   function successCallbackURL() {
@@ -248,11 +300,6 @@
     return true;
   }
 
-  async function init() {
-    consumeAccessTokenFromHash();
-    try { await loadConfig(); } catch {}
-  }
-
   async function parseNeonResponse(res) {
     const data = await readJSON(res);
     return { data, headerJwt: res.headers.get('set-auth-jwt') || res.headers.get('authorization') || '' };
@@ -283,6 +330,74 @@
       } catch {}
     }
     return null;
+  }
+
+  async function restoreNeonSession() {
+    try {
+      const baseURL = await neonAuthBaseURL();
+      const session = await fetchNeonSession(baseURL);
+      if (!session) return false;
+      await finishAuth(session);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function focusSecurityRadarUI() {
+    const path = window.location.pathname || '';
+    if (!/\/security-radar(?:\.html)?$/i.test(path)) return;
+
+    const style = document.createElement('style');
+    style.textContent = '@media(min-width:901px){.radars{grid-template-columns:repeat(2,1fr)!important}}[data-koschei-hidden-walletless="1"]{display:none!important}';
+    document.head.appendChild(style);
+
+    const rewriteLoginLinks = () => {
+      document.querySelectorAll('a[href="/login"],a[href="/login.html"]').forEach(a => {
+        a.setAttribute('href', loginURL('/login.html'));
+      });
+    };
+
+    const hideWalletless = () => {
+      document.querySelectorAll('.radar,.card,.feed-row').forEach(el => {
+        if (/Walletless Claim Shield|walletless_claim_shield/i.test(el.textContent || '')) {
+          el.setAttribute('data-koschei-hidden-walletless', '1');
+        }
+      });
+      rewriteLoginLinks();
+    };
+
+    const run = () => {
+      hideWalletless();
+      const subtitle = document.querySelector('.top .muted');
+      if (subtitle) subtitle.textContent = 'Security Radar is the focused command panel for Pump.fun launch clusters and Raydium pool risk. Walletless Claim Shield stays internal evidence only.';
+    };
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, { once: true });
+    else run();
+
+    const observer = new MutationObserver(run);
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  async function init() {
+    consumeAccessTokenFromHash();
+    try { await loadConfig(); } catch {}
+
+    const jwt = getJwt();
+    if (jwtIsUsable(jwt)) {
+      try {
+        await verifyMe(jwt);
+        focusSecurityRadarUI();
+        return true;
+      } catch {}
+    } else if (jwt) {
+      clearJwt();
+    }
+
+    const restored = await restoreNeonSession();
+    focusSecurityRadarUI();
+    return restored;
   }
 
   async function neonEmailAuth(path, body) {
@@ -316,11 +431,11 @@
     window.location.href = '/login.html';
   }
 
-  function isLoggedIn() { return _isJwt(getJwt()); }
+  function isLoggedIn() { return jwtIsUsable(getJwt()); }
 
-  function requireAuth() {
+  function requireAuth(loginPath) {
     if (!isLoggedIn()) {
-      window.location.href = '/login.html';
+      window.location.href = loginURL(loginPath || '/login.html');
       return false;
     }
     return true;
@@ -329,14 +444,28 @@
   async function apiCall(path, options = {}) {
     const jwt = getJwt();
     const headers = new Headers(options.headers || {});
-    if (jwt && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + jwt);
+    if (jwtIsUsable(jwt) && !headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + jwt);
     try {
       return await fetch(path, { ...options, headers });
     } catch { return null; }
   }
 
-  window.KoscheiAuth = { init, signIn, signUp, signOut, consumeAccessTokenFromHash,
-    isLoggedIn, requireAuth, apiCall, getEmail, getSub, getJwt };
+  window.KoscheiAuth = {
+    init,
+    signIn,
+    signUp,
+    signOut,
+    consumeAccessTokenFromHash,
+    isLoggedIn,
+    requireAuth,
+    apiCall,
+    getEmail,
+    getSub,
+    getJwt,
+    nextPath,
+    loginURL,
+    restoreNeonSession,
+  };
 })();
 
-// Email/password auth calls Neon Auth directly through /api/config -> neonAuthUrl, tolerates temporary app database outages, and persists as koschei_jwt.
+// Email/password auth calls Neon Auth directly through /api/config -> neonAuthUrl, restores Neon cookie sessions, persists as koschei_jwt, and keeps Security Radar focused on Pump.fun + Raydium UI surfaces.
