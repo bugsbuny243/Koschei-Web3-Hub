@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"strings"
 	"time"
@@ -13,13 +12,6 @@ type SecurityRadarWorker struct {
 	SolanaRPC string
 	PollEvery time.Duration
 	Enabled   bool
-}
-
-type securityRadarSourceRow struct {
-	ModuleID string
-	Label    string
-	Address  string
-	Network  string
 }
 
 func NewSecurityRadarWorker(store *SecurityRadarStore, solanaRPC string, enabled bool, pollEvery time.Duration) *SecurityRadarWorker {
@@ -64,11 +56,12 @@ func (w *SecurityRadarWorker) PollOnce(ctx context.Context) error {
 	if w == nil || w.Store == nil || w.Store.DB == nil || strings.TrimSpace(w.SolanaRPC) == "" {
 		return nil
 	}
-	sources, err := w.enabledSources(ctx)
+	sources, err := w.Store.EnabledSources(ctx)
 	if err != nil {
 		return err
 	}
 	if len(sources) == 0 {
+		log.Printf("security radar worker waiting for verified sources")
 		return nil
 	}
 	for _, source := range sources {
@@ -79,38 +72,7 @@ func (w *SecurityRadarWorker) PollOnce(ctx context.Context) error {
 	return nil
 }
 
-func (w *SecurityRadarWorker) enabledSources(ctx context.Context) ([]securityRadarSourceRow, error) {
-	rows, err := w.Store.DB.QueryContext(ctx, `
-		SELECT module_id, COALESCE(NULLIF(label,''), NULLIF(name,''), module_id), COALESCE(NULLIF(address,''), NULLIF(target,'')), COALESCE(NULLIF(network,''),'solana-mainnet')
-		FROM security_radar_sources
-		WHERE enabled = true
-		  AND COALESCE(NULLIF(address,''), NULLIF(target,'')) IS NOT NULL
-		ORDER BY updated_at ASC
-		LIMIT 50`)
-	if err != nil {
-		if isSecurityRadarMissingRelation(err) {
-			return []securityRadarSourceRow{}, nil
-		}
-		return nil, err
-	}
-	defer rows.Close()
-	items := []securityRadarSourceRow{}
-	for rows.Next() {
-		var item securityRadarSourceRow
-		if err := rows.Scan(&item.ModuleID, &item.Label, &item.Address, &item.Network); err != nil {
-			return nil, err
-		}
-		item.ModuleID = strings.TrimSpace(item.ModuleID)
-		item.Address = strings.TrimSpace(item.Address)
-		item.Network = normalizeRadarNetwork(item.Network)
-		if item.ModuleID != "" && item.Address != "" {
-			items = append(items, item)
-		}
-	}
-	return items, rows.Err()
-}
-
-func (w *SecurityRadarWorker) pollSource(ctx context.Context, source securityRadarSourceRow) error {
+func (w *SecurityRadarWorker) pollSource(ctx context.Context, source SecurityRadarSource) error {
 	pollCtx, cancel := context.WithTimeout(ctx, minSecurityRadarDuration(w.PollEvery, 12*time.Second))
 	defer cancel()
 	signatures, err := SolanaGetSignaturesForAddress(pollCtx, w.SolanaRPC, source.Address, 10)
@@ -146,10 +108,10 @@ func (w *SecurityRadarWorker) pollSource(ctx context.Context, source securityRad
 			Slot:          info.Slot,
 			BlockTime:     blockTime,
 			Signals: map[string]any{
-				"signature": sig,
-				"slot":      info.Slot,
+				"signature":  sig,
+				"slot":       info.Slot,
 				"rpc_method": "getSignaturesForAddress",
-				"source":    source.Label,
+				"source":     source.Label,
 			},
 			RawSummary: map[string]any{
 				"signature": sig,
@@ -211,5 +173,3 @@ func minSecurityRadarDuration(a, b time.Duration) time.Duration {
 	}
 	return b
 }
-
-var _ = sql.ErrNoRows
