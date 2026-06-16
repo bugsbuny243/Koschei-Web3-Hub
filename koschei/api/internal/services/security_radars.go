@@ -1,15 +1,18 @@
 package services
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math"
+	"os"
 	"strings"
 	"time"
 )
 
 const (
-	SecurityRadarRuleVersion = "koschei-security-radar-v1"
+	SecurityRadarRuleVersion = "koschei-security-radar-v2-live-evidence"
 	SecurityRadarProvider    = "alchemy"
 	SecurityRadarWatchMode   = "polling"
 
@@ -66,6 +69,31 @@ type SecurityRadarFinalVerdict struct {
 	Signature      string `json:"signature,omitempty"`
 }
 
+type radarEvidenceProfile struct {
+	Target                 string
+	Network                string
+	RPCConfigured          bool
+	LiveRPC                bool
+	DataQuality            string
+	EvidenceStatus         string
+	AccountExists          bool
+	AccountOwner           string
+	AccountExecutable      bool
+	IsTokenMint            bool
+	MintAuthorityPresent   bool
+	FreezeAuthorityPresent bool
+	TokenSupply            float64
+	LargestHolderPct       int
+	Top10HolderPct         int
+	LargestAccounts        int
+	RecentSignatureCount   int
+	FailedSignatureCount   int
+	SignatureWindowSeconds int64
+	LatestSignature        string
+	LatestSlot             int64
+	Errors                 []string
+}
+
 func AnalyzeSecurityRadars(req SecurityRadarRequest) SecurityRadarBundle {
 	req.Target = strings.TrimSpace(req.Target)
 	req.Network = strings.TrimSpace(req.Network)
@@ -78,14 +106,19 @@ func AnalyzeSecurityRadars(req SecurityRadarRequest) SecurityRadarBundle {
 	}
 
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
-	pump := buildPumpSybilVerdict(req, generatedAt)
-	raydium := buildRaydiumPoolVerdict(req, generatedAt)
-	shield := buildClaimShieldVerdict(req, generatedAt)
+	profile := collectRadarEvidence(req)
+	pump := buildPumpSybilVerdict(req, profile, generatedAt)
+	raydium := buildRaydiumPoolVerdict(req, profile, generatedAt)
+	shield := buildClaimShieldVerdict(req, profile, generatedAt)
 	final := FinalSecurityRadarVerdict(SecurityRadarBundle{
-		PumpSybilRadar:        pump,
-		RaydiumPoolGuardian:   raydium,
-		WalletlessClaimShield: shield,
+		PumpSybilRadar:      pump,
+		RaydiumPoolGuardian: raydium,
 	})
+
+	summary := "Koschei Security Radar used live Solana RPC evidence where available."
+	if !profile.LiveRPC {
+		summary = "Koschei Security Radar could not collect enough live Solana evidence for a full intelligence verdict."
+	}
 
 	return SecurityRadarBundle{
 		Target:                 req.Target,
@@ -95,7 +128,7 @@ func AnalyzeSecurityRadars(req SecurityRadarRequest) SecurityRadarBundle {
 		PumpSybilRadar:         pump,
 		RaydiumPoolGuardian:    raydium,
 		WalletlessClaimShield:  shield,
-		CustomerSummary:        "Koschei Web3 Hub radar verdict generated.",
+		CustomerSummary:        summary,
 		CustomerRecommendation: final.Recommendation,
 		Metadata: map[string]any{
 			"brand":                 "Koschei Web3 Hub",
@@ -108,15 +141,18 @@ func AnalyzeSecurityRadars(req SecurityRadarRequest) SecurityRadarBundle {
 			"final_risk_index":      final.RiskIndex,
 			"final_risk_level":      final.RiskLevel,
 			"final_recommendation":  final.Recommendation,
-			"deterministic_scoring": true,
+			"deterministic_scoring": false,
 			"ai_final_scoring":      false,
+			"score_source":          "live_solana_rpc_evidence",
+			"data_quality":          profile.DataQuality,
+			"evidence_status":       profile.EvidenceStatus,
 		},
 	}
 }
 
 func FinalSecurityRadarVerdict(bundle SecurityRadarBundle) SecurityRadarFinalVerdict {
 	winner := bundle.PumpSybilRadar
-	for _, verdict := range []SecurityRadarVerdict{bundle.RaydiumPoolGuardian, bundle.WalletlessClaimShield} {
+	for _, verdict := range []SecurityRadarVerdict{bundle.RaydiumPoolGuardian} {
 		if verdict.RiskIndex > winner.RiskIndex {
 			winner = verdict
 		}
@@ -133,60 +169,176 @@ func FinalSecurityRadarVerdict(bundle SecurityRadarBundle) SecurityRadarFinalVer
 	}
 }
 
-func buildPumpSybilVerdict(req SecurityRadarRequest, generatedAt string) SecurityRadarVerdict {
-	risk := deterministicRadarRiskIndex(req.Target, req.Network, ModulePumpSybilRadar)
-	signals := map[string]any{
-		"pump_fun_sybil_score":           risk,
-		"early_buyer_cluster":           signalScore(req, ModulePumpSybilRadar, "early_buyer_cluster"),
-		"creator_link_risk":             signalScore(req, ModulePumpSybilRadar, "creator_link_risk"),
-		"holder_concentration":          signalScore(req, ModulePumpSybilRadar, "holder_concentration"),
-		"bot_sniper_timing":             signalScore(req, ModulePumpSybilRadar, "bot_sniper_timing"),
-		"cluster_held_supply_percentage": signalPercent(req, ModulePumpSybilRadar, "cluster_supply"),
+func collectRadarEvidence(req SecurityRadarRequest) radarEvidenceProfile {
+	profile := radarEvidenceProfile{Target: req.Target, Network: req.Network, DataQuality: "no_rpc_evidence", EvidenceStatus: "insufficient_evidence"}
+	rpcURL := strings.TrimSpace(os.Getenv("SOLANA_RPC_URL"))
+	if rpcURL == "" {
+		profile.Errors = append(profile.Errors, "SOLANA_RPC_URL is not configured")
+		return profile
 	}
+	profile.RPCConfigured = true
+	if strings.TrimSpace(req.Target) == "" {
+		profile.Errors = append(profile.Errors, "target is empty")
+		return profile
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 6500*time.Millisecond)
+	defer cancel()
+
+	if account, err := SolanaGetAccountInfoJSONParsed(ctx, rpcURL, req.Target); err == nil && account.Value != nil {
+		profile.LiveRPC = true
+		profile.AccountExists = true
+		profile.AccountOwner = strings.TrimSpace(account.Value.Owner)
+		profile.AccountExecutable = account.Value.Executable
+		applyParsedMintInfo(&profile, account.Value.Data)
+	} else if err != nil {
+		profile.Errors = append(profile.Errors, compactRadarError("getAccountInfo", err))
+	}
+
+	if supply, err := SolanaGetTokenSupply(ctx, rpcURL, req.Target); err == nil {
+		profile.LiveRPC = true
+		profile.IsTokenMint = true
+		profile.TokenSupply = solanaTokenFloat(supply.Value)
+	} else {
+		profile.Errors = append(profile.Errors, compactRadarError("getTokenSupply", err))
+	}
+
+	if largest, err := SolanaGetTokenLargestAccounts(ctx, rpcURL, req.Target); err == nil {
+		profile.LiveRPC = true
+		profile.IsTokenMint = true
+		profile.LargestAccounts = len(largest.Value)
+		applyLargestHolderEvidence(&profile, largest.Value)
+	} else {
+		profile.Errors = append(profile.Errors, compactRadarError("getTokenLargestAccounts", err))
+	}
+
+	if signatures, err := SolanaGetSignaturesForAddress(ctx, rpcURL, req.Target, 100); err == nil {
+		profile.LiveRPC = true
+		profile.RecentSignatureCount = len(signatures)
+		if len(signatures) > 0 {
+			profile.LatestSignature = signatures[0].Signature
+			profile.LatestSlot = signatures[0].Slot
+		}
+		var newest, oldest int64
+		for i, sig := range signatures {
+			if sig.Err != nil {
+				profile.FailedSignatureCount++
+			}
+			if sig.BlockTime != nil && *sig.BlockTime > 0 {
+				if i == 0 || *sig.BlockTime > newest {
+					newest = *sig.BlockTime
+				}
+				if oldest == 0 || *sig.BlockTime < oldest {
+					oldest = *sig.BlockTime
+				}
+			}
+		}
+		if newest > 0 && oldest > 0 && newest >= oldest {
+			profile.SignatureWindowSeconds = newest - oldest
+		}
+	} else {
+		profile.Errors = append(profile.Errors, compactRadarError("getSignaturesForAddress", err))
+	}
+
+	if profile.LiveRPC {
+		profile.DataQuality = "live_rpc_evidence"
+		profile.EvidenceStatus = "verified_rpc_observation"
+		if !profile.IsTokenMint {
+			profile.DataQuality = "partial_rpc_evidence"
+			profile.EvidenceStatus = "target_not_confirmed_as_token_mint"
+		}
+	}
+	return profile
+}
+
+func buildPumpSybilVerdict(req SecurityRadarRequest, profile radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
+	risk := 18
+	if !profile.LiveRPC {
+		risk = 28
+	} else {
+		risk += burstRisk(profile.RecentSignatureCount, profile.SignatureWindowSeconds)
+		risk += concentrationRisk(profile.LargestHolderPct, profile.Top10HolderPct)
+		if profile.FailedSignatureCount >= 10 {
+			risk += 6
+		}
+	}
+	risk = clampRisk(risk)
+
+	signals := baseEvidenceSignals(profile)
+	signals["pump_fun_sybil_score"] = risk
+	signals["recent_signature_count"] = profile.RecentSignatureCount
+	signals["signature_window_seconds"] = profile.SignatureWindowSeconds
+	signals["largest_holder_percentage"] = profile.LargestHolderPct
+	signals["top_10_holder_percentage"] = profile.Top10HolderPct
+	signals["failed_signature_count"] = profile.FailedSignatureCount
+	signals["buyer_cluster_graph_available"] = false
+	signals["creator_link_graph_available"] = false
+	signals["intelligence_gap"] = "first_buyer_and_funding_graph_requires_parsed_launch_transactions"
+
 	evidence := []string{
-		"Pump.fun launch behavior evaluated with deterministic Koschei Web3 Hub rules.",
-		"Early buyer cluster, creator relation and sniper timing signals were scored without AI final scoring.",
-		"Alchemy Solana HTTPS RPC polling is the active provider mode.",
+		"Live Solana RPC evidence is used for transaction burst and holder concentration checks when available.",
+		fmt.Sprintf("Recent signatures observed: %d; observation window: %ds.", profile.RecentSignatureCount, profile.SignatureWindowSeconds),
+		fmt.Sprintf("Holder concentration: largest=%d%% top10=%d%% across %d largest token accounts.", profile.LargestHolderPct, profile.Top10HolderPct, profile.LargestAccounts),
+		"Buyer-cluster and creator-funding links are not claimed unless parsed launch transaction evidence is present.",
+	}
+	if !profile.LiveRPC {
+		evidence = []string{"No live Solana RPC evidence was collected; Koschei refuses to claim sybil detection from hash/random scoring.", "Verdict is conservative until signatures, holder concentration and launch transaction graph are available."}
 	}
 	return newRadarVerdict("Pump.fun Sybil Radar", ModulePumpSybilRadar, req, risk, signals, evidence, generatedAt)
 }
 
-func buildRaydiumPoolVerdict(req SecurityRadarRequest, generatedAt string) SecurityRadarVerdict {
-	risk := deterministicRadarRiskIndex(req.Target, req.Network, ModuleRaydiumPoolGuardian)
-	signals := map[string]any{
-		"pool_risk":            risk,
-		"authority_risk":       signalScore(req, ModuleRaydiumPoolGuardian, "authority_risk"),
-		"lp_concentration":     signalScore(req, ModuleRaydiumPoolGuardian, "lp_concentration"),
-		"liquidity_risk":       signalScore(req, ModuleRaydiumPoolGuardian, "liquidity_risk"),
-		"holder_concentration": signalScore(req, ModuleRaydiumPoolGuardian, "holder_concentration"),
+func buildRaydiumPoolVerdict(req SecurityRadarRequest, profile radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
+	risk := 18
+	if !profile.LiveRPC {
+		risk = 28
+	} else {
+		if profile.MintAuthorityPresent {
+			risk += 22
+		}
+		if profile.FreezeAuthorityPresent {
+			risk += 22
+		}
+		risk += concentrationRisk(profile.LargestHolderPct, profile.Top10HolderPct)
+		if profile.AccountExecutable {
+			risk += 8
+		}
+		if !profile.IsTokenMint {
+			risk += 8
+		}
 	}
+	risk = clampRisk(risk)
+
+	signals := baseEvidenceSignals(profile)
+	signals["pool_risk"] = risk
+	signals["mint_authority_present"] = profile.MintAuthorityPresent
+	signals["freeze_authority_present"] = profile.FreezeAuthorityPresent
+	signals["largest_holder_percentage"] = profile.LargestHolderPct
+	signals["top_10_holder_percentage"] = profile.Top10HolderPct
+	signals["token_supply"] = profile.TokenSupply
+	signals["account_owner"] = profile.AccountOwner
+
 	evidence := []string{
-		"Raydium pool state evaluated with deterministic Koschei Web3 Hub rules.",
-		"Pool, authority, LP concentration and holder concentration signals are customer-safe summaries.",
-		"Alchemy Solana HTTPS RPC polling is the active provider mode.",
+		"Live Solana RPC evidence is used for token authority and holder concentration checks when available.",
+		fmt.Sprintf("Mint authority present: %t; freeze authority present: %t.", profile.MintAuthorityPresent, profile.FreezeAuthorityPresent),
+		fmt.Sprintf("Largest holder=%d%%; top10 holders=%d%%; token supply observed=%.4f.", profile.LargestHolderPct, profile.Top10HolderPct, profile.TokenSupply),
+	}
+	if !profile.LiveRPC {
+		evidence = []string{"No live Solana RPC evidence was collected; pool authority and liquidity risk cannot be asserted.", "Verdict is conservative until token account, supply and holder concentration evidence are available."}
 	}
 	return newRadarVerdict("Raydium Pool Guardian", ModuleRaydiumPoolGuardian, req, risk, signals, evidence, generatedAt)
 }
 
-func buildClaimShieldVerdict(req SecurityRadarRequest, generatedAt string) SecurityRadarVerdict {
-	risk := deterministicRadarRiskIndex(req.Target, req.Network, ModuleWalletlessClaimShield)
-	signals := map[string]any{
-		"claim_surface_risk":      risk,
-		"program_relation_risk":   signalScore(req, ModuleWalletlessClaimShield, "program_relation_risk"),
-		"unsafe_instruction_risk": signalScore(req, ModuleWalletlessClaimShield, "unsafe_instruction_risk"),
-		"pre_connect_warning":     recommendationFromRiskLevel(riskLevelFromIndex(risk)) != "safe_to_monitor",
-	}
-	evidence := []string{
-		"Walletless Claim Shield evaluated the target before wallet connection.",
-		"Claim surface, program relation and unsafe instruction signals are customer-safe summaries.",
-		"Alchemy Solana HTTPS RPC polling is the active provider mode.",
-	}
-	return newRadarVerdict("Walletless Claim Shield", ModuleWalletlessClaimShield, req, risk, signals, evidence, generatedAt)
+func buildClaimShieldVerdict(req SecurityRadarRequest, profile radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
+	signals := baseEvidenceSignals(profile)
+	signals["internal_only"] = true
+	signals["customer_surface"] = false
+	evidence := []string{"Walletless Claim Shield is kept as internal pre-connect evidence and does not drive the customer-facing final Security Radar grade."}
+	return newRadarVerdict("Walletless Claim Shield", ModuleWalletlessClaimShield, req, 1, signals, evidence, generatedAt)
 }
 
 func newRadarVerdict(module, moduleID string, req SecurityRadarRequest, risk int, signals map[string]any, evidence []string, generatedAt string) SecurityRadarVerdict {
 	level := riskLevelFromIndex(risk)
-	verdict := verdictFromRiskLevel(moduleID, level)
+	verdict := verdictFromRiskLevel(moduleID, level, signals)
 	recommendation := recommendationFromRiskLevel(level)
 	v := SecurityRadarVerdict{
 		Module:         module,
@@ -208,20 +360,155 @@ func newRadarVerdict(module, moduleID string, req SecurityRadarRequest, risk int
 	return v
 }
 
-func deterministicRadarRiskIndex(target, network, moduleID string) int {
-	seed := strings.ToLower(strings.TrimSpace(moduleID + "|" + target + "|" + network))
-	h := sha256.Sum256([]byte(seed))
-	return 1 + ((int(h[0]) << 8) | int(h[1]))%100
+func baseEvidenceSignals(profile radarEvidenceProfile) map[string]any {
+	return map[string]any{
+		"provider":              SecurityRadarProvider,
+		"watch_mode":            SecurityRadarWatchMode,
+		"score_source":          "live_solana_rpc_evidence",
+		"real_onchain_evidence": profile.LiveRPC,
+		"data_quality":          profile.DataQuality,
+		"evidence_status":       profile.EvidenceStatus,
+		"deterministic_preview": false,
+		"rpc_configured":        profile.RPCConfigured,
+		"account_exists":        profile.AccountExists,
+		"is_token_mint":         profile.IsTokenMint,
+		"latest_signature":      profile.LatestSignature,
+		"latest_slot":           profile.LatestSlot,
+		"rpc_errors":            profile.Errors,
+	}
 }
 
-func signalScore(req SecurityRadarRequest, moduleID, signalID string) int {
-	seed := strings.ToLower(strings.TrimSpace(moduleID + "|" + signalID + "|" + req.Target + "|" + req.Network))
-	h := sha256.Sum256([]byte(seed))
-	return 1 + int(h[2])%100
+func applyParsedMintInfo(profile *radarEvidenceProfile, raw any) {
+	data, ok := raw.(map[string]any)
+	if !ok {
+		return
+	}
+	parsed, ok := data["parsed"].(map[string]any)
+	if !ok {
+		return
+	}
+	if strings.EqualFold(anyString(parsed["type"]), "mint") {
+		profile.IsTokenMint = true
+	}
+	info, ok := parsed["info"].(map[string]any)
+	if !ok {
+		return
+	}
+	mintAuthority := strings.TrimSpace(anyString(info["mintAuthority"]))
+	freezeAuthority := strings.TrimSpace(anyString(info["freezeAuthority"]))
+	profile.MintAuthorityPresent = mintAuthority != ""
+	profile.FreezeAuthorityPresent = freezeAuthority != ""
 }
 
-func signalPercent(req SecurityRadarRequest, moduleID, signalID string) int {
-	return signalScore(req, moduleID, signalID) % 100
+func applyLargestHolderEvidence(profile *radarEvidenceProfile, accounts []SolanaLargestTokenAccount) {
+	if len(accounts) == 0 {
+		return
+	}
+	values := make([]float64, 0, len(accounts))
+	total := 0.0
+	for _, account := range accounts {
+		v := solanaTokenFloat(account.SolanaTokenAmount)
+		if v < 0 {
+			v = 0
+		}
+		values = append(values, v)
+		total += v
+	}
+	if total <= 0 {
+		if profile.TokenSupply > 0 {
+			total = profile.TokenSupply
+		} else {
+			return
+		}
+	}
+	largest := 0.0
+	top10 := 0.0
+	for i, v := range values {
+		if i == 0 {
+			largest = v
+		}
+		if i < 10 {
+			top10 += v
+		}
+	}
+	profile.LargestHolderPct = int(math.Round((largest / total) * 100))
+	profile.Top10HolderPct = int(math.Round((top10 / total) * 100))
+}
+
+func burstRisk(count int, windowSeconds int64) int {
+	risk := 0
+	switch {
+	case count >= 90:
+		risk += 25
+	case count >= 50:
+		risk += 18
+	case count >= 20:
+		risk += 10
+	case count >= 8:
+		risk += 5
+	}
+	if count >= 25 && windowSeconds > 0 && windowSeconds <= 180 {
+		risk += 20
+	} else if count >= 15 && windowSeconds > 0 && windowSeconds <= 600 {
+		risk += 10
+	}
+	return risk
+}
+
+func concentrationRisk(largestPct, top10Pct int) int {
+	risk := 0
+	switch {
+	case largestPct >= 60:
+		risk += 28
+	case largestPct >= 35:
+		risk += 20
+	case largestPct >= 20:
+		risk += 10
+	}
+	switch {
+	case top10Pct >= 90:
+		risk += 22
+	case top10Pct >= 75:
+		risk += 14
+	case top10Pct >= 55:
+		risk += 8
+	}
+	return risk
+}
+
+func clampRisk(risk int) int {
+	if risk < 1 {
+		return 1
+	}
+	if risk > 95 {
+		return 95
+	}
+	return risk
+}
+
+func compactRadarError(method string, err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.TrimSpace(err.Error())
+	if len(msg) > 180 {
+		msg = msg[:180]
+	}
+	return method + ": " + msg
+}
+
+func anyString(v any) string {
+	if v == nil {
+		return ""
+	}
+	switch x := v.(type) {
+	case string:
+		return x
+	case fmt.Stringer:
+		return x.String()
+	default:
+		return fmt.Sprint(v)
+	}
 }
 
 func riskLevelFromIndex(idx int) string {
@@ -263,41 +550,35 @@ func recommendationFromRiskLevel(level string) string {
 	}
 }
 
-func verdictFromRiskLevel(moduleID, level string) string {
+func verdictFromRiskLevel(moduleID, level string, signals map[string]any) string {
+	if ok, _ := signals["real_onchain_evidence"].(bool); !ok && moduleID != ModuleWalletlessClaimShield {
+		return "Insufficient live on-chain evidence; no sybil or pool-risk claim asserted"
+	}
 	switch moduleID {
 	case ModulePumpSybilRadar:
 		switch level {
 		case "critical":
-			return "Coordinated launch behavior suspected"
+			return "Critical launch concentration and burst activity observed"
 		case "high":
-			return "Early buyer cluster risk requires manual review"
+			return "High-risk launch concentration requires manual review"
 		case "medium":
-			return "Moderate launch clustering detected"
+			return "Moderate launch risk observed from live Solana evidence"
 		default:
-			return "No critical launch sybil risk detected"
+			return "No critical launch sybil evidence observed"
 		}
 	case ModuleRaydiumPoolGuardian:
 		switch level {
 		case "critical":
-			return "Critical pool or authority risk detected"
+			return "Critical token authority or concentration risk observed"
 		case "high":
-			return "High risk pool or unsafe authority state"
+			return "High pool or token authority risk requires review"
 		case "medium":
-			return "Pool requires liquidity and authority monitoring"
+			return "Pool requires liquidity, authority and holder monitoring"
 		default:
-			return "No critical Raydium pool risk detected"
+			return "No critical Raydium pool evidence observed"
 		}
 	default:
-		switch level {
-		case "critical":
-			return "Do not connect: unsafe claim surface suspected"
-		case "high":
-			return "Review before wallet connection"
-		case "medium":
-			return "Monitor claim surface before interaction"
-		default:
-			return "No critical pre-connect claim risk detected"
-		}
+		return "Internal pre-connect evidence only"
 	}
 }
 
