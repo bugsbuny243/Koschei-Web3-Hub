@@ -12,6 +12,8 @@ import (
 )
 
 func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
+	setSecurityAuditDB(db)
+	protected := bodyLimit(sensitiveRateLimit(next))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		if strings.HasPrefix(path, "/api/") && path != "/api/me" && path != "/api/me/package" && path != "/api/v1/unified/analyze" && path != "/api/v1/risk/badge" && path != "/api/version" && path != "/api/config" && path != "/api/auth/register" && path != "/api/auth/login" && path != "/api/auth/provision" && path != "/api/auth/neon-login" && path != "/api/auth/neon-register" && path != "/api/auth/neon-callback" && path != "/api/public/impact" && path != "/api/public/metrics" && path != "/api/web3/health" && path != "/api/analytics/event" && db == nil {
@@ -20,39 +22,13 @@ func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable"})
 			return
 		}
-		next.ServeHTTP(w, r)
+		protected.ServeHTTP(w, r)
 	})
 }
 
 func registerLegacyDashboardRedirects(mux *http.ServeMux) {
 	legacyDashboards := []string{
-		"/airdrop-checker",
-		"/cross-chain-risk",
-		"/funding-assistant",
-		"/grant",
-		"/grant-writer",
-		"/graph",
-		"/hub",
-		"/intelligence-graph",
-		"/liquidity-radar",
-		"/mev-shield",
-		"/portfolio",
-		"/program-scanner",
-		"/project-radar",
-		"/radar",
-		"/risk",
-		"/risk-v2",
-		"/smart-money",
-		"/solana-risk-scanner",
-		"/solana-token-scanner",
-		"/solana-tx-decoder",
-		"/sybil-check",
-		"/sybil-checker",
-		"/token-scanner",
-		"/tx-decoder",
-		"/tx-decoder-pro",
-		"/unified",
-		"/wallet-score",
+		"/airdrop-checker", "/cross-chain-risk", "/funding-assistant", "/grant", "/grant-writer", "/graph", "/hub", "/intelligence-graph", "/liquidity-radar", "/mev-shield", "/portfolio", "/program-scanner", "/project-radar", "/radar", "/risk", "/risk-v2", "/smart-money", "/solana-risk-scanner", "/solana-token-scanner", "/solana-tx-decoder", "/sybil-check", "/sybil-checker", "/token-scanner", "/tx-decoder", "/tx-decoder-pro", "/unified", "/wallet-score",
 	}
 	for _, route := range legacyDashboards {
 		mux.HandleFunc(route, redirectToDashboard)
@@ -133,12 +109,7 @@ func cors(next http.Handler, origin string) http.Handler {
 }
 
 func buildAllowedOrigins(configured string) map[string]struct{} {
-	origins := map[string]struct{}{
-		"https://tradepigloball.co":     {},
-		"https://www.tradepigloball.co": {},
-		"http://tradepigloball.co":      {},
-		"http://www.tradepigloball.co":  {},
-	}
+	origins := map[string]struct{}{"https://tradepigloball.co": {}, "https://www.tradepigloball.co": {}, "http://tradepigloball.co": {}, "http://www.tradepigloball.co": {}}
 	for _, item := range strings.Split(configured, ",") {
 		item = strings.TrimSpace(item)
 		if item != "" {
