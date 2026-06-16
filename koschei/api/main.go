@@ -67,6 +67,8 @@ func main() {
 	appCtx := context.Background()
 	stopSecurityRadars := services.StartSecurityRadarWatcher(appCtx, conn, solanaRPC)
 	defer stopSecurityRadars()
+	stopSBX1Stream := services.StartSecurityRadarStreamIfEnabled(appCtx, conn)
+	defer stopSBX1Stream()
 	stopPumpPortal := services.StartPumpPortalRadarIfEnabled(appCtx, conn)
 	defer stopPumpPortal()
 	jobStore := jobs.NewStore(conn)
