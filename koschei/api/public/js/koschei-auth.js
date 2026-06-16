@@ -344,42 +344,6 @@
     }
   }
 
-  function focusSecurityRadarUI() {
-    const path = window.location.pathname || '';
-    if (!/\/security-radar(?:\.html)?$/i.test(path)) return;
-
-    const style = document.createElement('style');
-    style.textContent = '@media(min-width:901px){.radars{grid-template-columns:repeat(2,1fr)!important}}[data-koschei-hidden-walletless="1"]{display:none!important}';
-    document.head.appendChild(style);
-
-    const rewriteLoginLinks = () => {
-      document.querySelectorAll('a[href="/login"],a[href="/login.html"]').forEach(a => {
-        a.setAttribute('href', loginURL('/login.html'));
-      });
-    };
-
-    const hideWalletless = () => {
-      document.querySelectorAll('.radar,.card,.feed-row').forEach(el => {
-        if (/Walletless Claim Shield|walletless_claim_shield/i.test(el.textContent || '')) {
-          el.setAttribute('data-koschei-hidden-walletless', '1');
-        }
-      });
-      rewriteLoginLinks();
-    };
-
-    const run = () => {
-      hideWalletless();
-      const subtitle = document.querySelector('.top .muted');
-      if (subtitle) subtitle.textContent = 'Security Radar is the focused command panel for Pump.fun launch clusters and Raydium pool risk. Walletless Claim Shield stays internal evidence only.';
-    };
-
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run, { once: true });
-    else run();
-
-    const observer = new MutationObserver(run);
-    observer.observe(document.documentElement, { childList: true, subtree: true });
-  }
-
   async function init() {
     consumeAccessTokenFromHash();
     try { await loadConfig(); } catch {}
@@ -388,16 +352,13 @@
     if (jwtIsUsable(jwt)) {
       try {
         await verifyMe(jwt);
-        focusSecurityRadarUI();
         return true;
       } catch {}
     } else if (jwt) {
       clearJwt();
     }
 
-    const restored = await restoreNeonSession();
-    focusSecurityRadarUI();
-    return restored;
+    return restoreNeonSession();
   }
 
   async function neonEmailAuth(path, body) {
@@ -468,4 +429,4 @@
   };
 })();
 
-// Email/password auth calls Neon Auth directly through /api/config -> neonAuthUrl, restores Neon cookie sessions, persists as koschei_jwt, and keeps Security Radar focused on Pump.fun + Raydium UI surfaces.
+// Auth helper only: Neon Auth session restore + JWT persistence. It must not mutate or lock radar UI DOM.
