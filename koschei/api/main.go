@@ -60,8 +60,11 @@ func main() {
 	appCache := buildCache()
 	defer appCache.Close()
 	solanaRPC := web3.NewSolanaRPC(appCache)
-	stopSecurityRadars := services.StartSecurityRadarWatcher(context.Background(), conn, solanaRPC)
+	appCtx := context.Background()
+	stopSecurityRadars := services.StartSecurityRadarWatcher(appCtx, conn, solanaRPC)
 	defer stopSecurityRadars()
+	stopPumpPortal := services.StartPumpPortalRadarIfEnabled(appCtx, conn)
+	defer stopPumpPortal()
 	jobStore := jobs.NewStore(conn)
 	jobQueue := jobs.Queue(jobs.NoopQueue{})
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
