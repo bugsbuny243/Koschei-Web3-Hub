@@ -81,7 +81,7 @@ func NewSecurityRadarStreamWorker(store *SecurityRadarStore, wssURL string) *Sec
 	return &SecurityRadarStreamWorker{
 		Store:      store,
 		WSSURL:     strings.TrimSpace(wssURL),
-		Network:    firstSecurityRadarString(os.Getenv("RADAR_STREAM_NETWORK"), "solana-mainnet"),
+		Network:    firstRadarValue(os.Getenv("RADAR_STREAM_NETWORK"), "solana-mainnet"),
 		BufferSize: bufferSize,
 		Queue:      make(chan SecurityRadarStreamEventRecord, bufferSize),
 	}
@@ -129,7 +129,8 @@ func (w *SecurityRadarStreamWorker) runOnce(ctx context.Context) error {
 		return err
 	}
 	defer conn.Close()
-	if err := conn.WriteJSON(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "logsSubscribe", "params": []any{"all", map[string]any{"commitment": "confirmed"}}}); err != nil {
+	subscription := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "logsSubscribe", "params": []any{"all", map[string]any{"commitment": "confirmed"}}}
+	if err := conn.WriteJSON(subscription); err != nil {
 		return err
 	}
 	ping := time.NewTicker(25 * time.Second)
@@ -168,19 +169,15 @@ func (w *SecurityRadarStreamWorker) decodeLogsPayload(payload []byte) (SecurityR
 	}
 	params := asRadarMap(raw["params"])
 	result := asRadarMap(params["result"])
-	ctx := asRadarMap(result["context"])
+	contextValue := asRadarMap(result["context"])
 	value := asRadarMap(result["value"])
 	logs := radarStringSlice(value["logs"])
-	joined := strings.ToLower(strings.Join(logs, "\n"))
-	moduleID, eventType, programID := classifyRadarStreamText(joined)
+	moduleID, eventType, programID := classifyRadarStreamText(strings.ToLower(strings.Join(logs, "\n")))
 	if moduleID == "unknown" && !strings.EqualFold(os.Getenv("RADAR_STREAM_STORE_UNKNOWN"), "true") {
 		return SecurityRadarStreamEventRecord{}, false
 	}
 	signature := anyString(value["signature"])
-	target := extractRadarMintFromLogs(logs)
-	if target == "" {
-		target = signature
-	}
+	target := firstRadarValue(extractRadarMintFromLogs(logs), signature)
 	return SecurityRadarStreamEventRecord{
 		Provider:        SecurityRadarStreamProvider,
 		StreamMode:      SecurityRadarStreamModeLogs,
@@ -190,7 +187,7 @@ func (w *SecurityRadarStreamWorker) decodeLogsPayload(payload []byte) (SecurityR
 		Target:          target,
 		TargetType:      targetTypeForRadarModule(moduleID),
 		Signature:       signature,
-		Slot:            radarInt64(ctx["slot"]),
+		Slot:            radarInt64(contextValue["slot"]),
 		ProgramID:       programID,
 		EvidenceQuality: evidenceQualityForRadarModule(moduleID),
 		Decoded:         map[string]any{"logs": logs, "err": value["err"], "subscription_method": "logsSubscribe"},
@@ -212,7 +209,7 @@ func (w *SecurityRadarStreamWorker) persistEvent(ctx context.Context, event Secu
 	bundle := AnalyzeSecurityRadars(SecurityRadarRequest{Target: event.Target, Network: event.Network, Mode: "sbx1_stream"})
 	verdict := securityRadarModuleVerdict(bundle, event.ModuleID)
 	signals := mergeRadarMaps(verdict.Signals, map[string]any{"stream_event_type": event.EventType, "stream_mode": event.StreamMode, "stream_provider": event.Provider, "stream_signature": event.Signature, "stream_evidence_quality": event.EvidenceQuality})
-	eventID, err := w.Store.InsertEvent(ctx, SecurityRadarEventRecord{ModuleID: verdict.ModuleID, Target: verdict.Target, TargetType: event.TargetType, Network: verdict.Network, Signature: firstSecurityRadarString(event.Signature, verdict.Signature), SourceAddress: event.ProgramID, EventType: event.EventType, Slot: event.Slot, Signals: signals, RawSummary: event.Decoded, Source: "sbx1_stream"})
+	eventID, err := w.Store.InsertEvent(ctx, SecurityRadarEventRecord{ModuleID: verdict.ModuleID, Target: verdict.Target, TargetType: event.TargetType, Network: verdict.Network, Signature: firstRadarValue(event.Signature, verdict.Signature), SourceAddress: event.ProgramID, EventType: event.EventType, Slot: event.Slot, Signals: signals, RawSummary: event.Decoded, Source: "sbx1_stream"})
 	if err != nil {
 		log.Printf("security radar stream event-to-radar insert failed: %v", err)
 		return
@@ -234,7 +231,7 @@ func (s *SecurityRadarStore) InsertStreamEvent(ctx context.Context, event Securi
 		INSERT INTO security_radar_stream_events (provider,stream_mode,network,module_id,event_type,target,target_type,signature,slot,program_id,evidence_quality,decoded,raw_event,created_at,updated_at)
 		VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),$7,NULLIF($8,''),NULLIF($9,0),NULLIF($10,''),$11,$12::jsonb,$13::jsonb,now(),now())
 		ON CONFLICT DO NOTHING
-		RETURNING id::text`, firstSecurityRadarString(event.Provider, SecurityRadarStreamProvider), firstSecurityRadarString(event.StreamMode, SecurityRadarStreamModeLogs), normalizeRadarNetwork(event.Network), firstSecurityRadarString(event.ModuleID, "unknown"), firstSecurityRadarString(event.EventType, "stream_event"), strings.TrimSpace(event.Target), firstSecurityRadarString(event.TargetType, "unknown"), strings.TrimSpace(event.Signature), event.Slot, strings.TrimSpace(event.ProgramID), firstSecurityRadarString(event.EvidenceQuality, "raw_stream"), string(decoded), string(rawEvent)).Scan(&id)
+		RETURNING id::text`, firstRadarValue(event.Provider, SecurityRadarStreamProvider), firstRadarValue(event.StreamMode, SecurityRadarStreamModeLogs), normalizeRadarNetwork(event.Network), firstRadarValue(event.ModuleID, "unknown"), firstRadarValue(event.EventType, "stream_event"), strings.TrimSpace(event.Target), firstRadarValue(event.TargetType, "unknown"), strings.TrimSpace(event.Signature), event.Slot, strings.TrimSpace(event.ProgramID), firstRadarValue(event.EvidenceQuality, "raw_stream"), string(decoded), string(rawEvent)).Scan(&id)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
@@ -293,6 +290,15 @@ func mergeRadarMaps(a, b map[string]any) map[string]any {
 		out[k] = v
 	}
 	return out
+}
+
+func firstRadarValue(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func asRadarMap(v any) map[string]any {
