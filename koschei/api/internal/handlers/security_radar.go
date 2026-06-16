@@ -18,6 +18,10 @@ type securityRadarInput struct {
 }
 
 func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
+	if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("graph")), "1") || strings.TrimSpace(r.URL.Query().Get("verdict_id")) != "" {
+		h.SecurityRadarGraph(w, r)
+		return
+	}
 	if h == nil || h.DBRead == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "items": []any{}, "source": "koschei_security_radar", "provider": services.SecurityRadarProvider, "watch_mode": services.SecurityRadarWatchMode})
 		return
