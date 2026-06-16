@@ -71,6 +71,7 @@ func (a *PumpPortalRadarAdapter) HandleEvent(ctx context.Context, ev PumpPortalE
 		EventType:     eventType,
 		Signals:       signals,
 		RawSummary:    rawSummary,
+		Source:        "pumpportal",
 	})
 	if err != nil {
 		return err
