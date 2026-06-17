@@ -55,9 +55,9 @@ func StartSecurityRadarStreamIfEnabled(ctx context.Context, db *sql.DB) func() {
 	if db == nil || !securityRadarStreamEnabled() {
 		return func() {}
 	}
-	wssURL := firstSecurityRadarEnv("SOLANA_WSS_URL", "ALCHEMY_SOLANA_WSS_URL", "HELIUS_SOLANA_WSS_URL", "QUICKNODE_SOLANA_WSS_URL")
+	wssURL := resolveSecurityRadarWSSURL()
 	if wssURL == "" {
-		log.Printf("security radar SBX-1 stream not started: SOLANA_WSS_URL is empty")
+		log.Printf("security radar SBX-1 stream not started: no WSS URL could be resolved from SOLANA_WSS_URL, provider WSS env, SOLANA_RPC_URL, or ALCHEMY_API_KEY")
 		return func() {}
 	}
 	ctx, cancel := context.WithCancel(ctx)
@@ -67,8 +67,30 @@ func StartSecurityRadarStreamIfEnabled(ctx context.Context, db *sql.DB) func() {
 }
 
 func securityRadarStreamEnabled() bool {
-	v := strings.TrimSpace(os.Getenv("RADAR_STREAM_ENABLED"))
-	return strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
+	return envBool("RADAR_STREAM_ENABLED") || envBool("KOSCHEI_AUTO_RADAR_ENABLED") || strings.EqualFold(strings.TrimSpace(os.Getenv("KOSCHEI_SOLANA_WATCH_MODE")), "stream")
+}
+
+func resolveSecurityRadarWSSURL() string {
+	if v := firstSecurityRadarEnv("SOLANA_WSS_URL", "ALCHEMY_SOLANA_WSS_URL", "HELIUS_SOLANA_WSS_URL", "QUICKNODE_SOLANA_WSS_URL", "PUMPPORTAL_DATA_WS"); v != "" {
+		return v
+	}
+	if rpc := strings.TrimSpace(os.Getenv("SOLANA_RPC_URL")); rpc != "" {
+		if strings.HasPrefix(rpc, "https://") {
+			return "wss://" + strings.TrimPrefix(rpc, "https://")
+		}
+		if strings.HasPrefix(rpc, "http://") {
+			return "ws://" + strings.TrimPrefix(rpc, "http://")
+		}
+	}
+	if key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")); key != "" {
+		return "wss://solana-mainnet.g.alchemy.com/v2/" + key
+	}
+	return ""
+}
+
+func envBool(key string) bool {
+	v := strings.TrimSpace(os.Getenv(key))
+	return strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") || strings.EqualFold(v, "on")
 }
 
 func NewSecurityRadarStreamWorker(store *SecurityRadarStore, wssURL string) *SecurityRadarStreamWorker {
@@ -173,7 +195,7 @@ func (w *SecurityRadarStreamWorker) decodeLogsPayload(payload []byte) (SecurityR
 	value := asRadarMap(result["value"])
 	logs := radarStringSlice(value["logs"])
 	moduleID, eventType, programID := classifyRadarStreamText(strings.ToLower(strings.Join(logs, "\n")))
-	if moduleID == "unknown" && !strings.EqualFold(os.Getenv("RADAR_STREAM_STORE_UNKNOWN"), "true") {
+	if moduleID == "unknown" && !envBool("RADAR_STREAM_STORE_UNKNOWN") {
 		return SecurityRadarStreamEventRecord{}, false
 	}
 	signature := anyString(value["signature"])
