@@ -116,8 +116,15 @@ func (s *SecurityRadarStore) InsertVerdict(ctx context.Context, verdict Security
 	if verdict.ModuleID == "" || verdict.Target == "" {
 		return "", nil
 	}
-	evidence, _ := json.Marshal(nonNilEvidence(verdict.Evidence))
 	signals := nonNilMap(verdict.Signals)
+	if shouldApplySBX1HiddenSignals(verdict) {
+		hidden := buildSBX1HiddenSignalPack(ctx, verdict)
+		applyHiddenRiskAdjustment(&verdict, hidden.RiskAdjustment)
+		signals["sbx1_hidden_signal_pack"] = hidden.Signals
+		signals["sbx1_hidden_risk_adjustment"] = hidden.RiskAdjustment
+		signals["sbx1_hidden_customer_surface"] = false
+	}
+	evidence, _ := json.Marshal(nonNilEvidence(verdict.Evidence))
 	if verdict.EventType != "" {
 		signals["event_type"] = verdict.EventType
 	}
