@@ -19,7 +19,26 @@ SOLANA_WSS_URL=
 ALCHEMY_SOLANA_WSS_URL=
 HELIUS_SOLANA_WSS_URL=
 QUICKNODE_SOLANA_WSS_URL=
+PUMPPORTAL_DATA_WS=
 ```
+
+## Railway / existing env fallback
+
+If `RADAR_STREAM_ENABLED` is missing, SBX-1 can also start when either of these is enabled:
+
+```env
+KOSCHEI_AUTO_RADAR_ENABLED=true
+KOSCHEI_SOLANA_WATCH_MODE=stream
+```
+
+If `SOLANA_WSS_URL` is missing, SBX-1 will try to derive a WSS URL from:
+
+```env
+SOLANA_RPC_URL=https://solana-mainnet.g.alchemy.com/v2/...
+ALCHEMY_API_KEY=...
+```
+
+That means the Railway setup can work with existing `ALCHEMY_API_KEY` and `SOLANA_RPC_URL`, as long as the stream is enabled.
 
 ## Optional tuning
 
@@ -44,3 +63,19 @@ RADAR_STREAM_STORE_UNKNOWN=false
 - It must not deploy hidden scripts to third-party infrastructure.
 - It must not claim sybil detection without on-chain evidence.
 - It must not let AI change the final grade.
+
+## Deploy verification
+
+After redeploy, check service logs for:
+
+```text
+security radar SBX-1 WSS collector started
+```
+
+Owner radar summary should also expose:
+
+- `sbx1_stream_enabled`
+- `sbx1_wss_configured`
+- `sbx1_stream_events`
+- `sbx1_recognized_events`
+- `sbx1_last_event_at`
