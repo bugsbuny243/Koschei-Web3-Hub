@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -102,10 +104,58 @@ func (h *Handler) UnifiedIntelligenceHandler(w http.ResponseWriter, r *http.Requ
 		Sources:         []string{"koschei_security_rules", "alchemy_solana_rpc"},
 		PartialFailures: partialFailures,
 	}
+	_ = h.saveUnifiedArvisReport(r.Context(), claims.Sub, inputType, rawInput, final, data)
 	h.logUnifiedAnalysis(claimEmail, inputType, APICodeOK, "deterministic_signed", partialFailures)
 	h.logTool(claimEmail, "unified_analyze", "completed")
 	h.trackEvent(claimEmail, "unified_analyze", r.URL.Path)
 	writeAPISuccess(w, "Analysis completed", data)
+}
+
+func (h *Handler) UnifiedReportsHandler(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok { writeAPIError(w, http.StatusUnauthorized, APICodeUnauthorized, "Unauthorized", nil); return }
+	if h == nil || h.DBRead == nil { writeJSON(w, http.StatusOK, map[string]any{"ok": true, "reports": []any{}}); return }
+	rows, err := h.DBRead.QueryContext(r.Context(), `
+		SELECT request_id, target_type, target_id, overall_score, risk_level, module_results, created_at
+		FROM unified_reports
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+		LIMIT 50`, claims.Sub)
+	if isMissingRelation(err) { writeJSON(w, http.StatusOK, map[string]any{"ok": true, "reports": []any{}, "schema_pending": true}); return }
+	if err != nil { writeAPIError(w, http.StatusInternalServerError, APICodeIntegrationError, "Report vault unavailable", nil); return }
+	defer rows.Close()
+	reports := []map[string]any{}
+	for rows.Next() {
+		var id, targetType, targetID, riskLevel string
+		var score int
+		var raw json.RawMessage
+		var createdAt time.Time
+		if err := rows.Scan(&id, &targetType, &targetID, &score, &riskLevel, &raw, &createdAt); err != nil { continue }
+		reports = append(reports, map[string]any{"request_id": id, "target_type": targetType, "target_id": targetID, "target": targetID, "overall_score": score, "score": score, "risk_level": riskLevel, "created_at": createdAt.UTC().Format(time.RFC3339), "module_results": jsonRaw(raw)})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "reports": reports})
+}
+
+func (h *Handler) saveUnifiedArvisReport(ctx context.Context, userID, targetType, targetID string, final services.SecurityRadarFinalVerdict, data unifiedAnalyzeData) error {
+	if h == nil || h.DB == nil { return nil }
+	if strings.TrimSpace(userID) == "" || strings.TrimSpace(targetID) == "" { return nil }
+	riskLevel := strings.ToUpper(strings.TrimSpace(final.RiskLevel))
+	switch riskLevel { case "LOW", "MEDIUM", "HIGH", "CRITICAL": default: riskLevel = "UNKNOWN" }
+	if targetType == "" { targetType = "token" }
+	payload, err := json.Marshal(map[string]any{"surface": "KOSCHEİ WEB3 Arvıs", "target": targetID, "target_type": targetType, "final_verdict": final, "data": data})
+	if err != nil { return err }
+	_, err = h.DB.ExecContext(ctx, `
+		INSERT INTO unified_reports (request_id, user_id, target_type, target_id, overall_score, risk_level, module_results)
+		VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+		ON CONFLICT (request_id) DO NOTHING`, newArvisReportID(), userID, targetType, targetID, final.RiskIndex, riskLevel, string(payload))
+	if isMissingRelation(err) { return nil }
+	return err
+}
+
+func newArvisReportID() string {
+	var b [10]byte
+	if _, err := rand.Read(b[:]); err == nil { return "arvis_" + hex.EncodeToString(b[:]) }
+	return "arvis_" + strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", "")
 }
 
 func extractUnifiedTarget(input string) string {
@@ -217,7 +267,7 @@ func (h *Handler) logUnifiedAnalysis(email, inputType, status, provider string, 
 	if h == nil || h.DB == nil {
 		return
 	}
-	payload, _ := json.Marshal(map[string]any{"input_type": inputType, "provider": provider, "partial_failures": failures, "surface": "Koschei Web3 Hub Security Radar"})
+	payload, _ := json.Marshal(map[string]any{"input_type": inputType, "provider": provider, "partial_failures": failures, "surface": "KOSCHEİ WEB3 Arvıs"})
 	_, _ = h.DB.Exec(`INSERT INTO tool_usage_logs(email,tool_key,status) VALUES(NULLIF($1,''),$2,$3)`, email, "unified_analyze", status)
 	_, _ = h.DB.Exec(`INSERT INTO model_route_logs(email,tool,route,model,provider,prompt,status) VALUES(NULLIF($1,''),$2,$3,$4,$5,$6,$7)`, email, "unified_analyze", inputType, "", provider, string(payload), status)
 }
