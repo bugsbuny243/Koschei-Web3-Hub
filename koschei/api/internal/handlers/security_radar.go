@@ -15,11 +15,14 @@ type securityRadarInput struct { Target string `json:"target"`; Address string `
 
 func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
 	if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("graph")), "1") || strings.TrimSpace(r.URL.Query().Get("verdict_id")) != "" { h.SecurityRadarGraph(w, r); return }
-	if h == nil || h.DBRead == nil { writeJSON(w, http.StatusOK, map[string]any{"ok": true, "items": []any{}, "source": "koschei_security_radar", "provider": services.SecurityRadarProvider, "watch_mode": services.SecurityRadarWatchMode}); return }
+	base := map[string]any{"ok": true, "source": "koschei_security_radar", "provider": services.SecurityRadarProvider, "watch_mode": services.SecurityRadarWatchMode}
+	if h == nil || h.DBRead == nil { base["items"] = []any{}; base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured()}; writeJSON(w, http.StatusOK, base); return }
 	items, err := services.NewSecurityRadarStore(h.DBRead).LatestVerdicts(r.Context(), 50)
-	if isMissingRelation(err) { writeJSON(w, http.StatusOK, map[string]any{"ok": true, "items": []any{}, "source": "schema_pending", "provider": services.SecurityRadarProvider, "watch_mode": services.SecurityRadarWatchMode}); return }
+	if isMissingRelation(err) { base["items"] = []any{}; base["source"] = "schema_pending"; base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured(), "schema_pending": true}; writeJSON(w, http.StatusOK, base); return }
 	if err != nil { writeAPIError(w, http.StatusInternalServerError, APICodeIntegrationError, "Radar feed unavailable"); return }
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "items": items, "source": "koschei_security_radar", "provider": services.SecurityRadarProvider, "watch_mode": services.SecurityRadarWatchMode})
+	base["items"] = items
+	base["stream"] = h.securityRadarStreamStats(r.Context())
+	writeJSON(w, http.StatusOK, base)
 }
 
 func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +53,7 @@ func (h *Handler) SecurityRiskBadge(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) OwnerRadarSummary(w http.ResponseWriter, r *http.Request) {
 	if h == nil || h.DBRead == nil { writeJSON(w, http.StatusOK, map[string]any{"ok": true, "radar": map[string]any{}}); return }
-	metrics := map[string]any{"rule_version": services.SecurityRadarRuleVersion, "sbx1_stream_enabled": streamEnvEnabled(), "sbx1_wss_configured": strings.TrimSpace(firstNonEmptyString(os.Getenv("SOLANA_WSS_URL"), os.Getenv("ALCHEMY_SOLANA_WSS_URL"), os.Getenv("HELIUS_SOLANA_WSS_URL"), os.Getenv("QUICKNODE_SOLANA_WSS_URL"))) != ""}
+	metrics := map[string]any{"rule_version": services.SecurityRadarRuleVersion, "sbx1_stream_enabled": streamEnvEnabled(), "sbx1_wss_configured": streamWSSConfigured()}
 	count := func(key, query string) { var v int64; if err := h.DBRead.QueryRowContext(r.Context(), query).Scan(&v); err == nil { metrics[key] = v } }
 	text := func(key, query string) { var v string; if err := h.DBRead.QueryRowContext(r.Context(), query).Scan(&v); err == nil { metrics[key] = v } }
 	count("radar_events", `SELECT count(*) FROM security_radar_events`); count("radar_verdicts", `SELECT count(*) FROM security_radar_verdicts`); count("badge_consumers", `SELECT count(DISTINCT target) FROM security_radar_events WHERE COALESCE(source,'')='public_badge'`); count("critical_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE risk_level='critical' AND module_id <> 'walletless_claim_shield'`); count("high_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE risk_level='high' AND module_id <> 'walletless_claim_shield'`); count("module_usage", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'walletless_claim_shield'`)
@@ -58,7 +61,27 @@ func (h *Handler) OwnerRadarSummary(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "radar": metrics})
 }
 
-func streamEnvEnabled() bool { v := strings.TrimSpace(os.Getenv("RADAR_STREAM_ENABLED")); return strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") }
+func (h *Handler) securityRadarStreamStats(ctx context.Context) map[string]any {
+	metrics := map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured()}
+	if h == nil || h.DBRead == nil { return metrics }
+	count := func(key, query string) { var v int64; if err := h.DBRead.QueryRowContext(ctx, query).Scan(&v); err == nil { metrics[key] = v } }
+	text := func(key, query string) { var v string; if err := h.DBRead.QueryRowContext(ctx, query).Scan(&v); err == nil { metrics[key] = v } }
+	count("raw_stream_events", `SELECT count(*) FROM security_radar_stream_events`)
+	count("recognized_events", `SELECT count(*) FROM security_radar_stream_events WHERE module_id <> 'unknown'`)
+	count("enriched_mints", `SELECT count(*) FROM security_radar_stream_events WHERE evidence_quality='transaction_enriched_mint'`)
+	count("visible_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE module_id <> 'walletless_claim_shield'`)
+	text("last_stream_event_at", `SELECT COALESCE(max(created_at)::text,'') FROM security_radar_stream_events`)
+	text("last_stream_signature", `SELECT COALESCE(signature,'') FROM security_radar_stream_events WHERE signature IS NOT NULL ORDER BY created_at DESC LIMIT 1`)
+	text("last_stream_module", `SELECT COALESCE(module_id,'') FROM security_radar_stream_events ORDER BY created_at DESC LIMIT 1`)
+	return metrics
+}
+
+func streamEnvEnabled() bool {
+	v := strings.TrimSpace(firstNonEmptyString(os.Getenv("RADAR_STREAM_ENABLED"), os.Getenv("KOSCHEI_AUTO_RADAR_ENABLED")))
+	return strings.EqualFold(v, "1") || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes") || strings.EqualFold(v, "on") || strings.EqualFold(strings.TrimSpace(os.Getenv("KOSCHEI_SOLANA_WATCH_MODE")), "stream")
+}
+
+func streamWSSConfigured() bool { return strings.TrimSpace(firstNonEmptyString(os.Getenv("SOLANA_WSS_URL"), os.Getenv("ALCHEMY_SOLANA_WSS_URL"), os.Getenv("HELIUS_SOLANA_WSS_URL"), os.Getenv("QUICKNODE_SOLANA_WSS_URL"), os.Getenv("PUMPPORTAL_DATA_WS"), os.Getenv("ALCHEMY_API_KEY"))) != "" }
 
 func (h *Handler) saveSecurityRadarBundle(ctx context.Context, userID, source string, bundle services.SecurityRadarBundle) error {
 	if h == nil || h.DB == nil { return nil }
