@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -16,12 +17,13 @@ type securityRadarInput struct { Target string `json:"target"`; Address string `
 func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
 	if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("graph")), "1") || strings.TrimSpace(r.URL.Query().Get("verdict_id")) != "" { h.SecurityRadarGraph(w, r); return }
 	base := map[string]any{"ok": true, "source": "koschei_security_radar", "provider": services.SecurityRadarProvider, "watch_mode": services.SecurityRadarWatchMode}
-	if h == nil || h.DBRead == nil { base["items"] = []any{}; base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured()}; writeJSON(w, http.StatusOK, base); return }
+	if h == nil || h.DBRead == nil { base["items"] = []any{}; base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured()}; base["timeline"] = []any{}; writeJSON(w, http.StatusOK, base); return }
 	items, err := services.NewSecurityRadarStore(h.DBRead).LatestVerdicts(r.Context(), 50)
-	if isMissingRelation(err) { base["items"] = []any{}; base["source"] = "schema_pending"; base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured(), "schema_pending": true}; writeJSON(w, http.StatusOK, base); return }
+	if isMissingRelation(err) { base["items"] = []any{}; base["source"] = "schema_pending"; base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured(), "schema_pending": true}; base["timeline"] = []any{}; writeJSON(w, http.StatusOK, base); return }
 	if err != nil { writeAPIError(w, http.StatusInternalServerError, APICodeIntegrationError, "Radar feed unavailable"); return }
 	base["items"] = items
 	base["stream"] = h.securityRadarStreamStats(r.Context())
+	base["timeline"] = h.securityRadarStreamTimeline(r.Context(), 14)
 	writeJSON(w, http.StatusOK, base)
 }
 
@@ -75,6 +77,40 @@ func (h *Handler) securityRadarStreamStats(ctx context.Context) map[string]any {
 	text("last_stream_module", `SELECT COALESCE(module_id,'') FROM security_radar_stream_events ORDER BY created_at DESC LIMIT 1`)
 	return metrics
 }
+
+func (h *Handler) securityRadarStreamTimeline(ctx context.Context, limit int) []map[string]any {
+	out := []map[string]any{}
+	if h == nil || h.DBRead == nil { return out }
+	if limit <= 0 || limit > 30 { limit = 14 }
+	rows, err := h.DBRead.QueryContext(ctx, `
+		SELECT module_id, event_type, COALESCE(target,''), target_type, COALESCE(signature,''), COALESCE(slot,0), COALESCE(program_id,''), evidence_quality, created_at::text
+		FROM security_radar_stream_events
+		ORDER BY created_at DESC
+		LIMIT $1`, limit)
+	if err != nil { return out }
+	defer rows.Close()
+	for rows.Next() {
+		var moduleID, eventType, target, targetType, signature, programID, evidenceQuality, createdAt string
+		var slot sql.NullInt64
+		if err := rows.Scan(&moduleID, &eventType, &target, &targetType, &signature, &slot, &programID, &evidenceQuality, &createdAt); err != nil { continue }
+		label, meaning := arvisTimelineLabel(moduleID, eventType, evidenceQuality, target)
+		out = append(out, map[string]any{"module_id": moduleID, "event_type": eventType, "target": target, "target_type": targetType, "signature": signature, "slot": slot.Int64, "program_id": programID, "evidence_quality": evidenceQuality, "created_at": createdAt, "label": label, "meaning": meaning})
+	}
+	return out
+}
+
+func arvisTimelineLabel(moduleID, eventType, evidenceQuality, target string) (string, string) {
+	m := strings.ToLower(moduleID + " " + eventType + " " + evidenceQuality)
+	targetLabel := "a Solana event"
+	if strings.TrimSpace(target) != "" { targetLabel = "target " + shortRadarTarget(target) }
+	if strings.Contains(m, "raydium") { return "Raydium pool activity", "Arvıs detected pool/liquidity-related activity for " + targetLabel + "." }
+	if strings.Contains(m, "pump") { return "Pump.fun launch activity", "Arvıs detected launch/buyer-flow activity for " + targetLabel + "." }
+	if strings.Contains(m, "mint") || strings.Contains(m, "token") { return "Token authority / mint activity", "Arvıs detected token or mint-related activity for " + targetLabel + "." }
+	if strings.Contains(m, "transaction_enriched") { return "Enriched mint resolved", "Arvıs resolved a transaction into a usable mint target." }
+	return "Raw Solana stream event", "Arvıs captured a live Solana event; it stays internal until enough evidence exists."
+}
+
+func shortRadarTarget(v string) string { v = strings.TrimSpace(v); if len(v) <= 18 { return v }; return v[:8] + "…" + v[len(v)-6:] }
 
 func streamEnvEnabled() bool {
 	v := strings.TrimSpace(firstNonEmptyString(os.Getenv("RADAR_STREAM_ENABLED"), os.Getenv("KOSCHEI_AUTO_RADAR_ENABLED")))
