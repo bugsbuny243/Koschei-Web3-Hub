@@ -21,7 +21,14 @@ func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
 	items, err := services.NewSecurityRadarStore(h.DBRead).LatestVerdicts(r.Context(), 50)
 	if isMissingRelation(err) { base["items"] = []any{}; base["source"] = "schema_pending"; base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured(), "schema_pending": true}; base["timeline"] = []any{}; writeJSON(w, http.StatusOK, base); return }
 	if err != nil { writeAPIError(w, http.StatusInternalServerError, APICodeIntegrationError, "Radar feed unavailable"); return }
-	base["items"] = items
+	verified := make([]services.SecurityRadarVerdictRecord, 0, len(items))
+	for _, item := range items {
+		hasEvidence, _ := item.Signals["real_onchain_evidence"].(bool)
+		if item.Signed && hasEvidence {
+			verified = append(verified, item)
+		}
+	}
+	base["items"] = verified
 	base["stream"] = h.securityRadarStreamStats(r.Context())
 	base["timeline"] = h.securityRadarStreamTimeline(r.Context(), 14)
 	writeJSON(w, http.StatusOK, base)
@@ -37,18 +44,29 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 	if target == "" { writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "target is required"); return }
 	if input.Network == "" { input.Network = "solana-mainnet" }
 	services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_requested", "customer", "info", map[string]any{"network": input.Network, "mode": firstNonEmptyString(input.Mode, "manual_dashboard_check")}))
-	bundle := services.AnalyzeSecurityRadars(services.SecurityRadarRequest{Target: target, Network: input.Network, Mode: firstNonEmptyString(input.Mode, "manual_dashboard_check")})
+	bundle := services.EvidenceBackedSecurityRadarBundle(services.AnalyzeSecurityRadars(services.SecurityRadarRequest{Target: target, Network: input.Network, Mode: firstNonEmptyString(input.Mode, "manual_dashboard_check")}))
+	final := services.EvidenceBackedFinalSecurityRadarVerdict(bundle)
+	if !services.SecurityRadarHasLiveEvidence(bundle) {
+		services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_no_evidence", "customer", "warning", map[string]any{"network": input.Network, "target": target}))
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "real_data_unavailable", "message": services.SecurityRadarInsufficientEvidenceMessage, "bundle": bundle, "final_verdict": final, "charged": false})
+		return
+	}
 	_ = h.saveSecurityRadarBundle(r.Context(), claims.Sub, "manual_check", bundle)
 	if err := h.consumePremiumOutput(claims.Sub, claimEmail, "security_radar_check"); err != nil { writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse()); return }
 	h.logTool(claimEmail, "security_radar_check", "completed"); h.trackEvent(claimEmail, "security_radar_check", r.URL.Path)
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "bundle": bundle, "final_verdict": services.FinalSecurityRadarVerdict(bundle)})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "bundle": bundle, "final_verdict": final})
 }
 
 func (h *Handler) SecurityRiskBadge(w http.ResponseWriter, r *http.Request) {
 	address := strings.TrimSpace(r.URL.Query().Get("address")); if address == "" { address = strings.TrimSpace(r.URL.Query().Get("token")) }
 	if address == "" { writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "address parameter is required"}); return }
 	network := strings.TrimSpace(r.URL.Query().Get("network")); if network == "" { network = "solana-mainnet" }
-	bundle := services.AnalyzeSecurityRadars(services.SecurityRadarRequest{Target: address, Network: network, Mode: "public_badge"}); final := services.FinalSecurityRadarVerdict(bundle)
+	bundle := services.EvidenceBackedSecurityRadarBundle(services.AnalyzeSecurityRadars(services.SecurityRadarRequest{Target: address, Network: network, Mode: "public_badge"}))
+	final := services.EvidenceBackedFinalSecurityRadarVerdict(bundle)
+	if !services.SecurityRadarHasLiveEvidence(bundle) {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "real_data_unavailable", "message": services.SecurityRadarInsufficientEvidenceMessage, "address": address, "grade": final.Grade, "risk_index": final.RiskIndex, "risk_level": final.RiskLevel, "signed": false})
+		return
+	}
 	if h != nil && h.DB != nil { _ = h.saveSecurityRadarBundle(r.Context(), "", "public_badge", bundle) }
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "address": address, "grade": final.Grade, "risk_index": final.RiskIndex, "risk_level": final.RiskLevel, "verdict": final.Verdict, "rule_version": final.RuleVersion, "signed": final.Signed, "signature": final.Signature})
 }
@@ -58,7 +76,7 @@ func (h *Handler) OwnerRadarSummary(w http.ResponseWriter, r *http.Request) {
 	metrics := map[string]any{"rule_version": services.SecurityRadarRuleVersion, "sbx1_stream_enabled": streamEnvEnabled(), "sbx1_wss_configured": streamWSSConfigured()}
 	count := func(key, query string) { var v int64; if err := h.DBRead.QueryRowContext(r.Context(), query).Scan(&v); err == nil { metrics[key] = v } }
 	text := func(key, query string) { var v string; if err := h.DBRead.QueryRowContext(r.Context(), query).Scan(&v); err == nil { metrics[key] = v } }
-	count("radar_events", `SELECT count(*) FROM security_radar_events`); count("radar_verdicts", `SELECT count(*) FROM security_radar_verdicts`); count("badge_consumers", `SELECT count(DISTINCT target) FROM security_radar_events WHERE COALESCE(source,'')='public_badge'`); count("critical_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE risk_level='critical' AND module_id <> 'walletless_claim_shield'`); count("high_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE risk_level='high' AND module_id <> 'walletless_claim_shield'`); count("module_usage", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'walletless_claim_shield'`)
+	count("radar_events", `SELECT count(*) FROM security_radar_events`); count("radar_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`); count("badge_consumers", `SELECT count(DISTINCT target) FROM security_radar_events WHERE COALESCE(source,'')='public_badge'`); count("critical_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE risk_level='critical' AND module_id <> 'walletless_claim_shield' AND signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`); count("high_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE risk_level='high' AND module_id <> 'walletless_claim_shield' AND signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`); count("module_usage", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'walletless_claim_shield' AND signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`)
 	count("sbx1_stream_events", `SELECT count(*) FROM security_radar_stream_events`); count("sbx1_recognized_events", `SELECT count(*) FROM security_radar_stream_events WHERE module_id <> 'unknown'`); text("sbx1_last_event_at", `SELECT COALESCE(max(created_at)::text,'') FROM security_radar_stream_events`)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "radar": metrics})
 }
@@ -71,7 +89,7 @@ func (h *Handler) securityRadarStreamStats(ctx context.Context) map[string]any {
 	count("raw_stream_events", `SELECT count(*) FROM security_radar_stream_events`)
 	count("recognized_events", `SELECT count(*) FROM security_radar_stream_events WHERE module_id <> 'unknown'`)
 	count("enriched_mints", `SELECT count(*) FROM security_radar_stream_events WHERE evidence_quality='transaction_enriched_mint'`)
-	count("visible_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE module_id <> 'walletless_claim_shield'`)
+	count("visible_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE module_id <> 'walletless_claim_shield' AND signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`)
 	text("last_stream_event_at", `SELECT COALESCE(max(created_at)::text,'') FROM security_radar_stream_events`)
 	text("last_stream_signature", `SELECT COALESCE(signature,'') FROM security_radar_stream_events WHERE signature IS NOT NULL ORDER BY created_at DESC LIMIT 1`)
 	text("last_stream_module", `SELECT COALESCE(module_id,'') FROM security_radar_stream_events ORDER BY created_at DESC LIMIT 1`)
@@ -121,13 +139,17 @@ func streamWSSConfigured() bool { return strings.TrimSpace(firstNonEmptyString(o
 
 func (h *Handler) saveSecurityRadarBundle(ctx context.Context, userID, source string, bundle services.SecurityRadarBundle) error {
 	if h == nil || h.DB == nil { return nil }
+	if !services.SecurityRadarHasLiveEvidence(bundle) { return nil }
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second); defer cancel()
 	verdicts := []services.SecurityRadarVerdict{bundle.PumpSybilRadar, bundle.RaydiumPoolGuardian}
-	for _, verdict := range verdicts { if err := h.saveSecurityRadarVerdict(ctx, userID, source, verdict); err != nil { return err } }
+	for _, verdict := range verdicts { if !verdict.Signed { continue }; if err := h.saveSecurityRadarVerdict(ctx, userID, source, verdict); err != nil { return err } }
 	return nil
 }
 
 func (h *Handler) saveSecurityRadarVerdict(ctx context.Context, userID, source string, verdict services.SecurityRadarVerdict) error {
+	if !verdict.Signed { return nil }
+	hasEvidence, _ := verdict.Signals["real_onchain_evidence"].(bool)
+	if !hasEvidence { return nil }
 	store := services.NewSecurityRadarStore(h.DB)
 	eventID, err := store.InsertEvent(ctx, services.SecurityRadarEventRecord{ModuleID: verdict.ModuleID, Target: verdict.Target, TargetType: "token", Network: verdict.Network, Signature: verdict.Signature, EventType: firstNonEmptyString(source, "manual_verdict"), Signals: verdict.Signals, RawSummary: map[string]any{"source": source, "user_id": userID}, Source: firstNonEmptyString(source, "manual_check")})
 	if err != nil { return err }
