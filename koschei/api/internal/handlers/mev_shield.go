@@ -58,23 +58,18 @@ type mevAnalyzeResponse struct {
 	Message            string   `json:"message"`
 }
 
-// AnalyzeMEV provides a package-level compatibility endpoint for minimal integrations
-// that do not instantiate Handler. Production routes should use Handler.AnalyzeMEV
-// so database persistence is available.
 func AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 	(&Handler{}).AnalyzeMEV(w, r)
 }
 
-// AnalyzeMEV analyzes a submitted Solana swap transaction with deterministic heuristics and returns a sandwich-attack
-// risk report. Phase-1 uses deterministic local heuristics and persists the
-// estimated mev_saved_usd metric to mev_protection_events for owner reporting.
 func (h *Handler) AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+	claimEmail := normalizedClaimEmail(claims)
+	if _, err := h.requirePremiumOutput(claims.Sub, claimEmail); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
@@ -88,21 +83,38 @@ func (h *Handler) AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "transaction_required"})
 		return
 	}
+
 	report := buildMEVRiskReport(req)
+	reservation := premiumOutputReservation{}
+	reserved := false
 	if req.ProtectedSend && strings.TrimSpace(req.RawTransaction) != "" {
-		bundleID, status, err := h.submitJitoBundle(r.Context(), []string{req.RawTransaction})
+		var err error
+		reservation, err = h.reservePremiumOutput(r.Context(), claims.Sub, claimEmail, "mev_protected_analyze")
+		if err != nil {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			return
+		}
+		reserved = true
+		bundleID, status, sendErr := h.submitJitoBundle(r.Context(), []string{strings.TrimSpace(req.RawTransaction)})
 		report.JitoBundleID = bundleID
 		report.JitoStatus = status
-		if err != nil {
+		if sendErr != nil {
+			_ = h.refundPremiumOutputReservation(r.Context(), reservation, "mev_protected_analyze_failed")
 			report.JitoStatus = "failed"
-			report.Signals = append(report.Signals, "Jito Bundle API gönderimi başarısız: "+err.Error())
-		} else {
-			report.JitoTipUsed = true
-			report.Signals = append(report.Signals, "Korumalı Gönder işlemi Jito Bundle API üzerinden yönlendirildi.")
+			report.Signals = append(report.Signals, "Jito protected send failed; reserved output was returned.")
+			writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "jito_bundle_failed", "message": sendErr.Error(), "jito_status": status, "charged": false, "report": report})
+			return
 		}
+		report.JitoTipUsed = true
+		report.Signals = append(report.Signals, "Signed transaction was routed through Jito Bundle API.")
 	}
+
 	tx, err := h.DB.BeginTx(r.Context(), nil)
 	if err != nil {
+		if reserved {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "report": report, "persistence_warning": "Jito submission succeeded but audit persistence failed"})
+			return
+		}
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
@@ -110,24 +122,31 @@ func (h *Handler) AnalyzeMEV(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(req.UserWallet) != "" {
 		rawPayload, _ := json.Marshal(req)
 		if _, err := tx.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, mev_saved_usd, jito_tip_used, risk_score, risk_level, route, raw_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(req.RawTransaction)), report.EstimatedLossUSD, report.MEVSavedUSD, report.JitoTipUsed, report.RiskScore, report.RiskLevel, req.Route, string(rawPayload)); err != nil {
+			if reserved {
+				writeJSON(w, http.StatusOK, map[string]any{"ok": true, "report": report, "persistence_warning": "Jito submission succeeded but audit persistence failed"})
+				return
+			}
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
 	}
-	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, claims.Email, "mev_shield"); err != nil {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-		return
+	if !reserved {
+		if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, claimEmail, "mev_shield"); err != nil {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			return
+		}
 	}
 	if err := tx.Commit(); err != nil {
+		if reserved {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "report": report, "persistence_warning": "Jito submission succeeded but audit commit failed"})
+			return
+		}
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
 	writeJSON(w, http.StatusOK, report)
 }
 
-// ProtectedSendMEV forwards an already signed Solana transaction bundle to the
-// Jito Bundle API. Koschei never requests private keys or signs on behalf of a
-// user; the frontend must provide signed, serialized transactions.
 func (h *Handler) ProtectedSend(w http.ResponseWriter, r *http.Request) {
 	h.ProtectedSendMEV(w, r)
 }
@@ -138,7 +157,8 @@ func (h *Handler) ProtectedSendMEV(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+	claimEmail := normalizedClaimEmail(claims)
+	if _, err := h.requirePremiumOutput(claims.Sub, claimEmail); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
@@ -152,9 +172,9 @@ func (h *Handler) ProtectedSendMEV(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(req.RawTransaction) != "" {
 		txs = append(txs, strings.TrimSpace(req.RawTransaction))
 	}
-	for _, tx := range req.Transactions {
-		if strings.TrimSpace(tx) != "" {
-			txs = append(txs, strings.TrimSpace(tx))
+	for _, raw := range req.Transactions {
+		if strings.TrimSpace(raw) != "" {
+			txs = append(txs, strings.TrimSpace(raw))
 		}
 	}
 	if len(txs) == 0 {
@@ -162,38 +182,47 @@ func (h *Handler) ProtectedSendMEV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bundleID, status, err := h.submitJitoBundle(r.Context(), txs)
+	reservation, err := h.reservePremiumOutput(r.Context(), claims.Sub, claimEmail, "mev_protected_send")
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "jito_bundle_failed", "message": err.Error(), "jito_status": status})
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
+	bundleID, status, sendErr := h.submitJitoBundle(r.Context(), txs)
+	if sendErr != nil {
+		_ = h.refundPremiumOutputReservation(r.Context(), reservation, "mev_protected_send_failed")
+		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "jito_bundle_failed", "message": sendErr.Error(), "jito_status": status, "charged": false})
+		return
+	}
+
 	report := buildMEVRiskReport(mevAnalyzeRequest{InputAmountUSD: req.InputAmountUSD, SlippageBPS: req.SlippageBPS, RawTransaction: txs[0], TXSignature: req.TXSignature, UserWallet: req.UserWallet, Route: req.Route})
 	report.JitoTipUsed = true
 	report.JitoBundleID = bundleID
 	report.JitoStatus = status
-	report.Message = "Korumalı Gönder başarılı: işlem Jito Bundle API üzerinden yönlendirildi."
-	tx, err := h.DB.BeginTx(r.Context(), nil)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
-	defer tx.Rollback()
-	if strings.TrimSpace(req.UserWallet) != "" {
-		rawPayload, _ := json.Marshal(req)
-		if _, err := tx.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, mev_saved_usd, jito_tip_used, risk_score, risk_level, route, raw_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(txs[0])), report.EstimatedLossUSD, report.MEVSavedUSD, true, report.RiskScore, report.RiskLevel, firstNonEmpty(req.Route, "jito_bundle"), string(rawPayload)); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-			return
+	report.Message = "Protected send submitted through Jito Bundle API."
+
+	persistenceWarning := ""
+	if h.DB != nil && strings.TrimSpace(req.UserWallet) != "" {
+		tx, dbErr := h.DB.BeginTx(r.Context(), nil)
+		if dbErr != nil {
+			persistenceWarning = "Jito submission succeeded but audit persistence failed"
+		} else {
+			rawPayload, _ := json.Marshal(req)
+			_, dbErr = tx.ExecContext(r.Context(), `INSERT INTO mev_protection_events (user_wallet, tx_signature, estimated_loss_usd, mev_saved_usd, jito_tip_used, risk_score, risk_level, route, raw_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.UserWallet, firstNonEmpty(req.TXSignature, fingerprintPayload(txs[0])), report.EstimatedLossUSD, report.MEVSavedUSD, true, report.RiskScore, report.RiskLevel, firstNonEmpty(req.Route, "jito_bundle"), string(rawPayload))
+			if dbErr == nil {
+				dbErr = tx.Commit()
+			} else {
+				_ = tx.Rollback()
+			}
+			if dbErr != nil {
+				persistenceWarning = "Jito submission succeeded but audit persistence failed"
+			}
 		}
 	}
-	if err := h.applyCreditChargeTxWithReason(tx, claims.Sub, claims.Email, "mev_protected_send"); err != nil {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-		return
+	response := map[string]any{"ok": true, "jito_bundle_id": bundleID, "jito_status": status, "report": report}
+	if persistenceWarning != "" {
+		response["persistence_warning"] = persistenceWarning
 	}
-	if err := tx.Commit(); err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "jito_bundle_id": bundleID, "jito_status": status, "report": report})
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (h *Handler) submitJitoBundle(ctx context.Context, transactions []string) (string, string, error) {
@@ -231,21 +260,17 @@ func (h *Handler) submitJitoBundle(ctx context.Context, transactions []string) (
 	return bundleID, "submitted", nil
 }
 
-// MEVAnalyze keeps the v1 route name stable while the module-level handler
-// adopts the task-oriented AnalyzeMEV name.
 func (h *Handler) MEVAnalyze(w http.ResponseWriter, r *http.Request) {
 	h.AnalyzeMEV(w, r)
 }
 
-// TXDecoderMEVWarning exposes a lightweight warning box payload for the TX
-// Decoder frontend so consumer flows can reuse the same MEV score.
 func (h *Handler) TXDecoderMEVWarning(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+	if _, err := h.requirePremiumOutput(claims.Sub, normalizedClaimEmail(claims)); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
@@ -256,35 +281,35 @@ func (h *Handler) TXDecoderMEVWarning(w http.ResponseWriter, r *http.Request) {
 
 func buildMEVRiskReport(req mevAnalyzeRequest) mevAnalyzeResponse {
 	score := 12
-	signals := []string{"Temel swap simülasyonu çalıştırıldı."}
+	signals := []string{"Basic swap simulation completed."}
 	if req.SlippageBPS >= 100 {
 		score += 25
-		signals = append(signals, "Slippage toleransı sandwich saldırıları için geniş.")
+		signals = append(signals, "Slippage tolerance is wide for sandwich protection.")
 	}
 	if req.SlippageBPS >= 300 {
 		score += 20
-		signals = append(signals, "Çok yüksek slippage toleransı tespit edildi.")
+		signals = append(signals, "Very high slippage tolerance detected.")
 	}
 	if req.InputAmountUSD >= 10_000 {
 		score += 18
-		signals = append(signals, "İşlem büyüklüğü MEV botları için ekonomik olarak cazip.")
+		signals = append(signals, "Transaction size may be economically attractive to MEV bots.")
 	}
 	if req.PoolLiquidityUSD > 0 && req.InputAmountUSD/req.PoolLiquidityUSD >= 0.01 {
 		score += 25
-		signals = append(signals, "İşlem havuz likiditesine göre yüksek fiyat etkisi yaratıyor.")
+		signals = append(signals, "Transaction has high price impact relative to pool liquidity.")
 	}
 	if score > 100 {
 		score = 100
 	}
-	level := "DÜŞÜK"
+	level := "LOW"
 	if score >= 70 {
-		level = "YÜKSEK"
+		level = "HIGH"
 	} else if score >= 40 {
-		level = "ORTA"
+		level = "MEDIUM"
 	}
 	loss := estimatedMEVLossUSD(req.InputAmountUSD, req.SlippageBPS, score)
 	jitoTip := score >= 40
-	return mevAnalyzeResponse{RiskScore: score, RiskLevel: level, EstimatedLossUSD: loss, JitoTipUsed: jitoTip, RecommendedTipSOL: recommendedJitoTip(score), MEVSavedUSD: loss, Signals: signals, EnterpriseReadyAPI: true, Message: "MEV Shield raporu hazır. Risk orta/yüksek ise korumalı gönderim önerilir."}
+	return mevAnalyzeResponse{RiskScore: score, RiskLevel: level, EstimatedLossUSD: loss, JitoTipUsed: jitoTip, RecommendedTipSOL: recommendedJitoTip(score), MEVSavedUSD: loss, Signals: signals, EnterpriseReadyAPI: true, Message: "MEV Shield report ready. Protected send is recommended for medium or high risk."}
 }
 
 func estimatedMEVLossUSD(input float64, slippageBPS int, score int) float64 {
