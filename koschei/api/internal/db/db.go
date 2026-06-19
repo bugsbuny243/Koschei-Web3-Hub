@@ -117,9 +117,11 @@ func ensureCanonicalPlans(db *sql.DB) error {
 	}{
 		{id: "free", name: "Free", priceTry: 0, monthlyCredits: 0, isActive: true},
 		{id: "starter", name: "Starter", priceTry: 899, monthlyCredits: 25, isActive: true},
-		{id: "builder", name: "Builder", priceTry: 2299, monthlyCredits: 100, isActive: true},
-		{id: "pro", name: "Pro", priceTry: 2299, monthlyCredits: 100, isActive: true},
-		{id: "studio", name: "Studio", priceTry: 4999, monthlyCredits: 300, isActive: true},
+		{id: "professional", name: "Professional", priceTry: 2299, monthlyCredits: 100, isActive: true},
+		{id: "enterprise", name: "Enterprise", priceTry: 4999, monthlyCredits: 300, isActive: true},
+		{id: "builder", name: "Legacy Builder", priceTry: 2299, monthlyCredits: 100, isActive: false},
+		{id: "pro", name: "Legacy Pro", priceTry: 2299, monthlyCredits: 100, isActive: false},
+		{id: "studio", name: "Legacy Studio", priceTry: 4999, monthlyCredits: 300, isActive: false},
 	}
 
 	for _, plan := range canonicalPlans {
@@ -137,8 +139,36 @@ func ensureCanonicalPlans(db *sql.DB) error {
 		}
 	}
 
+	if _, err := db.Exec(`
+		UPDATE app_user_profiles
+		SET plan_id = CASE lower(COALESCE(plan_id,''))
+			WHEN 'builder' THEN 'professional'
+			WHEN 'pro' THEN 'professional'
+			WHEN 'studio' THEN 'enterprise'
+			ELSE plan_id
+		END,
+		updated_at = now()
+		WHERE lower(COALESCE(plan_id,'')) IN ('builder','pro','studio')
+	`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`
+		UPDATE entitlements
+		SET plan_id = CASE lower(COALESCE(plan_id,''))
+			WHEN 'builder' THEN 'professional'
+			WHEN 'pro' THEN 'professional'
+			WHEN 'studio' THEN 'enterprise'
+			ELSE plan_id
+		END,
+		updated_at = now()
+		WHERE lower(COALESCE(plan_id,'')) IN ('builder','pro','studio')
+	`); err != nil {
+		return err
+	}
+
 	return nil
 }
+
 func runMigrations(db *sql.DB) (int, int, error) {
 	applied := 0
 	skipped := 0
