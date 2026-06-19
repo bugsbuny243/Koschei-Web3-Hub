@@ -1,0 +1,39 @@
+name: API CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/**"
+      - "Dockerfile"
+      - ".github/workflows/api-ci.yml"
+  pull_request:
+    paths:
+      - "koschei/api/**"
+      - "Dockerfile"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Download modules
+        run: go mod download
+      - name: Test
+        run: go test ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Build
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
