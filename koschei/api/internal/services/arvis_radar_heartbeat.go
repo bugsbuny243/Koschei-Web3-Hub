@@ -1,0 +1,90 @@
+package services
+
+import (
+	"context"
+	"database/sql"
+	"log"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+func StartArvisRadarHeartbeat(ctx context.Context, db *sql.DB) func() {
+	if db == nil || envBool("ARVIS_HEARTBEAT_DISABLED") {
+		return func() {}
+	}
+	rpcURL := firstSecurityRadarEnv("SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL")
+	if rpcURL == "" {
+		if key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")); key != "" {
+			rpcURL = "https://solana-mainnet.g.alchemy.com/v2/" + key
+		}
+	}
+	if rpcURL == "" {
+		rpcURL = "https://api.mainnet-beta.solana.com"
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	go arvisRadarHeartbeatLoop(ctx, NewSecurityRadarStore(db), rpcURL)
+	return cancel
+}
+
+func arvisRadarHeartbeatLoop(ctx context.Context, store *SecurityRadarStore, rpcURL string) {
+	pollEvery := 20 * time.Second
+	if raw := strings.TrimSpace(os.Getenv("ARVIS_HEARTBEAT_SECONDS")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 5 && n <= 300 {
+			pollEvery = time.Duration(n) * time.Second
+		}
+	}
+	log.Printf("arvis radar heartbeat started interval=%s", pollEvery)
+	arvisRadarHeartbeatOnce(ctx, store, rpcURL)
+	ticker := time.NewTicker(pollEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("arvis radar heartbeat stopped")
+			return
+		case <-ticker.C:
+			arvisRadarHeartbeatOnce(ctx, store, rpcURL)
+		}
+	}
+}
+
+func arvisRadarHeartbeatOnce(ctx context.Context, store *SecurityRadarStore, rpcURL string) {
+	if store == nil || store.DB == nil || strings.TrimSpace(rpcURL) == "" {
+		return
+	}
+	address := firstRadarValue(os.Getenv("RAYDIUM_PROGRAM_ID"), "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9")
+	pollCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	signatures, err := SolanaGetSignaturesForAddress(pollCtx, rpcURL, address, 5)
+	cancel()
+	if err != nil {
+		log.Printf("arvis radar heartbeat poll failed: %v", err)
+		return
+	}
+	for i := len(signatures) - 1; i >= 0; i-- {
+		info := signatures[i]
+		sig := strings.TrimSpace(info.Signature)
+		if sig == "" {
+			continue
+		}
+		_, err := store.InsertStreamEvent(ctx, SecurityRadarStreamEventRecord{
+			Provider:        "solana_rpc",
+			StreamMode:      "heartbeat_poll",
+			Network:         "solana-mainnet",
+			ModuleID:        ModuleRaydiumPoolGuardian,
+			EventType:       "program_signature",
+			Target:          "",
+			TargetType:      "program",
+			Signature:       sig,
+			Slot:            info.Slot,
+			ProgramID:       address,
+			EvidenceQuality: "live_program_signature",
+			Decoded: map[string]any{"source": "raydium_program", "rpc_method": "getSignaturesForAddress"},
+			RawEvent: map[string]any{"signature": sig, "slot": info.Slot},
+		})
+		if err != nil {
+			log.Printf("arvis radar heartbeat insert failed: %v", err)
+		}
+	}
+}
