@@ -26,7 +26,7 @@ func (h *Handler) RequireActiveEntitlement(next http.HandlerFunc) http.HandlerFu
 			return
 		}
 		if !active {
-			writeAPIError(w, http.StatusForbidden, APICodePackageRequired, "Active Koschei package or credits required", nil)
+			writeAPIError(w, http.StatusForbidden, APICodePackageRequired, "Active Koschei package with remaining outputs required", nil)
 			return
 		}
 		next(w, r)
@@ -50,6 +50,9 @@ func (h *Handler) hasActiveEntitlement(ctx context.Context, email string) (bool,
 			FROM entitlements
 			WHERE lower(email) = lower($1)
 			  AND status = 'active'
+			  AND COALESCE(plan_id, '') <> ''
+			  AND COALESCE(plan_id, '') <> 'free'
+			  AND COALESCE(outputs_remaining, 0) > 0
 			  AND (expires_at IS NULL OR expires_at > now())
 		)`, email).Scan(&active)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -76,18 +79,14 @@ func (h *Handler) hasActiveEntitlementAccess(ctx context.Context, authSubject, e
 			FROM entitlements e
 			LEFT JOIN app_user_profiles p ON lower(p.email) = lower(e.email)
 			WHERE e.status = 'active'
+			  AND COALESCE(e.plan_id, '') <> ''
 			  AND COALESCE(e.plan_id, '') <> 'free'
+			  AND COALESCE(e.outputs_remaining, 0) > 0
 			  AND (e.expires_at IS NULL OR e.expires_at > now())
 			  AND (
 				($1 <> '' AND p.auth_subject = $1)
 				OR ($2 <> '' AND lower(e.email) = lower($2))
 			  )
-			UNION ALL
-			SELECT 1
-			FROM app_user_profiles p
-			WHERE (($1 <> '' AND p.auth_subject=$1) OR ($2 <> '' AND lower(p.email)=lower($2)))
-			  AND (COALESCE(p.credits,0) > 0 OR COALESCE(p.plan_id,'free') <> 'free')
-			LIMIT 1
 		)`, authSubject, email).Scan(&active)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
