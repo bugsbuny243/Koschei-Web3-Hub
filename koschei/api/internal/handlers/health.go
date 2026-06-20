@@ -5,9 +5,19 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"sync"
+	"time"
 
 	"koschei/api/internal/services"
 )
+
+const arvisHealthCacheTTL = 15 * time.Second
+
+var arvisHealthCache = struct {
+	sync.RWMutex
+	data      map[string]any
+	expiresAt time.Time
+}{}
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	if err := h.DBPingError(); err != nil {
@@ -23,31 +33,58 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stats := h.securityRadarStreamStats(r.Context())
-	arvis := map[string]any{
-		"pipeline_status":          stats["pipeline_status"],
-		"architecture_arm_count":   stats["architecture_arm_count"],
-		"runtime_engines":          stats["runtime_engines"],
-		"raw_stream_events":        stats["raw_stream_events"],
-		"recognized_events":        stats["recognized_events"],
-		"enriched_mints":           stats["enriched_mints"],
-		"visible_verdicts":         stats["visible_verdicts"],
-		"processing_active":        stats["processing_active"],
-		"processing_completed":     stats["processing_completed"],
-		"processing_insufficient":  stats["processing_insufficient"],
-		"processing_failed":        stats["processing_failed"],
-		"last_stream_event_at":     stats["last_stream_event_at"],
-		"last_processed_at":        stats["last_processed_at"],
-		"runtime_window_minutes":   stats["runtime_window_minutes"],
-		"sources":                  h.arvisSourceHealth(r.Context()),
-	}
-
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":   "ok",
 		"database": "connected",
 		"service":  "koschei-web3",
-		"arvis":    arvis,
+		"arvis":    h.cachedArvisHealth(r.Context()),
 	})
+}
+
+func (h *Handler) cachedArvisHealth(ctx context.Context) map[string]any {
+	now := time.Now()
+	arvisHealthCache.RLock()
+	if arvisHealthCache.data != nil && now.Before(arvisHealthCache.expiresAt) {
+		data := arvisHealthCache.data
+		arvisHealthCache.RUnlock()
+		return data
+	}
+	arvisHealthCache.RUnlock()
+
+	arvisHealthCache.Lock()
+	defer arvisHealthCache.Unlock()
+	if arvisHealthCache.data != nil && now.Before(arvisHealthCache.expiresAt) {
+		return arvisHealthCache.data
+	}
+	stats := h.securityRadarStreamStats(ctx)
+	data := map[string]any{
+		"pipeline_status":         stats["pipeline_status"],
+		"architecture_arm_count":  stats["architecture_arm_count"],
+		"runtime_engines":         stats["runtime_engines"],
+		"raw_stream_events":       stats["raw_stream_events"],
+		"recognized_events":       stats["recognized_events"],
+		"enriched_mints":          stats["enriched_mints"],
+		"visible_verdicts":        stats["visible_verdicts"],
+		"processing_active":       stats["processing_active"],
+		"processing_completed":    stats["processing_completed"],
+		"processing_insufficient": stats["processing_insufficient"],
+		"processing_failed":       stats["processing_failed"],
+		"last_stream_event_at":    stats["last_stream_event_at"],
+		"last_processed_at":       stats["last_processed_at"],
+		"runtime_window_minutes":  stats["runtime_window_minutes"],
+		"sources":                 h.arvisSourceHealth(ctx),
+		"cached_for_seconds":      int(arvisHealthCacheTTL.Seconds()),
+	}
+	arvisHealthCache.data = data
+	arvisHealthCache.expiresAt = now.Add(arvisHealthCacheTTL)
+	return data
+}
+
+func resetArvisHealthCache() {
+	arvisHealthCache.Lock()
+	arvisHealthCache.data = nil
+	arvisHealthCache.expiresAt = time.Time{}
+	arvisHealthCache.Unlock()
 }
 
 func (h *Handler) arvisSourceHealth(ctx context.Context) map[string]any {
@@ -66,10 +103,10 @@ func (h *Handler) arvisSourceHealth(ctx context.Context) map[string]any {
 
 func arvisModuleSourceHealth(ctx context.Context, db *sql.DB, moduleID string) map[string]any {
 	out := map[string]any{
-		"module_id": moduleID,
-		"events":    int64(0),
-		"recent":    int64(0),
-		"enriched":  int64(0),
+		"module_id":    moduleID,
+		"events":       int64(0),
+		"recent":       int64(0),
+		"enriched":     int64(0),
 		"last_event_at": "",
 	}
 	if db == nil || moduleID == "" {
