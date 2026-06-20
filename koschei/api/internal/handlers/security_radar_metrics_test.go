@@ -44,7 +44,7 @@ func TestArvisPipelineStatusUsesFreshness(t *testing.T) {
 		{name: "waiting enriched target", metrics: map[string]any{"raw_stream_events": int64(3), "last_stream_event_at": recentEvent}, want: "waiting_for_enriched_targets"},
 		{name: "stale stream", metrics: map[string]any{"raw_stream_events": int64(3), "enriched_mints": int64(1), "last_stream_event_at": staleEvent}, want: "stale"},
 		{name: "waiting stream", metrics: map[string]any{}, want: "waiting_for_stream"},
-		{name: "owner summary freshness", metrics: map[string]any{"sbx1_stream_events": int64(2), "processing_completed_recent": int64(1), "sbx1_last_event_at": recentEvent, "last_processed_at": recentProcessed}, want: "healthy"},
+		{name: "owner summary freshness", metrics: map[string]any{"sbx1_stream_events": int64(2), "processing_completed": int64(3), "processing_completed_recent": int64(1), "sbx1_last_event_at": recentEvent, "last_processed_at": recentProcessed}, want: "healthy"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
