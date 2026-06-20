@@ -26,6 +26,8 @@ func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadar
 	}
 
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
+	replaceArvisArm(arms, buildPumpTransactionArm(req, txEvidence, generatedAt))
+	replaceArvisArm(arms, buildRaydiumTransactionArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildTransactionMEVArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildLiquidityMovementTransactionArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildCreatorLinkTransactionArm(req, txEvidence, generatedAt))
@@ -40,7 +42,7 @@ func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadar
 	finalArm := buildFinalArm(req, withoutFinal, generatedAt)
 	replaceArvisArm(arms, finalArm)
 	final := finalVerdictFromArm(finalArm)
-	verified := verifiedArvisArmCount(arms)
+	verified := verifiedArvisEvidenceCount(arms)
 
 	bundle.Metadata["arvis_arms"] = arms
 	bundle.Metadata["verified_arm_count"] = verified
@@ -49,13 +51,15 @@ func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadar
 	bundle.Metadata["transaction_signature"] = txEvidence.Signature
 	bundle.Metadata["transaction_program_count"] = len(txEvidence.ProgramIDs)
 	bundle.Metadata["transaction_signer_count"] = len(txEvidence.Signers)
+	bundle.Metadata["pump_program_related"] = txEvidence.PumpRelated
+	bundle.Metadata["raydium_program_related"] = txEvidence.RaydiumRelated
 	bundle.Metadata["final_grade"] = final.Grade
 	bundle.Metadata["final_risk_index"] = final.RiskIndex
 	bundle.Metadata["final_risk_level"] = final.RiskLevel
 	bundle.Metadata["final_recommendation"] = final.Recommendation
 	bundle.CustomerRecommendation = final.Recommendation
 	if final.Signed {
-		bundle.CustomerSummary = fmt.Sprintf("ARVIS verified %d of 13 evidence arms, including parsed transaction evidence, and produced one signed verdict.", verified)
+		bundle.CustomerSummary = fmt.Sprintf("ARVIS verified %d of 13 evidence arms, including parsed transaction and program-relation evidence, and produced one signed verdict.", verified)
 	}
 	return bundle
 }
