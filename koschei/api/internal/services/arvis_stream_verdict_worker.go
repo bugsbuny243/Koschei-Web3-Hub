@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+var errArvisStreamInsufficientEvidence = errors.New("arvis stream insufficient evidence")
+
 type arvisStreamTarget struct {
 	ID        string
 	Target    string
@@ -67,7 +69,12 @@ func (w *arvisStreamVerdictWorker) processBatch(ctx context.Context) {
 		if !w.claimTarget(ctx, target) {
 			continue
 		}
-		if err := w.processTarget(ctx, target); err != nil {
+		err := w.processTarget(ctx, target)
+		if errors.Is(err, errArvisStreamInsufficientEvidence) {
+			w.markTarget(ctx, target.ID, "insufficient_evidence", SecurityRadarInsufficientEvidenceMessage)
+			continue
+		}
+		if err != nil {
 			w.markTarget(ctx, target.ID, "failed", err.Error())
 			log.Printf("arvis stream verdict failed event=%s target=%s err=%v", target.ID, target.Target, err)
 			continue
@@ -126,11 +133,24 @@ func (w *arvisStreamVerdictWorker) claimTarget(ctx context.Context, target arvis
 
 func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arvisStreamTarget) error {
 	analysis := AnalyzeArvisRadars(SecurityRadarRequest{Target: target.Target, Network: target.Network, Mode: "live_stream"})
+	if strings.TrimSpace(target.Signature) != "" {
+		for i := range analysis.Arms {
+			if analysis.Arms[i].Signals == nil {
+				analysis.Arms[i].Signals = map[string]any{}
+			}
+			analysis.Arms[i].Signals["latest_signature"] = target.Signature
+			analysis.Arms[i].Signals["source_stream_signature"] = target.Signature
+		}
+		if analysis.Bundle.Metadata == nil {
+			analysis.Bundle.Metadata = map[string]any{}
+		}
+		analysis.Bundle.Metadata["arvis_arms"] = analysis.Arms
+		analysis.Bundle.Metadata["source_stream_signature"] = target.Signature
+	}
 	bundle := EvidenceBackedSecurityRadarBundle(analysis.Bundle)
 	final := ArvisFinalFromBundle(bundle)
 	if !SecurityRadarHasLiveEvidence(bundle) || !final.Signed {
-		w.markTarget(ctx, target.ID, "insufficient_evidence", SecurityRadarInsufficientEvidenceMessage)
-		return nil
+		return errArvisStreamInsufficientEvidence
 	}
 	arms := ArvisArmsFromBundle(bundle)
 	if len(arms) == 0 {
