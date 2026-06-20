@@ -25,6 +25,7 @@ func SecurityRadarHasLiveEvidence(bundle SecurityRadarBundle) bool {
 }
 
 func EvidenceBackedSecurityRadarBundle(bundle SecurityRadarBundle) SecurityRadarBundle {
+	bundle = EnrichArvisBundleWithTransactions(bundle)
 	if SecurityRadarHasLiveEvidence(bundle) {
 		return bundle
 	}
