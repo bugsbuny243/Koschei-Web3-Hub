@@ -5,9 +5,14 @@ import (
 	"strings"
 )
 
+const defaultSolanaMainnetRPC = "https://api.mainnet-beta.solana.com"
+
 func init() {
 	if strings.TrimSpace(os.Getenv("PUMP_FUN_PROGRAM_ID")) == "" {
 		_ = os.Setenv("PUMP_FUN_PROGRAM_ID", defaultPumpProgramID)
+	}
+	if strings.TrimSpace(os.Getenv("SOLANA_RPC_URL")) == "" {
+		_ = os.Setenv("SOLANA_RPC_URL", resolvedArvisRPCURLFromEnv())
 	}
 	if strings.TrimSpace(os.Getenv("ARVIS_HEARTBEAT_SECONDS")) == "" {
 		if hasConfiguredArvisRPCProvider() {
@@ -23,6 +28,18 @@ func init() {
 			_ = os.Setenv("ARVIS_STREAM_VERDICT_SECONDS", "30")
 		}
 	}
+}
+
+func resolvedArvisRPCURLFromEnv() string {
+	for _, key := range []string{"SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL"} {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	if key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")); key != "" {
+		return "https://solana-mainnet.g.alchemy.com/v2/" + key
+	}
+	return defaultSolanaMainnetRPC
 }
 
 func hasConfiguredArvisRPCProvider() bool {
