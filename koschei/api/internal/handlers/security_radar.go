@@ -162,7 +162,7 @@ func (h *Handler) OwnerRadarSummary(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) securityRadarStreamStats(ctx context.Context) map[string]any {
-	metrics := map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured(), "architecture_arm_count": 14}
+	metrics := map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured(), "architecture_arm_count": 14, "runtime_window_minutes": 15}
 	if h == nil || h.DBRead == nil {
 		metrics["pipeline_status"] = "database_unavailable"
 		return metrics
@@ -183,8 +183,8 @@ func (h *Handler) securityRadarStreamStats(ctx context.Context) map[string]any {
 	count("raw_stream_events", `SELECT count(*) FROM security_radar_stream_events`)
 	count("recognized_events", `SELECT count(*) FROM security_radar_stream_events WHERE module_id <> 'unknown'`)
 	count("enriched_mints", `SELECT count(*) FROM security_radar_stream_events WHERE evidence_quality='transaction_enriched_mint'`)
-	count("visible_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND signed=true AND `+verifiedSQL)
-	count("runtime_engines", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'final_verdict_engine' AND signed=true AND `+verifiedSQL)
+	count("visible_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND signed=true AND created_at > now() - interval '24 hours' AND `+verifiedSQL)
+	count("runtime_engines", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'final_verdict_engine' AND source='arvis_stream' AND signed=true AND created_at > now() - interval '15 minutes' AND `+verifiedSQL)
 	text("last_stream_event_at", `SELECT COALESCE(max(created_at)::text,'') FROM security_radar_stream_events`)
 	text("last_stream_signature", `SELECT COALESCE(signature,'') FROM security_radar_stream_events WHERE signature IS NOT NULL ORDER BY created_at DESC LIMIT 1`)
 	text("last_stream_module", `SELECT COALESCE(module_id,'') FROM security_radar_stream_events ORDER BY created_at DESC LIMIT 1`)
@@ -197,18 +197,26 @@ func (h *Handler) addArvisProcessingMetrics(ctx context.Context, metrics map[str
 	if h == nil || h.DBRead == nil || metrics == nil {
 		return
 	}
-	count := func(key, status string) {
+	countStatus := func(key, status string) {
 		var value int64
-		err := h.DBRead.QueryRowContext(ctx, `SELECT count(*) FROM arvis_stream_processing WHERE status=$1`, status).Scan(&value)
-		if err == nil {
+		if err := h.DBRead.QueryRowContext(ctx, `SELECT count(*) FROM arvis_stream_processing WHERE status=$1`, status).Scan(&value); err == nil {
 			metrics[key] = value
 		}
 	}
-	count("processing_pending", "pending")
-	count("processing_active", "processing")
-	count("processing_completed", "completed")
-	count("processing_insufficient", "insufficient_evidence")
-	count("processing_failed", "failed")
+	countQuery := func(key, query string) {
+		var value int64
+		if err := h.DBRead.QueryRowContext(ctx, query).Scan(&value); err == nil {
+			metrics[key] = value
+		}
+	}
+	countStatus("processing_pending", "pending")
+	countStatus("processing_active", "processing")
+	countStatus("processing_completed", "completed")
+	countStatus("processing_insufficient", "insufficient_evidence")
+	countStatus("processing_failed", "failed")
+	countQuery("processing_completed_recent", `SELECT count(*) FROM arvis_stream_processing WHERE status='completed' AND processed_at > now() - interval '15 minutes'`)
+	countQuery("processing_failed_recent", `SELECT count(*) FROM arvis_stream_processing WHERE status='failed' AND updated_at > now() - interval '15 minutes'`)
+	countQuery("processing_stale_active", `SELECT count(*) FROM arvis_stream_processing WHERE status='processing' AND updated_at < now() - interval '5 minutes'`)
 	var lastProcessed string
 	if err := h.DBRead.QueryRowContext(ctx, `SELECT COALESCE(max(processed_at)::text,'') FROM arvis_stream_processing`).Scan(&lastProcessed); err == nil {
 		metrics["last_processed_at"] = lastProcessed
@@ -217,25 +225,40 @@ func (h *Handler) addArvisProcessingMetrics(ctx context.Context, metrics map[str
 
 func arvisPipelineStatus(metrics map[string]any) string {
 	raw := metricInt64(metrics, "raw_stream_events")
+	if raw == 0 {
+		raw = metricInt64(metrics, "sbx1_stream_events")
+	}
 	active := metricInt64(metrics, "processing_active")
-	completed := metricInt64(metrics, "processing_completed")
-	failed := metricInt64(metrics, "processing_failed")
-	if active > 0 {
+	staleActive := metricInt64(metrics, "processing_stale_active")
+	failedRecent := metricInt64(metrics, "processing_failed_recent")
+	completedRecent := metricInt64(metrics, "processing_completed_recent")
+	if active > 0 && staleActive == 0 {
 		return "processing"
 	}
-	if completed > 0 && failed == 0 {
-		return "healthy"
-	}
-	if completed > 0 && failed > 0 {
+	if staleActive > 0 || failedRecent > 0 {
 		return "degraded"
 	}
-	if failed > 0 {
-		return "degraded"
+	lastEvent := metricTime(metrics, "last_stream_event_at")
+	if lastEvent.IsZero() {
+		lastEvent = metricTime(metrics, "sbx1_last_event_at")
 	}
-	if raw > 0 {
+	if lastEvent.IsZero() {
+		if raw > 0 {
+			return "waiting_for_enriched_targets"
+		}
+		return "waiting_for_stream"
+	}
+	if time.Since(lastEvent) > 10*time.Minute {
+		return "stale"
+	}
+	if metricInt64(metrics, "enriched_mints") == 0 && metricInt64(metrics, "processing_completed") == 0 {
 		return "waiting_for_enriched_targets"
 	}
-	return "waiting_for_stream"
+	lastProcessed := metricTime(metrics, "last_processed_at")
+	if completedRecent > 0 || (!lastProcessed.IsZero() && time.Since(lastProcessed) <= 15*time.Minute) {
+		return "healthy"
+	}
+	return "waiting_for_processing"
 }
 
 func metricInt64(metrics map[string]any, key string) int64 {
@@ -252,6 +275,40 @@ func metricInt64(metrics map[string]any, key string) int64 {
 	default:
 		return 0
 	}
+}
+
+func metricTime(metrics map[string]any, key string) time.Time {
+	if metrics == nil {
+		return time.Time{}
+	}
+	value := strings.TrimSpace(metricString(metrics, key))
+	if value == "" {
+		return time.Time{}
+	}
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05.999999999Z07",
+		"2006-01-02 15:04:05Z07:00",
+		"2006-01-02 15:04:05Z07",
+	}
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
+}
+
+func metricString(metrics map[string]any, key string) string {
+	if metrics == nil {
+		return ""
+	}
+	if value, ok := metrics[key].(string); ok {
+		return value
+	}
+	return ""
 }
 
 func radarVerifiedEvidenceSQL() string {
