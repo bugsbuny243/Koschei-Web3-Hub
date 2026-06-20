@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -44,18 +43,37 @@ type ownerFeedbackUpdate struct {
 }
 
 func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request) {
+	var input customerFeedbackRequest
+	if err := decodeJSON(r, &input); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_json", "message": "Form verisi okunamadı."})
+		return
+	}
+	h.submitFeedbackInput(w, r, input)
+}
+
+func (h *Handler) submitFeedbackFromAnalytics(w http.ResponseWriter, r *http.Request, req analyticsEventInput) {
+	metadata := req.Metadata
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	input := customerFeedbackRequest{
+		Category:     feedbackMetadataString(metadata, "category"),
+		Subject:      feedbackMetadataString(metadata, "subject"),
+		Message:      feedbackMetadataString(metadata, "message"),
+		ContactEmail: firstNonEmptyString(feedbackMetadataString(metadata, "contact_email"), req.Email),
+		PageURL:      firstNonEmptyString(feedbackMetadataString(metadata, "page_url"), req.Path),
+		Website:      feedbackMetadataString(metadata, "website"),
+	}
+	h.submitFeedbackInput(w, r, input)
+}
+
+func (h *Handler) submitFeedbackInput(w http.ResponseWriter, r *http.Request, input customerFeedbackRequest) {
 	if h == nil || h.DB == nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"ok": false, "error": "database_unavailable"})
 		return
 	}
 	if h.Limiter != nil && !h.Limiter.allow("customer-feedback:"+clientIP(r), 5, time.Hour) {
 		writeJSON(w, http.StatusTooManyRequests, map[string]any{"ok": false, "error": "rate_limited", "message": "Çok fazla geri bildirim gönderildi. Lütfen daha sonra tekrar deneyin."})
-		return
-	}
-
-	var input customerFeedbackRequest
-	if err := decodeJSON(r, &input); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid_json", "message": "Form verisi okunamadı."})
 		return
 	}
 	if strings.TrimSpace(input.Website) != "" {
@@ -101,9 +119,9 @@ func (h *Handler) SubmitFeedback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"ok":           true,
-		"feedback_id":  id,
-		"message":      "Geri bildiriminiz alındı. Teşekkür ederiz.",
+		"ok":          true,
+		"feedback_id": id,
+		"message":     "Geri bildiriminiz alındı. Teşekkür ederiz.",
 	})
 }
 
@@ -131,7 +149,11 @@ func (h *Handler) ownerFeedbackList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rows, err := h.DBRead.QueryContext(r.Context(), `
+	db := h.DBRead
+	if db == nil {
+		db = h.DB
+	}
+	rows, err := db.QueryContext(r.Context(), `
 		SELECT id::text,category,subject,message,COALESCE(contact_email,''),COALESCE(page_url,''),status,COALESCE(owner_note,''),created_at,updated_at
 		FROM customer_feedback
 		WHERE ($1='' OR status=$1)
@@ -214,9 +236,10 @@ func truncateFeedbackText(value string, max int) string {
 	return string(runes[:max])
 }
 
-func nullableFeedbackTime(value sql.NullTime) any {
-	if value.Valid {
-		return value.Time
+func feedbackMetadataString(metadata map[string]any, key string) string {
+	if metadata == nil {
+		return ""
 	}
-	return nil
+	value, _ := metadata[key].(string)
+	return strings.TrimSpace(value)
 }
