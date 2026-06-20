@@ -6,6 +6,9 @@ import (
 )
 
 func init() {
+	if strings.TrimSpace(os.Getenv("PUMP_FUN_PROGRAM_ID")) == "" {
+		_ = os.Setenv("PUMP_FUN_PROGRAM_ID", defaultPumpProgramID)
+	}
 	if strings.TrimSpace(os.Getenv("ARVIS_HEARTBEAT_SECONDS")) == "" {
 		if hasConfiguredArvisRPCProvider() {
 			_ = os.Setenv("ARVIS_HEARTBEAT_SECONDS", "20")
