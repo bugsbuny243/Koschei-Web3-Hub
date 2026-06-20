@@ -125,9 +125,9 @@ func (h *Handler) arvisFailureHealth(ctx context.Context) map[string]any {
 	if err := db.QueryRowContext(ctx, `
 		SELECT
 			count(*) FILTER (WHERE status='failed' AND attempts < 3),
-			count(*) FILTER (WHERE status='failed' AND attempts >= 3),
-			count(*) FILTER (WHERE status='failed' AND updated_at > now() - interval '15 minutes'),
-			COALESCE(max(updated_at) FILTER (WHERE status='failed')::text,'')
+			count(*) FILTER (WHERE status='exhausted' OR (status='failed' AND attempts >= 3)),
+			count(*) FILTER (WHERE status='failed' AND attempts < 3 AND updated_at > now() - interval '15 minutes'),
+			COALESCE(max(updated_at) FILTER (WHERE status IN ('failed','exhausted'))::text,'')
 		FROM arvis_stream_processing
 	`).Scan(&retryable, &exhausted, &recent, &latestAt); err == nil {
 		out["retryable"] = retryable
@@ -139,7 +139,7 @@ func (h *Handler) arvisFailureHealth(ctx context.Context) map[string]any {
 	rows, err := db.QueryContext(ctx, `
 		SELECT COALESCE(last_error,''), updated_at::text
 		FROM arvis_stream_processing
-		WHERE status='failed'
+		WHERE status IN ('failed','exhausted')
 		ORDER BY updated_at DESC
 		LIMIT 200
 	`)
