@@ -19,13 +19,18 @@ func SecurityRadarAutoEnabled() bool {
 
 func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRPC) func() {
 	stopHeartbeat := StartArvisRadarHeartbeat(ctx, db)
+	stopStreamVerdicts := StartArvisStreamVerdictWorker(ctx, db)
+	stopAll := func() {
+		stopStreamVerdicts()
+		stopHeartbeat()
+	}
 	if db == nil || !SecurityRadarAutoEnabled() {
-		return stopHeartbeat
+		return stopAll
 	}
 	rpcURL := firstSecurityRadarEnv("SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL")
 	if rpcURL == "" {
-		log.Printf("security radar worker not started: SOLANA_RPC_URL is empty")
-		return stopHeartbeat
+		log.Printf("security radar polling worker not started: SOLANA_RPC_URL is empty")
+		return stopAll
 	}
 	pollEvery := 10 * time.Second
 	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_RADAR_POLL_SECONDS")); raw != "" {
@@ -34,11 +39,11 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 		}
 	}
 	worker := NewSecurityRadarWorker(NewSecurityRadarStore(db), rpcURL, true, pollEvery)
-	ctx, cancel := context.WithCancel(ctx)
-	go worker.Start(ctx)
+	pollCtx, cancelPolling := context.WithCancel(ctx)
+	go worker.Start(pollCtx)
 	return func() {
-		cancel()
-		stopHeartbeat()
+		cancelPolling()
+		stopAll()
 	}
 }
 
