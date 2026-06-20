@@ -3,11 +3,21 @@ package services
 const SecurityRadarInsufficientEvidenceMessage = "Real data unavailable. Analysis could not be completed."
 
 func SecurityRadarHasLiveEvidence(bundle SecurityRadarBundle) bool {
+	if arms := ArvisArmsFromBundle(bundle); len(arms) > 0 {
+		for _, verdict := range arms {
+			if verdict.ModuleID == ModuleFinalVerdictEngine || verdict.Signals == nil {
+				continue
+			}
+			if ok, _ := verdict.Signals["real_onchain_evidence"].(bool); ok && verdict.Signed {
+				return true
+			}
+		}
+	}
 	for _, verdict := range []SecurityRadarVerdict{bundle.PumpSybilRadar, bundle.RaydiumPoolGuardian} {
 		if verdict.Signals == nil {
 			continue
 		}
-		if ok, _ := verdict.Signals["real_onchain_evidence"].(bool); ok {
+		if ok, _ := verdict.Signals["real_onchain_evidence"].(bool); ok && verdict.Signed {
 			return true
 		}
 	}
@@ -26,6 +36,15 @@ func EvidenceBackedSecurityRadarBundle(bundle SecurityRadarBundle) SecurityRadar
 	if bundle.Metadata == nil {
 		bundle.Metadata = map[string]any{}
 	}
+	if arms := ArvisArmsFromBundle(bundle); len(arms) > 0 {
+		gated := make([]SecurityRadarVerdict, 0, len(arms))
+		for _, arm := range arms {
+			gated = append(gated, insufficientEvidenceVerdict(arm))
+		}
+		bundle.Metadata["arvis_arms"] = gated
+		bundle.Metadata["verified_arm_count"] = 0
+		bundle.Metadata["runtime_arm_count"] = 0
+	}
 	bundle.Metadata["final_grade"] = "-"
 	bundle.Metadata["final_risk_index"] = 0
 	bundle.Metadata["final_risk_level"] = "unknown"
@@ -39,15 +58,13 @@ func EvidenceBackedSecurityRadarBundle(bundle SecurityRadarBundle) SecurityRadar
 func EvidenceBackedFinalSecurityRadarVerdict(bundle SecurityRadarBundle) SecurityRadarFinalVerdict {
 	bundle = EvidenceBackedSecurityRadarBundle(bundle)
 	if !SecurityRadarHasLiveEvidence(bundle) {
-		return SecurityRadarFinalVerdict{
-			Grade:          "-",
-			RiskIndex:      0,
-			RiskLevel:      "unknown",
-			Verdict:        SecurityRadarInsufficientEvidenceMessage,
-			Recommendation: "insufficient_evidence",
-			RuleVersion:    SecurityRadarRuleVersion,
-			Signed:         false,
-			Signature:      "",
+		return SecurityRadarFinalVerdict{Grade: "-", RiskIndex: 0, RiskLevel: "unknown", Verdict: SecurityRadarInsufficientEvidenceMessage, Recommendation: "insufficient_evidence", RuleVersion: SecurityRadarRuleVersion, Signed: false, Signature: ""}
+	}
+	if arms := ArvisArmsFromBundle(bundle); len(arms) > 0 {
+		for _, arm := range arms {
+			if arm.ModuleID == ModuleFinalVerdictEngine {
+				return finalVerdictFromArm(arm)
+			}
 		}
 	}
 	final := FinalSecurityRadarVerdict(bundle)
@@ -70,6 +87,7 @@ func insufficientEvidenceVerdict(verdict SecurityRadarVerdict) SecurityRadarVerd
 	verdict.Signals["real_onchain_evidence"] = false
 	verdict.Signals["data_quality"] = "no_rpc_evidence"
 	verdict.Signals["evidence_status"] = "insufficient_evidence"
+	verdict.Signals["arm_evidence_available"] = false
 	verdict.Evidence = []string{SecurityRadarInsufficientEvidenceMessage}
 	return verdict
 }
