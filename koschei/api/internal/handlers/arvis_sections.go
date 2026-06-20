@@ -17,16 +17,24 @@ func arvisSections(arms []services.SecurityRadarVerdict, final services.Security
 		"arvis_arms": arms,
 	}
 	verified := 0
+	onchain := 0
+	offchain := 0
 	for _, arm := range arms {
 		sections[arm.ModuleID] = arm
-		if arm.ModuleID == services.ModuleFinalVerdictEngine || !arm.Signed || arm.Signals == nil {
+		if arm.ModuleID == services.ModuleFinalVerdictEngine || !services.SecurityRadarVerdictHasVerifiedEvidence(arm) {
 			continue
 		}
-		if ok, _ := arm.Signals["real_onchain_evidence"].(bool); ok {
-			verified++
+		verified++
+		if value, _ := arm.Signals["real_onchain_evidence"].(bool); value {
+			onchain++
+		}
+		if value, _ := arm.Signals["real_offchain_evidence"].(bool); value {
+			offchain++
 		}
 	}
 	sections["architecture_arm_count"] = 14
 	sections["verified_arm_count"] = verified
+	sections["verified_onchain_arm_count"] = onchain
+	sections["verified_offchain_arm_count"] = offchain
 	return sections
 }
