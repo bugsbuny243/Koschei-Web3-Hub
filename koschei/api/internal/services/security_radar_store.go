@@ -174,13 +174,7 @@ func (s *SecurityRadarStore) LatestVerdicts(ctx context.Context, limit int) ([]S
 		SELECT v.id::text, COALESCE(v.event_id::text,''), v.module_id, v.target, v.target_type, v.network, v.grade, v.risk_index, v.risk_level, v.verdict, v.recommendation, v.evidence, v.signals, v.rule_version, v.signed, COALESCE(v.signature,''), COALESCE(v.source,''), COALESCE(e.event_type,''), v.created_at
 		FROM security_radar_verdicts v
 		LEFT JOIN security_radar_events e ON e.id = v.event_id
-		WHERE v.module_id <> 'walletless_claim_shield'
-			AND NOT (
-				v.risk_index <= 20
-				AND COALESCE(v.signals->>'data_quality','') IN ('partial_rpc_evidence','no_rpc_evidence','')
-				AND COALESCE(v.signals->>'stream_evidence_quality','') <> 'transaction_enriched_mint'
-				AND COALESCE(v.signals->>'real_onchain_evidence','false') <> 'true'
-			)
+		WHERE v.module_id = 'final_verdict_engine'
 		ORDER BY v.created_at DESC
 		LIMIT $1`, limit)
 	if err != nil {
