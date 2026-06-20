@@ -5,19 +5,16 @@ const SecurityRadarInsufficientEvidenceMessage = "Real data unavailable. Analysi
 func SecurityRadarHasLiveEvidence(bundle SecurityRadarBundle) bool {
 	if arms := ArvisArmsFromBundle(bundle); len(arms) > 0 {
 		for _, verdict := range arms {
-			if verdict.ModuleID == ModuleFinalVerdictEngine || verdict.Signals == nil {
+			if verdict.ModuleID == ModuleFinalVerdictEngine {
 				continue
 			}
-			if ok, _ := verdict.Signals["real_onchain_evidence"].(bool); ok && verdict.Signed {
+			if SecurityRadarVerdictHasVerifiedEvidence(verdict) {
 				return true
 			}
 		}
 	}
-	for _, verdict := range []SecurityRadarVerdict{bundle.PumpSybilRadar, bundle.RaydiumPoolGuardian} {
-		if verdict.Signals == nil {
-			continue
-		}
-		if ok, _ := verdict.Signals["real_onchain_evidence"].(bool); ok && verdict.Signed {
+	for _, verdict := range []SecurityRadarVerdict{bundle.PumpSybilRadar, bundle.RaydiumPoolGuardian, bundle.WalletlessClaimShield} {
+		if SecurityRadarVerdictHasVerifiedEvidence(verdict) {
 			return true
 		}
 	}
@@ -26,6 +23,7 @@ func SecurityRadarHasLiveEvidence(bundle SecurityRadarBundle) bool {
 
 func EvidenceBackedSecurityRadarBundle(bundle SecurityRadarBundle) SecurityRadarBundle {
 	bundle = EnrichArvisBundleWithTransactions(bundle)
+	bundle = EnrichArvisBundleWithClaimSurface(bundle)
 	bundle = applyResolvedArvisProvider(bundle)
 	if SecurityRadarHasLiveEvidence(bundle) {
 		return bundle
@@ -52,7 +50,7 @@ func EvidenceBackedSecurityRadarBundle(bundle SecurityRadarBundle) SecurityRadar
 	bundle.Metadata["final_risk_level"] = "unknown"
 	bundle.Metadata["final_recommendation"] = "insufficient_evidence"
 	bundle.Metadata["score_source"] = "none"
-	bundle.Metadata["data_quality"] = "no_rpc_evidence"
+	bundle.Metadata["data_quality"] = "no_verified_evidence"
 	bundle.Metadata["evidence_status"] = "insufficient_evidence"
 	return applyResolvedArvisProvider(bundle)
 }
@@ -86,8 +84,10 @@ func insufficientEvidenceVerdict(verdict SecurityRadarVerdict) SecurityRadarVerd
 	verdict.Signed = false
 	verdict.Signature = ""
 	verdict.Signals["score_source"] = "none"
+	verdict.Signals["verified_evidence"] = false
 	verdict.Signals["real_onchain_evidence"] = false
-	verdict.Signals["data_quality"] = "no_rpc_evidence"
+	verdict.Signals["real_offchain_evidence"] = false
+	verdict.Signals["data_quality"] = "no_verified_evidence"
 	verdict.Signals["evidence_status"] = "insufficient_evidence"
 	verdict.Signals["arm_evidence_available"] = false
 	verdict.Evidence = []string{SecurityRadarInsufficientEvidenceMessage}
