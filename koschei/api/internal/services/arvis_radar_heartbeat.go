@@ -78,10 +78,13 @@ func arvisRadarHeartbeatOnce(ctx context.Context, store *SecurityRadarStore, rpc
 		txCancel()
 		if txErr == nil {
 			mints := extractMintsFromTransactionMap(map[string]any(tx))
+			selectedMint := selectArvisTargetMint(mints)
 			decoded["enriched_mints"] = mints
+			decoded["selected_project_mint"] = selectedMint
+			decoded["base_asset_mints_filtered"] = selectedMint != "" && len(mints) > 1
 			decoded["transaction_parsed"] = true
-			if len(mints) > 0 {
-				target = mints[0]
+			if selectedMint != "" {
+				target = selectedMint
 				targetType = "token"
 				evidenceQuality = "transaction_enriched_mint"
 				decoded["enriched_mint"] = target
