@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+const defaultPumpProgramID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+
+type arvisHeartbeatSource struct {
+	Label     string
+	ProgramID string
+	ModuleID  string
+	EventType string
+}
+
 func StartArvisRadarHeartbeat(ctx context.Context, db *sql.DB) func() {
 	if db == nil || envBool("ARVIS_HEARTBEAT_DISABLED") {
 		return func() {}
@@ -35,7 +44,8 @@ func arvisRadarHeartbeatLoop(ctx context.Context, store *SecurityRadarStore, rpc
 			pollEvery = time.Duration(n) * time.Second
 		}
 	}
-	log.Printf("arvis radar heartbeat started interval=%s", pollEvery)
+	sources := arvisHeartbeatSources()
+	log.Printf("arvis radar heartbeat started interval=%s sources=%d", pollEvery, len(sources))
 	arvisRadarHeartbeatOnce(ctx, store, rpcURL)
 	ticker := time.NewTicker(pollEvery)
 	defer ticker.Stop()
@@ -50,29 +60,59 @@ func arvisRadarHeartbeatLoop(ctx context.Context, store *SecurityRadarStore, rpc
 	}
 }
 
+func arvisHeartbeatSources() []arvisHeartbeatSource {
+	return []arvisHeartbeatSource{
+		{
+			Label:     "raydium_program",
+			ProgramID: firstRadarValue(os.Getenv("RAYDIUM_PROGRAM_ID"), "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9"),
+			ModuleID:  ModuleRaydiumPoolGuardian,
+			EventType: "raydium_program_signature",
+		},
+		{
+			Label:     "pump_program",
+			ProgramID: firstRadarValue(os.Getenv("PUMP_FUN_PROGRAM_ID"), defaultPumpProgramID),
+			ModuleID:  ModulePumpSybilRadar,
+			EventType: "pump_program_signature",
+		},
+	}
+}
+
 func arvisRadarHeartbeatOnce(ctx context.Context, store *SecurityRadarStore, rpcURL string) {
 	if store == nil || store.DB == nil || strings.TrimSpace(rpcURL) == "" {
 		return
 	}
-	address := firstRadarValue(os.Getenv("RAYDIUM_PROGRAM_ID"), "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9")
-	pollCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	signatures, err := SolanaGetSignaturesForAddress(pollCtx, rpcURL, address, 3)
+	for _, source := range arvisHeartbeatSources() {
+		if strings.TrimSpace(source.ProgramID) == "" {
+			continue
+		}
+		arvisPollHeartbeatSource(ctx, store, rpcURL, source)
+	}
+}
+
+func arvisPollHeartbeatSource(ctx context.Context, store *SecurityRadarStore, rpcURL string, source arvisHeartbeatSource) {
+	pollCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	signatures, err := SolanaGetSignaturesForAddress(pollCtx, rpcURL, source.ProgramID, 3)
 	cancel()
 	if err != nil {
-		log.Printf("arvis radar heartbeat poll failed: %v", err)
+		log.Printf("arvis radar heartbeat poll failed source=%s: %v", source.Label, err)
 		return
 	}
 	for i := len(signatures) - 1; i >= 0; i-- {
 		info := signatures[i]
 		sig := strings.TrimSpace(info.Signature)
-		if sig == "" || arvisHeartbeatEventExists(ctx, store.DB, sig) {
+		if sig == "" || arvisHeartbeatEventExists(ctx, store.DB, sig, source.ProgramID) {
 			continue
 		}
 
 		target := ""
 		targetType := "program"
 		evidenceQuality := "live_program_signature"
-		decoded := map[string]any{"source": "raydium_program", "rpc_method": "getSignaturesForAddress"}
+		decoded := map[string]any{
+			"source":       source.Label,
+			"module_id":    source.ModuleID,
+			"program_id":   source.ProgramID,
+			"rpc_method":   "getSignaturesForAddress",
+		}
 		txCtx, txCancel := context.WithTimeout(ctx, 7*time.Second)
 		tx, txErr := SolanaGetTransactionJSONParsed(txCtx, rpcURL, sig)
 		txCancel()
@@ -98,33 +138,40 @@ func arvisRadarHeartbeatOnce(ctx context.Context, store *SecurityRadarStore, rpc
 			Provider:        "solana_rpc",
 			StreamMode:      "heartbeat_poll",
 			Network:         "solana-mainnet",
-			ModuleID:        ModuleRaydiumPoolGuardian,
-			EventType:       "raydium_program_signature",
+			ModuleID:        source.ModuleID,
+			EventType:       source.EventType,
 			Target:          target,
 			TargetType:      targetType,
 			Signature:       sig,
 			Slot:            info.Slot,
-			ProgramID:       address,
+			ProgramID:       source.ProgramID,
 			EvidenceQuality: evidenceQuality,
 			Decoded:         decoded,
-			RawEvent:        map[string]any{"signature": sig, "slot": info.Slot, "target": target},
+			RawEvent: map[string]any{
+				"signature": sig,
+				"slot":      info.Slot,
+				"target":    target,
+				"source":    source.Label,
+			},
 		})
 		if err != nil {
-			log.Printf("arvis radar heartbeat insert failed: %v", err)
+			log.Printf("arvis radar heartbeat insert failed source=%s: %v", source.Label, err)
 		}
 	}
 }
 
-func arvisHeartbeatEventExists(ctx context.Context, db *sql.DB, signature string) bool {
-	if db == nil || strings.TrimSpace(signature) == "" {
+func arvisHeartbeatEventExists(ctx context.Context, db *sql.DB, signature, programID string) bool {
+	if db == nil || strings.TrimSpace(signature) == "" || strings.TrimSpace(programID) == "" {
 		return false
 	}
 	var exists bool
 	err := db.QueryRowContext(ctx, `
 		SELECT EXISTS(
 			SELECT 1 FROM security_radar_stream_events
-			WHERE signature=$1 AND stream_mode='heartbeat_poll'
+			WHERE signature=$1
+			  AND stream_mode='heartbeat_poll'
+			  AND program_id=$2
 		)
-	`, signature).Scan(&exists)
+	`, signature, programID).Scan(&exists)
 	return err == nil && exists
 }
