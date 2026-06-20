@@ -26,6 +26,7 @@ func SecurityRadarHasLiveEvidence(bundle SecurityRadarBundle) bool {
 
 func EvidenceBackedSecurityRadarBundle(bundle SecurityRadarBundle) SecurityRadarBundle {
 	bundle = EnrichArvisBundleWithTransactions(bundle)
+	bundle = applyResolvedArvisProvider(bundle)
 	if SecurityRadarHasLiveEvidence(bundle) {
 		return bundle
 	}
@@ -53,7 +54,7 @@ func EvidenceBackedSecurityRadarBundle(bundle SecurityRadarBundle) SecurityRadar
 	bundle.Metadata["score_source"] = "none"
 	bundle.Metadata["data_quality"] = "no_rpc_evidence"
 	bundle.Metadata["evidence_status"] = "insufficient_evidence"
-	return bundle
+	return applyResolvedArvisProvider(bundle)
 }
 
 func EvidenceBackedFinalSecurityRadarVerdict(bundle SecurityRadarBundle) SecurityRadarFinalVerdict {
