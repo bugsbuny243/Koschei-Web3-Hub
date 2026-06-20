@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -73,6 +74,7 @@ func (h *Handler) cachedArvisHealth(ctx context.Context) map[string]any {
 		"last_processed_at":       stats["last_processed_at"],
 		"runtime_window_minutes":  stats["runtime_window_minutes"],
 		"sources":                 h.arvisSourceHealth(ctx),
+		"failures":                h.arvisFailureHealth(ctx),
 		"cached_for_seconds":      int(arvisHealthCacheTTL.Seconds()),
 	}
 	arvisHealthCache.data = data
@@ -101,12 +103,96 @@ func (h *Handler) arvisSourceHealth(ctx context.Context) map[string]any {
 	}
 }
 
+func (h *Handler) arvisFailureHealth(ctx context.Context) map[string]any {
+	db := h.DBRead
+	if db == nil {
+		db = h.DB
+	}
+	out := map[string]any{
+		"retryable":         int64(0),
+		"exhausted":         int64(0),
+		"recent_15_minutes": int64(0),
+		"latest_error_code": "",
+		"latest_error_at":   "",
+		"reason_counts":     map[string]int64{},
+	}
+	if db == nil {
+		return out
+	}
+	_ = db.QueryRowContext(ctx, `
+		SELECT
+			count(*) FILTER (WHERE status='failed' AND attempts < 3),
+			count(*) FILTER (WHERE status='failed' AND attempts >= 3),
+			count(*) FILTER (WHERE status='failed' AND updated_at > now() - interval '15 minutes'),
+			COALESCE(max(updated_at) FILTER (WHERE status='failed')::text,'')
+		FROM arvis_stream_processing
+	`).Scan(&out["retryable"], &out["exhausted"], &out["recent_15_minutes"], &out["latest_error_at"])
+
+	rows, err := db.QueryContext(ctx, `
+		SELECT COALESCE(last_error,''), updated_at::text
+		FROM arvis_stream_processing
+		WHERE status='failed'
+		ORDER BY updated_at DESC
+		LIMIT 200
+	`)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	counts := map[string]int64{}
+	latestCode := ""
+	for rows.Next() {
+		var raw, updatedAt string
+		if rows.Scan(&raw, &updatedAt) != nil {
+			continue
+		}
+		code := classifyArvisFailure(raw)
+		counts[code]++
+		if latestCode == "" {
+			latestCode = code
+		}
+	}
+	out["reason_counts"] = counts
+	out["latest_error_code"] = latestCode
+	return out
+}
+
+func classifyArvisFailure(raw string) string {
+	text := strings.ToLower(strings.TrimSpace(raw))
+	switch {
+	case text == "":
+		return "unknown"
+	case strings.Contains(text, "insert arm verdict"):
+		return "verdict_insert"
+	case strings.Contains(text, "insert arm event"):
+		return "event_insert"
+	case strings.Contains(text, "check existing arm verdict"):
+		return "idempotency_check"
+	case strings.Contains(text, "duplicate key") || strings.Contains(text, "23505") || strings.Contains(text, "unique constraint"):
+		return "duplicate_write"
+	case strings.Contains(text, "foreign key") || strings.Contains(text, "23503"):
+		return "foreign_key"
+	case strings.Contains(text, "null value") || strings.Contains(text, "23502") || strings.Contains(text, "check constraint"):
+		return "schema_constraint"
+	case strings.Contains(text, "does not exist") || strings.Contains(text, "undefined table") || strings.Contains(text, "undefined column"):
+		return "missing_schema"
+	case strings.Contains(text, "deadline exceeded") || strings.Contains(text, "timeout") || strings.Contains(text, "timed out"):
+		return "timeout"
+	case strings.Contains(text, "connection") || strings.Contains(text, "network") || strings.Contains(text, "broken pipe") || strings.Contains(text, "eof"):
+		return "database_or_network"
+	case strings.Contains(text, "json"):
+		return "json_encoding"
+	default:
+		return "processing_error"
+	}
+}
+
 func arvisModuleSourceHealth(ctx context.Context, db *sql.DB, moduleID string) map[string]any {
 	out := map[string]any{
-		"module_id":    moduleID,
-		"events":       int64(0),
-		"recent":       int64(0),
-		"enriched":     int64(0),
+		"module_id":     moduleID,
+		"events":        int64(0),
+		"recent":        int64(0),
+		"enriched":      int64(0),
 		"last_event_at": "",
 	}
 	if db == nil || moduleID == "" {
