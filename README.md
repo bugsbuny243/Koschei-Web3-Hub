@@ -1,300 +1,175 @@
-# Koschei Web3 Hub
+# KOSCHEİ WEB3 — ARVIS
 
-> **Alchemy-first automatic Solana security radar.** Koschei watches Solana activity, detects early risk patterns, signs deterministic verdicts, and gives customers a clear A-F risk grade before they interact.
+KOSCHEİ WEB3 is a live crypto risk-intelligence product built to help investors inspect risk before interacting with a token, pool, wallet, transaction, program or claim surface.
 
-![Production](https://img.shields.io/badge/Production-Online-00ffaa?style=for-the-badge)
-![Solana](https://img.shields.io/badge/Solana-Mainnet-24eaff?style=for-the-badge)
-![Provider](https://img.shields.io/badge/Data-Alchemy%20HTTPS-7c5cff?style=for-the-badge)
-![Build](https://img.shields.io/badge/Build-Go%20API%20%2B%20Vanilla%20JS-success?style=for-the-badge)
+Solana is the first live market. The architecture is designed to expand beyond one chain without changing the core customer experience.
 
----
-
-## Product Direction
-
-Koschei is not a generic chatbot and it is not a manual-only scanner. The product direction is:
+## Product Rule
 
 ```text
-Koschei watches Solana.
-Koschei detects risk.
-Koschei signs verdicts.
-Customers consume the intelligence through dashboard, API, widget and badge.
+14 internal evidence arms
+        ↓
+one ARVIS core
+        ↓
+one customer-facing verdict card
 ```
 
-The first production security surface is focused on three core radars:
+The 14 arms are not sold as 14 separate products. They collect and verify evidence internally. Customers see one understandable result with the evidence, risk level and recommended next action.
 
-1. **Pump.fun Sybil Radar**
-2. **Raydium Pool Guardian**
-3. **Walletless Claim Shield**
+## Evidence Policy
 
-The model layer is private. Customers cannot change prompts, verdict thresholds, rule weights or scoring behavior. AI can explain findings, but the final grade belongs to the deterministic Koschei rule engine.
-
----
-
-## Core Radars
-
-### 1. Pump.fun Sybil Radar
-
-Detects coordinated launch behavior around new Pump.fun-style token launches.
-
-Koschei tracks and scores:
+ARVIS follows a strict evidence boundary:
 
 ```text
-new token launch activity
-creator wallet
-first 10 / 25 / 50 / 100 buyers
-shared funding-source clusters
-creator-linked buyer relations
-early holder concentration
-sniper-like timing patterns
+verified evidence exists  → signed verdict may be produced
+verified evidence missing → no score, no grade, no signed card
 ```
 
-Customer output:
+On-chain and off-chain evidence are labeled separately. A parsed claim URL is never represented as on-chain evidence. A program relation is never represented as confirmed sybil behavior without the required buyer and funding graph.
 
-```json
-{
-  "module": "pump_sybil_radar",
-  "grade": "F",
-  "risk_index": 91,
-  "risk_level": "critical",
-  "verdict": "Coordinated launch behavior suspected",
-  "recommendation": "avoid"
-}
-```
+ARVIS does not promise guaranteed safety and does not provide investment advice. A monitor result means no critical risk evidence was found in the current evidence window; it is not a guarantee.
 
-### 2. Raydium Pool Guardian
+## Fourteen Arms
 
-Detects risky Raydium pool behavior, unsafe authority state and liquidity concentration.
+1. Pump.fun Sybil Radar
+2. Raydium Pool Guardian
+3. Walletless Claim Shield
+4. Intelligence Graph
+5. MEV Shield
+6. Token Authority Scanner
+7. Holder Concentration
+8. Liquidity Movement
+9. Creator Link Analysis
+10. Funding Cluster Detector
+11. Sniper Timing Detector
+12. Claim Surface Risk
+13. Program Relation Scan
+14. Final Verdict Engine
 
-Koschei tracks and scores:
+Each arm remains unsigned when its required evidence is unavailable.
+
+## Live Pipeline
 
 ```text
-new Raydium pools
-liquidity added events
-token mint account
-mint authority
-freeze authority
-pool creator
-LP concentration
-top holder concentration
-liquidity movement signals
+Raydium + Pump program activity
+        ↓
+transaction parsing
+        ↓
+project-mint resolution
+        ↓
+14-arm evidence analysis
+        ↓
+Final Verdict Engine
+        ↓
+one visible risk or monitor card
 ```
 
-Customer output:
-
-```json
-{
-  "module": "raydium_pool_guardian",
-  "grade": "D",
-  "risk_index": 74,
-  "risk_level": "high",
-  "verdict": "High risk pool or unsafe authority state",
-  "recommendation": "manual_review"
-}
-```
-
-### 3. Walletless Claim Shield
-
-Lets users check claim pages, program IDs and suspicious Solana targets before connecting a wallet.
-
-Koschei tracks and scores:
+The stream processor is idempotent. The same stream event and arm cannot create duplicate verdicts. Processing jobs expose health states such as:
 
 ```text
-claim URLs
-claim program IDs
-claim token accounts
-known-risk relations
-unsafe transaction patterns
-pre-connect warning signals
+healthy
+processing
+degraded
+stale
+waiting_for_stream
+waiting_for_enriched_targets
+waiting_for_processing
 ```
 
-Customer output:
+## Evidence Sources
 
-```json
-{
-  "module": "walletless_claim_shield",
-  "grade": "F",
-  "risk_index": 92,
-  "risk_level": "critical",
-  "verdict": "Do not connect wallet before review",
-  "recommendation": "avoid"
-}
+ARVIS uses one canonical Solana RPC configuration. Resolution order:
+
+```text
+SOLANA_RPC_URL
+Alchemy / Helius / QuickNode provider URL
+Alchemy API key
+Solana public mainnet fallback
 ```
 
----
+The active provider is reported from the real runtime configuration rather than a hard-coded provider label.
+
+Current evidence surfaces include:
+
+- token mint and freeze authority
+- token supply and holder concentration
+- account owner and executable state
+- transaction timing and failure observations
+- parsed program relations
+- token-balance and SOL-balance changes
+- creator/signing candidates without identity claims
+- initialization funding links
+- Raydium interaction evidence
+- Pump program interaction evidence
+- priority-fee, compute-budget and route exposure
+- claim URL structure and signing/secret-request indicators
 
 ## Live Product Surfaces
 
 ```text
-/                       Landing page
-/dashboard              Paid customer dashboard
-/security-radar         Focused 3-radar command panel
-/security-ecosystem     Public ecosystem/module overview
-/security-ecosystem.json Machine-readable radar manifest
-/widget.js              Embeddable Koschei risk badge
-/owner-production.html  Owner operations panel
-/api/v1/unified/analyze Paid unified analyzer
+/                         landing page
+/dashboard                customer command center
+/security-radar           live ARVIS radar
+/reports                  signed report vault
+/pricing                  plans
+/health                   sanitized service and ARVIS pipeline health
+/api/v1/unified/analyze   paid unified analysis
+/api/v1/radar/check       paid ARVIS scan
+/api/v1/radar/feed        authenticated live verdict feed
+/api/v1/risk/badge        public rate-limited risk badge
 ```
 
-Widget example:
+## Runtime Controls
 
-```html
-<script src="https://tradepigloball.co/widget.js" data-token="TOKEN_MINT"></script>
-```
-
----
-
-## Data Provider Strategy
-
-Current production direction is **Alchemy-first**.
-
-```text
-Solana HTTPS RPC  -> required
-Solana WebSocket  -> optional, not required
-Helius            -> optional future data acceleration, not required
-Other chains      -> disabled for this Solana-first radar surface
-```
-
-The automatic radar can run with polling over Solana HTTPS RPC.
-
-```text
-SOLANA_RPC_URL
-↓
-Polling watcher
-↓
-Pump.fun / Raydium / claim activity detection
-↓
-Koschei deterministic rule engine
-↓
-Signed customer verdict
-```
-
----
-
-## Required Environment Variables
-
-Minimum production variables:
+Important non-secret variables:
 
 ```env
-PORT=8080
-DATABASE_URL=postgres://...
-SOLANA_RPC_URL=https://solana-mainnet.g.alchemy.com/v2/...
-ALCHEMY_API_KEY=...
-WEB3_PROVIDER=alchemy
-TOGETHER_API_KEY=...
-TOGETHER_AI_ENABLED=1
-TOGETHER_MODEL=Qwen/Qwen3-235B-A22B-Instruct-2507-tput
-```
-
-Security radar flags:
-
-```env
-KOSCHEI_SECURITY_MODULES=pump_sybil,raydium_guardian,claim_shield
-KOSCHEI_SECURITY_PROVIDER=alchemy
+PORT=10000
 KOSCHEI_AUTO_RADAR_ENABLED=1
-KOSCHEI_SOLANA_WATCH_MODE=polling
-KOSCHEI_RADAR_POLL_SECONDS=10
-KOSCHEI_MODEL_ROUTER_ENABLED=1
-KOSCHEI_VERDICT_MODE=deterministic_signed
-KOSCHEI_PUBLIC_BADGE_ENABLED=1
+ARVIS_HEARTBEAT_SECONDS=20
+ARVIS_STREAM_VERDICT_SECONDS=12
+RAYDIUM_PROGRAM_ID=675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9
+PUMP_FUN_PROGRAM_ID=6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P
 ```
 
-Owner/auth/payment variables are configured separately in production hosting and are not documented with secret values in this repository.
+Secrets and production credentials belong in the deployment environment and are not committed to this repository.
 
----
-
-## Architecture
+## Data and Infrastructure
 
 ```text
-Customer / Partner Surface
-  ├─ /security-radar
-  ├─ /dashboard
-  ├─ /widget.js
-  └─ API consumers
-
 Go API
-  ├─ auth + entitlement checks
-  ├─ unified analyzer
-  ├─ deterministic security rules
-  ├─ model explanation layer
-  └─ owner-only operations
-
-Data Layer
-  ├─ Alchemy Solana HTTPS RPC
-  ├─ Neon Postgres
-  └─ optional cache
-
-Verdict Layer
-  ├─ Pump.fun Sybil Radar
-  ├─ Raydium Pool Guardian
-  ├─ Walletless Claim Shield
-  ├─ A-F grade
-  ├─ risk index
-  ├─ evidence summary
-  └─ signed rule version
+Neon Postgres
+Railway production deployment
+Solana RPC provider with public fallback
+Vanilla HTML / CSS / JavaScript customer surfaces
 ```
 
----
+Database migrations create the radar event store, verdict store, processing queue, recovery state and stream-verdict idempotency constraints.
 
-## Security Rules
+## Payments and Access
 
-Koschei follows strict product boundaries:
+Paid analysis is entitlement-backed. A profile label alone cannot unlock premium output.
 
 ```text
-Customers cannot alter verdict thresholds.
-External projects cannot prompt models to change grades.
-AI summaries cannot override deterministic final grade.
-Owner controls rule versions and model routing.
-Raw prompts, rule weights and God Mode stay private.
+active entitlement + remaining output → analysis allowed
+failed evidence collection             → no output charged
+successful evidence-backed analysis    → one output consumed
 ```
 
----
+Jito protected send reserves an output before submission and refunds it when submission definitively fails.
 
-## Local Development
+## Development
 
 ```bash
 git clone https://github.com/bugsbuny243/Koschei-Web3-Hub.git
 cd Koschei-Web3-Hub/koschei/api
-go run main.go
-```
-
-Build check:
-
-```bash
 go test ./...
+go vet ./...
 go build ./...
 ```
 
----
-
-## Project Structure
-
-```text
-.
-├── README.md
-├── Dockerfile
-├── db/
-└── koschei/
-    └── api/
-        ├── main.go
-        ├── internal/
-        │   ├── handlers/
-        │   ├── http/
-        │   ├── services/
-        │   └── db/
-        └── public/
-            ├── index.html
-            ├── dashboard.html
-            ├── security-radar.html
-            ├── security-ecosystem.html
-            ├── security-ecosystem.json
-            ├── widget.js
-            ├── pricing.html
-            ├── reports.html
-            └── owner-production.html
-```
+GitHub Actions runs tests, vet and build checks for API changes. Railway remains the production deployment source of truth.
 
 ---
 
----
-
-Built for Solana security intelligence.
+Built as a live risk-intelligence system for crypto investors, beginning with Solana.
