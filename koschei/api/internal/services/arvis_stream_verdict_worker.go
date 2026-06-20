@@ -166,6 +166,21 @@ func arvisStreamAnalysisMode(moduleID string) string {
 	}
 }
 
+func prioritizeFinalArvisArm(arms []SecurityRadarVerdict) []SecurityRadarVerdict {
+	ordered := make([]SecurityRadarVerdict, 0, len(arms))
+	for _, arm := range arms {
+		if arm.ModuleID == ModuleFinalVerdictEngine {
+			ordered = append(ordered, arm)
+		}
+	}
+	for _, arm := range arms {
+		if arm.ModuleID != ModuleFinalVerdictEngine {
+			ordered = append(ordered, arm)
+		}
+	}
+	return ordered
+}
+
 func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arvisStreamTarget) error {
 	mode := arvisStreamAnalysisMode(target.ModuleID)
 	analysis := AnalyzeArvisRadars(SecurityRadarRequest{Target: target.Target, Network: target.Network, Mode: mode})
@@ -199,15 +214,27 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 	if len(arms) == 0 {
 		return errors.New("arvis arms missing from bundle")
 	}
-	for _, arm := range arms {
+
+	finalSaved := false
+	auxiliaryFailures := []string{}
+	for _, arm := range prioritizeFinalArvisArm(arms) {
 		if !SecurityRadarVerdictHasVerifiedEvidence(arm) {
 			continue
 		}
+		isFinal := arm.ModuleID == ModuleFinalVerdictEngine
 		alreadySaved, err := w.streamArmAlreadySaved(ctx, target.ID, arm.ModuleID)
 		if err != nil {
-			return fmt.Errorf("check existing arm verdict %s: %w", arm.ModuleID, err)
+			wrapped := fmt.Errorf("check existing arm verdict %s: %w", arm.ModuleID, err)
+			if isFinal {
+				return wrapped
+			}
+			auxiliaryFailures = append(auxiliaryFailures, wrapped.Error())
+			continue
 		}
 		if alreadySaved {
+			if isFinal {
+				finalSaved = true
+			}
 			continue
 		}
 		signals := cloneArvisSignals(arm.Signals)
@@ -233,7 +260,12 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 			Source: "arvis_stream",
 		})
 		if err != nil {
-			return fmt.Errorf("insert arm event %s: %w", arm.ModuleID, err)
+			wrapped := fmt.Errorf("insert arm event %s: %w", arm.ModuleID, err)
+			if isFinal {
+				return wrapped
+			}
+			auxiliaryFailures = append(auxiliaryFailures, wrapped.Error())
+			continue
 		}
 		if _, err := w.store.InsertVerdict(ctx, SecurityRadarVerdictRecord{
 			EventID: eventID, ModuleID: arm.ModuleID, Target: arm.Target, TargetType: "token", Network: arm.Network,
@@ -243,10 +275,27 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 			Source: "arvis_stream", EventType: "arvis_stream_verdict", Provider: provider,
 		}); err != nil {
 			if isArvisUniqueViolation(err) {
+				if isFinal {
+					finalSaved = true
+				}
 				continue
 			}
-			return fmt.Errorf("insert arm verdict %s: %w", arm.ModuleID, err)
+			wrapped := fmt.Errorf("insert arm verdict %s: %w", arm.ModuleID, err)
+			if isFinal {
+				return wrapped
+			}
+			auxiliaryFailures = append(auxiliaryFailures, wrapped.Error())
+			continue
 		}
+		if isFinal {
+			finalSaved = true
+		}
+	}
+	if !finalSaved {
+		return errors.New("final Arvis verdict was not persisted")
+	}
+	if len(auxiliaryFailures) > 0 {
+		log.Printf("arvis stream verdict completed with auxiliary warnings event=%s target=%s warning_count=%d", target.ID, target.Target, len(auxiliaryFailures))
 	}
 	return nil
 }
