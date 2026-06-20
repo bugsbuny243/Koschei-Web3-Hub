@@ -26,8 +26,8 @@ func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadar
 	}
 
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
-	replaceArvisArm(arms, buildPumpTransactionArm(req, txEvidence, generatedAt))
-	replaceArvisArm(arms, buildRaydiumTransactionArm(req, txEvidence, generatedAt))
+	replaceArvisArmPreservingVerifiedSource(arms, buildPumpTransactionArm(req, txEvidence, generatedAt))
+	replaceArvisArmPreservingVerifiedSource(arms, buildRaydiumTransactionArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildTransactionMEVArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildLiquidityMovementTransactionArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildCreatorLinkTransactionArm(req, txEvidence, generatedAt))
@@ -62,4 +62,17 @@ func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadar
 		bundle.CustomerSummary = fmt.Sprintf("ARVIS verified %d of 13 evidence arms, including parsed transaction and program-relation evidence, and produced one signed verdict.", verified)
 	}
 	return bundle
+}
+
+func replaceArvisArmPreservingVerifiedSource(arms []SecurityRadarVerdict, replacement SecurityRadarVerdict) {
+	for i := range arms {
+		if arms[i].ModuleID != replacement.ModuleID {
+			continue
+		}
+		if !replacement.Signed && arms[i].Signed && SecurityRadarVerdictHasVerifiedEvidence(arms[i]) {
+			return
+		}
+		arms[i] = replacement
+		return
+	}
 }
