@@ -160,6 +160,13 @@ func (s *SecurityRadarStore) InsertVerdict(ctx context.Context, verdict Security
 			source=EXCLUDED.source,
 			updated_at=now()
 		RETURNING id::text`, verdict.EventID, verdict.ModuleID, verdict.Target, verdict.TargetType, verdict.Network, verdict.Grade, verdict.RiskIndex, verdict.RiskLevel, verdict.Verdict, verdict.Recommendation, string(evidence), string(signalsRaw), verdict.RuleVersion, verdict.Signed, verdict.Signature, verdict.Source).Scan(&id)
+	if err != nil && strings.TrimSpace(verdict.EventID) != "" {
+		_, _ = s.DB.ExecContext(ctx, `
+			DELETE FROM security_radar_events e
+			WHERE e.id=$1::uuid
+			  AND NOT EXISTS (SELECT 1 FROM security_radar_verdicts v WHERE v.event_id=e.id)
+		`, verdict.EventID)
+	}
 	return id, err
 }
 
