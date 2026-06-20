@@ -22,14 +22,15 @@ func TestParseArvisTransactionEvidence(t *testing.T) {
 				"instructions": []any{
 					map[string]any{"programId": "ComputeBudget111111111111111111111111111111", "parsed": map[string]any{"type": "setComputeUnitPrice", "info": map[string]any{}}},
 					map[string]any{"programId": "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9", "parsed": map[string]any{"type": "initializeMint2", "info": map[string]any{"mint": mintA}}},
+					map[string]any{"programId": defaultPumpProgramID, "parsed": map[string]any{"type": "buy", "info": map[string]any{"mint": mintB}}},
 				},
 			},
 		},
 		"meta": map[string]any{
-			"fee":                 float64(500000),
+			"fee":                  float64(500000),
 			"computeUnitsConsumed": float64(600000),
-			"preBalances":         []any{float64(2_000_000), float64(0)},
-			"postBalances":        []any{float64(1_000_000), float64(995000)},
+			"preBalances":          []any{float64(2_000_000), float64(0)},
+			"postBalances":         []any{float64(1_000_000), float64(995000)},
 			"preTokenBalances": []any{
 				map[string]any{"mint": mintA, "uiTokenAmount": map[string]any{"uiAmount": float64(100)}},
 				map[string]any{"mint": mintB, "uiTokenAmount": map[string]any{"uiAmount": float64(50)}},
@@ -51,8 +52,11 @@ func TestParseArvisTransactionEvidence(t *testing.T) {
 	if evidence.CreatorCandidate != creator {
 		t.Fatalf("expected creator candidate %s, got %s", creator, evidence.CreatorCandidate)
 	}
-	if !evidence.RaydiumRelated || !evidence.ComputeBudgetRelated || !evidence.InitializeMint {
-		t.Fatalf("expected Raydium, compute-budget and initialize evidence: %#v", evidence)
+	if !evidence.RaydiumRelated || !evidence.PumpRelated || !evidence.ComputeBudgetRelated || !evidence.InitializeMint {
+		t.Fatalf("expected Pump, Raydium, compute-budget and initialize evidence: %#v", evidence)
+	}
+	if !containsString(evidence.ProgramIDs, defaultPumpProgramID) {
+		t.Fatalf("verified Pump program missing from parsed programs: %#v", evidence.ProgramIDs)
 	}
 	if len(evidence.FundingAccounts) == 0 || evidence.FundingAccounts[0] != creator {
 		t.Fatalf("expected creator funding delta, got %#v", evidence.FundingAccounts)
@@ -66,6 +70,12 @@ func TestTransactionArmsRequireParsedEvidence(t *testing.T) {
 	req := SecurityRadarRequest{Target: "target", Network: "solana-mainnet"}
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
 	missing := arvisTransactionEvidence{}
+	if arm := buildPumpTransactionArm(req, missing, generatedAt); arm.Signed {
+		t.Fatal("Pump arm must remain unsigned without parsed program evidence")
+	}
+	if arm := buildRaydiumTransactionArm(req, missing, generatedAt); arm.Signed {
+		t.Fatal("Raydium arm must remain unsigned without parsed program evidence")
+	}
 	if arm := buildLiquidityMovementTransactionArm(req, missing, generatedAt); arm.Signed {
 		t.Fatal("liquidity arm must remain unsigned without parsed transaction evidence")
 	}
