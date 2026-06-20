@@ -10,7 +10,10 @@ import (
 	"time"
 )
 
-const defaultPumpProgramID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+const (
+	defaultPumpProgramID     = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+	defaultPumpSwapProgramID = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+)
 
 type arvisHeartbeatSource struct {
 	Label     string
@@ -30,7 +33,7 @@ func StartArvisRadarHeartbeat(ctx context.Context, db *sql.DB) func() {
 		}
 	}
 	if rpcURL == "" {
-		rpcURL = "https://api.mainnet-beta.solana.com"
+		rpcURL = defaultSolanaMainnetRPC
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	go arvisRadarHeartbeatLoop(ctx, NewSecurityRadarStore(db), rpcURL)
@@ -74,6 +77,12 @@ func arvisHeartbeatSources() []arvisHeartbeatSource {
 			ModuleID:  ModulePumpSybilRadar,
 			EventType: "pump_program_signature",
 		},
+		{
+			Label:     "pumpswap_program",
+			ProgramID: firstRadarValue(os.Getenv("PUMP_SWAP_PROGRAM_ID"), defaultPumpSwapProgramID),
+			ModuleID:  ModulePumpSybilRadar,
+			EventType: "pumpswap_program_signature",
+		},
 	}
 }
 
@@ -108,10 +117,10 @@ func arvisPollHeartbeatSource(ctx context.Context, store *SecurityRadarStore, rp
 		targetType := "program"
 		evidenceQuality := "live_program_signature"
 		decoded := map[string]any{
-			"source":       source.Label,
-			"module_id":    source.ModuleID,
-			"program_id":   source.ProgramID,
-			"rpc_method":   "getSignaturesForAddress",
+			"source":     source.Label,
+			"module_id":  source.ModuleID,
+			"program_id": source.ProgramID,
+			"rpc_method": "getSignaturesForAddress",
 		}
 		txCtx, txCancel := context.WithTimeout(ctx, 7*time.Second)
 		tx, txErr := SolanaGetTransactionJSONParsed(txCtx, rpcURL, sig)
