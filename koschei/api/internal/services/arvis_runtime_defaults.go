@@ -11,6 +11,9 @@ func init() {
 	if strings.TrimSpace(os.Getenv("PUMP_FUN_PROGRAM_ID")) == "" {
 		_ = os.Setenv("PUMP_FUN_PROGRAM_ID", defaultPumpProgramID)
 	}
+	if strings.TrimSpace(os.Getenv("PUMP_SWAP_PROGRAM_ID")) == "" {
+		_ = os.Setenv("PUMP_SWAP_PROGRAM_ID", defaultPumpSwapProgramID)
+	}
 	if strings.TrimSpace(os.Getenv("SOLANA_RPC_URL")) == "" {
 		_ = os.Setenv("SOLANA_RPC_URL", resolvedArvisRPCURLFromEnv())
 	}
