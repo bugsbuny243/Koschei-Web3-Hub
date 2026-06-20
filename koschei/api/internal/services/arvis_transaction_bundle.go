@@ -6,15 +6,19 @@ import (
 )
 
 func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadarBundle {
+	if bundle.Metadata == nil {
+		bundle.Metadata = map[string]any{}
+	}
+	if attempted, _ := bundle.Metadata["transaction_enrichment_attempted"].(bool); attempted {
+		return bundle
+	}
+	bundle.Metadata["transaction_enrichment_attempted"] = true
 	arms := ArvisArmsFromBundle(bundle)
 	if len(arms) == 0 {
 		return bundle
 	}
 	req := SecurityRadarRequest{Target: bundle.Target, Network: bundle.Network, Mode: bundle.WatchMode}
 	txEvidence := collectArvisTransactionEvidence(req, arms)
-	if bundle.Metadata == nil {
-		bundle.Metadata = map[string]any{}
-	}
 	if !txEvidence.Available {
 		bundle.Metadata["transaction_evidence_available"] = false
 		bundle.Metadata["transaction_evidence_errors"] = txEvidence.Errors
