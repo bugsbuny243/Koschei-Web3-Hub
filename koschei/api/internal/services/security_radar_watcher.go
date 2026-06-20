@@ -20,7 +20,9 @@ func SecurityRadarAutoEnabled() bool {
 func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRPC) func() {
 	stopHeartbeat := StartArvisRadarHeartbeat(ctx, db)
 	stopStreamVerdicts := StartArvisStreamVerdictWorker(ctx, db)
+	stopStreamRecovery := StartArvisStreamRecovery(ctx, db)
 	stopAll := func() {
+		stopStreamRecovery()
 		stopStreamVerdicts()
 		stopHeartbeat()
 	}
