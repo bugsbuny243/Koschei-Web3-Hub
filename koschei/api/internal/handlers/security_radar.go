@@ -27,7 +27,7 @@ func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
 	base := map[string]any{"ok": true, "source": "koschei_security_radar", "provider": services.SecurityRadarProvider, "watch_mode": services.SecurityRadarWatchMode, "architecture_arm_count": 14}
 	if h == nil || h.DBRead == nil {
 		base["items"] = []any{}
-		base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured()}
+		base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured(), "pipeline_status": "database_unavailable"}
 		base["timeline"] = []any{}
 		writeJSON(w, http.StatusOK, base)
 		return
@@ -36,7 +36,7 @@ func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
 	if isMissingRelation(err) {
 		base["items"] = []any{}
 		base["source"] = "schema_pending"
-		base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured(), "schema_pending": true}
+		base["stream"] = map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured(), "schema_pending": true, "pipeline_status": "schema_pending"}
 		base["timeline"] = []any{}
 		writeJSON(w, http.StatusOK, base)
 		return
@@ -47,8 +47,7 @@ func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	verified := make([]services.SecurityRadarVerdictRecord, 0, len(items))
 	for _, item := range items {
-		hasEvidence, _ := item.Signals["real_onchain_evidence"].(bool)
-		if item.Signed && hasEvidence && item.ModuleID == services.ModuleFinalVerdictEngine {
+		if item.Signed && radarSignalsVerified(item.Signals) && item.ModuleID == services.ModuleFinalVerdictEngine {
 			verified = append(verified, item)
 		}
 	}
@@ -136,55 +135,139 @@ func (h *Handler) OwnerRadarSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	metrics := map[string]any{"rule_version": services.SecurityRadarRuleVersion, "architecture_arm_count": 14, "sbx1_stream_enabled": streamEnvEnabled(), "sbx1_wss_configured": streamWSSConfigured()}
 	count := func(key, query string) {
-		var v int64
-		if err := h.DBRead.QueryRowContext(r.Context(), query).Scan(&v); err == nil {
-			metrics[key] = v
+		var value int64
+		if err := h.DBRead.QueryRowContext(r.Context(), query).Scan(&value); err == nil {
+			metrics[key] = value
 		}
 	}
 	text := func(key, query string) {
-		var v string
-		if err := h.DBRead.QueryRowContext(r.Context(), query).Scan(&v); err == nil {
-			metrics[key] = v
+		var value string
+		if err := h.DBRead.QueryRowContext(r.Context(), query).Scan(&value); err == nil {
+			metrics[key] = value
 		}
 	}
+	verifiedSQL := radarVerifiedEvidenceSQL()
 	count("radar_events", `SELECT count(*) FROM security_radar_events`)
-	count("radar_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`)
+	count("radar_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND signed=true AND `+verifiedSQL)
 	count("badge_consumers", `SELECT count(DISTINCT target) FROM security_radar_events WHERE COALESCE(source,'')='public_badge'`)
-	count("critical_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND risk_level='critical' AND signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`)
-	count("high_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND risk_level='high' AND signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`)
-	count("module_usage", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'final_verdict_engine' AND signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`)
+	count("critical_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND risk_level='critical' AND signed=true AND `+verifiedSQL)
+	count("high_risk_count", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND risk_level='high' AND signed=true AND `+verifiedSQL)
+	count("module_usage", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'final_verdict_engine' AND signed=true AND `+verifiedSQL)
 	count("sbx1_stream_events", `SELECT count(*) FROM security_radar_stream_events`)
 	count("sbx1_recognized_events", `SELECT count(*) FROM security_radar_stream_events WHERE module_id <> 'unknown'`)
 	text("sbx1_last_event_at", `SELECT COALESCE(max(created_at)::text,'') FROM security_radar_stream_events`)
+	h.addArvisProcessingMetrics(r.Context(), metrics)
+	metrics["pipeline_status"] = arvisPipelineStatus(metrics)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "radar": metrics})
 }
 
 func (h *Handler) securityRadarStreamStats(ctx context.Context) map[string]any {
 	metrics := map[string]any{"enabled": streamEnvEnabled(), "wss_configured": streamWSSConfigured(), "architecture_arm_count": 14}
 	if h == nil || h.DBRead == nil {
+		metrics["pipeline_status"] = "database_unavailable"
 		return metrics
 	}
 	count := func(key, query string) {
-		var v int64
-		if err := h.DBRead.QueryRowContext(ctx, query).Scan(&v); err == nil {
-			metrics[key] = v
+		var value int64
+		if err := h.DBRead.QueryRowContext(ctx, query).Scan(&value); err == nil {
+			metrics[key] = value
 		}
 	}
 	text := func(key, query string) {
-		var v string
-		if err := h.DBRead.QueryRowContext(ctx, query).Scan(&v); err == nil {
-			metrics[key] = v
+		var value string
+		if err := h.DBRead.QueryRowContext(ctx, query).Scan(&value); err == nil {
+			metrics[key] = value
 		}
 	}
+	verifiedSQL := radarVerifiedEvidenceSQL()
 	count("raw_stream_events", `SELECT count(*) FROM security_radar_stream_events`)
 	count("recognized_events", `SELECT count(*) FROM security_radar_stream_events WHERE module_id <> 'unknown'`)
 	count("enriched_mints", `SELECT count(*) FROM security_radar_stream_events WHERE evidence_quality='transaction_enriched_mint'`)
-	count("visible_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`)
-	count("runtime_engines", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'final_verdict_engine' AND signed=true AND COALESCE(signals->>'real_onchain_evidence','false')='true'`)
+	count("visible_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND signed=true AND `+verifiedSQL)
+	count("runtime_engines", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'final_verdict_engine' AND signed=true AND `+verifiedSQL)
 	text("last_stream_event_at", `SELECT COALESCE(max(created_at)::text,'') FROM security_radar_stream_events`)
 	text("last_stream_signature", `SELECT COALESCE(signature,'') FROM security_radar_stream_events WHERE signature IS NOT NULL ORDER BY created_at DESC LIMIT 1`)
 	text("last_stream_module", `SELECT COALESCE(module_id,'') FROM security_radar_stream_events ORDER BY created_at DESC LIMIT 1`)
+	h.addArvisProcessingMetrics(ctx, metrics)
+	metrics["pipeline_status"] = arvisPipelineStatus(metrics)
 	return metrics
+}
+
+func (h *Handler) addArvisProcessingMetrics(ctx context.Context, metrics map[string]any) {
+	if h == nil || h.DBRead == nil || metrics == nil {
+		return
+	}
+	count := func(key, status string) {
+		var value int64
+		err := h.DBRead.QueryRowContext(ctx, `SELECT count(*) FROM arvis_stream_processing WHERE status=$1`, status).Scan(&value)
+		if err == nil {
+			metrics[key] = value
+		}
+	}
+	count("processing_pending", "pending")
+	count("processing_active", "processing")
+	count("processing_completed", "completed")
+	count("processing_insufficient", "insufficient_evidence")
+	count("processing_failed", "failed")
+	var lastProcessed string
+	if err := h.DBRead.QueryRowContext(ctx, `SELECT COALESCE(max(processed_at)::text,'') FROM arvis_stream_processing`).Scan(&lastProcessed); err == nil {
+		metrics["last_processed_at"] = lastProcessed
+	}
+}
+
+func arvisPipelineStatus(metrics map[string]any) string {
+	raw := metricInt64(metrics, "raw_stream_events")
+	active := metricInt64(metrics, "processing_active")
+	completed := metricInt64(metrics, "processing_completed")
+	failed := metricInt64(metrics, "processing_failed")
+	if active > 0 {
+		return "processing"
+	}
+	if completed > 0 && failed == 0 {
+		return "healthy"
+	}
+	if completed > 0 && failed > 0 {
+		return "degraded"
+	}
+	if failed > 0 {
+		return "degraded"
+	}
+	if raw > 0 {
+		return "waiting_for_enriched_targets"
+	}
+	return "waiting_for_stream"
+}
+
+func metricInt64(metrics map[string]any, key string) int64 {
+	if metrics == nil {
+		return 0
+	}
+	switch value := metrics[key].(type) {
+	case int64:
+		return value
+	case int:
+		return int64(value)
+	case float64:
+		return int64(value)
+	default:
+		return 0
+	}
+}
+
+func radarVerifiedEvidenceSQL() string {
+	return `(COALESCE(signals->>'verified_evidence','false')='true' OR COALESCE(signals->>'real_onchain_evidence','false')='true' OR COALESCE(signals->>'real_offchain_evidence','false')='true')`
+}
+
+func radarSignalsVerified(signals map[string]any) bool {
+	if signals == nil {
+		return false
+	}
+	for _, key := range []string{"verified_evidence", "real_onchain_evidence", "real_offchain_evidence"} {
+		if value, _ := signals[key].(bool); value {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Handler) securityRadarStreamTimeline(ctx context.Context, limit int) []map[string]any {
@@ -262,10 +345,10 @@ func (h *Handler) saveSecurityRadarBundle(ctx context.Context, userID, source st
 	defer cancel()
 	verdicts := services.ArvisArmsFromBundle(bundle)
 	if len(verdicts) == 0 {
-		verdicts = []services.SecurityRadarVerdict{bundle.PumpSybilRadar, bundle.RaydiumPoolGuardian}
+		verdicts = []services.SecurityRadarVerdict{bundle.PumpSybilRadar, bundle.RaydiumPoolGuardian, bundle.WalletlessClaimShield}
 	}
 	for _, verdict := range verdicts {
-		if !verdict.Signed {
+		if !services.SecurityRadarVerdictHasVerifiedEvidence(verdict) {
 			continue
 		}
 		if err := h.saveSecurityRadarVerdict(ctx, userID, source, verdict); err != nil {
@@ -276,19 +359,21 @@ func (h *Handler) saveSecurityRadarBundle(ctx context.Context, userID, source st
 }
 
 func (h *Handler) saveSecurityRadarVerdict(ctx context.Context, userID, source string, verdict services.SecurityRadarVerdict) error {
-	if !verdict.Signed || verdict.Signals == nil {
+	if !services.SecurityRadarVerdictHasVerifiedEvidence(verdict) {
 		return nil
 	}
-	hasEvidence, _ := verdict.Signals["real_onchain_evidence"].(bool)
-	if !hasEvidence {
-		return nil
+	targetType := "token"
+	if onchain, _ := verdict.Signals["real_onchain_evidence"].(bool); !onchain {
+		if offchain, _ := verdict.Signals["real_offchain_evidence"].(bool); offchain {
+			targetType = "url"
+		}
 	}
 	store := services.NewSecurityRadarStore(h.DB)
-	eventID, err := store.InsertEvent(ctx, services.SecurityRadarEventRecord{ModuleID: verdict.ModuleID, Target: verdict.Target, TargetType: "token", Network: verdict.Network, Signature: verdict.Signature, EventType: firstNonEmptyString(source, "manual_verdict"), Signals: verdict.Signals, RawSummary: map[string]any{"source": source, "user_id": userID}, Source: firstNonEmptyString(source, "manual_check")})
+	eventID, err := store.InsertEvent(ctx, services.SecurityRadarEventRecord{ModuleID: verdict.ModuleID, Target: verdict.Target, TargetType: targetType, Network: verdict.Network, Signature: verdict.Signature, EventType: firstNonEmptyString(source, "manual_verdict"), Signals: verdict.Signals, RawSummary: map[string]any{"source": source, "user_id": userID}, Source: firstNonEmptyString(source, "manual_check")})
 	if err != nil {
 		return err
 	}
-	_, err = store.InsertVerdict(ctx, services.SecurityRadarVerdictRecord{EventID: eventID, ModuleID: verdict.ModuleID, Target: verdict.Target, TargetType: "token", Network: verdict.Network, Grade: verdict.Grade, RiskIndex: verdict.RiskIndex, RiskLevel: verdict.RiskLevel, Verdict: verdict.Verdict, Recommendation: verdict.Recommendation, Evidence: verdict.Evidence, Signals: verdict.Signals, RuleVersion: verdict.RuleVersion, Signed: verdict.Signed, Signature: verdict.Signature, Source: firstNonEmptyString(source, "manual_check")})
+	_, err = store.InsertVerdict(ctx, services.SecurityRadarVerdictRecord{EventID: eventID, ModuleID: verdict.ModuleID, Target: verdict.Target, TargetType: targetType, Network: verdict.Network, Grade: verdict.Grade, RiskIndex: verdict.RiskIndex, RiskLevel: verdict.RiskLevel, Verdict: verdict.Verdict, Recommendation: verdict.Recommendation, Evidence: verdict.Evidence, Signals: verdict.Signals, RuleVersion: verdict.RuleVersion, Signed: verdict.Signed, Signature: verdict.Signature, Source: firstNonEmptyString(source, "manual_check")})
 	return err
 }
 
@@ -296,9 +381,9 @@ func jsonRaw(raw json.RawMessage) any {
 	if len(raw) == 0 {
 		return nil
 	}
-	var v any
-	if err := json.Unmarshal(raw, &v); err != nil {
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
 		return string(raw)
 	}
-	return v
+	return value
 }
