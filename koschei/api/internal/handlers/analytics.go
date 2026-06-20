@@ -27,6 +27,10 @@ func (h *Handler) AnalyticsEvent(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 		return
 	}
+	if eventName == "customer_feedback" {
+		h.submitFeedbackFromAnalytics(w, r, req)
+		return
+	}
 
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	if claims, ok := verifiedClaimsFromBearer(r); ok {
@@ -41,7 +45,7 @@ func (h *Handler) AnalyticsEvent(w http.ResponseWriter, r *http.Request) {
 	if metadata == nil {
 		metadata = map[string]any{}
 	}
-	metadataJSON, err := json.Marshal(metadata)
+	metadataJSON, err := json.Marshal(redactMetadata(metadata))
 	if err != nil {
 		metadataJSON = []byte("{}")
 	}
