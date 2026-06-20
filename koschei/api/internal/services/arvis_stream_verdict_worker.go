@@ -21,6 +21,7 @@ type arvisStreamTarget struct {
 	Network   string
 	Slot      int64
 	ProgramID string
+	ModuleID  string
 }
 
 func StartArvisStreamVerdictWorker(ctx context.Context, db *sql.DB) func() {
@@ -76,7 +77,7 @@ func (w *arvisStreamVerdictWorker) processBatch(ctx context.Context) {
 		}
 		if err != nil {
 			w.markTarget(ctx, target.ID, "failed", err.Error())
-			log.Printf("arvis stream verdict failed event=%s target=%s err=%v", target.ID, target.Target, err)
+			log.Printf("arvis stream verdict failed event=%s target=%s module=%s err=%v", target.ID, target.Target, target.ModuleID, err)
 			continue
 		}
 		w.markTarget(ctx, target.ID, "completed", "")
@@ -88,18 +89,25 @@ func (w *arvisStreamVerdictWorker) pendingTargets(ctx context.Context, limit int
 		limit = 5
 	}
 	rows, err := w.db.QueryContext(ctx, `
-		SELECT s.id::text, COALESCE(s.target,''), COALESCE(s.signature,''), COALESCE(s.network,'solana-mainnet'), COALESCE(s.slot,0), COALESCE(s.program_id,'')
+		SELECT s.id::text,
+		       COALESCE(s.target,''),
+		       COALESCE(s.signature,''),
+		       COALESCE(s.network,'solana-mainnet'),
+		       COALESCE(s.slot,0),
+		       COALESCE(s.program_id,''),
+		       COALESCE(s.module_id,'')
 		FROM security_radar_stream_events s
 		LEFT JOIN arvis_stream_processing p ON p.stream_event_id=s.id
 		WHERE COALESCE(s.target,'') <> ''
 		  AND COALESCE(s.target_type,'')='token'
+		  AND COALESCE(s.module_id,'') IN ($2,$3)
 		  AND (
 			p.stream_event_id IS NULL
 			OR (p.status='failed' AND p.attempts < 3 AND p.updated_at < now() - interval '30 seconds')
 		  )
 		ORDER BY s.created_at ASC
 		LIMIT $1
-	`, limit)
+	`, limit, ModulePumpSybilRadar, ModuleRaydiumPoolGuardian)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +115,7 @@ func (w *arvisStreamVerdictWorker) pendingTargets(ctx context.Context, limit int
 	out := []arvisStreamTarget{}
 	for rows.Next() {
 		var item arvisStreamTarget
-		if err := rows.Scan(&item.ID, &item.Target, &item.Signature, &item.Network, &item.Slot, &item.ProgramID); err != nil {
+		if err := rows.Scan(&item.ID, &item.Target, &item.Signature, &item.Network, &item.Slot, &item.ProgramID, &item.ModuleID); err != nil {
 			return nil, err
 		}
 		out = append(out, item)
@@ -148,22 +156,40 @@ func (w *arvisStreamVerdictWorker) streamArmAlreadySaved(ctx context.Context, st
 	return exists, err
 }
 
-func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arvisStreamTarget) error {
-	analysis := AnalyzeArvisRadars(SecurityRadarRequest{Target: target.Target, Network: target.Network, Mode: "live_stream"})
-	if strings.TrimSpace(target.Signature) != "" {
-		for i := range analysis.Arms {
-			if analysis.Arms[i].Signals == nil {
-				analysis.Arms[i].Signals = map[string]any{}
-			}
-			analysis.Arms[i].Signals["latest_signature"] = target.Signature
-			analysis.Arms[i].Signals["source_stream_signature"] = target.Signature
-		}
-		if analysis.Bundle.Metadata == nil {
-			analysis.Bundle.Metadata = map[string]any{}
-		}
-		analysis.Bundle.Metadata["arvis_arms"] = analysis.Arms
-		analysis.Bundle.Metadata["source_stream_signature"] = target.Signature
+func arvisStreamAnalysisMode(moduleID string) string {
+	moduleID = strings.TrimSpace(moduleID)
+	switch moduleID {
+	case ModulePumpSybilRadar, ModuleRaydiumPoolGuardian:
+		return "live_stream:" + moduleID
+	default:
+		return "live_stream"
 	}
+}
+
+func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arvisStreamTarget) error {
+	mode := arvisStreamAnalysisMode(target.ModuleID)
+	analysis := AnalyzeArvisRadars(SecurityRadarRequest{Target: target.Target, Network: target.Network, Mode: mode})
+	for i := range analysis.Arms {
+		if analysis.Arms[i].Signals == nil {
+			analysis.Arms[i].Signals = map[string]any{}
+		}
+		analysis.Arms[i].Signals["source_module"] = target.ModuleID
+		analysis.Arms[i].Signals["source_stream_event_id"] = target.ID
+		analysis.Arms[i].Signals["source_stream_signature"] = target.Signature
+		analysis.Arms[i].Signals["source_program_id"] = target.ProgramID
+		if strings.TrimSpace(target.Signature) != "" {
+			analysis.Arms[i].Signals["latest_signature"] = target.Signature
+		}
+	}
+	if analysis.Bundle.Metadata == nil {
+		analysis.Bundle.Metadata = map[string]any{}
+	}
+	analysis.Bundle.Metadata["arvis_arms"] = analysis.Arms
+	analysis.Bundle.Metadata["source_module"] = target.ModuleID
+	analysis.Bundle.Metadata["source_stream_event_id"] = target.ID
+	analysis.Bundle.Metadata["source_stream_signature"] = target.Signature
+	analysis.Bundle.Metadata["source_program_id"] = target.ProgramID
+
 	bundle := EvidenceBackedSecurityRadarBundle(analysis.Bundle)
 	final := ArvisFinalFromBundle(bundle)
 	if !SecurityRadarHasLiveEvidence(bundle) || !final.Signed {
@@ -185,9 +211,11 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 			continue
 		}
 		signals := cloneArvisSignals(arm.Signals)
+		signals["source_module"] = target.ModuleID
 		signals["source_stream_event_id"] = target.ID
 		signals["source_stream_signature"] = target.Signature
-		signals["stream_mode"] = "live_stream"
+		signals["source_program_id"] = target.ProgramID
+		signals["stream_mode"] = mode
 		provider := strings.TrimSpace(anyString(signals["provider"]))
 		if provider == "" || provider == "none" || provider == "unconfigured" {
 			provider = "solana_rpc"
@@ -196,7 +224,12 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 			ModuleID: arm.ModuleID, Target: arm.Target, TargetType: "token", Network: arm.Network,
 			Signature: arm.Signature, SourceAddress: target.ProgramID, EventType: "arvis_stream_verdict",
 			Slot: target.Slot, Signals: signals,
-			RawSummary: map[string]any{"source_stream_event_id": target.ID, "source_stream_signature": target.Signature},
+			RawSummary: map[string]any{
+				"source_module":           target.ModuleID,
+				"source_stream_event_id":  target.ID,
+				"source_stream_signature": target.Signature,
+				"source_program_id":       target.ProgramID,
+			},
 			Source: "arvis_stream",
 		})
 		if err != nil {
@@ -241,7 +274,7 @@ func arvisStreamVerdictInterval() time.Duration {
 }
 
 func cloneArvisSignals(in map[string]any) map[string]any {
-	out := make(map[string]any, len(in)+3)
+	out := make(map[string]any, len(in)+5)
 	for key, value := range in {
 		out[key] = value
 	}
