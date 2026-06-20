@@ -131,6 +131,23 @@ func (w *arvisStreamVerdictWorker) claimTarget(ctx context.Context, target arvis
 	return err == nil && attempts > 0
 }
 
+func (w *arvisStreamVerdictWorker) streamArmAlreadySaved(ctx context.Context, streamEventID, moduleID string) (bool, error) {
+	if w == nil || w.db == nil || strings.TrimSpace(streamEventID) == "" || strings.TrimSpace(moduleID) == "" {
+		return false, nil
+	}
+	var exists bool
+	err := w.db.QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1
+			FROM security_radar_verdicts
+			WHERE source='arvis_stream'
+			  AND module_id=$1
+			  AND COALESCE(signals->>'source_stream_event_id','')=$2
+		)
+	`, moduleID, streamEventID).Scan(&exists)
+	return exists, err
+}
+
 func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arvisStreamTarget) error {
 	analysis := AnalyzeArvisRadars(SecurityRadarRequest{Target: target.Target, Network: target.Network, Mode: "live_stream"})
 	if strings.TrimSpace(target.Signature) != "" {
@@ -157,17 +174,24 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 		return errors.New("arvis arms missing from bundle")
 	}
 	for _, arm := range arms {
-		if !arm.Signed || arm.Signals == nil {
+		if !SecurityRadarVerdictHasVerifiedEvidence(arm) {
 			continue
 		}
-		hasEvidence, _ := arm.Signals["real_onchain_evidence"].(bool)
-		if !hasEvidence {
+		alreadySaved, err := w.streamArmAlreadySaved(ctx, target.ID, arm.ModuleID)
+		if err != nil {
+			return fmt.Errorf("check existing arm verdict %s: %w", arm.ModuleID, err)
+		}
+		if alreadySaved {
 			continue
 		}
 		signals := cloneArvisSignals(arm.Signals)
 		signals["source_stream_event_id"] = target.ID
 		signals["source_stream_signature"] = target.Signature
 		signals["stream_mode"] = "live_stream"
+		provider := strings.TrimSpace(anyString(signals["provider"]))
+		if provider == "" || provider == "none" || provider == "unconfigured" {
+			provider = "solana_rpc"
+		}
 		eventID, err := w.store.InsertEvent(ctx, SecurityRadarEventRecord{
 			ModuleID: arm.ModuleID, Target: arm.Target, TargetType: "token", Network: arm.Network,
 			Signature: arm.Signature, SourceAddress: target.ProgramID, EventType: "arvis_stream_verdict",
@@ -183,8 +207,11 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 			Grade: arm.Grade, RiskIndex: arm.RiskIndex, RiskLevel: arm.RiskLevel, Verdict: arm.Verdict,
 			Recommendation: arm.Recommendation, Evidence: arm.Evidence, Signals: signals,
 			RuleVersion: arm.RuleVersion, Signed: arm.Signed, Signature: arm.Signature,
-			Source: "arvis_stream", EventType: "arvis_stream_verdict", Provider: "solana_rpc",
+			Source: "arvis_stream", EventType: "arvis_stream_verdict", Provider: provider,
 		}); err != nil {
+			if isArvisUniqueViolation(err) {
+				continue
+			}
 			return fmt.Errorf("insert arm verdict %s: %w", arm.ModuleID, err)
 		}
 	}
@@ -227,6 +254,14 @@ func compactArvisWorkerError(value string) string {
 		return value[:500]
 	}
 	return value
+}
+
+func isArvisUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(err.Error())
+	return strings.Contains(text, "duplicate key") || strings.Contains(text, "23505") || strings.Contains(text, "unique constraint")
 }
 
 func isUndefinedTableError(err error) bool {
