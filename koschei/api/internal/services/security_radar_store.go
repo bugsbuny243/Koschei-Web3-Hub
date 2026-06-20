@@ -116,7 +116,14 @@ func (s *SecurityRadarStore) InsertVerdict(ctx context.Context, verdict Security
 	if verdict.ModuleID == "" || verdict.Target == "" {
 		return "", nil
 	}
+
 	signals := nonNilMap(verdict.Signals)
+	if verdict.Source == "arvis_stream" {
+		if streamEventID, _ := signals["source_stream_event_id"].(string); strings.TrimSpace(streamEventID) != "" {
+			verdict.Signature = arvisStreamScopedVerdictSignature(verdict.Signature, verdict.ModuleID, streamEventID)
+			signals["stream_scoped_signature"] = true
+		}
+	}
 	if shouldApplySBX1HiddenSignals(verdict) {
 		hidden := buildSBX1HiddenSignalPack(ctx, verdict)
 		applyHiddenRiskAdjustment(&verdict, hidden.RiskAdjustment)
