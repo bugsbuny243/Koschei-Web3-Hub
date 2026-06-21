@@ -3,7 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -90,10 +90,16 @@ func (s *SecurityRadarStore) InsertEvent(ctx context.Context, event SecurityRada
 	if event.ModuleID == "" || event.Target == "" {
 		return "", nil
 	}
-	signals, _ := json.Marshal(nonNilMap(event.Signals))
-	rawSummary, _ := json.Marshal(nonNilMap(event.RawSummary))
+	signals, err := marshalSecurityRadarJSON(nonNilMap(event.Signals))
+	if err != nil {
+		return "", fmt.Errorf("encode event signals: %w", err)
+	}
+	rawSummary, err := marshalSecurityRadarJSON(nonNilMap(event.RawSummary))
+	if err != nil {
+		return "", fmt.Errorf("encode event summary: %w", err)
+	}
 	var id string
-	err := s.DB.QueryRowContext(ctx, `
+	err = s.DB.QueryRowContext(ctx, `
 		INSERT INTO security_radar_events (module_id,target,target_type,network,signature,source_address,event_type,slot,block_time,signals,raw_summary,source,created_at,updated_at)
 		VALUES ($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''),$7,NULLIF($8,0),$9,$10::jsonb,$11::jsonb,$12,now(),now())
 		RETURNING id::text`, event.ModuleID, event.Target, event.TargetType, event.Network, event.Signature, event.SourceAddress, event.EventType, event.Slot, event.BlockTime, string(signals), string(rawSummary), event.Source).Scan(&id)
@@ -131,16 +137,22 @@ func (s *SecurityRadarStore) InsertVerdict(ctx context.Context, verdict Security
 		signals["sbx1_hidden_risk_adjustment"] = hidden.RiskAdjustment
 		signals["sbx1_hidden_customer_surface"] = false
 	}
-	evidence, _ := json.Marshal(nonNilEvidence(verdict.Evidence))
+	evidence, err := marshalSecurityRadarJSON(nonNilEvidence(verdict.Evidence))
+	if err != nil {
+		return "", fmt.Errorf("encode verdict evidence: %w", err)
+	}
 	if verdict.EventType != "" {
 		signals["event_type"] = verdict.EventType
 	}
 	if verdict.Provider != "" {
 		signals["provider"] = verdict.Provider
 	}
-	signalsRaw, _ := json.Marshal(signals)
+	signalsRaw, err := marshalSecurityRadarJSON(signals)
+	if err != nil {
+		return "", fmt.Errorf("encode verdict signals: %w", err)
+	}
 	var id string
-	err := s.DB.QueryRowContext(ctx, `
+	err = s.DB.QueryRowContext(ctx, `
 		INSERT INTO security_radar_verdicts (event_id,module_id,target,target_type,network,grade,risk_index,risk_level,verdict,recommendation,evidence,signals,rule_version,signed,signature,source,created_at,updated_at)
 		VALUES (NULLIF($1,'')::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14,NULLIF($15,''),$16,now(),now())
 		ON CONFLICT (signature,module_id) WHERE signature IS NOT NULL DO UPDATE SET
