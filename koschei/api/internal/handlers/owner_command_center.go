@@ -20,7 +20,17 @@ func (h *Handler) OwnerCommandCenterStatus(w http.ResponseWriter, r *http.Reques
 	paddle := services.LoadPaddleConfigFromEnv()
 	arvis := h.securityRadarStreamStats(r.Context())
 	arvis["sources"] = h.arvisSourceHealth(r.Context())
-	arvis["failures"] = h.arvisFailureHealth(r.Context())
+	failureHealth := h.arvisFailureHealth(r.Context())
+	arvis["failures"] = failureHealth
+
+	retryable := mapInt64(failureHealth, "retryable")
+	exhausted := mapInt64(failureHealth, "exhausted")
+	arvis["processing_retryable_failed"] = retryable
+	arvis["processing_exhausted"] = exhausted
+	arvis["processing_failed"] = retryable + exhausted
+	if recent := mapInt64(failureHealth, "recent_15_minutes"); recent > mapInt64(arvis, "processing_failed_recent") {
+		arvis["processing_failed_recent"] = recent
+	}
 
 	servicesMap := map[string]any{
 		"database": map[string]any{"status": serviceStatus(db != nil, "connected", "unavailable")},
@@ -194,7 +204,8 @@ func ownerActionQueue(summary map[string]any, serviceMap map[string]any, arvis m
 		}
 		actions = append(actions, map[string]any{"priority": priority, "kind": kind, "title": title, "detail": detail, "target_tab": tab, "count": count})
 	}
-	add("critical", "arvis_failure", "Arvıs işlem hataları", "Son dönemde başarısız veya yeniden denenmesi gereken radar işleri var.", "arvis", mapInt64(arvis, "processing_failed_recent"))
+	add("critical", "arvis_failure", "Arvıs işlem hataları", "Son 15 dakikada başarısız veya yeniden denenmesi gereken radar işleri var.", "arvis", mapInt64(arvis, "processing_failed_recent"))
+	add("high", "arvis_exhausted", "Arvıs tükenmiş iş kuyruğu", "Yeniden deneme hakkı tükenen radar işleri owner incelemesi bekliyor.", "arvis", mapInt64(arvis, "processing_exhausted"))
 	add("critical", "security_feedback", "Güvenlik geri bildirimleri", "Müşteriler güvenlik kategorisinde yeni bildirim gönderdi.", "feedback", mapInt64(summary, "security_feedback"))
 	add("high", "security_events", "Kritik güvenlik olayları", "Son 24 saatte yüksek önem seviyesinde güvenlik olayı oluştu.", "security", mapInt64(summary, "critical_security_events_24h"))
 	add("high", "pending_payment", "Bekleyen ödeme onayları", "Shopier ödeme talepleri owner incelemesi bekliyor.", "revenue", mapInt64(summary, "pending_payments"))
