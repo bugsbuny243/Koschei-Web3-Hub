@@ -103,6 +103,17 @@ func (s *SecurityRadarStore) InsertEvent(ctx context.Context, event SecurityRada
 	err = s.DB.QueryRowContext(ctx, `
 		INSERT INTO security_radar_events (module_id,target,target_type,network,signature,source_address,event_type,slot,block_time,signals,raw_summary,source,created_at,updated_at)
 		VALUES ($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''),$7,NULLIF($8,0),$9,$10::jsonb,$11::jsonb,$12,now(),now())
+		ON CONFLICT (module_id, signature, source) DO UPDATE SET
+			target=EXCLUDED.target,
+			target_type=EXCLUDED.target_type,
+			network=EXCLUDED.network,
+			source_address=COALESCE(EXCLUDED.source_address, security_radar_events.source_address),
+			event_type=EXCLUDED.event_type,
+			slot=COALESCE(EXCLUDED.slot, security_radar_events.slot),
+			block_time=COALESCE(EXCLUDED.block_time, security_radar_events.block_time),
+			signals=EXCLUDED.signals,
+			raw_summary=EXCLUDED.raw_summary,
+			updated_at=now()
 		RETURNING id::text`, event.ModuleID, event.Target, event.TargetType, event.Network, event.Signature, event.SourceAddress, event.EventType, event.Slot, event.BlockTime, string(signals), string(rawSummary), event.Source).Scan(&id)
 	return id, err
 }
