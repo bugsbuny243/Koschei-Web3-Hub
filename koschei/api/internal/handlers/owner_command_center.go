@@ -203,13 +203,37 @@ func ownerActionQueue(summary map[string]any, serviceMap map[string]any, arvis m
 	add("medium", "failed_jobs", "Başarısız işler", "Son 24 saatte başarısız uygulama işleri oluştu.", "system", mapInt64(summary, "failed_jobs_24h"))
 
 	for name, raw := range serviceMap {
-		entry, _ := raw.(map[string]any)
-		status := strings.ToLower(firstMapString(entry, "status"))
-		if status == "missing" || status == "unavailable" || status == "error" {
-			actions = append(actions, map[string]any{"priority": "medium", "kind": "service", "title": name + " yapılandırması", "detail": "Servis eksik veya kullanılamıyor: " + status, "target_tab": "system", "count": int64(1)})
+		status := strings.ToLower(ownerServiceStatus(raw))
+		if ownerServiceNeedsAction(status) {
+			actions = append(actions, map[string]any{"priority": "medium", "kind": "service", "title": name + " yapılandırması", "detail": "Servis eksik, kısmi veya kullanılamıyor: " + status, "target_tab": "system", "count": int64(1)})
 		}
 	}
 	return actions
+}
+
+func ownerServiceStatus(raw any) string {
+	switch value := raw.(type) {
+	case string:
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	case map[string]any:
+		return firstMapString(value, "status")
+	case map[string]string:
+		if status := strings.TrimSpace(value["status"]); status != "" {
+			return status
+		}
+	}
+	return "unknown"
+}
+
+func ownerServiceNeedsAction(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "missing", "unavailable", "error", "not_configured", "partial", "unknown", "degraded", "stale":
+		return true
+	default:
+		return false
+	}
 }
 
 func mapInt64(values map[string]any, key string) int64 {
