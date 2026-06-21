@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 var errArvisStreamInsufficientEvidence = errors.New("arvis stream insufficient evidence")
@@ -76,7 +78,7 @@ func (w *arvisStreamVerdictWorker) processBatch(ctx context.Context) {
 			continue
 		}
 		if err != nil {
-			w.markTarget(ctx, target.ID, "failed", err.Error())
+			w.markTarget(ctx, target.ID, "failed", formatArvisWorkerError(err))
 			log.Printf("arvis stream verdict failed event=%s target=%s module=%s err=%v", target.ID, target.Target, target.ModuleID, err)
 			continue
 		}
@@ -104,8 +106,16 @@ func (w *arvisStreamVerdictWorker) pendingTargets(ctx context.Context, limit int
 		  AND (
 			p.stream_event_id IS NULL
 			OR (p.status='failed' AND p.attempts < 3 AND p.updated_at < now() - interval '30 seconds')
+			OR (p.status='exhausted' AND p.attempts < 5 AND p.updated_at < now() - interval '30 minutes')
 		  )
-		ORDER BY s.created_at ASC
+		ORDER BY
+		  CASE
+		    WHEN p.stream_event_id IS NULL THEN 0
+		    WHEN p.status='failed' THEN 1
+		    ELSE 2
+		  END,
+		  CASE WHEN p.stream_event_id IS NULL THEN s.created_at END DESC,
+		  p.updated_at ASC NULLS FIRST
 		LIMIT $1
 	`, limit, ModulePumpSybilRadar, ModuleRaydiumPoolGuardian)
 	if err != nil {
@@ -133,7 +143,8 @@ func (w *arvisStreamVerdictWorker) claimTarget(ctx context.Context, target arvis
 			attempts=arvis_stream_processing.attempts+1,
 			last_error='',
 			updated_at=now()
-		WHERE arvis_stream_processing.status='failed' AND arvis_stream_processing.attempts < 3
+		WHERE (arvis_stream_processing.status='failed' AND arvis_stream_processing.attempts < 3)
+		   OR (arvis_stream_processing.status='exhausted' AND arvis_stream_processing.attempts < 5)
 		RETURNING attempts
 	`, target.ID, target.Target, target.Signature).Scan(&attempts)
 	return err == nil && attempts > 0
@@ -330,6 +341,24 @@ func cloneArvisSignals(in map[string]any) map[string]any {
 	return out
 }
 
+func formatArvisWorkerError(err error) string {
+	if err == nil {
+		return ""
+	}
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) {
+		parts := []string{"sqlstate=" + string(pqErr.Code)}
+		if strings.TrimSpace(pqErr.Constraint) != "" {
+			parts = append(parts, "constraint="+pqErr.Constraint)
+		}
+		if strings.TrimSpace(pqErr.Message) != "" {
+			parts = append(parts, "message="+pqErr.Message)
+		}
+		return compactArvisWorkerError(strings.Join(parts, " "))
+	}
+	return compactArvisWorkerError(err.Error())
+}
+
 func compactArvisWorkerError(value string) string {
 	value = strings.TrimSpace(value)
 	if len(value) > 500 {
@@ -342,6 +371,10 @@ func isArvisUniqueViolation(err error) bool {
 	if err == nil {
 		return false
 	}
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && string(pqErr.Code) == "23505" {
+		return true
+	}
 	text := strings.ToLower(err.Error())
 	return strings.Contains(text, "duplicate key") || strings.Contains(text, "23505") || strings.Contains(text, "unique constraint")
 }
@@ -349,6 +382,10 @@ func isArvisUniqueViolation(err error) bool {
 func isUndefinedTableError(err error) bool {
 	if err == nil {
 		return false
+	}
+	var pqErr *pq.Error
+	if errors.As(err, &pqErr) && string(pqErr.Code) == "42P01" {
+		return true
 	}
 	text := strings.ToLower(err.Error())
 	return strings.Contains(text, "does not exist") || strings.Contains(text, "undefined table")
