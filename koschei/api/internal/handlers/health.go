@@ -170,26 +170,26 @@ func classifyArvisFailure(raw string) string {
 	switch {
 	case text == "":
 		return "unknown"
+	case strings.Contains(text, "duplicate key") || strings.Contains(text, "23505") || strings.Contains(text, "unique constraint"):
+		return "duplicate_write"
+	case strings.Contains(text, "foreign key") || strings.Contains(text, "23503"):
+		return "foreign_key"
+	case strings.Contains(text, "null value") || strings.Contains(text, "23502") || strings.Contains(text, "check constraint") || strings.Contains(text, "23514"):
+		return "schema_constraint"
+	case strings.Contains(text, "does not exist") || strings.Contains(text, "undefined table") || strings.Contains(text, "undefined column") || strings.Contains(text, "42p01") || strings.Contains(text, "42703"):
+		return "missing_schema"
+	case strings.Contains(text, "invalid input syntax for type json") || strings.Contains(text, "unsupported value") || strings.Contains(text, "json"):
+		return "json_encoding"
+	case strings.Contains(text, "deadline exceeded") || strings.Contains(text, "timeout") || strings.Contains(text, "timed out"):
+		return "timeout"
+	case strings.Contains(text, "connection") || strings.Contains(text, "network") || strings.Contains(text, "broken pipe") || strings.Contains(text, "eof"):
+		return "database_or_network"
 	case strings.Contains(text, "insert arm verdict"):
 		return "verdict_insert"
 	case strings.Contains(text, "insert arm event"):
 		return "event_insert"
 	case strings.Contains(text, "check existing arm verdict"):
 		return "idempotency_check"
-	case strings.Contains(text, "duplicate key") || strings.Contains(text, "23505") || strings.Contains(text, "unique constraint"):
-		return "duplicate_write"
-	case strings.Contains(text, "foreign key") || strings.Contains(text, "23503"):
-		return "foreign_key"
-	case strings.Contains(text, "null value") || strings.Contains(text, "23502") || strings.Contains(text, "check constraint"):
-		return "schema_constraint"
-	case strings.Contains(text, "does not exist") || strings.Contains(text, "undefined table") || strings.Contains(text, "undefined column"):
-		return "missing_schema"
-	case strings.Contains(text, "deadline exceeded") || strings.Contains(text, "timeout") || strings.Contains(text, "timed out"):
-		return "timeout"
-	case strings.Contains(text, "connection") || strings.Contains(text, "network") || strings.Contains(text, "broken pipe") || strings.Contains(text, "eof"):
-		return "database_or_network"
-	case strings.Contains(text, "json"):
-		return "json_encoding"
 	default:
 		return "processing_error"
 	}
