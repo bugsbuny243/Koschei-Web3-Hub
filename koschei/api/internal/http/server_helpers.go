@@ -16,7 +16,7 @@ func apiReadiness(db *sql.DB, next http.Handler) http.Handler {
 	protected := bodyLimit(sensitiveRateLimit(next))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
-		if strings.HasPrefix(path, "/api/") && path != "/api/me" && path != "/api/me/package" && path != "/api/v1/unified/analyze" && path != "/api/v1/risk/badge" && path != "/api/version" && path != "/api/config" && path != "/api/auth/register" && path != "/api/auth/login" && path != "/api/auth/provision" && path != "/api/auth/neon-login" && path != "/api/auth/neon-register" && path != "/api/auth/neon-callback" && path != "/api/owner/login" && path != "/api/public/impact" && path != "/api/public/metrics" && path != "/api/web3/health" && path != "/api/analytics/event" && db == nil {
+		if strings.HasPrefix(path, "/api/") && path != "/api/me" && path != "/api/me/package" && path != "/api/v1/unified/analyze" && path != "/api/v1/risk/badge" && path != "/api/version" && path != "/api/config" && path != "/api/auth/register" && path != "/api/auth/login" && path != "/api/auth/provision" && path != "/api/auth/neon-login" && path != "/api/auth/neon-register" && path != "/api/auth/neon-callback" && path != "/api/owner/login" && path != "/api/owner/logout" && path != "/api/owner/command-center" && path != "/api/public/impact" && path != "/api/public/metrics" && path != "/api/web3/health" && path != "/api/analytics/event" && db == nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "database unavailable"})
