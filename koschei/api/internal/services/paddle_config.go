@@ -31,24 +31,24 @@ func setPaddleCanonicalEnv(key, value string) {
 }
 
 type PaddleConfig struct {
-	Enabled              bool     `json:"enabled"`
-	CheckoutReady        bool     `json:"checkout_ready"`
-	AutomationReady      bool     `json:"automation_ready"`
-	Environment          string   `json:"environment"`
-	APIKeyConfigured     bool     `json:"api_key_configured"`
-	ClientTokenConfigured bool    `json:"client_token_configured"`
-	WebhookConfigured    bool     `json:"webhook_configured"`
-	APIKey               string   `json:"-"`
-	ClientToken          string   `json:"-"`
-	StarterPriceID       string   `json:"-"`
-	ProfessionalPriceID  string   `json:"-"`
-	EnterprisePriceID    string   `json:"-"`
-	StarterProductID     string   `json:"-"`
-	ProfessionalProductID string  `json:"-"`
-	EnterpriseProductID  string   `json:"-"`
-	PublicAppURL         string   `json:"-"`
-	CheckoutURL          string   `json:"-"`
-	MissingFields        []string `json:"-"`
+	Enabled                       bool     `json:"enabled"`
+	CheckoutReady                 bool     `json:"checkout_ready"`
+	AutomationReady               bool     `json:"automation_ready"`
+	Environment                   string   `json:"environment"`
+	APIKeyConfigured              bool     `json:"api_key_configured"`
+	ClientTokenConfigured         bool     `json:"client_token_configured"`
+	WebhookConfigured             bool     `json:"webhook_configured"`
+	APIKey                        string   `json:"-"`
+	ClientToken                   string   `json:"-"`
+	StarterPriceID                string   `json:"-"`
+	ProfessionalPriceID           string   `json:"-"`
+	EnterprisePriceID             string   `json:"-"`
+	StarterProductID              string   `json:"-"`
+	ProfessionalProductID         string   `json:"-"`
+	EnterpriseProductID           string   `json:"-"`
+	PublicAppURL                  string   `json:"-"`
+	CheckoutURL                   string   `json:"-"`
+	MissingFields                 []string `json:"-"`
 }
 
 func LoadPaddleConfigFromEnv() PaddleConfig {
@@ -58,24 +58,29 @@ func LoadPaddleConfigFromEnv() PaddleConfig {
 		env = "production"
 	}
 	cfg := PaddleConfig{
-		Environment:           env,
-		APIKey:               firstPaddleEnv("PADDLE_API_KEY", "PADDLE_SECRET_KEY"),
-		ClientToken:          firstPaddleEnv("PADDLE_CLIENT_TOKEN", "PADDLE_CLIENT_SIDE_TOKEN", "NEXT_PUBLIC_PADDLE_CLIENT_TOKEN", "PUBLIC_PADDLE_CLIENT_TOKEN"),
-		StarterPriceID:       firstPaddleEnv("PADDLE_STARTER_PRICE_ID", "PADDLE_STARTER_PRICE_USD_ID", "PADDLE_PRICE_STARTER_ID"),
-		ProfessionalPriceID:  firstPaddleEnv("PADDLE_PROFESSIONAL_PRICE_ID", "PADDLE_PROFESSIONAL_PRICE_USD_ID", "PADDLE_BUILDER_PRICE_ID", "PADDLE_PRICE_PROFESSIONAL_ID"),
-		EnterprisePriceID:    firstPaddleEnv("PADDLE_ENTERPRISE_PRICE_ID", "PADDLE_ENTERPRISE_PRICE_USD_ID", "PADDLE_STUDIO_PRICE_ID", "PADDLE_PRICE_ENTERPRISE_ID"),
-		StarterProductID:     firstPaddleEnv("PADDLE_STARTER_PRODUCT_ID", "PADDLE_PRODUCT_STARTER_ID"),
-		ProfessionalProductID:firstPaddleEnv("PADDLE_PROFESSIONAL_PRODUCT_ID", "PADDLE_BUILDER_PRODUCT_ID", "PADDLE_PRODUCT_PROFESSIONAL_ID"),
-		EnterpriseProductID:  firstPaddleEnv("PADDLE_ENTERPRISE_PRODUCT_ID", "PADDLE_STUDIO_PRODUCT_ID", "PADDLE_PRODUCT_ENTERPRISE_ID"),
-		PublicAppURL:          resolvePaddlePublicAppURL(),
-		CheckoutURL:           resolvePaddleCheckoutURL(),
+		Environment:            env,
+		APIKey:                 firstPaddleEnv("PADDLE_API_KEY", "PADDLE_SECRET_KEY"),
+		ClientToken:            firstPaddleEnv("PADDLE_CLIENT_TOKEN", "PADDLE_CLIENT_SIDE_TOKEN", "NEXT_PUBLIC_PADDLE_CLIENT_TOKEN", "PUBLIC_PADDLE_CLIENT_TOKEN"),
+		StarterPriceID:         firstPaddleEnv("PADDLE_STARTER_PRICE_ID", "PADDLE_STARTER_PRICE_USD_ID", "PADDLE_PRICE_STARTER_ID"),
+		ProfessionalPriceID:    firstPaddleEnv("PADDLE_PROFESSIONAL_PRICE_ID", "PADDLE_PROFESSIONAL_PRICE_USD_ID", "PADDLE_BUILDER_PRICE_ID", "PADDLE_PRICE_PROFESSIONAL_ID"),
+		EnterprisePriceID:      firstPaddleEnv("PADDLE_ENTERPRISE_PRICE_ID", "PADDLE_ENTERPRISE_PRICE_USD_ID", "PADDLE_STUDIO_PRICE_ID", "PADDLE_PRICE_ENTERPRISE_ID"),
+		StarterProductID:       firstPaddleEnv("PADDLE_STARTER_PRODUCT_ID", "PADDLE_PRODUCT_STARTER_ID"),
+		ProfessionalProductID:  firstPaddleEnv("PADDLE_PROFESSIONAL_PRODUCT_ID", "PADDLE_BUILDER_PRODUCT_ID", "PADDLE_PRODUCT_PROFESSIONAL_ID"),
+		EnterpriseProductID:    firstPaddleEnv("PADDLE_ENTERPRISE_PRODUCT_ID", "PADDLE_STUDIO_PRODUCT_ID", "PADDLE_PRODUCT_ENTERPRISE_ID"),
+		PublicAppURL:           resolvePaddlePublicAppURL(),
+		CheckoutURL:            resolvePaddleCheckoutURL(),
 	}
 	cfg.APIKeyConfigured = cfg.APIKey != ""
 	cfg.ClientTokenConfigured = cfg.ClientToken != ""
 	cfg.WebhookConfigured = strings.TrimSpace(firstPaddleEnv("PADDLE_WEBHOOK_SECRET", "PADDLE_WEBHOOK_KEY")) != ""
+
 	allPrices := cfg.StarterPriceID != "" && cfg.ProfessionalPriceID != "" && cfg.EnterprisePriceID != ""
-	cfg.CheckoutReady = cfg.ClientTokenConfigured && cfg.CheckoutURL != "" && allPrices
-	cfg.AutomationReady = cfg.CheckoutReady && cfg.APIKeyConfigured && cfg.WebhookConfigured
+
+	// KOSCHEİ creates Paddle transactions server-side with PADDLE_API_KEY and
+	// redirects the customer to Paddle's returned checkout URL. A client token
+	// is optional for this architecture and must not mark the system unavailable.
+	cfg.CheckoutReady = cfg.APIKeyConfigured && cfg.PublicAppURL != "" && allPrices
+	cfg.AutomationReady = cfg.CheckoutReady && cfg.WebhookConfigured
 	cfg.Enabled = cfg.AutomationReady
 	cfg.MissingFields = paddleMissingFields(cfg)
 	return cfg
@@ -108,7 +113,7 @@ func (c PaddleConfig) ProductID(plan string) string {
 }
 
 func (c PaddleConfig) PlanReady(plan string) bool {
-	return c.ClientTokenConfigured && c.CheckoutURL != "" && c.PriceID(plan) != ""
+	return c.APIKeyConfigured && c.PublicAppURL != "" && c.PriceID(plan) != ""
 }
 
 func (c PaddleConfig) PublicStatus() map[string]any {
@@ -120,6 +125,7 @@ func (c PaddleConfig) PublicStatus() map[string]any {
 		"automation_ready":              c.AutomationReady,
 		"api_key_configured":            c.APIKeyConfigured,
 		"client_token_configured":       c.ClientTokenConfigured,
+		"client_token_required":         false,
 		"webhook_configured":            c.WebhookConfigured,
 		"starter_price_configured":      c.StarterPriceID != "",
 		"professional_price_configured": c.ProfessionalPriceID != "",
@@ -162,9 +168,6 @@ func paddleMissingFields(c PaddleConfig) []string {
 	if !c.APIKeyConfigured {
 		missing = append(missing, "PADDLE_API_KEY")
 	}
-	if !c.ClientTokenConfigured {
-		missing = append(missing, "PADDLE_CLIENT_TOKEN")
-	}
 	if !c.WebhookConfigured {
 		missing = append(missing, "PADDLE_WEBHOOK_SECRET")
 	}
@@ -177,8 +180,8 @@ func paddleMissingFields(c PaddleConfig) []string {
 	if c.EnterprisePriceID == "" {
 		missing = append(missing, "PADDLE_ENTERPRISE_PRICE_ID")
 	}
-	if c.CheckoutURL == "" {
-		missing = append(missing, "PADDLE_CHECKOUT_URL_or_PUBLIC_APP_URL")
+	if c.PublicAppURL == "" {
+		missing = append(missing, "PUBLIC_APP_URL")
 	}
 	return missing
 }
@@ -190,7 +193,7 @@ func paddleConfigStatus(c PaddleConfig) string {
 	if c.CheckoutReady {
 		return "checkout_ready_webhook_incomplete"
 	}
-	if c.APIKeyConfigured || c.ClientTokenConfigured || c.WebhookConfigured || c.StarterPriceID != "" || c.ProfessionalPriceID != "" || c.EnterprisePriceID != "" || c.CheckoutURL != "" {
+	if c.APIKeyConfigured || c.ClientTokenConfigured || c.WebhookConfigured || c.StarterPriceID != "" || c.ProfessionalPriceID != "" || c.EnterprisePriceID != "" || c.PublicAppURL != "" {
 		return "partial"
 	}
 	return "not_configured"
