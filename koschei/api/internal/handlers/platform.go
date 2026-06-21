@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/services"
 )
 
 func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
@@ -15,10 +17,13 @@ func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 		"builder": configuredURL("SHOPIER_BUILDER_URL", "https://www.shopier.com/TradeVisual/46531900"),
 		"studio":  configuredURL("SHOPIER_STUDIO_URL", "https://www.shopier.com/TradeVisual/46531961"),
 	}
+	paddle := services.LoadPaddleConfigFromEnv()
 	paddleConfigured := map[string]bool{
-		"starter": strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "" && paddleConfiguredPriceID("starter") != "",
-		"builder": strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "" && paddleConfiguredPriceID("builder") != "",
-		"studio":  strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "" && paddleConfiguredPriceID("studio") != "",
+		"starter":      paddle.PlanReady("starter"),
+		"builder":      paddle.PlanReady("professional"),
+		"studio":       paddle.PlanReady("enterprise"),
+		"professional": paddle.PlanReady("professional"),
+		"enterprise":   paddle.PlanReady("enterprise"),
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"version":     "2.0.0",
@@ -26,6 +31,7 @@ func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 		"payments": map[string]any{
 			"shopierUrls":      shopierURLs,
 			"paddleConfigured": paddleConfigured,
+			"paddle":           paddle.PublicStatus(),
 		},
 	})
 }
