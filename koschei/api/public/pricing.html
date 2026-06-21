@@ -30,29 +30,112 @@
     ];
     const tr={badge:'Premium analiz kapısı',title:'İstihbarat kapasiteni seç.',subtitle:'Shopier owner onayıyla, Paddle ise otomatik ödeme ve webhook aktivasyonuyla çalışır.',flow1:'Paketi seç',flow2:'Ödeme yöntemini seç',flow3:'Paketi kullan',shopier:'Shopier ile satın al',report:'Shopier ödemesini bildir',paddle:'Paddle otomatik ödeme',send:'Owner’a gönder',close:'Kapat'};
     const en={badge:'Premium analysis gate',title:'Choose your intelligence capacity.',subtitle:'Shopier activates after owner approval. Paddle uses automatic checkout and webhook activation.',flow1:'Choose a package',flow2:'Choose payment method',flow3:'Use your package',shopier:'Buy with Shopier',report:'Report Shopier Payment',paddle:'Paddle Auto Pay',send:'Send to Owner',close:'Close'};
-    let lang=localStorage.getItem('pricing_lang')||'tr',selected='starter',paddleStatus=null,shopierUrls={starter:'https://www.shopier.com/TradeVisual/46531862',professional:'https://www.shopier.com/TradeVisual/46531900',enterprise:'https://www.shopier.com/TradeVisual/46531961'};
+    let lang=localStorage.getItem('pricing_lang')||'tr';
+    let selected='starter';
+    let paddleStatus=null;
+    let shopierUrls={starter:'https://www.shopier.com/TradeVisual/46531862',professional:'https://www.shopier.com/TradeVisual/46531900',enterprise:'https://www.shopier.com/TradeVisual/46531961'};
     const $=id=>document.getElementById(id),L=()=>lang==='tr'?tr:en;
     const token=()=>{try{return window.KoscheiAuth?.getJwt?.()||localStorage.getItem('koschei_jwt')||localStorage.getItem('koschei_token')||''}catch{return''}};
     const show=(message,kind='')=>{const el=$('status');el.style.display='block';el.className='surface '+kind;el.textContent=message};
     const cardError=(button,message)=>{const box=button.closest('.payment-actions').querySelector('.provider-error');box.textContent=message;box.classList.add('show')};
     const clearError=button=>{const box=button.closest('.payment-actions').querySelector('.provider-error');box.textContent='';box.classList.remove('show')};
-    const planStatusKey=id=>id==='starter'?'starter_price_id':id==='professional'?'professional_price_id':'enterprise_price_id';
-    const missingForPlan=id=>{if(!paddleStatus)return['Paddle status'];const missing=[];if(!paddleStatus.paddle_api_key)missing.push('PADDLE_API_KEY');if(!paddleStatus.public_app_url)missing.push('PUBLIC_APP_URL');if(!paddleStatus[planStatusKey(id)])missing.push(id==='starter'?'PADDLE_STARTER_PRICE_ID':id==='professional'?'PADDLE_PROFESSIONAL_PRICE_ID':'PADDLE_ENTERPRISE_PRICE_ID');return missing};
+    const planReadyKey=id=>id==='starter'?'starter_ready':id==='professional'?'professional_ready':'enterprise_ready';
+    const missingForPlan=id=>{
+      if(!paddleStatus)return['Paddle status'];
+      const missing=[];
+      if(!paddleStatus.api_key_configured)missing.push('PADDLE_API_KEY');
+      if(!paddleStatus.public_app_url_configured)missing.push('PUBLIC_APP_URL');
+      if(!paddleStatus.webhook_configured)missing.push('PADDLE_WEBHOOK_SECRET');
+      if(!paddleStatus[planReadyKey(id)])missing.push(id==='starter'?'PADDLE_STARTER_PRICE_ID':id==='professional'?'PADDLE_PROFESSIONAL_PRICE_ID':'PADDLE_ENTERPRISE_PRICE_ID');
+      return missing;
+    };
 
-    async function loadPublicConfig(){try{const r=await fetch('/api/config',{credentials:'same-origin'});const d=await r.json();const urls=d?.payments?.shopierUrls||{};shopierUrls={starter:urls.starter||shopierUrls.starter,professional:urls.professional||urls.builder||shopierUrls.professional,enterprise:urls.enterprise||urls.studio||shopierUrls.enterprise}}catch{}}
-    async function loadPaddleStatus(){const jwt=token();if(!jwt){paddleStatus=null;renderProviderStatus();return null}try{const r=await fetch('/api/paddle/status',{headers:{Authorization:'Bearer '+jwt},credentials:'same-origin'});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||d.error||'Paddle status unavailable');paddleStatus=d;renderProviderStatus();return d}catch(e){paddleStatus=null;renderProviderStatus(e.message);return null}}
-    function renderProviderStatus(error=''){const el=$('providerStatus');if(error){el.className='statusDock bad';el.textContent=(lang==='tr'?'Paddle durum kontrolü başarısız: ':'Paddle status check failed: ')+error;return}if(!token()){el.className='statusDock warn';el.textContent=lang==='tr'?'Paddle durumunu görmek ve otomatik ödeme yapmak için giriş yap.':'Sign in to check Paddle and use automatic checkout.';return}if(!paddleStatus){el.className='statusDock warn';el.textContent=lang==='tr'?'Paddle yapılandırması kontrol ediliyor…':'Checking Paddle configuration…';return}const missing=[...new Set(plans.flatMap(p=>missingForPlan(p.id)))];if(!missing.length){el.className='statusDock';el.textContent=(lang==='tr'?'Paddle sunucu yapılandırması hazır':'Paddle server configuration is ready')+' · '+String(paddleStatus.environment||'production').toUpperCase()+' · '+(lang==='tr'?'Otomatik ödeme kullanılabilir.':'Automatic checkout is available.');return}el.className='statusDock bad';el.textContent=(lang==='tr'?'Paddle eksik alanlar: ':'Missing Paddle fields: ')+missing.join(', ')}
+    function clearStaleAuth(){
+      try{localStorage.removeItem('koschei_jwt');localStorage.removeItem('koschei_token');window.KoscheiAuth?.logout?.()}catch{}
+    }
 
-    function renderPlans(){$('packages').innerHTML=plans.map(p=>`<article class="card plan ${p.id==='professional'?'featured':''}"><span class="badge">${p.name}</span><h2>Koschei ${p.name}</h2><p class="price">${p.price}</p><p class="sub">${p.outputs}</p><p class="sub">${p.desc}</p><ul><li>${p.outputs} premium rapor</li><li>Security Radar erişimi</li><li>Signed A-F verdict</li></ul><div class="payment-actions"><button class="btn-primary choose-shopier" data-product="${p.id}">${L().shopier}</button><button class="choose-report" data-product="${p.id}">${L().report}</button><button class="btn-muted choose-paddle" data-product="${p.id}">${L().paddle}</button><p class="provider-note">${lang==='tr'?'Shopier owner onayıyla; Paddle webhook ile otomatik aktifleşir.':'Shopier activates after owner approval; Paddle activates automatically by webhook.'}</p><p class="provider-error"></p></div></article>`).join('');document.querySelectorAll('.choose-shopier').forEach(b=>b.onclick=()=>{clearError(b);window.open(shopierUrls[b.dataset.product],'_blank','noopener,noreferrer');show(lang==='tr'?'Shopier açıldı. Ödeme sonrası bildir.':'Shopier opened. Report after payment.')});document.querySelectorAll('.choose-report').forEach(b=>b.onclick=()=>openReport(b.dataset.product));document.querySelectorAll('.choose-paddle').forEach(b=>b.onclick=()=>openPaddle(b))}
+    async function loadPublicConfig(){
+      try{
+        const r=await fetch('/api/config',{credentials:'same-origin',cache:'no-store'});
+        const d=await r.json();
+        const urls=d?.payments?.shopierUrls||{};
+        shopierUrls={starter:urls.starter||shopierUrls.starter,professional:urls.professional||urls.builder||shopierUrls.professional,enterprise:urls.enterprise||urls.studio||shopierUrls.enterprise};
+        paddleStatus=d?.payments?.paddle||null;
+        renderProviderStatus();
+        renderPlans();
+        return paddleStatus;
+      }catch(e){
+        paddleStatus=null;
+        renderProviderStatus(e?.message||'Public configuration unavailable');
+        return null;
+      }
+    }
+
+    function renderProviderStatus(error=''){
+      const el=$('providerStatus');
+      if(error){el.className='statusDock bad';el.textContent=(lang==='tr'?'Paddle durum kontrolü başarısız: ':'Paddle status check failed: ')+error;return}
+      if(!paddleStatus){el.className='statusDock warn';el.textContent=lang==='tr'?'Paddle yapılandırması kontrol ediliyor…':'Checking Paddle configuration…';return}
+      if(paddleStatus.automation_ready){el.className='statusDock';el.textContent=(lang==='tr'?'Paddle sunucu yapılandırması hazır':'Paddle server configuration is ready')+' · '+String(paddleStatus.environment||'production').toUpperCase()+' · '+(lang==='tr'?'Otomatik ödeme ve webhook aktivasyonu kullanılabilir.':'Automatic checkout and webhook activation are available.');return}
+      if(paddleStatus.checkout_ready){el.className='statusDock warn';el.textContent=lang==='tr'?'Paddle checkout hazır; webhook aktivasyonu tamamlanmamış.':'Paddle checkout is ready; webhook activation is incomplete.';return}
+      const missing=Array.isArray(paddleStatus.missing_fields)?paddleStatus.missing_fields:[...new Set(plans.flatMap(p=>missingForPlan(p.id)))];
+      el.className='statusDock bad';el.textContent=(lang==='tr'?'Paddle eksik alanlar: ':'Missing Paddle fields: ')+(missing.join(', ')||'configuration unavailable');
+    }
+
+    function renderPlans(){
+      $('packages').innerHTML=plans.map(p=>`<article class="card plan ${p.id==='professional'?'featured':''}"><span class="badge">${p.name}</span><h2>Koschei ${p.name}</h2><p class="price">${p.price}</p><p class="sub">${p.outputs}</p><p class="sub">${p.desc}</p><ul><li>${p.outputs} premium rapor</li><li>Security Radar erişimi</li><li>Signed A-F verdict</li></ul><div class="payment-actions"><button class="btn-primary choose-shopier" data-product="${p.id}">${L().shopier}</button><button class="choose-report" data-product="${p.id}">${L().report}</button><button class="btn-muted choose-paddle" data-product="${p.id}">${L().paddle}</button><p class="provider-note">${lang==='tr'?'Shopier owner onayıyla; Paddle webhook ile otomatik aktifleşir.':'Shopier activates after owner approval; Paddle activates automatically by webhook.'}</p><p class="provider-error"></p></div></article>`).join('');
+      document.querySelectorAll('.choose-shopier').forEach(b=>b.onclick=()=>{clearError(b);window.open(shopierUrls[b.dataset.product],'_blank','noopener,noreferrer');show(lang==='tr'?'Shopier açıldı. Ödeme sonrası bildir.':'Shopier opened. Report after payment.')});
+      document.querySelectorAll('.choose-report').forEach(b=>b.onclick=()=>openReport(b.dataset.product));
+      document.querySelectorAll('.choose-paddle').forEach(b=>b.onclick=()=>openPaddle(b));
+    }
+
     function openReport(product){selected=product;$('modalTitle').textContent=(lang==='tr'?'Shopier Ödemesini Bildir — ':'Report Shopier Payment — ')+product;$('paymentForm').payment_reference.value='';$('modal').classList.add('show')}
-    function paddleFailureMessage(data,status){const backend=String(data?.message||data?.error||data?.code||'').trim();const missing=missingForPlan(status);if(missing.length)return(lang==='tr'?'Paddle eksik alanlar: ':'Missing Paddle fields: ')+missing.join(', ');if(/checkout url|checkout failed|internal_error|configuration is unavailable/i.test(backend)){return lang==='tr'?'Paddle env değerleri görünüyor; ancak checkout transaction oluşturulamadı. Paddle Dashboard → Checkout settings bölümünde Default Payment Link ve tradepigloball.co domain onayını kontrol et.':'Paddle env values are visible, but the checkout transaction could not be created. Check Default Payment Link and tradepigloball.co domain approval in Paddle Dashboard → Checkout settings.'}return backend||(lang==='tr'?'Paddle checkout açılamadı.':'Paddle checkout could not be opened.')}
-    async function openPaddle(button){const old=button.textContent,product=button.dataset.product,jwt=token();clearError(button);if(!jwt){location.href='/login.html?next=/pricing';return}button.disabled=true;button.textContent=lang==='tr'?'Paddle kontrol ediliyor…':'Checking Paddle…';try{await loadPaddleStatus();const missing=missingForPlan(product);if(missing.length){const m=(lang==='tr'?'Paddle eksik alanlar: ':'Missing Paddle fields: ')+missing.join(', ');cardError(button,m);show(m,'bad');return}const r=await fetch('/api/paddle/checkout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',Authorization:'Bearer '+jwt},body:JSON.stringify({package:product,plan_tier:product})});const d=await r.json().catch(()=>({}));const url=d?.checkout_url||d?.data?.checkout_url||d?.url||d?.data?.url;if(r.ok&&url){location.href=url;return}const m=paddleFailureMessage(d,product);cardError(button,m);show(m,'bad')}catch(e){const m=e?.message||(lang==='tr'?'Paddle bağlantısı kurulamadı.':'Could not connect to Paddle.');cardError(button,m);show(m,'bad')}finally{button.disabled=false;button.textContent=old}}
 
-    $('paymentForm').onsubmit=async e=>{e.preventDefault();const jwt=token();if(!jwt){location.href='/login.html?next=/pricing';return}const b=$('submitPayment');b.disabled=true;try{const payload=Object.fromEntries(new FormData(e.target).entries());payload.product_id=selected;payload.registered_email=window.KoscheiAuth?.getEmail?.()||'';const r=await fetch('/api/payments/request',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',Authorization:'Bearer '+jwt},body:JSON.stringify(payload)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||d.error||'Ödeme bildirimi gönderilemedi.');$('modal').classList.remove('show');show(lang==='tr'?'Ödeme bildirimi owner onayına gönderildi.':'Payment report sent for owner approval.')}catch(e){show(e.message||String(e),'bad')}finally{b.disabled=false}};
+    function paddleFailureMessage(data,product){
+      const backend=String(data?.message||data?.error||data?.code||'').trim();
+      const missing=missingForPlan(product);
+      if(missing.length)return(lang==='tr'?'Paddle eksik alanlar: ':'Missing Paddle fields: ')+missing.join(', ');
+      if(/checkout url|checkout failed|internal_error|configuration is unavailable/i.test(backend))return lang==='tr'?'Paddle transaction oluşturulamadı. Paddle Dashboard checkout ayarları ve tradepigloball.co domain onayını kontrol et.':'Paddle transaction could not be created. Check Paddle Dashboard checkout settings and tradepigloball.co domain approval.';
+      return backend||(lang==='tr'?'Paddle checkout açılamadı.':'Paddle checkout could not be opened.');
+    }
+
+    async function openPaddle(button){
+      const old=button.textContent,product=button.dataset.product;
+      clearError(button);
+      if(!paddleStatus)await loadPublicConfig();
+      const missing=missingForPlan(product);
+      if(missing.length){const m=(lang==='tr'?'Paddle eksik alanlar: ':'Missing Paddle fields: ')+missing.join(', ');cardError(button,m);show(m,'bad');return}
+      const jwt=token();
+      if(!jwt){location.href='/login.html?next=/pricing';return}
+      button.disabled=true;button.textContent=lang==='tr'?'Paddle açılıyor…':'Opening Paddle…';
+      try{
+        const r=await fetch('/api/paddle/checkout',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',Authorization:'Bearer '+jwt},body:JSON.stringify({package:product,plan_tier:product})});
+        const d=await r.json().catch(()=>({}));
+        if(r.status===401){clearStaleAuth();location.href='/login.html?next=/pricing';return}
+        const url=d?.checkout_url||d?.data?.checkout_url||d?.url||d?.data?.url;
+        if(r.ok&&url){location.href=url;return}
+        const m=paddleFailureMessage(d,product);cardError(button,m);show(m,'bad');
+      }catch(e){const m=e?.message||(lang==='tr'?'Paddle bağlantısı kurulamadı.':'Could not connect to Paddle.');cardError(button,m);show(m,'bad')}
+      finally{button.disabled=false;button.textContent=old}
+    }
+
+    $('paymentForm').onsubmit=async e=>{
+      e.preventDefault();
+      const jwt=token();if(!jwt){location.href='/login.html?next=/pricing';return}
+      const b=$('submitPayment');b.disabled=true;
+      try{
+        const payload=Object.fromEntries(new FormData(e.target).entries());payload.product_id=selected;payload.registered_email=window.KoscheiAuth?.getEmail?.()||'';
+        const r=await fetch('/api/payments/request',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',Authorization:'Bearer '+jwt},body:JSON.stringify(payload)});
+        const d=await r.json().catch(()=>({}));
+        if(r.status===401){clearStaleAuth();location.href='/login.html?next=/pricing';return}
+        if(!r.ok)throw new Error(d.message||d.error||'Ödeme bildirimi gönderilemedi.');
+        $('modal').classList.remove('show');show(lang==='tr'?'Ödeme bildirimi owner onayına gönderildi.':'Payment report sent for owner approval.');
+      }catch(e){show(e.message||String(e),'bad')}finally{b.disabled=false}
+    };
+
     $('closeModal').onclick=()=>$('modal').classList.remove('show');
     $('langBtn').onclick=()=>{lang=lang==='tr'?'en':'tr';localStorage.setItem('pricing_lang',lang);applyLang()};
     function applyLang(){document.documentElement.lang=lang;$('langBtn').textContent=lang==='tr'?'EN':'TR';$('heroBadge').textContent=L().badge;$('heroTitle').textContent=L().title;$('heroSubtitle').textContent=L().subtitle;$('flow1').textContent=L().flow1;$('flow2').textContent=L().flow2;$('flow3').textContent=L().flow3;$('submitPayment').textContent=L().send;$('closeModal').textContent=L().close;renderPlans();renderProviderStatus()}
-    (async()=>{applyLang();await loadPublicConfig();await loadPaddleStatus()})();
+    (async()=>{applyLang();await loadPublicConfig()})();
   })();
   </script>
 </body>
