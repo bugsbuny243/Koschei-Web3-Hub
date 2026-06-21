@@ -1,2 +1,0 @@
-UPDATE arvis_stream_processing SET status='failed', attempts=0, last_error='', processed_at=NULL, updated_at=now() WHERE status='exhausted' AND last_error LIKE '%security_radar_events_module_id_signature_source_key%';
-UPDATE arvis_stream_processing SET status='failed', last_error='recovered stale processing lease', processed_at=NULL, updated_at=now() WHERE status='processing' AND updated_at < now() - interval '10 minutes';
