@@ -11,8 +11,11 @@ import (
 )
 
 const (
-	defaultPumpProgramID     = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-	defaultPumpSwapProgramID = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+	defaultRaydiumProgramID     = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+	legacyRaydiumProgramID      = "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9"
+	legacyRaydiumSourceID       = "675kPX9MHTjS2zt1qfr1NY5Wwrzj4mWjU7VtXv9syS2"
+	defaultPumpProgramID        = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+	defaultPumpSwapProgramID    = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 )
 
 type arvisHeartbeatSource struct {
@@ -67,7 +70,7 @@ func arvisHeartbeatSources() []arvisHeartbeatSource {
 	return []arvisHeartbeatSource{
 		{
 			Label:     "raydium_program",
-			ProgramID: firstRadarValue(os.Getenv("RAYDIUM_PROGRAM_ID"), "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9"),
+			ProgramID: normalizeRaydiumProgramID(os.Getenv("RAYDIUM_PROGRAM_ID")),
 			ModuleID:  ModuleRaydiumPoolGuardian,
 			EventType: "raydium_program_signature",
 		},
@@ -83,6 +86,16 @@ func arvisHeartbeatSources() []arvisHeartbeatSource {
 			ModuleID:  ModulePumpSybilRadar,
 			EventType: "pumpswap_program_signature",
 		},
+	}
+}
+
+func normalizeRaydiumProgramID(value string) string {
+	value = strings.TrimSpace(value)
+	switch value {
+	case "", legacyRaydiumProgramID, legacyRaydiumSourceID:
+		return defaultRaydiumProgramID
+	default:
+		return value
 	}
 }
 
