@@ -88,8 +88,8 @@ func TestSolanaRPC429StopsAtConfiguredRetryLimit(t *testing.T) {
 func TestProductionSolanaRPCDefaultPacing(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("SOLANA_RPC_MIN_INTERVAL_MS", "")
-	if got := solanaRPCMinInterval(); got != 250*time.Millisecond {
-		t.Fatalf("default production interval = %s, want 250ms", got)
+	if got := solanaRPCMinInterval(); got != 500*time.Millisecond {
+		t.Fatalf("default production interval = %s, want 500ms", got)
 	}
 }
 
@@ -98,5 +98,26 @@ func TestSolanaRPCPacingCanBeOverridden(t *testing.T) {
 	t.Setenv("SOLANA_RPC_MIN_INTERVAL_MS", "80")
 	if got := solanaRPCMinInterval(); got != 80*time.Millisecond {
 		t.Fatalf("configured interval = %s, want 80ms", got)
+	}
+}
+
+func TestRetryAfterZeroFallsBackToConfiguredBackoff(t *testing.T) {
+	t.Setenv("SOLANA_RPC_429_BACKOFF_MS", "20")
+	if got := solanaRPC429Delay(0, "0"); got != 20*time.Millisecond {
+		t.Fatalf("429 delay = %s, want 20ms fallback", got)
+	}
+}
+
+func TestSharedCooldownBlocksNextWorker(t *testing.T) {
+	resetSolanaRPCCachesForTest()
+	t.Setenv("APP_ENV", "test")
+	t.Setenv("SOLANA_RPC_MIN_INTERVAL_MS", "0")
+	deferSolanaRPCRequests(30 * time.Millisecond)
+	started := time.Now()
+	if err := waitForSolanaRPCSlot(context.Background()); err != nil {
+		t.Fatalf("waitForSolanaRPCSlot() error = %v", err)
+	}
+	if elapsed := time.Since(started); elapsed < 20*time.Millisecond {
+		t.Fatalf("shared cooldown was not honored: elapsed=%s", elapsed)
 	}
 }
