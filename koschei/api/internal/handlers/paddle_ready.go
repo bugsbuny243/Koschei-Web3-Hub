@@ -28,6 +28,22 @@ func paddleReadyDB() *sql.DB {
 func PaddleWebhookReadyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/api/paddle/public-config":
+			if r.Method != http.MethodGet {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			h := &Handler{DB: paddleReadyDB(), DBRead: paddleReadyDB(), Limiter: NewLimiter()}
+			h.PaddlePublicConfig(w, r)
+			return
+		case "/api/paddle/status":
+			if r.Method != http.MethodGet {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			h := &Handler{DB: paddleReadyDB(), DBRead: paddleReadyDB(), Limiter: NewLimiter()}
+			RequireAuth(h.PaddleStatusFinal)(w, r)
+			return
 		case "/api/paddle/checkout", "/api/v1/paddle/checkout", "/api/v1/b2b/checkout":
 			if r.Method != http.MethodPost {
 				w.WriteHeader(http.StatusMethodNotAllowed)
