@@ -3,6 +3,7 @@ package handlers
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
 	"io"
 	"strings"
 	"testing"
@@ -18,6 +19,7 @@ func TestOwnerGameSlug(t *testing.T) {
 }
 
 func TestBuildOwnerExpoGameBundleContainsPlayableProject(t *testing.T) {
+	t.Setenv("ANDROID_PLAY_PACKAGE_NAME", "com.koschei.playgame")
 	spec := gameSpec{
 		GameType: "lane runner",
 		Theme: "neon space",
@@ -66,5 +68,22 @@ func TestBuildOwnerExpoGameBundleContainsPlayableProject(t *testing.T) {
 	}
 	if strings.Contains(app, "__TITLE__") || strings.Contains(app, "__PROJECT_ID__") {
 		t.Fatal("template placeholders were not replaced")
+	}
+	var appConfig struct {
+		Expo struct {
+			Android struct {
+				Package string `json:"package"`
+				VersionCode int `json:"versionCode"`
+			} `json:"android"`
+		} `json:"expo"`
+	}
+	if err := json.Unmarshal([]byte(files["neon-runner/app.json"]), &appConfig); err != nil {
+		t.Fatalf("app.json invalid: %v", err)
+	}
+	if appConfig.Expo.Android.Package != "com.koschei.playgame" || appConfig.Expo.Android.VersionCode <= 0 {
+		t.Fatalf("unexpected Android config: %#v", appConfig.Expo.Android)
+	}
+	if !strings.Contains(files["neon-runner/eas.json"], `"autoIncrement": true`) {
+		t.Fatal("EAS production profile does not auto-increment version code")
 	}
 }
