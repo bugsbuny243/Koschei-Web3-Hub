@@ -5,7 +5,45 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"sync"
 )
+
+var paddleReadyState struct {
+	sync.RWMutex
+	db *sql.DB
+}
+
+func SetPaddleReadyDB(db *sql.DB) {
+	paddleReadyState.Lock()
+	paddleReadyState.db = db
+	paddleReadyState.Unlock()
+}
+
+func paddleReadyDB() *sql.DB {
+	paddleReadyState.RLock()
+	defer paddleReadyState.RUnlock()
+	return paddleReadyState.db
+}
+
+func PaddleWebhookReadyMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/paddle/webhook" && r.URL.Path != "/api/v1/paddle/webhook" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		db := paddleReadyDB()
+		if db == nil {
+			writeAPIError(w, http.StatusServiceUnavailable, "PAYMENT_SCHEMA_UNAVAILABLE", "Paddle payment database unavailable")
+			return
+		}
+		h := &Handler{DB: db, DBRead: db, Limiter: NewLimiter()}
+		h.HandlePaddleWebhookReady(w, r)
+	})
+}
 
 func (h *Handler) CreateCheckoutReady(w http.ResponseWriter, r *http.Request) {
 	if err := ensurePaddleIdempotencySchema(r.Context(), h.DB); err != nil {
