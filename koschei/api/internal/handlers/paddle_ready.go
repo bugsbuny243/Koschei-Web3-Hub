@@ -27,21 +27,36 @@ func paddleReadyDB() *sql.DB {
 
 func PaddleWebhookReadyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/paddle/webhook" && r.URL.Path != "/api/v1/paddle/webhook" {
+		switch r.URL.Path {
+		case "/api/paddle/checkout", "/api/v1/paddle/checkout", "/api/v1/b2b/checkout":
+			if r.Method != http.MethodPost {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			db := paddleReadyDB()
+			if db == nil {
+				writeAPIError(w, http.StatusServiceUnavailable, "PAYMENT_SCHEMA_UNAVAILABLE", "Paddle payment database unavailable")
+				return
+			}
+			h := &Handler{DB: db, DBRead: db, Limiter: NewLimiter()}
+			RequireAuth(h.CreateCheckoutReady)(w, r)
+			return
+		case "/api/paddle/webhook", "/api/v1/paddle/webhook":
+			if r.Method != http.MethodPost {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			db := paddleReadyDB()
+			if db == nil {
+				writeAPIError(w, http.StatusServiceUnavailable, "PAYMENT_SCHEMA_UNAVAILABLE", "Paddle payment database unavailable")
+				return
+			}
+			h := &Handler{DB: db, DBRead: db, Limiter: NewLimiter()}
+			h.HandlePaddleWebhookReady(w, r)
+			return
+		default:
 			next.ServeHTTP(w, r)
-			return
 		}
-		if r.Method != http.MethodPost {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		db := paddleReadyDB()
-		if db == nil {
-			writeAPIError(w, http.StatusServiceUnavailable, "PAYMENT_SCHEMA_UNAVAILABLE", "Paddle payment database unavailable")
-			return
-		}
-		h := &Handler{DB: db, DBRead: db, Limiter: NewLimiter()}
-		h.HandlePaddleWebhookReady(w, r)
 	})
 }
 
