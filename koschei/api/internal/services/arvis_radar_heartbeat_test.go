@@ -27,7 +27,7 @@ func TestArvisHeartbeatSourcesIncludeRaydiumPumpAndPumpSwap(t *testing.T) {
 	if raydium.ModuleID != ModuleRaydiumPoolGuardian {
 		t.Fatalf("unexpected Raydium module: %s", raydium.ModuleID)
 	}
-	if raydium.ProgramID != "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9" {
+	if raydium.ProgramID != defaultRaydiumProgramID {
 		t.Fatalf("unexpected Raydium program id: %s", raydium.ProgramID)
 	}
 
@@ -54,7 +54,7 @@ func TestArvisHeartbeatSourcesIncludeRaydiumPumpAndPumpSwap(t *testing.T) {
 	}
 }
 
-func TestArvisHeartbeatSourcesRespectRenderOverrides(t *testing.T) {
+func TestArvisHeartbeatSourcesRespectEnvironmentOverrides(t *testing.T) {
 	t.Setenv("RAYDIUM_PROGRAM_ID", "raydium-override")
 	t.Setenv("PUMP_FUN_PROGRAM_ID", "pump-override")
 	t.Setenv("PUMP_SWAP_PROGRAM_ID", "pumpswap-override")
@@ -72,5 +72,17 @@ func TestArvisHeartbeatSourcesRespectRenderOverrides(t *testing.T) {
 	}
 	if byLabel["pumpswap_program"].ProgramID != "pumpswap-override" {
 		t.Fatalf("PumpSwap override ignored: %s", byLabel["pumpswap_program"].ProgramID)
+	}
+}
+
+func TestArvisHeartbeatSourcesNormalizeLegacyRaydiumIDs(t *testing.T) {
+	for _, legacy := range []string{legacyRaydiumProgramID, legacyRaydiumSourceID} {
+		t.Run(legacy, func(t *testing.T) {
+			t.Setenv("RAYDIUM_PROGRAM_ID", legacy)
+			sources := arvisHeartbeatSources()
+			if sources[0].ProgramID != defaultRaydiumProgramID {
+				t.Fatalf("legacy Raydium id was not normalized: got %s", sources[0].ProgramID)
+			}
+		})
 	}
 }
