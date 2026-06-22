@@ -11,6 +11,7 @@ on:
     paths:
       - "koschei/api/**"
       - "Dockerfile"
+      - ".github/workflows/api-ci.yml"
 
 permissions:
   contents: read
