@@ -38,15 +38,15 @@ func (h *Handler) buildOwnerChatSnapshot(ctx context.Context) ownerChatSnapshot 
 	snapshot := ownerChatSnapshot{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 		Services: map[string]any{
-			"database":     ownerDatabaseStatus(ctx, h.DB),
-			"ai_provider":  ownerAIProviderStatus(),
-			"paddle":       configuredStatus("PADDLE_API_KEY", "PADDLE_WEBHOOK_SECRET", "PADDLE_ENV"),
-			"alchemy_rpc":  configuredStatusAny("ALCHEMY_API_KEY", "SOLANA_RPC_URL"),
-			"neon":         configuredStatus("DATABASE_URL"),
-			"google_play":  configuredStatusAny("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "GOOGLE_APPLICATION_CREDENTIALS_JSON", "GOOGLE_APPLICATION_CREDENTIALS"),
+			"database":    ownerDatabaseStatus(ctx, h.DB),
+			"ai_provider": ownerAIProviderStatus(),
+			"paddle":      configuredStatus("PADDLE_API_KEY", "PADDLE_WEBHOOK_SECRET", "PADDLE_ENV"),
+			"alchemy_rpc": configuredStatusAny("ALCHEMY_API_KEY", "SOLANA_RPC_URL"),
+			"neon":        configuredStatus("DATABASE_URL"),
+			"google_play": configuredStatusAny("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "GOOGLE_APPLICATION_CREDENTIALS_JSON", "GOOGLE_APPLICATION_CREDENTIALS"),
 		},
-		Business: map[string]any{},
-		Radar:    map[string]any{},
+		Business:   map[string]any{},
+		Radar:      map[string]any{},
 		GooglePlay: googlePlayReadiness(),
 	}
 
@@ -111,15 +111,6 @@ func ownerAIProviderStatus() map[string]any {
 		"provider":   provider,
 		"model":      model,
 	}
-}
-
-func ownerCount(ctx context.Context, db *sql.DB, query string) int64 {
-	var value int64
-	if db == nil {
-		return 0
-	}
-	_ = db.QueryRowContext(ctx, query).Scan(&value)
-	return value
 }
 
 func ownerTimestamp(ctx context.Context, db *sql.DB, query string) string {
