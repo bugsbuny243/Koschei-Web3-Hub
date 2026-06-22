@@ -33,55 +33,12 @@ func (h *Handler) OwnerGameStudio(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
 		return
 	}
-	switch r.Method {
-	case http.MethodGet:
-		h.ownerGameStudioList(w, r)
-	case http.MethodPost:
-		h.ownerGameStudioCreate(w, r)
-	default:
-		w.Header().Set("Allow", "GET, POST")
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method_not_allowed"})
-	}
-}
-
-func (h *Handler) ownerGameStudioList(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.QueryContext(r.Context(), `
-		SELECT gp.id::text, gp.title, gp.prompt, gp.game_type, gp.target_platform, gp.status,
-		       COALESCE(to_jsonb(gp)->>'created_at',''), COALESCE(spec.spec_json::text,'{}')
-		FROM game_projects gp
-		LEFT JOIN LATERAL (
-			SELECT gs.spec_json FROM game_specs gs
-			WHERE gs.game_project_id=gp.id
-			ORDER BY COALESCE(to_jsonb(gs)->>'created_at','') DESC, gs.id::text DESC LIMIT 1
-		) spec ON true
-		WHERE gp.user_id=$1
-		ORDER BY COALESCE(to_jsonb(gp)->>'created_at','') DESC, gp.id::text DESC
-		LIMIT 30`, ownerGameStudioUserID())
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "game_projects_unavailable"})
 		return
 	}
-	defer rows.Close()
-
-	projects := []ownerGameProjectView{}
-	for rows.Next() {
-		var project ownerGameProjectView
-		var rawSpec string
-		if err := rows.Scan(&project.ID, &project.Title, &project.Prompt, &project.GameType, &project.TargetPlatform, &project.Status, &project.CreatedAt, &rawSpec); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "game_projects_scan_failed"})
-			return
-		}
-		_ = json.Unmarshal([]byte(rawSpec), &project.Spec)
-		project.BundleURL = "/api/owner/game-studio/bundle?id=" + project.ID
-		projects = append(projects, project)
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":       true,
-		"ai_ready": aiProviderConfigured(),
-		"model":    firstNonEmpty(strings.TrimSpace(os.Getenv("TOGETHER_MODEL_GAME_DESIGN")), strings.TrimSpace(os.Getenv("TOGETHER_MODEL")), "router-default"),
-		"projects": projects,
-	})
+	h.ownerGameStudioCreate(w, r)
 }
 
 func (h *Handler) ownerGameStudioCreate(w http.ResponseWriter, r *http.Request) {
@@ -123,11 +80,19 @@ func (h *Handler) ownerGameStudioCreate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(r.Context(), `INSERT INTO game_projects (id,user_id,title,prompt,game_type,target_platform,ownership_status,status) VALUES ($1,$2,$3,$4,$5,$6,'owner_owned','spec_generated')`, projectID, ownerGameStudioUserID(), req.Title, req.Prompt, spec.GameType, req.TargetPlatform); err != nil {
+	if _, err := tx.ExecContext(r.Context(), `
+		INSERT INTO game_projects
+			(id,user_id,title,prompt,game_type,target_platform,ownership_status,status)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,'spec_generated')`,
+		projectID, ownerGameStudioUserID(), req.Title, req.Prompt, spec.GameType, req.TargetPlatform, ownerGameOwnershipStatus); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "game_project_insert_failed"})
 		return
 	}
-	if _, err := tx.ExecContext(r.Context(), `INSERT INTO game_specs (id,game_project_id,spec_json,generated_by_model,status) VALUES ($1,$2,$3::jsonb,$4,'spec_generated')`, newID(), projectID, string(specJSON), firstNonEmpty(model, "router-default")); err != nil {
+	if _, err := tx.ExecContext(r.Context(), `
+		INSERT INTO game_specs
+			(id,game_project_id,spec_json,generated_by_model,status)
+		VALUES ($1,$2,$3::jsonb,$4,'spec_generated')`,
+		newID(), projectID, string(specJSON), firstNonEmpty(model, "router-default")); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "game_spec_insert_failed"})
 		return
 	}
@@ -143,8 +108,10 @@ func (h *Handler) ownerGameStudioCreate(w http.ResponseWriter, r *http.Request) 
 		BundleURL: "/api/owner/game-studio/bundle?id=" + projectID,
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{
-		"ok": true, "message": "Mobil oyun ve çalıştırılabilir Expo kaynak paketi hazırlandı.",
-		"spec_summary": buildSpecSummary(spec), "project": project,
+		"ok": true,
+		"message": "Mobil oyun ve çalıştırılabilir Expo kaynak paketi hazırlandı.",
+		"spec_summary": buildSpecSummary(spec),
+		"project": project,
 	})
 }
 
@@ -160,9 +127,11 @@ func (h *Handler) OwnerGameStudioBundle(w http.ResponseWriter, r *http.Request) 
 	var title, targetPlatform, rawSpec string
 	err := h.DB.QueryRowContext(r.Context(), `
 		SELECT gp.title, gp.target_platform, gs.spec_json::text
-		FROM game_projects gp JOIN game_specs gs ON gs.game_project_id=gp.id
+		FROM game_projects gp
+		JOIN game_specs gs ON gs.game_project_id=gp.id
 		WHERE gp.id=$1 AND gp.user_id=$2
-		ORDER BY COALESCE(to_jsonb(gs)->>'created_at','') DESC, gs.id::text DESC LIMIT 1`, projectID, ownerGameStudioUserID()).Scan(&title, &targetPlatform, &rawSpec)
+		ORDER BY COALESCE(to_jsonb(gs)->>'created_at','') DESC, gs.id::text DESC
+		LIMIT 1`, projectID, ownerGameStudioUserID()).Scan(&title, &targetPlatform, &rawSpec)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "game_project_not_found"})
@@ -232,8 +201,13 @@ func ownerExpoGameFiles(title, projectID, targetPlatform string, spec gameSpec) 
 	packageJSON, err := json.MarshalIndent(map[string]any{
 		"name": slug, "version": "1.0.0", "private": true,
 		"main": "node_modules/expo/AppEntry.js",
-		"scripts": map[string]string{"start": "expo start", "android": "expo start --android", "web": "expo start --web", "build:android": "eas build --platform android"},
-		"dependencies": map[string]string{"expo": "latest", "react": "latest", "react-native": "latest"},
+		"scripts": map[string]string{
+			"start": "expo start", "android": "expo start --android",
+			"web": "expo start --web", "build:android": "eas build --platform android",
+		},
+		"dependencies": map[string]string{
+			"expo": "latest", "react": "latest", "react-native": "latest",
+		},
 		"devDependencies": map[string]string{"@babel/core": "latest"},
 	}, "", "  ")
 	if err != nil {
@@ -255,11 +229,13 @@ func ownerExpoGameFiles(title, projectID, targetPlatform string, spec gameSpec) 
 
 	appJS := ownerGameAppTemplate
 	values := map[string]any{
-		"__TITLE__": title, "__THEME__": firstNonEmpty(spec.Theme, "Neon frontier"),
+		"__TITLE__": title,
+		"__THEME__": firstNonEmpty(spec.Theme, "Neon frontier"),
 		"__PLAYER__": firstNonEmpty(spec.Player, "pilot"),
 		"__ENEMIES__": ownerGameList(spec.Enemies, []string{"meteor", "drone"}),
 		"__COLLECTIBLES__": ownerGameList(spec.Collectibles, []string{"energy", "crystal"}),
-		"__WIN__": firstNonEmpty(spec.WinCondition, "Reach 100 points"), "__PROJECT_ID__": projectID,
+		"__WIN__": firstNonEmpty(spec.WinCondition, "Reach 100 points"),
+		"__PROJECT_ID__": projectID,
 	}
 	for token, value := range values {
 		raw, _ := json.Marshal(value)
@@ -267,9 +243,13 @@ func ownerExpoGameFiles(title, projectID, targetPlatform string, spec gameSpec) 
 	}
 	readme := fmt.Sprintf("# %s\n\nKoschei Owner Mobile Game Studio tarafından otomatik üretilen Expo projesi.\n\n- Project ID: %s\n- Game type: %s\n- Theme: %s\n- Target: %s\n- Win condition: %s\n\n## Çalıştır\n\n1. npm install\n2. npx expo start\n3. Expo Go ile QR kodu okutun veya npm run android çalıştırın.\n\n## APK üret\n\n1. npm install -g eas-cli\n2. eas login\n3. npm run build:android\n\nPaket production secret içermez.\n", title, projectID, spec.GameType, spec.Theme, targetPlatform, spec.WinCondition)
 	return map[string]string{
-		"App.js": appJS, "README.md": readme, "app.json": string(appJSON),
+		"App.js": appJS,
+		"README.md": readme,
+		"app.json": string(appJSON),
 		"babel.config.js": "module.exports = function(api) { api.cache(true); return { presets: ['babel-preset-expo'] }; };\n",
-		"eas.json": string(easJSON), "game-spec.json": string(specJSON), "package.json": string(packageJSON),
+		"eas.json": string(easJSON),
+		"game-spec.json": string(specJSON),
+		"package.json": string(packageJSON),
 	}, nil
 }
 
@@ -305,6 +285,7 @@ func ownerGameSlug(value string) string {
 			out.WriteByte('-')
 			separator = true
 		}
+	}
 	slug := strings.Trim(out.String(), "-")
 	if slug == "" {
 		slug = "koschei-mobile-game"
