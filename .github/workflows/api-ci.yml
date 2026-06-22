@@ -11,7 +11,6 @@ on:
     paths:
       - "koschei/api/**"
       - "Dockerfile"
-      - ".github/workflows/api-ci.yml"
 
 permissions:
   contents: read
@@ -33,17 +32,7 @@ jobs:
       - name: Download modules
         run: go mod download
       - name: Test
-        shell: bash
-        run: |
-          set -o pipefail
-          go test ./... 2>&1 | tee test-output.log
-      - name: Upload failed test output
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: owner-game-ci-output
-          path: koschei/api/test-output.log
-          if-no-files-found: error
+        run: go test ./...
       - name: Vet
         run: go vet ./...
       - name: Build
