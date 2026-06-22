@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lib/pq"
@@ -31,21 +32,35 @@ func StartArvisStreamVerdictWorker(ctx context.Context, db *sql.DB) func() {
 		return func() {}
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	go (&arvisStreamVerdictWorker{db: db, store: NewSecurityRadarStore(db), interval: arvisStreamVerdictInterval()}).start(ctx)
+	go (&arvisStreamVerdictWorker{
+		db:          db,
+		store:       NewSecurityRadarStore(db),
+		interval:    arvisStreamVerdictInterval(),
+		batchSize:   arvisStreamVerdictBatchSize(),
+		concurrency: arvisStreamVerdictConcurrency(),
+	}).start(ctx)
 	return cancel
 }
 
 type arvisStreamVerdictWorker struct {
-	db       *sql.DB
-	store    *SecurityRadarStore
-	interval time.Duration
+	db          *sql.DB
+	store       *SecurityRadarStore
+	interval    time.Duration
+	batchSize   int
+	concurrency int
 }
 
 func (w *arvisStreamVerdictWorker) start(ctx context.Context) {
 	if w == nil || w.db == nil || w.store == nil {
 		return
 	}
-	log.Printf("arvis stream verdict worker started interval=%s", w.interval)
+	if w.batchSize <= 0 {
+		w.batchSize = arvisStreamVerdictBatchSize()
+	}
+	if w.concurrency <= 0 {
+		w.concurrency = arvisStreamVerdictConcurrency()
+	}
+	log.Printf("arvis stream verdict worker started interval=%s batch=%d concurrency=%d", w.interval, w.batchSize, w.concurrency)
 	w.processBatch(ctx)
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
@@ -61,61 +76,125 @@ func (w *arvisStreamVerdictWorker) start(ctx context.Context) {
 }
 
 func (w *arvisStreamVerdictWorker) processBatch(ctx context.Context) {
-	targets, err := w.pendingTargets(ctx, 5)
+	targets, err := w.pendingTargets(ctx, w.batchSize)
 	if err != nil {
 		if !isUndefinedTableError(err) {
 			log.Printf("arvis stream verdict queue read failed: %v", err)
 		}
 		return
 	}
-	for _, target := range targets {
-		if !w.claimTarget(ctx, target) {
-			continue
-		}
-		err := w.processTarget(ctx, target)
-		if errors.Is(err, errArvisStreamInsufficientEvidence) {
-			w.markTarget(ctx, target.ID, "insufficient_evidence", SecurityRadarInsufficientEvidenceMessage)
-			continue
-		}
-		if err != nil {
-			w.markTarget(ctx, target.ID, "failed", formatArvisWorkerError(err))
-			log.Printf("arvis stream verdict failed event=%s target=%s module=%s err=%v", target.ID, target.Target, target.ModuleID, err)
-			continue
-		}
-		w.markTarget(ctx, target.ID, "completed", "")
+	if len(targets) == 0 {
+		return
 	}
+	concurrency := w.concurrency
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+	if concurrency > len(targets) {
+		concurrency = len(targets)
+	}
+
+	jobs := make(chan arvisStreamTarget)
+	var workers sync.WaitGroup
+	workers.Add(concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			defer workers.Done()
+			for target := range jobs {
+				w.processOne(ctx, target)
+			}
+		}()
+	}
+
+sendLoop:
+	for _, target := range targets {
+		select {
+		case <-ctx.Done():
+			break sendLoop
+		case jobs <- target:
+		}
+	}
+	close(jobs)
+	workers.Wait()
+}
+
+func (w *arvisStreamVerdictWorker) processOne(ctx context.Context, target arvisStreamTarget) {
+	if !w.claimTarget(ctx, target) {
+		return
+	}
+	err := w.processTarget(ctx, target)
+	if errors.Is(err, errArvisStreamInsufficientEvidence) {
+		w.markTarget(ctx, target.ID, "insufficient_evidence", SecurityRadarInsufficientEvidenceMessage)
+		return
+	}
+	if err != nil {
+		w.markTarget(ctx, target.ID, "failed", formatArvisWorkerError(err))
+		log.Printf("arvis stream verdict failed event=%s target=%s module=%s err=%v", target.ID, target.Target, target.ModuleID, err)
+		return
+	}
+	w.markTarget(ctx, target.ID, "completed", "")
 }
 
 func (w *arvisStreamVerdictWorker) pendingTargets(ctx context.Context, limit int) ([]arvisStreamTarget, error) {
-	if limit <= 0 || limit > 20 {
-		limit = 5
+	if limit <= 0 || limit > 100 {
+		limit = arvisStreamVerdictBatchSize()
 	}
 	rows, err := w.db.QueryContext(ctx, `
-		SELECT s.id::text,
-		       COALESCE(s.target,''),
-		       COALESCE(s.signature,''),
-		       COALESCE(s.network,'solana-mainnet'),
-		       COALESCE(s.slot,0),
-		       COALESCE(s.program_id,''),
-		       COALESCE(s.module_id,'')
-		FROM security_radar_stream_events s
-		LEFT JOIN arvis_stream_processing p ON p.stream_event_id=s.id
-		WHERE COALESCE(s.target,'') <> ''
-		  AND COALESCE(s.target_type,'')='token'
-		  AND COALESCE(s.module_id,'') IN ($2,$3)
-		  AND (
-			p.stream_event_id IS NULL
-			OR (p.status='failed' AND p.attempts < 3 AND p.updated_at < now() - interval '30 seconds')
-			OR (p.status='exhausted' AND p.attempts < 5 AND p.updated_at < now() - interval '30 minutes')
-		  )
+		WITH eligible AS (
+			SELECT s.id::text,
+			       COALESCE(s.target,'') AS target,
+			       COALESCE(s.signature,'') AS signature,
+			       COALESCE(s.network,'solana-mainnet') AS network,
+			       COALESCE(s.slot,0) AS slot,
+			       COALESCE(s.program_id,'') AS program_id,
+			       COALESCE(s.module_id,'') AS module_id,
+			       s.created_at,
+			       p.updated_at,
+			       CASE
+			         WHEN p.status='failed' THEN 'failed'
+			         WHEN p.status='exhausted' THEN 'exhausted'
+			         WHEN p.stream_event_id IS NULL AND s.created_at >= now() - interval '2 minutes' THEN 'fresh'
+			         ELSE 'backlog'
+			       END AS bucket,
+			       COALESCE(p.updated_at,s.created_at) AS queue_time
+			FROM security_radar_stream_events s
+			LEFT JOIN arvis_stream_processing p ON p.stream_event_id=s.id
+			WHERE COALESCE(s.target,'') <> ''
+			  AND COALESCE(s.target_type,'')='token'
+			  AND COALESCE(s.module_id,'') IN ($2,$3)
+			  AND (
+				p.stream_event_id IS NULL
+				OR (p.status='failed' AND p.attempts < 3 AND p.updated_at < now() - interval '30 seconds')
+				OR (p.status='exhausted' AND p.attempts < 5 AND p.updated_at < now() - interval '30 minutes')
+			  )
+		), ranked AS (
+			SELECT eligible.*,
+			       row_number() OVER (
+			         PARTITION BY bucket
+			         ORDER BY
+			           CASE WHEN bucket='fresh' THEN created_at END DESC,
+			           CASE WHEN bucket<>'fresh' THEN queue_time END ASC,
+			           created_at ASC
+			       ) AS bucket_rank
+			FROM eligible
+		), prioritized AS (
+			SELECT ranked.*,
+			       CASE
+			         WHEN bucket='failed' AND bucket_rank <= GREATEST(1,$1/5) THEN 0
+			         WHEN bucket='fresh' AND bucket_rank <= GREATEST(1,($1*3)/10) THEN 1
+			         WHEN bucket='backlog' AND bucket_rank <= GREATEST(1,($1*4)/10) THEN 2
+			         WHEN bucket='exhausted' AND bucket_rank <= GREATEST(1,$1/10) THEN 3
+			         ELSE 10
+			       END AS queue_priority
+			FROM ranked
+		)
+		SELECT id,target,signature,network,slot,program_id,module_id
+		FROM prioritized
 		ORDER BY
-		  CASE
-		    WHEN p.stream_event_id IS NULL THEN 0
-		    WHEN p.status='failed' THEN 1
-		    ELSE 2
-		  END,
-		  CASE WHEN p.stream_event_id IS NULL THEN s.created_at END DESC,
-		  p.updated_at ASC NULLS FIRST
+		  queue_priority,
+		  CASE WHEN bucket='fresh' THEN created_at END DESC,
+		  CASE WHEN bucket<>'fresh' THEN queue_time END ASC,
+		  created_at ASC
 		LIMIT $1
 	`, limit, ModulePumpSybilRadar, ModuleRaydiumPoolGuardian)
 	if err != nil {
@@ -331,6 +410,26 @@ func arvisStreamVerdictInterval() time.Duration {
 		}
 	}
 	return time.Duration(seconds) * time.Second
+}
+
+func arvisStreamVerdictBatchSize() int {
+	batchSize := 20
+	if raw := strings.TrimSpace(os.Getenv("ARVIS_STREAM_VERDICT_BATCH_SIZE")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 5 && n <= 100 {
+			batchSize = n
+		}
+	}
+	return batchSize
+}
+
+func arvisStreamVerdictConcurrency() int {
+	concurrency := 4
+	if raw := strings.TrimSpace(os.Getenv("ARVIS_STREAM_VERDICT_CONCURRENCY")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 1 && n <= 12 {
+			concurrency = n
+		}
+	}
+	return concurrency
 }
 
 func cloneArvisSignals(in map[string]any) map[string]any {
