@@ -3,12 +3,15 @@ package handlers
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"database/sql"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -33,12 +36,19 @@ func (h *Handler) OwnerGameStudio(w http.ResponseWriter, r *http.Request) {
 	if !h.ownerAuth(w, r) {
 		return
 	}
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, googlePlayReadiness())
+	case http.MethodPost:
+		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type"))), "multipart/form-data") {
+			h.ownerGooglePlayUploadAAB(w, r)
+			return
+		}
+		h.ownerGameStudioCreate(w, r)
+	default:
+		w.Header().Set("Allow", "GET, POST")
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method_not_allowed"})
-		return
 	}
-	h.ownerGameStudioCreate(w, r)
 }
 
 func (h *Handler) ownerGameStudioCreate(w http.ResponseWriter, r *http.Request) {
@@ -111,7 +121,51 @@ func (h *Handler) ownerGameStudioCreate(w http.ResponseWriter, r *http.Request) 
 		"ok": true,
 		"message": "Mobil oyun ve çalıştırılabilir Expo kaynak paketi hazırlandı.",
 		"spec_summary": buildSpecSummary(spec),
+		"play": googlePlayReadiness(),
 		"project": project,
+	})
+}
+
+func (h *Handler) ownerGooglePlayUploadAAB(w http.ResponseWriter, r *http.Request) {
+	const maxAABSize = int64(200 << 20)
+	r.Body = http.MaxBytesReader(w, r.Body, maxAABSize+1)
+	if err := r.ParseMultipartForm(16 << 20); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_multipart_upload"})
+		return
+	}
+	file, header, err := r.FormFile("aab")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "aab_file_required"})
+		return
+	}
+	defer file.Close()
+	if !strings.EqualFold(filepath.Ext(header.Filename), ".aab") {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "only_aab_files_are_allowed"})
+		return
+	}
+	aab, err := io.ReadAll(io.LimitReader(file, maxAABSize+1))
+	if err != nil || int64(len(aab)) > maxAABSize {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "aab_file_too_large"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	defer cancel()
+	publisher, source, serviceAccount, err := newGooglePlayPublisher(ctx)
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "google_play_not_ready", "detail": shortError(err.Error())})
+		return
+	}
+	result, err := publisher.PublishAAB(ctx, aab, r.FormValue("release_name"), r.FormValue("release_notes"))
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "google_play_publish_failed", "detail": shortError(err.Error())})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": true,
+		"message": "AAB Google Play Internal Testing düzenlemesine gönderildi.",
+		"credentials_source": source,
+		"service_account": serviceAccount,
+		"result": result,
 	})
 }
 
@@ -197,13 +251,15 @@ func buildOwnerExpoGameBundle(title, projectID, targetPlatform string, spec game
 
 func ownerExpoGameFiles(title, projectID, targetPlatform string, spec gameSpec) (map[string]string, error) {
 	slug := ownerGameSlug(title)
-	packageName := "com.koschei.owner." + strings.ReplaceAll(slug, "-", "")
+	fallbackPackage := "com.koschei.owner." + strings.ReplaceAll(slug, "-", "")
+	packageName := firstNonEmpty(strings.TrimSpace(os.Getenv("ANDROID_PLAY_PACKAGE_NAME")), fallbackPackage)
+	versionCode := int(time.Now().Unix())
 	packageJSON, err := json.MarshalIndent(map[string]any{
 		"name": slug, "version": "1.0.0", "private": true,
 		"main": "node_modules/expo/AppEntry.js",
 		"scripts": map[string]string{
 			"start": "expo start", "android": "expo start --android",
-			"web": "expo start --web", "build:android": "eas build --platform android",
+			"web": "expo start --web", "build:android": "eas build --platform android --profile production",
 		},
 		"dependencies": map[string]string{
 			"expo": "latest", "react": "latest", "react-native": "latest",
@@ -215,7 +271,8 @@ func ownerExpoGameFiles(title, projectID, targetPlatform string, spec gameSpec) 
 	}
 	appJSON, err := json.MarshalIndent(map[string]any{"expo": map[string]any{
 		"name": title, "slug": slug, "version": "1.0.0", "orientation": "portrait",
-		"userInterfaceStyle": "dark", "android": map[string]string{"package": packageName},
+		"userInterfaceStyle": "dark",
+		"android": map[string]any{"package": packageName, "versionCode": versionCode},
 		"web": map[string]string{"bundler": "metro"},
 	}}, "", "  ")
 	if err != nil {
@@ -223,7 +280,7 @@ func ownerExpoGameFiles(title, projectID, targetPlatform string, spec gameSpec) 
 	}
 	easJSON, _ := json.MarshalIndent(map[string]any{"build": map[string]any{
 		"preview": map[string]any{"distribution": "internal", "android": map[string]string{"buildType": "apk"}},
-		"production": map[string]any{},
+		"production": map[string]any{"autoIncrement": true},
 	}}, "", "  ")
 	specJSON, _ := json.MarshalIndent(spec, "", "  ")
 
@@ -241,7 +298,7 @@ func ownerExpoGameFiles(title, projectID, targetPlatform string, spec gameSpec) 
 		raw, _ := json.Marshal(value)
 		appJS = strings.ReplaceAll(appJS, token, string(raw))
 	}
-	readme := fmt.Sprintf("# %s\n\nKoschei Owner Mobile Game Studio tarafından otomatik üretilen Expo projesi.\n\n- Project ID: %s\n- Game type: %s\n- Theme: %s\n- Target: %s\n- Win condition: %s\n\n## Çalıştır\n\n1. npm install\n2. npx expo start\n3. Expo Go ile QR kodu okutun veya npm run android çalıştırın.\n\n## APK üret\n\n1. npm install -g eas-cli\n2. eas login\n3. npm run build:android\n\nPaket production secret içermez.\n", title, projectID, spec.GameType, spec.Theme, targetPlatform, spec.WinCondition)
+	readme := fmt.Sprintf("# %s\n\nKoschei Owner Mobile Game Studio tarafından otomatik üretilen Expo projesi.\n\n- Project ID: %s\n- Game type: %s\n- Theme: %s\n- Target: %s\n- Android package: %s\n- Version code: %d\n- Win condition: %s\n\n## Çalıştır\n\n1. npm install\n2. npx expo start\n3. Expo Go ile QR kodu okutun veya npm run android çalıştırın.\n\n## AAB üret\n\n1. npm install -g eas-cli\n2. eas login\n3. npm run build:android\n4. Oluşan .aab dosyasını Owner Panel > Mobil Oyun Studio içinden Internal Testing taslağına gönderin.\n\nPaket production secret içermez.\n", title, projectID, spec.GameType, spec.Theme, targetPlatform, packageName, versionCode, spec.WinCondition)
 	return map[string]string{
 		"App.js": appJS,
 		"README.md": readme,
