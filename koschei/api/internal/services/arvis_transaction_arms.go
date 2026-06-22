@@ -215,8 +215,7 @@ func parseArvisTransactionMap(tx map[string]any, out *arvisTransactionEvidence) 
 	logs := radarStringSlice(meta["logMessages"])
 	logText := strings.ToLower(strings.Join(logs, "\n"))
 	for _, program := range out.ProgramIDs {
-		lower := strings.ToLower(program)
-		if program == "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9" || strings.Contains(lower, "raydium") {
+		if isKnownRaydiumProgram(program) {
 			out.RaydiumRelated = true
 		}
 		if program == "ComputeBudget111111111111111111111111111111" {
