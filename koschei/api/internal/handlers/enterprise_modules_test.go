@@ -13,8 +13,8 @@ func TestBuildMEVRiskReportHighRisk(t *testing.T) {
 	if report.RiskScore < 70 {
 		t.Fatalf("RiskScore = %d, want high risk >= 70", report.RiskScore)
 	}
-	if report.RiskLevel != "YÜKSEK" {
-		t.Fatalf("RiskLevel = %q, want YÜKSEK", report.RiskLevel)
+	if report.RiskLevel != "HIGH" {
+		t.Fatalf("RiskLevel = %q, want HIGH", report.RiskLevel)
 	}
 	if report.EstimatedLossUSD <= 0 || !report.JitoTipUsed || report.MEVSavedUSD != report.EstimatedLossUSD {
 		t.Fatalf("unexpected MEV economics: %+v", report)
