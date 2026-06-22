@@ -1,0 +1,3 @@
+package handlers
+
+// This staged source is activated atomically when the legacy Paddle file is removed.
