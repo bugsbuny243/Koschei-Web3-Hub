@@ -103,7 +103,16 @@ func (s *SecurityRadarStore) InsertEvent(ctx context.Context, event SecurityRada
 	err = s.DB.QueryRowContext(ctx, `
 		INSERT INTO security_radar_events (module_id,target,target_type,network,signature,source_address,event_type,slot,block_time,signals,raw_summary,source,created_at,updated_at)
 		VALUES ($1,$2,$3,$4,NULLIF($5,''),NULLIF($6,''),$7,NULLIF($8,0),$9,$10::jsonb,$11::jsonb,$12,now(),now())
+		ON CONFLICT DO NOTHING
 		RETURNING id::text`, event.ModuleID, event.Target, event.TargetType, event.Network, event.Signature, event.SourceAddress, event.EventType, event.Slot, event.BlockTime, string(signals), string(rawSummary), event.Source).Scan(&id)
+	if err == sql.ErrNoRows && strings.TrimSpace(event.Signature) != "" {
+		err = s.DB.QueryRowContext(ctx, `
+			SELECT id::text
+			FROM security_radar_events
+			WHERE module_id=$1 AND signature=$2 AND source=$3
+			ORDER BY created_at ASC
+			LIMIT 1`, event.ModuleID, event.Signature, event.Source).Scan(&id)
+	}
 	return id, err
 }
 
