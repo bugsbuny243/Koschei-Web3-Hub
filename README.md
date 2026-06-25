@@ -1,8 +1,35 @@
 # KOSCHEİ WEB3 — ARVIS
 
-KOSCHEİ WEB3 is a live crypto risk-intelligence product built to help investors inspect risk before interacting with a token, pool, wallet, transaction, program or claim surface.
+KOSCHEİ WEB3 is a live, Solana-native risk-intelligence infrastructure layer built to help developers, wallets, launchpads, research teams and investors inspect risk before interacting with a token, pool, wallet, transaction, program or claim surface.
 
-Solana is the first live market. The architecture is designed to expand beyond one chain without changing the core customer experience.
+Solana is the first live market. The architecture is designed to expose reusable security intelligence through APIs, dashboards and open technical components, while remaining extensible beyond one chain without changing the core customer experience.
+
+## Developer Infrastructure
+
+Koschei turns fragmented on-chain evidence into structured, integration-ready risk outputs for Solana products and research workflows.
+
+Primary developer-facing surfaces include:
+
+- token and liquidity risk analysis
+- wallet, counterparty and sybil intelligence
+- transaction decoding and execution-risk visibility
+- standardized security summaries
+- authenticated APIs and live verdict feeds
+- public, rate-limited risk badges
+- technical documentation and integration examples
+
+The long-term open-source plan focuses on reusable ecosystem components such as transaction-decoding utilities, risk-rule helpers, example clients and integration starters. Open components must preserve the same evidence boundaries used by the live product: unavailable or unverified evidence must never be represented as a confirmed risk finding.
+
+## Technical Outputs
+
+Koschei is developed as technical infrastructure rather than a community or education program. Its concrete outputs are:
+
+1. a live Solana-native risk engine
+2. developer-facing API endpoints
+3. structured token, wallet and transaction risk objects
+4. a working dashboard and radar environment
+5. reusable open-source technical components
+6. documentation and integration examples for external builders
 
 ## Product Rule
 
@@ -172,4 +199,4 @@ GitHub Actions runs tests, vet and build checks for API changes. Railway remains
 
 ---
 
-Built as a live risk-intelligence system for crypto investors, beginning with Solana.
+Built as a live Solana-native risk-intelligence system and reusable developer infrastructure layer.
