@@ -5,40 +5,41 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Koschei ARVIS Developers</title>
 <style>
-:root{--bg:#03070d;--line:#24eaff30;--text:#f7fbff;--muted:#9eb0c2;--green:#18ffb2;--cyan:#24eaff;--panel:#071421;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 12% 0,#18ffb229,transparent 34%),linear-gradient(135deg,#020409,#071522 62%,#02040a)}a{color:inherit;text-decoration:none}.wrap{width:min(1120px,calc(100% - 22px));margin:auto;padding:22px 0 80px}.top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:22px;padding:12px 14px;border:1px solid var(--line);border-radius:24px;background:#ffffff10}.brand{font-weight:1000}.nav{display:flex;gap:8px;flex-wrap:wrap}.nav a,.btn{border:1px solid var(--line);border-radius:999px;padding:10px 13px;color:var(--muted);font-weight:850}.btn.primary{background:linear-gradient(135deg,var(--green),var(--cyan));border:0;color:#03110d}.hero,.card{border:1px solid var(--line);border-radius:28px;background:linear-gradient(145deg,#ffffff14,#071421d4);box-shadow:0 28px 90px #0008}.hero{padding:34px;margin-bottom:18px}.eyebrow{display:inline-flex;color:#bfffe8;background:#18ffb218;border:1px solid #18ffb245;border-radius:999px;padding:8px 12px;font:900 11px var(--mono);letter-spacing:.12em;text-transform:uppercase}h1{font-size:clamp(42px,7vw,74px);line-height:.95;letter-spacing:-.06em;margin:18px 0 12px}.sub{color:var(--muted);line-height:1.75;font-size:16px;max-width:780px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{padding:22px}.card h2{margin:0 0 8px}.card p,.card li{color:var(--muted);line-height:1.6}.code{display:block;margin-top:12px;border:1px solid #ffffff16;border-radius:18px;padding:14px;background:#02070d;color:#d9fbff;font-family:var(--mono);font-size:13px;white-space:pre-wrap;overflow:auto}.pill{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:6px 9px;color:#bfffe8;font:900 10px var(--mono);text-transform:uppercase}.roadmap{display:grid;gap:10px;margin-top:14px}.roadmap div{border:1px solid #ffffff12;border-radius:18px;padding:14px;background:#ffffff08}@media(max-width:760px){.top{align-items:flex-start;flex-direction:column}.grid{grid-template-columns:1fr}.actions .btn{width:100%;text-align:center}}
+:root{--line:#24eaff30;--text:#f7fbff;--muted:#9eb0c2;--green:#18ffb2;--cyan:#24eaff;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 12% 0,#18ffb229,transparent 34%),linear-gradient(135deg,#020409,#071522 62%,#02040a)}a{color:inherit;text-decoration:none}.wrap{width:min(1120px,calc(100% - 22px));margin:auto;padding:22px 0 80px}.top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:22px;padding:12px 14px;border:1px solid var(--line);border-radius:24px;background:#ffffff10}.brand{font-weight:1000}.nav{display:flex;gap:8px;flex-wrap:wrap}.nav a,.btn{border:1px solid var(--line);border-radius:999px;padding:10px 13px;color:var(--muted);font-weight:850}.btn.primary{background:linear-gradient(135deg,var(--green),var(--cyan));border:0;color:#03110d}.hero,.card{border:1px solid var(--line);border-radius:28px;background:linear-gradient(145deg,#ffffff14,#071421d4);box-shadow:0 28px 90px #0008}.hero{padding:34px;margin-bottom:18px}.eyebrow{display:inline-flex;color:#bfffe8;background:#18ffb218;border:1px solid #18ffb245;border-radius:999px;padding:8px 12px;font:900 11px var(--mono);letter-spacing:.12em;text-transform:uppercase}h1{font-size:clamp(42px,7vw,74px);line-height:.95;letter-spacing:-.06em;margin:18px 0 12px}.sub{color:var(--muted);line-height:1.75;font-size:16px;max-width:800px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{padding:22px}.card h2{margin:0 0 8px}.card p,.card li{color:var(--muted);line-height:1.6}.code{display:block;margin-top:12px;border:1px solid #ffffff16;border-radius:18px;padding:14px;background:#02070d;color:#d9fbff;font-family:var(--mono);font-size:13px;white-space:pre-wrap;overflow:auto}.pill{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:6px 9px;color:#bfffe8;font:900 10px var(--mono);text-transform:uppercase}.roadmap{display:grid;gap:10px;margin-top:14px}.roadmap div{border:1px solid #ffffff12;border-radius:18px;padding:14px;background:#ffffff08}@media(max-width:760px){.top{align-items:flex-start;flex-direction:column}.grid{grid-template-columns:1fr}.actions .btn{width:100%;text-align:center}}
 </style>
 </head>
 <body>
 <main class="wrap">
 <nav class="top"><a class="brand" href="/">Koschei ARVIS</a><div class="nav"><a href="/security-radar">Radar</a><a href="/architecture">Architecture</a><a href="/pricing">Plans</a></div></nav>
-<section class="hero"><span class="eyebrow">Developer resources</span><h1>Solana risk intelligence API for builders.</h1><p class="sub">Koschei ARVIS exposes a signed verdict pipeline that Solana wallets, launchpads, research teams and security products can consume. The goal is a developer-facing security primitive: live Solana data, verified evidence, deterministic risk output.</p><div class="actions"><a class="btn primary" href="/security-radar">Open live radar</a><a class="btn" href="/architecture">View architecture</a></div></section>
+<section class="hero"><span class="eyebrow">Developer resources</span><h1>Solana risk intelligence for builders.</h1><p class="sub">The routes below are aligned with the current production server. Session-authenticated radar routes serve the customer product; API-key routes serve partner integrations. Planned future routes are clearly labeled instead of being presented as live.</p><div class="actions"><a class="btn primary" href="/security-radar">Open live radar</a><a class="btn" href="/architecture">View architecture</a></div></section>
 <section class="grid">
-<article class="card"><span class="pill">Endpoint</span><h2>Risk check</h2><p>General Solana target risk check for tokens, pools, wallets, programs, transactions or claim URLs.</p><code class="code">POST /api/v1/risk/check
+<article class="card"><span class="pill">Live · session auth</span><h2>Radar check</h2><p>Runs an evidence-backed ARVIS check for a Solana target.</p><code class="code">POST /api/v1/radar/check
+Authorization: Bearer &lt;session-token&gt;
 {
   "target": "SOLANA_TARGET",
   "network": "solana-mainnet"
 }</code></article>
-<article class="card"><span class="pill">Endpoint</span><h2>Token scan</h2><p>Token-focused scan for launch behavior, authority state, liquidity evidence and holder concentration.</p><code class="code">POST /api/v1/token/scan
+<article class="card"><span class="pill">Live · session auth</span><h2>Radar feed</h2><p>Returns verified cards, source freshness, processing health and production proof counters.</p><code class="code">GET /api/v1/radar/feed
+Authorization: Bearer &lt;session-token&gt;</code></article>
+<article class="card"><span class="pill">Live · API key</span><h2>B2B token scan</h2><p>Partner token-scan route protected by API key and quota controls.</p><code class="code">POST /api/v1/scan/token
+X-API-Key: &lt;key&gt;
 {
-  "mint": "TOKEN_MINT",
-  "include_evidence": true
+  "mint": "TOKEN_MINT"
 }</code></article>
-<article class="card"><span class="pill">Endpoint</span><h2>Wallet analyze</h2><p>Wallet intelligence surface for age, activity, counterparty risk and sybil hints.</p><code class="code">POST /api/v1/wallet/analyze
-{
-  "wallet": "SOLANA_WALLET"
-}</code></article>
-<article class="card"><span class="pill">Endpoint</span><h2>Radar feed</h2><p>Live feed for verified cards, stream health and signed verdict production proof.</p><code class="code">GET /api/v1/radar/feed</code></article>
-<article class="card"><span class="pill">Schema</span><h2>Signed verdict contract</h2><p>Every final customer verdict should carry a stable structure that downstream tools can verify and display.</p><code class="code">{
+<article class="card"><span class="pill">Live · API key</span><h2>Shield preflight</h2><p>Preflight security surface for transaction or target checks.</p><code class="code">POST /api/v1/shield/preflight
+X-API-Key: &lt;key&gt;</code></article>
+<article class="card"><span class="pill">Live · API key</span><h2>Usage history</h2><p>Returns API usage, quota events, credit reservations and charged requests.</p><code class="code">GET /api/v1/usage
+X-API-Key: &lt;key&gt;</code></article>
+<article class="card"><span class="pill">Schema</span><h2>Signed verdict contract</h2><p>Customer-visible verdicts carry evidence, rule metadata and a signed final status.</p><code class="code">{
   "grade": "A-F",
-  "risk_index": 0,
-  "risk_level": "low|medium|high|critical",
+  "risk_index": 45,
+  "risk_level": "medium",
   "evidence": [],
   "rule_version": "arvis-live",
   "signed": true
 }</code></article>
-<article class="card"><span class="pill">Open source path</span><h2>Components planned</h2><ul><li>Pump/Raydium event normalization module</li><li>Signed verdict JSON schema</li><li>Sample verifier and SDK starter</li><li>Example wallet / launchpad integration</li></ul></article>
 </section>
-<section class="card" style="margin-top:14px"><span class="eyebrow">Grant-aligned roadmap</span><div class="roadmap"><div><b>0-30 days:</b> API docs v1, signed verdict schema, first open-source parser module.</div><div><b>30-60 days:</b> wallet intelligence endpoint expansion, webhook alerts, integration examples.</div><div><b>60-90 days:</b> ecosystem pilots with wallets, launchpads or research/security teams.</div></div></section>
+<section class="card" style="margin-top:14px"><span class="eyebrow">Planned expansion</span><div class="roadmap"><div><b>0-30 days:</b> publish schema, SDK starter, real-route API docs and event normalization draft.</div><div><b>30-60 days:</b> add wallet-oriented API-key surface, webhook examples and partner integration samples.</div><div><b>60-90 days:</b> pilot integrations and publish case studies, benchmarks and limitations.</div></div></section>
 </main>
 </body>
 </html>
