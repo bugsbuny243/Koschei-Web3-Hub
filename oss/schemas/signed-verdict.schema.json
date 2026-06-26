@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tradepigloball.co/schemas/signed-verdict.schema.json",
+  "title": "Koschei ARVIS Signed Verdict",
+  "type": "object",
+  "required": ["grade", "risk_index", "risk_level", "signed"],
+  "properties": {
+    "target": { "type": "string", "minLength": 1 },
+    "network": { "type": "string", "default": "solana-mainnet" },
+    "grade": { "type": "string", "pattern": "^[A-F]$" },
+    "risk_index": { "type": "number", "minimum": 0, "maximum": 100 },
+    "risk_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "verdict": { "type": "string" },
+    "recommendation": { "type": "string" },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "rule_version": { "type": "string", "minLength": 1 },
+    "signed": { "const": true },
+    "signature": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": true
+}
