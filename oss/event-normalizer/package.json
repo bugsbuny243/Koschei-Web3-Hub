@@ -1,0 +1,17 @@
+{
+  "name": "@koschei/solana-event-normalizer",
+  "version": "0.1.0",
+  "description": "Normalize Pump-style and Raydium-style observations for Solana risk pipelines",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "license": "MIT"
+}
