@@ -11,13 +11,15 @@ import (
 )
 
 type shieldPreflightRequest struct {
-	Target      string         `json:"target"`
-	TargetMint  string         `json:"target_mint"`
-	Address     string         `json:"address"`
-	Network     string         `json:"network"`
-	Wallet      string         `json:"wallet"`
-	Transaction string         `json:"transaction"`
-	Context     map[string]any `json:"context"`
+	Target           string         `json:"target"`
+	TargetMint       string         `json:"target_mint"`
+	Address          string         `json:"address"`
+	Network          string         `json:"network"`
+	Wallet           string         `json:"wallet"`
+	Transaction      string         `json:"transaction"`
+	Encoding         string         `json:"encoding"`
+	ExpectedPrograms []string       `json:"expected_programs"`
+	Context          map[string]any `json:"context"`
 }
 
 func (h *Handler) ShieldPreflight(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +28,11 @@ func (h *Handler) ShieldPreflight(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "code": "invalid_request", "message": "Invalid request body"})
 		return
 	}
-	target := strings.TrimSpace(firstNonEmptyString(input.TargetMint, input.Target, input.Address, input.Transaction))
+	if strings.TrimSpace(input.Transaction) != "" {
+		h.transactionFirewallSimulate(w, r, input)
+		return
+	}
+	target := strings.TrimSpace(firstNonEmptyString(input.TargetMint, input.Target, input.Address))
 	if target == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "code": "target_required", "message": "target, target_mint, address or transaction is required"})
 		return
@@ -62,11 +68,11 @@ func (h *Handler) ShieldPreflight(w http.ResponseWriter, r *http.Request) {
 		"signature":       final.Signature,
 		"latency_ms":      latencyMS,
 		"evidence_quality": map[string]any{
-			"pump_fun_sybil_radar":      bundle.PumpSybilRadar.Signals["data_quality"],
-			"raydium_pool_guardian":     bundle.RaydiumPoolGuardian.Signals["data_quality"],
-			"score_source":              bundle.Metadata["score_source"],
-			"deterministic_scoring":     bundle.Metadata["deterministic_scoring"],
-			"ai_final_scoring":          bundle.Metadata["ai_final_scoring"],
+			"pump_fun_sybil_radar":  bundle.PumpSybilRadar.Signals["data_quality"],
+			"raydium_pool_guardian": bundle.RaydiumPoolGuardian.Signals["data_quality"],
+			"score_source":          bundle.Metadata["score_source"],
+			"deterministic_scoring": bundle.Metadata["deterministic_scoring"],
+			"ai_final_scoring":      bundle.Metadata["ai_final_scoring"],
 		},
 		"modules": []any{bundle.PumpSybilRadar, bundle.RaydiumPoolGuardian},
 	})
