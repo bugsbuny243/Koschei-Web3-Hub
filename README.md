@@ -147,7 +147,7 @@ npm pack --dry-run
 
 ```text
 Go API and workers
-Render deployment
+Railway deployment
 Neon PostgreSQL
 Solana RPC provider with automatic public fallback
 Pump-style stream observations
