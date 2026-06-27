@@ -16,6 +16,7 @@ import (
 	"koschei/api/internal/jobs"
 	"koschei/api/internal/services"
 	"koschei/api/internal/web3"
+	"koschei/api/internal/webhooks"
 )
 
 func main() {
@@ -71,6 +72,8 @@ func main() {
 	defer stopSBX1Stream()
 	stopPumpPortal := services.StartPumpPortalRadarIfEnabled(appCtx, conn)
 	defer stopPumpPortal()
+	stopWebhookDeliveries := webhooks.StartDeliveryWorker(appCtx, conn)
+	defer stopWebhookDeliveries()
 	jobStore := jobs.NewStore(conn)
 	jobQueue := jobs.Queue(jobs.NoopQueue{})
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
