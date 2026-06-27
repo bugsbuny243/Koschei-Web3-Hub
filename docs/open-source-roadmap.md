@@ -28,7 +28,15 @@ Status: shipped and tested.
 
 The dependency-free client supports the current production API routes and includes deterministic structural validation for signed verdicts.
 
-### 4. Integration examples
+### 4. Signed verdict CLI
+
+Location: `sdk/typescript/bin/arvis-verdict.mjs`
+
+Status: shipped and tested.
+
+The command-line tool validates verdict JSON from a file or stdin and returns deterministic exit codes for valid, malformed and withheld outputs.
+
+### 5. Integration examples
 
 Location: `examples`
 
@@ -40,7 +48,7 @@ Current examples demonstrate:
 - launchpad token screening
 - signed-verdict withholding when evidence is incomplete
 
-### 5. Developer documentation
+### 6. Developer documentation
 
 Locations:
 
@@ -67,7 +75,7 @@ The Go API has a separate test, vet and build workflow.
 
 - publish versioned npm releases for the SDK and event normalizer
 - add fixture-based Pump and Raydium normalization examples
-- publish a standalone verdict-validation CLI
+- publish package checksums and release notes
 - add webhook receiver examples after the webhook contract is finalized
 
 ## Next 60 days
