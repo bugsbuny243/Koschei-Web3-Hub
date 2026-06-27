@@ -7,36 +7,23 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"koschei/api/internal/services"
 )
 
 func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 	shopierURLs := map[string]string{
-		"starter": configuredURL("SHOPIER_STARTER_URL", "https://www.shopier.com/TradeVisual/46531862"),
-		"builder": configuredURL("SHOPIER_BUILDER_URL", "https://www.shopier.com/TradeVisual/46531900"),
-		"studio":  configuredURL("SHOPIER_STUDIO_URL", "https://www.shopier.com/TradeVisual/46531961"),
+		"starter":      configuredURL("SHOPIER_STARTER_URL", "https://www.shopier.com/TradeVisual/46531862"),
+		"builder":      configuredURL("SHOPIER_BUILDER_URL", "https://www.shopier.com/TradeVisual/46531900"),
+		"studio":       configuredURL("SHOPIER_STUDIO_URL", "https://www.shopier.com/TradeVisual/46531961"),
+		"professional": configuredURL("SHOPIER_BUILDER_URL", "https://www.shopier.com/TradeVisual/46531900"),
+		"enterprise":   configuredURL("SHOPIER_STUDIO_URL", "https://www.shopier.com/TradeVisual/46531961"),
 	}
-	paddle := services.LoadPaddleConfigFromEnv()
-	paddleConfigured := map[string]bool{
-		"starter":      paddle.PlanReady("starter"),
-		"builder":      paddle.PlanReady("professional"),
-		"studio":       paddle.PlanReady("enterprise"),
-		"professional": paddle.PlanReady("professional"),
-		"enterprise":   paddle.PlanReady("enterprise"),
-	}
-	paddlePublic := paddle.PublicStatus()
-	paddlePublic["client_token"] = paddle.ClientToken
-	paddlePublic["checkout_url"] = paddle.CheckoutURL
-	paddlePublic["success_url"] = strings.TrimRight(paddle.PublicAppURL, "/") + "/dashboard?payment=paddle_success"
-	paddlePublic["cancel_url"] = strings.TrimRight(paddle.PublicAppURL, "/") + "/pricing?payment=paddle_cancelled"
 	writeJSON(w, http.StatusOK, map[string]any{
 		"version":     "2.0.0",
 		"neonAuthUrl": configuredPublicNeonAuthURL(),
 		"payments": map[string]any{
-			"shopierUrls":      shopierURLs,
-			"paddleConfigured": paddleConfigured,
-			"paddle":           paddlePublic,
+			"provider":    "shopier",
+			"mode":        "manual_owner_approval",
+			"shopierUrls": shopierURLs,
 		},
 	})
 }
