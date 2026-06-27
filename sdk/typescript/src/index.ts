@@ -1,4 +1,5 @@
 export type RiskLevel = "low" | "medium" | "high" | "critical" | string;
+export type RiskDecision = "block" | "warn" | "allow" | "withhold";
 
 export interface SignedVerdict {
   target?: string;
@@ -22,6 +23,24 @@ export interface VerdictValidationResult {
   verdict?: SignedVerdict;
 }
 
+export interface RiskPolicy {
+  blockAt?: number;
+  warnAt?: number;
+  blockLevels?: RiskLevel[];
+  warnLevels?: RiskLevel[];
+  requireSigned?: boolean;
+  requireEvidence?: boolean;
+}
+
+export interface RiskPolicyResult {
+  decision: RiskDecision;
+  reason: string;
+  riskIndex?: number;
+  riskLevel?: RiskLevel;
+  grade?: string;
+  validation: VerdictValidationResult;
+}
+
 export interface RadarCheckRequest {
   target: string;
   network?: string;
@@ -32,6 +51,47 @@ export interface TokenScanRequest {
   mint: string;
   network?: string;
   include_ai?: boolean;
+  idempotencyKey?: string;
+}
+
+export interface TokenBatchScanRequest {
+  mints: string[];
+  network?: string;
+  include_ai?: boolean;
+  idempotencyKey?: string;
+}
+
+export interface QueuedScanResponse {
+  request_id: string;
+  status: string;
+  mode?: "single" | "batch";
+  target_count?: number;
+  cost_credits: number;
+  result_url?: string;
+  idempotent_replay?: boolean;
+}
+
+export interface AsyncRequestStatus<T = unknown> {
+  ok: boolean;
+  request_id: string;
+  endpoint: string;
+  status: string;
+  terminal: boolean;
+  credits_reserved: number;
+  credits_charged: number;
+  error_code?: string;
+  latency_ms?: number | null;
+  idempotency_key?: string;
+  result_available: boolean;
+  result: T;
+  poll_after_ms?: number;
+  created_at: string;
+  completed_at?: string | null;
+}
+
+export interface WaitForRequestOptions {
+  timeoutMs?: number;
+  pollIntervalMs?: number;
 }
 
 export interface ShieldPreflightRequest {
@@ -92,16 +152,57 @@ export class ArvisClient {
     return this.request<T>("/api/v1/radar/feed", { method: "GET", auth: "session" });
   }
 
-  async tokenScan<T = { request_id: string; status: string; cost_credits: number }>(request: TokenScanRequest): Promise<T> {
+  async tokenScan<T = QueuedScanResponse>(request: TokenScanRequest): Promise<T> {
     return this.request<T>("/api/v1/scan/token", {
       method: "POST",
       auth: "apiKey",
+      headers: idempotencyHeaders(request.idempotencyKey),
       body: {
         mint: request.mint,
         network: request.network ?? "solana-mainnet",
         include_ai: request.include_ai ?? false
       }
     });
+  }
+
+  async tokenScanBatch<T = QueuedScanResponse>(request: TokenBatchScanRequest): Promise<T> {
+    const mints = [...new Set(request.mints.map((mint) => mint.trim()).filter(Boolean))];
+    if (mints.length === 0) throw new Error("At least one token mint is required.");
+    if (mints.length > 20) throw new Error("A batch can contain at most 20 token mints.");
+    return this.request<T>("/api/v1/scan/token", {
+      method: "POST",
+      auth: "apiKey",
+      headers: idempotencyHeaders(request.idempotencyKey),
+      body: {
+        mints,
+        network: request.network ?? "solana-mainnet",
+        include_ai: request.include_ai ?? false
+      }
+    });
+  }
+
+  async requestStatus<T = unknown>(requestId: string): Promise<AsyncRequestStatus<T>> {
+    const normalized = requestId.trim();
+    if (!normalized) throw new Error("requestId is required.");
+    return this.request<AsyncRequestStatus<T>>(`/api/v1/usage?request_id=${encodeURIComponent(normalized)}`, {
+      method: "GET",
+      auth: "apiKey"
+    });
+  }
+
+  async waitForRequest<T = unknown>(requestId: string, options: WaitForRequestOptions = {}): Promise<AsyncRequestStatus<T>> {
+    const timeoutMs = Math.max(1_000, options.timeoutMs ?? 120_000);
+    const pollIntervalMs = Math.max(250, options.pollIntervalMs ?? 1_500);
+    const startedAt = Date.now();
+
+    for (;;) {
+      const status = await this.requestStatus<T>(requestId);
+      if (status.terminal) return status;
+      if (Date.now() - startedAt >= timeoutMs) {
+        throw new Error(`Timed out waiting for ARVIS request ${requestId}.`);
+      }
+      await delay(Math.max(250, status.poll_after_ms ?? pollIntervalMs));
+    }
   }
 
   async shieldPreflight<T = SignedVerdict & { action?: string; request_id?: string }>(request: ShieldPreflightRequest): Promise<T> {
@@ -115,15 +216,21 @@ export class ArvisClient {
     });
   }
 
-  async usage<T = { usage?: unknown[] }>(): Promise<T> {
-    return this.request<T>("/api/v1/usage", { method: "GET", auth: "apiKey" });
+  async usage<T = { usage?: unknown[] }>(options: { includeResults?: boolean } = {}): Promise<T> {
+    const query = options.includeResults ? "?include_results=1" : "";
+    return this.request<T>(`/api/v1/usage${query}`, { method: "GET", auth: "apiKey" });
   }
 
   private async request<T>(
     path: string,
-    input: { method: "GET" | "POST"; auth: "session" | "apiKey"; body?: unknown }
+    input: {
+      method: "GET" | "POST";
+      auth: "session" | "apiKey";
+      body?: unknown;
+      headers?: Record<string, string>;
+    }
   ): Promise<T> {
-    const headers = new Headers({ Accept: "application/json" });
+    const headers = new Headers({ Accept: "application/json", ...input.headers });
 
     if (input.body !== undefined) {
       headers.set("Content-Type", "application/json");
@@ -216,4 +323,68 @@ export function validateSignedVerdict(value: unknown): VerdictValidationResult {
 
 export function isSignedVerdict(value: unknown): value is SignedVerdict {
   return validateSignedVerdict(value).ok;
+}
+
+export function evaluateVerdictPolicy(value: unknown, policy: RiskPolicy = {}): RiskPolicyResult {
+  const validation = validateSignedVerdict(value);
+  if (!validation.ok || !validation.verdict) {
+    return {
+      decision: "withhold",
+      reason: validation.errors.join("; ") || "Signed verdict unavailable.",
+      validation
+    };
+  }
+
+  const verdict = validation.verdict;
+  const riskIndex = verdict.risk_index as number;
+  const riskLevel = verdict.risk_level as RiskLevel;
+  const blockAt = clampThreshold(policy.blockAt ?? 70);
+  const warnAt = Math.min(blockAt, clampThreshold(policy.warnAt ?? 40));
+  const blockLevels = policy.blockLevels ?? ["high", "critical"];
+  const warnLevels = policy.warnLevels ?? ["medium"];
+
+  if (blockLevels.includes(riskLevel) || riskIndex >= blockAt) {
+    return {
+      decision: "block",
+      reason: `Risk ${riskLevel} / ${riskIndex} meets the blocking policy.`,
+      riskIndex,
+      riskLevel,
+      grade: verdict.grade,
+      validation
+    };
+  }
+  if (warnLevels.includes(riskLevel) || riskIndex >= warnAt) {
+    return {
+      decision: "warn",
+      reason: `Risk ${riskLevel} / ${riskIndex} meets the warning policy.`,
+      riskIndex,
+      riskLevel,
+      grade: verdict.grade,
+      validation
+    };
+  }
+  return {
+    decision: "allow",
+    reason: `Risk ${riskLevel} / ${riskIndex} is below configured warning thresholds.`,
+    riskIndex,
+    riskLevel,
+    grade: verdict.grade,
+    validation
+  };
+}
+
+function idempotencyHeaders(value?: string): Record<string, string> | undefined {
+  const normalized = value?.trim();
+  if (!normalized) return undefined;
+  if (normalized.length > 128) throw new Error("Idempotency key must be 128 characters or fewer.");
+  return { "Idempotency-Key": normalized };
+}
+
+function clampThreshold(value: number): number {
+  if (!Number.isFinite(value)) return 100;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
