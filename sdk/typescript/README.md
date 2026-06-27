@@ -66,6 +66,21 @@ Structural validation requires:
 
 This function validates the developer contract. It does not replace cryptographic verification when a signature-verification mechanism is available.
 
+## Verdict CLI
+
+The package includes a zero-dependency command-line validator.
+
+```bash
+arvis-verdict verdict.json
+cat verdict.json | arvis-verdict
+```
+
+Exit codes:
+
+- `0`: structurally valid signed verdict
+- `1`: unreadable input or invalid JSON
+- `2`: parsed JSON does not satisfy the signed-verdict contract
+
 ## Session-authenticated radar example
 
 ```ts
