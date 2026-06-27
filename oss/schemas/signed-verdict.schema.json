@@ -2,13 +2,21 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tradepigloball.co/schemas/signed-verdict.schema.json",
   "title": "Koschei ARVIS Signed Verdict",
+  "description": "Evidence-backed final verdict contract for Solana developer integrations.",
   "type": "object",
-  "required": ["grade", "risk_index", "risk_level", "signed"],
+  "required": [
+    "grade",
+    "risk_index",
+    "risk_level",
+    "evidence",
+    "rule_version",
+    "signed"
+  ],
   "properties": {
     "target": { "type": "string", "minLength": 1 },
     "network": { "type": "string", "default": "solana-mainnet" },
     "grade": { "type": "string", "pattern": "^[A-F]$" },
-    "risk_index": { "type": "number", "minimum": 0, "maximum": 100 },
+    "risk_index": { "type": "integer", "minimum": 0, "maximum": 100 },
     "risk_level": {
       "type": "string",
       "enum": ["low", "medium", "high", "critical"]
@@ -17,11 +25,13 @@
     "recommendation": { "type": "string" },
     "evidence": {
       "type": "array",
-      "items": { "type": "string" }
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
     },
     "rule_version": { "type": "string", "minLength": 1 },
     "signed": { "const": true },
-    "signature": { "type": "string" },
+    "signature": { "type": "string", "minLength": 1 },
     "created_at": { "type": "string", "format": "date-time" }
   },
   "additionalProperties": true
