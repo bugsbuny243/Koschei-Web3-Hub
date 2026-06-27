@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -128,7 +129,18 @@ func (h *Handler) APIUsage(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-	rows, err := h.DB.QueryContext(r.Context(), `SELECT request_id::text,endpoint,status,credits_reserved,credits_charged,COALESCE(error_code,''),created_at,completed_at FROM api_usage_events WHERE api_key_id=$1 ORDER BY created_at DESC LIMIT 100`, p.KeyID)
+	if requestID := strings.TrimSpace(r.URL.Query().Get("request_id")); requestID != "" {
+		h.apiUsageRequestResult(w, r, p, requestID)
+		return
+	}
+
+	includeResults := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("include_results")), "1") || strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("include_results")), "true")
+	rows, err := h.DB.QueryContext(r.Context(), `
+		SELECT request_id::text,endpoint,status,credits_reserved,credits_charged,COALESCE(error_code,''),latency_ms,metadata,COALESCE(idempotency_key,''),created_at,completed_at
+		FROM api_usage_events
+		WHERE api_key_id=$1
+		ORDER BY created_at DESC
+		LIMIT 100`, p.KeyID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
@@ -136,17 +148,103 @@ func (h *Handler) APIUsage(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	items := []map[string]any{}
 	for rows.Next() {
-		var rid, endpoint, status, code string
+		var rid, endpoint, status, code, idempotencyKey string
 		var reserved, charged int
+		var latency sql.NullInt64
+		var metadata []byte
 		var created time.Time
 		var completed sql.NullTime
-		if err := rows.Scan(&rid, &endpoint, &status, &reserved, &charged, &code, &created, &completed); err != nil {
+		if err := rows.Scan(&rid, &endpoint, &status, &reserved, &charged, &code, &latency, &metadata, &idempotencyKey, &created, &completed); err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
-		items = append(items, map[string]any{"request_id": rid, "endpoint": endpoint, "status": status, "credits_reserved": reserved, "credits_charged": charged, "error_code": code, "created_at": created, "completed_at": nullableTime(completed)})
+		item := map[string]any{
+			"request_id":        rid,
+			"endpoint":          endpoint,
+			"status":            status,
+			"credits_reserved":  reserved,
+			"credits_charged":   charged,
+			"error_code":        code,
+			"latency_ms":        nullableInt64(latency),
+			"idempotency_key":   idempotencyKey,
+			"result_available":  usageResultAvailable(metadata),
+			"created_at":        created,
+			"completed_at":      nullableTime(completed),
+			"result_url":        "/api/v1/usage?request_id=" + rid,
+		}
+		if includeResults {
+			item["result"] = decodeUsageMetadata(metadata)
+		}
+		items = append(items, item)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "title": "API Kullanım Geçmişi", "usage": items})
+}
+
+func (h *Handler) apiUsageRequestResult(w http.ResponseWriter, r *http.Request, p apiPrincipal, requestID string) {
+	var rid, endpoint, status, code, idempotencyKey string
+	var reserved, charged int
+	var latency sql.NullInt64
+	var metadata []byte
+	var created time.Time
+	var completed sql.NullTime
+	err := h.DB.QueryRowContext(r.Context(), `
+		SELECT request_id::text,endpoint,status,credits_reserved,credits_charged,COALESCE(error_code,''),latency_ms,metadata,COALESCE(idempotency_key,''),created_at,completed_at
+		FROM api_usage_events
+		WHERE api_key_id=$1 AND request_id::text=$2
+		LIMIT 1`, p.KeyID, requestID).
+		Scan(&rid, &endpoint, &status, &reserved, &charged, &code, &latency, &metadata, &idempotencyKey, &created, &completed)
+	if err == sql.ErrNoRows {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "request_not_found"})
+		return
+	}
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	terminal := status == "completed" || status == "refunded" || status == "failed"
+	response := map[string]any{
+		"ok":                true,
+		"request_id":        rid,
+		"endpoint":          endpoint,
+		"status":            status,
+		"terminal":          terminal,
+		"credits_reserved":  reserved,
+		"credits_charged":   charged,
+		"error_code":        code,
+		"latency_ms":        nullableInt64(latency),
+		"idempotency_key":   idempotencyKey,
+		"result_available":  usageResultAvailable(metadata),
+		"result":            decodeUsageMetadata(metadata),
+		"created_at":        created,
+		"completed_at":      nullableTime(completed),
+	}
+	if !terminal {
+		response["poll_after_ms"] = 1500
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func decodeUsageMetadata(raw []byte) any {
+	if len(raw) == 0 || string(raw) == "null" {
+		return map[string]any{}
+	}
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return map[string]any{}
+	}
+	return value
+}
+
+func usageResultAvailable(raw []byte) bool {
+	trimmed := strings.TrimSpace(string(raw))
+	return trimmed != "" && trimmed != "{}" && trimmed != "null"
+}
+
+func nullableInt64(value sql.NullInt64) any {
+	if value.Valid {
+		return value.Int64
+	}
+	return nil
 }
 
 func (h *Handler) APIKeyAuth(next http.HandlerFunc) http.HandlerFunc {
