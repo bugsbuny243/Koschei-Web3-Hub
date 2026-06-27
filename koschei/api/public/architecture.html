@@ -2,25 +2,36 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Koschei ARVIS Architecture</title>
+<link rel="stylesheet" href="/css/koschei-global-shell.css?v=1">
 <style>
-body{margin:0;background:#02070d;color:#f7fbff;font-family:Inter,system-ui,sans-serif}a{color:inherit;text-decoration:none}.wrap{width:min(1080px,calc(100% - 24px));margin:auto;padding:24px 0 80px}.top,.hero,.card{border:1px solid #24eaff30;border-radius:24px;background:#071421;padding:18px}.top{display:flex;justify-content:space-between;gap:12px;margin-bottom:18px}.nav{display:flex;gap:8px;flex-wrap:wrap}.nav a{border:1px solid #24eaff30;border-radius:999px;padding:9px 12px;color:#9eb0c2}.hero{padding:34px;margin-bottom:14px}h1{font-size:clamp(40px,7vw,72px);line-height:.95;letter-spacing:-.06em;margin:10px 0 14px}.sub,p,li{color:#9eb0c2;line-height:1.65}.eyebrow{color:#18ffb2;font:900 11px ui-monospace;text-transform:uppercase;letter-spacing:.12em}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card h2{margin-top:0}.stat{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}.stat div{border:1px solid #24eaff30;border-radius:20px;padding:15px;background:#ffffff08}.stat b{display:block;color:#18ffb2;font-size:26px}@media(max-width:760px){.top{flex-direction:column}.grid,.stat{grid-template-columns:1fr}}
+:root{--line:#24eaff30;--muted:#9eb0c2;--green:#18ffb2;--cyan:#24eaff}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 12% 0,#18ffb21f,transparent 32%),linear-gradient(135deg,#020409,#071522 60%,#02040a);color:#f7fbff;font-family:Inter,system-ui,sans-serif}a{color:inherit;text-decoration:none}.wrap{width:min(1080px,calc(100% - 24px));margin:auto;padding:24px 0 34px}.top,.hero,.card,.stat div,.live-note{border:1px solid var(--line);border-radius:24px;background:linear-gradient(145deg,#ffffff10,#071421e8);box-shadow:0 22px 70px #0007}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;padding:14px 16px}.nav{display:flex;gap:8px;flex-wrap:wrap}.hero{padding:34px;margin-bottom:14px}h1{font-size:clamp(40px,7vw,72px);line-height:.95;letter-spacing:-.06em;margin:10px 0 14px}.sub,p,li{color:var(--muted);line-height:1.7}.eyebrow{color:var(--green);font:900 11px ui-monospace;text-transform:uppercase;letter-spacing:.12em}.stat{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}.stat div{padding:15px}.stat b{display:block;color:var(--green);font-size:26px}.stat span{display:block;color:var(--muted);font-size:13px;margin-top:4px}.live-note{padding:12px 15px;color:#c7d9e3;font-size:13px;margin-bottom:14px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{padding:20px}.card h2{margin:0 0 8px}.card p{margin:0}.status{display:inline-flex;align-items:center;gap:7px;color:#bfffe8}.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green)}@media(max-width:760px){.top{flex-direction:column;align-items:flex-start}.grid,.stat{grid-template-columns:1fr}.wrap{padding-top:12px}.hero{padding:24px}.card{padding:18px}.sub,p{font-size:15px}}
 </style>
 </head>
 <body>
 <main class="wrap">
-<nav class="top"><b>Koschei ARVIS</b><div class="nav"><a href="/developers">Developers</a><a href="/security-radar">Radar</a><a href="/pricing">Plans</a></div></nav>
-<section class="hero"><div class="eyebrow">Technical architecture</div><h1>Solana risk intelligence infrastructure.</h1><p class="sub">ARVIS is organized as four layers: live source collection, evidence processing, final verdict generation, and developer delivery. The goal is technical infrastructure that Solana builders can evaluate, use, and integrate.</p></section>
-<section class="stat"><div><b>32k+</b><span>completed jobs</span></div><div><b>20k+</b><span>signed verdicts per day</span></div><div><b>0</b><span>retryable backlog</span></div><div><b>live</b><span>launch and liquidity sources</span></div></section>
+<nav class="top"><b>Koschei ARVIS</b><div class="nav"></div></nav>
+<section class="hero"><div class="eyebrow">Technical architecture</div><h1>Solana risk intelligence infrastructure.</h1><p class="sub">ARVIS is organized as four layers: live source collection, evidence processing, final verdict generation and developer delivery. Every public metric below is read from the same production health source used by the live radar.</p></section>
+<section class="stat">
+<div><b id="completed">—</b><span>completed stream targets</span></div>
+<div><b id="verdicts">—</b><span>signed verdicts in the proof window</span></div>
+<div><b id="retryable">—</b><span>retryable backlog</span></div>
+<div><b id="sources">—</b><span>live launch and liquidity sources</span></div>
+</section>
+<div class="live-note"><span class="status"><span class="dot"></span><b>Live production metrics</b></span> · Values refresh every 15 seconds from the production health endpoint.</div>
 <section class="grid">
 <article class="card"><h2>1. Source collection</h2><p>ARVIS observes Solana launch and liquidity surfaces and stores normalized events for later risk processing.</p></article>
 <article class="card"><h2>2. Evidence processing</h2><p>Independent evidence arms check launch behavior, liquidity context, wallet relations, authority state and claim risk.</p></article>
-<article class="card"><h2>3. Signed verdict</h2><p>Verified evidence becomes a final verdict with grade, risk index, evidence list, rule version and signature flag.</p></article>
-<article class="card"><h2>4. Developer delivery</h2><p>The same verdict contract is used by radar screens, reports, API endpoints and future open-source components.</p></article>
-<article class="card"><h2>Open-source expansion</h2><p>Planned components include event normalization helpers, the signed verdict schema, sample verifier and integration examples.</p></article>
-<article class="card"><h2>Ecosystem impact</h2><p>Wallet apps, launchpads, researchers and security teams can use the infrastructure to reduce risk for Solana users.</p></article>
+<article class="card"><h2>3. Signed verdict</h2><p>Verified evidence becomes a final verdict with grade, risk index, evidence list, rule version and signature state.</p></article>
+<article class="card"><h2>4. Developer delivery</h2><p>The same verdict contract is used by radar screens, reports, partner APIs, watchlists and signed webhooks.</p></article>
+<article class="card"><h2>Production safety layers</h2><p>Transaction simulation, Token-2022 extension analysis, bounded batch scans and RPC failover run as isolated Go services.</p></article>
+<article class="card"><h2>Ecosystem delivery</h2><p>Wallet apps, launchpads, researchers and security teams can consume evidence through APIs, watchlist alerts and signed webhooks.</p></article>
 </section>
 </main>
+<script>
+(()=>{const n=v=>Number(v||0).toLocaleString();async function load(){try{const r=await fetch('/health',{cache:'no-store'});if(!r.ok)return;const d=await r.json(),a=d.arvis||{},f=a.failures||{},s=a.sources||{};document.getElementById('completed').textContent=n(a.processing_completed);document.getElementById('verdicts').textContent=n(a.visible_verdicts||a.processing_completed_recent);document.getElementById('retryable').textContent=n(f.retryable);const live=[s.pump,s.raydium].filter(x=>x&&Number(x.recent||0)>0).length;document.getElementById('sources').textContent=live?live+' live':'checking';}catch{}}load();setInterval(load,15000)})();
+</script>
+<script src="/js/koschei-global-shell.js?v=1"></script>
 </body>
 </html>
