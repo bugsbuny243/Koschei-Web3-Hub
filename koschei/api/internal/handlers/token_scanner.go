@@ -251,7 +251,7 @@ func assessToken2022Extension(name string, details map[string]any) tokenExtensio
 	case "transferhook":
 		assessment.Severity, assessment.RiskPenalty, assessment.Summary = "high", 30, "A custom program can run on every token transfer."
 	case "transferfeeconfig":
-		bps := nestedNumber(details, "transferFeeBasisPoints")
+		bps := token2022NestedNumber(details, "transferFeeBasisPoints")
 		assessment.Severity, assessment.RiskPenalty = "medium", 18
 		assessment.Summary = "Protocol-level transfer fees are enabled."
 		if bps >= 1000 {
@@ -265,7 +265,7 @@ func assessToken2022Extension(name string, details map[string]any) tokenExtensio
 	case "mintcloseauthority":
 		assessment.Severity, assessment.RiskPenalty, assessment.Summary = "high", 30, "The mint account can be closed by an authority."
 	case "defaultaccountstate":
-		state := strings.ToLower(nestedString(details, "state"))
+		state := strings.ToLower(token2022NestedString(details, "state"))
 		assessment.Severity, assessment.RiskPenalty, assessment.Summary = "medium", 15, "New token accounts use a configured default state."
 		if strings.Contains(state, "frozen") {
 			assessment.Severity, assessment.RiskPenalty, assessment.Summary = "high", 30, "New token accounts start frozen and require authority intervention."
@@ -299,12 +299,12 @@ func assessToken2022Extension(name string, details map[string]any) tokenExtensio
 func summarizeToken2022Extensions(extensions []tokenExtensionAssessment) (int, map[string]any, []string, []string) {
 	penalty := 0
 	behavior := map[string]any{
-		"standard_transfer": true,
-		"transfer_fee":      false,
-		"transfer_hook":     false,
-		"non_transferable":  false,
-		"pausable":          false,
-		"permanent_delegate": false,
+		"standard_transfer":   true,
+		"transfer_fee":        false,
+		"transfer_hook":       false,
+		"non_transferable":    false,
+		"pausable":            false,
+		"permanent_delegate":  false,
 	}
 	visibility := []string{}
 	compatibility := []string{}
@@ -317,17 +317,17 @@ func summarizeToken2022Extensions(extensions []tokenExtensionAssessment) (int, m
 		case "transferfeeconfig":
 			behavior["transfer_fee"] = true
 			behavior["standard_transfer"] = false
-			if value := nestedNumber(extension.Details, "transferFeeBasisPoints"); value > 0 {
+			if value := token2022NestedNumber(extension.Details, "transferFeeBasisPoints"); value > 0 {
 				behavior["transfer_fee_basis_points"] = value
 			}
-			if value := nestedAny(extension.Details, "maximumFee"); value != nil {
+			if value := token2022NestedAny(extension.Details, "maximumFee"); value != nil {
 				behavior["maximum_fee"] = value
 			}
 			appendUnique(&compatibility, seenCompatibility, "Integrations must account for protocol-level transfer fees.")
 		case "transferhook":
 			behavior["transfer_hook"] = true
 			behavior["standard_transfer"] = false
-			if value := nestedString(extension.Details, "programId"); value != "" {
+			if value := token2022NestedString(extension.Details, "programId"); value != "" {
 				behavior["transfer_hook_program"] = value
 			}
 			appendUnique(&compatibility, seenCompatibility, "Every transfer may invoke a custom program and require additional accounts.")
@@ -341,7 +341,7 @@ func summarizeToken2022Extensions(extensions []tokenExtensionAssessment) (int, m
 			appendUnique(&compatibility, seenCompatibility, "Token transfers may be paused globally by an authority.")
 		case "permanentdelegate":
 			behavior["permanent_delegate"] = true
-			if value := nestedString(extension.Details, "delegate"); value != "" {
+			if value := token2022NestedString(extension.Details, "delegate"); value != "" {
 				behavior["permanent_delegate_address"] = value
 			}
 			appendUnique(&compatibility, seenCompatibility, "A permanent delegate may transfer or burn holder balances.")
@@ -425,7 +425,7 @@ func firstMapStringValue(values map[string]any, keys ...string) string {
 	return ""
 }
 
-func nestedAny(value any, key string) any {
+func token2022NestedAny(value any, key string) any {
 	target := normalizeExtensionName(key)
 	switch current := value.(type) {
 	case map[string]any:
@@ -434,13 +434,13 @@ func nestedAny(value any, key string) any {
 				return child
 			}
 		for _, child := range current {
-			if found := nestedAny(child, key); found != nil {
+			if found := token2022NestedAny(child, key); found != nil {
 				return found
 			}
 		}
 	case []any:
 		for _, child := range current {
-			if found := nestedAny(child, key); found != nil {
+			if found := token2022NestedAny(child, key); found != nil {
 				return found
 			}
 		}
@@ -448,8 +448,8 @@ func nestedAny(value any, key string) any {
 	return nil
 }
 
-func nestedString(value any, key string) string {
-	found := nestedAny(value, key)
+func token2022NestedString(value any, key string) string {
+	found := token2022NestedAny(value, key)
 	switch typed := found.(type) {
 	case string:
 		return strings.TrimSpace(typed)
@@ -462,8 +462,8 @@ func nestedString(value any, key string) string {
 	}
 }
 
-func nestedNumber(value any, key string) float64 {
-	found := nestedAny(value, key)
+func token2022NestedNumber(value any, key string) float64 {
+	found := token2022NestedAny(value, key)
 	switch typed := found.(type) {
 	case float64:
 		return typed
@@ -498,7 +498,7 @@ func normalizeExtensionName(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
 	var builder strings.Builder
 	for _, character := range value {
-		if character >= 'a' && character <= 'z' || character >= '0' && character <= '9' {
+		if (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') {
 			builder.WriteRune(character)
 		}
 	}
