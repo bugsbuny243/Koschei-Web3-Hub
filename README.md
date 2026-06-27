@@ -1,62 +1,61 @@
 # KOSCHEİ WEB3 — ARVIS
 
-KOSCHEİ WEB3 is a live, Solana-native risk-intelligence infrastructure layer built to help developers, wallets, launchpads, research teams and investors inspect risk before interacting with a token, pool, wallet, transaction, program or claim surface.
+KOSCHEİ WEB3 is a live, Solana-native risk-intelligence infrastructure layer for developers, wallets, launchpads, research teams and security operators.
 
-Solana is the first live market. The architecture is designed to expose reusable security intelligence through APIs, dashboards and open technical components, while remaining extensible beyond one chain without changing the core customer experience.
+ARVIS converts launch, liquidity, token, wallet, transaction, program and claim observations into evidence-backed, versioned risk outputs. Solana is the first live market.
 
-## Developer Infrastructure
+## Technical scope
 
-Koschei turns fragmented on-chain evidence into structured, integration-ready risk outputs for Solana products and research workflows.
+Koschei is an engineering and infrastructure project. Its concrete outputs are:
 
-Primary developer-facing surfaces include:
+1. a live Solana observation and risk-processing pipeline
+2. deterministic evidence collection and final verdict generation
+3. authenticated developer APIs
+4. a TypeScript SDK
+5. an open-source Solana event normalizer
+6. a machine-readable signed-verdict schema
+7. wallet and launchpad integration examples
+8. developer documentation and reproducible CI checks
 
-- token and liquidity risk analysis
-- wallet, counterparty and sybil intelligence
-- transaction decoding and execution-risk visibility
-- standardized security summaries
-- authenticated APIs and live verdict feeds
-- public, rate-limited risk badges
-- technical documentation and integration examples
+Community events, general education and ecosystem promotion are not the product scope.
 
-The long-term open-source plan focuses on reusable ecosystem components such as transaction-decoding utilities, risk-rule helpers, example clients and integration starters. Open components must preserve the same evidence boundaries used by the live product: unavailable or unverified evidence must never be represented as a confirmed risk finding.
+## Open-source developer kit
 
-## Technical Outputs
+| Component | Location | Status |
+| --- | --- | --- |
+| TypeScript API client | `sdk/typescript` | Shipped and tested |
+| Solana event normalizer | `oss/event-normalizer` | Shipped and tested |
+| Signed verdict schema | `oss/schemas/signed-verdict.schema.json` | Shipped |
+| Wallet warning example | `examples/wallet-warning` | Shipped |
+| Launchpad screening example | `examples/launchpad-screening` | Shipped |
+| API reference | `docs/api-reference.md` | Shipped |
+| Developer quickstart | `docs/DEVELOPER_QUICKSTART.md` | Shipped |
+| Grant evidence matrix | `docs/grant-evidence-matrix.md` | Shipped |
 
-Koschei is developed as technical infrastructure rather than a community or education program. Its concrete outputs are:
+The open-source packages are MIT licensed and designed to remain useful without the hosted dashboard.
 
-1. a live Solana-native risk engine
-2. developer-facing API endpoints
-3. structured token, wallet and transaction risk objects
-4. a working dashboard and radar environment
-5. reusable open-source technical components
-6. documentation and integration examples for external builders
-
-## Product Rule
+## Product rule
 
 ```text
 14 internal evidence arms
         ↓
 one ARVIS core
         ↓
-one customer-facing verdict card
+one customer-facing verdict
 ```
 
-The 14 arms are not sold as 14 separate products. They collect and verify evidence internally. Customers see one understandable result with the evidence, risk level and recommended next action.
+The evidence arms are internal verification layers, not separate products. Customers and integrations receive one structured output with evidence, risk level, rule version and recommended action.
 
-## Evidence Policy
-
-ARVIS follows a strict evidence boundary:
+## Evidence policy
 
 ```text
 verified evidence exists  → signed verdict may be produced
-verified evidence missing → no score, no grade, no signed card
+verified evidence missing → no score, no grade, no signed verdict
 ```
 
-On-chain and off-chain evidence are labeled separately. A parsed claim URL is never represented as on-chain evidence. A program relation is never represented as confirmed sybil behavior without the required buyer and funding graph.
+On-chain and off-chain observations are labeled separately. Parsed URLs are not presented as on-chain evidence. Wallet relations are not presented as real-world identity claims. A low-risk or monitor result is not a safety guarantee.
 
-ARVIS does not promise guaranteed safety and does not provide investment advice. A monitor result means no critical risk evidence was found in the current evidence window; it is not a guarantee.
-
-## Fourteen Arms
+## Core evidence arms
 
 1. Pump.fun Sybil Radar
 2. Raydium Pool Guardian
@@ -75,117 +74,46 @@ ARVIS does not promise guaranteed safety and does not provide investment advice.
 
 Each arm remains unsigned when its required evidence is unavailable.
 
-## Live Pipeline
+## Live pipeline
 
 ```text
-Raydium + Pump program activity
+Pump-style + Raydium-style observations
         ↓
-transaction parsing
+transaction and account enrichment
         ↓
-project-mint resolution
+target normalization
         ↓
-14-arm evidence analysis
+evidence-arm processing
         ↓
 Final Verdict Engine
         ↓
-one visible risk or monitor card
+signed risk, monitor or withheld output
 ```
 
-The stream processor is idempotent. The same stream event and arm cannot create duplicate verdicts. Processing jobs expose health states such as:
+The stream processor is idempotent. The same stream event and evidence arm cannot create duplicate final output. Processing states include healthy, processing, degraded, stale, retryable failure and exhausted failure.
+
+## Provider resilience
+
+ARVIS resolves one canonical Solana RPC provider at startup and applies process-wide pacing and retry controls. When the configured production provider is rate-limited or unavailable, standard Solana RPC calls automatically fall back to the public Solana mainnet endpoint.
+
+Provider-specific limits never authorize the system to fabricate evidence. Unsupported or unavailable evidence results in a withheld or partial analysis.
+
+## Developer routes
 
 ```text
-healthy
-processing
-degraded
-stale
-waiting_for_stream
-waiting_for_enriched_targets
-waiting_for_processing
+POST /api/v1/radar/check       session-authenticated radar check
+GET  /api/v1/radar/feed        authenticated verdict feed
+POST /api/v1/scan/token        API-key token scan
+POST /api/v1/shield/preflight  API-key pre-signing risk check
+GET  /api/v1/usage             API-key usage records
+GET  /api/v1/risk/badge        public rate-limited risk badge
 ```
 
-## Evidence Sources
+See `docs/api-reference.md` for authentication boundaries and current production status.
 
-ARVIS uses one canonical Solana RPC configuration. Resolution order:
+## Local validation
 
-```text
-SOLANA_RPC_URL
-Alchemy / Helius / QuickNode provider URL
-Alchemy API key
-Solana public mainnet fallback
-```
-
-The active provider is reported from the real runtime configuration rather than a hard-coded provider label.
-
-Current evidence surfaces include:
-
-- token mint and freeze authority
-- token supply and holder concentration
-- account owner and executable state
-- transaction timing and failure observations
-- parsed program relations
-- token-balance and SOL-balance changes
-- creator/signing candidates without identity claims
-- initialization funding links
-- Raydium interaction evidence
-- Pump program interaction evidence
-- priority-fee, compute-budget and route exposure
-- claim URL structure and signing/secret-request indicators
-
-## Live Product Surfaces
-
-```text
-/                         landing page
-/dashboard                customer command center
-/security-radar           live ARVIS radar
-/reports                  signed report vault
-/pricing                  plans
-/health                   sanitized service and ARVIS pipeline health
-/api/v1/unified/analyze   paid unified analysis
-/api/v1/radar/check       paid ARVIS scan
-/api/v1/radar/feed        authenticated live verdict feed
-/api/v1/risk/badge        public rate-limited risk badge
-```
-
-## Runtime Controls
-
-Important non-secret variables:
-
-```env
-PORT=10000
-KOSCHEI_AUTO_RADAR_ENABLED=1
-ARVIS_HEARTBEAT_SECONDS=20
-ARVIS_STREAM_VERDICT_SECONDS=12
-RAYDIUM_PROGRAM_ID=
-PUMP_FUN_PROGRAM_ID=
-```
-
-Secrets and production credentials belong in the deployment environment and are not committed to this repository.
-
-## Data and Infrastructure
-
-```text
-Go API
-Neon Postgres
-Railway production deployment
-Solana RPC provider with public fallback
-Vanilla HTML / CSS / JavaScript customer surfaces
-```
-
-Database migrations create the radar event store, verdict store, processing queue, recovery state and stream-verdict idempotency constraints.
-
-## Payments and Access
-
-Paid analysis is entitlement-backed. A profile label alone cannot unlock premium output.
-
-```text
-active entitlement + remaining output → analysis allowed
-failed evidence collection             → no output charged
-successful evidence-backed analysis    → one output consumed
-```
-
-Jito protected send reserves an output before submission and refunds it when submission definitively fails.
-
-## Development
+### Go API
 
 ```bash
 git clone https://github.com/bugsbuny243/Koschei-Web3-Hub.git
@@ -195,8 +123,66 @@ go vet ./...
 go build ./...
 ```
 
-GitHub Actions runs tests, vet and build checks for API changes. Railway remains the production deployment source of truth.
+### TypeScript SDK
+
+```bash
+cd sdk/typescript
+npm install
+npm run check
+npm test
+npm pack --dry-run
+```
+
+### Event normalizer
+
+```bash
+cd oss/event-normalizer
+npm install
+npm run check
+npm test
+npm pack --dry-run
+```
+
+## Production architecture
+
+```text
+Go API and workers
+Render deployment
+Neon PostgreSQL
+Solana RPC provider with automatic public fallback
+Pump-style stream observations
+Vanilla HTML / CSS / JavaScript customer surfaces
+```
+
+Secrets and production credentials live only in the deployment environment and are not committed to the repository.
+
+## Access model
+
+Paid analysis is entitlement-backed. A profile label alone cannot unlock premium output.
+
+```text
+active entitlement + remaining output → analysis allowed
+failed evidence collection             → no output charged
+successful evidence-backed analysis    → one output consumed
+```
+
+## Documentation
+
+- Architecture: `docs/ARCHITECTURE.md`
+- Data flow: `docs/architecture/data-flow.md`
+- API reference: `docs/api-reference.md`
+- Developer quickstart: `docs/DEVELOPER_QUICKSTART.md`
+- Signed verdict contract: `docs/signed-verdict-schema.md`
+- Limitations: `docs/limitations.md`
+- Technical whitepaper: `docs/technical-whitepaper.md`
+- Open-source roadmap: `docs/open-source-roadmap.md`
+- Grant resubmission: `docs/grant-v2-proposal.md`
+- Grant evidence matrix: `docs/grant-evidence-matrix.md`
+
+## License
+
+MIT — see `LICENSE`.
 
 ---
 
-Built as a live Solana-native risk-intelligence system and reusable developer infrastructure layer.
+Built as live Solana-native risk infrastructure and reusable developer tooling.

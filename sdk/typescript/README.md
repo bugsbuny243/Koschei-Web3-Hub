@@ -1,15 +1,18 @@
 # Koschei ARVIS TypeScript SDK
 
-A small dependency-free TypeScript client for the current Koschei ARVIS production routes.
+A dependency-free TypeScript client for the current Koschei ARVIS production routes.
 
-## Install locally
+## Validate locally
 
 ```bash
 cd sdk/typescript
 npm install
 npm run check
-npm run build
+npm test
+npm pack --dry-run
 ```
+
+The package requires Node.js 18 or newer.
 
 ## API-key example
 
@@ -39,6 +42,45 @@ const result = await arvis.shieldPreflight({
 console.log(result.action, result.grade, result.risk_index);
 ```
 
+## Signed verdict validation
+
+```ts
+import { validateSignedVerdict } from "@koschei/arvis-sdk";
+
+const validation = validateSignedVerdict(result);
+if (!validation.ok) {
+  console.log({ action: "withhold", errors: validation.errors });
+} else {
+  console.log(validation.verdict.grade, validation.verdict.evidence);
+}
+```
+
+Structural validation requires:
+
+- `signed === true`
+- an A-F grade
+- a finite 0-100 risk index
+- a supported risk level
+- an evidence array
+- a rule version
+
+This function validates the developer contract. It does not replace cryptographic verification when a signature-verification mechanism is available.
+
+## Verdict CLI
+
+The package includes a zero-dependency command-line validator.
+
+```bash
+arvis-verdict verdict.json
+cat verdict.json | arvis-verdict
+```
+
+Exit codes:
+
+- `0`: structurally valid signed verdict
+- `1`: unreadable input or invalid JSON
+- `2`: parsed JSON does not satisfy the signed-verdict contract
+
 ## Session-authenticated radar example
 
 ```ts
@@ -67,4 +109,4 @@ const result = await radar.radarCheck({
 
 ## Trust rule
 
-A signed verdict should be treated as final only when `signed === true`. Consumers should also inspect evidence and rule metadata rather than relying on the numeric score alone.
+A result is not a final signed verdict merely because it contains a numeric score. Consumers should validate signed status, grade, evidence and rule metadata, and withhold the final UI decision when required fields are missing.

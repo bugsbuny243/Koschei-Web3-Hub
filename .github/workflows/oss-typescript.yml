@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 jobs:
-  typecheck:
+  validate:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -35,3 +35,5 @@ jobs:
           node-version: "20"
       - run: npm install --no-audit --no-fund
       - run: npm run check
+      - run: npm test
+      - run: npm pack --dry-run

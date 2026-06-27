@@ -19,6 +19,7 @@ export interface RawObservation {
 }
 
 export interface NormalizedObservation {
+  schema_version: "1.0";
   source: ArvisSource;
   module_id: string;
   event_type: string;
@@ -66,13 +67,13 @@ const normalizeTargetType = (value: string, source: ArvisSource): ArvisTargetTyp
   return "unknown";
 };
 
-const normalizeTimestamp = (...values: unknown[]): string => {
+const normalizeTimestamp = (...values: unknown[]): string | undefined => {
   for (const value of values) {
     if (typeof value !== "string" || !value.trim()) continue;
     const parsed = new Date(value);
     if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
   }
-  return new Date().toISOString();
+  return undefined;
 };
 
 const normalizeMetadata = (value: unknown): Record<string, unknown> => {
@@ -87,16 +88,19 @@ export function normalizeObservation(input: RawObservation): NormalizeResult {
   const target = firstString(input.target, input.target_mint, input.mint, input.address);
   const eventType = firstString(input.event_type, "observed");
   const targetType = normalizeTargetType(asString(input.target_type), source);
+  const observedAt = normalizeTimestamp(input.observed_at, input.created_at);
 
   if (!target) errors.push("target is required");
   if (source === "unknown") errors.push("source could not be classified");
+  if (!observedAt) errors.push("observed_at or created_at must be a valid timestamp");
 
-  if (errors.length > 0) return { ok: false, errors };
+  if (errors.length > 0 || !observedAt) return { ok: false, errors };
 
   return {
     ok: true,
     errors: [],
     observation: {
+      schema_version: "1.0",
       source,
       module_id: moduleId,
       event_type: eventType,
@@ -104,7 +108,7 @@ export function normalizeObservation(input: RawObservation): NormalizeResult {
       target,
       target_type: targetType,
       network: firstString(input.network, "solana-mainnet"),
-      observed_at: normalizeTimestamp(input.observed_at, input.created_at),
+      observed_at: observedAt,
       metadata: normalizeMetadata(input.metadata)
     }
   };
