@@ -1,6 +1,11 @@
 name: Token2022 Debug
 
 on:
+  pull_request:
+    paths:
+      - "koschei/api/internal/handlers/token_scanner.go"
+      - "koschei/api/internal/handlers/token_scanner_extensions_test.go"
+      - ".github/workflows/debug-token2022.yml"
   push:
     branches:
       - feature/token-2022-security-scanner
