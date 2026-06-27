@@ -1,0 +1,35 @@
+name: Token2022 Debug
+
+on:
+  push:
+    branches:
+      - feature/token-2022-security-scanner
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Capture tests
+        shell: bash
+        run: |
+          set +e
+          cd koschei/api
+          go test ./... > /tmp/token2022-test.log 2>&1
+          echo $? > /tmp/token2022-exit.txt
+          cat /tmp/token2022-test.log
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: token2022-test-log
+          path: |
+            /tmp/token2022-test.log
+            /tmp/token2022-exit.txt
+          retention-days: 1
