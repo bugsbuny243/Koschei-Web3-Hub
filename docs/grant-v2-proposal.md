@@ -57,6 +57,12 @@ Location: `sdk/typescript`
 
 Provides dependency-free clients for current production routes, structured API errors and deterministic signed-verdict validation.
 
+### Signed verdict CLI
+
+Location: `sdk/typescript/bin/arvis-verdict.mjs`
+
+Validates verdict JSON from a file or stdin and returns deterministic exit codes for accepted, malformed and withheld results.
+
 ### Solana event normalizer
 
 Location: `oss/event-normalizer`
@@ -81,18 +87,19 @@ The repository includes API references, a developer quickstart, data-flow archit
 
 ## Grant-funded technical deliverables
 
-### Milestone 1 — Reproducible developer kit
+### Milestone 1 — Reproducible developer releases
 
-- publish versioned npm packages for the SDK and event normalizer
+- publish versioned npm releases for the SDK and event normalizer
 - publish deterministic fixtures for Pump and Raydium observations
-- publish a standalone verdict-validation CLI
 - publish package checksums and release notes
+- document compatibility and support policy
 
 Acceptance criteria:
 
 - clean installation on Node.js 18+
 - strict type-check and runtime tests pass in CI
 - example input produces documented deterministic output
+- package archives contain only documented distributable files
 
 ### Milestone 2 — Solana integration surfaces
 
