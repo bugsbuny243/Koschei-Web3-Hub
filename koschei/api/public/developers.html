@@ -10,27 +10,36 @@
 </head>
 <body>
 <main class="wrap">
-<nav class="top"><a class="brand" href="/">Koschei ARVIS</a><div class="nav"><a href="/security-radar">Radar</a><a href="/architecture">Architecture</a><a href="/pricing">Plans</a></div></nav>
-<section class="hero"><span class="eyebrow">Developer resources</span><h1>Solana risk intelligence for builders.</h1><p class="sub">The routes below are aligned with the current production server. Session-authenticated radar routes serve the customer product; API-key routes serve partner integrations. Planned future routes are clearly labeled instead of being presented as live.</p><div class="actions"><a class="btn primary" href="/security-radar">Open live radar</a><a class="btn" href="/architecture">View architecture</a></div></section>
+<nav class="top"><a class="brand" href="/">Koschei ARVIS</a><div class="nav"><a href="/security-radar">Radar</a><a href="/transaction-firewall">Firewall</a><a href="/token-2022-scanner">Token-2022</a><a href="/architecture">Architecture</a><a href="/pricing">Plans</a></div></nav>
+<section class="hero"><span class="eyebrow">Go API · plain HTML surfaces</span><h1>Solana risk intelligence for builders.</h1><p class="sub">Production security services run on the Go backend. Customer tools use plain HTML, CSS and browser JavaScript without a frontend framework.</p><div class="actions"><a class="btn primary" href="/token-2022-scanner">Open Token-2022 Scanner</a><a class="btn" href="/transaction-firewall">Open Transaction Firewall</a><a class="btn" href="/security-radar">Open live radar</a></div></section>
 <section class="grid">
+<article class="card"><span class="pill">Live · membership</span><h2>Token-2022 Security Scanner</h2><p>Distinguishes classic SPL Token from Token-2022 and evaluates extensions that change transfer, authority, privacy and compatibility behavior.</p><code class="code">POST /api/token/scan
+Authorization: Bearer &lt;session-token&gt;
+{
+  "mint": "TOKEN_MINT",
+  "network": "solana-mainnet"
+}</code></article>
+<article class="card"><span class="pill">Live · API key · shadow</span><h2>Transaction Firewall</h2><p>Simulates a base64 Solana transaction before signing and returns allow, warn, block or withhold evidence.</p><code class="code">POST /api/v1/shield/transaction
+X-API-Key: &lt;key&gt;
+{
+  "transaction": "BASE64_TRANSACTION",
+  "encoding": "base64"
+}</code></article>
 <article class="card"><span class="pill">Live · session auth</span><h2>Radar check</h2><p>Runs an evidence-backed ARVIS check for a Solana target.</p><code class="code">POST /api/v1/radar/check
 Authorization: Bearer &lt;session-token&gt;
 {
   "target": "SOLANA_TARGET",
   "network": "solana-mainnet"
 }</code></article>
-<article class="card"><span class="pill">Live · session auth</span><h2>Radar feed</h2><p>Returns verified cards, source freshness, processing health and production proof counters.</p><code class="code">GET /api/v1/radar/feed
-Authorization: Bearer &lt;session-token&gt;</code></article>
-<article class="card"><span class="pill">Live · API key</span><h2>B2B token scan</h2><p>Partner token-scan route protected by API key and quota controls.</p><code class="code">POST /api/v1/scan/token
+<article class="card"><span class="pill">Live · API key</span><h2>B2B token scan</h2><p>Partner token-scan route supporting single and batch targets with quota controls.</p><code class="code">POST /api/v1/scan/token
 X-API-Key: &lt;key&gt;
 {
-  "mint": "TOKEN_MINT"
+  "mints": ["MINT_A", "MINT_B"]
 }</code></article>
-<article class="card"><span class="pill">Live · API key</span><h2>Shield preflight</h2><p>Preflight security surface for transaction or target checks.</p><code class="code">POST /api/v1/shield/preflight
+<article class="card"><span class="pill">Live · API key</span><h2>Usage and asynchronous results</h2><p>Returns API usage, reserved and charged outputs, latency and stored results.</p><code class="code">GET /api/v1/usage
+GET /api/v1/usage?request_id=REQUEST_ID
 X-API-Key: &lt;key&gt;</code></article>
-<article class="card"><span class="pill">Live · API key</span><h2>Usage history</h2><p>Returns API usage, quota events, credit reservations and charged requests.</p><code class="code">GET /api/v1/usage
-X-API-Key: &lt;key&gt;</code></article>
-<article class="card"><span class="pill">Schema</span><h2>Signed verdict contract</h2><p>Customer-visible verdicts carry evidence, rule metadata and a signed final status.</p><code class="code">{
+<article class="card"><span class="pill">Schema</span><h2>Signed verdict contract</h2><p>Final verdicts carry evidence, rule metadata and a signed status.</p><code class="code">{
   "grade": "A-F",
   "risk_index": 45,
   "risk_level": "medium",
@@ -39,7 +48,7 @@ X-API-Key: &lt;key&gt;</code></article>
   "signed": true
 }</code></article>
 </section>
-<section class="card" style="margin-top:14px"><span class="eyebrow">Planned expansion</span><div class="roadmap"><div><b>0-30 days:</b> publish schema, SDK starter, real-route API docs and event normalization draft.</div><div><b>30-60 days:</b> add wallet-oriented API-key surface, webhook examples and partner integration samples.</div><div><b>60-90 days:</b> pilot integrations and publish case studies, benchmarks and limitations.</div></div></section>
+<section class="card" style="margin-top:14px"><span class="eyebrow">Next Go + HTML package</span><div class="roadmap"><div><b>Persistent Watchlist:</b> target storage, change detection, alert rules and delivery history.</div><div><b>Webhook delivery:</b> HMAC signatures, retry schedule and dead-letter queue.</div></div></section>
 </main>
 </body>
 </html>

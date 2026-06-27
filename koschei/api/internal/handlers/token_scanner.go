@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+
 type tokenScanRequest struct {
 	Mint    string `json:"mint"`
 	Address string `json:"address"`
@@ -19,18 +21,26 @@ type tokenScanRequest struct {
 }
 
 type tokenScanResponse struct {
-	Mint                 string   `json:"mint"`
-	Network              string   `json:"network"`
-	Score                int      `json:"score"`
-	RiskLevel            string   `json:"risk_level"`
-	Supply               string   `json:"supply"`
-	Decimals             int      `json:"decimals"`
-	MintAuthority        string   `json:"mint_authority,omitempty"`
-	FreezeAuthority      string   `json:"freeze_authority,omitempty"`
-	LargestHolderPercent float64  `json:"largest_holder_percent"`
-	TopTenPercent        float64  `json:"top_ten_percent"`
-	Findings             []string `json:"findings"`
-	Disclaimer           string   `json:"disclaimer"`
+	Mint                     string                     `json:"mint"`
+	Network                  string                     `json:"network"`
+	Score                    int                        `json:"score"`
+	RiskLevel                string                     `json:"risk_level"`
+	Supply                   string                     `json:"supply"`
+	Decimals                 int                        `json:"decimals"`
+	MintAuthority            string                     `json:"mint_authority,omitempty"`
+	FreezeAuthority          string                     `json:"freeze_authority,omitempty"`
+	LargestHolderPercent     float64                    `json:"largest_holder_percent"`
+	TopTenPercent            float64                    `json:"top_ten_percent"`
+	Findings                 []string                   `json:"findings"`
+	TokenProgram             string                     `json:"token_program"`
+	Token2022                bool                       `json:"token_2022"`
+	Extensions               []tokenExtensionAssessment `json:"extensions"`
+	ExtensionRiskPenalty     int                        `json:"extension_risk_penalty"`
+	TransferBehavior         map[string]any             `json:"transfer_behavior"`
+	VisibilityLimitations    []string                   `json:"visibility_limitations"`
+	CompatibilityWarnings    []string                   `json:"compatibility_warnings"`
+	FinalPolicy              string                     `json:"final_policy"`
+	Disclaimer               string                     `json:"disclaimer"`
 }
 
 type rpcEnvelope struct {
@@ -73,13 +83,14 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 
 	var account struct {
 		Value *struct {
-			Data struct {
-				Parsed struct {
-					Info struct {
-						MintAuthority   *string `json:"mintAuthority"`
-						FreezeAuthority *string `json:"freezeAuthority"`
-					} `json:"info"`
+			Owner string `json:"owner"`
+			Data  struct {
+				Program string `json:"program"`
+				Parsed  struct {
+					Type string         `json:"type"`
+					Info map[string]any `json:"info"`
 				} `json:"parsed"`
+				Space int `json:"space"`
 			} `json:"data"`
 		} `json:"value"`
 	}
@@ -107,22 +118,44 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 	score := 100
 	findings := []string{}
 	mintAuthority, freezeAuthority := "", ""
+	tokenProgram := "spl-token"
+	isToken2022 := false
+	extensions := []tokenExtensionAssessment{}
+	transferBehavior := map[string]any{"standard_transfer": true}
+	visibilityLimitations := []string{}
+	compatibilityWarnings := []string{}
+	extensionPenalty := 0
+
 	if account.Value != nil {
-		if account.Value.Data.Parsed.Info.MintAuthority != nil {
-			mintAuthority = *account.Value.Data.Parsed.Info.MintAuthority
+		info := account.Value.Data.Parsed.Info
+		mintAuthority = tokenInfoString(info, "mintAuthority")
+		freezeAuthority = tokenInfoString(info, "freezeAuthority")
+		if mintAuthority != "" {
 			score -= 25
 			findings = append(findings, "Mint authority is active and can create additional supply.")
 		} else {
 			findings = append(findings, "Mint authority is disabled.")
 		}
-		if account.Value.Data.Parsed.Info.FreezeAuthority != nil {
-			freezeAuthority = *account.Value.Data.Parsed.Info.FreezeAuthority
+		if freezeAuthority != "" {
 			score -= 20
 			findings = append(findings, "Freeze authority is active and can freeze token accounts.")
 		} else {
 			findings = append(findings, "Freeze authority is disabled.")
 		}
+
+		isToken2022 = account.Value.Owner == token2022ProgramID || strings.EqualFold(account.Value.Data.Program, "spl-token-2022")
+		if isToken2022 {
+			tokenProgram = "token-2022"
+			extensions = parseToken2022Extensions(info)
+			extensionPenalty, transferBehavior, visibilityLimitations, compatibilityWarnings = summarizeToken2022Extensions(extensions)
+			score -= extensionPenalty
+			findings = append(findings, token2022Findings(extensions)...)
+			if len(extensions) == 0 {
+				findings = append(findings, "Token is owned by the Token-2022 program and no active mint extensions were reported by the RPC parser.")
+			}
+		}
 	}
+
 	if topOne >= 50 {
 		score -= 35
 		findings = append(findings, "The largest token account controls at least half of the supply.")
@@ -137,29 +170,42 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 	if score < 0 {
 		score = 0
 	}
-	risk := "low"
-	if score < 40 {
-		risk = "high"
-	} else if score < 70 {
-		risk = "medium"
-	}
 
-	disclaimer := "Koschei provides read-only risk signals based on public on-chain data. This is not financial advice."
+	risk := tokenRiskLevel(score)
+	policy := tokenFinalPolicy(score, extensions, visibilityLimitations)
+	disclaimer := "Koschei provides read-only risk signals based on public on-chain data. Token extensions can be legitimate but may materially change transfer, authority, fee, privacy, or compatibility behavior. This is not financial advice."
 
 	writeJSON(w, http.StatusOK, tokenScanResponse{
-		Mint:                 mint,
-		Network:              req.Network,
-		Score:                score,
-		RiskLevel:            risk,
-		Supply:               supply.Value.Amount,
-		Decimals:             supply.Value.Decimals,
-		MintAuthority:        mintAuthority,
-		FreezeAuthority:      freezeAuthority,
-		LargestHolderPercent: roundPercent(topOne),
-		TopTenPercent:        roundPercent(topTen),
-		Findings:             findings,
-		Disclaimer:           disclaimer,
+		Mint:                  mint,
+		Network:               req.Network,
+		Score:                 score,
+		RiskLevel:             risk,
+		Supply:                supply.Value.Amount,
+		Decimals:              supply.Value.Decimals,
+		MintAuthority:         mintAuthority,
+		FreezeAuthority:       freezeAuthority,
+		LargestHolderPercent:  roundPercent(topOne),
+		TopTenPercent:         roundPercent(topTen),
+		Findings:              findings,
+		TokenProgram:          tokenProgram,
+		Token2022:             isToken2022,
+		Extensions:            extensions,
+		ExtensionRiskPenalty:  extensionPenalty,
+		TransferBehavior:      transferBehavior,
+		VisibilityLimitations: visibilityLimitations,
+		CompatibilityWarnings: compatibilityWarnings,
+		FinalPolicy:           policy,
+		Disclaimer:            disclaimer,
 	})
+}
+
+func tokenInfoString(info map[string]any, key string) string {
+	value, exists := info[key]
+	if !exists || value == nil {
+		return ""
+	}
+	text, _ := value.(string)
+	return strings.TrimSpace(text)
 }
 
 func (h *Handler) callSolanaRPC(ctx context.Context, client *http.Client, rpcURL, network, method string, params interface{}, target interface{}) error {
