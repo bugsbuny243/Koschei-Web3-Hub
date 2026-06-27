@@ -16,6 +16,12 @@ export interface SignedVerdict {
   [key: string]: unknown;
 }
 
+export interface VerdictValidationResult {
+  ok: boolean;
+  errors: string[];
+  verdict?: SignedVerdict;
+}
+
 export interface RadarCheckRequest {
   target: string;
   network?: string;
@@ -109,7 +115,7 @@ export class ArvisClient {
     });
   }
 
-  async usage<T = { usage?: unknown[] }>() : Promise<T> {
+  async usage<T = { usage?: unknown[] }>(): Promise<T> {
     return this.request<T>("/api/v1/usage", { method: "GET", auth: "apiKey" });
   }
 
@@ -167,8 +173,41 @@ export class ArvisClient {
   }
 }
 
+export function validateSignedVerdict(value: unknown): VerdictValidationResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { ok: false, errors: ["verdict must be an object"] };
+  }
+
+  const verdict = value as SignedVerdict;
+  const errors: string[] = [];
+
+  if (verdict.signed !== true) errors.push("signed must be true");
+  if (typeof verdict.risk_index !== "number" || !Number.isFinite(verdict.risk_index)) {
+    errors.push("risk_index must be a finite number");
+  } else if (verdict.risk_index < 0 || verdict.risk_index > 100) {
+    errors.push("risk_index must be between 0 and 100");
+  }
+  if (typeof verdict.grade !== "string" || !/^[A-F]$/.test(verdict.grade)) {
+    errors.push("grade must be A through F");
+  }
+  if (
+    typeof verdict.risk_level !== "string" ||
+    !["low", "medium", "high", "critical"].includes(verdict.risk_level)
+  ) {
+    errors.push("risk_level must be low, medium, high, or critical");
+  }
+  if (!Array.isArray(verdict.evidence) || verdict.evidence.some((item) => typeof item !== "string")) {
+    errors.push("evidence must be an array of strings");
+  }
+  if (typeof verdict.rule_version !== "string" || verdict.rule_version.trim() === "") {
+    errors.push("rule_version is required");
+  }
+
+  return errors.length === 0
+    ? { ok: true, errors: [], verdict }
+    : { ok: false, errors };
+}
+
 export function isSignedVerdict(value: unknown): value is SignedVerdict {
-  if (!value || typeof value !== "object") return false;
-  const verdict = value as Record<string, unknown>;
-  return verdict.signed === true && typeof verdict.risk_index === "number";
+  return validateSignedVerdict(value).ok;
 }
