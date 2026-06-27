@@ -38,8 +38,12 @@ func StartDeliveryWorker(parent context.Context, db *sql.DB) func() {
 		return func() {}
 	}
 	ctx, cancel := context.WithCancel(parent)
+	client := NewDeliveryClient()
 	var once sync.Once
 	go func() {
+		if transport, ok := client.Transport.(*http.Transport); ok {
+			defer transport.CloseIdleConnections()
+		}
 		_, _ = db.ExecContext(ctx, `
 			UPDATE webhook_deliveries
 			SET status='retry', locked_at=NULL, next_attempt_at=now(), updated_at=now(),
@@ -48,7 +52,7 @@ func StartDeliveryWorker(parent context.Context, db *sql.DB) func() {
 		ticker := time.NewTicker(deliveryPollInterval)
 		defer ticker.Stop()
 		for {
-			if err := processDeliveryBatch(ctx, db); err != nil && ctx.Err() == nil {
+			if err := processDeliveryBatch(ctx, db, client); err != nil && ctx.Err() == nil {
 				log.Printf("webhook delivery worker: %v", err)
 			}
 			select {
@@ -61,8 +65,7 @@ func StartDeliveryWorker(parent context.Context, db *sql.DB) func() {
 	return func() { once.Do(cancel) }
 }
 
-func processDeliveryBatch(ctx context.Context, db *sql.DB) error {
-	client := NewDeliveryClient()
+func processDeliveryBatch(ctx context.Context, db *sql.DB, client *http.Client) error {
 	for i := 0; i < deliveryBatchSize; i++ {
 		delivery, err := claimDelivery(ctx, db)
 		if err == sql.ErrNoRows {
