@@ -11,4 +11,9 @@ func registerWatchlistRoutes(mux *http.ServeMux, h *handlers.Handler, premium fu
 	mux.HandleFunc("/api/watchlist/refresh", requiresDB(h, premium(method(http.MethodPost, h.WatchlistRefresh))))
 	mux.HandleFunc("/api/watchlist/alerts", requiresDB(h, premium(h.WatchlistAlerts)))
 	mux.HandleFunc("/api/watchlist/", requiresDB(h, premium(h.WatchlistItem)))
+
+	mux.HandleFunc("/api/webhooks/deliveries", requiresDB(h, premium(h.WebhookDeliveries)))
+	mux.HandleFunc("/api/webhooks/deliveries/", requiresDB(h, premium(h.WebhookDeliveryItem)))
+	mux.HandleFunc("/api/webhooks", requiresDB(h, premium(h.WebhookEndpoints)))
+	mux.HandleFunc("/api/webhooks/", requiresDB(h, premium(h.WebhookEndpointItem)))
 }
