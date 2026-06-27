@@ -51,3 +51,49 @@ CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_owner_created
     ON webhook_deliveries (auth_subject, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_endpoint_created
     ON webhook_deliveries (endpoint_id, created_at DESC);
+
+CREATE OR REPLACE FUNCTION enqueue_watchlist_alert_webhooks()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    INSERT INTO webhook_deliveries (endpoint_id, auth_subject, event_id, event_type, payload)
+    SELECT
+        e.id,
+        NEW.auth_subject,
+        NEW.id,
+        'watchlist.alert.created',
+        jsonb_build_object(
+            'id', NEW.id::text,
+            'type', 'watchlist.alert.created',
+            'created_at', NEW.created_at,
+            'data', jsonb_build_object(
+                'watchlist_id', NEW.watchlist_id::text,
+                'target', t.target,
+                'target_type', t.target_type,
+                'network', t.network,
+                'label', t.label,
+                'event_type', NEW.event_type,
+                'severity', NEW.severity,
+                'title', NEW.title,
+                'message', NEW.message,
+                'previous_value', NEW.previous_value,
+                'current_value', NEW.current_value,
+                'evidence', NEW.evidence
+            )
+        )
+    FROM webhook_endpoints e
+    JOIN watchlist_targets t ON t.id = NEW.watchlist_id
+    WHERE e.auth_subject = NEW.auth_subject
+      AND e.status = 'active'
+      AND 'watchlist.alert.created' = ANY(e.event_types)
+    ON CONFLICT (endpoint_id, event_id, event_type) DO NOTHING;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_watchlist_alert_webhook_enqueue ON watchlist_alerts;
+CREATE TRIGGER trg_watchlist_alert_webhook_enqueue
+AFTER INSERT ON watchlist_alerts
+FOR EACH ROW
+EXECUTE FUNCTION enqueue_watchlist_alert_webhooks();
