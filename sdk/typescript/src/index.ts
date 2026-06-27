@@ -184,6 +184,8 @@ export function validateSignedVerdict(value: unknown): VerdictValidationResult {
   if (verdict.signed !== true) errors.push("signed must be true");
   if (typeof verdict.risk_index !== "number" || !Number.isFinite(verdict.risk_index)) {
     errors.push("risk_index must be a finite number");
+  } else if (!Number.isInteger(verdict.risk_index)) {
+    errors.push("risk_index must be an integer");
   } else if (verdict.risk_index < 0 || verdict.risk_index > 100) {
     errors.push("risk_index must be between 0 and 100");
   }
@@ -196,8 +198,12 @@ export function validateSignedVerdict(value: unknown): VerdictValidationResult {
   ) {
     errors.push("risk_level must be low, medium, high, or critical");
   }
-  if (!Array.isArray(verdict.evidence) || verdict.evidence.some((item) => typeof item !== "string")) {
-    errors.push("evidence must be an array of strings");
+  if (
+    !Array.isArray(verdict.evidence) ||
+    verdict.evidence.length === 0 ||
+    verdict.evidence.some((item) => typeof item !== "string" || item.trim() === "")
+  ) {
+    errors.push("evidence must be a non-empty array of strings");
   }
   if (typeof verdict.rule_version !== "string" || verdict.rule_version.trim() === "") {
     errors.push("rule_version is required");
