@@ -1,67 +1,89 @@
-# Open Source Roadmap
+# Open-Source Infrastructure Roadmap
 
-Koschei ARVIS is moving from a customer dashboard toward Solana-native security infrastructure. The open-source plan focuses on components that can help builders even without using the hosted product.
+Koschei ARVIS is a Solana-native security infrastructure project. The repository now contains reusable components that builders can run, inspect and integrate without depending on the customer dashboard.
 
-## Component 1: Event normalization helpers
+## Shipped components
 
-Normalize launch and liquidity observations into a stable internal format.
+### 1. Solana event normalizer
 
-Planned scope:
+Location: `oss/event-normalizer`
 
-- Pump-style launch event fields
-- Raydium-style pool event fields
-- target, target type and network normalization
-- timestamp and source metadata
+Status: shipped and tested.
 
-## Component 2: Signed verdict schema
+The package converts Pump-style and Raydium-style observations into a deterministic versioned contract containing source, target, target type, network, timestamp and metadata. Missing timestamps or unclassified sources are rejected rather than silently invented.
 
-Publish the final verdict contract used by radar, reports and API consumers.
+### 2. Signed verdict schema
 
-Planned scope:
+Location: `oss/schemas/signed-verdict.schema.json`
 
-- JSON schema
-- example low, medium and critical verdicts
-- withheld verdict example
-- simple verifier example
+Status: shipped.
 
-## Component 3: SDK starter
+The schema defines the stable output contract used by developer integrations: grade, risk index, risk level, evidence, rule version and signed status.
 
-A small SDK starter for Solana builders who want to request and display ARVIS verdicts.
+### 3. TypeScript SDK
 
-Planned scope:
+Location: `sdk/typescript`
 
-- TypeScript client
-- request helpers
-- response parser
-- error handling examples
+Status: shipped and tested.
 
-## Component 4: Integration examples
+The dependency-free client supports the current production API routes and includes deterministic structural validation for signed verdicts.
 
-Examples for teams that want to embed ARVIS risk intelligence.
+### 4. Integration examples
 
-Planned examples:
+Location: `examples`
 
-- wallet warning widget
-- launchpad screening widget
-- research dashboard feed consumer
-- webhook alert receiver
+Status: shipped.
 
-## 30 / 60 / 90 day plan
+Current examples demonstrate:
 
-### 0-30 days
+- wallet preflight warnings
+- launchpad token screening
+- signed-verdict withholding when evidence is incomplete
 
-- publish signed verdict schema
-- publish event normalization draft
-- publish API documentation v1
+### 5. Developer documentation
 
-### 30-60 days
+Locations:
 
-- publish SDK starter
-- publish integration examples
-- add webhook documentation
+- `docs/api-reference.md`
+- `docs/DEVELOPER_QUICKSTART.md`
+- `docs/architecture/data-flow.md`
+- `docs/signed-verdict-schema.md`
+- `docs/technical-whitepaper.md`
 
-### 60-90 days
+Status: shipped.
 
-- pilot integrations with Solana builders
-- publish case studies and benchmark notes
-- expand wallet and token intelligence examples
+## Quality gates
+
+The open-source TypeScript workflow runs for both packages and checks:
+
+- strict TypeScript compilation
+- runtime unit tests
+- package build output
+- package archive validation
+
+The Go API has a separate test, vet and build workflow.
+
+## Next 30 days
+
+- publish versioned npm releases for the SDK and event normalizer
+- add fixture-based Pump and Raydium normalization examples
+- publish a standalone verdict-validation CLI
+- add webhook receiver examples after the webhook contract is finalized
+
+## Next 60 days
+
+- release a wallet integration starter
+- release a launchpad screening starter
+- add batch token-screening support
+- publish deterministic benchmark fixtures and expected results
+
+## Next 90 days
+
+- run pilot integrations with Solana builders
+- publish integration case studies
+- expand wallet, token and sybil evidence coverage
+- document false-positive review and rule-version governance
+
+## Trust boundary
+
+Open-source helpers do not declare an address malicious. They normalize observations, validate output structure and call evidence-backed APIs. When verified evidence is unavailable, integrations must withhold a final verdict rather than manufacture a score.
