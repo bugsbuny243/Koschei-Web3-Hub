@@ -7,7 +7,7 @@ This document maps the previous grant feedback to concrete repository outputs. I
 | Technical product | Go API, ARVIS worker runtime, event/verdict stores, authenticated analysis routes | Live |
 | Solana-native infrastructure | Pump-style observation ingestion, Raydium analysis, Solana RPC enrichment and failover | Live |
 | Open-source software | `oss/event-normalizer`, `oss/schemas/signed-verdict.schema.json` | Shipped |
-| Developer tool | `sdk/typescript` with API client and signed-verdict validation | Shipped |
+| Developer tools | `sdk/typescript`, signed-verdict validator and `arvis-verdict` CLI | Shipped |
 | Developer resources | API reference, developer quickstart, architecture, limitations and integration examples | Shipped |
 | Reproducible quality | Go CI plus TypeScript compile, runtime test and package-validation workflow | Shipped |
 | Broader ecosystem impact | Wallet warning and launchpad screening integration patterns | Shipped examples |
@@ -21,7 +21,7 @@ This document maps the previous grant feedback to concrete repository outputs. I
 - Data flow: `docs/architecture/data-flow.md`
 - API reference: `docs/api-reference.md`
 - Developer quickstart: `docs/DEVELOPER_QUICKSTART.md`
-- TypeScript SDK: `sdk/typescript`
+- TypeScript SDK and CLI: `sdk/typescript`
 - Event normalizer: `oss/event-normalizer`
 - Signed verdict schema: `oss/schemas/signed-verdict.schema.json`
 - Integration examples: `examples`
