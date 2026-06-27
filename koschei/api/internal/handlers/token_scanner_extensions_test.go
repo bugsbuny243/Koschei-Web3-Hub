@@ -79,18 +79,18 @@ func TestNestedExtensionValues(t *testing.T) {
 		"olderTransferFee": map[string]any{"transferFeeBasisPoints": float64(100)},
 		"newerTransferFee": map[string]any{"maximumFee": "900"},
 	}
-	if got := nestedNumber(value, "transferFeeBasisPoints"); got != 100 {
+	if got := token2022NestedNumber(value, "transferFeeBasisPoints"); got != 100 {
 		t.Fatalf("expected 100 bps, got %v", got)
 	}
-	if got := nestedString(value, "maximumFee"); got != "900" {
+	if got := token2022NestedString(value, "maximumFee"); got != "900" {
 		t.Fatalf("expected maximum fee 900, got %q", got)
 	}
 }
 
 func TestNormalizeExtensionName(t *testing.T) {
 	cases := map[string]string{
-		"PermanentDelegate":      "permanentdelegate",
-		"transfer_fee_config":    "transferfeeconfig",
+		"PermanentDelegate":       "permanentdelegate",
+		"transfer_fee_config":     "transferfeeconfig",
 		"Scaled UI Amount Config": "scaleduiamountconfig",
 	}
 	for input, want := range cases {
