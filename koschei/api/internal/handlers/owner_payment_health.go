@@ -10,14 +10,17 @@ import (
 )
 
 func (h *Handler) OwnerPaymentHealth(w http.ResponseWriter, r *http.Request) {
-	cfg := services.LoadPaddleConfigFromEnv()
 	response := map[string]any{
-		"ok":     true,
-		"paddle": cfg.PublicStatus(),
+		"ok":       true,
+		"provider": "shopier",
+		"mode":     "manual_owner_approval",
 		"summary": map[string]any{
-			"active_entitlements":      0,
-			"latest_payment_events":    []map[string]any{},
-			"failed_webhook_events_24h": 0,
+			"active_entitlements":       int64(0),
+			"pending_payment_requests":  int64(0),
+			"approved_payments_30d":     int64(0),
+			"revenue_try_30d":           int64(0),
+			"latest_payment_events":     []map[string]any{},
+			"failed_webhook_events_24h": int64(0),
 		},
 	}
 	if h == nil || h.DBRead == nil {
@@ -26,38 +29,63 @@ func (h *Handler) OwnerPaymentHealth(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, response)
 		return
 	}
-	summary := map[string]any{"active_entitlements": h.countActivePaddleEntitlements(r), "latest_payment_events": h.latestPaymentEvents(r), "failed_webhook_events_24h": h.failedWebhookEvents24h(r)}
-	response["summary"] = summary
+	response["summary"] = map[string]any{
+		"active_entitlements":       h.countActiveEntitlements(r),
+		"pending_payment_requests":  h.countPaymentRequests(r, "pending"),
+		"approved_payments_30d":     h.countApprovedPayments30d(r),
+		"revenue_try_30d":           h.approvedRevenueTRY30d(r),
+		"latest_payment_events":     h.latestManualPaymentEvents(r),
+		"failed_webhook_events_24h": h.failedWebhookEvents24h(r),
+	}
 	writeJSON(w, http.StatusOK, response)
 }
 
-func (h *Handler) countActivePaddleEntitlements(r *http.Request) int64 {
+func (h *Handler) countActiveEntitlements(r *http.Request) int64 {
 	var count int64
-	_ = h.DBRead.QueryRowContext(r.Context(), `SELECT count(*) FROM entitlements WHERE status='active' AND COALESCE(payment_provider,'')='paddle' AND (expires_at IS NULL OR expires_at > now())`).Scan(&count)
+	_ = h.DBRead.QueryRowContext(r.Context(), `SELECT count(*) FROM entitlements WHERE status='active' AND (expires_at IS NULL OR expires_at > now())`).Scan(&count)
 	return count
+}
+
+func (h *Handler) countPaymentRequests(r *http.Request, status string) int64 {
+	var count int64
+	_ = h.DBRead.QueryRowContext(r.Context(), `SELECT count(*) FROM payment_requests WHERE status=$1`, status).Scan(&count)
+	return count
+}
+
+func (h *Handler) countApprovedPayments30d(r *http.Request) int64 {
+	var count int64
+	_ = h.DBRead.QueryRowContext(r.Context(), `SELECT count(*) FROM payment_requests WHERE status='approved' AND COALESCE(reviewed_at,created_at) >= now() - interval '30 days'`).Scan(&count)
+	return count
+}
+
+func (h *Handler) approvedRevenueTRY30d(r *http.Request) int64 {
+	var total int64
+	_ = h.DBRead.QueryRowContext(r.Context(), `SELECT COALESCE(sum(amount_try),0) FROM payment_requests WHERE status='approved' AND COALESCE(reviewed_at,created_at) >= now() - interval '30 days'`).Scan(&total)
+	return total
 }
 
 func (h *Handler) failedWebhookEvents24h(r *http.Request) int64 {
 	var count int64
-	_ = h.DBRead.QueryRowContext(r.Context(), `SELECT count(*) FROM security_audit_events WHERE event_type='payment_webhook_invalid' AND created_at >= now() - interval '24 hours'`).Scan(&count)
+	_ = h.DBRead.QueryRowContext(r.Context(), `SELECT count(*) FROM security_audit_events WHERE event_type='shopier_webhook_invalid' AND created_at >= now() - interval '24 hours'`).Scan(&count)
 	return count
 }
 
-func (h *Handler) latestPaymentEvents(r *http.Request) []map[string]any {
-	rows, err := h.DBRead.QueryContext(r.Context(), `SELECT provider, COALESCE(provider_order_id,''), COALESCE(provider_payment_id,''), status, currency, amount_try_cents, created_at FROM orders WHERE provider='paddle' ORDER BY created_at DESC LIMIT 10`)
+func (h *Handler) latestManualPaymentEvents(r *http.Request) []map[string]any {
+	rows, err := h.DBRead.QueryContext(r.Context(), `SELECT id::text, COALESCE(email,''), COALESCE(product_slug,plan,''), COALESCE(amount_try,0), COALESCE(currency,'TRY'), status, created_at, reviewed_at FROM payment_requests ORDER BY created_at DESC LIMIT 10`)
 	if err != nil {
 		return []map[string]any{}
 	}
 	defer rows.Close()
 	items := []map[string]any{}
 	for rows.Next() {
-		var provider, orderID, paymentID, status, currency string
+		var id, email, product, currency, status string
 		var amount int64
 		var createdAt time.Time
-		if err := rows.Scan(&provider, &orderID, &paymentID, &status, &currency, &amount, &createdAt); err != nil {
+		var reviewedAt any
+		if err := rows.Scan(&id, &email, &product, &amount, &currency, &status, &createdAt, &reviewedAt); err != nil {
 			continue
 		}
-		items = append(items, map[string]any{"provider": provider, "provider_order_id": orderID, "provider_payment_id": paymentID, "status": status, "currency": currency, "amount_cents": amount, "created_at": createdAt})
+		items = append(items, map[string]any{"id": id, "email": email, "product_id": product, "amount_try": amount, "currency": currency, "status": status, "created_at": createdAt, "reviewed_at": reviewedAt})
 	}
 	return items
 }

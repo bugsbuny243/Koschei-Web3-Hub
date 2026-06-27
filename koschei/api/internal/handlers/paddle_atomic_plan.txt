@@ -1,1 +1,0 @@
-Paddle route methods, webhook verification, subscription helpers and B2B quota functions will be preserved in one atomic tree update.

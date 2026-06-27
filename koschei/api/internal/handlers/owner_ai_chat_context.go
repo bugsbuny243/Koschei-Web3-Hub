@@ -40,7 +40,7 @@ func (h *Handler) buildOwnerChatSnapshot(ctx context.Context) ownerChatSnapshot 
 		Services: map[string]any{
 			"database":    ownerDatabaseStatus(ctx, h.DB),
 			"ai_provider": ownerAIProviderStatus(),
-			"paddle":      configuredStatus("PADDLE_API_KEY", "PADDLE_WEBHOOK_SECRET", "PADDLE_ENV"),
+			"shopier":     "manual_owner_approval",
 			"alchemy_rpc": configuredStatusAny("ALCHEMY_API_KEY", "SOLANA_RPC_URL"),
 			"neon":        configuredStatus("DATABASE_URL"),
 			"google_play": configuredStatusAny("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "GOOGLE_APPLICATION_CREDENTIALS_JSON", "GOOGLE_APPLICATION_CREDENTIALS"),
@@ -59,9 +59,9 @@ func (h *Handler) buildOwnerChatSnapshot(ctx context.Context) ownerChatSnapshot 
 	if ownerTableExists(ctx, h.DB, "payment_requests") {
 		snapshot.Business["pending_payments"] = ownerCount(ctx, h.DB, `SELECT count(*) FROM payment_requests WHERE status='pending'`)
 		snapshot.Business["approved_payments_30d"] = ownerCount(ctx, h.DB, `SELECT count(*) FROM payment_requests WHERE status='approved' AND COALESCE(reviewed_at,created_at) >= now()-interval '30 days'`)
-	}
-	if ownerTableExists(ctx, h.DB, "orders") {
-		snapshot.Business["paddle_orders_total"] = ownerCount(ctx, h.DB, `SELECT count(*) FROM orders WHERE provider='paddle'`)
+		var revenueTRY int64
+		_ = h.DB.QueryRowContext(ctx, `SELECT COALESCE(sum(amount_try),0) FROM payment_requests WHERE status='approved' AND COALESCE(reviewed_at,created_at) >= now()-interval '30 days'`).Scan(&revenueTRY)
+		snapshot.Business["revenue_try_30d"] = revenueTRY
 	}
 
 	if ownerTableExists(ctx, h.DB, "arvis_stream_processing") {

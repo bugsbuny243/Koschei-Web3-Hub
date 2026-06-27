@@ -7,8 +7,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"koschei/api/internal/services"
 )
 
 func (h *Handler) OwnerCommandCenterStatus(w http.ResponseWriter, r *http.Request) {
@@ -17,7 +15,6 @@ func (h *Handler) OwnerCommandCenterStatus(w http.ResponseWriter, r *http.Reques
 		db = h.DB
 	}
 
-	paddle := services.LoadPaddleConfigFromEnv()
 	arvis := h.securityRadarStreamStats(r.Context())
 	arvis["sources"] = h.arvisSourceHealth(r.Context())
 	failureHealth := h.arvisFailureHealth(r.Context())
@@ -33,11 +30,10 @@ func (h *Handler) OwnerCommandCenterStatus(w http.ResponseWriter, r *http.Reques
 	}
 
 	servicesMap := map[string]any{
-		"database": map[string]any{"status": serviceStatus(db != nil, "connected", "unavailable")},
-		"neon_auth": map[string]any{"status": serviceStatus(envSet("NEON_AUTH_JWKS_URL"), "configured", "missing")},
-		"solana_rpc": map[string]any{"status": serviceStatus(envSet("SOLANA_RPC_URL") || envSet("ALCHEMY_SOLANA_RPC_URL") || envSet("HELIUS_SOLANA_RPC_URL") || envSet("QUICKNODE_SOLANA_RPC_URL") || envSet("ALCHEMY_API_KEY"), "configured", "missing")},
-		"paddle": paddle.PublicStatus(),
-		"shopier": map[string]any{"status": serviceStatus(envSet("SHOPIER_WEBHOOK_SECRET"), "configured", "manual")},
+		"database":       map[string]any{"status": serviceStatus(db != nil, "connected", "unavailable")},
+		"neon_auth":      map[string]any{"status": serviceStatus(envSet("NEON_AUTH_JWKS_URL"), "configured", "missing")},
+		"solana_rpc":     map[string]any{"status": serviceStatus(envSet("SOLANA_RPC_URL") || envSet("ALCHEMY_SOLANA_RPC_URL") || envSet("HELIUS_SOLANA_RPC_URL") || envSet("QUICKNODE_SOLANA_RPC_URL") || envSet("ALCHEMY_API_KEY"), "configured", "missing")},
+		"shopier":        map[string]any{"status": serviceStatus(envSet("SHOPIER_WEBHOOK_SECRET"), "configured", "manual")},
 		"security_radar": map[string]any{"status": firstMapString(arvis, "pipeline_status"), "mode": firstOwnerEnv("KOSCHEI_SOLANA_WATCH_MODE", "stream")},
 	}
 
@@ -97,17 +93,10 @@ func (h *Handler) ownerBusinessSummary(ctx context.Context, db *sql.DB) map[stri
 	}
 	if ownerTableExists(ctx, db, "payment_requests") {
 		summary["pending_payments"] = ownerCount(ctx, db, `SELECT count(*) FROM payment_requests WHERE status='pending'`)
-	}
-	if ownerTableExists(ctx, db, "orders") {
-		var paidOrders, revenue int64
-		_ = db.QueryRowContext(ctx, `
-			SELECT count(*), COALESCE(sum(amount_try_cents),0)
-			FROM orders
-			WHERE created_at >= now() - interval '30 days'
-			  AND lower(COALESCE(status,'')) IN ('paid','completed','success','active')
-		`).Scan(&paidOrders, &revenue)
-		summary["paid_orders_30d"] = paidOrders
-		summary["revenue_try_cents_30d"] = revenue
+		summary["paid_orders_30d"] = ownerCount(ctx, db, `SELECT count(*) FROM payment_requests WHERE status='approved' AND COALESCE(reviewed_at,created_at) >= now() - interval '30 days'`)
+		var revenueTRY int64
+		_ = db.QueryRowContext(ctx, `SELECT COALESCE(sum(amount_try),0) FROM payment_requests WHERE status='approved' AND COALESCE(reviewed_at,created_at) >= now() - interval '30 days'`).Scan(&revenueTRY)
+		summary["revenue_try_cents_30d"] = revenueTRY * 100
 	}
 	if ownerTableExists(ctx, db, "customer_feedback") {
 		summary["open_feedback"] = ownerCount(ctx, db, `SELECT count(*) FROM customer_feedback WHERE status IN ('new','reviewing','planned')`)
@@ -170,16 +159,16 @@ func ownerDailyUserTrend(ctx context.Context, db *sql.DB) []map[string]any {
 
 func ownerDailyOrderTrend(ctx context.Context, db *sql.DB) []map[string]any {
 	out := make([]map[string]any, 0, 7)
-	if db == nil || !ownerTableExists(ctx, db, "orders") {
+	if db == nil || !ownerTableExists(ctx, db, "payment_requests") {
 		return out
 	}
 	rows, err := db.QueryContext(ctx, `
 		WITH days AS (SELECT generate_series(current_date - interval '6 days', current_date, interval '1 day')::date AS day)
 		SELECT day::text,
-		       count(o.id) FILTER (WHERE lower(COALESCE(o.status,'')) IN ('paid','completed','success','active')),
-		       COALESCE(sum(o.amount_try_cents) FILTER (WHERE lower(COALESCE(o.status,'')) IN ('paid','completed','success','active')),0)
+		       count(p.id) FILTER (WHERE p.status='approved'),
+		       COALESCE(sum(p.amount_try * 100) FILTER (WHERE p.status='approved'),0)
 		FROM days
-		LEFT JOIN orders o ON o.created_at >= day AND o.created_at < day + interval '1 day'
+		LEFT JOIN payment_requests p ON COALESCE(p.reviewed_at,p.created_at) >= day AND COALESCE(p.reviewed_at,p.created_at) < day + interval '1 day'
 		GROUP BY day ORDER BY day
 	`)
 	if err != nil {
