@@ -2,16 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Koschei ARVIS Developers</title>
+<link rel="stylesheet" href="/css/koschei-global-shell.css?v=1">
 <style>
-:root{--line:#24eaff30;--text:#f7fbff;--muted:#9eb0c2;--green:#18ffb2;--cyan:#24eaff;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 12% 0,#18ffb229,transparent 34%),linear-gradient(135deg,#020409,#071522 62%,#02040a)}a{color:inherit;text-decoration:none}.wrap{width:min(1120px,calc(100% - 22px));margin:auto;padding:22px 0 80px}.top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:22px;padding:12px 14px;border:1px solid var(--line);border-radius:24px;background:#ffffff10}.brand{font-weight:1000}.nav{display:flex;gap:8px;flex-wrap:wrap}.nav a,.btn{border:1px solid var(--line);border-radius:999px;padding:10px 13px;color:var(--muted);font-weight:850}.btn.primary{background:linear-gradient(135deg,var(--green),var(--cyan));border:0;color:#03110d}.hero,.card{border:1px solid var(--line);border-radius:28px;background:linear-gradient(145deg,#ffffff14,#071421d4);box-shadow:0 28px 90px #0008}.hero{padding:34px;margin-bottom:18px}.eyebrow{display:inline-flex;color:#bfffe8;background:#18ffb218;border:1px solid #18ffb245;border-radius:999px;padding:8px 12px;font:900 11px var(--mono);letter-spacing:.12em;text-transform:uppercase}h1{font-size:clamp(42px,7vw,74px);line-height:.95;letter-spacing:-.06em;margin:18px 0 12px}.sub{color:var(--muted);line-height:1.75;font-size:16px;max-width:800px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{padding:22px}.card h2{margin:0 0 8px}.card p,.card li{color:var(--muted);line-height:1.6}.code{display:block;margin-top:12px;border:1px solid #ffffff16;border-radius:18px;padding:14px;background:#02070d;color:#d9fbff;font-family:var(--mono);font-size:13px;white-space:pre-wrap;overflow:auto}.pill{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:6px 9px;color:#bfffe8;font:900 10px var(--mono);text-transform:uppercase}.roadmap{display:grid;gap:10px;margin-top:14px}.roadmap div{border:1px solid #ffffff12;border-radius:18px;padding:14px;background:#ffffff08}@media(max-width:760px){.top{align-items:flex-start;flex-direction:column}.grid{grid-template-columns:1fr}.actions .btn{width:100%;text-align:center}}
+:root{--line:#24eaff30;--text:#f7fbff;--muted:#9eb0c2;--green:#18ffb2;--cyan:#24eaff;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 12% 0,#18ffb229,transparent 34%),linear-gradient(135deg,#020409,#071522 62%,#02040a)}a{color:inherit;text-decoration:none}.wrap{width:min(1120px,calc(100% - 22px));margin:auto;padding:22px 0 34px}.top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:22px;padding:12px 14px;border:1px solid var(--line);border-radius:24px;background:#ffffff10}.brand{font-weight:1000}.nav{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);border-radius:999px;padding:10px 13px;color:var(--muted);font-weight:850}.btn.primary{background:linear-gradient(135deg,var(--green),var(--cyan));border:0;color:#03110d}.hero,.card{border:1px solid var(--line);border-radius:28px;background:linear-gradient(145deg,#ffffff14,#071421d4);box-shadow:0 28px 90px #0008}.hero{padding:34px;margin-bottom:18px}.eyebrow{display:inline-flex;color:#bfffe8;background:#18ffb218;border:1px solid #18ffb245;border-radius:999px;padding:8px 12px;font:900 11px var(--mono);letter-spacing:.12em;text-transform:uppercase}h1{font-size:clamp(42px,7vw,74px);line-height:.95;letter-spacing:-.06em;margin:18px 0 12px}.sub{color:var(--muted);line-height:1.75;font-size:16px;max-width:820px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{padding:22px}.card h2{margin:9px 0 8px}.card p,.card li{color:var(--muted);line-height:1.65}.code{display:block;margin-top:12px;border:1px solid #ffffff16;border-radius:18px;padding:14px;background:#02070d;color:#d9fbff;font-family:var(--mono);font-size:13px;white-space:pre-wrap;overflow:auto}.pill{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:6px 9px;color:#bfffe8;font:900 10px var(--mono);text-transform:uppercase}.live-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}.live-grid a{border:1px solid #ffffff12;border-radius:18px;padding:15px;background:#ffffff08}.live-grid b{display:block;margin-bottom:5px}.live-grid span{color:var(--muted);font-size:13px;line-height:1.5}@media(max-width:760px){.top{align-items:flex-start;flex-direction:column}.grid,.live-grid{grid-template-columns:1fr}.actions .btn{width:100%;text-align:center}.hero{padding:24px}.card{padding:18px}.card p{font-size:15px}.code{font-size:12px}}
 </style>
 </head>
 <body>
 <main class="wrap">
-<nav class="top"><a class="brand" href="/">Koschei ARVIS</a><div class="nav"><a href="/security-radar">Radar</a><a href="/transaction-firewall">Firewall</a><a href="/token-2022-scanner">Token-2022</a><a href="/architecture">Architecture</a><a href="/pricing">Plans</a></div></nav>
-<section class="hero"><span class="eyebrow">Go API · plain HTML surfaces</span><h1>Solana risk intelligence for builders.</h1><p class="sub">Production security services run on the Go backend. Customer tools use plain HTML, CSS and browser JavaScript without a frontend framework.</p><div class="actions"><a class="btn primary" href="/token-2022-scanner">Open Token-2022 Scanner</a><a class="btn" href="/transaction-firewall">Open Transaction Firewall</a><a class="btn" href="/security-radar">Open live radar</a></div></section>
+<nav class="top"><a class="brand" href="/">Koschei ARVIS</a><div class="nav"></div></nav>
+<section class="hero"><span class="eyebrow">Go API · plain HTML surfaces</span><h1>Solana risk intelligence for builders.</h1><p class="sub">Production security services run on the Go backend. Customer tools use plain HTML, CSS and browser JavaScript without a frontend framework.</p><div class="actions"><a class="btn primary" href="/token-2022-scanner">Open Token-2022 Scanner</a><a class="btn" href="/transaction-firewall">Open Transaction Firewall</a><a class="btn" href="/webhooks">Open Webhook Console</a></div></section>
 <section class="grid">
 <article class="card"><span class="pill">Live · membership</span><h2>Token-2022 Security Scanner</h2><p>Distinguishes classic SPL Token from Token-2022 and evaluates extensions that change transfer, authority, privacy and compatibility behavior.</p><code class="code">POST /api/token/scan
 Authorization: Bearer &lt;session-token&gt;
@@ -25,21 +26,30 @@ X-API-Key: &lt;key&gt;
   "transaction": "BASE64_TRANSACTION",
   "encoding": "base64"
 }</code></article>
+<article class="card"><span class="pill">Live · membership</span><h2>Persistent Watchlist</h2><p>Stores token targets, compares verified snapshots and raises alerts for score, authority, supply and concentration changes.</p><code class="code">GET  /api/watchlist
+POST /api/watchlist
+POST /api/watchlist/{id}/refresh
+GET  /api/watchlist/alerts</code></article>
+<article class="card"><span class="pill">Live · HMAC signed</span><h2>Webhook Delivery</h2><p>Delivers watchlist alerts with encrypted secrets, HMAC-SHA256 signatures, automatic retries and a dead-letter queue.</p><code class="code">GET  /api/webhooks
+POST /api/webhooks
+POST /api/webhooks/{id}/test
+GET  /api/webhooks/deliveries</code></article>
 <article class="card"><span class="pill">Live · session auth</span><h2>Radar check</h2><p>Runs an evidence-backed ARVIS check for a Solana target.</p><code class="code">POST /api/v1/radar/check
 Authorization: Bearer &lt;session-token&gt;
 {
   "target": "SOLANA_TARGET",
   "network": "solana-mainnet"
 }</code></article>
-<article class="card"><span class="pill">Live · API key</span><h2>B2B token scan</h2><p>Partner token-scan route supporting single and batch targets with quota controls.</p><code class="code">POST /api/v1/scan/token
+<article class="card"><span class="pill">Live · API key</span><h2>B2B batch screening</h2><p>Partner token-scan route supporting up to 20 unique targets with idempotency, asynchronous results and quota controls.</p><code class="code">POST /api/v1/scan/token
 X-API-Key: &lt;key&gt;
+Idempotency-Key: import-42
 {
   "mints": ["MINT_A", "MINT_B"]
 }</code></article>
 <article class="card"><span class="pill">Live · API key</span><h2>Usage and asynchronous results</h2><p>Returns API usage, reserved and charged outputs, latency and stored results.</p><code class="code">GET /api/v1/usage
 GET /api/v1/usage?request_id=REQUEST_ID
 X-API-Key: &lt;key&gt;</code></article>
-<article class="card"><span class="pill">Schema</span><h2>Signed verdict contract</h2><p>Final verdicts carry evidence, rule metadata and a signed status.</p><code class="code">{
+<article class="card"><span class="pill">Contract</span><h2>Signed verdict</h2><p>Final verdicts carry evidence, rule metadata and signed status.</p><code class="code">{
   "grade": "A-F",
   "risk_index": 45,
   "risk_level": "medium",
@@ -48,7 +58,8 @@ X-API-Key: &lt;key&gt;</code></article>
   "signed": true
 }</code></article>
 </section>
-<section class="card" style="margin-top:14px"><span class="eyebrow">Next Go + HTML package</span><div class="roadmap"><div><b>Persistent Watchlist:</b> target storage, change detection, alert rules and delivery history.</div><div><b>Webhook delivery:</b> HMAC signatures, retry schedule and dead-letter queue.</div></div></section>
+<section class="card" style="margin-top:14px"><span class="eyebrow">Production surfaces</span><div class="live-grid"><a href="/watchlist"><b>Watchlist</b><span>Persistent targets and evidence-backed change alerts.</span></a><a href="/webhooks"><b>Webhook Console</b><span>Signed delivery, retry history and dead letters.</span></a><a href="/architecture"><b>Architecture</b><span>Live metrics from the same production health source.</span></a></div></section>
 </main>
+<script src="/js/koschei-global-shell.js?v=1"></script>
 </body>
 </html>
