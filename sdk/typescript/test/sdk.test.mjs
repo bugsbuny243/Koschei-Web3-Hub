@@ -36,7 +36,13 @@ test("rejects unsigned or incomplete verdicts", () => {
   assert.equal(result.ok, false);
   assert.ok(result.errors.includes("signed must be true"));
   assert.ok(result.errors.includes("risk_index must be between 0 and 100"));
-  assert.ok(result.errors.includes("evidence must be an array of strings"));
+  assert.ok(result.errors.includes("evidence must be a non-empty array of strings"));
+});
+
+test("rejects fractional risk indexes", () => {
+  const result = validateSignedVerdict({ ...validVerdict, risk_index: 45.5 });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.includes("risk_index must be an integer"));
 });
 
 test("sends API-key requests to the live token scan route", async () => {
