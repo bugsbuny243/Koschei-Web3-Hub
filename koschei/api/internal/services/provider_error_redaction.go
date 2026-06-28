@@ -6,8 +6,8 @@ import (
 )
 
 var providerCredentialPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)((?:https?|wss?)://[^\s\"]+/v2/)[^\s\"]+`),
-	regexp.MustCompile(`(?i)([?&](?:api[_-]?key|apikey|key|token)=)[^&\s\"]+`),
+	regexp.MustCompile(`(?i)((?:https?|wss?)://[^\s"]+/v2/)[^\s"]+`),
+	regexp.MustCompile(`(?i)([?&](?:api[_-]?key|apikey|key|token)=)[^&\s"]+`),
 }
 
 func safeProviderError(err error) string {
