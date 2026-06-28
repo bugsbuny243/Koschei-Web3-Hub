@@ -34,9 +34,9 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 		log.Printf("security radar polling worker not started: SOLANA_RPC_URL is empty")
 		return stopAll
 	}
-	pollEvery := 10 * time.Second
+	pollEvery := 60 * time.Second
 	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_RADAR_POLL_SECONDS")); raw != "" {
-		if seconds, err := strconv.Atoi(raw); err == nil && seconds > 0 {
+		if seconds, err := strconv.Atoi(raw); err == nil && seconds >= 30 && seconds <= 600 {
 			pollEvery = time.Duration(seconds) * time.Second
 		}
 	}
