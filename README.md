@@ -1,8 +1,49 @@
 # KOSCHEİ WEB3 — ARVIS
 
-KOSCHEİ WEB3 is a live, Solana-native risk-intelligence infrastructure layer for developers, wallets, launchpads, research teams and security operators.
+Koschei ARVIS is a live, Solana-native pre-signing risk layer for developers, wallets, launchpads, dApps, DeFi protocols, research teams and security operators.
 
-ARVIS converts launch, liquidity, token, wallet, transaction, program and claim observations into evidence-backed, versioned risk outputs. Solana is the first live market.
+## 30-second pitch
+
+Koschei ARVIS stops risky Solana interactions before users sign. Integrating products call one API and receive a machine-readable **allow, warn, block or withhold** decision backed by verified evidence, rule metadata and signed status.
+
+Instead of building separate token, wallet, transaction, monitoring and alert systems, Solana product teams integrate one reusable risk layer.
+
+## Who pays — and why
+
+| Customer | What ARVIS does | Why they pay |
+| --- | --- | --- |
+| Wallets | Adds evidence-backed pre-signing warnings | Reduce preventable risky interactions and support incidents |
+| Launchpads | Screens token behavior, authorities and concentration | Avoid maintaining several disconnected screening systems |
+| dApps and DeFi protocols | Simulates transactions and applies integration policy | Make consistent allow, warn, block or withhold decisions before execution |
+| Security and research teams | Monitors targets and delivers signed alerts | Replace manual monitoring with auditable evidence and reliable delivery |
+
+Commercial access can be output-based API capacity, persistent monitoring capacity or a B2B integration agreement.
+
+## Why Solana
+
+ARVIS is not a generic Web3 score with a Solana label. Its evidence model is built around:
+
+- Solana transaction instructions and account relationships
+- SPL Token and Token-2022 authorities, extensions and transfer behavior
+- mint and freeze authority evidence
+- program-specific relations and liquidity activity
+- priority-fee and pre-signing simulation context
+- Pump-style launch observations
+- Raydium-oriented liquidity evidence
+
+## Current proof and next proof
+
+Live today:
+
+- production Go API and worker pipeline
+- evidence-backed radar and signed verdict contract
+- Token-2022 scanner and transaction firewall
+- persistent watchlists and HMAC-signed webhook delivery
+- authenticated B2B batch screening with idempotency
+- asynchronous result lookup and usage accounting
+- TypeScript client, schemas, examples and CI checks
+
+The next proof is external adoption: integration pilots, measured reliability and published technical case studies. Pilot requests are collected at `/pilot`.
 
 ## Technical scope
 
@@ -31,6 +72,7 @@ Community events, general education and ecosystem promotion are not the product 
 | API reference | `docs/api-reference.md` | Shipped |
 | Developer quickstart | `docs/DEVELOPER_QUICKSTART.md` | Shipped |
 | Grant evidence matrix | `docs/grant-evidence-matrix.md` | Shipped |
+| Pitch one-pager | `docs/pitch-one-pager.md` | Shipped |
 
 The open-source packages are MIT licensed and designed to remain useful without the hosted dashboard.
 
@@ -101,15 +143,31 @@ Provider-specific limits never authorize the system to fabricate evidence. Unsup
 ## Developer routes
 
 ```text
-POST /api/v1/radar/check       session-authenticated radar check
-GET  /api/v1/radar/feed        authenticated verdict feed
-POST /api/v1/scan/token        API-key token scan
-POST /api/v1/shield/preflight  API-key pre-signing risk check
-GET  /api/v1/usage             API-key usage records
-GET  /api/v1/risk/badge        public rate-limited risk badge
+POST /api/v1/radar/check        session-authenticated radar check
+GET  /api/v1/radar/feed         authenticated verdict feed
+POST /api/v1/scan/token         API-key token and batch scan
+POST /api/v1/shield/preflight   API-key pre-signing risk check
+POST /api/v1/shield/transaction API-key transaction simulation
+GET  /api/v1/usage              API-key usage and async results
+GET  /api/v1/risk/badge         public rate-limited risk badge
 ```
 
 See `docs/api-reference.md` for authentication boundaries and current production status.
+
+## Integration pilot
+
+The pilot flow is for wallets, dApps, launchpads, DeFi protocols and security teams with a real Solana integration surface.
+
+A strong pilot has:
+
+- one named integration owner
+- one explicit risk decision
+- one documented live API route
+- measurable decision latency and completed-check rate
+- reviewed false-positive and withheld-output samples
+- permission to publish anonymized technical integration notes
+
+Apply through the production `/pilot` page.
 
 ## Local validation
 
@@ -176,7 +234,8 @@ successful evidence-backed analysis    → one output consumed
 - Limitations: `docs/limitations.md`
 - Technical whitepaper: `docs/technical-whitepaper.md`
 - Open-source roadmap: `docs/open-source-roadmap.md`
-- Grant resubmission: `docs/grant-v2-proposal.md`
+- Pitch one-pager: `docs/pitch-one-pager.md`
+- Grant resubmission: `docs/grant-v3-proposal.md`
 - Grant evidence matrix: `docs/grant-evidence-matrix.md`
 
 ## License
@@ -185,4 +244,4 @@ MIT — see `LICENSE`.
 
 ---
 
-Built as live Solana-native risk infrastructure and reusable developer tooling.
+Built as live Solana-native pre-signing risk infrastructure and reusable developer tooling.
