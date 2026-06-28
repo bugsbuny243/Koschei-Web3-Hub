@@ -14,7 +14,7 @@ const NAV=[
 
 const state={
   active:'command',dashboard:null,users:[],payments:[],paymentHealth:null,
-  feedback:[],security:[],radarSources:[],loading:false
+  feedback:[],security:[],radarSources:[],systemHealth:null,loading:false
 };
 
 const $=id=>document.getElementById(id);
@@ -33,7 +33,7 @@ const STATUS_LABELS={
   disabled:'Kapalı',waiting:'Bekliyor',unknown:'Bilinmiyor',missing:'Eksik',unavailable:'Kullanılamıyor',
   degraded:'Zayıfladı',stale:'Güncel değil',failed:'Başarısız',error:'Hata',critical:'Kritik',fatal:'Kritik',
   retryable:'Yeniden denenebilir',exhausted:'Tükendi',banned:'Yasaklı',removed:'Kaldırıldı',new:'Yeni',
-  approved:'Onaylandı',rejected:'Reddedildi',none:'Yok'
+  approved:'Onaylandı',rejected:'Reddedildi',none:'Yok',manual_owner_approval:'Owner onayı'
 };
 
 async function api(path,opt={}){
@@ -195,8 +195,8 @@ function renderRevenue(){
   document.querySelectorAll('[data-pay-approve]').forEach(b=>b.onclick=()=>reviewPayment(b.dataset.payApprove,true));
   document.querySelectorAll('[data-pay-reject]').forEach(b=>b.onclick=()=>reviewPayment(b.dataset.payReject,false));
 }
-function paymentTable(items){if(!items.length)return'<div class="empty compact">Ödeme talebi yok.</div>';return`<div class="table-wrap"><table class="table"><thead><tr><th>Müşteri</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>${items.map(p=>`<tr><td><b>${esc(p.email)}</b><div class="small muted">${esc(p.full_name||'')}</div></td><td>${esc(p.product_id||p.product_slug||p.plan||'—')}</td><td>${moneyTRY(p.amount_try)} ${esc(p.currency||'TRY')}</td><td>${badge(p.status)}</td><td>${p.status==='pending'?`<div class="row-actions"><button class="btn small primary" data-pay-approve="${esc(p.id)}" type="button">Onayla</button><button class="btn small danger" data-pay-reject="${esc(p.id)}" type="button">Reddet</button></div>`:'—'}</td></tr>`).join('')}</tbody></table></div>`}
-function paymentEventTable(items){if(!items.length)return'<div class="empty compact">Ödeme kaydı yok.</div>';return`<div class="table-wrap"><table class="table compact-table"><thead><tr><th>Müşteri</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>${items.map(item=>`<tr><td>${esc(item.email||'—')}</td><td>${esc(item.product_id||'—')}</td><td>${moneyTRY(item.amount_try)} ${esc(item.currency||'TRY')}</td><td>${badge(item.status)}</td><td>${dt(item.reviewed_at||item.created_at)}</td></tr>`).join('')}</tbody></table></div>`}
+function paymentTable(items){if(!items.length)return'<div class="empty compact">Ödeme talebi yok.</div>';return`<div class="table-wrap"><table class="table"><thead><tr><th>Müşteri</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>İşlem</th></tr></thead><tbody>${items.map(p=>`<tr><td><b>${esc(p.email)}</b><div class="small muted">${esc(p.full_name||'')}</div></td><td>${esc(p.product_id||p.product_slug||p.plan||'—')}</td><td>${moneyTRY(p.amount_try)}</td><td>${badge(p.status)}</td><td>${p.status==='pending'?`<div class="row-actions"><button class="btn small primary" data-pay-approve="${esc(p.id)}" type="button">Onayla</button><button class="btn small danger" data-pay-reject="${esc(p.id)}" type="button">Reddet</button></div>`:'—'}</td></tr>`).join('')}</tbody></table></div>`}
+function paymentEventTable(items){if(!items.length)return'<div class="empty compact">Ödeme kaydı yok.</div>';return`<div class="table-wrap"><table class="table compact-table"><thead><tr><th>Müşteri</th><th>Paket</th><th>Tutar</th><th>Durum</th><th>Tarih</th></tr></thead><tbody>${items.map(item=>`<tr><td>${esc(item.email||'—')}</td><td>${esc(item.product_id||'—')}</td><td>${moneyTRY(item.amount_try)}</td><td>${badge(item.status)}</td><td>${dt(item.reviewed_at||item.created_at)}</td></tr>`).join('')}</tbody></table></div>`}
 async function reviewPayment(id,approve){const reason=prompt(approve?'Onay notu:':'Red nedeni:',approve?'owner_verified_payment':'payment_not_verified');if(reason===null)return;try{await api(approve?'/api/owner/payments/approve':'/api/owner/payments/reject',{method:'POST',body:JSON.stringify({payment_request_id:id,reason})});toast(approve?'Ödeme onaylandı ve paket aktive edildi.':'Ödeme reddedildi.');await refreshDashboard();await loadRevenue()}catch(e){toast(e.message,true)}}
 
 async function loadFeedback(status=''){
@@ -249,7 +249,7 @@ function securityTable(items){if(!items.length)return'<div class="empty">Güvenl
 
 async function loadSystem(){
   const content=$('systemContent');content.innerHTML=loadingCard('Sistem sağlığı yükleniyor…');
-  try{const health=await api('/api/owner/health');renderSystem(health)}catch(e){renderSystem(null,e)}
+  try{const health=await api('/api/owner/health');state.systemHealth=health;renderSystem(health)}catch(e){state.systemHealth=null;renderSystem(null,e)}
 }
 function renderSystem(health,error){
   const services=state.dashboard?.services||{};
@@ -273,7 +273,7 @@ async function refreshDashboard(){
     state.dashboard=await api('/api/owner/command-center');showApp();setSync(`Canlı · ${dt(state.dashboard.generated_at)}`,'ok');renderNavigation();
     if(state.active==='command')renderCommand();
     if(state.active==='arvis'&&$('arvisContent').children.length)renderArvis();
-    if(state.active==='system'&&$('systemContent').children.length)renderSystem(null);
+    if(state.active==='system'&&$('systemContent').children.length&&state.systemHealth)renderSystem(state.systemHealth);
   }catch(e){
     if(e.status===404||e.status===401||e.status===403)showLogin('Owner oturumu gerekli.');
     else{setSync('Bağlantı hatası','bad');toast(e.message,true)}
