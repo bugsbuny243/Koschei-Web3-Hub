@@ -58,49 +58,22 @@
     return jwtPayload(jwt).sub || null;
   }
 
-  function fallbackMeFromJwt(jwt) {
-    const payload = jwtPayload(jwt);
-    const email = payload.email || '';
-    const sub = payload.sub || email;
-    return {
-      ok: true,
-      user: {
-        auth_subject: sub,
-        email,
-        role: 'member',
-        plan_id: 'free',
-        plan: 'free',
-        credits: 0,
-        outputs_total: 0,
-        outputs_remaining: 0,
-      },
-      warning: 'profile_database_unavailable',
-    };
-  }
-
-  function jsonResponse(body, status) {
-    return new Response(JSON.stringify(body), {
-      status: status || 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  function installDatabaseFallbackFetch() {
-    if (window.__koscheiDatabaseFallbackFetchInstalled) return;
-    window.__koscheiDatabaseFallbackFetchInstalled = true;
+  function installAuthenticatedFetch() {
+    if (window.__koscheiAuthenticatedFetchInstalled) return;
+    window.__koscheiAuthenticatedFetchInstalled = true;
     const nativeFetch = window.fetch.bind(window);
     window.fetch = async function(input, init) {
-      let path = '';
       let sameOrigin = false;
+      let apiRequest = false;
       try {
         const raw = typeof input === 'string' ? input : (input && input.url) || '';
         const url = new URL(raw, window.location.origin);
-        path = url.pathname;
         sameOrigin = url.origin === window.location.origin;
+        apiRequest = url.pathname.startsWith('/api/');
       } catch {}
 
       let requestInit = init;
-      if (sameOrigin && path.startsWith('/api/')) {
+      if (sameOrigin && apiRequest) {
         const jwt = getJwt();
         if (jwtIsUsable(jwt)) {
           const headers = new Headers((requestInit && requestInit.headers) || (input && input.headers) || {});
@@ -108,43 +81,11 @@
           requestInit = { ...(requestInit || {}), headers };
         }
       }
-
-      const res = await nativeFetch(input, requestInit);
-      if (!path.startsWith('/api/')) return res;
-      if (res.status !== 503) return res;
-      const clone = res.clone();
-      let data = {};
-      try { data = await clone.json(); } catch {}
-      const rawError = String(data.error || data.message || '').toLowerCase();
-      if (!rawError.includes('database unavailable')) return res;
-      if (path === '/api/me/package') {
-        return jsonResponse({
-          success: true,
-          code: 'OK',
-          data: { has_active_package: false, plan_id: null, status: 'none', expires_at: null, warning: 'package_database_unavailable' },
-        }, 200);
-      }
-      if (path === '/api/me') {
-        return jsonResponse(fallbackMeFromJwt(getJwt()), 200);
-      }
-      if (path === '/api/v1/unified/analyze') {
-        return jsonResponse({
-          success: false,
-          code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
-          message: 'Koschei analiz servisi şu an veritabanı bağlantısını bekliyor. Ekran çalışıyor; analiz için backend DB bağlantısı aktif olmalı.',
-          data: null,
-        }, 503);
-      }
-      return jsonResponse({
-        success: false,
-        code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
-        message: 'Koschei servisi şu an veritabanı bağlantısını bekliyor.',
-        data: null,
-      }, 503);
+      return nativeFetch(input, requestInit);
     };
   }
 
-  installDatabaseFallbackFetch();
+  installAuthenticatedFetch();
 
   function defaultUserName(email) {
     const name = String(email || '').split('@')[0].trim();
@@ -179,7 +120,7 @@
   }
 
   function successCallbackURL() {
-    return window.location.origin.replace(/\/+$/, '') + '/hub.html';
+    return window.location.origin.replace(/\/+$/, '') + '/dashboard';
   }
 
   function publicErrorMessage(raw, fallback) {
@@ -188,7 +129,7 @@
     if (!value) return fallback;
     if (['unauthorized', 'token_missing', 'auth_session_missing', 'auth_verification_required'].includes(normalized) || normalized.includes('401')) return 'Giriş yapmanız gerekiyor.';
     if (['forbidden', 'insufficient_outputs'].includes(normalized) || normalized.includes('active package') || normalized.includes('active_entitlement_required')) return 'Bu işlem için aktif Koschei paketi gerekli.';
-    if (normalized.includes('database unavailable')) return 'Koschei veritabanı bağlantısı geçici olarak beklemede.';
+    if (normalized.includes('database unavailable') || normalized.includes('could not be verified')) return 'Koschei veritabanı bağlantısı geçici olarak kullanılamıyor.';
     if (normalized.includes('paddle')) return value;
     if (normalized.includes('shopier')) return 'Shopier bağlantısı açılamadı.';
     return value || fallback;
@@ -267,12 +208,8 @@
     });
     const data = await readJSON(res);
     if (!res.ok) {
-      const raw = String(data.error || data.message || '').toLowerCase();
-      if (res.status === 503 && raw.includes('database unavailable')) {
-        return fallbackMeFromJwt(jwt);
-      }
-      clearJwt();
-      throw new Error(errorMessage(data, 'Giriş yapmanız gerekiyor.'));
+      if (res.status === 401) clearJwt();
+      throw new Error(errorMessage(data, res.status === 503 ? 'Koschei veritabanı bağlantısı geçici olarak kullanılamıyor.' : 'Giriş yapmanız gerekiyor.'));
     }
     return data;
   }
