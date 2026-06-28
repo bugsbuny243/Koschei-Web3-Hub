@@ -1,6 +1,9 @@
 package handlers
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+)
 
 func notImplemented(w http.ResponseWriter, name string) {
 	writeJSON(w, http.StatusNotImplemented, map[string]string{"error": "not_implemented", "handler": name})
@@ -49,11 +52,19 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	summary, err := h.provisionMember(r.Context(), claims)
+	if errors.Is(err, errAccountDisabled) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "account_disabled", "message": "Account access is disabled."})
+		return
+	}
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "profile provisioning unavailable"})
 		return
 	}
 	p, err := h.upsertProfile(r.Context(), claims.Sub, claims.Email)
+	if errors.Is(err, errAccountDisabled) {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "account_disabled", "message": "Account access is disabled."})
+		return
+	}
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "profile provisioning unavailable"})
 		return
