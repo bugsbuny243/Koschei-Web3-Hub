@@ -5,37 +5,60 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow">
   <title>KOSCHEİ WEB3 · Owner Operasyon Merkezi</title>
-  <link rel="stylesheet" href="/css/owner-control-center.css?v=2">
-  <link rel="stylesheet" href="/css/owner-mobile-fixes.css?v=1">
+  <link rel="stylesheet" href="/css/owner-control-center.css?v=4">
 </head>
 <body>
   <main id="loginView" class="login-wrap">
-    <section class="login-card">
-      <div class="brand"><span class="brand-mark">K</span><span><strong>KOSCHEİ WEB3</strong><small>Owner Operasyon Merkezi</small></span></div>
-      <div style="margin-top:28px"><span class="eyebrow">Yalnızca owner</span><h1 style="margin:0;font-size:38px;letter-spacing:-.05em">İşletmenin tamamı tek ekranda.</h1><p class="muted">Sistem, gelir, müşteriler, ARVIS, güvenlik ve geri bildirim operasyonlarını gerçek üretim verileriyle yönetin.</p></div>
-      <form id="loginForm">
-        <div class="field"><label for="loginWallet">Owner kimliği</label><input class="input" id="loginWallet" autocomplete="username" placeholder="e-posta veya wallet"></div>
-        <div class="field"><label for="loginSecret">Owner secret</label><input class="input" id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET"></div>
-        <button class="btn primary" id="loginButton" style="width:100%;margin-top:18px" type="submit">Kontrol merkezine gir</button>
-        <div id="loginError" class="error-box hidden" style="margin-top:12px"></div>
+    <section class="login-card" aria-labelledby="ownerLoginTitle">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">K</span>
+        <span><strong>KOSCHEİ WEB3</strong><small>Owner Operasyon Merkezi</small></span>
+      </div>
+      <div class="login-copy">
+        <span class="eyebrow">Yalnızca owner</span>
+        <h1 id="ownerLoginTitle">Üretim operasyonları tek ekranda.</h1>
+        <p class="muted">Müşteri, ödeme, ARVIS, geri bildirim, güvenlik ve sistem verileri doğrudan üretim servislerinden okunur.</p>
+        <div class="production-note">Demo veri yok · mock skor yok · hassas değer gösterilmez</div>
+      </div>
+      <form id="loginForm" novalidate>
+        <div class="field">
+          <label for="loginWallet">Owner kimliği</label>
+          <input class="input" id="loginWallet" autocomplete="username" placeholder="e-posta veya wallet" required>
+        </div>
+        <div class="field">
+          <label for="loginSecret">Owner secret</label>
+          <input class="input" id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET" required>
+        </div>
+        <button class="btn primary full" id="loginButton" type="submit">Kontrol merkezine gir</button>
+        <div id="loginError" class="error-box hidden" role="alert"></div>
       </form>
     </section>
   </main>
 
   <div id="appView" class="owner-app hidden">
     <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">K</span><span><strong>KOSCHEİ WEB3</strong><small>Owner Operasyon Merkezi</small></span></div>
-      <nav class="sidebar-nav" id="desktopNav"></nav>
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">K</span>
+        <span><strong>KOSCHEİ WEB3</strong><small>Owner Operasyon Merkezi</small></span>
+      </div>
+      <nav class="sidebar-nav" id="desktopNav" aria-label="Owner menüsü"></nav>
       <div class="sidebar-foot">
-        <div class="session-box"><b>Owner oturumu</b><span id="sessionState">12 saatlik güvenli oturum</span></div>
-        <button class="btn danger" id="logoutButton">Çıkış yap</button>
+        <div class="session-box"><b>Owner oturumu</b><span id="sessionState">Güvenli httpOnly oturum</span></div>
+        <button class="btn danger" id="logoutButton" type="button">Çıkış yap</button>
       </div>
     </aside>
 
     <main class="main">
       <header class="topbar">
-        <div><span class="eyebrow" id="pageEyebrow">Operasyon merkezi</span><h1 id="pageTitle">Bugün</h1></div>
-        <div class="top-actions"><span class="sync-pill"><span class="dot warn" id="syncDot"></span><span id="syncText">Bağlanıyor</span></span><button class="btn primary" id="gameStudioButton">Mobil Oyun</button><button class="btn" id="refreshButton">Yenile</button><button class="btn danger mobile-logout" type="button" onclick="document.getElementById('logoutButton').click()">Çıkış</button></div>
+        <div class="topbar-title">
+          <span class="eyebrow" id="pageEyebrow">Operasyon merkezi</span>
+          <h1 id="pageTitle">Bugün</h1>
+        </div>
+        <div class="top-actions">
+          <span class="sync-pill" title="Son üretim verisi senkronizasyonu"><span class="dot warn" id="syncDot"></span><span id="syncText">Bağlanıyor</span></span>
+          <button class="btn" id="refreshButton" type="button">Yenile</button>
+          <button class="btn danger mobile-logout" id="mobileLogoutButton" type="button">Çıkış</button>
+        </div>
       </header>
 
       <section class="page active" id="page-command"><div id="commandContent"></div></section>
@@ -48,14 +71,12 @@
       <section class="page" id="page-brain"><div id="brainContent"></div></section>
     </main>
 
-    <nav class="mobile-nav" id="mobileNav"></nav>
+    <nav class="mobile-nav" id="mobileNav" aria-label="Mobil owner menüsü"></nav>
   </div>
 
   <div id="modalRoot"></div>
-  <div class="toast" id="toast"></div>
-  <script src="/js/owner-control-center.js?v=3"></script>
-  <script src="/js/owner-production-real-data.js?v=1"></script>
-  <script src="/js/owner-game-studio.js?v=1"></script>
-  <script src="/js/owner-ai-chat.js?v=1"></script>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/js/owner-control-center.js?v=4"></script>
+  <script src="/js/owner-ai-chat.js?v=2"></script>
 </body>
 </html>
