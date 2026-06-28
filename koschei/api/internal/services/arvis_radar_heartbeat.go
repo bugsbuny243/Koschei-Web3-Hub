@@ -44,9 +44,9 @@ func StartArvisRadarHeartbeat(ctx context.Context, db *sql.DB) func() {
 }
 
 func arvisRadarHeartbeatLoop(ctx context.Context, store *SecurityRadarStore, rpcURL string) {
-	pollEvery := 20 * time.Second
+	pollEvery := 60 * time.Second
 	if raw := strings.TrimSpace(os.Getenv("ARVIS_HEARTBEAT_SECONDS")); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil && n >= 5 && n <= 300 {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 30 && n <= 300 {
 			pollEvery = time.Duration(n) * time.Second
 		}
 	}
@@ -116,7 +116,7 @@ func arvisPollHeartbeatSource(ctx context.Context, store *SecurityRadarStore, rp
 	signatures, err := SolanaGetSignaturesForAddress(pollCtx, rpcURL, source.ProgramID, 3)
 	cancel()
 	if err != nil {
-		log.Printf("arvis radar heartbeat poll failed source=%s: %v", source.Label, err)
+		log.Printf("arvis radar heartbeat poll failed source=%s: %s", source.Label, safeProviderError(err))
 		return
 	}
 	for i := len(signatures) - 1; i >= 0; i-- {
