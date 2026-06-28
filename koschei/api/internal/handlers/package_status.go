@@ -29,7 +29,7 @@ func (h *Handler) MePackage(w http.ResponseWriter, r *http.Request) {
 	}
 	status, err := h.customerPackageStatus(r.Context(), claims.Sub, normalizedClaimEmail(claims))
 	if err != nil {
-		writeAPIData(w, http.StatusOK, customerPackageStatus{HasActivePackage: false, PlanID: nil, Status: "none", ExpiresAt: nil, Warning: "package_database_unavailable"})
+		writeAPIError(w, http.StatusServiceUnavailable, APICodeInternalError, "Package access could not be verified", nil)
 		return
 	}
 	writeAPIData(w, http.StatusOK, status)
@@ -37,10 +37,10 @@ func (h *Handler) MePackage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) customerPackageStatus(ctx context.Context, authSubject, email string) (customerPackageStatus, error) {
 	if h.DB == nil {
-		return customerPackageStatus{HasActivePackage: false, PlanID: nil, Status: "none", ExpiresAt: nil, Warning: "package_database_unavailable"}, nil
+		return customerPackageStatus{}, errors.New("database unavailable")
 	}
 	if err := ensurePaymentSchema(ctx, h.DB); err != nil {
-		return customerPackageStatus{HasActivePackage: false, PlanID: nil, Status: "none", ExpiresAt: nil, Warning: "package_database_unavailable"}, nil
+		return customerPackageStatus{}, err
 	}
 	authSubject = strings.TrimSpace(authSubject)
 	email = strings.ToLower(strings.TrimSpace(email))
@@ -51,24 +51,39 @@ func (h *Handler) customerPackageStatus(ctx context.Context, authSubject, email 
 	var startsAt, expiresAt sql.NullTime
 	var outputsTotal, outputsRemaining int
 	err := h.DB.QueryRowContext(ctx, `
+		WITH identity AS (
+			SELECT lower(p.email) AS email
+			FROM app_user_profiles p
+			WHERE p.status = 'active'
+			  AND (
+				($1 <> '' AND p.auth_subject = $1)
+				OR ($2 <> '' AND lower(p.email) = lower($2))
+			  )
+			ORDER BY CASE WHEN $1 <> '' AND p.auth_subject = $1 THEN 0 ELSE 1 END,
+			         p.updated_at DESC,
+			         p.created_at DESC
+			LIMIT 1
+		)
 		SELECT COALESCE(e.plan_id,''), COALESCE(e.status,''), COALESCE(e.outputs_total,0), COALESCE(e.outputs_remaining,0), e.starts_at, e.expires_at
 		FROM entitlements e
-		LEFT JOIN app_user_profiles p ON lower(p.email) = lower(e.email)
+		JOIN identity i ON lower(e.email) = i.email
 		WHERE e.status = 'active'
 		  AND COALESCE(e.plan_id, '') <> ''
 		  AND COALESCE(e.plan_id, '') <> 'free'
 		  AND COALESCE(e.outputs_remaining, 0) > 0
 		  AND (e.expires_at IS NULL OR e.expires_at > now())
-		  AND (($1 <> '' AND p.auth_subject = $1) OR ($2 <> '' AND lower(e.email) = lower($2)))
 		ORDER BY e.updated_at DESC NULLS LAST, e.created_at DESC
 		LIMIT 1`, authSubject, email).Scan(&planID, &status, &outputsTotal, &outputsRemaining, &startsAt, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return customerPackageStatus{HasActivePackage: false, PlanID: nil, Status: "none", ExpiresAt: nil}, nil
 	}
 	if err != nil {
-		return customerPackageStatus{HasActivePackage: false, PlanID: nil, Status: "none", ExpiresAt: nil, Warning: "package_database_unavailable"}, nil
+		return customerPackageStatus{}, err
 	}
 	planID = normalizePackageID(planID)
+	if planID == "" {
+		return customerPackageStatus{}, errors.New("invalid active package")
+	}
 	if outputsTotal <= 0 {
 		if count, ok := packageOutputCount(planID); ok {
 			outputsTotal = count
