@@ -4,15 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="robots" content="noindex,nofollow">
-  <title>KOSCHEİ WEB3 · Owner Control Center</title>
+  <title>KOSCHEİ WEB3 · Owner Operasyon Merkezi</title>
   <link rel="stylesheet" href="/css/owner-control-center.css?v=2">
   <link rel="stylesheet" href="/css/owner-mobile-fixes.css?v=1">
 </head>
 <body>
   <main id="loginView" class="login-wrap">
     <section class="login-card">
-      <div class="brand"><span class="brand-mark">K</span><span><strong>KOSCHEİ WEB3</strong><small>Owner Control Center</small></span></div>
-      <div style="margin-top:28px"><span class="eyebrow">Owner only</span><h1 style="margin:0;font-size:38px;letter-spacing:-.05em">İşletmenin tamamı tek ekranda.</h1><p class="muted">Sistem, gelir, müşteriler, Arvıs, güvenlik ve geri bildirim operasyonlarını yönetin.</p></div>
+      <div class="brand"><span class="brand-mark">K</span><span><strong>KOSCHEİ WEB3</strong><small>Owner Operasyon Merkezi</small></span></div>
+      <div style="margin-top:28px"><span class="eyebrow">Yalnızca owner</span><h1 style="margin:0;font-size:38px;letter-spacing:-.05em">İşletmenin tamamı tek ekranda.</h1><p class="muted">Sistem, gelir, müşteriler, ARVIS, güvenlik ve geri bildirim operasyonlarını gerçek üretim verileriyle yönetin.</p></div>
       <form id="loginForm">
         <div class="field"><label for="loginWallet">Owner kimliği</label><input class="input" id="loginWallet" autocomplete="username" placeholder="e-posta veya wallet"></div>
         <div class="field"><label for="loginSecret">Owner secret</label><input class="input" id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET"></div>
@@ -24,10 +24,10 @@
 
   <div id="appView" class="owner-app hidden">
     <aside class="sidebar">
-      <div class="brand"><span class="brand-mark">K</span><span><strong>KOSCHEİ WEB3</strong><small>Owner Control Center</small></span></div>
+      <div class="brand"><span class="brand-mark">K</span><span><strong>KOSCHEİ WEB3</strong><small>Owner Operasyon Merkezi</small></span></div>
       <nav class="sidebar-nav" id="desktopNav"></nav>
       <div class="sidebar-foot">
-        <div class="session-box"><b>Owner session</b><span id="sessionState">12 saatlik güvenli oturum</span></div>
+        <div class="session-box"><b>Owner oturumu</b><span id="sessionState">12 saatlik güvenli oturum</span></div>
         <button class="btn danger" id="logoutButton">Çıkış yap</button>
       </div>
     </aside>
@@ -53,8 +53,8 @@
 
   <div id="modalRoot"></div>
   <div class="toast" id="toast"></div>
-  <script src="/js/owner-control-center.js?v=2"></script>
-  <script src="/js/owner-paddle-diagnostics.js?v=1"></script>
+  <script src="/js/owner-control-center.js?v=3"></script>
+  <script src="/js/owner-production-real-data.js?v=1"></script>
   <script src="/js/owner-game-studio.js?v=1"></script>
   <script src="/js/owner-ai-chat.js?v=1"></script>
 </body>
