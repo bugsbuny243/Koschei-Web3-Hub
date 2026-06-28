@@ -15,8 +15,8 @@ type SecurityRadarWorker struct {
 }
 
 func NewSecurityRadarWorker(store *SecurityRadarStore, solanaRPC string, enabled bool, pollEvery time.Duration) *SecurityRadarWorker {
-	if pollEvery <= 0 {
-		pollEvery = 10 * time.Second
+	if pollEvery < 30*time.Second {
+		pollEvery = 60 * time.Second
 	}
 	return &SecurityRadarWorker{Store: store, SolanaRPC: strings.TrimSpace(solanaRPC), Enabled: enabled, PollEvery: pollEvery}
 }
@@ -35,7 +35,7 @@ func (w *SecurityRadarWorker) Start(ctx context.Context) {
 	}
 	log.Printf("security radar worker started provider=%s mode=%s interval=%s", SecurityRadarProvider, SecurityRadarWatchMode, w.PollEvery)
 	if err := w.PollOnce(ctx); err != nil {
-		log.Printf("security radar poll failed: %v", err)
+		log.Printf("security radar poll failed: %s", safeProviderError(err))
 	}
 	ticker := time.NewTicker(w.PollEvery)
 	defer ticker.Stop()
@@ -46,7 +46,7 @@ func (w *SecurityRadarWorker) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			if err := w.PollOnce(ctx); err != nil {
-				log.Printf("security radar poll failed: %v", err)
+				log.Printf("security radar poll failed: %s", safeProviderError(err))
 			}
 		}
 	}
@@ -66,7 +66,7 @@ func (w *SecurityRadarWorker) PollOnce(ctx context.Context) error {
 	}
 	for _, source := range sources {
 		if err := w.pollSource(ctx, source); err != nil {
-			log.Printf("security radar source poll failed module=%s address=%s err=%v", source.ModuleID, source.Address, err)
+			log.Printf("security radar source poll failed module=%s address=%s err=%s", source.ModuleID, source.Address, safeProviderError(err))
 		}
 	}
 	return nil
