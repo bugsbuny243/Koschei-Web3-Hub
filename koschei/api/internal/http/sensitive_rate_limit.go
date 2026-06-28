@@ -46,7 +46,7 @@ func sensitiveRuleForPath(path string) (sensitiveLimitRule, bool) {
 	switch path {
 	case "/api/owner/login":
 		return sensitiveLimitRule{Limit: 5, Window: 15 * time.Minute}, true
-	case "/api/auth/login", "/api/auth/register", "/api/auth/otp/start", "/api/auth/otp/verify":
+	case "/api/auth/login", "/api/auth/register":
 		return sensitiveLimitRule{Limit: 10, Window: 10 * time.Minute}, true
 	case "/api/v1/radar/check", "/api/v1/unified/analyze":
 		return sensitiveLimitRule{Limit: 30, Window: time.Minute}, true
