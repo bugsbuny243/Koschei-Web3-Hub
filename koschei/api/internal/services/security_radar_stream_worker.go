@@ -72,7 +72,7 @@ func securityRadarStreamEnabled() bool {
 }
 
 func resolveSecurityRadarWSSURL() string {
-	if v := firstSecurityRadarEnv("SOLANA_WSS_URL", "ALCHEMY_SOLANA_WSS_URL", "HELIUS_SOLANA_WSS_URL", "QUICKNODE_SOLANA_WSS_URL", "PUMPPORTAL_DATA_WS"); v != "" {
+	if v := firstSecurityRadarEnv("SOLANA_WSS_URL", "ALCHEMY_SOLANA_WSS_URL", "HELIUS_SOLANA_WSS_URL", "QUICKNODE_SOLANA_WSS_URL"); v != "" {
 		return v
 	}
 	if rpc := strings.TrimSpace(os.Getenv("SOLANA_RPC_URL")); rpc != "" {
@@ -116,12 +116,38 @@ func (w *SecurityRadarStreamWorker) Start(ctx context.Context) {
 	if w == nil || w.Store == nil || w.Store.DB == nil || strings.TrimSpace(w.WSSURL) == "" { return }
 	log.Printf("security radar SBX-1 WSS collector started provider=%s mode=%s network=%s enrichment_rpc=%t", SecurityRadarStreamProvider, SecurityRadarStreamModeLogs, w.Network, strings.TrimSpace(w.RPCURL) != "")
 	go w.persistLoop(ctx)
-	reconnect := 3 * time.Second
+	backoff := 3 * time.Second
 	for {
 		select { case <-ctx.Done(): log.Printf("security radar SBX-1 WSS collector stopped"); return; default: }
-		if err := w.runOnce(ctx); err != nil && ctx.Err() == nil { log.Printf("security radar SBX-1 WSS reconnect: %v", err) }
-		select { case <-ctx.Done(): return; case <-time.After(reconnect): }
+		startedAt := time.Now()
+		err := w.runOnce(ctx)
+		if ctx.Err() != nil { return }
+		if time.Since(startedAt) >= 45*time.Second { backoff = 3 * time.Second }
+		if isRadarRateLimitError(err) && backoff < 30*time.Second { backoff = 30 * time.Second }
+		wait := radarReconnectWait(backoff)
+		if err != nil { log.Printf("security radar SBX-1 WSS reconnect scheduled retry_in=%s err=%s", wait.Round(time.Second), safeProviderError(err)) }
+		if backoff < 2*time.Minute {
+			backoff *= 2
+			if backoff > 2*time.Minute { backoff = 2 * time.Minute }
+		}
+		select { case <-ctx.Done(): return; case <-time.After(wait): }
 	}
+}
+
+func isRadarRateLimitError(err error) bool {
+	if err == nil { return false }
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "429") || strings.Contains(message, "too many requests") || strings.Contains(message, "rate limit")
+}
+
+func radarReconnectWait(base time.Duration) time.Duration {
+	if base <= 0 { base = 3 * time.Second }
+	var sample [2]byte
+	if _, err := rand.Read(sample[:]); err != nil { return base }
+	jitterMax := base / 5
+	if jitterMax <= 0 { return base }
+	fraction := float64(binary.BigEndian.Uint16(sample[:])) / 65535.0
+	return base + time.Duration(fraction*float64(jitterMax))
 }
 
 func (w *SecurityRadarStreamWorker) persistLoop(ctx context.Context) {
@@ -132,8 +158,12 @@ func (w *SecurityRadarStreamWorker) runOnce(ctx context.Context) error {
 	conn, err := dialMinimalWebSocket(ctx, w.WSSURL)
 	if err != nil { return err }
 	defer conn.Close()
-	subscription := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "logsSubscribe", "params": []any{"all", map[string]any{"commitment": "confirmed"}}}
-	if err := conn.WriteJSON(subscription); err != nil { return err }
+	for index, source := range arvisHeartbeatSources() {
+		programID := strings.TrimSpace(source.ProgramID)
+		if programID == "" { continue }
+		subscription := map[string]any{"jsonrpc": "2.0", "id": index + 1, "method": "logsSubscribe", "params": []any{map[string]any{"mentions": []string{programID}}, map[string]any{"commitment": "confirmed"}}}
+		if err := conn.WriteJSON(subscription); err != nil { return err }
+	}
 	ping := time.NewTicker(25 * time.Second); defer ping.Stop()
 	for {
 		select { case <-ctx.Done(): return ctx.Err(); case <-ping.C: _ = conn.Ping(); default: }
@@ -154,7 +184,7 @@ func (w *SecurityRadarStreamWorker) decodeLogsPayload(payload []byte) (SecurityR
 	moduleID, eventType, programID := classifyRadarStreamText(strings.ToLower(strings.Join(logs, "\n")))
 	if moduleID == "unknown" && !envBool("RADAR_STREAM_STORE_UNKNOWN") { return SecurityRadarStreamEventRecord{}, false }
 	signature := anyString(value["signature"])
-	target := firstRadarValue(extractRadarMintFromLogs(logs), signature)
+	target := signature
 	return SecurityRadarStreamEventRecord{Provider: SecurityRadarStreamProvider, StreamMode: SecurityRadarStreamModeLogs, Network: w.Network, ModuleID: moduleID, EventType: eventType, Target: target, TargetType: targetTypeForRadarModule(moduleID), Signature: signature, Slot: radarInt64(contextValue["slot"]), ProgramID: programID, EvidenceQuality: evidenceQualityForRadarModule(moduleID), Decoded: map[string]any{"logs": logs, "err": value["err"], "subscription_method": "logsSubscribe"}, RawEvent: raw}, signature != "" || moduleID != "unknown"
 }
 
@@ -232,7 +262,16 @@ func (s *SecurityRadarStore) InsertStreamEvent(ctx context.Context, event Securi
 
 func classifyRadarStreamText(text string) (string, string, string) {
 	lower := strings.ToLower(text)
+	raydiumProgram := strings.ToLower(defaultRaydiumProgramID)
+	pumpProgram := strings.ToLower(defaultPumpProgramID)
+	pumpSwapProgram := strings.ToLower(defaultPumpSwapProgramID)
 	switch {
+	case strings.Contains(lower, pumpSwapProgram):
+		return ModulePumpSybilRadar, "pumpswap_trade_or_liquidity", defaultPumpSwapProgramID
+	case strings.Contains(lower, pumpProgram):
+		return ModulePumpSybilRadar, "pump_launch_or_trade", defaultPumpProgramID
+	case strings.Contains(lower, raydiumProgram):
+		return ModuleRaydiumPoolGuardian, "raydium_pool_or_liquidity", defaultRaydiumProgramID
 	case strings.Contains(lower, "pump") || strings.Contains(lower, "pumpswap"):
 		return ModulePumpSybilRadar, "pump_launch_or_trade", "pump"
 	case strings.Contains(lower, "raydium") || strings.Contains(lower, "initialize2") || strings.Contains(lower, "amm"):
