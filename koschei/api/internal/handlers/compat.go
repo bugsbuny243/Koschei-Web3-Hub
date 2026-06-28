@@ -37,18 +37,43 @@ type authUser struct {
 func upsertAppProfileTx(ctx context.Context, store appProfileStore, sub, email string, _ *authUser) error {
 	res, err := store.ExecContext(ctx, `
 		UPDATE app_user_profiles
-		SET auth_subject = $1,
+		SET email = lower($2),
 			status = 'active',
 			banned_at = NULL,
 			ban_reason = NULL,
 			updated_at = now()
-		WHERE lower(email) = lower($2)`, sub, email)
+		WHERE auth_subject = $1`, sub, email)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n > 0 {
 		return nil
 	}
+
+	res, err = store.ExecContext(ctx, `
+		WITH chosen AS (
+			SELECT id
+			FROM app_user_profiles
+			WHERE lower(email) = lower($2)
+			ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'banned' THEN 1 ELSE 2 END,
+			         updated_at DESC,
+			         created_at DESC
+			LIMIT 1
+		)
+		UPDATE app_user_profiles
+		SET auth_subject = $1,
+			status = 'active',
+			banned_at = NULL,
+			ban_reason = NULL,
+			updated_at = now()
+		WHERE id = (SELECT id FROM chosen)`, sub, email)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		return nil
+	}
+
 	_, err = store.ExecContext(ctx, `
 		INSERT INTO app_user_profiles (auth_subject,email,plan_id,credits,status,created_at,updated_at)
 		VALUES ($1,lower($2),'free',0,'active',now(),now())
@@ -72,12 +97,12 @@ func (h *Handler) upsertAppProfile(ctx context.Context, subject, email string) (
 	profile := authUser{}
 	err := h.DB.QueryRowContext(ctx, `
 		UPDATE app_user_profiles
-		SET auth_subject = $1,
+		SET email = lower($2),
 			status = 'active',
 			banned_at = NULL,
 			ban_reason = NULL,
 			updated_at = now()
-		WHERE lower(email) = lower($2)
+		WHERE auth_subject = $1
 		RETURNING id::text, auth_subject, email, COALESCE(plan_id,''), COALESCE(credits,0)`, subject, email).Scan(&profile.ID, &profile.AuthSubject, &profile.Email, &profile.PlanID, &profile.Credits)
 	if err == nil {
 		profile.Plan = profile.PlanID
@@ -86,6 +111,33 @@ func (h *Handler) upsertAppProfile(ctx context.Context, subject, email string) (
 	if err != sql.ErrNoRows {
 		return profile, err
 	}
+
+	err = h.DB.QueryRowContext(ctx, `
+		WITH chosen AS (
+			SELECT id
+			FROM app_user_profiles
+			WHERE lower(email) = lower($2)
+			ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'banned' THEN 1 ELSE 2 END,
+			         updated_at DESC,
+			         created_at DESC
+			LIMIT 1
+		)
+		UPDATE app_user_profiles
+		SET auth_subject = $1,
+			status = 'active',
+			banned_at = NULL,
+			ban_reason = NULL,
+			updated_at = now()
+		WHERE id = (SELECT id FROM chosen)
+		RETURNING id::text, auth_subject, email, COALESCE(plan_id,''), COALESCE(credits,0)`, subject, email).Scan(&profile.ID, &profile.AuthSubject, &profile.Email, &profile.PlanID, &profile.Credits)
+	if err == nil {
+		profile.Plan = profile.PlanID
+		return profile, nil
+	}
+	if err != sql.ErrNoRows {
+		return profile, err
+	}
+
 	err = h.DB.QueryRowContext(ctx, `
 		INSERT INTO app_user_profiles (auth_subject,email,plan_id,credits,status,created_at,updated_at)
 		VALUES ($1,lower($2),'free',0,'active',now(),now())
