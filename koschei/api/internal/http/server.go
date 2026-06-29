@@ -202,6 +202,7 @@ func registerCustomerProductRoutes(mux *http.ServeMux, h *handlers.Handler, prem
 	mux.HandleFunc("/api/dao/proposal-risk", requiresDB(h, handlers.RequireAuth(method("POST", h.DAOGuardianAnalyze))))
 	mux.HandleFunc("/api/wallet/score", requiresDB(h, premium(method("POST", h.WalletScore))))
 	mux.HandleFunc("/api/token/scan", requiresDB(h, premium(method("POST", h.TokenScan))))
+	mux.HandleFunc("/api/smart-money/snapshot", requiresDB(h, premium(method("GET", h.SmartMoneySnapshot))))
 	mux.HandleFunc("/api/account/api-keys", requiresDB(h, handlers.RequireAuth(h.APIKeysCollection)))
 	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, handlers.RequireAuth(method("POST", h.RevokeAPIKey))))
 	registerWatchlistRoutes(mux, h, premium)
