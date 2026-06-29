@@ -19,6 +19,18 @@ type apiAccessPolicyDecision struct {
 	EvidenceConfidence float64
 }
 
+func normalizeAPIAccessDecision(decision apiAccessPolicyDecision) apiAccessPolicyDecision {
+	// A probabilistic label alone must never produce a hard denial.
+	if (decision.Decision == "deny" || decision.Decision == "temporary_hold") && decision.EvidenceConfidence < 0.90 {
+		decision.Decision = "enterprise_review"
+		decision.ReasonCode = "insufficient_evidence_for_hard_restriction"
+	}
+	if decision.RateMultiplier <= 0 || decision.RateMultiplier > 1 {
+		decision.RateMultiplier = 1
+	}
+	return decision
+}
+
 func (h *Handler) enforceAPIAccessPolicy(w http.ResponseWriter, r *http.Request, principal apiPrincipal) bool {
 	decision, found, err := h.resolveAPIAccessPolicy(r, principal)
 	if err != nil {
@@ -31,13 +43,7 @@ func (h *Handler) enforceAPIAccessPolicy(w http.ResponseWriter, r *http.Request,
 	if !found || decision.Decision == "allow" {
 		return true
 	}
-
-	// A probabilistic label alone must never produce a hard denial.
-	if (decision.Decision == "deny" || decision.Decision == "temporary_hold") && decision.EvidenceConfidence < 0.90 {
-		decision.Decision = "enterprise_review"
-		decision.ReasonCode = "insufficient_evidence_for_hard_restriction"
-	}
-
+	decision = normalizeAPIAccessDecision(decision)
 	h.recordAPIAccessDecision(r, principal, decision)
 
 	switch decision.Decision {
@@ -46,11 +52,7 @@ func (h *Handler) enforceAPIAccessPolicy(w http.ResponseWriter, r *http.Request,
 		if limit <= 0 {
 			limit = 60
 		}
-		multiplier := decision.RateMultiplier
-		if multiplier <= 0 || multiplier > 1 {
-			multiplier = 1
-		}
-		limit = int(float64(limit) * multiplier)
+		limit = int(float64(limit) * decision.RateMultiplier)
 		if limit < 1 {
 			limit = 1
 		}
