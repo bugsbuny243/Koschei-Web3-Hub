@@ -23,3 +23,15 @@ func TestPublicTokenStatusPlanningState(t *testing.T) {
 		t.Fatalf("unexpected response: %#v", body)
 	}
 }
+
+func TestPublicTokenConcentration(t *testing.T) {
+	accounts := []publicTokenLargestAccount{
+		{Amount: "250"},
+		{Amount: "150"},
+		{Amount: "100"},
+	}
+	got := publicTokenConcentration(accounts, "1000", 2)
+	if got < 39.999 || got > 40.001 {
+		t.Fatalf("concentration = %f, want 40", got)
+	}
+}
