@@ -265,6 +265,9 @@ func (h *Handler) APIKeyAuth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		_, _ = h.DB.ExecContext(r.Context(), `UPDATE api_keys SET last_used_at=now() WHERE id=$1`, p.KeyID)
 		r = r.WithContext(context.WithValue(r.Context(), apiPrincipalContextKey{}, p))
+		if !h.enforceAPIAccessPolicy(w, r, p) {
+			return
+		}
 		next(w, r)
 	}
 }
