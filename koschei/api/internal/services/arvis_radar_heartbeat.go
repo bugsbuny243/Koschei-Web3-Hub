@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	defaultRaydiumProgramID     = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
-	legacyRaydiumProgramID      = "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9"
-	legacyRaydiumSourceID       = "675kPX9MHTjS2zt1qfr1NY5Wwrzj4mWjU7VtXv9syS2"
-	defaultPumpProgramID        = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
-	defaultPumpSwapProgramID    = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+	defaultRaydiumProgramID  = "675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8"
+	legacyRaydiumProgramID   = "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9"
+	legacyRaydiumSourceID    = "675kPX9MHTjS2zt1qfr1NY5Wwrzj4mWjU7VtXv9syS2"
+	defaultPumpProgramID     = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+	defaultPumpSwapProgramID = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 )
 
 type arvisHeartbeatSource struct {
@@ -44,12 +44,7 @@ func StartArvisRadarHeartbeat(ctx context.Context, db *sql.DB) func() {
 }
 
 func arvisRadarHeartbeatLoop(ctx context.Context, store *SecurityRadarStore, rpcURL string) {
-	pollEvery := 60 * time.Second
-	if raw := strings.TrimSpace(os.Getenv("ARVIS_HEARTBEAT_SECONDS")); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil && n >= 30 && n <= 300 {
-			pollEvery = time.Duration(n) * time.Second
-		}
-	}
+	pollEvery := time.Duration(envIntRange("ARVIS_HEARTBEAT_SECONDS", 120, 30, 900)) * time.Second
 	sources := arvisHeartbeatSources()
 	log.Printf("arvis radar heartbeat started interval=%s sources=%d", pollEvery, len(sources))
 	arvisRadarHeartbeatOnce(ctx, store, rpcURL)
@@ -103,7 +98,11 @@ func arvisRadarHeartbeatOnce(ctx context.Context, store *SecurityRadarStore, rpc
 	if store == nil || store.DB == nil || strings.TrimSpace(rpcURL) == "" {
 		return
 	}
-	for _, source := range arvisHeartbeatSources() {
+	limit := envIntRange("ARVIS_HEARTBEAT_SOURCE_LIMIT", 1, 1, 3)
+	for index, source := range arvisHeartbeatSources() {
+		if index >= limit {
+			break
+		}
 		if strings.TrimSpace(source.ProgramID) == "" {
 			continue
 		}
@@ -112,8 +111,8 @@ func arvisRadarHeartbeatOnce(ctx context.Context, store *SecurityRadarStore, rpc
 }
 
 func arvisPollHeartbeatSource(ctx context.Context, store *SecurityRadarStore, rpcURL string, source arvisHeartbeatSource) {
-	pollCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
-	signatures, err := SolanaGetSignaturesForAddress(pollCtx, rpcURL, source.ProgramID, 3)
+	pollCtx, cancel := context.WithTimeout(ctx, time.Duration(envIntRange("ARVIS_HEARTBEAT_RPC_TIMEOUT_SECONDS", 5, 3, 20))*time.Second)
+	signatures, err := SolanaGetSignaturesForAddress(pollCtx, rpcURL, source.ProgramID, envIntRange("ARVIS_HEARTBEAT_SIGNATURE_LIMIT", 1, 1, 3))
 	cancel()
 	if err != nil {
 		log.Printf("arvis radar heartbeat poll failed source=%s: %s", source.Label, safeProviderError(err))
@@ -135,7 +134,7 @@ func arvisPollHeartbeatSource(ctx context.Context, store *SecurityRadarStore, rp
 			"program_id": source.ProgramID,
 			"rpc_method": "getSignaturesForAddress",
 		}
-		txCtx, txCancel := context.WithTimeout(ctx, 7*time.Second)
+		txCtx, txCancel := context.WithTimeout(ctx, time.Duration(envIntRange("ARVIS_HEARTBEAT_TX_TIMEOUT_SECONDS", 4, 2, 20))*time.Second)
 		tx, txErr := SolanaGetTransactionJSONParsed(txCtx, rpcURL, sig)
 		txCancel()
 		if txErr == nil {
