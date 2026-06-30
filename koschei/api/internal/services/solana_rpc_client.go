@@ -272,6 +272,7 @@ func resetSolanaRPCCachesForTest() {
 	solanaRPCRateLimiter.Lock()
 	solanaRPCRateLimiter.Next = time.Time{}
 	solanaRPCRateLimiter.Unlock()
+	resetSolanaRPCBudgetForTest()
 }
 
 func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) (T, error) {
@@ -287,6 +288,9 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 
 	maxRetries := solanaRPCMax429Retries()
 	for attempt := 0; ; attempt++ {
+		if err := reserveSolanaRPCBudget(ctx, method); err != nil {
+			return zero, err
+		}
 		if err := waitForSolanaRPCSlot(ctx); err != nil {
 			return zero, err
 		}
@@ -306,7 +310,7 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 		}
 
 		if res.StatusCode == http.StatusTooManyRequests {
-			delay := solanaRPC429Delay(attempt, res.Header.Get("Retry-After"))
+			delay := maxDuration(solanaRPC429Delay(attempt, res.Header.Get("Retry-After")), solanaRPC429Cooldown())
 			deferSolanaRPCRequests(delay)
 			if attempt < maxRetries {
 				continue
@@ -322,7 +326,7 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 			return zero, fmt.Errorf("solana rpc malformed response: %w", err)
 		}
 		if out.Error != nil && out.Error.Code == http.StatusTooManyRequests {
-			delay := solanaRPC429Delay(attempt, "")
+			delay := maxDuration(solanaRPC429Delay(attempt, ""), solanaRPC429Cooldown())
 			deferSolanaRPCRequests(delay)
 			if attempt < maxRetries {
 				continue
