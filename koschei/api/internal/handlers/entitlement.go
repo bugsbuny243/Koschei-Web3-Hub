@@ -25,30 +25,6 @@ func (h *Handler) RequireActiveEntitlement(next http.HandlerFunc) http.HandlerFu
 			writeAPIError(w, http.StatusServiceUnavailable, APICodeInternalError, "Entitlement access could not be verified", nil)
 			return
 		}
-		if !active {
-			writeAPIError(w, http.StatusForbidden, APICodePackageRequired, "Active Koschei package with remaining outputs required", nil)
-			return
-		}
-		next(w, r)
-	}
-}
-
-func (h *Handler) RequirePremiumAccess(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		claims, ok := userFromContext(r.Context())
-		if !ok {
-			writeAPIError(w, http.StatusUnauthorized, APICodeUnauthorized, "Unauthorized", nil)
-			return
-		}
-		email := normalizedClaimEmail(claims)
-		if email == "" && strings.TrimSpace(claims.Sub) != "" && h.DB != nil {
-			_ = h.DB.QueryRowContext(r.Context(), `SELECT lower(email) FROM app_user_profiles WHERE auth_subject=$1 AND status='active'`, strings.TrimSpace(claims.Sub)).Scan(&email)
-		}
-		active, err := h.hasActiveEntitlementAccess(r.Context(), claims.Sub, email)
-		if err != nil {
-			writeAPIError(w, http.StatusServiceUnavailable, APICodeInternalError, "Premium access could not be verified", nil)
-			return
-		}
 		if active {
 			next(w, r)
 			return
@@ -64,6 +40,10 @@ func (h *Handler) RequirePremiumAccess(next http.HandlerFunc) http.HandlerFunc {
 		}
 		next(w, r)
 	}
+}
+
+func (h *Handler) RequirePremiumAccess(next http.HandlerFunc) http.HandlerFunc {
+	return h.RequireActiveEntitlement(next)
 }
 
 func (h *Handler) hasTokenTierAccess(ctx context.Context, authSubject string, requiredTier string) (bool, error) {
