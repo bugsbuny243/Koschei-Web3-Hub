@@ -17,8 +17,8 @@ func TestTokenAccessAmountMath(t *testing.T) {
 
 func TestTokenAccessTierOrder(t *testing.T) {
 	thresholds := map[string]*big.Int{
-		"basic": big.NewInt(5),
-		"pro": big.NewInt(20),
+		"basic":      big.NewInt(5),
+		"pro":        big.NewInt(20),
 		"enterprise": big.NewInt(100),
 	}
 	if got := evaluateTokenTier(big.NewInt(25), thresholds); got != "pro" {
@@ -26,5 +26,19 @@ func TestTokenAccessTierOrder(t *testing.T) {
 	}
 	if tokenTierRank("enterprise") <= tokenTierRank("pro") {
 		t.Fatal("invalid tier order")
+	}
+}
+
+func TestTokenAccessBasicPremiumThreshold(t *testing.T) {
+	thresholds := map[string]*big.Int{
+		"basic":      big.NewInt(5),
+		"pro":        big.NewInt(20),
+		"enterprise": big.NewInt(100),
+	}
+	if got := evaluateTokenTier(big.NewInt(4), thresholds); tokenTierRank(got) >= tokenTierRank("basic") {
+		t.Fatalf("amount below basic should not unlock premium, tier=%s", got)
+	}
+	if got := evaluateTokenTier(big.NewInt(5), thresholds); tokenTierRank(got) < tokenTierRank("basic") {
+		t.Fatalf("basic threshold should unlock premium, tier=%s", got)
 	}
 }
