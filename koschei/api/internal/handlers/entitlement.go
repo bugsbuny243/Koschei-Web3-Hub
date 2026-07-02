@@ -25,12 +25,36 @@ func (h *Handler) RequireActiveEntitlement(next http.HandlerFunc) http.HandlerFu
 			writeAPIError(w, http.StatusServiceUnavailable, APICodeInternalError, "Entitlement access could not be verified", nil)
 			return
 		}
-		if !active {
-			writeAPIError(w, http.StatusForbidden, APICodePackageRequired, "Active Koschei package with remaining outputs required", nil)
+		if active {
+			next(w, r)
+			return
+		}
+		tokenAccess, err := h.hasTokenTierAccess(r.Context(), claims.Sub, "basic")
+		if err != nil {
+			writeAPIError(w, http.StatusServiceUnavailable, APICodeInternalError, "Token access could not be verified", nil)
+			return
+		}
+		if !tokenAccess {
+			writeAPIError(w, http.StatusForbidden, APICodePackageRequired, "Active Koschei package or KOSCHEI holder access required", nil)
 			return
 		}
 		next(w, r)
 	}
+}
+
+func (h *Handler) RequirePremiumAccess(next http.HandlerFunc) http.HandlerFunc {
+	return h.RequireActiveEntitlement(next)
+}
+
+func (h *Handler) hasTokenTierAccess(ctx context.Context, authSubject string, requiredTier string) (bool, error) {
+	evaluation, err := h.evaluateTokenAccess(ctx, authSubject)
+	if err != nil {
+		return false, err
+	}
+	if !evaluation.GateEnabled || !evaluation.Configured || !evaluation.WalletVerified {
+		return false, nil
+	}
+	return tokenTierRank(evaluation.Tier) >= tokenTierRank(requiredTier), nil
 }
 
 func (h *Handler) hasActiveEntitlement(ctx context.Context, email string) (bool, error) {
