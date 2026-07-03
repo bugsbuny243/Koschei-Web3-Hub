@@ -112,7 +112,7 @@
   }
 
   async function fetchNeonJSON(baseURL, path, options = {}) {
-    const response = await fetch(baseURL + path, { credentials: 'include', ...options });
+    const response = await fetch(baseURL + path, { credentials: 'same-origin', ...options });
     const result = await parseNeonResponse(response);
     if (!response.ok) {
       throw new Error(errorMessage(result.data, `Neon Auth failed (${response.status})`));
