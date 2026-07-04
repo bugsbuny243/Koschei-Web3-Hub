@@ -243,7 +243,7 @@
   }
 
   async function fetchNeonJSON(baseURL, path, options = {}) {
-    const res = await fetch(baseURL + path, { credentials: 'same-origin', ...options });
+    const res = await fetch(baseURL + path, { credentials: 'include', ...options });
     const result = await parseNeonResponse(res);
     if (!res.ok) throw new Error(errorMessage(result.data, `Neon Auth failed (${res.status})`));
     return result;
@@ -312,12 +312,17 @@
   }
 
   async function signUp(email, password) {
-    return neonEmailAuth('/sign-up/email', {
-      email,
-      password,
-      name: defaultUserName(email),
-      callbackURL: successCallbackURL(),
-    });
+    try {
+      return await neonEmailAuth('/sign-up/email', {
+        email,
+        password,
+        name: defaultUserName(email),
+        callbackURL: successCallbackURL(),
+      });
+    } catch (error) {
+      if (!String(error && error.message || '').includes('Giriş oturumu alınamadı')) throw error;
+      return signIn(email, password);
+    }
   }
 
   async function signIn(email, password) {
