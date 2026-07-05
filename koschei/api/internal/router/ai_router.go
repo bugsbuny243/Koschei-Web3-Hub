@@ -35,9 +35,10 @@ type chatCompletionPayload struct {
 	Temperature float64             `json:"temperature"`
 }
 
-// Chat routes every server-side LLM request through a single policy: OpenAI is
-// primary and Together is fallback. Callers should not invoke provider SDKs or
-// HTTP APIs directly from feature modules.
+// Chat routes server-side LLM requests through the Koschei model router.
+// The default production policy is cost-aware: prefer Together/Qwen-family
+// models when available, then fall back to OpenAI only if explicitly available.
+// Feature modules should not call provider HTTP APIs directly.
 func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	if strings.TrimSpace(req.Prompt) == "" {
 		return ChatResponse{}, errors.New("prompt is required")
@@ -55,19 +56,27 @@ func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	defer cancel()
 
 	var errs []string
-	if strings.TrimSpace(os.Getenv("OPENAI_API_KEY")) != "" {
-		resp, err := callOpenAI(ctx, req)
-		if err == nil {
-			return resp, nil
+	for _, provider := range orderedProviders() {
+		switch provider {
+		case "together":
+			if strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {
+				continue
+			}
+			resp, err := callTogether(ctx, req)
+			if err == nil {
+				return resp, nil
+			}
+			errs = append(errs, "together: "+err.Error())
+		case "openai":
+			if strings.TrimSpace(os.Getenv("OPENAI_API_KEY")) == "" {
+				continue
+			}
+			resp, err := callOpenAI(ctx, req)
+			if err == nil {
+				return resp, nil
+			}
+			errs = append(errs, "openai: "+err.Error())
 		}
-		errs = append(errs, "openai: "+err.Error())
-	}
-	if strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) != "" {
-		resp, err := callTogether(ctx, req)
-		if err == nil {
-			return resp, nil
-		}
-		errs = append(errs, "together: "+err.Error())
 	}
 	if len(errs) == 0 {
 		return ChatResponse{}, errors.New("no AI provider configured")
@@ -75,9 +84,21 @@ func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	return ChatResponse{}, errors.New(strings.Join(errs, "; "))
 }
 
+func orderedProviders() []string {
+	preferred := strings.ToLower(strings.TrimSpace(firstEnv("AI_PROVIDER", "ARVIS_AI_PROVIDER")))
+	switch preferred {
+	case "openai":
+		return []string{"openai", "together"}
+	case "together", "qwen", "together-qwen":
+		return []string{"together", "openai"}
+	default:
+		return []string{"together", "openai"}
+	}
+}
+
 func callOpenAI(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	model := strings.TrimSpace(req.Model)
-	if model == "" || strings.HasPrefix(strings.ToLower(model), "meta-") {
+	if model == "" || strings.HasPrefix(strings.ToLower(model), "meta-") || strings.HasPrefix(strings.ToLower(model), "qwen") {
 		model = firstEnv("OPENAI_MODEL", "OPENAI_CHAT_MODEL")
 	}
 	if model == "" {
@@ -94,10 +115,10 @@ func callOpenAI(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 func callTogether(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	model := strings.TrimSpace(req.Model)
 	if model == "" || strings.HasPrefix(strings.ToLower(model), "gpt-") {
-		model = firstEnv("TOGETHER_MODEL", "TOGETHER_MODEL_CHAT")
+		model = firstEnv("TOGETHER_MODEL_SECURITY", "TOGETHER_MODEL", "TOGETHER_MODEL_CHAT")
 	}
 	if model == "" {
-		model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+		model = "Qwen/Qwen3.7-Plus"
 	}
 	payload := chatCompletionPayload{Model: model, Messages: messages(req.System, req.Prompt), MaxTokens: req.MaxTokens, Temperature: req.Temperature}
 	content, err := postChat(ctx, "https://api.together.xyz/v1/chat/completions", os.Getenv("TOGETHER_API_KEY"), payload)
