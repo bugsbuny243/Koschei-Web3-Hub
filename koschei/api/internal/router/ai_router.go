@@ -36,15 +36,7 @@ type chatCompletionPayload struct {
 }
 
 // Chat routes every server-side ARVIS/LLM request through one policy layer.
-//
-// Provider policy:
-//   - AI_PROVIDER=together: Together only
-//   - AI_PROVIDER=openai: OpenAI only
-//   - AI_PROVIDER=auto or empty: Together first, OpenAI fallback
-//
-// Koschei's default is Together-first because ARVIS should primarily use the
-// selected open model stack, while still allowing an explicit fallback when a
-// paid backup provider is configured.
+// Koschei uses the configured Together model stack only.
 func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	if strings.TrimSpace(req.Prompt) == "" {
 		return ChatResponse{}, errors.New("prompt is required")
@@ -61,63 +53,10 @@ func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, req.Timeout)
 	defer cancel()
 
-	var errs []string
-	for _, provider := range orderedProviders() {
-		switch provider {
-		case "together":
-			if strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {
-				continue
-			}
-			resp, err := callTogether(ctx, req)
-			if err == nil {
-				return resp, nil
-			}
-			errs = append(errs, "together: "+err.Error())
-		case "openai":
-			if strings.TrimSpace(os.Getenv("OPENAI_API_KEY")) == "" {
-				continue
-			}
-			resp, err := callOpenAI(ctx, req)
-			if err == nil {
-				return resp, nil
-			}
-			errs = append(errs, "openai: "+err.Error())
-		}
+	if strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {
+		return ChatResponse{}, errors.New("TOGETHER_API_KEY is not configured")
 	}
-	if len(errs) == 0 {
-		return ChatResponse{}, errors.New("no AI provider configured")
-	}
-	return ChatResponse{}, errors.New(strings.Join(errs, "; "))
-}
-
-func providerOrder() []string {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("AI_PROVIDER"))) {
-	case "openai":
-		return []string{"openai"}
-	case "together", "qwen":
-		return []string{"together"}
-	case "auto", "", "arvis":
-		return []string{"together", "openai"}
-	default:
-		return []string{"together", "openai"}
-	}
-}
-
-func callOpenAI(ctx context.Context, req ChatRequest) (ChatResponse, error) {
-	model := strings.TrimSpace(req.Model)
-	lowerModel := strings.ToLower(model)
-	if model == "" || strings.HasPrefix(lowerModel, "meta-") || strings.HasPrefix(lowerModel, "qwen") || strings.Contains(lowerModel, "/qwen") {
-		model = firstEnv("OPENAI_MODEL", "OPENAI_CHAT_MODEL")
-	}
-	if model == "" {
-		model = "gpt-4.1-mini"
-	}
-	payload := chatCompletionPayload{Model: model, Messages: messages(req.System, req.Prompt), MaxTokens: req.MaxTokens, Temperature: req.Temperature}
-	content, err := postChat(ctx, "https://api.openai.com/v1/chat/completions", os.Getenv("OPENAI_API_KEY"), payload)
-	if err != nil {
-		return ChatResponse{}, err
-	}
-	return ChatResponse{Provider: "openai", Model: model, Content: content}, nil
+	return callTogether(ctx, req)
 }
 
 func callTogether(ctx context.Context, req ChatRequest) (ChatResponse, error) {
