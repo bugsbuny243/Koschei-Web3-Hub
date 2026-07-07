@@ -12,15 +12,15 @@ import (
 func (h *Handler) OwnerPaymentHealth(w http.ResponseWriter, r *http.Request) {
 	response := map[string]any{
 		"ok":       true,
-		"provider": "shopier",
-		"mode":     "manual_owner_approval",
+		"provider": "kosch_token",
+		"mode":     "token_payment_owner_approval",
 		"summary": map[string]any{
 			"active_entitlements":       int64(0),
 			"pending_payment_requests":  int64(0),
 			"approved_payments_30d":     int64(0),
-			"revenue_try_30d":           int64(0),
+			"revenue_kosch_30d":         "0",
 			"latest_payment_events":     []map[string]any{},
-			"failed_webhook_events_24h": int64(0),
+			"failed_payment_events_24h": int64(0),
 		},
 	}
 	if h == nil || h.DBRead == nil {
@@ -33,9 +33,9 @@ func (h *Handler) OwnerPaymentHealth(w http.ResponseWriter, r *http.Request) {
 		"active_entitlements":       h.countActiveEntitlements(r),
 		"pending_payment_requests":  h.countPaymentRequests(r, "pending"),
 		"approved_payments_30d":     h.countApprovedPayments30d(r),
-		"revenue_try_30d":           h.approvedRevenueTRY30d(r),
+		"revenue_kosch_30d":         h.approvedRevenueKOSCH30d(r),
 		"latest_payment_events":     h.latestManualPaymentEvents(r),
-		"failed_webhook_events_24h": h.failedWebhookEvents24h(r),
+		"failed_payment_events_24h": h.failedPaymentEvents24h(r),
 	}
 	writeJSON(w, http.StatusOK, response)
 }
@@ -58,34 +58,41 @@ func (h *Handler) countApprovedPayments30d(r *http.Request) int64 {
 	return count
 }
 
-func (h *Handler) approvedRevenueTRY30d(r *http.Request) int64 {
-	var total int64
-	_ = h.DBRead.QueryRowContext(r.Context(), `SELECT COALESCE(sum(amount_try),0) FROM payment_requests WHERE status='approved' AND COALESCE(reviewed_at,created_at) >= now() - interval '30 days'`).Scan(&total)
+func (h *Handler) approvedRevenueKOSCH30d(r *http.Request) string {
+	var total string
+	_ = h.DBRead.QueryRowContext(r.Context(), `
+		SELECT COALESCE(sum(CASE WHEN COALESCE(amount_kosch,'') ~ '^[0-9]+(\.[0-9]+)?$' THEN amount_kosch::numeric ELSE 0 END),0)::text
+		FROM payment_requests
+		WHERE status='approved'
+		  AND COALESCE(payment_provider, raw_payload->>'payment_provider', 'kosch_token')='kosch_token'
+		  AND COALESCE(reviewed_at,created_at) >= now() - interval '30 days'`).Scan(&total)
+	if strings.TrimSpace(total) == "" {
+		return "0"
+	}
 	return total
 }
 
-func (h *Handler) failedWebhookEvents24h(r *http.Request) int64 {
+func (h *Handler) failedPaymentEvents24h(r *http.Request) int64 {
 	var count int64
-	_ = h.DBRead.QueryRowContext(r.Context(), `SELECT count(*) FROM security_audit_events WHERE event_type='shopier_webhook_invalid' AND created_at >= now() - interval '24 hours'`).Scan(&count)
+	_ = h.DBRead.QueryRowContext(r.Context(), `SELECT count(*) FROM security_audit_events WHERE event_type IN ('kosch_payment_invalid','kosch_payment_rejected') AND created_at >= now() - interval '24 hours'`).Scan(&count)
 	return count
 }
 
 func (h *Handler) latestManualPaymentEvents(r *http.Request) []map[string]any {
-	rows, err := h.DBRead.QueryContext(r.Context(), `SELECT id::text, COALESCE(email,''), COALESCE(product_slug,plan,''), COALESCE(amount_try,0), COALESCE(currency,'TRY'), status, created_at, reviewed_at FROM payment_requests ORDER BY created_at DESC LIMIT 10`)
+	rows, err := h.DBRead.QueryContext(r.Context(), `SELECT id::text, COALESCE(email,''), COALESCE(product_slug,plan,''), COALESCE(amount_kosch,''), COALESCE(currency,'KOSCH'), COALESCE(payment_provider,'kosch_token'), status, created_at, reviewed_at FROM payment_requests ORDER BY created_at DESC LIMIT 10`)
 	if err != nil {
 		return []map[string]any{}
 	}
 	defer rows.Close()
 	items := []map[string]any{}
 	for rows.Next() {
-		var id, email, product, currency, status string
-		var amount int64
+		var id, email, product, amountKOSCH, currency, provider, status string
 		var createdAt time.Time
 		var reviewedAt any
-		if err := rows.Scan(&id, &email, &product, &amount, &currency, &status, &createdAt, &reviewedAt); err != nil {
+		if err := rows.Scan(&id, &email, &product, &amountKOSCH, &currency, &provider, &status, &createdAt, &reviewedAt); err != nil {
 			continue
 		}
-		items = append(items, map[string]any{"id": id, "email": email, "product_id": product, "amount_try": amount, "currency": currency, "status": status, "created_at": createdAt, "reviewed_at": reviewedAt})
+		items = append(items, map[string]any{"id": id, "email": email, "product_id": product, "amount_kosch": amountKOSCH, "currency": currency, "payment_provider": provider, "status": status, "created_at": createdAt, "reviewed_at": reviewedAt})
 	}
 	return items
 }
