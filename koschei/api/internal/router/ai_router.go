@@ -35,11 +35,10 @@ type chatCompletionPayload struct {
 	Temperature float64             `json:"temperature"`
 }
 
-// Chat routes every server-side LLM request through a single policy. Together is
-// the default primary provider for Koschei security intelligence, so Qwen and
-// other open-weight models can carry daily traffic. Set AI_PROVIDER=openai to
-// force OpenAI-first, or AI_PROVIDER=auto/together to keep Together-first with
-// OpenAI as fallback.
+// Chat routes server-side LLM requests through the Koschei model router.
+// The default production policy is cost-aware: prefer Together/Qwen-family
+// models when available, then fall back to OpenAI only if explicitly available.
+// Feature modules should not call provider HTTP APIs directly.
 func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	if strings.TrimSpace(req.Prompt) == "" {
 		return ChatResponse{}, errors.New("prompt is required")
@@ -57,7 +56,7 @@ func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	defer cancel()
 
 	var errs []string
-	for _, provider := range providerOrder() {
+	for _, provider := range orderedProviders() {
 		switch provider {
 		case "together":
 			if strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {
@@ -85,11 +84,12 @@ func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	return ChatResponse{}, errors.New(strings.Join(errs, "; "))
 }
 
-func providerOrder() []string {
-	switch strings.ToLower(strings.TrimSpace(firstEnv("AI_PROVIDER", "AI_MODEL_PROVIDER"))) {
+func orderedProviders() []string {
+	preferred := strings.ToLower(strings.TrimSpace(firstEnv("AI_PROVIDER", "ARVIS_AI_PROVIDER")))
+	switch preferred {
 	case "openai":
 		return []string{"openai", "together"}
-	case "together", "auto", "", "qwen":
+	case "together", "qwen", "together-qwen":
 		return []string{"together", "openai"}
 	default:
 		return []string{"together", "openai"}
@@ -115,7 +115,7 @@ func callOpenAI(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 func callTogether(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	model := strings.TrimSpace(req.Model)
 	if model == "" || strings.HasPrefix(strings.ToLower(model), "gpt-") {
-		model = firstEnv("TOGETHER_MODEL", "TOGETHER_MODEL_SECURITY", "TOGETHER_MODEL_CHAT")
+		model = firstEnv("TOGETHER_MODEL_SECURITY", "TOGETHER_MODEL", "TOGETHER_MODEL_CHAT")
 	}
 	if model == "" {
 		model = "Qwen/Qwen3.7-Plus"
