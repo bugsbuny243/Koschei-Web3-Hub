@@ -35,7 +35,7 @@ var solanaPreflightAddressLike = regexp.MustCompile(`^[1-9A-HJ-NP-Za-km-z]{32,44
 const arvisPreflightSystemPrompt = `You are ARVIS, Koschei's defensive Web3 security analyst.
 Help users avoid fraud before they buy, sign, connect a wallet, or trust a token.
 Be evidence-based, concise and conservative.
-Never promise profit. Never give investment advice. Never help with abuse, harassment, evasion or retaliation.
+Never promise profit. Never give investment advice.
 Return a short Turkish risk explanation with concrete reasons and safe next steps.`
 
 func (h *Handler) ARVISPreflight(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +64,7 @@ func (h *Handler) ARVISPreflight(w http.ResponseWriter, r *http.Request) {
 func evaluateARVISPreflight(req arvisPreflightRequest) arvisPreflightResponse {
 	target := strings.TrimSpace(req.Target)
 	kind := strings.ToLower(strings.TrimSpace(req.Kind))
-	intent := strings.ToLower(strings.TrimSpace(req.Intent + " " + req.Note))
+	intent := strings.ToLower(strings.TrimSpace(req.Intent + " " + req.Note + " " + target))
 	resp := arvisPreflightResponse{OK: true, Decision: "review", RiskLevel: "medium", Score: 45, CreditsCharged: false}
 	addReason := func(reason string) {
 		for _, existing := range resp.Reasons {
@@ -88,3 +88,47 @@ func evaluateARVISPreflight(req arvisPreflightRequest) arvisPreflightResponse {
 		resp.Score = 90
 		addReason("Kontrol edilecek adres, site, token veya işlem verisi eksik.")
 		addStep("İşlem yapmadan önce hedefi doğrula.")
+		resp.HumanMessage = "Hedef bilgi eksik olduğu için güvenli karar verilemiyor."
+		return resp
+	}
+	if solanaPreflightAddressLike.MatchString(target) {
+		addReason("Hedef Solana adres formatına benziyor; zincir üstü kanıtlarla doğrulanmalı.")
+		addStep("Token, wallet veya program adresini ARVIS dashboard içinde detaylı tara.")
+	} else {
+		addReason("Hedef adres formatı doğrulanamadı; sahte site veya hatalı adres riski kontrol edilmeli.")
+		addStep("Resmi kaynaklardan adres/site doğrulaması yap.")
+		resp.Score = maxInt(resp.Score, 55)
+	}
+	if strings.Contains(kind, "site") || strings.Contains(kind, "url") || strings.Contains(intent, "connect") || strings.Contains(intent, "sign") {
+		addReason("Cüzdan bağlantısı veya imza akışı kullanıcı varlığı için doğrudan risk oluşturabilir.")
+		addStep("Bağlanmadan önce domain, izinler ve imzalanacak işlem içeriğini kontrol et.")
+		resp.Score = maxInt(resp.Score, 60)
+	}
+	if strings.Contains(intent, "airdrop") || strings.Contains(intent, "claim") || strings.Contains(intent, "free") || strings.Contains(intent, "urgent") || strings.Contains(intent, "guarantee") {
+		addReason("Claim/airdrop/aciliyet dili dolandırıcılık kampanyalarında sık görülür.")
+		addStep("Sıradışı izin isteyen akışları durdur ve resmi kaynaklardan doğrula.")
+		resp.RiskLevel = "high"
+		resp.Score = maxInt(resp.Score, 78)
+		resp.Decision = "warn"
+	}
+	if strings.Contains(intent, "recovery phrase") || strings.Contains(intent, "unlimited approval") || strings.Contains(intent, "full permission") {
+		addReason("Gizli kurtarma ifadesi veya sınırsız izin isteyen akış kritik risk taşır.")
+		addStep("İşlemi durdur ve yalnızca resmi, doğrulanmış kaynakları kullan.")
+		resp.RiskLevel = "high"
+		resp.Score = 95
+		resp.Decision = "blocked"
+	}
+	if len(resp.Reasons) == 0 {
+		resp.RiskLevel = "low"
+		resp.Score = 25
+		resp.Decision = "allow"
+		addReason("Belirgin yüksek risk sinyali tespit edilmedi.")
+		addStep("Yine de işlem detaylarını imzalamadan önce kontrol et.")
+	}
+	if resp.Decision == "review" && resp.Score >= 70 {
+		resp.Decision = "warn"
+		resp.RiskLevel = "high"
+	}
+	resp.HumanMessage = "ARVIS ön kontrol sonucu: " + resp.Decision + " / " + resp.RiskLevel + ". İmzadan önce kanıtları ve izinleri doğrula."
+	return resp
+}
