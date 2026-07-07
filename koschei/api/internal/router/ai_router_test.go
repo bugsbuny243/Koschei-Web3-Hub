@@ -1,25 +1,26 @@
 package router
 
-import (
-	"os"
-	"testing"
-)
+import "testing"
 
-func TestOrderedProvidersDefaultsToTogetherFirst(t *testing.T) {
-	t.Setenv("AI_PROVIDER", "")
-	t.Setenv("ARVIS_AI_PROVIDER", "")
-	got := orderedProviders()
-	if len(got) != 2 || got[0] != "together" || got[1] != "openai" {
-		t.Fatalf("got %v, want together then openai", got)
+func TestProviderFromEnvUsesTogetherOnly(t *testing.T) {
+	oldGetEnv := getEnv
+	defer func() { getEnv = oldGetEnv }()
+	getEnv = func(key string) string {
+		if key == "TOGETHER_API_KEY" {
+			return "test-key"
+		}
+		return ""
+	}
+	if got := providerFromEnv(); got != "together" {
+		t.Fatalf("got %q, want together", got)
 	}
 }
 
-func TestOrderedProvidersAllowsOpenAIOverride(t *testing.T) {
-	old := os.Getenv("AI_PROVIDER")
-	defer os.Setenv("AI_PROVIDER", old)
-	os.Setenv("AI_PROVIDER", "openai")
-	got := orderedProviders()
-	if len(got) != 2 || got[0] != "openai" || got[1] != "together" {
-		t.Fatalf("got %v, want openai then together", got)
+func TestProviderFromEnvUnconfiguredWithoutTogether(t *testing.T) {
+	oldGetEnv := getEnv
+	defer func() { getEnv = oldGetEnv }()
+	getEnv = func(key string) string { return "" }
+	if got := providerFromEnv(); got != "unconfigured" {
+		t.Fatalf("got %q, want unconfigured", got)
 	}
 }
