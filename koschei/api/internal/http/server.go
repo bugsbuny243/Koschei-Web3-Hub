@@ -3,8 +3,10 @@ package http
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"koschei/api/internal/cache"
@@ -23,29 +25,11 @@ type serverConfig struct {
 
 type Option func(*serverConfig)
 
-func WithReadDB(db *sql.DB) Option {
-	return func(c *serverConfig) { c.dbRead = db }
-}
-
-func WithCache(value cache.Cache) Option {
-	return func(c *serverConfig) {
-		if value != nil {
-			c.cache = value
-		}
-	}
-}
-
-func WithSolanaRPC(rpc *web3.SolanaRPC) Option {
-	return func(c *serverConfig) { c.solanaRPC = rpc }
-}
-
-func WithJobStore(store *jobs.Store) Option {
-	return func(c *serverConfig) { c.jobStore = store }
-}
-
-func WithJobQueue(queue jobs.Queue) Option {
-	return func(c *serverConfig) { c.jobQueue = queue }
-}
+func WithReadDB(db *sql.DB) Option { return func(c *serverConfig) { c.dbRead = db } }
+func WithCache(value cache.Cache) Option { return func(c *serverConfig) { if value != nil { c.cache = value } } }
+func WithSolanaRPC(rpc *web3.SolanaRPC) Option { return func(c *serverConfig) { c.solanaRPC = rpc } }
+func WithJobStore(store *jobs.Store) Option { return func(c *serverConfig) { c.jobStore = store } }
+func WithJobQueue(queue jobs.Queue) Option { return func(c *serverConfig) { c.jobQueue = queue } }
 
 func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string, opts ...Option) http.Handler {
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
@@ -53,33 +37,19 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 			panic("production auth env missing: " + strings.Join(missing, ", "))
 		}
 	}
-	config := serverConfig{}
-	for _, opt := range opts {
-		if opt != nil {
-			opt(&config)
-		}
-	}
-	cacheValue := config.cache
-	if cacheValue == nil {
-		cacheValue = cache.NewMemoryCache()
-	}
-	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewRateLimiter(), DBInitError: dbInitError, Cache: cacheValue, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue}
-	if h.DBRead == nil {
-		h.DBRead = db
-	}
+	config := serverConfig{cache: cache.NewNoop()}
+	for _, opt := range opts { if opt != nil { opt(&config) } }
+	if config.dbRead == nil { config.dbRead = db }
+	if config.solanaRPC == nil { config.solanaRPC = web3.NewSolanaRPC(config.cache) }
+	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue}
 	mux := http.NewServeMux()
-	premium := func(next http.HandlerFunc) http.HandlerFunc {
-		return handlers.RequireAuth(h.RequireActiveEntitlement(next))
-	}
+	premium := func(next http.HandlerFunc) http.HandlerFunc { return handlers.RequireAuth(h.RequireActiveEntitlement(next)) }
+	_ = premium
 
 	registerCoreRoutes(mux, h)
 	registerOwnerRoutes(mux, h, staticDir)
-	registerRuntimeRoutes(mux, h)
-	registerCustomerProductRoutes(mux, h, premium)
-	registerB2BRoutes(mux, h)
-	registerWeb3Routes(mux, h, premium)
-	registerStaticFiles(mux, staticDir)
-
+	registerPublicProductRoutes(mux, h)
+	registerStatic(mux, staticDir)
 	return securityHeaders(cors(apiReadiness(db, mux), corsOrigin))
 }
 
@@ -90,25 +60,19 @@ func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler) {
 	mux.HandleFunc("/api/web3/health", method("GET", h.Web3Health))
 	mux.HandleFunc("/api/web3/health/logs", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3HealthLogs))))
 	mux.HandleFunc("/api/analytics/event", method("POST", h.AnalyticsEvent))
-	mux.HandleFunc("/ads.txt", method("GET", adsTXT))
-	mux.HandleFunc("/robots.txt", method("GET", robotsTXT))
-	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok"})
-	}))
-
+	mux.HandleFunc("/ads.txt", method("GET", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "text/plain; charset=utf-8"); _, _ = w.Write([]byte("google.com, pub-6081394144742471, DIRECT, f08c47fec0942fa0")) }))
+	mux.HandleFunc("/robots.txt", method("GET", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "text/plain; charset=utf-8"); _, _ = w.Write([]byte("User-agent: *\nAllow: /\nSitemap: https://tradepigloball.co/sitemap.xml")) }))
+	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "application/json"); _ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok"}) }))
 	mux.HandleFunc("/api/auth/register", method("POST", h.Register))
 	mux.HandleFunc("/api/auth/login", method("POST", h.Login))
 	mux.HandleFunc("/api/auth/neon-login", method("GET", h.NeonLogin))
 	mux.HandleFunc("/api/auth/neon-register", method("GET", h.NeonRegister))
 	mux.HandleFunc("/api/auth/neon-callback", method("GET", h.NeonCallback))
-
 	mux.HandleFunc("/api/me", handlers.RequireAuth(method("GET", h.Me)))
 	mux.HandleFunc("/api/me/package", handlers.RequireAuth(method("GET", h.MePackage)))
 	mux.HandleFunc("/api/member/summary", requiresDB(h, handlers.RequireAuth(method("GET", h.MemberSummary))))
 	mux.HandleFunc("/api/payments/request", requiresDB(h, handlers.RequireAuth(method("POST", h.PaymentRequest))))
 	mux.HandleFunc("/api/shopier/webhook", requiresDB(h, method("POST", h.ShopierWebhook)))
-
 	mux.HandleFunc("/api/arvis/preflight", method("POST", h.ARVISPreflight))
 	mux.HandleFunc("/api/public/impact", method("GET", h.PublicImpact))
 	mux.HandleFunc("/api/public/metrics", method("GET", h.GetPublicMetrics))
@@ -138,4 +102,29 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/api/owner/chat", requiresDB(h, ownerOnly(h, h.OwnerChat)))
 	mux.HandleFunc("/api/owner/health", requiresDB(h, ownerOnly(h, method("GET", h.OwnerHealth))))
 	mux.HandleFunc("/api/owner/status", requiresDB(h, ownerOnly(h, method("GET", h.OwnerStatus))))
+	mux.HandleFunc("/owner", ownerPageHandler(staticDir))
+	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
+}
+
+func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler) {
+	mux.HandleFunc("/api/rug-radar/feed", method("GET", h.RugRadarFeed))
+	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
+}
+
+func registerStatic(mux *http.ServeMux, staticDir string) {
+	if staticDir == "" { return }
+	info, err := os.Stat(staticDir)
+	if err != nil || !info.IsDir() { log.Printf("warning: static directory unavailable at %q: %v", staticDir, err); return }
+	fileServer := http.FileServer(http.Dir(staticDir))
+	indexPath := filepath.Join(staticDir, "index.html")
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") { http.NotFound(w, r); return }
+		if r.Method != http.MethodGet && r.Method != http.MethodHead { w.WriteHeader(http.StatusMethodNotAllowed); return }
+		if r.URL.Path == "/" { http.ServeFile(w, r, indexPath); return }
+		clean := strings.TrimPrefix(filepath.Clean(r.URL.Path), "/")
+		candidate := filepath.Join(staticDir, clean)
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() { fileServer.ServeHTTP(w, r); return }
+		if info, err := os.Stat(candidate + ".html"); err == nil && !info.IsDir() { http.ServeFile(w, r, candidate+".html"); return }
+		http.ServeFile(w, r, indexPath)
+	})
 }
