@@ -62,7 +62,7 @@ func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	defer cancel()
 
 	var errs []string
-	for _, provider := range providerOrder() {
+	for _, provider := range orderedProviders() {
 		switch provider {
 		case "together":
 			if strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {

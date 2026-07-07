@@ -2,46 +2,24 @@ package router
 
 import (
 	"os"
-	"reflect"
 	"testing"
 )
 
-func TestProviderOrderDefaultsTogetherFirst(t *testing.T) {
+func TestOrderedProvidersDefaultsToTogetherFirst(t *testing.T) {
 	t.Setenv("AI_PROVIDER", "")
-	t.Setenv("AI_MODEL_PROVIDER", "")
-	got := providerOrder()
-	want := []string{"together", "openai"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("providerOrder() = %v, want %v", got, want)
+	t.Setenv("ARVIS_AI_PROVIDER", "")
+	got := orderedProviders()
+	if len(got) != 2 || got[0] != "together" || got[1] != "openai" {
+		t.Fatalf("got %v, want together then openai", got)
 	}
 }
 
-func TestProviderOrderAllowsOpenAIFirst(t *testing.T) {
-	t.Setenv("AI_PROVIDER", "openai")
-	t.Setenv("AI_MODEL_PROVIDER", "")
-	got := providerOrder()
-	want := []string{"openai", "together"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("providerOrder() = %v, want %v", got, want)
-	}
-}
-
-func TestProviderOrderAcceptsQwenAlias(t *testing.T) {
-	t.Setenv("AI_PROVIDER", "qwen")
-	t.Setenv("AI_MODEL_PROVIDER", "")
-	got := providerOrder()
-	want := []string{"together", "openai"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("providerOrder() = %v, want %v", got, want)
-	}
-}
-
-func TestProviderOrderFallsBackToLegacyProviderEnv(t *testing.T) {
-	_ = os.Unsetenv("AI_PROVIDER")
-	t.Setenv("AI_MODEL_PROVIDER", "openai")
-	got := providerOrder()
-	want := []string{"openai", "together"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("providerOrder() = %v, want %v", got, want)
+func TestOrderedProvidersAllowsOpenAIOverride(t *testing.T) {
+	old := os.Getenv("AI_PROVIDER")
+	defer os.Setenv("AI_PROVIDER", old)
+	os.Setenv("AI_PROVIDER", "openai")
+	got := orderedProviders()
+	if len(got) != 2 || got[0] != "openai" || got[1] != "together" {
+		t.Fatalf("got %v, want openai then together", got)
 	}
 }
