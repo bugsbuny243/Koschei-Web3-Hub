@@ -33,10 +33,10 @@ var KoscheiAnalytics = (function() {
   }
 
   function ensureFormMessage(form) {
-    let message = form.querySelector('[data-shopier-form-message="true"]');
+    let message = form.querySelector('[data-kosch-form-message="true"]') || form.querySelector('[data-shopier-form-message="true"]');
     if (message) return message;
     message = document.createElement('div');
-    message.setAttribute('data-shopier-form-message', 'true');
+    message.setAttribute('data-kosch-form-message', 'true');
     message.style.display = 'none';
     message.style.border = '1px solid rgba(45,238,255,.28)';
     message.style.background = 'rgba(0,255,136,.10)';
@@ -59,15 +59,26 @@ var KoscheiAnalytics = (function() {
     message.style.color = bad ? '#ffd6df' : '#d9ffe9';
   }
 
-  function selectedProductFromModal(form) {
-    const title = document.getElementById('modalTitle');
-    const text = (title && title.textContent || '').toLowerCase();
-    if (text.includes('professional')) return 'professional';
-    if (text.includes('enterprise')) return 'enterprise';
+  function normalizeProductID(value) {
+    const product = String(value || '').trim().toLowerCase();
+    if (product === 'builder' || product === 'pro') return 'professional';
+    if (product === 'studio') return 'enterprise';
+    if (product === 'professional' || product === 'enterprise' || product === 'starter') return product;
     return 'starter';
   }
 
-  async function submitShopierPayment(form) {
+  function selectedProductFromModal(form) {
+    if (form && form.dataset && form.dataset.product) return normalizeProductID(form.dataset.product);
+    const hidden = form && form.querySelector('[name="product_id"]');
+    if (hidden && hidden.value) return normalizeProductID(hidden.value);
+    const title = document.getElementById('modalTitle');
+    const text = (title && title.textContent || '').toLowerCase();
+    if (text.includes('professional') || text.includes('builder')) return 'professional';
+    if (text.includes('enterprise') || text.includes('studio')) return 'enterprise';
+    return 'starter';
+  }
+
+  async function submitKoschPayment(form) {
     const button = form.querySelector('#submitPayment') || form.querySelector('button[type="submit"]');
     const oldText = button ? button.textContent : '';
     const jwt = authJwt();
@@ -79,19 +90,27 @@ var KoscheiAnalytics = (function() {
     body.product_id = selectedProductFromModal(form);
     body.registered_email = authEmail() || body.customer_email || '';
     body.customer_email = body.customer_email || body.registered_email || '';
+    body.wallet_address = String(body.wallet_address || body.payer_wallet || '').trim();
+    body.payer_wallet = body.wallet_address;
+    body.transaction_signature = String(body.transaction_signature || body.tx_signature || body.payment_reference || '').trim();
+    body.payment_reference = body.transaction_signature;
     if (!String(body.full_name || '').trim()) {
       setFormMessage(form, 'Ad soyad alanı gerekli.', true);
       return;
     }
-    if (!String(body.payment_reference || '').trim()) {
-      setFormMessage(form, 'Shopier sipariş / ödeme no gerekli.', true);
+    if (!body.wallet_address) {
+      setFormMessage(form, 'Ödeme yaptığın Solana cüzdan adresi gerekli.', true);
+      return;
+    }
+    if (!body.transaction_signature) {
+      setFormMessage(form, 'KOSCH transferinin Solana transaction signature değeri gerekli.', true);
       return;
     }
     if (button) {
       button.disabled = true;
       button.textContent = 'Gönderiliyor…';
     }
-    setFormMessage(form, 'Ödeme bildirimi owner paneline gönderiliyor…', false);
+    setFormMessage(form, 'KOSCH ödeme bildirimi owner paneline gönderiliyor…', false);
     try {
       const response = await fetch('/api/payments/request', {
         method: 'POST',
@@ -105,11 +124,11 @@ var KoscheiAnalytics = (function() {
         return;
       }
       if (!response.ok) {
-        setFormMessage(form, data.message || data.error || 'Ödeme bildirimi gönderilemedi.', true);
+        setFormMessage(form, data.message || data.error || 'KOSCH ödeme bildirimi gönderilemedi.', true);
         return;
       }
-      setFormMessage(form, data.message || 'Ödeme bildirimi owner paneline gönderildi.', false);
-      track('shopier_payment_report_sent', { product_id: body.product_id });
+      setFormMessage(form, data.message || 'KOSCH ödeme bildirimi owner paneline gönderildi.', false);
+      track('kosch_payment_report_sent', { product_id: body.product_id });
     } catch (error) {
       setFormMessage(form, 'Bağlantı hatası. Lütfen tekrar dene.', true);
     } finally {
@@ -125,6 +144,7 @@ var KoscheiAnalytics = (function() {
       if (!/\/pricing/.test(window.location.pathname)) return;
       const form = document.getElementById('paymentForm');
       if (!form) return;
+      if (!form.dataset.product) form.dataset.product = 'starter';
       if (!form.querySelector('[name="customer_email"]')) {
         const grid = form.querySelector('.form-grid') || form;
         const label = document.createElement('label');
@@ -140,14 +160,14 @@ var KoscheiAnalytics = (function() {
         grid.insertBefore(label, grid.firstChild);
       }
       ensureFormMessage(form);
-      if (!form.__koscheiShopierSubmitBound) {
-        form.__koscheiShopierSubmitBound = true;
+      if (!form.__koscheiKoschSubmitBound) {
+        form.__koscheiKoschSubmitBound = true;
         form.addEventListener('submit', function(event) {
           event.preventDefault();
           event.stopImmediatePropagation();
           const field = form.querySelector('[name="customer_email"]');
           if (field && !field.value) field.value = authEmail() || '';
-          submitShopierPayment(form);
+          submitKoschPayment(form);
         }, true);
       }
     } catch {}
