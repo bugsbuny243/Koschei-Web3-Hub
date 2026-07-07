@@ -10,22 +10,24 @@ import (
 	"time"
 )
 
-const paymentRequestMessage = "Payment request received. Owner review required."
+const paymentRequestMessage = "KOSCH payment proof received. Owner review required."
+const koschPaymentProvider = "kosch_token"
+const koschDefaultTokenMint = "HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump"
 
 type koscheiPackage struct {
-	ID        string
-	Name      string
-	AmountTRY int
-	Outputs   int
+	ID          string
+	Name        string
+	AmountKOSCH string
+	Outputs     int
 }
 
 var koscheiPackages = map[string]koscheiPackage{
-	"starter":      {ID: "starter", Name: "Koschei Starter", AmountTRY: 899, Outputs: 25},
-	"professional": {ID: "professional", Name: "Koschei Professional", AmountTRY: 2299, Outputs: 100},
-	"enterprise":   {ID: "enterprise", Name: "Koschei Enterprise", AmountTRY: 4999, Outputs: 300},
+	"starter":      {ID: "starter", Name: "Koschei Starter", AmountKOSCH: "250000", Outputs: 25},
+	"professional": {ID: "professional", Name: "Koschei Professional", AmountKOSCH: "750000", Outputs: 100},
+	"enterprise":   {ID: "enterprise", Name: "Koschei Enterprise", AmountKOSCH: "2000000", Outputs: 300},
 }
 
-var shopierPacks = map[string]koscheiPackage{
+var koschPacks = map[string]koscheiPackage{
 	"starter":      koscheiPackages["starter"],
 	"professional": koscheiPackages["professional"],
 	"enterprise":   koscheiPackages["enterprise"],
@@ -34,12 +36,16 @@ var shopierPacks = map[string]koscheiPackage{
 }
 
 type paymentRequestInput struct {
-	FullName         string `json:"full_name"`
-	ProductID        string `json:"product_id"`
-	PaymentReference string `json:"payment_reference"`
-	RegisteredEmail  string `json:"registered_email"`
-	CustomerEmail    string `json:"customer_email"`
-	Note             string `json:"note"`
+	FullName             string `json:"full_name"`
+	ProductID            string `json:"product_id"`
+	PaymentReference     string `json:"payment_reference"`
+	RegisteredEmail      string `json:"registered_email"`
+	CustomerEmail        string `json:"customer_email"`
+	Note                 string `json:"note"`
+	WalletAddress        string `json:"wallet_address"`
+	PayerWallet          string `json:"payer_wallet"`
+	TransactionSignature string `json:"transaction_signature"`
+	TxSignature          string `json:"tx_signature"`
 }
 
 type paymentRequestReviewInput struct {
@@ -61,36 +67,47 @@ func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS product_slug text`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS plan text`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS amount_try integer`,
-		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'TRY'`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS amount_kosch text NOT NULL DEFAULT ''`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'KOSCH'`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'pending'`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS raw_payload jsonb NOT NULL DEFAULT '{}'::jsonb`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS reviewed_at timestamptz`,
-		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS payment_provider text NOT NULL DEFAULT 'shopier'`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS payment_provider text NOT NULL DEFAULT 'kosch_token'`,
 		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS external_payment_id text`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS transaction_signature text`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS payer_wallet text`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS treasury_wallet text`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS token_mint text`,
+		`ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS chain text NOT NULL DEFAULT 'solana'`,
+		`ALTER TABLE payment_requests ALTER COLUMN payment_provider SET DEFAULT 'kosch_token'`,
+		`ALTER TABLE payment_requests ALTER COLUMN currency SET DEFAULT 'KOSCH'`,
 		`UPDATE payment_requests SET plan = COALESCE(NULLIF(plan, ''), NULLIF(product_slug, ''), raw_payload->>'product_id', 'starter') WHERE plan IS NULL OR plan = ''`,
 		`ALTER TABLE payment_requests ALTER COLUMN plan SET DEFAULT 'starter'`,
 		`ALTER TABLE payment_requests ALTER COLUMN plan SET NOT NULL`,
-		`CREATE TABLE IF NOT EXISTS products (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text NOT NULL, name text NOT NULL, pack_type text NOT NULL, description text, price_try_cents integer NOT NULL DEFAULT 0, output_quota integer NOT NULL DEFAULT 0, shopier_url text NOT NULL DEFAULT '', image_url text, is_active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS payment_requests_kosch_tx_sig_idx ON payment_requests (lower(transaction_signature)) WHERE transaction_signature IS NOT NULL AND transaction_signature <> ''`,
+		`CREATE TABLE IF NOT EXISTS products (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text NOT NULL, name text NOT NULL, pack_type text NOT NULL, description text, price_try_cents integer NOT NULL DEFAULT 0, price_usd_cents integer NOT NULL DEFAULT 0, price_kosch text NOT NULL DEFAULT '', output_quota integer NOT NULL DEFAULT 0, shopier_url text NOT NULL DEFAULT '', image_url text, is_active boolean NOT NULL DEFAULT true, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now())`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS slug text`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS name text`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS pack_type text`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS description text`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS price_try_cents integer NOT NULL DEFAULT 0`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS price_usd_cents integer NOT NULL DEFAULT 0`,
+		`ALTER TABLE products ADD COLUMN IF NOT EXISTS price_kosch text NOT NULL DEFAULT ''`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS output_quota integer NOT NULL DEFAULT 0`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS shopier_url text NOT NULL DEFAULT ''`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url text`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true`,
 		`ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
 		`CREATE TABLE IF NOT EXISTS customers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text, full_name text, company_name text, country text, source text, notes text, created_at timestamptz NOT NULL DEFAULT now())`,
-		`CREATE TABLE IF NOT EXISTS orders (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid, product_id uuid, provider text NOT NULL DEFAULT 'paddle', provider_order_id text, provider_payment_id text, amount_try_cents integer NOT NULL DEFAULT 0, currency text NOT NULL DEFAULT 'USD', status text NOT NULL DEFAULT 'pending', raw_payload jsonb, purchased_at timestamptz, created_at timestamptz NOT NULL DEFAULT now())`,
+		`CREATE TABLE IF NOT EXISTS orders (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), customer_id uuid, product_id uuid, provider text NOT NULL DEFAULT 'kosch_token', provider_order_id text, provider_payment_id text, amount_try_cents integer NOT NULL DEFAULT 0, currency text NOT NULL DEFAULT 'KOSCH', status text NOT NULL DEFAULT 'pending', raw_payload jsonb, purchased_at timestamptz, created_at timestamptz NOT NULL DEFAULT now())`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_id uuid`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS product_id uuid`,
-		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'paddle'`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'kosch_token'`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider_order_id text`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS provider_payment_id text`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS amount_try_cents integer NOT NULL DEFAULT 0`,
-		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'USD'`,
+		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'KOSCH'`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'pending'`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS raw_payload jsonb`,
 		`ALTER TABLE orders ADD COLUMN IF NOT EXISTS purchased_at timestamptz`,
@@ -107,12 +124,12 @@ func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS orders_provider_order_idx ON orders (provider, provider_order_id)`,
 		`CREATE INDEX IF NOT EXISTS orders_provider_payment_idx ON orders (provider, provider_payment_id)`,
 		`CREATE INDEX IF NOT EXISTS entitlements_email_status_expires_idx ON entitlements (lower(email), status, expires_at)`,
-		`UPDATE products SET name='Starter', pack_type='starter', description='Koschei Starter package', price_try_cents=89900, output_quota=25, is_active=true, updated_at=now() WHERE slug='starter'`,
-		`UPDATE products SET name='Professional', pack_type='professional', description='Koschei Professional package', price_try_cents=229900, output_quota=100, is_active=true, updated_at=now() WHERE slug='professional'`,
-		`UPDATE products SET name='Enterprise', pack_type='enterprise', description='Koschei Enterprise package', price_try_cents=499900, output_quota=300, is_active=true, updated_at=now() WHERE slug='enterprise'`,
-		`INSERT INTO products (slug, name, pack_type, description, price_try_cents, output_quota, shopier_url, is_active) SELECT 'starter','Starter','starter','Koschei Starter package',89900,25,'',true WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug='starter')`,
-		`INSERT INTO products (slug, name, pack_type, description, price_try_cents, output_quota, shopier_url, is_active) SELECT 'professional','Professional','professional','Koschei Professional package',229900,100,'',true WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug='professional')`,
-		`INSERT INTO products (slug, name, pack_type, description, price_try_cents, output_quota, shopier_url, is_active) SELECT 'enterprise','Enterprise','enterprise','Koschei Enterprise package',499900,300,'',true WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug='enterprise')`,
+		`UPDATE products SET name='Starter', pack_type='starter', description='Koschei Starter package - paid with KOSCH', price_try_cents=0, price_usd_cents=0, price_kosch='250000', output_quota=25, shopier_url='', is_active=true, updated_at=now() WHERE slug='starter'`,
+		`UPDATE products SET name='Professional', pack_type='professional', description='Koschei Professional package - paid with KOSCH', price_try_cents=0, price_usd_cents=0, price_kosch='750000', output_quota=100, shopier_url='', is_active=true, updated_at=now() WHERE slug='professional'`,
+		`UPDATE products SET name='Enterprise', pack_type='enterprise', description='Koschei Enterprise package - paid with KOSCH', price_try_cents=0, price_usd_cents=0, price_kosch='2000000', output_quota=300, shopier_url='', is_active=true, updated_at=now() WHERE slug='enterprise'`,
+		`INSERT INTO products (slug, name, pack_type, description, price_try_cents, price_usd_cents, price_kosch, output_quota, shopier_url, is_active) SELECT 'starter','Starter','starter','Koschei Starter package - paid with KOSCH',0,0,'250000',25,'',true WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug='starter')`,
+		`INSERT INTO products (slug, name, pack_type, description, price_try_cents, price_usd_cents, price_kosch, output_quota, shopier_url, is_active) SELECT 'professional','Professional','professional','Koschei Professional package - paid with KOSCH',0,0,'750000',100,'',true WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug='professional')`,
+		`INSERT INTO products (slug, name, pack_type, description, price_try_cents, price_usd_cents, price_kosch, output_quota, shopier_url, is_active) SELECT 'enterprise','Enterprise','enterprise','Koschei Enterprise package - paid with KOSCH',0,0,'2000000',300,'',true WHERE NOT EXISTS (SELECT 1 FROM products WHERE slug='enterprise')`,
 	}
 	for _, statement := range statements {
 		if _, err := db.ExecContext(ctx, statement); err != nil {
@@ -123,16 +140,18 @@ func ensurePaymentSchema(ctx context.Context, db *sql.DB) error {
 }
 
 type paymentRequestRecord struct {
-	ID         string         `json:"id"`
-	Email      string         `json:"email"`
-	FullName   string         `json:"full_name"`
-	ProductID  string         `json:"product_id"`
-	AmountTRY  int            `json:"amount_try"`
-	Currency   string         `json:"currency"`
-	Status     string         `json:"status"`
-	RawPayload map[string]any `json:"raw_payload"`
-	CreatedAt  time.Time      `json:"created_at"`
-	ReviewedAt *time.Time     `json:"reviewed_at,omitempty"`
+	ID              string         `json:"id"`
+	Email           string         `json:"email"`
+	FullName        string         `json:"full_name"`
+	ProductID       string         `json:"product_id"`
+	AmountTRY       int            `json:"amount_try"`
+	AmountKOSCH     string         `json:"amount_kosch"`
+	Currency        string         `json:"currency"`
+	Status          string         `json:"status"`
+	PaymentProvider string         `json:"payment_provider"`
+	RawPayload      map[string]any `json:"raw_payload"`
+	CreatedAt       time.Time      `json:"created_at"`
+	ReviewedAt      *time.Time     `json:"reviewed_at,omitempty"`
 }
 
 func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +159,7 @@ func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payment schema unavailable", "message": err.Error()})
 		return
 	}
-	if !h.Limiter.allow("billing:"+clientIP(r), 10, 10_000_000_000) {
+	if h.Limiter != nil && !h.Limiter.allow("billing:"+clientIP(r), 10, 10_000_000_000) {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate limited"})
 		return
 	}
@@ -155,31 +174,53 @@ func (h *Handler) PaymentRequest(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
 		return
 	}
-	req.FullName = strings.TrimSpace(req.FullName)
-	req.ProductID = normalizePackageID(req.ProductID)
-	req.PaymentReference = strings.TrimSpace(req.PaymentReference)
-	req.RegisteredEmail = strings.ToLower(strings.TrimSpace(req.RegisteredEmail))
-	req.CustomerEmail = strings.ToLower(strings.TrimSpace(req.CustomerEmail))
-	req.Note = strings.TrimSpace(req.Note)
 	email := strings.ToLower(strings.TrimSpace(claims.Email))
-	pack, ok := shopierPacks[req.ProductID]
-	if email == "" || req.FullName == "" || !ok {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+	fullName := strings.TrimSpace(req.FullName)
+	productID := normalizePackageID(req.ProductID)
+	pack, ok := koschPacks[productID]
+	signature := sanitizePaymentSignature(firstNonEmpty(req.TransactionSignature, req.TxSignature, req.PaymentReference))
+	payerWallet := normalizeWallet(firstNonEmpty(req.PayerWallet, req.WalletAddress))
+	treasuryWallet := normalizeWallet(firstEnv("KOSCH_TREASURY_WALLET", "KOSCHEI_TREASURY_WALLET", "OWNER_WALLET", "KOSCHEI_OWNER_WALLET"))
+	tokenMint := strings.TrimSpace(firstEnv("KOSCH_TOKEN_MINT", "KOSCHEI_TOKEN_MINT"))
+	if tokenMint == "" {
+		tokenMint = koschDefaultTokenMint
+	}
+	if email == "" || fullName == "" || !ok || signature == "" || payerWallet == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body", "message": "full_name, product_id, payer_wallet and transaction_signature are required"})
 		return
 	}
-	declaredEmail := firstNonEmpty(req.RegisteredEmail, req.CustomerEmail, email)
-	rawPayload, err := json.Marshal(map[string]string{"payment_reference": req.PaymentReference, "registered_email": email, "declared_email": declaredEmail, "product_id": req.ProductID, "note": req.Note})
+	if treasuryWallet == "" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "kosch treasury wallet not configured"})
+		return
+	}
+	rawPayload, err := json.Marshal(map[string]string{
+		"payment_provider":      koschPaymentProvider,
+		"registered_email":      email,
+		"declared_email":        firstNonEmpty(strings.ToLower(strings.TrimSpace(req.RegisteredEmail)), strings.ToLower(strings.TrimSpace(req.CustomerEmail)), email),
+		"product_id":            productID,
+		"amount_kosch":          pack.AmountKOSCH,
+		"note":                  strings.TrimSpace(req.Note),
+		"transaction_signature": signature,
+		"payer_wallet":          payerWallet,
+		"treasury_wallet":       treasuryWallet,
+		"token_mint":            tokenMint,
+		"chain":                 "solana",
+	})
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "payload encoding failed"})
 		return
 	}
 	if _, err := h.DB.ExecContext(r.Context(), `
-		INSERT INTO payment_requests (email, full_name, product_slug, plan, amount_try, currency, status, raw_payload, payment_provider, created_at)
-		VALUES ($1, $2, $3, $3, $4, 'TRY', 'pending', $5::jsonb, 'shopier', now())`, email, req.FullName, req.ProductID, pack.AmountTRY, string(rawPayload)); err != nil {
+		INSERT INTO payment_requests (email, full_name, product_slug, plan, amount_try, amount_kosch, currency, status, raw_payload, payment_provider, external_payment_id, transaction_signature, payer_wallet, treasury_wallet, token_mint, chain, created_at)
+		VALUES ($1, $2, $3, $3, 0, $4, 'KOSCH', 'pending', $5::jsonb, $6, $7, $7, $8, $9, $10, 'solana', now())`, email, fullName, productID, pack.AmountKOSCH, string(rawPayload), koschPaymentProvider, signature, payerWallet, treasuryWallet, tokenMint); err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "transaction signature already submitted"})
+			return
+		}
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db insert failed", "message": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "status": "pending", "message": paymentRequestMessage})
+	writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "status": "pending", "provider": koschPaymentProvider, "currency": "KOSCH", "amount_kosch": pack.AmountKOSCH, "message": paymentRequestMessage})
 }
 
 func (h *Handler) OwnerPaymentRequestsList(w http.ResponseWriter, r *http.Request) {
@@ -191,8 +232,7 @@ func (h *Handler) OwnerPaymentRequestsList(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	rows, err := h.DB.QueryContext(r.Context(), `
-		SELECT id::text, COALESCE(email,''), COALESCE(full_name, ''), COALESCE(NULLIF(product_slug,''), raw_payload->>'product_id', product_id::text, plan, ''), COALESCE(amount_try, 0), COALESCE(currency, 'TRY'), status,
-		       COALESCE(raw_payload, '{}'::jsonb), created_at, reviewed_at
+		SELECT id::text, COALESCE(email,''), COALESCE(full_name, ''), COALESCE(NULLIF(product_slug,''), raw_payload->>'product_id', product_id::text, plan, ''), COALESCE(amount_try, 0), COALESCE(amount_kosch, raw_payload->>'amount_kosch', ''), COALESCE(currency, 'KOSCH'), status, COALESCE(payment_provider, raw_payload->>'payment_provider', 'kosch_token'), COALESCE(raw_payload, '{}'::jsonb), created_at, reviewed_at
 		FROM payment_requests
 		ORDER BY created_at DESC
 		LIMIT 200`)
@@ -206,7 +246,7 @@ func (h *Handler) OwnerPaymentRequestsList(w http.ResponseWriter, r *http.Reques
 	for rows.Next() {
 		var request paymentRequestRecord
 		var rawPayload []byte
-		if err := rows.Scan(&request.ID, &request.Email, &request.FullName, &request.ProductID, &request.AmountTRY, &request.Currency, &request.Status, &rawPayload, &request.CreatedAt, &request.ReviewedAt); err != nil {
+		if err := rows.Scan(&request.ID, &request.Email, &request.FullName, &request.ProductID, &request.AmountTRY, &request.AmountKOSCH, &request.Currency, &request.Status, &request.PaymentProvider, &rawPayload, &request.CreatedAt, &request.ReviewedAt); err != nil {
 			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "payment_requests": requests, "warning": "payment request scan failed"})
 			return
 		}
@@ -244,12 +284,12 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 	}
 	defer tx.Rollback()
 
-	var email, productID, status string
+	var email, productID, status, provider, externalPaymentID string
 	if err := tx.QueryRowContext(r.Context(), `
-		SELECT lower(email), COALESCE(NULLIF(product_slug,''), raw_payload->>'product_id', product_id::text, plan, ''), status
+		SELECT lower(email), COALESCE(NULLIF(product_slug,''), raw_payload->>'product_id', product_id::text, plan, ''), status, COALESCE(payment_provider, raw_payload->>'payment_provider', 'kosch_token'), COALESCE(transaction_signature, raw_payload->>'transaction_signature', external_payment_id, '')
 		FROM payment_requests
 		WHERE id = $1
-		FOR UPDATE`, paymentRequestID).Scan(&email, &productID, &status); err != nil {
+		FOR UPDATE`, paymentRequestID).Scan(&email, &productID, &status, &provider, &externalPaymentID); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"error": "payment request not found"})
 			return
@@ -258,7 +298,7 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	productID = normalizePackageID(productID)
-	if _, ok := shopierPacks[productID]; !ok {
+	if _, ok := koschPacks[productID]; !ok {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown product_id"})
 		return
 	}
@@ -267,7 +307,7 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if _, err := activatePackageEntitlementTx(r.Context(), tx, email, productID, "owner_manual", paymentRequestID, paymentRequestID); err != nil {
+	if _, err := activatePackageEntitlementTx(r.Context(), tx, email, productID, normalizePaymentProvider(provider), externalPaymentID, paymentRequestID); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "entitlement activation failed"})
 		return
 	}
@@ -279,7 +319,7 @@ func (h *Handler) OwnerApprovePaymentRequest(w http.ResponseWriter, r *http.Requ
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db commit failed"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "approved"})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "approved", "provider": normalizePaymentProvider(provider)})
 }
 
 func (h *Handler) OwnerRejectPaymentRequest(w http.ResponseWriter, r *http.Request) {
@@ -357,11 +397,27 @@ func packageName(packageID string) string {
 
 func normalizePaymentProvider(provider string) string {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "kosch", "kosch_token", "koschei_token":
+		return koschPaymentProvider
 	case "shopier", "shopier_manual", "paddle", "owner_manual":
 		return strings.ToLower(strings.TrimSpace(provider))
 	default:
 		return "owner_manual"
 	}
+}
+
+func sanitizePaymentSignature(signature string) string {
+	signature = strings.TrimSpace(signature)
+	if len(signature) < 40 || len(signature) > 120 {
+		return ""
+	}
+	const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+	for _, char := range signature {
+		if !strings.ContainsRune(alphabet, char) {
+			return ""
+		}
+	}
+	return signature
 }
 
 func (h *Handler) activatePackageEntitlement(ctx context.Context, email, packageID, paymentProvider, externalPaymentID string) (entitlementActivationResult, error) {
