@@ -35,10 +35,16 @@ type chatCompletionPayload struct {
 	Temperature float64             `json:"temperature"`
 }
 
-// Chat routes server-side LLM requests through the Koschei model router.
-// The default production policy is cost-aware: prefer Together/Qwen-family
-// models when available, then fall back to OpenAI only if explicitly available.
-// Feature modules should not call provider HTTP APIs directly.
+// Chat routes every server-side ARVIS/LLM request through one policy layer.
+//
+// Provider policy:
+//   - AI_PROVIDER=together: Together only
+//   - AI_PROVIDER=openai: OpenAI only
+//   - AI_PROVIDER=auto or empty: Together first, OpenAI fallback
+//
+// Koschei's default is Together-first because ARVIS should primarily use the
+// selected open model stack, while still allowing an explicit fallback when a
+// paid backup provider is configured.
 func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	if strings.TrimSpace(req.Prompt) == "" {
 		return ChatResponse{}, errors.New("prompt is required")
@@ -84,12 +90,13 @@ func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	return ChatResponse{}, errors.New(strings.Join(errs, "; "))
 }
 
-func orderedProviders() []string {
-	preferred := strings.ToLower(strings.TrimSpace(firstEnv("AI_PROVIDER", "ARVIS_AI_PROVIDER")))
-	switch preferred {
+func providerOrder() []string {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("AI_PROVIDER"))) {
 	case "openai":
-		return []string{"openai", "together"}
-	case "together", "qwen", "together-qwen":
+		return []string{"openai"}
+	case "together", "qwen":
+		return []string{"together"}
+	case "auto", "", "arvis":
 		return []string{"together", "openai"}
 	default:
 		return []string{"together", "openai"}
@@ -98,7 +105,8 @@ func orderedProviders() []string {
 
 func callOpenAI(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	model := strings.TrimSpace(req.Model)
-	if model == "" || strings.HasPrefix(strings.ToLower(model), "meta-") || strings.HasPrefix(strings.ToLower(model), "qwen") {
+	lowerModel := strings.ToLower(model)
+	if model == "" || strings.HasPrefix(lowerModel, "meta-") || strings.HasPrefix(lowerModel, "qwen") || strings.Contains(lowerModel, "/qwen") {
 		model = firstEnv("OPENAI_MODEL", "OPENAI_CHAT_MODEL")
 	}
 	if model == "" {
@@ -115,10 +123,10 @@ func callOpenAI(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 func callTogether(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	model := strings.TrimSpace(req.Model)
 	if model == "" || strings.HasPrefix(strings.ToLower(model), "gpt-") {
-		model = firstEnv("TOGETHER_MODEL_SECURITY", "TOGETHER_MODEL", "TOGETHER_MODEL_CHAT")
+		model = firstEnv("TOGETHER_MODEL_SECURITY", "TOGETHER_MODEL_ARVIS", "TOGETHER_MODEL", "TOGETHER_MODEL_CHAT")
 	}
 	if model == "" {
-		model = "Qwen/Qwen3.7-Plus"
+		model = "Qwen/Qwen3-235B-A22B-2507"
 	}
 	payload := chatCompletionPayload{Model: model, Messages: messages(req.System, req.Prompt), MaxTokens: req.MaxTokens, Temperature: req.Temperature}
 	content, err := postChat(ctx, "https://api.together.xyz/v1/chat/completions", os.Getenv("TOGETHER_API_KEY"), payload)
