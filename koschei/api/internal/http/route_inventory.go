@@ -96,6 +96,8 @@ func productionRouteInventory() []routeInventoryGroup {
 			Auth: "customer_session_or_public_badge",
 			Routes: []string{
 				"GET /api/rug-radar/feed",
+				"POST /api/token/scan",
+				"POST /api/v1/token/extensions",
 				"GET /api/v1/risk/badge",
 				"GET /api/v1/radar/feed",
 				"POST /api/v1/radar/check",
