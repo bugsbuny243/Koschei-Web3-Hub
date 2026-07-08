@@ -29,24 +29,10 @@ func (h *Handler) exposureToken2022Section(ctx context.Context, target, network 
 	}
 
 	if err := h.callSolanaRPC(ctx, client, rpcURL, network, "getAccountInfo", []interface{}{target, map[string]string{"encoding": "jsonParsed"}}, &account); err != nil {
-		return map[string]any{
-			"module_id": "token_2022_extensions",
-			"module": "Token-2022 Extension Deep Scanner",
-			"verified": false,
-			"status": "rpc_unavailable",
-			"is_token_2022": false,
-			"evidence": []string{"Token-2022 extension evidence could not be collected from the RPC provider."},
-		}
+		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": false, "status": "rpc_unavailable", "is_token_2022": false, "evidence": []string{"Token-2022 extension evidence could not be collected from the RPC provider."}}
 	}
 	if account.Value == nil {
-		return map[string]any{
-			"module_id": "token_2022_extensions",
-			"module": "Token-2022 Extension Deep Scanner",
-			"verified": false,
-			"status": "account_not_found",
-			"is_token_2022": false,
-			"evidence": []string{"Target account was not found; Token-2022 extension state is unavailable."},
-		}
+		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": false, "status": "account_not_found", "is_token_2022": false, "evidence": []string{"Target account was not found; Token-2022 extension state is unavailable."}}
 	}
 
 	info := account.Value.Data.Parsed.Info
@@ -57,16 +43,7 @@ func (h *Handler) exposureToken2022Section(ctx context.Context, target, network 
 		tokenProgram = "token-2022"
 	}
 	if !isMint {
-		return map[string]any{
-			"module_id": "token_2022_extensions",
-			"module": "Token-2022 Extension Deep Scanner",
-			"verified": true,
-			"status": "target_not_mint",
-			"is_token_2022": isToken2022,
-			"token_program": tokenProgram,
-			"account_owner": account.Value.Owner,
-			"evidence": []string{"Target exists, but it is not parsed as a token mint; Token-2022 mint extensions are not applicable."},
-		}
+		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": true, "status": "target_not_mint", "is_token_2022": isToken2022, "token_program": tokenProgram, "account_owner": account.Value.Owner, "evidence": []string{"Target exists, but it is not parsed as a token mint; Token-2022 mint extensions are not applicable."}}
 	}
 
 	extensions := []tokenExtensionAssessment{}
@@ -87,25 +64,7 @@ func (h *Handler) exposureToken2022Section(ctx context.Context, target, network 
 	}
 
 	riskIndex := exposureToken2022RiskIndex(isToken2022, penalty, extensions, visibility)
-	return map[string]any{
-		"module_id": "token_2022_extensions",
-		"module": "Token-2022 Extension Deep Scanner",
-		"verified": true,
-		"status": exposureToken2022Status(isToken2022, extensions),
-		"risk_index": riskIndex,
-		"risk_level": riskLevelFromScore(riskIndex),
-		"is_token_2022": isToken2022,
-		"token_program": tokenProgram,
-		"account_owner": account.Value.Owner,
-		"extension_count": len(extensions),
-		"extension_risk_penalty": penalty,
-		"final_policy": tokenFinalPolicy(100-riskIndex, extensions, visibility),
-		"extensions": extensions,
-		"transfer_behavior": behavior,
-		"visibility_limitations": visibility,
-		"compatibility_warnings": compatibility,
-		"evidence": findings,
-	}
+	return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": true, "status": exposureToken2022Status(isToken2022, extensions), "risk_index": riskIndex, "risk_level": exposureRiskLevelFromScore(riskIndex), "is_token_2022": isToken2022, "token_program": tokenProgram, "account_owner": account.Value.Owner, "extension_count": len(extensions), "extension_risk_penalty": penalty, "final_policy": tokenFinalPolicy(100-riskIndex, extensions, visibility), "extensions": extensions, "transfer_behavior": behavior, "visibility_limitations": visibility, "compatibility_warnings": compatibility, "evidence": findings}
 }
 
 func exposureToken2022Status(isToken2022 bool, extensions []tokenExtensionAssessment) string {
@@ -145,7 +104,7 @@ func exposureToken2022RiskIndex(isToken2022 bool, penalty int, extensions []toke
 	return risk
 }
 
-func riskLevelFromScore(score int) string {
+func exposureRiskLevelFromScore(score int) string {
 	switch {
 	case score >= 85:
 		return "critical"
