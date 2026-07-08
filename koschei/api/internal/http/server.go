@@ -44,11 +44,14 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue}
 	mux := http.NewServeMux()
 	premium := func(next http.HandlerFunc) http.HandlerFunc { return handlers.RequireAuth(h.RequireActiveEntitlement(next)) }
-	_ = premium
+	apiKey := func(next http.HandlerFunc) http.HandlerFunc { return h.APIKeyAuth(h.APIRateLimit(next)) }
 
 	registerCoreRoutes(mux, h)
+	registerAccountRoutes(mux, h)
 	registerOwnerRoutes(mux, h, staticDir)
 	registerPublicProductRoutes(mux, h)
+	registerDeveloperAPIRoutes(mux, h, apiKey)
+	registerWatchlistRoutes(mux, h, premium)
 	registerStatic(mux, staticDir)
 	return securityHeaders(cors(apiReadiness(db, mux), corsOrigin))
 }
@@ -84,6 +87,11 @@ func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler) {
 	mux.HandleFunc("/api/agent/chain-health", requiresDB(h, method("POST", h.AgentTool)))
 }
 
+func registerAccountRoutes(mux *http.ServeMux, h *handlers.Handler) {
+	mux.HandleFunc("/api/account/api-keys", requiresDB(h, handlers.RequireAuth(h.APIKeysCollection)))
+	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, handlers.RequireAuth(method("POST", h.RevokeAPIKey))))
+}
+
 func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir string) {
 	mux.HandleFunc("/api/owner/login", method("POST", h.OwnerLoginAudited))
 	mux.HandleFunc("/api/owner/logout", ownerOnly(h, method("POST", h.OwnerLogout)))
@@ -113,6 +121,13 @@ func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler) {
 	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, handlers.RequireAuth(method("POST", h.SecurityRadarCheck))))
 	mux.HandleFunc("/api/v1/radar/graph", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarGraph))))
 	mux.HandleFunc("/api/v1/radar/exposure", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarExposureReport))))
+}
+
+func registerDeveloperAPIRoutes(mux *http.ServeMux, h *handlers.Handler, apiKey func(http.HandlerFunc) http.HandlerFunc) {
+	mux.HandleFunc("/api/v1/scan/token", requiresDB(h, apiKey(method("POST", h.B2BTokenScan))))
+	mux.HandleFunc("/api/v1/usage", requiresDB(h, apiKey(method("GET", h.APIUsage))))
+	mux.HandleFunc("/api/v1/shield/preflight", requiresDB(h, apiKey(method("POST", h.ShieldPreflight))))
+	mux.HandleFunc("/api/v1/shield/transaction", requiresDB(h, apiKey(method("POST", h.ShieldPreflight))))
 }
 
 func registerStatic(mux *http.ServeMux, staticDir string) {
