@@ -49,7 +49,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	registerCoreRoutes(mux, h)
 	registerAccountRoutes(mux, h)
 	registerOwnerRoutes(mux, h, staticDir)
-	registerPublicProductRoutes(mux, h)
+	registerPublicProductRoutes(mux, h, premium)
 	registerDeveloperAPIRoutes(mux, h, apiKey)
 	registerWatchlistRoutes(mux, h, premium)
 	registerStatic(mux, staticDir)
@@ -115,8 +115,10 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
 }
 
-func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler) {
+func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler, premium func(http.HandlerFunc) http.HandlerFunc) {
 	mux.HandleFunc("/api/rug-radar/feed", method("GET", h.RugRadarFeed))
+	mux.HandleFunc("/api/token/scan", requiresDB(h, premium(method("POST", h.TokenScan))))
+	mux.HandleFunc("/api/v1/token/extensions", requiresDB(h, premium(method("POST", h.TokenScan))))
 	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
 	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarFeed))))
 	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, handlers.RequireAuth(method("POST", h.SecurityRadarCheck))))
