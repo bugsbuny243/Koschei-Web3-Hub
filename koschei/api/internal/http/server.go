@@ -112,6 +112,7 @@ func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler) {
 	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarFeed))))
 	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, handlers.RequireAuth(method("POST", h.SecurityRadarCheck))))
 	mux.HandleFunc("/api/v1/radar/graph", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarGraph))))
+	mux.HandleFunc("/api/v1/radar/exposure", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarExposureReport))))
 }
 
 func registerStatic(mux *http.ServeMux, staticDir string) {
