@@ -406,6 +406,8 @@ func aggregateSecurityRadarFeedItems(items []services.SecurityRadarVerdictRecord
 	out := make([]securityRadarFeedItem, 0, len(groups))
 	for _, acc := range groups {
 		item := securityRadarFeedItem{SecurityRadarVerdictRecord: acc.Best, OccurrenceCount: acc.OccurrenceCount, RiskEvents: acc.RiskEvents, MonitorEvents: acc.MonitorEvents, MaxRiskIndex: acc.MaxRiskIndex, MinRiskIndex: acc.MinRiskIndex, FirstSeenAt: acc.FirstSeenAt, LastSeenAt: acc.LastSeenAt}
+		item.Evidence = enrichSecurityRadarFeedEvidence(item.Evidence, item)
+		item.Recommendation = enrichSecurityRadarFeedRecommendation(item.Recommendation, item)
 		item.Summary = map[string]any{"deduped": true, "target": item.Target, "network": item.Network, "target_type": item.TargetType, "occurrence_count": item.OccurrenceCount, "risk_events": item.RiskEvents, "monitor_events": item.MonitorEvents, "max_risk_index": item.MaxRiskIndex, "min_risk_index": item.MinRiskIndex, "first_seen_at": item.FirstSeenAt, "last_seen_at": item.LastSeenAt, "rule_versions": keysFromBoolMap(acc.RuleVersions), "providers": keysFromBoolMap(acc.Providers)}
 		out = append(out, item)
 	}
@@ -419,6 +421,33 @@ func aggregateSecurityRadarFeedItems(items []services.SecurityRadarVerdictRecord
 		return out[i].LastSeenAt.After(out[j].LastSeenAt)
 	})
 	return out
+}
+
+func enrichSecurityRadarFeedEvidence(evidence []string, item securityRadarFeedItem) []string {
+	out := make([]string, 0, len(evidence)+4)
+	if item.OccurrenceCount > 1 {
+		out = append(out, "ARVIS feed dedup: bu hedef son radar penceresinde "+strconv.Itoa(item.OccurrenceCount)+" doğrulanmış gözlem altında tek kartta birleştirildi.")
+	}
+	if item.RiskEvents > 0 || item.MonitorEvents > 0 {
+		out = append(out, "Exposure summary: "+strconv.Itoa(item.RiskEvents)+" risk sinyali, "+strconv.Itoa(item.MonitorEvents)+" izleme sinyali aynı hedefe bağlandı.")
+	}
+	if item.MaxRiskIndex > 0 || item.MinRiskIndex > 0 {
+		out = append(out, "Risk range: "+strconv.Itoa(item.MinRiskIndex)+"-"+strconv.Itoa(item.MaxRiskIndex)+"/100; müşteri kartında en güçlü kanıt temsilci karar olarak gösterilir.")
+	}
+	if !item.LastSeenAt.IsZero() {
+		out = append(out, "Last seen: "+item.LastSeenAt.UTC().Format(time.RFC3339)+" UTC canlı ARVIS radarı tarafından gözlendi.")
+	}
+	out = append(out, evidence...)
+	return out
+}
+
+func enrichSecurityRadarFeedRecommendation(recommendation string, item securityRadarFeedItem) string {
+	recommendation = strings.TrimSpace(recommendation)
+	prefix := "ARVIS bu hedefi tekilleştirilmiş exposure kartı olarak gösteriyor: "+strconv.Itoa(item.OccurrenceCount)+" doğrulanmış gözlem, max risk "+strconv.Itoa(item.MaxRiskIndex)+"/100."
+	if recommendation == "" {
+		return prefix
+	}
+	return prefix + " " + recommendation
 }
 
 func securityRadarFeedKey(item services.SecurityRadarVerdictRecord) string {
