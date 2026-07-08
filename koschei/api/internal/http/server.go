@@ -96,6 +96,7 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/api/owner/login", method("POST", h.OwnerLoginAudited))
 	mux.HandleFunc("/api/owner/logout", ownerOnly(h, method("POST", h.OwnerLogout)))
 	mux.HandleFunc("/api/owner/command-center", ownerOnly(h, method("GET", h.OwnerCommandCenterStatus)))
+	mux.HandleFunc("/api/owner/route-map", ownerOnly(h, method("GET", ownerRouteMap)))
 	mux.HandleFunc("/api/owner/feedback", requiresDB(h, ownerOnly(h, h.OwnerFeedback)))
 	mux.HandleFunc("/api/owner/users", requiresDB(h, ownerOnly(h, method("GET", h.OwnerUsersV2))))
 	mux.HandleFunc("/api/owner/credits/add", requiresDB(h, ownerOnly(h, method("POST", h.OwnerAddCredits))))
