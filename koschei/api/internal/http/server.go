@@ -109,6 +109,9 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler) {
 	mux.HandleFunc("/api/rug-radar/feed", method("GET", h.RugRadarFeed))
 	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
+	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarFeed))))
+	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, handlers.RequireAuth(method("POST", h.SecurityRadarCheck))))
+	mux.HandleFunc("/api/v1/radar/graph", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarGraph))))
 }
 
 func registerStatic(mux *http.ServeMux, staticDir string) {
