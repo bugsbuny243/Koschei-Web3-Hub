@@ -32,6 +32,8 @@ type arvisPreflightResponse struct {
 
 var solanaPreflightAddressLike = regexp.MustCompile(`^[1-9A-HJ-NP-Za-km-z]{32,44}$`)
 
+const officialKOSCHMint = "HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump"
+
 const arvisPreflightSystemPrompt = `You are ARVIS, Koschei's defensive Web3 security analyst.
 Help users avoid fraud before they buy, sign, connect a wallet, or trust a token.
 Be evidence-based, concise and conservative.
@@ -49,7 +51,7 @@ func (h *Handler) ARVISPreflight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := evaluateARVISPreflight(req)
-	if aiProviderConfigured() && resp.RiskLevel != "low" {
+	if aiProviderConfigured() && resp.RiskLevel != "low" && !isOfficialKOSCHMint(req.Target) {
 		prompt := "Target: " + strings.TrimSpace(req.Target) + "\nKind: " + strings.TrimSpace(req.Kind) + "\nIntent: " + strings.TrimSpace(req.Intent) + "\nNote: " + strings.TrimSpace(req.Note) + "\nLocal decision: " + resp.Decision + "\nLocal reasons: " + strings.Join(resp.Reasons, "; ")
 		ai, err := router.Chat(r.Context(), router.ChatRequest{System: arvisPreflightSystemPrompt, Prompt: prompt, MaxTokens: 450, Temperature: 0.1, Timeout: 18 * time.Second})
 		if err == nil {
@@ -89,6 +91,17 @@ func evaluateARVISPreflight(req arvisPreflightRequest) arvisPreflightResponse {
 		addReason("Kontrol edilecek adres, site, token veya işlem verisi eksik.")
 		addStep("İşlem yapmadan önce hedefi doğrula.")
 		resp.HumanMessage = "Hedef bilgi eksik olduğu için güvenli karar verilemiyor."
+		return resp
+	}
+	if isOfficialKOSCHMint(target) {
+		resp.Decision = "review"
+		resp.RiskLevel = "medium"
+		resp.Score = 40
+		addReason("Bu adres resmi KOSCH mint adresiyle eşleşiyor.")
+		addReason("KOSCH, Koschei ARVIS içinde erişim ve ödeme bildirimi utility katmanı olarak konumlandırılır.")
+		addStep("İşlem yapmadan önce mint adresini resmi /kosch sayfasındaki adresle tekrar karşılaştır.")
+		addStep("KOSCH erişimi için yalnızca resmi /pricing ödeme bildirim akışını kullan.")
+		resp.HumanMessage = "ARVIS ön kontrol sonucu: resmi KOSCH mint eşleşti. Bu finansal tavsiye değildir; işlem yapmadan önce zincir üstü bilgileri ve resmi sayfayı doğrula."
 		return resp
 	}
 	if solanaPreflightAddressLike.MatchString(target) {
@@ -131,4 +144,8 @@ func evaluateARVISPreflight(req arvisPreflightRequest) arvisPreflightResponse {
 	}
 	resp.HumanMessage = "ARVIS ön kontrol sonucu: " + resp.Decision + " / " + resp.RiskLevel + ". İmzadan önce kanıtları ve izinleri doğrula."
 	return resp
+}
+
+func isOfficialKOSCHMint(target string) bool {
+	return strings.EqualFold(strings.TrimSpace(target), officialKOSCHMint)
 }
