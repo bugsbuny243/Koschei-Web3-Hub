@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,6 +19,31 @@ type securityRadarInput struct {
 	Address string `json:"address"`
 	Network string `json:"network"`
 	Mode    string `json:"mode"`
+}
+
+type securityRadarFeedItem struct {
+	services.SecurityRadarVerdictRecord
+	OccurrenceCount int            `json:"occurrence_count"`
+	RiskEvents      int            `json:"risk_events"`
+	MonitorEvents   int            `json:"monitor_events"`
+	MaxRiskIndex    int            `json:"max_risk_index"`
+	MinRiskIndex    int            `json:"min_risk_index"`
+	FirstSeenAt     time.Time      `json:"first_seen_at"`
+	LastSeenAt      time.Time      `json:"last_seen_at"`
+	Summary         map[string]any `json:"summary"`
+}
+
+type securityRadarFeedAccumulator struct {
+	Best            services.SecurityRadarVerdictRecord
+	OccurrenceCount int
+	RiskEvents      int
+	MonitorEvents   int
+	MaxRiskIndex    int
+	MinRiskIndex    int
+	FirstSeenAt     time.Time
+	LastSeenAt      time.Time
+	RuleVersions    map[string]bool
+	Providers       map[string]bool
 }
 
 func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +78,10 @@ func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
 			verified = append(verified, item)
 		}
 	}
-	base["items"] = verified
+	aggregated := aggregateSecurityRadarFeedItems(verified)
+	base["items"] = aggregated
+	base["raw_item_count"] = len(verified)
+	base["deduped_item_count"] = len(aggregated)
 	base["stream"] = h.securityRadarStreamStats(r.Context())
 	base["timeline"] = h.securityRadarStreamTimeline(r.Context(), 14)
 	writeJSON(w, http.StatusOK, base)
@@ -325,6 +355,137 @@ func radarSignalsVerified(signals map[string]any) bool {
 		}
 	}
 	return false
+}
+
+func aggregateSecurityRadarFeedItems(items []services.SecurityRadarVerdictRecord) []securityRadarFeedItem {
+	groups := map[string]*securityRadarFeedAccumulator{}
+	for _, item := range items {
+		key := securityRadarFeedKey(item)
+		if key == "" {
+			key = strings.TrimSpace(item.ID)
+		}
+		if key == "" {
+			key = strings.TrimSpace(item.Signature)
+		}
+		if key == "" {
+			key = item.CreatedAt.Format(time.RFC3339Nano)
+		}
+		acc, ok := groups[key]
+		if !ok {
+			acc = &securityRadarFeedAccumulator{Best: item, MaxRiskIndex: item.RiskIndex, MinRiskIndex: item.RiskIndex, FirstSeenAt: item.CreatedAt, LastSeenAt: item.CreatedAt, RuleVersions: map[string]bool{}, Providers: map[string]bool{}}
+			groups[key] = acc
+		}
+		acc.OccurrenceCount++
+		if securityRadarItemIsRisk(item) {
+			acc.RiskEvents++
+		} else {
+			acc.MonitorEvents++
+		}
+		if item.RiskIndex > acc.MaxRiskIndex {
+			acc.MaxRiskIndex = item.RiskIndex
+		}
+		if item.RiskIndex < acc.MinRiskIndex {
+			acc.MinRiskIndex = item.RiskIndex
+		}
+		if acc.FirstSeenAt.IsZero() || item.CreatedAt.Before(acc.FirstSeenAt) {
+			acc.FirstSeenAt = item.CreatedAt
+		}
+		if item.CreatedAt.After(acc.LastSeenAt) {
+			acc.LastSeenAt = item.CreatedAt
+		}
+		if strings.TrimSpace(item.RuleVersion) != "" {
+			acc.RuleVersions[item.RuleVersion] = true
+		}
+		if strings.TrimSpace(item.Provider) != "" {
+			acc.Providers[item.Provider] = true
+		}
+		if preferSecurityRadarRepresentative(item, acc.Best) {
+			acc.Best = item
+		}
+	}
+	out := make([]securityRadarFeedItem, 0, len(groups))
+	for _, acc := range groups {
+		item := securityRadarFeedItem{SecurityRadarVerdictRecord: acc.Best, OccurrenceCount: acc.OccurrenceCount, RiskEvents: acc.RiskEvents, MonitorEvents: acc.MonitorEvents, MaxRiskIndex: acc.MaxRiskIndex, MinRiskIndex: acc.MinRiskIndex, FirstSeenAt: acc.FirstSeenAt, LastSeenAt: acc.LastSeenAt}
+		item.Summary = map[string]any{"deduped": true, "target": item.Target, "network": item.Network, "target_type": item.TargetType, "occurrence_count": item.OccurrenceCount, "risk_events": item.RiskEvents, "monitor_events": item.MonitorEvents, "max_risk_index": item.MaxRiskIndex, "min_risk_index": item.MinRiskIndex, "first_seen_at": item.FirstSeenAt, "last_seen_at": item.LastSeenAt, "rule_versions": keysFromBoolMap(acc.RuleVersions), "providers": keysFromBoolMap(acc.Providers)}
+		out = append(out, item)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].MaxRiskIndex != out[j].MaxRiskIndex {
+			return out[i].MaxRiskIndex > out[j].MaxRiskIndex
+		}
+		if out[i].OccurrenceCount != out[j].OccurrenceCount {
+			return out[i].OccurrenceCount > out[j].OccurrenceCount
+		}
+		return out[i].LastSeenAt.After(out[j].LastSeenAt)
+	})
+	return out
+}
+
+func securityRadarFeedKey(item services.SecurityRadarVerdictRecord) string {
+	target := strings.ToLower(strings.TrimSpace(item.Target))
+	if target == "" {
+		return ""
+	}
+	network := strings.ToLower(strings.TrimSpace(item.Network))
+	if network == "" {
+		network = "solana-mainnet"
+	}
+	targetType := strings.ToLower(strings.TrimSpace(item.TargetType))
+	return network + "|" + targetType + "|" + target
+}
+
+func preferSecurityRadarRepresentative(candidate, current services.SecurityRadarVerdictRecord) bool {
+	if candidate.RiskIndex != current.RiskIndex {
+		return candidate.RiskIndex > current.RiskIndex
+	}
+	if securityRadarItemIsRisk(candidate) != securityRadarItemIsRisk(current) {
+		return securityRadarItemIsRisk(candidate)
+	}
+	return candidate.CreatedAt.After(current.CreatedAt)
+}
+
+func securityRadarItemIsRisk(item services.SecurityRadarVerdictRecord) bool {
+	level := strings.ToLower(strings.TrimSpace(item.RiskLevel))
+	if level == "critical" || level == "high" || item.RiskIndex >= 65 {
+		return true
+	}
+	if value, _ := item.Signals["mint_authority_present"].(bool); value {
+		return true
+	}
+	return securityRadarSignalFloat(item.Signals, "top_10_holder_percentage") >= 75
+}
+
+func securityRadarSignalFloat(signals map[string]any, key string) float64 {
+	if signals == nil {
+		return 0
+	}
+	switch value := signals[key].(type) {
+	case float64:
+		return value
+	case float32:
+		return float64(value)
+	case int:
+		return float64(value)
+	case int64:
+		return float64(value)
+	case json.Number:
+		parsed, _ := value.Float64()
+		return parsed
+	case string:
+		parsed, _ := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		return parsed
+	default:
+		return 0
+	}
+}
+
+func keysFromBoolMap(values map[string]bool) []string {
+	out := make([]string, 0, len(values))
+	for key := range values {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func (h *Handler) securityRadarStreamTimeline(ctx context.Context, limit int) []map[string]any {
