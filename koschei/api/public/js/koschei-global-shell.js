@@ -3,7 +3,7 @@
 
   var translations={
     'Dashboard':'Panel','Radar':'Radar','Token-2022':'Token-2022','Firewall':'İşlem Güvenliği','Watchlist':'İzleme Listesi','Webhooks':'Webhooklar','Integrate':'Entegrasyon','Plans':'Paketler',
-    'Architecture':'Mimari','Developers':'Geliştiriciler','Integration Pilot':'Entegrasyon Pilotu','KOSCH Access':'KOSCH Erişim','Token':'Token','Account':'Hesap','Reports':'Raporlar','Chain Health':'Zincir Sağlığı',
+    'Architecture':'Mimari','Developers':'Geliştiriciler','Integration Pilot':'Entegrasyon Pilotu','KOSCH Access':'KOSCH Erişim','Token':'Token','Account':'Hesap','Reports':'Raporlar','Chain Health':'Zincir Sağlığı','Safe Check':'Güvenli Kontrol',
     'ARVIS command center':'ARVIS komuta merkezi','Evidence-backed only':'Yalnızca kanıta dayalı','User':'Kullanıcı',
     'ARVIS unified radar':'ARVIS birleşik radarı','One radar. Evidence first.':'Tek radar. Önce kanıt.',
     'Solana is the first live market. ARVIS returns a score only when verified on-chain or claim-surface evidence exists. Missing data never becomes a grade or signed report.':'İlk canlı pazar Solana’dır. ARVIS yalnız doğrulanmış zincir üstü veya claim yüzeyi kanıtı varsa skor üretir. Eksik veri hiçbir zaman nota veya imzalı rapora dönüşmez.',
@@ -34,7 +34,7 @@
   }
 
   ready(function(){
-    var links=[['/dashboard','Panel'],['/kosch-access','KOSCH Access'],['/chain-health','Chain Health'],['/security-radar','Radar'],['/exposure-report','Reports'],['/token-2022-scanner','Token-2022'],['/address-poisoning-shield','Address Shield'],['/token','Token'],['/account','Account']];
+    var links=[['/dashboard','Panel'],['/safe-check','Safe Check'],['/kosch-access','KOSCH Access'],['/chain-health','Chain Health'],['/security-radar','Radar'],['/exposure-report','Reports'],['/token-2022-scanner','Token-2022'],['/address-poisoning-shield','Address Shield'],['/token','Token'],['/account','Account']];
     var current=(location.pathname||'/').replace(/\.html$/,'').replace(/\/$/,'')||'/';
     var existing=document.querySelector('.top .nav, header.top nav.nav, nav.top .nav');
     var nav=existing||document.createElement('nav');
@@ -44,7 +44,7 @@
     links.forEach(function(item){var a=document.createElement('a');a.href=item[0];a.textContent=item[1];if(current===item[0])a.setAttribute('aria-current','page');nav.appendChild(a);});
     if(!existing){var top=document.querySelector('header.top,.top');if(top){nav.className+=' detached';top.parentNode.insertBefore(nav,top.nextSibling);}}
     var bottom=document.querySelector('nav.bottom');if(bottom)bottom.remove();
-    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei ARVIS · Solana imza öncesi risk altyapısı</span><span><a href="/kosch-access">KOSCH Access</a> · <a href="/chain-health">Zincir Sağlığı</a> · <a href="/token">Token</a> · <a href="/account">Hesap</a></span>';document.body.appendChild(footer);}
+    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei ARVIS · Solana imza öncesi risk altyapısı</span><span><a href="/safe-check">Güvenli Kontrol</a> · <a href="/kosch-access">KOSCH Access</a> · <a href="/chain-health">Zincir Sağlığı</a> · <a href="/token">Token</a></span>';document.body.appendChild(footer);}
     translate(document.body);
     var observer=new MutationObserver(function(records){records.forEach(function(record){record.addedNodes.forEach(function(node){if(node.nodeType===1)translate(node);else if(node.nodeType===3&&node.parentElement){var next=translateString(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;}});});});
     observer.observe(document.body,{childList:true,subtree:true,characterData:false});
