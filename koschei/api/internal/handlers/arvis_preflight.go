@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -84,6 +85,15 @@ func evaluateARVISPreflight(req arvisPreflightRequest) arvisPreflightResponse {
 		}
 		resp.NextSteps = append(resp.NextSteps, step)
 	}
+	raise := func(score int, decision, level string) {
+		resp.Score = maxInt(resp.Score, score)
+		if decision != "" {
+			resp.Decision = decision
+		}
+		if level != "" {
+			resp.RiskLevel = level
+		}
+	}
 	if target == "" {
 		resp.Decision = "blocked"
 		resp.RiskLevel = "high"
@@ -99,37 +109,69 @@ func evaluateARVISPreflight(req arvisPreflightRequest) arvisPreflightResponse {
 		resp.Score = 40
 		addReason("Bu adres resmi KOSCH mint adresiyle eşleşiyor.")
 		addReason("KOSCH, Koschei ARVIS içinde erişim ve ödeme bildirimi utility katmanı olarak konumlandırılır.")
-		addStep("İşlem yapmadan önce mint adresini resmi /kosch sayfasındaki adresle tekrar karşılaştır.")
-		addStep("KOSCH erişimi için yalnızca resmi /pricing ödeme bildirim akışını kullan.")
+		addStep("İşlem yapmadan önce mint adresini resmi /token sayfasındaki adresle tekrar karşılaştır.")
+		addStep("KOSCH erişimi için yalnızca resmi /kosch-access wallet doğrulama akışını kullan.")
 		resp.HumanMessage = "ARVIS ön kontrol sonucu: resmi KOSCH mint eşleşti. Bu finansal tavsiye değildir; işlem yapmadan önce zincir üstü bilgileri ve resmi sayfayı doğrula."
 		return resp
+	}
+	if host := arvisPreflightHost(target); host != "" {
+		addReason("Hedef bir web/domain yüzeyi içeriyor; bağlantı ve imza riski domain seviyesinde kontrol edilmeli.")
+		addStep("Domaini resmi sosyal hesaplar ve dokümantasyonla birebir karşılaştır.")
+		if arvisIsTrustedKoscheiHost(host) {
+			addReason("Domain resmi Koschei alan adıyla eşleşiyor.")
+		} else {
+			raise(58, "review", "medium")
+		}
+		if arvisIsURLShortener(host) {
+			addReason("Kısaltılmış link gerçek hedefi gizleyebilir; Web3 imza akışlarında yüksek dikkat gerekir.")
+			addStep("Kısaltılmış linki açma; gerçek domaini resmi kaynaklardan doğrula.")
+			raise(76, "warn", "high")
+		}
+		if strings.Contains(host, "xn--") {
+			addReason("Domain punycode/idn biçimi içeriyor; görsel olarak resmi siteye benzeyen sahte domain riski olabilir.")
+			addStep("Domaini kopyalayıp harf harf kontrol et; şüphede işlemi durdur.")
+			raise(82, "warn", "high")
+		}
+		if strings.Contains(target, "@") && strings.Contains(target, "://") {
+			addReason("URL içinde @ karakteri var; bu yapı kullanıcıyı farklı bir hosta yönlendirmek için kötüye kullanılabilir.")
+			addStep("Bu link üzerinden cüzdan bağlama veya imza verme.")
+			raise(85, "warn", "high")
+		}
+		if arvisLooksLikeBrandImpersonation(host) {
+			addReason("Domain popüler cüzdan/DEX/marketplace markalarına benzer ifade içeriyor ancak bilinen resmi hostla eşleşmiyor.")
+			addStep("Resmi uygulamayı doğrudan yazılmış URL veya doğrulanmış sosyal bağlantıdan aç.")
+			raise(78, "warn", "high")
+		}
 	}
 	if solanaPreflightAddressLike.MatchString(target) {
 		addReason("Hedef Solana adres formatına benziyor; zincir üstü kanıtlarla doğrulanmalı.")
 		addStep("Token, wallet veya program adresini ARVIS dashboard içinde detaylı tara.")
-	} else {
+	} else if arvisPreflightHost(target) == "" {
 		addReason("Hedef adres formatı doğrulanamadı; sahte site veya hatalı adres riski kontrol edilmeli.")
 		addStep("Resmi kaynaklardan adres/site doğrulaması yap.")
 		resp.Score = maxInt(resp.Score, 55)
 	}
-	if strings.Contains(kind, "site") || strings.Contains(kind, "url") || strings.Contains(intent, "connect") || strings.Contains(intent, "sign") {
+	if strings.Contains(kind, "site") || strings.Contains(kind, "url") || strings.Contains(intent, "connect") || strings.Contains(intent, "sign") || strings.Contains(intent, "imza") {
 		addReason("Cüzdan bağlantısı veya imza akışı kullanıcı varlığı için doğrudan risk oluşturabilir.")
 		addStep("Bağlanmadan önce domain, izinler ve imzalanacak işlem içeriğini kontrol et.")
 		resp.Score = maxInt(resp.Score, 60)
 	}
-	if strings.Contains(intent, "airdrop") || strings.Contains(intent, "claim") || strings.Contains(intent, "free") || strings.Contains(intent, "urgent") || strings.Contains(intent, "guarantee") {
+	if arvisContainsAny(intent, []string{"airdrop", "claim", "free", "urgent", "guarantee", "bonus", "reward", "hediye", "acil", "ücretsiz", "odul", "ödül"}) {
 		addReason("Claim/airdrop/aciliyet dili dolandırıcılık kampanyalarında sık görülür.")
 		addStep("Sıradışı izin isteyen akışları durdur ve resmi kaynaklardan doğrula.")
-		resp.RiskLevel = "high"
-		resp.Score = maxInt(resp.Score, 78)
-		resp.Decision = "warn"
+		raise(78, "warn", "high")
 	}
-	if strings.Contains(intent, "recovery phrase") || strings.Contains(intent, "unlimited approval") || strings.Contains(intent, "full permission") {
-		addReason("Gizli kurtarma ifadesi veya sınırsız izin isteyen akış kritik risk taşır.")
-		addStep("İşlemi durdur ve yalnızca resmi, doğrulanmış kaynakları kullan.")
+	if arvisContainsAny(intent, []string{"recovery phrase", "seed phrase", "mnemonic", "private key", "secret phrase", "12 words", "24 words", "gizli anahtar", "kurtarma ifadesi", "seed", "özel anahtar"}) {
+		addReason("Gizli kurtarma ifadesi, seed phrase veya private key isteyen akış kritik risk taşır.")
+		addStep("İşlemi durdur. Seed phrase/private key hiçbir sitede paylaşılmaz.")
 		resp.RiskLevel = "high"
-		resp.Score = 95
+		resp.Score = 98
 		resp.Decision = "blocked"
+	}
+	if arvisContainsAny(intent, []string{"unlimited approval", "full permission", "setauthority", "delegate", "approve all", "sweep", "drain", "drainer", "sınırsız izin", "tam yetki"}) {
+		addReason("Sınırsız izin, delegate/setAuthority veya varlık boşaltma benzeri ifade kritik işlem riski taşır.")
+		addStep("İmzayı durdur; transaction instruction detayını ARVIS veya wallet simülasyonuyla doğrula.")
+		raise(94, "blocked", "high")
 	}
 	if len(resp.Reasons) == 0 {
 		resp.RiskLevel = "low"
@@ -148,4 +190,71 @@ func evaluateARVISPreflight(req arvisPreflightRequest) arvisPreflightResponse {
 
 func isOfficialKOSCHMint(target string) bool {
 	return strings.EqualFold(strings.TrimSpace(target), officialKOSCHMint)
+}
+
+func arvisPreflightHost(target string) string {
+	value := strings.TrimSpace(target)
+	if value == "" || strings.ContainsAny(value, " \t\n\r") {
+		return ""
+	}
+	parseValue := value
+	if !strings.Contains(parseValue, "://") {
+		if !strings.Contains(parseValue, ".") {
+			return ""
+		}
+		parseValue = "https://" + parseValue
+	}
+	parsed, err := url.Parse(parseValue)
+	if err != nil {
+		return ""
+	}
+	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
+	if host == "" || !strings.Contains(host, ".") {
+		return ""
+	}
+	return strings.Trim(host, ".")
+}
+
+func arvisIsTrustedKoscheiHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	return host == "tradepigloball.co" || host == "www.tradepigloball.co"
+}
+
+func arvisIsURLShortener(host string) bool {
+	host = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(host), "www."))
+	shorteners := []string{"bit.ly", "tinyurl.com", "t.co", "shorturl.at", "cutt.ly", "is.gd", "buff.ly", "rebrand.ly", "ow.ly", "lnkd.in"}
+	for _, shortener := range shorteners {
+		if host == shortener {
+			return true
+		}
+	}
+	return false
+}
+
+func arvisLooksLikeBrandImpersonation(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	knownHosts := []string{"phantom.app", "solflare.com", "jup.ag", "raydium.io", "pump.fun", "dexscreener.com", "solscan.io", "tradepigloball.co", "www.tradepigloball.co"}
+	for _, known := range knownHosts {
+		if host == known || strings.HasSuffix(host, "."+known) {
+			return false
+		}
+	}
+	brandTerms := []string{"phantom", "solflare", "jupiter", "raydium", "pumpfun", "pump-fun", "dexscreener", "solscan", "walletconnect", "airdrop", "claim"}
+	compact := strings.ReplaceAll(strings.ReplaceAll(host, "-", ""), ".", "")
+	for _, term := range brandTerms {
+		if strings.Contains(compact, strings.ReplaceAll(term, "-", "")) {
+			return true
+		}
+	}
+	return false
+}
+
+func arvisContainsAny(value string, terms []string) bool {
+	value = strings.ToLower(value)
+	for _, term := range terms {
+		if strings.Contains(value, strings.ToLower(term)) {
+			return true
+		}
+	}
+	return false
 }
