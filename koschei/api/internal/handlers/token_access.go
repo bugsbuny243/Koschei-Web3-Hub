@@ -114,12 +114,12 @@ func (h *Handler) RequireTokenTier(required string, next http.HandlerFunc) http.
 }
 
 func (h *Handler) evaluateTokenAccess(ctx context.Context, authSubject string) (tokenAccessEvaluation, error) {
-	mint := strings.TrimSpace(os.Getenv("KOSCHEI_TOKEN_MINT"))
-	network, validNetwork := normalizeWalletNetwork(os.Getenv("KOSCHEI_TOKEN_NETWORK"))
+	mint := configuredKoscheiTokenMint()
+	network, validNetwork := normalizeWalletNetwork(firstNonEmptyString(os.Getenv("KOSCHEI_TOKEN_NETWORK"), os.Getenv("KOSCH_TOKEN_NETWORK"), "solana-mainnet"))
 	if !validNetwork {
 		return tokenAccessEvaluation{}, tokenAccessError{Status: http.StatusServiceUnavailable, Code: "invalid_token_network_configuration"}
 	}
-	gateEnabled, _ := strconv.ParseBool(strings.TrimSpace(os.Getenv("KOSCHEI_TOKEN_GATE_ENABLED")))
+	gateEnabled := configuredKoscheiTokenGateEnabled()
 	evaluation := tokenAccessEvaluation{
 		GateEnabled: gateEnabled,
 		Configured:  mint != "",
@@ -218,11 +218,27 @@ func (h *Handler) evaluateTokenAccess(ctx context.Context, authSubject string) (
 	return evaluation, nil
 }
 
+func configuredKoscheiTokenMint() string {
+	return strings.TrimSpace(firstNonEmptyString(os.Getenv("KOSCHEI_TOKEN_MINT"), os.Getenv("KOSCH_TOKEN_MINT"), officialKOSCHMint))
+}
+
+func configuredKoscheiTokenGateEnabled() bool {
+	value := strings.TrimSpace(os.Getenv("KOSCHEI_TOKEN_GATE_ENABLED"))
+	if value == "" {
+		return true
+	}
+	enabled, err := strconv.ParseBool(value)
+	if err != nil {
+		return false
+	}
+	return enabled
+}
+
 func configuredTokenThresholds(decimals int) (map[string]string, map[string]*big.Int, error) {
 	values := map[string]string{
-		"basic":      strings.TrimSpace(os.Getenv("KOSCHEI_TOKEN_TIER_BASIC")),
-		"pro":        strings.TrimSpace(os.Getenv("KOSCHEI_TOKEN_TIER_PRO")),
-		"enterprise": strings.TrimSpace(os.Getenv("KOSCHEI_TOKEN_TIER_ENTERPRISE")),
+		"basic":      tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "0.000001"),
+		"pro":        tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_PRO", "250000"),
+		"enterprise": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_ENTERPRISE", "2000000"),
 	}
 	raw := map[string]*big.Int{}
 	for _, tier := range []string{"basic", "pro", "enterprise"} {
@@ -239,6 +255,14 @@ func configuredTokenThresholds(decimals int) (map[string]string, map[string]*big
 		return nil, nil, fmt.Errorf("threshold order is invalid")
 	}
 	return values, raw, nil
+}
+
+func tokenTierThresholdEnv(name, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value != "" {
+		return value
+	}
+	return fallback
 }
 
 func parseTokenAmount(value string, decimals int) (*big.Int, error) {
