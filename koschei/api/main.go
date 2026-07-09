@@ -68,10 +68,14 @@ func main() {
 	appCtx := context.Background()
 	stopSecurityRadars := services.StartSecurityRadarWatcher(appCtx, conn, solanaRPC)
 	defer stopSecurityRadars()
-	stopSBX1Stream := services.StartSecurityRadarStreamIfEnabled(appCtx, conn)
-	defer stopSBX1Stream()
-	stopPumpPortal := services.StartPumpPortalRadarIfEnabled(appCtx, conn)
-	defer stopPumpPortal()
+	if services.SolanaRPCLimitSaverEnabled() && !services.ForceBackgroundRadarEnabled() {
+		log.Printf("background Solana streams paused: RPC saver mode protects Alchemy quota; manual scans and Safe Check stay live")
+	} else {
+		stopSBX1Stream := services.StartSecurityRadarStreamIfEnabled(appCtx, conn)
+		defer stopSBX1Stream()
+		stopPumpPortal := services.StartPumpPortalRadarIfEnabled(appCtx, conn)
+		defer stopPumpPortal()
+	}
 	stopWebhookDeliveries := webhooks.StartDeliveryWorker(appCtx, conn)
 	defer stopWebhookDeliveries()
 	jobStore := jobs.NewStore(conn)
