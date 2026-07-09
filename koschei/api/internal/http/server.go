@@ -119,6 +119,7 @@ func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler, premiu
 	mux.HandleFunc("/api/rug-radar/feed", method("GET", h.RugRadarFeed))
 	mux.HandleFunc("/api/token/scan", requiresDB(h, premium(method("POST", h.TokenScan))))
 	mux.HandleFunc("/api/v1/token/extensions", requiresDB(h, premium(method("POST", h.TokenScan))))
+	mux.HandleFunc("/api/v1/address-poisoning/check", requiresDB(h, premium(method("POST", h.AddressPoisoningCheck))))
 	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
 	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarFeed))))
 	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, handlers.RequireAuth(method("POST", h.SecurityRadarCheck))))
@@ -131,6 +132,7 @@ func registerDeveloperAPIRoutes(mux *http.ServeMux, h *handlers.Handler, apiKey 
 	mux.HandleFunc("/api/v1/usage", requiresDB(h, apiKey(method("GET", h.APIUsage))))
 	mux.HandleFunc("/api/v1/shield/preflight", requiresDB(h, apiKey(method("POST", h.ShieldPreflight))))
 	mux.HandleFunc("/api/v1/shield/transaction", requiresDB(h, apiKey(method("POST", h.ShieldPreflight))))
+	mux.HandleFunc("/api/v1/shield/address-poisoning", requiresDB(h, apiKey(method("POST", h.AddressPoisoningCheck))))
 }
 
 func registerStatic(mux *http.ServeMux, staticDir string) {
