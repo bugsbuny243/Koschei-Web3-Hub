@@ -98,6 +98,7 @@ func productionRouteInventory() []routeInventoryGroup {
 				"GET /api/rug-radar/feed",
 				"POST /api/token/scan",
 				"POST /api/v1/token/extensions",
+				"POST /api/v1/address-poisoning/check",
 				"GET /api/v1/risk/badge",
 				"GET /api/v1/radar/feed",
 				"POST /api/v1/radar/check",
@@ -113,6 +114,7 @@ func productionRouteInventory() []routeInventoryGroup {
 				"GET /api/v1/usage",
 				"POST /api/v1/shield/preflight",
 				"POST /api/v1/shield/transaction",
+				"POST /api/v1/shield/address-poisoning",
 			},
 		},
 		{
