@@ -18,6 +18,13 @@ func SecurityRadarAutoEnabled() bool {
 }
 
 func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRPC) func() {
+	if db == nil {
+		return func() {}
+	}
+	if SolanaRPCLimitSaverEnabled() && !ForceBackgroundRadarEnabled() {
+		log.Printf("security radar background workers paused: SOLANA_RPC_LIMIT_SAVER_ENABLED=true; manual Safe Check, token scans and user-triggered reports remain available")
+		return func() {}
+	}
 	stopHeartbeat := StartArvisRadarHeartbeat(ctx, db)
 	stopStreamVerdicts := StartArvisStreamVerdictWorker(ctx, db)
 	stopStreamRecovery := StartArvisStreamRecovery(ctx, db)
@@ -26,7 +33,7 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 		stopStreamVerdicts()
 		stopHeartbeat()
 	}
-	if db == nil || !SecurityRadarAutoEnabled() {
+	if !SecurityRadarAutoEnabled() {
 		return stopAll
 	}
 	rpcURL := firstSecurityRadarEnv("SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL")
@@ -34,9 +41,9 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 		log.Printf("security radar polling worker not started: SOLANA_RPC_URL is empty")
 		return stopAll
 	}
-	pollEvery := 60 * time.Second
+	pollEvery := 10 * time.Minute
 	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_RADAR_POLL_SECONDS")); raw != "" {
-		if seconds, err := strconv.Atoi(raw); err == nil && seconds >= 30 && seconds <= 600 {
+		if seconds, err := strconv.Atoi(raw); err == nil && seconds >= 300 && seconds <= 3600 {
 			pollEvery = time.Duration(seconds) * time.Second
 		}
 	}
