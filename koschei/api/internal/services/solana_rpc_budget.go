@@ -53,8 +53,30 @@ func resetSolanaRPCBudgetForTest() {
 	solanaRPCBudget.Unlock()
 }
 
+func SolanaRPCLimitSaverEnabled() bool {
+	raw := strings.TrimSpace(os.Getenv("SOLANA_RPC_LIMIT_SAVER_ENABLED"))
+	if raw != "" {
+		enabled, err := strconv.ParseBool(raw)
+		if err == nil {
+			return enabled
+		}
+	}
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
+}
+
+func ForceBackgroundRadarEnabled() bool {
+	return envBool("KOSCHEI_AUTO_RADAR_FORCE_BACKGROUND") || envBool("RADAR_STREAM_FORCE_ENABLED") || envBool("ARVIS_BACKGROUND_RPC_ENRICHMENT_ENABLED")
+}
+
 func solanaRPCBudgetEnabled() bool {
-	return envBool("SOLANA_RPC_BUDGET_ENABLED")
+	raw := strings.TrimSpace(os.Getenv("SOLANA_RPC_BUDGET_ENABLED"))
+	if raw != "" {
+		enabled, err := strconv.ParseBool(raw)
+		if err == nil {
+			return enabled
+		}
+	}
+	return SolanaRPCLimitSaverEnabled()
 }
 
 func solanaRPCBudgetMaxRequests() int {
@@ -62,6 +84,9 @@ func solanaRPCBudgetMaxRequests() int {
 		if value, err := strconv.Atoi(raw); err == nil && value >= 0 && value <= 1000000 {
 			return value
 		}
+	}
+	if SolanaRPCLimitSaverEnabled() {
+		return 220
 	}
 	return 0
 }
@@ -77,6 +102,9 @@ func solanaRPCBudgetWindow() time.Duration {
 
 func solanaRPC429Cooldown() time.Duration {
 	seconds := 60
+	if SolanaRPCLimitSaverEnabled() {
+		seconds = 300
+	}
 	if raw := strings.TrimSpace(os.Getenv("SOLANA_RPC_429_COOLDOWN_SECONDS")); raw != "" {
 		if value, err := strconv.Atoi(raw); err == nil {
 			seconds = value
