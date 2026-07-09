@@ -43,6 +43,7 @@
     while(nav.firstChild)nav.removeChild(nav.firstChild);
     links.forEach(function(item){var a=document.createElement('a');a.href=item[0];a.textContent=item[1];if(current===item[0])a.setAttribute('aria-current','page');nav.appendChild(a);});
     if(!existing){var top=document.querySelector('header.top,.top');if(top){nav.className+=' detached';top.parentNode.insertBefore(nav,top.nextSibling);}}
+    if(current==='/dashboard'&&!document.querySelector('.koschei-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip';strip.innerHTML='<div><b>İmzalamadan önce Safe Check çalıştır.</b><span>Şüpheli claim linki, token mint, recipient adresi veya imza metnini önce ARVIS’e sor.</span></div><a href="/safe-check">Güvenli Kontrol Aç</a>';var anchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(anchor&&anchor.parentNode){anchor.parentNode.insertBefore(strip,anchor.nextSibling);}}
     var bottom=document.querySelector('nav.bottom');if(bottom)bottom.remove();
     if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei ARVIS · Solana imza öncesi risk altyapısı</span><span><a href="/safe-check">Güvenli Kontrol</a> · <a href="/kosch-access">KOSCH Access</a> · <a href="/chain-health">Zincir Sağlığı</a> · <a href="/token">Token</a></span>';document.body.appendChild(footer);}
     translate(document.body);
