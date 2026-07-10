@@ -199,17 +199,69 @@ func (s *SecurityRadarStore) LatestVerdicts(ctx context.Context, limit int) ([]S
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT v.id::text, COALESCE(v.event_id::text,''), v.module_id, v.target, v.target_type, v.network, v.grade, v.risk_index, v.risk_level, v.verdict, v.recommendation, v.evidence, v.signals, v.rule_version, v.signed, COALESCE(v.signature,''), COALESCE(v.source,''), COALESCE(e.event_type,''), v.created_at
-		FROM security_radar_verdicts v
-		LEFT JOIN security_radar_events e ON e.id = v.event_id
-		WHERE v.module_id = 'final_verdict_engine'
-		ORDER BY v.created_at DESC
-		LIMIT $1`, limit)
+
+	items, err := s.latestVerdictsWindow(ctx, limit, true)
+	if err != nil || len(items) > 0 {
+		return items, err
+	}
+	return s.latestVerdictsWindow(ctx, limit, false)
+}
+
+func (s *SecurityRadarStore) latestVerdictsWindow(ctx context.Context, limit int, recentOnly bool) ([]SecurityRadarVerdictRecord, error) {
+	windowFilter := ""
+	if recentOnly {
+		windowFilter = "AND v.created_at >= now() - interval '24 hours'"
+	}
+
+	query := `
+		WITH representatives AS (
+			SELECT DISTINCT ON (v.target)
+				v.id::text AS id,
+				COALESCE(v.event_id::text,'') AS event_id,
+				v.module_id,
+				v.target,
+				v.target_type,
+				v.network,
+				v.grade,
+				v.risk_index,
+				v.risk_level,
+				v.verdict,
+				v.recommendation,
+				v.evidence,
+				v.signals,
+				v.rule_version,
+				v.signed,
+				COALESCE(v.signature,'') AS signature,
+				COALESCE(v.source,'') AS source,
+				COALESCE(e.event_type,'') AS event_type,
+				v.created_at
+			FROM security_radar_verdicts v
+			LEFT JOIN security_radar_events e ON e.id = v.event_id
+			WHERE v.module_id = 'final_verdict_engine'
+			  AND v.signed = true
+			  AND v.signature IS NOT NULL
+			  AND btrim(v.signature) <> ''
+			  AND btrim(v.target) <> ''
+			  AND NOT (v.target = ANY (` + securityRadarPublicFeedExcludedMintsSQL + `))
+			  AND (
+				COALESCE(v.signals->>'verified_evidence','false') = 'true'
+				OR COALESCE(v.signals->>'real_onchain_evidence','false') = 'true'
+				OR COALESCE(v.signals->>'real_offchain_evidence','false') = 'true'
+			  )
+			  ` + windowFilter + `
+			ORDER BY v.target, v.risk_index DESC, v.created_at DESC, v.id DESC
+		)
+		SELECT id, event_id, module_id, target, target_type, network, grade, risk_index, risk_level, verdict, recommendation, evidence, signals, rule_version, signed, signature, source, event_type, created_at
+		FROM representatives
+		ORDER BY risk_index DESC, created_at DESC
+		LIMIT $1`
+
+	rows, err := s.DB.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	items := []SecurityRadarVerdictRecord{}
 	for rows.Next() {
 		var item SecurityRadarVerdictRecord
