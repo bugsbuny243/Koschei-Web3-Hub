@@ -1,9 +1,15 @@
 name: Radar Structural Compile
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/security-radar-structural-floor-20260710
+      - main
+    paths:
+      - "koschei/api/internal/services/security_radar_store.go"
+      - "koschei/api/internal/services/security_radar_allowlist.go"
+      - "koschei/api/internal/services/security_radar_structural.go"
+      - "koschei/api/neon_structural_floor.sql"
+      - ".github/workflows/radar-structural-compile.yml"
 
 permissions:
   contents: read
