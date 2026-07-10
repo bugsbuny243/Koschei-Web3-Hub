@@ -33,9 +33,7 @@ func WithJobQueue(queue jobs.Queue) Option { return func(c *serverConfig) { c.jo
 
 func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string, opts ...Option) http.Handler {
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
-		if missing := handlers.MissingProductionAuthEnv(); len(missing) > 0 {
-			panic("production auth env missing: " + strings.Join(missing, ", "))
-		}
+		if missing := handlers.MissingProductionAuthEnv(); len(missing) > 0 { panic("production auth env missing: " + strings.Join(missing, ", ")) }
 	}
 	config := serverConfig{cache: cache.NewNoop()}
 	for _, opt := range opts { if opt != nil { opt(&config) } }
@@ -45,9 +43,8 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux := http.NewServeMux()
 	koschAccess := func(next http.HandlerFunc) http.HandlerFunc { return handlers.RequireAuth(h.RequireActiveEntitlement(next)) }
 	apiKey := func(next http.HandlerFunc) http.HandlerFunc { return h.APIKeyAuth(h.APIRateLimit(next)) }
-
 	registerCoreRoutes(mux, h)
-	registerAccountRoutes(mux, h)
+	registerAccountRoutes(mux, h, koschAccess)
 	registerOwnerRoutes(mux, h, staticDir)
 	registerPublicProductRoutes(mux, h, koschAccess)
 	registerDeveloperAPIRoutes(mux, h, apiKey)
@@ -82,9 +79,9 @@ func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler) {
 	mux.HandleFunc("/api/agent/chain-health", requiresDB(h, method("POST", h.AgentTool)))
 }
 
-func registerAccountRoutes(mux *http.ServeMux, h *handlers.Handler) {
-	mux.HandleFunc("/api/account/api-keys", requiresDB(h, handlers.RequireAuth(h.APIKeysCollection)))
-	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, handlers.RequireAuth(method("POST", h.RevokeAPIKey))))
+func registerAccountRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess func(http.HandlerFunc) http.HandlerFunc) {
+	mux.HandleFunc("/api/account/api-keys", requiresDB(h, koschAccess(h.APIKeysCollection)))
+	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, koschAccess(method("POST", h.RevokeAPIKey))))
 }
 
 func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir string) {
@@ -110,10 +107,10 @@ func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler, koschA
 	mux.HandleFunc("/api/v1/token/extensions", requiresDB(h, koschAccess(method("POST", h.TokenScan))))
 	mux.HandleFunc("/api/v1/address-poisoning/check", requiresDB(h, koschAccess(method("POST", h.AddressPoisoningCheck))))
 	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
-	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarFeed))))
-	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, handlers.RequireAuth(method("POST", h.SecurityRadarCheck))))
-	mux.HandleFunc("/api/v1/radar/graph", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarGraph))))
-	mux.HandleFunc("/api/v1/radar/exposure", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarExposureReport))))
+	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, koschAccess(method("GET", h.SecurityRadarFeed))))
+	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, koschAccess(method("POST", h.SecurityRadarCheck))))
+	mux.HandleFunc("/api/v1/radar/graph", requiresDB(h, koschAccess(method("GET", h.SecurityRadarGraph))))
+	mux.HandleFunc("/api/v1/radar/exposure", requiresDB(h, koschAccess(method("GET", h.SecurityRadarExposureReport))))
 }
 
 func registerDeveloperAPIRoutes(mux *http.ServeMux, h *handlers.Handler, apiKey func(http.HandlerFunc) http.HandlerFunc) {
