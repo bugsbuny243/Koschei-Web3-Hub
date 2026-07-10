@@ -26,23 +26,43 @@ type serverConfig struct {
 type Option func(*serverConfig)
 
 func WithReadDB(db *sql.DB) Option { return func(c *serverConfig) { c.dbRead = db } }
-func WithCache(value cache.Cache) Option { return func(c *serverConfig) { if value != nil { c.cache = value } } }
+func WithCache(value cache.Cache) Option {
+	return func(c *serverConfig) {
+		if value != nil {
+			c.cache = value
+		}
+	}
+}
 func WithSolanaRPC(rpc *web3.SolanaRPC) Option { return func(c *serverConfig) { c.solanaRPC = rpc } }
-func WithJobStore(store *jobs.Store) Option { return func(c *serverConfig) { c.jobStore = store } }
-func WithJobQueue(queue jobs.Queue) Option { return func(c *serverConfig) { c.jobQueue = queue } }
+func WithJobStore(store *jobs.Store) Option    { return func(c *serverConfig) { c.jobStore = store } }
+func WithJobQueue(queue jobs.Queue) Option     { return func(c *serverConfig) { c.jobQueue = queue } }
 
 func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string, opts ...Option) http.Handler {
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
-		if missing := handlers.MissingProductionAuthEnv(); len(missing) > 0 { panic("production auth env missing: " + strings.Join(missing, ", ")) }
+		if missing := handlers.MissingProductionAuthEnv(); len(missing) > 0 {
+			panic("production auth env missing: " + strings.Join(missing, ", "))
+		}
 	}
 	config := serverConfig{cache: cache.NewNoop()}
-	for _, opt := range opts { if opt != nil { opt(&config) } }
-	if config.dbRead == nil { config.dbRead = db }
-	if config.solanaRPC == nil { config.solanaRPC = web3.NewSolanaRPC(config.cache) }
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&config)
+		}
+	}
+	if config.dbRead == nil {
+		config.dbRead = db
+	}
+	if config.solanaRPC == nil {
+		config.solanaRPC = web3.NewSolanaRPC(config.cache)
+	}
 	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue}
 	mux := http.NewServeMux()
-	koschAccess := func(next http.HandlerFunc) http.HandlerFunc { return handlers.RequireAuth(h.RequireActiveEntitlement(next)) }
-	apiKey := func(next http.HandlerFunc) http.HandlerFunc { return h.APIKeyAuth(h.RequireAPIKeyKOSCH(h.APIRateLimit(next))) }
+	koschAccess := func(next http.HandlerFunc) http.HandlerFunc {
+		return handlers.RequireAuth(h.RequireActiveEntitlement(next))
+	}
+	apiKey := func(next http.HandlerFunc) http.HandlerFunc {
+		return h.APIKeyAuth(h.RequireAPIKeyKOSCH(h.APIRateLimit(next)))
+	}
 	registerCoreRoutes(mux, h, koschAccess)
 	registerAccountRoutes(mux, h, koschAccess)
 	registerOwnerRoutes(mux, h, staticDir)
@@ -60,9 +80,18 @@ func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess fun
 	mux.HandleFunc("/api/web3/health", method("GET", h.Web3Health))
 	mux.HandleFunc("/api/web3/health/logs", requiresDB(h, handlers.RequireAuth(method("GET", h.Web3HealthLogs))))
 	mux.HandleFunc("/api/analytics/event", method("POST", h.AnalyticsEvent))
-	mux.HandleFunc("/ads.txt", method("GET", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "text/plain; charset=utf-8"); _, _ = w.Write([]byte("google.com, pub-6081394144742471, DIRECT, f08c47fec0942fa0")) }))
-	mux.HandleFunc("/robots.txt", method("GET", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "text/plain; charset=utf-8"); _, _ = w.Write([]byte("User-agent: *\nAllow: /\nSitemap: https://tradepigloball.co/sitemap.xml")) }))
-	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "application/json"); _ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok", "access": "kosch-only"}) }))
+	mux.HandleFunc("/ads.txt", method("GET", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write([]byte("google.com, pub-6081394144742471, DIRECT, f08c47fec0942fa0"))
+	}))
+	mux.HandleFunc("/robots.txt", method("GET", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write([]byte("User-agent: *\nAllow: /\nSitemap: https://tradepigloball.co/sitemap.xml"))
+	}))
+	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok", "access": "kosch-only"})
+	}))
 	mux.HandleFunc("/api/auth/register", method("POST", h.Register))
 	mux.HandleFunc("/api/auth/login", method("POST", h.Login))
 	mux.HandleFunc("/api/auth/neon-login", method("GET", h.NeonLogin))
@@ -122,19 +151,39 @@ func registerDeveloperAPIRoutes(mux *http.ServeMux, h *handlers.Handler, apiKey 
 }
 
 func registerStatic(mux *http.ServeMux, staticDir string) {
-	if staticDir == "" { return }
+	if staticDir == "" {
+		return
+	}
 	info, err := os.Stat(staticDir)
-	if err != nil || !info.IsDir() { log.Printf("warning: static directory unavailable at %q: %v", staticDir, err); return }
+	if err != nil || !info.IsDir() {
+		log.Printf("warning: static directory unavailable at %q: %v", staticDir, err)
+		return
+	}
 	fileServer := http.FileServer(http.Dir(staticDir))
 	indexPath := filepath.Join(staticDir, "index.html")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") { http.NotFound(w, r); return }
-		if r.Method != http.MethodGet && r.Method != http.MethodHead { w.WriteHeader(http.StatusMethodNotAllowed); return }
-		if r.URL.Path == "/" { http.ServeFile(w, r, indexPath); return }
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			http.NotFound(w, r)
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if r.URL.Path == "/" {
+			http.ServeFile(w, r, indexPath)
+			return
+		}
 		clean := strings.TrimPrefix(filepath.Clean(r.URL.Path), "/")
 		candidate := filepath.Join(staticDir, clean)
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() { fileServer.ServeHTTP(w, r); return }
-		if info, err := os.Stat(candidate + ".html"); err == nil && !info.IsDir() { http.ServeFile(w, r, candidate+".html"); return }
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		if info, err := os.Stat(candidate + ".html"); err == nil && !info.IsDir() {
+			http.ServeFile(w, r, candidate+".html")
+			return
+		}
 		http.ServeFile(w, r, indexPath)
 	})
 }
