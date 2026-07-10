@@ -95,7 +95,8 @@ jobs:
 
       - name: Check inline page scripts
         run: |
-          python3 - <<'PY'
+          set +e
+          python3 - <<'PY' > /tmp/kosch-inline.log 2>&1
           import pathlib, re, subprocess, tempfile
 
           pages = [
@@ -130,6 +131,21 @@ jobs:
           if failures:
               raise SystemExit('\n'.join(failures))
           PY
+          code=$?
+          cat /tmp/kosch-inline.log
+          echo "$code" > /tmp/kosch-inline.exit
+          exit 0
 
-      - name: Stop on vet failure
-        run: test "$(cat /tmp/kosch-vet.exit)" = "0"
+      - name: Upload inline diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: kosch-inline-diagnostics
+          path: |
+            /tmp/kosch-inline.log
+            /tmp/kosch-inline.exit
+          if-no-files-found: error
+
+      - name: Stop on diagnostics failure
+        run: |
+          test "$(cat /tmp/kosch-vet.exit)" = "0"
+          test "$(cat /tmp/kosch-inline.exit)" = "0"
