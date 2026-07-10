@@ -48,3 +48,36 @@ jobs:
           assert 'Shopier' not in text and 'Paddle' not in text
           assert 'aktif Koschei paketi' not in text
           PY
+      - name: Smoke test Neon sign-in request
+        run: |
+          node <<'JS'
+          const fs = require('fs');
+          const vm = require('vm');
+          const calls = [];
+          const storage = new Map();
+          global.window = global;
+          global.document = { title: 'test' };
+          global.location = { origin: 'https://tradepigloball.co', pathname: '/login.html', search: '', hash: '', href: '' };
+          global.history = { replaceState() {} };
+          global.localStorage = {
+            getItem: key => storage.get(key) || null,
+            setItem: (key, value) => storage.set(key, String(value)),
+            removeItem: key => storage.delete(key),
+          };
+          const payload = Buffer.from(JSON.stringify({ sub: 'user-1', email: 'user@example.com', exp: Math.floor(Date.now()/1000)+3600 })).toString('base64url');
+          const token = `e30.${payload}.sig`;
+          global.fetch = async (url, options = {}) => {
+            calls.push({ url: String(url), options });
+            if (url === '/api/config') return new Response(JSON.stringify({ neonAuthUrl: 'https://auth.example.test' }), { status: 200 });
+            if (url === 'https://auth.example.test/sign-in/email') return new Response(JSON.stringify({ access_token: token }), { status: 200 });
+            if (url === '/api/me') return new Response(JSON.stringify({ ok: true, email: 'user@example.com' }), { status: 200 });
+            return new Response('{}', { status: 404 });
+          };
+          vm.runInThisContext(fs.readFileSync('public/js/koschei-auth.js', 'utf8'));
+          KoscheiAuth.signIn('user@example.com', 'secret').then(() => {
+            const neon = calls.find(call => call.url.includes('/sign-in/email'));
+            if (!neon) throw new Error('Neon sign-in request missing');
+            if ('credentials' in neon.options) throw new Error('Cross-origin credentials must not be sent');
+            if (KoscheiAuth.getEmail() !== 'user@example.com') throw new Error('JWT persistence failed');
+          }).catch(error => { console.error(error); process.exit(1); });
+          JS
