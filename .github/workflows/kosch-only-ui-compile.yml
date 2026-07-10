@@ -59,7 +59,22 @@ jobs:
         run: go build ./internal/handlers ./internal/http
 
       - name: Vet changed backend packages
-        run: go vet -tests=false ./internal/handlers ./internal/http
+        run: |
+          set +e
+          go vet -tests=false ./internal/handlers ./internal/http > /tmp/kosch-vet.log 2>&1
+          code=$?
+          cat /tmp/kosch-vet.log
+          echo "$code" > /tmp/kosch-vet.exit
+          exit 0
+
+      - name: Upload vet diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: kosch-vet-diagnostics
+          path: |
+            /tmp/kosch-vet.log
+            /tmp/kosch-vet.exit
+          if-no-files-found: error
 
       - name: Build complete API
         run: CGO_ENABLED=0 GOOS=linux go build ./...
@@ -115,3 +130,6 @@ jobs:
           if failures:
               raise SystemExit('\n'.join(failures))
           PY
+
+      - name: Stop on vet failure
+        run: test "$(cat /tmp/kosch-vet.exit)" = "0"
