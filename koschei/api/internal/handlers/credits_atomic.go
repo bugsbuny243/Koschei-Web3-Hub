@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"strings"
@@ -21,6 +22,8 @@ func entitlementEmailFromSubject(authSubject string) string {
 	return ""
 }
 
+// Legacy package counters remain readable for historical owner data, but they
+// no longer grant customer access or control product usage.
 func (h *Handler) userCreditsAndRole(authSubject string, emails ...string) (bool, int, error) {
 	authSubject = strings.TrimSpace(authSubject)
 	email := ""
@@ -118,80 +121,29 @@ func (h *Handler) applyCreditChargeTxWithReason(tx *sql.Tx, authSubject, email, 
 	return errors.New("active package output required")
 }
 
+// KOSCH holder access is balance-based and does not consume legacy package
+// outputs. The method remains for existing call sites and is intentionally a
+// no-op after a successful KOSCH access check.
 func (h *Handler) consumePremiumOutput(authSubject, email, reason string) error {
-	if h.DB == nil {
-		return errors.New("database unavailable")
-	}
-	tx, err := h.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if err := h.applyCreditChargeTxWithReason(tx, authSubject, email, reason); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return nil
 }
 
 func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) {
-	if h.DB == nil {
-		return false, errors.New("database unavailable")
-	}
-	authSubject = strings.TrimSpace(authSubject)
-	email = strings.ToLower(strings.TrimSpace(email))
-	if email == "" {
-		email = entitlementEmailFromSubject(authSubject)
-	}
-	var active bool
-	err := h.DB.QueryRow(`
-		WITH identity AS (
-			SELECT lower(p.email) AS email
-			FROM app_user_profiles p
-			WHERE p.status = 'active'
-			  AND (
-				($1 <> '' AND p.auth_subject = $1)
-				OR ($2 <> '' AND lower(p.email) = lower($2))
-			  )
-			ORDER BY CASE WHEN $1 <> '' AND p.auth_subject = $1 THEN 0 ELSE 1 END,
-			         p.updated_at DESC,
-			         p.created_at DESC
-			LIMIT 1
-		)
-		SELECT EXISTS (
-			SELECT 1
-			FROM entitlements e
-			JOIN identity i ON lower(e.email) = i.email
-			WHERE e.status = 'active'
-			  AND COALESCE(e.plan_id, '') <> 'free'
-			  AND (e.expires_at IS NULL OR e.expires_at > now())
-		)`, authSubject, email).Scan(&active)
-	return active, err
+	return false, nil
 }
 
+// Existing premium handlers call this before work begins. It now verifies the
+// basic KOSCH tier instead of looking up paid packages or output balances.
 func (h *Handler) requirePremiumOutput(authSubject string, emails ...string) (int, error) {
-	if h.DB == nil {
+	if h == nil || h.DB == nil {
 		return 0, errors.New("database unavailable")
 	}
-	email := ""
-	if len(emails) > 0 {
-		email = strings.ToLower(strings.TrimSpace(emails[0]))
-	}
-	if email == "" {
-		email = entitlementEmailFromSubject(authSubject)
-	}
-	active, err := h.hasActivePaidPackage(authSubject, email)
+	active, err := h.hasTokenTierAccess(context.Background(), authSubject, "basic")
 	if err != nil {
 		return 0, err
 	}
 	if !active {
-		return 0, errors.New("active package required")
+		return 0, errors.New("verified KOSCH holder access required")
 	}
-	_, available, err := h.userCreditsAndRole(authSubject, email)
-	if err != nil {
-		return 0, err
-	}
-	if available <= 0 {
-		return 0, errors.New("active package output required")
-	}
-	return available, nil
+	return 1, nil
 }
