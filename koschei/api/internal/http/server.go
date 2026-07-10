@@ -42,7 +42,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue}
 	mux := http.NewServeMux()
 	koschAccess := func(next http.HandlerFunc) http.HandlerFunc { return handlers.RequireAuth(h.RequireActiveEntitlement(next)) }
-	apiKey := func(next http.HandlerFunc) http.HandlerFunc { return h.APIKeyAuth(h.APIRateLimit(next)) }
+	apiKey := func(next http.HandlerFunc) http.HandlerFunc { return h.APIKeyAuth(h.RequireAPIKeyKOSCH(h.APIRateLimit(next))) }
 	registerCoreRoutes(mux, h)
 	registerAccountRoutes(mux, h, koschAccess)
 	registerOwnerRoutes(mux, h, staticDir)
