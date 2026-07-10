@@ -56,7 +56,26 @@ jobs:
           if-no-files-found: error
 
       - name: Compile handler and HTTP tests
-        run: go test ./internal/handlers ./internal/http -run '^$'
+        id: compile
+        run: |
+          set +e
+          go test ./internal/handlers ./internal/http -run '^$' > /tmp/kosch-compile.log 2>&1
+          code=$?
+          cat /tmp/kosch-compile.log
+          echo "$code" > /tmp/kosch-compile.exit
+          exit 0
+
+      - name: Upload compile diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: kosch-compile-diagnostics
+          path: |
+            /tmp/kosch-compile.log
+            /tmp/kosch-compile.exit
+          if-no-files-found: error
+
+      - name: Stop on compile failure
+        run: test "$(cat /tmp/kosch-compile.exit)" = "0"
 
       - name: Vet changed backend packages
         run: go vet ./internal/handlers ./internal/http
