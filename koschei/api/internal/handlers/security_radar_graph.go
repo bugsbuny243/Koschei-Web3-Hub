@@ -41,7 +41,7 @@ func (h *Handler) SecurityRadarGraph(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"ok": true, "locked": false, "access_provider": "kosch_token",
-			"graph": services.SecurityRadarGraphResponse{OK: true, Empty: true, Message: "No node graph evidence is available for this verdict yet.", Nodes: []services.SecurityRadarGraphNode{}, Edges: []services.SecurityRadarGraphEdge{}},
+			"graph":   services.SecurityRadarGraphResponse{OK: true, Empty: true, Message: "No node graph evidence is available for this verdict yet.", Nodes: []services.SecurityRadarGraphNode{}, Edges: []services.SecurityRadarGraphEdge{}},
 			"warning": "node graph store unavailable",
 		})
 		return
