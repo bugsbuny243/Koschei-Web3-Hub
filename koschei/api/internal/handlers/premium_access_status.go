@@ -1,14 +1,10 @@
 package handlers
 
-import (
-	"net/http"
-	"strings"
-)
+import "net/http"
 
 type premiumAccessStatus struct {
 	Active            bool   `json:"active"`
 	Source            string `json:"source"`
-	PackageActive     bool   `json:"package_active"`
 	TokenGateEnabled  bool   `json:"token_gate_enabled"`
 	TokenConfigured   bool   `json:"token_configured"`
 	WalletVerified    bool   `json:"wallet_verified"`
@@ -24,27 +20,6 @@ func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email := normalizedClaimEmail(claims)
-	if email == "" && strings.TrimSpace(claims.Sub) != "" && h.DB != nil {
-		_ = h.DB.QueryRowContext(r.Context(), `
-			SELECT lower(email)
-			FROM app_user_profiles
-			WHERE auth_subject=$1 AND status='active'`, strings.TrimSpace(claims.Sub)).Scan(&email)
-	}
-
-	packageActive, err := h.hasActiveEntitlementAccess(r.Context(), claims.Sub, email)
-	if err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "premium_access_unavailable"})
-		return
-	}
-	if packageActive {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"ok": true,
-			"access": decidePremiumAccess(true, tokenAccessEvaluation{}),
-		})
-		return
-	}
-
 	tokenAccess, err := h.evaluateTokenAccess(r.Context(), claims.Sub)
 	if err != nil {
 		if accessErr, ok := err.(tokenAccessError); ok {
@@ -56,16 +31,15 @@ func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true,
-		"access": decidePremiumAccess(false, tokenAccess),
+		"ok":     true,
+		"access": decidePremiumAccess(tokenAccess),
 	})
 }
 
-func decidePremiumAccess(packageActive bool, token tokenAccessEvaluation) premiumAccessStatus {
+func decidePremiumAccess(token tokenAccessEvaluation) premiumAccessStatus {
 	status := premiumAccessStatus{
-		Active:            packageActive,
+		Active:            false,
 		Source:            "none",
-		PackageActive:     packageActive,
 		TokenGateEnabled:  token.GateEnabled,
 		TokenConfigured:   token.Configured,
 		WalletVerified:    token.WalletVerified,
@@ -78,10 +52,6 @@ func decidePremiumAccess(packageActive bool, token tokenAccessEvaluation) premiu
 	}
 	if status.TokenAmount == "" {
 		status.TokenAmount = "0"
-	}
-	if packageActive {
-		status.Source = "package"
-		return status
 	}
 	if token.GateEnabled && token.Configured && token.WalletVerified && tokenTierRank(token.Tier) >= tokenTierRank("basic") {
 		status.Active = true
