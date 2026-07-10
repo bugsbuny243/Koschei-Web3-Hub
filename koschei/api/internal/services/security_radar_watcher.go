@@ -21,9 +21,12 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 	if db == nil {
 		return func() {}
 	}
+	// Retention is pure database hygiene. It must stay active when RPC-based
+	// background workers are paused by the Alchemy quota saver.
+	stopRetention := StartSecurityRadarRetentionWorker(ctx, db)
 	if SolanaRPCLimitSaverEnabled() && !ForceBackgroundRadarEnabled() {
 		log.Printf("security radar background workers paused: SOLANA_RPC_LIMIT_SAVER_ENABLED=true; manual Safe Check, token scans and user-triggered reports remain available")
-		return func() {}
+		return stopRetention
 	}
 	stopHeartbeat := StartArvisRadarHeartbeat(ctx, db)
 	stopStreamVerdicts := StartArvisStreamVerdictWorker(ctx, db)
@@ -32,6 +35,7 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 		stopStreamRecovery()
 		stopStreamVerdicts()
 		stopHeartbeat()
+		stopRetention()
 	}
 	if !SecurityRadarAutoEnabled() {
 		return stopAll
