@@ -1,23 +1,172 @@
 <!doctype html>
 <html lang="tr">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Koschei ARVIS Security Radar: token başına tek doğrulanmış kart, 24 saatlik en güçlü risk kararı ve 7 günlük yapısal risk tabanı.">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Koschei ARVIS Security Radar: token başına tek doğrulanmış kart, 24 saatlik en güçlü risk ve 7 günlük yapısal risk tabanı.">
 <title>KOSCHEI ARVIS | Yapısal Güvenlik Radarı</title>
 <link rel="stylesheet" href="/css/koschei-global-shell.css?v=2">
 <style>
-:root{--bg:#02070d;--panel:#07131c;--line:#24eaff30;--text:#f4fbff;--muted:#9aabb8;--green:#18ffb2;--cyan:#24eaff;--red:#ff5577;--amber:#ffcc66;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 10% 0,#18ffb224,transparent 30%),radial-gradient(circle at 90% 8%,#24eaff1c,transparent 28%),linear-gradient(135deg,#020409,#071522 58%,#02040a)}a{color:inherit;text-decoration:none}button,input{font:inherit}.shell{width:min(1180px,calc(100% - 20px));margin:auto;padding:16px 0 70px}.glass,.card,.lane{border:1px solid var(--line);background:linear-gradient(145deg,#081722f2,#04090ff2);border-radius:24px;box-shadow:0 24px 80px #0009,inset 0 0 40px #24eaff08}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.brand{display:flex;align-items:center;gap:11px;font-weight:1000}.logo{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;color:#02110d;background:linear-gradient(135deg,var(--green),var(--cyan))}.nav,.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);border-radius:15px;min-height:42px;padding:10px 14px;font-weight:950;color:var(--text);background:#ffffff0c;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.btn.primary{border:0;background:linear-gradient(135deg,var(--green),var(--cyan));color:#02100d}.btn:disabled{opacity:.55;cursor:wait}.hero{padding:26px}.hero-grid{display:grid;grid-template-columns:1fr 350px;gap:16px;align-items:center}.eyebrow{font:1000 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#8fffe5}.hero h1{margin:9px 0;font-size:clamp(42px,6vw,74px);line-height:.94;letter-spacing:-.06em}.hero p,.muted{color:var(--muted);line-height:1.6}.status{border:1px solid #ffffff16;background:#02070da0;border-radius:20px;padding:16px}.status b{display:block}.status small{display:block;color:var(--muted);line-height:1.5;margin-top:7px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--amber);margin-right:8px;box-shadow:0 0 15px currentColor}.dot.live{background:var(--green)}.dot.bad{background:var(--red)}.command{display:grid;grid-template-columns:1fr 180px;gap:10px;margin-top:18px}.command input{width:100%;border:1px solid #24eaff35;background:#02070d;color:var(--text);border-radius:16px;padding:17px;font-family:var(--mono);outline:none}.notice{display:none;margin:14px 0 0;padding:14px 16px;border-radius:16px;border:1px solid #ffcc6650;background:#ffcc6612;color:#ffe6ae}.notice.show{display:block}.notice.bad{border-color:#ff55775b;background:#ff557713;color:#ffd7df}.policy{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.policy .card{padding:15px;border-radius:19px}.policy b{display:block;color:var(--green);font-size:18px;margin-top:6px}.policy small{display:block;color:var(--muted);line-height:1.45;margin-top:5px}.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}.metric{padding:14px;border:1px solid var(--line);background:#ffffff08;border-radius:18px}.metric label{display:block;font:1000 10px var(--mono);color:#8ca3b1;text-transform:uppercase}.metric b{display:block;font-size:25px;margin-top:6px}.feed{display:grid;grid-template-columns:1fr 1fr;gap:14px}.lane{padding:15px}.lane.risk{border-color:#ff55774d}.lane.monitor{border-color:#18ffb244}.lane-title{display:flex;align-items:center;gap:9px;margin-bottom:10px}.lane-title h2{margin:0;font-size:22px}.count{margin-left:auto;border-radius:999px;background:#ffffff12;padding:6px 9px;font:1000 11px var(--mono)}.cards{display:grid;gap:9px}.radar-card{border:1px solid #ffffff14;background:#ffffff07;border-radius:17px;padding:13px;cursor:pointer}.risk .radar-card{border-color:#ff55773d}.monitor .radar-card{border-color:#18ffb235}.cardtop{display:flex;justify-content:space-between;gap:10px}.project{font-weight:1000}.token{font:11px var(--mono);color:#9cb4c3;margin-top:4px}.badge,.pill{display:inline-flex;width:max-content;border-radius:999px;padding:6px 9px;font:1000 9px var(--mono);text-transform:uppercase;border:1px solid var(--line);color:#cfffff;background:#06131c}.badge.red,.pill.red{color:#ffcbd4;border-color:#ff557750;background:#ff557714}.badge.green,.pill.green{color:#bfffe9;border-color:#18ffb244;background:#18ffb214}.pill.amber{color:#ffe6ae;border-color:#ffcc6650;background:#ffcc6612}.mini{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #ffffff10;font-size:12px}.empty{border:1px dashed #24eaff35;border-radius:16px;padding:16px;color:#bdd2dd;line-height:1.55}.reportbox{padding:18px;margin-top:14px}.report{display:grid;grid-template-columns:145px 1fr;gap:16px;align-items:center}.grade{height:135px;border-radius:27px;display:grid;place-items:center;text-align:center;border:1px solid #24eaff50;background:#02070d}.grade b{font-size:56px}.grade small{display:block;color:#8fffe5;font:1000 10px var(--mono)}.report h2{margin:0 0 7px}.evidence{padding-left:19px;color:#dceaf0;line-height:1.55}.sig{font:10px var(--mono);color:#91a7b5;word-break:break-all;margin-top:9px}@media(max-width:900px){.hero-grid,.feed,.report{grid-template-columns:1fr}.policy{grid-template-columns:repeat(2,1fr)}.metrics{grid-template-columns:repeat(2,1fr)}.command{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}@media(max-width:560px){.shell{width:calc(100% - 12px)}.hero{padding:17px}.policy,.metrics{grid-template-columns:1fr}.nav{width:100%}.nav .btn{flex:1}}
+:root{--bg:#02070d;--line:#24eaff30;--text:#f4fbff;--muted:#9aabb8;--green:#18ffb2;--cyan:#24eaff;--red:#ff5577;--amber:#ffcc66;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 10% 0,#18ffb224,transparent 30%),radial-gradient(circle at 90% 8%,#24eaff1c,transparent 28%),linear-gradient(135deg,#020409,#071522 58%,#02040a)}a{color:inherit;text-decoration:none}button,input{font:inherit}.shell{width:min(1180px,calc(100% - 20px));margin:auto;padding:16px 0 70px}.glass,.card,.lane{border:1px solid var(--line);background:linear-gradient(145deg,#081722f2,#04090ff2);border-radius:24px;box-shadow:0 24px 80px #0009,inset 0 0 40px #24eaff08}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.brand{display:flex;align-items:center;gap:11px;font-weight:1000}.logo{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;color:#02110d;background:linear-gradient(135deg,var(--green),var(--cyan))}.nav,.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);border-radius:15px;min-height:42px;padding:10px 14px;font-weight:950;color:var(--text);background:#ffffff0c;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.btn.primary{border:0;background:linear-gradient(135deg,var(--green),var(--cyan));color:#02100d}.btn:disabled{opacity:.55;cursor:wait}.hero{padding:26px}.hero-grid{display:grid;grid-template-columns:1fr 350px;gap:16px;align-items:center}.eyebrow{font:1000 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#8fffe5}.hero h1{margin:9px 0;font-size:clamp(42px,6vw,74px);line-height:.94;letter-spacing:-.06em}.hero p,.muted{color:var(--muted);line-height:1.6}.status{border:1px solid #ffffff16;background:#02070da0;border-radius:20px;padding:16px}.status b{display:block}.status small{display:block;color:var(--muted);line-height:1.5;margin-top:7px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--amber);margin-right:8px;box-shadow:0 0 15px currentColor}.dot.live{background:var(--green)}.command{display:grid;grid-template-columns:1fr 180px;gap:10px;margin-top:18px}.command input{width:100%;border:1px solid #24eaff35;background:#02070d;color:var(--text);border-radius:16px;padding:17px;font-family:var(--mono);outline:none}.notice{display:none;margin:14px 0 0;padding:14px 16px;border-radius:16px;border:1px solid #ffcc6650;background:#ffcc6612;color:#ffe6ae}.notice.show{display:block}.notice.bad{border-color:#ff55775b;background:#ff557713;color:#ffd7df}.policy{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.policy .card{padding:15px;border-radius:19px}.policy b{display:block;color:var(--green);font-size:18px;margin-top:6px}.policy small{display:block;color:var(--muted);line-height:1.45;margin-top:5px}.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}.metric{padding:14px;border:1px solid var(--line);background:#ffffff08;border-radius:18px}.metric label{display:block;font:1000 10px var(--mono);color:#8ca3b1;text-transform:uppercase}.metric b{display:block;font-size:25px;margin-top:6px}.feed{display:grid;grid-template-columns:1fr 1fr;gap:14px}.lane{padding:15px}.lane.risk{border-color:#ff55774d}.lane.monitor{border-color:#18ffb244}.lane-title{display:flex;align-items:center;gap:9px;margin-bottom:10px}.lane-title h2{margin:0;font-size:22px}.count{margin-left:auto;border-radius:999px;background:#ffffff12;padding:6px 9px;font:1000 11px var(--mono)}.cards{display:grid;gap:9px}.radar-card{border:1px solid #ffffff14;background:#ffffff07;border-radius:17px;padding:13px;cursor:pointer}.risk .radar-card{border-color:#ff55773d}.monitor .radar-card{border-color:#18ffb235}.cardtop{display:flex;justify-content:space-between;gap:10px}.project{font-weight:1000}.token{font:11px var(--mono);color:#9cb4c3;margin-top:4px}.badge,.pill{display:inline-flex;width:max-content;border-radius:999px;padding:6px 9px;font:1000 9px var(--mono);text-transform:uppercase;border:1px solid var(--line);color:#cfffff;background:#06131c}.badge.red,.pill.red{color:#ffcbd4;border-color:#ff557750;background:#ff557714}.badge.green,.pill.green{color:#bfffe9;border-color:#18ffb244;background:#18ffb214}.pill.amber{color:#ffe6ae;border-color:#ffcc6650;background:#ffcc6612}.mini{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #ffffff10;font-size:12px}.empty{border:1px dashed #24eaff35;border-radius:16px;padding:16px;color:#bdd2dd;line-height:1.55}.reportbox{padding:18px;margin-top:14px}.report{display:grid;grid-template-columns:145px 1fr;gap:16px;align-items:center}.grade{height:135px;border-radius:27px;display:grid;place-items:center;text-align:center;border:1px solid #24eaff50;background:#02070d}.grade b{font-size:56px}.grade small{display:block;color:#8fffe5;font:1000 10px var(--mono)}.evidence{padding-left:19px;color:#dceaf0;line-height:1.55}.sig{font:10px var(--mono);color:#91a7b5;word-break:break-all;margin-top:9px}@media(max-width:900px){.hero-grid,.feed,.report{grid-template-columns:1fr}.policy{grid-template-columns:repeat(2,1fr)}.metrics{grid-template-columns:repeat(2,1fr)}.command{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}@media(max-width:560px){.shell{width:calc(100% - 12px)}.hero{padding:17px}.policy,.metrics{grid-template-columns:1fr}.nav{width:100%}.nav .btn{flex:1}}
 </style>
 </head>
-<body><main class="shell">
+<body>
+<main class="shell">
 <header class="top"><a class="brand" href="/"><span class="logo">A</span><span><span class="eyebrow">KOSCHEI WEB3</span><br>ARVIS Security Radar</span></a><nav class="nav"><a class="btn" href="/dashboard">Panel</a><a class="btn" href="/reports">Raporlar</a><a class="btn" href="/kosch-access">KOSCH Access</a></nav></header>
-<section class="hero glass"><div class="hero-grid"><div><div class="eyebrow">Doğrulanmış karar mimarisi</div><h1>Tek Token.<br>Tek Hikâye.</h1><p>Radar artık her token için yalnız bir temsilci kart gösterir: son 24 saatteki en yüksek doğrulanmış risk. Holder yoğunluğu ve mint/freeze authority gerçeği yedi günlük yapısal taban olarak korunur; geçici olay eksikliği bilinen riski aşağı çekemez.</p></div><aside class="status"><b><span id="statusDot" class="dot"></span><span id="statusText">Sistem kontrol ediliyor…</span></b><small id="statusNote">Arka plan quota saver modunda olsa bile manuel Safe Check, token taraması ve kullanıcı raporları canlı kalır.</small><div class="actions" style="margin-top:12px"><span class="pill" id="accessPill">KOSCH kontrolü</span></div></aside></div><div class="command"><input id="target" autocomplete="off" placeholder="SOLANA MINT / HAVUZ / CÜZDAN / İŞLEM / CLAIM URL"><button class="btn primary" id="run">ARVIS'İ ÇALIŞTIR</button></div><div id="notice" class="notice"></div></section>
-<section class="policy"><article class="card"><span class="eyebrow">Feed</span><b>1 token = 1 kart</b><small>Aynı token için tekrar eden kart yok.</small></article><article class="card"><span class="eyebrow">Temsilci</span><b>24s en güçlü risk</b><small>Risk eşitse en yeni doğrulanmış karar seçilir.</small></article><article class="card"><span class="eyebrow">Yapısal hafıza</span><b>7 günlük floor</b><small>Holder ve authority gözlemleri ayrı tazelik saatiyle korunur.</small></article><article class="card"><span class="eyebrow">Gürültü filtresi</span><b>14 altyapı minti</b><small>DB’de saklanır, müşteri feed’inde risk kartı olmaz.</small></article></section>
+<section class="hero glass"><div class="hero-grid"><div><div class="eyebrow">Doğrulanmış karar mimarisi</div><h1>Tek Token.<br>Tek Hikâye.</h1><p>Her token için yalnız bir temsilci kart gösterilir: son 24 saatteki en yüksek doğrulanmış risk. Holder yoğunluğu ve mint/freeze authority gerçeği yedi günlük yapısal taban olarak korunur.</p></div><aside class="status"><b><span id="statusDot" class="dot"></span><span id="statusText">Sistem kontrol ediliyor…</span></b><small id="statusNote">Quota saver modunda manuel Safe Check ve kullanıcı taramaları canlı kalır.</small><div class="actions" style="margin-top:12px"><span class="pill" id="accessPill">KOSCH kontrolü</span></div></aside></div><div class="command"><input id="target" autocomplete="off" placeholder="SOLANA MINT / HAVUZ / CÜZDAN / İŞLEM / CLAIM URL"><button class="btn primary" id="run">ARVIS'İ ÇALIŞTIR</button></div><div id="notice" class="notice"></div></section>
+<section class="policy"><article class="card"><span class="eyebrow">Feed</span><b>1 token = 1 kart</b><small>Tekrar eden kart yok.</small></article><article class="card"><span class="eyebrow">Temsilci</span><b>24s en güçlü risk</b><small>Eşitlikte en yeni karar.</small></article><article class="card"><span class="eyebrow">Hafıza</span><b>7 günlük floor</b><small>Holder ve authority ayrı tazelikte.</small></article><article class="card"><span class="eyebrow">Filtre</span><b>14 altyapı minti</b><small>DB'de kalır, public kart olmaz.</small></article></section>
 <section class="metrics"><div class="metric"><label>Görünen token</label><b id="visible">—</b></div><div class="metric"><label>Yapısal floor</label><b id="floored">—</b></div><div class="metric"><label>İşlenen</label><b id="processed">—</b></div><div class="metric"><label>Kanıt bekleyen</label><b id="insufficient">—</b></div><div class="metric"><label>Son karar</label><b id="lastDecision">—</b></div></section>
 <section class="feed"><div class="lane risk"><div class="lane-title"><span>🟥</span><h2>Risk Kartları</h2><span class="count" id="redCount">0</span></div><div id="danger" class="cards"><div class="empty">Doğrulanmış yüksek risk kartı yok.</div></div></div><div class="lane monitor"><div class="lane-title"><span>🟩</span><h2>İzleme Kartları</h2><span class="count" id="greenCount">0</span></div><div id="monitor" class="cards"><div class="empty">Doğrulanmış izleme kartı yok.</div></div></div></section>
 <section class="reportbox glass"><div class="eyebrow">İmzalı karar detayı</div><h2 id="reportTitle">Kart seçin veya manuel tarama çalıştırın</h2><div id="reportBody" class="empty">Skor, kanıt, yapısal taban ve imza yalnız doğrulanmış karar üzerinden gösterilir.</div></section>
 </main>
-<script src="/js/koschei-auth.js?v=32"></script><script src="/js/koschei-global-shell.js?v=2"></script>
+<script src="/js/koschei-auth.js?v=32"></script>
+<script src="/js/koschei-global-shell.js?v=2"></script>
 <script>
-(async()=>{if(window.KoscheiAuth){await KoscheiAuth.init();if(!KoscheiAuth.requireAuth('/login'))return}const $=id=>document.getElementById(id),run=$('run'),target=$('target'),notice=$('notice'),danger=$('danger'),monitor=$('monitor'),reportBody=$('reportBody'),reportTitle=$('reportTitle');let store={};const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const short=v=>{v=String(v||'');return v.length>24?v.slice(0,11)+'…'+v.slice(-8):v||'—'};const num=v=>Number(v||0).toLocaleString('tr-TR');const jwt=()=>KoscheiAuth?.getJwt?.()||'';async function api(path,opt={}){const h=new Headers(opt.headers||{});h.set('Content-Type','application/json');const t=jwt();if(t)h.set('Authorization','Bearer '+t);const res=await fetch(path,{credentials:'same-origin',...opt,headers:h});let data={};try{data=await res.json()}catch{}return{res,data}}function show(m,b=false){notice.textContent=m;notice.className='notice show'+(b?' bad':'')}function clear(){notice.className='notice';notice.textContent=''}function verified(x){const s=x?.signals||{};return x?.signed===true&&(s.verified_evidence===true||s.real_onchain_evidence===true||s.real_offchain_evidence===true)}function isRisk(x){const l=String(x?.risk_level||'').toLowerCase(),r=Number(x?.risk_index||0),s=x?.signals||{};return l==='critical'||l==='high'||r>=65||s.mint_authority_present===true||Number(s.top_10_holder_percentage||0)>=75}function key(x){return String(x.id||x.signature||x.target||Math.random()).replace(/[^a-zA-Z0-9_-]/g,'').slice(0,60)}function relative(v){if(!v)return'—';const d=new Date(v);if(isNaN(d))return'—';const m=Math.max(0,Math.round((Date.now()-d)/60000));return m<1?'şimdi':m<60?m+' dk':Math.round(m/60)+' sa'}function floorInfo(x){const s=x?.signals||{};const floor=Number(s.structural_floor||0);if(!floor)return'';return`<div class="mini"><span>Yapısal taban</span><b>${esc(floor)}/100</b></div>`}function card(x){const k=key(x),bad=isRisk(x),summary=x.summary||{};store[k]=x;return`<article class="radar-card" data-key="${esc(k)}"><div class="cardtop"><div><div class="project">${esc(short(x.target))}</div><div class="token">${esc(x.network||'solana-mainnet')} · ${esc(x.rule_version||'ARVIS')}</div></div><span class="badge ${bad?'red':'green'}">${bad?'Risk':'İzle'}</span></div><div class="mini"><span>Temsilci risk</span><b>${esc(x.risk_index)}/100</b></div>${floorInfo(x)}<div class="mini"><span>Gözlem</span><b>${esc(summary.occurrence_count||x.occurrence_count||1)}</b></div><div class="mini"><span>Son görülen</span><b>${esc(relative(summary.last_seen_at||x.last_seen_at||x.created_at))}</b></div></article>`}function bind(){document.querySelectorAll('[data-key]').forEach(el=>el.onclick=()=>renderReport(store[el.dataset.key]))}function renderCards(items=[]){store={};const visible=items.filter(verified),red=visible.filter(isRisk),green=visible.filter(x=>!isRisk(x));$('redCount').textContent=red.length;$('greenCount').textContent=green.length;$('visible').textContent=num(visible.length);$('floored').textContent=num(visible.filter(x=>Number(x.signals?.structural_floor||0)>0).length);danger.innerHTML=red.length?red.map(card).join(''):'<div class="empty">Doğrulanmış yüksek risk kartı yok.</div>';monitor.innerHTML=green.length?green.map(card).join(''):'<div class="empty">Doğrulanmış izleme kartı yok.</div>';bind();return visible}function renderStatus(s={}){const manual=s.enabled===false||['waiting_for_stream','stale'].includes(String(s.pipeline_status||''));$('statusDot').className='dot '+(manual?'':'live');$('statusText').textContent=manual?'Manuel koruma canlı · arka plan quota saver':'ARVIS işlem hattı canlı';$('statusNote').textContent=manual?'Otomatik stream/polling tasarruf için duraklatılmış olabilir. Manuel Radar Check, Safe Check ve kullanıcı raporları çalışır.':`İşlem hattı ${String(s.pipeline_status||'healthy').replaceAll('_',' ')}. Token başına tek doğrulanmış karar gösterilir.`;$('processed').textContent=num(s.processing_completed);$('insufficient').textContent=num(s.processing_insufficient);$('lastDecision').textContent=relative(s.last_processed_at)}function renderReport(x){if(!x||!verified(x)){reportTitle.textContent='Doğrulanmış karar bulunamadı';reportBody.className='empty';reportBody.textContent='Kanıt yoksa müşteri kararı gösterilmez.';return}const s=x.signals||{},ev=Array.isArray(x.evidence)?x.evidence:[],floor=Number(s.structural_floor||0),original=s.structural_floor_original_risk_index,structural=[];if(floor)structural.push(`<span class="pill amber">Floor ${esc(floor)}/100</span>`);if(s.structural_largest_holder_pct!==undefined)structural.push(`<span class="pill">Largest holder %${esc(s.structural_largest_holder_pct)}</span>`);if(s.structural_top10_holder_pct!==undefined)structural.push(`<span class="pill">Top 10 %${esc(s.structural_top10_holder_pct)}</span>`);if(s.structural_mint_authority_present!==undefined)structural.push(`<span class="pill ${s.structural_mint_authority_present?'red':'green'}">Mint authority ${s.structural_mint_authority_present?'aktif':'kapalı'}</span>`);if(s.structural_freeze_authority_present!==undefined)structural.push(`<span class="pill ${s.structural_freeze_authority_present?'red':'green'}">Freeze authority ${s.structural_freeze_authority_present?'aktif':'kapalı'}</span>`);reportTitle.textContent=short(x.target);reportBody.className='report';reportBody.innerHTML=`<div class="grade"><div><b>${esc(x.grade||'—')}</b><small>${esc(x.risk_index)}/100</small></div></div><div><h2>${esc(x.verdict||'İmzalı ARVIS kararı')}</h2><p class="muted">${esc(x.recommendation||'Kanıtları inceleyin.')}</p><div class="actions"><span class="pill ${isRisk(x)?'red':'green'}">${esc(x.risk_level||'watch')}</span><span class="pill">1 token · 1 kart</span>${structural.join('')}</div>${floor?`<p class="muted">Bu karar ${original!==undefined?esc(original)+'/100 olay skorundan ':''}doğrulanmış yapısal tabana yükseltildi. Gözlem: ${esc(s.structural_observed_at||'—')}.</p>`:''}<ul class="evidence">${ev.slice(0,8).map(v=>`<li>${esc(v)}</li>`).join('')||'<li>Doğrulanmış kanıt saklandı.</li>'}</ul>${x.signature?`<div class="sig">İmza: ${esc(x.signature)}</div>`:''}</div>`}async function loadAccess(){try{const{res,data}=await api('/api/auth/premium-access');const a=data.access||{};$('accessPill').textContent=a.active?`KOSCH ${String(a.token_tier||'basic').toUpperCase()} · AKTİF`:'KOSCH doğrulaması gerekli';$('accessPill').className='pill '+(a.active?'green':'amber')}catch{$('accessPill').textContent='KOSCH durumu alınamadı'}}async function loadFeed(){const{res,data}=await api('/api/v1/radar/feed');if(!res.ok){show(res.status===401?'Giriş yapmanız gerekiyor.':'Radar feed kullanılamıyor.',true);return[]}renderStatus(data.stream||{});return renderCards(data.items||[])}run.onclick=async()=>{clear();const value=target.value.trim();if(!value){show('Kontrol edilecek Solana hedefini girin.',true);return}run.disabled=true;reportTitle.textContent='ARVIS kanıt topluyor';reportBody.className='empty';reportBody.textContent='Sonuç DB’ye yazıldıktan sonra yapısal tabanla birlikte gösterilecek.';try{const{res,data}=await api('/api/v1/radar/check',{method:'POST',body:JSON.stringify({target:value,network:'solana-mainnet'})});if(!res.ok){show([402,403].includes(res.status)?'Bu işlem için doğrulanmış KOSCH holder access gerekir.':(data.message||data.error||'Tarama tamamlanamadı.'),true);return}const items=await loadFeed();const matched=items.find(x=>String(x.target||'').toLowerCase()===value.toLowerCase());if(matched)renderReport(matched);else renderReport(data.final_verdict||data.data||data)}catch{show('ARVIS yanıtı kullanılamıyor.',true)}finally{run.disabled=false}}await Promise.all([loadAccess(),loadFeed()]);setInterval(loadFeed,20000)})();
-</script></body></html>
+(async () => {
+  await KoscheiAuth.init();
+  if (!KoscheiAuth.requireAuth('/login')) return;
+
+  const $ = id => document.getElementById(id);
+  const run = $('run');
+  const target = $('target');
+  const notice = $('notice');
+  const danger = $('danger');
+  const monitor = $('monitor');
+  const reportBody = $('reportBody');
+  const reportTitle = $('reportTitle');
+  const cardsByKey = new Map();
+
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const short = value => { const v = String(value || ''); return v.length > 24 ? `${v.slice(0,11)}…${v.slice(-8)}` : (v || '—'); };
+  const number = value => Number(value || 0).toLocaleString('tr-TR');
+  const relative = value => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
+    return minutes < 1 ? 'şimdi' : minutes < 60 ? `${minutes} dk` : `${Math.round(minutes / 60)} sa`;
+  };
+  const verified = item => {
+    const signals = item?.signals || {};
+    return item?.signed === true && (signals.verified_evidence === true || signals.real_onchain_evidence === true || signals.real_offchain_evidence === true);
+  };
+  const risky = item => {
+    const signals = item?.signals || {};
+    const level = String(item?.risk_level || '').toLowerCase();
+    return ['critical','high'].includes(level) || Number(item?.risk_index || 0) >= 65 || signals.mint_authority_present === true || Number(signals.top_10_holder_percentage || 0) >= 75;
+  };
+
+  async function api(path, options = {}) {
+    const response = await KoscheiAuth.apiCall(path, options);
+    const data = await response.json().catch(() => ({}));
+    return {response, data};
+  }
+
+  function show(message, bad = false) {
+    notice.textContent = message;
+    notice.className = `notice show${bad ? ' bad' : ''}`;
+  }
+
+  function renderReport(item) {
+    if (!item || !verified(item)) {
+      reportTitle.textContent = 'Doğrulanmış karar bulunamadı';
+      reportBody.className = 'empty';
+      reportBody.textContent = 'Kanıt yoksa müşteri kararı gösterilmez.';
+      return;
+    }
+    const signals = item.signals || {};
+    const floor = Number(signals.structural_floor || 0);
+    const evidence = Array.isArray(item.evidence) ? item.evidence : [];
+    const pills = [`<span class="pill ${risky(item) ? 'red' : 'green'}">${esc(item.risk_level || 'watch')}</span>`, '<span class="pill">1 token · 1 kart</span>'];
+    if (floor) pills.push(`<span class="pill amber">Floor ${esc(floor)}/100</span>`);
+    if (signals.structural_largest_holder_pct !== undefined) pills.push(`<span class="pill">Largest %${esc(signals.structural_largest_holder_pct)}</span>`);
+    if (signals.structural_top10_holder_pct !== undefined) pills.push(`<span class="pill">Top10 %${esc(signals.structural_top10_holder_pct)}</span>`);
+    reportTitle.textContent = short(item.target);
+    reportBody.className = 'report';
+    reportBody.innerHTML = `<div class="grade"><div><b>${esc(item.grade || '—')}</b><small>${esc(item.risk_index)}/100</small></div></div><div><h2>${esc(item.verdict || 'İmzalı ARVIS kararı')}</h2><p class="muted">${esc(item.recommendation || 'Kanıtları inceleyin.')}</p><div class="actions">${pills.join('')}</div>${floor ? `<p class="muted">Yapısal gözlem: ${esc(signals.structural_observed_at || '—')}.</p>` : ''}<ul class="evidence">${evidence.slice(0,8).map(v => `<li>${esc(v)}</li>`).join('') || '<li>Doğrulanmış kanıt saklandı.</li>'}</ul>${item.signature ? `<div class="sig">İmza: ${esc(item.signature)}</div>` : ''}</div>`;
+  }
+
+  function renderCards(items) {
+    cardsByKey.clear();
+    const visible = (items || []).filter(verified);
+    const red = visible.filter(risky);
+    const green = visible.filter(item => !risky(item));
+    $('visible').textContent = number(visible.length);
+    $('floored').textContent = number(visible.filter(item => Number(item.signals?.structural_floor || 0) > 0).length);
+    $('redCount').textContent = red.length;
+    $('greenCount').textContent = green.length;
+
+    const html = item => {
+      const key = String(item.id || item.signature || item.target || Math.random()).replace(/[^a-zA-Z0-9_-]/g, '').slice(0,60);
+      cardsByKey.set(key, item);
+      const summary = item.summary || {};
+      const floor = Number(item.signals?.structural_floor || 0);
+      return `<article class="radar-card" data-key="${esc(key)}"><div class="cardtop"><div><div class="project">${esc(short(item.target))}</div><div class="token">${esc(item.network || 'solana-mainnet')}</div></div><span class="badge ${risky(item) ? 'red' : 'green'}">${risky(item) ? 'Risk' : 'İzle'}</span></div><div class="mini"><span>Temsilci risk</span><b>${esc(item.risk_index)}/100</b></div>${floor ? `<div class="mini"><span>Yapısal taban</span><b>${esc(floor)}/100</b></div>` : ''}<div class="mini"><span>Gözlem</span><b>${esc(summary.occurrence_count || item.occurrence_count || 1)}</b></div><div class="mini"><span>Son görülen</span><b>${esc(relative(summary.last_seen_at || item.created_at))}</b></div></article>`;
+    };
+
+    danger.innerHTML = red.length ? red.map(html).join('') : '<div class="empty">Doğrulanmış yüksek risk kartı yok.</div>';
+    monitor.innerHTML = green.length ? green.map(html).join('') : '<div class="empty">Doğrulanmış izleme kartı yok.</div>';
+    document.querySelectorAll('[data-key]').forEach(node => node.addEventListener('click', () => renderReport(cardsByKey.get(node.dataset.key))));
+    return visible;
+  }
+
+  function renderStatus(stream = {}) {
+    const manual = stream.enabled === false || ['waiting_for_stream','stale'].includes(String(stream.pipeline_status || ''));
+    $('statusDot').className = `dot ${manual ? '' : 'live'}`;
+    $('statusText').textContent = manual ? 'Manuel koruma canlı · quota saver' : 'ARVIS işlem hattı canlı';
+    $('statusNote').textContent = manual ? 'Otomatik worker duraklatılmış olabilir; manuel taramalar çalışır.' : 'Token başına tek doğrulanmış karar gösterilir.';
+    $('processed').textContent = number(stream.processing_completed);
+    $('insufficient').textContent = number(stream.processing_insufficient);
+    $('lastDecision').textContent = relative(stream.last_processed_at);
+  }
+
+  async function loadAccess() {
+    const {response, data} = await api('/api/auth/premium-access');
+    const access = data.access || {};
+    $('accessPill').textContent = response.ok && access.active ? `KOSCH ${String(access.token_tier || 'basic').toUpperCase()} · AKTİF` : 'KOSCH doğrulaması gerekli';
+    $('accessPill').className = `pill ${response.ok && access.active ? 'green' : 'amber'}`;
+  }
+
+  async function loadFeed() {
+    const {response, data} = await api('/api/v1/radar/feed');
+    if (!response.ok) {
+      show(response.status === 401 ? 'Giriş yapmanız gerekiyor.' : 'KOSCH holder access veya Radar servisi gerekli.', true);
+      return [];
+    }
+    renderStatus(data.stream || {});
+    return renderCards(data.items || []);
+  }
+
+  run.addEventListener('click', async () => {
+    const value = target.value.trim();
+    if (!value) {
+      show('Kontrol edilecek Solana hedefini girin.', true);
+      return;
+    }
+    notice.className = 'notice';
+    run.disabled = true;
+    reportTitle.textContent = 'ARVIS kanıt topluyor';
+    reportBody.className = 'empty';
+    reportBody.textContent = 'Persist edilmiş yapısal karar bekleniyor.';
+    try {
+      const {response, data} = await api('/api/v1/radar/check', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({target:value,network:'solana-mainnet'})});
+      if (!response.ok) {
+        show([402,403].includes(response.status) ? 'Doğrulanmış KOSCH holder access gerekir.' : (data.message || data.error || 'Tarama tamamlanamadı.'), true);
+        return;
+      }
+      const items = await loadFeed();
+      const match = items.find(item => String(item.target || '').toLowerCase() === value.toLowerCase());
+      renderReport(match || data.final_verdict || data.data || data);
+    } catch {
+      show('ARVIS yanıtı kullanılamıyor.', true);
+    } finally {
+      run.disabled = false;
+    }
+  });
+
+  await Promise.all([loadAccess(), loadFeed()]);
+  setInterval(loadFeed, 20000);
+})();
+</script>
+</body>
+</html>
