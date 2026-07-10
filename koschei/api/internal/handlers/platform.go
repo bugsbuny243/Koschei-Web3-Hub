@@ -14,12 +14,12 @@ func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 		"version":     "3.0.0",
 		"neonAuthUrl": configuredPublicNeonAuthURL(),
 		"access": map[string]any{
-			"provider":      "kosch_token",
-			"mode":          "verified_holder_balance",
-			"mint":          configuredKoscheiTokenMint(),
-			"network":       firstNonEmptyString(os.Getenv("KOSCHEI_TOKEN_NETWORK"), os.Getenv("KOSCH_TOKEN_NETWORK"), "solana-mainnet"),
-			"wallet_proof":  "phantom_message_signature",
-			"custodial":     false,
+			"provider":       "kosch_token",
+			"mode":           "verified_holder_balance",
+			"mint":           configuredKoscheiTokenMint(),
+			"network":        firstNonEmptyString(os.Getenv("KOSCHEI_TOKEN_NETWORK"), os.Getenv("KOSCH_TOKEN_NETWORK"), "solana-mainnet"),
+			"wallet_proof":   "phantom_message_signature",
+			"custodial":      false,
 			"legacy_billing": false,
 		},
 	})
