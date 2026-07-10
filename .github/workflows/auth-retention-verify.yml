@@ -1,0 +1,50 @@
+name: Auth Retention Verify
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "koschei/api/public/js/koschei-auth.js"
+      - "koschei/api/internal/services/security_radar_watcher.go"
+      - "koschei/api/internal/services/security_radar_retention_worker.go"
+      - ".github/workflows/auth-retention-verify.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - run: go mod download
+      - name: Go format
+        run: test -z "$(gofmt -l internal/services/security_radar_watcher.go internal/services/security_radar_retention_worker.go)"
+      - name: Compile services package
+        run: go test ./internal/services -run '^$'
+      - name: Vet services package
+        run: go vet ./internal/services
+      - name: Build complete API
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: Check auth JavaScript
+        run: node --check public/js/koschei-auth.js
+      - name: Enforce Neon CORS hard rule
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('public/js/koschei-auth.js').read_text()
+          start = text.index('async function fetchNeonJSON')
+          end = text.index('async function fetchNeonSession')
+          block = text[start:end]
+          assert "credentials: 'include'" not in block.replace("// HARD RULE: never add credentials:'include' here.", '')
+          assert 'HARD RULE' in block
+          assert 'Shopier' not in text and 'Paddle' not in text
+          assert 'aktif Koschei paketi' not in text
+          PY
