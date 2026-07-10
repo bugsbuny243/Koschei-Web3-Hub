@@ -10,20 +10,17 @@ import (
 )
 
 func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
-	shopierURLs := map[string]string{
-		"starter":      configuredURL("SHOPIER_STARTER_URL", "https://www.shopier.com/TradeVisual/46531862"),
-		"builder":      configuredURL("SHOPIER_BUILDER_URL", "https://www.shopier.com/TradeVisual/46531900"),
-		"studio":       configuredURL("SHOPIER_STUDIO_URL", "https://www.shopier.com/TradeVisual/46531961"),
-		"professional": configuredURL("SHOPIER_BUILDER_URL", "https://www.shopier.com/TradeVisual/46531900"),
-		"enterprise":   configuredURL("SHOPIER_STUDIO_URL", "https://www.shopier.com/TradeVisual/46531961"),
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"version":     "2.0.0",
+		"version":     "3.0.0",
 		"neonAuthUrl": configuredPublicNeonAuthURL(),
-		"payments": map[string]any{
-			"provider":    "shopier",
-			"mode":        "manual_owner_approval",
-			"shopierUrls": shopierURLs,
+		"access": map[string]any{
+			"provider":       "kosch_token",
+			"mode":           "verified_holder_balance",
+			"mint":           configuredKoscheiTokenMint(),
+			"network":        firstNonEmptyString(os.Getenv("KOSCHEI_TOKEN_NETWORK"), os.Getenv("KOSCH_TOKEN_NETWORK"), "solana-mainnet"),
+			"wallet_proof":   "phantom_message_signature",
+			"custodial":      false,
+			"legacy_billing": false,
 		},
 	})
 }

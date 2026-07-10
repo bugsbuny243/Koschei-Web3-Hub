@@ -1,7 +1,12 @@
-<!doctype html><html lang="tr"><head>
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-1QFWMJJC3"></script>
-<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','G-1QFWMJJC3');</script>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/koschei.css"><title>SDK Referansları — Koschei</title><style>pre{white-space:pre-wrap;color:#c7f9df}.stack{display:grid;gap:16px}</style></head><body><nav class="nav"><a class="nav-logo" href="/docs">K Koschei Dokümanları</a><div class="nav-links"><a class="nav-link" href="/docs">Genel Bakış</a><a class="nav-link" href="/docs/api">API</a><a class="nav-link" href="/dashboard">Panel</a></div></nav><main class="page"><h1>Kopyalanabilir SDK Referansları</h1><p class="page-sub">Ayrı bir npm paketi gerekmez. Standart HTTP istemcilerini kullanabilirsiniz.</p><div class="stack"><section class="card"><h2>JavaScript fetch</h2><pre>const response = await fetch('/api/public/impact');
-const impact = await response.json();</pre></section><section class="card"><h2>Python requests</h2><pre>import requests
-impact = requests.get('https://your-host/api/public/impact').json()
-print(impact)</pre></section><section class="card"><h2>curl</h2><pre>curl https://your-host/api/public/impact</pre></section><section class="card"><h2>Çalışma notu</h2><p>Webhook kurulumu zorunlu değildir. İzleme listesi Alchemy API sorgulamasını kullanır.</p><p>Çekirdek araçlar için cüzdan bağlantısı veya özel anahtar gerekmez.</p></section></div></main></body></html>
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/koschei.css"><title>KOSCH Developer API — Koschei ARVIS</title><style>pre{white-space:pre-wrap;color:#c7f9df}.stack{display:grid;gap:16px}.note{border:1px solid #18ffb245;background:#18ffb210;border-radius:16px;padding:15px}</style></head><body><nav class="nav"><a class="nav-logo" href="/docs">K Koschei Dokümanları</a><div class="nav-links"><a class="nav-link" href="/docs">Genel Bakış</a><a class="nav-link" href="/kosch-access">KOSCH Access</a><a class="nav-link" href="/account">Hesap</a></div></nav><main class="page"><h1>KOSCH-bound API Referansı</h1><p class="page-sub">API anahtarı yalnız kimlik bilgisidir; ürün erişimini atlamaz. Anahtarın sahibi doğrulanmış Basic-or-higher KOSCH holder olmalıdır.</p><div class="note"><b>Akış:</b> Neon Auth hesabı → Phantom mesaj imzası → KOSCH bakiye doğrulaması → API anahtarı oluşturma → X-API-Key ile çağrı.</div><div class="stack"><section class="card"><h2>Token scan</h2><pre>curl -X POST https://tradepigloball.co/api/v1/scan/token \
+  -H "X-API-Key: kos_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"mint":"SOLANA_MINT","network":"solana-mainnet"}'</pre></section><section class="card"><h2>Shield preflight</h2><pre>const response = await fetch('/api/v1/shield/preflight', {
+  method: 'POST',
+  headers: {'X-API-Key': apiKey, 'Content-Type': 'application/json'},
+  body: JSON.stringify({target, intent: 'sign'})
+});</pre></section><section class="card"><h2>Kullanım geçmişi</h2><pre>import requests
+usage = requests.get(
+  'https://tradepigloball.co/api/v1/usage',
+  headers={'X-API-Key': api_key}
+).json()</pre></section><section class="card"><h2>Erişim notu</h2><p>Shopier, Paddle, paket satın alma veya ödeme webhook'u API erişimi vermez. API çağrılarında anahtar sahibinin KOSCH holder durumu yeniden doğrulanır.</p></section></div></main></body></html>
