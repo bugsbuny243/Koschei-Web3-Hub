@@ -133,6 +133,14 @@ func (s *SecurityRadarStore) InsertVerdict(ctx context.Context, verdict Security
 		return "", nil
 	}
 
+	// Structural score layer: harvest holder/authority facts from every
+	// verdict, and floor final_verdict_engine scores to the cached
+	// structural baseline so event-evidence gaps can't flip a risky token
+	// green. Both calls are best-effort and never block the insert.
+	verdict.Signals = nonNilMap(verdict.Signals)
+	s.captureStructuralSignals(ctx, verdict)
+	s.applyStructuralFloor(ctx, &verdict)
+
 	signals := nonNilMap(verdict.Signals)
 	if verdict.Source == "arvis_stream" {
 		if streamEventID, _ := signals["source_stream_event_id"].(string); strings.TrimSpace(streamEventID) != "" {
