@@ -43,7 +43,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	mux := http.NewServeMux()
 	koschAccess := func(next http.HandlerFunc) http.HandlerFunc { return handlers.RequireAuth(h.RequireActiveEntitlement(next)) }
 	apiKey := func(next http.HandlerFunc) http.HandlerFunc { return h.APIKeyAuth(h.RequireAPIKeyKOSCH(h.APIRateLimit(next))) }
-	registerCoreRoutes(mux, h)
+	registerCoreRoutes(mux, h, koschAccess)
 	registerAccountRoutes(mux, h, koschAccess)
 	registerOwnerRoutes(mux, h, staticDir)
 	registerPublicProductRoutes(mux, h, koschAccess)
@@ -53,7 +53,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	return securityHeaders(cors(apiReadiness(db, mux), corsOrigin))
 }
 
-func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler) {
+func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess func(http.HandlerFunc) http.HandlerFunc) {
 	mux.HandleFunc("/health", h.Health)
 	mux.HandleFunc("/api/config", method("GET", h.Config))
 	mux.HandleFunc("/api/auth/provision", method("POST", h.Provision))
@@ -73,10 +73,10 @@ func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler) {
 	mux.HandleFunc("/api/public/impact", method("GET", h.PublicImpact))
 	mux.HandleFunc("/api/public/metrics", method("GET", h.GetPublicMetrics))
 	mux.HandleFunc("/api/agent/health", requiresDB(h, method("GET", h.AgentTool)))
-	mux.HandleFunc("/api/agent/wallet-score", requiresDB(h, method("POST", h.AgentTool)))
-	mux.HandleFunc("/api/agent/risk-summary", requiresDB(h, method("POST", h.AgentTool)))
-	mux.HandleFunc("/api/agent/metadata-template", requiresDB(h, method("POST", h.AgentTool)))
-	mux.HandleFunc("/api/agent/chain-health", requiresDB(h, method("POST", h.AgentTool)))
+	mux.HandleFunc("/api/agent/wallet-score", requiresDB(h, koschAccess(method("POST", h.AgentTool))))
+	mux.HandleFunc("/api/agent/risk-summary", requiresDB(h, koschAccess(method("POST", h.AgentTool))))
+	mux.HandleFunc("/api/agent/metadata-template", requiresDB(h, koschAccess(method("POST", h.AgentTool))))
+	mux.HandleFunc("/api/agent/chain-health", requiresDB(h, koschAccess(method("POST", h.AgentTool))))
 }
 
 func registerAccountRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess func(http.HandlerFunc) http.HandlerFunc) {
