@@ -43,15 +43,15 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	if config.solanaRPC == nil { config.solanaRPC = web3.NewSolanaRPC(config.cache) }
 	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue}
 	mux := http.NewServeMux()
-	premium := func(next http.HandlerFunc) http.HandlerFunc { return handlers.RequireAuth(h.RequireActiveEntitlement(next)) }
+	koschAccess := func(next http.HandlerFunc) http.HandlerFunc { return handlers.RequireAuth(h.RequireActiveEntitlement(next)) }
 	apiKey := func(next http.HandlerFunc) http.HandlerFunc { return h.APIKeyAuth(h.APIRateLimit(next)) }
 
 	registerCoreRoutes(mux, h)
 	registerAccountRoutes(mux, h)
 	registerOwnerRoutes(mux, h, staticDir)
-	registerPublicProductRoutes(mux, h, premium)
+	registerPublicProductRoutes(mux, h, koschAccess)
 	registerDeveloperAPIRoutes(mux, h, apiKey)
-	registerWatchlistRoutes(mux, h, premium)
+	registerWatchlistRoutes(mux, h, koschAccess)
 	registerStatic(mux, staticDir)
 	return securityHeaders(cors(apiReadiness(db, mux), corsOrigin))
 }
@@ -65,21 +65,16 @@ func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler) {
 	mux.HandleFunc("/api/analytics/event", method("POST", h.AnalyticsEvent))
 	mux.HandleFunc("/ads.txt", method("GET", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "text/plain; charset=utf-8"); _, _ = w.Write([]byte("google.com, pub-6081394144742471, DIRECT, f08c47fec0942fa0")) }))
 	mux.HandleFunc("/robots.txt", method("GET", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "text/plain; charset=utf-8"); _, _ = w.Write([]byte("User-agent: *\nAllow: /\nSitemap: https://tradepigloball.co/sitemap.xml")) }))
-	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "application/json"); _ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok"}) }))
+	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) { w.Header().Set("Content-Type", "application/json"); _ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok", "access": "kosch-only"}) }))
 	mux.HandleFunc("/api/auth/register", method("POST", h.Register))
 	mux.HandleFunc("/api/auth/login", method("POST", h.Login))
 	mux.HandleFunc("/api/auth/neon-login", method("GET", h.NeonLogin))
 	mux.HandleFunc("/api/auth/neon-register", method("GET", h.NeonRegister))
 	mux.HandleFunc("/api/auth/neon-callback", method("GET", h.NeonCallback))
 	mux.HandleFunc("/api/me", handlers.RequireAuth(method("GET", h.Me)))
-	mux.HandleFunc("/api/me/package", handlers.RequireAuth(method("GET", h.MePackage)))
-	mux.HandleFunc("/api/member/summary", requiresDB(h, handlers.RequireAuth(method("GET", h.MemberSummary))))
-	mux.HandleFunc("/api/payments/request", requiresDB(h, handlers.RequireAuth(method("POST", h.PaymentRequest))))
-	mux.HandleFunc("/api/shopier/webhook", requiresDB(h, method("POST", h.ShopierWebhook)))
 	mux.HandleFunc("/api/arvis/preflight", method("POST", h.ARVISPreflight))
 	mux.HandleFunc("/api/public/impact", method("GET", h.PublicImpact))
 	mux.HandleFunc("/api/public/metrics", method("GET", h.GetPublicMetrics))
-	mux.HandleFunc("/api/public/tool-prices", requiresDB(h, method("GET", h.ToolPrices)))
 	mux.HandleFunc("/api/agent/health", requiresDB(h, method("GET", h.AgentTool)))
 	mux.HandleFunc("/api/agent/wallet-score", requiresDB(h, method("POST", h.AgentTool)))
 	mux.HandleFunc("/api/agent/risk-summary", requiresDB(h, method("POST", h.AgentTool)))
@@ -99,13 +94,8 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/api/owner/route-map", ownerOnly(h, method("GET", ownerRouteMap)))
 	mux.HandleFunc("/api/owner/feedback", requiresDB(h, ownerOnly(h, h.OwnerFeedback)))
 	mux.HandleFunc("/api/owner/users", requiresDB(h, ownerOnly(h, method("GET", h.OwnerUsersV2))))
-	mux.HandleFunc("/api/owner/credits/add", requiresDB(h, ownerOnly(h, method("POST", h.OwnerAddCredits))))
 	mux.HandleFunc("/api/owner/users/ban", requiresDB(h, ownerOnly(h, method("POST", h.OwnerBanUser))))
 	mux.HandleFunc("/api/owner/users/remove", requiresDB(h, ownerOnly(h, method("POST", h.OwnerRemoveUser))))
-	mux.HandleFunc("/api/owner/payment-requests", requiresDB(h, ownerOnly(h, method("GET", h.OwnerPaymentRequests))))
-	mux.HandleFunc("/api/owner/payment-health", requiresDB(h, ownerOnly(h, method("GET", h.OwnerPaymentHealth))))
-	mux.HandleFunc("/api/owner/payments/approve", requiresDB(h, ownerOnly(h, method("POST", h.OwnerApprovePayment))))
-	mux.HandleFunc("/api/owner/payments/reject", requiresDB(h, ownerOnly(h, method("POST", h.OwnerRejectPayment))))
 	mux.HandleFunc("/api/owner/command", requiresDB(h, ownerOnly(h, method("POST", h.OwnerCommand))))
 	mux.HandleFunc("/api/owner/brain", requiresDB(h, ownerOnly(h, method("POST", h.OwnerBrain))))
 	mux.HandleFunc("/api/owner/chat", requiresDB(h, ownerOnly(h, h.OwnerChat)))
@@ -115,11 +105,10 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
 }
 
-func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler, premium func(http.HandlerFunc) http.HandlerFunc) {
-	mux.HandleFunc("/api/rug-radar/feed", method("GET", h.RugRadarFeed))
-	mux.HandleFunc("/api/token/scan", requiresDB(h, premium(method("POST", h.TokenScan))))
-	mux.HandleFunc("/api/v1/token/extensions", requiresDB(h, premium(method("POST", h.TokenScan))))
-	mux.HandleFunc("/api/v1/address-poisoning/check", requiresDB(h, premium(method("POST", h.AddressPoisoningCheck))))
+func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess func(http.HandlerFunc) http.HandlerFunc) {
+	mux.HandleFunc("/api/token/scan", requiresDB(h, koschAccess(method("POST", h.TokenScan))))
+	mux.HandleFunc("/api/v1/token/extensions", requiresDB(h, koschAccess(method("POST", h.TokenScan))))
+	mux.HandleFunc("/api/v1/address-poisoning/check", requiresDB(h, koschAccess(method("POST", h.AddressPoisoningCheck))))
 	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
 	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, handlers.RequireAuth(method("GET", h.SecurityRadarFeed))))
 	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, handlers.RequireAuth(method("POST", h.SecurityRadarCheck))))
