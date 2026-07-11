@@ -2,11 +2,13 @@
   "ok": true,
   "product": "Koschei ARVIS",
   "surface": "Security Radar Ecosystem",
-  "version": "security-ecosystem-v2-structural",
-  "positioning": "Koschei ARVIS collects verified evidence, preserves structural token facts and signs one consistent risk story per target.",
+  "version": "security-ecosystem-v3-free-core-kosch-premium",
+  "positioning": "Koschei ARVIS offers public basic security checks and lets verified KOSCH holders unlock deeper structural intelligence, history and automation.",
   "access_model": {
-    "provider": "KOSCH token",
-    "mode": "verified_holder_balance",
+    "provider": "free core plus KOSCH premium",
+    "mode": "public_basic_verified_holder_premium",
+    "free_core": ["public safe check", "basic token fundamentals"],
+    "premium": ["security radar", "exposure reports", "graph", "watchlist", "webhooks", "developer API", "advanced agents"],
     "wallet_proof": "Phantom one-time message signature",
     "legacy_payment_providers": [],
     "package_outputs": false
@@ -52,19 +54,22 @@
   ],
   "customer_surfaces": [
     "/dashboard",
+    "/safe-check",
     "/security-radar",
     "/exposure-report",
     "/reports",
     "/kosch-access",
+    "/api/token/scan",
     "/api/v1/risk/badge",
     "/widget.js"
   ],
   "immutable_rules": [
     "No evidence, no claim",
+    "Basic security checks remain public and rate limited",
+    "KOSCH unlocks premium depth; it does not remove free access",
     "A temporary event gap cannot lower a fresh structural token floor",
     "Customers cannot alter verdict thresholds",
     "AI summaries cannot override the deterministic final grade",
-    "Infrastructure mints remain internal and do not become public risk cards",
-    "Product access is granted only by verified KOSCH holdings"
+    "Infrastructure mints remain internal and do not become public risk cards"
   ]
 }
