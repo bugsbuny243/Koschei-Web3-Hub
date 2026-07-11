@@ -118,17 +118,12 @@ func ownerDatabaseStatus(ctx context.Context, db *sql.DB) string {
 }
 
 func ownerAIProviderStatus() map[string]any {
-	provider := strings.ToLower(strings.TrimSpace(os.Getenv("AI_PROVIDER")))
-	if provider == "" {
-		provider = "router"
+	return map[string]any{
+		"configured": ownerAIProviderConfigured(),
+		"provider":   "anthropic",
+		"model":      ownerChatModel(),
+		"scope":      "owner_panel_only",
 	}
-	model := firstNonEmpty(
-		strings.TrimSpace(os.Getenv("OWNER_CHAT_MODEL")),
-		strings.TrimSpace(os.Getenv("TOGETHER_MODEL")),
-		strings.TrimSpace(os.Getenv("OPENAI_MODEL")),
-		"router-default",
-	)
-	return map[string]any{"configured": aiProviderConfigured(), "provider": provider, "model": model}
 }
 
 func ownerTimestamp(ctx context.Context, db *sql.DB, query string) string {
@@ -194,7 +189,11 @@ func ownerChatIdentity() string {
 }
 
 func ownerChatModel() string {
-	return firstNonEmpty(strings.TrimSpace(os.Getenv("OWNER_CHAT_MODEL")), strings.TrimSpace(os.Getenv("TOGETHER_MODEL")), strings.TrimSpace(os.Getenv("OPENAI_MODEL")))
+	return firstNonEmpty(strings.TrimSpace(os.Getenv("ANTHROPIC_OWNER_MODEL")), "claude-sonnet-5")
+}
+
+func ownerAIProviderConfigured() bool {
+	return strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY")) != ""
 }
 
 func ownerChatGenerationError(err error) string {
