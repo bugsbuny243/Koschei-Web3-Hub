@@ -111,6 +111,16 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 	if input.Network == "" {
 		input.Network = "solana-mainnet"
 	}
+	classification := classifyRadarTarget(r.Context(), target)
+	if !radarTargetTokenVerdictAllowed(classification) {
+		services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_wrong_target_type", "customer", "warning", map[string]any{"network": input.Network, "target": target, "target_type": classification.Type}))
+		statusCode := http.StatusUnprocessableEntity
+		if classification.Type == radarTargetUnknown {
+			statusCode = http.StatusServiceUnavailable
+		}
+		writeJSON(w, statusCode, map[string]any{"ok": false, "error": "token_mint_required", "message": radarTargetRejectionMessage(classification), "target": target, "target_classification": classification, "charged": false, "final_verdict": map[string]any{"risk_index": nil, "risk_level": "unknown", "signed": false, "recommendation": classification.Type + "_intelligence_required"}})
+		return
+	}
 	mode := firstNonEmptyString(input.Mode, "manual_dashboard_check")
 	services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_requested", "customer", "info", map[string]any{"network": input.Network, "mode": mode}))
 	analysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: target, Network: input.Network, Mode: mode})
@@ -144,6 +154,15 @@ func (h *Handler) SecurityRiskBadge(w http.ResponseWriter, r *http.Request) {
 	network := strings.TrimSpace(r.URL.Query().Get("network"))
 	if network == "" {
 		network = "solana-mainnet"
+	}
+	classification := classifyRadarTarget(r.Context(), address)
+	if !radarTargetTokenVerdictAllowed(classification) {
+		statusCode := http.StatusUnprocessableEntity
+		if classification.Type == radarTargetUnknown {
+			statusCode = http.StatusServiceUnavailable
+		}
+		writeJSON(w, statusCode, map[string]any{"ok": false, "error": "token_mint_required", "message": radarTargetRejectionMessage(classification), "address": address, "target_classification": classification, "risk_index": nil, "risk_level": "unknown", "signed": false})
+		return
 	}
 	analysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: address, Network: network, Mode: "public_badge"})
 	bundle := services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
@@ -443,7 +462,7 @@ func enrichSecurityRadarFeedEvidence(evidence []string, item securityRadarFeedIt
 
 func enrichSecurityRadarFeedRecommendation(recommendation string, item securityRadarFeedItem) string {
 	recommendation = strings.TrimSpace(recommendation)
-	prefix := "ARVIS bu hedefi tekilleştirilmiş exposure kartı olarak gösteriyor: "+strconv.Itoa(item.OccurrenceCount)+" doğrulanmış gözlem, max risk "+strconv.Itoa(item.MaxRiskIndex)+"/100."
+	prefix := "ARVIS bu hedefi tekilleştirilmiş exposure kartı olarak gösteriyor: " + strconv.Itoa(item.OccurrenceCount) + " doğrulanmış gözlem, max risk " + strconv.Itoa(item.MaxRiskIndex) + "/100."
 	if recommendation == "" {
 		return prefix
 	}

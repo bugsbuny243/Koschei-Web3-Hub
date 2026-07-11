@@ -119,6 +119,25 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 	if network == "" {
 		network = "solana-mainnet"
 	}
+	classification := classifyRadarTarget(r.Context(), target)
+	if !radarTargetTokenVerdictAllowed(classification) {
+		statusCode := http.StatusUnprocessableEntity
+		if classification.Type == radarTargetUnknown {
+			statusCode = http.StatusServiceUnavailable
+		}
+		writeJSON(w, statusCode, map[string]any{
+			"ok": false, "error": "token_mint_required", "charged": false,
+			"target": target, "network": network, "target_classification": classification,
+			"analysis_scope": classification.Type, "report_status": "insufficient_evidence",
+			"message": radarTargetRejectionMessage(classification),
+			"final_verdict": map[string]any{
+				"grade": "-", "risk_index": nil, "risk_level": "unknown", "signed": false,
+				"verdict":        "INSUFFICIENT EVIDENCE: token-mint verdict is not applicable to this target type.",
+				"recommendation": classification.Type + "_intelligence_required",
+			},
+		})
+		return
+	}
 	analysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: target, Network: network, Mode: "owner_full_scan"})
 	bundle := services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
 	arms := services.ArvisArmsFromBundle(bundle)
@@ -139,8 +158,9 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 	warning := radarDetailWarning(final, distribution, structural, modules, sourceContext)
 	graph := h.radarDetailGraph(r.Context(), target)
 	detail := map[string]any{
-		"ok": true, "schema_version": "koschei-owner-radar-v1", "target": target,
+		"ok": true, "schema_version": "koschei-owner-radar-v2", "target": target,
 		"network": network, "generated_at": time.Now().UTC().Format(time.RFC3339),
+		"target_classification": classification, "analysis_scope": radarTargetTokenMint,
 		"final_verdict": final, "warning": warning, "holder_distribution": distribution,
 		"structural_memory": structural, "source_context": sourceContext,
 		"modules": modules, "evidence": evidence, "graph": graph,
