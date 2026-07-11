@@ -89,6 +89,9 @@ type radarEvidenceProfile struct {
 	RawTop10HolderPct      int
 	LargestAccounts        int
 	HolderRoles            HolderRoleAnalysis
+	HolderCluster          HolderClusterAnalysis
+	TargetOldestBlockTime  int64
+	TargetOldestSlot       int64
 	RecentSignatureCount   int
 	FailedSignatureCount   int
 	SignatureWindowSeconds int64
@@ -185,7 +188,11 @@ func collectRadarEvidence(req SecurityRadarRequest) radarEvidenceProfile {
 		return profile
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 6500*time.Millisecond)
+	timeout := 6500 * time.Millisecond
+	if strings.Contains(strings.ToLower(req.Mode), "owner") || strings.Contains(strings.ToLower(req.Mode), "manual") {
+		timeout = 18 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	if account, err := SolanaGetAccountInfoJSONParsed(ctx, rpcURL, req.Target); err == nil && account.Value != nil {
@@ -244,14 +251,20 @@ func collectRadarEvidence(req SecurityRadarRequest) radarEvidenceProfile {
 				}
 				if oldest == 0 || *sig.BlockTime < oldest {
 					oldest = *sig.BlockTime
+					profile.TargetOldestSlot = sig.Slot
 				}
 			}
 		}
 		if newest > 0 && oldest > 0 && newest >= oldest {
 			profile.SignatureWindowSeconds = newest - oldest
+			profile.TargetOldestBlockTime = oldest
 		}
 	} else {
 		profile.Errors = append(profile.Errors, compactRadarError("getSignaturesForAddress", err))
+	}
+
+	if profile.IsTokenMint && profile.HolderRoles.Available {
+		profile.HolderCluster = AnalyzeSolanaHolderCluster(ctx, rpcURL, req.Target, profile.HolderRoles, profile.TargetOldestBlockTime, profile.TargetOldestSlot)
 	}
 
 	if profile.LiveRPC {

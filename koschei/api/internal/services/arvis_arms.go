@@ -65,7 +65,7 @@ func AnalyzeArvisRadars(req SecurityRadarRequest) ArvisAnalysis {
 	holders := buildHolderArm(req, profile, generatedAt)
 	liquidity := unavailableArm("Liquidity Movement", ModuleLiquidityMovement, req, generatedAt, "Historical LP balance and pool reserve snapshots are required.")
 	creator := unavailableArm("Creator Link Analysis", ModuleCreatorLinkAnalysis, req, generatedAt, "Creator identity and parsed launch transaction evidence are required.")
-	funding := unavailableArm("Funding Cluster Detector", ModuleFundingClusterDetector, req, generatedAt, "Parsed funding transactions and counterparty graph evidence are required.")
+	funding := buildFundingClusterArm(req, profile, generatedAt)
 	sniper := buildSniperTimingArm(req, profile, generatedAt)
 	claimSurface := unavailableArm("Claim Surface Risk", ModuleClaimSurfaceRisk, req, generatedAt, "URL fetch, instruction simulation and domain evidence are required.")
 	program := buildProgramRelationArm(req, profile, generatedAt)
@@ -93,6 +93,7 @@ func AnalyzeArvisRadars(req SecurityRadarRequest) ArvisAnalysis {
 			"final_grade": final.Grade, "final_risk_index": final.RiskIndex,
 			"final_risk_level": final.RiskLevel, "final_recommendation": final.Recommendation,
 			"data_quality": profile.DataQuality, "evidence_status": profile.EvidenceStatus,
+			"holder_cluster_analysis": profile.HolderCluster,
 		},
 	}
 	return ArvisAnalysis{Bundle: bundle, Arms: arms, Final: final}
@@ -212,17 +213,64 @@ func buildHolderArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedA
 	return evidenceArm("Holder Concentration", ModuleHolderConcentration, req, risk, s, e, generatedAt)
 }
 
-func buildSniperTimingArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
-	if !p.LiveRPC || p.RecentSignatureCount == 0 || p.SignatureWindowSeconds <= 0 {
-		return unavailableArm("Sniper Timing Detector", ModuleSniperTimingDetector, req, generatedAt, "Timestamped signature activity is required.")
+func buildFundingClusterArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
+	a := p.HolderCluster
+	if !a.Available {
+		return unavailableArm("Funding Cluster Detector", ModuleFundingClusterDetector, req, generatedAt, "At least three resolved holder wallets with bounded funding evidence are required; unavailable evidence is not LOW.")
 	}
-	risk := 8 + burstRisk(p.RecentSignatureCount, p.SignatureWindowSeconds)
+	s := armSignals(req, p, ModuleFundingClusterDetector)
+	s["holder_cluster_analysis"] = a
+	s["cluster_confidence"] = a.Confidence
+	s["shared_funding_group_count"] = a.SharedFundingGroupCount
+	s["largest_shared_funding_group"] = a.LargestSharedFundingGroup
+	s["same_amount_group_count"] = a.SameAmountGroupCount
+	s["synchronized_wallet_count"] = a.SynchronizedWalletCount
+	s["linked_holder_percentage"] = a.LinkedHolderPercentage
+	s["sybil_verdict"] = a.Verdict
+	e := append([]string{}, a.Findings...)
+	for _, limitation := range a.Limitations {
+		e = append(e, "Limitation: "+limitation)
+	}
+	v := evidenceArm("Funding Cluster Detector", ModuleFundingClusterDetector, req, a.RiskIndex, s, e, generatedAt)
+	v.Verdict = a.Verdict
+	if a.RiskIndex >= 45 {
+		v.Recommendation = "Inspect shared funders, synchronized acquisition slots and linked holder wallets before relying on apparent decentralization."
+	}
+	return v
+}
+
+func buildSniperTimingArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
+	mintTiming := p.LiveRPC && p.RecentSignatureCount > 0 && p.SignatureWindowSeconds > 0
+	clusterTiming := p.HolderCluster.Available && p.HolderCluster.SynchronizedWalletCount >= 2
+	if !mintTiming && !clusterTiming {
+		return unavailableArm("Sniper Timing Detector", ModuleSniperTimingDetector, req, generatedAt, "Timestamped mint activity or parsed holder acquisition slots are required.")
+	}
+	risk := 8
 	s := armSignals(req, p, ModuleSniperTimingDetector)
-	s["recent_signature_count"] = p.RecentSignatureCount
-	s["signature_window_seconds"] = p.SignatureWindowSeconds
-	s["failed_signature_count"] = p.FailedSignatureCount
-	s["scope_note"] = "activity burst signal; sniper confirmation requires parsed launch transactions"
-	e := []string{fmt.Sprintf("Observed %d signatures in a %d second window.", p.RecentSignatureCount, p.SignatureWindowSeconds), "This arm reports timing concentration only; it does not claim confirmed sniper wallets without parsed launch transactions."}
+	e := []string{}
+	if mintTiming {
+		risk += burstRisk(p.RecentSignatureCount, p.SignatureWindowSeconds)
+		s["recent_signature_count"] = p.RecentSignatureCount
+		s["signature_window_seconds"] = p.SignatureWindowSeconds
+		s["failed_signature_count"] = p.FailedSignatureCount
+		e = append(e, fmt.Sprintf("Observed %d mint-address signatures in a %d second window.", p.RecentSignatureCount, p.SignatureWindowSeconds))
+	}
+	if clusterTiming {
+		clusterRisk := 12 + p.HolderCluster.SynchronizedWalletCount*10
+		if p.HolderCluster.SynchronizationSlotSpread <= 1 {
+			clusterRisk += 15
+		}
+		if clusterRisk > risk {
+			risk = clusterRisk
+		}
+		s["synchronized_holder_wallets"] = p.HolderCluster.SynchronizedWallets
+		s["synchronized_wallet_count"] = p.HolderCluster.SynchronizedWalletCount
+		s["synchronization_slot_spread"] = p.HolderCluster.SynchronizationSlotSpread
+		s["parsed_holder_acquisition_evidence"] = true
+		e = append(e, fmt.Sprintf("%d resolved holder wallets acquired the token inside a %d-slot window.", p.HolderCluster.SynchronizedWalletCount, p.HolderCluster.SynchronizationSlotSpread))
+	}
+	s["scope_note"] = "Timing coordination is evidence of automation/coordination risk; it is not sole proof of common ownership."
+	e = append(e, "Timing evidence is combined with funding relations before Koschei raises a high-confidence Sybil conclusion.")
 	return evidenceArm("Sniper Timing Detector", ModuleSniperTimingDetector, req, risk, s, e, generatedAt)
 }
 
