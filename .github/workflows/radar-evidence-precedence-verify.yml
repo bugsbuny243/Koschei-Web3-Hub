@@ -30,10 +30,28 @@ jobs:
           python scripts/radar_evidence_precedence_patch.py
           gofmt -w internal/services/security_radars.go internal/services/arvis_arms.go internal/services/arvis_transaction_bundle.go internal/services/arvis_transaction_arms.go internal/services/arvis_evidence_precedence_test.go internal/handlers/owner_operations.go internal/handlers/owner_radar_conclusion_test.go
       - name: Focused evidence tests
+        id: focused
+        continue-on-error: true
         working-directory: koschei/api
         run: |
-          go test ./internal/services -run 'Test(FundingCluster|SniperTiming|MajorityEOAHolder)' -count=1
-          go test ./internal/handlers -run '^TestOwnerRadarPracticalConclusion' -count=1
+          set -o pipefail
+          go test ./internal/services -run 'Test(FundingCluster|SniperTiming|MajorityEOAHolder)' -count=1 2>&1 | tee focused-services.log
+          services_status=${PIPESTATUS[0]}
+          go test ./internal/handlers -run '^TestOwnerRadarPracticalConclusion' -count=1 2>&1 | tee focused-handlers.log
+          handlers_status=${PIPESTATUS[0]}
+          if [ "$services_status" -ne 0 ] || [ "$handlers_status" -ne 0 ]; then exit 1; fi
+      - name: Upload focused test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: radar-focused-test-logs
+          path: |
+            koschei/api/focused-services.log
+            koschei/api/focused-handlers.log
+          if-no-files-found: warn
+      - name: Fail when focused tests failed
+        if: steps.focused.outcome == 'failure'
+        run: exit 1
       - name: Production package build
         working-directory: koschei/api
         run: go build ./internal/services ./internal/handlers ./internal/http
