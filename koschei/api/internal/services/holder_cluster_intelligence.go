@@ -24,6 +24,7 @@ type HolderClusterWallet struct {
 	HolderPercentage      float64  `json:"holder_percentage"`
 	Status                string   `json:"status"`
 	SignaturesObserved    int      `json:"signatures_observed"`
+	ParsedTransactions    int      `json:"parsed_transactions"`
 	HistoryExhausted      bool     `json:"history_exhausted"`
 	OldestObservedAt      string   `json:"oldest_observed_at,omitempty"`
 	NewestObservedAt      string   `json:"newest_observed_at,omitempty"`
@@ -170,6 +171,7 @@ func analyzeHolderClusterWallet(ctx context.Context, rpcURL, mint string, accoun
 		if txErr != nil {
 			continue
 		}
+		row.ParsedTransactions++
 		txMap := map[string]any(tx)
 		blockTime := holderClusterInt64(txMap["blockTime"])
 		slot := holderClusterInt64(txMap["slot"])
@@ -187,8 +189,12 @@ func analyzeHolderClusterWallet(ctx context.Context, rpcURL, mint string, accoun
 			}
 		}
 	}
-	row.Status = "verified_bounded_observation"
-	row.Evidence = append(row.Evidence, fmt.Sprintf("Observed %d signatures; history exhausted within query window: %t.", row.SignaturesObserved, row.HistoryExhausted))
+	if row.ParsedTransactions > 0 {
+		row.Status = "verified_bounded_observation"
+	} else {
+		row.Status = "signature_only_observation"
+	}
+	row.Evidence = append(row.Evidence, fmt.Sprintf("Observed %d signatures and parsed %d transactions; history exhausted within query window: %t.", row.SignaturesObserved, row.ParsedTransactions, row.HistoryExhausted))
 	if row.FreshNearLaunch {
 		row.Evidence = append(row.Evidence, "Oldest observed wallet activity falls within 24 hours of the bounded token launch estimate.")
 	}
@@ -206,7 +212,7 @@ func summarizeHolderCluster(out HolderClusterAnalysis) HolderClusterAnalysis {
 	amounts := map[string][]HolderClusterWallet{}
 	acquisitions := []HolderClusterWallet{}
 	for _, wallet := range out.Wallets {
-		if wallet.Status == "verified_bounded_observation" {
+		if wallet.Status == "verified_bounded_observation" && wallet.ParsedTransactions > 0 {
 			out.WalletsAnalyzed++
 		}
 		if wallet.FreshNearLaunch {
@@ -224,7 +230,7 @@ func summarizeHolderCluster(out HolderClusterAnalysis) HolderClusterAnalysis {
 		}
 	}
 	if out.WalletsAnalyzed < 3 {
-		out.Limitations = append(out.Limitations, "Fewer than three holder wallets produced verified bounded observations; no LOW verdict is issued.")
+		out.Limitations = append(out.Limitations, "Fewer than three holder wallets produced parsed transaction evidence; no LOW verdict is issued.")
 		return out
 	}
 
