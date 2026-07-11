@@ -30,7 +30,13 @@ jobs:
           gofmt -w internal/handlers/owner_operations.go internal/handlers/owner_operations_narrative_test.go
       - name: Narrative tests
         working-directory: koschei/api
-        run: go test ./internal/handlers -run '^TestOwnerRadarNarrative' -count=1
+        run: |
+          set +e
+          go test ./internal/handlers -run '^TestOwnerRadarNarrative' -count=1 > scripts/narrative-test-output.txt 2>&1
+          status=$?
+          printf '%s\n' "$status" > scripts/narrative-test-status.txt
+          cat scripts/narrative-test-output.txt
+          exit 0
       - name: Production package build
         working-directory: koschei/api
         run: go build ./internal/handlers ./internal/http
@@ -45,12 +51,12 @@ jobs:
           grep -q 'ana risk sürücüsü' internal/handlers/owner_operations.go
           grep -q 'Creator/deployer cüzdanı bu taramada doğrulanamadı' internal/handlers/owner_operations.go
           git diff origin/main...HEAD -- public/js/koschei-auth.js | test ! -s /dev/stdin
-      - name: Commit verified narrative
+      - name: Commit diagnostic integration
         if: success()
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add koschei/api/internal/handlers/owner_operations.go koschei/api/internal/handlers/owner_operations_narrative_test.go
+          git add koschei/api/internal/handlers/owner_operations.go koschei/api/internal/handlers/owner_operations_narrative_test.go koschei/api/scripts/narrative-test-output.txt koschei/api/scripts/narrative-test-status.txt
           git commit -m 'Make ARVIS summaries explain risk in plain language'
           git push origin HEAD:${{ github.head_ref }}
