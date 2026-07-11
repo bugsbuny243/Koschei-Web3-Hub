@@ -52,7 +52,7 @@ func AnalyzeArvisRadarsWithTransactions(req SecurityRadarRequest) ArvisAnalysis 
 	replaceArvisArm(arms, buildTransactionMEVArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildLiquidityMovementTransactionArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildCreatorLinkTransactionArm(req, txEvidence, generatedAt))
-	replaceArvisArm(arms, buildFundingClusterTransactionArm(req, txEvidence, generatedAt))
+	replaceFundingClusterArmPreservingHolderEvidence(arms, buildFundingClusterTransactionArm(req, txEvidence, generatedAt))
 
 	withoutFinal := make([]SecurityRadarVerdict, 0, len(arms)-1)
 	for _, arm := range arms {
@@ -293,8 +293,12 @@ func applyLamportDeltas(meta map[string]any, out *arvisTransactionEvidence) {
 	pre, _ := meta["preBalances"].([]any)
 	post, _ := meta["postBalances"].([]any)
 	limit := len(out.AccountKeys)
-	if len(pre) < limit { limit = len(pre) }
-	if len(post) < limit { limit = len(post) }
+	if len(pre) < limit {
+		limit = len(pre)
+	}
+	if len(post) < limit {
+		limit = len(post)
+	}
 	for i := 0; i < limit; i++ {
 		out.LamportDeltas[out.AccountKeys[i]] = radarInt64(post[i]) - radarInt64(pre[i])
 	}
@@ -348,14 +352,34 @@ func buildTransactionMEVArm(req SecurityRadarRequest, tx arvisTransactionEvidenc
 		return unavailableArm("MEV Shield", ModuleMEVShield, req, generatedAt, "A parsed transaction with priority-fee or bundle evidence is required.")
 	}
 	risk := 8
-	if tx.ComputeBudgetRelated { risk += 12 }
-	if tx.FeeLamports >= 1_000_000 { risk += 18 } else if tx.FeeLamports >= 100_000 { risk += 8 }
-	if tx.ComputeUnits >= 1_000_000 { risk += 12 } else if tx.ComputeUnits >= 400_000 { risk += 5 }
-	if tx.WritableCount >= 12 { risk += 8 }
-	if tx.JitoRelated { risk -= 5 }
-	if risk < 1 { risk = 1 }
+	if tx.ComputeBudgetRelated {
+		risk += 12
+	}
+	if tx.FeeLamports >= 1_000_000 {
+		risk += 18
+	} else if tx.FeeLamports >= 100_000 {
+		risk += 8
+	}
+	if tx.ComputeUnits >= 1_000_000 {
+		risk += 12
+	} else if tx.ComputeUnits >= 400_000 {
+		risk += 5
+	}
+	if tx.WritableCount >= 12 {
+		risk += 8
+	}
+	if tx.JitoRelated {
+		risk -= 5
+	}
+	if risk < 1 {
+		risk = 1
+	}
 	s := transactionArmSignals(tx, ModuleMEVShield)
-	s["fee_lamports"] = tx.FeeLamports; s["compute_units"] = tx.ComputeUnits; s["compute_budget_program"] = tx.ComputeBudgetRelated; s["jito_related"] = tx.JitoRelated; s["scope_note"] = "priority and route exposure; slippage-specific sandwich simulation requires swap inputs"
+	s["fee_lamports"] = tx.FeeLamports
+	s["compute_units"] = tx.ComputeUnits
+	s["compute_budget_program"] = tx.ComputeBudgetRelated
+	s["jito_related"] = tx.JitoRelated
+	s["scope_note"] = "priority and route exposure; slippage-specific sandwich simulation requires swap inputs"
 	e := []string{fmt.Sprintf("Transaction fee: %d lamports; compute units: %d.", tx.FeeLamports, tx.ComputeUnits), fmt.Sprintf("Compute Budget program present: %t; Jito-related log evidence: %t.", tx.ComputeBudgetRelated, tx.JitoRelated), "This arm measures transaction priority and route exposure; it does not claim a confirmed sandwich attack without swap and slippage inputs."}
 	return evidenceArm("MEV Shield", ModuleMEVShield, req, risk, s, e, generatedAt)
 }
@@ -366,14 +390,25 @@ func buildLiquidityMovementTransactionArm(req SecurityRadarRequest, tx arvisTran
 	}
 	changed := 0
 	for _, delta := range tx.TokenBalanceChanges {
-		if math.Abs(delta) > 0 { changed++ }
+		if math.Abs(delta) > 0 {
+			changed++
+		}
 	}
 	risk := 12
-	if changed >= 2 { risk += 18 }
-	if tx.InnerInstructionCount >= 10 { risk += 8 }
-	if tx.FailedTransaction() { risk += 10 }
+	if changed >= 2 {
+		risk += 18
+	}
+	if tx.InnerInstructionCount >= 10 {
+		risk += 8
+	}
+	if tx.FailedTransaction() {
+		risk += 10
+	}
 	s := transactionArmSignals(tx, ModuleLiquidityMovement)
-	s["raydium_related"] = true; s["token_mint_count"] = len(tx.TokenMints); s["changed_token_surfaces"] = changed; s["token_balance_changes"] = tx.TokenBalanceChanges
+	s["raydium_related"] = true
+	s["token_mint_count"] = len(tx.TokenMints)
+	s["changed_token_surfaces"] = changed
+	s["token_balance_changes"] = tx.TokenBalanceChanges
 	e := []string{fmt.Sprintf("Raydium-related transaction observed with %d token mint surfaces.", len(tx.TokenMints)), fmt.Sprintf("Token balance changes detected on %d surfaces.", changed), fmt.Sprintf("Inner instructions observed: %d.", tx.InnerInstructionCount), "This is a movement signal; historical reserve snapshots are still required to classify a liquidity drain."}
 	return evidenceArm("Liquidity Movement", ModuleLiquidityMovement, req, risk, s, e, generatedAt)
 }
@@ -383,11 +418,21 @@ func buildCreatorLinkTransactionArm(req SecurityRadarRequest, tx arvisTransactio
 		return unavailableArm("Creator Link Analysis", ModuleCreatorLinkAnalysis, req, generatedAt, "A parsed mint or account initialization transaction with signer evidence is required.")
 	}
 	risk := 10
-	if len(tx.Signers) >= 3 { risk += 8 }
-	if len(tx.FundingAccounts) >= 2 { risk += 14 }
-	if tx.PumpRelated { risk += 8 }
+	if len(tx.Signers) >= 3 {
+		risk += 8
+	}
+	if len(tx.FundingAccounts) >= 2 {
+		risk += 14
+	}
+	if tx.PumpRelated {
+		risk += 8
+	}
 	s := transactionArmSignals(tx, ModuleCreatorLinkAnalysis)
-	s["creator_candidate"] = tx.CreatorCandidate; s["signer_count"] = len(tx.Signers); s["funding_account_count"] = len(tx.FundingAccounts); s["initialize_mint"] = tx.InitializeMint; s["scope_note"] = "initialization signer candidate, not identity attribution"
+	s["creator_candidate"] = tx.CreatorCandidate
+	s["signer_count"] = len(tx.Signers)
+	s["funding_account_count"] = len(tx.FundingAccounts)
+	s["initialize_mint"] = tx.InitializeMint
+	s["scope_note"] = "initialization signer candidate, not identity attribution"
 	e := []string{fmt.Sprintf("Initialization signer candidate: %s.", tx.CreatorCandidate), fmt.Sprintf("Signer count: %d; funding accounts with negative SOL delta: %d.", len(tx.Signers), len(tx.FundingAccounts)), "The address is reported as an initialization signer candidate; ARVIS does not claim real-world creator identity."}
 	return evidenceArm("Creator Link Analysis", ModuleCreatorLinkAnalysis, req, risk, s, e, generatedAt)
 }
@@ -397,10 +442,17 @@ func buildFundingClusterTransactionArm(req SecurityRadarRequest, tx arvisTransac
 		return unavailableArm("Funding Cluster Detector", ModuleFundingClusterDetector, req, generatedAt, "Initialization funding deltas and signer evidence are required.")
 	}
 	risk := 8 + len(tx.FundingAccounts)*7
-	if len(tx.FundingAccounts) >= 3 { risk += 12 }
-	if risk > 80 { risk = 80 }
+	if len(tx.FundingAccounts) >= 3 {
+		risk += 12
+	}
+	if risk > 80 {
+		risk = 80
+	}
 	s := transactionArmSignals(tx, ModuleFundingClusterDetector)
-	s["creator_candidate"] = tx.CreatorCandidate; s["funding_accounts"] = tx.FundingAccounts; s["funding_account_count"] = len(tx.FundingAccounts); s["lamport_deltas"] = tx.LamportDeltas
+	s["creator_candidate"] = tx.CreatorCandidate
+	s["funding_accounts"] = tx.FundingAccounts
+	s["funding_account_count"] = len(tx.FundingAccounts)
+	s["lamport_deltas"] = tx.LamportDeltas
 	e := []string{fmt.Sprintf("Initialization candidate %s is linked to %d accounts with negative SOL balance deltas.", tx.CreatorCandidate, len(tx.FundingAccounts)), "Funding links are derived from the parsed transaction balance delta, not wallet ownership assumptions."}
 	return evidenceArm("Funding Cluster Detector", ModuleFundingClusterDetector, req, risk, s, e, generatedAt)
 }
@@ -421,17 +473,27 @@ func replaceArvisArm(arms []SecurityRadarVerdict, replacement SecurityRadarVerdi
 func verifiedArvisArmCount(arms []SecurityRadarVerdict) int {
 	count := 0
 	for _, arm := range arms {
-		if arm.ModuleID == ModuleFinalVerdictEngine || !arm.Signed || arm.Signals == nil { continue }
-		if ok, _ := arm.Signals["real_onchain_evidence"].(bool); ok { count++ }
+		if arm.ModuleID == ModuleFinalVerdictEngine || !arm.Signed || arm.Signals == nil {
+			continue
+		}
+		if ok, _ := arm.Signals["real_onchain_evidence"].(bool); ok {
+			count++
+		}
 	}
 	return count
 }
 
 func looksLikeSolanaSignature(value string) bool {
 	value = strings.TrimSpace(value)
-	if len(value) < 80 || len(value) > 100 { return false }
+	if len(value) < 80 || len(value) > 100 {
+		return false
+	}
 	alphabet := "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-	for _, r := range value { if !strings.ContainsRune(alphabet, r) { return false } }
+	for _, r := range value {
+		if !strings.ContainsRune(alphabet, r) {
+			return false
+		}
+	}
 	return true
 }
 
@@ -446,18 +508,25 @@ func radarFloat(value any) float64 {
 	case int64:
 		return float64(v)
 	case jsonNumber:
-		f, _ := strconv.ParseFloat(string(v), 64); return f
+		f, _ := strconv.ParseFloat(string(v), 64)
+		return f
 	case string:
-		f, _ := strconv.ParseFloat(strings.TrimSpace(v), 64); return f
+		f, _ := strconv.ParseFloat(strings.TrimSpace(v), 64)
+		return f
 	default:
-		f, _ := strconv.ParseFloat(strings.TrimSpace(anyString(v)), 64); return f
+		f, _ := strconv.ParseFloat(strings.TrimSpace(anyString(v)), 64)
+		return f
 	}
 }
 
 type jsonNumber string
 
 func containsString(values []string, target string) bool {
-	for _, value := range values { if value == target { return true } }
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
 	return false
 }
 

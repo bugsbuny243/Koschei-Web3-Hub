@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -57,11 +58,18 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 	}
 
 	radar := h.securityRadarStreamStats(ctx)
+	radarStatus := firstMapString(radar, "pipeline_status")
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("SOLANA_RPC_LIMIT_SAVER_ENABLED")), "true") {
+		radarStatus = "manual_rpc_saver"
+		radar["pipeline_status"] = radarStatus
+		radar["background_streams_paused"] = true
+		radar["manual_scans_available"] = true
+	}
 	servicesMap := map[string]any{
 		"database":        map[string]any{"status": serviceStatus(db != nil, "connected", "unavailable")},
 		"neon_auth":       map[string]any{"status": serviceStatus(envSet("NEON_AUTH_JWKS_URL"), "configured", "missing")},
 		"solana_rpc":      map[string]any{"status": serviceStatus(envSet("SOLANA_RPC_URL") || envSet("ALCHEMY_SOLANA_RPC_URL") || envSet("HELIUS_SOLANA_RPC_URL") || envSet("QUICKNODE_SOLANA_RPC_URL") || envSet("ALCHEMY_API_KEY"), "configured", "missing")},
-		"security_radar":  map[string]any{"status": firstMapString(radar, "pipeline_status")},
+		"security_radar":  map[string]any{"status": radarStatus},
 		"kosch_access":    map[string]any{"status": serviceStatus(configuredKoscheiTokenGateEnabled() && configuredKoscheiTokenMint() != "", "configured", "missing")},
 		"visual_renderer": map[string]any{"status": "ready", "mode": "client_canvas_png"},
 		"owner_brain":     map[string]any{"status": serviceStatus(aiProviderConfigured(), "configured", "missing")},
@@ -247,7 +255,7 @@ func ownerRadarNarrative(target string, final, warning, distribution, source map
 		parts = append(parts, "Creator/deployer cüzdanı bu taramada doğrulanamadı. Bu, creator olmadığı anlamına gelmez; yalnızca mevcut kaynakların ilişkiyi çözemediğini gösterir.")
 	}
 
-	parts = append(parts, ownerRadarPracticalConclusion(level))
+	parts = append(parts, ownerRadarPracticalConclusion(level, distribution))
 	parts = append(parts, "Bu değerlendirme kanıt kapsamındadır; kötü niyet, dolandırıcılık veya gerçek kişi kimliği iddiası değildir.")
 	return strings.Join(parts, " ")
 }
@@ -364,12 +372,23 @@ func ownerRadarHolderMeaning(top1, top10 float64) string {
 	}
 }
 
-func ownerRadarPracticalConclusion(level string) string {
+func ownerRadarPracticalConclusion(level string, distribution map[string]any) string {
+	available, _ := distribution["available"].(bool)
+	if available {
+		top1 := radarDetailNumber(distribution["top_1_percentage"])
+		top10 := radarDetailNumber(distribution["top_10_percentage"])
+		switch {
+		case top1 >= 50:
+			return "Pratik sonuç: tek bir risk taşıyan cüzdan dolaşımdaki arzın yarısından fazlasını kontrol ediyor. Bu cüzdanın satış, transfer, funding ve ortak-exit geçmişi çözülmeden token güvenli kabul edilmemelidir."
+		case top1 >= 20 || top10 >= 75:
+			return "Pratik sonuç: holder dağılımı merkezileşmiş durumda. Büyük cüzdanların satış kapasitesi, likidite çıkış yolları ve cluster bağlantıları işlem öncesinde doğrulanmalıdır."
+		}
+	}
 	switch level {
 	case "critical", "high":
 		return "Pratik sonuç: işlem yapmadan önce ana risk sürücüsünün kanıtlarını, likidite çıkış yollarını, creator geçmişini ve bağlı cüzdan kümelerini doğrulamak gerekir."
 	case "medium":
-		return "Pratik sonuç: holder dağılımı rahat görünse bile token otomatik olarak güvenli sayılmaz. Ana risk modülü, likidite davranışı, creator geçmişi ve Sybil/funding-cluster bağlantıları birlikte incelenmelidir."
+		return "Pratik sonuç: token otomatik olarak güvenli sayılmaz. Ana risk modülü, likidite davranışı, creator geçmişi ve Sybil/funding-cluster bağlantıları birlikte incelenmelidir."
 	case "low":
 		return "Pratik sonuç: mevcut taramada ağır bir alarm yok; yine de likidite, creator ve cüzdan kümeleri değişebileceği için karar güncel verilerle yenilenmelidir."
 	default:

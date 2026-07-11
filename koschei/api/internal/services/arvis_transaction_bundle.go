@@ -31,7 +31,7 @@ func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadar
 	replaceArvisArm(arms, buildTransactionMEVArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildLiquidityMovementTransactionArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildCreatorLinkTransactionArm(req, txEvidence, generatedAt))
-	replaceArvisArm(arms, buildFundingClusterTransactionArm(req, txEvidence, generatedAt))
+	replaceFundingClusterArmPreservingHolderEvidence(arms, buildFundingClusterTransactionArm(req, txEvidence, generatedAt))
 
 	withoutFinal := make([]SecurityRadarVerdict, 0, len(arms)-1)
 	for _, arm := range arms {
@@ -62,6 +62,28 @@ func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadar
 		bundle.CustomerSummary = fmt.Sprintf("ARVIS verified %d of 13 evidence arms, including parsed transaction and program-relation evidence, and produced one signed verdict.", verified)
 	}
 	return bundle
+}
+
+func replaceFundingClusterArmPreservingHolderEvidence(arms []SecurityRadarVerdict, replacement SecurityRadarVerdict) {
+	for i := range arms {
+		if arms[i].ModuleID != ModuleFundingClusterDetector {
+			continue
+		}
+		_, hasHolderCluster := arms[i].Signals["holder_cluster_analysis"]
+		if hasHolderCluster {
+			if arms[i].Signed && SecurityRadarVerdictHasVerifiedEvidence(arms[i]) {
+				return
+			}
+			if !replacement.Signed {
+				return
+			}
+		}
+		if !replacement.Signed && arms[i].Signed && SecurityRadarVerdictHasVerifiedEvidence(arms[i]) {
+			return
+		}
+		arms[i] = replacement
+		return
+	}
 }
 
 func replaceArvisArmPreservingVerifiedSource(arms []SecurityRadarVerdict, replacement SecurityRadarVerdict) {
