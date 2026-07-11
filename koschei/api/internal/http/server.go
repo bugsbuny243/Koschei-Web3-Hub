@@ -66,7 +66,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	registerCoreRoutes(mux, h, koschAccess)
 	registerAccountRoutes(mux, h, koschAccess)
 	registerOwnerRoutes(mux, h, staticDir)
-	registerPublicProductRoutes(mux, h, koschAccess)
+	registerProductRoutes(mux, h, koschAccess)
 	registerDeveloperAPIRoutes(mux, h, apiKey)
 	registerWatchlistRoutes(mux, h, koschAccess)
 	registerStatic(mux, staticDir)
@@ -90,7 +90,7 @@ func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess fun
 	}))
 	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok", "access": "kosch-only"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"app": "koschei-engine", "status": "ok", "access": "free-core-kosch-premium"})
 	}))
 	mux.HandleFunc("/api/auth/register", method("POST", h.Register))
 	mux.HandleFunc("/api/auth/login", method("POST", h.Login))
@@ -131,8 +131,12 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
 }
 
-func registerPublicProductRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess func(http.HandlerFunc) http.HandlerFunc) {
-	mux.HandleFunc("/api/token/scan", requiresDB(h, koschAccess(method("POST", h.TokenScan))))
+func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess func(http.HandlerFunc) http.HandlerFunc) {
+	// Free core: no account or KOSCH balance required. This is intentionally
+	// limited to deterministic read-only token fundamentals and public preflight.
+	mux.HandleFunc("/api/token/scan", method("POST", h.TokenScan))
+
+	// Premium: KOSCH unlocks deeper history, graph, exposure and automation.
 	mux.HandleFunc("/api/v1/token/extensions", requiresDB(h, koschAccess(method("POST", h.TokenScan))))
 	mux.HandleFunc("/api/v1/address-poisoning/check", requiresDB(h, koschAccess(method("POST", h.AddressPoisoningCheck))))
 	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
