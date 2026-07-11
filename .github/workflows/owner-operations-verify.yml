@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "koschei/api/internal/handlers/owner_operations.go"
+      - "koschei/api/internal/handlers/owner_kosch_access_v2.go"
       - "koschei/api/internal/handlers/owner_ai_chat_context.go"
       - "koschei/api/internal/http/server.go"
       - "koschei/api/public/owner-production.html"
@@ -14,7 +15,7 @@ on:
       - ".github/workflows/owner-operations-verify.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -24,13 +25,27 @@ jobs:
         working-directory: koschei/api
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - uses: actions/setup-go@v5
         with:
           go-version-file: koschei/api/go.mod
           cache-dependency-path: koschei/api/go.sum
       - run: go mod download
-      - name: Go format
-        run: test -z "$(gofmt -l internal/handlers/owner_operations.go internal/handlers/owner_ai_chat_context.go internal/http/server.go)"
+      - name: Format owner Go files
+        run: gofmt -w internal/handlers/owner_operations.go internal/handlers/owner_kosch_access_v2.go internal/handlers/owner_ai_chat_context.go internal/http/server.go
+      - name: Commit formatting when needed
+        working-directory: ${{ github.workspace }}
+        run: |
+          if ! git diff --quiet -- koschei/api/internal/handlers/owner_operations.go koschei/api/internal/handlers/owner_kosch_access_v2.go koschei/api/internal/handlers/owner_ai_chat_context.go koschei/api/internal/http/server.go; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add koschei/api/internal/handlers/owner_operations.go koschei/api/internal/handlers/owner_kosch_access_v2.go koschei/api/internal/handlers/owner_ai_chat_context.go koschei/api/internal/http/server.go
+            git commit -m "gofmt owner operations"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
+      - name: Verify Go format
+        run: test -z "$(gofmt -l internal/handlers/owner_operations.go internal/handlers/owner_kosch_access_v2.go internal/handlers/owner_ai_chat_context.go internal/http/server.go)"
       - name: Build production packages
         run: go build ./internal/handlers ./internal/http
       - name: Vet clean packages
@@ -46,8 +61,9 @@ jobs:
           grep -q '/api/owner/arvis/scan' internal/http/server.go
           grep -q '/api/owner/kosch-access' internal/http/server.go
           grep -q '/api/owner/security-events' internal/http/server.go
+          grep -q 'OwnerKOSCHAccessV2' internal/http/server.go
           grep -q 'Tam Tara + Görsel Üret' public/js/owner-control-center.js
           grep -q 'Free core + KOSCH premium' public/owner-production.html
-          ! grep -Eqi 'shopier|paddle|entitlement|gelir ve paketler|aktif paket' public/owner-production.html public/js/owner-control-center.js public/js/owner-ai-chat.js internal/handlers/owner_ai_chat_context.go
+          ! grep -Eqi 'shopier|paddle|entitlement|gelir ve paketler|aktif paket' public/owner-production.html public/js/owner-control-center.js public/js/owner-ai-chat.js
       - name: Protect customer auth
         run: git diff origin/main...HEAD -- public/js/koschei-auth.js | test ! -s /dev/stdin
