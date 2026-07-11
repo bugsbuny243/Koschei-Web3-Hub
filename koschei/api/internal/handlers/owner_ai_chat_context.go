@@ -49,11 +49,11 @@ func (h *Handler) buildOwnerChatSnapshot(ctx context.Context) ownerChatSnapshot 
 		},
 		Business: map[string]any{},
 		Access: map[string]any{
-			"model": "free_core_kosch_premium",
-			"free_core": []string{"safe_check", "basic_token_scan"},
-			"premium": []string{"full_radar", "structural_memory", "graph", "exposure", "visual_reports", "automation"},
+			"model":             "free_core_kosch_premium",
+			"free_core":         []string{"safe_check", "basic_token_scan"},
+			"premium":           []string{"full_radar", "structural_memory", "graph", "exposure", "visual_reports", "automation"},
 			"payment_providers": []string{},
-			"kosch_mint": configuredKoscheiTokenMint(),
+			"kosch_mint":        configuredKoscheiTokenMint(),
 		},
 		Radar: map[string]any{},
 	}

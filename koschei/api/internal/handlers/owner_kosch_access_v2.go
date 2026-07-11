@@ -113,8 +113,8 @@ func (h *Handler) OwnerKOSCHAccessV2(w http.ResponseWriter, r *http.Request) {
 		"ok": true, "users": users, "summary": counts,
 		"mint_address": configuredKoscheiTokenMint(),
 		"thresholds": map[string]string{
-			"basic": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "0.000001"),
-			"pro": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_PRO", "250000"),
+			"basic":      tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "0.000001"),
+			"pro":        tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_PRO", "250000"),
 			"enterprise": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_ENTERPRISE", "2000000"),
 		},
 	})

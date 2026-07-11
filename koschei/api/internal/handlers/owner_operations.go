@@ -70,8 +70,8 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 		"ok": true, "generated_at": time.Now().UTC(), "summary": summary,
 		"services": servicesMap, "radar": radar,
 		"access_model": map[string]any{
-			"free_core": []string{"safe_check", "basic_token_scan"},
-			"kosch_premium": []string{"full_radar", "structural_memory", "graph", "exposure", "visual_reports", "automation"},
+			"free_core":         []string{"safe_check", "basic_token_scan"},
+			"kosch_premium":     []string{"full_radar", "structural_memory", "graph", "exposure", "visual_reports", "automation"},
 			"payment_providers": []string{},
 		},
 	})
@@ -147,7 +147,7 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 		"evidence_policy": map[string]any{
 			"hide_verified_details": false, "no_evidence_no_claim": true,
 			"creator_wallet_scope": "source-reported or on-chain relation; not proof of wrongdoing or real-world identity",
-			"financial_advice": false,
+			"financial_advice":     false,
 		},
 	}
 	detail["narrative"] = ownerRadarNarrative(target, final, warning, distribution, sourceContext)
@@ -243,6 +243,6 @@ func (h *Handler) OwnerKOSCHAccess(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "users": users, "summary": counts,
 		"mint_address": configuredKoscheiTokenMint(),
-		"thresholds": map[string]string{"basic": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "0.000001"), "pro": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_PRO", "250000"), "enterprise": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_ENTERPRISE", "2000000")},
+		"thresholds":   map[string]string{"basic": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "0.000001"), "pro": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_PRO", "250000"), "enterprise": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_ENTERPRISE", "2000000")},
 	})
 }
