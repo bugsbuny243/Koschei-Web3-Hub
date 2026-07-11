@@ -263,6 +263,9 @@ func radarDetailFinalMap(fresh services.SecurityRadarFinalVerdict, persisted *se
 		"rule_version": fresh.RuleVersion, "signed": fresh.Signed, "signature": fresh.Signature,
 		"source": "fresh_verified_arms",
 	}
+	if !fresh.Signed {
+		return out
+	}
 	if persisted == nil || !persisted.Signed {
 		return out
 	}
