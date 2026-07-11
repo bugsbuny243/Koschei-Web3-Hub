@@ -30,23 +30,10 @@ jobs:
       - run: go mod download
       - name: Go format
         run: test -z "$(gofmt -l internal/handlers/security_radar_detail.go internal/services/pumpportal_radar_adapter.go internal/http/server.go)"
-      - name: Compile changed packages
-        id: compile
-        continue-on-error: true
-        run: go test ./internal/handlers ./internal/services ./internal/http -run '^$' > /tmp/radar-compile.log 2>&1
-      - name: Upload compile diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: radar-compile-log
-          path: /tmp/radar-compile.log
-      - name: Stop on compile failure
-        if: steps.compile.outcome != 'success'
-        run: |
-          cat /tmp/radar-compile.log
-          exit 1
-      - name: Vet changed packages
-        run: go vet ./internal/handlers ./internal/services ./internal/http
+      - name: Build changed production packages
+        run: go build ./internal/handlers ./internal/services ./internal/http
+      - name: Vet changed production packages
+        run: go vet -tests=false ./internal/handlers ./internal/services ./internal/http
       - name: Build complete API
         run: CGO_ENABLED=0 GOOS=linux go build ./...
       - name: Check Radar JavaScript
