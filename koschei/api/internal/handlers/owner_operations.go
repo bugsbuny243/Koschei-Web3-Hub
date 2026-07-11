@@ -164,6 +164,7 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 		"final_verdict": final, "warning": warning, "holder_distribution": distribution,
 		"structural_memory": structural, "source_context": sourceContext,
 		"modules": modules, "evidence": evidence, "graph": graph,
+		"holder_cluster": ownerRadarModuleSignal(modules, services.ModuleFundingClusterDetector, "holder_cluster_analysis"),
 		"evidence_policy": map[string]any{
 			"hide_verified_details": false, "no_evidence_no_claim": true,
 			"creator_wallet_scope": "source-reported or on-chain relation; not proof of wrongdoing or real-world identity",
@@ -173,6 +174,19 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 	detail["primary_risk_driver"] = ownerRadarPrimaryRiskDriver(modules)
 	detail["narrative"] = ownerRadarNarrative(target, final, warning, distribution, sourceContext, modules)
 	writeJSON(w, http.StatusOK, detail)
+}
+
+func ownerRadarModuleSignal(modules []map[string]any, moduleID, key string) any {
+	for _, module := range modules {
+		if !strings.EqualFold(strings.TrimSpace(fmt.Sprint(module["module_id"])), moduleID) {
+			continue
+		}
+		signals, _ := module["signals"].(map[string]any)
+		if signals != nil {
+			return signals[key]
+		}
+	}
+	return nil
 }
 
 func ownerRadarNarrative(target string, final, warning, distribution, source map[string]any, modules []map[string]any) string {
