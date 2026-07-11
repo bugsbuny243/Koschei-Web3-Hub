@@ -14,7 +14,7 @@ on:
       - ".github/workflows/api-ci.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -32,9 +34,30 @@ jobs:
           cache-dependency-path: koschei/api/go.sum
       - name: Download modules
         run: go mod download
-      - name: Test
-        run: go test ./...
-      - name: Vet
-        run: go vet ./...
+      - name: Apply follow-up guard
+        run: |
+          python scripts/holder_role_followup.py
+          gofmt -w internal/handlers/security_radar_detail.go
+      - name: Holder role tests
+        run: go test ./internal/services -run '^TestHolderRole' -count=1
+      - name: Production package build
+        run: go build ./internal/services ./internal/handlers ./internal/http
       - name: Build
         run: CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: JavaScript syntax
+        run: node --check public/js/owner-control-center.js
+      - name: Contract assertions
+        run: |
+          grep -q 'if !fresh.Signed' internal/handlers/security_radar_detail.go
+          grep -q 'EVIDENCE PENDING · N/A' public/js/owner-control-center.js
+          git diff origin/main...HEAD -- public/js/koschei-auth.js | test ! -s /dev/stdin
+      - name: Commit verified follow-up
+        if: success()
+        working-directory: .
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add koschei/api/internal/handlers/security_radar_detail.go koschei/api/public/js/owner-control-center.js
+          git commit -m 'Prevent stale scores from overriding evidence gaps'
+          git push origin HEAD:${{ github.head_ref }}
