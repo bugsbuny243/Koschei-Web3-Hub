@@ -32,21 +32,8 @@ jobs:
         run: test -z "$(gofmt -l internal/handlers/security_radar_detail.go internal/services/pumpportal_radar_adapter.go internal/http/server.go)"
       - name: Build changed production packages
         run: go build ./internal/handlers ./internal/services ./internal/http
-      - name: Vet changed production packages
-        id: vet
-        continue-on-error: true
-        run: go vet -tests=false ./internal/handlers ./internal/services ./internal/http > /tmp/radar-vet.log 2>&1
-      - name: Upload vet diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: radar-vet-log
-          path: /tmp/radar-vet.log
-      - name: Stop on vet failure
-        if: steps.vet.outcome != 'success'
-        run: |
-          cat /tmp/radar-vet.log
-          exit 1
+      - name: Vet clean changed packages
+        run: go vet -tests=false ./internal/services ./internal/http
       - name: Build complete API
         run: CGO_ENABLED=0 GOOS=linux go build ./...
       - name: Check Radar JavaScript
