@@ -170,34 +170,197 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 			"financial_advice":     false,
 		},
 	}
-	detail["narrative"] = ownerRadarNarrative(target, final, warning, distribution, sourceContext)
+	detail["primary_risk_driver"] = ownerRadarPrimaryRiskDriver(modules)
+	detail["narrative"] = ownerRadarNarrative(target, final, warning, distribution, sourceContext, modules)
 	writeJSON(w, http.StatusOK, detail)
 }
 
-func ownerRadarNarrative(target string, final, warning, distribution, source map[string]any) string {
-	risk := fmt.Sprint(final["risk_index"])
-	level := strings.ToUpper(strings.TrimSpace(fmt.Sprint(final["risk_level"])))
-	if level == "" || level == "<NIL>" {
-		level = "UNKNOWN"
+func ownerRadarNarrative(target string, final, warning, distribution, source map[string]any, modules []map[string]any) string {
+	signed, _ := final["signed"].(bool)
+	level := strings.ToLower(strings.TrimSpace(fmt.Sprint(final["risk_level"])))
+	if !signed || final["risk_index"] == nil || level == "" || level == "unknown" || level == "<nil>" {
+		return "Koschei bu hedef için doğrulanmış bir final risk puanı üretmedi. Kanıt eksikliği düşük risk anlamına gelmez; eksik modüller tamamlanana kadar sonuç EVIDENCE PENDING olarak değerlendirilmelidir."
 	}
-	parts := []string{fmt.Sprintf("%s için ARVIS kararı: %s, risk %s/100.", target, level, risk)}
+
+	risk := radarDetailNumber(final["risk_index"])
+	parts := []string{
+		fmt.Sprintf("Koschei bu tokenı (%s) %.0f/100 ile %s risk seviyesinde değerlendiriyor. %s", ownerRadarShortTarget(target), risk, ownerRadarRiskLabelTR(level), ownerRadarRiskMeaning(level)),
+	}
+
 	if available, _ := distribution["available"].(bool); available {
-		parts = append(parts, fmt.Sprintf("Holder yoğunluğu: Top 1 %v%%, Top 10 %v%%, Top 20 %v%%.", distribution["top_1_percentage"], distribution["top_10_percentage"], distribution["top_20_percentage"]))
+		top1 := radarDetailNumber(distribution["top_1_percentage"])
+		top10 := radarDetailNumber(distribution["top_10_percentage"])
+		top20 := radarDetailNumber(distribution["top_20_percentage"])
 		if adjusted, _ := distribution["role_adjusted"].(bool); adjusted {
-			parts = append(parts, fmt.Sprintf("Ham arz yoğunluğu rol sınıflandırmasıyla düzeltildi: protokol/bonding-curve envanteri %v%%; baskın rol %v.", distribution["protocol_controlled_percentage"], distribution["dominant_role"]))
+			protocolPct := radarDetailNumber(distribution["protocol_controlled_percentage"])
+			role := ownerRadarRoleTR(strings.TrimSpace(fmt.Sprint(distribution["dominant_role"])))
+			parts = append(parts, fmt.Sprintf("Holder hesabında ham arzın %.2f%%'si doğrulanmış bonding-curve veya protokol envanteri olduğu için normal bir balina gibi sayılmadı. Bu ayrımdan sonra en büyük gerçek holderın payı %.2f%%, ilk 10 holderın toplamı %.2f%% ve ilk 20 holderın toplamı %.2f%% olarak ölçüldü; baskın hesap tipi %s.", protocolPct, top1, top10, top20, role))
+		} else {
+			parts = append(parts, fmt.Sprintf("Gözlenen holder dağılımında en büyük hesap %.2f%%, ilk 10 hesap %.2f%% ve ilk 20 hesap %.2f%% paya sahip.", top1, top10, top20))
 		}
+		parts = append(parts, ownerRadarHolderMeaning(top1, top10))
 		if blocked, _ := distribution["blocking_evidence_gap"].(bool); blocked {
-			parts = append(parts, "Baskın holder rolü çözülmediği için final yoğunlaşma kararı bekletildi; veri yokluğu düşük risk sayılmadı.")
+			parts = append(parts, "Ancak baskın token hesabının ekonomik rolü çözülemediği için holder tarafında kesin sonuç verilmedi; veri yokluğu güvenli kabul edilmedi.")
 		}
 	}
-	if creator := strings.TrimSpace(fmt.Sprint(source["creator_wallet"])); creator != "" && creator != "<nil>" {
-		parts = append(parts, "Kaynakta creator/deployer ilişkisi görülen cüzdan: "+creator+".")
+
+	positives := ownerRadarStringSlice(warning["positive_signals"])
+	if len(positives) > 0 {
+		if len(positives) > 3 {
+			positives = positives[:3]
+		}
+		parts = append(parts, "Olumlu sinyaller: "+strings.Join(positives, " "))
 	}
-	if headline := strings.TrimSpace(fmt.Sprint(warning["headline"])); headline != "" && headline != "<nil>" {
-		parts = append(parts, headline)
+
+	if driver := ownerRadarPrimaryRiskDriver(modules); len(driver) > 0 {
+		name := strings.TrimSpace(fmt.Sprint(driver["module"]))
+		score := radarDetailNumber(driver["risk_index"])
+		verdict := strings.TrimSpace(fmt.Sprint(driver["verdict"]))
+		if verdict == "" || verdict == "<nil>" {
+			verdict = strings.TrimSpace(fmt.Sprint(driver["recommendation"]))
+		}
+		if verdict != "" && verdict != "<nil>" {
+			parts = append(parts, fmt.Sprintf("Final puanı yukarı taşıyan ana risk sürücüsü %s modülüdür (%.0f/100). Modülün yorumu: %s", name, score, verdict))
+		} else {
+			parts = append(parts, fmt.Sprintf("Final puanı yukarı taşıyan ana risk sürücüsü %s modülüdür (%.0f/100).", name, score))
+		}
 	}
-	parts = append(parts, "Bu değerlendirme kanıt kapsamındadır; kötü niyet veya gerçek kişi kimliği iddiası değildir.")
+
+	creator := strings.TrimSpace(fmt.Sprint(source["creator_wallet"]))
+	if creator != "" && creator != "<nil>" {
+		parts = append(parts, "Launch kaynağında creator/deployer ile ilişkili görünen cüzdan "+creator+" olarak gözlendi. Bu yalnızca zincir üstü veya kaynak temelli bir ilişkiyi gösterir; tek başına kötü niyet kanıtı değildir.")
+	} else {
+		parts = append(parts, "Creator/deployer cüzdanı bu taramada doğrulanamadı. Bu, creator olmadığı anlamına gelmez; yalnızca mevcut kaynakların ilişkiyi çözemediğini gösterir.")
+	}
+
+	parts = append(parts, ownerRadarPracticalConclusion(level))
+	parts = append(parts, "Bu değerlendirme kanıt kapsamındadır; kötü niyet, dolandırıcılık veya gerçek kişi kimliği iddiası değildir.")
 	return strings.Join(parts, " ")
+}
+
+func ownerRadarPrimaryRiskDriver(modules []map[string]any) map[string]any {
+	var best map[string]any
+	bestRisk := -1.0
+	for _, module := range modules {
+		moduleID := strings.ToLower(strings.TrimSpace(fmt.Sprint(module["module_id"])))
+		if moduleID == "" || moduleID == "final_verdict_engine" {
+			continue
+		}
+		verified, _ := module["verified"].(bool)
+		signed, _ := module["signed"].(bool)
+		if !verified || !signed {
+			continue
+		}
+		risk := radarDetailNumber(module["risk_index"])
+		if risk > bestRisk {
+			bestRisk = risk
+			best = module
+		}
+	}
+	return best
+}
+
+func ownerRadarStringSlice(raw any) []string {
+	out := []string{}
+	switch values := raw.(type) {
+	case []string:
+		for _, value := range values {
+			if value = strings.TrimSpace(value); value != "" {
+				out = append(out, value)
+			}
+		}
+	case []any:
+		for _, rawValue := range values {
+			if value := strings.TrimSpace(fmt.Sprint(rawValue)); value != "" && value != "<nil>" {
+				out = append(out, value)
+			}
+		}
+	}
+	return out
+}
+
+func ownerRadarShortTarget(target string) string {
+	target = strings.TrimSpace(target)
+	if len(target) <= 18 {
+		return target
+	}
+	return target[:9] + "…" + target[len(target)-7:]
+}
+
+func ownerRadarRiskLabelTR(level string) string {
+	switch level {
+	case "critical":
+		return "KRİTİK"
+	case "high":
+		return "YÜKSEK"
+	case "medium":
+		return "ORTA"
+	case "low":
+		return "DÜŞÜK"
+	default:
+		return strings.ToUpper(level)
+	}
+}
+
+func ownerRadarRiskMeaning(level string) string {
+	switch level {
+	case "critical", "high":
+		return "Bu seviye, doğrulanmış risk sinyallerinin işlem öncesinde ayrıntılı biçimde incelenmesi gerektiğini gösterir; otomatik olarak rug veya dolandırıcılık hükmü değildir."
+	case "medium":
+		return "Bu seviye doğrudan rug kanıtı değildir; bazı risk kollarının temiz görünürken en az bir doğrulanmış modülün ek inceleme istediğini gösterir."
+	case "low":
+		return "Bu seviye mevcut kanıtlarda ağır bir risk sürücüsü görülmediğini gösterir; yine de düşük risk, risksiz anlamına gelmez."
+	default:
+		return "Karar yalnızca mevcut ve doğrulanmış kanıtların kapsamını yansıtır."
+	}
+}
+
+func ownerRadarRoleTR(role string) string {
+	switch role {
+	case "externally_owned_wallet":
+		return "normal kullanıcı cüzdanı"
+	case "pump_bonding_curve_or_protocol_vault":
+		return "Pump bonding-curve/protokol kasası"
+	case "pump_liquidity_vault":
+		return "Pump likidite kasası"
+	case "burn_sink":
+		return "burn adresi"
+	case "program_controlled_unresolved":
+		return "rolü henüz çözülememiş program kontrollü hesap"
+	default:
+		if role == "" || role == "<nil>" {
+			return "belirlenemeyen hesap"
+		}
+		return strings.ReplaceAll(role, "_", " ")
+	}
+}
+
+func ownerRadarHolderMeaning(top1, top10 float64) string {
+	switch {
+	case top1 < 5 && top10 < 25:
+		return "Bu dağılım tek başına ciddi bir balina veya arz merkezileşmesi göstermiyor; holder tarafı görece dengeli görünüyor."
+	case top1 < 15 && top10 < 50:
+		return "Holder dağılımı belirgin bir tek-cüzdan hâkimiyeti göstermiyor, ancak büyük hesapların hareketleri izlenmeye devam edilmelidir."
+	case top1 >= 50:
+		return "Tek bir risk taşıyan cüzdan arzın yarısından fazlasını kontrol ediyor; satış hâlinde ciddi fiyat ve exit-liquidity baskısı oluşabilir."
+	case top1 >= 20 || top10 >= 75:
+		return "Holder dağılımı merkezileşmiş görünüyor; büyük cüzdanların satış ve bağlantı geçmişi çözülmeden güvenli kabul edilmemelidir."
+	default:
+		return "Holder yoğunluğu orta seviyede; tek başına nihai karar vermek için creator, likidite, funding cluster ve zamanlama kanıtlarıyla birlikte okunmalıdır."
+	}
+}
+
+func ownerRadarPracticalConclusion(level string) string {
+	switch level {
+	case "critical", "high":
+		return "Pratik sonuç: işlem yapmadan önce ana risk sürücüsünün kanıtlarını, likidite çıkış yollarını, creator geçmişini ve bağlı cüzdan kümelerini doğrulamak gerekir."
+	case "medium":
+		return "Pratik sonuç: holder dağılımı rahat görünse bile token otomatik olarak güvenli sayılmaz. Ana risk modülü, likidite davranışı, creator geçmişi ve Sybil/funding-cluster bağlantıları birlikte incelenmelidir."
+	case "low":
+		return "Pratik sonuç: mevcut taramada ağır bir alarm yok; yine de likidite, creator ve cüzdan kümeleri değişebileceği için karar güncel verilerle yenilenmelidir."
+	default:
+		return "Pratik sonuç: kanıt kapsamı tamamlanmadan kesin güvenlik yorumu yapılmamalıdır."
+	}
 }
 
 // OwnerKOSCHAccess exposes current wallet verification and the latest cached
