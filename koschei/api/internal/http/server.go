@@ -121,7 +121,7 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/api/owner/arvis", requiresDB(h, ownerOnly(h, method("GET", h.OwnerRadarOverview))))
 	mux.HandleFunc("/api/owner/arvis/scan", requiresDB(h, ownerOnly(h, method("POST", h.OwnerRadarScan))))
 	mux.HandleFunc("/api/owner/radar/sources", requiresDB(h, ownerOnly(h, h.OwnerRadarSources)))
-	mux.HandleFunc("/api/owner/kosch-access", requiresDB(h, ownerOnly(h, method("GET", h.OwnerKOSCHAccess))))
+	mux.HandleFunc("/api/owner/kosch-access", requiresDB(h, ownerOnly(h, method("GET", h.OwnerKOSCHAccessV2))))
 	mux.HandleFunc("/api/owner/security-events", requiresDB(h, ownerOnly(h, method("GET", h.OwnerSecurityEvents))))
 	mux.HandleFunc("/api/owner/route-map", ownerOnly(h, method("GET", ownerRouteMap)))
 	mux.HandleFunc("/api/owner/feedback", requiresDB(h, ownerOnly(h, h.OwnerFeedback)))
