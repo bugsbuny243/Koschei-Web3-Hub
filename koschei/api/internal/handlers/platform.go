@@ -11,11 +11,13 @@ import (
 
 func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"version":     "3.0.0",
+		"version":     "3.1.0",
 		"neonAuthUrl": configuredPublicNeonAuthURL(),
 		"access": map[string]any{
-			"provider":       "kosch_token",
-			"mode":           "verified_holder_balance",
+			"provider":       "free_core_plus_kosch_premium",
+			"mode":           "public_basic_verified_holder_premium",
+			"free_core":      []string{"safe_check", "basic_token_scan"},
+			"premium":        []string{"security_radar", "exposure_reports", "graph", "watchlist", "webhooks", "developer_api", "advanced_agents"},
 			"mint":           configuredKoscheiTokenMint(),
 			"network":        firstNonEmptyString(os.Getenv("KOSCHEI_TOKEN_NETWORK"), os.Getenv("KOSCH_TOKEN_NETWORK"), "solana-mainnet"),
 			"wallet_proof":   "phantom_message_signature",
