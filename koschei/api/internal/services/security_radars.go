@@ -46,15 +46,15 @@ type SecurityRadarVerdict struct {
 }
 
 type SecurityRadarBundle struct {
-	Target                 string                `json:"target"`
-	Network                string                `json:"network"`
-	Provider               string                `json:"provider"`
-	WatchMode              string                `json:"watch_mode"`
+	Target                 string               `json:"target"`
+	Network                string               `json:"network"`
+	Provider               string               `json:"provider"`
+	WatchMode              string               `json:"watch_mode"`
 	PumpSybilRadar         SecurityRadarVerdict `json:"pump_sybil_radar"`
 	RaydiumPoolGuardian    SecurityRadarVerdict `json:"raydium_pool_guardian"`
 	WalletlessClaimShield  SecurityRadarVerdict `json:"walletless_claim_shield"`
-	CustomerSummary        string                `json:"customer_summary"`
-	CustomerRecommendation string                `json:"customer_recommendation"`
+	CustomerSummary        string               `json:"customer_summary"`
+	CustomerRecommendation string               `json:"customer_recommendation"`
 	Metadata               map[string]any       `json:"metadata"`
 }
 
@@ -85,7 +85,10 @@ type radarEvidenceProfile struct {
 	TokenSupply            float64
 	LargestHolderPct       int
 	Top10HolderPct         int
+	RawLargestHolderPct    int
+	RawTop10HolderPct      int
 	LargestAccounts        int
+	HolderRoles            HolderRoleAnalysis
 	RecentSignatureCount   int
 	FailedSignatureCount   int
 	SignatureWindowSeconds int64
@@ -208,6 +211,17 @@ func collectRadarEvidence(req SecurityRadarRequest) radarEvidenceProfile {
 		profile.IsTokenMint = true
 		profile.LargestAccounts = len(largest.Value)
 		applyLargestHolderEvidence(&profile, largest.Value)
+		profile.RawLargestHolderPct = profile.LargestHolderPct
+		profile.RawTop10HolderPct = profile.Top10HolderPct
+		profile.HolderRoles = AnalyzeSolanaHolderRoles(ctx, rpcURL, profile.TokenSupply, largest.Value)
+		if profile.HolderRoles.Available && profile.HolderRoles.RoleAdjusted && !profile.HolderRoles.BlockingEvidenceGap {
+			profile.LargestHolderPct = int(math.Round(profile.HolderRoles.EffectiveTop1Percentage))
+			profile.Top10HolderPct = int(math.Round(profile.HolderRoles.EffectiveTop10Percentage))
+		}
+		if profile.HolderRoles.BlockingEvidenceGap {
+			profile.DataQuality = "partial_rpc_evidence"
+			profile.EvidenceStatus = "dominant_holder_role_unresolved"
+		}
 	} else {
 		profile.Errors = append(profile.Errors, compactRadarError("getTokenLargestAccounts", err))
 	}
@@ -362,19 +376,26 @@ func newRadarVerdict(module, moduleID string, req SecurityRadarRequest, risk int
 
 func baseEvidenceSignals(profile radarEvidenceProfile) map[string]any {
 	return map[string]any{
-		"provider":              SecurityRadarProvider,
-		"watch_mode":            SecurityRadarWatchMode,
-		"score_source":          "live_solana_rpc_evidence",
-		"real_onchain_evidence": profile.LiveRPC,
-		"data_quality":          profile.DataQuality,
-		"evidence_status":       profile.EvidenceStatus,
-		"deterministic_preview": false,
-		"rpc_configured":        profile.RPCConfigured,
-		"account_exists":        profile.AccountExists,
-		"is_token_mint":         profile.IsTokenMint,
-		"latest_signature":      profile.LatestSignature,
-		"latest_slot":           profile.LatestSlot,
-		"rpc_errors":            profile.Errors,
+		"provider":                      SecurityRadarProvider,
+		"watch_mode":                    SecurityRadarWatchMode,
+		"score_source":                  "live_solana_rpc_evidence",
+		"real_onchain_evidence":         profile.LiveRPC,
+		"data_quality":                  profile.DataQuality,
+		"evidence_status":               profile.EvidenceStatus,
+		"deterministic_preview":         false,
+		"rpc_configured":                profile.RPCConfigured,
+		"account_exists":                profile.AccountExists,
+		"is_token_mint":                 profile.IsTokenMint,
+		"largest_holder_percentage":     profile.LargestHolderPct,
+		"top_10_holder_percentage":      profile.Top10HolderPct,
+		"raw_largest_holder_percentage": profile.RawLargestHolderPct,
+		"raw_top_10_holder_percentage":  profile.RawTop10HolderPct,
+		"holder_role_analysis":          profile.HolderRoles,
+		"holder_role_adjusted":          profile.HolderRoles.RoleAdjusted,
+		"holder_role_blocking_gap":      profile.HolderRoles.BlockingEvidenceGap,
+		"latest_signature":              profile.LatestSignature,
+		"latest_slot":                   profile.LatestSlot,
+		"rpc_errors":                    profile.Errors,
 	}
 }
 

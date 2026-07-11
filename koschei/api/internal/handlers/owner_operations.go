@@ -183,6 +183,12 @@ func ownerRadarNarrative(target string, final, warning, distribution, source map
 	parts := []string{fmt.Sprintf("%s için ARVIS kararı: %s, risk %s/100.", target, level, risk)}
 	if available, _ := distribution["available"].(bool); available {
 		parts = append(parts, fmt.Sprintf("Holder yoğunluğu: Top 1 %v%%, Top 10 %v%%, Top 20 %v%%.", distribution["top_1_percentage"], distribution["top_10_percentage"], distribution["top_20_percentage"]))
+		if adjusted, _ := distribution["role_adjusted"].(bool); adjusted {
+			parts = append(parts, fmt.Sprintf("Ham arz yoğunluğu rol sınıflandırmasıyla düzeltildi: protokol/bonding-curve envanteri %v%%; baskın rol %v.", distribution["protocol_controlled_percentage"], distribution["dominant_role"]))
+		}
+		if blocked, _ := distribution["blocking_evidence_gap"].(bool); blocked {
+			parts = append(parts, "Baskın holder rolü çözülmediği için final yoğunlaşma kararı bekletildi; veri yokluğu düşük risk sayılmadı.")
+		}
 	}
 	if creator := strings.TrimSpace(fmt.Sprint(source["creator_wallet"])); creator != "" && creator != "<nil>" {
 		parts = append(parts, "Kaynakta creator/deployer ilişkisi görülen cüzdan: "+creator+".")

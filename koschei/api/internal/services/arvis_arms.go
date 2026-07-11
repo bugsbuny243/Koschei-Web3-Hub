@@ -181,13 +181,34 @@ func buildHolderArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedA
 	if !p.LiveRPC || !p.IsTokenMint || p.LargestAccounts == 0 {
 		return unavailableArm("Holder Concentration", ModuleHolderConcentration, req, generatedAt, "Token largest-account evidence is required.")
 	}
+	if p.HolderRoles.BlockingEvidenceGap {
+		v := unavailableArm("Holder Concentration", ModuleHolderConcentration, req, generatedAt, "Dominant token-account role is unresolved; raw concentration cannot be converted into a wallet-control verdict.")
+		v.Signals["blocking_final_verdict"] = true
+		v.Signals["holder_role_analysis"] = p.HolderRoles
+		v.Signals["raw_largest_holder_percentage"] = p.RawLargestHolderPct
+		v.Signals["raw_top_10_holder_percentage"] = p.RawTop10HolderPct
+		return v
+	}
 	risk := 5 + concentrationRisk(p.LargestHolderPct, p.Top10HolderPct)
 	s := armSignals(req, p, ModuleHolderConcentration)
 	s["largest_holder_percentage"] = p.LargestHolderPct
 	s["top_10_holder_percentage"] = p.Top10HolderPct
+	s["raw_largest_holder_percentage"] = p.RawLargestHolderPct
+	s["raw_top_10_holder_percentage"] = p.RawTop10HolderPct
+	s["holder_role_adjusted"] = p.HolderRoles.RoleAdjusted
+	s["holder_role_analysis"] = p.HolderRoles
 	s["largest_accounts"] = p.LargestAccounts
 	s["token_supply"] = p.TokenSupply
-	e := []string{fmt.Sprintf("Largest holder controls %d%% of observed supply.", p.LargestHolderPct), fmt.Sprintf("Top 10 holders control %d%%.", p.Top10HolderPct), fmt.Sprintf("Largest token accounts observed: %d.", p.LargestAccounts)}
+	basis := "raw total supply"
+	if p.HolderRoles.RoleAdjusted {
+		basis = "role-adjusted circulating holder supply"
+	}
+	e := []string{
+		fmt.Sprintf("Holder concentration basis: %s.", basis),
+		fmt.Sprintf("Risk-bearing largest holder controls %d%%; Top 10 control %d%%.", p.LargestHolderPct, p.Top10HolderPct),
+		fmt.Sprintf("Raw token-account concentration before role classification: Top 1=%d%% Top 10=%d%%.", p.RawLargestHolderPct, p.RawTop10HolderPct),
+		fmt.Sprintf("Protocol-controlled inventory=%.4f%%; burn sinks=%.4f%%; unresolved=%.4f%%.", p.HolderRoles.ProtocolControlledPercentage, p.HolderRoles.BurnPercentage, p.HolderRoles.UnresolvedPercentage),
+	}
 	return evidenceArm("Holder Concentration", ModuleHolderConcentration, req, risk, s, e, generatedAt)
 }
 
@@ -225,6 +246,14 @@ func buildProgramRelationArm(req SecurityRadarRequest, p radarEvidenceProfile, g
 }
 
 func buildFinalArm(req SecurityRadarRequest, arms []SecurityRadarVerdict, generatedAt string) SecurityRadarVerdict {
+	for _, arm := range arms {
+		if blocked, _ := arm.Signals["blocking_final_verdict"].(bool); blocked {
+			v := unavailableArm("Final Verdict Engine", ModuleFinalVerdictEngine, req, generatedAt, "A dominant holder role is unresolved; Unavailable is not Low and no final token-risk score is issued.")
+			v.Signals["blocking_final_verdict"] = true
+			v.Signals["blocking_module"] = arm.ModuleID
+			return v
+		}
+	}
 	verified := make([]SecurityRadarVerdict, 0, len(arms))
 	for _, arm := range arms {
 		if !arm.Signed || arm.Signals == nil {

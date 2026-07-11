@@ -29,6 +29,15 @@ func (h *Handler) SecurityRadarDetail(w http.ResponseWriter, r *http.Request) {
 	if network == "" {
 		network = "solana-mainnet"
 	}
+	classification := classifyRadarTarget(r.Context(), target)
+	if !radarTargetTokenVerdictAllowed(classification) {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+			"ok": false, "error": "target_not_token_mint", "message": radarTargetRejectionMessage(classification),
+			"target": target, "target_classification": classification,
+			"final_verdict": map[string]any{"risk_index": nil, "risk_level": "unknown", "grade": "-", "signed": false, "verdict": "INSUFFICIENT EVIDENCE"},
+		})
+		return
+	}
 
 	analysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: target, Network: network, Mode: "manual_detail"})
 	bundle := services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
@@ -73,77 +82,28 @@ func (h *Handler) SecurityRadarDetail(w http.ResponseWriter, r *http.Request) {
 
 func radarDetailHolderDistribution(parent context.Context, target string) map[string]any {
 	rpcURL := strings.TrimSpace(firstNonEmptyString(os.Getenv("SOLANA_RPC_URL"), os.Getenv("ALCHEMY_SOLANA_RPC_URL")))
-	out := map[string]any{"available": false, "top_accounts": []any{}}
 	if rpcURL == "" {
-		out["status"] = "rpc_not_configured"
-		return out
+		return map[string]any{"available": false, "status": "rpc_not_configured", "top_accounts": []any{}}
 	}
 	ctx, cancel := context.WithTimeout(parent, 9*time.Second)
 	defer cancel()
 	supplyResult, err := services.SolanaGetTokenSupply(ctx, rpcURL, target)
 	if err != nil {
-		out["status"] = "supply_unavailable"
-		out["error"] = compactRadarDetailError(err)
-		return out
+		return map[string]any{"available": false, "status": "supply_unavailable", "error": compactRadarDetailError(err), "top_accounts": []any{}}
 	}
 	accountsResult, err := services.SolanaGetTokenLargestAccounts(ctx, rpcURL, target)
 	if err != nil {
-		out["status"] = "largest_accounts_unavailable"
-		out["error"] = compactRadarDetailError(err)
-		return out
+		return map[string]any{"available": false, "status": "largest_accounts_unavailable", "error": compactRadarDetailError(err), "top_accounts": []any{}}
 	}
 	supply := radarDetailTokenAmount(supplyResult.Value)
-	if supply <= 0 {
-		out["status"] = "invalid_supply"
-		return out
-	}
-
-	accounts := make([]map[string]any, 0, len(accountsResult.Value))
-	cumulative := 0.0
-	top1, top3, top10, top20 := 0.0, 0.0, 0.0, 0.0
-	for i, account := range accountsResult.Value {
-		balance := radarDetailTokenAmount(account.SolanaTokenAmount)
-		if balance < 0 {
-			balance = 0
-		}
-		cumulative += balance
-		pct := balance / supply * 100
-		if i == 0 {
-			top1 = pct
-		}
-		if i < 3 {
-			top3 += pct
-		}
-		if i < 10 {
-			top10 += pct
-		}
-		if i < 20 {
-			top20 += pct
-		}
-		accounts = append(accounts, map[string]any{
-			"rank": i + 1, "token_account": account.Address,
-			"balance": radarDetailRound(balance, 6), "percentage": radarDetailRound(pct, 4),
-			"cumulative_percentage": radarDetailRound(cumulative/supply*100, 4),
-			"owner_wallet_resolved": false,
-		})
-	}
-	out["available"] = true
-	out["status"] = "verified_rpc_observation"
-	out["supply"] = radarDetailRound(supply, 6)
+	roles := services.AnalyzeSolanaHolderRoles(ctx, rpcURL, supply, accountsResult.Value)
+	out := services.HolderRoleAnalysisMap(roles)
 	out["decimals"] = supplyResult.Value.Decimals
-	out["largest_account_balance"] = func() float64 {
-		if len(accountsResult.Value) == 0 {
-			return 0
-		}
-		return radarDetailRound(radarDetailTokenAmount(accountsResult.Value[0].SolanaTokenAmount), 6)
-	}()
-	out["top_1_percentage"] = radarDetailRound(top1, 4)
-	out["top_3_percentage"] = radarDetailRound(top3, 4)
-	out["top_10_percentage"] = radarDetailRound(top10, 4)
-	out["top_20_percentage"] = radarDetailRound(top20, 4)
-	out["observed_account_count"] = len(accountsResult.Value)
-	out["top_accounts"] = accounts
-	out["account_scope"] = "Solana token accounts; owner-wallet identity requires separate parsed owner mapping"
+	out["largest_account_balance"] = 0.0
+	if len(accountsResult.Value) > 0 {
+		out["largest_account_balance"] = radarDetailRound(radarDetailTokenAmount(accountsResult.Value[0].SolanaTokenAmount), 6)
+	}
+	out["account_scope"] = "Token accounts resolved to owner wallets and owner programs; only positively identified protocol inventory or burn sinks are excluded from holder-risk concentration."
 	return out
 }
 
@@ -303,6 +263,9 @@ func radarDetailFinalMap(fresh services.SecurityRadarFinalVerdict, persisted *se
 		"rule_version": fresh.RuleVersion, "signed": fresh.Signed, "signature": fresh.Signature,
 		"source": "fresh_verified_arms",
 	}
+	if !fresh.Signed {
+		return out
+	}
 	if persisted == nil || !persisted.Signed {
 		return out
 	}
@@ -369,6 +332,16 @@ func radarDetailWarning(final, distribution, structural map[string]any, modules 
 	}
 	reasons := []string{}
 	positive := []string{}
+	roleAdjusted, _ := distribution["role_adjusted"].(bool)
+	blockingRoleGap, _ := distribution["blocking_evidence_gap"].(bool)
+	protocolPct := radarDetailNumber(distribution["protocol_controlled_percentage"])
+	if blockingRoleGap {
+		label = "EVIDENCE_PENDING"
+		reasons = append(reasons, "Baskın token hesabının ekonomik rolü çözülemedi; Koschei bu durumda yoğunlaşmayı LOW olarak yorumlamaz ve final karar bekletilir.")
+	}
+	if roleAdjusted && protocolPct > 0 {
+		positive = append(positive, fmt.Sprintf("Ham arzın %.2f%%'si doğrulanmış protokol/bonding-curve envanteri olarak ayrıldı; holder riski dolaşımdaki cüzdan dağılımından hesaplandı.", protocolPct))
+	}
 	largest := radarDetailNumber(distribution["top_1_percentage"])
 	if largest == 0 {
 		largest = radarDetailNumber(structural["largest_holder_percentage"])
