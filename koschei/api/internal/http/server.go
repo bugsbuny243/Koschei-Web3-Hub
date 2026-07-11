@@ -142,6 +142,7 @@ func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess 
 	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
 	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, koschAccess(method("GET", h.SecurityRadarFeed))))
 	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, koschAccess(method("POST", h.SecurityRadarCheck))))
+	mux.HandleFunc("/api/v1/radar/detail", requiresDB(h, koschAccess(method("GET", h.SecurityRadarDetail))))
 	mux.HandleFunc("/api/v1/radar/graph", requiresDB(h, koschAccess(method("GET", h.SecurityRadarGraph))))
 	mux.HandleFunc("/api/v1/radar/exposure", requiresDB(h, koschAccess(method("GET", h.SecurityRadarExposureReport))))
 }
