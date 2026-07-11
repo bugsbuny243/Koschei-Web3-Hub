@@ -1,0 +1,23 @@
+name: Owner JS Syntax Verify
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check owner JavaScript syntax
+        run: node --check koschei/api/public/js/owner-control-center.js
+      - name: Verify cache version
+        run: grep -q 'owner-control-center.js?v=6' koschei/api/public/owner-production.html
