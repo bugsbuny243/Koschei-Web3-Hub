@@ -1,8 +1,0 @@
-# koschei/api/internal/handlers [koschei/api/internal/handlers.test]
-internal/handlers/base58_test.go:6:6: undefined: isValidSolanaAddress
-internal/handlers/base58_test.go:9:5: undefined: isValidSolanaAddress
-internal/handlers/base58_test.go:12:5: undefined: isValidSolanaAddress
-internal/handlers/owner_ai_chat_test.go:44:3: unknown field GooglePlay in struct literal of type ownerChatSnapshot
-internal/handlers/owner_game_studio_ownership_test.go:7:9: undefined: ownerGameStudioUserID
-FAIL	koschei/api/internal/handlers [build failed]
-FAIL
