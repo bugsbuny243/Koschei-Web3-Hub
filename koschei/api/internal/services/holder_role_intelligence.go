@@ -7,27 +7,27 @@ import (
 )
 
 const (
-	solanaSystemProgramID       = "11111111111111111111111111111111"
-	solanaIncineratorAddress    = "1nc1nerator11111111111111111111111111111111"
-	pumpBondingCurveProgramID   = "6EF8rrecthR5DkzZEXAPch3d4H6Wu1R5uWsTFTTF1F6P"
-	pumpLiquidityProgramID      = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+	solanaSystemProgramID     = "11111111111111111111111111111111"
+	solanaIncineratorAddress  = "1nc1nerator11111111111111111111111111111111"
+	pumpBondingCurveProgramID = "6EF8rrecthR5DkzZEXAPch3d4H6Wu1R5uWsTFTTF1F6P"
+	pumpLiquidityProgramID    = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 )
 
 // HolderRoleAccount separates a token account from the wallet or PDA that
 // controls it. Role labels are evidence-scoped and never claim real-world
 // identity or malicious intent.
 type HolderRoleAccount struct {
-	Rank                 int      `json:"rank"`
-	TokenAccount         string   `json:"token_account"`
-	OwnerWallet          string   `json:"owner_wallet,omitempty"`
-	OwnerProgram         string   `json:"owner_program,omitempty"`
-	Balance              float64  `json:"balance"`
-	RawPercentage        float64  `json:"raw_percentage"`
-	CirculatingPercentage float64 `json:"circulating_percentage,omitempty"`
-	Role                 string   `json:"role"`
-	Confidence           string   `json:"confidence"`
-	ExcludedFromHolderRisk bool   `json:"excluded_from_holder_risk"`
-	Evidence             []string `json:"evidence"`
+	Rank                   int      `json:"rank"`
+	TokenAccount           string   `json:"token_account"`
+	OwnerWallet            string   `json:"owner_wallet,omitempty"`
+	OwnerProgram           string   `json:"owner_program,omitempty"`
+	Balance                float64  `json:"balance"`
+	RawPercentage          float64  `json:"raw_percentage"`
+	CirculatingPercentage  float64  `json:"circulating_percentage,omitempty"`
+	Role                   string   `json:"role"`
+	Confidence             string   `json:"confidence"`
+	ExcludedFromHolderRisk bool     `json:"excluded_from_holder_risk"`
+	Evidence               []string `json:"evidence"`
 }
 
 // HolderRoleAnalysis preserves raw supply concentration while also producing
