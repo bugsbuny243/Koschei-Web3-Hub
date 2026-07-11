@@ -1,0 +1,83 @@
+name: Creator Intelligence Verify
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/handlers/creator_wallet_intelligence.go"
+      - "koschei/api/internal/handlers/creator_wallet_intelligence_test.go"
+      - "koschei/api/internal/services/solana_multiple_accounts.go"
+      - "koschei/api/internal/http/server.go"
+      - "koschei/api/public/js/owner-creator-intelligence.js"
+      - "koschei/api/public/owner-production.html"
+      - ".github/workflows/creator-intelligence-verify.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Fix safe parsed-owner lookup and format
+        working-directory: koschei/api
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('internal/handlers/creator_wallet_intelligence.go')
+          s = p.read_text()
+          old = '''func creatorIntelParsedTokenOwner(raw any) string {
+          \treturn creatorIntelCleanString(creatorIntelMap(creatorIntelMap(raw)["parsed"])["info"].(map[string]any)["owner"])
+          }'''
+          new = '''func creatorIntelParsedTokenOwner(raw any) string {
+          \tdata := creatorIntelMap(raw)
+          \tparsed := creatorIntelMap(data["parsed"])
+          \tinfo := creatorIntelMap(parsed["info"])
+          \treturn creatorIntelCleanString(info["owner"])
+          }'''
+          if old not in s:
+              raise SystemExit('unsafe parsed-owner function not found')
+          p.write_text(s.replace(old, new))
+          PY
+          gofmt -w internal/handlers/creator_wallet_intelligence.go internal/handlers/creator_wallet_intelligence_test.go internal/services/solana_multiple_accounts.go internal/http/server.go
+      - name: Unit tests
+        working-directory: koschei/api
+        run: go test ./internal/handlers -run '^TestCreatorIntel' -count=1
+      - name: Build production packages
+        working-directory: koschei/api
+        run: go build ./internal/handlers ./internal/services ./internal/http
+      - name: Vet clean packages
+        working-directory: koschei/api
+        run: go vet -tests=false ./internal/http ./internal/services
+      - name: Build complete API
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: JavaScript syntax
+        working-directory: koschei/api
+        run: node --check public/js/owner-creator-intelligence.js
+      - name: Contract assertions
+        working-directory: koschei/api
+        run: |
+          grep -q '/api/owner/creator-intelligence' internal/http/server.go
+          grep -q '/api/v1/radar/creator-intelligence' internal/http/server.go
+          grep -q 'previous_launch_count' internal/handlers/creator_wallet_intelligence.go
+          grep -q 'early_sale_like_transactions' internal/handlers/creator_wallet_intelligence.go
+          grep -q 'matches_top_holder' internal/handlers/creator_wallet_intelligence.go
+          grep -q 'Creator Görselini İndir' public/js/owner-creator-intelligence.js
+          git diff origin/main...HEAD -- public/js/koschei-auth.js | test ! -s /dev/stdin
+      - name: Commit verified formatting and safety fix
+        if: success()
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add koschei/api/internal/handlers/creator_wallet_intelligence.go koschei/api/internal/handlers/creator_wallet_intelligence_test.go koschei/api/internal/services/solana_multiple_accounts.go koschei/api/internal/http/server.go
+          git commit -m 'Format and harden creator intelligence'
+          git push origin HEAD:${{ github.head_ref }}
