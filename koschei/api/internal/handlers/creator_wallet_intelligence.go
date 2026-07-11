@@ -24,12 +24,12 @@ type creatorIntelFlow struct {
 }
 
 type creatorIntelHolderResult struct {
-	Status                  string
-	Accounts                []map[string]any
-	OwnerIndex              map[string]map[string]any
-	CreatorIsTopHolder      bool
-	CreatorRank             int
-	CreatorPercentage       float64
+	Status             string
+	Accounts           []map[string]any
+	OwnerIndex         map[string]map[string]any
+	CreatorIsTopHolder bool
+	CreatorRank        int
+	CreatorPercentage  float64
 }
 
 // OwnerCreatorIntelligence continues a Radar investigation after a launch
@@ -51,9 +51,9 @@ func (h *Handler) OwnerCreatorIntelligence(w http.ResponseWriter, r *http.Reques
 	if creator == "" {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "intelligence": map[string]any{
 			"available": false,
-			"target": target,
-			"status": "creator_wallet_not_observed",
-			"summary": "Creator/deployer cüzdanı doğrulanamadığı için davranış analizi çalıştırılmadı.",
+			"target":    target,
+			"status":    "creator_wallet_not_observed",
+			"summary":   "Creator/deployer cüzdanı doğrulanamadığı için davranış analizi çalıştırılmadı.",
 		}})
 		return
 	}
@@ -66,21 +66,21 @@ func (h *Handler) buildCreatorWalletIntelligence(ctx context.Context, target, ne
 	launches, launchAt := h.creatorIntelObservedLaunches(ctx, target, network, creator)
 	holders := creatorIntelHolderOwners(ctx, target, creator)
 	result := map[string]any{
-		"available": true,
-		"target": target,
-		"network": network,
-		"creator_wallet": creator,
-		"source": creatorIntelCleanString(source["source"]),
-		"checked_at": time.Now().UTC().Format(time.RFC3339),
-		"observed_launches": launches,
-		"observed_launch_count": len(launches),
-		"previous_launch_count": creatorIntelPreviousLaunchCount(launches, target),
-		"holder_accounts": holders.Accounts,
-		"creator_is_top_holder": holders.CreatorIsTopHolder,
-		"creator_holder_rank": holders.CreatorRank,
+		"available":                 true,
+		"target":                    target,
+		"network":                   network,
+		"creator_wallet":            creator,
+		"source":                    creatorIntelCleanString(source["source"]),
+		"checked_at":                time.Now().UTC().Format(time.RFC3339),
+		"observed_launches":         launches,
+		"observed_launch_count":     len(launches),
+		"previous_launch_count":     creatorIntelPreviousLaunchCount(launches, target),
+		"holder_accounts":           holders.Accounts,
+		"creator_is_top_holder":     holders.CreatorIsTopHolder,
+		"creator_holder_rank":       holders.CreatorRank,
 		"creator_holder_percentage": creatorIntelRound(holders.CreatorPercentage, 4),
-		"holder_resolution_status": holders.Status,
-		"evidence_scope": "Koschei-observed launches plus bounded recent Solana RPC history; wallet relations are not proof of wrongdoing or real-world identity.",
+		"holder_resolution_status":  holders.Status,
+		"evidence_scope":            "Koschei-observed launches plus bounded recent Solana RPC history; wallet relations are not proof of wrongdoing or real-world identity.",
 	}
 
 	rpcURL := creatorIntelRPCURL()
@@ -162,16 +162,16 @@ func (h *Handler) buildCreatorWalletIntelligence(ctx context.Context, target, ne
 
 		if creatorDelta != 0 || swapRelated || launchRelated {
 			transactions = append(transactions, map[string]any{
-				"signature": signature.Signature,
-				"block_time": blockTime,
-				"observed_at": creatorIntelUnixTime(blockTime),
-				"creator_signed": creatorIntelContains(signers, creator),
+				"signature":           signature.Signature,
+				"block_time":          blockTime,
+				"observed_at":         creatorIntelUnixTime(blockTime),
+				"creator_signed":      creatorIntelContains(signers, creator),
 				"creator_token_delta": creatorIntelRound(creatorDelta, 8),
-				"classification": classification,
-				"swap_related": swapRelated,
-				"launch_related": launchRelated,
-				"instruction_types": instructionTypes,
-				"token_mints": instructionMints,
+				"classification":      classification,
+				"swap_related":        swapRelated,
+				"launch_related":      launchRelated,
+				"instruction_types":   instructionTypes,
+				"token_mints":         instructionMints,
 			})
 		}
 	}
@@ -463,11 +463,11 @@ func creatorIntelFlowRows(items map[string]*creatorIntelFlow, holderIndex map[st
 	rows := make([]map[string]any, 0, len(items))
 	for _, item := range items {
 		row := map[string]any{
-			"wallet": item.Wallet,
-			"amount": creatorIntelRound(item.Amount, 8),
-			"transactions": item.Transactions,
-			"first_observed_at": creatorIntelUnixTime(item.FirstAt),
-			"last_observed_at": creatorIntelUnixTime(item.LastAt),
+			"wallet":             item.Wallet,
+			"amount":             creatorIntelRound(item.Amount, 8),
+			"transactions":       item.Transactions,
+			"first_observed_at":  creatorIntelUnixTime(item.FirstAt),
+			"last_observed_at":   creatorIntelUnixTime(item.LastAt),
 			"matches_top_holder": false,
 		}
 		if holderIndex != nil {
@@ -479,7 +479,9 @@ func creatorIntelFlowRows(items map[string]*creatorIntelFlow, holderIndex map[st
 		}
 		rows = append(rows, row)
 	}
-	sort.SliceStable(rows, func(i, j int) bool { return creatorIntelFloat(rows[i]["amount"]) > creatorIntelFloat(rows[j]["amount"]) })
+	sort.SliceStable(rows, func(i, j int) bool {
+		return creatorIntelFloat(rows[i]["amount"]) > creatorIntelFloat(rows[j]["amount"])
+	})
 	if len(rows) > 20 {
 		rows = rows[:20]
 	}
@@ -618,7 +620,10 @@ func creatorIntelPreviousLaunchCount(items []map[string]any, target string) int 
 }
 
 func creatorIntelParsedTokenOwner(raw any) string {
-	return creatorIntelCleanString(creatorIntelMap(creatorIntelMap(raw)["parsed"])["info"].(map[string]any)["owner"])
+	data := creatorIntelMap(raw)
+	parsed := creatorIntelMap(data["parsed"])
+	info := creatorIntelMap(parsed["info"])
+	return creatorIntelCleanString(info["owner"])
 }
 
 func creatorIntelTokenAmount(value services.SolanaTokenAmount) float64 {
