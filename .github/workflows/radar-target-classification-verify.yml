@@ -1,0 +1,144 @@
+name: Radar Target Classification Verify
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/handlers/radar_target_classification.go"
+      - "koschei/api/internal/handlers/owner_operations.go"
+      - "koschei/api/internal/handlers/security_radar.go"
+      - ".github/workflows/radar-target-classification-verify.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Wire target classification gates
+        working-directory: koschei/api
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          owner = Path('internal/handlers/owner_operations.go')
+          s = owner.read_text()
+          old = '''\tif network == "" {
+          \t\tnetwork = "solana-mainnet"
+          \t}
+          \tanalysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: target, Network: network, Mode: "owner_full_scan"})'''
+          new = '''\tif network == "" {
+          \t\tnetwork = "solana-mainnet"
+          \t}
+          \tclassification := classifyRadarTarget(r.Context(), target)
+          \tif !radarTargetTokenVerdictAllowed(classification) {
+          \t\tstatusCode := http.StatusUnprocessableEntity
+          \t\tif classification.Type == radarTargetUnknown {
+          \t\t\tstatusCode = http.StatusServiceUnavailable
+          \t\t}
+          \t\twriteJSON(w, statusCode, map[string]any{
+          \t\t\t"ok": false, "error": "token_mint_required", "charged": false,
+          \t\t\t"target": target, "network": network, "target_classification": classification,
+          \t\t\t"analysis_scope": classification.Type, "report_status": "insufficient_evidence",
+          \t\t\t"message": radarTargetRejectionMessage(classification),
+          \t\t\t"final_verdict": map[string]any{
+          \t\t\t\t"grade": "-", "risk_index": nil, "risk_level": "unknown", "signed": false,
+          \t\t\t\t"verdict": "INSUFFICIENT EVIDENCE: token-mint verdict is not applicable to this target type.",
+          \t\t\t\t"recommendation": classification.Type + "_intelligence_required",
+          \t\t\t},
+          \t\t})
+          \t\treturn
+          \t}
+          \tanalysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: target, Network: network, Mode: "owner_full_scan"})'''
+          if old not in s:
+              raise SystemExit('OwnerRadarScan insertion point not found')
+          s = s.replace(old, new, 1)
+          old = '''\t\t"ok": true, "schema_version": "koschei-owner-radar-v1", "target": target,
+          \t\t"network": network, "generated_at": time.Now().UTC().Format(time.RFC3339),'''
+          new = '''\t\t"ok": true, "schema_version": "koschei-owner-radar-v2", "target": target,
+          \t\t"network": network, "generated_at": time.Now().UTC().Format(time.RFC3339),
+          \t\t"target_classification": classification, "analysis_scope": radarTargetTokenMint,'''
+          if old not in s:
+              raise SystemExit('OwnerRadarScan response point not found')
+          owner.write_text(s.replace(old, new, 1))
+
+          radar = Path('internal/handlers/security_radar.go')
+          s = radar.read_text()
+          old = '''\tif input.Network == "" {
+          \t\tinput.Network = "solana-mainnet"
+          \t}
+          \tmode := firstNonEmptyString(input.Mode, "manual_dashboard_check")'''
+          new = '''\tif input.Network == "" {
+          \t\tinput.Network = "solana-mainnet"
+          \t}
+          \tclassification := classifyRadarTarget(r.Context(), target)
+          \tif !radarTargetTokenVerdictAllowed(classification) {
+          \t\tservices.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_wrong_target_type", "customer", "warning", map[string]any{"network": input.Network, "target": target, "target_type": classification.Type}))
+          \t\tstatusCode := http.StatusUnprocessableEntity
+          \t\tif classification.Type == radarTargetUnknown {
+          \t\t\tstatusCode = http.StatusServiceUnavailable
+          \t\t}
+          \t\twriteJSON(w, statusCode, map[string]any{"ok": false, "error": "token_mint_required", "message": radarTargetRejectionMessage(classification), "target": target, "target_classification": classification, "charged": false, "final_verdict": map[string]any{"risk_index": nil, "risk_level": "unknown", "signed": false, "recommendation": classification.Type + "_intelligence_required"}})
+          \t\treturn
+          \t}
+          \tmode := firstNonEmptyString(input.Mode, "manual_dashboard_check")'''
+          if old not in s:
+              raise SystemExit('SecurityRadarCheck insertion point not found')
+          s = s.replace(old, new, 1)
+          old = '''\tif network == "" {
+          \t\tnetwork = "solana-mainnet"
+          \t}
+          \tanalysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: address, Network: network, Mode: "public_badge"})'''
+          new = '''\tif network == "" {
+          \t\tnetwork = "solana-mainnet"
+          \t}
+          \tclassification := classifyRadarTarget(r.Context(), address)
+          \tif !radarTargetTokenVerdictAllowed(classification) {
+          \t\tstatusCode := http.StatusUnprocessableEntity
+          \t\tif classification.Type == radarTargetUnknown {
+          \t\t\tstatusCode = http.StatusServiceUnavailable
+          \t\t}
+          \t\twriteJSON(w, statusCode, map[string]any{"ok": false, "error": "token_mint_required", "message": radarTargetRejectionMessage(classification), "address": address, "target_classification": classification, "risk_index": nil, "risk_level": "unknown", "signed": false})
+          \t\treturn
+          \t}
+          \tanalysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: address, Network: network, Mode: "public_badge"})'''
+          if old not in s:
+              raise SystemExit('SecurityRiskBadge insertion point not found')
+          radar.write_text(s.replace(old, new, 1))
+          PY
+          gofmt -w internal/handlers/radar_target_classification.go internal/handlers/owner_operations.go internal/handlers/security_radar.go
+      - name: Build production packages
+        working-directory: koschei/api
+        run: go build ./internal/handlers ./internal/services ./internal/http
+      - name: Vet clean packages
+        working-directory: koschei/api
+        run: go vet -tests=false ./internal/http ./internal/services
+      - name: Build complete API
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: Contract assertions
+        working-directory: koschei/api
+        run: |
+          grep -q 'token_mint_required' internal/handlers/owner_operations.go
+          grep -q 'radar_check_wrong_target_type' internal/handlers/security_radar.go
+          grep -q 'INSUFFICIENT EVIDENCE' internal/handlers/owner_operations.go
+          grep -q 'radarTargetTokenAccount' internal/handlers/radar_target_classification.go
+          grep -q 'risk_index": nil' internal/handlers/security_radar.go
+          git diff origin/main...HEAD -- public/js/koschei-auth.js | test ! -s /dev/stdin
+      - name: Commit verified wiring
+        if: success()
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add koschei/api/internal/handlers/radar_target_classification.go koschei/api/internal/handlers/owner_operations.go koschei/api/internal/handlers/security_radar.go
+          git commit -m 'Reject non-mint targets from token Radar scoring'
+          git push origin HEAD:${{ github.head_ref }}
