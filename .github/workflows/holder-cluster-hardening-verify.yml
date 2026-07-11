@@ -1,0 +1,53 @@
+name: Holder Cluster Hardening Verify
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "koschei/api/scripts/holder_cluster_hardening_patch.py"
+      - "koschei/api/internal/services/holder_cluster_intelligence.go"
+      - "koschei/api/internal/services/holder_cluster_intelligence_test.go"
+      - ".github/workflows/holder-cluster-hardening-verify.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Apply hardening patch
+        working-directory: koschei/api
+        run: |
+          python scripts/holder_cluster_hardening_patch.py
+          gofmt -w internal/services/holder_cluster_intelligence.go internal/services/holder_cluster_intelligence_test.go
+      - name: Cluster tests
+        working-directory: koschei/api
+        run: go test ./internal/services -run '^TestSummarizeHolderCluster' -count=1
+      - name: Production build
+        working-directory: koschei/api
+        run: |
+          go build ./internal/services ./internal/handlers ./internal/http
+          CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: Hard evidence assertions
+        working-directory: koschei/api
+        run: |
+          grep -q 'ParsedTransactions' internal/services/holder_cluster_intelligence.go
+          grep -q 'parsed transaction evidence; no LOW verdict' internal/services/holder_cluster_intelligence.go
+          git diff origin/main...HEAD -- public/js/koschei-auth.js | test ! -s /dev/stdin
+      - name: Commit hardening
+        if: success()
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add koschei/api/internal/services/holder_cluster_intelligence.go koschei/api/internal/services/holder_cluster_intelligence_test.go
+          git commit -m 'Require parsed holder transactions before cluster scoring'
+          git push origin HEAD:${{ github.head_ref }}
