@@ -191,6 +191,20 @@ func buildHolderArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedA
 		return v
 	}
 	risk := 5 + concentrationRisk(p.LargestHolderPct, p.Top10HolderPct)
+	switch {
+	case p.LargestHolderPct >= 50:
+		if risk < 70 {
+			risk = 70
+		}
+	case p.LargestHolderPct >= 35:
+		if risk < 55 {
+			risk = 55
+		}
+	case p.Top10HolderPct >= 75:
+		if risk < 60 {
+			risk = 60
+		}
+	}
 	s := armSignals(req, p, ModuleHolderConcentration)
 	s["largest_holder_percentage"] = p.LargestHolderPct
 	s["top_10_holder_percentage"] = p.Top10HolderPct
@@ -216,7 +230,13 @@ func buildHolderArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedA
 func buildFundingClusterArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
 	a := p.HolderCluster
 	if !a.Available {
-		return unavailableArm("Funding Cluster Detector", ModuleFundingClusterDetector, req, generatedAt, "At least three resolved holder wallets with bounded funding evidence are required; unavailable evidence is not LOW.")
+		v := unavailableArm("Funding Cluster Detector", ModuleFundingClusterDetector, req, generatedAt, "At least three resolved holder wallets with parsed funding evidence are required; unavailable evidence is not LOW.")
+		v.Signals["holder_cluster_analysis"] = a
+		v.Signals["cluster_confidence"] = a.Confidence
+		for _, limitation := range a.Limitations {
+			v.Evidence = append(v.Evidence, "Limitation: "+limitation)
+		}
+		return v
 	}
 	s := armSignals(req, p, ModuleFundingClusterDetector)
 	s["holder_cluster_analysis"] = a
@@ -240,10 +260,14 @@ func buildFundingClusterArm(req SecurityRadarRequest, p radarEvidenceProfile, ge
 }
 
 func buildSniperTimingArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
-	mintTiming := p.LiveRPC && p.RecentSignatureCount > 0 && p.SignatureWindowSeconds > 0
+	mintTiming := p.LiveRPC && p.TargetSignatureHistoryExhausted && p.TargetSignatureTimingObserved && p.RecentSignatureCount >= 2
 	clusterTiming := p.HolderCluster.Available && p.HolderCluster.SynchronizedWalletCount >= 2
 	if !mintTiming && !clusterTiming {
-		return unavailableArm("Sniper Timing Detector", ModuleSniperTimingDetector, req, generatedAt, "Timestamped mint activity or parsed holder acquisition slots are required.")
+		reason := "Parsed holder acquisition slots or a complete mint-address signature history are required."
+		if p.RecentSignatureCount >= 100 && !p.TargetSignatureHistoryExhausted {
+			reason = "The latest 100 mint-address signatures are a truncated recent-activity window, not launch timing; parsed holder acquisition slots are required."
+		}
+		return unavailableArm("Sniper Timing Detector", ModuleSniperTimingDetector, req, generatedAt, reason)
 	}
 	risk := 8
 	s := armSignals(req, p, ModuleSniperTimingDetector)
@@ -253,7 +277,9 @@ func buildSniperTimingArm(req SecurityRadarRequest, p radarEvidenceProfile, gene
 		s["recent_signature_count"] = p.RecentSignatureCount
 		s["signature_window_seconds"] = p.SignatureWindowSeconds
 		s["failed_signature_count"] = p.FailedSignatureCount
-		e = append(e, fmt.Sprintf("Observed %d mint-address signatures in a %d second window.", p.RecentSignatureCount, p.SignatureWindowSeconds))
+		s["mint_signature_history_exhausted"] = true
+		s["mint_timing_scope"] = "complete_observed_address_history"
+		e = append(e, fmt.Sprintf("RPC returned the complete observed mint-address history: %d signatures across %d seconds.", p.RecentSignatureCount, p.SignatureWindowSeconds))
 	}
 	if clusterTiming {
 		clusterRisk := 12 + p.HolderCluster.SynchronizedWalletCount*10
@@ -268,6 +294,10 @@ func buildSniperTimingArm(req SecurityRadarRequest, p radarEvidenceProfile, gene
 		s["synchronization_slot_spread"] = p.HolderCluster.SynchronizationSlotSpread
 		s["parsed_holder_acquisition_evidence"] = true
 		e = append(e, fmt.Sprintf("%d resolved holder wallets acquired the token inside a %d-slot window.", p.HolderCluster.SynchronizedWalletCount, p.HolderCluster.SynchronizationSlotSpread))
+	}
+	if p.RecentSignatureCount >= 100 && !p.TargetSignatureHistoryExhausted {
+		s["truncated_recent_mint_window_ignored"] = true
+		e = append(e, "The latest 100 mint-address signatures were not treated as launch timing because the history was truncated.")
 	}
 	s["scope_note"] = "Timing coordination is evidence of automation/coordination risk; it is not sole proof of common ownership."
 	e = append(e, "Timing evidence is combined with funding relations before Koschei raises a high-confidence Sybil conclusion.")

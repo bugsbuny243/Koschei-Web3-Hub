@@ -70,34 +70,36 @@ type SecurityRadarFinalVerdict struct {
 }
 
 type radarEvidenceProfile struct {
-	Target                 string
-	Network                string
-	RPCConfigured          bool
-	LiveRPC                bool
-	DataQuality            string
-	EvidenceStatus         string
-	AccountExists          bool
-	AccountOwner           string
-	AccountExecutable      bool
-	IsTokenMint            bool
-	MintAuthorityPresent   bool
-	FreezeAuthorityPresent bool
-	TokenSupply            float64
-	LargestHolderPct       int
-	Top10HolderPct         int
-	RawLargestHolderPct    int
-	RawTop10HolderPct      int
-	LargestAccounts        int
-	HolderRoles            HolderRoleAnalysis
-	HolderCluster          HolderClusterAnalysis
-	TargetOldestBlockTime  int64
-	TargetOldestSlot       int64
-	RecentSignatureCount   int
-	FailedSignatureCount   int
-	SignatureWindowSeconds int64
-	LatestSignature        string
-	LatestSlot             int64
-	Errors                 []string
+	Target                          string
+	Network                         string
+	RPCConfigured                   bool
+	LiveRPC                         bool
+	DataQuality                     string
+	EvidenceStatus                  string
+	AccountExists                   bool
+	AccountOwner                    string
+	AccountExecutable               bool
+	IsTokenMint                     bool
+	MintAuthorityPresent            bool
+	FreezeAuthorityPresent          bool
+	TokenSupply                     float64
+	LargestHolderPct                int
+	Top10HolderPct                  int
+	RawLargestHolderPct             int
+	RawTop10HolderPct               int
+	LargestAccounts                 int
+	HolderRoles                     HolderRoleAnalysis
+	HolderCluster                   HolderClusterAnalysis
+	TargetOldestBlockTime           int64
+	TargetOldestSlot                int64
+	RecentSignatureCount            int
+	FailedSignatureCount            int
+	SignatureWindowSeconds          int64
+	TargetSignatureHistoryExhausted bool
+	TargetSignatureTimingObserved   bool
+	LatestSignature                 string
+	LatestSlot                      int64
+	Errors                          []string
 }
 
 func AnalyzeSecurityRadars(req SecurityRadarRequest) SecurityRadarBundle {
@@ -236,6 +238,7 @@ func collectRadarEvidence(req SecurityRadarRequest) radarEvidenceProfile {
 	if signatures, err := SolanaGetSignaturesForAddress(ctx, rpcURL, req.Target, 100); err == nil {
 		profile.LiveRPC = true
 		profile.RecentSignatureCount = len(signatures)
+		profile.TargetSignatureHistoryExhausted = len(signatures) < 100
 		if len(signatures) > 0 {
 			profile.LatestSignature = signatures[0].Signature
 			profile.LatestSlot = signatures[0].Slot
@@ -256,6 +259,7 @@ func collectRadarEvidence(req SecurityRadarRequest) radarEvidenceProfile {
 			}
 		}
 		if newest > 0 && oldest > 0 && newest >= oldest {
+			profile.TargetSignatureTimingObserved = true
 			profile.SignatureWindowSeconds = newest - oldest
 			profile.TargetOldestBlockTime = oldest
 		}
