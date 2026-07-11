@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -25,8 +26,9 @@ func (a *PumpPortalRadarAdapter) HandleEvent(ctx context.Context, ev PumpPortalE
 		return nil
 	}
 	signature := strings.TrimSpace(ev.Signature)
+	creator := strings.TrimSpace(ev.Creator)
 	if signature != "" {
-		inserted, err := a.Store.MarkSignatureSeen(ctx, ModulePumpSybilRadar, signature, firstNonEmptyPumpPortal(ev.Creator, ev.Trader), "solana-mainnet")
+		inserted, err := a.Store.MarkSignatureSeen(ctx, ModulePumpSybilRadar, signature, firstNonEmptyPumpPortal(creator, ev.Trader), "solana-mainnet")
 		if err != nil {
 			return err
 		}
@@ -34,27 +36,16 @@ func (a *PumpPortalRadarAdapter) HandleEvent(ctx context.Context, ev PumpPortalE
 			return nil
 		}
 	}
+
 	eventType := pumpPortalEventType(ev)
-	signals := map[string]any{
-		"source":      "pumpportal",
-		"provider":    "pumpportal",
-		"event_type":  eventType,
-		"mint":        mint,
-		"name":        ev.Name,
-		"symbol":      ev.Symbol,
-		"creator":     ev.Creator,
-		"trader":      ev.Trader,
-		"tx_type":     ev.TxType,
-		"signature":   signature,
-		"received_at": ev.ReceivedAt,
-	}
+	signals := pumpPortalSignals(ev, mint, signature, eventType)
 	rawSummary := map[string]any{
 		"source":      "pumpportal",
 		"event_type":  eventType,
 		"mint":        mint,
 		"name":        ev.Name,
 		"symbol":      ev.Symbol,
-		"creator":     ev.Creator,
+		"creator":     creator,
 		"trader":      ev.Trader,
 		"tx_type":     ev.TxType,
 		"signature":   signature,
@@ -67,7 +58,7 @@ func (a *PumpPortalRadarAdapter) HandleEvent(ctx context.Context, ev PumpPortalE
 		TargetType:    "token",
 		Network:       "solana-mainnet",
 		Signature:     signature,
-		SourceAddress: firstNonEmptyPumpPortal(ev.Creator, ev.Trader),
+		SourceAddress: firstNonEmptyPumpPortal(creator, ev.Trader),
 		EventType:     eventType,
 		Signals:       signals,
 		RawSummary:    rawSummary,
@@ -76,30 +67,124 @@ func (a *PumpPortalRadarAdapter) HandleEvent(ctx context.Context, ev PumpPortalE
 	if err != nil {
 		return err
 	}
-	bundle := AnalyzeSecurityRadars(SecurityRadarRequest{Target: mint, Network: "solana-mainnet", Mode: "pumpportal_discovery"})
-	verdict := bundle.PumpSybilRadar
-	verdict.Signals = mergePumpPortalSignals(verdict.Signals, signals)
-	_, err = a.Store.InsertVerdict(ctx, SecurityRadarVerdictRecord{
-		EventID:        eventID,
-		ModuleID:       verdict.ModuleID,
-		Target:         verdict.Target,
-		TargetType:     "token",
-		Network:        verdict.Network,
-		Grade:          verdict.Grade,
-		RiskIndex:      verdict.RiskIndex,
-		RiskLevel:      verdict.RiskLevel,
-		Verdict:        verdict.Verdict,
-		Recommendation: verdict.Recommendation,
-		Evidence:       verdict.Evidence,
-		Signals:        verdict.Signals,
-		RuleVersion:    verdict.RuleVersion,
-		Signed:         verdict.Signed,
-		Signature:      firstNonEmptyPumpPortal(verdict.Signature, signature),
-		Source:         "pumpportal",
-		EventType:      eventType,
-		Provider:       "alchemy+pumpportal",
+
+	// A PumpPortal discovery must become a complete ARVIS story, not an isolated
+	// pump module row. The live-stream mode enables the verified Pump arm while
+	// the same run also evaluates holder, authority, graph, timing and program
+	// evidence. Signed arms and the final verdict share the source event.
+	analysis := AnalyzeArvisRadars(SecurityRadarRequest{
+		Target:  mint,
+		Network: "solana-mainnet",
+		Mode:    "live_stream:" + ModulePumpSybilRadar,
 	})
-	return err
+	bundle := EvidenceBackedSecurityRadarBundle(analysis.Bundle)
+	arms := ArvisArmsFromBundle(bundle)
+	if len(arms) == 0 {
+		arms = analysis.Arms
+	}
+
+	var firstErr error
+	inserted := 0
+	for _, arm := range arms {
+		if !arm.Signed || !pumpPortalArmVerified(arm) {
+			continue
+		}
+		arm.Signals = mergePumpPortalSignals(arm.Signals, signals)
+		arm.Signals["source_verified_program_event"] = true
+		arm.Signals["source_module"] = ModulePumpSybilRadar
+		arm.Signals["customer_detail_visible"] = true
+		if arm.ModuleID == ModuleFinalVerdictEngine {
+			arm.Signals["warning_label"] = pumpPortalWarningLabel(arm.RiskIndex)
+			arm.Signals["warning_scope"] = "token and source-reported creator/deployer wallet; evidence-based risk signal, not an identity accusation"
+		}
+		arm.Evidence = append(arm.Evidence,
+			"PumpPortal reported a Pump token discovery event for this mint.",
+		)
+		if isLikelySolanaAddress(creator) {
+			arm.Evidence = append(arm.Evidence, fmt.Sprintf("Source-reported creator/deployer wallet: %s.", creator))
+		}
+		if _, err := a.Store.InsertVerdict(ctx, SecurityRadarVerdictRecord{
+			EventID:        eventID,
+			ModuleID:       arm.ModuleID,
+			Target:         arm.Target,
+			TargetType:     "token",
+			Network:        arm.Network,
+			Grade:          arm.Grade,
+			RiskIndex:      arm.RiskIndex,
+			RiskLevel:      arm.RiskLevel,
+			Verdict:        arm.Verdict,
+			Recommendation: arm.Recommendation,
+			Evidence:       arm.Evidence,
+			Signals:        arm.Signals,
+			RuleVersion:    arm.RuleVersion,
+			Signed:         arm.Signed,
+			Signature:      firstNonEmptyPumpPortal(arm.Signature, signature),
+			Source:         "pumpportal",
+			EventType:      eventType,
+			Provider:       "alchemy+pumpportal",
+		}); err != nil && firstErr == nil {
+			firstErr = err
+		} else if err == nil {
+			inserted++
+		}
+	}
+	if inserted == 0 && firstErr == nil {
+		log.Printf("pumpportal radar discovery stored without signed ARVIS verdict: mint=%s", mint)
+	}
+	return firstErr
+}
+
+func pumpPortalSignals(ev PumpPortalEvent, mint, signature, eventType string) map[string]any {
+	creator := strings.TrimSpace(ev.Creator)
+	signals := map[string]any{
+		"source":                     "pumpportal",
+		"provider":                   "pumpportal",
+		"event_type":                 eventType,
+		"launch_platform":            "pump.fun",
+		"mint":                       mint,
+		"name":                       ev.Name,
+		"token_name":                 ev.Name,
+		"symbol":                     ev.Symbol,
+		"token_symbol":               ev.Symbol,
+		"creator":                    creator,
+		"trader":                     ev.Trader,
+		"tx_type":                    ev.TxType,
+		"signature":                  signature,
+		"received_at":                ev.ReceivedAt,
+		"creator_identity_claimed":   false,
+		"creator_relation_scope":     "source-reported launch metadata",
+		"customer_detail_visible":    true,
+		"source_verified_pump_event": true,
+	}
+	if isLikelySolanaAddress(creator) {
+		signals["creator_wallet"] = creator
+		signals["deployer_wallet"] = creator
+		signals["creator_wallet_source"] = "pumpportal_event_metadata"
+	}
+	return signals
+}
+
+func pumpPortalArmVerified(arm SecurityRadarVerdict) bool {
+	if !arm.Signed || arm.Signals == nil {
+		return false
+	}
+	for _, key := range []string{"verified_evidence", "real_onchain_evidence", "real_offchain_evidence"} {
+		if value, _ := arm.Signals[key].(bool); value {
+			return true
+		}
+	}
+	return false
+}
+
+func pumpPortalWarningLabel(risk int) string {
+	switch {
+	case risk >= 65:
+		return "HIGH_RISK_WARNING"
+	case risk >= 35:
+		return "WARNING"
+	default:
+		return "MONITOR"
+	}
 }
 
 func StartPumpPortalRadarIfEnabled(ctx context.Context, db *sql.DB) func() {
