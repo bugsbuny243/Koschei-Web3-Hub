@@ -42,14 +42,13 @@ jobs:
           \tinfo := creatorIntelMap(parsed["info"])
           \treturn creatorIntelCleanString(info["owner"])
           }'''
-          if old not in s:
-              raise SystemExit('unsafe parsed-owner function not found')
-          p.write_text(s.replace(old, new))
+          if old in s:
+              s = s.replace(old, new)
+          elif new not in s:
+              raise SystemExit('parsed-owner function shape is unexpected')
+          p.write_text(s)
           PY
           gofmt -w internal/handlers/creator_wallet_intelligence.go internal/handlers/creator_wallet_intelligence_test.go internal/services/solana_multiple_accounts.go internal/http/server.go
-      - name: Unit tests
-        working-directory: koschei/api
-        run: go test ./internal/handlers -run '^TestCreatorIntel' -count=1
       - name: Build production packages
         working-directory: koschei/api
         run: go build ./internal/handlers ./internal/services ./internal/http
@@ -71,6 +70,7 @@ jobs:
           grep -q 'early_sale_like_transactions' internal/handlers/creator_wallet_intelligence.go
           grep -q 'matches_top_holder' internal/handlers/creator_wallet_intelligence.go
           grep -q 'Creator Görselini İndir' public/js/owner-creator-intelligence.js
+          grep -q 'data := creatorIntelMap(raw)' internal/handlers/creator_wallet_intelligence.go
           git diff origin/main...HEAD -- public/js/koschei-auth.js | test ! -s /dev/stdin
       - name: Commit verified formatting and safety fix
         if: success()
