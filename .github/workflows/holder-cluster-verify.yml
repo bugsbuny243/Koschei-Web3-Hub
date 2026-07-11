@@ -1,0 +1,56 @@
+name: Holder Cluster Verify
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "koschei/api/scripts/holder_cluster_patch.py"
+      - "koschei/api/internal/services/**"
+      - "koschei/api/internal/handlers/owner_operations.go"
+      - ".github/workflows/holder-cluster-verify.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Apply holder cluster patch
+        working-directory: koschei/api
+        run: |
+          python scripts/holder_cluster_patch.py
+          gofmt -w internal/services/holder_cluster_intelligence.go internal/services/holder_cluster_intelligence_test.go internal/services/security_radars.go internal/services/arvis_arms.go internal/handlers/owner_operations.go
+      - name: Holder cluster tests
+        working-directory: koschei/api
+        run: go test ./internal/services -run '^TestSummarizeHolderCluster' -count=1
+      - name: Production package build
+        working-directory: koschei/api
+        run: go build ./internal/services ./internal/handlers ./internal/http
+      - name: Linux build
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: Contract assertions
+        working-directory: koschei/api
+        run: |
+          grep -q 'HIGH SYBIL / COORDINATED HOLDER RISK' internal/services/holder_cluster_intelligence.go
+          grep -q 'shared funding source' internal/services/holder_cluster_intelligence.go
+          grep -q 'SynchronizedWalletCount' internal/services/arvis_arms.go
+          grep -q 'holder_cluster' internal/handlers/owner_operations.go
+          git diff origin/main...HEAD -- public/js/koschei-auth.js | test ! -s /dev/stdin
+      - name: Commit verified implementation
+        if: success()
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add koschei/api/internal/services/holder_cluster_intelligence.go koschei/api/internal/services/holder_cluster_intelligence_test.go koschei/api/internal/services/security_radars.go koschei/api/internal/services/arvis_arms.go koschei/api/internal/handlers/owner_operations.go
+          git commit -m 'Add evidence-backed holder cluster intelligence'
+          git push origin HEAD:${{ github.head_ref }}
