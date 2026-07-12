@@ -11,7 +11,6 @@ import (
 
 	"koschei/api/internal/cache"
 	"koschei/api/internal/handlers"
-	"koschei/api/internal/jobs"
 	"koschei/api/internal/web3"
 )
 
@@ -19,8 +18,6 @@ type serverConfig struct {
 	dbRead    *sql.DB
 	cache     cache.Cache
 	solanaRPC *web3.SolanaRPC
-	jobStore  *jobs.Store
-	jobQueue  jobs.Queue
 }
 
 type Option func(*serverConfig)
@@ -34,8 +31,6 @@ func WithCache(value cache.Cache) Option {
 	}
 }
 func WithSolanaRPC(rpc *web3.SolanaRPC) Option { return func(c *serverConfig) { c.solanaRPC = rpc } }
-func WithJobStore(store *jobs.Store) Option    { return func(c *serverConfig) { c.jobStore = store } }
-func WithJobQueue(queue jobs.Queue) Option     { return func(c *serverConfig) { c.jobQueue = queue } }
 
 func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string, opts ...Option) http.Handler {
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
@@ -55,7 +50,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	if config.solanaRPC == nil {
 		config.solanaRPC = web3.NewSolanaRPC(config.cache)
 	}
-	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue}
+	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC}
 	mux := http.NewServeMux()
 	koschAccess := func(next http.HandlerFunc) http.HandlerFunc {
 		return handlers.RequireAuth(h.RequireActiveEntitlement(next))
