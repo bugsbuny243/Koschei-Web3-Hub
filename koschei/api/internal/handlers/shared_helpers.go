@@ -55,19 +55,6 @@ func normalizePlanTier(planTier string) string {
 	return normalizePackageID(planTier)
 }
 
-func normalizePackageID(packageID string) string {
-	switch strings.ToLower(strings.TrimSpace(packageID)) {
-	case "starter":
-		return "starter"
-	case "builder", "pro", "professional":
-		return "professional"
-	case "studio", "enterprise":
-		return "enterprise"
-	default:
-		return ""
-	}
-}
-
 func nullTimePtr(value sql.NullTime) *time.Time {
 	if !value.Valid {
 		return nil
