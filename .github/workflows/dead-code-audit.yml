@@ -3,6 +3,8 @@ name: Dead Code Audit
 on:
   push:
     branches: [chore/dead-code-audit-cleanup-20260712]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
