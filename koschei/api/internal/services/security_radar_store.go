@@ -67,10 +67,13 @@ func (s *SecurityRadarStore) MarkSignatureSeen(ctx context.Context, moduleID, si
 		return false, nil
 	}
 	var id string
+	// Production carries both the legacy (module_id, signature) unique index
+	// and the newer network-scoped index. A targetless conflict handler makes
+	// duplicate PumpPortal deliveries idempotent against either constraint.
 	err := s.DB.QueryRowContext(ctx, `
 		INSERT INTO security_radar_seen_signatures (module_id, signature, source_address, source_target, network, seen_at, created_at)
 		VALUES ($1,$2,NULLIF($3,''),NULLIF($3,''),$4,now(),now())
-		ON CONFLICT (signature, module_id, network) DO NOTHING
+		ON CONFLICT DO NOTHING
 		RETURNING id::text`, moduleID, signature, sourceAddress, network).Scan(&id)
 	if err == sql.ErrNoRows {
 		return false, nil
