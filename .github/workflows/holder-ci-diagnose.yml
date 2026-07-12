@@ -1,0 +1,45 @@
+name: Holder CI Diagnose
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/holder-ci-diagnose.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Run full tests and capture concise failure
+        working-directory: koschei/api
+        shell: bash
+        run: |
+          set +e
+          go test ./... > /tmp/full-test.log 2>&1
+          status=$?
+          {
+            echo "exit_status=$status"
+            echo "=== failure markers ==="
+            grep -E -- '(^--- FAIL:|^FAIL[[:space:]]|panic:|undefined:|cannot use |too many arguments|not enough arguments|expected .* got|build failed)' /tmp/full-test.log | tail -n 160 || true
+            echo "=== log tail ==="
+            tail -n 120 /tmp/full-test.log
+          } > ci-holder-diagnose.txt
+          exit 0
+      - name: Commit diagnostic
+        working-directory: koschei/api
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ci-holder-diagnose.txt
+          git commit -m 'Add temporary holder CI diagnostic' || exit 0
+          git push origin HEAD:${{ github.head_ref }}
