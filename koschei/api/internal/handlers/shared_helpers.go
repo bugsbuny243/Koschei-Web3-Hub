@@ -61,3 +61,11 @@ func nullTimePtr(value sql.NullTime) *time.Time {
 	}
 	return &value.Time
 }
+
+func isMissingRelation(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "does not exist") || strings.Contains(msg, "undefined_table")
+}
