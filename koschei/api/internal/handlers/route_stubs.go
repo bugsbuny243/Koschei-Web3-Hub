@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log"
 	"net/http"
 )
 
@@ -33,6 +34,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		log.Printf("provisionMember failed: sub=%s email=%s err=%v", claims.Sub, claims.Email, err)
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "profile provisioning unavailable"})
 		return
 	}
