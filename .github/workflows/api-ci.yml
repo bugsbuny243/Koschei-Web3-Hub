@@ -33,7 +33,12 @@ jobs:
       - name: Download modules
         run: go mod download
       - name: Test
-        run: go test ./...
+        run: |
+          set +e
+          go test ./... > /tmp/go-test.log 2>&1
+          status=$?
+          tail -n 100 /tmp/go-test.log
+          exit $status
       - name: Vet
         run: go vet ./...
       - name: Build
