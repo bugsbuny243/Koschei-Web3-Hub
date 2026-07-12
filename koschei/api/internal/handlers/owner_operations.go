@@ -109,7 +109,7 @@ func (h *Handler) OwnerRadarOverview(w http.ResponseWriter, r *http.Request) {
 		if loaded, err := store.ListSources(r.Context()); err == nil {
 			sources = loaded
 		}
-		if loaded, err := store.LatestPumpHighVolumeReports(r.Context(), 100); err == nil {
+		if loaded, err := store.LatestPumpHighVolumeReports(r.Context(), 200); err == nil {
 			highVolumePump = loaded
 		}
 	}

@@ -74,6 +74,11 @@ func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	verified := make([]services.SecurityRadarVerdictRecord, 0, len(items))
 	for _, item := range items {
+		if visible, exists := item.Signals["customer_detail_visible"]; exists {
+			if allowed, ok := visible.(bool); ok && !allowed {
+				continue
+			}
+		}
 		if item.Signed && radarSignalsVerified(item.Signals) && item.ModuleID == services.ModuleFinalVerdictEngine {
 			verified = append(verified, item)
 		}

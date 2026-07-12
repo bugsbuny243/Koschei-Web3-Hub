@@ -22,8 +22,9 @@ const (
 	defaultPumpHighVolumeThresholdUSD = 500000.0
 	defaultPumpHighVolumePoll         = 5 * time.Minute
 	defaultPumpHighVolumeCooldown     = 6 * time.Hour
+	defaultPumpHighVolumeAttemptPause = 30 * time.Minute
 	defaultPumpHighVolumePageSize     = 900
-	defaultPumpHighVolumeMaxReports   = 3
+	defaultPumpHighVolumeMaxReports   = 1
 	dexScreenerTokenBatchSize         = 30
 	pumpHighVolumeEventType           = "pumpportal_high_volume_24h"
 	pumpHighVolumeSource              = "pump_volume_gate"
@@ -265,6 +266,15 @@ func pumpHighVolumeReportCooldown() time.Duration {
 	return defaultPumpHighVolumeCooldown
 }
 
+func pumpHighVolumeAttemptCooldown() time.Duration {
+	if raw := strings.TrimSpace(os.Getenv("PUMP_HIGH_VOLUME_ATTEMPT_COOLDOWN_SECONDS")); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil && value >= 300 && value <= 21600 {
+			return time.Duration(value) * time.Second
+		}
+	}
+	return defaultPumpHighVolumeAttemptPause
+}
+
 func pumpHighVolumePageSize() int {
 	if raw := strings.TrimSpace(os.Getenv("PUMP_HIGH_VOLUME_CANDIDATE_PAGE_SIZE")); raw != "" {
 		if value, err := strconv.Atoi(raw); err == nil && value >= 30 && value <= 3000 {
@@ -289,6 +299,7 @@ type PumpHighVolumeRadarWorker struct {
 	ThresholdUSD       float64
 	PollEvery          time.Duration
 	ReportCooldown     time.Duration
+	AttemptCooldown    time.Duration
 	CandidatePageSize  int
 	MaxReportsPerCycle int
 
@@ -304,8 +315,8 @@ func NewPumpHighVolumeRadarWorker(store *SecurityRadarStore, provider PumpVolume
 	return &PumpHighVolumeRadarWorker{
 		Store: store, Volumes: provider,
 		ThresholdUSD: PumpHighVolumeThresholdUSD(), PollEvery: PumpHighVolumePollInterval(),
-		ReportCooldown: pumpHighVolumeReportCooldown(), CandidatePageSize: pumpHighVolumePageSize(),
-		MaxReportsPerCycle: pumpHighVolumeMaxReportsPerCycle(),
+		ReportCooldown: pumpHighVolumeReportCooldown(), AttemptCooldown: pumpHighVolumeAttemptCooldown(),
+		CandidatePageSize: pumpHighVolumePageSize(), MaxReportsPerCycle: pumpHighVolumeMaxReportsPerCycle(),
 	}
 }
 
@@ -405,6 +416,11 @@ func (w *PumpHighVolumeRadarWorker) RunOnce(ctx context.Context) error {
 
 	reports := 0
 	for _, item := range qualified {
+		attempted, attemptErr := w.Store.PumpHighVolumeAttemptedRecently(ctx, item.Candidate.Mint, w.AttemptCooldown)
+		if attemptErr != nil {
+			log.Printf("pump high-volume attempt cooldown lookup failed mint=%s: %v", item.Candidate.Mint, attemptErr)
+			continue
+		}
 		eventID, eventErr := w.Store.RecordPumpHighVolumeObservation(ctx, item.Candidate, item.Market, w.ThresholdUSD)
 		if eventErr != nil {
 			log.Printf("pump high-volume event store failed mint=%s: %v", item.Candidate.Mint, eventErr)
@@ -415,7 +431,11 @@ func (w *PumpHighVolumeRadarWorker) RunOnce(ctx context.Context) error {
 			log.Printf("pump high-volume cooldown lookup failed mint=%s: %v", item.Candidate.Mint, recentErr)
 			continue
 		}
-		if recent || reports >= w.MaxReportsPerCycle {
+		if recent || attempted || reports >= w.MaxReportsPerCycle {
+			continue
+		}
+		if markErr := w.Store.MarkPumpHighVolumeAttempted(ctx, eventID); markErr != nil {
+			log.Printf("pump high-volume attempt marker failed mint=%s: %v", item.Candidate.Mint, markErr)
 			continue
 		}
 		if err := w.scanAndStore(ctx, eventID, item.Candidate, item.Market); err != nil {
@@ -562,12 +582,41 @@ func (s *SecurityRadarStore) PumpHighVolumeReportedRecently(ctx context.Context,
 	return exists, err
 }
 
+func (s *SecurityRadarStore) PumpHighVolumeAttemptedRecently(ctx context.Context, mint string, cooldown time.Duration) (bool, error) {
+	if s == nil || s.DB == nil {
+		return false, nil
+	}
+	if cooldown <= 0 {
+		cooldown = defaultPumpHighVolumeAttemptPause
+	}
+	var exists bool
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM security_radar_events
+			WHERE event_type=$1 AND source=$2 AND lower(target)=lower($3)
+			  AND COALESCE(signals->>'auto_scan_attempted','false')='true'
+			  AND created_at >= now()-($4 * interval '1 second')
+		)`, pumpHighVolumeEventType, pumpHighVolumeSource, strings.TrimSpace(mint), int64(cooldown/time.Second)).Scan(&exists)
+	return exists, err
+}
+
+func (s *SecurityRadarStore) MarkPumpHighVolumeAttempted(ctx context.Context, eventID string) error {
+	if s == nil || s.DB == nil || strings.TrimSpace(eventID) == "" {
+		return nil
+	}
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE security_radar_events
+		SET signals=jsonb_set(COALESCE(signals,'{}'::jsonb),'{auto_scan_attempted}','true'::jsonb,true), updated_at=now()
+		WHERE id=$1::uuid`, strings.TrimSpace(eventID))
+	return err
+}
+
 func (s *SecurityRadarStore) LatestPumpHighVolumeReports(ctx context.Context, limit int) ([]PumpHighVolumeOwnerItem, error) {
 	if s == nil || s.DB == nil {
 		return []PumpHighVolumeOwnerItem{}, nil
 	}
 	if limit <= 0 || limit > 200 {
-		limit = 100
+		limit = 200
 	}
 	rows, err := s.DB.QueryContext(ctx, `
 		WITH latest_events AS (
@@ -613,7 +662,10 @@ func (s *SecurityRadarStore) LatestPumpHighVolumeReports(ctx context.Context, li
 		item.LiquidityUSD = pumpSignalFloat(item.Signals, "liquidity_usd")
 		item.MarketCapUSD = pumpSignalFloat(item.Signals, "market_cap_usd")
 		item.VolumeProvider = pumpSignalString(item.Signals, "volume_provider")
-		item.ReportStatus = "evidence_pending"
+		item.ReportStatus = "queued"
+		if pumpSignalBool(item.Signals, "auto_scan_attempted") {
+			item.ReportStatus = "evidence_pending"
+		}
 		if risk.Valid {
 			value := int(risk.Int64)
 			item.RiskIndex = &value
@@ -637,7 +689,7 @@ func pumpHighVolumeSignals(candidate PumpRadarCandidate, market PumpTokenMarket,
 		"symbol": firstNonEmptyPumpPortal(candidate.Symbol, market.Symbol), "token_symbol": firstNonEmptyPumpPortal(candidate.Symbol, market.Symbol),
 		"creator": candidate.Creator, "creator_wallet": candidate.Creator, "creator_relation_scope": "source-reported PumpPortal launch metadata",
 		"creator_identity_claimed": false, "source_verified_pump_event": true,
-		"auto_volume_gate": true, "volume_window": "24h", "volume_currency": "USD",
+		"auto_volume_gate": true, "auto_scan_attempted": false, "volume_window": "24h", "volume_currency": "USD",
 		"volume_24h_usd": roundPumpUSD(market.Volume24hUSD), "volume_threshold_usd": roundPumpUSD(threshold),
 		"volume_pair_count": market.PairCount, "volume_provider": firstNonEmptyPumpPortal(market.Provider, "dexscreener"),
 		"best_pair_address": market.BestPairAddress, "best_pair_dex": market.BestPairDEX,
@@ -701,5 +753,17 @@ func pumpSignalFloat(signals map[string]any, key string) float64 {
 		return parsed
 	default:
 		return 0
+	}
+}
+
+func pumpSignalBool(signals map[string]any, key string) bool {
+	switch value := signals[key].(type) {
+	case bool:
+		return value
+	case string:
+		parsed, _ := strconv.ParseBool(strings.TrimSpace(value))
+		return parsed
+	default:
+		return false
 	}
 }

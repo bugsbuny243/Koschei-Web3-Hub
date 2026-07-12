@@ -61,6 +61,9 @@ func TestPumpHighVolumeSignalsUse24hUSDGate(t *testing.T) {
 	if signals["auto_volume_gate"] != true || signals["source_verified_pump_event"] != true {
 		t.Fatalf("missing gate evidence: %#v", signals)
 	}
+	if pumpSignalBool(signals, "auto_scan_attempted") {
+		t.Fatalf("a qualified observation must begin queued, not attempted: %#v", signals)
+	}
 	if got := pumpSignalFloat(signals, "volume_24h_usd"); got != 500001.25 {
 		t.Fatalf("volume = %.2f", got)
 	}
@@ -87,5 +90,16 @@ func TestPumpHighVolumeThresholdDefaultsTo500K(t *testing.T) {
 	t.Setenv("PUMP_HIGH_VOLUME_MIN_24H_USD", "")
 	if got := PumpHighVolumeThresholdUSD(); got != 500000 {
 		t.Fatalf("threshold = %.2f", got)
+	}
+}
+
+func TestPumpHighVolumeQuotaDefaults(t *testing.T) {
+	t.Setenv("PUMP_HIGH_VOLUME_MAX_REPORTS_PER_CYCLE", "")
+	t.Setenv("PUMP_HIGH_VOLUME_ATTEMPT_COOLDOWN_SECONDS", "")
+	if got := pumpHighVolumeMaxReportsPerCycle(); got != 1 {
+		t.Fatalf("max reports per cycle = %d", got)
+	}
+	if got := pumpHighVolumeAttemptCooldown(); got != 30*time.Minute {
+		t.Fatalf("attempt cooldown = %s", got)
 	}
 }
