@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 root = Path('.')
 
@@ -56,24 +55,31 @@ shared.write_text(text)
 # fallback instead of preserving an undocumented second issuer.
 neon = root / 'internal/handlers/neon_auth.go'
 text = neon.read_text()
-text = text.replace('''func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
+old = '''func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
 	if claims, ok, err := tryLocalJWT(token); ok {
 		return claims, err
 	}
 	return neonClaimsFromToken(token)
-}''', '''func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
+}'''
+new = '''func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
 	return neonClaimsFromToken(token)
-}''')
-neon.write_text(text)
+}'''
+if old not in text:
+    raise SystemExit('local JWT fallback block not found')
+neon.write_text(text.replace(old, new, 1))
 
 # Remove the orphaned Shopier webhook implementation. It is not registered and
 # referenced a package map that no longer exists, breaking the production build.
 owner = root / 'internal/handlers/owner.go'
 text = owner.read_text()
-pattern = re.compile(r'\nfunc \(h \*Handler\) ShopierWebhook\(w http\.ResponseWriter, r \*http\.Request\) \{.*?\n\}\n\nfunc \(h \*Handler\) executeOwnerBrainCommand', re.S)
-text, count = pattern.subn('\nfunc (h *Handler) executeOwnerBrainCommand', text, count=1)
-if count != 1:
+start_marker = 'func (h *Handler) ShopierWebhook('
+end_marker = 'func (h *Handler) executeOwnerBrainCommand('
+start = text.find(start_marker)
+end = text.find(end_marker, start if start >= 0 else 0)
+if start < 0 or end < 0 or end <= start:
     raise SystemExit('ShopierWebhook block not found')
+# Preserve exactly one blank line before the next function.
+text = text[:start].rstrip() + '\n\n' + text[end:]
 owner.write_text(text)
 
 # Files proven to have no live route or production reference. Helpers used by
