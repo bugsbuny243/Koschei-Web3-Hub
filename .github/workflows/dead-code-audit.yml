@@ -1,8 +1,6 @@
 name: Dead Code Audit
 
 on:
-  push:
-    branches: [chore/dead-code-audit-cleanup-20260712]
   pull_request:
     branches: [main]
 
@@ -26,12 +24,7 @@ jobs:
           python - <<'PY' | tee dead-code-audit.txt
           from pathlib import Path
           import re
-
-          names = {
-            'rug_radar.go','web3.go','local_auth.go','mev_shield.go','liquidity_radar.go',
-            'impact_metrics.go','metadata.go','owner_payment_health.go','web3_jobs.go',
-            'package_status.go','jobs.go','dao_guardian.go','plans.go','payments.go','smart_money.go'
-          }
+          names = {'rug_radar.go','web3.go','local_auth.go','mev_shield.go','liquidity_radar.go','impact_metrics.go','metadata.go','owner_payment_health.go','web3_jobs.go','package_status.go','jobs.go','dao_guardian.go','plans.go','payments.go','smart_money.go'}
           root = Path('.')
           files = [p for p in root.rglob('*.go') if '/vendor/' not in str(p)]
           candidates = [p for p in files if p.name in names or p.name.startswith('credits')]
@@ -45,40 +38,39 @@ jobs:
             symbols = list(dict.fromkeys(funcs + types + vars_))
             external = []
             for sym in symbols:
-              hits = []
-              rx = re.compile(r'\b'+re.escape(sym)+r'\b')
-              for other, body in all_text.items():
-                if other == p:
-                  continue
-                count = len(rx.findall(body))
-                if count:
-                  hits.append((str(other), count))
-              if hits:
-                external.append((sym, hits))
+              hits=[]; rx=re.compile(r'\b'+re.escape(sym)+r'\b')
+              for other,body in all_text.items():
+                if other==p: continue
+                count=len(rx.findall(body))
+                if count: hits.append((str(other),count))
+              if hits: external.append((sym,hits))
             print(f'\nFILE {p} lines={len(text.splitlines())}')
             print('symbols:', ', '.join(symbols) or '(none)')
             if external:
               print('EXTERNAL REFERENCES:')
-              for sym, hits in external:
-                print(' ', sym, '=>', '; '.join(f'{f}:{n}' for f,n in hits))
-            else:
-              print('EXTERNAL REFERENCES: NONE')
-
+              for sym,hits in external: print(' ',sym,'=>','; '.join(f'{f}:{n}' for f,n in hits))
+            else: print('EXTERNAL REFERENCES: NONE')
           print('\n=== ROUTE REFERENCES ===')
           for p in sorted(root.rglob('*.go')):
-            body = p.read_text(errors='ignore')
-            if re.search(r'(RugRadar|Web3|MEV|Liquidity|PackageStatus|SmartMoney|DAO|Payment|Credit|Job)', body, re.I):
-              if 'internal/http' in str(p) or 'server.go' in p.name or 'routes' in p.name or 'router' in str(p):
-                print(p)
-                for i,line in enumerate(body.splitlines(),1):
-                  if re.search(r'(RugRadar|Web3|MEV|Liquidity|PackageStatus|SmartMoney|DAO|Payment|Credit|Job)', line, re.I):
-                    print(f'  {i}: {line.strip()}')
+            body=p.read_text(errors='ignore')
+            if re.search(r'(RugRadar|Web3|MEV|Liquidity|PackageStatus|SmartMoney|DAO|Payment|Credit|Job)', body, re.I) and ('internal/http' in str(p) or 'server.go' in p.name or 'routes' in p.name or 'router' in str(p)):
+              print(p)
+              for i,line in enumerate(body.splitlines(),1):
+                if re.search(r'(RugRadar|Web3|MEV|Liquidity|PackageStatus|SmartMoney|DAO|Payment|Credit|Job)', line, re.I): print(f'  {i}: {line.strip()}')
           PY
       - name: Production build before cleanup
+        id: build
+        continue-on-error: true
         working-directory: koschei/api
-        run: go build ./...
+        run: go build ./... 2>&1 | tee build-before.txt
       - name: Upload audit
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dead-code-audit
-          path: koschei/api/dead-code-audit.txt
+          path: |
+            koschei/api/dead-code-audit.txt
+            koschei/api/build-before.txt
+      - name: Stop if baseline build is broken
+        if: steps.build.outcome == 'failure'
+        run: exit 1
