@@ -595,7 +595,7 @@ func (s *SecurityRadarStore) PumpHighVolumeAttemptedRecently(ctx context.Context
 			SELECT 1 FROM security_radar_events
 			WHERE event_type=$1 AND source=$2 AND lower(target)=lower($3)
 			  AND COALESCE(signals->>'auto_scan_attempted','false')='true'
-			  AND created_at >= now()-($4 * interval '1 second')
+			  AND updated_at >= now()-($4 * interval '1 second')
 		)`, pumpHighVolumeEventType, pumpHighVolumeSource, strings.TrimSpace(mint), int64(cooldown/time.Second)).Scan(&exists)
 	return exists, err
 }
