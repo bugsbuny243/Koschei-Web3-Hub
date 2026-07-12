@@ -1,4 +1,4 @@
-name: Repository Dead Code Audit
+name: Repository Cleanup Verify
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  audit:
+  cleanup:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,29 +19,47 @@ jobs:
         with:
           go-version-file: koschei/api/go.mod
           cache-dependency-path: koschei/api/go.sum
-      - name: Repair incomplete legacy payment cleanup
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply repository cleanup
         working-directory: koschei/api
         run: |
           python scripts/repo_cleanup_phase1.py
-          gofmt -w internal/handlers/owner.go
-      - name: Verify repaired baseline
+          python scripts/repo_cleanup_phase2.py
+          gofmt -w internal/handlers internal/router
+      - name: Production package build
         working-directory: koschei/api
-        run: go build ./...
-      - name: Run deletion simulations
-        run: python .github/scripts/repo_dead_code_audit.py
-      - name: Upload audit report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: repo-dead-code-audit
-          path: audit-output/
-          if-no-files-found: error
-      - name: Commit baseline repair
+        run: go build ./internal/handlers ./internal/http ./internal/router ./internal/services ./internal/web3
+      - name: Full Linux build
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: Full test suite
+        working-directory: koschei/api
+        run: go test ./... -count=1
+      - name: Frontend syntax
+        run: |
+          node --check koschei/api/public/js/koschei-premium-modules.js
+          node --check koschei/api/public/js/owner-control-center.js
+          node --check koschei/api/public/js/koschei-auth.js
+      - name: Cleanup contract
+        run: |
+          test ! -e koschei/api/internal/handlers/rug_radar.go
+          test ! -e koschei/api/internal/handlers/web3.go
+          test ! -e koschei/api/internal/handlers/local_auth.go
+          test ! -e koschei/api/internal/handlers/mev_shield.go
+          test ! -e koschei/api/internal/handlers/liquidity_radar.go
+          test ! -e koschei/api/internal/handlers/payments.go
+          test ! -e koschei/api/internal/router/model_router.go
+          test -e koschei/api/internal/handlers/kosch_access_guard.go
+          test -e koschei/api/internal/handlers/auth_session.go
+          ! grep -R "shopierPacks\|tryLocalJWT\|requirePremiumOutput\|consumePremiumOutput\|OwnerPaymentRequestsList\|ResolveModelRoute" koschei/api/internal --include='*.go'
+      - name: Commit verified cleanup
         if: success()
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add koschei/api/internal/handlers/owner.go
-          git commit -m 'Remove orphaned Shopier webhook'
+          git add -A
+          git commit -m 'Remove dead legacy repository surfaces'
           git push origin HEAD:${{ github.head_ref }}
