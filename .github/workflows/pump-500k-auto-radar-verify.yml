@@ -41,8 +41,22 @@ jobs:
           python scripts/pump_500k_auto_radar_patch.py
           gofmt -w main.go internal/services/pump_high_volume_radar.go internal/services/pump_high_volume_radar_test.go internal/services/pumpportal_radar_adapter.go internal/services/security_radar_watcher.go internal/handlers/owner_operations.go internal/handlers/security_radar.go internal/handlers/security_radar_detail.go
       - name: Focused Pump volume tests
+        id: focused_tests
+        continue-on-error: true
         working-directory: koschei/api
-        run: go test ./internal/services -run '^Test(DexScreenerPumpVolume|PumpHighVolume)' -count=1
+        run: |
+          set -o pipefail
+          go test ./internal/services -run '^Test(DexScreenerPumpVolume|PumpHighVolume)' -count=1 -v 2>&1 | tee pump-test.log
+      - name: Upload focused test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pump-500k-test-log
+          path: koschei/api/pump-test.log
+          if-no-files-found: error
+      - name: Stop on focused test failure
+        if: steps.focused_tests.outcome == 'failure'
+        run: exit 1
       - name: Production package build
         working-directory: koschei/api
         run: go build ./internal/services ./internal/handlers ./internal/http
