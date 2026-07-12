@@ -1,0 +1,29 @@
+name: Repository Dead Code Audit
+
+on:
+  push:
+    branches:
+      - chore/repo-dead-code-cleanup-20260712
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Run deletion simulations
+        run: python .github/scripts/repo_dead_code_audit.py
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-dead-code-audit
+          path: audit-output/
+          if-no-files-found: error
