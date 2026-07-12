@@ -1,0 +1,67 @@
+name: Holder Cluster Flow V2 Verify
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "koschei/api/scripts/holder_cluster_flow_v2_patch.py"
+      - "koschei/api/internal/services/holder_cluster_*.go"
+      - "koschei/api/internal/services/arvis_arms.go"
+      - "koschei/api/public/js/owner-control-center.js"
+      - "koschei/api/public/owner-production.html"
+      - ".github/workflows/holder-cluster-flow-v2-verify.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply Holder Cluster Flow V2 patch
+        working-directory: koschei/api
+        run: |
+          python scripts/holder_cluster_flow_v2_patch.py
+          gofmt -w internal/services/holder_cluster_intelligence.go internal/services/holder_cluster_flow_intelligence.go internal/services/holder_cluster_flow_intelligence_test.go internal/services/arvis_arms.go
+      - name: Focused flow tests
+        working-directory: koschei/api
+        run: go test ./internal/services -run '^TestHolderCluster(Flow|TokenOwner|TransactionIndexes)' -count=1
+      - name: Production package build
+        working-directory: koschei/api
+        run: go build ./internal/services ./internal/handlers ./internal/http
+      - name: Linux build
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: Owner JavaScript syntax
+        run: node --check koschei/api/public/js/owner-control-center.js
+      - name: Contract assertions
+        working-directory: koschei/api
+        run: |
+          grep -q 'HolderClusterFlowAnalysis' internal/services/holder_cluster_intelligence.go
+          grep -q 'CommonExitGroupCount' internal/services/holder_cluster_flow_intelligence.go
+          grep -q 'CircularWalletCount' internal/services/holder_cluster_flow_intelligence.go
+          grep -q 'program identity alone is deliberately excluded' internal/services/holder_cluster_flow_intelligence.go
+          grep -q 'common_exit_group_count' internal/services/arvis_arms.go
+          grep -q 'Holder Cluster Intelligence V2' public/js/owner-control-center.js
+          grep -q 'owner-control-center.js?v=7' public/owner-production.html
+          ! grep -q 'wash trading verdict' internal/services/holder_cluster_flow_intelligence.go
+          git diff origin/main...HEAD -- public/js/koschei-auth.js | test ! -s /dev/stdin
+      - name: Commit verified implementation
+        if: success()
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add koschei/api/internal/services/holder_cluster_intelligence.go koschei/api/internal/services/holder_cluster_flow_intelligence.go koschei/api/internal/services/holder_cluster_flow_intelligence_test.go koschei/api/internal/services/arvis_arms.go koschei/api/public/js/owner-control-center.js koschei/api/public/owner-production.html
+          git commit -m 'Add Holder Cluster Flow V2 intelligence'
+          git push origin HEAD:${{ github.head_ref }}
