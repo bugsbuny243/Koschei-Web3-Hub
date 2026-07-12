@@ -33,7 +33,20 @@ jobs:
       - name: Download modules
         run: go mod download
       - name: Test
-        run: go test ./...
+        run: |
+          set +e
+          go test ./... > /tmp/go-test.log 2>&1
+          status=$?
+          tail -n 50 /tmp/go-test.log
+          exit $status
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-test-diagnostics
+          path: /tmp/go-test.log
+          if-no-files-found: error
+          retention-days: 1
       - name: Vet
         run: go vet ./...
       - name: Build
