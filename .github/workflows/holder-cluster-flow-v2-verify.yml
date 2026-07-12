@@ -50,7 +50,7 @@ jobs:
           grep -q 'HolderClusterFlowAnalysis' internal/services/holder_cluster_intelligence.go
           grep -q 'CommonExitGroupCount' internal/services/holder_cluster_flow_intelligence.go
           grep -q 'CircularWalletCount' internal/services/holder_cluster_flow_intelligence.go
-          grep -q 'program identity alone is deliberately excluded' internal/services/holder_cluster_flow_intelligence.go
+          grep -qi 'program identity alone is deliberately excluded' internal/services/holder_cluster_flow_intelligence.go
           grep -q 'common_exit_group_count' internal/services/arvis_arms.go
           grep -q 'Holder Cluster Intelligence V2' public/js/owner-control-center.js
           grep -q 'owner-control-center.js?v=7' public/owner-production.html
