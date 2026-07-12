@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 func solanaRPCURL(network string, apiKey string) string {
@@ -51,4 +53,24 @@ func maxInt(a, b int) int {
 
 func normalizePlanTier(planTier string) string {
 	return normalizePackageID(planTier)
+}
+
+func normalizePackageID(packageID string) string {
+	switch strings.ToLower(strings.TrimSpace(packageID)) {
+	case "starter":
+		return "starter"
+	case "builder", "pro", "professional":
+		return "professional"
+	case "studio", "enterprise":
+		return "enterprise"
+	default:
+		return ""
+	}
+}
+
+func nullTimePtr(value sql.NullTime) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	return &value.Time
 }
