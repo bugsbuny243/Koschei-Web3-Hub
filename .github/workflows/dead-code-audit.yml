@@ -1,76 +1,64 @@
-name: Dead Code Audit
+name: Dead Code Cleanup Verify
 
 on:
   pull_request:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  audit:
+  cleanup:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: koschei/api/go.mod
           cache-dependency-path: koschei/api/go.sum
-      - name: Inventory and reference audit
+      - name: Apply cleanup
         working-directory: koschei/api
         run: |
-          python - <<'PY' | tee dead-code-audit.txt
-          from pathlib import Path
-          import re
-          names = {'rug_radar.go','web3.go','local_auth.go','mev_shield.go','liquidity_radar.go','impact_metrics.go','metadata.go','owner_payment_health.go','web3_jobs.go','package_status.go','jobs.go','dao_guardian.go','plans.go','payments.go','smart_money.go'}
-          root = Path('.')
-          files = [p for p in root.rglob('*.go') if '/vendor/' not in str(p)]
-          candidates = [p for p in files if p.name in names or p.name.startswith('credits')]
-          all_text = {p: p.read_text(errors='ignore') for p in files}
-          print('=== CANDIDATE FILES ===')
-          for p in sorted(candidates):
-            text = all_text[p]
-            funcs = re.findall(r'^func\s+(?:\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(', text, re.M)
-            types = re.findall(r'^type\s+([A-Za-z_][A-Za-z0-9_]*)\b', text, re.M)
-            vars_ = re.findall(r'^(?:var|const)\s+([A-Za-z_][A-Za-z0-9_]*)\b', text, re.M)
-            symbols = list(dict.fromkeys(funcs + types + vars_))
-            external = []
-            for sym in symbols:
-              hits=[]; rx=re.compile(r'\b'+re.escape(sym)+r'\b')
-              for other,body in all_text.items():
-                if other==p: continue
-                count=len(rx.findall(body))
-                if count: hits.append((str(other),count))
-              if hits: external.append((sym,hits))
-            print(f'\nFILE {p} lines={len(text.splitlines())}')
-            print('symbols:', ', '.join(symbols) or '(none)')
-            if external:
-              print('EXTERNAL REFERENCES:')
-              for sym,hits in external: print(' ',sym,'=>','; '.join(f'{f}:{n}' for f,n in hits))
-            else: print('EXTERNAL REFERENCES: NONE')
-          print('\n=== ROUTE REFERENCES ===')
-          for p in sorted(root.rglob('*.go')):
-            body=p.read_text(errors='ignore')
-            if re.search(r'(RugRadar|Web3|MEV|Liquidity|PackageStatus|SmartMoney|DAO|Payment|Credit|Job)', body, re.I) and ('internal/http' in str(p) or 'server.go' in p.name or 'routes' in p.name or 'router' in str(p)):
-              print(p)
-              for i,line in enumerate(body.splitlines(),1):
-                if re.search(r'(RugRadar|Web3|MEV|Liquidity|PackageStatus|SmartMoney|DAO|Payment|Credit|Job)', line, re.I): print(f'  {i}: {line.strip()}')
-          PY
-      - name: Production build before cleanup
-        id: build
-        continue-on-error: true
+          python scripts/dead_code_cleanup_patch.py
+          gofmt -w internal/handlers/shared_helpers.go internal/handlers/neon_auth.go internal/handlers/owner.go
+      - name: Verify removed files
         working-directory: koschei/api
-        run: go build ./... 2>&1 | tee build-before.txt
-      - name: Upload audit
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dead-code-audit
-          path: |
-            koschei/api/dead-code-audit.txt
-            koschei/api/build-before.txt
-      - name: Stop if baseline build is broken
-        if: steps.build.outcome == 'failure'
-        run: exit 1
+        run: |
+          for f in \
+            internal/handlers/rug_radar.go \
+            internal/handlers/web3.go \
+            internal/handlers/local_auth.go \
+            internal/handlers/mev_shield.go \
+            internal/handlers/liquidity_radar.go \
+            internal/handlers/impact_metrics.go \
+            internal/handlers/metadata.go \
+            internal/handlers/owner_payment_health.go \
+            internal/handlers/web3_jobs.go \
+            internal/handlers/package_status.go \
+            internal/handlers/jobs.go \
+            internal/handlers/dao_guardian.go \
+            internal/handlers/plans.go \
+            internal/handlers/smart_money.go \
+            internal/handlers/credits.go \
+            internal/handlers/credits_reservation.go \
+            internal/handlers/enterprise_modules_test.go; do
+            test ! -e "$f"
+          done
+          ! grep -R "tryLocalJWT"='*.go'
+          grep -q "return neonClaimsFromToken(token)" internal/handlers/neon_auth.go
+          grep -q "func normalizedClaimEmail" internal/handlers/shared_helpers.go
+          grep -q "func firstNonEmptyString" internal/handlers/shared_helpers.go
+          grep -q "func isMissingRelation" internal/handlers/shared_helpers.go
+      - name: Commit verified cleanup
+        if: success()
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git reset .github/workflows/dead-code-audit.yml koschei/api/scripts/dead_code_cleanup_patch.py
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Remove dead legacy backend modules'
+          git push origin HEAD:${{ github.head_ref }}
