@@ -396,6 +396,9 @@ func (w *PumpHighVolumeRadarWorker) RunOnce(ctx context.Context) error {
 			if market.Volume24hUSD < w.ThresholdUSD {
 				continue
 			}
+			if IsSecurityRadarInfraTarget(mint) {
+				continue
+			}
 			candidate, ok := candidateByMint[mint]
 			if !ok {
 				continue
