@@ -55,19 +55,19 @@ jobs:
       - name: Selective automation contract
         working-directory: koschei/api
         run: |
-          grep -q 'defaultPumpHighVolumeThresholdUSD = 500000.0' internal/services/pump_high_volume_radar.go
-          grep -q 'defaultPumpHighVolumeMaxReports   = 1' internal/services/pump_high_volume_radar.go
-          grep -q 'PumpHighVolumeAttemptedRecently' internal/services/pump_high_volume_radar.go
-          grep -A12 'PumpHighVolumeAttemptedRecently' internal/services/pump_high_volume_radar.go | grep -q 'updated_at >='
-          grep -q 'customer_detail_visible' internal/handlers/security_radar.go
-          grep -q 'live_stream:.*ModulePumpSybilRadar' internal/services/security_radars.go
-          grep -q 'HARD RULE: do not run a full scan for every new Pump token' internal/services/pumpportal_radar_adapter.go
-          grep -q 'selective Pump 24h-volume radar' main.go
-          grep -q 'high_volume_pump' internal/handlers/owner_operations.go
-          grep -q 'Otomatik Pump hacim radarı' public/js/owner-control-center.js
-          grep -q 'owner-control-center.js?v=8' public/owner-production.html
-          grep -q 'PUMP_HIGH_VOLUME_MIN_24H_USD=500000' ../../.env.example
-          grep -q 'PUMP_HIGH_VOLUME_MAX_REPORTS_PER_CYCLE=1' ../../.env.example
+          grep -Fq 'defaultPumpHighVolumeThresholdUSD = 500000.0' internal/services/pump_high_volume_radar.go
+          grep -Fq 'defaultPumpHighVolumeMaxReports   = 1' internal/services/pump_high_volume_radar.go
+          grep -Fq 'PumpHighVolumeAttemptedRecently' internal/services/pump_high_volume_radar.go
+          grep -Fq "AND updated_at >= now()-" internal/services/pump_high_volume_radar.go
+          grep -Fq 'customer_detail_visible' internal/handlers/security_radar.go
+          grep -Fq 'strings.Contains(modeLower, "live_stream:"+ModulePumpSybilRadar)' internal/services/security_radars.go
+          grep -Fq 'HARD RULE: do not run a full scan for every new Pump token' internal/services/pumpportal_radar_adapter.go
+          grep -Fq 'selective Pump 24h-volume radar' main.go
+          grep -Fq 'high_volume_pump' internal/handlers/owner_operations.go
+          grep -Fq 'Otomatik Pump hacim radarı' public/js/owner-control-center.js
+          grep -Fq 'owner-control-center.js?v=8' public/owner-production.html
+          grep -Fq 'PUMP_HIGH_VOLUME_MIN_24H_USD=500000' ../../.env.example
+          grep -Fq 'PUMP_HIGH_VOLUME_MAX_REPORTS_PER_CYCLE=1' ../../.env.example
       - name: Commit verified implementation
         if: success()
         run: |
