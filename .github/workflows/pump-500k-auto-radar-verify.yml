@@ -1,0 +1,73 @@
+name: Pump 500K Auto Radar Verify
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "koschei/api/scripts/pump_500k_auto_radar_patch.py"
+      - "koschei/api/internal/services/pump_high_volume_radar.go"
+      - "koschei/api/internal/services/pump_high_volume_radar_test.go"
+      - "koschei/api/internal/services/pumpportal_radar_adapter.go"
+      - "koschei/api/internal/services/security_radar_watcher.go"
+      - "koschei/api/internal/handlers/owner_operations.go"
+      - "koschei/api/internal/handlers/security_radar.go"
+      - "koschei/api/internal/handlers/security_radar_detail.go"
+      - "koschei/api/public/js/owner-control-center.js"
+      - "koschei/api/public/owner-production.html"
+      - "koschei/api/main.go"
+      - ".env.example"
+      - ".github/workflows/pump-500k-auto-radar-verify.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply selective Pump Radar patch
+        working-directory: koschei/api
+        run: |
+          python scripts/pump_500k_auto_radar_patch.py
+          gofmt -w main.go internal/services/pump_high_volume_radar.go internal/services/pump_high_volume_radar_test.go internal/services/pumpportal_radar_adapter.go internal/services/security_radar_watcher.go internal/handlers/owner_operations.go internal/handlers/security_radar.go internal/handlers/security_radar_detail.go
+      - name: Focused Pump volume tests
+        working-directory: koschei/api
+        run: go test ./internal/services -run '^Test(DexScreenerPumpVolume|PumpHighVolume)' -count=1
+      - name: Production package build
+        working-directory: koschei/api
+        run: go build ./internal/services ./internal/handlers ./internal/http
+      - name: Full Linux build
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: Owner JavaScript syntax
+        run: node --check koschei/api/public/js/owner-control-center.js
+      - name: Selective automation contract
+        working-directory: koschei/api
+        run: |
+          grep -q 'defaultPumpHighVolumeThresholdUSD = 500000.0' internal/services/pump_high_volume_radar.go
+          grep -q 'volume_window.*24h' internal/services/pump_high_volume_radar.go
+          grep -q 'HARD RULE: do not run a full scan for every new Pump token' internal/services/pumpportal_radar_adapter.go
+          grep -q 'selective Pump 24h-volume radar' main.go
+          grep -q 'high_volume_pump' internal/handlers/owner_operations.go
+          grep -q 'Otomatik Pump hacim radarı' public/js/owner-control-center.js
+          grep -q 'owner-control-center.js?v=8' public/owner-production.html
+          grep -q 'PUMP_HIGH_VOLUME_MIN_24H_USD=500000' ../../.env.example
+      - name: Commit verified implementation
+        if: success()
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .env.example koschei/api/main.go koschei/api/internal/services/pump_high_volume_radar.go koschei/api/internal/services/pump_high_volume_radar_test.go koschei/api/internal/services/pumpportal_radar_adapter.go koschei/api/internal/services/security_radar_watcher.go koschei/api/internal/handlers/owner_operations.go koschei/api/internal/handlers/security_radar.go koschei/api/internal/handlers/security_radar_detail.go koschei/api/public/js/owner-control-center.js koschei/api/public/owner-production.html
+          git commit -m 'Add selective Pump 500K automatic Radar'
+          git push origin HEAD:${{ github.head_ref }}
