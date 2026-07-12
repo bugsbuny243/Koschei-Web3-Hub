@@ -121,6 +121,7 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/api/owner/arvis", requiresDB(h, ownerOnly(h, method("GET", h.OwnerRadarOverviewFast))))
 	mux.HandleFunc("/api/owner/arvis/scan", requiresDB(h, ownerOnly(h, method("POST", h.OwnerRadarScan))))
 	mux.HandleFunc("/api/owner/creator-intelligence", requiresDB(h, ownerOnly(h, method("GET", h.OwnerCreatorIntelligence))))
+	mux.HandleFunc("/api/owner/actor-intelligence", requiresDB(h, ownerOnly(h, method("GET", h.OwnerActorSecurityIntelligence))))
 	mux.HandleFunc("/api/owner/radar/sources", requiresDB(h, ownerOnly(h, h.OwnerRadarSources)))
 	mux.HandleFunc("/api/owner/kosch-access", requiresDB(h, ownerOnly(h, method("GET", h.OwnerKOSCHAccessV2))))
 	mux.HandleFunc("/api/owner/security-events", requiresDB(h, ownerOnly(h, method("GET", h.OwnerSecurityEvents))))
@@ -151,6 +152,7 @@ func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess 
 	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, koschAccess(method("POST", h.SecurityRadarCheck))))
 	mux.HandleFunc("/api/v1/radar/detail", requiresDB(h, koschAccess(method("GET", h.SecurityRadarDetail))))
 	mux.HandleFunc("/api/v1/radar/creator-intelligence", requiresDB(h, koschAccess(method("GET", h.OwnerCreatorIntelligence))))
+	mux.HandleFunc("/api/v1/radar/actor-intelligence", requiresDB(h, koschAccess(method("GET", h.OwnerActorSecurityIntelligence))))
 	mux.HandleFunc("/api/v1/radar/graph", requiresDB(h, koschAccess(method("GET", h.SecurityRadarGraph))))
 	mux.HandleFunc("/api/v1/radar/exposure", requiresDB(h, koschAccess(method("GET", h.SecurityRadarExposureReport))))
 }
