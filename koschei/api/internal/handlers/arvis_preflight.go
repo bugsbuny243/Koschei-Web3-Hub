@@ -55,6 +55,8 @@ func (h *Handler) ARVISPreflight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := evaluateARVISPreflight(req)
+	// HARD RULE: a cached, fresh, verified structural floor may raise Safe
+	// Check, but must never lower a stronger local phishing/signature verdict.
 	resp = h.alignARVISPreflightWithStructuralBaseline(r.Context(), req, resp)
 	if aiProviderConfigured() && resp.RiskLevel != "low" && !isOfficialKOSCHMint(req.Target) {
 		prompt := "Target: " + strings.TrimSpace(req.Target) + "\nKind: " + strings.TrimSpace(req.Kind) + "\nIntent: " + strings.TrimSpace(req.Intent) + "\nNote: " + strings.TrimSpace(req.Note) + "\nLocal decision: " + resp.Decision + "\nLocal reasons: " + strings.Join(resp.Reasons, "; ")
