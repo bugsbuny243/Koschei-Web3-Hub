@@ -19,12 +19,28 @@ if old not in text:
     raise SystemExit("legacy local JWT fallback not found")
 neon.write_text(text.replace(old, new, 1))
 
-# web3.go accumulated a few generic helpers that are used by live handlers.
-# Preserve only those primitives in a purpose-named file before deleting the
-# disconnected Web3 event-source implementation.
+# Remove an unreachable Shopier webhook left inside the owner monolith. The
+# production route map exposes no Shopier webhook and the current product has no
+# external payment-provider route.
+owner = handlers / "owner.go"
+owner_text = owner.read_text()
+start_marker = "func (h *Handler) ShopierWebhook(w http.ResponseWriter, r *http.Request) {"
+end_marker = "func (h *Handler) executeOwnerBrainCommand"
+start = owner_text.find(start_marker)
+end = owner_text.find(end_marker, start)
+if start < 0 or end < 0:
+    raise SystemExit("stale Shopier webhook block not found")
+owner.write_text(owner_text[:start] + owner_text[end:])
+
+# web3.go, package_status.go, impact_metrics.go and mev_shield.go accumulated
+# generic helpers used by live handlers. Keep only those primitives here.
 (handlers / "request_identity_helpers.go").write_text('''package handlers
 
-import "strings"
+import (
+	"database/sql"
+	"strings"
+	"time"
+)
 
 func normalizedClaimEmail(claims neonJWTClaims) string {
 	return strings.ToLower(strings.TrimSpace(claims.Email))
@@ -44,6 +60,30 @@ func firstNonEmptyString(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func nullTimePtr(value sql.NullTime) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	return &value.Time
+}
+
+func isMissingRelation(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "does not exist") || strings.Contains(message, "undefined_table")
 }
 ''')
 
