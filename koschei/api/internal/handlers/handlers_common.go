@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"koschei/api/internal/cache"
-	"koschei/api/internal/jobs"
 	"koschei/api/internal/web3"
 )
 
@@ -26,8 +25,6 @@ type Handler struct {
 	DBInitError   string
 	Cache         cache.Cache
 	SolanaRPC     *web3.SolanaRPC
-	JobStore      *jobs.Store
-	JobQueue      jobs.Queue
 }
 
 func (h *Handler) dbAvailable(ctx context.Context) error {
