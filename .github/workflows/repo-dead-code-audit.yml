@@ -1,9 +1,8 @@
 name: Repository Dead Code Audit
 
 on:
-  push:
-    branches:
-      - chore/repo-dead-code-cleanup-20260712
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
