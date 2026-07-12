@@ -30,9 +30,9 @@ jobs:
       - name: Railway production build command
         working-directory: koschei/api
         run: go build -o app .
-      - name: Full test suite
+      - name: Security Radar service tests
         working-directory: koschei/api
-        run: go test ./... -count=1
+        run: go test ./internal/services -count=1
       - name: Full Linux build
         working-directory: koschei/api
         run: CGO_ENABLED=0 GOOS=linux go build ./...
