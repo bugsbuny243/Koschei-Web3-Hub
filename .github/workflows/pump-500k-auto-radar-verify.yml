@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "koschei/api/scripts/pump_500k_auto_radar_patch.py"
+      - "koschei/api/scripts/pump_500k_compile_fix.py"
       - "koschei/api/internal/services/pump_high_volume_radar.go"
       - "koschei/api/internal/services/pump_high_volume_radar_test.go"
       - "koschei/api/internal/services/pumpportal_radar_adapter.go"
@@ -39,6 +40,7 @@ jobs:
         working-directory: koschei/api
         run: |
           python scripts/pump_500k_auto_radar_patch.py
+          python scripts/pump_500k_compile_fix.py
           gofmt -w main.go internal/services/pump_high_volume_radar.go internal/services/pump_high_volume_radar_test.go internal/services/pumpportal_radar_adapter.go internal/services/security_radar_watcher.go internal/handlers/owner_operations.go internal/handlers/security_radar.go internal/handlers/security_radar_detail.go
       - name: Focused Pump volume tests
         id: focused_tests
