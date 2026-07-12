@@ -141,7 +141,7 @@ func (h *Handler) radarDetailSourceContext(ctx context.Context, target, network 
 		       COALESCE(raw_summary,'{}'::jsonb), created_at
 		FROM security_radar_events
 		WHERE lower(target)=lower($1) AND network=$2
-		ORDER BY CASE WHEN source='pumpportal' THEN 0 ELSE 1 END, created_at DESC
+		ORDER BY CASE WHEN event_type='pumpportal_high_volume_24h' AND created_at >= now()-interval '36 hours' THEN 0 WHEN source='pumpportal' THEN 1 ELSE 2 END, created_at DESC
 		LIMIT 1`
 	var moduleID, eventType, source, sourceAddress, signature string
 	var signalsRaw, summaryRaw []byte
@@ -177,8 +177,11 @@ func (h *Handler) radarDetailSourceContext(ctx context.Context, target, network 
 	}())
 	out["creator_wallet"] = creator
 	out["creator_label"] = "source-reported creator/deployer wallet"
-	out["creator_relation_verified"] = creator != "" && strings.EqualFold(source, "pumpportal")
+	out["creator_relation_verified"] = creator != "" && (strings.EqualFold(source, "pumpportal") || strings.EqualFold(eventType, "pumpportal_high_volume_24h"))
 	out["creator_scope"] = "launch-source relation only; not proof of fraud, ownership of other wallets, or real-world identity"
+	out["volume_24h_usd"] = signals["volume_24h_usd"]
+	out["volume_threshold_usd"] = signals["volume_threshold_usd"]
+	out["volume_provider"] = signals["volume_provider"]
 	out["signals"] = signals
 	return out
 }

@@ -68,13 +68,15 @@ func main() {
 	appCtx := context.Background()
 	stopSecurityRadars := services.StartSecurityRadarWatcher(appCtx, conn, solanaRPC)
 	defer stopSecurityRadars()
+	// Pump discovery + the 500K USD selective gate are data-filtered and stay
+	// live in saver mode. Only mints crossing the gate consume deep Solana RPC.
+	stopPumpPortal := services.StartPumpPortalRadarIfEnabled(appCtx, conn)
+	defer stopPumpPortal()
 	if services.SolanaRPCLimitSaverEnabled() && !services.ForceBackgroundRadarEnabled() {
-		log.Printf("background Solana streams paused: RPC saver mode protects Alchemy quota; manual scans and Safe Check stay live")
+		log.Printf("broad Solana streams paused: RPC saver protects quota; selective Pump 24h-volume radar, manual scans and Safe Check stay live")
 	} else {
 		stopSBX1Stream := services.StartSecurityRadarStreamIfEnabled(appCtx, conn)
 		defer stopSBX1Stream()
-		stopPumpPortal := services.StartPumpPortalRadarIfEnabled(appCtx, conn)
-		defer stopPumpPortal()
 	}
 	stopWebhookDeliveries := webhooks.StartDeliveryWorker(appCtx, conn)
 	defer stopWebhookDeliveries()

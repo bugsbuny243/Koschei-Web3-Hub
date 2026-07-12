@@ -191,7 +191,8 @@ func collectRadarEvidence(req SecurityRadarRequest) radarEvidenceProfile {
 	}
 
 	timeout := 6500 * time.Millisecond
-	if strings.Contains(strings.ToLower(req.Mode), "owner") || strings.Contains(strings.ToLower(req.Mode), "manual") {
+	modeLower := strings.ToLower(req.Mode)
+	if strings.Contains(modeLower, "owner") || strings.Contains(modeLower, "manual") || strings.Contains(modeLower, "live_stream:"+ModulePumpSybilRadar) {
 		timeout = 18 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)

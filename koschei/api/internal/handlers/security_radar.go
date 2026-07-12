@@ -74,6 +74,11 @@ func (h *Handler) SecurityRadarFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	verified := make([]services.SecurityRadarVerdictRecord, 0, len(items))
 	for _, item := range items {
+		if visible, exists := item.Signals["customer_detail_visible"]; exists {
+			if allowed, ok := visible.(bool); ok && !allowed {
+				continue
+			}
+		}
 		if item.Signed && radarSignalsVerified(item.Signals) && item.ModuleID == services.ModuleFinalVerdictEngine {
 			verified = append(verified, item)
 		}
@@ -238,7 +243,18 @@ func (h *Handler) securityRadarStreamStats(ctx context.Context) map[string]any {
 	text("last_stream_signature", `SELECT COALESCE(signature,'') FROM security_radar_stream_events WHERE signature IS NOT NULL ORDER BY created_at DESC LIMIT 1`)
 	text("last_stream_module", `SELECT COALESCE(module_id,'') FROM security_radar_stream_events ORDER BY created_at DESC LIMIT 1`)
 	h.addArvisProcessingMetrics(ctx, metrics)
-	metrics["pipeline_status"] = arvisPipelineStatus(metrics)
+	count("pump_volume_reports_24h", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND signed=true AND source='pump_volume_gate' AND created_at > now()-interval '24 hours'`)
+	count("pump_volume_qualified_24h", `SELECT count(DISTINCT target) FROM security_radar_events WHERE event_type='pumpportal_high_volume_24h' AND created_at > now()-interval '24 hours'`)
+	text("pump_volume_last_observed_at", `SELECT COALESCE(max(created_at)::text,'') FROM security_radar_events WHERE event_type='pumpportal_high_volume_24h'`)
+	metrics["pump_volume_auto_enabled"] = services.PumpHighVolumeRadarEnabled()
+	metrics["pump_volume_threshold_usd"] = services.PumpHighVolumeThresholdUSD()
+	metrics["pump_volume_window"] = "24h"
+	metrics["pump_volume_currency"] = "USD"
+	status := arvisPipelineStatus(metrics)
+	if services.PumpHighVolumeRadarEnabled() && services.SolanaRPCLimitSaverEnabled() && !services.ForceBackgroundRadarEnabled() {
+		status = "selective_auto_volume"
+	}
+	metrics["pipeline_status"] = status
 	return metrics
 }
 
