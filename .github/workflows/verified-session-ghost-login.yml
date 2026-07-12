@@ -1,0 +1,131 @@
+name: Verified Session Ghost Login
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "koschei/api/scripts/verified_session_patch.py"
+      - "koschei/api/public/js/koschei-auth.js"
+      - "koschei/api/public/*.html"
+      - ".github/workflows/verified-session-ghost-login.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply verified-session patch
+        working-directory: koschei/api
+        run: python scripts/verified_session_patch.py
+      - name: JavaScript syntax
+        run: node --check koschei/api/public/js/koschei-auth.js
+      - name: Ghost-session behavior test
+        working-directory: koschei/api
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const vm = require('vm');
+
+          function jwt() {
+            const enc = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+            return `${enc({alg:'none',typ:'JWT'})}.${enc({sub:'deleted-user',email:'ghost@example.com',exp:Math.floor(Date.now()/1000)+3600})}.sig`;
+          }
+
+          function response(status, body) {
+            return new Response(JSON.stringify(body || {}), {
+              status,
+              headers: {'Content-Type':'application/json'},
+            });
+          }
+
+          async function scenario(meStatus) {
+            const storage = new Map([['koschei_jwt', jwt()]]);
+            const location = {
+              origin: 'https://tradepigloball.co',
+              pathname: '/login.html',
+              search: '',
+              hash: '',
+              href: '',
+            };
+            const nativeFetch = async input => {
+              const raw = typeof input === 'string' ? input : input.url;
+              const url = new URL(raw, location.origin);
+              if (url.pathname === '/api/config') return response(200, {neonAuthUrl:'https://auth.example'});
+              if (url.pathname === '/api/me') return meStatus === 200
+                ? response(200, {id:'active-user',email:'active@example.com'})
+                : response(401, {error:'unauthorized'});
+              if (url.origin === 'https://auth.example') return response(401, {error:'session_missing'});
+              throw new Error(`unexpected fetch ${url}`);
+            };
+            const context = {
+              console,
+              URL,
+              URLSearchParams,
+              Headers,
+              Response,
+              Request,
+              atob: value => Buffer.from(value, 'base64').toString('binary'),
+              btoa: value => Buffer.from(value, 'binary').toString('base64'),
+              localStorage: {
+                getItem: key => storage.get(key) || null,
+                setItem: (key, value) => storage.set(key, String(value)),
+                removeItem: key => storage.delete(key),
+              },
+              location,
+              history: {replaceState(){}},
+              document: {title:'Koschei'},
+              fetch: nativeFetch,
+            };
+            context.window = context;
+            vm.createContext(context);
+            vm.runInContext(fs.readFileSync('public/js/koschei-auth.js','utf8'), context);
+            if (context.KoscheiAuth.isLoggedIn()) throw new Error('JWT must not count as logged in before server verification');
+            const initialized = await context.KoscheiAuth.init();
+            return {context, storage, initialized};
+          }
+
+          (async () => {
+            const ghost = await scenario(401);
+            if (ghost.initialized !== false) throw new Error('deleted user must fail init');
+            if (ghost.context.KoscheiAuth.isLoggedIn()) throw new Error('deleted user remained logged in');
+            if (ghost.storage.has('koschei_jwt') || ghost.storage.has('koschei_token')) throw new Error('ghost JWT was not cleared');
+
+            const active = await scenario(200);
+            if (active.initialized !== true) throw new Error('active user must pass init');
+            if (!active.context.KoscheiAuth.isLoggedIn()) throw new Error('verified active user is not logged in');
+            console.log('verified-session behavior OK');
+          })().catch(error => { console.error(error); process.exit(1); });
+          NODE
+      - name: Login and register ordering contract
+        working-directory: koschei/api
+        run: |
+          grep -Fq 'await KoscheiAuth.init();' public/login.html
+          grep -Fq 'if(KoscheiAuth.isLoggedIn())' public/login.html
+          grep -Fq 'await KoscheiAuth.init();' public/register.html
+          grep -Fq 'if(KoscheiAuth.isLoggedIn())' public/register.html
+      - name: Cache-bust contract
+        working-directory: koschei/api
+        run: |
+          if grep -RIl '/js/koschei-auth.js?v=32' public --include='*.html' --exclude='dashboard.html'; then
+            echo 'stale v32 auth reference remains'
+            exit 1
+          fi
+          grep -Fq '/js/koschei-auth.js?v=33' public/login.html
+          grep -Fq '/js/koschei-auth.js?v=33' public/register.html
+      - name: Commit verified implementation
+        if: success()
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add koschei/api/public/js/koschei-auth.js koschei/api/public/*.html
+          git commit -m 'Require server-verified auth sessions'
+          git push origin HEAD:${{ github.head_ref }}
