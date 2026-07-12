@@ -24,7 +24,7 @@ jobs:
         run: |
           python scripts/dead_code_cleanup_patch.py
           gofmt -w internal/handlers/shared_helpers.go internal/handlers/neon_auth.go internal/handlers/owner.go
-      - name: Verify removed files
+      - name: Verify removed files and auth isolation
         working-directory: koschei/api
         run: |
           for f in \
@@ -47,11 +47,20 @@ jobs:
             internal/handlers/enterprise_modules_test.go; do
             test ! -e "$f"
           done
-          ! grep -R "tryLocalJWT"='*.go'
-          grep -q "return neonClaimsFromToken(token)" internal/handlers/neon_auth.go
-          grep -q "func normalizedClaimEmail" internal/handlers/shared_helpers.go
-          grep -q "func firstNonEmptyString" internal/handlers/shared_helpers.go
-          grep -q "func isMissingRelation" internal/handlers/shared_helpers.go
+          ! grep -R --include='*.go' -n 'tryLocalJWT' internal
+          grep -q 'return neonClaimsFromToken(token)' internal/handlers/neon_auth.go
+          grep -q 'func normalizedClaimEmail' internal/handlers/shared_helpers.go
+          grep -q 'func firstNonEmptyString' internal/handlers/shared_helpers.go
+          grep -q 'func firstNonEmpty' internal/handlers/shared_helpers.go
+          grep -q 'func isMissingRelation' internal/handlers/shared_helpers.go
+          grep -q 'func nullTimePtr' internal/handlers/shared_helpers.go
+          ! grep -R --include='*.go' -n 'ShopierWebhook' internal
+      - name: Production package build
+        working-directory: koschei/api
+        run: go build ./internal/services ./internal/handlers ./internal/http
+      - name: Full Linux build
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
       - name: Commit verified cleanup
         if: success()
         run: |
