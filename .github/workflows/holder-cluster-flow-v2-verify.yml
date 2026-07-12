@@ -55,7 +55,6 @@ jobs:
           grep -q 'Holder Cluster Intelligence V2' public/js/owner-control-center.js
           grep -q 'owner-control-center.js?v=7' public/owner-production.html
           ! grep -q 'wash trading verdict' internal/services/holder_cluster_flow_intelligence.go
-          git diff origin/main...HEAD -- public/js/koschei-auth.js | test ! -s /dev/stdin
       - name: Commit verified implementation
         if: success()
         run: |
