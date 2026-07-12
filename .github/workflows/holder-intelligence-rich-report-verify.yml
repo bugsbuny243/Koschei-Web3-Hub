@@ -1,0 +1,75 @@
+name: Holder Intelligence Rich Report Verify
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "koschei/api/scripts/holder_intelligence_rich_report_patch.py"
+      - "koschei/api/scripts/holder_intelligence_owner_ui_patch.py"
+      - "koschei/api/internal/services/token_market_snapshot.go"
+      - "koschei/api/internal/services/token_market_snapshot_test.go"
+      - "koschei/api/internal/services/holder_intelligence.go"
+      - "koschei/api/internal/services/holder_intelligence_test.go"
+      - "koschei/api/internal/services/arvis_arms.go"
+      - "koschei/api/internal/handlers/security_radar_detail.go"
+      - "koschei/api/internal/handlers/owner_operations.go"
+      - "koschei/api/internal/handlers/owner_operations_narrative_test.go"
+      - "koschei/api/public/js/owner-control-center.js"
+      - "koschei/api/public/owner-production.html"
+      - ".github/workflows/holder-intelligence-rich-report-verify.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply holder intelligence integration
+        working-directory: koschei/api
+        run: |
+          python scripts/holder_intelligence_rich_report_patch.py
+          python scripts/holder_intelligence_owner_ui_patch.py
+          gofmt -w internal/services/token_market_snapshot.go internal/services/token_market_snapshot_test.go internal/services/holder_intelligence.go internal/services/holder_intelligence_test.go internal/services/arvis_arms.go internal/handlers/security_radar_detail.go internal/handlers/owner_operations.go internal/handlers/owner_operations_narrative_test.go
+      - name: Focused holder intelligence tests
+        working-directory: koschei/api
+        run: go test ./internal/services -run '^Test(TokenMarketSnapshot|HolderIntelligence)' -count=1
+      - name: Production package build
+        working-directory: koschei/api
+        run: go build ./internal/services ./internal/handlers ./internal/http
+      - name: Full Linux build
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: Owner JavaScript syntax
+        run: node --check koschei/api/public/js/owner-control-center.js
+      - name: Product contract assertions
+        working-directory: koschei/api
+        run: |
+          grep -Fq 'most_liquid_solana_pair_reference_price' internal/services/token_market_snapshot.go
+          grep -Fq 'OwnerAggregationApplied' internal/services/holder_intelligence.go
+          grep -Fq 'verified_holdings_final_pending' internal/services/holder_intelligence.go
+          grep -Fq 'holder_intelligence' internal/handlers/owner_operations.go
+          grep -Fq 'holder_intelligence' internal/handlers/security_radar_detail.go
+          grep -Fq 'Final skor bekliyor, bakiyeler beklemiyor.' public/js/owner-control-center.js
+          grep -Fq 'HOLDER INTELLIGENCE' public/js/owner-control-center.js
+          grep -Fq 'owner-control-center.js?v=9' public/owner-production.html
+          ! grep -Fq 'Koschei bu hedef için doğrulanmış bir final risk puanı üretmedi. Kanıt eksikliği düşük risk anlamına gelmez' internal/handlers/owner_operations.go
+      - name: Commit verified implementation
+        if: success()
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add koschei/api/internal/services/arvis_arms.go koschei/api/internal/handlers/security_radar_detail.go koschei/api/internal/handlers/owner_operations.go koschei/api/public/js/owner-control-center.js koschei/api/public/owner-production.html
+          git commit -m 'Integrate rich holder intelligence report'
+          git push origin HEAD:${{ github.head_ref }}
