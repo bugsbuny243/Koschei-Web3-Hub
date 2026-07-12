@@ -4,8 +4,6 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "koschei/api/scripts/pump_500k_auto_radar_patch.py"
-      - "koschei/api/scripts/pump_500k_compile_fix.py"
       - "koschei/api/scripts/pump_500k_hardening_patch.py"
       - "koschei/api/internal/services/pump_high_volume_radar.go"
       - "koschei/api/internal/services/pump_high_volume_radar_test.go"
@@ -38,11 +36,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply selective Pump Radar patch
+      - name: Apply Pump Radar hardening
         working-directory: koschei/api
         run: |
-          python scripts/pump_500k_auto_radar_patch.py
-          python scripts/pump_500k_compile_fix.py
           python scripts/pump_500k_hardening_patch.py
           gofmt -w main.go internal/services/pump_high_volume_radar.go internal/services/pump_high_volume_radar_test.go internal/services/pumpportal_radar_adapter.go internal/services/security_radar_watcher.go internal/services/security_radars.go internal/handlers/owner_operations.go internal/handlers/security_radar.go internal/handlers/security_radar_detail.go
       - name: Focused Pump volume tests
