@@ -128,6 +128,16 @@ func ArvisFinalFromBundle(bundle SecurityRadarBundle) SecurityRadarFinalVerdict 
 	return EvidenceBackedFinalSecurityRadarVerdict(bundle)
 }
 
+func ArvisHolderClusterFromBundle(bundle SecurityRadarBundle) HolderClusterAnalysis {
+	if bundle.Metadata == nil {
+		return HolderClusterAnalysis{}
+	}
+	if value, ok := bundle.Metadata["holder_cluster_analysis"].(HolderClusterAnalysis); ok {
+		return value
+	}
+	return HolderClusterAnalysis{}
+}
+
 func arvisSourceModule(mode string) string {
 	mode = strings.TrimSpace(mode)
 	const prefix = "live_stream:"
