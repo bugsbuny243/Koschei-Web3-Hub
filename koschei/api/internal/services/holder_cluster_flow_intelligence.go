@@ -156,6 +156,12 @@ func summarizeHolderClusterFlow(wallets []HolderClusterWallet) HolderClusterFlow
 				out.InternalTransfers = append(out.InternalTransfers, observation)
 			}
 		case "external_token_recipient":
+			// A shared recipient inside a known DEX/pool route is commonly a vault
+			// or pool authority. Keep it as route context, but never score it as
+			// evidence of coordinated control.
+			if len(observation.ProgramIDs) > 0 {
+				continue
+			}
 			if commonExitSources[observation.Destination] == nil {
 				commonExitSources[observation.Destination] = map[string]bool{}
 			}

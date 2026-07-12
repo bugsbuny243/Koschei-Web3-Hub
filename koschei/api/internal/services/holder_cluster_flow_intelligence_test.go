@@ -59,6 +59,17 @@ func TestHolderClusterFlowDoesNotScoreSharedDEXProgramAsCommonExit(t *testing.T)
 	}
 }
 
+func TestHolderClusterFlowDoesNotScoreSharedDEXRecipientOwner(t *testing.T) {
+	wallets := []HolderClusterWallet{
+		{Wallet: "WalletA", HolderPercentage: 10, FlowObservations: []HolderClusterFlowObservation{{SourceWallet: "WalletA", Destination: "PoolAuthority", Kind: "external_token_recipient", Amount: 2, Signature: "sig-a", ProgramIDs: []string{pumpLiquidityProgramID}}}},
+		{Wallet: "WalletB", HolderPercentage: 12, FlowObservations: []HolderClusterFlowObservation{{SourceWallet: "WalletB", Destination: "PoolAuthority", Kind: "external_token_recipient", Amount: 3, Signature: "sig-b", ProgramIDs: []string{pumpLiquidityProgramID}}}},
+	}
+	flow := summarizeHolderClusterFlow(wallets)
+	if flow.CommonExitGroupCount != 0 || flow.RiskContribution != 0 {
+		t.Fatalf("shared DEX recipient owner must remain route context only: %#v", flow)
+	}
+}
+
 func TestHolderClusterTokenOwnerDeltas(t *testing.T) {
 	tx := map[string]any{
 		"meta": map[string]any{
