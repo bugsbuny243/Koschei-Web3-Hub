@@ -55,6 +55,7 @@ func normalizePlanTier(planTier string) string {
 	return normalizePackageID(planTier)
 }
 
+// Shared compatibility helpers retained by live owner and Security Radar code.
 func nullTimePtr(value sql.NullTime) *time.Time {
 	if !value.Valid {
 		return nil
