@@ -246,6 +246,12 @@ func buildFundingClusterArm(req SecurityRadarRequest, p radarEvidenceProfile, ge
 	s["same_amount_group_count"] = a.SameAmountGroupCount
 	s["synchronized_wallet_count"] = a.SynchronizedWalletCount
 	s["linked_holder_percentage"] = a.LinkedHolderPercentage
+	s["common_exit_group_count"] = a.Flow.CommonExitGroupCount
+	s["largest_common_exit_group"] = a.Flow.LargestCommonExitGroup
+	s["internal_transfer_count"] = a.Flow.InternalTransferCount
+	s["circular_wallet_count"] = a.Flow.CircularWalletCount
+	s["flow_linked_holder_percentage"] = a.Flow.LinkedHolderPercentage
+	s["holder_flow_confidence"] = a.Flow.Confidence
 	s["sybil_verdict"] = a.Verdict
 	e := append([]string{}, a.Findings...)
 	for _, limitation := range a.Limitations {
@@ -254,7 +260,7 @@ func buildFundingClusterArm(req SecurityRadarRequest, p radarEvidenceProfile, ge
 	v := evidenceArm("Funding Cluster Detector", ModuleFundingClusterDetector, req, a.RiskIndex, s, e, generatedAt)
 	v.Verdict = a.Verdict
 	if a.RiskIndex >= 45 {
-		v.Recommendation = "Inspect shared funders, synchronized acquisition slots and linked holder wallets before relying on apparent decentralization."
+		v.Recommendation = "Inspect shared funders, synchronized acquisition slots, common exits and direct holder transfers before relying on apparent decentralization."
 	}
 	return v
 }

@@ -11,31 +11,33 @@ import (
 )
 
 const (
-	holderClusterWalletLimit    = 8
-	holderClusterSignatureLimit = 20
+	holderClusterWalletLimit            = 8
+	holderClusterSignatureLimit         = 20
+	holderClusterParsedTransactionLimit = 3
 )
 
 // HolderClusterWallet records bounded, evidence-scoped observations for one
 // risk-bearing holder owner. An observation is never treated as real-world
 // identity proof or sole proof of common control.
 type HolderClusterWallet struct {
-	Rank                  int      `json:"rank"`
-	Wallet                string   `json:"wallet"`
-	HolderPercentage      float64  `json:"holder_percentage"`
-	Status                string   `json:"status"`
-	SignaturesObserved    int      `json:"signatures_observed"`
-	ParsedTransactions    int      `json:"parsed_transactions"`
-	HistoryExhausted      bool     `json:"history_exhausted"`
-	OldestObservedAt      string   `json:"oldest_observed_at,omitempty"`
-	NewestObservedAt      string   `json:"newest_observed_at,omitempty"`
-	OldestObservedSlot    int64    `json:"oldest_observed_slot,omitempty"`
-	FundingSource         string   `json:"funding_source,omitempty"`
-	FundingAmountSOL      float64  `json:"funding_amount_sol,omitempty"`
-	FundingObservedAt     string   `json:"funding_observed_at,omitempty"`
-	AcquisitionSlot       int64    `json:"acquisition_slot,omitempty"`
-	AcquisitionObservedAt string   `json:"acquisition_observed_at,omitempty"`
-	FreshNearLaunch       bool     `json:"fresh_near_launch"`
-	Evidence              []string `json:"evidence"`
+	Rank                  int                            `json:"rank"`
+	Wallet                string                         `json:"wallet"`
+	HolderPercentage      float64                        `json:"holder_percentage"`
+	Status                string                         `json:"status"`
+	SignaturesObserved    int                            `json:"signatures_observed"`
+	ParsedTransactions    int                            `json:"parsed_transactions"`
+	HistoryExhausted      bool                           `json:"history_exhausted"`
+	OldestObservedAt      string                         `json:"oldest_observed_at,omitempty"`
+	NewestObservedAt      string                         `json:"newest_observed_at,omitempty"`
+	OldestObservedSlot    int64                          `json:"oldest_observed_slot,omitempty"`
+	FundingSource         string                         `json:"funding_source,omitempty"`
+	FundingAmountSOL      float64                        `json:"funding_amount_sol,omitempty"`
+	FundingObservedAt     string                         `json:"funding_observed_at,omitempty"`
+	AcquisitionSlot       int64                          `json:"acquisition_slot,omitempty"`
+	AcquisitionObservedAt string                         `json:"acquisition_observed_at,omitempty"`
+	FreshNearLaunch       bool                           `json:"fresh_near_launch"`
+	FlowObservations      []HolderClusterFlowObservation `json:"flow_observations"`
+	Evidence              []string                       `json:"evidence"`
 }
 
 // HolderClusterGroup describes a repeated relation shared by at least two
@@ -52,30 +54,31 @@ type HolderClusterGroup struct {
 // acquisition evidence. Low risk is issued only when at least three holder
 // wallets were actually observed; unavailable evidence never becomes LOW.
 type HolderClusterAnalysis struct {
-	Available                 bool                  `json:"available"`
-	Status                    string                `json:"status"`
-	RiskIndex                 int                   `json:"risk_index,omitempty"`
-	RiskLevel                 string                `json:"risk_level,omitempty"`
-	Confidence                string                `json:"confidence"`
-	Verdict                   string                `json:"verdict"`
-	WalletsRequested          int                   `json:"wallets_requested"`
-	WalletsAnalyzed           int                   `json:"wallets_analyzed"`
-	FreshWalletCount          int                   `json:"fresh_wallet_count"`
-	SharedFundingGroupCount   int                   `json:"shared_funding_group_count"`
-	LargestSharedFundingGroup int                   `json:"largest_shared_funding_group"`
-	SameAmountGroupCount      int                   `json:"same_amount_group_count"`
-	LargestSameAmountGroup    int                   `json:"largest_same_amount_group"`
-	SynchronizedWalletCount   int                   `json:"synchronized_wallet_count"`
-	SynchronizationSlotSpread int64                 `json:"synchronization_slot_spread,omitempty"`
-	LinkedHolderPercentage    float64               `json:"linked_holder_percentage"`
-	LaunchEstimateAt          string                `json:"launch_estimate_at,omitempty"`
-	LaunchEstimateSlot        int64                 `json:"launch_estimate_slot,omitempty"`
-	Wallets                   []HolderClusterWallet `json:"wallets"`
-	SharedFundingGroups       []HolderClusterGroup  `json:"shared_funding_groups"`
-	SameAmountGroups          []HolderClusterGroup  `json:"same_amount_groups"`
-	SynchronizedWallets       []string              `json:"synchronized_wallets"`
-	Findings                  []string              `json:"findings"`
-	Limitations               []string              `json:"limitations"`
+	Available                 bool                      `json:"available"`
+	Status                    string                    `json:"status"`
+	RiskIndex                 int                       `json:"risk_index,omitempty"`
+	RiskLevel                 string                    `json:"risk_level,omitempty"`
+	Confidence                string                    `json:"confidence"`
+	Verdict                   string                    `json:"verdict"`
+	WalletsRequested          int                       `json:"wallets_requested"`
+	WalletsAnalyzed           int                       `json:"wallets_analyzed"`
+	FreshWalletCount          int                       `json:"fresh_wallet_count"`
+	SharedFundingGroupCount   int                       `json:"shared_funding_group_count"`
+	LargestSharedFundingGroup int                       `json:"largest_shared_funding_group"`
+	SameAmountGroupCount      int                       `json:"same_amount_group_count"`
+	LargestSameAmountGroup    int                       `json:"largest_same_amount_group"`
+	SynchronizedWalletCount   int                       `json:"synchronized_wallet_count"`
+	SynchronizationSlotSpread int64                     `json:"synchronization_slot_spread,omitempty"`
+	LinkedHolderPercentage    float64                   `json:"linked_holder_percentage"`
+	LaunchEstimateAt          string                    `json:"launch_estimate_at,omitempty"`
+	LaunchEstimateSlot        int64                     `json:"launch_estimate_slot,omitempty"`
+	Wallets                   []HolderClusterWallet     `json:"wallets"`
+	SharedFundingGroups       []HolderClusterGroup      `json:"shared_funding_groups"`
+	SameAmountGroups          []HolderClusterGroup      `json:"same_amount_groups"`
+	SynchronizedWallets       []string                  `json:"synchronized_wallets"`
+	Flow                      HolderClusterFlowAnalysis `json:"flow"`
+	Findings                  []string                  `json:"findings"`
+	Limitations               []string                  `json:"limitations"`
 }
 
 func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles HolderRoleAnalysis, launchBlockTime, launchSlot int64) HolderClusterAnalysis {
@@ -104,6 +107,10 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 		}
 	}
 	out.WalletsRequested = len(candidates)
+	candidateWallets := map[string]bool{}
+	for _, candidate := range candidates {
+		candidateWallets[candidate.OwnerWallet] = true
+	}
 	if len(candidates) < 3 {
 		out.Limitations = append(out.Limitations, "At least three resolved risk-bearing holder wallets are required for cluster analysis.")
 		return out
@@ -114,19 +121,19 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 			out.Limitations = append(out.Limitations, "Cluster analysis stopped at the request deadline; partial observations are preserved.")
 			break
 		}
-		out.Wallets = append(out.Wallets, analyzeHolderClusterWallet(ctx, rpcURL, mint, account, launchBlockTime))
+		out.Wallets = append(out.Wallets, analyzeHolderClusterWallet(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets))
 	}
 	return summarizeHolderCluster(out)
 }
 
-func analyzeHolderClusterWallet(ctx context.Context, rpcURL, mint string, account HolderRoleAccount, launchBlockTime int64) HolderClusterWallet {
+func analyzeHolderClusterWallet(ctx context.Context, rpcURL, mint string, account HolderRoleAccount, launchBlockTime int64, holderWallets map[string]bool) HolderClusterWallet {
 	percentage := account.CirculatingPercentage
 	if percentage <= 0 {
 		percentage = account.RawPercentage
 	}
 	row := HolderClusterWallet{
 		Rank: account.Rank, Wallet: account.OwnerWallet, HolderPercentage: holderClusterRound(percentage, 4),
-		Status: "signature_history_unavailable", Evidence: []string{},
+		Status: "signature_history_unavailable", FlowObservations: []HolderClusterFlowObservation{}, Evidence: []string{},
 	}
 	signatures, err := SolanaGetSignaturesForAddress(ctx, rpcURL, account.OwnerWallet, holderClusterSignatureLimit)
 	if err != nil {
@@ -175,6 +182,7 @@ func analyzeHolderClusterWallet(ctx context.Context, rpcURL, mint string, accoun
 		txMap := map[string]any(tx)
 		blockTime := holderClusterInt64(txMap["blockTime"])
 		slot := holderClusterInt64(txMap["slot"])
+		row.FlowObservations = append(row.FlowObservations, observeHolderClusterWalletFlow(txMap, signatures[index].Signature, mint, account.OwnerWallet, holderWallets)...)
 		if row.FundingSource == "" {
 			if source, amount := holderClusterFundingSource(txMap, account.OwnerWallet); source != "" && amount > 0 {
 				row.FundingSource = source
@@ -208,6 +216,7 @@ func analyzeHolderClusterWallet(ctx context.Context, rpcURL, mint string, accoun
 }
 
 func summarizeHolderCluster(out HolderClusterAnalysis) HolderClusterAnalysis {
+	out.Flow = summarizeHolderClusterFlow(out.Wallets)
 	funding := map[string][]HolderClusterWallet{}
 	amounts := map[string][]HolderClusterWallet{}
 	acquisitions := []HolderClusterWallet{}
@@ -275,6 +284,9 @@ func summarizeHolderCluster(out HolderClusterAnalysis) HolderClusterAnalysis {
 	for _, wallet := range out.SynchronizedWallets {
 		suspicious[wallet] = true
 	}
+	for _, wallet := range out.Flow.LinkedWallets {
+		suspicious[wallet] = true
+	}
 	for _, wallet := range out.Wallets {
 		if suspicious[wallet.Wallet] {
 			out.LinkedHolderPercentage += wallet.HolderPercentage
@@ -313,6 +325,10 @@ func summarizeHolderCluster(out HolderClusterAnalysis) HolderClusterAnalysis {
 	if out.LargestSharedFundingGroup >= 3 && out.SynchronizedWalletCount >= 3 {
 		score += 15
 	}
+	score += out.Flow.RiskContribution
+	if out.Flow.LargestCommonExitGroup >= 3 && out.LargestSharedFundingGroup >= 2 {
+		score += 12
+	}
 	if score > 100 {
 		score = 100
 	}
@@ -323,7 +339,9 @@ func summarizeHolderCluster(out HolderClusterAnalysis) HolderClusterAnalysis {
 	switch {
 	case out.LargestSharedFundingGroup >= 3 && out.SynchronizedWalletCount >= 3:
 		out.Confidence = "high"
-	case out.LargestSharedFundingGroup >= 2 || out.SynchronizedWalletCount >= 3 || out.FreshWalletCount >= 3:
+	case out.Flow.Confidence == "high" && (out.LargestSharedFundingGroup >= 2 || out.SynchronizedWalletCount >= 2):
+		out.Confidence = "high"
+	case out.LargestSharedFundingGroup >= 2 || out.SynchronizedWalletCount >= 3 || out.FreshWalletCount >= 3 || out.Flow.Confidence == "medium" || out.Flow.Confidence == "high":
 		out.Confidence = "medium"
 	default:
 		out.Confidence = "low"
@@ -337,8 +355,9 @@ func summarizeHolderCluster(out HolderClusterAnalysis) HolderClusterAnalysis {
 		out.Verdict = "NO STRONG COORDINATION FOUND IN THE BOUNDED WINDOW"
 	}
 	out.Findings = holderClusterFindings(out)
+	out.Limitations = append(out.Limitations, out.Flow.Limitations...)
 	out.Limitations = append(out.Limitations,
-		"Wallet history is bounded to the latest 20 signatures per holder and at most two parsed transactions per wallet.",
+		fmt.Sprintf("Wallet history is bounded to the latest %d signatures per holder and at most %d parsed transactions per wallet.", holderClusterSignatureLimit, holderClusterParsedTransactionLimit),
 		"A shared funding source can be an exchange or service wallet; common control is not claimed without combined timing and graph evidence.",
 		"Wash trading requires circular swap/transfer evidence and is not claimed from holder freshness alone.",
 	)
@@ -362,8 +381,9 @@ func holderClusterFindings(out HolderClusterAnalysis) []string {
 	if out.LinkedHolderPercentage > 0 {
 		findings = append(findings, fmt.Sprintf("Wallets in the strongest funding/timing relations represent approximately %.4f%% of role-adjusted holder supply.", out.LinkedHolderPercentage))
 	}
+	findings = append(findings, out.Flow.Findings...)
 	if len(findings) == 1 {
-		findings = append(findings, "No repeated shared-funding or synchronized-acquisition pattern was verified in the bounded observation window.")
+		findings = append(findings, "No repeated shared-funding, synchronized-acquisition, common-exit or internal-transfer pattern was verified in the bounded observation window.")
 	}
 	return findings
 }
@@ -407,18 +427,35 @@ func holderClusterTransactionIndexes(signatures []SolanaSignatureInfo, launchBlo
 	if len(signatures) == 0 {
 		return nil
 	}
-	oldest := len(signatures) - 1
-	for oldest >= 0 && signatures[oldest].Err != nil {
-		oldest--
-	}
 	indexes := []int{}
-	if oldest >= 0 {
-		indexes = append(indexes, oldest)
+	seen := map[int]bool{}
+	appendIndex := func(index int) {
+		if index < 0 || index >= len(signatures) || seen[index] || signatures[index].Err != nil || strings.TrimSpace(signatures[index].Signature) == "" {
+			return
+		}
+		seen[index] = true
+		indexes = append(indexes, index)
 	}
+
+	// Newest successful transaction captures recent exit/transfer behavior.
+	for i := 0; i < len(signatures); i++ {
+		if signatures[i].Err == nil && strings.TrimSpace(signatures[i].Signature) != "" {
+			appendIndex(i)
+			break
+		}
+	}
+	// Oldest bounded transaction captures initial funding/age evidence.
+	for i := len(signatures) - 1; i >= 0; i-- {
+		if signatures[i].Err == nil && strings.TrimSpace(signatures[i].Signature) != "" {
+			appendIndex(i)
+			break
+		}
+	}
+	// Closest transaction to the bounded launch estimate captures acquisition timing.
 	if launchBlockTime > 0 {
 		closest, best := -1, int64(math.MaxInt64)
 		for i, signature := range signatures {
-			if signature.Err != nil || signature.BlockTime == nil || *signature.BlockTime <= 0 {
+			if signature.Err != nil || signature.BlockTime == nil || *signature.BlockTime <= 0 || strings.TrimSpace(signature.Signature) == "" {
 				continue
 			}
 			delta := *signature.BlockTime - launchBlockTime
@@ -429,9 +466,10 @@ func holderClusterTransactionIndexes(signatures []SolanaSignatureInfo, launchBlo
 				best, closest = delta, i
 			}
 		}
-		if closest >= 0 && closest != oldest {
-			indexes = append(indexes, closest)
-		}
+		appendIndex(closest)
+	}
+	if len(indexes) > holderClusterParsedTransactionLimit {
+		indexes = indexes[:holderClusterParsedTransactionLimit]
 	}
 	return indexes
 }
