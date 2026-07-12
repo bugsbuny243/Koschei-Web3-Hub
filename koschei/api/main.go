@@ -13,7 +13,6 @@ import (
 	"koschei/api/internal/db"
 	"koschei/api/internal/handlers"
 	apihttp "koschei/api/internal/http"
-	"koschei/api/internal/jobs"
 	"koschei/api/internal/services"
 	"koschei/api/internal/web3"
 	"koschei/api/internal/webhooks"
@@ -80,12 +79,6 @@ func main() {
 	}
 	stopWebhookDeliveries := webhooks.StartDeliveryWorker(appCtx, conn)
 	defer stopWebhookDeliveries()
-	jobStore := jobs.NewStore(conn)
-	jobQueue := jobs.Queue(jobs.NoopQueue{})
-	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
-		jobQueue = jobs.NewNATSQueue(natsURL, os.Getenv("NATS_SUBJECT_PREFIX"))
-	}
-	defer jobQueue.Close()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -96,7 +89,7 @@ func main() {
 	}
 	staticDir := resolveStaticDir(os.Getenv("STATIC_DIR"))
 	log.Printf("static public path: %s", staticDir)
-	srv := apihttp.NewServer(conn, dbInitError, os.Getenv("ADMIN_PASSWORD"), firstEnv("CORS_ORIGIN", "CORS_ALLOWED_ORIGIN"), staticDir, apihttp.WithReadDB(readConn), apihttp.WithCache(appCache), apihttp.WithSolanaRPC(solanaRPC), apihttp.WithJobStore(jobStore), apihttp.WithJobQueue(jobQueue))
+	srv := apihttp.NewServer(conn, dbInitError, os.Getenv("ADMIN_PASSWORD"), firstEnv("CORS_ORIGIN", "CORS_ALLOWED_ORIGIN"), staticDir, apihttp.WithReadDB(readConn), apihttp.WithCache(appCache), apihttp.WithSolanaRPC(solanaRPC))
 	log.Printf("api listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, srv); err != nil {
 		log.Fatal(err)
