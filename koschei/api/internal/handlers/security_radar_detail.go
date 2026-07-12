@@ -47,7 +47,14 @@ func (h *Handler) SecurityRadarDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	freshFinal := services.ArvisFinalFromBundle(bundle)
 
-	distribution := radarDetailHolderDistribution(r.Context(), target)
+	holderRoles := services.ArvisHolderRolesFromBundle(bundle)
+	distribution := radarDetailHolderDistributionFromRoles(holderRoles)
+	if !holderRoles.Available {
+		distribution, holderRoles = radarDetailHolderDistribution(r.Context(), target)
+	}
+	holderCluster := services.ArvisHolderClusterFromBundle(bundle)
+	market := radarDetailMarketSnapshot(r.Context(), target)
+	holderIntelligence := services.BuildHolderIntelligence(holderRoles, holderCluster, market, time.Now().UTC())
 	sourceContext := h.radarDetailSourceContext(r.Context(), target, network)
 	structural := h.radarDetailStructuralContext(r.Context(), target, network)
 	persisted := h.radarDetailPersistedVerdict(r.Context(), target)
@@ -66,6 +73,9 @@ func (h *Handler) SecurityRadarDetail(w http.ResponseWriter, r *http.Request) {
 		"final_verdict":       final,
 		"warning":             warning,
 		"holder_distribution": distribution,
+		"holder_intelligence": holderIntelligence,
+		"holder_cluster":      holderCluster,
+		"market":              market,
 		"structural_memory":   structural,
 		"source_context":      sourceContext,
 		"modules":             modules,
@@ -80,20 +90,34 @@ func (h *Handler) SecurityRadarDetail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func radarDetailHolderDistribution(parent context.Context, target string) map[string]any {
+func radarDetailHolderDistributionFromRoles(roles services.HolderRoleAnalysis) map[string]any {
+	if !roles.Available {
+		return map[string]any{"available": false, "status": "holder_roles_unavailable", "top_accounts": []any{}}
+	}
+	out := services.HolderRoleAnalysisMap(roles)
+	out["largest_account_balance"] = 0.0
+	if len(roles.Accounts) > 0 {
+		out["largest_account_balance"] = radarDetailRound(roles.Accounts[0].Balance, 6)
+	}
+	out["account_scope"] = "Token accounts resolved to owner wallets and owner programs; only positively identified protocol inventory or burn sinks are excluded from holder-risk concentration."
+	out["evidence_reused_from_full_scan"] = true
+	return out
+}
+
+func radarDetailHolderDistribution(parent context.Context, target string) (map[string]any, services.HolderRoleAnalysis) {
 	rpcURL := strings.TrimSpace(firstNonEmptyString(os.Getenv("SOLANA_RPC_URL"), os.Getenv("ALCHEMY_SOLANA_RPC_URL")))
 	if rpcURL == "" {
-		return map[string]any{"available": false, "status": "rpc_not_configured", "top_accounts": []any{}}
+		return map[string]any{"available": false, "status": "rpc_not_configured", "top_accounts": []any{}}, services.HolderRoleAnalysis{}
 	}
 	ctx, cancel := context.WithTimeout(parent, 9*time.Second)
 	defer cancel()
 	supplyResult, err := services.SolanaGetTokenSupply(ctx, rpcURL, target)
 	if err != nil {
-		return map[string]any{"available": false, "status": "supply_unavailable", "error": compactRadarDetailError(err), "top_accounts": []any{}}
+		return map[string]any{"available": false, "status": "supply_unavailable", "error": compactRadarDetailError(err), "top_accounts": []any{}}, services.HolderRoleAnalysis{}
 	}
 	accountsResult, err := services.SolanaGetTokenLargestAccounts(ctx, rpcURL, target)
 	if err != nil {
-		return map[string]any{"available": false, "status": "largest_accounts_unavailable", "error": compactRadarDetailError(err), "top_accounts": []any{}}
+		return map[string]any{"available": false, "status": "largest_accounts_unavailable", "error": compactRadarDetailError(err), "top_accounts": []any{}}, services.HolderRoleAnalysis{}
 	}
 	supply := radarDetailTokenAmount(supplyResult.Value)
 	roles := services.AnalyzeSolanaHolderRoles(ctx, rpcURL, supply, accountsResult.Value)
@@ -104,7 +128,13 @@ func radarDetailHolderDistribution(parent context.Context, target string) map[st
 		out["largest_account_balance"] = radarDetailRound(radarDetailTokenAmount(accountsResult.Value[0].SolanaTokenAmount), 6)
 	}
 	out["account_scope"] = "Token accounts resolved to owner wallets and owner programs; only positively identified protocol inventory or burn sinks are excluded from holder-risk concentration."
-	return out
+	return out, roles
+}
+
+func radarDetailMarketSnapshot(parent context.Context, target string) services.TokenMarketSnapshot {
+	ctx, cancel := context.WithTimeout(parent, 6*time.Second)
+	defer cancel()
+	return services.FetchSolanaTokenMarketSnapshot(ctx, target)
 }
 
 func radarDetailTokenAmount(value services.SolanaTokenAmount) float64 {

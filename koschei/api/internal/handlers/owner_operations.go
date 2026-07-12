@@ -167,7 +167,14 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 		_ = h.saveSecurityRadarBundle(r.Context(), ownerChatIdentity(), "owner_full_scan", bundle)
 	}
 	freshFinal := services.ArvisFinalFromBundle(bundle)
-	distribution := radarDetailHolderDistribution(r.Context(), target)
+	holderRoles := services.ArvisHolderRolesFromBundle(bundle)
+	distribution := radarDetailHolderDistributionFromRoles(holderRoles)
+	if !holderRoles.Available {
+		distribution, holderRoles = radarDetailHolderDistribution(r.Context(), target)
+	}
+	holderCluster := services.ArvisHolderClusterFromBundle(bundle)
+	market := radarDetailMarketSnapshot(r.Context(), target)
+	holderIntelligence := services.BuildHolderIntelligence(holderRoles, holderCluster, market, time.Now().UTC())
 	sourceContext := h.radarDetailSourceContext(r.Context(), target, network)
 	structural := h.radarDetailStructuralContext(r.Context(), target, network)
 	persisted := h.radarDetailPersistedVerdict(r.Context(), target)
@@ -181,9 +188,9 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 		"network": network, "generated_at": time.Now().UTC().Format(time.RFC3339),
 		"target_classification": classification, "analysis_scope": radarTargetTokenMint,
 		"final_verdict": final, "warning": warning, "holder_distribution": distribution,
+		"holder_intelligence": holderIntelligence, "holder_cluster": holderCluster, "market": market,
 		"structural_memory": structural, "source_context": sourceContext,
 		"modules": modules, "evidence": evidence, "graph": graph,
-		"holder_cluster": ownerRadarModuleSignal(modules, services.ModuleFundingClusterDetector, "holder_cluster_analysis"),
 		"evidence_policy": map[string]any{
 			"hide_verified_details": false, "no_evidence_no_claim": true,
 			"creator_wallet_scope": "source-reported or on-chain relation; not proof of wrongdoing or real-world identity",
@@ -191,7 +198,7 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	detail["primary_risk_driver"] = ownerRadarPrimaryRiskDriver(modules)
-	detail["narrative"] = ownerRadarNarrative(target, final, warning, distribution, sourceContext, modules)
+	detail["narrative"] = ownerRadarNarrative(target, final, warning, distribution, sourceContext, modules, holderIntelligence)
 	writeJSON(w, http.StatusOK, detail)
 }
 
@@ -208,11 +215,11 @@ func ownerRadarModuleSignal(modules []map[string]any, moduleID, key string) any 
 	return nil
 }
 
-func ownerRadarNarrative(target string, final, warning, distribution, source map[string]any, modules []map[string]any) string {
+func ownerRadarNarrative(target string, final, warning, distribution, source map[string]any, modules []map[string]any, holder services.HolderIntelligence) string {
 	signed, _ := final["signed"].(bool)
 	level := strings.ToLower(strings.TrimSpace(fmt.Sprint(final["risk_level"])))
 	if !signed || final["risk_index"] == nil || level == "" || level == "unknown" || level == "<nil>" {
-		return "Koschei bu hedef için doğrulanmış bir final risk puanı üretmedi. Kanıt eksikliği düşük risk anlamına gelmez; eksik modüller tamamlanana kadar sonuç EVIDENCE PENDING olarak değerlendirilmelidir."
+		return ownerRadarPendingNarrative(target, holder, distribution, warning)
 	}
 
 	risk := radarDetailNumber(final["risk_index"])
@@ -273,8 +280,55 @@ func ownerRadarNarrative(target string, final, warning, distribution, source map
 		parts = append(parts, "Creator/deployer cüzdanı bu taramada doğrulanamadı. Bu, creator olmadığı anlamına gelmez; yalnızca mevcut kaynakların ilişkiyi çözemediğini gösterir.")
 	}
 
+	if holder.Available {
+		for _, finding := range holder.Findings {
+			if strings.TrimSpace(finding) != "" {
+				parts = append(parts, finding)
+			}
+		}
+	}
 	parts = append(parts, ownerRadarPracticalConclusion(level, distribution))
 	parts = append(parts, "Bu değerlendirme kanıt kapsamındadır; kötü niyet, dolandırıcılık veya gerçek kişi kimliği iddiası değildir.")
+	return strings.Join(parts, " ")
+}
+
+func ownerRadarPendingNarrative(target string, holder services.HolderIntelligence, distribution, warning map[string]any) string {
+	parts := []string{
+		"Koschei bu hedef için doğrulanmış bir final risk puanı üretmedi; bu, elde veri olmadığı veya tokenın güvenli olduğu anlamına gelmez.",
+	}
+	if holder.Available {
+		parts = append(parts, fmt.Sprintf("Zincir üstü holder yüzeyi yine doğrulandı: toplam arz %.4f token, owner bazında %d kontrol yüzeyi ve %d risk taşıyan owner gözlendi.", holder.Supply, holder.OwnerCount, holder.RiskBearingOwnerCount))
+		if len(holder.Rows) > 0 {
+			top := holder.Rows[0]
+			owner := top.OwnerWallet
+			if owner == "" && len(top.TokenAccounts) > 0 {
+				owner = top.TokenAccounts[0]
+			}
+			usd := ""
+			if top.ReferenceUSDValue != nil {
+				usd = fmt.Sprintf("; referans piyasa değeri yaklaşık $%.2f", *top.ReferenceUSDValue)
+			}
+			parts = append(parts, fmt.Sprintf("En büyük gözlenen hesap %s üzerinde %.4f token tutuyor ve owner-bazlı arz payı yaklaşık %.4f%%%s.", ownerRadarShortTarget(owner), top.Balance, holder.TopOwnerPercentage, usd))
+			if !top.OwnerResolved || strings.Contains(top.Role, "unresolved") || top.Role == "wallet_account_unavailable" {
+				parts = append(parts, "Bu baskın hesabın owner veya ekonomik rolü çözülemediği için Koschei yüksek yoğunluğu saklamadı fakat wallet-control finali de uydurmadı; sonuç bu nedenle EVIDENCE PENDING kaldı.")
+			}
+		}
+		if holder.Market.Available {
+			parts = append(parts, fmt.Sprintf("Piyasa bağlamı: referans fiyat $%.10f, 24 saatlik hacim $%.2f, likidite $%.2f ve piyasa değeri $%.2f.", holder.Market.PriceUSD, holder.Market.Volume24hUSD, holder.Market.LiquidityUSD, holder.Market.MarketCapUSD))
+		}
+		if holder.WalletsWithObservedOutflow > 0 {
+			parts = append(parts, fmt.Sprintf("Sınırlı cüzdan geçmişinde %d holder wallet için hedef-token çıkışı gözlendi.", holder.WalletsWithObservedOutflow))
+		}
+		if holder.CommonExitGroupCount > 0 {
+			parts = append(parts, fmt.Sprintf("%d ortak recipient-owner çıkış grubu doğrulandı; bu ilişki tek başına ortak sahiplik, satış veya wash trading kanıtı değildir.", holder.CommonExitGroupCount))
+		}
+	}
+	for _, reason := range ownerRadarStringSlice(warning["reasons"]) {
+		if strings.TrimSpace(reason) != "" {
+			parts = append(parts, reason)
+		}
+	}
+	parts = append(parts, "Final skor için eksik rol ve modül kanıtları tamamlanmalıdır; mevcut gerçek bakiyeler, yüzdeler ve davranış gözlemleri aşağıdaki holder tablosunda gösterilir.")
 	return strings.Join(parts, " ")
 }
 
