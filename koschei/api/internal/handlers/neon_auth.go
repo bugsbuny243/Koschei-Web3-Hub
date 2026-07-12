@@ -161,9 +161,6 @@ func cookieNames(cookies []*http.Cookie) []string {
 }
 
 func parseAndVerifyNeonJWT(token string) (neonJWTClaims, error) {
-	if claims, ok, err := tryLocalJWT(token); ok {
-		return claims, err
-	}
 	return neonClaimsFromToken(token)
 }
 
