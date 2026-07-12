@@ -27,6 +27,7 @@ jobs:
         run: |
           python scripts/repo_cleanup_phase1.py
           python scripts/repo_cleanup_phase2.py
+          python scripts/repo_cleanup_phase3.py
           gofmt -w internal/handlers internal/router
       - name: Production package build
         working-directory: koschei/api
@@ -53,7 +54,7 @@ jobs:
           test ! -e koschei/api/internal/router/model_router.go
           test -e koschei/api/internal/handlers/kosch_access_guard.go
           test -e koschei/api/internal/handlers/auth_session.go
-          ! grep -R "shopierPacks\|tryLocalJWT\|requirePremiumOutput\|consumePremiumOutput\|OwnerPaymentRequestsList\|ResolveModelRoute" koschei/api/internal --include='*.go'
+          ! grep -R "shopierPacks\|tryLocalJWT\|requirePremiumOutput\|consumePremiumOutput\|OwnerPaymentRequestsList\|ResolveModelRoute\|PADDLE_API_KEY\|OPENAI_API_KEY\|credit_events" koschei/api/internal --include='*.go'
       - name: Commit verified cleanup
         run: |
           if git diff --quiet; then exit 0; fi
