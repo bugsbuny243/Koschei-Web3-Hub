@@ -53,6 +53,12 @@ preflight_path = Path("internal/handlers/arvis_preflight.go")
 preflight = preflight_path.read_text()
 preflight = replace_once(
     preflight,
+    'import (\n\t"net/http"',
+    'import (\n\t"context"\n\t"net/http"',
+    "context import",
+)
+preflight = replace_once(
+    preflight,
     '\t"regexp"\n\t"strings"',
     '\t"regexp"\n\t"strconv"\n\t"strings"',
     "strconv import",
