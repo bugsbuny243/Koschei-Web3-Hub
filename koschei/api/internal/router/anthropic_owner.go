@@ -24,11 +24,10 @@ var (
 )
 
 type anthropicOwnerPayload struct {
-	Model       string                  `json:"model"`
-	System      string                  `json:"system,omitempty"`
-	Messages    []anthropicOwnerMessage `json:"messages"`
-	MaxTokens   int                     `json:"max_tokens"`
-	Temperature float64                 `json:"temperature,omitempty"`
+	Model     string                  `json:"model"`
+	System    string                  `json:"system,omitempty"`
+	Messages  []anthropicOwnerMessage `json:"messages"`
+	MaxTokens int                     `json:"max_tokens"`
 }
 
 type anthropicOwnerMessage struct {
@@ -74,21 +73,18 @@ func OwnerChat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	if req.Timeout <= 0 {
 		req.Timeout = 65 * time.Second
 	}
-	if req.Temperature < 0 || req.Temperature > 1 {
-		req.Temperature = 0.2
-	}
-	if req.Temperature == 0 {
-		req.Temperature = 0.2
-	}
+	// HARD RULE: never send `temperature` to the Anthropic API. Claude
+	// Sonnet 5 rejects that legacy parameter with HTTP 400. Keep temperature
+	// absent from anthropicOwnerPayload itself so future call-site changes
+	// cannot accidentally serialize it back into owner requests.
 
 	callCtx, cancel := context.WithTimeout(ctx, req.Timeout)
 	defer cancel()
 	payload := anthropicOwnerPayload{
-		Model:       model,
-		System:      strings.TrimSpace(req.System),
-		Messages:    []anthropicOwnerMessage{{Role: "user", Content: req.Prompt}},
-		MaxTokens:   req.MaxTokens,
-		Temperature: req.Temperature,
+		Model:     model,
+		System:    strings.TrimSpace(req.System),
+		Messages:  []anthropicOwnerMessage{{Role: "user", Content: req.Prompt}},
+		MaxTokens: req.MaxTokens,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

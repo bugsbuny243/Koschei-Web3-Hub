@@ -258,6 +258,8 @@ func clampStructuralPercent(value int) int {
 // StructuralBaseline exposes the strongest fresh, verified structural floor
 // for quick read paths such as Safe Check. A quick heuristic answer must never
 // contradict stronger holder/authority evidence Koschei already verified.
+// HARD RULE: holder and authority freshness remain independent; do not replace
+// their timestamps with a single aggregate observed_at value.
 func (s *SecurityRadarStore) StructuralBaseline(ctx context.Context, target, network string) (int, string, time.Time, bool) {
 	if s == nil || s.DB == nil {
 		return 0, "", time.Time{}, false
