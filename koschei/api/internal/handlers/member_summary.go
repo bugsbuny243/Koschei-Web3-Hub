@@ -108,7 +108,7 @@ func provisionMemberTx(ctx context.Context, store appProfileStore, sub, email st
 			SELECT CASE WHEN (SELECT plan_id FROM paid_plan) IS NOT NULL THEN (SELECT plan_id FROM paid_plan) ELSE 'free' END AS plan_id,
 		       outputs_total,
 		       outputs_remaining
-		FROM totals`, email, sub).Scan(&summary.Plan, &summary.OutputsTotal, &summary.OutputsRemaining); err != nil {
+		FROM totals`, email).Scan(&summary.Plan, &summary.OutputsTotal, &summary.OutputsRemaining); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return memberSummaryResponse{}, errors.New("active entitlement missing after initialization")
 		}
