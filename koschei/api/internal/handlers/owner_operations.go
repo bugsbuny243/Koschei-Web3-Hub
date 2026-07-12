@@ -60,10 +60,16 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 	radar := h.securityRadarStreamStats(ctx)
 	radarStatus := firstMapString(radar, "pipeline_status")
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("SOLANA_RPC_LIMIT_SAVER_ENABLED")), "true") {
-		radarStatus = "manual_rpc_saver"
-		radar["pipeline_status"] = radarStatus
 		radar["background_streams_paused"] = true
 		radar["manual_scans_available"] = true
+		if services.PumpHighVolumeRadarEnabled() {
+			radarStatus = "selective_auto_volume"
+			radar["pump_volume_auto_enabled"] = true
+			radar["pump_volume_threshold_usd"] = services.PumpHighVolumeThresholdUSD()
+		} else {
+			radarStatus = "manual_rpc_saver"
+		}
+		radar["pipeline_status"] = radarStatus
 	}
 	servicesMap := map[string]any{
 		"database":        map[string]any{"status": serviceStatus(db != nil, "connected", "unavailable")},
@@ -94,6 +100,7 @@ func (h *Handler) OwnerRadarOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	items := []services.SecurityRadarVerdictRecord{}
 	sources := []services.SecurityRadarSource{}
+	highVolumePump := []services.PumpHighVolumeOwnerItem{}
 	if db != nil {
 		store := services.NewSecurityRadarStore(db)
 		if loaded, err := store.LatestVerdicts(r.Context(), 100); err == nil {
@@ -102,10 +109,14 @@ func (h *Handler) OwnerRadarOverview(w http.ResponseWriter, r *http.Request) {
 		if loaded, err := store.ListSources(r.Context()); err == nil {
 			sources = loaded
 		}
+		if loaded, err := store.LatestPumpHighVolumeReports(r.Context(), 100); err == nil {
+			highVolumePump = loaded
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "generated_at": time.Now().UTC(), "items": items,
-		"sources": sources, "pipeline": h.securityRadarStreamStats(r.Context()),
+		"high_volume_pump": highVolumePump,
+		"sources":          sources, "pipeline": h.securityRadarStreamStats(r.Context()),
 	})
 }
 
@@ -207,6 +218,13 @@ func ownerRadarNarrative(target string, final, warning, distribution, source map
 	risk := radarDetailNumber(final["risk_index"])
 	parts := []string{
 		fmt.Sprintf("Koschei bu tokenı (%s) %.0f/100 ile %s risk seviyesinde değerlendiriyor. %s", ownerRadarShortTarget(target), risk, ownerRadarRiskLabelTR(level), ownerRadarRiskMeaning(level)),
+	}
+	if sourceSignals, ok := source["signals"].(map[string]any); ok {
+		volume := radarDetailNumber(sourceSignals["volume_24h_usd"])
+		threshold := radarDetailNumber(sourceSignals["volume_threshold_usd"])
+		if volume > 0 && threshold > 0 {
+			parts = append(parts, fmt.Sprintf("Bu rapor otomatik Pump hacim radarı tarafından açıldı: toplam 24 saatlik işlem hacmi $%.0f ve eşik $%.0f. Hacim tek başına güvenlik veya dolandırıcılık hükmü değildir; yalnızca derin inceleme tetikleyicisidir.", volume, threshold))
+		}
 	}
 
 	if available, _ := distribution["available"].(bool); available {

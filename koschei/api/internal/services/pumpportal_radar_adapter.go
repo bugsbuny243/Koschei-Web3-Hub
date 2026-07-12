@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -52,7 +51,7 @@ func (a *PumpPortalRadarAdapter) HandleEvent(ctx context.Context, ev PumpPortalE
 		"received_at": ev.ReceivedAt,
 		"raw":         ev.Raw,
 	}
-	eventID, err := a.Store.InsertEvent(ctx, SecurityRadarEventRecord{
+	_, err := a.Store.InsertEvent(ctx, SecurityRadarEventRecord{
 		ModuleID:      ModulePumpSybilRadar,
 		Target:        mint,
 		TargetType:    "token",
@@ -68,70 +67,11 @@ func (a *PumpPortalRadarAdapter) HandleEvent(ctx context.Context, ev PumpPortalE
 		return err
 	}
 
-	// A PumpPortal discovery must become a complete ARVIS story, not an isolated
-	// pump module row. The live-stream mode enables the verified Pump arm while
-	// the same run also evaluates holder, authority, graph, timing and program
-	// evidence. Signed arms and the final verdict share the source event.
-	analysis := AnalyzeArvisRadars(SecurityRadarRequest{
-		Target:  mint,
-		Network: "solana-mainnet",
-		Mode:    "live_stream:" + ModulePumpSybilRadar,
-	})
-	bundle := EvidenceBackedSecurityRadarBundle(analysis.Bundle)
-	arms := ArvisArmsFromBundle(bundle)
-	if len(arms) == 0 {
-		arms = analysis.Arms
-	}
-
-	var firstErr error
-	inserted := 0
-	for _, arm := range arms {
-		if !arm.Signed || !pumpPortalArmVerified(arm) {
-			continue
-		}
-		arm.Signals = mergePumpPortalSignals(arm.Signals, signals)
-		arm.Signals["source_verified_program_event"] = true
-		arm.Signals["source_module"] = ModulePumpSybilRadar
-		arm.Signals["customer_detail_visible"] = true
-		if arm.ModuleID == ModuleFinalVerdictEngine {
-			arm.Signals["warning_label"] = pumpPortalWarningLabel(arm.RiskIndex)
-			arm.Signals["warning_scope"] = "token and source-reported creator/deployer wallet; evidence-based risk signal, not an identity accusation"
-		}
-		arm.Evidence = append(arm.Evidence,
-			"PumpPortal reported a Pump token discovery event for this mint.",
-		)
-		if isLikelySolanaAddress(creator) {
-			arm.Evidence = append(arm.Evidence, fmt.Sprintf("Source-reported creator/deployer wallet: %s.", creator))
-		}
-		if _, err := a.Store.InsertVerdict(ctx, SecurityRadarVerdictRecord{
-			EventID:        eventID,
-			ModuleID:       arm.ModuleID,
-			Target:         arm.Target,
-			TargetType:     "token",
-			Network:        arm.Network,
-			Grade:          arm.Grade,
-			RiskIndex:      arm.RiskIndex,
-			RiskLevel:      arm.RiskLevel,
-			Verdict:        arm.Verdict,
-			Recommendation: arm.Recommendation,
-			Evidence:       arm.Evidence,
-			Signals:        arm.Signals,
-			RuleVersion:    arm.RuleVersion,
-			Signed:         arm.Signed,
-			Signature:      firstNonEmptyPumpPortal(arm.Signature, signature),
-			Source:         "pumpportal",
-			EventType:      eventType,
-			Provider:       "alchemy+pumpportal",
-		}); err != nil && firstErr == nil {
-			firstErr = err
-		} else if err == nil {
-			inserted++
-		}
-	}
-	if inserted == 0 && firstErr == nil {
-		log.Printf("pumpportal radar discovery stored without signed ARVIS verdict: mint=%s", mint)
-	}
-	return firstErr
+	// Discovery is intentionally cheap. PumpPortal new-token/migration events
+	// are stored for coverage, while the selective 24h USD volume worker decides
+	// whether this mint may consume Solana RPC for a complete ARVIS report.
+	// HARD RULE: do not run a full scan for every new Pump token.
+	return nil
 }
 
 func pumpPortalSignals(ev PumpPortalEvent, mint, signature, eventType string) map[string]any {
@@ -189,19 +129,27 @@ func pumpPortalWarningLabel(risk int) string {
 
 func StartPumpPortalRadarIfEnabled(ctx context.Context, db *sql.DB) func() {
 	cfg := LoadPumpPortalConfigFromEnv()
-	if !cfg.Enabled {
+	volumeEnabled := PumpHighVolumeRadarEnabled()
+	if !cfg.Enabled && !volumeEnabled {
 		return func() {}
 	}
 	if db == nil {
-		log.Printf("pumpportal radar disabled: database unavailable")
+		log.Printf("pump selective radar disabled: database unavailable")
 		return func() {}
 	}
-	ctx, cancel := context.WithCancel(ctx)
+	workerCtx, cancel := context.WithCancel(ctx)
 	store := NewSecurityRadarStore(db)
-	adapter := NewPumpPortalRadarAdapter(store)
-	client := NewPumpPortalClient(cfg)
-	go client.Start(ctx, adapter.HandleEvent)
-	log.Printf("pumpportal radar discovery started: data-only websocket=%s", cfg.redactedWebsocketHost())
+	if cfg.Enabled {
+		adapter := NewPumpPortalRadarAdapter(store)
+		client := NewPumpPortalClient(cfg)
+		go client.Start(workerCtx, adapter.HandleEvent)
+		log.Printf("pumpportal discovery started: free new-token/migration websocket=%s", cfg.redactedWebsocketHost())
+	}
+	if volumeEnabled {
+		worker := NewPumpHighVolumeRadarWorker(store, nil)
+		go worker.Start(workerCtx)
+		log.Printf("pump selective automatic radar started: volume_window=24h currency=USD threshold=%.0f poll=%s max_reports_per_cycle=%d rpc_saver=%t", worker.ThresholdUSD, worker.PollEvery, worker.MaxReportsPerCycle, SolanaRPCLimitSaverEnabled())
+	}
 	return cancel
 }
 

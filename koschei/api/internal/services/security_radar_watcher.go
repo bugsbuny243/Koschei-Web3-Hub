@@ -25,7 +25,7 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 	// background workers are paused by the Alchemy quota saver.
 	stopRetention := StartSecurityRadarRetentionWorker(ctx, db)
 	if SolanaRPCLimitSaverEnabled() && !ForceBackgroundRadarEnabled() {
-		log.Printf("security radar background workers paused: SOLANA_RPC_LIMIT_SAVER_ENABLED=true; manual Safe Check, token scans and user-triggered reports remain available")
+		log.Printf("broad security radar RPC workers paused: SOLANA_RPC_LIMIT_SAVER_ENABLED=true; selective Pump volume radar is managed separately; manual scans remain available")
 		return stopRetention
 	}
 	stopHeartbeat := StartArvisRadarHeartbeat(ctx, db)

@@ -24,9 +24,9 @@ const (
 	defaultPumpHighVolumeCooldown     = 6 * time.Hour
 	defaultPumpHighVolumePageSize     = 900
 	defaultPumpHighVolumeMaxReports   = 3
-	dexScreenerTokenBatchSize          = 30
-	pumpHighVolumeEventType            = "pumpportal_high_volume_24h"
-	pumpHighVolumeSource               = "pump_volume_gate"
+	dexScreenerTokenBatchSize         = 30
+	pumpHighVolumeEventType           = "pumpportal_high_volume_24h"
+	pumpHighVolumeSource              = "pump_volume_gate"
 )
 
 // PumpRadarCandidate is a PumpPortal-discovered mint eligible for selective
@@ -43,19 +43,19 @@ type PumpRadarCandidate struct {
 // PumpTokenMarket is the aggregated 24-hour market surface for one mint.
 // Volume is summed across unique Solana pairs returned for that token.
 type PumpTokenMarket struct {
-	Mint                  string    `json:"mint"`
-	Name                  string    `json:"name,omitempty"`
-	Symbol                string    `json:"symbol,omitempty"`
-	Volume24hUSD          float64   `json:"volume_24h_usd"`
-	PairCount             int       `json:"pair_count"`
-	BestPairAddress       string    `json:"best_pair_address,omitempty"`
-	BestPairDEX           string    `json:"best_pair_dex,omitempty"`
-	BestPairVolume24hUSD  float64   `json:"best_pair_volume_24h_usd"`
-	LiquidityUSD          float64   `json:"liquidity_usd"`
-	MarketCapUSD          float64   `json:"market_cap_usd"`
-	FDVUSD                float64   `json:"fdv_usd"`
-	Provider              string    `json:"provider"`
-	ObservedAt            time.Time `json:"observed_at"`
+	Mint                 string    `json:"mint"`
+	Name                 string    `json:"name,omitempty"`
+	Symbol               string    `json:"symbol,omitempty"`
+	Volume24hUSD         float64   `json:"volume_24h_usd"`
+	PairCount            int       `json:"pair_count"`
+	BestPairAddress      string    `json:"best_pair_address,omitempty"`
+	BestPairDEX          string    `json:"best_pair_dex,omitempty"`
+	BestPairVolume24hUSD float64   `json:"best_pair_volume_24h_usd"`
+	LiquidityUSD         float64   `json:"liquidity_usd"`
+	MarketCapUSD         float64   `json:"market_cap_usd"`
+	FDVUSD               float64   `json:"fdv_usd"`
+	Provider             string    `json:"provider"`
+	ObservedAt           time.Time `json:"observed_at"`
 }
 
 type PumpHighVolumeOwnerItem struct {
@@ -642,8 +642,8 @@ func pumpHighVolumeSignals(candidate PumpRadarCandidate, market PumpTokenMarket,
 		"volume_pair_count": market.PairCount, "volume_provider": firstNonEmptyPumpPortal(market.Provider, "dexscreener"),
 		"best_pair_address": market.BestPairAddress, "best_pair_dex": market.BestPairDEX,
 		"best_pair_volume_24h_usd": roundPumpUSD(market.BestPairVolume24hUSD),
-		"liquidity_usd": roundPumpUSD(market.LiquidityUSD), "market_cap_usd": roundPumpUSD(market.MarketCapUSD), "fdv_usd": roundPumpUSD(market.FDVUSD),
-		"volume_observed_at": market.ObservedAt.UTC().Format(time.RFC3339),
+		"liquidity_usd":            roundPumpUSD(market.LiquidityUSD), "market_cap_usd": roundPumpUSD(market.MarketCapUSD), "fdv_usd": roundPumpUSD(market.FDVUSD),
+		"volume_observed_at":   market.ObservedAt.UTC().Format(time.RFC3339),
 		"owner_detail_visible": true, "customer_detail_visible": false,
 	}
 }
