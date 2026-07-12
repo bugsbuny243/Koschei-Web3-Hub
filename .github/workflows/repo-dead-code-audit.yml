@@ -29,8 +29,26 @@ jobs:
           python scripts/repo_cleanup_phase2.py
           gofmt -w internal/handlers internal/router
       - name: Production package build
+        id: package_build
+        continue-on-error: true
         working-directory: koschei/api
-        run: go build ./internal/handlers ./internal/http ./internal/router ./internal/services ./internal/web3
+        run: |
+          set +e
+          go build ./internal/handlers ./internal/http ./internal/router ./internal/services ./internal/web3 > ../../cleanup-build.log 2>&1
+          code=$?
+          cat ../../cleanup-build.log
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit $code
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-cleanup-build
+          path: cleanup-build.log
+          if-no-files-found: error
+      - name: Stop on package build failure
+        if: steps.package_build.outputs.exit_code != '0'
+        run: exit 1
       - name: Full Linux build
         working-directory: koschei/api
         run: CGO_ENABLED=0 GOOS=linux go build ./...
