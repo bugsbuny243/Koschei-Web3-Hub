@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "koschei/api/scripts/holder_cluster_flow_v2_patch.py"
+      - "koschei/api/scripts/holder_cluster_flow_guard_patch.py"
       - "koschei/api/internal/services/holder_cluster_*.go"
       - "koschei/api/internal/services/arvis_arms.go"
       - "koschei/api/public/js/owner-control-center.js"
@@ -28,11 +28,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply Holder Cluster Flow V2 patch
+      - name: Apply DEX common-exit guard
         working-directory: koschei/api
         run: |
-          python scripts/holder_cluster_flow_v2_patch.py
-          gofmt -w internal/services/holder_cluster_intelligence.go internal/services/holder_cluster_flow_intelligence.go internal/services/holder_cluster_flow_intelligence_test.go internal/services/arvis_arms.go
+          python scripts/holder_cluster_flow_guard_patch.py
+          gofmt -w internal/services/holder_cluster_flow_intelligence.go internal/services/holder_cluster_flow_intelligence_test.go
       - name: Focused flow tests
         working-directory: koschei/api
         run: go test ./internal/services -run '^TestHolderCluster(Flow|TokenOwner|TransactionIndexes)' -count=1
@@ -44,12 +44,12 @@ jobs:
         run: CGO_ENABLED=0 GOOS=linux go build ./...
       - name: Owner JavaScript syntax
         run: node --check koschei/api/public/js/owner-control-center.js
-      - name: Commit verified implementation
+      - name: Commit verified guard
         if: success()
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add koschei/api/internal/services/holder_cluster_intelligence.go koschei/api/internal/services/holder_cluster_flow_intelligence.go koschei/api/internal/services/holder_cluster_flow_intelligence_test.go koschei/api/internal/services/arvis_arms.go koschei/api/public/js/owner-control-center.js koschei/api/public/owner-production.html
-          git commit -m 'Add Holder Cluster Flow V2 intelligence'
+          git add koschei/api/internal/services/holder_cluster_flow_intelligence.go koschei/api/internal/services/holder_cluster_flow_intelligence_test.go
+          git commit -m 'Exclude known DEX routes from common-exit scoring'
           git push origin HEAD:${{ github.head_ref }}
