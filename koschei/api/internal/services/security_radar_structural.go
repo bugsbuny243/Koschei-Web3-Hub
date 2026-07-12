@@ -254,3 +254,38 @@ func clampStructuralPercent(value int) int {
 	}
 	return value
 }
+
+// StructuralBaseline exposes the strongest fresh, verified structural floor
+// for quick read paths such as Safe Check. A quick heuristic answer must never
+// contradict stronger holder/authority evidence Koschei already verified.
+func (s *SecurityRadarStore) StructuralBaseline(ctx context.Context, target, network string) (int, string, time.Time, bool) {
+	if s == nil || s.DB == nil {
+		return 0, "", time.Time{}, false
+	}
+	target = strings.TrimSpace(target)
+	if target == "" || IsSecurityRadarInfraTarget(target) {
+		return 0, "", time.Time{}, false
+	}
+
+	cacheCtx, cancel := context.WithTimeout(ctx, structuralCacheTimeout)
+	defer cancel()
+	var cached tokenStructuralSignals
+	err := s.DB.QueryRowContext(cacheCtx, `
+		SELECT largest_holder_pct, top10_holder_pct, has_holder_data,
+		       mint_authority_present, freeze_authority_present, has_authority_data,
+		       holder_observed_at, authority_observed_at
+		FROM token_structural_signals
+		WHERE target = $1 AND network = $2`, target, normalizeRadarNetwork(network)).Scan(
+		&cached.LargestHolderPct, &cached.Top10HolderPct, &cached.HasHolderData,
+		&cached.MintAuthorityPresent, &cached.FreezeAuthorityPresent, &cached.HasAuthorityData,
+		&cached.HolderObservedAt, &cached.AuthorityObservedAt)
+	if err != nil {
+		return 0, "", time.Time{}, false
+	}
+
+	floor, observedAt := cached.structuralFloor(time.Now().UTC())
+	if floor <= 0 || observedAt.IsZero() {
+		return 0, "", time.Time{}, false
+	}
+	return floor, riskLevelFromIndex(floor), observedAt, true
+}

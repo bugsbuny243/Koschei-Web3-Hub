@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"koschei/api/internal/router"
+	"koschei/api/internal/services"
 )
 
 type arvisPreflightRequest struct {
@@ -52,6 +55,7 @@ func (h *Handler) ARVISPreflight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := evaluateARVISPreflight(req)
+	resp = h.alignARVISPreflightWithStructuralBaseline(r.Context(), req, resp)
 	if aiProviderConfigured() && resp.RiskLevel != "low" && !isOfficialKOSCHMint(req.Target) {
 		prompt := "Target: " + strings.TrimSpace(req.Target) + "\nKind: " + strings.TrimSpace(req.Kind) + "\nIntent: " + strings.TrimSpace(req.Intent) + "\nNote: " + strings.TrimSpace(req.Note) + "\nLocal decision: " + resp.Decision + "\nLocal reasons: " + strings.Join(resp.Reasons, "; ")
 		ai, err := router.Chat(r.Context(), router.ChatRequest{System: arvisPreflightSystemPrompt, Prompt: prompt, MaxTokens: 450, Temperature: 0.1, Timeout: 18 * time.Second})
@@ -62,6 +66,61 @@ func (h *Handler) ARVISPreflight(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) alignARVISPreflightWithStructuralBaseline(ctx context.Context, req arvisPreflightRequest, resp arvisPreflightResponse) arvisPreflightResponse {
+	target := strings.TrimSpace(req.Target)
+	if !solanaPreflightAddressLike.MatchString(target) || isOfficialKOSCHMint(target) {
+		return resp
+	}
+	db := h.DBRead
+	if db == nil {
+		db = h.DB
+	}
+	if db == nil {
+		return resp
+	}
+	floor, level, observedAt, ok := services.NewSecurityRadarStore(db).StructuralBaseline(ctx, target, "solana-mainnet")
+	if !ok || floor <= resp.Score {
+		return resp
+	}
+	return applyARVISStructuralBaseline(resp, floor, level, observedAt)
+}
+
+func applyARVISStructuralBaseline(resp arvisPreflightResponse, floor int, level string, observedAt time.Time) arvisPreflightResponse {
+	if floor <= resp.Score {
+		return resp
+	}
+	resp.Score = floor
+	if strings.TrimSpace(level) != "" {
+		resp.RiskLevel = strings.ToLower(strings.TrimSpace(level))
+	}
+	switch resp.RiskLevel {
+	case "critical", "high":
+		if resp.Decision != "blocked" {
+			resp.Decision = "warn"
+		}
+	case "medium":
+		if resp.Decision == "allow" {
+			resp.Decision = "review"
+		}
+	}
+	reason := "Koschei yapısal hafızası: bu mint için doğrulanmış holder/authority tabanı " + strconv.Itoa(floor) + "/100."
+	if !observedAt.IsZero() {
+		reason = "Koschei yapısal hafızası: bu mint için " + observedAt.UTC().Format("02.01.2006 15:04 UTC") + " tarihinde doğrulanmış holder/authority tabanı " + strconv.Itoa(floor) + "/100."
+	}
+	seen := false
+	for _, existing := range resp.Reasons {
+		if existing == reason {
+			seen = true
+			break
+		}
+	}
+	if !seen {
+		resp.Reasons = append(resp.Reasons, reason)
+	}
+	resp.HumanMessage = "ARVIS ön kontrol sonucu: " + resp.Decision + " / " + resp.RiskLevel + ". Doğrulanmış yapısal risk tabanı uygulandı; detaylı Radar kanıtlarını incele."
+	return resp
 }
 
 func evaluateARVISPreflight(req arvisPreflightRequest) arvisPreflightResponse {
