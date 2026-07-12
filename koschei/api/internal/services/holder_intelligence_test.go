@@ -73,3 +73,20 @@ func TestHolderIntelligenceDoesNotCallWalletActivityHoldingDuration(t *testing.T
 		t.Fatalf("activity age = %d", row.ObservedActivityAgeDays)
 	}
 }
+
+func TestHolderIntelligenceTopSummaryExcludesProtocolInventory(t *testing.T) {
+	roles := HolderRoleAnalysis{
+		Available: true, Supply: 1000, CirculatingSupply: 100,
+		Accounts: []HolderRoleAccount{
+			{Rank: 1, TokenAccount: "Protocol", OwnerWallet: "ProtocolPDA", Balance: 900, Role: "pump_liquidity_vault", Confidence: "high", ExcludedFromHolderRisk: true},
+			{Rank: 2, TokenAccount: "Wallet", OwnerWallet: "WalletA", Balance: 100, Role: "externally_owned_wallet", Confidence: "high", ExcludedFromHolderRisk: false},
+		},
+	}
+	result := BuildHolderIntelligence(roles, HolderClusterAnalysis{}, TokenMarketSnapshot{PriceUSD: 2}, time.Now().UTC())
+	if result.TopOwnerBalance != 100 || result.TopOwnerPercentage != 100 {
+		t.Fatalf("protocol inventory became top risk-bearing owner: %#v", result)
+	}
+	if result.TopOwnerReferenceUSDValue == nil || *result.TopOwnerReferenceUSDValue != 200 {
+		t.Fatalf("top owner value = %#v", result.TopOwnerReferenceUSDValue)
+	}
+}

@@ -47,7 +47,11 @@ func (h *Handler) SecurityRadarDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	freshFinal := services.ArvisFinalFromBundle(bundle)
 
-	distribution, holderRoles := radarDetailHolderDistribution(r.Context(), target)
+	holderRoles := services.ArvisHolderRolesFromBundle(bundle)
+	distribution := radarDetailHolderDistributionFromRoles(holderRoles)
+	if !holderRoles.Available {
+		distribution, holderRoles = radarDetailHolderDistribution(r.Context(), target)
+	}
 	holderCluster := services.ArvisHolderClusterFromBundle(bundle)
 	market := radarDetailMarketSnapshot(r.Context(), target)
 	holderIntelligence := services.BuildHolderIntelligence(holderRoles, holderCluster, market, time.Now().UTC())
@@ -84,6 +88,20 @@ func (h *Handler) SecurityRadarDetail(w http.ResponseWriter, r *http.Request) {
 			"financial_advice":      false,
 		},
 	})
+}
+
+func radarDetailHolderDistributionFromRoles(roles services.HolderRoleAnalysis) map[string]any {
+	if !roles.Available {
+		return map[string]any{"available": false, "status": "holder_roles_unavailable", "top_accounts": []any{}}
+	}
+	out := services.HolderRoleAnalysisMap(roles)
+	out["largest_account_balance"] = 0.0
+	if len(roles.Accounts) > 0 {
+		out["largest_account_balance"] = radarDetailRound(roles.Accounts[0].Balance, 6)
+	}
+	out["account_scope"] = "Token accounts resolved to owner wallets and owner programs; only positively identified protocol inventory or burn sinks are excluded from holder-risk concentration."
+	out["evidence_reused_from_full_scan"] = true
+	return out
 }
 
 func radarDetailHolderDistribution(parent context.Context, target string) (map[string]any, services.HolderRoleAnalysis) {

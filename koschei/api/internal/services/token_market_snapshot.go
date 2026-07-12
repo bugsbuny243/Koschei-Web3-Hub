@@ -18,28 +18,28 @@ const defaultTokenMarketEndpoint = "https://api.dexscreener.com/tokens/v1/solana
 // Price and USD values are reference estimates from the most liquid returned
 // Solana pair and must never be presented as guaranteed liquidation value.
 type TokenMarketSnapshot struct {
-	Available             bool      `json:"available"`
-	Status                string    `json:"status"`
-	Provider              string    `json:"provider"`
-	Mint                  string    `json:"mint"`
-	Name                  string    `json:"name,omitempty"`
-	Symbol                string    `json:"symbol,omitempty"`
-	PriceUSD              float64   `json:"price_usd"`
-	PriceChange24hPct     float64   `json:"price_change_24h_pct"`
-	Volume24hUSD          float64   `json:"volume_24h_usd"`
-	LiquidityUSD          float64   `json:"liquidity_usd"`
-	MarketCapUSD          float64   `json:"market_cap_usd"`
-	FDVUSD                float64   `json:"fdv_usd"`
-	Buys24h               int       `json:"buys_24h"`
-	Sells24h              int       `json:"sells_24h"`
-	PairCount             int       `json:"pair_count"`
-	BestPairAddress       string    `json:"best_pair_address,omitempty"`
-	BestPairDEX           string    `json:"best_pair_dex,omitempty"`
-	BestPairLiquidityUSD  float64   `json:"best_pair_liquidity_usd"`
-	BestPairVolume24hUSD  float64   `json:"best_pair_volume_24h_usd"`
-	ObservedAt            time.Time `json:"observed_at"`
-	ValuationScope        string    `json:"valuation_scope"`
-	Limitations           []string  `json:"limitations"`
+	Available            bool      `json:"available"`
+	Status               string    `json:"status"`
+	Provider             string    `json:"provider"`
+	Mint                 string    `json:"mint"`
+	Name                 string    `json:"name,omitempty"`
+	Symbol               string    `json:"symbol,omitempty"`
+	PriceUSD             float64   `json:"price_usd"`
+	PriceChange24hPct    float64   `json:"price_change_24h_pct"`
+	Volume24hUSD         float64   `json:"volume_24h_usd"`
+	LiquidityUSD         float64   `json:"liquidity_usd"`
+	MarketCapUSD         float64   `json:"market_cap_usd"`
+	FDVUSD               float64   `json:"fdv_usd"`
+	Buys24h              int       `json:"buys_24h"`
+	Sells24h             int       `json:"sells_24h"`
+	PairCount            int       `json:"pair_count"`
+	BestPairAddress      string    `json:"best_pair_address,omitempty"`
+	BestPairDEX          string    `json:"best_pair_dex,omitempty"`
+	BestPairLiquidityUSD float64   `json:"best_pair_liquidity_usd"`
+	BestPairVolume24hUSD float64   `json:"best_pair_volume_24h_usd"`
+	ObservedAt           time.Time `json:"observed_at"`
+	ValuationScope       string    `json:"valuation_scope"`
+	Limitations          []string  `json:"limitations"`
 }
 
 type tokenMarketPair struct {
@@ -56,8 +56,8 @@ type tokenMarketPair struct {
 		Name    string `json:"name"`
 		Symbol  string `json:"symbol"`
 	} `json:"quoteToken"`
-	PriceUSD   string `json:"priceUsd"`
-	Txns       map[string]struct {
+	PriceUSD string `json:"priceUsd"`
+	Txns     map[string]struct {
 		Buys  int `json:"buys"`
 		Sells int `json:"sells"`
 	} `json:"txns"`
@@ -140,7 +140,9 @@ func (c *TokenMarketClient) Fetch(ctx context.Context, mint string) TokenMarketS
 	}
 
 	seen := map[string]bool{}
-	bestMetric := -1.0
+	bestHasLiquidity := false
+	bestLiquidity := -1.0
+	bestVolume := -1.0
 	for _, pair := range pairs {
 		if strings.TrimSpace(pair.ChainID) != "solana" {
 			continue
@@ -180,18 +182,22 @@ func (c *TokenMarketClient) Fetch(ctx context.Context, mint string) TokenMarketS
 		if !baseMatches {
 			continue
 		}
-		metric := liquidity
-		if metric <= 0 {
-			metric = volume / 1000000
+		better := false
+		if liquidity > 0 {
+			better = !bestHasLiquidity || liquidity > bestLiquidity
+		} else if !bestHasLiquidity {
+			better = volume > bestVolume
 		}
-		if metric < bestMetric {
+		if !better {
 			continue
 		}
 		price, _ := strconv.ParseFloat(strings.TrimSpace(pair.PriceUSD), 64)
 		if price < 0 {
 			price = 0
 		}
-		bestMetric = metric
+		bestHasLiquidity = liquidity > 0
+		bestLiquidity = liquidity
+		bestVolume = volume
 		out.Name = strings.TrimSpace(pair.BaseToken.Name)
 		out.Symbol = strings.TrimSpace(pair.BaseToken.Symbol)
 		out.PriceUSD = price

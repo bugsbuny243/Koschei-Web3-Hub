@@ -12,36 +12,36 @@ import (
 // accounts controlled by the same resolved owner are aggregated. Unresolved
 // token accounts remain separate and are never silently attributed to a wallet.
 type HolderIntelligenceRow struct {
-	Rank                       int      `json:"rank"`
-	OwnerWallet                string   `json:"owner_wallet,omitempty"`
-	OwnerResolved              bool     `json:"owner_resolved"`
-	TokenAccounts              []string `json:"token_accounts"`
-	TokenAccountCount          int      `json:"token_account_count"`
-	Role                       string   `json:"role"`
-	RoleConfidence             string   `json:"role_confidence"`
-	RiskBearing                bool     `json:"risk_bearing"`
-	ExcludedFromHolderRisk     bool     `json:"excluded_from_holder_risk"`
-	Balance                    float64  `json:"balance"`
-	RawPercentage              float64  `json:"raw_percentage"`
-	CirculatingPercentage      float64  `json:"circulating_percentage,omitempty"`
-	ReferenceUSDValue          *float64 `json:"reference_usd_value,omitempty"`
-	AcquisitionObserved        bool     `json:"acquisition_observed"`
-	AcquisitionObservedAt      string   `json:"acquisition_observed_at,omitempty"`
-	OldestActivityObservedAt   string   `json:"oldest_activity_observed_at,omitempty"`
-	NewestActivityObservedAt   string   `json:"newest_activity_observed_at,omitempty"`
-	ObservedHoldingDays        int      `json:"observed_holding_days,omitempty"`
-	ObservedActivityAgeDays    int      `json:"observed_activity_age_days,omitempty"`
-	HoldingDurationScope       string   `json:"holding_duration_scope"`
-	HistoryExhausted           bool     `json:"history_exhausted"`
-	SignaturesObserved         int      `json:"signatures_observed"`
-	ParsedTransactions         int      `json:"parsed_transactions"`
-	OutflowTransactions        int      `json:"outflow_transactions"`
-	CommonExitObserved         bool     `json:"common_exit_observed"`
-	CommonExitRecipient        string   `json:"common_exit_recipient,omitempty"`
-	FreshNearLaunch            bool     `json:"fresh_near_launch"`
-	FundingSource              string   `json:"funding_source,omitempty"`
-	Behavior                   string   `json:"behavior"`
-	Evidence                   []string `json:"evidence"`
+	Rank                     int      `json:"rank"`
+	OwnerWallet              string   `json:"owner_wallet,omitempty"`
+	OwnerResolved            bool     `json:"owner_resolved"`
+	TokenAccounts            []string `json:"token_accounts"`
+	TokenAccountCount        int      `json:"token_account_count"`
+	Role                     string   `json:"role"`
+	RoleConfidence           string   `json:"role_confidence"`
+	RiskBearing              bool     `json:"risk_bearing"`
+	ExcludedFromHolderRisk   bool     `json:"excluded_from_holder_risk"`
+	Balance                  float64  `json:"balance"`
+	RawPercentage            float64  `json:"raw_percentage"`
+	CirculatingPercentage    float64  `json:"circulating_percentage,omitempty"`
+	ReferenceUSDValue        *float64 `json:"reference_usd_value,omitempty"`
+	AcquisitionObserved      bool     `json:"acquisition_observed"`
+	AcquisitionObservedAt    string   `json:"acquisition_observed_at,omitempty"`
+	OldestActivityObservedAt string   `json:"oldest_activity_observed_at,omitempty"`
+	NewestActivityObservedAt string   `json:"newest_activity_observed_at,omitempty"`
+	ObservedHoldingDays      int      `json:"observed_holding_days,omitempty"`
+	ObservedActivityAgeDays  int      `json:"observed_activity_age_days,omitempty"`
+	HoldingDurationScope     string   `json:"holding_duration_scope"`
+	HistoryExhausted         bool     `json:"history_exhausted"`
+	SignaturesObserved       int      `json:"signatures_observed"`
+	ParsedTransactions       int      `json:"parsed_transactions"`
+	OutflowTransactions      int      `json:"outflow_transactions"`
+	CommonExitObserved       bool     `json:"common_exit_observed"`
+	CommonExitRecipient      string   `json:"common_exit_recipient,omitempty"`
+	FreshNearLaunch          bool     `json:"fresh_near_launch"`
+	FundingSource            string   `json:"funding_source,omitempty"`
+	Behavior                 string   `json:"behavior"`
+	Evidence                 []string `json:"evidence"`
 }
 
 // HolderIntelligence keeps factual holdings visible even when an unresolved
@@ -77,15 +77,15 @@ type HolderIntelligence struct {
 }
 
 type holderOwnerAggregate struct {
-	OwnerWallet            string
-	OwnerResolved          bool
-	TokenAccounts          []string
-	Role                   string
-	RoleConfidence         string
-	Excluded               bool
-	Balance                float64
-	Evidence               []string
-	mixedRole              bool
+	OwnerWallet    string
+	OwnerResolved  bool
+	TokenAccounts  []string
+	Role           string
+	RoleConfidence string
+	Excluded       bool
+	Balance        float64
+	Evidence       []string
+	mixedRole      bool
 }
 
 func BuildHolderIntelligence(roles HolderRoleAnalysis, cluster HolderClusterAnalysis, market TokenMarketSnapshot, now time.Time) HolderIntelligence {
@@ -143,7 +143,7 @@ func BuildHolderIntelligence(roles HolderRoleAnalysis, cluster HolderClusterAnal
 			TokenAccounts: append([]string{}, agg.TokenAccounts...), TokenAccountCount: len(agg.TokenAccounts),
 			Role: agg.Role, RoleConfidence: agg.RoleConfidence, ExcludedFromHolderRisk: agg.Excluded,
 			RiskBearing: !agg.Excluded, Balance: roundHolderIntelligence(agg.Balance, 8),
-			RawPercentage: roundHolderIntelligence(holderIntelligencePercent(agg.Balance, roles.Supply), 4),
+			RawPercentage:        roundHolderIntelligence(holderIntelligencePercent(agg.Balance, roles.Supply), 4),
 			HoldingDurationScope: "not_observed", Behavior: holderIntelligenceBaseBehavior(agg),
 			Evidence: append([]string{}, agg.Evidence...),
 		}
@@ -239,13 +239,13 @@ func BuildHolderIntelligence(roles HolderRoleAnalysis, cluster HolderClusterAnal
 		}
 	}
 	out.Top1Percentage, out.Top3Percentage, out.Top10Percentage, out.Top20Percentage = holderIntelligenceConcentration(rows, roles.CirculatingSupply)
-	if len(rows) > 0 {
-		out.TopOwnerBalance = rows[0].Balance
-		out.TopOwnerPercentage = rows[0].RawPercentage
-		if rows[0].RiskBearing && rows[0].CirculatingPercentage > 0 {
-			out.TopOwnerPercentage = rows[0].CirculatingPercentage
+	if top := holderIntelligenceTopRiskRow(rows); top != nil {
+		out.TopOwnerBalance = top.Balance
+		out.TopOwnerPercentage = top.RawPercentage
+		if top.CirculatingPercentage > 0 {
+			out.TopOwnerPercentage = top.CirculatingPercentage
 		}
-		out.TopOwnerReferenceUSDValue = rows[0].ReferenceUSDValue
+		out.TopOwnerReferenceUSDValue = top.ReferenceUSDValue
 	}
 	out.Findings = holderIntelligenceFindings(out)
 	out.Limitations = append(out.Limitations, roles.Limitations...)
@@ -253,6 +253,15 @@ func BuildHolderIntelligence(roles HolderRoleAnalysis, cluster HolderClusterAnal
 	out.Limitations = append(out.Limitations, market.Limitations...)
 	out.Limitations = appendUniqueHolderEvidence([]string{}, out.Limitations...)
 	return out
+}
+
+func holderIntelligenceTopRiskRow(rows []HolderIntelligenceRow) *HolderIntelligenceRow {
+	for i := range rows {
+		if rows[i].RiskBearing {
+			return &rows[i]
+		}
+	}
+	return nil
 }
 
 func holderIntelligenceConcentration(rows []HolderIntelligenceRow, circulatingSupply float64) (float64, float64, float64, float64) {
@@ -286,8 +295,8 @@ func holderIntelligenceConcentration(rows []HolderIntelligenceRow, circulatingSu
 
 func holderIntelligenceFindings(out HolderIntelligence) []string {
 	findings := []string{}
-	if len(out.Rows) > 0 {
-		top := out.Rows[0]
+	if topRow := holderIntelligenceTopRiskRow(out.Rows); topRow != nil {
+		top := *topRow
 		ownerLabel := top.OwnerWallet
 		if ownerLabel == "" && len(top.TokenAccounts) > 0 {
 			ownerLabel = top.TokenAccounts[0]

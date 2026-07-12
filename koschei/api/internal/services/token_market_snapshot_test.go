@@ -66,3 +66,19 @@ func TestTokenMarketSnapshotDoesNotUseQuoteTokenBasePrice(t *testing.T) {
 		t.Fatalf("market context missing: %#v", market)
 	}
 }
+
+func TestTokenMarketSnapshotPositiveLiquidityOutranksNoLiquidityVolume(t *testing.T) {
+	mint := "MintLiquidity11111111111111111111111111111111"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[
+			{"chainId":"solana","dexId":"no-liquidity","pairAddress":"a","baseToken":{"address":"` + mint + `"},"quoteToken":{"address":"SOL"},"priceUsd":"99","volume":{"h24":900000000}},
+			{"chainId":"solana","dexId":"liquid","pairAddress":"b","baseToken":{"address":"` + mint + `"},"quoteToken":{"address":"USDC"},"priceUsd":"0.10","volume":{"h24":1000},"liquidity":{"usd":10}}
+		]`))
+	}))
+	defer server.Close()
+	market := (&TokenMarketClient{Endpoint: server.URL, Client: server.Client()}).Fetch(context.Background(), mint)
+	if market.PriceUSD != 0.10 || market.BestPairAddress != "b" {
+		t.Fatalf("no-liquidity pair became price reference: %#v", market)
+	}
+}

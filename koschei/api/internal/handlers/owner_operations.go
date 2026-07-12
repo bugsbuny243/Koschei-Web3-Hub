@@ -167,7 +167,11 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 		_ = h.saveSecurityRadarBundle(r.Context(), ownerChatIdentity(), "owner_full_scan", bundle)
 	}
 	freshFinal := services.ArvisFinalFromBundle(bundle)
-	distribution, holderRoles := radarDetailHolderDistribution(r.Context(), target)
+	holderRoles := services.ArvisHolderRolesFromBundle(bundle)
+	distribution := radarDetailHolderDistributionFromRoles(holderRoles)
+	if !holderRoles.Available {
+		distribution, holderRoles = radarDetailHolderDistribution(r.Context(), target)
+	}
 	holderCluster := services.ArvisHolderClusterFromBundle(bundle)
 	market := radarDetailMarketSnapshot(r.Context(), target)
 	holderIntelligence := services.BuildHolderIntelligence(holderRoles, holderCluster, market, time.Now().UTC())
