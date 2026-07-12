@@ -1,0 +1,43 @@
+name: Holder List Priority Patch
+
+on:
+  push:
+    branches:
+      - feat/holder-intelligence-rich-report-20260712
+    paths:
+      - "koschei/api/scripts/holder_list_priority_patch.py"
+      - ".github/workflows/holder-list-priority-patch.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/holder-intelligence-rich-report-20260712
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply list-first owner report
+        working-directory: koschei/api
+        run: python scripts/holder_list_priority_patch.py
+      - name: Verify owner JavaScript
+        run: node --check koschei/api/public/js/owner-control-center.js
+      - name: Verify list-first contract
+        working-directory: koschei/api
+        run: |
+          grep -Fq 'Tam Tara + Listele' public/js/owner-control-center.js
+          grep -Fq 'Holder Intelligence · Gerçek sahiplik ve değer' public/js/owner-control-center.js
+          grep -Fq 'Koschei açıklaması' public/js/owner-control-center.js
+          grep -Fq 'owner-control-center.js?v=10' public/owner-production.html
+          ! grep -Fq 'Holder Görselini İndir' public/js/owner-control-center.js
+      - name: Commit list-first owner report
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add koschei/api/public/js/owner-control-center.js koschei/api/public/owner-production.html
+          git commit -m 'Prioritize holder list in owner report'
+          git push origin HEAD:feat/holder-intelligence-rich-report-20260712
