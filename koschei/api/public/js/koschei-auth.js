@@ -1,6 +1,8 @@
 (function () {
   const KEY = 'koschei_jwt';
   const LEGACY_KEY = 'koschei_token';
+  // A syntactically valid JWT is not an authenticated session until /api/me confirms it.
+  let sessionVerified = false;
 
   function saveJwt(t) {
     try {
@@ -16,6 +18,7 @@
   }
 
   function clearJwt() {
+    sessionVerified = false;
     try {
       localStorage.removeItem(KEY);
       localStorage.removeItem(LEGACY_KEY);
@@ -217,8 +220,10 @@
   async function finishAuth(result) {
     const jwt = jwtFromHeader(result.headerJwt) || findJwt(result.data);
     if (!_isJwt(jwt)) throw new Error('Giriş oturumu alınamadı. Lütfen tekrar giriş yapın.');
+    sessionVerified = false;
     saveJwt(jwt);
     const me = await verifyMe(jwt);
+    sessionVerified = true;
     return { ...result.data, me, access_token: jwt, token_type: 'Bearer' };
   }
 
@@ -282,6 +287,7 @@
   }
 
   async function init() {
+    sessionVerified = false;
     consumeAccessTokenFromHash();
     try { await loadConfig(); } catch {}
 
@@ -289,6 +295,7 @@
     if (jwtIsUsable(jwt)) {
       try {
         await verifyMe(jwt);
+        sessionVerified = true;
         return true;
       } catch {}
     } else if (jwt) {
@@ -334,7 +341,7 @@
     window.location.href = '/login.html';
   }
 
-  function isLoggedIn() { return jwtIsUsable(getJwt()); }
+  function isLoggedIn() { return sessionVerified && jwtIsUsable(getJwt()); }
 
   function requireAuth(loginPath) {
     if (!isLoggedIn()) {
