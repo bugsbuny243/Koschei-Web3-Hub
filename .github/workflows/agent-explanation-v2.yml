@@ -35,6 +35,7 @@ jobs:
           test "$(cat .github/agent/chunk-* | git hash-object --stdin)" = "aaaada17ad419271d5766ec0b734b243a8b9098a"
           cat .github/agent/chunk-* | base64 -d | gzip -d > /tmp/apply_explanation_v2.py
           python3 /tmp/apply_explanation_v2.py 2>&1 | tee explanation-v2-diagnostics/apply.log
+          sed -i '/^[[:space:]]*"fmt"$/d' koschei/api/internal/handlers/holder_intelligence_core.go
           gofmt -w \
             koschei/api/internal/handlers/explanation_engine_v2.go \
             koschei/api/internal/handlers/explanation_engine_v2_test.go \
