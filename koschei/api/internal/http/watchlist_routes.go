@@ -10,6 +10,7 @@ func registerWatchlistRoutes(mux *http.ServeMux, h *handlers.Handler, premium fu
 	mux.HandleFunc("/api/public/token/status", method(http.MethodGet, h.PublicTokenStatus))
 	mux.HandleFunc("/api/public/token/readiness", method(http.MethodGet, h.PublicTokenLaunchReadiness))
 	mux.HandleFunc("/api/public/scan-history", method(http.MethodGet, h.PublicScanHistory))
+	mux.HandleFunc("/api/public/transaction-simulate", method(http.MethodPost, h.PublicTransactionSimulate))
 
 	mux.HandleFunc("/api/auth/wallet/challenge", requiresDB(h, handlers.RequireAuth(method(http.MethodPost, h.CreateWalletChallenge))))
 	mux.HandleFunc("/api/auth/wallet/verify", requiresDB(h, handlers.RequireAuth(method(http.MethodPost, h.VerifyWalletChallenge))))
