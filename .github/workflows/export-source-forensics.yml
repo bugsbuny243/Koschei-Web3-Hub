@@ -1,0 +1,23 @@
+name: Export current PR579 source
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    if: github.head_ref == 'feature/pump-ledger-launch-forensics'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Package source
+        run: tar --exclude=.git -czf /tmp/koschei-pr579-current.tgz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: koschei-pr579-current
+          path: /tmp/koschei-pr579-current.tgz
