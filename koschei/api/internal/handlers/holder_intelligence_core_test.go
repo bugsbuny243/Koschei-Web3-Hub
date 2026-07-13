@@ -47,6 +47,34 @@ func TestCustomerTokenMappingUsesOwnerNormalizedConcentration(t *testing.T) {
 	}
 }
 
+func TestCustomerAndOwnerSurfacesShareNormalizedConcentration(t *testing.T) {
+	core := fixtureHolderCore()
+	ownerTop1, ownerTop10, ok := holderIntelligenceCoreConcentration(core)
+	if !ok {
+		t.Fatal("shared holder core did not expose concentration")
+	}
+	customer := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core)
+	if customer.Token.LargestHolderPercent != roundPercent(ownerTop1) || customer.Token.TopTenPercent != roundPercent(ownerTop10) {
+		t.Fatalf("customer concentration diverged from OwnerRadar core: customer=%#v owner=%.4f/%.4f", customer.Token, ownerTop1, ownerTop10)
+	}
+}
+
+func TestCustomerMappingPreservesDeepAndShallowObservationMetadata(t *testing.T) {
+	core := fixtureHolderCore()
+	core.Intelligence.Rows = append(core.Intelligence.Rows, services.HolderIntelligenceRow{
+		OwnerWallet: "OwnerB", OwnerResolved: true, RiskBearing: true,
+		ObservationTier: "shallow", ObservationStatus: "signature_only_observation",
+		SignaturesFetched: 20, ParsedTransactions: 2, ObservationWindowExhausted: true,
+	})
+	got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core)
+	if got.HolderIntelligence.Rows[0].ObservationTier != "deep" || got.HolderIntelligence.Rows[0].SignaturesFetched != 100 || got.HolderIntelligence.Rows[0].ParsedTransactions != 10 {
+		t.Fatalf("deep observation metadata was lost: %#v", got.HolderIntelligence.Rows[0])
+	}
+	if got.HolderIntelligence.Rows[1].ObservationTier != "shallow" || got.HolderIntelligence.Rows[1].SignaturesFetched != 20 || got.HolderIntelligence.Rows[1].ParsedTransactions != 2 || !got.HolderIntelligence.Rows[1].ObservationWindowExhausted {
+		t.Fatalf("shallow observation metadata was lost: %#v", got.HolderIntelligence.Rows[1])
+	}
+}
+
 func TestCustomerTokenMappingCarriesLaunchAndCreatorEvidence(t *testing.T) {
 	core := fixtureHolderCore()
 	core.LaunchForensics = services.LaunchForensicsAnalysis{
@@ -80,6 +108,26 @@ func TestHolderCoreWithholdsUnavailableOrBlockingEvidence(t *testing.T) {
 	got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core)
 	if got.FinalPolicy != "withhold" || !got.VerdictWithheld || holderIntelligenceCoreShieldAction(core) != "withhold" {
 		t.Fatalf("blocking evidence was converted into a reassuring verdict: %#v", got)
+	}
+}
+
+func TestPreflightKeepsHolderSectionWhenRPCBudgetDegrades(t *testing.T) {
+	core := fixtureHolderCore()
+	core.Final = services.SecurityRadarFinalVerdict{Signed: true, RiskLevel: "high", RiskIndex: 70}
+	core.Cluster.RPCCallsUsed = core.Cluster.RPCBudget
+	core.Intelligence.Rows = append(core.Intelligence.Rows, services.HolderIntelligenceRow{
+		OwnerWallet: "OwnerB", OwnerResolved: true, RiskBearing: true,
+		ObservationTier: "shallow", ObservationStatus: "rpc_budget_exhausted",
+		ObservationBudgetDegraded: true,
+	})
+	if action := holderIntelligenceCoreShieldAction(core); action != "warn" {
+		t.Fatalf("preflight did not use the shared evidence-backed final: %s", action)
+	}
+	if !core.Intelligence.Available || len(core.Intelligence.Rows) != 2 || !core.Intelligence.Rows[1].ObservationBudgetDegraded {
+		t.Fatalf("budget degradation removed holder intelligence: %#v", core.Intelligence)
+	}
+	if explanation := holderIntelligenceCoreExplanation(core); !strings.Contains(explanation, "budget-degraded") || !strings.Contains(explanation, "not classified as safe or organic") {
+		t.Fatalf("budget limitation was not explained honestly: %s", explanation)
 	}
 }
 
