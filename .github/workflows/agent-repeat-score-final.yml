@@ -1,3 +1,4 @@
+# One-shot final scoring bridge; removed after successful verification.
 name: Verify Repeat Holder Legacy Scoring
 
 on:
