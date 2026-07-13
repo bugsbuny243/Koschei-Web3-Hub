@@ -87,6 +87,43 @@ func (b *holderScanRPCBudget) Used() int {
 	return b.used
 }
 
+// ReserveUpTo reserves at most calls from the remaining per-scan budget and
+// returns the granted count. It is used for JSON-RPC batches where every
+// member request consumes provider quota even though the HTTP transport is one
+// request.
+func (b *holderScanRPCBudget) ReserveUpTo(calls int) int {
+	if calls <= 0 {
+		return 0
+	}
+	if b == nil {
+		return calls
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	remaining := b.limit - b.used
+	if remaining <= 0 {
+		return 0
+	}
+	if calls > remaining {
+		calls = remaining
+	}
+	b.used += calls
+	return calls
+}
+
+func (b *holderScanRPCBudget) Remaining() int {
+	if b == nil {
+		return 0
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	remaining := b.limit - b.used
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
+}
+
 func holderClusterRiskOwnerCandidates(accounts []HolderRoleAccount, limit int) []HolderRoleAccount {
 	if limit <= 0 {
 		return nil

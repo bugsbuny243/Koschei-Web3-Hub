@@ -10,10 +10,40 @@ import (
 
 type PumpPortalRadarAdapter struct {
 	Store *SecurityRadarStore
+	queue chan PumpPortalEvent
 }
 
 func NewPumpPortalRadarAdapter(store *SecurityRadarStore) *PumpPortalRadarAdapter {
-	return &PumpPortalRadarAdapter{Store: store}
+	return &PumpPortalRadarAdapter{Store: store, queue: make(chan PumpPortalEvent, 2048)}
+}
+
+func (a *PumpPortalRadarAdapter) Start(ctx context.Context) {
+	if a == nil || a.Store == nil || a.Store.DB == nil {
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event := <-a.queue:
+			if err := a.HandleEvent(ctx, event); err != nil && ctx.Err() == nil {
+				log.Printf("pumpportal radar event failed: %v", err)
+			}
+		}
+	}
+}
+
+func (a *PumpPortalRadarAdapter) Enqueue(event PumpPortalEvent) bool {
+	if a == nil || a.queue == nil {
+		return false
+	}
+	select {
+	case a.queue <- event:
+		return true
+	default:
+		log.Printf("pumpportal radar queue full; discovery event dropped mint=%s", resolvePumpPortalMint(event))
+		return false
+	}
 }
 
 func (a *PumpPortalRadarAdapter) HandleEvent(ctx context.Context, ev PumpPortalEvent) error {
@@ -141,9 +171,18 @@ func StartPumpPortalRadarIfEnabled(ctx context.Context, db *sql.DB) func() {
 	store := NewSecurityRadarStore(db)
 	if cfg.Enabled {
 		adapter := NewPumpPortalRadarAdapter(store)
+		ledger := NewPumpTradeLedgerWriter(db)
 		client := NewPumpPortalClient(cfg)
-		go client.Start(workerCtx, adapter.HandleEvent)
-		log.Printf("pumpportal discovery started: free new-token/migration websocket=%s", cfg.redactedWebsocketHost())
+		go adapter.Start(workerCtx)
+		go ledger.Start(workerCtx)
+		go client.Start(workerCtx, func(_ context.Context, event PumpPortalEvent) error {
+			ledger.EnqueuePumpPortal(event)
+			if !isPumpPortalTradeEvent(event) {
+				adapter.Enqueue(event)
+			}
+			return nil
+		})
+		log.Printf("pumpportal discovery + non-blocking trade ledger started websocket=%s", cfg.redactedWebsocketHost())
 	}
 	if volumeEnabled {
 		worker := NewPumpHighVolumeRadarWorker(store, nil)

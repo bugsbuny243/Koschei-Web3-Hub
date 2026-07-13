@@ -21,7 +21,7 @@ func TestOwnerRadarNarrativeExplainsMeaning(t *testing.T) {
 		"verdict": "Ardışık slotlarda kümelenen alımlar ek inceleme gerektiriyor.",
 	}}
 	holder := services.HolderIntelligence{Available: true, Findings: []string{"En büyük owner bakiyesi ve referans USD değeri doğrulandı."}}
-	text := ownerRadarNarrative("4ko5tSr5o3H4v1sFtjTSd9MPUW7yx5AFCpkNPoL6pump", final, warning, distribution, map[string]any{}, modules, holder)
+	text := ownerRadarNarrative("4ko5tSr5o3H4v1sFtjTSd9MPUW7yx5AFCpkNPoL6pump", final, warning, distribution, map[string]any{}, modules, holder, services.LaunchForensicsAnalysis{})
 	for _, expected := range []string{
 		"53/100 ile ORTA risk seviyesinde", "tek başına ciddi bir balina", "Olumlu sinyaller:",
 		"ana risk sürücüsü Sniper Timing Detector", "Creator/deployer cüzdanı bu taramada doğrulanamadı",
@@ -42,10 +42,10 @@ func TestOwnerRadarNarrativeEvidencePendingStillExplainsKnownHoldings(t *testing
 		Available: true, Supply: 1000000000, OwnerCount: 20, RiskBearingOwnerCount: 19,
 		TopOwnerPercentage: 99.4236, WalletsWithObservedOutflow: 2, CommonExitGroupCount: 1,
 		Market: services.TokenMarketSnapshot{Available: true, PriceUSD: 0.005, Volume24hUSD: 800000, LiquidityUSD: 200000, MarketCapUSD: 5000000},
-		Rows: []services.HolderIntelligenceRow{{TokenAccounts: []string{"DominantTokenAccount"}, Balance: 994236000, RawPercentage: 99.4236, Role: "owner_unresolved", ReferenceUSDValue: &usd}},
+		Rows:   []services.HolderIntelligenceRow{{TokenAccounts: []string{"DominantTokenAccount"}, Balance: 994236000, RawPercentage: 99.4236, Role: "owner_unresolved", ReferenceUSDValue: &usd}},
 	}
 	warning := map[string]any{"reasons": []string{"Baskın token hesabının ekonomik rolü çözülemedi."}}
-	text := ownerRadarNarrative("target", map[string]any{"risk_index": nil, "risk_level": "unknown", "signed": false}, warning, map[string]any{}, map[string]any{}, nil, holder)
+	text := ownerRadarNarrative("target", map[string]any{"risk_index": nil, "risk_level": "unknown", "signed": false}, warning, map[string]any{}, map[string]any{}, nil, holder, services.LaunchForensicsAnalysis{})
 	for _, expected := range []string{"EVIDENCE PENDING", "994236000", "99.4236%", "$4971180.00", "2 holder wallet", "1 ortak recipient-owner"} {
 		if !strings.Contains(text, expected) {
 			t.Fatalf("expected %q in pending narrative: %s", expected, text)

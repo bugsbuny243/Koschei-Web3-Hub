@@ -15,30 +15,39 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type PumpPortalClient struct {
-	Config PumpPortalConfig
+	Config     PumpPortalConfig
+	tradeMints map[string]bool
+	tradeOrder []string
 }
 
 type PumpPortalEvent struct {
-	Type       string         `json:"type"`
-	Signature  string         `json:"signature,omitempty"`
-	Mint       string         `json:"mint,omitempty"`
-	TokenMint  string         `json:"tokenMint,omitempty"`
-	Name       string         `json:"name,omitempty"`
-	Symbol     string         `json:"symbol,omitempty"`
-	Creator    string         `json:"creator,omitempty"`
-	Trader     string         `json:"traderPublicKey,omitempty"`
-	TxType     string         `json:"txType,omitempty"`
-	Raw        map[string]any `json:"raw,omitempty"`
-	ReceivedAt time.Time      `json:"received_at"`
+	Type        string         `json:"type"`
+	Signature   string         `json:"signature,omitempty"`
+	Mint        string         `json:"mint,omitempty"`
+	TokenMint   string         `json:"tokenMint,omitempty"`
+	Name        string         `json:"name,omitempty"`
+	Symbol      string         `json:"symbol,omitempty"`
+	Creator     string         `json:"creator,omitempty"`
+	Trader      string         `json:"traderPublicKey,omitempty"`
+	TxType      string         `json:"txType,omitempty"`
+	Side        string         `json:"side,omitempty"`
+	SOLAmount   float64        `json:"sol_amount,omitempty"`
+	TokenAmount float64        `json:"token_amount,omitempty"`
+	Slot        int64          `json:"slot,omitempty"`
+	BlockTime   time.Time      `json:"block_time,omitempty"`
+	Raw         map[string]any `json:"raw,omitempty"`
+	ReceivedAt  time.Time      `json:"received_at"`
 }
 
 func NewPumpPortalClient(cfg PumpPortalConfig) *PumpPortalClient {
-	return &PumpPortalClient{Config: cfg}
+	return &PumpPortalClient{Config: cfg, tradeMints: map[string]bool{}, tradeOrder: []string{}}
 }
 
 func (c *PumpPortalClient) Start(ctx context.Context, onEvent func(context.Context, PumpPortalEvent) error) {
@@ -84,6 +93,11 @@ func (c *PumpPortalClient) run(ctx context.Context, onEvent func(context.Context
 			return err
 		}
 	}
+	for _, keys := range c.tradeSubscriptionBatches() {
+		if err := writeWebSocketText(conn, map[string]any{"method": "subscribeTokenTrade", "keys": keys}); err != nil {
+			return err
+		}
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -101,6 +115,19 @@ func (c *PumpPortalClient) run(ctx context.Context, onEvent func(context.Context
 			event, ok := parsePumpPortalEvent(payload)
 			if !ok {
 				continue
+			}
+			if c.shouldTrackMint(event) {
+				added, evicted := c.rememberTradeMint(event.Mint)
+				if evicted != "" {
+					if err := writeWebSocketText(conn, map[string]any{"method": "unsubscribeTokenTrade", "keys": []string{evicted}}); err != nil {
+						return err
+					}
+				}
+				if added {
+					if err := writeWebSocketText(conn, map[string]any{"method": "subscribeTokenTrade", "keys": []string{event.Mint}}); err != nil {
+						return err
+					}
+				}
 			}
 			if err := onEvent(ctx, event); err != nil {
 				log.Printf("pumpportal event adapter failed: %v", err)
@@ -128,6 +155,11 @@ func parsePumpPortalEvent(payload []byte) (PumpPortalEvent, bool) {
 	event.Creator = firstPumpPortalString(raw, "creator", "creatorPublicKey", "deployer")
 	event.Trader = firstPumpPortalString(raw, "traderPublicKey", "trader", "buyer")
 	event.TxType = firstPumpPortalString(raw, "txType", "transactionType")
+	event.Side = normalizePumpPortalTradeSide(firstPumpPortalString(raw, "side", "txType", "transactionType"))
+	event.SOLAmount = firstPumpPortalFloat(raw, "solAmount", "sol_amount", "sol")
+	event.TokenAmount = firstPumpPortalFloat(raw, "tokenAmount", "token_amount", "amount")
+	event.Slot = firstPumpPortalInt64(raw, "slot")
+	event.BlockTime = firstPumpPortalTime(raw, "blockTime", "block_time", "timestamp", "time")
 	if strings.TrimSpace(event.Mint) == "" {
 		event.Mint = event.TokenMint
 	}
@@ -141,6 +173,139 @@ func parsePumpPortalEvent(payload []byte) (PumpPortalEvent, bool) {
 		event.Type = "pumpportal_event"
 	}
 	return event, true
+}
+
+func (c *PumpPortalClient) shouldTrackMint(event PumpPortalEvent) bool {
+	if strings.TrimSpace(event.Mint) == "" || isPumpPortalTradeEvent(event) {
+		return false
+	}
+	value := strings.ToLower(strings.TrimSpace(firstNonEmptyPumpPortal(event.Type, event.TxType)))
+	return value == "create" || strings.Contains(value, "new") || strings.Contains(value, "migrat") || strings.Contains(value, "create")
+}
+
+func (c *PumpPortalClient) rememberTradeMint(mint string) (bool, string) {
+	mint = strings.TrimSpace(mint)
+	if mint == "" || c == nil {
+		return false, ""
+	}
+	if c.tradeMints == nil {
+		c.tradeMints = map[string]bool{}
+	}
+	if c.tradeMints[mint] {
+		return false, ""
+	}
+	limit := pumpPortalTradeSubscriptionLimit()
+	evicted := ""
+	if len(c.tradeOrder) >= limit {
+		evicted = c.tradeOrder[0]
+		c.tradeOrder = c.tradeOrder[1:]
+		delete(c.tradeMints, evicted)
+	}
+	c.tradeMints[mint] = true
+	c.tradeOrder = append(c.tradeOrder, mint)
+	return true, evicted
+}
+
+func (c *PumpPortalClient) tradeSubscriptionBatches() [][]string {
+	if c == nil || len(c.tradeOrder) == 0 {
+		return nil
+	}
+	out := [][]string{}
+	for start := 0; start < len(c.tradeOrder); start += 100 {
+		end := start + 100
+		if end > len(c.tradeOrder) {
+			end = len(c.tradeOrder)
+		}
+		out = append(out, append([]string{}, c.tradeOrder[start:end]...))
+	}
+	return out
+}
+
+func pumpPortalTradeSubscriptionLimit() int {
+	if raw := strings.TrimSpace(os.Getenv("PUMPPORTAL_TRADE_SUBSCRIPTION_LIMIT")); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil && value >= 100 && value <= 10000 {
+			return value
+		}
+	}
+	return 1000
+}
+
+func isPumpPortalTradeEvent(event PumpPortalEvent) bool {
+	return event.Side == "buy" || event.Side == "sell"
+}
+
+func normalizePumpPortalTradeSide(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if strings.Contains(value, "buy") {
+		return "buy"
+	}
+	if strings.Contains(value, "sell") {
+		return "sell"
+	}
+	return ""
+}
+
+func firstPumpPortalFloat(raw map[string]any, keys ...string) float64 {
+	for _, key := range keys {
+		if value, ok := raw[key]; ok {
+			switch typed := value.(type) {
+			case float64:
+				return typed
+			case float32:
+				return float64(typed)
+			case int:
+				return float64(typed)
+			case int64:
+				return float64(typed)
+			case json.Number:
+				if parsed, err := typed.Float64(); err == nil {
+					return parsed
+				}
+			case string:
+				if parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64); err == nil {
+					return parsed
+				}
+			}
+		}
+	}
+	return 0
+}
+
+func firstPumpPortalInt64(raw map[string]any, keys ...string) int64 {
+	return int64(firstPumpPortalFloat(raw, keys...))
+}
+
+func firstPumpPortalTime(raw map[string]any, keys ...string) time.Time {
+	for _, key := range keys {
+		value, ok := raw[key]
+		if !ok {
+			continue
+		}
+		switch typed := value.(type) {
+		case string:
+			if parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(typed)); err == nil {
+				return parsed.UTC()
+			}
+			if seconds, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64); err == nil {
+				return pumpPortalUnixTime(seconds)
+			}
+		default:
+			if seconds := firstPumpPortalFloat(map[string]any{"value": typed}, "value"); seconds > 0 {
+				return pumpPortalUnixTime(int64(seconds))
+			}
+		}
+	}
+	return time.Time{}
+}
+
+func pumpPortalUnixTime(value int64) time.Time {
+	if value <= 0 {
+		return time.Time{}
+	}
+	if value > 1_000_000_000_000 {
+		value /= 1000
+	}
+	return time.Unix(value, 0).UTC()
 }
 
 func firstPumpPortalString(raw map[string]any, keys ...string) string {
