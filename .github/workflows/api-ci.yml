@@ -33,7 +33,18 @@ jobs:
       - name: Download modules
         run: go mod download
       - name: Test
-        run: go test ./...
+        shell: bash
+        run: |
+          set +e
+          go test ./... 2>&1 | tee /tmp/go-test.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            echo "=== FAILING TEST SUMMARY ==="
+            grep -E '^(--- FAIL:|FAIL[[:space:]]|panic:|[[:space:]]+Error Trace:|[[:space:]]+Error:)' /tmp/go-test.log || true
+            echo "=== TEST OUTPUT TAIL ==="
+            tail -n 160 /tmp/go-test.log
+          fi
+          exit "$status"
       - name: Vet
         run: go vet ./...
       - name: Build
