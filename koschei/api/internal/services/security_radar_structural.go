@@ -15,14 +15,16 @@ const (
 )
 
 type tokenStructuralSignals struct {
-	LargestHolderPct       int
-	Top10HolderPct         int
-	HasHolderData          bool
-	MintAuthorityPresent   bool
-	FreezeAuthorityPresent bool
-	HasAuthorityData       bool
-	HolderObservedAt       *time.Time
-	AuthorityObservedAt    *time.Time
+	LargestHolderPct          int
+	Top10HolderPct            int
+	HasHolderData             bool
+	MintAuthorityPresent      bool
+	FreezeAuthorityPresent    bool
+	HasAuthorityData          bool
+	HolderObservedAt          *time.Time
+	AuthorityObservedAt       *time.Time
+	LaunchForensicsRisk       int
+	LaunchForensicsObservedAt *time.Time
 }
 
 func (t tokenStructuralSignals) structuralFloor(now time.Time) (int, time.Time) {
@@ -46,6 +48,12 @@ func (t tokenStructuralSignals) structuralFloor(now time.Time) (int, time.Time) 
 		if value > floor {
 			floor = value
 			observedAt = t.AuthorityObservedAt.UTC()
+		}
+	}
+	if t.LaunchForensicsRisk > 0 && structuralObservationFresh(now, t.LaunchForensicsObservedAt) {
+		if t.LaunchForensicsRisk > floor {
+			floor = t.LaunchForensicsRisk
+			observedAt = t.LaunchForensicsObservedAt.UTC()
 		}
 	}
 	if floor <= 0 {
@@ -137,12 +145,14 @@ func (s *SecurityRadarStore) applyStructuralFloor(ctx context.Context, verdict *
 	err := s.DB.QueryRowContext(cacheCtx, `
 		SELECT largest_holder_pct, top10_holder_pct, has_holder_data,
 		       mint_authority_present, freeze_authority_present, has_authority_data,
-		       holder_observed_at, authority_observed_at
+		       holder_observed_at, authority_observed_at,
+		       COALESCE(launch_forensics_risk,0), launch_forensics_observed_at
 		FROM token_structural_signals
 		WHERE target = $1 AND network = $2`, target, normalizeRadarNetwork(verdict.Network)).Scan(
 		&cached.LargestHolderPct, &cached.Top10HolderPct, &cached.HasHolderData,
 		&cached.MintAuthorityPresent, &cached.FreezeAuthorityPresent, &cached.HasAuthorityData,
-		&cached.HolderObservedAt, &cached.AuthorityObservedAt)
+		&cached.HolderObservedAt, &cached.AuthorityObservedAt,
+		&cached.LaunchForensicsRisk, &cached.LaunchForensicsObservedAt)
 	if err != nil {
 		return
 	}
@@ -174,6 +184,9 @@ func (s *SecurityRadarStore) applyStructuralFloor(ctx context.Context, verdict *
 	if cached.HasAuthorityData && structuralObservationFresh(time.Now().UTC(), cached.AuthorityObservedAt) {
 		verdict.Signals["structural_mint_authority_present"] = cached.MintAuthorityPresent
 		verdict.Signals["structural_freeze_authority_present"] = cached.FreezeAuthorityPresent
+	}
+	if cached.LaunchForensicsRisk > 0 && structuralObservationFresh(time.Now().UTC(), cached.LaunchForensicsObservedAt) {
+		verdict.Signals["structural_launch_forensics_floor"] = cached.LaunchForensicsRisk
 	}
 	verdict.Evidence = append(nonNilEvidence(verdict.Evidence),
 		fmt.Sprintf("Structural floor applied: verified cached on-chain structure observed %s scored %d/100; current event evidence scored %d/100.", observedAt.Format(time.RFC3339), floor, originalRisk))
@@ -229,6 +242,29 @@ func structuralSignalInt(signals map[string]any, key string) (int, bool) {
 	}
 }
 
+// CaptureLaunchForensicsFloor stores only deterministic, evidence-backed launch
+// timing/funding structure. ORGANIC or missing history never lowers a baseline.
+func (s *SecurityRadarStore) CaptureLaunchForensicsFloor(ctx context.Context, target, network string, analysis LaunchForensicsAnalysis) {
+	if s == nil || s.DB == nil || !analysis.Available || analysis.StructuralFloor <= 0 {
+		return
+	}
+	target = strings.TrimSpace(target)
+	if target == "" || IsSecurityRadarInfraTarget(target) {
+		return
+	}
+	cacheCtx, cancel := context.WithTimeout(ctx, structuralCacheTimeout)
+	defer cancel()
+	_, _ = s.DB.ExecContext(cacheCtx, `
+		INSERT INTO token_structural_signals
+			(target,network,launch_forensics_risk,launch_forensics_observed_at,observed_at,updated_at)
+		VALUES ($1,$2,$3,now(),now(),now())
+		ON CONFLICT (target,network) DO UPDATE SET
+			launch_forensics_risk=GREATEST(token_structural_signals.launch_forensics_risk,EXCLUDED.launch_forensics_risk),
+			launch_forensics_observed_at=EXCLUDED.launch_forensics_observed_at,
+			observed_at=GREATEST(token_structural_signals.observed_at,EXCLUDED.observed_at),
+			updated_at=now()`, target, normalizeRadarNetwork(network), analysis.StructuralFloor)
+}
+
 func structuralSignalBool(signals map[string]any, key string) (bool, bool) {
 	value, ok := signals[key]
 	if !ok || value == nil {
@@ -275,12 +311,14 @@ func (s *SecurityRadarStore) StructuralBaseline(ctx context.Context, target, net
 	err := s.DB.QueryRowContext(cacheCtx, `
 		SELECT largest_holder_pct, top10_holder_pct, has_holder_data,
 		       mint_authority_present, freeze_authority_present, has_authority_data,
-		       holder_observed_at, authority_observed_at
+		       holder_observed_at, authority_observed_at,
+		       COALESCE(launch_forensics_risk,0), launch_forensics_observed_at
 		FROM token_structural_signals
 		WHERE target = $1 AND network = $2`, target, normalizeRadarNetwork(network)).Scan(
 		&cached.LargestHolderPct, &cached.Top10HolderPct, &cached.HasHolderData,
 		&cached.MintAuthorityPresent, &cached.FreezeAuthorityPresent, &cached.HasAuthorityData,
-		&cached.HolderObservedAt, &cached.AuthorityObservedAt)
+		&cached.HolderObservedAt, &cached.AuthorityObservedAt,
+		&cached.LaunchForensicsRisk, &cached.LaunchForensicsObservedAt)
 	if err != nil {
 		return 0, "", time.Time{}, false
 	}
