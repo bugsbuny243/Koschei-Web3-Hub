@@ -1,12 +1,15 @@
 package services
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+
+	"koschei/api/internal/web3"
 )
 
 type solanaFailoverTransport struct {
@@ -22,11 +25,24 @@ func init() {
 }
 
 func (t *solanaFailoverTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	method := strings.TrimSpace(req.Header.Get("X-Koschei-RPC-Method"))
 	resp, err := t.base.RoundTrip(req)
+	if err != nil || (resp != nil && (resp.StatusCode < 200 || resp.StatusCode >= 300)) {
+		status := 0
+		failureErr := err
+		if resp != nil {
+			status = resp.StatusCode
+			if failureErr == nil {
+				failureErr = fmt.Errorf("http status %d", status)
+			}
+		}
+		web3.LogRPCFailure(method, req.URL.String(), status, failureErr)
+	}
 	if !solanaFailoverEnabled() || !solanaFailoverRequired(resp, err) {
 		return resp, err
 	}
-	if strings.EqualFold(req.URL.Hostname(), "api.mainnet-beta.solana.com") || req.GetBody == nil {
+	fallbackRaw := web3.SolanaRPCFallbackURL("solana-mainnet")
+	if strings.EqualFold(req.URL.Hostname(), web3.RPCProviderHost(fallbackRaw)) || req.GetBody == nil {
 		return resp, err
 	}
 	if resp != nil && resp.Body != nil {
@@ -35,10 +51,12 @@ func (t *solanaFailoverTransport) RoundTrip(req *http.Request) (*http.Response, 
 	}
 	body, bodyErr := req.GetBody()
 	if bodyErr != nil {
+		web3.LogRPCFailure(method, req.URL.String(), 0, bodyErr)
 		return nil, bodyErr
 	}
-	fallbackURL, parseErr := url.Parse(defaultSolanaMainnetRPC)
+	fallbackURL, parseErr := url.Parse(fallbackRaw)
 	if parseErr != nil {
+		web3.LogRPCFailure(method, fallbackRaw, 0, parseErr)
 		return nil, parseErr
 	}
 	fallbackReq := req.Clone(req.Context())
@@ -47,7 +65,19 @@ func (t *solanaFailoverTransport) RoundTrip(req *http.Request) (*http.Response, 
 	fallbackReq.RequestURI = ""
 	fallbackReq.Body = body
 	fallbackReq.GetBody = req.GetBody
-	return t.base.RoundTrip(fallbackReq)
+	fallbackResp, fallbackErr := t.base.RoundTrip(fallbackReq)
+	if fallbackErr != nil || (fallbackResp != nil && (fallbackResp.StatusCode < 200 || fallbackResp.StatusCode >= 300)) {
+		status := 0
+		failureErr := fallbackErr
+		if fallbackResp != nil {
+			status = fallbackResp.StatusCode
+			if failureErr == nil {
+				failureErr = fmt.Errorf("http status %d", status)
+			}
+		}
+		web3.LogRPCFailure(method, fallbackRaw, status, failureErr)
+	}
+	return fallbackResp, fallbackErr
 }
 
 func solanaFailoverEnabled() bool {

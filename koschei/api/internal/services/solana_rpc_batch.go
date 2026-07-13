@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"koschei/api/internal/web3"
 )
 
 func SolanaGetSignaturesForAddressBefore(ctx context.Context, rpcURL, address string, limit int, before string) ([]SolanaSignatureInfo, error) {
@@ -66,28 +68,38 @@ func SolanaGetTransactionsJSONParsedBatch(ctx context.Context, rpcURL string, si
 	}
 	payload, err := json.Marshal(requests)
 	if err != nil {
+		web3.LogRPCFailure("getTransactionBatch", rpcURL, 0, err)
 		return nil, err
 	}
 	maxRetries := solanaRPCMax429Retries()
 	for attempt := 0; ; attempt++ {
 		if err := reserveSolanaRPCBudget(ctx, "getTransactionBatch"); err != nil {
+			web3.LogRPCFailure("getTransactionBatch", rpcURL, 0, err)
 			return nil, err
 		}
 		if err := waitForSolanaRPCSlot(ctx); err != nil {
+			web3.LogRPCFailure("getTransactionBatch", rpcURL, 0, err)
 			return nil, err
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, rpcURL, bytes.NewReader(payload))
 		if err != nil {
+			web3.LogRPCFailure("getTransactionBatch", rpcURL, 0, err)
 			return nil, err
 		}
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Koschei-RPC-Method", "getTransactionBatch")
 		res, err := solanaRPCClient.Do(req)
 		if err != nil {
 			return nil, err
 		}
 		body, readErr := io.ReadAll(io.LimitReader(res.Body, 32<<20))
 		res.Body.Close()
+		actualEndpoint := rpcURL
+		if res.Request != nil && res.Request.URL != nil {
+			actualEndpoint = res.Request.URL.String()
+		}
 		if readErr != nil {
+			web3.LogRPCFailure("getTransactionBatch", actualEndpoint, res.StatusCode, readErr)
 			return nil, readErr
 		}
 		if res.StatusCode == http.StatusTooManyRequests {
@@ -103,11 +115,22 @@ func SolanaGetTransactionsJSONParsedBatch(ctx context.Context, rpcURL string, si
 		}
 		var responses []solanaRPCBatchTransactionResponse
 		if err := json.Unmarshal(body, &responses); err != nil {
-			return nil, fmt.Errorf("solana rpc malformed batch response: %w", err)
+			wrapped := fmt.Errorf("solana rpc malformed batch response: %w", err)
+			web3.LogRPCFailure("getTransactionBatch", actualEndpoint, res.StatusCode, wrapped)
+			return nil, wrapped
 		}
 		out := map[string]SolanaTransactionResult{}
 		for _, response := range responses {
-			if response.ID <= 0 || response.ID > len(clean) || response.Error != nil || response.Result == nil {
+			if response.ID <= 0 || response.ID > len(clean) {
+				continue
+			}
+			if response.Error != nil {
+				web3.LogRPCFailure("getTransaction", actualEndpoint, res.StatusCode,
+					fmt.Errorf("solana rpc error %d: %s", response.Error.Code, response.Error.Message))
+				continue
+			}
+			if response.Result == nil {
+				web3.LogRPCFailure("getTransaction", actualEndpoint, res.StatusCode, fmt.Errorf("rpc result unavailable"))
 				continue
 			}
 			out[clean[response.ID-1]] = response.Result

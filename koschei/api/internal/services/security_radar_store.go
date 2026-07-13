@@ -327,3 +327,134 @@ func nonNilEvidence(in []string) []string {
 	}
 	return in
 }
+
+func (s *SecurityRadarStore) CaptureHolderSnapshots(ctx context.Context, target, network string, holder HolderIntelligence) error {
+	if s == nil || s.DB == nil || !holder.Available {
+		return nil
+	}
+	target = strings.TrimSpace(target)
+	network = normalizeRadarNetwork(network)
+	if target == "" {
+		return nil
+	}
+	scannedAt := time.Now().UTC()
+	scanID := fmt.Sprintf("%s|%s|%d", target, network, scannedAt.UnixNano())
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	riskRank := 0
+	for _, row := range holder.Rows {
+		owner := strings.TrimSpace(row.OwnerWallet)
+		if owner == "" || !row.OwnerResolved || !row.RiskBearing || row.ExcludedFromHolderRisk {
+			continue
+		}
+		riskRank++
+		if riskRank > 5 {
+			break
+		}
+		percentage := row.CirculatingPercentage
+		if percentage <= 0 {
+			percentage = row.RawPercentage
+		}
+		if _, err := tx.ExecContext(ctx, `
+            INSERT INTO security_radar_holder_snapshots
+                (scan_id,target,network,owner_wallet,holder_rank,balance,percentage,scanned_at,created_at)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,now())
+            ON CONFLICT (scan_id,owner_wallet) DO UPDATE SET
+                holder_rank=EXCLUDED.holder_rank,
+                balance=EXCLUDED.balance,
+                percentage=EXCLUDED.percentage,
+                scanned_at=EXCLUDED.scanned_at`,
+			scanID, target, network, owner, riskRank, row.Balance, percentage, scannedAt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *SecurityRadarStore) RepeatDominantHolders(ctx context.Context, holder HolderIntelligence, currentMint string, windowDays int) ([]RepeatDominantHolderEvidence, error) {
+	if s == nil || s.DB == nil || !holder.Available {
+		return []RepeatDominantHolderEvidence{}, nil
+	}
+	if windowDays <= 0 {
+		windowDays = RepeatDominantObservationDays
+	}
+	out := []RepeatDominantHolderEvidence{}
+	checked := 0
+	for _, row := range holder.Rows {
+		owner := strings.TrimSpace(row.OwnerWallet)
+		if owner == "" || !row.OwnerResolved || !row.RiskBearing || row.ExcludedFromHolderRisk {
+			continue
+		}
+		checked++
+		if checked > 5 {
+			break
+		}
+		matches, err := s.repeatDominantHolderMatches(ctx, owner, windowDays)
+		if err != nil {
+			return nil, err
+		}
+		qualifying := make([]RepeatDominantHolderMatch, 0, len(matches))
+		for _, match := range matches {
+			if match.Percentage >= 20 {
+				qualifying = append(qualifying, match)
+			}
+		}
+		if len(qualifying) < 2 {
+			continue
+		}
+		currentPercentage := row.CirculatingPercentage
+		if currentPercentage <= 0 {
+			currentPercentage = row.RawPercentage
+		}
+		riskWeight := RepeatDominantRiskWeight(currentPercentage, len(qualifying))
+		if riskWeight == 0 {
+			continue
+		}
+		evidence := RepeatDominantHolderEvidence{
+			OwnerWallet:       owner,
+			CurrentMint:       strings.TrimSpace(currentMint),
+			CurrentPercentage: currentPercentage,
+			TokenCount:        len(qualifying),
+			ObservationDays:   windowDays,
+			ObservationWindow: fmt.Sprintf("son %d gün Koschei gözlemi", windowDays),
+			RiskWeight:        riskWeight,
+			Matches:           qualifying,
+		}
+		evidence.EvidenceLine = RepeatDominantEvidenceLine(owner, qualifying, windowDays)
+		out = append(out, evidence)
+	}
+	return out, nil
+}
+
+func (s *SecurityRadarStore) repeatDominantHolderMatches(ctx context.Context, owner string, windowDays int) ([]RepeatDominantHolderMatch, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+        WITH latest AS (
+            SELECT DISTINCT ON (target)
+                target, percentage, holder_rank, scanned_at
+            FROM security_radar_holder_snapshots
+            WHERE owner_wallet=$1
+              AND scanned_at >= now() - make_interval(days => $2)
+            ORDER BY target, scanned_at DESC, id DESC
+        )
+        SELECT target, percentage, holder_rank, scanned_at
+        FROM latest
+        ORDER BY percentage DESC, scanned_at DESC`, owner, windowDays)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []RepeatDominantHolderMatch{}
+	for rows.Next() {
+		var item RepeatDominantHolderMatch
+		var scannedAt time.Time
+		if err := rows.Scan(&item.Mint, &item.Percentage, &item.Rank, &scannedAt); err != nil {
+			return nil, err
+		}
+		item.ScannedAt = scannedAt.UTC().Format(time.RFC3339)
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}

@@ -126,7 +126,7 @@ func TestPreflightKeepsHolderSectionWhenRPCBudgetDegrades(t *testing.T) {
 	if !core.Intelligence.Available || len(core.Intelligence.Rows) != 2 || !core.Intelligence.Rows[1].ObservationBudgetDegraded {
 		t.Fatalf("budget degradation removed holder intelligence: %#v", core.Intelligence)
 	}
-	if explanation := holderIntelligenceCoreExplanation(core); !strings.Contains(explanation, "budget-degraded") || !strings.Contains(explanation, "not classified as safe or organic") {
+	if explanation := holderIntelligenceCoreExplanation(core); !strings.Contains(explanation, "RPC-bütçe-sınırlı") || !strings.Contains(explanation, "güvenli veya organik") {
 		t.Fatalf("budget limitation was not explained honestly: %s", explanation)
 	}
 }
@@ -138,7 +138,7 @@ func TestHolderCoreExplanationStatesBoundedObservation(t *testing.T) {
 		ObservationWindowExhausted: true,
 	})
 	text := holderIntelligenceCoreExplanation(core)
-	for _, expected := range []string{"aggregated", "reported separately", "Bounded behavior observation", "not classified as safe or organic"} {
+	for _, expected := range []string{"Top 1 60.00%", "Sınırlar:", "güvenli veya organik"} {
 		if !strings.Contains(text, expected) {
 			t.Fatalf("expected %q in explanation: %s", expected, text)
 		}

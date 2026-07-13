@@ -19,16 +19,19 @@
     [...body.querySelectorAll('tr')].forEach((tr,index)=>{
       const holder=holderRows[index]||{};
       const profile=profiles.get(String(holder.owner_wallet||'').trim());
-      if(!profile||Number(profile.trade_count||0)<=0)return;
+      const repeat=holder.repeat_dominant_holder===true;
+      if((!profile||Number(profile.trade_count||0)<=0)&&!repeat)return;
       const cells=tr.querySelectorAll('td');
       if(cells.length<7)return;
       const labelCell=cells[6],badge=labelCell.querySelector('.badge'),sub=labelCell.querySelector('.muted.small');
-      const base=labels[String(profile.label||'')]||String(profile.label||'İŞLEM GEÇMİŞİ');
-      if(badge){badge.textContent=profile.creator_linked?`${base} · CREATOR BAĞLI`:base;badge.className=`badge ${profile.creator_linked||profile.label==='SNIPER_BOT'||profile.label==='RHYTHM_BOT'?'bad':profile.label==='FLIPPER'?'warn':'ok'}`;}
-      const firstEvidence=arr(profile.evidence)[0]||'';
-      if(sub)sub.textContent=`${Number(profile.buy_count||0)} alım · ${Number(profile.sell_count||0)} satış${firstEvidence?` · ${firstEvidence}`:''}`;
+      const base=profile?(labels[String(profile.label||'')]||String(profile.label||'İŞLEM GEÇMİŞİ')):'HOLDER';
+      const repeatLabel=repeat?`TEKRAR BASKIN · ${Number(holder.repeat_dominant_token_count||0)} TOKEN`:'';
+      if(badge){badge.textContent=[profile?.creator_linked?`${base} · CREATOR BAĞLI`:base,repeatLabel].filter(Boolean).join(' · ');badge.className=`badge ${repeat||profile?.creator_linked||profile?.label==='SNIPER_BOT'||profile?.label==='RHYTHM_BOT'?'bad':profile?.label==='FLIPPER'?'warn':'ok'}`;}
+      const firstEvidence=arr(profile?.evidence)[0]||'';
+      const repeatEvidence=arr(holder.repeat_dominant_matches).map(match=>`${short(match.mint)} %${Number(match.percentage||0).toFixed(2)}`).join(', ');
+      if(sub)sub.textContent=[profile?`${Number(profile.buy_count||0)} alım · ${Number(profile.sell_count||0)} satış${firstEvidence?` · ${firstEvidence}`:''}`:'',repeatEvidence?`${holder.repeat_dominant_observation_window||'Koschei gözlemi'} · ${repeatEvidence}`:''].filter(Boolean).join(' · ');
       const duration=cells[5];
-      if(duration){
+      if(duration&&profile){
         const minutes=Number(profile.minutes_after_launch||0);
         const timing=profile.launch_time_known?(minutes>=0?`Lansmandan ${minutes.toFixed(1)} dk sonra`:`Lansman referansından ${Math.abs(minutes).toFixed(1)} dk önce`):`Giriş sırası #${Number(profile.entry_rank||0)||'—'}`;
         const timingEvidence=profile.first_buy_time?new Date(profile.first_buy_time).toLocaleString('tr-TR'):(profile.first_buy_slot?`slot ${profile.first_buy_slot}`:'zaman kanıtı yok');

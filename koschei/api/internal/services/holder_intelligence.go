@@ -12,48 +12,53 @@ import (
 // accounts controlled by the same resolved owner are aggregated. Unresolved
 // token accounts remain separate and are never silently attributed to a wallet.
 type HolderIntelligenceRow struct {
-	Rank                       int      `json:"rank"`
-	OwnerWallet                string   `json:"owner_wallet,omitempty"`
-	OwnerResolved              bool     `json:"owner_resolved"`
-	TokenAccounts              []string `json:"token_accounts"`
-	TokenAccountCount          int      `json:"token_account_count"`
-	Role                       string   `json:"role"`
-	RoleConfidence             string   `json:"role_confidence"`
-	RiskBearing                bool     `json:"risk_bearing"`
-	ExcludedFromHolderRisk     bool     `json:"excluded_from_holder_risk"`
-	Balance                    float64  `json:"balance"`
-	RawPercentage              float64  `json:"raw_percentage"`
-	CirculatingPercentage      float64  `json:"circulating_percentage,omitempty"`
-	ReferenceUSDValue          *float64 `json:"reference_usd_value,omitempty"`
-	AcquisitionObserved        bool     `json:"acquisition_observed"`
-	AcquisitionObservedAt      string   `json:"acquisition_observed_at,omitempty"`
-	OldestActivityObservedAt   string   `json:"oldest_activity_observed_at,omitempty"`
-	NewestActivityObservedAt   string   `json:"newest_activity_observed_at,omitempty"`
-	ObservedHoldingDays        int      `json:"observed_holding_days,omitempty"`
-	ObservedActivityAgeDays    int      `json:"observed_activity_age_days,omitempty"`
-	HoldingDurationScope       string   `json:"holding_duration_scope"`
-	HistoryExhausted           bool     `json:"history_exhausted"`
-	ObservationStatus          string   `json:"observation_status,omitempty"`
-	ObservationTier            string   `json:"observation_tier,omitempty"`
-	ObservationBudgetDegraded  bool     `json:"observation_budget_degraded,omitempty"`
-	ObservationWindowExhausted bool     `json:"observation_window_exhausted"`
-	SignaturesFetched          int      `json:"signatures_fetched"`
-	SignaturesObserved         int      `json:"signatures_observed"`
-	ParsedTransactions         int      `json:"parsed_transactions"`
-	OutflowTransactions        int      `json:"outflow_transactions"`
-	CommonExitObserved         bool     `json:"common_exit_observed"`
-	CommonExitRecipient        string   `json:"common_exit_recipient,omitempty"`
-	FreshNearLaunch            bool     `json:"fresh_near_launch"`
-	FundingSource              string   `json:"funding_source,omitempty"`
-	Behavior                   string   `json:"behavior"`
-	LaunchBehaviorLabel        string   `json:"launch_behavior_label,omitempty"`
-	LaunchBehaviorEvidence     []string `json:"launch_behavior_evidence,omitempty"`
-	LaunchEntryRank            int      `json:"launch_entry_rank,omitempty"`
-	LaunchFirstBuyAt           string   `json:"launch_first_buy_at,omitempty"`
-	LaunchMinutesAfter         float64  `json:"launch_minutes_after,omitempty"`
-	LaunchCreatorLinked        bool     `json:"launch_creator_linked"`
-	LaunchFundingStatus        string   `json:"launch_funding_status,omitempty"`
-	Evidence                   []string `json:"evidence"`
+	Rank                            int                         `json:"rank"`
+	OwnerWallet                     string                      `json:"owner_wallet,omitempty"`
+	OwnerResolved                   bool                        `json:"owner_resolved"`
+	TokenAccounts                   []string                    `json:"token_accounts"`
+	TokenAccountCount               int                         `json:"token_account_count"`
+	Role                            string                      `json:"role"`
+	RoleConfidence                  string                      `json:"role_confidence"`
+	RiskBearing                     bool                        `json:"risk_bearing"`
+	ExcludedFromHolderRisk          bool                        `json:"excluded_from_holder_risk"`
+	Balance                         float64                     `json:"balance"`
+	RawPercentage                   float64                     `json:"raw_percentage"`
+	CirculatingPercentage           float64                     `json:"circulating_percentage,omitempty"`
+	ReferenceUSDValue               *float64                    `json:"reference_usd_value,omitempty"`
+	AcquisitionObserved             bool                        `json:"acquisition_observed"`
+	AcquisitionObservedAt           string                      `json:"acquisition_observed_at,omitempty"`
+	OldestActivityObservedAt        string                      `json:"oldest_activity_observed_at,omitempty"`
+	NewestActivityObservedAt        string                      `json:"newest_activity_observed_at,omitempty"`
+	ObservedHoldingDays             int                         `json:"observed_holding_days,omitempty"`
+	ObservedActivityAgeDays         int                         `json:"observed_activity_age_days,omitempty"`
+	HoldingDurationScope            string                      `json:"holding_duration_scope"`
+	HistoryExhausted                bool                        `json:"history_exhausted"`
+	ObservationStatus               string                      `json:"observation_status,omitempty"`
+	ObservationTier                 string                      `json:"observation_tier,omitempty"`
+	ObservationBudgetDegraded       bool                        `json:"observation_budget_degraded,omitempty"`
+	ObservationWindowExhausted      bool                        `json:"observation_window_exhausted"`
+	SignaturesFetched               int                         `json:"signatures_fetched"`
+	SignaturesObserved              int                         `json:"signatures_observed"`
+	ParsedTransactions              int                         `json:"parsed_transactions"`
+	OutflowTransactions             int                         `json:"outflow_transactions"`
+	CommonExitObserved              bool                        `json:"common_exit_observed"`
+	CommonExitRecipient             string                      `json:"common_exit_recipient,omitempty"`
+	FreshNearLaunch                 bool                        `json:"fresh_near_launch"`
+	FundingSource                   string                      `json:"funding_source,omitempty"`
+	Behavior                        string                      `json:"behavior"`
+	LaunchBehaviorLabel             string                      `json:"launch_behavior_label,omitempty"`
+	LaunchBehaviorEvidence          []string                    `json:"launch_behavior_evidence,omitempty"`
+	LaunchEntryRank                 int                         `json:"launch_entry_rank,omitempty"`
+	LaunchFirstBuyAt                string                      `json:"launch_first_buy_at,omitempty"`
+	LaunchMinutesAfter              float64                     `json:"launch_minutes_after,omitempty"`
+	LaunchCreatorLinked             bool                        `json:"launch_creator_linked"`
+	LaunchFundingStatus             string                      `json:"launch_funding_status,omitempty"`
+	RepeatDominantHolder            bool                        `json:"repeat_dominant_holder"`
+	RepeatDominantTokenCount        int                         `json:"repeat_dominant_token_count,omitempty"`
+	RepeatDominantObservationWindow string                      `json:"repeat_dominant_observation_window,omitempty"`
+	RepeatDominantRiskWeight        int                         `json:"repeat_dominant_risk_weight,omitempty"`
+	RepeatDominantMatches           []RepeatDominantHolderMatch `json:"repeat_dominant_matches,omitempty"`
+	Evidence                        []string                    `json:"evidence"`
 }
 
 // HolderIntelligence keeps factual holdings visible even when an unresolved
@@ -77,6 +82,7 @@ type HolderIntelligence struct {
 	CommonExitGroupCount       int                     `json:"common_exit_group_count"`
 	LaunchForensicsAvailable   bool                    `json:"launch_forensics_available"`
 	LaunchProfilesMatched      int                     `json:"launch_profiles_matched"`
+	RepeatDominantHolderCount  int                     `json:"repeat_dominant_holder_count"`
 	Top1Percentage             float64                 `json:"top_1_percentage"`
 	Top3Percentage             float64                 `json:"top_3_percentage"`
 	Top10Percentage            float64                 `json:"top_10_percentage"`

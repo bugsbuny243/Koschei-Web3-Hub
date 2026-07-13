@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"koschei/api/internal/services"
+	"koschei/api/internal/web3"
 )
 
 const token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
@@ -47,6 +48,7 @@ type tokenScanResponse struct {
 	LaunchForensics       services.LaunchForensicsAnalysis `json:"launch_forensics"`
 	VerifiedEvidence      []string                         `json:"verified_evidence"`
 	Explanation           string                           `json:"explanation"`
+	ExplanationV2         scanExplanationV2                `json:"explanation_v2"`
 	HolderAnalysisStatus  string                           `json:"holder_analysis_status"`
 	VerdictWithheld       bool                             `json:"verdict_withheld"`
 	Disclaimer            string                           `json:"disclaimer"`
@@ -168,6 +170,12 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 	if score < 0 {
 		score = 0
 	}
+	score = applyRepeatDominantRiskToLegacyScore(score, holderCore)
+	if repeatRisk := holderIntelligenceCoreRepeatRisk(holderCore); repeatRisk > 0 {
+		findings = appendUniqueHolderCoreEvidence(findings,
+			fmt.Sprintf("Repeat-dominant holder evidence applies a %d/100 cross-token actor risk weight from the stored Koschei observation window.", repeatRisk),
+		)
+	}
 
 	risk := tokenRiskLevel(score)
 	policy := tokenFinalPolicy(score, extensions, visibilityLimitations)
@@ -203,6 +211,7 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 		LaunchForensics:       holderCore.LaunchForensics,
 		VerifiedEvidence:      holderIntelligenceCoreEvidence(holderCore),
 		Explanation:           holderIntelligenceCoreExplanation(holderCore),
+		ExplanationV2:         holderIntelligenceCoreExplanationV2(holderCore),
 		HolderAnalysisStatus:  holderIntelligenceCoreStatus(holderCore),
 		VerdictWithheld:       holderPolicy == "withhold",
 		Disclaimer:            disclaimer,
@@ -232,20 +241,34 @@ func callSolanaRPC(client *http.Client, rpcURL, method string, params interface{
 	}
 	resp, err := client.Post(rpcURL, "application/json", bytes.NewReader(body))
 	if err != nil {
+		web3.LogRPCFailure(method, rpcURL, 0, err)
 		return err
 	}
 	defer resp.Body.Close()
+	actualEndpoint := rpcURL
+	if resp.Request != nil && resp.Request.URL != nil {
+		actualEndpoint = resp.Request.URL.String()
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("rpc status %d", resp.StatusCode)
+		err := fmt.Errorf("rpc status %d", resp.StatusCode)
+		web3.LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
 	}
 	var envelope rpcEnvelope
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		web3.LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
 	if envelope.Error != nil {
-		return fmt.Errorf("rpc error: %s", envelope.Error.Message)
+		err := fmt.Errorf("rpc error: %s", envelope.Error.Message)
+		web3.LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
 	}
-	return json.Unmarshal(envelope.Result, target)
+	if err := json.Unmarshal(envelope.Result, target); err != nil {
+		web3.LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
+	}
+	return nil
 }
 
 func roundPercent(value float64) float64 {

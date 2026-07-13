@@ -80,3 +80,16 @@ func TestUniqueRPCURLsRemovesDuplicates(t *testing.T) {
 		t.Fatalf("expected two unique endpoints, got %v", got)
 	}
 }
+
+func TestSolanaRPCFallbackPrefersDifferentConfiguredProvider(t *testing.T) {
+	t.Setenv("SOLANA_RPC_URL", "https://mainnet.helius-rpc.com/?api-key=primary-secret")
+	t.Setenv("SOLANA_RPC_FALLBACK_URL", "")
+	t.Setenv("ALCHEMY_SOLANA_RPC_URL", "https://solana-mainnet.g.alchemy.com/v2/fallback-secret")
+	t.Setenv("HELIUS_SOLANA_RPC_URL", "")
+	t.Setenv("QUICKNODE_SOLANA_RPC_URL", "")
+	t.Setenv("ALCHEMY_API_KEY", "")
+	got := SolanaRPCFallbackURL("solana-mainnet")
+	if RPCProviderHost(got) != "solana-mainnet.g.alchemy.com" {
+		t.Fatalf("fallback host=%q url=%q", RPCProviderHost(got), got)
+	}
+}

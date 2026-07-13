@@ -128,27 +128,43 @@ func (m *RPCManager) callProvider(ctx context.Context, p RPCProviderConfig, meth
 	defer cancel()
 	payload, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
 	if err != nil {
+		LogRPCFailure(method, p.URL, 0, err)
 		return err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.URL, bytes.NewReader(payload))
 	if err != nil {
+		LogRPCFailure(method, p.URL, 0, err)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := m.client.Do(req)
 	if err != nil {
+		LogRPCFailure(method, p.URL, 0, err)
 		return err
 	}
 	defer resp.Body.Close()
+	actualEndpoint := p.URL
+	if resp.Request != nil && resp.Request.URL != nil {
+		actualEndpoint = resp.Request.URL.String()
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("%s rpc status %d", p.Name, resp.StatusCode)
+		err := fmt.Errorf("%s rpc status %d", p.Name, resp.StatusCode)
+		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
 	}
 	var envelope rpcEnvelope
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
 	if envelope.Error != nil {
-		return fmt.Errorf("%s rpc error: %s", p.Name, envelope.Error.Message)
+		err := fmt.Errorf("%s rpc error: %s", p.Name, envelope.Error.Message)
+		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
 	}
-	return json.Unmarshal(envelope.Result, target)
+	if err := json.Unmarshal(envelope.Result, target); err != nil {
+		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
+	}
+	return nil
 }
