@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/unify-holder-intelligence-core
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -12,10 +15,13 @@ jobs:
   apply-and-verify:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    env:
+      TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.TARGET_BRANCH }}
           fetch-depth: 0
 
       - name: Set up Go
@@ -63,4 +69,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "Unify customer holder intelligence"
-          git push origin HEAD:${GITHUB_REF_NAME}
+          git push origin HEAD:${TARGET_BRANCH}
