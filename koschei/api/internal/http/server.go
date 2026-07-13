@@ -174,6 +174,7 @@ func registerStatic(mux *http.ServeMux, staticDir string) {
 		log.Printf("warning: static directory unavailable at %q: %v", staticDir, err)
 		return
 	}
+	registerStaticAliases(mux, staticDir)
 	fileServer := http.FileServer(http.Dir(staticDir))
 	indexPath := filepath.Join(staticDir, "index.html")
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
