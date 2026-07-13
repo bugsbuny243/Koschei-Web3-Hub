@@ -56,6 +56,21 @@ function setList(id,items,fallback){
   const el=$(id);el.innerHTML='';
   (items&&items.length?items:[fallback]).forEach(text=>{const li=document.createElement('li');li.textContent=text;el.appendChild(li)});
 }
+function renderHistory(data){
+  const section=$('historySection'),list=$('historyList'),summary=$('historySummary');
+  if(!section||!list||!summary)return;
+  const items=Array.isArray(data&&data.items)?data.items:[];
+  if(!items.length){section.hidden=true;return}
+  section.hidden=false;list.innerHTML='';
+  const change=Number(data.risk_change||0);
+  summary.textContent=items.length>1?(change===0?'Son iki imzalı verdict aynı risk seviyesinde.':`Önceki imzalı verdict’e göre risk ${change>0?`${change} puan yükseldi`:`${Math.abs(change)} puan düştü`}.`):'Bu mint için ilk imzalı verdict kaydedildi.';
+  items.slice(0,6).forEach(item=>{
+    const li=document.createElement('li');
+    const when=item.created_at?new Date(item.created_at).toLocaleString('tr-TR'):'';
+    li.textContent=`${item.grade||grade(item.risk_index)} · ${clamp(item.risk_index)}/100 · ${String(item.risk_level||'').toUpperCase()} · ${when}`;
+    list.appendChild(li);
+  });
+}
 function render(v){
   empty.hidden=true;result.hidden=false;
   $('grade').textContent=v.grade;
@@ -72,11 +87,11 @@ function render(v){
     meta.textContent=v.signed?`İmzalı · ${v.ruleVersion||'ARVIS rule'} · ${v.signature.slice(0,16)}…${v.signature.slice(-10)}`:'İmza yok · ön değerlendirme';
     meta.dataset.signed=v.signed?'true':'false';
   }
-  lastShareURL=`${location.origin}/scan?mint=${encodeURIComponent(v.target)}`;
+  lastShareURL=`${location.origin}/scan/${encodeURIComponent(v.target)}`;
   share.hidden=false;
   openExplorer.hidden=!v.explorer;
   if(v.explorer)openExplorer.href=v.explorer;
-  history.replaceState({},'',`/scan?mint=${encodeURIComponent(v.target)}`);
+  history.replaceState({},'',`/scan/${encodeURIComponent(v.target)}`);
 }
 async function fetchJSON(url,options){
   const response=await fetch(url,options);
@@ -90,6 +105,7 @@ async function runScan(){
   submit.disabled=true;submit.textContent='ARVIS zinciri tarıyor…';
   empty.hidden=false;empty.innerHTML='<h2>Canlı Solana kanıtı toplanıyor</h2><p>Authority, supply, holder yoğunluğu ve imzalı verdict kontrol ediliyor.</p>';
   result.hidden=true;share.hidden=true;openExplorer.hidden=true;
+  if($('historySection'))$('historySection').hidden=true;
   try{
     const tokenMode=kind.value==='token';
     if(tokenMode){
@@ -97,6 +113,7 @@ async function runScan(){
       const badgePromise=fetchJSON(`/api/v1/risk/badge?address=${encodeURIComponent(value)}&network=solana-mainnet`).catch(()=>null);
       const [tokenData,badgeData]=await Promise.all([tokenPromise,badgePromise]);
       render(tokenVerdict(tokenData,badgeData,value));
+      fetchJSON(`/api/public/scan-history?mint=${encodeURIComponent(value)}&limit=12`).then(renderHistory).catch(()=>{});
     }else{
       const data=await fetchJSON('/api/arvis/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:value,kind:kind.value,intent:note.value.trim(),note:note.value.trim()})});
       render(preflightVerdict(data,value));
