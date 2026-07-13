@@ -31,6 +31,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p rpc-observability-diagnostics
           test "$(cat .github/agent-rpc/chunk-* | git hash-object --stdin)" = "19706a3337587eac8eaebca9a933159ba12c1d4e"
           cat .github/agent-rpc/chunk-* | base64 -d | gzip -d > /tmp/apply_rpc_observability.py
           python3 /tmp/apply_rpc_observability.py
@@ -49,19 +50,36 @@ jobs:
 
       - name: Test API
         working-directory: koschei/api
-        run: go test ./...
+        shell: bash
+        run: |
+          set -o pipefail
+          go test ./... 2>&1 | tee ../../rpc-observability-diagnostics/test.log
 
       - name: Vet API
         working-directory: koschei/api
-        run: go vet ./...
+        shell: bash
+        run: |
+          set -o pipefail
+          go vet ./... 2>&1 | tee ../../rpc-observability-diagnostics/vet.log
 
       - name: Build API
         working-directory: koschei/api
-        run: CGO_ENABLED=0 GOOS=linux go build ./...
+        shell: bash
+        run: |
+          set -o pipefail
+          CGO_ENABLED=0 GOOS=linux go build ./... 2>&1 | tee ../../rpc-observability-diagnostics/build.log
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpc-observability-diagnostics
+          path: rpc-observability-diagnostics
+          if-no-files-found: error
 
       - name: Commit verified implementation
         run: |
-          rm -rf .github/agent-rpc .github/workflows/agent-rpc-observability.yml
+          rm -rf .github/agent-rpc .github/workflows/agent-rpc-observability.yml rpc-observability-diagnostics
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
