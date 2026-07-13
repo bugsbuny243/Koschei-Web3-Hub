@@ -78,3 +78,27 @@ CREATE INDEX IF NOT EXISTS idx_security_threat_tracks_target
     ON security_threat_tracks (network,target_kind,target_id);
 CREATE INDEX IF NOT EXISTS idx_security_threat_tracks_last_investigated
     ON security_threat_tracks (last_investigated_at DESC);
+
+-- The automatic correlation worker reads only a bounded 30-day sensor window.
+-- These indexes keep that path independent from total historical table growth.
+CREATE INDEX IF NOT EXISTS idx_security_radar_events_creator_observation
+    ON security_radar_events (
+        network,
+        (COALESCE(
+            NULLIF(btrim(signals->>'creator_wallet'),''),
+            NULLIF(btrim(signals->>'deployer_wallet'),'')
+        )),
+        target,
+        created_at DESC
+    )
+    WHERE target_type='token'
+      AND COALESCE(
+            NULLIF(btrim(signals->>'creator_wallet'),''),
+            NULLIF(btrim(signals->>'deployer_wallet'),'')
+          ) IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_security_radar_holder_snapshots_latest_owner
+    ON security_radar_holder_snapshots (
+        network,target,owner_wallet,scanned_at DESC,id DESC
+    )
+    WHERE btrim(owner_wallet) <> '';
