@@ -1,0 +1,579 @@
+name: Apply tiered holder depth
+
+on:
+  push:
+    branches:
+      - feature/arvis-tiered-holder-depth
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/arvis-tiered-holder-depth
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+      - name: Apply surgical tiered-depth patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'anchor not found in {path}: {old[:120]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          cluster = 'koschei/api/internal/services/holder_cluster_intelligence.go'
+          replace_once(cluster,
+          '''const (
+          \tholderClusterWalletLimit            = 8
+          \tholderClusterSignatureLimit         = 20
+          \tholderClusterParsedTransactionLimit = 3
+          )''',
+          '''const (
+          \tholderClusterWalletLimit            = 20
+          \tholderClusterSignatureLimit         = 20 // legacy helper default; tiered scans use env-backed limits
+          \tholderClusterParsedTransactionLimit = 3  // legacy helper default; tiered scans use env-backed limits
+          )''')
+
+          replace_once(cluster,
+          '''\tStatus                string                         `json:"status"`
+          \tSignaturesObserved    int                            `json:"signatures_observed"`
+          \tParsedTransactions    int                            `json:"parsed_transactions"`
+          \tHistoryExhausted      bool                           `json:"history_exhausted"`''',
+          '''\tStatus                string                         `json:"status"`
+          \tTier                  string                         `json:"tier"`
+          \tSignaturesFetched     int                            `json:"signatures_fetched"`
+          \tTxsParsed             int                            `json:"txs_parsed"`
+          \tWindowExhausted       bool                           `json:"window_exhausted"`
+          \tBudgetDegraded        bool                           `json:"budget_degraded,omitempty"`
+          \tSignaturesObserved    int                            `json:"signatures_observed"`
+          \tParsedTransactions    int                            `json:"parsed_transactions"`
+          \tHistoryExhausted      bool                           `json:"history_exhausted"`''')
+
+          replace_once(cluster,
+          '''\tWalletsRequested          int                       `json:"wallets_requested"`
+          \tWalletsAnalyzed           int                       `json:"wallets_analyzed"`
+          \tFreshWalletCount          int                       `json:"fresh_wallet_count"`''',
+          '''\tWalletsRequested          int                       `json:"wallets_requested"`
+          \tWalletsAnalyzed           int                       `json:"wallets_analyzed"`
+          \tDeepOwnersScanned         int                       `json:"deep_owners_scanned"`
+          \tShallowOwnersScanned      int                       `json:"shallow_owners_scanned"`
+          \tDeepSignatureLimit        int                       `json:"deep_signature_limit"`
+          \tDeepTransactionLimit      int                       `json:"deep_transaction_limit"`
+          \tShallowSignatureLimit     int                       `json:"shallow_signature_limit"`
+          \tShallowTransactionLimit   int                       `json:"shallow_transaction_limit"`
+          \tRPCBudget                 int                       `json:"rpc_budget"`
+          \tRPCCallsUsed              int                       `json:"rpc_calls_used"`
+          \tBudgetDegradedOwners      int                       `json:"budget_degraded_owners"`
+          \tFreshWalletCount          int                       `json:"fresh_wallet_count"`''')
+
+          replace_once(cluster,
+          '''\tcandidates := make([]HolderRoleAccount, 0, holderClusterWalletLimit)
+          \tfor _, account := range roles.Accounts {
+          \t\tif account.ExcludedFromHolderRisk || account.Role != "externally_owned_wallet" || strings.TrimSpace(account.OwnerWallet) == "" {
+          \t\t\tcontinue
+          \t\t}
+          \t\tcandidates = append(candidates, account)
+          \t\tif len(candidates) >= holderClusterWalletLimit {
+          \t\t\tbreak
+          \t\t}
+          \t}''',
+          '''\tcfg := loadHolderScanTierConfig()
+          \tcandidates := holderClusterRiskOwnerCandidates(roles.Accounts, holderClusterWalletLimit)
+          \tplans := holderClusterAssignScanTiers(candidates, cfg)
+          \tbudget := newHolderScanRPCBudget(cfg.RPCBudget)
+          \tout.DeepSignatureLimit = cfg.DeepSignatureLimit
+          \tout.DeepTransactionLimit = cfg.DeepTransactionLimit
+          \tout.ShallowSignatureLimit = cfg.ShallowSignatureLimit
+          \tout.ShallowTransactionLimit = cfg.ShallowTransactionLimit
+          \tout.RPCBudget = cfg.RPCBudget''')
+
+          replace_once(cluster,
+          '''\tfor _, account := range candidates {
+          \t\tif ctx.Err() != nil {
+          \t\t\tout.Limitations = append(out.Limitations, "Cluster analysis stopped at the request deadline; partial observations are preserved.")
+          \t\t\tbreak
+          \t\t}
+          \t\tout.Wallets = append(out.Wallets, analyzeHolderClusterWallet(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets))
+          \t}
+          \treturn summarizeHolderCluster(out)''',
+          '''\tfor i, account := range candidates {
+          \t\tif ctx.Err() != nil {
+          \t\t\tout.Limitations = append(out.Limitations, "Cluster analysis stopped at the request deadline; partial observations are preserved.")
+          \t\t\tbreak
+          \t\t}
+          \t\tplan := plans[i]
+          \t\trow := analyzeHolderClusterWalletTiered(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
+          \t\tif row.Tier == "deep" {
+          \t\t\tout.DeepOwnersScanned++
+          \t\t} else {
+          \t\t\tout.ShallowOwnersScanned++
+          \t\t}
+          \t\tif row.BudgetDegraded {
+          \t\t\tout.BudgetDegradedOwners++
+          \t\t}
+          \t\tout.Wallets = append(out.Wallets, row)
+          \t}
+          \tout.RPCCallsUsed = budget.Used()
+          \treturn summarizeHolderCluster(out)''')
+
+          replace_once(cluster,
+          '''\tout.Limitations = append(out.Limitations,
+          \t\tfmt.Sprintf("Wallet history is bounded to the latest %d signatures per holder and at most %d parsed transactions per wallet.", holderClusterSignatureLimit, holderClusterParsedTransactionLimit),
+          \t\t"A shared funding source can be an exchange or service wallet; common control is not claimed without combined timing and graph evidence.",''',
+          '''\tout.Limitations = append(out.Limitations,
+          \t\tfmt.Sprintf("Tiered holder history: first %d risk-bearing owners use up to %d signatures / %d parsed transactions; remaining owners use up to %d / %d. RPC calls used: %d of %d.", out.DeepOwnersScanned, out.DeepSignatureLimit, out.DeepTransactionLimit, out.ShallowSignatureLimit, out.ShallowTransactionLimit, out.RPCCallsUsed, out.RPCBudget),
+          \t\t"A shallow window with no observed activity contributes zero safety weight; it is not evidence that activity does not exist.",
+          \t\t"A shared funding source can be an exchange or service wallet; common control is not claimed without combined timing and graph evidence.",''')
+
+          replace_once(cluster,
+          '''func holderClusterFindings(out HolderClusterAnalysis) []string {
+          \tfindings := []string{fmt.Sprintf("Verified bounded observations were produced for %d of %d requested holder wallets.", out.WalletsAnalyzed, out.WalletsRequested)}''',
+          '''func holderClusterFindings(out HolderClusterAnalysis) []string {
+          \tfindings := []string{
+          \t\tfmt.Sprintf("Verified bounded observations were produced for %d of %d requested holder wallets.", out.WalletsAnalyzed, out.WalletsRequested),
+          \t\tfmt.Sprintf("İlk %d owner derin pencereyle (%d imza / %d tx), kalan %d owner standart pencereyle (%d imza / %d tx) tarandı.", out.DeepOwnersScanned, out.DeepSignatureLimit, out.DeepTransactionLimit, out.ShallowOwnersScanned, out.ShallowSignatureLimit, out.ShallowTransactionLimit),
+          \t}''')
+
+          Path('koschei/api/internal/services/holder_scan_tiers.go').write_text(r'''package services
+
+import (
+    "context"
+    "fmt"
+    "os"
+    "sort"
+    "strconv"
+    "strings"
+    "sync"
+    "time"
+)
+
+const holderDeepConcurrencyMax = 3
+
+type holderScanTierConfig struct {
+    DeepSignatureLimit       int
+    DeepTransactionLimit     int
+    ShallowSignatureLimit    int
+    ShallowTransactionLimit  int
+    DeepOwnerCount           int
+    RPCBudget                int
+}
+
+type holderScanPlan struct {
+    Tier             string
+    SignatureLimit   int
+    TransactionLimit int
+    BudgetDegraded   bool
+}
+
+type holderScanRPCBudget struct {
+    mu    sync.Mutex
+    limit int
+    used  int
+}
+
+func loadHolderScanTierConfig() holderScanTierConfig {
+    return holderScanTierConfig{
+        DeepSignatureLimit:      holderScanEnvInt("ARVIS_DEEP_SIG_LIMIT", 100, 20, 500),
+        DeepTransactionLimit:    holderScanEnvInt("ARVIS_DEEP_TX_PARSE", 10, 2, 50),
+        ShallowSignatureLimit:   holderScanEnvInt("ARVIS_SHALLOW_SIG_LIMIT", 20, 5, 100),
+        ShallowTransactionLimit: holderScanEnvInt("ARVIS_SHALLOW_TX_PARSE", 2, 1, 10),
+        DeepOwnerCount:          holderScanEnvInt("ARVIS_DEEP_OWNER_COUNT", 8, 0, 20),
+        RPCBudget:               holderScanEnvInt("ARVIS_SCAN_RPC_BUDGET", 600, 25, 5000),
+    }
+}
+
+func holderScanEnvInt(name string, fallback, min, max int) int {
+    raw := strings.TrimSpace(os.Getenv(name))
+    if raw == "" {
+        return fallback
+    }
+    value, err := strconv.Atoi(raw)
+    if err != nil || value < min || value > max {
+        return fallback
+    }
+    return value
+}
+
+func newHolderScanRPCBudget(limit int) *holderScanRPCBudget {
+    if limit <= 0 {
+        limit = 600
+    }
+    return &holderScanRPCBudget{limit: limit}
+}
+
+func (b *holderScanRPCBudget) Reserve(calls int) bool {
+    if b == nil || calls <= 0 {
+        return true
+    }
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    if b.used+calls > b.limit {
+        return false
+    }
+    b.used += calls
+    return true
+}
+
+func (b *holderScanRPCBudget) Used() int {
+    if b == nil {
+        return 0
+    }
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    return b.used
+}
+
+func holderClusterRiskOwnerCandidates(accounts []HolderRoleAccount, limit int) []HolderRoleAccount {
+    if limit <= 0 {
+        return nil
+    }
+    byOwner := map[string]*HolderRoleAccount{}
+    order := []string{}
+    for _, account := range accounts {
+        owner := strings.TrimSpace(account.OwnerWallet)
+        if owner == "" || account.ExcludedFromHolderRisk || account.Role != "externally_owned_wallet" {
+            continue
+        }
+        aggregate := byOwner[owner]
+        if aggregate == nil {
+            copy := account
+            copy.OwnerWallet = owner
+            copy.TokenAccount = ""
+            copy.Evidence = append([]string{}, account.Evidence...)
+            byOwner[owner] = &copy
+            order = append(order, owner)
+            continue
+        }
+        aggregate.Balance += account.Balance
+        aggregate.RawPercentage += account.RawPercentage
+        aggregate.CirculatingPercentage += account.CirculatingPercentage
+        aggregate.Evidence = appendUniqueHolderEvidence(aggregate.Evidence, account.Evidence...)
+        if account.Rank > 0 && (aggregate.Rank == 0 || account.Rank < aggregate.Rank) {
+            aggregate.Rank = account.Rank
+        }
+    }
+    out := make([]HolderRoleAccount, 0, len(order))
+    for _, owner := range order {
+        out = append(out, *byOwner[owner])
+    }
+    sort.SliceStable(out, func(i, j int) bool { return out[i].Balance > out[j].Balance })
+    if len(out) > limit {
+        out = out[:limit]
+    }
+    return out
+}
+
+func holderClusterAssignScanTiers(candidates []HolderRoleAccount, cfg holderScanTierConfig) []holderScanPlan {
+    plans := make([]holderScanPlan, 0, len(candidates))
+    remaining := cfg.RPCBudget
+    deepCost := 1 + cfg.DeepTransactionLimit
+    shallowCost := 1 + cfg.ShallowTransactionLimit
+    for i := range candidates {
+        plan := holderScanPlan{Tier: "shallow", SignatureLimit: cfg.ShallowSignatureLimit, TransactionLimit: cfg.ShallowTransactionLimit}
+        if i < cfg.DeepOwnerCount {
+            if remaining >= deepCost {
+                plan = holderScanPlan{Tier: "deep", SignatureLimit: cfg.DeepSignatureLimit, TransactionLimit: cfg.DeepTransactionLimit}
+                remaining -= deepCost
+            } else {
+                plan.BudgetDegraded = true
+                if remaining >= shallowCost {
+                    remaining -= shallowCost
+                } else {
+                    remaining = 0
+                }
+            }
+        } else if remaining >= shallowCost {
+            remaining -= shallowCost
+        } else {
+            plan.BudgetDegraded = true
+            remaining = 0
+        }
+        plans = append(plans, plan)
+    }
+    return plans
+}
+
+func analyzeHolderClusterWalletTiered(ctx context.Context, rpcURL, mint string, account HolderRoleAccount, launchBlockTime int64, holderWallets map[string]bool, plan holderScanPlan, budget *holderScanRPCBudget) HolderClusterWallet {
+    percentage := account.CirculatingPercentage
+    if percentage <= 0 {
+        percentage = account.RawPercentage
+    }
+    row := HolderClusterWallet{
+        Rank: account.Rank, Wallet: account.OwnerWallet, HolderPercentage: holderClusterRound(percentage, 4),
+        Status: "signature_history_unavailable", Tier: plan.Tier, BudgetDegraded: plan.BudgetDegraded,
+        FlowObservations: []HolderClusterFlowObservation{}, Evidence: []string{},
+    }
+    if !budget.Reserve(1) {
+        row.Status = "rpc_budget_exhausted"
+        row.Tier = "shallow"
+        row.BudgetDegraded = true
+        row.Evidence = append(row.Evidence, "RPC budget exhausted before holder signature history could be fetched; no behavior claim was made.")
+        return row
+    }
+    signatures, err := SolanaGetSignaturesForAddress(ctx, rpcURL, account.OwnerWallet, plan.SignatureLimit)
+    if err != nil {
+        row.Evidence = append(row.Evidence, "Holder signature history could not be fetched: "+compactClusterError(err))
+        return row
+    }
+    row.SignaturesFetched = len(signatures)
+    row.SignaturesObserved = len(signatures)
+    row.WindowExhausted = len(signatures) < plan.SignatureLimit
+    row.HistoryExhausted = row.WindowExhausted
+    if len(signatures) == 0 {
+        row.Status = "no_observed_signatures"
+        row.Evidence = append(row.Evidence, fmt.Sprintf("No signatures were returned in the %s holder history window; this is not a safety signal.", row.Tier))
+        return row
+    }
+
+    var oldestTime, newestTime, oldestSlot int64
+    for _, signature := range signatures {
+        if signature.BlockTime == nil || *signature.BlockTime <= 0 {
+            continue
+        }
+        if newestTime == 0 || *signature.BlockTime > newestTime {
+            newestTime = *signature.BlockTime
+        }
+        if oldestTime == 0 || *signature.BlockTime < oldestTime {
+            oldestTime = *signature.BlockTime
+            oldestSlot = signature.Slot
+        }
+    }
+    row.OldestObservedSlot = oldestSlot
+    row.OldestObservedAt = holderClusterUnixTime(oldestTime)
+    row.NewestObservedAt = holderClusterUnixTime(newestTime)
+    if row.WindowExhausted && launchBlockTime > 0 && oldestTime > 0 {
+        delta := oldestTime - launchBlockTime
+        row.FreshNearLaunch = delta >= -86400 && delta <= 86400
+    }
+
+    for _, index := range holderClusterTransactionIndexesForLimit(signatures, launchBlockTime, plan.TransactionLimit) {
+        if index < 0 || index >= len(signatures) || signatures[index].Err != nil || strings.TrimSpace(signatures[index].Signature) == "" {
+            continue
+        }
+        if !budget.Reserve(1) {
+            row.BudgetDegraded = true
+            row.Evidence = append(row.Evidence, "RPC budget reached while parsing holder transactions; partial evidence is preserved.")
+            break
+        }
+        tx, txErr := SolanaGetTransactionJSONParsed(ctx, rpcURL, signatures[index].Signature)
+        if txErr != nil {
+            continue
+        }
+        row.ParsedTransactions++
+        row.TxsParsed = row.ParsedTransactions
+        txMap := map[string]any(tx)
+        blockTime := holderClusterInt64(txMap["blockTime"])
+        slot := holderClusterInt64(txMap["slot"])
+        row.FlowObservations = append(row.FlowObservations, observeHolderClusterWalletFlow(txMap, signatures[index].Signature, mint, account.OwnerWallet, holderWallets)...)
+        if row.FundingSource == "" {
+            if source, amount := holderClusterFundingSource(txMap, account.OwnerWallet); source != "" && amount > 0 {
+                row.FundingSource = source
+                row.FundingAmountSOL = holderClusterRound(amount, 9)
+                row.FundingObservedAt = holderClusterUnixTime(blockTime)
+            }
+        }
+        if delta := holderClusterOwnerTokenDelta(txMap, mint, account.OwnerWallet); delta > 0.000000001 {
+            if row.AcquisitionSlot == 0 || (slot > 0 && slot < row.AcquisitionSlot) {
+                row.AcquisitionSlot = slot
+                row.AcquisitionObservedAt = holderClusterUnixTime(blockTime)
+            }
+        }
+    }
+    if row.ParsedTransactions > 0 {
+        row.Status = "verified_bounded_observation"
+    } else {
+        row.Status = "signature_only_observation"
+    }
+    row.Evidence = append(row.Evidence, fmt.Sprintf("%s tier observed %d signatures and parsed %d transactions; window_exhausted=%t.", row.Tier, row.SignaturesFetched, row.TxsParsed, row.WindowExhausted))
+    if row.FreshNearLaunch {
+        row.Evidence = append(row.Evidence, "Oldest observed wallet activity falls within 24 hours of the bounded token launch estimate.")
+    }
+    if row.FundingSource != "" {
+        row.Evidence = append(row.Evidence, fmt.Sprintf("First bounded funding relation: %s supplied approximately %.9f SOL.", row.FundingSource, row.FundingAmountSOL))
+    }
+    if row.AcquisitionSlot > 0 {
+        row.Evidence = append(row.Evidence, fmt.Sprintf("Positive target-token acquisition was observed at slot %d.", row.AcquisitionSlot))
+    }
+    return row
+}
+
+func holderClusterTransactionIndexesForLimit(signatures []SolanaSignatureInfo, launchBlockTime int64, limit int) []int {
+    if limit <= 0 || len(signatures) == 0 {
+        return nil
+    }
+    indexes := holderClusterTransactionIndexes(signatures, launchBlockTime)
+    if len(indexes) > limit {
+        return indexes[:limit]
+    }
+    seen := map[int]bool{}
+    for _, index := range indexes {
+        seen[index] = true
+    }
+    for i, signature := range signatures {
+        if len(indexes) >= limit {
+            break
+        }
+        if seen[i] || signature.Err != nil || strings.TrimSpace(signature.Signature) == "" {
+            continue
+        }
+        seen[i] = true
+        indexes = append(indexes, i)
+    }
+    return indexes
+}
+
+var _ = time.RFC3339
+var _ = holderDeepConcurrencyMax
+''')
+
+          Path('koschei/api/internal/services/holder_scan_tiers_test.go').write_text(r'''package services
+
+import "testing"
+
+func TestHolderClusterTierAssignmentExcludesProtocolInventory(t *testing.T) {
+    accounts := []HolderRoleAccount{{Rank: 1, OwnerWallet: "LP", Balance: 1000, Role: "pump_liquidity_vault", ExcludedFromHolderRisk: true}}
+    for i := 0; i < 12; i++ {
+        accounts = append(accounts, HolderRoleAccount{Rank: i + 2, OwnerWallet: "Wallet" + string(rune('A'+i)), Balance: float64(100-i), Role: "externally_owned_wallet"})
+    }
+    candidates := holderClusterRiskOwnerCandidates(accounts, 20)
+    if len(candidates) != 12 {
+        t.Fatalf("candidate count = %d", len(candidates))
+    }
+    if candidates[0].OwnerWallet == "LP" {
+        t.Fatal("LP/protocol inventory consumed a deep slot")
+    }
+    cfg := holderScanTierConfig{DeepSignatureLimit: 100, DeepTransactionLimit: 10, ShallowSignatureLimit: 20, ShallowTransactionLimit: 2, DeepOwnerCount: 8, RPCBudget: 600}
+    plans := holderClusterAssignScanTiers(candidates, cfg)
+    for i, plan := range plans {
+        expected := "shallow"
+        if i < 8 {
+            expected = "deep"
+        }
+        if plan.Tier != expected {
+            t.Fatalf("plan %d tier = %s, want %s", i, plan.Tier, expected)
+        }
+    }
+}
+
+func TestHolderClusterTierAssignmentDegradesWhenBudgetCannotFitDeep(t *testing.T) {
+    candidates := []HolderRoleAccount{
+        {OwnerWallet: "A", Balance: 3, Role: "externally_owned_wallet"},
+        {OwnerWallet: "B", Balance: 2, Role: "externally_owned_wallet"},
+    }
+    cfg := holderScanTierConfig{DeepSignatureLimit: 100, DeepTransactionLimit: 10, ShallowSignatureLimit: 20, ShallowTransactionLimit: 2, DeepOwnerCount: 2, RPCBudget: 6}
+    plans := holderClusterAssignScanTiers(candidates, cfg)
+    if plans[0].Tier != "shallow" || !plans[0].BudgetDegraded {
+        t.Fatalf("first plan = %#v", plans[0])
+    }
+    if plans[1].Tier != "shallow" || !plans[1].BudgetDegraded {
+        t.Fatalf("second plan = %#v", plans[1])
+    }
+}
+
+func TestHolderClusterTransactionIndexesRespectTierLimit(t *testing.T) {
+    signatures := make([]SolanaSignatureInfo, 12)
+    for i := range signatures {
+        signatures[i].Signature = "sig"
+    }
+    if got := len(holderClusterTransactionIndexesForLimit(signatures, 0, 2)); got != 2 {
+        t.Fatalf("shallow indexes = %d", got)
+    }
+    if got := len(holderClusterTransactionIndexesForLimit(signatures, 0, 10)); got != 10 {
+        t.Fatalf("deep indexes = %d", got)
+    }
+}
+''')
+
+          Path('koschei/api/public/js/owner-holder-tier-labels.js').write_text(r'''(()=>{
+  'use strict';
+  const kit=window.OwnerRadarKit;
+  if(!kit||window.__ownerHolderTierLabelsInstalled)return;
+  window.__ownerHolderTierLabelsInstalled=true;
+  const render=kit.render.bind(kit);
+  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const arr=value=>Array.isArray(value)?value:[];
+  const activity=new Set(['common_exit_recipient_observed','token_outflow_observed','acquisition_observed_no_outflow_in_bounded_window']);
+  function apply(root,data){
+    const detail=[...root.querySelectorAll('details.owner-details')].find(node=>node.querySelector('summary b')?.textContent?.includes('Holder Intelligence'));
+    const body=detail?.querySelector('tbody');
+    if(!body)return;
+    const holderRows=arr(data?.holder_intelligence?.rows);
+    const observed=new Map(arr(data?.holder_cluster?.wallets).map(row=>[String(row.wallet||'').trim(),row]));
+    [...body.querySelectorAll('tr')].forEach((tr,index)=>{
+      const holder=holderRows[index]||{};
+      const meta=observed.get(String(holder.owner_wallet||'').trim());
+      if(!meta)return;
+      const cells=tr.querySelectorAll('td');
+      if(cells.length<7)return;
+      const tier=meta.tier==='deep'?'deep':'shallow';
+      const sig=Number(meta.signatures_fetched??meta.signatures_observed??0);
+      const tx=Number(meta.txs_parsed??meta.parsed_transactions??0);
+      const behavior=String(holder.behavior||'');
+      const hasActivity=activity.has(behavior);
+      const labelCell=cells[6];
+      const badge=labelCell.querySelector('.badge');
+      const sub=labelCell.querySelector('.muted.small');
+      if(!hasActivity){
+        if(tier==='deep'){
+          if(badge)badge.textContent='DERİN TARAMA · HAREKET YOK';
+          if(sub)sub.textContent=`${sig} imza · ${tx} tx incelendi`;
+        }else{
+          if(badge){badge.textContent='STANDART TARAMA';badge.title='Standart pencerede hedef-token hareketi gözlenmedi; bu, hareket olmadığı anlamına gelmez.';}
+          if(sub)sub.textContent=`Sığ pencere — derin analiz bu cüzdana uygulanmadı · ${sig} imza · ${tx} tx incelendi`;
+        }
+      }else if(sub){
+        sub.textContent=`${sig} imza · ${tx} tx incelendi · ${tier==='deep'?'derin':'standart'} pencere`;
+      }
+      const duration=cells[5];
+      if(duration&&duration.textContent.trim().startsWith('Bilinmiyor')){
+        const last=duration.querySelector('.muted.small')?.textContent||'Son hareket zamanı gözlenmedi';
+        duration.innerHTML=`${tier==='deep'?'Derin pencere tarandı':'Standart pencere tarandı'}<div class="muted small">${esc(last)}</div>`;
+      }
+    });
+  }
+  window.OwnerRadarKit={...kit,render(root,data){render(root,data);apply(root,data);}};
+})();
+''')
+
+          html='koschei/api/public/owner-production.html'
+          replace_once(html,
+          '''  <script src="/js/owner-control-center.js?v=10"></script>
+            <script src="/js/owner-arvis-runtime-fix.js?v=1"></script>''',
+          '''  <script src="/js/owner-control-center.js?v=10"></script>
+            <script src="/js/owner-holder-tier-labels.js?v=1"></script>
+            <script src="/js/owner-arvis-runtime-fix.js?v=1"></script>''')
+
+          env=Path('.env.example')
+          if env.exists():
+              text=env.read_text()
+              block='''\n# ARVIS holder tiered history depth\nARVIS_DEEP_SIG_LIMIT=100\nARVIS_DEEP_TX_PARSE=10\nARVIS_SHALLOW_SIG_LIMIT=20\nARVIS_SHALLOW_TX_PARSE=2\nARVIS_DEEP_OWNER_COUNT=8\nARVIS_SCAN_RPC_BUDGET=600\n'''
+              if 'ARVIS_DEEP_SIG_LIMIT=' not in text:
+                  env.write_text(text.rstrip()+block+'\n')
+          PY
+          gofmt -w koschei/api/internal/services/holder_scan_tiers.go koschei/api/internal/services/holder_scan_tiers_test.go koschei/api/internal/services/holder_cluster_intelligence.go
+          node --check koschei/api/public/js/owner-holder-tier-labels.js
+          cd koschei/api
+          go test ./...
+          go vet ./...
+          go build ./...
+      - name: Commit verified source changes
+        shell: bash
+        run: |
+          rm .github/workflows/apply-tiered-holder-depth.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "feat: add tiered ARVIS holder scan depth"
+          git push origin HEAD:feature/arvis-tiered-holder-depth
