@@ -20,15 +20,16 @@ type actorDefenseRequest struct {
 }
 
 type actorDefenseLiveCoverage struct {
-	Status             string   `json:"status"`
-	SignaturesSeen     int      `json:"signatures_seen"`
-	TransactionsParsed int      `json:"transactions_parsed"`
-	EvidencePersisted  int      `json:"evidence_persisted"`
-	RPCFailures        int      `json:"rpc_failures"`
-	SignatureLimit     int      `json:"signature_limit"`
-	TransactionLimit   int      `json:"transaction_limit"`
-	EvidenceLimit      int      `json:"evidence_limit"`
-	Limitations        []string `json:"limitations"`
+	Status              string   `json:"status"`
+	SignaturesSeen      int      `json:"signatures_seen"`
+	TransactionsParsed  int      `json:"transactions_parsed"`
+	EvidencePersisted   int      `json:"evidence_persisted"`
+	RPCFailures         int      `json:"rpc_failures"`
+	PersistenceFailures int      `json:"persistence_failures"`
+	SignatureLimit      int      `json:"signature_limit"`
+	TransactionLimit    int      `json:"transaction_limit"`
+	EvidenceLimit       int      `json:"evidence_limit"`
+	Limitations         []string `json:"limitations"`
 }
 
 type actorDefenseTokenAccountOwner struct {
@@ -157,6 +158,16 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 			relatedActors[actor.Wallet] = true
 		}
 	}
+	persist := func(item services.ActorDefenseEvidenceRecord) {
+		if coverage.EvidencePersisted >= coverage.EvidenceLimit {
+			return
+		}
+		if err := store.UpsertEvidence(ctx, item); err != nil {
+			coverage.PersistenceFailures++
+			return
+		}
+		coverage.EvidencePersisted++
+	}
 
 	for _, signature := range signatures {
 		if coverage.TransactionsParsed >= coverage.TransactionLimit || coverage.EvidencePersisted >= coverage.EvidenceLimit || ctx.Err() != nil {
@@ -170,12 +181,15 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 			coverage.RPCFailures++
 			continue
 		}
-		coverage.TransactionsParsed++
 		txMap := map[string]any(tx)
 		meta := creatorIntelMap(txMap["meta"])
+		if meta["err"] != nil {
+			continue
+		}
+		coverage.TransactionsParsed++
 		message := creatorIntelMap(creatorIntelMap(txMap["transaction"])["message"])
 		keys, signers := creatorIntelAccountKeys(message)
-		actorSigned := creatorIntelContains(signers, dossier.Wallet)
+		actorSigned := actorDefenseContainsExact(signers, dossier.Wallet)
 		observedAt := actorDefenseObservedAt(signature, txMap)
 		owners := actorDefenseTokenAccountOwners(meta, keys)
 		instructions := actorDefenseInstructions(message, meta)
@@ -184,117 +198,132 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 			if coverage.EvidencePersisted >= coverage.EvidenceLimit {
 				break
 			}
-			parsed := creatorIntelMap(instruction["parsed"])
-			kind := strings.ToLower(creatorIntelCleanString(parsed["type"]))
-			info := creatorIntelMap(parsed["info"])
-			program := strings.ToLower(creatorIntelCleanString(instruction["program"]))
-			evidenceKey := fmt.Sprintf("%s:%d", signature.Signature, index)
-
-			if program == "system" && kind == "transfer" {
-				source := creatorIntelCleanString(info["source"])
-				destination := creatorIntelCleanString(info["destination"])
-				lamports := creatorIntelInt64(info["lamports"])
-				if source == dossier.Wallet && destination != "" && destination != dossier.Wallet && actorSigned {
-					item := services.ActorDefenseEvidenceRecord{
-						Network: dossier.Network, ActorWallet: dossier.Wallet,
-						CounterpartKind: "wallet", CounterpartID: destination,
-						Relation: "direct_sol_transfer_out", VerificationStatus: "verified",
-						EvidenceKey: evidenceKey, Source: "solana_jsonparsed_instruction",
-						Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
-						AmountNative: float64(lamports) / 1e9,
-						Metadata: map[string]any{"actor_signed": true, "instruction_type": kind, "known_related_actor": relatedActors[destination]},
-					}
-					if store.UpsertEvidence(ctx, item) == nil {
-						coverage.EvidencePersisted++
-					}
-				} else if destination == dossier.Wallet && source != "" && source != dossier.Wallet {
-					item := services.ActorDefenseEvidenceRecord{
-						Network: dossier.Network, ActorWallet: dossier.Wallet,
-						CounterpartKind: "wallet", CounterpartID: source,
-						Relation: "direct_sol_transfer_in", VerificationStatus: "verified",
-						EvidenceKey: evidenceKey, Source: "solana_jsonparsed_instruction",
-						Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
-						AmountNative: float64(lamports) / 1e9,
-						Metadata: map[string]any{"actor_signed": actorSigned, "instruction_type": kind, "known_related_actor": relatedActors[source]},
-					}
-					if store.UpsertEvidence(ctx, item) == nil {
-						coverage.EvidencePersisted++
-					}
-				}
-				continue
-			}
-
-			if strings.Contains(program, "token") && (kind == "transfer" || kind == "transferchecked") {
-				sourceAccount := creatorIntelCleanString(info["source"])
-				destinationAccount := creatorIntelCleanString(info["destination"])
-				authority := creatorIntelCleanString(info["authority"])
-				sourceOwner := owners[sourceAccount]
-				destinationOwner := owners[destinationAccount]
-				mint := firstNonEmptyString(sourceOwner.Mint, destinationOwner.Mint, creatorIntelCleanString(info["mint"]))
-				amount := actorDefenseTokenAmount(info)
-				if sourceOwner.Owner == dossier.Wallet && destinationOwner.Owner != "" && destinationOwner.Owner != dossier.Wallet && (authority == dossier.Wallet || actorSigned) {
-					item := services.ActorDefenseEvidenceRecord{
-						Network: dossier.Network, ActorWallet: dossier.Wallet,
-						CounterpartKind: "wallet", CounterpartID: destinationOwner.Owner,
-						Relation: "direct_token_transfer_out", VerificationStatus: "verified",
-						EvidenceKey: evidenceKey, Source: "solana_jsonparsed_instruction",
-						Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
-						TokenMint: mint, TokenAmount: amount,
-						Metadata: map[string]any{
-							"actor_signed": actorSigned, "authority": authority,
-							"source_token_account": sourceAccount, "destination_token_account": destinationAccount,
-							"known_token": knownMints[mint], "known_related_actor": relatedActors[destinationOwner.Owner],
-						},
-					}
-					if store.UpsertEvidence(ctx, item) == nil {
-						coverage.EvidencePersisted++
-					}
-				} else if destinationOwner.Owner == dossier.Wallet && sourceOwner.Owner != "" && sourceOwner.Owner != dossier.Wallet {
-					item := services.ActorDefenseEvidenceRecord{
-						Network: dossier.Network, ActorWallet: dossier.Wallet,
-						CounterpartKind: "wallet", CounterpartID: sourceOwner.Owner,
-						Relation: "direct_token_transfer_in", VerificationStatus: "verified",
-						EvidenceKey: evidenceKey, Source: "solana_jsonparsed_instruction",
-						Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
-						TokenMint: mint, TokenAmount: amount,
-						Metadata: map[string]any{
-							"actor_signed": actorSigned, "authority": authority,
-							"source_token_account": sourceAccount, "destination_token_account": destinationAccount,
-							"known_token": knownMints[mint], "known_related_actor": relatedActors[sourceOwner.Owner],
-						},
-					}
-					if store.UpsertEvidence(ctx, item) == nil {
-						coverage.EvidencePersisted++
-					}
-				}
+			for _, item := range actorDefenseInstructionEvidence(dossier, signature, observedAt, actorSigned, instruction, owners, knownMints, relatedActors, index) {
+				persist(item)
 			}
 		}
 
 		if actorSigned {
 			if action, instructionTypes := actorDefenseLiquidityRemoval(message, meta); action {
-				item := services.ActorDefenseEvidenceRecord{
+				persist(services.ActorDefenseEvidenceRecord{
 					Network: dossier.Network, ActorWallet: dossier.Wallet,
 					CounterpartKind: "transaction", CounterpartID: signature.Signature,
 					Relation: "liquidity_remove_activity", VerificationStatus: "observed",
 					EvidenceKey: signature.Signature + ":liquidity_remove", Source: "solana_transaction_logs",
 					Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
-					Metadata: map[string]any{"actor_signed": true, "instruction_types": instructionTypes, "classification_scope": "parsed instruction/log observation; not proof of malicious intent"},
-				}
-				if store.UpsertEvidence(ctx, item) == nil {
-					coverage.EvidencePersisted++
-				}
+					Metadata: map[string]any{
+						"actor_signed": true,
+						"instruction_types": instructionTypes,
+						"classification_scope": "parsed instruction/log observation; not proof of malicious intent",
+					},
+				})
 			}
 		}
 	}
 	if coverage.TransactionsParsed == 0 && coverage.Status == "complete" {
 		coverage.Status = "no_parsed_transactions"
 	}
+	if coverage.PersistenceFailures > 0 && coverage.Status == "complete" {
+		coverage.Status = "partial_persistence"
+	}
 	coverage.Limitations = append(coverage.Limitations,
 		fmt.Sprintf("Canlı kanıt taraması en fazla %d imza, %d başarılı transaction ve %d yeni kanıtla sınırlandırıldı.", coverage.SignatureLimit, coverage.TransactionLimit, coverage.EvidenceLimit),
 		"Doğrudan transfer yalnız jsonParsed instruction ve token-account owner eşleşmesiyle VERIFIED olur.",
+		"Solana adresleri case-sensitive karşılaştırılır.",
 		"Likidite kaldırma davranışı parsed instruction/log gözlemidir; tek başına kötü niyet kanıtı değildir.",
 	)
 	return coverage
+}
+
+func actorDefenseInstructionEvidence(
+	dossier services.ActorDefenseDossier,
+	signature services.SolanaSignatureInfo,
+	observedAt time.Time,
+	actorSigned bool,
+	instruction map[string]any,
+	owners map[string]actorDefenseTokenAccountOwner,
+	knownMints map[string]bool,
+	relatedActors map[string]bool,
+	index int,
+) []services.ActorDefenseEvidenceRecord {
+	parsed := creatorIntelMap(instruction["parsed"])
+	kind := strings.ToLower(creatorIntelCleanString(parsed["type"]))
+	info := creatorIntelMap(parsed["info"])
+	program := strings.ToLower(creatorIntelCleanString(instruction["program"]))
+	evidenceKey := fmt.Sprintf("%s:%d", signature.Signature, index)
+	baseMetadata := map[string]any{"instruction_type": kind, "actor_signed": actorSigned}
+
+	if program == "system" && kind == "transfer" {
+		source := creatorIntelCleanString(info["source"])
+		destination := creatorIntelCleanString(info["destination"])
+		lamports := creatorIntelInt64(info["lamports"])
+		if source == dossier.Wallet && destination != "" && destination != dossier.Wallet && actorSigned {
+			baseMetadata["known_related_actor"] = relatedActors[destination]
+			return []services.ActorDefenseEvidenceRecord{{
+				Network: dossier.Network, ActorWallet: dossier.Wallet,
+				CounterpartKind: "wallet", CounterpartID: destination,
+				Relation: "direct_sol_transfer_out", VerificationStatus: "verified",
+				EvidenceKey: evidenceKey, Source: "solana_jsonparsed_instruction",
+				Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
+				AmountNative: float64(lamports) / 1e9, Metadata: baseMetadata,
+			}}
+		}
+		if destination == dossier.Wallet && source != "" && source != dossier.Wallet {
+			baseMetadata["known_related_actor"] = relatedActors[source]
+			return []services.ActorDefenseEvidenceRecord{{
+				Network: dossier.Network, ActorWallet: dossier.Wallet,
+				CounterpartKind: "wallet", CounterpartID: source,
+				Relation: "direct_sol_transfer_in", VerificationStatus: "verified",
+				EvidenceKey: evidenceKey, Source: "solana_jsonparsed_instruction",
+				Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
+				AmountNative: float64(lamports) / 1e9, Metadata: baseMetadata,
+			}}
+		}
+		return nil
+	}
+
+	if !strings.Contains(program, "token") || (kind != "transfer" && kind != "transferchecked") {
+		return nil
+	}
+	sourceAccount := creatorIntelCleanString(info["source"])
+	destinationAccount := creatorIntelCleanString(info["destination"])
+	authority := creatorIntelCleanString(info["authority"])
+	sourceOwner := owners[sourceAccount]
+	destinationOwner := owners[destinationAccount]
+	mint := firstNonEmptyString(sourceOwner.Mint, destinationOwner.Mint, creatorIntelCleanString(info["mint"]))
+	amount := actorDefenseTokenAmount(info)
+	metadata := map[string]any{
+		"actor_signed": actorSigned,
+		"authority": authority,
+		"source_token_account": sourceAccount,
+		"destination_token_account": destinationAccount,
+		"known_token": knownMints[mint],
+		"raw_amount": creatorIntelCleanString(info["amount"]),
+		"amount_scope": actorDefenseTokenAmountScope(info),
+	}
+	if sourceOwner.Owner == dossier.Wallet && destinationOwner.Owner != "" && destinationOwner.Owner != dossier.Wallet && authority == dossier.Wallet && actorSigned {
+		metadata["known_related_actor"] = relatedActors[destinationOwner.Owner]
+		return []services.ActorDefenseEvidenceRecord{{
+			Network: dossier.Network, ActorWallet: dossier.Wallet,
+			CounterpartKind: "wallet", CounterpartID: destinationOwner.Owner,
+			Relation: "direct_token_transfer_out", VerificationStatus: "verified",
+			EvidenceKey: evidenceKey, Source: "solana_jsonparsed_instruction",
+			Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
+			TokenMint: mint, TokenAmount: amount, Metadata: metadata,
+		}}
+	}
+	if destinationOwner.Owner == dossier.Wallet && sourceOwner.Owner != "" && sourceOwner.Owner != dossier.Wallet {
+		metadata["known_related_actor"] = relatedActors[sourceOwner.Owner]
+		return []services.ActorDefenseEvidenceRecord{{
+			Network: dossier.Network, ActorWallet: dossier.Wallet,
+			CounterpartKind: "wallet", CounterpartID: sourceOwner.Owner,
+			Relation: "direct_token_transfer_in", VerificationStatus: "verified",
+			EvidenceKey: evidenceKey, Source: "solana_jsonparsed_instruction",
+			Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
+			TokenMint: mint, TokenAmount: amount, Metadata: metadata,
+		}}
+	}
+	return nil
 }
 
 func actorDefenseInstructions(message, meta map[string]any) []map[string]any {
@@ -322,7 +351,11 @@ func actorDefenseTokenAccountOwners(meta map[string]any, keys []string) map[stri
 		items, _ := raw.([]any)
 		for _, item := range items {
 			row := creatorIntelMap(item)
-			index := creatorIntelInt(row["accountIndex"])
+			rawIndex, exists := row["accountIndex"]
+			if !exists {
+				continue
+			}
+			index := creatorIntelInt(rawIndex)
 			if index < 0 || index >= len(keys) {
 				continue
 			}
@@ -342,9 +375,24 @@ func actorDefenseTokenAmount(info map[string]any) float64 {
 	if tokenAmount := creatorIntelMap(info["tokenAmount"]); len(tokenAmount) > 0 {
 		return creatorIntelUIAmount(tokenAmount)
 	}
-	raw := creatorIntelCleanString(info["amount"])
-	value, _ := strconv.ParseFloat(raw, 64)
-	return value
+	if raw := creatorIntelCleanString(info["uiAmountString"]); raw != "" {
+		value, _ := strconv.ParseFloat(raw, 64)
+		return value
+	}
+	// Plain SPL `transfer` exposes raw base units without decimals. Keeping the
+	// UI amount at zero prevents Koschei from presenting raw units as tokens;
+	// the exact raw amount remains in evidence metadata.
+	return 0
+}
+
+func actorDefenseTokenAmountScope(info map[string]any) string {
+	if tokenAmount := creatorIntelMap(info["tokenAmount"]); len(tokenAmount) > 0 {
+		return "ui_amount"
+	}
+	if creatorIntelCleanString(info["uiAmountString"]) != "" {
+		return "ui_amount"
+	}
+	return "raw_base_units_only"
 }
 
 func actorDefenseLiquidityRemoval(message, meta map[string]any) (bool, []string) {
@@ -373,6 +421,15 @@ func actorDefenseObservedAt(signature services.SolanaSignatureInfo, tx map[strin
 		return time.Unix(*signature.BlockTime, 0).UTC()
 	}
 	return time.Now().UTC()
+}
+
+func actorDefenseContainsExact(items []string, target string) bool {
+	for _, item := range items {
+		if item == target {
+			return true
+		}
+	}
+	return false
 }
 
 func actorDefenseEnvInt(name string, fallback, minimum, maximum int) int {
