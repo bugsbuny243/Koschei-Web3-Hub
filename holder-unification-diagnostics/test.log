@@ -1,0 +1,19 @@
+# koschei/api/internal/handlers
+internal/handlers/owner_operations.go:162:2: declared and not used: holderRoles
+internal/handlers/security_radar_detail_v3.go:33:2: declared and not used: bundle
+FAIL	koschei/api [build failed]
+?   	koschei/api/internal/db	[no test files]
+FAIL	koschei/api/internal/handlers [build failed]
+FAIL	koschei/api/internal/http [build failed]
+?   	koschei/api/internal/jobs	[no test files]
+?   	koschei/api/internal/mocks	[no test files]
+ok  	koschei/api/internal/cache	0.028s
+ok  	koschei/api/internal/router	0.004s
+?   	koschei/api/internal/singleflight	[no test files]
+?   	koschei/api/pkg/agent	[no test files]
+?   	koschei/api/pkg/audit	[no test files]
+?   	koschei/api/pkg/utils	[no test files]
+ok  	koschei/api/internal/services	120.421s
+ok  	koschei/api/internal/web3	0.015s
+ok  	koschei/api/internal/webhooks	0.004s
+FAIL
