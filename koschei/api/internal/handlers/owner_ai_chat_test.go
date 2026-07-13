@@ -38,10 +38,9 @@ func TestOwnerChatWindowKeepsNewestMessages(t *testing.T) {
 func TestBuildOwnerChatPromptIncludesSnapshotAndConversation(t *testing.T) {
 	snapshot := ownerChatSnapshot{
 		GeneratedAt: "2026-06-22T12:00:00Z",
-		Services: map[string]any{"database": "connected"},
-		Business: map[string]any{"total_users": 4},
-		Radar: map[string]any{"retryable": 0},
-		GooglePlay: map[string]any{"aab_upload_ready": true},
+		Services:    map[string]any{"database": "connected"},
+		Business:    map[string]any{"total_users": 4},
+		Radar:       map[string]any{"retryable": 0},
 	}
 	messages := []ownerChatMessage{
 		{Role: "user", Content: "Radar nasıl?", CreatedAt: time.Now()},
