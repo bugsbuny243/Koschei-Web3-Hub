@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"koschei/api/internal/web3"
 )
 
 type SolanaSignatureInfo struct {
@@ -283,29 +285,39 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 	}
 	payload, err := json.Marshal(solanaRPCRequest{JSONRPC: "2.0", ID: 1, Method: method, Params: params})
 	if err != nil {
+		web3.LogRPCFailure(method, rpcURL, 0, err)
 		return zero, err
 	}
 
 	maxRetries := solanaRPCMax429Retries()
 	for attempt := 0; ; attempt++ {
 		if err := reserveSolanaRPCBudget(ctx, method); err != nil {
+			web3.LogRPCFailure(method, rpcURL, 0, err)
 			return zero, err
 		}
 		if err := waitForSolanaRPCSlot(ctx); err != nil {
+			web3.LogRPCFailure(method, rpcURL, 0, err)
 			return zero, err
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, rpcURL, bytes.NewReader(payload))
 		if err != nil {
+			web3.LogRPCFailure(method, rpcURL, 0, err)
 			return zero, err
 		}
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Koschei-RPC-Method", method)
 		res, err := solanaRPCClient.Do(req)
 		if err != nil {
 			return zero, err
 		}
 		body, readErr := io.ReadAll(io.LimitReader(res.Body, 8<<20))
 		res.Body.Close()
+		actualEndpoint := rpcURL
+		if res.Request != nil && res.Request.URL != nil {
+			actualEndpoint = res.Request.URL.String()
+		}
 		if readErr != nil {
+			web3.LogRPCFailure(method, actualEndpoint, res.StatusCode, readErr)
 			return zero, readErr
 		}
 
@@ -323,9 +335,13 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 
 		var out solanaRPCResponse[T]
 		if err := json.Unmarshal(body, &out); err != nil {
-			return zero, fmt.Errorf("solana rpc malformed response: %w", err)
+			wrapped := fmt.Errorf("solana rpc malformed response: %w", err)
+			web3.LogRPCFailure(method, actualEndpoint, res.StatusCode, wrapped)
+			return zero, wrapped
 		}
 		if out.Error != nil && out.Error.Code == http.StatusTooManyRequests {
+			rpcErr := fmt.Errorf("solana rpc error %d: %s", out.Error.Code, out.Error.Message)
+			web3.LogRPCFailure(method, actualEndpoint, res.StatusCode, rpcErr)
 			delay := maxDuration(solanaRPC429Delay(attempt, ""), solanaRPC429Cooldown())
 			deferSolanaRPCRequests(delay)
 			if attempt < maxRetries {
@@ -333,7 +349,11 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 			}
 		}
 		if out.Error != nil {
-			return zero, fmt.Errorf("solana rpc error %d: %s", out.Error.Code, out.Error.Message)
+			err := fmt.Errorf("solana rpc error %d: %s", out.Error.Code, out.Error.Message)
+			if out.Error.Code != http.StatusTooManyRequests {
+				web3.LogRPCFailure(method, actualEndpoint, res.StatusCode, err)
+			}
+			return zero, err
 		}
 		return out.Result, nil
 	}

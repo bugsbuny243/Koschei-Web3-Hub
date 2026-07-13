@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"koschei/api/internal/services"
+	"koschei/api/internal/web3"
 )
 
 const token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
@@ -240,20 +241,34 @@ func callSolanaRPC(client *http.Client, rpcURL, method string, params interface{
 	}
 	resp, err := client.Post(rpcURL, "application/json", bytes.NewReader(body))
 	if err != nil {
+		web3.LogRPCFailure(method, rpcURL, 0, err)
 		return err
 	}
 	defer resp.Body.Close()
+	actualEndpoint := rpcURL
+	if resp.Request != nil && resp.Request.URL != nil {
+		actualEndpoint = resp.Request.URL.String()
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("rpc status %d", resp.StatusCode)
+		err := fmt.Errorf("rpc status %d", resp.StatusCode)
+		web3.LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
 	}
 	var envelope rpcEnvelope
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		web3.LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
 	if envelope.Error != nil {
-		return fmt.Errorf("rpc error: %s", envelope.Error.Message)
+		err := fmt.Errorf("rpc error: %s", envelope.Error.Message)
+		web3.LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
 	}
-	return json.Unmarshal(envelope.Result, target)
+	if err := json.Unmarshal(envelope.Result, target); err != nil {
+		web3.LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
+	}
+	return nil
 }
 
 func roundPercent(value float64) float64 {

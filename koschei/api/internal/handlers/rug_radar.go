@@ -1,10 +1,8 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -109,50 +107,30 @@ func (h *Handler) RugRadarSubmit(w http.ResponseWriter, r *http.Request) {
 	txCount := 0
 
 	// getAccountInfo
-	acctBody, _ := json.Marshal(map[string]interface{}{
-		"jsonrpc": "2.0", "id": 1,
-		"method": "getAccountInfo",
-		"params": []interface{}{req.MintAddress, map[string]string{"encoding": "jsonParsed"}},
-	})
-	if resp, err := client.Post(rpcURL, "application/json", bytes.NewReader(acctBody)); err == nil {
-		defer resp.Body.Close()
-		var result struct {
-			Result struct {
-				Value *struct {
-					Data struct {
-						Parsed *struct {
-							Info *struct {
-								MintAuthority   *string `json:"mintAuthority"`
-								FreezeAuthority *string `json:"freezeAuthority"`
-							} `json:"info"`
-							Type string `json:"type"`
-						} `json:"parsed"`
-					} `json:"data"`
-				} `json:"value"`
-			} `json:"result"`
-		}
-		if d, _ := io.ReadAll(resp.Body); json.Unmarshal(d, &result) == nil && result.Result.Value != nil {
-			if p := result.Result.Value.Data.Parsed; p != nil && p.Info != nil {
-				isRenounced = p.Info.MintAuthority == nil
-				isFrozen = p.Info.FreezeAuthority != nil
-			}
+	var accountResult struct {
+		Value *struct {
+			Data struct {
+				Parsed *struct {
+					Info *struct {
+						MintAuthority   *string `json:"mintAuthority"`
+						FreezeAuthority *string `json:"freezeAuthority"`
+					} `json:"info"`
+					Type string `json:"type"`
+				} `json:"parsed"`
+			} `json:"data"`
+		} `json:"value"`
+	}
+	if err := h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getAccountInfo", []interface{}{req.MintAddress, map[string]string{"encoding": "jsonParsed"}}, &accountResult); err == nil && accountResult.Value != nil {
+		if parsed := accountResult.Value.Data.Parsed; parsed != nil && parsed.Info != nil {
+			isRenounced = parsed.Info.MintAuthority == nil
+			isFrozen = parsed.Info.FreezeAuthority != nil
 		}
 	}
 
 	// Tx count
-	sigBody, _ := json.Marshal(map[string]interface{}{
-		"jsonrpc": "2.0", "id": 2,
-		"method": "getSignaturesForAddress",
-		"params": []interface{}{req.MintAddress, map[string]interface{}{"limit": 50}},
-	})
-	if resp, err := client.Post(rpcURL, "application/json", bytes.NewReader(sigBody)); err == nil {
-		defer resp.Body.Close()
-		var result struct {
-			Result []struct{} `json:"result"`
-		}
-		if d, _ := io.ReadAll(resp.Body); json.Unmarshal(d, &result) == nil {
-			txCount = len(result.Result)
-		}
+	var signatures []struct{}
+	if err := h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getSignaturesForAddress", []interface{}{req.MintAddress, map[string]interface{}{"limit": 50}}, &signatures); err == nil {
+		txCount = len(signatures)
 	}
 
 	// Score

@@ -73,8 +73,25 @@ func SolanaRPCURL(network, apiKey string) string {
 
 func SolanaRPCFallbackURL(network string) string {
 	if isSolanaMainnet(network) {
-		if value := strings.TrimSpace(os.Getenv("SOLANA_RPC_FALLBACK_URL")); value != "" {
-			return value
+		primaryURL := configuredSolanaRPCURL(network, strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")))
+		if explicit := strings.TrimSpace(os.Getenv("SOLANA_RPC_FALLBACK_URL")); explicit != "" && explicit != strings.TrimSpace(primaryURL) {
+			return explicit
+		}
+		primaryHost := RPCProviderHost(primaryURL)
+		candidates := []string{
+			strings.TrimSpace(os.Getenv("ALCHEMY_SOLANA_RPC_URL")),
+			strings.TrimSpace(os.Getenv("HELIUS_SOLANA_RPC_URL")),
+			strings.TrimSpace(os.Getenv("QUICKNODE_SOLANA_RPC_URL")),
+		}
+		if key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")); key != "" {
+			candidates = append(candidates, "https://solana-mainnet.g.alchemy.com/v2/"+key)
+		}
+		candidates = append(candidates, "https://api.mainnet-beta.solana.com")
+		for _, candidate := range candidates {
+			if candidate == "" || RPCProviderHost(candidate) == primaryHost {
+				continue
+			}
+			return candidate
 		}
 		return "https://api.mainnet-beta.solana.com"
 	}
@@ -143,6 +160,7 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	}
 	body, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
 	if err != nil {
+		LogRPCFailure(method, s.URL(network), 0, err)
 		return err
 	}
 	client := s.Client
@@ -152,7 +170,7 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 
 	var lastErr error
 	for _, endpoint := range uniqueRPCURLs(s.URL(network), SolanaRPCFallbackURL(network)) {
-		if err := callSolanaRPC(ctx, client, endpoint, body, target); err != nil {
+		if err := callSolanaRPC(ctx, client, endpoint, method, body, target); err != nil {
 			lastErr = err
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -168,31 +186,45 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	return lastErr
 }
 
-func callSolanaRPC(ctx context.Context, client *http.Client, endpoint string, body []byte, target any) error {
+func callSolanaRPC(ctx context.Context, client *http.Client, endpoint, method string, body []byte, target any) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
+		LogRPCFailure(method, endpoint, 0, err)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
+		LogRPCFailure(method, endpoint, 0, err)
 		return err
 	}
 	defer resp.Body.Close()
+	actualEndpoint := endpoint
+	if resp.Request != nil && resp.Request.URL != nil {
+		actualEndpoint = resp.Request.URL.String()
+	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("rpc status %d", resp.StatusCode)
+		err := fmt.Errorf("rpc status %d", resp.StatusCode)
+		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
 	}
 	var env solanaRPCEnvelope
 	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
+		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
 	if env.Error != nil {
-		return fmt.Errorf("rpc error: %s", env.Error.Message)
+		err := fmt.Errorf("rpc error: %s", env.Error.Message)
+		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
 	}
 	if len(env.Result) == 0 || string(env.Result) == "null" {
-		return fmt.Errorf("rpc result unavailable")
+		err := fmt.Errorf("rpc result unavailable")
+		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
+		return err
 	}
 	if err := json.Unmarshal(env.Result, target); err != nil {
+		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
 	return nil
