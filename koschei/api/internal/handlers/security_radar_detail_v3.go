@@ -31,22 +31,29 @@ func (h *Handler) SecurityRadarDetailV3(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	analysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: target, Network: network, Mode: "manual_detail"})
+	req := services.SecurityRadarRequest{Target: target, Network: network, Mode: "manual_detail"}
+	analysis := services.AnalyzeArvisRadars(req)
 	bundle := services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
-	arms := services.ArvisArmsFromBundle(bundle)
-	if len(arms) == 0 {
-		arms = analysis.Arms
-	}
-	freshFinal := services.ArvisFinalFromBundle(bundle)
 	holderRoles := services.ArvisHolderRolesFromBundle(bundle)
 	distribution := radarDetailHolderDistributionFromRoles(holderRoles)
 	if !holderRoles.Available {
 		distribution, holderRoles = radarDetailHolderDistribution(r.Context(), target)
 	}
 	holderCluster := services.ArvisHolderClusterFromBundle(bundle)
-	market := radarDetailMarketSnapshot(r.Context(), target)
-	holderIntelligence := services.BuildHolderIntelligence(holderRoles, holderCluster, market, time.Now().UTC())
 	sourceContext := h.radarDetailSourceContext(r.Context(), target, network)
+	launchForensics := h.analyzeLaunchForensics(r.Context(), target, holderRoles, holderCluster, sourceContext)
+	analysis = services.ApplyLaunchForensicsToAnalysis(analysis, req, launchForensics)
+	bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
+	if h.DB != nil {
+		services.NewSecurityRadarStore(h.DB).CaptureLaunchForensicsFloor(r.Context(), target, network, launchForensics)
+	}
+	arms := services.ArvisArmsFromBundle(bundle)
+	if len(arms) == 0 {
+		arms = analysis.Arms
+	}
+	freshFinal := services.ArvisFinalFromBundle(bundle)
+	market := radarDetailMarketSnapshot(r.Context(), target)
+	holderIntelligence := services.ApplyLaunchForensicsToHolderIntelligence(services.BuildHolderIntelligence(holderRoles, holderCluster, market, time.Now().UTC()), launchForensics)
 	actorIntelligence := h.actorSecurityIntelligenceForDetail(r.Context(), target, network, sourceContext, holderRoles, holderCluster, market)
 	structural := h.radarDetailStructuralContext(r.Context(), target, network)
 	persisted := h.radarDetailPersistedVerdict(r.Context(), target)
@@ -57,23 +64,24 @@ func (h *Handler) SecurityRadarDetailV3(w http.ResponseWriter, r *http.Request) 
 	graph := h.radarDetailGraph(r.Context(), target)
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":                   true,
-		"schema_version":       "koschei-radar-detail-v3",
-		"target":               target,
-		"network":              network,
-		"generated_at":         time.Now().UTC().Format(time.RFC3339),
-		"final_verdict":        final,
-		"warning":              warning,
-		"holder_distribution":  distribution,
-		"holder_intelligence":  holderIntelligence,
-		"holder_cluster":       holderCluster,
-		"actor_intelligence":   actorIntelligence,
-		"market":               market,
-		"structural_memory":    structural,
-		"source_context":       sourceContext,
-		"modules":              modules,
-		"evidence":             allEvidence,
-		"graph":                graph,
+		"ok":                  true,
+		"schema_version":      "koschei-radar-detail-v3",
+		"target":              target,
+		"network":             network,
+		"generated_at":        time.Now().UTC().Format(time.RFC3339),
+		"final_verdict":       final,
+		"warning":             warning,
+		"holder_distribution": distribution,
+		"holder_intelligence": holderIntelligence,
+		"holder_cluster":      holderCluster,
+		"launch_forensics":    launchForensics,
+		"actor_intelligence":  actorIntelligence,
+		"market":              market,
+		"structural_memory":   structural,
+		"source_context":      sourceContext,
+		"modules":             modules,
+		"evidence":            allEvidence,
+		"graph":               graph,
 		"evidence_policy": map[string]any{
 			"hide_verified_details": false,
 			"no_evidence_no_claim":  true,
