@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - agent/unify-holder-intelligence-core
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: write
@@ -16,7 +13,7 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     env:
-      TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
+      TARGET_BRANCH: ${{ github.ref_name }}
     steps:
       - name: Checkout branch
         uses: actions/checkout@v4
@@ -34,10 +31,24 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          rm -rf holder-unification-diagnostics
           mkdir -p holder-unification-diagnostics
           test "$(cat .github/agent/chunk-* | git hash-object --stdin)" = "815ab33bc5a057737e4ae8ac9da7d4b193f52de5"
           cat .github/agent/chunk-* | base64 -d | gzip -d > .github/agent/apply_holder_unification.py
           python3 .github/agent/apply_holder_unification.py 2>&1 | tee holder-unification-diagnostics/apply.log
+          python3 - <<'PY'
+          from pathlib import Path
+
+          fixes = {
+              Path("koschei/api/internal/handlers/owner_operations.go"): "\tholderRoles := core.Roles\n",
+              Path("koschei/api/internal/handlers/security_radar_detail_v3.go"): "\tbundle := core.Bundle\n",
+          }
+          for path, obsolete in fixes.items():
+              text = path.read_text()
+              if text.count(obsolete) != 1:
+                  raise SystemExit(f"{path}: expected one obsolete assignment, found {text.count(obsolete)}")
+              path.write_text(text.replace(obsolete, "", 1))
+          PY
           gofmt -w \
             koschei/api/internal/services/security_radars.go \
             koschei/api/internal/services/arvis_arms.go \
