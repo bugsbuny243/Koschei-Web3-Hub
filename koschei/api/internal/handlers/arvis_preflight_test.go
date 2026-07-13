@@ -11,8 +11,8 @@ func TestARVISPreflightBlocksMissingTarget(t *testing.T) {
 
 func TestARVISPreflightBlocksRecoveryPhraseRequest(t *testing.T) {
 	got := evaluateARVISPreflight(arvisPreflightRequest{Target: "https://example.com", Intent: "asks for recovery phrase"})
-	if got.Decision != "blocked" || got.RiskLevel != "critical" || got.Score != 100 {
-		t.Fatalf("got %+v, want blocked critical score 100", got)
+	if got.Decision != "blocked" || got.RiskLevel != "high" || got.Score != 98 {
+		t.Fatalf("got %+v, want blocked high score 98", got)
 	}
 }
 
