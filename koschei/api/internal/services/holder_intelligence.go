@@ -41,6 +41,13 @@ type HolderIntelligenceRow struct {
 	FreshNearLaunch          bool     `json:"fresh_near_launch"`
 	FundingSource            string   `json:"funding_source,omitempty"`
 	Behavior                 string   `json:"behavior"`
+	LaunchBehaviorLabel      string   `json:"launch_behavior_label,omitempty"`
+	LaunchBehaviorEvidence   []string `json:"launch_behavior_evidence,omitempty"`
+	LaunchEntryRank          int      `json:"launch_entry_rank,omitempty"`
+	LaunchFirstBuyAt         string   `json:"launch_first_buy_at,omitempty"`
+	LaunchMinutesAfter       float64  `json:"launch_minutes_after,omitempty"`
+	LaunchCreatorLinked      bool     `json:"launch_creator_linked"`
+	LaunchFundingStatus      string   `json:"launch_funding_status,omitempty"`
 	Evidence                 []string `json:"evidence"`
 }
 
@@ -63,6 +70,8 @@ type HolderIntelligence struct {
 	WalletsWithObservedInflow  int                     `json:"wallets_with_observed_inflow"`
 	WalletsWithObservedOutflow int                     `json:"wallets_with_observed_outflow"`
 	CommonExitGroupCount       int                     `json:"common_exit_group_count"`
+	LaunchForensicsAvailable   bool                    `json:"launch_forensics_available"`
+	LaunchProfilesMatched      int                     `json:"launch_profiles_matched"`
 	Top1Percentage             float64                 `json:"top_1_percentage"`
 	Top3Percentage             float64                 `json:"top_3_percentage"`
 	Top10Percentage            float64                 `json:"top_10_percentage"`
@@ -406,4 +415,39 @@ func shortHolderIntelligence(value string) string {
 		return value
 	}
 	return value[:8] + "…" + value[len(value)-6:]
+}
+
+// ApplyLaunchForensicsToHolderIntelligence joins deterministic launch history
+// by resolved owner wallet. It never rewrites holdings or treats missing
+// history as a positive signal.
+func ApplyLaunchForensicsToHolderIntelligence(holder HolderIntelligence, launch LaunchForensicsAnalysis) HolderIntelligence {
+	if !holder.Available || len(holder.Rows) == 0 {
+		return holder
+	}
+	byWallet := map[string]LaunchActorProfile{}
+	for _, profile := range launch.Profiles {
+		wallet := strings.TrimSpace(profile.OwnerWallet)
+		if wallet != "" {
+			byWallet[wallet] = profile
+		}
+	}
+	for i := range holder.Rows {
+		profile, ok := byWallet[strings.TrimSpace(holder.Rows[i].OwnerWallet)]
+		if !ok || profile.TradeCount <= 0 {
+			continue
+		}
+		holder.Rows[i].LaunchBehaviorLabel = profile.Label
+		holder.Rows[i].LaunchBehaviorEvidence = append([]string{}, profile.Evidence...)
+		holder.Rows[i].LaunchEntryRank = profile.EntryRank
+		if !profile.FirstBuyTime.IsZero() {
+			holder.Rows[i].LaunchFirstBuyAt = profile.FirstBuyTime.UTC().Format(time.RFC3339)
+		}
+		holder.Rows[i].LaunchMinutesAfter = profile.MinutesAfterLaunch
+		holder.Rows[i].LaunchCreatorLinked = profile.CreatorLinked
+		holder.Rows[i].LaunchFundingStatus = profile.FundingStatus
+		holder.Rows[i].Evidence = appendUniqueHolderEvidence(holder.Rows[i].Evidence, profile.Evidence...)
+		holder.LaunchProfilesMatched++
+	}
+	holder.LaunchForensicsAvailable = launch.Available
+	return holder
 }
