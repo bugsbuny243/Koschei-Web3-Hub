@@ -39,14 +39,18 @@ jobs:
           go test ./... > /tmp/go-test.log 2>&1
           status=$?
           if [ "$status" -ne 0 ]; then
-            echo "=== FAILING TEST SUMMARY ==="
-            grep -E '^(--- FAIL:|FAIL[[:space:]]|panic:|[[:space:]]+Error Trace:|[[:space:]]+Error:)' /tmp/go-test.log || true
-            echo "=== TEST OUTPUT TAIL ==="
-            tail -n 160 /tmp/go-test.log
+            echo "go test ./... failed; see go-test-log artifact"
           else
             echo "go test ./... passed"
           fi
           exit "$status"
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-test-log
+          path: /tmp/go-test.log
+          if-no-files-found: error
       - name: Vet
         run: go vet ./...
       - name: Build
