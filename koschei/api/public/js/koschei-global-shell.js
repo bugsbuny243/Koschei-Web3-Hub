@@ -4,6 +4,18 @@
   var translations={
     'Dashboard':'Panel','Radar':'Güvenlik Radarı','Token-2022':'Token-2022','Firewall':'İşlem Güvenliği','Watchlist':'İzleme Listesi','Webhooks':'Webhooklar','Integrate':'Entegrasyon','Plans':'Paketler',
     'Architecture':'Mimari','Developers':'Geliştiriciler','Integration Pilot':'Entegrasyon Pilotu','KOSCH Access':'KOSCH Erişimi','Token':'Token','Account':'Hesap','Reports':'Raporlar','Chain Health':'Zincir Sağlığı','Safe Check':'Güvenli Kontrol',
+    'ARVIS Security Radar':'ARVIS Güvenlik Radarı','Complete evidence intelligence':'Eksiksiz kanıt istihbaratı','Özet değil. Tam risk dosyası.':'Özet değil. Tam güvenlik dosyası.',
+    'Discovery':'Keşif','Distribution':'Dağılım','Structure':'Yapı','Evidence':'Kanıt','Pump + creator relation':'Pump ve creator bağlantısı','Yapısal floor':'Yapısal taban',
+    'Warning / High Risk':'Uyarı / Yüksek Risk','Monitor':'İzleme','Complete ARVIS intelligence file':'Eksiksiz ARVIS istihbarat dosyası',
+    'Free basic preflight':'Ücretsiz temel ön kontrol','Target':'Hedef','Recipient Shield':'Alıcı Adresi Kalkanı','Safe Check Çalıştır':'Güvenli Kontrolü Çalıştır',
+    'Bu Radar değil':'Bu yalnız hızlı kontroldür','No evidence, no claim. Şüphe varsa önce dur, sonra doğrula.':'Kanıt yoksa kesin hüküm yok. Şüphe varsa önce dur, sonra doğrula.',
+    'BLOCK':'ENGELLE','WARN':'UYARI','REVIEW':'İNCELE','ALLOW':'İZİN VER','Basic preflight risk':'Temel ön kontrol riski','ARVIS preflight tamamlandı.':'ARVIS ön kontrolü tamamlandı.',
+    'WARNING':'UYARI','MONITOR':'İZLEME','NO DATA':'VERİ YOK','VERIFIED':'DOĞRULANDI','INSUFFICIENT EVIDENCE':'YETERSİZ KANIT','REVOKED':'KAPALI',
+    'RISK / 100':'RİSK / 100','ARVIS VERDICT':'ARVIS KARARI','CREATOR / DEPLOYER RELATION':'CREATOR / DEPLOYER BAĞLANTISI','Source-reported creator/deployer wallet':'Kaynak tarafından bildirilen creator/deployer cüzdanı',
+    'Observed source relation. This is not proof of wrongdoing or real-world identity.':'Gözlenen kaynak bağlantısıdır; kötü niyetin veya gerçek dünya kimliğinin kanıtı değildir.',
+    'HOLDER CONCENTRATION':'HOLDER YOĞUNLUĞU','AUTHORITY STATUS':'YETKİ DURUMU','WARNING EXPLANATION':'UYARI AÇIKLAMASI','POSITIVE SIGNALS':'OLUMLU SİNYALLER',
+    'ALL ARVIS MODULES':'TÜM ARVIS MODÜLLERİ','RELATION GRAPH':'İLİŞKİ GRAFİĞİ','TOP TOKEN ACCOUNTS':'EN BÜYÜK TOKEN HESAPLARI','COMPLETE EVIDENCE LOG':'EKSİKSİZ KANIT KAYDI','SOURCE & FINAL SIGNALS':'KAYNAK VE SON SİNYALLER',
+    'Final verdict signals':'Son karar sinyalleri','Launch/source signals':'Launch ve kaynak sinyalleri','Creator / deployer':'Creator / deployer','unknown':'belirsiz','ARVIS module':'ARVIS modülü',
     'ARVIS command center':'ARVIS komuta merkezi','Evidence-backed only':'Yalnızca kanıta dayalı','User':'Kullanıcı',
     'ARVIS unified radar':'ARVIS birleşik radarı','One radar. Evidence first.':'Tek radar. Önce kanıt.',
     'Solana is the first live market. ARVIS returns a score only when verified on-chain or claim-surface evidence exists. Missing data never becomes a grade or signed report.':'İlk canlı pazar Solana’dır. ARVIS yalnız doğrulanmış zincir üstü veya bağlantı yüzeyi kanıtı varsa skor üretir. Eksik veri hiçbir zaman nota veya imzalı rapora dönüşmez.',
@@ -33,6 +45,47 @@
     document.documentElement.lang='tr';
   }
 
+  function esc(value){return String(value==null?'':value).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});}
+  function clamp(value){return Math.max(0,Math.min(100,Math.round(Number(value)||0)));}
+  function grade(risk){return risk>=85?'F':risk>=70?'E':risk>=50?'D':risk>=35?'C':risk>=20?'B':'A';}
+  function action(risk){return risk>=85?'UZAK DUR':risk>=65?'YÜKSEK DİKKAT':risk>=35?'DİKKAT':'İZLE';}
+  function riskClass(risk){return risk>=65?'bad':risk>=35?'warn':'good';}
+  function base58Address(value){return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(String(value||'').trim());}
+
+  function installLandingQuickCheck(current){
+    if(current!=='/')return;
+    var run=document.getElementById('run'),target=document.getElementById('target'),intent=document.getElementById('intent'),result=document.getElementById('result');
+    if(!run||!target||!intent||!result)return;
+    run.onclick=async function(){
+      var value=target.value.trim();
+      if(!value){result.className='result show';result.innerHTML='<div class="line">Önce kontrol edilecek bağlantı, token, adres veya imza metnini gir.</div>';return;}
+      run.disabled=true;run.textContent='Kontrol ediliyor…';result.className='result show';result.innerHTML='<div class="line">ARVIS canlı kanıtları inceliyor…</div>';
+      try{
+        if(base58Address(value)){
+          var tokenResponse=await fetch('/api/token/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mint:value,network:'solana-mainnet'})});
+          var tokenData=await tokenResponse.json().catch(function(){return {};});
+          if(tokenResponse.ok){
+            var risk=clamp(100-clamp(tokenData.score));
+            var findings=Array.isArray(tokenData.findings)?tokenData.findings.slice(0,3):[];
+            if(!findings.length)findings=['Canlı Solana taraması tamamlandı; belirgin authority veya holder yoğunluğu bulgusu dönmedi.'];
+            result.innerHTML='<div class="score '+riskClass(risk)+'">'+esc(grade(risk))+' · '+esc(risk)+'/100</div><b>'+esc(action(risk))+'</b><p class="sub" style="margin-top:6px">Canlı token taraması tamamlandı.</p>'+findings.map(function(item){return '<div class="line">'+esc(item)+'</div>';}).join('')+'<div class="actions" style="margin-top:12px"><a class="btn primary" href="/scan/'+encodeURIComponent(value)+'">Kanıtlı sonucu aç</a><a class="btn" href="/security-radar?target='+encodeURIComponent(value)+'">Derin tarama</a></div>';
+            return;
+          }
+          if(tokenResponse.status>=500)throw new Error('live_token_unavailable');
+        }
+        var response=await fetch('/api/arvis/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:value,intent:intent.value,note:'landing_instant_safe_check'})});
+        var data=await response.json().catch(function(){return {};});
+        if(!response.ok)throw new Error(data.error||'preflight_failed');
+        var score=clamp(data.score||data.risk_index);var level=String(data.risk_level||'belirsiz').toLowerCase();var decision=String(data.decision||data.policy||'review').toLowerCase();
+        var decisionLabel=decision==='blocked'||decision==='block'?'ENGELLE':decision==='warn'?'UYARI':decision==='allow'?'İZİN VER':'İNCELE';
+        var reasons=(Array.isArray(data.reasons)?data.reasons:[]).concat(Array.isArray(data.next_steps)?data.next_steps:[]).slice(0,5);
+        result.innerHTML='<div class="score '+riskClass(score)+'">'+esc(score)+'</div><b>'+esc(decisionLabel)+' · '+esc(level==='medium'?'orta':level==='high'?'yüksek':level==='low'?'düşük':level)+'</b><p class="sub" style="margin-top:6px">'+esc(data.human_message||data.verdict||'ARVIS ön kontrolü tamamlandı.')+'</p>'+reasons.map(function(item){return '<div class="line">'+esc(item)+'</div>';}).join('')+'<div class="actions" style="margin-top:12px"><a class="btn primary" href="/safe-check">Ayrıntılı kontrol</a><a class="btn" href="/security-radar?target='+encodeURIComponent(value)+'">Derin tarama</a></div>';
+      }catch(error){
+        result.innerHTML='<div class="line">Canlı güvenlik kanıtı alınamadı. Güvenli hüküm üretilmedi; şüpheli işlemi yapma ve daha sonra tekrar dene.</div>';
+      }finally{run.disabled=false;run.textContent='ARVIS ile kontrol et';}
+    };
+  }
+
   ready(function(){
     var links=[['/scan','Token Tara'],['/transaction-shield','İşlem Kalkanı'],['/safe-check','Güvenli Kontrol'],['/security-radar','Güvenlik Radarı'],['/dashboard','Panel'],['/kosch','KOSCH']];
     var current=(location.pathname||'/').replace(/\.html$/,'').replace(/\/$/,'')||'/';
@@ -46,7 +99,10 @@
     if(current==='/dashboard'&&!document.querySelector('.koschei-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip';strip.innerHTML='<div><b>Satın almadan veya imzalamadan önce Koschei’ye sor.</b><span>Token mintini canlı tara ya da Solana işlemini gönderilmeden önce simüle et.</span></div><span><a href="/scan">Token Tara</a> <a href="/transaction-shield">İşlem Kalkanı</a></span>';var anchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(anchor&&anchor.parentNode){anchor.parentNode.insertBefore(strip,anchor.nextSibling);}}
     var bottom=document.querySelector('nav.bottom');if(bottom)bottom.remove();
     if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei ARVIS · Solana güvenlik merkezi</span><span><a href="/scan">Token Tara</a> · <a href="/transaction-shield">İşlem Kalkanı</a> · <a href="/safe-check">Güvenli Kontrol</a> · <a href="/kosch">KOSCH</a></span>';document.body.appendChild(footer);}
+    if(current==='/safe-check')document.title='Güvenli Kontrol — Koschei ARVIS';
+    if(current==='/security-radar')document.title='Koschei ARVIS — Tam Güvenlik Radarı';
     translate(document.body);
+    installLandingQuickCheck(current);
     var observer=new MutationObserver(function(records){records.forEach(function(record){record.addedNodes.forEach(function(node){if(node.nodeType===1)translate(node);else if(node.nodeType===3&&node.parentElement){var next=translateString(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;}});});});
     observer.observe(document.body,{childList:true,subtree:true,characterData:false});
   });
