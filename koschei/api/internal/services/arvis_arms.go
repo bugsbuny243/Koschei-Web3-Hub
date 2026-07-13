@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -28,6 +29,13 @@ type ArvisAnalysis struct {
 }
 
 func AnalyzeArvisRadars(req SecurityRadarRequest) ArvisAnalysis {
+	return AnalyzeArvisRadarsContext(context.Background(), req)
+}
+
+func AnalyzeArvisRadarsContext(ctx context.Context, req SecurityRadarRequest) ArvisAnalysis {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	req.Target = strings.TrimSpace(req.Target)
 	req.Network = strings.TrimSpace(req.Network)
 	req.Mode = strings.TrimSpace(req.Mode)
@@ -39,7 +47,7 @@ func AnalyzeArvisRadars(req SecurityRadarRequest) ArvisAnalysis {
 	}
 
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
-	profile := collectRadarEvidence(req)
+	profile := collectRadarEvidenceContext(ctx, req)
 	sourceModule := arvisSourceModule(req.Mode)
 
 	pump := unavailableArm("Pump.fun Sybil Radar", ModulePumpSybilRadar, req, generatedAt, "Verified Pump program or parsed launch transaction evidence is required.")

@@ -74,6 +74,26 @@ func TestHolderIntelligenceDoesNotCallWalletActivityHoldingDuration(t *testing.T
 	}
 }
 
+func TestHolderIntelligencePreservesObservationTierWithoutCallingNoActivitySafe(t *testing.T) {
+	roles := HolderRoleAnalysis{
+		Available: true, Supply: 100, CirculatingSupply: 100,
+		Accounts: []HolderRoleAccount{{Rank: 1, TokenAccount: "A", OwnerWallet: "WalletA", Balance: 40, Role: "externally_owned_wallet", Confidence: "high"}},
+	}
+	cluster := HolderClusterAnalysis{Wallets: []HolderClusterWallet{{
+		Wallet: "WalletA", Status: "no_observed_signatures", Tier: "shallow",
+		WindowExhausted: true, HistoryExhausted: true, SignaturesFetched: 0,
+		Evidence: []string{"No signatures were returned in the shallow holder history window; this is not a safety signal."},
+	}}}
+	result := BuildHolderIntelligence(roles, cluster, TokenMarketSnapshot{}, time.Now().UTC())
+	row := result.Rows[0]
+	if row.ObservationTier != "shallow" || row.ObservationStatus != "no_observed_signatures" || !row.ObservationWindowExhausted || !row.HistoryExhausted {
+		t.Fatalf("observation metadata was lost: %#v", row)
+	}
+	if row.Behavior == "safe" || row.Behavior == "organic" || row.Behavior == "low_risk" {
+		t.Fatalf("shallow no-activity was mislabeled as reassuring: %#v", row)
+	}
+}
+
 func TestHolderIntelligenceTopSummaryExcludesProtocolInventory(t *testing.T) {
 	roles := HolderRoleAnalysis{
 		Available: true, Supply: 1000, CirculatingSupply: 100,

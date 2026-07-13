@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"math"
+	"sort"
 	"strings"
 )
 
@@ -109,7 +110,6 @@ func AnalyzeSolanaHolderRoles(ctx context.Context, rpcURL string, totalSupply fl
 	}
 
 	rawBalances := make([]float64, 0, len(largest))
-	riskBalances := []float64{}
 	excludedBalance := 0.0
 	protocolBalance := 0.0
 	burnBalance := 0.0
@@ -134,8 +134,6 @@ func AnalyzeSolanaHolderRoles(ctx context.Context, rpcURL string, totalSupply fl
 			} else {
 				protocolBalance += balance
 			}
-		} else {
-			riskBalances = append(riskBalances, balance)
 		}
 		if role == "owner_unresolved" || role == "wallet_account_unavailable" || role == "program_controlled_unresolved" {
 			unresolvedBalance += balance
@@ -152,6 +150,7 @@ func AnalyzeSolanaHolderRoles(ctx context.Context, rpcURL string, totalSupply fl
 		out.BlockingEvidenceGap = true
 		out.CirculatingSupply = 0
 	}
+	riskBalances := holderRoleRiskBalancesByOwner(out.Accounts)
 	out.EffectiveTop1Percentage, out.EffectiveTop3Percentage, out.EffectiveTop10Percentage, out.EffectiveTop20Percentage = holderRoleConcentration(riskBalances, out.CirculatingSupply)
 	for i := range out.Accounts {
 		if !out.Accounts[i].ExcludedFromHolderRisk && out.CirculatingSupply > 0 {
@@ -212,6 +211,26 @@ func holderRoleParsedOwner(raw any) string {
 	parsed, _ := data["parsed"].(map[string]any)
 	info, _ := parsed["info"].(map[string]any)
 	return strings.TrimSpace(anyString(info["owner"]))
+}
+
+func holderRoleRiskBalancesByOwner(accounts []HolderRoleAccount) []float64 {
+	byOwner := map[string]float64{}
+	for _, account := range accounts {
+		if account.ExcludedFromHolderRisk || account.Balance <= 0 {
+			continue
+		}
+		key := strings.TrimSpace(account.OwnerWallet)
+		if key == "" {
+			key = "token-account:" + strings.TrimSpace(account.TokenAccount)
+		}
+		byOwner[key] += account.Balance
+	}
+	values := make([]float64, 0, len(byOwner))
+	for _, balance := range byOwner {
+		values = append(values, balance)
+	}
+	sort.Sort(sort.Reverse(sort.Float64Slice(values)))
+	return values
 }
 
 func holderRoleConcentration(values []float64, denominator float64) (float64, float64, float64, float64) {
