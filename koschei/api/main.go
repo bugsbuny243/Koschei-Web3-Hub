@@ -80,6 +80,8 @@ func main() {
 	}
 	stopWebhookDeliveries := webhooks.StartDeliveryWorker(appCtx, conn)
 	defer stopWebhookDeliveries()
+	stopWatchlistMonitor := handlers.StartWatchlistMonitor(appCtx, conn)
+	defer stopWatchlistMonitor()
 	jobStore := jobs.NewStore(conn)
 	jobQueue := jobs.Queue(jobs.NoopQueue{})
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
