@@ -34,9 +34,9 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p .github/agent/diagnostics
+          mkdir -p holder-unification-diagnostics
           base64 -d .github/agent/apply_holder_unification.py.gz.b64 | gzip -d > .github/agent/apply_holder_unification.py
-          python3 .github/agent/apply_holder_unification.py 2>&1 | tee .github/agent/diagnostics/apply.log
+          python3 .github/agent/apply_holder_unification.py 2>&1 | tee holder-unification-diagnostics/apply.log
           gofmt -w \
             koschei/api/internal/services/security_radars.go \
             koschei/api/internal/services/arvis_arms.go \
@@ -57,33 +57,33 @@ jobs:
         working-directory: koschei/api
         run: |
           set -o pipefail
-          go test ./... 2>&1 | tee ../../.github/agent/diagnostics/test.log
+          go test ./... 2>&1 | tee ../../holder-unification-diagnostics/test.log
 
       - name: Vet API
         shell: bash
         working-directory: koschei/api
         run: |
           set -o pipefail
-          go vet ./... 2>&1 | tee ../../.github/agent/diagnostics/vet.log
+          go vet ./... 2>&1 | tee ../../holder-unification-diagnostics/vet.log
 
       - name: Build API
         shell: bash
         working-directory: koschei/api
         run: |
           set -o pipefail
-          CGO_ENABLED=0 GOOS=linux go build ./... 2>&1 | tee ../../.github/agent/diagnostics/build.log
+          CGO_ENABLED=0 GOOS=linux go build ./... 2>&1 | tee ../../holder-unification-diagnostics/build.log
 
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: holder-unification-diagnostics
-          path: .github/agent/diagnostics
+          path: holder-unification-diagnostics
           if-no-files-found: error
 
       - name: Commit verified implementation
         run: |
-          rm -rf .github/agent .github/workflows/agent-holder-unification.yml
+          rm -rf .github/agent .github/workflows/agent-holder-unification.yml holder-unification-diagnostics
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
