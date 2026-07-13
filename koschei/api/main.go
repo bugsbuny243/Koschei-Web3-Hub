@@ -76,6 +76,10 @@ func main() {
 	// live in saver mode. Only mints crossing the gate consume deep Solana RPC.
 	stopPumpPortal := services.StartPumpPortalRadarIfEnabled(appCtx, conn)
 	defer stopPumpPortal()
+	// Actor correlation is SQL-only: every Pump discovery and owner-resolved
+	// holder snapshot can enter durable threat memory without spending RPC.
+	stopActorDefense := services.StartActorDefenseCorrelator(appCtx, conn)
+	defer stopActorDefense()
 	if services.SolanaRPCLimitSaverEnabled() && !services.ForceBackgroundRadarEnabled() {
 		log.Printf("broad Solana streams paused: RPC saver protects quota; selective Pump 24h-volume radar, manual scans and Safe Check stay live")
 	} else {
