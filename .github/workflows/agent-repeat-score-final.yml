@@ -1,0 +1,158 @@
+name: Verify Repeat Holder Legacy Scoring
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    env:
+      TARGET_BRANCH: ${{ github.head_ref }}
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Apply legacy score bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          core = Path('koschei/api/internal/handlers/holder_intelligence_core.go')
+          text = core.read_text()
+          marker = '''func holderIntelligenceCoreEvidence(core holderIntelligenceCoreResult) []string {'''
+          helper = '''func holderIntelligenceCoreRepeatRisk(core holderIntelligenceCoreResult) int {
+          strongest := 0
+          for _, item := range core.RepeatDominantHolders {
+              if item.RiskWeight > strongest {
+                  strongest = item.RiskWeight
+              }
+          }
+          return strongest
+          }
+
+          func applyRepeatDominantRiskToLegacyScore(score int, core holderIntelligenceCoreResult) int {
+          repeatRisk := holderIntelligenceCoreRepeatRisk(core)
+          if repeatRisk <= 0 {
+              return score
+          }
+          ceiling := 100 - repeatRisk
+          if ceiling < 0 {
+              ceiling = 0
+          }
+          if score > ceiling {
+              return ceiling
+          }
+          return score
+          }
+
+          '''
+          if helper.strip() not in text:
+              if marker not in text:
+                  raise SystemExit('holder evidence marker missing')
+              text = text.replace(marker, helper + marker, 1)
+          old = '''	rescored := web3.ScoreTokenRisk(base.Token)
+	if strings.TrimSpace(base.Disclaimer) != "" {'''
+          new = '''	rescored := web3.ScoreTokenRisk(base.Token)
+	rescored.Score = applyRepeatDominantRiskToLegacyScore(rescored.Score, core)
+	rescored.RiskLevel = tokenRiskLevel(rescored.Score)
+	if repeatRisk := holderIntelligenceCoreRepeatRisk(core); repeatRisk > 0 {
+		rescored.Findings = appendUniqueHolderCoreEvidence(rescored.Findings,
+			fmt.Sprintf("Repeat-dominant holder evidence applies a %d/100 cross-token actor risk weight from the stored Koschei observation window.", repeatRisk),
+		)
+	}
+	if strings.TrimSpace(base.Disclaimer) != "" {'''
+          if old not in text:
+              raise SystemExit('customer rescore marker missing')
+          text = text.replace(old, new, 1)
+          text = text.replace('import (\n\t"context"', 'import (\n\t"context"\n\t"fmt"', 1)
+          core.write_text(text)
+
+          scanner = Path('koschei/api/internal/handlers/token_scanner.go')
+          text = scanner.read_text()
+          old = '''	if score < 0 {
+		score = 0
+	}
+
+	risk := tokenRiskLevel(score)'''
+          new = '''	if score < 0 {
+		score = 0
+	}
+	score = applyRepeatDominantRiskToLegacyScore(score, holderCore)
+	if repeatRisk := holderIntelligenceCoreRepeatRisk(holderCore); repeatRisk > 0 {
+		findings = appendUniqueHolderCoreEvidence(findings,
+			fmt.Sprintf("Repeat-dominant holder evidence applies a %d/100 cross-token actor risk weight from the stored Koschei observation window.", repeatRisk),
+		)
+	}
+
+	risk := tokenRiskLevel(score)'''
+          if old not in text:
+              raise SystemExit('public score marker missing')
+          scanner.write_text(text.replace(old, new, 1))
+
+          tests = Path('koschei/api/internal/handlers/holder_intelligence_core_test.go')
+          text = tests.read_text()
+          addition = '''
+          func TestCustomerTokenMappingAppliesRepeatDominantRiskWeight(t *testing.T) {
+          core := fixtureHolderCore()
+          core.RepeatDominantHolders = []services.RepeatDominantHolderEvidence{{
+              OwnerWallet: "OwnerA", CurrentPercentage: 60, TokenCount: 2, RiskWeight: 80,
+              ObservationWindow: "son 30 gün Koschei gözlemi",
+          }}
+          got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core)
+          if got.Score != 20 || got.RiskLevel != "high" {
+              t.Fatalf("repeat-holder risk did not reach legacy customer score: score=%d risk=%s", got.Score, got.RiskLevel)
+          }
+          if score := applyRepeatDominantRiskToLegacyScore(100, core); score != 20 {
+              t.Fatalf("public legacy score bridge = %d", score)
+          }
+          if score := applyRepeatDominantRiskToLegacyScore(10, core); score != 10 {
+              t.Fatalf("repeat risk must not make an already-worse score reassuring: %d", score)
+          }
+          }
+          '''
+          if 'TestCustomerTokenMappingAppliesRepeatDominantRiskWeight' not in text:
+              text += addition
+          tests.write_text(text)
+          PY
+          gofmt -w \
+            koschei/api/internal/handlers/holder_intelligence_core.go \
+            koschei/api/internal/handlers/holder_intelligence_core_test.go \
+            koschei/api/internal/handlers/token_scanner.go
+
+      - name: Test API
+        working-directory: koschei/api
+        run: go test ./...
+
+      - name: Vet API
+        working-directory: koschei/api
+        run: go vet ./...
+
+      - name: Build API
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+
+      - name: Commit verified score bridge
+        run: |
+          rm -f .github/workflows/agent-repeat-score-final.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply repeat holder risk to legacy customer scores"
+          git push origin HEAD:${TARGET_BRANCH}
