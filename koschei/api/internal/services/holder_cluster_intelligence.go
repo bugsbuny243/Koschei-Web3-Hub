@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	holderClusterWalletLimit            = 8
-	holderClusterSignatureLimit         = 20
-	holderClusterParsedTransactionLimit = 3
+	holderClusterWalletLimit            = 20
+	holderClusterSignatureLimit         = 20 // legacy helper default; tiered scans use env-backed limits
+	holderClusterParsedTransactionLimit = 3  // legacy helper default; tiered scans use env-backed limits
 )
 
 // HolderClusterWallet records bounded, evidence-scoped observations for one
@@ -24,6 +24,11 @@ type HolderClusterWallet struct {
 	Wallet                string                         `json:"wallet"`
 	HolderPercentage      float64                        `json:"holder_percentage"`
 	Status                string                         `json:"status"`
+	Tier                  string                         `json:"tier"`
+	SignaturesFetched     int                            `json:"signatures_fetched"`
+	TxsParsed             int                            `json:"txs_parsed"`
+	WindowExhausted       bool                           `json:"window_exhausted"`
+	BudgetDegraded        bool                           `json:"budget_degraded,omitempty"`
 	SignaturesObserved    int                            `json:"signatures_observed"`
 	ParsedTransactions    int                            `json:"parsed_transactions"`
 	HistoryExhausted      bool                           `json:"history_exhausted"`
@@ -62,6 +67,15 @@ type HolderClusterAnalysis struct {
 	Verdict                   string                    `json:"verdict"`
 	WalletsRequested          int                       `json:"wallets_requested"`
 	WalletsAnalyzed           int                       `json:"wallets_analyzed"`
+	DeepOwnersScanned         int                       `json:"deep_owners_scanned"`
+	ShallowOwnersScanned      int                       `json:"shallow_owners_scanned"`
+	DeepSignatureLimit        int                       `json:"deep_signature_limit"`
+	DeepTransactionLimit      int                       `json:"deep_transaction_limit"`
+	ShallowSignatureLimit     int                       `json:"shallow_signature_limit"`
+	ShallowTransactionLimit   int                       `json:"shallow_transaction_limit"`
+	RPCBudget                 int                       `json:"rpc_budget"`
+	RPCCallsUsed              int                       `json:"rpc_calls_used"`
+	BudgetDegradedOwners      int                       `json:"budget_degraded_owners"`
 	FreshWalletCount          int                       `json:"fresh_wallet_count"`
 	SharedFundingGroupCount   int                       `json:"shared_funding_group_count"`
 	LargestSharedFundingGroup int                       `json:"largest_shared_funding_group"`
@@ -96,16 +110,15 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 		return out
 	}
 
-	candidates := make([]HolderRoleAccount, 0, holderClusterWalletLimit)
-	for _, account := range roles.Accounts {
-		if account.ExcludedFromHolderRisk || account.Role != "externally_owned_wallet" || strings.TrimSpace(account.OwnerWallet) == "" {
-			continue
-		}
-		candidates = append(candidates, account)
-		if len(candidates) >= holderClusterWalletLimit {
-			break
-		}
-	}
+	cfg := loadHolderScanTierConfig()
+	candidates := holderClusterRiskOwnerCandidates(roles.Accounts, holderClusterWalletLimit)
+	plans := holderClusterAssignScanTiers(candidates, cfg)
+	budget := newHolderScanRPCBudget(cfg.RPCBudget)
+	out.DeepSignatureLimit = cfg.DeepSignatureLimit
+	out.DeepTransactionLimit = cfg.DeepTransactionLimit
+	out.ShallowSignatureLimit = cfg.ShallowSignatureLimit
+	out.ShallowTransactionLimit = cfg.ShallowTransactionLimit
+	out.RPCBudget = cfg.RPCBudget
 	out.WalletsRequested = len(candidates)
 	candidateWallets := map[string]bool{}
 	for _, candidate := range candidates {
@@ -116,13 +129,24 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 		return out
 	}
 
-	for _, account := range candidates {
+	for i, account := range candidates {
 		if ctx.Err() != nil {
 			out.Limitations = append(out.Limitations, "Cluster analysis stopped at the request deadline; partial observations are preserved.")
 			break
 		}
-		out.Wallets = append(out.Wallets, analyzeHolderClusterWallet(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets))
+		plan := plans[i]
+		row := analyzeHolderClusterWalletTiered(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
+		if row.Tier == "deep" {
+			out.DeepOwnersScanned++
+		} else {
+			out.ShallowOwnersScanned++
+		}
+		if row.BudgetDegraded {
+			out.BudgetDegradedOwners++
+		}
+		out.Wallets = append(out.Wallets, row)
 	}
+	out.RPCCallsUsed = budget.Used()
 	return summarizeHolderCluster(out)
 }
 
@@ -357,7 +381,8 @@ func summarizeHolderCluster(out HolderClusterAnalysis) HolderClusterAnalysis {
 	out.Findings = holderClusterFindings(out)
 	out.Limitations = append(out.Limitations, out.Flow.Limitations...)
 	out.Limitations = append(out.Limitations,
-		fmt.Sprintf("Wallet history is bounded to the latest %d signatures per holder and at most %d parsed transactions per wallet.", holderClusterSignatureLimit, holderClusterParsedTransactionLimit),
+		fmt.Sprintf("Tiered holder history: first %d risk-bearing owners use up to %d signatures / %d parsed transactions; remaining owners use up to %d / %d. RPC calls used: %d of %d.", out.DeepOwnersScanned, out.DeepSignatureLimit, out.DeepTransactionLimit, out.ShallowSignatureLimit, out.ShallowTransactionLimit, out.RPCCallsUsed, out.RPCBudget),
+		"A shallow window with no observed activity contributes zero safety weight; it is not evidence that activity does not exist.",
 		"A shared funding source can be an exchange or service wallet; common control is not claimed without combined timing and graph evidence.",
 		"Wash trading requires circular swap/transfer evidence and is not claimed from holder freshness alone.",
 	)
@@ -365,7 +390,10 @@ func summarizeHolderCluster(out HolderClusterAnalysis) HolderClusterAnalysis {
 }
 
 func holderClusterFindings(out HolderClusterAnalysis) []string {
-	findings := []string{fmt.Sprintf("Verified bounded observations were produced for %d of %d requested holder wallets.", out.WalletsAnalyzed, out.WalletsRequested)}
+	findings := []string{
+		fmt.Sprintf("Verified bounded observations were produced for %d of %d requested holder wallets.", out.WalletsAnalyzed, out.WalletsRequested),
+		fmt.Sprintf("İlk %d owner derin pencereyle (%d imza / %d tx), kalan %d owner standart pencereyle (%d imza / %d tx) tarandı.", out.DeepOwnersScanned, out.DeepSignatureLimit, out.DeepTransactionLimit, out.ShallowOwnersScanned, out.ShallowSignatureLimit, out.ShallowTransactionLimit),
+	}
 	if out.FreshWalletCount > 0 {
 		findings = append(findings, fmt.Sprintf("%d holder wallets have exhausted bounded histories whose oldest activity falls within 24 hours of the launch estimate.", out.FreshWalletCount))
 	}

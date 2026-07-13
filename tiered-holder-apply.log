@@ -1,0 +1,16 @@
+go: downloading github.com/lib/pq v1.10.9
+ok  	koschei/api	0.003s
+ok  	koschei/api/internal/cache	0.023s
+?   	koschei/api/internal/db	[no test files]
+ok  	koschei/api/internal/handlers	0.077s
+?   	koschei/api/internal/jobs	[no test files]
+?   	koschei/api/internal/mocks	[no test files]
+ok  	koschei/api/internal/http	0.041s
+ok  	koschei/api/internal/router	0.004s
+?   	koschei/api/internal/singleflight	[no test files]
+?   	koschei/api/pkg/agent	[no test files]
+?   	koschei/api/pkg/audit	[no test files]
+?   	koschei/api/pkg/utils	[no test files]
+ok  	koschei/api/internal/services	120.592s
+ok  	koschei/api/internal/web3	0.015s
+ok  	koschei/api/internal/webhooks	0.005s
