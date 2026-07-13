@@ -1,0 +1,32 @@
+name: Agent Source Snapshot
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      - name: Package API sources
+        run: |
+          tar -czf koschei-api-source.tar.gz \
+            koschei/api/main.go \
+            koschei/api/internal/services \
+            koschei/api/internal/web3 \
+            koschei/api/internal/handlers \
+            koschei/api/migrations \
+            koschei/api/go.mod \
+            koschei/api/go.sum
+      - uses: actions/upload-artifact@v4
+        with:
+          name: koschei-api-source
+          path: koschei-api-source.tar.gz
