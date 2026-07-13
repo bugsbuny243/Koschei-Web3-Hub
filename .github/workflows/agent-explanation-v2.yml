@@ -35,11 +35,50 @@ jobs:
           test "$(cat .github/agent/chunk-* | git hash-object --stdin)" = "aaaada17ad419271d5766ec0b734b243a8b9098a"
           cat .github/agent/chunk-* | base64 -d | gzip -d > /tmp/apply_explanation_v2.py
           python3 /tmp/apply_explanation_v2.py 2>&1 | tee explanation-v2-diagnostics/apply.log
-          sed -i '/^[[:space:]]*"fmt"$/d' koschei/api/internal/handlers/holder_intelligence_core.go
+          python3 - <<'PY'
+          from pathlib import Path
+
+          engine = Path('koschei/api/internal/handlers/explanation_engine_v2.go')
+          text = engine.read_text()
+          text = text.replace(
+              'Bu değerlendirme yalnızca doğrulanmış zincir üstü ve saklanan Koschei gözlemlerini açıklar; kimlik, niyet, dolandırıcılık veya yatırım tavsiyesi iddiası değildir.',
+              'Kanıt kapsamıdır; kimlik/niyet iddiası veya yatırım tavsiyesi değildir.',
+          )
+          text = text.replace(
+              '''    } else if caseClass == "clean_distributed" && mintKnown && freezeKnown {\n        out = append(out, "Mint ve freeze authority kapalı olarak doğrulandı.")\n    }''',
+              '    }',
+          )
+          text = text.replace(
+              'if caseClass == "critical_concentration" && top1 >= 50 && len(out) == 0 {',
+              'if caseClass == "critical_concentration" && top1 >= 50 {',
+          )
+          text = text.replace("%d owner'dan yalnızca %d'si için çözüldü", "%d owner'dan yalnızca %d'i için çözüldü")
+          text = text.replace(
+              'limits = append(limits, fmt.Sprintf("%d owner yalnızca bounded/shallow veya RPC-bütçe-sınırlı pencerede gözlendi", limitedOwners))',
+              'limits = append(limits, fmt.Sprintf("%d owner yalnızca bounded/shallow veya RPC-bütçe-sınırlı pencerede gözlendi; bu boşluk güvenli veya organik olarak sınıflandırılmadı", limitedOwners))',
+          )
+          engine.write_text(text)
+
+          core = Path('koschei/api/internal/handlers/holder_intelligence_core.go')
+          core.write_text(core.read_text().replace('\n\t"fmt"', ''))
+
+          tests = Path('koschei/api/internal/handlers/holder_intelligence_core_test.go')
+          text = tests.read_text()
+          text = text.replace(
+              'if explanation := holderIntelligenceCoreExplanation(core); !strings.Contains(explanation, "budget-degraded") || !strings.Contains(explanation, "not classified as safe or organic") {',
+              'if explanation := holderIntelligenceCoreExplanation(core); !strings.Contains(explanation, "RPC-bütçe-sınırlı") || !strings.Contains(explanation, "güvenli veya organik") {',
+          )
+          text = text.replace(
+              'for _, expected := range []string{"aggregated", "reported separately", "Bounded behavior observation", "not classified as safe or organic"} {',
+              'for _, expected := range []string{"Top 1 60.00%", "Sınırlar:", "güvenli veya organik"} {',
+          )
+          tests.write_text(text)
+          PY
           gofmt -w \
             koschei/api/internal/handlers/explanation_engine_v2.go \
             koschei/api/internal/handlers/explanation_engine_v2_test.go \
             koschei/api/internal/handlers/holder_intelligence_core.go \
+            koschei/api/internal/handlers/holder_intelligence_core_test.go \
             koschei/api/internal/handlers/owner_operations.go \
             koschei/api/internal/handlers/owner_operations_narrative_test.go \
             koschei/api/internal/handlers/security_radar_detail_v3.go \
