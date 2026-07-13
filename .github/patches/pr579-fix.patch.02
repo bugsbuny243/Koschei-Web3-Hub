@@ -1,0 +1,160 @@
+ 	profile.FundingStatus = "funding_not_traced"
+-	if strings.TrimSpace(rpcURL) == "" || strings.TrimSpace(profile.OwnerWallet) == "" {
++	owner := strings.TrimSpace(profile.OwnerWallet)
++	if owner != "" && fundingMatches(owner, creator, creatorFunder) {
++		profile.FundingPath = []string{owner}
++		profile.FundingHops = 0
++		markCreatorLinked(profile, owner)
++		return
++	}
++	if strings.TrimSpace(rpcURL) == "" || owner == "" {
+ 		profile.Evidence = append(profile.Evidence, "Funding not traced: Solana RPC or owner wallet is unavailable.")
+ 		return
+ 	}
+@@ -31,9 +38,9 @@
+ 	profile.FundingStatus = "funding_source_observed"
+ 	profile.FundingPath = []string{profile.OwnerWallet, first}
+ 	profile.FundingHops = 1
+-	profile.Evidence = append(profile.Evidence, fmt.Sprintf("İlk doğrulanmış SOL kaynağı %s (yaklaşık %.6f SOL).", first, amount))
++	profile.Evidence = append(profile.Evidence, fmt.Sprintf("Sınırlı geçmiş penceresindeki en eski doğrulanmış SOL kaynağı %s (yaklaşık %.6f SOL).", first, amount))
+ 	if fundingMatches(first, creator, creatorFunder) {
+-		markCreatorLinked(profile, creator, creatorFunder)
++		markCreatorLinked(profile, first)
+ 		return
+ 	}
+ 	if budget.Used() >= cfg.FundingRPCBudget {
+@@ -49,7 +56,7 @@
+ 	profile.FundingHops = 2
+ 	profile.Evidence = append(profile.Evidence, fmt.Sprintf("İkinci funding hop'u %s (yaklaşık %.6f SOL).", second, secondAmount))
+ 	if fundingMatches(second, creator, creatorFunder) {
+-		markCreatorLinked(profile, creator, creatorFunder)
++		markCreatorLinked(profile, second)
+ 	}
+ }
+ 
+@@ -74,10 +81,11 @@
+ 		}
+ 		before = pageRows[len(pageRows)-1].Signature
+ 	}
+-	if len(signatures) == 0 || !budget.Reserve(1) {
++	if len(signatures) == 0 {
+ 		return "", 0
+ 	}
+-	// Oldest observations are the most useful for initial-funding evidence.
++	// Parse a bounded set of the oldest observations returned by the two-page
++	// window. Every batch member consumes one unit of the per-scan RPC budget.
+ 	start := 0
+ 	if len(signatures) > 40 {
+ 		start = len(signatures) - 40
+@@ -88,6 +96,14 @@
+ 			keys = append(keys, signatures[i].Signature)
+ 		}
+ 	}
++	if len(keys) > cfg.FundingTxParse {
++		keys = keys[:cfg.FundingTxParse]
++	}
++	granted := budget.ReserveUpTo(len(keys))
++	if granted == 0 {
++		return "", 0
++	}
++	keys = keys[:granted]
+ 	transactions, err := SolanaGetTransactionsJSONParsedBatch(ctx, rpcURL, keys)
+ 	if err != nil {
+ 		return "", 0
+@@ -106,15 +122,11 @@
+ 
+ func fundingMatches(value, creator, creatorFunder string) bool {
+ 	value = strings.TrimSpace(value)
+-	return value != "" && (strings.EqualFold(value, strings.TrimSpace(creator)) || strings.EqualFold(value, strings.TrimSpace(creatorFunder)))
++	return value != "" && (value == strings.TrimSpace(creator) || value == strings.TrimSpace(creatorFunder))
+ }
+ 
+-func markCreatorLinked(profile *LaunchActorProfile, creator, creatorFunder string) {
++func markCreatorLinked(profile *LaunchActorProfile, matched string) {
+ 	profile.CreatorLinked = true
+ 	profile.FundingStatus = "creator_linked"
+-	label := strings.TrimSpace(creator)
+-	if label == "" {
+-		label = strings.TrimSpace(creatorFunder)
+-	}
+-	profile.Evidence = append(profile.Evidence, fmt.Sprintf("CREATOR_LINKED: funding zinciri %d hop içinde creator/deployer veya creator fonlayıcısına ulaştı (%s).", profile.FundingHops, label))
++	profile.Evidence = append(profile.Evidence, fmt.Sprintf("CREATOR_LINKED: fonlama zinciri %d hop içinde creator/deployer veya creator fonlayıcısına ulaştı (%s).", profile.FundingHops, strings.TrimSpace(matched)))
+ }
+--- a/koschei/api/internal/services/launch_forensics_arvis.go
++++ b/koschei/api/internal/services/launch_forensics_arvis.go
+@@ -23,9 +23,6 @@
+ 	launchArm := unavailableArm("Launch Forensics", ModuleLaunchForensics, req, generatedAt, "Live ledger or ATA target-token history is required; missing launch history is not a safety signal.")
+ 	if forensics.Available {
+ 		risk := forensics.StructuralFloor
+-		if risk <= 0 {
+-			risk = 1
+-		}
+ 		signals := map[string]any{
+ 			"real_onchain_evidence": true, "verified_evidence": true,
+ 			"evidence_status":                    "verified_launch_forensics",
+@@ -34,6 +31,8 @@
+ 			"sniper_count":                       forensics.SniperCount,
+ 			"rhythm_bot_count":                   forensics.RhythmBotCount,
+ 			"creator_linked_count":               forensics.CreatorLinkedCount,
++			"funding_owners_attempted":           forensics.FundingOwnersAttempted,
++			"funding_owners_resolved":            forensics.FundingOwnersResolved,
+ 			"launch_forensics_risk_contribution": forensics.RiskContribution,
+ 			"launch_forensics_structural_floor":  forensics.StructuralFloor,
+ 			"absence_is_safety_signal":           false,
+--- a/koschei/api/internal/services/pumpportal_client.go
++++ b/koschei/api/internal/services/pumpportal_client.go
+@@ -116,9 +116,17 @@
+ 			if !ok {
+ 				continue
+ 			}
+-			if c.shouldTrackMint(event) && c.rememberTradeMint(event.Mint) {
+-				if err := writeWebSocketText(conn, map[string]any{"method": "subscribeTokenTrade", "keys": []string{event.Mint}}); err != nil {
+-					return err
++			if c.shouldTrackMint(event) {
++				added, evicted := c.rememberTradeMint(event.Mint)
++				if evicted != "" {
++					if err := writeWebSocketText(conn, map[string]any{"method": "unsubscribeTokenTrade", "keys": []string{evicted}}); err != nil {
++						return err
++					}
++				}
++				if added {
++					if err := writeWebSocketText(conn, map[string]any{"method": "subscribeTokenTrade", "keys": []string{event.Mint}}); err != nil {
++						return err
++					}
+ 				}
+ 			}
+ 			if err := onEvent(ctx, event); err != nil {
+@@ -175,26 +183,27 @@
+ 	return value == "create" || strings.Contains(value, "new") || strings.Contains(value, "migrat") || strings.Contains(value, "create")
+ }
+ 
+-func (c *PumpPortalClient) rememberTradeMint(mint string) bool {
++func (c *PumpPortalClient) rememberTradeMint(mint string) (bool, string) {
+ 	mint = strings.TrimSpace(mint)
+ 	if mint == "" || c == nil {
+-		return false
++		return false, ""
+ 	}
+ 	if c.tradeMints == nil {
+ 		c.tradeMints = map[string]bool{}
+ 	}
+ 	if c.tradeMints[mint] {
+-		return false
++		return false, ""
+ 	}
+ 	limit := pumpPortalTradeSubscriptionLimit()
++	evicted := ""
+ 	if len(c.tradeOrder) >= limit {
+-		oldest := c.tradeOrder[0]
++		evicted = c.tradeOrder[0]
+ 		c.tradeOrder = c.tradeOrder[1:]
+-		delete(c.tradeMints, oldest)
++		delete(c.tradeMints, evicted)
+ 	}
+ 	c.tradeMints[mint] = true
+ 	c.tradeOrder = append(c.tradeOrder, mint)
+-	return true
++	return true, evicted
+ }
+ 
+ func (c *PumpPortalClient) tradeSubscriptionBatches() [][]string {
