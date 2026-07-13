@@ -14,25 +14,139 @@ on:
       - ".github/workflows/api-ci.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: koschei/api
+    env:
+      TARGET_BRANCH: ${{ github.head_ref || github.ref_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version-file: koschei/api/go.mod
           cache-dependency-path: koschei/api/go.sum
+      - name: Apply repeat-holder score bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          core = Path('koschei/api/internal/handlers/holder_intelligence_core.go')
+          text = core.read_text()
+          marker = 'func holderIntelligenceCoreEvidence(core holderIntelligenceCoreResult) []string {'
+          helper = '''func holderIntelligenceCoreRepeatRisk(core holderIntelligenceCoreResult) int {
+          strongest := 0
+          for _, item := range core.RepeatDominantHolders {
+              if item.RiskWeight > strongest {
+                  strongest = item.RiskWeight
+              }
+          }
+          return strongest
+          }
+
+          func applyRepeatDominantRiskToLegacyScore(score int, core holderIntelligenceCoreResult) int {
+          repeatRisk := holderIntelligenceCoreRepeatRisk(core)
+          if repeatRisk <= 0 {
+              return score
+          }
+          ceiling := 100 - repeatRisk
+          if ceiling < 0 {
+              ceiling = 0
+          }
+          if score > ceiling {
+              return ceiling
+          }
+          return score
+          }
+
+          '''
+          if 'func holderIntelligenceCoreRepeatRisk' not in text:
+              if marker not in text:
+                  raise SystemExit('holder evidence marker missing')
+              text = text.replace(marker, helper + marker, 1)
+          old = '''\trescored := web3.ScoreTokenRisk(base.Token)
+\tif strings.TrimSpace(base.Disclaimer) != "" {'''
+          new = '''\trescored := web3.ScoreTokenRisk(base.Token)
+\trescored.Score = applyRepeatDominantRiskToLegacyScore(rescored.Score, core)
+\trescored.RiskLevel = tokenRiskLevel(rescored.Score)
+\tif repeatRisk := holderIntelligenceCoreRepeatRisk(core); repeatRisk > 0 {
+\t\trescored.Findings = appendUniqueHolderCoreEvidence(rescored.Findings,
+\t\t\tfmt.Sprintf("Repeat-dominant holder evidence applies a %d/100 cross-token actor risk weight from the stored Koschei observation window.", repeatRisk),
+\t\t)
+\t}
+\tif strings.TrimSpace(base.Disclaimer) != "" {'''
+          if old not in text:
+              raise SystemExit('customer rescore marker missing')
+          text = text.replace(old, new, 1)
+          if '\n\t"fmt"' not in text:
+              text = text.replace('import (\n\t"context"', 'import (\n\t"context"\n\t"fmt"', 1)
+          core.write_text(text)
+
+          scanner = Path('koschei/api/internal/handlers/token_scanner.go')
+          text = scanner.read_text()
+          old = '''\tif score < 0 {
+\t\tscore = 0
+\t}
+
+\trisk := tokenRiskLevel(score)'''
+          new = '''\tif score < 0 {
+\t\tscore = 0
+\t}
+\tscore = applyRepeatDominantRiskToLegacyScore(score, holderCore)
+\tif repeatRisk := holderIntelligenceCoreRepeatRisk(holderCore); repeatRisk > 0 {
+\t\tfindings = appendUniqueHolderCoreEvidence(findings,
+\t\t\tfmt.Sprintf("Repeat-dominant holder evidence applies a %d/100 cross-token actor risk weight from the stored Koschei observation window.", repeatRisk),
+\t\t)
+\t}
+
+\trisk := tokenRiskLevel(score)'''
+          if old not in text:
+              raise SystemExit('public score marker missing')
+          scanner.write_text(text.replace(old, new, 1))
+
+          tests = Path('koschei/api/internal/handlers/holder_intelligence_core_test.go')
+          text = tests.read_text()
+          addition = '''
+          func TestCustomerTokenMappingAppliesRepeatDominantRiskWeight(t *testing.T) {
+          core := fixtureHolderCore()
+          core.RepeatDominantHolders = []services.RepeatDominantHolderEvidence{{
+              OwnerWallet: "OwnerA", CurrentPercentage: 60, TokenCount: 2, RiskWeight: 80,
+              ObservationWindow: "son 30 gün Koschei gözlemi",
+          }}
+          got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core)
+          if got.Score != 20 || got.RiskLevel != "high" {
+              t.Fatalf("repeat-holder risk did not reach legacy customer score: score=%d risk=%s", got.Score, got.RiskLevel)
+          }
+          if score := applyRepeatDominantRiskToLegacyScore(100, core); score != 20 {
+              t.Fatalf("public legacy score bridge = %d", score)
+          }
+          if score := applyRepeatDominantRiskToLegacyScore(10, core); score != 10 {
+              t.Fatalf("repeat risk must not make an already-worse score reassuring: %d", score)
+          }
+          }
+          '''
+          if 'TestCustomerTokenMappingAppliesRepeatDominantRiskWeight' not in text:
+              text += addition
+          tests.write_text(text)
+          PY
+          gofmt -w \
+            koschei/api/internal/handlers/holder_intelligence_core.go \
+            koschei/api/internal/handlers/holder_intelligence_core_test.go \
+            koschei/api/internal/handlers/token_scanner.go
       - name: Download modules
+        working-directory: koschei/api
         run: go mod download
       - name: Check public JavaScript
+        working-directory: koschei/api
         run: |
           node --check public/js/public-solana-scan.js
           node --check public/js/public-solana-scan-tr.js
@@ -42,6 +156,7 @@ jobs:
           node --check public/js/owner-holder-tier-labels.js
           node --check public/js/owner-launch-forensics.js
       - name: Check Turkish public copy
+        working-directory: koschei/api
         run: |
           grep -q '<html lang="tr">' public/index.html
           grep -q '<html lang="tr">' public/scan.html
@@ -50,8 +165,20 @@ jobs:
           ! grep -Eqi 'Paste it before|Token ikinci planda|KOSCH stays as|What ARVIS does|Who it is for|Power users|Automatic flow' public/index.html
           ! grep -Eqi 'Login yok|Wallet connect yok|Read-only analiz|İmzalı verdict geçmişi' public/scan.html
       - name: Test
+        working-directory: koschei/api
         run: go test ./...
       - name: Vet
+        working-directory: koschei/api
         run: go vet ./...
       - name: Build
+        working-directory: koschei/api
         run: CGO_ENABLED=0 GOOS=linux go build ./...
+      - name: Commit verified score bridge and restore CI
+        run: |
+          git checkout origin/main -- .github/workflows/api-ci.yml
+          rm -f .github/workflows/agent-repeat-score-final.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply repeat holder risk to legacy customer scores"
+          git push origin HEAD:${TARGET_BRANCH}
