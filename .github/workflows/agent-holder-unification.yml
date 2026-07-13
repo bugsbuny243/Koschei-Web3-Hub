@@ -1,0 +1,66 @@
+name: Agent Holder Intelligence Unification
+
+on:
+  push:
+    branches:
+      - agent/unify-holder-intelligence-core
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Expand and apply surgical edits
+        run: |
+          base64 -d .github/agent/apply_holder_unification.py.gz.b64 | gzip -d > .github/agent/apply_holder_unification.py
+          python3 .github/agent/apply_holder_unification.py
+          gofmt -w \
+            koschei/api/internal/services/security_radars.go \
+            koschei/api/internal/services/arvis_arms.go \
+            koschei/api/internal/services/holder_role_intelligence.go \
+            koschei/api/internal/services/holder_intelligence.go \
+            koschei/api/internal/services/holder_role_intelligence_test.go \
+            koschei/api/internal/services/holder_intelligence_test.go \
+            koschei/api/internal/handlers/holder_intelligence_core.go \
+            koschei/api/internal/handlers/holder_intelligence_core_test.go \
+            koschei/api/internal/handlers/token_scanner.go \
+            koschei/api/internal/handlers/b2b_token_scan.go \
+            koschei/api/internal/handlers/shield.go \
+            koschei/api/internal/handlers/owner_operations.go \
+            koschei/api/internal/handlers/security_radar_detail_v3.go
+
+      - name: Test API
+        working-directory: koschei/api
+        run: go test ./...
+
+      - name: Vet API
+        working-directory: koschei/api
+        run: go vet ./...
+
+      - name: Build API
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+
+      - name: Commit verified implementation
+        run: |
+          rm -f .github/agent/apply_holder_unification.py .github/agent/apply_holder_unification.py.gz.b64 .github/workflows/agent-holder-unification.yml
+          rmdir .github/agent 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Unify customer holder intelligence"
+          git push origin HEAD:${GITHUB_REF_NAME}
