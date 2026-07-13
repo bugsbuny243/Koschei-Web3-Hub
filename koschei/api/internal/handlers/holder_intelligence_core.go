@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -124,6 +125,31 @@ func holderIntelligenceCorePolicy(core holderIntelligenceCoreResult) string {
 	return "evidence_backed"
 }
 
+func holderIntelligenceCoreRepeatRisk(core holderIntelligenceCoreResult) int {
+	strongest := 0
+	for _, item := range core.RepeatDominantHolders {
+		if item.RiskWeight > strongest {
+			strongest = item.RiskWeight
+		}
+	}
+	return strongest
+}
+
+func applyRepeatDominantRiskToLegacyScore(score int, core holderIntelligenceCoreResult) int {
+	repeatRisk := holderIntelligenceCoreRepeatRisk(core)
+	if repeatRisk <= 0 {
+		return score
+	}
+	ceiling := 100 - repeatRisk
+	if ceiling < 0 {
+		ceiling = 0
+	}
+	if score > ceiling {
+		return ceiling
+	}
+	return score
+}
+
 func holderIntelligenceCoreEvidence(core holderIntelligenceCoreResult) []string {
 	values := []string{}
 	values = appendUniqueHolderCoreEvidence(values, core.Intelligence.Findings...)
@@ -206,6 +232,13 @@ func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligen
 		base.Token.TopTenPercent = roundPercent(top10)
 	}
 	rescored := web3.ScoreTokenRisk(base.Token)
+	rescored.Score = applyRepeatDominantRiskToLegacyScore(rescored.Score, core)
+	rescored.RiskLevel = tokenRiskLevel(rescored.Score)
+	if repeatRisk := holderIntelligenceCoreRepeatRisk(core); repeatRisk > 0 {
+		rescored.Findings = appendUniqueHolderCoreEvidence(rescored.Findings,
+			fmt.Sprintf("Repeat-dominant holder evidence applies a %d/100 cross-token actor risk weight from the stored Koschei observation window.", repeatRisk),
+		)
+	}
 	if strings.TrimSpace(base.Disclaimer) != "" {
 		rescored.Disclaimer = base.Disclaimer
 	}
