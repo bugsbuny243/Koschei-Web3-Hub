@@ -1,0 +1,160 @@
++	profile := classifyLaunchActor("buyer", []LaunchTrade{{
++		Trader: "buyer", Side: "buy", Slot: 99, BlockTime: launch.Add(-10 * time.Second), TokenAmount: 1,
++	}}, 100, launch, 3)
++	if profile.Sniper || profile.Label == LaunchLabelSniperBot {
++		t.Fatalf("pre-reference buy must not be a sniper: %#v", profile)
++	}
++	if !profile.LaunchSlotKnown || profile.SlotOffsetFromLaunch != -1 || !profile.LaunchTimeKnown || profile.MinutesAfterLaunch >= 0 {
++		t.Fatalf("negative timing evidence should be preserved honestly: %#v", profile)
++	}
++}
+--- a/koschei/api/internal/services/launch_forensics.go
++++ b/koschei/api/internal/services/launch_forensics.go
+@@ -30,6 +30,8 @@
+ 	RPCCallsUsed           int                   `json:"rpc_calls_used"`
+ 	FundingRPCBudget       int                   `json:"funding_rpc_budget"`
+ 	FundingRPCCallsUsed    int                   `json:"funding_rpc_calls_used"`
++	FundingOwnersAttempted int                   `json:"funding_owners_attempted"`
++	FundingOwnersResolved  int                   `json:"funding_owners_resolved"`
+ 	SniperCount            int                   `json:"sniper_count"`
+ 	RhythmBotCount         int                   `json:"rhythm_bot_count"`
+ 	FlipperCount           int                   `json:"flipper_count"`
+@@ -161,7 +163,11 @@
+ 		checks = len(profiles)
+ 	}
+ 	for i := 0; i < checks; i++ {
++		out.FundingOwnersAttempted++
+ 		traceLaunchFunding(ctx, rpcURL, creator, creatorFunder, &profiles[i], cfg, fundingBudget)
++		if profiles[i].FundingStatus == "creator_linked" || profiles[i].FundingStatus == "funding_source_observed" {
++			out.FundingOwnersResolved++
++		}
+ 	}
+ 	for i := checks; i < len(profiles); i++ {
+ 		profiles[i].FundingStatus = "not_traced_outside_top_limit"
+@@ -220,6 +226,7 @@
+ 	FundingRPCBudget  int
+ 	SniperSlotWindow  int
+ 	FundingSigLimit   int
++	FundingTxParse    int
+ 	LedgerLimit       int
+ }
+ 
+@@ -232,6 +239,7 @@
+ 		FundingRPCBudget:  holderScanEnvInt("ARVIS_FUNDING_RPC_BUDGET", 100, 10, 1000),
+ 		SniperSlotWindow:  holderScanEnvInt("ARVIS_SNIPER_SLOT_WINDOW", 3, 0, 100),
+ 		FundingSigLimit:   holderScanEnvInt("ARVIS_FUNDING_SIG_LIMIT", 25, 5, 100),
++		FundingTxParse:    holderScanEnvInt("ARVIS_FUNDING_TX_PARSE", 6, 1, 20),
+ 		LedgerLimit:       launchEnvInt("ARVIS_TRADE_LEDGER_READ_LIMIT", 20000, 100, 100000),
+ 	}
+ }
+@@ -287,7 +295,7 @@
+ 		SELECT mint,trader,side,sol_amount::float8,token_amount::float8,
+ 		       COALESCE(slot,0),block_time,signature,source
+ 		FROM token_trade_events
+-		WHERE lower(mint)=lower($1)
++		WHERE mint=$1
+ 		ORDER BY COALESCE(slot,0) ASC, COALESCE(block_time,created_at) ASC
+ 		LIMIT $2`, mint, limit)
+ 	if err != nil {
+@@ -342,6 +350,8 @@
+ 			profiles[i].EntryRank = rank.EntryRank
+ 			profiles[i].SlotOffsetFromLaunch = rank.SlotOffsetFromLaunch
+ 			profiles[i].MinutesAfterLaunch = rank.MinutesAfterLaunch
++			profiles[i].LaunchSlotKnown = rank.LaunchSlotKnown
++			profiles[i].LaunchTimeKnown = rank.LaunchTimeKnown
+ 			if rank.Sniper && !profiles[i].Sniper {
+ 				profiles[i].Sniper = true
+ 				profiles[i].Evidence = append(profiles[i].Evidence, rank.Evidence...)
+@@ -377,6 +387,7 @@
+ 		entry := LaunchTimelineEntry{
+ 			EntryRank: profile.EntryRank, Wallet: profile.OwnerWallet, FirstBuySlot: profile.FirstBuySlot,
+ 			SlotOffset: profile.SlotOffsetFromLaunch, MinutesAfterLaunch: profile.MinutesAfterLaunch,
++			LaunchSlotKnown: profile.LaunchSlotKnown, LaunchTimeKnown: profile.LaunchTimeKnown,
+ 			Label: profile.Label, CreatorLinked: profile.CreatorLinked, FundingHops: profile.FundingHops,
+ 			Evidence: append([]string{}, profile.Evidence...),
+ 		}
+@@ -482,13 +493,13 @@
+ 	if out.AccumulatorCount > 0 {
+ 		findings = append(findings, fmt.Sprintf("%d holder en az 30 dakikaya yayılan, satışsız birikim davranışı gösterdi.", out.AccumulatorCount))
+ 	}
+-	findings = append(findings, fmt.Sprintf("Launch Forensics RPC kullanımı: ATA %d/%d, funding %d/%d.", out.RPCCallsUsed, out.RPCBudget, out.FundingRPCCallsUsed, out.FundingRPCBudget))
++	findings = append(findings, fmt.Sprintf("Lansman analizi RPC kullanımı: ATA %d/%d, fonlama %d/%d; fonlama izi çözülen owner %d/%d.", out.RPCCallsUsed, out.RPCBudget, out.FundingRPCCallsUsed, out.FundingRPCBudget, out.FundingOwnersResolved, out.FundingOwnersAttempted))
+ 	return findings
+ }
+ 
+ func containsLaunchString(values []string, target string) bool {
+ 	for _, value := range values {
+-		if strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(target)) {
++		if strings.TrimSpace(value) == strings.TrimSpace(target) {
+ 			return true
+ 		}
+ 	}
+--- a/koschei/api/internal/services/launch_forensics_ata.go
++++ b/koschei/api/internal/services/launch_forensics_ata.go
+@@ -126,8 +126,8 @@
+ 	})
+ 	trades := []LaunchTrade{}
+ 	for start := 0; start < len(signatures); start += launchTransactionBatchSize {
+-		if ctx.Err() != nil || !budget.Reserve(1) {
+-			base.Evidence = append(base.Evidence, "ATA transaction parse bütçesi doldu; kısmi geçmiş korundu.")
++		if ctx.Err() != nil {
++			base.Evidence = append(base.Evidence, "ATA işlem ayrıştırması istek süresi nedeniyle kısmi kaldı.")
+ 			break
+ 		}
+ 		end := start + launchTransactionBatchSize
+@@ -138,13 +138,19 @@
+ 		for _, signature := range signatures[start:end] {
+ 			keys = append(keys, signature.Signature)
+ 		}
++		granted := budget.ReserveUpTo(len(keys))
++		if granted == 0 {
++			base.Evidence = append(base.Evidence, "ATA işlem ayrıştırma bütçesi doldu; kısmi geçmiş korundu.")
++			break
++		}
++		keys = keys[:granted]
+ 		transactions, err := SolanaGetTransactionsJSONParsedBatch(ctx, rpcURL, keys)
+ 		if err != nil {
+ 			base.Evidence = append(base.Evidence, "ATA parsed transaction batch alınamadı: "+compactClusterError(err))
+ 			continue
+ 		}
+ 		base.TransactionsParsed += len(transactions)
+-		for _, signature := range signatures[start:end] {
++		for _, signature := range signatures[start : start+granted] {
+ 			tx, ok := transactions[signature.Signature]
+ 			if !ok {
+ 				continue
+@@ -198,7 +204,7 @@
+ 		limit = len(post)
+ 	}
+ 	for i := 0; i < limit; i++ {
+-		if strings.EqualFold(keys[i], wallet) {
++		if keys[i] == wallet {
+ 			return float64(post[i]-pre[i]) / 1e9
+ 		}
+ 	}
+@@ -209,9 +215,9 @@
+ 	message := holderClusterMap(holderClusterMap(tx["transaction"])["message"])
+ 	for _, key := range holderClusterAccountKeys(message["accountKeys"]) {
+ 		switch {
+-		case strings.EqualFold(key, defaultPumpProgramID):
++		case key == defaultPumpProgramID:
+ 			return "pump.fun"
+-		case strings.EqualFold(key, defaultPumpSwapProgramID), strings.EqualFold(key, pumpLiquidityProgramID):
++		case key == defaultPumpSwapProgramID, key == pumpLiquidityProgramID:
+ 			return "pumpswap"
+ 		case isKnownRaydiumProgram(key):
+ 			return "raydium"
+@@ -235,7 +241,7 @@
+ 	return strings.Join([]string{
+ 		"ATA geçmişi",
+ 		strconvItoa(profile.SignaturesFetched) + " imza",
+-		strconvItoa(profile.TransactionsParsed) + " transaction", window,
++		strconvItoa(profile.TransactionsParsed) + " işlem", window,
+ 	}, " · ")
+ }
+ 
+--- a/koschei/api/internal/services/launch_funding_trace.go
++++ b/koschei/api/internal/services/launch_funding_trace.go
+@@ -11,7 +11,14 @@
+ 		return
+ 	}
