@@ -38,6 +38,10 @@ jobs:
           node --check public/js/public-transaction-shield.js
           node --check public/js/kosch-transparency.js
           node --check public/js/koschei-global-shell.js
+      - name: Check Turkish landing copy
+        run: |
+          grep -q '<html lang="tr">' public/index.html
+          ! grep -Eqi 'Paste it before|Token ikinci planda|KOSCH stays as|What ARVIS does|Who it is for|Power users|Automatic flow' public/index.html
       - name: Test
         run: go test ./...
       - name: Vet
