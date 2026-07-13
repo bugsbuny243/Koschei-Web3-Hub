@@ -1,0 +1,27 @@
+diff --git a/koschei/api/internal/services/pump_high_volume_radar.go b/koschei/api/internal/services/pump_high_volume_radar.go
+index 83d505e..f1a774c 100644
+--- a/koschei/api/internal/services/pump_high_volume_radar.go
++++ b/koschei/api/internal/services/pump_high_volume_radar.go
+@@ -451,8 +451,21 @@ func (w *PumpHighVolumeRadarWorker) RunOnce(ctx context.Context) error {
+ }
+ 
+ func (w *PumpHighVolumeRadarWorker) scanAndStore(ctx context.Context, eventID string, candidate PumpRadarCandidate, market PumpTokenMarket) error {
+-	analysis := AnalyzeArvisRadars(SecurityRadarRequest{Target: candidate.Mint, Network: "solana-mainnet", Mode: "live_stream:" + ModulePumpSybilRadar})
++	req := SecurityRadarRequest{Target: candidate.Mint, Network: "solana-mainnet", Mode: "live_stream:" + ModulePumpSybilRadar}
++	analysis := AnalyzeArvisRadars(req)
+ 	bundle := EvidenceBackedSecurityRadarBundle(analysis.Bundle)
++	roles := ArvisHolderRolesFromBundle(bundle)
++	cluster := ArvisHolderClusterFromBundle(bundle)
++	launchBlockTime := int64(0)
++	if parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(cluster.LaunchEstimateAt)); err == nil {
++		launchBlockTime = parsed.Unix()
++	}
++	forensicsCtx, cancelForensics := context.WithTimeout(ctx, 120*time.Second)
++	forensics := AnalyzeLaunchForensics(forensicsCtx, w.Store.DB, firstSecurityRadarEnv("SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL"), candidate.Mint, candidate.Creator, roles, launchBlockTime, cluster.LaunchEstimateSlot)
++	cancelForensics()
++	analysis = ApplyLaunchForensicsToAnalysis(analysis, req, forensics)
++	w.Store.CaptureLaunchForensicsFloor(ctx, candidate.Mint, "solana-mainnet", forensics)
++	bundle = EvidenceBackedSecurityRadarBundle(analysis.Bundle)
+ 	arms := ArvisArmsFromBundle(bundle)
+ 	if len(arms) == 0 {
+ 		arms = analysis.Arms
