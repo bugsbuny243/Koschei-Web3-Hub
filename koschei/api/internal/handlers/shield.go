@@ -42,39 +42,53 @@ func (h *Handler) ShieldPreflight(w http.ResponseWriter, r *http.Request) {
 		network = "solana-mainnet"
 	}
 	started := time.Now()
-	bundle := services.AnalyzeSecurityRadars(services.SecurityRadarRequest{Target: target, Network: network, Mode: "don2n_preflight"})
-	final := services.FinalSecurityRadarVerdict(bundle)
-	action := shieldAction(final.RiskLevel, final.RiskIndex)
-	reason := shieldReason(bundle, final)
+	core := h.runHolderIntelligenceCore(r.Context(), target, network, "don2n_preflight")
+	bundle := core.Bundle
+	final := core.Final
+	action := holderIntelligenceCoreShieldAction(core)
+	reason := holderIntelligenceCoreExplanation(core)
+	if strings.TrimSpace(final.Verdict) != "" {
+		reason = strings.TrimSpace(final.Verdict + " · " + reason)
+	}
 	requestID := shieldRequestID(target, network, started)
 	_ = h.saveSecurityRadarBundle(r.Context(), "api_preflight", "don2n_preflight", bundle)
 	latencyMS := time.Since(started).Milliseconds()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":              true,
-		"request_id":      requestID,
-		"product":         "Koschei Shield",
-		"mode":            "don2n_preflight",
-		"target":          target,
-		"network":         network,
-		"wallet":          strings.TrimSpace(input.Wallet),
-		"action":          action,
-		"grade":           final.Grade,
-		"risk_index":      final.RiskIndex,
-		"risk_level":      final.RiskLevel,
-		"verdict":         final.Verdict,
-		"recommendation":  final.Recommendation,
-		"reason":          reason,
-		"signed":          final.Signed,
-		"signature":       final.Signature,
-		"latency_ms":      latencyMS,
+		"ok":                     true,
+		"request_id":             requestID,
+		"product":                "Koschei Shield",
+		"mode":                   "don2n_preflight",
+		"target":                 target,
+		"network":                network,
+		"wallet":                 strings.TrimSpace(input.Wallet),
+		"action":                 action,
+		"grade":                  final.Grade,
+		"risk_index":             final.RiskIndex,
+		"risk_level":             final.RiskLevel,
+		"verdict":                final.Verdict,
+		"recommendation":         final.Recommendation,
+		"reason":                 reason,
+		"signed":                 final.Signed,
+		"signature":              final.Signature,
+		"latency_ms":             latencyMS,
+		"final_policy":           holderIntelligenceCorePolicy(core),
+		"holder_analysis_status": holderIntelligenceCoreStatus(core),
+		"holder_distribution":    core.Distribution,
+		"holder_intelligence":    core.Intelligence,
+		"holder_cluster":         core.Cluster,
+		"launch_forensics":       core.LaunchForensics,
+		"verified_evidence":      holderIntelligenceCoreEvidence(core),
 		"evidence_quality": map[string]any{
-			"pump_fun_sybil_radar":  bundle.PumpSybilRadar.Signals["data_quality"],
-			"raydium_pool_guardian": bundle.RaydiumPoolGuardian.Signals["data_quality"],
-			"score_source":          bundle.Metadata["score_source"],
-			"deterministic_scoring": bundle.Metadata["deterministic_scoring"],
-			"ai_final_scoring":      bundle.Metadata["ai_final_scoring"],
+			"data_quality":           bundle.Metadata["data_quality"],
+			"evidence_status":        bundle.Metadata["evidence_status"],
+			"verified_arm_count":     bundle.Metadata["verified_arm_count"],
+			"owner_aggregation":      core.Intelligence.OwnerAggregationApplied,
+			"deep_owners_scanned":    core.Cluster.DeepOwnersScanned,
+			"shallow_owners_scanned": core.Cluster.ShallowOwnersScanned,
+			"rpc_budget":             core.Cluster.RPCBudget,
+			"rpc_calls_used":         core.Cluster.RPCCallsUsed,
 		},
-		"modules": []any{bundle.PumpSybilRadar, bundle.RaydiumPoolGuardian},
+		"modules": core.Arms,
 	})
 }
 

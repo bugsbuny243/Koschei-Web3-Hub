@@ -157,32 +157,19 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	req := services.SecurityRadarRequest{Target: target, Network: network, Mode: "owner_full_scan"}
-	analysis := services.AnalyzeArvisRadars(req)
-	bundle := services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
-	holderRoles := services.ArvisHolderRolesFromBundle(bundle)
-	distribution := radarDetailHolderDistributionFromRoles(holderRoles)
-	if !holderRoles.Available {
-		distribution, holderRoles = radarDetailHolderDistribution(r.Context(), target)
-	}
-	holderCluster := services.ArvisHolderClusterFromBundle(bundle)
-	sourceContext := h.radarDetailSourceContext(r.Context(), target, network)
-	launchForensics := h.analyzeLaunchForensics(r.Context(), target, holderRoles, holderCluster, sourceContext)
-	analysis = services.ApplyLaunchForensicsToAnalysis(analysis, req, launchForensics)
-	bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
-	if h.DB != nil {
-		services.NewSecurityRadarStore(h.DB).CaptureLaunchForensicsFloor(r.Context(), target, network, launchForensics)
-	}
+	core := h.runHolderIntelligenceCore(r.Context(), target, network, "owner_full_scan")
+	bundle := core.Bundle
+	distribution := core.Distribution
+	holderCluster := core.Cluster
+	sourceContext := core.SourceContext
+	launchForensics := core.LaunchForensics
 	if services.SecurityRadarHasLiveEvidence(bundle) {
 		_ = h.saveSecurityRadarBundle(r.Context(), ownerChatIdentity(), "owner_full_scan", bundle)
 	}
-	arms := services.ArvisArmsFromBundle(bundle)
-	if len(arms) == 0 {
-		arms = analysis.Arms
-	}
-	freshFinal := services.ArvisFinalFromBundle(bundle)
-	market := radarDetailMarketSnapshot(r.Context(), target)
-	holderIntelligence := services.ApplyLaunchForensicsToHolderIntelligence(services.BuildHolderIntelligence(holderRoles, holderCluster, market, time.Now().UTC()), launchForensics)
+	arms := core.Arms
+	freshFinal := core.Final
+	market := core.Market
+	holderIntelligence := core.Intelligence
 	structural := h.radarDetailStructuralContext(r.Context(), target, network)
 	persisted := h.radarDetailPersistedVerdict(r.Context(), target)
 	final := radarDetailFinalMap(freshFinal, persisted)

@@ -178,6 +178,13 @@ func FinalSecurityRadarVerdict(bundle SecurityRadarBundle) SecurityRadarFinalVer
 }
 
 func collectRadarEvidence(req SecurityRadarRequest) radarEvidenceProfile {
+	return collectRadarEvidenceContext(context.Background(), req)
+}
+
+func collectRadarEvidenceContext(parent context.Context, req SecurityRadarRequest) radarEvidenceProfile {
+	if parent == nil {
+		parent = context.Background()
+	}
 	profile := radarEvidenceProfile{Target: req.Target, Network: req.Network, DataQuality: "no_rpc_evidence", EvidenceStatus: "insufficient_evidence"}
 	rpcURL := strings.TrimSpace(os.Getenv("SOLANA_RPC_URL"))
 	if rpcURL == "" {
@@ -195,7 +202,7 @@ func collectRadarEvidence(req SecurityRadarRequest) radarEvidenceProfile {
 	if strings.Contains(modeLower, "owner") || strings.Contains(modeLower, "manual") || strings.Contains(modeLower, "live_stream:"+ModulePumpSybilRadar) {
 		timeout = 18 * time.Second
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 
 	if account, err := SolanaGetAccountInfoJSONParsed(ctx, rpcURL, req.Target); err == nil && account.Value != nil {

@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"koschei/api/internal/services"
 )
 
 // SecurityRadarDetailV3 returns the complete premium Radar investigation with
@@ -31,29 +29,16 @@ func (h *Handler) SecurityRadarDetailV3(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	req := services.SecurityRadarRequest{Target: target, Network: network, Mode: "manual_detail"}
-	analysis := services.AnalyzeArvisRadars(req)
-	bundle := services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
-	holderRoles := services.ArvisHolderRolesFromBundle(bundle)
-	distribution := radarDetailHolderDistributionFromRoles(holderRoles)
-	if !holderRoles.Available {
-		distribution, holderRoles = radarDetailHolderDistribution(r.Context(), target)
-	}
-	holderCluster := services.ArvisHolderClusterFromBundle(bundle)
-	sourceContext := h.radarDetailSourceContext(r.Context(), target, network)
-	launchForensics := h.analyzeLaunchForensics(r.Context(), target, holderRoles, holderCluster, sourceContext)
-	analysis = services.ApplyLaunchForensicsToAnalysis(analysis, req, launchForensics)
-	bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
-	if h.DB != nil {
-		services.NewSecurityRadarStore(h.DB).CaptureLaunchForensicsFloor(r.Context(), target, network, launchForensics)
-	}
-	arms := services.ArvisArmsFromBundle(bundle)
-	if len(arms) == 0 {
-		arms = analysis.Arms
-	}
-	freshFinal := services.ArvisFinalFromBundle(bundle)
-	market := radarDetailMarketSnapshot(r.Context(), target)
-	holderIntelligence := services.ApplyLaunchForensicsToHolderIntelligence(services.BuildHolderIntelligence(holderRoles, holderCluster, market, time.Now().UTC()), launchForensics)
+	core := h.runHolderIntelligenceCore(r.Context(), target, network, "manual_detail")
+	holderRoles := core.Roles
+	distribution := core.Distribution
+	holderCluster := core.Cluster
+	sourceContext := core.SourceContext
+	launchForensics := core.LaunchForensics
+	arms := core.Arms
+	freshFinal := core.Final
+	market := core.Market
+	holderIntelligence := core.Intelligence
 	actorIntelligence := h.actorSecurityIntelligenceForDetail(r.Context(), target, network, sourceContext, holderRoles, holderCluster, market)
 	structural := h.radarDetailStructuralContext(r.Context(), target, network)
 	persisted := h.radarDetailPersistedVerdict(r.Context(), target)

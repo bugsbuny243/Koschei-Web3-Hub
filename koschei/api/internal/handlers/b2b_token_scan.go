@@ -242,7 +242,7 @@ func (h *Handler) runB2BTokenScan(requestID, network, mint string) {
 	start := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	result, err := h.tokenService().ScanToken(ctx, network, mint)
+	result, err := h.scanCustomerToken(ctx, network, mint)
 	if err != nil {
 		h.refundAPICredits(ctx, requestID, "rpc_scan_failed")
 		return
@@ -270,7 +270,7 @@ func (h *Handler) runB2BTokenBatch(requestID, network string, mints []string) {
 			defer wg.Done()
 			for index := range jobs {
 				mint := mints[index]
-				result, err := h.tokenService().ScanToken(ctx, network, mint)
+				result, err := h.scanCustomerToken(ctx, network, mint)
 				if err != nil {
 					items[index] = b2bBatchScanItem{Mint: mint, Status: "failed", Error: "scan_failed"}
 					continue

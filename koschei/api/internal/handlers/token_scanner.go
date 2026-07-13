@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
+
+	"koschei/api/internal/services"
 )
 
 const token2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
@@ -21,26 +22,34 @@ type tokenScanRequest struct {
 }
 
 type tokenScanResponse struct {
-	Mint                     string                     `json:"mint"`
-	Network                  string                     `json:"network"`
-	Score                    int                        `json:"score"`
-	RiskLevel                string                     `json:"risk_level"`
-	Supply                   string                     `json:"supply"`
-	Decimals                 int                        `json:"decimals"`
-	MintAuthority            string                     `json:"mint_authority,omitempty"`
-	FreezeAuthority          string                     `json:"freeze_authority,omitempty"`
-	LargestHolderPercent     float64                    `json:"largest_holder_percent"`
-	TopTenPercent            float64                    `json:"top_ten_percent"`
-	Findings                 []string                   `json:"findings"`
-	TokenProgram             string                     `json:"token_program"`
-	Token2022                bool                       `json:"token_2022"`
-	Extensions               []tokenExtensionAssessment `json:"extensions"`
-	ExtensionRiskPenalty     int                        `json:"extension_risk_penalty"`
-	TransferBehavior         map[string]any             `json:"transfer_behavior"`
-	VisibilityLimitations    []string                   `json:"visibility_limitations"`
-	CompatibilityWarnings    []string                   `json:"compatibility_warnings"`
-	FinalPolicy              string                     `json:"final_policy"`
-	Disclaimer               string                     `json:"disclaimer"`
+	Mint                  string                           `json:"mint"`
+	Network               string                           `json:"network"`
+	Score                 int                              `json:"score"`
+	RiskLevel             string                           `json:"risk_level"`
+	Supply                string                           `json:"supply"`
+	Decimals              int                              `json:"decimals"`
+	MintAuthority         string                           `json:"mint_authority,omitempty"`
+	FreezeAuthority       string                           `json:"freeze_authority,omitempty"`
+	LargestHolderPercent  float64                          `json:"largest_holder_percent"`
+	TopTenPercent         float64                          `json:"top_ten_percent"`
+	Findings              []string                         `json:"findings"`
+	TokenProgram          string                           `json:"token_program"`
+	Token2022             bool                             `json:"token_2022"`
+	Extensions            []tokenExtensionAssessment       `json:"extensions"`
+	ExtensionRiskPenalty  int                              `json:"extension_risk_penalty"`
+	TransferBehavior      map[string]any                   `json:"transfer_behavior"`
+	VisibilityLimitations []string                         `json:"visibility_limitations"`
+	CompatibilityWarnings []string                         `json:"compatibility_warnings"`
+	FinalPolicy           string                           `json:"final_policy"`
+	HolderDistribution    map[string]any                   `json:"holder_distribution"`
+	HolderIntelligence    services.HolderIntelligence      `json:"holder_intelligence"`
+	HolderCluster         services.HolderClusterAnalysis   `json:"holder_cluster"`
+	LaunchForensics       services.LaunchForensicsAnalysis `json:"launch_forensics"`
+	VerifiedEvidence      []string                         `json:"verified_evidence"`
+	Explanation           string                           `json:"explanation"`
+	HolderAnalysisStatus  string                           `json:"holder_analysis_status"`
+	VerdictWithheld       bool                             `json:"verdict_withheld"`
+	Disclaimer            string                           `json:"disclaimer"`
 }
 
 type rpcEnvelope struct {
@@ -96,24 +105,8 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getAccountInfo", []interface{}{mint, map[string]string{"encoding": "jsonParsed"}}, &account)
 
-	var largest struct {
-		Value []struct {
-			Amount string `json:"amount"`
-		} `json:"value"`
-	}
-	_ = h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getTokenLargestAccounts", []interface{}{mint}, &largest)
-
-	total, _ := strconv.ParseFloat(supply.Value.Amount, 64)
-	topOne, topTen := 0.0, 0.0
-	for i, holder := range largest.Value {
-		amount, _ := strconv.ParseFloat(holder.Amount, 64)
-		if total > 0 && i < 10 {
-			topTen += amount / total * 100
-			if i == 0 {
-				topOne = amount / total * 100
-			}
-		}
-	}
+	holderCore := h.runHolderIntelligenceCore(r.Context(), mint, req.Network, "customer_token_scan")
+	topOne, topTen, holderConcentrationAvailable := holderIntelligenceCoreConcentration(holderCore)
 
 	score := 100
 	findings := []string{}
@@ -156,6 +149,11 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	findings = appendUniqueHolderCoreEvidence(findings, holderIntelligenceCoreEvidence(holderCore)...)
+	if !holderConcentrationAvailable {
+		findings = appendUniqueHolderCoreEvidence(findings, "Holder concentration was unavailable; missing evidence is not treated as a safety signal.")
+	}
+
 	if topOne >= 50 {
 		score -= 35
 		findings = append(findings, "The largest token account controls at least half of the supply.")
@@ -173,6 +171,10 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 
 	risk := tokenRiskLevel(score)
 	policy := tokenFinalPolicy(score, extensions, visibilityLimitations)
+	holderPolicy := holderIntelligenceCorePolicy(holderCore)
+	if holderPolicy == "withhold" {
+		policy = "withhold"
+	}
 	disclaimer := "Koschei provides read-only risk signals based on public on-chain data. Token extensions can be legitimate but may materially change transfer, authority, fee, privacy, or compatibility behavior. This is not financial advice."
 
 	writeJSON(w, http.StatusOK, tokenScanResponse{
@@ -195,6 +197,14 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 		VisibilityLimitations: visibilityLimitations,
 		CompatibilityWarnings: compatibilityWarnings,
 		FinalPolicy:           policy,
+		HolderDistribution:    holderCore.Distribution,
+		HolderIntelligence:    holderCore.Intelligence,
+		HolderCluster:         holderCore.Cluster,
+		LaunchForensics:       holderCore.LaunchForensics,
+		VerifiedEvidence:      holderIntelligenceCoreEvidence(holderCore),
+		Explanation:           holderIntelligenceCoreExplanation(holderCore),
+		HolderAnalysisStatus:  holderIntelligenceCoreStatus(holderCore),
+		VerdictWithheld:       holderPolicy == "withhold",
 		Disclaimer:            disclaimer,
 	})
 }
