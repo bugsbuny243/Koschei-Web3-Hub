@@ -31,9 +31,11 @@ jobs:
           cache-dependency-path: koschei/api/go.sum
 
       - name: Expand and apply surgical edits
+        shell: bash
         run: |
+          set -o pipefail
           base64 -d .github/agent/apply_holder_unification.py.gz.b64 | gzip -d > .github/agent/apply_holder_unification.py
-          python3 .github/agent/apply_holder_unification.py
+          python3 .github/agent/apply_holder_unification.py 2>&1 | tee /tmp/holder-unification-apply.log
           gofmt -w \
             koschei/api/internal/services/security_radars.go \
             koschei/api/internal/services/arvis_arms.go \
@@ -48,6 +50,14 @@ jobs:
             koschei/api/internal/handlers/shield.go \
             koschei/api/internal/handlers/owner_operations.go \
             koschei/api/internal/handlers/security_radar_detail_v3.go
+
+      - name: Upload patch diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: holder-unification-diagnostics
+          path: /tmp/holder-unification-apply.log
+          if-no-files-found: error
 
       - name: Test API
         working-directory: koschei/api
