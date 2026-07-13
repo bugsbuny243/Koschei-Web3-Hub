@@ -2,16 +2,16 @@
   function ready(fn){if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',fn,{once:true});}else{fn();}}
 
   var translations={
-    'Dashboard':'Panel','Radar':'Radar','Token-2022':'Token-2022','Firewall':'İşlem Güvenliği','Watchlist':'İzleme Listesi','Webhooks':'Webhooklar','Integrate':'Entegrasyon','Plans':'Paketler',
-    'Architecture':'Mimari','Developers':'Geliştiriciler','Integration Pilot':'Entegrasyon Pilotu','KOSCH Access':'KOSCH Erişim','Token':'Token','Account':'Hesap','Reports':'Raporlar','Chain Health':'Zincir Sağlığı','Safe Check':'Güvenli Kontrol',
+    'Dashboard':'Panel','Radar':'Güvenlik Radarı','Token-2022':'Token-2022','Firewall':'İşlem Güvenliği','Watchlist':'İzleme Listesi','Webhooks':'Webhooklar','Integrate':'Entegrasyon','Plans':'Paketler',
+    'Architecture':'Mimari','Developers':'Geliştiriciler','Integration Pilot':'Entegrasyon Pilotu','KOSCH Access':'KOSCH Erişimi','Token':'Token','Account':'Hesap','Reports':'Raporlar','Chain Health':'Zincir Sağlığı','Safe Check':'Güvenli Kontrol',
     'ARVIS command center':'ARVIS komuta merkezi','Evidence-backed only':'Yalnızca kanıta dayalı','User':'Kullanıcı',
     'ARVIS unified radar':'ARVIS birleşik radarı','One radar. Evidence first.':'Tek radar. Önce kanıt.',
-    'Solana is the first live market. ARVIS returns a score only when verified on-chain or claim-surface evidence exists. Missing data never becomes a grade or signed report.':'İlk canlı pazar Solana’dır. ARVIS yalnız doğrulanmış zincir üstü veya claim yüzeyi kanıtı varsa skor üretir. Eksik veri hiçbir zaman nota veya imzalı rapora dönüşmez.',
-    'Live Radar':'Canlı Radar','Go security services':'Go güvenlik servisleri','Runtime engines':'Çalışan motorlar','Checking…':'Kontrol ediliyor…','Output rule':'Çıktı kuralı','Signed + evidence':'İmzalı + kanıt',
-    'Run ARVIS':'ARVIS’i çalıştır','Active Plan':'Aktif Paket','Remaining Outputs':'Kalan Çıktı','Core Status':'Temel Durum','Pipeline':'İşlem hattı','Stream':'Akış','Runtime arms':'Çalışan kanıt kolları','Visible cards':'Görünen kartlar','Processed':'İşlenen','No evidence':'Kanıt yok','Failed':'Başarısız','Last event':'Son olay',
-    'Reading entitlement.':'Paket yetkisi okunuyor.','Failed evidence collection is not charged.':'Başarısız kanıt toplama işlemi ücrete tabi değildir.','Loading account access and ARVIS status…':'Hesap erişimi ve ARVIS durumu yükleniyor…',
-    'View Plans':'KOSCH Erişimi Aç','Open Live Radar':'Canlı Radarı Aç','Explore Tools':'Araçları İncele','No active plan':'Aktif erişim yok','Choose a plan to unlock customer scans.':'KOSCH holder access için cüzdan doğrulayın.','Entitlement verified.':'Erişim doğrulandı.','Get Outputs':'KOSCH Access Aç',
-    'Choose a plan to run ARVIS':'ARVIS’i çalıştırmak için KOSCH access açın','The live production radar remains visible, while customer scans, reports, watchlists and alerts require an active package.':'Canlı üretim radarı görüntülenebilir; müşteri taramaları, raporlar, izleme listeleri ve alarmlar için KOSCH holder access gerekir.',
+    'Solana is the first live market. ARVIS returns a score only when verified on-chain or claim-surface evidence exists. Missing data never becomes a grade or signed report.':'İlk canlı pazar Solana’dır. ARVIS yalnız doğrulanmış zincir üstü veya bağlantı yüzeyi kanıtı varsa skor üretir. Eksik veri hiçbir zaman nota veya imzalı rapora dönüşmez.',
+    'Live Radar':'Canlı Radar','Go security services':'Go güvenlik servisleri','Runtime engines':'Çalışan motorlar','Checking…':'Kontrol ediliyor…','Output rule':'Çıktı kuralı','Signed + evidence':'İmzalı ve kanıtlı',
+    'Run ARVIS':'ARVIS’i çalıştır','Active Plan':'Aktif Erişim','Remaining Outputs':'Kalan Çıktı','Core Status':'Temel Durum','Pipeline':'İşlem hattı','Stream':'Akış','Runtime arms':'Çalışan kanıt kolları','Visible cards':'Görünen kartlar','Processed':'İşlenen','No evidence':'Kanıt yok','Failed':'Başarısız','Last event':'Son olay',
+    'Reading entitlement.':'Erişim bilgisi okunuyor.','Failed evidence collection is not charged.':'Başarısız kanıt toplama işlemi ücrete tabi değildir.','Loading account access and ARVIS status…':'Hesap erişimi ve ARVIS durumu yükleniyor…',
+    'View Plans':'KOSCH Erişimini Aç','Open Live Radar':'Canlı Radarı Aç','Explore Tools':'Araçları İncele','No active plan':'Aktif erişim yok','Choose a plan to unlock customer scans.':'Gelişmiş taramalar için KOSCH erişimini doğrulayın.','Entitlement verified.':'Erişim doğrulandı.','Get Outputs':'KOSCH Erişimini Aç',
+    'Choose a plan to run ARVIS':'ARVIS’i çalıştırmak için KOSCH erişimini açın','The live production radar remains visible, while customer scans, reports, watchlists and alerts require an active package.':'Canlı üretim radarı görüntülenebilir; müşteri taramaları, raporlar, izleme listeleri ve alarmlar için KOSCH erişimi gerekir.',
     'No outputs remaining':'Kalan çıktı yok','Your package is active, but a new output allocation is required before another customer scan can run.':'Erişim aktif ancak yeni müşteri taraması için kapasite gerekir.','Enter a target. A verdict appears only after evidence verification.':'Bir hedef girin. Karar yalnız kanıt doğrulandıktan sonra görünür.',
     'Locked':'Kilitli','Live':'Canlı','Stale':'Güncelliğini yitirmiş','Waiting':'Bekleniyor','verified':'doğrulanmış','verified evidence':'doğrulanmış kanıt','ARVIS engine':'ARVIS motoru','Verified observation':'Doğrulanmış gözlem','Real data unavailable. No output was charged.':'Gerçek veri kullanılamıyor. Çıktı hakkı düşülmedi.','Signed ARVIS verdict':'İmzalı ARVIS kararı','Verified verdict':'Doğrulanmış karar','Vault':'Rapor Kasası','Enter a target.':'Bir hedef girin.','Collecting verified evidence…':'Doğrulanmış kanıt toplanıyor…','Analysis failed.':'Analiz başarısız.','Verified evidence unavailable.':'Doğrulanmış kanıt kullanılamıyor.','No output was charged.':'Çıktı hakkı düşülmedi.','ARVIS response unavailable.':'ARVIS yanıtı kullanılamıyor.'
   };
@@ -20,7 +20,7 @@
     var text=String(value||'');
     var trimmed=text.trim();
     if(translations[trimmed]) return text.replace(trimmed,translations[trimmed]);
-    if(/^Enter a Solana token, pool, wallet, program, transaction or claim URL$/i.test(trimmed)) return 'Solana token, havuz, cüzdan, program, işlem veya claim URL’si girin';
+    if(/^Enter a Solana token, pool, wallet, program, transaction or claim URL$/i.test(trimmed)) return 'Solana token, havuz, cüzdan, program, işlem veya bağlantı girin';
     return text;
   }
 
@@ -34,7 +34,7 @@
   }
 
   ready(function(){
-    var links=[['/scan','Token Tara'],['/transaction-shield','İşlem Kalkanı'],['/safe-check','Safe Check'],['/security-radar','Radar'],['/dashboard','Panel'],['/kosch','KOSCH'],['/kosch-access','KOSCH Erişim'],['/address-poisoning-shield','Address Shield'],['/account','Hesap']];
+    var links=[['/scan','Token Tara'],['/transaction-shield','İşlem Kalkanı'],['/safe-check','Güvenli Kontrol'],['/security-radar','Güvenlik Radarı'],['/dashboard','Panel'],['/kosch','KOSCH']];
     var current=(location.pathname||'/').replace(/\.html$/,'').replace(/\/$/,'')||'/';
     var existing=document.querySelector('.top .nav, header.top nav.nav, nav.top .nav');
     var nav=existing||document.createElement('nav');
@@ -43,9 +43,9 @@
     while(nav.firstChild)nav.removeChild(nav.firstChild);
     links.forEach(function(item){var a=document.createElement('a');a.href=item[0];a.textContent=item[1];if(current===item[0])a.setAttribute('aria-current','page');nav.appendChild(a);});
     if(!existing){var top=document.querySelector('header.top,.top');if(top){nav.className+=' detached';top.parentNode.insertBefore(nav,top.nextSibling);}}
-    if(current==='/dashboard'&&!document.querySelector('.koschei-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip';strip.innerHTML='<div><b>Satın almadan veya imzalamadan önce Koschei’ye sor.</b><span>Token mintini canlı tara ya da serialized transaction’ı read-only simüle et.</span></div><span><a href="/scan">Token Tara</a> <a href="/transaction-shield">İşlem Kalkanı</a></span>';var anchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(anchor&&anchor.parentNode){anchor.parentNode.insertBefore(strip,anchor.nextSibling);}}
+    if(current==='/dashboard'&&!document.querySelector('.koschei-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip';strip.innerHTML='<div><b>Satın almadan veya imzalamadan önce Koschei’ye sor.</b><span>Token mintini canlı tara ya da Solana işlemini gönderilmeden önce simüle et.</span></div><span><a href="/scan">Token Tara</a> <a href="/transaction-shield">İşlem Kalkanı</a></span>';var anchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(anchor&&anchor.parentNode){anchor.parentNode.insertBefore(strip,anchor.nextSibling);}}
     var bottom=document.querySelector('nav.bottom');if(bottom)bottom.remove();
-    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei ARVIS · Solana satın alma ve imza öncesi güvenlik merkezi</span><span><a href="/scan">Token Tara</a> · <a href="/transaction-shield">İşlem Kalkanı</a> · <a href="/safe-check">Güvenli Kontrol</a> · <a href="/kosch">KOSCH</a></span>';document.body.appendChild(footer);}
+    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei ARVIS · Solana güvenlik merkezi</span><span><a href="/scan">Token Tara</a> · <a href="/transaction-shield">İşlem Kalkanı</a> · <a href="/safe-check">Güvenli Kontrol</a> · <a href="/kosch">KOSCH</a></span>';document.body.appendChild(footer);}
     translate(document.body);
     var observer=new MutationObserver(function(records){records.forEach(function(record){record.addedNodes.forEach(function(node){if(node.nodeType===1)translate(node);else if(node.nodeType===3&&node.parentElement){var next=translateString(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;}});});});
     observer.observe(document.body,{childList:true,subtree:true,characterData:false});
