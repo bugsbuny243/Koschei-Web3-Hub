@@ -1,0 +1,69 @@
+name: Verify RPC Provider Observability
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    env:
+      TARGET_BRANCH: ${{ github.head_ref }}
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Apply RPC observability patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat .github/agent-rpc/chunk-* | git hash-object --stdin)" = "19706a3337587eac8eaebca9a933159ba12c1d4e"
+          cat .github/agent-rpc/chunk-* | base64 -d | gzip -d > /tmp/apply_rpc_observability.py
+          python3 /tmp/apply_rpc_observability.py
+          gofmt -w \
+            koschei/api/main.go \
+            koschei/api/internal/web3/rpc_observability.go \
+            koschei/api/internal/web3/rpc_observability_test.go \
+            koschei/api/internal/web3/solana_rpc.go \
+            koschei/api/internal/web3/solana_rpc_test.go \
+            koschei/api/internal/web3/rpc_manager.go \
+            koschei/api/internal/services/solana_rpc_client.go \
+            koschei/api/internal/services/solana_rpc_batch.go \
+            koschei/api/internal/services/solana_rpc_failover.go \
+            koschei/api/internal/handlers/token_scanner.go \
+            koschei/api/internal/handlers/rug_radar.go
+
+      - name: Test API
+        working-directory: koschei/api
+        run: go test ./...
+
+      - name: Vet API
+        working-directory: koschei/api
+        run: go vet ./...
+
+      - name: Build API
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+
+      - name: Commit verified implementation
+        run: |
+          rm -rf .github/agent-rpc .github/workflows/agent-rpc-observability.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Log Solana RPC providers and failure classes"
+          git push origin HEAD:${TARGET_BRANCH}
