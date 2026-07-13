@@ -48,6 +48,8 @@ jobs:
               '''    } else if caseClass == "clean_distributed" && mintKnown && freezeKnown {\n        out = append(out, "Mint ve freeze authority kapalı olarak doğrulandı.")\n    }''',
               '    }',
           )
+          text = text.replace('mintAuth, mintKnown := explanationModuleBool', 'mintAuth, _ := explanationModuleBool')
+          text = text.replace('freezeAuth, freezeKnown := explanationModuleBool', 'freezeAuth, _ := explanationModuleBool')
           text = text.replace(
               'if caseClass == "critical_concentration" && top1 >= 50 && len(out) == 0 {',
               'if caseClass == "critical_concentration" && top1 >= 50 {',
