@@ -73,13 +73,14 @@ jobs:
           set -o pipefail
           CGO_ENABLED=0 GOOS=linux go build ./... 2>&1 | tee ../../holder-unification-diagnostics/build.log
 
-      - name: Upload diagnostics
+      - name: Persist diagnostics on failure
         if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: holder-unification-diagnostics
-          path: holder-unification-diagnostics
-          if-no-files-found: error
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add holder-unification-diagnostics
+          git commit -m "Record holder unification diagnostics"
+          git push origin HEAD:${TARGET_BRANCH}
 
       - name: Commit verified implementation
         run: |
