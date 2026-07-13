@@ -7,51 +7,25 @@ import (
 	"koschei/api/internal/services"
 )
 
-func TestOwnerRadarNarrativeExplainsMeaning(t *testing.T) {
-	final := map[string]any{"risk_index": 53, "risk_level": "medium", "signed": true}
-	warning := map[string]any{"positive_signals": []string{"Mint authority kapalı/revoked olarak gözlendi.", "Freeze authority kapalı/revoked olarak gözlendi."}}
-	distribution := map[string]any{
-		"available": true, "role_adjusted": true, "blocking_evidence_gap": false,
-		"top_1_percentage": 2.4774, "top_10_percentage": 14.6475, "top_20_percentage": 22.108,
-		"protocol_controlled_percentage": 2.0999, "dominant_role": "externally_owned_wallet",
+func TestOwnerRadarNarrativeUsesDriverFirstV2(t *testing.T) {
+	usd := 16000.0
+	holder := services.HolderIntelligence{Available: true, Top1Percentage: 62, Top10Percentage: 88, RiskBearingOwnerCount: 5, WalletsWithParsedEvidence: 3, Market: services.TokenMarketSnapshot{LiquidityUSD: 10000}, Rows: []services.HolderIntelligenceRow{{OwnerWallet: "WalletA", OwnerResolved: true, RiskBearing: true, ReferenceUSDValue: &usd}}}
+	modules := []map[string]any{{"module": "Holder Concentration", "module_id": "holder_concentration", "risk_index": 70, "verified": true, "signed": true, "signals": map[string]any{}}}
+	text := ownerRadarNarrative("target", map[string]any{"risk_index": 70, "risk_level": "high", "signed": true}, map[string]any{}, map[string]any{"top_1_percentage": 62.0, "top_10_percentage": 88.0}, map[string]any{}, modules, holder, services.LaunchForensicsAnalysis{OwnersRequested: 5, OwnersWithTradeHistory: 3})
+	if !strings.HasPrefix(text, "WalletA") || !strings.Contains(text, "62.00%") || !strings.Contains(text, "havuzun ~1.6 katı") {
+		t.Fatalf("narrative=%s", text)
 	}
-	modules := []map[string]any{{
-		"module": "Sniper Timing Detector", "module_id": "sniper_timing_detector",
-		"risk_index": 53, "risk_level": "medium", "verified": true, "signed": true,
-		"verdict": "Ardışık slotlarda kümelenen alımlar ek inceleme gerektiriyor.",
-	}}
-	holder := services.HolderIntelligence{Available: true, Findings: []string{"En büyük owner bakiyesi ve referans USD değeri doğrulandı."}}
-	text := ownerRadarNarrative("4ko5tSr5o3H4v1sFtjTSd9MPUW7yx5AFCpkNPoL6pump", final, warning, distribution, map[string]any{}, modules, holder, services.LaunchForensicsAnalysis{})
-	for _, expected := range []string{
-		"53/100 ile ORTA risk seviyesinde", "tek başına ciddi bir balina", "Olumlu sinyaller:",
-		"ana risk sürücüsü Sniper Timing Detector", "Creator/deployer cüzdanı bu taramada doğrulanamadı",
-		"En büyük owner bakiyesi", "Pratik sonuç:",
-	} {
-		if !strings.Contains(text, expected) {
-			t.Fatalf("expected %q in narrative: %s", expected, text)
+	for _, forbidden := range []string{"Koschei bu tokenı", "Olumlu sinyaller:", "Pratik sonuç:"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("template phrase %q leaked: %s", forbidden, text)
 		}
-	}
-	if strings.Contains(text, "ARVIS kararı: MEDIUM, risk") {
-		t.Fatalf("machine-like legacy summary returned: %s", text)
 	}
 }
 
-func TestOwnerRadarNarrativeEvidencePendingStillExplainsKnownHoldings(t *testing.T) {
-	usd := 4971180.0
-	holder := services.HolderIntelligence{
-		Available: true, Supply: 1000000000, OwnerCount: 20, RiskBearingOwnerCount: 19,
-		TopOwnerPercentage: 99.4236, WalletsWithObservedOutflow: 2, CommonExitGroupCount: 1,
-		Market: services.TokenMarketSnapshot{Available: true, PriceUSD: 0.005, Volume24hUSD: 800000, LiquidityUSD: 200000, MarketCapUSD: 5000000},
-		Rows:   []services.HolderIntelligenceRow{{TokenAccounts: []string{"DominantTokenAccount"}, Balance: 994236000, RawPercentage: 99.4236, Role: "owner_unresolved", ReferenceUSDValue: &usd}},
-	}
-	warning := map[string]any{"reasons": []string{"Baskın token hesabının ekonomik rolü çözülemedi."}}
-	text := ownerRadarNarrative("target", map[string]any{"risk_index": nil, "risk_level": "unknown", "signed": false}, warning, map[string]any{}, map[string]any{}, nil, holder, services.LaunchForensicsAnalysis{})
-	for _, expected := range []string{"EVIDENCE PENDING", "994236000", "99.4236%", "$4971180.00", "2 holder wallet", "1 ortak recipient-owner"} {
-		if !strings.Contains(text, expected) {
-			t.Fatalf("expected %q in pending narrative: %s", expected, text)
-		}
-	}
-	if strings.Contains(text, "elde veri olmadığı") && !strings.Contains(text, "bu, elde veri olmadığı") {
-		t.Fatalf("pending narrative hid known facts: %s", text)
+func TestOwnerRadarNarrativePendingKeepsKnownNumbersAndOneLimitsParagraph(t *testing.T) {
+	holder := services.HolderIntelligence{Available: true, Top1Percentage: 99.42, Top10Percentage: 100, FinalVerdictBlocked: true, Rows: []services.HolderIntelligenceRow{{OwnerWallet: "WalletA", OwnerResolved: true, RiskBearing: true}}}
+	text := ownerRadarNarrative("target", map[string]any{"risk_index": nil, "risk_level": "unknown", "signed": false}, map[string]any{}, map[string]any{"top_1_percentage": 99.42, "top_10_percentage": 100.0}, map[string]any{}, nil, holder, services.LaunchForensicsAnalysis{OwnersRequested: 19, OwnersWithTradeHistory: 1})
+	if !strings.Contains(text, "Top 1 99.42%") || strings.Count(text, "Sınırlar:") != 1 || !strings.Contains(text, "eksik gözlem güvenlik sinyali sayılmadı") {
+		t.Fatalf("narrative=%s", text)
 	}
 }

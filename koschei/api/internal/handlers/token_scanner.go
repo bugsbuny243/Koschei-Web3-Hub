@@ -47,6 +47,7 @@ type tokenScanResponse struct {
 	LaunchForensics       services.LaunchForensicsAnalysis `json:"launch_forensics"`
 	VerifiedEvidence      []string                         `json:"verified_evidence"`
 	Explanation           string                           `json:"explanation"`
+	ExplanationV2         scanExplanationV2                `json:"explanation_v2"`
 	HolderAnalysisStatus  string                           `json:"holder_analysis_status"`
 	VerdictWithheld       bool                             `json:"verdict_withheld"`
 	Disclaimer            string                           `json:"disclaimer"`
@@ -203,6 +204,7 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 		LaunchForensics:       holderCore.LaunchForensics,
 		VerifiedEvidence:      holderIntelligenceCoreEvidence(holderCore),
 		Explanation:           holderIntelligenceCoreExplanation(holderCore),
+		ExplanationV2:         holderIntelligenceCoreExplanationV2(holderCore),
 		HolderAnalysisStatus:  holderIntelligenceCoreStatus(holderCore),
 		VerdictWithheld:       holderPolicy == "withhold",
 		Disclaimer:            disclaimer,

@@ -47,6 +47,7 @@ func (h *Handler) SecurityRadarDetailV3(w http.ResponseWriter, r *http.Request) 
 	allEvidence := radarDetailEvidence(arms)
 	warning := radarDetailWarning(final, distribution, structural, modules, sourceContext)
 	graph := h.radarDetailGraph(r.Context(), target)
+	explanationV2 := holderIntelligenceCoreExplanationV2(core)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":                  true,
@@ -66,6 +67,8 @@ func (h *Handler) SecurityRadarDetailV3(w http.ResponseWriter, r *http.Request) 
 		"source_context":      sourceContext,
 		"modules":             modules,
 		"evidence":            allEvidence,
+		"explanation_v2":      explanationV2,
+		"narrative":           explanationV2.Text,
 		"graph":               graph,
 		"evidence_policy": map[string]any{
 			"hide_verified_details": false,

@@ -191,8 +191,10 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 			"financial_advice":     false,
 		},
 	}
+	explanationV2 := holderIntelligenceCoreExplanationV2(core)
 	detail["primary_risk_driver"] = ownerRadarPrimaryRiskDriver(modules)
-	detail["narrative"] = ownerRadarNarrative(target, final, warning, distribution, sourceContext, modules, holderIntelligence, launchForensics)
+	detail["explanation_v2"] = explanationV2
+	detail["narrative"] = explanationV2.Text
 	writeJSON(w, http.StatusOK, detail)
 }
 
@@ -211,82 +213,24 @@ func ownerRadarModuleSignal(modules []map[string]any, moduleID, key string) any 
 
 func ownerRadarNarrative(target string, final, warning, distribution, source map[string]any, modules []map[string]any, holder services.HolderIntelligence, launch services.LaunchForensicsAnalysis) string {
 	signed, _ := final["signed"].(bool)
-	level := strings.ToLower(strings.TrimSpace(fmt.Sprint(final["risk_level"])))
-	if !signed || final["risk_index"] == nil || level == "" || level == "unknown" || level == "<nil>" {
-		return ownerRadarPendingNarrative(target, holder, distribution, warning)
-	}
-
-	risk := radarDetailNumber(final["risk_index"])
-	parts := []string{
-		fmt.Sprintf("Koschei bu tokenı (%s) %.0f/100 ile %s risk seviyesinde değerlendiriyor. %s", ownerRadarShortTarget(target), risk, ownerRadarRiskLabelTR(level), ownerRadarRiskMeaning(level)),
-	}
-	if sourceSignals, ok := source["signals"].(map[string]any); ok {
-		volume := radarDetailNumber(sourceSignals["volume_24h_usd"])
-		threshold := radarDetailNumber(sourceSignals["volume_threshold_usd"])
-		if volume > 0 && threshold > 0 {
-			parts = append(parts, fmt.Sprintf("Bu rapor otomatik Pump hacim radarı tarafından açıldı: toplam 24 saatlik işlem hacmi $%.0f ve eşik $%.0f. Hacim tek başına güvenlik veya dolandırıcılık hükmü değildir; yalnızca derin inceleme tetikleyicisidir.", volume, threshold))
-		}
-	}
-
-	if available, _ := distribution["available"].(bool); available {
-		top1 := radarDetailNumber(distribution["top_1_percentage"])
-		top10 := radarDetailNumber(distribution["top_10_percentage"])
-		top20 := radarDetailNumber(distribution["top_20_percentage"])
-		if adjusted, _ := distribution["role_adjusted"].(bool); adjusted {
-			protocolPct := radarDetailNumber(distribution["protocol_controlled_percentage"])
-			role := ownerRadarRoleTR(strings.TrimSpace(fmt.Sprint(distribution["dominant_role"])))
-			parts = append(parts, fmt.Sprintf("Holder hesabında ham arzın %.2f%%'si doğrulanmış bonding-curve veya protokol envanteri olduğu için normal bir balina gibi sayılmadı. Bu ayrımdan sonra en büyük gerçek holderın payı %.2f%%, ilk 10 holderın toplamı %.2f%% ve ilk 20 holderın toplamı %.2f%% olarak ölçüldü; baskın hesap tipi %s.", protocolPct, top1, top10, top20, role))
-		} else {
-			parts = append(parts, fmt.Sprintf("Gözlenen holder dağılımında en büyük hesap %.2f%%, ilk 10 hesap %.2f%% ve ilk 20 hesap %.2f%% paya sahip.", top1, top10, top20))
-		}
-		parts = append(parts, ownerRadarHolderMeaning(top1, top10))
-		if blocked, _ := distribution["blocking_evidence_gap"].(bool); blocked {
-			parts = append(parts, "Ancak baskın token hesabının ekonomik rolü çözülemediği için holder tarafında kesin sonuç verilmedi; veri yokluğu güvenli kabul edilmedi.")
-		}
-	}
-
-	positives := ownerRadarStringSlice(warning["positive_signals"])
-	if len(positives) > 0 {
-		if len(positives) > 3 {
-			positives = positives[:3]
-		}
-		parts = append(parts, "Olumlu sinyaller: "+strings.Join(positives, " "))
-	}
-
-	if driver := ownerRadarPrimaryRiskDriver(modules); len(driver) > 0 {
-		name := strings.TrimSpace(fmt.Sprint(driver["module"]))
-		score := radarDetailNumber(driver["risk_index"])
-		verdict := strings.TrimSpace(fmt.Sprint(driver["verdict"]))
-		if verdict == "" || verdict == "<nil>" {
-			verdict = strings.TrimSpace(fmt.Sprint(driver["recommendation"]))
-		}
-		if verdict != "" && verdict != "<nil>" {
-			parts = append(parts, fmt.Sprintf("Final puanı yukarı taşıyan ana risk sürücüsü %s modülüdür (%.0f/100). Modülün yorumu: %s", name, score, verdict))
-		} else {
-			parts = append(parts, fmt.Sprintf("Final puanı yukarı taşıyan ana risk sürücüsü %s modülüdür (%.0f/100).", name, score))
-		}
-	}
-
-	creator := strings.TrimSpace(fmt.Sprint(source["creator_wallet"]))
-	if creator != "" && creator != "<nil>" {
-		parts = append(parts, "Launch kaynağında creator/deployer ile ilişkili görünen cüzdan "+creator+" olarak gözlendi. Bu yalnızca zincir üstü veya kaynak temelli bir ilişkiyi gösterir; tek başına kötü niyet kanıtı değildir.")
-	} else {
-		parts = append(parts, "Creator/deployer cüzdanı bu taramada doğrulanamadı. Bu, creator olmadığı anlamına gelmez; yalnızca mevcut kaynakların ilişkiyi çözemediğini gösterir.")
-	}
-
-	if holder.Available {
-		for _, finding := range holder.Findings {
-			if strings.TrimSpace(finding) != "" {
-				parts = append(parts, finding)
+	explanation := buildScanExplanationV2(scanExplanationInput{
+		Target:    target,
+		RiskIndex: radarDetailNumber(final["risk_index"]),
+		RiskLevel: strings.TrimSpace(fmt.Sprint(final["risk_level"])),
+		Signed:    signed,
+		Policy: func() string {
+			if signed {
+				return "evidence_backed"
 			}
-		}
-	}
-	if strings.TrimSpace(launch.Summary) != "" {
-		parts = append(parts, launch.Summary)
-	}
-	parts = append(parts, ownerRadarPracticalConclusion(level, distribution))
-	parts = append(parts, "Bu değerlendirme kanıt kapsamındadır; kötü niyet, dolandırıcılık veya gerçek kişi kimliği iddiası değildir.")
-	return strings.Join(parts, " ")
+			return "withhold"
+		}(),
+		Distribution: distribution,
+		Warning:      warning,
+		Holder:       holder,
+		Launch:       launch,
+		Modules:      modules,
+	})
+	return explanation.Text
 }
 
 func ownerRadarPendingNarrative(target string, holder services.HolderIntelligence, distribution, warning map[string]any) string {

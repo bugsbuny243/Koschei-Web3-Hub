@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -14,18 +13,19 @@ import (
 // preserves raw account evidence in Roles while exposing owner-normalized
 // concentration, bounded history and launch forensics through Intelligence.
 type holderIntelligenceCoreResult struct {
-	Request         services.SecurityRadarRequest
-	Analysis        services.ArvisAnalysis
-	Bundle          services.SecurityRadarBundle
-	Arms            []services.SecurityRadarVerdict
-	Final           services.SecurityRadarFinalVerdict
-	Roles           services.HolderRoleAnalysis
-	Distribution    map[string]any
-	Cluster         services.HolderClusterAnalysis
-	Market          services.TokenMarketSnapshot
-	Intelligence    services.HolderIntelligence
-	LaunchForensics services.LaunchForensicsAnalysis
-	SourceContext   map[string]any
+	Request               services.SecurityRadarRequest
+	Analysis              services.ArvisAnalysis
+	Bundle                services.SecurityRadarBundle
+	Arms                  []services.SecurityRadarVerdict
+	Final                 services.SecurityRadarFinalVerdict
+	Roles                 services.HolderRoleAnalysis
+	Distribution          map[string]any
+	Cluster               services.HolderClusterAnalysis
+	Market                services.TokenMarketSnapshot
+	Intelligence          services.HolderIntelligence
+	LaunchForensics       services.LaunchForensicsAnalysis
+	RepeatDominantHolders []services.RepeatDominantHolderEvidence
+	SourceContext         map[string]any
 }
 
 func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, network, mode string) holderIntelligenceCoreResult {
@@ -65,13 +65,35 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 		services.BuildHolderIntelligence(roles, cluster, market, time.Now().UTC()),
 		launch,
 	)
+	repeatDominant := []services.RepeatDominantHolderEvidence{}
+	if h != nil {
+		historyDB := h.DB
+		if historyDB == nil {
+			historyDB = h.DBRead
+		}
+		if historyDB != nil {
+			store := services.NewSecurityRadarStore(historyDB)
+			_ = store.CaptureHolderSnapshots(parent, target, network, intelligence)
+			if found, err := store.RepeatDominantHolders(parent, intelligence, target, services.RepeatDominantObservationDays); err == nil && len(found) > 0 {
+				repeatDominant = found
+				intelligence = services.ApplyRepeatDominantHolderEvidenceToHolderIntelligence(intelligence, found)
+				analysis = services.ApplyRepeatDominantHolderEvidenceToAnalysis(analysis, req, found)
+				bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
+				arms = services.ArvisArmsFromBundle(bundle)
+				if len(arms) == 0 {
+					arms = analysis.Arms
+				}
+				final = services.ArvisFinalFromBundle(bundle)
+			}
+		}
+	}
 	if h != nil && h.DB != nil {
 		services.NewSecurityRadarStore(h.DB).CaptureLaunchForensicsFloor(parent, target, network, launch)
 	}
 	return holderIntelligenceCoreResult{
 		Request: req, Analysis: analysis, Bundle: bundle, Arms: arms, Final: final,
 		Roles: roles, Distribution: distribution, Cluster: cluster, Market: market,
-		Intelligence: intelligence, LaunchForensics: launch, SourceContext: source,
+		Intelligence: intelligence, LaunchForensics: launch, RepeatDominantHolders: repeatDominant, SourceContext: source,
 	}
 }
 
@@ -107,6 +129,9 @@ func holderIntelligenceCoreEvidence(core holderIntelligenceCoreResult) []string 
 	values = appendUniqueHolderCoreEvidence(values, core.Intelligence.Findings...)
 	values = appendUniqueHolderCoreEvidence(values, core.Cluster.Findings...)
 	values = appendUniqueHolderCoreEvidence(values, core.LaunchForensics.Findings...)
+	for _, repeat := range core.RepeatDominantHolders {
+		values = appendUniqueHolderCoreEvidence(values, repeat.EvidenceLine)
+	}
 	if strings.TrimSpace(core.LaunchForensics.Summary) != "" {
 		values = appendUniqueHolderCoreEvidence(values, core.LaunchForensics.Summary)
 	}
@@ -135,57 +160,17 @@ func appendUniqueHolderCoreEvidence(dst []string, values ...string) []string {
 	return dst
 }
 
+func holderIntelligenceCoreExplanationV2(core holderIntelligenceCoreResult) scanExplanationV2 {
+	return buildScanExplanationV2(scanExplanationInput{
+		Target: core.Request.Target, RiskIndex: float64(core.Final.RiskIndex), RiskLevel: core.Final.RiskLevel,
+		Signed: core.Final.Signed, Policy: holderIntelligenceCorePolicy(core), Distribution: core.Distribution,
+		Holder: core.Intelligence, Cluster: core.Cluster, Launch: core.LaunchForensics, Modules: radarDetailModules(core.Arms),
+		RepeatDominant: core.RepeatDominantHolders,
+	})
+}
+
 func holderIntelligenceCoreExplanation(core holderIntelligenceCoreResult) string {
-	if !core.Intelligence.Available {
-		return "Holder intelligence is unavailable or incomplete; missing history is not treated as a safety signal."
-	}
-	parts := []string{}
-	if core.Intelligence.OwnerAggregationApplied {
-		parts = append(parts, fmt.Sprintf(
-			"Token accounts were resolved and aggregated into %d controlling owner surfaces before concentration was calculated.",
-			core.Intelligence.OwnerCount,
-		))
-	}
-	if protocol := core.Roles.ProtocolControlledPercentage + core.Roles.BurnPercentage; protocol > 0 {
-		parts = append(parts, fmt.Sprintf(
-			"Positively identified protocol, liquidity or burn inventory representing %.4f%% of raw supply was reported separately from ordinary holder risk.",
-			protocol,
-		))
-	}
-	parts = append(parts, fmt.Sprintf(
-		"Ordinary risk-bearing owners account for an owner-normalized Top 1 concentration of %.4f%% and Top 10 concentration of %.4f%%.",
-		core.Intelligence.Top1Percentage,
-		core.Intelligence.Top10Percentage,
-	))
-	if core.Cluster.WalletsRequested > 0 {
-		parts = append(parts, fmt.Sprintf(
-			"Bounded behavior observation used deep history for %d owners and shallow history for %d owners, consuming %d of the %d-call RPC budget.",
-			core.Cluster.DeepOwnersScanned,
-			core.Cluster.ShallowOwnersScanned,
-			core.Cluster.RPCCallsUsed,
-			core.Cluster.RPCBudget,
-		))
-	}
-	limited := 0
-	for _, row := range core.Intelligence.Rows {
-		if row.ObservationBudgetDegraded || row.ObservationStatus == "rpc_budget_exhausted" ||
-			row.ObservationStatus == "no_observed_signatures" || row.ObservationStatus == "signature_only_observation" {
-			limited++
-		}
-	}
-	if limited > 0 {
-		parts = append(parts, fmt.Sprintf(
-			"%d owner observations were limited, signature-only, empty within the queried window or budget-degraded; those gaps are not classified as safe or organic.",
-			limited,
-		))
-	}
-	if strings.TrimSpace(core.LaunchForensics.Summary) != "" {
-		parts = append(parts, core.LaunchForensics.Summary)
-	}
-	if core.Intelligence.FinalVerdictBlocked {
-		parts = append(parts, "A dominant owner role remains unresolved, so the holder verdict is withheld rather than downgraded.")
-	}
-	return strings.Join(parts, " ")
+	return holderIntelligenceCoreExplanationV2(core).Text
 }
 
 type customerTokenScanResult struct {
@@ -196,6 +181,7 @@ type customerTokenScanResult struct {
 	LaunchForensics      services.LaunchForensicsAnalysis `json:"launch_forensics"`
 	VerifiedEvidence     []string                         `json:"verified_evidence"`
 	Explanation          string                           `json:"explanation"`
+	ExplanationV2        scanExplanationV2                `json:"explanation_v2"`
 	HolderAnalysisStatus string                           `json:"holder_analysis_status"`
 	FinalPolicy          string                           `json:"final_policy"`
 	VerdictWithheld      bool                             `json:"verdict_withheld"`
@@ -238,6 +224,7 @@ func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligen
 		LaunchForensics:      core.LaunchForensics,
 		VerifiedEvidence:     holderIntelligenceCoreEvidence(core),
 		Explanation:          holderIntelligenceCoreExplanation(core),
+		ExplanationV2:        holderIntelligenceCoreExplanationV2(core),
 		HolderAnalysisStatus: holderIntelligenceCoreStatus(core),
 		FinalPolicy:          policy,
 		VerdictWithheld:      policy == "withhold",

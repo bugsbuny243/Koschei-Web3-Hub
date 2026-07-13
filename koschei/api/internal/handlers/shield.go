@@ -68,6 +68,7 @@ func (h *Handler) ShieldPreflight(w http.ResponseWriter, r *http.Request) {
 		"verdict":                final.Verdict,
 		"recommendation":         final.Recommendation,
 		"reason":                 reason,
+		"explanation_v2":         holderIntelligenceCoreExplanationV2(core),
 		"signed":                 final.Signed,
 		"signature":              final.Signature,
 		"latency_ms":             latencyMS,
