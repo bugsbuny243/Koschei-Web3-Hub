@@ -10,12 +10,12 @@ import (
 	"time"
 )
 
-const defaultActorDefenseCorrelationInterval = 2 * time.Minute
+const defaultActorDefenseCorrelationInterval = 10 * time.Minute
 
-// ActorDefenseCorrelator continuously turns cheap production sensor history
-// into durable wallet-level threat tracks. It performs no Solana RPC calls and
-// therefore remains safe for the full Pump discovery volume. Expensive live
-// transaction verification stays selective and on-demand.
+// ActorDefenseCorrelator continuously turns a bounded 30-day production sensor
+// window into durable wallet-level threat tracks. It performs no Solana RPC
+// calls and therefore remains safe for the full Pump discovery volume.
+// Expensive live transaction verification stays selective and on-demand.
 type ActorDefenseCorrelator struct {
 	DB        *sql.DB
 	PollEvery time.Duration
@@ -39,13 +39,13 @@ func (w *ActorDefenseCorrelator) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			runCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+			runCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 			stats, err := w.RunOnce(runCtx)
 			cancel()
 			if err != nil && ctx.Err() == nil {
 				log.Printf("actor defense correlation cycle failed: %v", err)
 			} else if stats.CreatorTracks > 0 || stats.HolderTracks > 0 {
-				log.Printf("actor defense correlation cycle: creator_tracks=%d repeat_holder_tracks=%d", stats.CreatorTracks, stats.HolderTracks)
+				log.Printf("actor defense correlation cycle: creator_tracks=%d repeat_holder_tracks=%d window_days=30", stats.CreatorTracks, stats.HolderTracks)
 			}
 			timer.Reset(w.PollEvery)
 		}
@@ -89,7 +89,7 @@ func actorDefenseCorrelationInterval() time.Duration {
 		return defaultActorDefenseCorrelationInterval
 	}
 	seconds, err := strconv.Atoi(raw)
-	if err != nil || seconds < 60 || seconds > 3600 {
+	if err != nil || seconds < 120 || seconds > 3600 {
 		return defaultActorDefenseCorrelationInterval
 	}
 	return time.Duration(seconds) * time.Second
@@ -108,6 +108,7 @@ WITH creator_tokens AS (
 		max(e.created_at) AS last_seen_at
 	FROM security_radar_events e
 	WHERE e.target_type='token'
+	  AND e.created_at >= now()-interval '30 days'
 	  AND btrim(COALESCE(e.target,''))<>''
 	  AND COALESCE(
 			NULLIF(btrim(e.signals->>'creator_wallet'),''),
@@ -126,7 +127,8 @@ WITH creator_tokens AS (
 	SELECT DISTINCT ON (network,target,owner_wallet)
 		network,target,owner_wallet,percentage,scanned_at
 	FROM security_radar_holder_snapshots
-	WHERE btrim(COALESCE(owner_wallet,''))<>''
+	WHERE scanned_at >= now()-interval '30 days'
+	  AND btrim(COALESCE(owner_wallet,''))<>''
 	ORDER BY network,target,owner_wallet,scanned_at DESC,id DESC
 ), repeated_related AS (
 	SELECT ct.network,ct.wallet,lh.owner_wallet,count(DISTINCT ct.target)::integer AS shared_tokens
@@ -153,6 +155,7 @@ SELECT
 	jsonb_build_object(
 		'auto_correlated',true,
 		'actor_role','creator_deployer',
+		'observation_window_days',30,
 		'created_token_count',c.token_count,
 		'repeated_related_actor_count',COALESCE(r.related_actor_count,0),
 		'max_shared_token_count',COALESCE(r.max_shared_tokens,0),
@@ -183,7 +186,8 @@ WITH latest AS (
 	SELECT DISTINCT ON (network,target,owner_wallet)
 		network,target,owner_wallet,percentage,scanned_at
 	FROM security_radar_holder_snapshots
-	WHERE btrim(COALESCE(owner_wallet,''))<>''
+	WHERE scanned_at >= now()-interval '30 days'
+	  AND btrim(COALESCE(owner_wallet,''))<>''
 	ORDER BY network,target,owner_wallet,scanned_at DESC,id DESC
 ), repeat_holders AS (
 	SELECT network,owner_wallet,count(DISTINCT target)::integer AS token_count,
@@ -203,6 +207,7 @@ SELECT
 	jsonb_build_object(
 		'auto_correlated',true,
 		'actor_role','repeat_dominant_holder',
+		'observation_window_days',30,
 		'dominant_holder_token_count',token_count,
 		'max_holder_percentage',max_percentage,
 		'correlation_scope','Owner-resolved top-five holder snapshots at or above 20 percent; not identity or intent proof'
