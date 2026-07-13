@@ -35,7 +35,8 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p holder-unification-diagnostics
-          base64 -d .github/agent/apply_holder_unification.py.gz.b64 | gzip -d > .github/agent/apply_holder_unification.py
+          test "$(cat .github/agent/chunk-* | git hash-object --stdin)" = "815ab33bc5a057737e4ae8ac9da7d4b193f52de5"
+          cat .github/agent/chunk-* | base64 -d | gzip -d > .github/agent/apply_holder_unification.py
           python3 .github/agent/apply_holder_unification.py 2>&1 | tee holder-unification-diagnostics/apply.log
           gofmt -w \
             koschei/api/internal/services/security_radars.go \
