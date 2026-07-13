@@ -106,11 +106,28 @@ func (w *securityRadarRetentionWorker) runOnce(ctx context.Context) {
 			LIMIT $2
 		)`, cutoff)
 
+	trades := w.deleteBatched(ctx, "token_trade_events", `
+		DELETE FROM token_trade_events
+		WHERE id IN (
+			SELECT t.id FROM token_trade_events t
+			WHERE COALESCE(t.block_time,t.created_at) < now()-interval '72 hours'
+			  AND NOT EXISTS (
+				SELECT 1 FROM watchlist_targets w
+				WHERE w.status='active' AND lower(w.target)=lower(t.mint)
+			  )
+			  AND NOT EXISTS (
+				SELECT 1 FROM security_radar_verdicts v
+				WHERE lower(v.target)=lower(t.mint) AND v.created_at >= $1
+			  )
+			ORDER BY COALESCE(t.block_time,t.created_at) ASC
+			LIMIT $2
+		)`, cutoff)
+
 	// token_structural_signals is deliberately retained. It is one row per
 	// token and the floor reader already ignores stale holder/authority clocks.
-	if verdicts+events+seen+stream > 0 {
-		log.Printf("radar retention: removed verdicts=%d events=%d seen_signatures=%d stream_events=%d (older than %s)",
-			verdicts, events, seen, stream, cutoff.Format(time.RFC3339))
+	if verdicts+events+seen+stream+trades > 0 {
+		log.Printf("radar retention: removed verdicts=%d events=%d seen_signatures=%d stream_events=%d trade_events=%d (scan cutoff %s; unprotected trades also require age >72h)",
+			verdicts, events, seen, stream, trades, cutoff.Format(time.RFC3339))
 	}
 }
 
