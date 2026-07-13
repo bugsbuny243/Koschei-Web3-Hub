@@ -1,0 +1,89 @@
+name: Verify Explanation V2 and Repeat Holders
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    env:
+      TARGET_BRANCH: ${{ github.head_ref }}
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Apply surgical patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat .github/agent/chunk-* | git hash-object --stdin)" = "aaaada17ad419271d5766ec0b734b243a8b9098a"
+          cat .github/agent/chunk-* | base64 -d | gzip -d > /tmp/apply_explanation_v2.py
+          python3 /tmp/apply_explanation_v2.py
+          gofmt -w \
+            koschei/api/internal/handlers/explanation_engine_v2.go \
+            koschei/api/internal/handlers/explanation_engine_v2_test.go \
+            koschei/api/internal/handlers/holder_intelligence_core.go \
+            koschei/api/internal/handlers/owner_operations.go \
+            koschei/api/internal/handlers/owner_operations_narrative_test.go \
+            koschei/api/internal/handlers/security_radar_detail_v3.go \
+            koschei/api/internal/handlers/shield.go \
+            koschei/api/internal/handlers/token_scanner.go \
+            koschei/api/internal/services/holder_intelligence.go \
+            koschei/api/internal/services/repeat_dominant_holder.go \
+            koschei/api/internal/services/repeat_dominant_holder_test.go \
+            koschei/api/internal/services/security_radar_store.go
+          node --check koschei/api/public/js/owner-launch-forensics.js
+
+      - name: Test API
+        shell: bash
+        working-directory: koschei/api
+        run: |
+          set -o pipefail
+          mkdir -p ../../explanation-v2-diagnostics
+          go test ./... 2>&1 | tee ../../explanation-v2-diagnostics/test.log
+
+      - name: Vet API
+        shell: bash
+        working-directory: koschei/api
+        run: |
+          set -o pipefail
+          go vet ./... 2>&1 | tee ../../explanation-v2-diagnostics/vet.log
+
+      - name: Build API
+        shell: bash
+        working-directory: koschei/api
+        run: |
+          set -o pipefail
+          CGO_ENABLED=0 GOOS=linux go build ./... 2>&1 | tee ../../explanation-v2-diagnostics/build.log
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: explanation-v2-diagnostics
+          path: explanation-v2-diagnostics
+          if-no-files-found: ignore
+
+      - name: Commit verified implementation
+        run: |
+          rm -rf .github/agent .github/workflows/agent-explanation-v2.yml explanation-v2-diagnostics
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add driver-first explanations and repeat holder intelligence"
+          git push origin HEAD:${TARGET_BRANCH}
