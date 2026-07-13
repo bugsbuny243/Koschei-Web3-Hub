@@ -126,8 +126,8 @@ func analyzeLaunchOwnerATA(ctx context.Context, rpcURL, mint string, candidate l
 	})
 	trades := []LaunchTrade{}
 	for start := 0; start < len(signatures); start += launchTransactionBatchSize {
-		if ctx.Err() != nil || !budget.Reserve(1) {
-			base.Evidence = append(base.Evidence, "ATA transaction parse bütçesi doldu; kısmi geçmiş korundu.")
+		if ctx.Err() != nil {
+			base.Evidence = append(base.Evidence, "ATA işlem ayrıştırması istek süresi nedeniyle kısmi kaldı.")
 			break
 		}
 		end := start + launchTransactionBatchSize
@@ -138,13 +138,19 @@ func analyzeLaunchOwnerATA(ctx context.Context, rpcURL, mint string, candidate l
 		for _, signature := range signatures[start:end] {
 			keys = append(keys, signature.Signature)
 		}
+		granted := budget.ReserveUpTo(len(keys))
+		if granted == 0 {
+			base.Evidence = append(base.Evidence, "ATA işlem ayrıştırma bütçesi doldu; kısmi geçmiş korundu.")
+			break
+		}
+		keys = keys[:granted]
 		transactions, err := SolanaGetTransactionsJSONParsedBatch(ctx, rpcURL, keys)
 		if err != nil {
 			base.Evidence = append(base.Evidence, "ATA parsed transaction batch alınamadı: "+compactClusterError(err))
 			continue
 		}
 		base.TransactionsParsed += len(transactions)
-		for _, signature := range signatures[start:end] {
+		for _, signature := range signatures[start : start+granted] {
 			tx, ok := transactions[signature.Signature]
 			if !ok {
 				continue
@@ -198,7 +204,7 @@ func launchOwnerSOLDelta(tx map[string]any, wallet string) float64 {
 		limit = len(post)
 	}
 	for i := 0; i < limit; i++ {
-		if strings.EqualFold(keys[i], wallet) {
+		if keys[i] == wallet {
 			return float64(post[i]-pre[i]) / 1e9
 		}
 	}
@@ -209,9 +215,9 @@ func launchCounterpartyProgram(tx map[string]any) string {
 	message := holderClusterMap(holderClusterMap(tx["transaction"])["message"])
 	for _, key := range holderClusterAccountKeys(message["accountKeys"]) {
 		switch {
-		case strings.EqualFold(key, defaultPumpProgramID):
+		case key == defaultPumpProgramID:
 			return "pump.fun"
-		case strings.EqualFold(key, defaultPumpSwapProgramID), strings.EqualFold(key, pumpLiquidityProgramID):
+		case key == defaultPumpSwapProgramID, key == pumpLiquidityProgramID:
 			return "pumpswap"
 		case isKnownRaydiumProgram(key):
 			return "raydium"
@@ -235,7 +241,7 @@ func launchCoverageEvidence(profile LaunchActorProfile) string {
 	return strings.Join([]string{
 		"ATA geçmişi",
 		strconvItoa(profile.SignaturesFetched) + " imza",
-		strconvItoa(profile.TransactionsParsed) + " transaction", window,
+		strconvItoa(profile.TransactionsParsed) + " işlem", window,
 	}, " · ")
 }
 

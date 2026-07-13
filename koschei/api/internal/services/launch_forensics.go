@@ -30,6 +30,8 @@ type LaunchForensicsAnalysis struct {
 	RPCCallsUsed           int                   `json:"rpc_calls_used"`
 	FundingRPCBudget       int                   `json:"funding_rpc_budget"`
 	FundingRPCCallsUsed    int                   `json:"funding_rpc_calls_used"`
+	FundingOwnersAttempted int                   `json:"funding_owners_attempted"`
+	FundingOwnersResolved  int                   `json:"funding_owners_resolved"`
 	SniperCount            int                   `json:"sniper_count"`
 	RhythmBotCount         int                   `json:"rhythm_bot_count"`
 	FlipperCount           int                   `json:"flipper_count"`
@@ -161,7 +163,11 @@ func AnalyzeLaunchForensics(ctx context.Context, db *sql.DB, rpcURL, mint, creat
 		checks = len(profiles)
 	}
 	for i := 0; i < checks; i++ {
+		out.FundingOwnersAttempted++
 		traceLaunchFunding(ctx, rpcURL, creator, creatorFunder, &profiles[i], cfg, fundingBudget)
+		if profiles[i].FundingStatus == "creator_linked" || profiles[i].FundingStatus == "funding_source_observed" {
+			out.FundingOwnersResolved++
+		}
 	}
 	for i := checks; i < len(profiles); i++ {
 		profiles[i].FundingStatus = "not_traced_outside_top_limit"
@@ -220,6 +226,7 @@ type launchForensicsConfig struct {
 	FundingRPCBudget  int
 	SniperSlotWindow  int
 	FundingSigLimit   int
+	FundingTxParse    int
 	LedgerLimit       int
 }
 
@@ -232,6 +239,7 @@ func loadLaunchForensicsConfig() launchForensicsConfig {
 		FundingRPCBudget:  holderScanEnvInt("ARVIS_FUNDING_RPC_BUDGET", 100, 10, 1000),
 		SniperSlotWindow:  holderScanEnvInt("ARVIS_SNIPER_SLOT_WINDOW", 3, 0, 100),
 		FundingSigLimit:   holderScanEnvInt("ARVIS_FUNDING_SIG_LIMIT", 25, 5, 100),
+		FundingTxParse:    holderScanEnvInt("ARVIS_FUNDING_TX_PARSE", 6, 1, 20),
 		LedgerLimit:       launchEnvInt("ARVIS_TRADE_LEDGER_READ_LIMIT", 20000, 100, 100000),
 	}
 }
@@ -287,7 +295,7 @@ func loadTokenTradeEvents(ctx context.Context, db *sql.DB, mint string, limit in
 		SELECT mint,trader,side,sol_amount::float8,token_amount::float8,
 		       COALESCE(slot,0),block_time,signature,source
 		FROM token_trade_events
-		WHERE lower(mint)=lower($1)
+		WHERE mint=$1
 		ORDER BY COALESCE(slot,0) ASC, COALESCE(block_time,created_at) ASC
 		LIMIT $2`, mint, limit)
 	if err != nil {
@@ -342,6 +350,8 @@ func rerankLaunchProfiles(profiles []LaunchActorProfile, launchSlot int64, launc
 			profiles[i].EntryRank = rank.EntryRank
 			profiles[i].SlotOffsetFromLaunch = rank.SlotOffsetFromLaunch
 			profiles[i].MinutesAfterLaunch = rank.MinutesAfterLaunch
+			profiles[i].LaunchSlotKnown = rank.LaunchSlotKnown
+			profiles[i].LaunchTimeKnown = rank.LaunchTimeKnown
 			if rank.Sniper && !profiles[i].Sniper {
 				profiles[i].Sniper = true
 				profiles[i].Evidence = append(profiles[i].Evidence, rank.Evidence...)
@@ -377,6 +387,7 @@ func launchTimeline(allLedger, topProfiles []LaunchActorProfile, capturedLive bo
 		entry := LaunchTimelineEntry{
 			EntryRank: profile.EntryRank, Wallet: profile.OwnerWallet, FirstBuySlot: profile.FirstBuySlot,
 			SlotOffset: profile.SlotOffsetFromLaunch, MinutesAfterLaunch: profile.MinutesAfterLaunch,
+			LaunchSlotKnown: profile.LaunchSlotKnown, LaunchTimeKnown: profile.LaunchTimeKnown,
 			Label: profile.Label, CreatorLinked: profile.CreatorLinked, FundingHops: profile.FundingHops,
 			Evidence: append([]string{}, profile.Evidence...),
 		}
@@ -482,13 +493,13 @@ func launchForensicsFindings(out LaunchForensicsAnalysis) []string {
 	if out.AccumulatorCount > 0 {
 		findings = append(findings, fmt.Sprintf("%d holder en az 30 dakikaya yayılan, satışsız birikim davranışı gösterdi.", out.AccumulatorCount))
 	}
-	findings = append(findings, fmt.Sprintf("Launch Forensics RPC kullanımı: ATA %d/%d, funding %d/%d.", out.RPCCallsUsed, out.RPCBudget, out.FundingRPCCallsUsed, out.FundingRPCBudget))
+	findings = append(findings, fmt.Sprintf("Lansman analizi RPC kullanımı: ATA %d/%d, fonlama %d/%d; fonlama izi çözülen owner %d/%d.", out.RPCCallsUsed, out.RPCBudget, out.FundingRPCCallsUsed, out.FundingRPCBudget, out.FundingOwnersResolved, out.FundingOwnersAttempted))
 	return findings
 }
 
 func containsLaunchString(values []string, target string) bool {
 	for _, value := range values {
-		if strings.EqualFold(strings.TrimSpace(value), strings.TrimSpace(target)) {
+		if strings.TrimSpace(value) == strings.TrimSpace(target) {
 			return true
 		}
 	}

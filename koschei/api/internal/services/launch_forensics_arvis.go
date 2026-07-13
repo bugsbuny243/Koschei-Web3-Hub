@@ -23,9 +23,6 @@ func ApplyLaunchForensicsToAnalysis(analysis ArvisAnalysis, req SecurityRadarReq
 	launchArm := unavailableArm("Launch Forensics", ModuleLaunchForensics, req, generatedAt, "Live ledger or ATA target-token history is required; missing launch history is not a safety signal.")
 	if forensics.Available {
 		risk := forensics.StructuralFloor
-		if risk <= 0 {
-			risk = 1
-		}
 		signals := map[string]any{
 			"real_onchain_evidence": true, "verified_evidence": true,
 			"evidence_status":                    "verified_launch_forensics",
@@ -34,6 +31,8 @@ func ApplyLaunchForensicsToAnalysis(analysis ArvisAnalysis, req SecurityRadarReq
 			"sniper_count":                       forensics.SniperCount,
 			"rhythm_bot_count":                   forensics.RhythmBotCount,
 			"creator_linked_count":               forensics.CreatorLinkedCount,
+			"funding_owners_attempted":           forensics.FundingOwnersAttempted,
+			"funding_owners_resolved":            forensics.FundingOwnersResolved,
 			"launch_forensics_risk_contribution": forensics.RiskContribution,
 			"launch_forensics_structural_floor":  forensics.StructuralFloor,
 			"absence_is_safety_signal":           false,

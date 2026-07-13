@@ -116,9 +116,17 @@ func (c *PumpPortalClient) run(ctx context.Context, onEvent func(context.Context
 			if !ok {
 				continue
 			}
-			if c.shouldTrackMint(event) && c.rememberTradeMint(event.Mint) {
-				if err := writeWebSocketText(conn, map[string]any{"method": "subscribeTokenTrade", "keys": []string{event.Mint}}); err != nil {
-					return err
+			if c.shouldTrackMint(event) {
+				added, evicted := c.rememberTradeMint(event.Mint)
+				if evicted != "" {
+					if err := writeWebSocketText(conn, map[string]any{"method": "unsubscribeTokenTrade", "keys": []string{evicted}}); err != nil {
+						return err
+					}
+				}
+				if added {
+					if err := writeWebSocketText(conn, map[string]any{"method": "subscribeTokenTrade", "keys": []string{event.Mint}}); err != nil {
+						return err
+					}
 				}
 			}
 			if err := onEvent(ctx, event); err != nil {
@@ -175,26 +183,27 @@ func (c *PumpPortalClient) shouldTrackMint(event PumpPortalEvent) bool {
 	return value == "create" || strings.Contains(value, "new") || strings.Contains(value, "migrat") || strings.Contains(value, "create")
 }
 
-func (c *PumpPortalClient) rememberTradeMint(mint string) bool {
+func (c *PumpPortalClient) rememberTradeMint(mint string) (bool, string) {
 	mint = strings.TrimSpace(mint)
 	if mint == "" || c == nil {
-		return false
+		return false, ""
 	}
 	if c.tradeMints == nil {
 		c.tradeMints = map[string]bool{}
 	}
 	if c.tradeMints[mint] {
-		return false
+		return false, ""
 	}
 	limit := pumpPortalTradeSubscriptionLimit()
+	evicted := ""
 	if len(c.tradeOrder) >= limit {
-		oldest := c.tradeOrder[0]
+		evicted = c.tradeOrder[0]
 		c.tradeOrder = c.tradeOrder[1:]
-		delete(c.tradeMints, oldest)
+		delete(c.tradeMints, evicted)
 	}
 	c.tradeMints[mint] = true
 	c.tradeOrder = append(c.tradeOrder, mint)
-	return true
+	return true, evicted
 }
 
 func (c *PumpPortalClient) tradeSubscriptionBatches() [][]string {

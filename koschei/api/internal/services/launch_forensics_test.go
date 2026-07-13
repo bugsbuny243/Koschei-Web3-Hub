@@ -35,3 +35,32 @@ func TestLaunchForensicsPredatingCaptureDegradesHonestly(t *testing.T) {
 		t.Fatalf("floor=%d", result.StructuralFloor)
 	}
 }
+
+func TestHolderScanRPCBudgetReserveUpToNeverExceedsLimit(t *testing.T) {
+	budget := newHolderScanRPCBudget(5)
+	if got := budget.ReserveUpTo(3); got != 3 {
+		t.Fatalf("first grant=%d", got)
+	}
+	if got := budget.ReserveUpTo(10); got != 2 {
+		t.Fatalf("bounded grant=%d", got)
+	}
+	if got := budget.ReserveUpTo(1); got != 0 {
+		t.Fatalf("exhausted grant=%d", got)
+	}
+	if budget.Used() != 5 || budget.Remaining() != 0 {
+		t.Fatalf("used=%d remaining=%d", budget.Used(), budget.Remaining())
+	}
+}
+
+func TestTraceLaunchFundingMarksDirectCreatorWithoutRPC(t *testing.T) {
+	profile := LaunchActorProfile{OwnerWallet: "CreatorWallet", Evidence: []string{}}
+	cfg := loadLaunchForensicsConfig()
+	budget := newHolderScanRPCBudget(10)
+	traceLaunchFunding(context.Background(), "", "CreatorWallet", "", &profile, cfg, budget)
+	if !profile.CreatorLinked || profile.FundingStatus != "creator_linked" || profile.FundingHops != 0 {
+		t.Fatalf("direct creator link not preserved: %#v", profile)
+	}
+	if budget.Used() != 0 {
+		t.Fatalf("direct link should not spend RPC budget: %d", budget.Used())
+	}
+}

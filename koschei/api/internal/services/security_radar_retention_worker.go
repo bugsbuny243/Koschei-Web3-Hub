@@ -113,11 +113,11 @@ func (w *securityRadarRetentionWorker) runOnce(ctx context.Context) {
 			WHERE COALESCE(t.block_time,t.created_at) < now()-interval '72 hours'
 			  AND NOT EXISTS (
 				SELECT 1 FROM watchlist_targets w
-				WHERE w.status='active' AND lower(w.target)=lower(t.mint)
+				WHERE w.status='active' AND w.target=t.mint
 			  )
 			  AND NOT EXISTS (
 				SELECT 1 FROM security_radar_verdicts v
-				WHERE lower(v.target)=lower(t.mint) AND v.created_at >= $1
+				WHERE v.target=t.mint AND v.created_at >= $1
 			  )
 			ORDER BY COALESCE(t.block_time,t.created_at) ASC
 			LIMIT $2

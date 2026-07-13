@@ -37,6 +37,8 @@ type LaunchActorProfile struct {
 	FirstBuyTime            time.Time `json:"first_buy_time,omitempty"`
 	MinutesAfterLaunch      float64   `json:"minutes_after_launch,omitempty"`
 	SlotOffsetFromLaunch    int64     `json:"slot_offset_from_launch,omitempty"`
+	LaunchTimeKnown         bool      `json:"launch_time_known"`
+	LaunchSlotKnown         bool      `json:"launch_slot_known"`
 	BuyCount                int       `json:"buy_count"`
 	SellCount               int       `json:"sell_count"`
 	TradeCount              int       `json:"trade_count"`
@@ -69,6 +71,8 @@ type LaunchTimelineEntry struct {
 	FirstBuyTime       string   `json:"first_buy_time,omitempty"`
 	SlotOffset         int64    `json:"slot_offset,omitempty"`
 	MinutesAfterLaunch float64  `json:"minutes_after_launch,omitempty"`
+	LaunchTimeKnown    bool     `json:"launch_time_known"`
+	LaunchSlotKnown    bool     `json:"launch_slot_known"`
 	Label              string   `json:"label"`
 	CreatorLinked      bool     `json:"creator_linked"`
 	FundingHops        int      `json:"funding_hops,omitempty"`
@@ -104,9 +108,11 @@ func classifyLaunchActors(trades []LaunchTrade, launchSlot int64, launchTime tim
 		}
 		return left.OwnerWallet < right.OwnerWallet
 	})
+	rank := 0
 	for i := range profiles {
 		if profiles[i].BuyCount > 0 {
-			profiles[i].EntryRank = i + 1
+			rank++
+			profiles[i].EntryRank = rank
 		}
 	}
 	return profiles
@@ -165,23 +171,22 @@ func classifyLaunchActor(wallet string, trades []LaunchTrade, launchSlot int64, 
 	profile.SoldTokenAmount = roundLaunchNumber(profile.SoldTokenAmount, 9)
 	profile.AverageIntervalSeconds, profile.IntervalStddevSeconds = launchIntervalStats(intervals)
 
-	if launchSlot > 0 && profile.FirstBuySlot > 0 {
+	profile.LaunchSlotKnown = launchSlot > 0 && profile.FirstBuySlot > 0
+	if profile.LaunchSlotKnown {
 		profile.SlotOffsetFromLaunch = profile.FirstBuySlot - launchSlot
-		if profile.SlotOffsetFromLaunch < 0 {
-			profile.SlotOffsetFromLaunch = 0
-		}
 	}
-	if !launchTime.IsZero() && !profile.FirstBuyTime.IsZero() {
-		seconds := profile.FirstBuyTime.Sub(launchTime).Seconds()
-		if seconds < 0 {
-			seconds = 0
-		}
-		profile.MinutesAfterLaunch = roundLaunchNumber(seconds/60, 2)
+	profile.LaunchTimeKnown = !launchTime.IsZero() && !profile.FirstBuyTime.IsZero()
+	var launchDelta time.Duration
+	if profile.LaunchTimeKnown {
+		launchDelta = profile.FirstBuyTime.Sub(launchTime)
+		profile.MinutesAfterLaunch = roundLaunchNumber(launchDelta.Seconds()/60, 2)
 	}
 	if sniperSlotWindow <= 0 {
 		sniperSlotWindow = 3
 	}
-	profile.Sniper = profile.BuyCount > 0 && ((launchSlot > 0 && profile.FirstBuySlot > 0 && profile.SlotOffsetFromLaunch <= int64(sniperSlotWindow)) || (!launchTime.IsZero() && !profile.FirstBuyTime.IsZero() && profile.FirstBuyTime.Sub(launchTime) >= 0 && profile.FirstBuyTime.Sub(launchTime) <= time.Minute))
+	slotSniper := profile.LaunchSlotKnown && profile.SlotOffsetFromLaunch >= 0 && profile.SlotOffsetFromLaunch <= int64(sniperSlotWindow)
+	timeSniper := profile.LaunchTimeKnown && launchDelta >= 0 && launchDelta <= time.Minute
+	profile.Sniper = profile.BuyCount > 0 && (slotSniper || timeSniper)
 	profile.RhythmBot = profile.TradeCount >= 5 && profile.AverageIntervalSeconds > 0 && profile.IntervalStddevSeconds/profile.AverageIntervalSeconds < 0.25
 	if profile.BoughtTokenAmount > 0 && !profile.FirstBuyTime.IsZero() {
 		sold15 := 0.0
@@ -219,9 +224,9 @@ func classifyLaunchActor(wallet string, trades []LaunchTrade, launchSlot int64, 
 func launchActorEvidence(profile LaunchActorProfile, firstSellTime time.Time) []string {
 	evidence := []string{}
 	if profile.Sniper {
-		if profile.SlotOffsetFromLaunch >= 0 && profile.FirstBuySlot > 0 {
+		if profile.LaunchSlotKnown && profile.SlotOffsetFromLaunch >= 0 {
 			evidence = append(evidence, fmt.Sprintf("Lansmandan %d slot sonra ilk alım yapıldı.", profile.SlotOffsetFromLaunch))
-		} else {
+		} else if profile.LaunchTimeKnown && profile.MinutesAfterLaunch >= 0 {
 			evidence = append(evidence, fmt.Sprintf("Lansmandan yaklaşık %.0f saniye sonra ilk alım yapıldı.", profile.MinutesAfterLaunch*60))
 		}
 	}

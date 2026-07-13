@@ -49,3 +49,32 @@ func TestLaunchForensicsRiskAbsenceIsNotSafetySignal(t *testing.T) {
 		t.Fatalf("organic contribution=%d floor=%d", contribution, floor)
 	}
 }
+
+func TestClassifyLaunchActorsRanksOnlyBuyersContiguously(t *testing.T) {
+	launch := time.Unix(1_700_000_000, 0).UTC()
+	profiles := classifyLaunchActors([]LaunchTrade{
+		{Trader: "sell-only", Side: "sell", Slot: 99, BlockTime: launch.Add(-time.Second), TokenAmount: 1},
+		{Trader: "buyer-a", Side: "buy", Slot: 101, BlockTime: launch.Add(time.Second), TokenAmount: 1},
+		{Trader: "buyer-b", Side: "buy", Slot: 102, BlockTime: launch.Add(2 * time.Second), TokenAmount: 1},
+	}, 100, launch, 3)
+	byWallet := map[string]LaunchActorProfile{}
+	for _, profile := range profiles {
+		byWallet[profile.OwnerWallet] = profile
+	}
+	if byWallet["sell-only"].EntryRank != 0 || byWallet["buyer-a"].EntryRank != 1 || byWallet["buyer-b"].EntryRank != 2 {
+		t.Fatalf("unexpected entry ranks: %#v", byWallet)
+	}
+}
+
+func TestClassifyLaunchActorDoesNotCallPreReferenceBuySniper(t *testing.T) {
+	launch := time.Unix(1_700_000_000, 0).UTC()
+	profile := classifyLaunchActor("buyer", []LaunchTrade{{
+		Trader: "buyer", Side: "buy", Slot: 99, BlockTime: launch.Add(-10 * time.Second), TokenAmount: 1,
+	}}, 100, launch, 3)
+	if profile.Sniper || profile.Label == LaunchLabelSniperBot {
+		t.Fatalf("pre-reference buy must not be a sniper: %#v", profile)
+	}
+	if !profile.LaunchSlotKnown || profile.SlotOffsetFromLaunch != -1 || !profile.LaunchTimeKnown || profile.MinutesAfterLaunch >= 0 {
+		t.Fatalf("negative timing evidence should be preserved honestly: %#v", profile)
+	}
+}

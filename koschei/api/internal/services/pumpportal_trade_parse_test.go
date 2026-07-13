@@ -2,6 +2,7 @@ package services
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 )
 
@@ -29,5 +30,23 @@ func TestPumpTradeLedgerQueueNeverBlocksWhenFull(t *testing.T) {
 	event.Signature = "sig-2"
 	if writer.EnqueuePumpPortal(event) {
 		t.Fatal("full queue should drop without blocking")
+	}
+}
+
+func TestPumpPortalTradeSubscriptionEvictsOldestAtLimit(t *testing.T) {
+	t.Setenv("PUMPPORTAL_TRADE_SUBSCRIPTION_LIMIT", "100")
+	client := NewPumpPortalClient(PumpPortalConfig{})
+	for i := 0; i < 100; i++ {
+		added, evicted := client.rememberTradeMint(fmt.Sprintf("Mint-%03d", i))
+		if !added || evicted != "" {
+			t.Fatalf("unexpected add at %d: added=%t evicted=%q", i, added, evicted)
+		}
+	}
+	added, evicted := client.rememberTradeMint("Mint-100")
+	if !added || evicted != "Mint-000" {
+		t.Fatalf("expected oldest eviction, added=%t evicted=%q", added, evicted)
+	}
+	if len(client.tradeOrder) != 100 || client.tradeMints["Mint-000"] || !client.tradeMints["Mint-100"] {
+		t.Fatalf("subscription window not bounded: order=%d", len(client.tradeOrder))
 	}
 }

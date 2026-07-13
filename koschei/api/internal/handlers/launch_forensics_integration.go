@@ -40,8 +40,11 @@ func (h *Handler) launchForensicsDB() *sql.DB {
 	if h == nil {
 		return nil
 	}
-	if h.DBRead != nil {
-		return h.DBRead
+	// Live Pump trades are written to the primary database and can be newer than
+	// a read replica. Prefer the primary so a scan performed seconds after launch
+	// sees the ledger immediately; fall back to DBRead only when necessary.
+	if h.DB != nil {
+		return h.DB
 	}
-	return h.DB
+	return h.DBRead
 }
