@@ -34,7 +34,7 @@
   }
 
   ready(function(){
-    var links=[['/dashboard','Panel'],['/safe-check','Safe Check'],['/kosch-access','KOSCH Access'],['/chain-health','Chain Health'],['/security-radar','Radar'],['/exposure-report','Reports'],['/token-2022-scanner','Token-2022'],['/address-poisoning-shield','Address Shield'],['/token','Token'],['/account','Account']];
+    var links=[['/scan','Token Tara'],['/transaction-shield','İşlem Kalkanı'],['/safe-check','Safe Check'],['/security-radar','Radar'],['/dashboard','Panel'],['/kosch','KOSCH'],['/kosch-access','KOSCH Erişim'],['/address-poisoning-shield','Address Shield'],['/account','Hesap']];
     var current=(location.pathname||'/').replace(/\.html$/,'').replace(/\/$/,'')||'/';
     var existing=document.querySelector('.top .nav, header.top nav.nav, nav.top .nav');
     var nav=existing||document.createElement('nav');
@@ -43,9 +43,9 @@
     while(nav.firstChild)nav.removeChild(nav.firstChild);
     links.forEach(function(item){var a=document.createElement('a');a.href=item[0];a.textContent=item[1];if(current===item[0])a.setAttribute('aria-current','page');nav.appendChild(a);});
     if(!existing){var top=document.querySelector('header.top,.top');if(top){nav.className+=' detached';top.parentNode.insertBefore(nav,top.nextSibling);}}
-    if(current==='/dashboard'&&!document.querySelector('.koschei-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip';strip.innerHTML='<div><b>İmzalamadan önce Safe Check çalıştır.</b><span>Şüpheli claim linki, token mint, recipient adresi veya imza metnini önce ARVIS’e sor.</span></div><a href="/safe-check">Güvenli Kontrol Aç</a>';var anchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(anchor&&anchor.parentNode){anchor.parentNode.insertBefore(strip,anchor.nextSibling);}}
+    if(current==='/dashboard'&&!document.querySelector('.koschei-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip';strip.innerHTML='<div><b>Satın almadan veya imzalamadan önce Koschei’ye sor.</b><span>Token mintini canlı tara ya da serialized transaction’ı read-only simüle et.</span></div><span><a href="/scan">Token Tara</a> <a href="/transaction-shield">İşlem Kalkanı</a></span>';var anchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(anchor&&anchor.parentNode){anchor.parentNode.insertBefore(strip,anchor.nextSibling);}}
     var bottom=document.querySelector('nav.bottom');if(bottom)bottom.remove();
-    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei ARVIS · Solana imza öncesi risk altyapısı</span><span><a href="/safe-check">Güvenli Kontrol</a> · <a href="/kosch-access">KOSCH Access</a> · <a href="/chain-health">Zincir Sağlığı</a> · <a href="/token">Token</a></span>';document.body.appendChild(footer);}
+    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei ARVIS · Solana satın alma ve imza öncesi güvenlik merkezi</span><span><a href="/scan">Token Tara</a> · <a href="/transaction-shield">İşlem Kalkanı</a> · <a href="/safe-check">Güvenli Kontrol</a> · <a href="/kosch">KOSCH</a></span>';document.body.appendChild(footer);}
     translate(document.body);
     var observer=new MutationObserver(function(records){records.forEach(function(record){record.addedNodes.forEach(function(node){if(node.nodeType===1)translate(node);else if(node.nodeType===3&&node.parentElement){var next=translateString(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;}});});});
     observer.observe(document.body,{childList:true,subtree:true,characterData:false});
