@@ -37,6 +37,7 @@ jobs:
           node --check public/js/public-solana-scan.js
           node --check public/js/public-transaction-shield.js
           node --check public/js/kosch-transparency.js
+          node --check public/js/koschei-global-shell.js
       - name: Test
         run: go test ./...
       - name: Vet
