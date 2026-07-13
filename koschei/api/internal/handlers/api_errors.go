@@ -3,15 +3,16 @@ package handlers
 import "net/http"
 
 const (
-	APICodeOK               = "OK"
-	APICodePackageRequired  = "PACKAGE_REQUIRED"
-	APICodeInvalidInput     = "INVALID_INPUT"
-	APICodeInvalidCategory  = "INVALID_CATEGORY"
-	APICodeNotFound         = "NOT_FOUND"
-	APICodeIntegrationError = "INTEGRATION_ERROR"
-	APICodeInternalError    = "INTERNAL_ERROR"
-	APICodeUnauthorized     = "UNAUTHORIZED"
-	APICodeForbidden        = "FORBIDDEN"
+	APICodeOK                 = "OK"
+	APICodePackageRequired    = "PACKAGE_REQUIRED"
+	APICodeInvalidInput       = "INVALID_INPUT"
+	APICodeInvalidCategory    = "INVALID_CATEGORY"
+	APICodeNotFound           = "NOT_FOUND"
+	APICodeIntegrationError   = "INTEGRATION_ERROR"
+	APICodeInternalError      = "INTERNAL_ERROR"
+	APICodeServiceUnavailable = "SERVICE_UNAVAILABLE"
+	APICodeUnauthorized       = "UNAUTHORIZED"
+	APICodeForbidden          = "FORBIDDEN"
 )
 
 type apiEnvelope struct {
