@@ -24,22 +24,24 @@ const trFinding=value=>{
   };
   return map[v]||v;
 };
-function tokenVerdict(data,mint){
-  const safety=clamp(data.score);
-  const risk=clamp(100-safety);
-  const evidence=unique((data.findings||[]).map(trFinding)).slice(0,3);
+function tokenVerdict(tokenData,badgeData,mint){
+  const fallbackRisk=clamp(100-clamp(tokenData.score));
+  const signed=Boolean(badgeData&&badgeData.ok&&badgeData.signed&&badgeData.signature);
+  const risk=signed?clamp(badgeData.risk_index):fallbackRisk;
+  const evidence=unique([
+    ...(tokenData.findings||[]).map(trFinding),
+    signed&&badgeData.verdict?String(badgeData.verdict):'',
+    signed&&badgeData.recommendation?`ARVIS aksiyonu: ${badgeData.recommendation}`:''
+  ]).slice(0,3);
   if(!evidence.length)evidence.push('Canlı Solana RPC taraması tamamlandı; belirgin authority veya yoğunluk kanıtı dönmedi.');
-  const coverage=[
-    'Canlı token supply',
-    'Mint/freeze authority',
-    'Top token-account yoğunluğu',
-    data.token_2022?'Token-2022 extension analizi':'SPL token program kontrolü'
-  ];
   return {
-    target:mint,risk,grade:grade(risk),riskLevel:level(risk),action:action(risk),decision:decision(risk),
-    evidence,coverage,official:mint===OFFICIAL_KOSCH_MINT,
-    message:`ARVIS canlı Solana kanıtıyla ${grade(risk)} notu üretti. ${action(risk)}.`,
-    explorer:`https://solscan.io/token/${encodeURIComponent(mint)}`
+    target:mint,risk,grade:signed?(badgeData.grade||grade(risk)):grade(risk),riskLevel:signed?(badgeData.risk_level||level(risk)):level(risk),
+    action:action(risk),decision:decision(risk),evidence,
+    coverage:['Canlı token supply','Mint/freeze authority','Top token-account yoğunluğu',tokenData.token_2022?'Token-2022 extension analizi':'SPL token program kontrolü',signed?'İmzalı ARVIS verdict':'ARVIS imzası alınamadı'],
+    official:mint===OFFICIAL_KOSCH_MINT,
+    message:signed?`ARVIS canlı Solana kanıtıyla imzalı ${badgeData.grade||grade(risk)} notu üretti. ${action(risk)}.`:'Canlı temel tarama tamamlandı; imzalı ARVIS verdict alınamadığı için sonuç ön değerlendirmedir.',
+    explorer:`https://solscan.io/token/${encodeURIComponent(mint)}`,
+    signed,signature:signed?String(badgeData.signature):'',ruleVersion:signed?String(badgeData.rule_version||''):''
   };
 }
 function preflightVerdict(data,value){
@@ -47,7 +49,7 @@ function preflightVerdict(data,value){
   return {
     target:value,risk,grade:grade(risk),riskLevel:level(risk),action:action(risk),decision:data.decision||decision(risk),
     evidence:unique(data.reasons).slice(0,3),coverage:['URL/intent heuristics','İmza ve izin dili','Koschei yapısal hafızası (varsa)'],
-    official:value===OFFICIAL_KOSCH_MINT,message:data.human_message||`ARVIS ön kontrolü ${grade(risk)} notu üretti.`,explorer:''
+    official:value===OFFICIAL_KOSCH_MINT,message:data.human_message||`ARVIS ön kontrolü ${grade(risk)} notu üretti.`,explorer:'',signed:false,signature:'',ruleVersion:''
   };
 }
 function setList(id,items,fallback){
@@ -65,27 +67,40 @@ function render(v){
   $('officialKosch').hidden=!v.official;
   setList('evidence',v.evidence,'Doğrulanmış kanıt dönmedi.');
   setList('coverage',v.coverage,'Kapsam bilgisi dönmedi.');
+  const meta=$('verdictMeta');
+  if(meta){
+    meta.textContent=v.signed?`İmzalı · ${v.ruleVersion||'ARVIS rule'} · ${v.signature.slice(0,16)}…${v.signature.slice(-10)}`:'İmza yok · ön değerlendirme';
+    meta.dataset.signed=v.signed?'true':'false';
+  }
   lastShareURL=`${location.origin}/scan?mint=${encodeURIComponent(v.target)}`;
   share.hidden=false;
   openExplorer.hidden=!v.explorer;
   if(v.explorer)openExplorer.href=v.explorer;
   history.replaceState({},'',`/scan?mint=${encodeURIComponent(v.target)}`);
 }
+async function fetchJSON(url,options){
+  const response=await fetch(url,options);
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||'scan_failed');
+  return data;
+}
 async function runScan(){
   const value=target.value.trim();
   if(!value)return;
   submit.disabled=true;submit.textContent='ARVIS zinciri tarıyor…';
-  empty.hidden=false;empty.innerHTML='<h2>Canlı Solana kanıtı toplanıyor</h2><p>Authority, supply ve holder yoğunluğu kontrol ediliyor.</p>';
+  empty.hidden=false;empty.innerHTML='<h2>Canlı Solana kanıtı toplanıyor</h2><p>Authority, supply, holder yoğunluğu ve imzalı verdict kontrol ediliyor.</p>';
   result.hidden=true;share.hidden=true;openExplorer.hidden=true;
   try{
     const tokenMode=kind.value==='token';
-    const response=await fetch(tokenMode?'/api/token/scan':'/api/arvis/preflight',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(tokenMode?{mint:value,network:'solana-mainnet'}:{target:value,kind:kind.value,intent:note.value.trim(),note:note.value.trim()})
-    });
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(data.error||'scan_failed');
-    render(tokenMode?tokenVerdict(data,value):preflightVerdict(data,value));
+    if(tokenMode){
+      const tokenPromise=fetchJSON('/api/token/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mint:value,network:'solana-mainnet'})});
+      const badgePromise=fetchJSON(`/api/v1/risk/badge?address=${encodeURIComponent(value)}&network=solana-mainnet`).catch(()=>null);
+      const [tokenData,badgeData]=await Promise.all([tokenPromise,badgePromise]);
+      render(tokenVerdict(tokenData,badgeData,value));
+    }else{
+      const data=await fetchJSON('/api/arvis/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:value,kind:kind.value,intent:note.value.trim(),note:note.value.trim()})});
+      render(preflightVerdict(data,value));
+    }
   }catch(error){
     empty.hidden=false;empty.innerHTML='<h2>Tarama tamamlanamadı</h2><p>Bu hedef için canlı kanıt alınamadı. İşlem yapmadan önce tekrar dene.</p>';
   }finally{submit.disabled=false;submit.textContent='Ücretsiz ARVIS taraması'}
