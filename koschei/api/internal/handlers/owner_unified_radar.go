@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"strings"
@@ -291,15 +292,11 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 	})
 }
 
-func (h *Handler) persistUnifiedRadarVerdict(ctx context.Context, db interface{ QueryRowContext(context.Context, string, ...any) *sql.Row }, network, targetKind, targetID string, verdict services.UnifiedRadarVerdict, behavior services.UnifiedRadarBehaviorReport) (string, []services.UnifiedRadarVerdictHistoryRecord) {
+func (h *Handler) persistUnifiedRadarVerdict(ctx context.Context, db *sql.DB, network, targetKind, targetID string, verdict services.UnifiedRadarVerdict, behavior services.UnifiedRadarBehaviorReport) (string, []services.UnifiedRadarVerdictHistoryRecord) {
 	if db == nil {
 		return "database_unavailable", []services.UnifiedRadarVerdictHistoryRecord{}
 	}
-	concrete, ok := db.(*sql.DB)
-	if !ok || concrete == nil {
-		return "database_unavailable", []services.UnifiedRadarVerdictHistoryRecord{}
-	}
-	store := services.NewUnifiedRadarVerdictStore(concrete)
+	store := services.NewUnifiedRadarVerdictStore(db)
 	status := "persisted"
 	if _, err := store.Persist(ctx, network, targetKind, targetID, verdict, behavior); err != nil {
 		status = "failed"
