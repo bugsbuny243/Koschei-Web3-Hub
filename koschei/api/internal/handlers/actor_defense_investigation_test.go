@@ -51,13 +51,36 @@ func TestActorDefenseLiquidityRemovalFromParsedInstruction(t *testing.T) {
 	if len(kinds) != 1 || kinds[0] != "removeliquidity" {
 		t.Fatalf("instruction kinds=%v", kinds)
 	}
+	if !actorDefenseParsedLiquidityRemoval(kinds) {
+		t.Fatal("parsed removal must satisfy the parsed-instruction boundary")
+	}
 }
 
-func TestActorDefenseLiquidityRemovalFromLogs(t *testing.T) {
+func TestActorDefenseLiquidityRemovalFromLogsRemainsUnverified(t *testing.T) {
 	meta := map[string]any{"logMessages": []any{"Program log: remove_liquidity"}}
-	found, _ := actorDefenseLiquidityRemoval(map[string]any{}, meta)
+	found, kinds := actorDefenseLiquidityRemoval(map[string]any{}, meta)
 	if !found {
 		t.Fatal("expected log-backed remove-liquidity observation")
+	}
+	if actorDefenseParsedLiquidityRemoval(kinds) {
+		t.Fatal("log-only marker must not satisfy the VERIFIED parsed-instruction boundary")
+	}
+}
+
+func TestActorDefenseKnownTransactionMints(t *testing.T) {
+	meta := map[string]any{
+		"preTokenBalances": []any{
+			map[string]any{"mint": "known-two"},
+			map[string]any{"mint": "unrelated"},
+		},
+		"postTokenBalances": []any{
+			map[string]any{"mint": "known-one"},
+			map[string]any{"mint": "known-two"},
+		},
+	}
+	got := actorDefenseKnownTransactionMints(meta, map[string]bool{"known-one": true, "known-two": true})
+	if len(got) != 2 || got[0] != "known-one" || got[1] != "known-two" {
+		t.Fatalf("known mints=%v", got)
 	}
 }
 
@@ -99,6 +122,9 @@ func TestActorDefenseInstructionEvidenceRequiresExactAuthority(t *testing.T) {
 		"source-ata": {Owner: "ActorABC", Mint: "mint-one"},
 		"dest-ata":   {Owner: "holder-wallet", Mint: "mint-one"},
 	}
+	related := map[string]services.ActorDefenseRelatedActor{
+		"holder-wallet": {Wallet: "holder-wallet", SharedTokenCount: 2, MaxPercentage: 55},
+	}
 	instruction := map[string]any{
 		"program": "spl-token",
 		"parsed": map[string]any{
@@ -111,18 +137,34 @@ func TestActorDefenseInstructionEvidenceRequiresExactAuthority(t *testing.T) {
 			},
 		},
 	}
-	rows := actorDefenseInstructionEvidence(dossier, signature, time.Unix(1700000000, 0).UTC(), true, instruction, owners, map[string]bool{"mint-one": true}, map[string]bool{"holder-wallet": true}, 0)
+	rows := actorDefenseInstructionEvidence(dossier, signature, time.Unix(1700000000, 0).UTC(), true, instruction, owners, map[string]bool{"mint-one": true}, related, 0)
 	if len(rows) != 0 {
 		t.Fatalf("case-mismatched authority produced verified evidence: %#v", rows)
 	}
 
 	instruction["parsed"].(map[string]any)["info"].(map[string]any)["authority"] = "ActorABC"
-	rows = actorDefenseInstructionEvidence(dossier, signature, time.Unix(1700000000, 0).UTC(), true, instruction, owners, map[string]bool{"mint-one": true}, map[string]bool{"holder-wallet": true}, 0)
+	rows = actorDefenseInstructionEvidence(dossier, signature, time.Unix(1700000000, 0).UTC(), true, instruction, owners, map[string]bool{"mint-one": true}, related, 0)
 	if len(rows) != 1 {
 		t.Fatalf("exact authority evidence rows=%d", len(rows))
 	}
 	if rows[0].VerificationStatus != "verified" || rows[0].Relation != "direct_token_transfer_out" {
 		t.Fatalf("unexpected evidence=%#v", rows[0])
+	}
+	if value, _ := rows[0].Metadata["dominant_holder_relation"].(bool); !value {
+		t.Fatalf("dominant holder relation was not preserved: %#v", rows[0].Metadata)
+	}
+}
+
+func TestActorDefenseLowShareRelatedWalletDoesNotBecomeDominantHolder(t *testing.T) {
+	metadata := map[string]any{}
+	actorDefenseApplyRelatedActorMetadata(metadata, map[string]services.ActorDefenseRelatedActor{
+		"small-holder": {Wallet: "small-holder", SharedTokenCount: 2, MaxPercentage: 4.5},
+	}, "small-holder")
+	if observed, _ := metadata["related_actor_observed"].(bool); !observed {
+		t.Fatal("related actor observation should remain visible")
+	}
+	if dominant, _ := metadata["known_related_actor"].(bool); dominant {
+		t.Fatal("low-share related wallet must not activate dominant-holder funding rule")
 	}
 }
 
