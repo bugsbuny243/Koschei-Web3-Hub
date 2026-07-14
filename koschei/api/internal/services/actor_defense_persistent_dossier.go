@@ -71,6 +71,10 @@ func (s *ActorDefenseStore) LoadPersistentWalletDossier(ctx context.Context, wal
 	if err != nil {
 		return ActorDefenseDossier{}, err
 	}
+	verifiedCreatorTokens, err := s.countPersistentVerifiedCreatorTokens(ctx, wallet, network)
+	if err != nil {
+		return ActorDefenseDossier{}, err
+	}
 	verified, observed := 0, 0
 	for _, row := range evidence {
 		switch row.VerificationStatus {
@@ -79,6 +83,10 @@ func (s *ActorDefenseStore) LoadPersistentWalletDossier(ctx context.Context, wal
 		case "observed":
 			observed++
 		}
+	}
+	creatorReuseStatus := "observed"
+	if verifiedCreatorTokens >= 2 {
+		creatorReuseStatus = "verified"
 	}
 
 	track := ActorDefenseTrack{
@@ -93,6 +101,10 @@ func (s *ActorDefenseStore) LoadPersistentWalletDossier(ctx context.Context, wal
 		"evidence_count": len(evidence),
 		"actor_memory_scope": "persistent_actor_index",
 		"raw_event_retention_independent": true,
+		"verified_creator_token_count": verifiedCreatorTokens,
+		"creator_reuse_evidence_status": creatorReuseStatus,
+		"holder_reuse_evidence_status": "observed",
+		"related_actor_evidence_status": "observed",
 		"state_basis": []string{"persistent_actor_evidence", "pump_trade_ledger", "signed_transaction_evidence"},
 		"no_identity_or_intent_claim": true,
 	}
@@ -105,6 +117,7 @@ func (s *ActorDefenseStore) LoadPersistentWalletDossier(ctx context.Context, wal
 		RelatedActors: related, Evidence: evidence,
 		Coverage: map[string]any{
 			"created_tokens": createdCount,
+			"verified_creator_tokens": verifiedCreatorTokens,
 			"dominant_holder_tokens": dominantCount,
 			"traded_tokens": tradedCount,
 			"related_actors": len(related),
@@ -180,6 +193,21 @@ func (s *ActorDefenseStore) loadPersistentCreatedTokens(ctx context.Context, wal
 		count++
 	}
 	return count, rows.Err()
+}
+
+func (s *ActorDefenseStore) countPersistentVerifiedCreatorTokens(ctx context.Context, wallet, network string) (int, error) {
+	var count int
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT count(DISTINCT token_mint)::integer
+		FROM security_actor_evidence
+		WHERE network=$2
+		  AND actor_wallet=$1
+		  AND actor_role='creator_deployer'
+		  AND relation='created_token'
+		  AND verification_status='verified'
+		  AND token_mint IS NOT NULL
+		  AND btrim(token_mint)<>''`, wallet, network).Scan(&count)
+	return count, err
 }
 
 func (s *ActorDefenseStore) loadPersistentDominantHolderTokens(ctx context.Context, wallet, network string, ensure func(string) *actorDefenseTokenBuilder) (int, error) {
