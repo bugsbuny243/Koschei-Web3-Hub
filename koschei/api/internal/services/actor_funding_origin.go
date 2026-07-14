@@ -12,30 +12,30 @@ import (
 // ActorFundingOriginOptions bounds a selective wallet investigation. This
 // routine is never used by the broad Pump discovery pipeline.
 type ActorFundingOriginOptions struct {
-	PageSize               int
-	MaxPages               int
+	PageSize                  int
+	MaxPages                  int
 	OldestTransactionsToParse int
 }
 
 type ActorFundingOrigin struct {
-	Wallet              string    `json:"wallet"`
-	Status              string    `json:"status"`
-	HistoryComplete     bool      `json:"history_complete"`
-	SourceWallet        string    `json:"source_wallet,omitempty"`
-	DestinationWallet   string    `json:"destination_wallet,omitempty"`
-	AmountSOL           float64   `json:"amount_sol,omitempty"`
-	Signature           string    `json:"signature,omitempty"`
-	Slot                int64     `json:"slot,omitempty"`
-	ObservedAt          time.Time `json:"observed_at,omitempty"`
-	Program             string    `json:"program,omitempty"`
-	InstructionType     string    `json:"instruction_type,omitempty"`
-	VerificationStatus  string    `json:"verification_status"`
-	TrailStatus         string    `json:"trail_status"`
-	IdentityScope       string    `json:"identity_scope"`
-	PagesScanned        int       `json:"pages_scanned"`
-	SignaturesScanned   int       `json:"signatures_scanned"`
-	TransactionsParsed  int       `json:"transactions_parsed"`
-	Limitations         []string  `json:"limitations"`
+	Wallet             string    `json:"wallet"`
+	Status             string    `json:"status"`
+	HistoryComplete    bool      `json:"history_complete"`
+	SourceWallet       string    `json:"source_wallet,omitempty"`
+	DestinationWallet  string    `json:"destination_wallet,omitempty"`
+	AmountSOL          float64   `json:"amount_sol,omitempty"`
+	Signature          string    `json:"signature,omitempty"`
+	Slot               int64     `json:"slot,omitempty"`
+	ObservedAt         time.Time `json:"observed_at,omitempty"`
+	Program            string    `json:"program,omitempty"`
+	InstructionType    string    `json:"instruction_type,omitempty"`
+	VerificationStatus string    `json:"verification_status"`
+	TrailStatus        string    `json:"trail_status"`
+	IdentityScope      string    `json:"identity_scope"`
+	PagesScanned       int       `json:"pages_scanned"`
+	SignaturesScanned  int       `json:"signatures_scanned"`
+	TransactionsParsed int       `json:"transactions_parsed"`
+	Limitations        []string  `json:"limitations"`
 }
 
 type actorFundingCandidate struct {
@@ -53,12 +53,12 @@ func FindActorFundingOrigin(ctx context.Context, rpcURL, wallet string, options 
 	wallet = strings.TrimSpace(wallet)
 	rpcURL = strings.TrimSpace(rpcURL)
 	result := ActorFundingOrigin{
-		Wallet: wallet,
-		Status: "not_investigated",
+		Wallet:             wallet,
+		Status:             "not_investigated",
 		VerificationStatus: "unverified",
-		TrailStatus: "not_investigated",
-		IdentityScope: "onchain_wallet_only",
-		Limitations: []string{},
+		TrailStatus:        "not_investigated",
+		IdentityScope:      "onchain_wallet_only",
+		Limitations:        []string{},
 	}
 	if wallet == "" {
 		return result, fmt.Errorf("actor wallet is required")
@@ -211,28 +211,28 @@ func ActorFundingOriginEvidence(origin ActorFundingOrigin, network string) (Acto
 		return ActorDefenseEvidenceRecord{}, false
 	}
 	return ActorDefenseEvidenceRecord{
-		Network: normalizeRadarNetwork(network),
-		ActorWallet: strings.TrimSpace(origin.Wallet),
-		CounterpartKind: "wallet",
-		CounterpartID: strings.TrimSpace(origin.SourceWallet),
-		Relation: "initial_funding_in",
+		Network:            normalizeRadarNetwork(network),
+		ActorWallet:        strings.TrimSpace(origin.Wallet),
+		CounterpartKind:    "wallet",
+		CounterpartID:      strings.TrimSpace(origin.SourceWallet),
+		Relation:           "initial_funding_in",
 		VerificationStatus: status,
-		EvidenceKey: strings.TrimSpace(origin.Signature) + ":initial_funding",
-		Source: "solana_jsonparsed_instruction",
-		Signature: strings.TrimSpace(origin.Signature),
-		Slot: origin.Slot,
-		ObservedAt: origin.ObservedAt.UTC(),
-		AmountNative: origin.AmountSOL,
+		EvidenceKey:        strings.TrimSpace(origin.Signature) + ":initial_funding",
+		Source:             "solana_jsonparsed_instruction",
+		Signature:          strings.TrimSpace(origin.Signature),
+		Slot:               origin.Slot,
+		ObservedAt:         origin.ObservedAt.UTC(),
+		AmountNative:       origin.AmountSOL,
 		Metadata: map[string]any{
-			"actor_role": "funded_wallet",
-			"source_wallet": strings.TrimSpace(origin.SourceWallet),
+			"actor_role":        "funded_wallet",
+			"source_wallet":     strings.TrimSpace(origin.SourceWallet),
 			"destination_wallet": strings.TrimSpace(origin.DestinationWallet),
-			"program": "system",
-			"instruction_type": strings.TrimSpace(origin.InstructionType),
-			"history_complete": origin.HistoryComplete,
-			"funding_status": origin.Status,
-			"trail_status": origin.TrailStatus,
-			"identity_scope": origin.IdentityScope,
+			"program":           "system",
+			"instruction_type":  strings.TrimSpace(origin.InstructionType),
+			"history_complete":  origin.HistoryComplete,
+			"funding_status":    origin.Status,
+			"trail_status":      origin.TrailStatus,
+			"identity_scope":    origin.IdentityScope,
 			"persistent_actor_index": true,
 		},
 	}, true
@@ -277,14 +277,14 @@ func actorFundingInstructionCandidate(wallet string, signature SolanaSignatureIn
 		return actorFundingCandidate{}, false
 	}
 	return actorFundingCandidate{
-		Source: source,
-		Destination: destination,
-		Lamports: lamports,
-		Signature: strings.TrimSpace(signature.Signature),
-		Slot: signature.Slot,
-		ObservedAt: observedAt,
+		Source:          source,
+		Destination:     destination,
+		Lamports:        lamports,
+		Signature:       strings.TrimSpace(signature.Signature),
+		Slot:            signature.Slot,
+		ObservedAt:      observedAt,
 		InstructionType: kind,
-		SourceSigned: signers[source],
+		SourceSigned:    signers[source],
 	}, true
 }
 
@@ -360,9 +360,6 @@ func actorFundingInt64(value any) int64 {
 		return int64(typed)
 	case float64:
 		return int64(typed)
-	case jsonNumber:
-		parsed, _ := strconv.ParseInt(string(typed), 10, 64)
-		return parsed
 	case string:
 		parsed, _ := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
 		return parsed
@@ -370,10 +367,6 @@ func actorFundingInt64(value any) int64 {
 		return 0
 	}
 }
-
-// jsonNumber is kept local so this file does not change the shared RPC decoder
-// contract. Standard JSON numbers currently arrive as float64.
-type jsonNumber string
 
 func actorFundingBool(value any) bool {
 	switch typed := value.(type) {
