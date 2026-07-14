@@ -40,8 +40,8 @@ type actorDefenseTokenAccountOwner struct {
 // OwnerActorDefenseInvestigation is the wallet-first investigation surface for
 // Koschei's defense network. It assembles existing Pump discovery, holder and
 // trade sensors, then verifies bounded direct transaction evidence. It does not
-// produce a token score for a wallet and it never turns a relation into an
-// identity or wrongdoing claim.
+// produce a numeric score and it never turns a relation into an identity or
+// wrongdoing claim. Letter grades come only from the versioned ruleset.
 func (h *Handler) OwnerActorDefenseInvestigation(w http.ResponseWriter, r *http.Request) {
 	var input actorDefenseRequest
 	if err := decodeJSON(r, &input); err != nil {
@@ -111,17 +111,31 @@ func (h *Handler) OwnerActorDefenseInvestigation(w http.ResponseWriter, r *http.
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Actor defense dossier could not be refreshed")
 		return
 	}
+	ruleVerdict := services.EvaluateActorDefenseRules(final.Track, final.Evidence)
+	rulePersistence := "persisted"
+	if err := store.PersistRuleVerdict(ctx, final.Track, ruleVerdict); err != nil {
+		rulePersistence = "failed"
+		coverage.PersistenceFailures++
+		if coverage.Status == "complete" {
+			coverage.Status = "partial_persistence"
+		}
+		coverage.Limitations = append(coverage.Limitations, "Deterministik rule verdict threat track üzerine kaydedilemedi.")
+	}
 	final.Coverage["live_evidence"] = coverage
 	final.Coverage["requested_target"] = target
 	final.Coverage["resolved_wallet"] = wallet
+	final.Coverage["rule_verdict_persistence"] = rulePersistence
+	final.Coverage["numeric_score_disabled"] = true
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true,
-		"schema_version": "koschei-actor-defense-v1",
+		"schema_version": "koschei-actor-defense-v2",
+		"ruleset_version": services.ActorDefenseRulesetVersion,
 		"target": target,
 		"wallet": wallet,
 		"network": network,
 		"target_classification": classification,
 		"dossier": final,
+		"rule_verdict": ruleVerdict,
 	})
 }
 
