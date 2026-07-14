@@ -70,22 +70,30 @@ func main() {
 		web3.RPCProviderHost(web3.SolanaRPCFallbackURL("solana-mainnet")),
 	)
 	appCtx := context.Background()
+
+	// Retention remains active because it performs database hygiene only. Every
+	// quota-consuming automatic scanner is opt-in through the master switch.
 	stopSecurityRadars := services.StartSecurityRadarWatcher(appCtx, conn, solanaRPC)
 	defer stopSecurityRadars()
-	// Pump discovery + the 500K USD selective gate are data-filtered and stay
-	// live in saver mode. Only mints crossing the gate consume deep Solana RPC.
-	stopPumpPortal := services.StartPumpPortalRadarIfEnabled(appCtx, conn)
-	defer stopPumpPortal()
-	if services.SolanaRPCLimitSaverEnabled() && !services.ForceBackgroundRadarEnabled() {
-		log.Printf("broad Solana streams paused: RPC saver protects quota; selective Pump 24h-volume radar, manual scans and Safe Check stay live")
+	if services.AutomaticBackgroundScanningEnabled() {
+		stopPumpPortal := services.StartPumpPortalRadarIfEnabled(appCtx, conn)
+		defer stopPumpPortal()
+		stopActorDefense := services.StartActorDefenseCorrelator(appCtx, conn)
+		defer stopActorDefense()
+		if services.SolanaRPCLimitSaverEnabled() && !services.ForceBackgroundRadarEnabled() {
+			log.Printf("broad Solana streams paused: RPC saver protects quota; explicitly enabled selective workers may remain active")
+		} else {
+			stopSBX1Stream := services.StartSecurityRadarStreamIfEnabled(appCtx, conn)
+			defer stopSBX1Stream()
+		}
+		stopWatchlistMonitor := handlers.StartWatchlistMonitor(appCtx, conn)
+		defer stopWatchlistMonitor()
 	} else {
-		stopSBX1Stream := services.StartSecurityRadarStreamIfEnabled(appCtx, conn)
-		defer stopSBX1Stream()
+		log.Printf("automatic scanning disabled: no Pump discovery, radar polling, background stream, actor correlation or watchlist refresh; manual scans and Safe Check remain available")
 	}
+
 	stopWebhookDeliveries := webhooks.StartDeliveryWorker(appCtx, conn)
 	defer stopWebhookDeliveries()
-	stopWatchlistMonitor := handlers.StartWatchlistMonitor(appCtx, conn)
-	defer stopWatchlistMonitor()
 	jobStore := jobs.NewStore(conn)
 	jobQueue := jobs.Queue(jobs.NoopQueue{})
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {

@@ -14,5 +14,13 @@ CREATE TABLE IF NOT EXISTS paddle_webhook_events (
 CREATE INDEX IF NOT EXISTS paddle_webhook_events_status_updated_idx
 ON paddle_webhook_events (status, updated_at DESC);
 
-CREATE INDEX IF NOT EXISTS orders_provider_status_created_idx
-ON orders (provider, status, created_at DESC);
+-- orders belongs to the optional legacy payment schema and is not present on
+-- every fresh installation. Do not make Paddle webhook idempotency depend on
+-- that unrelated legacy table.
+DO $$
+BEGIN
+    IF to_regclass('public.orders') IS NOT NULL THEN
+        CREATE INDEX IF NOT EXISTS orders_provider_status_created_idx
+        ON orders (provider, status, created_at DESC);
+    END IF;
+END $$;

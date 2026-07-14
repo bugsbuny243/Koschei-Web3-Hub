@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"koschei/api/internal/services"
 )
 
 type dueWatchlistTarget struct {
@@ -16,8 +18,8 @@ type dueWatchlistTarget struct {
 }
 
 // StartWatchlistMonitor turns the existing watchlist snapshot engine into
-// continuous retail protection. It reuses the existing alert comparison and
-// database webhook trigger; it does not change authentication or entitlement.
+// continuous retail protection only when both automatic scanning and the
+// watchlist worker are explicitly enabled. Manual refresh remains available.
 func StartWatchlistMonitor(parent context.Context, db *sql.DB) func() {
 	ctx, cancel := context.WithCancel(parent)
 	if db == nil || !watchlistMonitorEnabled() {
@@ -103,8 +105,11 @@ func claimDueWatchlistTargets(ctx context.Context, db *sql.DB, limit int) ([]due
 }
 
 func watchlistMonitorEnabled() bool {
+	if !services.AutomaticBackgroundScanningEnabled() {
+		return false
+	}
 	value := strings.ToLower(strings.TrimSpace(os.Getenv("WATCHLIST_MONITOR_ENABLED")))
-	return value != "false" && value != "0" && value != "off"
+	return value == "1" || value == "true" || value == "yes" || value == "on"
 }
 
 func watchlistMonitorInterval() time.Duration {

@@ -19,6 +19,20 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: koschei_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d koschei_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     defaults:
       run:
         working-directory: koschei/api
@@ -32,6 +46,40 @@ jobs:
           cache-dependency-path: koschei/api/go.sum
       - name: Download modules
         run: go mod download
+      - name: Validate migrations on PostgreSQL 17
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          result_file="${RUNNER_TEMP}/migration-validation.txt"
+          output_file="${RUNNER_TEMP}/migration-output.txt"
+          : > "${result_file}"
+          for migration in $(find migrations -maxdepth 1 -type f -name '*.sql' | sort); do
+            echo "RUN ${migration}" >> "${result_file}"
+            if ! psql \
+              --host=127.0.0.1 \
+              --port=5432 \
+              --username=postgres \
+              --dbname=koschei_ci \
+              --set=ON_ERROR_STOP=1 \
+              --file="${migration}" \
+              > "${output_file}" 2>&1; then
+              echo "FAIL ${migration}" >> "${result_file}"
+              tail -n 120 "${output_file}" >> "${result_file}"
+              cat "${result_file}"
+              exit 1
+            fi
+            echo "PASS ${migration}" >> "${result_file}"
+          done
+          cat "${result_file}"
+      - name: Upload migration validation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-validation
+          path: ${{ runner.temp }}/migration-validation.txt
+          if-no-files-found: error
+          retention-days: 7
       - name: Check public JavaScript
         run: |
           node --check public/js/public-solana-scan.js
@@ -41,6 +89,9 @@ jobs:
           node --check public/js/koschei-global-shell.js
           node --check public/js/owner-holder-tier-labels.js
           node --check public/js/owner-launch-forensics.js
+          node --check public/js/owner-defense-network.js
+          node --check public/js/owner-actor-distribution.js
+          node --check public/js/owner-unified-radar.js
       - name: Check Turkish public copy
         run: |
           grep -q '<html lang="tr">' public/index.html
@@ -50,7 +101,17 @@ jobs:
           ! grep -Eqi 'Paste it before|Token ikinci planda|KOSCH stays as|What ARVIS does|Who it is for|Power users|Automatic flow' public/index.html
           ! grep -Eqi 'Login yok|Wallet connect yok|Read-only analiz|İmzalı verdict geçmişi' public/scan.html
       - name: Test
-        run: go test ./...
+        run: |
+          set -o pipefail
+          go test ./... 2>&1 | tee "${RUNNER_TEMP}/go-test.txt"
+      - name: Upload Go test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-test
+          path: ${{ runner.temp }}/go-test.txt
+          if-no-files-found: warn
+          retention-days: 7
       - name: Vet
         run: go vet ./...
       - name: Build
