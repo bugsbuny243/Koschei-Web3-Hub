@@ -5,12 +5,13 @@ import (
 	"time"
 )
 
-func TestWatchlistMonitorConfigDefaults(t *testing.T) {
+func TestWatchlistMonitorDefaultsToDisabled(t *testing.T) {
+	t.Setenv("KOSCHEI_AUTOMATIC_SCANNING_ENABLED", "")
 	t.Setenv("WATCHLIST_MONITOR_ENABLED", "")
 	t.Setenv("WATCHLIST_MONITOR_INTERVAL", "")
 	t.Setenv("WATCHLIST_MONITOR_BATCH_SIZE", "")
-	if !watchlistMonitorEnabled() {
-		t.Fatal("watchlist monitor should default to enabled")
+	if watchlistMonitorEnabled() {
+		t.Fatal("watchlist monitor must default to disabled")
 	}
 	if got := watchlistMonitorInterval(); got != time.Minute {
 		t.Fatalf("interval = %s, want %s", got, time.Minute)
@@ -20,7 +21,20 @@ func TestWatchlistMonitorConfigDefaults(t *testing.T) {
 	}
 }
 
+func TestWatchlistMonitorRequiresBothExplicitSwitches(t *testing.T) {
+	t.Setenv("KOSCHEI_AUTOMATIC_SCANNING_ENABLED", "true")
+	t.Setenv("WATCHLIST_MONITOR_ENABLED", "true")
+	if !watchlistMonitorEnabled() {
+		t.Fatal("watchlist monitor should start only when both explicit switches are enabled")
+	}
+	t.Setenv("KOSCHEI_AUTOMATIC_SCANNING_ENABLED", "false")
+	if watchlistMonitorEnabled() {
+		t.Fatal("master automatic-scanning switch must override the watchlist switch")
+	}
+}
+
 func TestWatchlistMonitorConfigBounds(t *testing.T) {
+	t.Setenv("KOSCHEI_AUTOMATIC_SCANNING_ENABLED", "true")
 	t.Setenv("WATCHLIST_MONITOR_ENABLED", "false")
 	t.Setenv("WATCHLIST_MONITOR_INTERVAL", "5s")
 	t.Setenv("WATCHLIST_MONITOR_BATCH_SIZE", "999")
