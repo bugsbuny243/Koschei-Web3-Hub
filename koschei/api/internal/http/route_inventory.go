@@ -28,6 +28,7 @@ func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 			"Developer API keys remain identity credentials and do not bypass live KOSCH verification.",
 			"Legacy Shopier, Paddle, package purchase and owner payment routes are not registered.",
 			"Evidence-backed verdicts must not be signed without verified evidence.",
+			"Recipient fate investigation is mint-specific ATA-only and never queries recipient-wide signature history.",
 		},
 	})
 }
@@ -49,7 +50,8 @@ func productionRouteInventory() []routeInventoryGroup {
 		}},
 		{Name: "owner", Auth: "owner_session", Routes: []string{
 			"POST /api/owner/login", "POST /api/owner/logout", "GET /api/owner/command-center", "GET /api/owner/route-map",
-			"GET /api/owner/defense/tracks", "POST /api/owner/defense/investigate", "GET /api/owner/users", "POST /api/owner/users/ban", "POST /api/owner/users/remove", "POST /api/owner/command",
+			"GET /api/owner/defense/tracks", "POST /api/owner/defense/investigate", "POST /api/owner/defense/distribution",
+			"GET /api/owner/users", "POST /api/owner/users/ban", "POST /api/owner/users/remove", "POST /api/owner/command",
 			"POST /api/owner/brain", "/api/owner/chat", "GET /api/owner/health", "GET /api/owner/status",
 		}},
 		{Name: "premium_radar_and_reports", Auth: "customer_session_plus_kosch", Routes: []string{
