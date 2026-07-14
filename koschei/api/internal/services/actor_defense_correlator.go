@@ -12,10 +12,11 @@ import (
 
 const defaultActorDefenseCorrelationInterval = 10 * time.Minute
 
-// ActorDefenseCorrelator continuously turns a bounded 30-day production sensor
-// window into durable wallet-level threat tracks. It performs no Solana RPC
-// calls and therefore remains safe for the full Pump discovery volume.
-// Expensive live transaction verification stays selective and on-demand.
+// ActorDefenseCorrelator turns the persistent actor evidence/index into durable
+// wallet-level threat tracks. Raw radar tables may be retained for a bounded
+// period, but actor memory is all-time and is never rebuilt from a 30-day window.
+// The worker performs no Solana RPC calls; expensive verification remains
+// selective and on-demand.
 type ActorDefenseCorrelator struct {
 	DB        *sql.DB
 	PollEvery time.Duration
@@ -45,7 +46,7 @@ func (w *ActorDefenseCorrelator) Start(ctx context.Context) {
 			if err != nil && ctx.Err() == nil {
 				log.Printf("actor defense correlation cycle failed: %v", err)
 			} else if stats.CreatorTracks > 0 || stats.HolderTracks > 0 {
-				log.Printf("actor defense correlation cycle: changed_creator_tracks=%d changed_repeat_holder_tracks=%d window_days=30", stats.CreatorTracks, stats.HolderTracks)
+				log.Printf("actor defense correlation cycle: changed_creator_tracks=%d changed_repeat_holder_tracks=%d memory=persistent_actor_index", stats.CreatorTracks, stats.HolderTracks)
 			}
 			timer.Reset(w.PollEvery)
 		}
@@ -98,48 +99,74 @@ func actorDefenseCorrelationInterval() time.Duration {
 const actorDefenseCreatorCorrelationSQL = `
 WITH creator_tokens AS (
 	SELECT
-		COALESCE(NULLIF(e.network,''),'solana-mainnet') AS network,
-		COALESCE(
-			NULLIF(btrim(e.signals->>'creator_wallet'),''),
-			NULLIF(btrim(e.signals->>'deployer_wallet'),'')
-		) AS wallet,
-		e.target,
-		min(e.created_at) AS first_seen_at,
-		max(e.created_at) AS last_seen_at
-	FROM security_radar_events e
-	WHERE e.target_type='token'
-	  AND e.created_at >= now()-interval '30 days'
-	  AND btrim(COALESCE(e.target,''))<>''
-	  AND COALESCE(
-			NULLIF(btrim(e.signals->>'creator_wallet'),''),
-			NULLIF(btrim(e.signals->>'deployer_wallet'),'')
-	  ) IS NOT NULL
-	GROUP BY COALESCE(NULLIF(e.network,''),'solana-mainnet'),
-		COALESCE(NULLIF(btrim(e.signals->>'creator_wallet'),''),NULLIF(btrim(e.signals->>'deployer_wallet'),'')),
-		e.target
+		network,
+		actor_wallet AS wallet,
+		token_mint AS target,
+		min(first_observed_at) AS first_seen_at,
+		max(last_observed_at) AS last_seen_at,
+		bool_or(verification_status='verified') AS verified_relation
+	FROM security_actor_evidence
+	WHERE actor_role='creator_deployer'
+	  AND relation='created_token'
+	  AND counterpart_kind='token'
+	  AND verification_status IN ('verified','observed')
+	  AND token_mint IS NOT NULL
+	  AND btrim(token_mint)<>''
+	GROUP BY network,actor_wallet,token_mint
 ), creator_rollup AS (
-	SELECT network,wallet,count(*)::integer AS token_count,
-		min(first_seen_at) AS first_seen_at,max(last_seen_at) AS last_seen_at
+	SELECT
+		network,
+		wallet,
+		count(*)::integer AS token_count,
+		count(*) FILTER (WHERE verified_relation)::integer AS verified_token_count,
+		min(first_seen_at) AS first_seen_at,
+		max(last_seen_at) AS last_seen_at
 	FROM creator_tokens
 	GROUP BY network,wallet
 	HAVING count(*) >= 2
-), latest_holders AS (
-	SELECT DISTINCT ON (network,target,owner_wallet)
-		network,target,owner_wallet,percentage,scanned_at
-	FROM security_radar_holder_snapshots
-	WHERE scanned_at >= now()-interval '30 days'
-	  AND btrim(COALESCE(owner_wallet,''))<>''
-	ORDER BY network,target,owner_wallet,scanned_at DESC,id DESC
+), holder_tokens AS (
+	SELECT
+		network,
+		actor_wallet AS owner_wallet,
+		token_mint AS target,
+		max(
+			CASE
+				WHEN COALESCE(metadata->>'max_holder_percentage',metadata->>'holder_percentage','')
+					~ '^[0-9]+([.][0-9]+)?$'
+				THEN COALESCE(metadata->>'max_holder_percentage',metadata->>'holder_percentage')::numeric
+				ELSE 0
+			END
+		)::double precision AS max_percentage,
+		min(first_observed_at) AS first_seen_at,
+		max(last_observed_at) AS last_seen_at
+	FROM security_actor_evidence
+	WHERE actor_role='dominant_holder'
+	  AND relation='dominant_holder_of'
+	  AND verification_status IN ('verified','observed')
+	  AND token_mint IS NOT NULL
+	  AND btrim(token_mint)<>''
+	GROUP BY network,actor_wallet,token_mint
 ), repeated_related AS (
-	SELECT ct.network,ct.wallet,lh.owner_wallet,count(DISTINCT ct.target)::integer AS shared_tokens
+	SELECT
+		ct.network,
+		ct.wallet,
+		ht.owner_wallet,
+		count(DISTINCT ct.target)::integer AS shared_tokens,
+		max(ht.max_percentage)::double precision AS max_percentage,
+		min(ht.first_seen_at) AS first_seen_at,
+		max(ht.last_seen_at) AS last_seen_at
 	FROM creator_tokens ct
-	JOIN latest_holders lh ON lh.network=ct.network AND lh.target=ct.target
-	WHERE lh.owner_wallet<>ct.wallet AND lh.percentage>=20
-	GROUP BY ct.network,ct.wallet,lh.owner_wallet
+	JOIN holder_tokens ht ON ht.network=ct.network AND ht.target=ct.target
+	WHERE ht.owner_wallet<>ct.wallet AND ht.max_percentage>=20
+	GROUP BY ct.network,ct.wallet,ht.owner_wallet
 	HAVING count(DISTINCT ct.target) >= 2
 ), related_rollup AS (
-	SELECT network,wallet,count(*)::integer AS related_actor_count,
-		max(shared_tokens)::integer AS max_shared_tokens
+	SELECT
+		network,
+		wallet,
+		count(*)::integer AS related_actor_count,
+		max(shared_tokens)::integer AS max_shared_tokens,
+		max(max_percentage)::double precision AS max_holder_percentage
 	FROM repeated_related
 	GROUP BY network,wallet
 )
@@ -149,19 +176,34 @@ INSERT INTO security_threat_tracks (
 	dossier,first_seen_at,last_seen_at,last_investigated_at,created_at,updated_at
 )
 SELECT
-	c.network,'wallet',c.wallet,
+	c.network,
+	'wallet',
+	c.wallet,
 	CASE WHEN COALESCE(r.related_actor_count,0)>0 THEN 'correlated' ELSE 'tracked' END,
-	c.token_count,0,0,COALESCE(r.related_actor_count,0),0,0,
+	c.token_count,
+	0,
+	0,
+	COALESCE(r.related_actor_count,0),
+	0,
+	0,
 	jsonb_build_object(
 		'auto_correlated',true,
 		'actor_role','creator_deployer',
-		'observation_window_days',30,
+		'memory_scope','persistent_actor_index',
 		'created_token_count',c.token_count,
+		'verified_creator_token_count',c.verified_token_count,
+		'creator_reuse_evidence_status',CASE WHEN c.verified_token_count>=2 THEN 'verified' ELSE 'observed' END,
 		'repeated_related_actor_count',COALESCE(r.related_actor_count,0),
 		'max_shared_token_count',COALESCE(r.max_shared_tokens,0),
-		'correlation_scope','Koschei Pump discovery and owner-resolved holder memory; not identity or intent proof'
+		'max_related_holder_percentage',COALESCE(r.max_holder_percentage,0),
+		'related_actor_evidence_status','observed',
+		'correlation_scope','Persistent creator/deployer and owner-resolved holder evidence; not identity or intent proof'
 	),
-	c.first_seen_at,c.last_seen_at,c.first_seen_at,now(),now()
+	c.first_seen_at,
+	c.last_seen_at,
+	now(),
+	now(),
+	now()
 FROM creator_rollup c
 LEFT JOIN related_rollup r ON r.network=c.network AND r.wallet=c.wallet
 ON CONFLICT (network,target_kind,target_id)
@@ -188,18 +230,38 @@ WHERE
 	NOT security_threat_tracks.dossier @> EXCLUDED.dossier`
 
 const actorDefenseRepeatHolderCorrelationSQL = `
-WITH latest AS (
-	SELECT DISTINCT ON (network,target,owner_wallet)
-		network,target,owner_wallet,percentage,scanned_at
-	FROM security_radar_holder_snapshots
-	WHERE scanned_at >= now()-interval '30 days'
-	  AND btrim(COALESCE(owner_wallet,''))<>''
-	ORDER BY network,target,owner_wallet,scanned_at DESC,id DESC
+WITH holder_tokens AS (
+	SELECT
+		network,
+		actor_wallet AS owner_wallet,
+		token_mint AS target,
+		max(
+			CASE
+				WHEN COALESCE(metadata->>'max_holder_percentage',metadata->>'holder_percentage','')
+					~ '^[0-9]+([.][0-9]+)?$'
+				THEN COALESCE(metadata->>'max_holder_percentage',metadata->>'holder_percentage')::numeric
+				ELSE 0
+			END
+		)::double precision AS max_percentage,
+		min(first_observed_at) AS first_seen_at,
+		max(last_observed_at) AS last_seen_at
+	FROM security_actor_evidence
+	WHERE actor_role='dominant_holder'
+	  AND relation='dominant_holder_of'
+	  AND verification_status IN ('verified','observed')
+	  AND token_mint IS NOT NULL
+	  AND btrim(token_mint)<>''
+	GROUP BY network,actor_wallet,token_mint
 ), repeat_holders AS (
-	SELECT network,owner_wallet,count(DISTINCT target)::integer AS token_count,
-		max(percentage) AS max_percentage,min(scanned_at) AS first_seen_at,max(scanned_at) AS last_seen_at
-	FROM latest
-	WHERE percentage>=20
+	SELECT
+		network,
+		owner_wallet,
+		count(DISTINCT target)::integer AS token_count,
+		max(max_percentage)::double precision AS max_percentage,
+		min(first_seen_at) AS first_seen_at,
+		max(last_seen_at) AS last_seen_at
+	FROM holder_tokens
+	WHERE max_percentage>=20
 	GROUP BY network,owner_wallet
 	HAVING count(DISTINCT target) >= 2
 )
@@ -209,16 +271,30 @@ INSERT INTO security_threat_tracks (
 	dossier,first_seen_at,last_seen_at,last_investigated_at,created_at,updated_at
 )
 SELECT
-	network,'wallet',owner_wallet,'correlated',0,token_count,0,0,0,0,
+	network,
+	'wallet',
+	owner_wallet,
+	'correlated',
+	0,
+	token_count,
+	0,
+	0,
+	0,
+	0,
 	jsonb_build_object(
 		'auto_correlated',true,
 		'actor_role','repeat_dominant_holder',
-		'observation_window_days',30,
+		'memory_scope','persistent_actor_index',
 		'dominant_holder_token_count',token_count,
 		'max_holder_percentage',max_percentage,
-		'correlation_scope','Owner-resolved top-five holder snapshots at or above 20 percent; not identity or intent proof'
+		'holder_reuse_evidence_status','observed',
+		'correlation_scope','Persistent owner-resolved dominant-holder observations at or above 20 percent; not identity or intent proof'
 	),
-	first_seen_at,last_seen_at,first_seen_at,now(),now()
+	first_seen_at,
+	last_seen_at,
+	now(),
+	now(),
+	now()
 FROM repeat_holders
 ON CONFLICT (network,target_kind,target_id)
 DO UPDATE SET
