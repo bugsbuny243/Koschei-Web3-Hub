@@ -7,7 +7,10 @@ import (
 )
 
 func StartActorDefenseCorrelator(ctx context.Context, db *sql.DB) func() {
-	if db == nil {
+	if db == nil || !AutomaticBackgroundScanningEnabled() {
+		if db != nil {
+			log.Printf("actor defense correlator disabled: automatic scanning is off")
+		}
 		return func() {}
 	}
 	workerCtx, cancel := context.WithCancel(ctx)
