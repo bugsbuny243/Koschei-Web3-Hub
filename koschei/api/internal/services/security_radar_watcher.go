@@ -13,6 +13,9 @@ import (
 )
 
 func SecurityRadarAutoEnabled() bool {
+	if !AutomaticBackgroundScanningEnabled() {
+		return false
+	}
 	value := strings.TrimSpace(os.Getenv("KOSCHEI_AUTO_RADAR_ENABLED"))
 	return strings.EqualFold(value, "1") || strings.EqualFold(value, "true")
 }
@@ -21,11 +24,15 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 	if db == nil {
 		return func() {}
 	}
-	// Retention is pure database hygiene. It must stay active when RPC-based
-	// background workers are paused by the Alchemy quota saver.
+	// Retention is pure database hygiene. It stays active even when every
+	// quota-consuming automatic scanner is disabled.
 	stopRetention := StartSecurityRadarRetentionWorker(ctx, db)
+	if !AutomaticBackgroundScanningEnabled() {
+		log.Printf("security radar automatic workers disabled by KOSCHEI_AUTOMATIC_SCANNING_ENABLED")
+		return stopRetention
+	}
 	if SolanaRPCLimitSaverEnabled() && !ForceBackgroundRadarEnabled() {
-		log.Printf("broad security radar RPC workers paused: SOLANA_RPC_LIMIT_SAVER_ENABLED=true; selective Pump volume radar is managed separately; manual scans remain available")
+		log.Printf("broad security radar RPC workers paused: SOLANA_RPC_LIMIT_SAVER_ENABLED=true; manual scans remain available")
 		return stopRetention
 	}
 	stopHeartbeat := StartArvisRadarHeartbeat(ctx, db)
