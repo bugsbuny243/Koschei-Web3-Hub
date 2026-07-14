@@ -114,8 +114,11 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 		}
 	}
 
-	sales := services.LoadCreatorSellAcceleration(ctx, db, target, creator, time.Now().UTC())
-	behavior := services.EvaluateUnifiedRadarBehavior(target, creator, core.Market, core.Intelligence, core.Cluster, sales, time.Now().UTC())
+	now := time.Now().UTC()
+	sales := services.LoadCreatorSellAcceleration(ctx, db, target, creator, now)
+	sellVerification := services.VerifyCreatorSellTransactions(ctx, creatorIntelRPCURL(), sales)
+	behavior := services.EvaluateUnifiedRadarBehavior(target, creator, core.Market, core.Intelligence, core.Cluster, sales, now)
+	behavior = services.HardenUnifiedRadarBehavior(behavior, sellVerification, core.Cluster)
 	behaviorPersistence := "not_applicable"
 	if store != nil && len(behavior.Evidence) > 0 {
 		behaviorPersistence = "persisted"
@@ -141,6 +144,7 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 		}
 	}
 	unifiedVerdict := services.EvaluateUnifiedRadarVerdict(target, actorVerdict, behavior)
+	unifiedPersistence, unifiedHistory := h.persistUnifiedRadarVerdict(ctx, db, network, "token", target, unifiedVerdict, behavior)
 
 	legacy := map[string]any{
 		"architecture_arm_count": 14,
@@ -175,6 +179,8 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 			"single_final_verdict": true,
 		},
 		"final_verdict": unifiedVerdict,
+		"final_verdict_persistence": unifiedPersistence,
+		"final_verdict_history": unifiedHistory,
 		"legacy_14_arm_radar": legacy,
 		"actor_investigation": map[string]any{
 			"wallet": creator,
@@ -184,6 +190,7 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 			"rule_verdict_persistence": actorVerdictPersistence,
 		},
 		"behavior_signals": behavior,
+		"creator_sell_transaction_verification": sellVerification,
 		"behavior_evidence_persistence": behaviorPersistence,
 		"evidence_policy": map[string]any{
 			"numeric_final_score_disabled": true,
@@ -191,6 +198,8 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 			"inferred_watch_only": true,
 			"unverified_excluded": true,
 			"ai_may_explain_but_cannot_grade": true,
+			"creator_sell_acceleration_is_observed": true,
+			"verified_behavior_evidence_requires_complete_canonical_line": true,
 		},
 	})
 }
@@ -234,6 +243,7 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 	}
 	behavior := services.EvaluateUnifiedRadarBehavior("", wallet, services.TokenMarketSnapshot{}, services.HolderIntelligence{}, services.HolderClusterAnalysis{}, services.CreatorSellAcceleration{}, time.Now().UTC())
 	unifiedVerdict := services.EvaluateUnifiedRadarVerdict(wallet, actorVerdict, behavior)
+	unifiedPersistence, unifiedHistory := h.persistUnifiedRadarVerdict(ctx, db, network, "wallet", wallet, unifiedVerdict, behavior)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true,
 		"schema_version": "koschei-unified-radar-v1",
@@ -254,6 +264,8 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 			"single_final_verdict": true,
 		},
 		"final_verdict": unifiedVerdict,
+		"final_verdict_persistence": unifiedPersistence,
+		"final_verdict_history": unifiedHistory,
 		"legacy_14_arm_radar": map[string]any{
 			"applicable": false,
 			"reason": "The legacy 14 token arms require a token mint. They remain part of the same Radar architecture but are not fabricated for wallet targets.",
@@ -277,4 +289,27 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 			"ai_may_explain_but_cannot_grade": true,
 		},
 	})
+}
+
+func (h *Handler) persistUnifiedRadarVerdict(ctx context.Context, db interface{ QueryRowContext(context.Context, string, ...any) *sql.Row }, network, targetKind, targetID string, verdict services.UnifiedRadarVerdict, behavior services.UnifiedRadarBehaviorReport) (string, []services.UnifiedRadarVerdictHistoryRecord) {
+	if db == nil {
+		return "database_unavailable", []services.UnifiedRadarVerdictHistoryRecord{}
+	}
+	concrete, ok := db.(*sql.DB)
+	if !ok || concrete == nil {
+		return "database_unavailable", []services.UnifiedRadarVerdictHistoryRecord{}
+	}
+	store := services.NewUnifiedRadarVerdictStore(concrete)
+	status := "persisted"
+	if _, err := store.Persist(ctx, network, targetKind, targetID, verdict, behavior); err != nil {
+		status = "failed"
+	}
+	history, err := store.History(ctx, network, targetKind, targetID, 20)
+	if err != nil {
+		if status == "persisted" {
+			status = "history_read_failed"
+		}
+		return status, []services.UnifiedRadarVerdictHistoryRecord{}
+	}
+	return status, history
 }
