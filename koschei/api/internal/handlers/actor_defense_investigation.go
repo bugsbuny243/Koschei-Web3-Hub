@@ -93,7 +93,7 @@ func (h *Handler) OwnerActorDefenseInvestigation(w http.ResponseWriter, r *http.
 	ctx, cancel := context.WithTimeout(r.Context(), 170*time.Second)
 	defer cancel()
 	store := services.NewActorDefenseStore(db)
-	initial, err := store.LoadWalletDossier(ctx, wallet, network, 75)
+	initial, err := store.LoadPersistentWalletDossier(ctx, wallet, network, 75)
 	if err != nil {
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Actor defense dossier could not be assembled")
 		return
@@ -120,7 +120,7 @@ func (h *Handler) OwnerActorDefenseInvestigation(w http.ResponseWriter, r *http.
 			coverage.Limitations = append(coverage.Limitations, "Funding-origin kanıtı kalıcı actor index'e yazılamadı.")
 		}
 	}
-	final, err := store.LoadWalletDossier(ctx, wallet, network, 100)
+	final, err := store.LoadPersistentWalletDossier(ctx, wallet, network, 100)
 	if err != nil {
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Actor defense dossier could not be refreshed")
 		return
