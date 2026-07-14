@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -12,14 +13,14 @@ import (
 )
 
 type recipientRPCFixture struct {
-	mu            sync.Mutex
-	methods       []string
-	signatureArgs []string
-	ownerQueries  []struct{ Owner, Mint string }
-	creator       string
-	recipient     string
-	mint          string
-	sourceATA     string
+	mu             sync.Mutex
+	methods        []string
+	signatureArgs  []string
+	ownerQueries   []struct{ Owner, Mint string }
+	creator        string
+	recipient      string
+	mint           string
+	sourceATA      string
 	destinationATA string
 }
 
@@ -117,10 +118,10 @@ func (fixture *recipientRPCFixture) server(t *testing.T) *httptest.Server {
 func TestInvestigateActorInitialRecipientsUsesMintSpecificATAOnly(t *testing.T) {
 	resetSolanaRPCCachesForTest()
 	fixture := &recipientRPCFixture{
-		creator: "Creator11111111111111111111111111111111111",
-		recipient: "Recipient111111111111111111111111111111111",
-		mint: "Mint111111111111111111111111111111111111111",
-		sourceATA: "SourceATA111111111111111111111111111111111",
+		creator:        "Creator11111111111111111111111111111111111",
+		recipient:      "Recipient111111111111111111111111111111111",
+		mint:           "Mint111111111111111111111111111111111111111",
+		sourceATA:      "SourceATA111111111111111111111111111111111",
 		destinationATA: "DestinationATA1111111111111111111111111111",
 	}
 	server := fixture.server(t)
