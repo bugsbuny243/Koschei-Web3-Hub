@@ -1,8 +1,10 @@
 package services
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -38,17 +40,17 @@ type ActorDefenseRuleHit struct {
 }
 
 type ActorDefenseRuleVerdict struct {
-	Grade                       string                `json:"grade"`
-	Verdict                     string                `json:"verdict"`
-	RulesetVersion              string                `json:"ruleset_version"`
-	TriggeredRules              []ActorDefenseRuleHit `json:"triggered_rules"`
-	WatchFlags                  []ActorDefenseRuleHit `json:"watch_flags"`
-	ExcludedUnverifiedEvidence  int                   `json:"excluded_unverified_evidence"`
-	DecisionPath                []string              `json:"decision_path"`
-	NarrativeSource             string                `json:"narrative_source"`
-	Signed                      bool                  `json:"signed"`
-	Signature                   string                `json:"signature,omitempty"`
-	GeneratedAt                 time.Time             `json:"generated_at"`
+	Grade                      string                `json:"grade"`
+	Verdict                    string                `json:"verdict"`
+	RulesetVersion             string                `json:"ruleset_version"`
+	TriggeredRules             []ActorDefenseRuleHit `json:"triggered_rules"`
+	WatchFlags                 []ActorDefenseRuleHit `json:"watch_flags"`
+	ExcludedUnverifiedEvidence int                   `json:"excluded_unverified_evidence"`
+	DecisionPath               []string              `json:"decision_path"`
+	NarrativeSource            string                `json:"narrative_source"`
+	Signed                     bool                  `json:"signed"`
+	Signature                  string                `json:"signature,omitempty"`
+	GeneratedAt                time.Time             `json:"generated_at"`
 }
 
 // EvaluateActorDefenseRules applies a versioned rule table. It never averages
@@ -241,6 +243,59 @@ func EvaluateActorDefenseRules(track ActorDefenseTrack, evidence []ActorDefenseE
 	return result
 }
 
+func (s *ActorDefenseStore) PersistRuleVerdict(ctx context.Context, track ActorDefenseTrack, verdict ActorDefenseRuleVerdict) error {
+	if s == nil || s.DB == nil {
+		return fmt.Errorf("actor defense database is unavailable")
+	}
+	payload, err := json.Marshal(verdict)
+	if err != nil {
+		return fmt.Errorf("encode actor rule verdict: %w", err)
+	}
+	result, err := s.DB.ExecContext(ctx, `
+		UPDATE security_threat_tracks
+		SET dossier=dossier || jsonb_build_object(
+			'rule_verdict',$4::jsonb,
+			'ruleset_version',$5,
+			'numeric_score_disabled',true
+		), updated_at=now()
+		WHERE network=$1 AND target_kind=$2 AND target_id=$3`,
+		normalizeRadarNetwork(track.Network), firstNonEmptyString(track.TargetKind, "wallet"),
+		strings.TrimSpace(track.TargetID), string(payload), verdict.RulesetVersion)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return fmt.Errorf("actor defense track was not found for rule verdict persistence")
+	}
+	return nil
+}
+
+func ActorDefenseRuleVerdictFromDossier(dossier map[string]any) (ActorDefenseRuleVerdict, bool) {
+	if dossier == nil {
+		return ActorDefenseRuleVerdict{}, false
+	}
+	raw, ok := dossier["rule_verdict"]
+	if !ok || raw == nil {
+		return ActorDefenseRuleVerdict{}, false
+	}
+	payload, err := json.Marshal(raw)
+	if err != nil {
+		return ActorDefenseRuleVerdict{}, false
+	}
+	var verdict ActorDefenseRuleVerdict
+	if err := json.Unmarshal(payload, &verdict); err != nil {
+		return ActorDefenseRuleVerdict{}, false
+	}
+	if strings.TrimSpace(verdict.RulesetVersion) == "" || strings.TrimSpace(verdict.Verdict) == "" {
+		return ActorDefenseRuleVerdict{}, false
+	}
+	return verdict, true
+}
+
 func actorRulePlaceHit(hit ActorDefenseRuleHit, compound, watch *[]ActorDefenseRuleHit, unverified *int) {
 	switch normalizeActorEvidenceStatus(hit.EvidenceStatus) {
 	case "verified", "observed":
@@ -250,7 +305,7 @@ func actorRulePlaceHit(hit ActorDefenseRuleHit, compound, watch *[]ActorDefenseR
 		hit.GradeEffect = "none"
 		*watch = append(*watch, hit)
 	case "unverified":
-		*unverified++
+		(*unverified)++
 	}
 }
 
