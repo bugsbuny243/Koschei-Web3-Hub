@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS security_actor_evidence (
             btrim(evidence_key) <> '' AND
             btrim(source) <> ''
         ),
+    CONSTRAINT security_actor_evidence_amounts_check
+        CHECK (amount_native >= 0 AND token_amount >= 0 AND occurrence_count >= 1),
     CONSTRAINT security_actor_evidence_unique
         UNIQUE (network,actor_wallet,counterpart_kind,counterpart_id,relation,source,evidence_key)
 );
@@ -68,6 +70,17 @@ CREATE TABLE IF NOT EXISTS security_threat_tracks (
         CHECK (state IN ('detected','tracked','correlated','verified','alerted')),
     CONSTRAINT security_threat_tracks_nonempty_check
         CHECK (btrim(target_kind) <> '' AND btrim(target_id) <> ''),
+    CONSTRAINT security_threat_tracks_counts_check
+        CHECK (
+            created_token_count >= 0 AND
+            dominant_holder_token_count >= 0 AND
+            traded_token_count >= 0 AND
+            related_actor_count >= 0 AND
+            verified_evidence_count >= 0 AND
+            observed_evidence_count >= 0
+        ),
+    CONSTRAINT security_threat_tracks_time_check
+        CHECK (first_seen_at <= last_seen_at),
     CONSTRAINT security_threat_tracks_target_unique
         UNIQUE (network,target_kind,target_id)
 );
