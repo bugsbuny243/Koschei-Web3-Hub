@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -166,10 +167,10 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 			knownMints[token.Mint] = true
 		}
 	}
-	relatedActors := map[string]bool{}
+	relatedActors := map[string]services.ActorDefenseRelatedActor{}
 	for _, actor := range dossier.RelatedActors {
 		if strings.TrimSpace(actor.Wallet) != "" {
-			relatedActors[actor.Wallet] = true
+			relatedActors[actor.Wallet] = actor
 		}
 	}
 	persist := func(item services.ActorDefenseEvidenceRecord) {
@@ -219,16 +220,32 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 
 		if actorSigned {
 			if action, instructionTypes := actorDefenseLiquidityRemoval(message, meta); action {
+				transactionMints := actorDefenseKnownTransactionMints(meta, knownMints)
+				verificationStatus := "observed"
+				source := "solana_transaction_logs"
+				scope := "parsed instruction or log observation; creator-token relation not fully verified"
+				if dossier.Track.CreatedTokenCount > 0 && actorDefenseParsedLiquidityRemoval(instructionTypes) && len(transactionMints) > 0 {
+					verificationStatus = "verified"
+					source = "solana_jsonparsed_instruction"
+					scope = "creator signed parsed liquidity-removal instruction touching a creator-linked token mint"
+				}
+				tokenMint := ""
+				if len(transactionMints) > 0 {
+					tokenMint = transactionMints[0]
+				}
 				persist(services.ActorDefenseEvidenceRecord{
 					Network: dossier.Network, ActorWallet: dossier.Wallet,
 					CounterpartKind: "transaction", CounterpartID: signature.Signature,
-					Relation: "liquidity_remove_activity", VerificationStatus: "observed",
-					EvidenceKey: signature.Signature + ":liquidity_remove", Source: "solana_transaction_logs",
+					Relation: "liquidity_remove_activity", VerificationStatus: verificationStatus,
+					EvidenceKey: signature.Signature + ":liquidity_remove", Source: source,
 					Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
+					TokenMint: tokenMint,
 					Metadata: map[string]any{
 						"actor_signed": true,
+						"creator_role_observed": dossier.Track.CreatedTokenCount > 0,
 						"instruction_types": instructionTypes,
-						"classification_scope": "parsed instruction/log observation; not proof of malicious intent",
+						"known_transaction_mints": transactionMints,
+						"classification_scope": scope,
 					},
 				})
 			}
@@ -243,8 +260,9 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 	coverage.Limitations = append(coverage.Limitations,
 		fmt.Sprintf("Canlı kanıt taraması en fazla %d imza, %d başarılı transaction ve %d yeni kanıtla sınırlandırıldı.", coverage.SignatureLimit, coverage.TransactionLimit, coverage.EvidenceLimit),
 		"Doğrudan transfer yalnız jsonParsed instruction ve token-account owner eşleşmesiyle VERIFIED olur.",
+		"Creator liquidity removal yalnız actor-signed parsed removal instruction ve creator-linked mint aynı transaction'da doğrulanırsa VERIFIED olur.",
 		"Solana adresleri case-sensitive karşılaştırılır.",
-		"Likidite kaldırma davranışı parsed instruction/log gözlemidir; tek başına kötü niyet kanıtı değildir.",
+		"Log-only likidite kaldırma işareti OBSERVED kalır; tek başına kötü niyet kanıtı değildir.",
 	)
 	return coverage
 }
@@ -257,7 +275,7 @@ func actorDefenseInstructionEvidence(
 	instruction map[string]any,
 	owners map[string]actorDefenseTokenAccountOwner,
 	knownMints map[string]bool,
-	relatedActors map[string]bool,
+	relatedActors map[string]services.ActorDefenseRelatedActor,
 	index int,
 ) []services.ActorDefenseEvidenceRecord {
 	parsed := creatorIntelMap(instruction["parsed"])
@@ -272,7 +290,7 @@ func actorDefenseInstructionEvidence(
 		destination := creatorIntelCleanString(info["destination"])
 		lamports := creatorIntelInt64(info["lamports"])
 		if source == dossier.Wallet && destination != "" && destination != dossier.Wallet && actorSigned {
-			baseMetadata["known_related_actor"] = relatedActors[destination]
+			actorDefenseApplyRelatedActorMetadata(baseMetadata, relatedActors, destination)
 			return []services.ActorDefenseEvidenceRecord{{
 				Network: dossier.Network, ActorWallet: dossier.Wallet,
 				CounterpartKind: "wallet", CounterpartID: destination,
@@ -283,7 +301,7 @@ func actorDefenseInstructionEvidence(
 			}}
 		}
 		if destination == dossier.Wallet && source != "" && source != dossier.Wallet {
-			baseMetadata["known_related_actor"] = relatedActors[source]
+			actorDefenseApplyRelatedActorMetadata(baseMetadata, relatedActors, source)
 			return []services.ActorDefenseEvidenceRecord{{
 				Network: dossier.Network, ActorWallet: dossier.Wallet,
 				CounterpartKind: "wallet", CounterpartID: source,
@@ -316,7 +334,7 @@ func actorDefenseInstructionEvidence(
 		"amount_scope": actorDefenseTokenAmountScope(info),
 	}
 	if sourceOwner.Owner == dossier.Wallet && destinationOwner.Owner != "" && destinationOwner.Owner != dossier.Wallet && authority == dossier.Wallet && actorSigned {
-		metadata["known_related_actor"] = relatedActors[destinationOwner.Owner]
+		actorDefenseApplyRelatedActorMetadata(metadata, relatedActors, destinationOwner.Owner)
 		return []services.ActorDefenseEvidenceRecord{{
 			Network: dossier.Network, ActorWallet: dossier.Wallet,
 			CounterpartKind: "wallet", CounterpartID: destinationOwner.Owner,
@@ -327,7 +345,7 @@ func actorDefenseInstructionEvidence(
 		}}
 	}
 	if destinationOwner.Owner == dossier.Wallet && sourceOwner.Owner != "" && sourceOwner.Owner != dossier.Wallet {
-		metadata["known_related_actor"] = relatedActors[sourceOwner.Owner]
+		actorDefenseApplyRelatedActorMetadata(metadata, relatedActors, sourceOwner.Owner)
 		return []services.ActorDefenseEvidenceRecord{{
 			Network: dossier.Network, ActorWallet: dossier.Wallet,
 			CounterpartKind: "wallet", CounterpartID: sourceOwner.Owner,
@@ -338,6 +356,21 @@ func actorDefenseInstructionEvidence(
 		}}
 	}
 	return nil
+}
+
+func actorDefenseApplyRelatedActorMetadata(metadata map[string]any, actors map[string]services.ActorDefenseRelatedActor, wallet string) {
+	if metadata == nil {
+		return
+	}
+	actor, found := actors[wallet]
+	dominant := found && actor.MaxPercentage >= 20
+	metadata["related_actor_observed"] = found
+	metadata["known_related_actor"] = dominant
+	metadata["dominant_holder_relation"] = dominant
+	if found {
+		metadata["shared_token_count"] = actor.SharedTokenCount
+		metadata["max_holder_percentage"] = actor.MaxPercentage
+	}
 }
 
 func actorDefenseInstructions(message, meta map[string]any) []map[string]any {
@@ -385,6 +418,27 @@ func actorDefenseTokenAccountOwners(meta map[string]any, keys []string) map[stri
 	return out
 }
 
+func actorDefenseKnownTransactionMints(meta map[string]any, knownMints map[string]bool) []string {
+	seen := map[string]bool{}
+	collect := func(raw any) {
+		items, _ := raw.([]any)
+		for _, item := range items {
+			mint := creatorIntelCleanString(creatorIntelMap(item)["mint"])
+			if mint != "" && knownMints[mint] {
+				seen[mint] = true
+			}
+		}
+	}
+	collect(meta["preTokenBalances"])
+	collect(meta["postTokenBalances"])
+	out := make([]string, 0, len(seen))
+	for mint := range seen {
+		out = append(out, mint)
+	}
+	sort.Strings(out)
+	return out
+}
+
 func actorDefenseTokenAmount(info map[string]any) float64 {
 	if tokenAmount := creatorIntelMap(info["tokenAmount"]); len(tokenAmount) > 0 {
 		return creatorIntelUIAmount(tokenAmount)
@@ -412,11 +466,8 @@ func actorDefenseTokenAmountScope(info map[string]any) string {
 func actorDefenseLiquidityRemoval(message, meta map[string]any) (bool, []string) {
 	instructionTypes, _ := creatorIntelInstructions(message, meta)
 	logs := strings.ToLower(strings.Join(creatorIntelStringSlice(meta["logMessages"]), "\n"))
-	for _, kind := range instructionTypes {
-		value := strings.ToLower(kind)
-		if strings.Contains(value, "removeliquidity") || strings.Contains(value, "remove_liquidity") || strings.Contains(value, "withdrawliquidity") || strings.Contains(value, "withdraw_liquidity") {
-			return true, instructionTypes
-		}
+	if actorDefenseParsedLiquidityRemoval(instructionTypes) {
+		return true, instructionTypes
 	}
 	markers := []string{"remove_liquidity", "remove liquidity", "withdraw liquidity", "withdraw all token types"}
 	for _, marker := range markers {
@@ -425,6 +476,16 @@ func actorDefenseLiquidityRemoval(message, meta map[string]any) (bool, []string)
 		}
 	}
 	return false, instructionTypes
+}
+
+func actorDefenseParsedLiquidityRemoval(instructionTypes []string) bool {
+	for _, kind := range instructionTypes {
+		value := strings.ToLower(strings.TrimSpace(kind))
+		if strings.Contains(value, "removeliquidity") || strings.Contains(value, "remove_liquidity") || strings.Contains(value, "withdrawliquidity") || strings.Contains(value, "withdraw_liquidity") {
+			return true
+		}
+	}
+	return false
 }
 
 func actorDefenseObservedAt(signature services.SolanaSignatureInfo, tx map[string]any) time.Time {
