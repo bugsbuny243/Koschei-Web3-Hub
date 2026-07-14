@@ -29,6 +29,7 @@ func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 			"Legacy Shopier, Paddle, package purchase and owner payment routes are not registered.",
 			"Evidence-backed verdicts must not be signed without verified evidence.",
 			"Recipient fate investigation is mint-specific ATA-only and never queries recipient-wide signature history.",
+			"The owner unified Radar is manual-only and joins 14 legacy ARVIS arms, actor investigation and four deterministic behavior rules.",
 		},
 	})
 }
@@ -50,7 +51,7 @@ func productionRouteInventory() []routeInventoryGroup {
 		}},
 		{Name: "owner", Auth: "owner_session", Routes: []string{
 			"POST /api/owner/login", "POST /api/owner/logout", "GET /api/owner/command-center", "GET /api/owner/route-map",
-			"GET /api/owner/defense/tracks", "POST /api/owner/defense/investigate", "POST /api/owner/defense/distribution",
+			"POST /api/owner/radar/unified", "GET /api/owner/defense/tracks", "POST /api/owner/defense/investigate", "POST /api/owner/defense/distribution",
 			"GET /api/owner/users", "POST /api/owner/users/ban", "POST /api/owner/users/remove", "POST /api/owner/command",
 			"POST /api/owner/brain", "/api/owner/chat", "GET /api/owner/health", "GET /api/owner/status",
 		}},
