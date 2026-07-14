@@ -262,15 +262,20 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 		}
 
 		if actorSigned {
-			if action, instructionTypes := actorDefenseLiquidityRemoval(message, meta); action {
+			liquidity := actorDefenseLiquidityEvidence(message, meta)
+			if liquidity.Found {
 				transactionMints := actorDefenseKnownTransactionMints(meta, knownMints)
 				verificationStatus := "observed"
 				source := "solana_transaction_logs"
-				scope := "parsed instruction or log observation; creator-token relation not fully verified"
-				if dossier.Track.CreatedTokenCount > 0 && actorDefenseParsedLiquidityRemoval(instructionTypes) && len(transactionMints) > 0 {
+				scope := "parsed instruction or log observation; complete creator-to-pool evidence line not available"
+				counterpartKind := "transaction"
+				counterpartID := signature.Signature
+				if dossier.Track.CreatedTokenCount > 0 && liquidity.Complete() && len(transactionMints) > 0 {
 					verificationStatus = "verified"
 					source = "solana_jsonparsed_instruction"
-					scope = "creator signed parsed liquidity-removal instruction touching a creator-linked token mint"
+					scope = "creator signed parsed liquidity-removal instruction with explicit pool, program and creator-linked token mint"
+					counterpartKind = "pool"
+					counterpartID = liquidity.PoolWallet
 				}
 				tokenMint := ""
 				if len(transactionMints) > 0 {
@@ -278,7 +283,7 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 				}
 				persist(services.ActorDefenseEvidenceRecord{
 					Network: dossier.Network, ActorWallet: dossier.Wallet,
-					CounterpartKind: "transaction", CounterpartID: signature.Signature,
+					CounterpartKind: counterpartKind, CounterpartID: counterpartID,
 					Relation: "liquidity_remove_activity", VerificationStatus: verificationStatus,
 					EvidenceKey: signature.Signature + ":liquidity_remove", Source: source,
 					Signature: signature.Signature, Slot: signature.Slot, ObservedAt: observedAt,
@@ -286,8 +291,12 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 					Metadata: map[string]any{
 						"actor_signed": true,
 						"creator_role_observed": dossier.Track.CreatedTokenCount > 0,
-						"instruction_types": instructionTypes,
+						"instruction_types": liquidity.InstructionTypes,
 						"known_transaction_mints": transactionMints,
+						"source_wallet": dossier.Wallet,
+						"destination_wallet": liquidity.PoolWallet,
+						"pool_account": liquidity.PoolWallet,
+						"program": liquidity.Program,
 						"classification_scope": scope,
 					},
 				})
@@ -303,9 +312,9 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 	coverage.Limitations = append(coverage.Limitations,
 		fmt.Sprintf("Canlı kanıt taraması en fazla %d imza, %d başarılı transaction ve %d yeni kanıtla sınırlandırıldı.", coverage.SignatureLimit, coverage.TransactionLimit, coverage.EvidenceLimit),
 		"Doğrudan transfer yalnız jsonParsed instruction ve token-account owner eşleşmesiyle VERIFIED olur.",
-		"Creator liquidity removal yalnız actor-signed parsed removal instruction ve creator-linked mint aynı transaction'da doğrulanırsa VERIFIED olur.",
+		"Creator liquidity removal yalnız actor-signed parsed removal instruction, explicit pool/program ve creator-linked mint aynı transaction'da doğrulanırsa VERIFIED olur.",
 		"Solana adresleri case-sensitive karşılaştırılır.",
-		"Log-only likidite kaldırma işareti OBSERVED kalır; tek başına kötü niyet kanıtı değildir.",
+		"Log-only veya pool/program alanı eksik likidite kaldırma işareti OBSERVED kalır; tek başına kötü niyet kanıtı değildir.",
 	)
 	return coverage
 }
@@ -507,18 +516,8 @@ func actorDefenseTokenAmountScope(info map[string]any) string {
 }
 
 func actorDefenseLiquidityRemoval(message, meta map[string]any) (bool, []string) {
-	instructionTypes, _ := creatorIntelInstructions(message, meta)
-	logs := strings.ToLower(strings.Join(creatorIntelStringSlice(meta["logMessages"]), "\n"))
-	if actorDefenseParsedLiquidityRemoval(instructionTypes) {
-		return true, instructionTypes
-	}
-	markers := []string{"remove_liquidity", "remove liquidity", "withdraw liquidity", "withdraw all token types"}
-	for _, marker := range markers {
-		if strings.Contains(logs, marker) {
-			return true, instructionTypes
-		}
-	}
-	return false, instructionTypes
+	line := actorDefenseLiquidityEvidence(message, meta)
+	return line.Found, line.InstructionTypes
 }
 
 func actorDefenseParsedLiquidityRemoval(instructionTypes []string) bool {
