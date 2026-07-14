@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -50,6 +49,7 @@ func (s *ActorDefenseStore) ListVerificationQueue(ctx context.Context, network, 
 	if err != nil {
 		return ActorDefenseQueue{}, err
 	}
+	now := time.Now().UTC()
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id::text,network,target_kind,target_id,state,
 		       created_token_count,dominant_holder_token_count,traded_token_count,
@@ -57,19 +57,29 @@ func (s *ActorDefenseStore) ListVerificationQueue(ctx context.Context, network, 
 		       dossier,first_seen_at,last_seen_at,last_investigated_at
 		FROM security_threat_tracks
 		WHERE network=$1 AND ($2='' OR state=$2)
-		ORDER BY
+		ORDER BY LEAST(100,
 			CASE state
-				WHEN 'correlated' THEN 0
-				WHEN 'tracked' THEN 1
-				WHEN 'detected' THEN 2
-				WHEN 'verified' THEN 3
-				WHEN 'alerted' THEN 4
-				ELSE 5
-			END,
-			(related_actor_count + dominant_holder_token_count + created_token_count) DESC,
-			last_seen_at DESC,
-			id DESC
-		LIMIT $3 OFFSET $4`, network, state, limit, offset)
+				WHEN 'correlated' THEN 30
+				WHEN 'alerted' THEN 20
+				WHEN 'tracked' THEN 14
+				WHEN 'verified' THEN 12
+				WHEN 'detected' THEN 5
+				ELSE 0
+			END
+			+ LEAST(created_token_count*6,18)
+			+ LEAST(dominant_holder_token_count*8,24)
+			+ LEAST(related_actor_count*5,20)
+			+ LEAST(observed_evidence_count*3,9)
+			+ LEAST(verified_evidence_count*2,6)
+			+ CASE
+				WHEN last_seen_at >= $5-interval '24 hours' THEN 10
+				WHEN last_seen_at >= $5-interval '7 days' THEN 5
+				ELSE 0
+			  END
+		) DESC,
+		last_seen_at DESC,
+		id DESC
+		LIMIT $3 OFFSET $4`, network, state, limit, offset, now)
 	if err != nil {
 		return ActorDefenseQueue{}, err
 	}
@@ -91,7 +101,7 @@ func (s *ActorDefenseStore) ListVerificationQueue(ctx context.Context, network, 
 		if len(dossierRaw) > 0 {
 			_ = json.Unmarshal(dossierRaw, &track.Dossier)
 		}
-		priority, reasons, nextAction := ActorDefenseVerificationPriority(track, time.Now().UTC())
+		priority, reasons, nextAction := ActorDefenseVerificationPriority(track, now)
 		items = append(items, ActorDefenseQueueItem{
 			Track: track,
 			VerificationPriority: priority,
@@ -104,22 +114,9 @@ func (s *ActorDefenseStore) ListVerificationQueue(ctx context.Context, network, 
 		return ActorDefenseQueue{}, err
 	}
 
-	// SQL first limits the candidate set by durable state and recurrence. This
-	// stable in-memory sort applies the transparent deterministic priority.
-	for i := 1; i < len(items); i++ {
-		for j := i; j > 0; j-- {
-			left, right := items[j-1], items[j]
-			if left.VerificationPriority > right.VerificationPriority ||
-				(left.VerificationPriority == right.VerificationPriority && !left.Track.LastSeenAt.Before(right.Track.LastSeenAt)) {
-				break
-			}
-			items[j-1], items[j] = items[j], items[j-1]
-		}
-	}
-
 	return ActorDefenseQueue{
 		Items: items, Counts: counts, Total: total, Network: network, StateFilter: state,
-		GeneratedAt: time.Now().UTC(),
+		GeneratedAt: now,
 		Policy: map[string]any{
 			"score_type": "operational_verification_priority",
 			"not_token_or_wallet_risk_score": true,
@@ -236,5 +233,3 @@ func minActorDefenseInt(left, right int) int {
 	}
 	return right
 }
-
-var _ = sql.ErrNoRows
