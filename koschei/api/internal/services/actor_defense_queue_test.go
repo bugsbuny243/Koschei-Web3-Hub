@@ -1,76 +1,64 @@
 package services
 
-import (
-	"testing"
-	"time"
-)
+import "testing"
 
-func TestActorDefenseVerificationPriorityCorrelatedCreator(t *testing.T) {
-	now := time.Date(2026, 7, 14, 2, 0, 0, 0, time.UTC)
-	track := ActorDefenseTrack{
-		State: "correlated", CreatedTokenCount: 3, RelatedActorCount: 2,
-		LastSeenAt: now.Add(-2 * time.Hour),
+func TestActorDefenseVerificationBandHardTrigger(t *testing.T) {
+	verdict := ActorDefenseRuleVerdict{
+		Grade: "D", Verdict: "hard_trigger",
+		TriggeredRules: []ActorDefenseRuleHit{{RuleID: ActorRuleHardCreatorHolderFunding, Tier: "hard_trigger"}},
 	}
-	score, reasons, action := ActorDefenseVerificationPriority(track, now)
-	if score != 68 {
-		t.Fatalf("priority=%d want=68 reasons=%v", score, reasons)
+	band, reason := ActorDefenseVerificationBand(ActorDefenseTrack{}, verdict)
+	if band != "hard_trigger" {
+		t.Fatalf("band=%q", band)
 	}
-	if action != "verify_creator_funding_and_transfer_chain" {
+	if reason != ActorRuleHardCreatorHolderFunding {
+		t.Fatalf("reason=%q", reason)
+	}
+}
+
+func TestActorDefenseVerificationBandCompounding(t *testing.T) {
+	verdict := ActorDefenseRuleVerdict{
+		Grade: "B", Verdict: "compounding_rule",
+		TriggeredRules: []ActorDefenseRuleHit{
+			{RuleID: ActorRuleCompoundCreatorReuse, Tier: "compounding"},
+			{RuleID: ActorRuleCompoundHolderReuse, Tier: "compounding"},
+		},
+	}
+	band, reason := ActorDefenseVerificationBand(ActorDefenseTrack{}, verdict)
+	if band != "compounding" {
+		t.Fatalf("band=%q", band)
+	}
+	if reason != ActorRuleCompoundCreatorReuse+", "+ActorRuleCompoundHolderReuse {
+		t.Fatalf("reason=%q", reason)
+	}
+}
+
+func TestActorDefenseVerificationBandCorrelatedNeedsEvidence(t *testing.T) {
+	track := ActorDefenseTrack{State: "correlated"}
+	band, _ := ActorDefenseVerificationBand(track, ActorDefenseRuleVerdict{Verdict: "single_observation"})
+	if band != "evidence_pending" {
+		t.Fatalf("band=%q", band)
+	}
+	if !actorDefenseNeedsLiveEvidence(track, ActorDefenseRuleVerdict{Verdict: "single_observation"}) {
+		t.Fatal("correlated track must request live evidence")
+	}
+}
+
+func TestActorDefenseRuleNextActionUsesExplicitRule(t *testing.T) {
+	verdict := ActorDefenseRuleVerdict{TriggeredRules: []ActorDefenseRuleHit{{RuleID: ActorRuleHardCreatorLiquidityRemoval}}}
+	if action := ActorDefenseRuleNextAction(ActorDefenseTrack{}, verdict); action != "review_verified_creator_liquidity_removal" {
 		t.Fatalf("next_action=%q", action)
 	}
 }
 
-func TestActorDefenseVerificationPriorityRepeatHolder(t *testing.T) {
-	now := time.Date(2026, 7, 14, 2, 0, 0, 0, time.UTC)
-	track := ActorDefenseTrack{
-		State: "correlated", DominantHolderTokenCount: 2,
-		LastSeenAt: now.Add(-72 * time.Hour),
+func TestActorDefenseQueuePolicyHasNoNumericPriority(t *testing.T) {
+	track := ActorDefenseTrack{State: "correlated", CreatedTokenCount: 3, DominantHolderTokenCount: 2}
+	verdict := EvaluateActorDefenseRules(track, nil)
+	if verdict.Grade != "B" || verdict.Verdict != "compounding_rule" {
+		t.Fatalf("verdict=%#v", verdict)
 	}
-	score, _, action := ActorDefenseVerificationPriority(track, now)
-	if score != 51 {
-		t.Fatalf("priority=%d want=51", score)
-	}
-	if action != "collect_live_transaction_evidence" {
-		t.Fatalf("next_action=%q", action)
-	}
-}
-
-func TestActorDefenseVerificationPriorityVerifiedEvidence(t *testing.T) {
-	now := time.Date(2026, 7, 14, 2, 0, 0, 0, time.UTC)
-	track := ActorDefenseTrack{
-		State: "verified", VerifiedEvidenceCount: 2, ObservedEvidenceCount: 1,
-		LastSeenAt: now.Add(-10 * time.Hour),
-	}
-	score, _, action := ActorDefenseVerificationPriority(track, now)
-	if score != 29 {
-		t.Fatalf("priority=%d want=29", score)
-	}
-	if action != "review_verified_evidence" {
-		t.Fatalf("next_action=%q", action)
-	}
-}
-
-func TestActorDefenseVerificationPriorityCapsAtHundred(t *testing.T) {
-	now := time.Now().UTC()
-	track := ActorDefenseTrack{
-		State: "correlated", CreatedTokenCount: 100, DominantHolderTokenCount: 100,
-		RelatedActorCount: 100, ObservedEvidenceCount: 100, VerifiedEvidenceCount: 100,
-		LastSeenAt: now,
-	}
-	score, _, _ := ActorDefenseVerificationPriority(track, now)
-	if score != 100 {
-		t.Fatalf("priority=%d want=100", score)
-	}
-}
-
-func TestActorDefenseVerificationPriorityDoesNotRewardStaleObservation(t *testing.T) {
-	now := time.Date(2026, 7, 14, 2, 0, 0, 0, time.UTC)
-	track := ActorDefenseTrack{State: "detected", LastSeenAt: now.Add(-31 * 24 * time.Hour)}
-	score, reasons, action := ActorDefenseVerificationPriority(track, now)
-	if score != 5 {
-		t.Fatalf("priority=%d want=5 reasons=%v", score, reasons)
-	}
-	if action != "monitor_sensor_memory" {
-		t.Fatalf("next_action=%q", action)
+	band, _ := ActorDefenseVerificationBand(track, verdict)
+	if band != "compounding" {
+		t.Fatalf("band=%q", band)
 	}
 }
