@@ -19,6 +19,20 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: koschei_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d koschei_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     defaults:
       run:
         working-directory: koschei/api
@@ -32,6 +46,21 @@ jobs:
           cache-dependency-path: koschei/api/go.sum
       - name: Download modules
         run: go mod download
+      - name: Validate migrations on PostgreSQL 17
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          for migration in $(find migrations -maxdepth 1 -type f -name '*.sql' | sort); do
+            echo "Applying ${migration}"
+            psql \
+              --host=127.0.0.1 \
+              --port=5432 \
+              --username=postgres \
+              --dbname=koschei_ci \
+              --set=ON_ERROR_STOP=1 \
+              --file="${migration}"
+          done
       - name: Check public JavaScript
         run: |
           node --check public/js/public-solana-scan.js
