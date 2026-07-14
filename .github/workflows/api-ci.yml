@@ -90,6 +90,7 @@ jobs:
           node --check public/js/owner-holder-tier-labels.js
           node --check public/js/owner-launch-forensics.js
           node --check public/js/owner-defense-network.js
+          node --check public/js/owner-actor-distribution.js
       - name: Check Turkish public copy
         run: |
           grep -q '<html lang="tr">' public/index.html
