@@ -78,7 +78,7 @@ func TestUnifiedVerdictJoinsActorAndMarketRulesWithoutNumber(t *testing.T) {
 		}},
 	}
 	behavior := UnifiedRadarBehaviorReport{Signals: []UnifiedRadarSignal{{
-		RuleID: UnifiedRuleVolumeLiquidityGap, Title: "gap", Tier: "", EvidenceStatus: "observed",
+		RuleID: UnifiedRuleVolumeLiquidityGap, Title: "gap", EvidenceStatus: "observed",
 		Triggered: true, GradeEffect: "compounding_input", Summary: "gap observed",
 	}}}
 	verdict := EvaluateUnifiedRadarVerdict("MintOne", actor, behavior)
