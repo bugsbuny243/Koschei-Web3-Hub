@@ -51,16 +51,35 @@ jobs:
           PGPASSWORD: postgres
         run: |
           set -euo pipefail
+          result_file="${RUNNER_TEMP}/migration-validation.txt"
+          output_file="${RUNNER_TEMP}/migration-output.txt"
+          : > "${result_file}"
           for migration in $(find migrations -maxdepth 1 -type f -name '*.sql' | sort); do
-            echo "Applying ${migration}"
-            psql \
+            echo "RUN ${migration}" >> "${result_file}"
+            if ! psql \
               --host=127.0.0.1 \
               --port=5432 \
               --username=postgres \
               --dbname=koschei_ci \
               --set=ON_ERROR_STOP=1 \
-              --file="${migration}"
+              --file="${migration}" \
+              > "${output_file}" 2>&1; then
+              echo "FAIL ${migration}" >> "${result_file}"
+              tail -n 120 "${output_file}" >> "${result_file}"
+              cat "${result_file}"
+              exit 1
+            fi
+            echo "PASS ${migration}" >> "${result_file}"
           done
+          cat "${result_file}"
+      - name: Upload migration validation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: migration-validation
+          path: ${{ runner.temp }}/migration-validation.txt
+          if-no-files-found: error
+          retention-days: 7
       - name: Check public JavaScript
         run: |
           node --check public/js/public-solana-scan.js
