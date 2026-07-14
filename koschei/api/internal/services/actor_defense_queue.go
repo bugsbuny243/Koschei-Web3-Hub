@@ -8,15 +8,15 @@ import (
 	"time"
 )
 
-// ActorDefenseQueueItem is an operational verification priority, not a risk
-// score or wrongdoing claim. Every point is derived from persisted recurrence,
-// evidence coverage and observation recency.
+// ActorDefenseQueueItem is sorted by an explicit rule band. It contains no
+// weighted priority, probability or wallet-risk number.
 type ActorDefenseQueueItem struct {
-	Track                ActorDefenseTrack `json:"track"`
-	VerificationPriority int               `json:"verification_priority"`
-	PriorityReasons      []string          `json:"priority_reasons"`
-	NextAction           string            `json:"next_action"`
-	NeedsLiveEvidence    bool              `json:"needs_live_evidence"`
+	Track             ActorDefenseTrack       `json:"track"`
+	RuleVerdict       ActorDefenseRuleVerdict `json:"rule_verdict"`
+	VerificationBand  string                  `json:"verification_band"`
+	BandReason        string                  `json:"band_reason"`
+	NextAction        string                  `json:"next_action"`
+	NeedsLiveEvidence bool                    `json:"needs_live_evidence"`
 }
 
 type ActorDefenseQueue struct {
@@ -49,7 +49,6 @@ func (s *ActorDefenseStore) ListVerificationQueue(ctx context.Context, network, 
 	if err != nil {
 		return ActorDefenseQueue{}, err
 	}
-	now := time.Now().UTC()
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id::text,network,target_kind,target_id,state,
 		       created_token_count,dominant_holder_token_count,traded_token_count,
@@ -57,29 +56,24 @@ func (s *ActorDefenseStore) ListVerificationQueue(ctx context.Context, network, 
 		       dossier,first_seen_at,last_seen_at,last_investigated_at
 		FROM security_threat_tracks
 		WHERE network=$1 AND ($2='' OR state=$2)
-		ORDER BY LEAST(100,
-			CASE state
-				WHEN 'correlated' THEN 30
-				WHEN 'alerted' THEN 20
-				WHEN 'tracked' THEN 14
-				WHEN 'verified' THEN 12
-				WHEN 'detected' THEN 5
-				ELSE 0
-			END
-			+ LEAST(created_token_count*6,18)
-			+ LEAST(dominant_holder_token_count*8,24)
-			+ LEAST(related_actor_count*5,20)
-			+ LEAST(observed_evidence_count*3,9)
-			+ LEAST(verified_evidence_count*2,6)
-			+ CASE
-				WHEN last_seen_at >= $5-interval '24 hours' THEN 10
-				WHEN last_seen_at >= $5-interval '7 days' THEN 5
-				ELSE 0
-			  END
-		) DESC,
-		last_seen_at DESC,
-		id DESC
-		LIMIT $3 OFFSET $4`, network, state, limit, offset, now)
+		ORDER BY
+			CASE
+				WHEN dossier->'rule_verdict'->>'verdict'='hard_trigger' THEN 0
+				WHEN dossier->'rule_verdict'->>'verdict'='compounding_rule' THEN 1
+				WHEN (
+					(created_token_count>=2 AND dominant_holder_token_count>=2) OR
+					(created_token_count>=2 AND related_actor_count>0) OR
+					(dominant_holder_token_count>=2 AND related_actor_count>0)
+				) THEN 1
+				WHEN state='correlated' THEN 2
+				WHEN dossier->'rule_verdict'->>'verdict'='watch_only' THEN 3
+				WHEN state IN ('verified','alerted') THEN 4
+				WHEN state='tracked' THEN 5
+				ELSE 6
+			END,
+			last_seen_at DESC,
+			id DESC
+		LIMIT $3 OFFSET $4`, network, state, limit, offset)
 	if err != nil {
 		return ActorDefenseQueue{}, err
 	}
@@ -101,13 +95,18 @@ func (s *ActorDefenseStore) ListVerificationQueue(ctx context.Context, network, 
 		if len(dossierRaw) > 0 {
 			_ = json.Unmarshal(dossierRaw, &track.Dossier)
 		}
-		priority, reasons, nextAction := ActorDefenseVerificationPriority(track, now)
+		verdict, ok := ActorDefenseRuleVerdictFromDossier(track.Dossier)
+		if !ok || verdict.RulesetVersion != ActorDefenseRulesetVersion {
+			verdict = EvaluateActorDefenseRules(track, nil)
+		}
+		band, reason := ActorDefenseVerificationBand(track, verdict)
 		items = append(items, ActorDefenseQueueItem{
 			Track: track,
-			VerificationPriority: priority,
-			PriorityReasons: reasons,
-			NextAction: nextAction,
-			NeedsLiveEvidence: track.VerifiedEvidenceCount == 0 && actorDefenseStateRank(track.State) >= actorDefenseStateRank("correlated"),
+			RuleVerdict: verdict,
+			VerificationBand: band,
+			BandReason: reason,
+			NextAction: ActorDefenseRuleNextAction(track, verdict),
+			NeedsLiveEvidence: actorDefenseNeedsLiveEvidence(track, verdict),
 		})
 	}
 	if err := rows.Err(); err != nil {
@@ -116,13 +115,15 @@ func (s *ActorDefenseStore) ListVerificationQueue(ctx context.Context, network, 
 
 	return ActorDefenseQueue{
 		Items: items, Counts: counts, Total: total, Network: network, StateFilter: state,
-		GeneratedAt: now,
+		GeneratedAt: time.Now().UTC(),
 		Policy: map[string]any{
-			"score_type": "operational_verification_priority",
-			"not_token_or_wallet_risk_score": true,
+			"ruleset_version": ActorDefenseRulesetVersion,
+			"numeric_score": false,
+			"weighted_formula": false,
+			"queue_order": []string{"hard_trigger", "compounding", "evidence_pending", "watch", "verified_review", "monitor"},
+			"inferred_policy": "watch_only",
+			"unverified_policy": "excluded",
 			"no_identity_or_wrongdoing_claim": true,
-			"live_evidence_required_for_verified_state": true,
-			"priority_factors": []string{"track_state", "creator_recurrence", "dominant_holder_recurrence", "related_actor_recurrence", "evidence_coverage", "observation_recency"},
 		},
 	}, nil
 }
@@ -151,85 +152,72 @@ func (s *ActorDefenseStore) actorDefenseQueueCounts(ctx context.Context, network
 	return counts, total, rows.Err()
 }
 
-func ActorDefenseVerificationPriority(track ActorDefenseTrack, now time.Time) (int, []string, string) {
-	score := 0
-	reasons := []string{}
-	state := strings.ToLower(strings.TrimSpace(track.State))
-	switch state {
-	case "correlated":
-		score += 30
-		reasons = append(reasons, "cross-token correlation")
-	case "tracked":
-		score += 14
-		reasons = append(reasons, "repeat observation")
-	case "detected":
-		score += 5
-		reasons = append(reasons, "initial observation")
-	case "verified":
-		score += 12
-		reasons = append(reasons, "verified evidence ready for review")
-	case "alerted":
-		score += 20
-		reasons = append(reasons, "owner alert state")
+func ActorDefenseVerificationBand(track ActorDefenseTrack, verdict ActorDefenseRuleVerdict) (string, string) {
+	switch verdict.Verdict {
+	case "hard_trigger":
+		return "hard_trigger", actorRuleIDList(verdict.TriggeredRules, "hard_trigger")
+	case "compounding_rule":
+		return "compounding", actorRuleIDList(verdict.TriggeredRules, "compounding")
 	}
-
-	if track.CreatedTokenCount > 0 {
-		points := minActorDefenseInt(track.CreatedTokenCount*6, 18)
-		score += points
-		reasons = append(reasons, fmt.Sprintf("%d creator/deployer token", track.CreatedTokenCount))
+	if strings.EqualFold(track.State, "correlated") {
+		return "evidence_pending", "cross-token correlation requires live transaction verification"
 	}
-	if track.DominantHolderTokenCount > 0 {
-		points := minActorDefenseInt(track.DominantHolderTokenCount*8, 24)
-		score += points
-		reasons = append(reasons, fmt.Sprintf("%d dominant-holder token", track.DominantHolderTokenCount))
+	if verdict.Verdict == "watch_only" || len(verdict.WatchFlags) > 0 {
+		return "watch", actorRuleIDList(verdict.WatchFlags, "watch")
 	}
-	if track.RelatedActorCount > 0 {
-		points := minActorDefenseInt(track.RelatedActorCount*5, 20)
-		score += points
-		reasons = append(reasons, fmt.Sprintf("%d recurring related actor", track.RelatedActorCount))
+	if track.VerifiedEvidenceCount > 0 || strings.EqualFold(track.State, "verified") || strings.EqualFold(track.State, "alerted") {
+		return "verified_review", "verified evidence is ready for owner review"
 	}
-	if track.ObservedEvidenceCount > 0 {
-		score += minActorDefenseInt(track.ObservedEvidenceCount*3, 9)
-		reasons = append(reasons, fmt.Sprintf("%d observed evidence", track.ObservedEvidenceCount))
-	}
-	if track.VerifiedEvidenceCount > 0 {
-		score += minActorDefenseInt(track.VerifiedEvidenceCount*2, 6)
-		reasons = append(reasons, fmt.Sprintf("%d verified evidence", track.VerifiedEvidenceCount))
-	}
-	if !track.LastSeenAt.IsZero() {
-		age := now.Sub(track.LastSeenAt)
-		switch {
-		case age < 0 || age <= 24*time.Hour:
-			score += 10
-			reasons = append(reasons, "observed within 24h")
-		case age <= 7*24*time.Hour:
-			score += 5
-			reasons = append(reasons, "observed within 7d")
-		}
-	}
-	if score > 100 {
-		score = 100
-	}
-
-	nextAction := "monitor_sensor_memory"
-	switch {
-	case track.VerifiedEvidenceCount > 0:
-		nextAction = "review_verified_evidence"
-	case state == "correlated" && track.CreatedTokenCount >= 2:
-		nextAction = "verify_creator_funding_and_transfer_chain"
-	case state == "correlated":
-		nextAction = "collect_live_transaction_evidence"
-	case track.DominantHolderTokenCount >= 2:
-		nextAction = "expand_cross_token_holder_network"
-	case track.CreatedTokenCount >= 2:
-		nextAction = "expand_creator_token_history"
-	}
-	return score, reasons, nextAction
+	return "monitor", "no grade-changing rule is currently satisfied"
 }
 
-func minActorDefenseInt(left, right int) int {
-	if left < right {
-		return left
+func ActorDefenseRuleNextAction(track ActorDefenseTrack, verdict ActorDefenseRuleVerdict) string {
+	for _, hit := range verdict.TriggeredRules {
+		switch hit.RuleID {
+		case ActorRuleHardCreatorHolderFunding:
+			return "review_verified_creator_holder_funding"
+		case ActorRuleHardCreatorLiquidityRemoval:
+			return "review_verified_creator_liquidity_removal"
+		case ActorRuleHardPriorTokenRug:
+			return "review_verified_previous_token_incident"
+		}
 	}
-	return right
+	if verdict.Verdict == "compounding_rule" || strings.EqualFold(track.State, "correlated") {
+		return "collect_live_transaction_evidence"
+	}
+	if len(verdict.WatchFlags) > 0 {
+		return "verify_inferred_relations"
+	}
+	if track.VerifiedEvidenceCount > 0 {
+		return "review_verified_evidence"
+	}
+	if track.DominantHolderTokenCount >= 2 {
+		return "expand_cross_token_holder_network"
+	}
+	if track.CreatedTokenCount >= 2 {
+		return "expand_creator_token_history"
+	}
+	return "monitor_sensor_memory"
+}
+
+func actorDefenseNeedsLiveEvidence(track ActorDefenseTrack, verdict ActorDefenseRuleVerdict) bool {
+	if verdict.Verdict == "hard_trigger" {
+		return false
+	}
+	return verdict.Verdict == "compounding_rule" || strings.EqualFold(track.State, "correlated") || len(verdict.WatchFlags) > 0
+}
+
+func actorRuleIDList(items []ActorDefenseRuleHit, tier string) string {
+	ids := []string{}
+	for _, item := range items {
+		if tier != "" && item.Tier != tier {
+			continue
+		}
+		ids = append(ids, item.RuleID)
+	}
+	ids = actorRuleUniqueStrings(ids)
+	if len(ids) == 0 {
+		return "rule evidence available"
+	}
+	return strings.Join(ids, ", ")
 }
