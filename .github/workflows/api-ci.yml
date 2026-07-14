@@ -99,7 +99,17 @@ jobs:
           ! grep -Eqi 'Paste it before|Token ikinci planda|KOSCH stays as|What ARVIS does|Who it is for|Power users|Automatic flow' public/index.html
           ! grep -Eqi 'Login yok|Wallet connect yok|Read-only analiz|İmzalı verdict geçmişi' public/scan.html
       - name: Test
-        run: go test ./...
+        run: |
+          set -o pipefail
+          go test ./... 2>&1 | tee "${RUNNER_TEMP}/go-test.txt"
+      - name: Upload Go test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-test
+          path: ${{ runner.temp }}/go-test.txt
+          if-no-files-found: warn
+          retention-days: 7
       - name: Vet
         run: go vet ./...
       - name: Build
