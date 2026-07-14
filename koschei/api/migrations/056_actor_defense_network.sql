@@ -85,6 +85,57 @@ CREATE TABLE IF NOT EXISTS security_threat_tracks (
         UNIQUE (network,target_kind,target_id)
 );
 
+-- Threat memory is monotonic even when separate workers race. A later partial
+-- dossier may enrich a track but may not erase stronger state, counters or the
+-- earliest/latest observation window already persisted.
+CREATE OR REPLACE FUNCTION preserve_security_threat_track_history()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    old_rank integer;
+    new_rank integer;
+BEGIN
+    old_rank := CASE OLD.state
+        WHEN 'detected' THEN 1
+        WHEN 'tracked' THEN 2
+        WHEN 'correlated' THEN 3
+        WHEN 'verified' THEN 4
+        WHEN 'alerted' THEN 5
+        ELSE 0
+    END;
+    new_rank := CASE NEW.state
+        WHEN 'detected' THEN 1
+        WHEN 'tracked' THEN 2
+        WHEN 'correlated' THEN 3
+        WHEN 'verified' THEN 4
+        WHEN 'alerted' THEN 5
+        ELSE 0
+    END;
+    IF old_rank > new_rank THEN
+        NEW.state := OLD.state;
+    END IF;
+    NEW.created_token_count := GREATEST(OLD.created_token_count,NEW.created_token_count);
+    NEW.dominant_holder_token_count := GREATEST(OLD.dominant_holder_token_count,NEW.dominant_holder_token_count);
+    NEW.traded_token_count := GREATEST(OLD.traded_token_count,NEW.traded_token_count);
+    NEW.related_actor_count := GREATEST(OLD.related_actor_count,NEW.related_actor_count);
+    NEW.verified_evidence_count := GREATEST(OLD.verified_evidence_count,NEW.verified_evidence_count);
+    NEW.observed_evidence_count := GREATEST(OLD.observed_evidence_count,NEW.observed_evidence_count);
+    NEW.dossier := COALESCE(OLD.dossier,'{}'::jsonb) || COALESCE(NEW.dossier,'{}'::jsonb);
+    NEW.first_seen_at := LEAST(OLD.first_seen_at,NEW.first_seen_at);
+    NEW.last_seen_at := GREATEST(OLD.last_seen_at,NEW.last_seen_at);
+    NEW.last_investigated_at := GREATEST(OLD.last_investigated_at,NEW.last_investigated_at);
+    NEW.updated_at := now();
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS security_threat_tracks_preserve_history ON security_threat_tracks;
+CREATE TRIGGER security_threat_tracks_preserve_history
+BEFORE UPDATE ON security_threat_tracks
+FOR EACH ROW
+EXECUTE FUNCTION preserve_security_threat_track_history();
+
 CREATE INDEX IF NOT EXISTS idx_security_threat_tracks_state_time
     ON security_threat_tracks (state,last_seen_at DESC);
 CREATE INDEX IF NOT EXISTS idx_security_threat_tracks_target
