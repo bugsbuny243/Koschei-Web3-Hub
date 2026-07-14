@@ -11,8 +11,8 @@ import (
 )
 
 // OwnerActorDefenseQueue returns Koschei's durable wallet investigation queue.
-// verification_priority is an operational scheduling value, never a wallet
-// risk score or an identity/wrongdoing claim.
+// Ordering is categorical and rule-based; no weighted priority or risk number
+// is generated.
 func (h *Handler) OwnerActorDefenseQueue(w http.ResponseWriter, r *http.Request) {
 	db := h.DBRead
 	if db == nil {
@@ -44,7 +44,8 @@ func (h *Handler) OwnerActorDefenseQueue(w http.ResponseWriter, r *http.Request)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true,
-		"schema_version": "koschei-actor-defense-queue-v1",
+		"schema_version": "koschei-actor-defense-queue-v2",
+		"ruleset_version": services.ActorDefenseRulesetVersion,
 		"queue": queue,
 	})
 }
