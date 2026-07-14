@@ -60,15 +60,22 @@ func TestActorDefenseCorrelationDefaultsAreBounded(t *testing.T) {
 	}
 }
 
-func TestActorDefenseCorrelationQueriesStayWithinThirtyDays(t *testing.T) {
+func TestActorDefenseCorrelationQueriesUsePersistentActorIndex(t *testing.T) {
 	for name, query := range map[string]string{
 		"creator": actorDefenseCreatorCorrelationSQL,
 		"holder":  actorDefenseRepeatHolderCorrelationSQL,
 	} {
-		if !strings.Contains(query, "interval '30 days'") {
-			t.Fatalf("%s correlation query lost its bounded observation window", name)
+		lower := strings.ToLower(query)
+		if !strings.Contains(lower, "security_actor_evidence") {
+			t.Fatalf("%s correlation query does not use persistent actor memory", name)
 		}
-		if strings.Contains(strings.ToLower(query), "gettransaction") || strings.Contains(strings.ToLower(query), "rpc") {
+		if strings.Contains(lower, "security_radar_events") || strings.Contains(lower, "security_radar_holder_snapshots") {
+			t.Fatalf("%s correlation query regressed to retention-bound raw sensor tables", name)
+		}
+		if strings.Contains(lower, "interval '30 days'") {
+			t.Fatalf("%s correlation query must not forget actors after 30 days", name)
+		}
+		if strings.Contains(lower, "gettransaction") || strings.Contains(lower, "rpc") {
 			t.Fatalf("%s correlation query must remain SQL-only", name)
 		}
 	}
