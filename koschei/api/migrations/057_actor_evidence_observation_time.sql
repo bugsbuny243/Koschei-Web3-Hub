@@ -1,4 +1,4 @@
--- Canonical architecture: ACTOR_INVESTIGATION_ENGINE.md section 4.
+-- Canonical architecture: ACTOR_INVESTIGATION_ENGINE.md sections 4 and 6.
 -- A live evidence row must retain the transaction timestamp. Column defaults
 -- must never replace it with the migration/insert wall-clock time.
 CREATE OR REPLACE FUNCTION normalize_security_actor_evidence_line()
@@ -86,3 +86,19 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+-- Persistent actor memory is queried independently from raw-event retention.
+-- These partial indexes keep all-time creator/holder correlation selective.
+CREATE INDEX IF NOT EXISTS idx_security_actor_evidence_creator_memory
+    ON security_actor_evidence (network,actor_wallet,token_mint,last_observed_at DESC)
+    WHERE actor_role='creator_deployer'
+      AND relation='created_token'
+      AND verification_status IN ('verified','observed')
+      AND token_mint IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_security_actor_evidence_holder_memory
+    ON security_actor_evidence (network,token_mint,actor_wallet,last_observed_at DESC)
+    WHERE actor_role='dominant_holder'
+      AND relation='dominant_holder_of'
+      AND verification_status IN ('verified','observed')
+      AND token_mint IS NOT NULL;
