@@ -39,10 +39,10 @@ type actorDefenseTokenAccountOwner struct {
 }
 
 // OwnerActorDefenseInvestigation is the wallet-first investigation surface for
-// Koschei's defense network. It assembles existing Pump discovery, holder and
-// trade sensors, then verifies bounded direct transaction evidence. It does not
-// produce a numeric score and it never turns a relation into an identity or
-// wrongdoing claim. Letter grades come only from the versioned ruleset.
+// Koschei's defense network. It assembles persistent actor memory, Pump trade
+// observations and selective live transaction evidence. It does not produce a
+// numeric score and it never turns a relation into an identity or wrongdoing
+// claim. Letter grades come only from the versioned deterministic ruleset.
 func (h *Handler) OwnerActorDefenseInvestigation(w http.ResponseWriter, r *http.Request) {
 	var input actorDefenseRequest
 	if err := decodeJSON(r, &input); err != nil {
@@ -90,7 +90,7 @@ func (h *Handler) OwnerActorDefenseInvestigation(w http.ResponseWriter, r *http.
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Actor defense database is unavailable")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 95*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 170*time.Second)
 	defer cancel()
 	store := services.NewActorDefenseStore(db)
 	initial, err := store.LoadWalletDossier(ctx, wallet, network, 75)
@@ -103,9 +103,22 @@ func (h *Handler) OwnerActorDefenseInvestigation(w http.ResponseWriter, r *http.
 	if input.LiveEvidence != nil {
 		liveEnabled = *input.LiveEvidence
 	}
-	coverage := actorDefenseLiveCoverage{Status: "stored_evidence_only"}
+	coverage := actorDefenseLiveCoverage{Status: "stored_evidence_only", Limitations: []string{}}
+	fundingOrigin := services.ActorFundingOrigin{
+		Wallet: wallet, Status: "stored_evidence_only", VerificationStatus: "unverified",
+		TrailStatus: "not_investigated", IdentityScope: "onchain_wallet_only", Limitations: []string{},
+	}
+	fundingPersistence := "not_requested"
 	if liveEnabled {
+		fundingOrigin, fundingPersistence = h.collectActorFundingOrigin(ctx, store, wallet, network)
 		coverage = h.collectActorDefenseLiveEvidence(ctx, store, initial)
+		if fundingPersistence == "failed" {
+			coverage.PersistenceFailures++
+			if coverage.Status == "complete" {
+				coverage.Status = "partial_persistence"
+			}
+			coverage.Limitations = append(coverage.Limitations, "Funding-origin kanıtı kalıcı actor index'e yazılamadı.")
+		}
 	}
 	final, err := store.LoadWalletDossier(ctx, wallet, network, 100)
 	if err != nil {
@@ -123,21 +136,50 @@ func (h *Handler) OwnerActorDefenseInvestigation(w http.ResponseWriter, r *http.
 		coverage.Limitations = append(coverage.Limitations, "Deterministik rule verdict threat track üzerine kaydedilemedi.")
 	}
 	final.Coverage["live_evidence"] = coverage
+	final.Coverage["funding_origin"] = fundingOrigin
+	final.Coverage["funding_origin_persistence"] = fundingPersistence
 	final.Coverage["requested_target"] = target
 	final.Coverage["resolved_wallet"] = wallet
 	final.Coverage["rule_verdict_persistence"] = rulePersistence
 	final.Coverage["numeric_score_disabled"] = true
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true,
-		"schema_version": "koschei-actor-defense-v2",
+		"schema_version": "koschei-actor-defense-v3",
 		"ruleset_version": services.ActorDefenseRulesetVersion,
 		"target": target,
 		"wallet": wallet,
 		"network": network,
 		"target_classification": classification,
 		"dossier": final,
+		"funding_origin": fundingOrigin,
 		"rule_verdict": ruleVerdict,
 	})
+}
+
+func (h *Handler) collectActorFundingOrigin(ctx context.Context, store *services.ActorDefenseStore, wallet, network string) (services.ActorFundingOrigin, string) {
+	timeout := time.Duration(actorDefenseEnvInt("ACTOR_FUNDING_TIMEOUT_SECONDS", 75, 20, 140)) * time.Second
+	fundingCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	origin, err := services.FindActorFundingOrigin(fundingCtx, creatorIntelRPCURL(), wallet, services.ActorFundingOriginOptions{
+		PageSize: actorDefenseEnvInt("ACTOR_FUNDING_PAGE_SIZE", 250, 50, 1000),
+		MaxPages: actorDefenseEnvInt("ACTOR_FUNDING_MAX_PAGES", 8, 1, 20),
+		OldestTransactionsToParse: actorDefenseEnvInt("ACTOR_FUNDING_TRANSACTION_LIMIT", 60, 10, 250),
+	})
+	if err != nil {
+		return services.ActorFundingOrigin{
+			Wallet: wallet, Status: "investigation_failed", VerificationStatus: "unverified",
+			TrailStatus: "not_investigated", IdentityScope: "onchain_wallet_only",
+			Limitations: []string{"Funding-origin araştırması tamamlanamadı: " + creatorIntelCompactError(err)},
+		}, "not_persisted"
+	}
+	evidence, ok := services.ActorFundingOriginEvidence(origin, network)
+	if !ok {
+		return origin, "no_persistable_evidence"
+	}
+	if err := store.UpsertEvidence(ctx, evidence); err != nil {
+		return origin, "failed"
+	}
+	return origin, "persisted"
 }
 
 func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *services.ActorDefenseStore, dossier services.ActorDefenseDossier) actorDefenseLiveCoverage {
@@ -146,6 +188,7 @@ func (h *Handler) collectActorDefenseLiveEvidence(ctx context.Context, store *se
 		SignatureLimit: actorDefenseEnvInt("ACTOR_DEFENSE_SIGNATURE_LIMIT", 120, 20, 500),
 		TransactionLimit: actorDefenseEnvInt("ACTOR_DEFENSE_TRANSACTION_LIMIT", 40, 5, 120),
 		EvidenceLimit: actorDefenseEnvInt("ACTOR_DEFENSE_EVIDENCE_LIMIT", 100, 10, 300),
+		Limitations: []string{},
 	}
 	rpcURL := creatorIntelRPCURL()
 	if rpcURL == "" {
