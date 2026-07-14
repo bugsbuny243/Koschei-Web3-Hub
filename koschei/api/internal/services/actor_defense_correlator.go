@@ -45,7 +45,7 @@ func (w *ActorDefenseCorrelator) Start(ctx context.Context) {
 			if err != nil && ctx.Err() == nil {
 				log.Printf("actor defense correlation cycle failed: %v", err)
 			} else if stats.CreatorTracks > 0 || stats.HolderTracks > 0 {
-				log.Printf("actor defense correlation cycle: creator_tracks=%d repeat_holder_tracks=%d window_days=30", stats.CreatorTracks, stats.HolderTracks)
+				log.Printf("actor defense correlation cycle: changed_creator_tracks=%d changed_repeat_holder_tracks=%d window_days=30", stats.CreatorTracks, stats.HolderTracks)
 			}
 			timer.Reset(w.PollEvery)
 		}
@@ -161,7 +161,7 @@ SELECT
 		'max_shared_token_count',COALESCE(r.max_shared_tokens,0),
 		'correlation_scope','Koschei Pump discovery and owner-resolved holder memory; not identity or intent proof'
 	),
-	c.first_seen_at,c.last_seen_at,now(),now(),now()
+	c.first_seen_at,c.last_seen_at,c.first_seen_at,now(),now()
 FROM creator_rollup c
 LEFT JOIN related_rollup r ON r.network=c.network AND r.wallet=c.wallet
 ON CONFLICT (network,target_kind,target_id)
@@ -178,8 +178,14 @@ DO UPDATE SET
 	dossier=security_threat_tracks.dossier || EXCLUDED.dossier,
 	first_seen_at=LEAST(security_threat_tracks.first_seen_at,EXCLUDED.first_seen_at),
 	last_seen_at=GREATEST(security_threat_tracks.last_seen_at,EXCLUDED.last_seen_at),
-	last_investigated_at=EXCLUDED.last_investigated_at,
-	updated_at=now()`
+	updated_at=now()
+WHERE
+	(EXCLUDED.state='correlated' AND security_threat_tracks.state NOT IN ('correlated','verified','alerted')) OR
+	security_threat_tracks.created_token_count < EXCLUDED.created_token_count OR
+	security_threat_tracks.related_actor_count < EXCLUDED.related_actor_count OR
+	security_threat_tracks.first_seen_at > EXCLUDED.first_seen_at OR
+	security_threat_tracks.last_seen_at < EXCLUDED.last_seen_at OR
+	NOT security_threat_tracks.dossier @> EXCLUDED.dossier`
 
 const actorDefenseRepeatHolderCorrelationSQL = `
 WITH latest AS (
@@ -212,7 +218,7 @@ SELECT
 		'max_holder_percentage',max_percentage,
 		'correlation_scope','Owner-resolved top-five holder snapshots at or above 20 percent; not identity or intent proof'
 	),
-	first_seen_at,last_seen_at,now(),now(),now()
+	first_seen_at,last_seen_at,first_seen_at,now(),now()
 FROM repeat_holders
 ON CONFLICT (network,target_kind,target_id)
 DO UPDATE SET
@@ -225,5 +231,10 @@ DO UPDATE SET
 	dossier=security_threat_tracks.dossier || EXCLUDED.dossier,
 	first_seen_at=LEAST(security_threat_tracks.first_seen_at,EXCLUDED.first_seen_at),
 	last_seen_at=GREATEST(security_threat_tracks.last_seen_at,EXCLUDED.last_seen_at),
-	last_investigated_at=EXCLUDED.last_investigated_at,
-	updated_at=now()`
+	updated_at=now()
+WHERE
+	security_threat_tracks.state NOT IN ('correlated','verified','alerted') OR
+	security_threat_tracks.dominant_holder_token_count < EXCLUDED.dominant_holder_token_count OR
+	security_threat_tracks.first_seen_at > EXCLUDED.first_seen_at OR
+	security_threat_tracks.last_seen_at < EXCLUDED.last_seen_at OR
+	NOT security_threat_tracks.dossier @> EXCLUDED.dossier`
