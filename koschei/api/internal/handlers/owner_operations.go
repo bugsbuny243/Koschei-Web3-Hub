@@ -120,9 +120,11 @@ func (h *Handler) OwnerRadarOverview(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// OwnerRadarScan executes the complete evidence pipeline and returns the same
-// unabridged detail contract used by premium Radar. It never invents missing
-// creator, holder, liquidity or graph evidence.
+// OwnerRadarScan executes the complete evidence pipeline and joins the original
+// 14 ARVIS arms, persistent actor investigation and the four versioned behavior
+// rules in one manual dossier. Numeric legacy output is retained only as an
+// evidence appendix; the authoritative final verdict is deterministic and
+// letter-based.
 func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 	var input securityRadarInput
 	if err := decodeJSON(r, &input); err != nil {
@@ -172,29 +174,47 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 	holderIntelligence := core.Intelligence
 	structural := h.radarDetailStructuralContext(r.Context(), target, network)
 	persisted := h.radarDetailPersistedVerdict(r.Context(), target)
-	final := radarDetailFinalMap(freshFinal, persisted)
+	legacyFinal := radarDetailFinalMap(freshFinal, persisted)
 	modules := radarDetailModules(arms)
 	evidence := radarDetailEvidence(arms)
-	warning := radarDetailWarning(final, distribution, structural, modules, sourceContext)
+	warning := radarDetailWarning(legacyFinal, distribution, structural, modules, sourceContext)
 	graph := h.radarDetailGraph(r.Context(), target)
+	unified := h.buildOwnerUnifiedRadarOverlay(r.Context(), target, network, core)
+
 	detail := map[string]any{
-		"ok": true, "schema_version": "koschei-owner-radar-v2", "target": target,
+		"ok": true, "schema_version": "koschei-owner-radar-v3", "target": target,
 		"network": network, "generated_at": time.Now().UTC().Format(time.RFC3339),
 		"target_classification": classification, "analysis_scope": radarTargetTokenMint,
-		"final_verdict": final, "warning": warning, "holder_distribution": distribution,
+		"final_verdict": unified.FinalVerdict,
+		"legacy_arvis_final": legacyFinal,
+		"numeric_score_authoritative": false,
+		"numeric_score_disabled_for_final": true,
+		"ruleset_version": unified.FinalVerdict.RulesetVersion,
+		"unified_radar": unified,
+		"warning": warning, "holder_distribution": distribution,
 		"holder_intelligence": holderIntelligence, "holder_cluster": holderCluster, "launch_forensics": launchForensics, "market": market,
 		"structural_memory": structural, "source_context": sourceContext,
 		"modules": modules, "evidence": evidence, "graph": graph,
 		"evidence_policy": map[string]any{
 			"hide_verified_details": false, "no_evidence_no_claim": true,
 			"creator_wallet_scope": "source-reported or on-chain relation; not proof of wrongdoing or real-world identity",
-			"financial_advice":     false,
+			"financial_advice": false,
+			"automatic_scanning": false,
+			"manual_scan_only": true,
+			"inferred_is_watch_only": true,
+			"unverified_is_excluded": true,
 		},
 	}
 	explanationV2 := holderIntelligenceCoreExplanationV2(core)
-	detail["primary_risk_driver"] = ownerRadarPrimaryRiskDriver(modules)
-	detail["explanation_v2"] = explanationV2
-	detail["narrative"] = explanationV2.Text
+	detail["legacy_primary_risk_driver"] = ownerRadarPrimaryRiskDriver(modules)
+	if len(unified.FinalVerdict.TriggeredRules) > 0 {
+		detail["primary_risk_driver"] = unified.FinalVerdict.TriggeredRules[0]
+	} else {
+		detail["primary_risk_driver"] = nil
+	}
+	detail["legacy_explanation_v2"] = explanationV2
+	detail["legacy_narrative"] = explanationV2.Text
+	detail["narrative"] = unified.Narrative
 	writeJSON(w, http.StatusOK, detail)
 }
 
@@ -478,6 +498,10 @@ func (h *Handler) OwnerKOSCHAccess(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "users": users, "summary": counts,
 		"mint_address": configuredKoscheiTokenMint(),
-		"thresholds":   map[string]string{"basic": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "0.000001"), "pro": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_PRO", "250000"), "enterprise": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_ENTERPRISE", "2000000")},
+		"thresholds": map[string]string{
+			"basic": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "0.000001"),
+			"pro": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_PRO", "250000"),
+			"enterprise": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_ENTERPRISE", "2000000"),
+		},
 	})
 }
