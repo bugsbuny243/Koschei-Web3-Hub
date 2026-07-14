@@ -77,10 +77,14 @@ func FindActorFundingOrigin(ctx context.Context, rpcURL, wallet string, options 
 	for page := 0; page < maxPages && ctx.Err() == nil; page++ {
 		rows, err := SolanaGetSignaturesForAddressPage(ctx, rpcURL, wallet, SolanaSignaturePageOptions{Limit: pageSize, Before: before})
 		if err != nil {
-			result.Status = "signature_history_failed"
-			result.TrailStatus = "not_investigated"
-			result.Limitations = append(result.Limitations, "Wallet imza geçmişi sayfalanırken RPC hatası oluştu: "+compactActorFundingError(err))
-			return result, nil
+			if len(signatures) == 0 {
+				result.Status = "signature_history_failed"
+				result.TrailStatus = "not_investigated"
+				result.Limitations = append(result.Limitations, "Wallet imza geçmişi sayfalanırken RPC hatası oluştu: "+compactActorFundingError(err))
+				return result, nil
+			}
+			result.Limitations = append(result.Limitations, "İmza geçmişi kısmi kaldı; sonraki sayfa alınamadı: "+compactActorFundingError(err))
+			break
 		}
 		result.PagesScanned++
 		for _, row := range rows {
@@ -101,6 +105,9 @@ func FindActorFundingOrigin(ctx context.Context, rpcURL, wallet string, options 
 			break
 		}
 		before = last
+	}
+	if ctx.Err() != nil {
+		result.Limitations = append(result.Limitations, "Funding-origin süresi doldu; taranan pencere kısmi kaldı.")
 	}
 	result.SignaturesScanned = len(signatures)
 	if len(signatures) == 0 {
@@ -175,7 +182,13 @@ func FindActorFundingOrigin(ctx context.Context, rpcURL, wallet string, options 
 			}
 			return candidates[i].ObservedAt.Before(candidates[j].ObservedAt)
 		}
-		return candidates[i].Slot < candidates[j].Slot
+		if candidates[i].Slot != candidates[j].Slot {
+			return candidates[i].Slot < candidates[j].Slot
+		}
+		if candidates[i].Signature != candidates[j].Signature {
+			return candidates[i].Signature < candidates[j].Signature
+		}
+		return candidates[i].Source < candidates[j].Source
 	})
 	chosen := candidates[0]
 	result.SourceWallet = chosen.Source
@@ -210,29 +223,35 @@ func ActorFundingOriginEvidence(origin ActorFundingOrigin, network string) (Acto
 	if status == "unverified" {
 		return ActorDefenseEvidenceRecord{}, false
 	}
+	relation := "oldest_funding_in_window"
+	evidenceSuffix := ":oldest_funding_window"
+	if origin.HistoryComplete {
+		relation = "initial_funding_in"
+		evidenceSuffix = ":initial_funding"
+	}
 	return ActorDefenseEvidenceRecord{
 		Network:            normalizeRadarNetwork(network),
 		ActorWallet:        strings.TrimSpace(origin.Wallet),
 		CounterpartKind:    "wallet",
 		CounterpartID:      strings.TrimSpace(origin.SourceWallet),
-		Relation:           "initial_funding_in",
+		Relation:           relation,
 		VerificationStatus: status,
-		EvidenceKey:        strings.TrimSpace(origin.Signature) + ":initial_funding",
+		EvidenceKey:        strings.TrimSpace(origin.Signature) + evidenceSuffix,
 		Source:             "solana_jsonparsed_instruction",
 		Signature:          strings.TrimSpace(origin.Signature),
 		Slot:               origin.Slot,
 		ObservedAt:         origin.ObservedAt.UTC(),
 		AmountNative:       origin.AmountSOL,
 		Metadata: map[string]any{
-			"actor_role":        "funded_wallet",
-			"source_wallet":     strings.TrimSpace(origin.SourceWallet),
-			"destination_wallet": strings.TrimSpace(origin.DestinationWallet),
-			"program":           "system",
-			"instruction_type":  strings.TrimSpace(origin.InstructionType),
-			"history_complete":  origin.HistoryComplete,
-			"funding_status":    origin.Status,
-			"trail_status":      origin.TrailStatus,
-			"identity_scope":    origin.IdentityScope,
+			"actor_role":             "funded_wallet",
+			"source_wallet":          strings.TrimSpace(origin.SourceWallet),
+			"destination_wallet":     strings.TrimSpace(origin.DestinationWallet),
+			"program":                "system",
+			"instruction_type":       strings.TrimSpace(origin.InstructionType),
+			"history_complete":       origin.HistoryComplete,
+			"funding_status":         origin.Status,
+			"trail_status":           origin.TrailStatus,
+			"identity_scope":         origin.IdentityScope,
 			"persistent_actor_index": true,
 		},
 	}, true
