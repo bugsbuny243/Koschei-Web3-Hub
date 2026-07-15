@@ -169,6 +169,16 @@
     return `<div class="barline"><label>${esc(label)}</label><div class="track"><div class="fill ${pct >= badAt ? 'bad' : ''}" style="width:${pct}%"></div></div><b>%${num(pct, 2)}</b></div>`;
   }
 
+
+  function renderVerdictCard(data) {
+    if (!window.KoscheiVerdictCard) return '';
+    const vm = window.KoscheiVerdictCard.mapVerdictCard(data, { lang: 'en' });
+    const h = vm.header;
+    const headerMain = h.state === 'gathering' ? `<div class="vc-hourglass">${esc(h.icon)}</div>` : `<strong>${esc(h.grade || '—')}</strong>`;
+    const leverage = vm.leverage.length ? vm.leverage.map(row => `<a class="vc-row red" href="${esc(row.evidence_anchor)}"><span></span><b>${esc(row.text)}</b></a>`).join('') : '<div class="vc-empty">No verified owner leverage rows yet.</div>';
+    return `<section class="verdict-card ${esc(h.tone)}" id="verdict-card"><div class="vc-header"><div class="vc-grade">${headerMain}</div><div><span class="eyebrow">Investor-readable verdict card</span><h2>${esc(h.title)}</h2><p>${esc(h.copy)}</p><a class="vc-meta" href="#full-report-detail">Ruleset ${esc(h.ruleset_version)} · signature ${esc(h.signature_short || '—')} · generated ${esc(h.generated_at || '—')}</a></div></div><div class="vc-block"><h3>${esc(vm.leverage_title)}</h3><div class="vc-list">${leverage}</div></div><div class="vc-block"><h3>${esc(vm.checklist_title)}</h3><div class="vc-list">${vm.checklist.map(row => `<a class="vc-row ${esc(row.status)}" id="evidence-${esc(row.id)}" href="${esc(row.evidence_anchor)}"><span></span><b>${esc(row.label)}</b><em>${esc(row.value)}</em></a>`).join('')}</div></div><p class="vc-disclaimer">${esc(vm.disclaimer)}</p></section><div id="full-report-detail"></div>`;
+  }
+
   function renderDetail(data, fallbackItem = {}) {
     const final = data.final_verdict || {};
     const warning = data.warning || {};
@@ -195,6 +205,7 @@
     $('reportTitle').textContent = tokenSymbol || tokenName || short(data.target || fallbackItem.target);
     $('reportBody').className = 'detail-body';
     $('reportBody').innerHTML = `
+      ${renderVerdictCard({...data, final_verdict: final})}
       <section class="verdict-head ${riskClass(risk)}">
         <div class="scorebox"><strong>${esc(risk)}</strong><span>RISK / 100</span></div>
         <div><span class="eyebrow">${esc(warning.label || final.risk_level || 'ARVIS VERDICT')}</span><h2>${esc(final.verdict || fallbackItem.verdict || 'İmzalı ARVIS kararı')}</h2><div class="target-full">${esc(data.target || fallbackItem.target)}</div><p class="muted">${esc(final.recommendation || fallbackItem.recommendation || 'Tüm kanıtları inceleyin.')}</p><div class="actions"><span class="pill ${risk >= 65 ? 'red' : risk >= 35 ? 'amber' : 'green'}">${esc(final.risk_level || fallbackItem.risk_level || 'unknown')}</span><span class="pill">${esc(final.grade || fallbackItem.grade || '—')}</span><span class="pill violet">${esc(source.launch_platform || 'Solana')}</span></div></div>

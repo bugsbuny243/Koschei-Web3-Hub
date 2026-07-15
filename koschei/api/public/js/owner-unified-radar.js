@@ -21,6 +21,15 @@
   };
   const gradeLabel=grade=>grade&&grade!=='-'?`GRADE ${grade}`:'GRADE YOK';
 
+
+  function renderVerdictCard(payload){
+    if(!window.KoscheiVerdictCard)return'';
+    const vm=window.KoscheiVerdictCard.mapVerdictCard(payload,{lang:'tr'}),h=vm.header;
+    const headerMain=h.state==='gathering'?`<div class="vc-hourglass">${esc(h.icon)}</div>`:`<strong>${esc(h.grade||'—')}</strong>`;
+    const leverage=vm.leverage.length?vm.leverage.map(row=>`<a class="vc-row red" href="${esc(row.evidence_anchor)}"><span></span><b>${esc(row.text)}</b></a>`).join(''):'<div class="empty compact">Doğrulanmış owner koz satırı yok.</div>';
+    return`<article class="card verdict-card ${esc(h.tone)}" id="verdict-card"><div class="vc-header"><div class="vc-grade">${headerMain}</div><div><span class="eyebrow">YATIRIMCI OKUNABİLİR VERDICT CARD</span><h2>${esc(h.title)}</h2><p class="muted">${esc(h.copy)}</p><a class="vc-meta" href="#full-report-detail">Ruleset ${esc(h.ruleset_version)} · imza ${esc(h.signature_short||'—')} · ${esc(h.generated_at||'—')}</a></div></div><div class="vc-block"><h3>${esc(vm.leverage_title)}</h3><div class="vc-list">${leverage}</div></div><div class="vc-block"><h3>${esc(vm.checklist_title)}</h3><div class="vc-list">${vm.checklist.map(row=>`<a class="vc-row ${esc(row.status)}" id="evidence-${esc(row.id)}" href="${esc(row.evidence_anchor)}"><span></span><b>${esc(row.label)}</b><em>${esc(row.value)}</em></a>`).join('')}</div></div><p class="vc-disclaimer">${esc(vm.disclaimer)}</p></article>`;
+  }
+
   function renderVerdict(verdict){
     verdict=obj(verdict);
     const rules=arr(verdict.triggered_rules),watch=arr(verdict.watch_flags);
@@ -57,7 +66,7 @@
   function renderUnified(root,payload){
     root=rootFor(root);
     if(!root)return;
-    root.innerHTML=`<div class="grid compact-grid"><div class="span-12">${renderVerdict(payload.final_verdict)}</div><div class="span-12">${renderBehavior(payload.behavior_signals)}</div><div class="span-12">${renderLegacy(payload.legacy_14_arm_radar)}</div></div>`;
+    root.innerHTML=`${renderVerdictCard(payload)}<div class="grid compact-grid section-gap" id="full-report-detail"><div class="span-12">${renderVerdict(payload.final_verdict)}</div><div class="span-12">${renderBehavior(payload.behavior_signals)}</div><div class="span-12">${renderLegacy(payload.legacy_14_arm_radar)}</div></div>`;
     renderActor(root,payload);
   }
 

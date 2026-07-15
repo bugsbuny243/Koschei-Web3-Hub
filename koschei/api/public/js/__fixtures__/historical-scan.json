@@ -1,0 +1,12 @@
+{
+  "target":"HistMint111111111111111111111111111111111",
+  "final_verdict":{"grade":"D","verdict":"triggered by rules [URD-C003]","ruleset_version":"unified-radar-v1.0","actor_ruleset_version":"actor-v1.0","signature":"abcdef1234567890abcdef1234567890","generated_at":"2026-07-15T10:00:00Z","signals":{}},
+  "source_context":{"launch_time":"2026-07-15T08:00:00Z"},
+  "modules":[
+    {"module_id":"token_authority_scanner","evidence_status":"VERIFIED","signals":{"mint_authority_present":false,"freeze_authority_present":true}},
+    {"module_id":"holder_concentration","evidence_status":"VERIFIED","metrics":{"owner_resolved_top_holder_pct":61.5}},
+    {"module_id":"repeat_actor_scan","evidence_status":"VERIFIED","metrics":{"created_token_count":3}},
+    {"module_id":"pool_guardian","evidence_status":"VERIFIED","metrics":{"liquidity_usd":12500,"lock_status":"locked","lp_unlocked":false}}
+  ],
+  "behavior_signals":{"signals":[{"rule_id":"URD-C003","evidence_status":"VERIFIED","triggered":true,"metrics":{"summary":"creator sell acceleration observed"}}]}
+}
