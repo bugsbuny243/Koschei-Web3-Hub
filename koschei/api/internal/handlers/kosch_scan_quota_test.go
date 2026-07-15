@@ -55,14 +55,14 @@ func TestKOSCHQuotaExhaustionAndFailedWorkRefund(t *testing.T) {
 	if !errors.As(err, &accessErr) || accessErr.Status != http.StatusTooManyRequests || accessErr.Code != "quota_exceeded" {
 		t.Fatalf("expected quota_exceeded, status=%#v err=%v", exhausted, err)
 	}
-	if err := h.refundKOSCHScanQuota(context.Background(), reservation, "failed_work_refund"); err != nil {
+	if err := h.refundPremiumOutputReservation(context.Background(), reservation, "failed_work_refund"); err != nil {
 		t.Fatal(err)
 	}
 	second, restored, err := h.reserveKOSCHScanQuota(context.Background(), subject, "basic", "retry", now)
 	if err != nil || restored.Used != 1 {
 		t.Fatalf("quota was not restored: status=%#v err=%v", restored, err)
 	}
-	if err := h.finalizeKOSCHScanQuota(context.Background(), second); err != nil {
+	if err := h.finalizePremiumOutputReservation(context.Background(), second); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -82,12 +82,12 @@ func TestKOSCHQuotaResetsAtNextUTCDate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer h.finalizeKOSCHScanQuota(context.Background(), first)
+	defer h.finalizePremiumOutputReservation(context.Background(), first)
 	second, status, err := h.reserveKOSCHScanQuota(context.Background(), subject, "basic", "day-two", dayTwo)
 	if err != nil {
 		t.Fatalf("new UTC day must restore quota: %v", err)
 	}
-	defer h.finalizeKOSCHScanQuota(context.Background(), second)
+	defer h.finalizePremiumOutputReservation(context.Background(), second)
 	if status.Used != 1 || !status.ResetsAt.Equal(time.Date(2026, 7, 17, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("unexpected day-two status: %#v", status)
 	}
