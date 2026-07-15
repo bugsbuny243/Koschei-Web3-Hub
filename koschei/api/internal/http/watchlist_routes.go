@@ -6,7 +6,12 @@ import (
 	"koschei/api/internal/handlers"
 )
 
-func registerWatchlistRoutes(mux *http.ServeMux, h *handlers.Handler, proMetered routeGate, enterprise routeGate) {
+func registerWatchlistRoutes(
+	mux *http.ServeMux,
+	h *handlers.Handler,
+	koschTier func(string, http.HandlerFunc) http.HandlerFunc,
+	koschTierNoQuota func(string, http.HandlerFunc) http.HandlerFunc,
+) {
 	mux.HandleFunc("/api/public/token/status", method(http.MethodGet, h.PublicTokenStatus))
 	mux.HandleFunc("/api/public/token/readiness", method(http.MethodGet, h.PublicTokenLaunchReadiness))
 	mux.HandleFunc("/api/public/scan-history", method(http.MethodGet, h.PublicScanHistory))
@@ -19,15 +24,16 @@ func registerWatchlistRoutes(mux *http.ServeMux, h *handlers.Handler, proMetered
 	mux.HandleFunc("/api/auth/token-access", requiresDB(h, handlers.RequireAuth(method(http.MethodGet, h.TokenAccessStatus))))
 	mux.HandleFunc("/api/auth/premium-access", requiresDB(h, handlers.RequireAuth(method(http.MethodGet, h.PremiumAccessStatus))))
 
-	mux.HandleFunc("/api/watchlist", requiresDB(h, proMetered(h.WatchlistCollection)))
-	mux.HandleFunc("/api/watchlist/refresh", requiresDB(h, proMetered(method(http.MethodPost, h.WatchlistRefresh))))
-	mux.HandleFunc("/api/watchlist/alerts", requiresDB(h, proMetered(h.WatchlistAlerts)))
-	mux.HandleFunc("/api/watchlist/", requiresDB(h, proMetered(h.WatchlistItem)))
+	// Continuous watch/alert activity is a Pro surface and consumes daily quota.
+	mux.HandleFunc("/api/watchlist", requiresDB(h, koschTier("pro", h.WatchlistCollection)))
+	mux.HandleFunc("/api/watchlist/refresh", requiresDB(h, koschTier("pro", method(http.MethodPost, h.WatchlistRefresh))))
+	mux.HandleFunc("/api/watchlist/alerts", requiresDB(h, koschTier("pro", h.WatchlistAlerts)))
+	mux.HandleFunc("/api/watchlist/", requiresDB(h, koschTier("pro", h.WatchlistItem)))
 
-	// Webhook management requires Enterprise eligibility but does not consume a
-	// scan unit. The scans that produce webhook events are metered separately.
-	mux.HandleFunc("/api/webhooks/deliveries", requiresDB(h, enterprise(h.WebhookDeliveries)))
-	mux.HandleFunc("/api/webhooks/deliveries/", requiresDB(h, enterprise(h.WebhookDeliveryItem)))
-	mux.HandleFunc("/api/webhooks", requiresDB(h, enterprise(h.WebhookEndpoints)))
-	mux.HandleFunc("/api/webhooks/", requiresDB(h, enterprise(h.WebhookEndpointItem)))
+	// Webhook management is Enterprise eligibility but does not consume a scan
+	// unit until an actual metered scan/shield request is made.
+	mux.HandleFunc("/api/webhooks/deliveries", requiresDB(h, koschTierNoQuota("enterprise", h.WebhookDeliveries)))
+	mux.HandleFunc("/api/webhooks/deliveries/", requiresDB(h, koschTierNoQuota("enterprise", h.WebhookDeliveryItem)))
+	mux.HandleFunc("/api/webhooks", requiresDB(h, koschTierNoQuota("enterprise", h.WebhookEndpoints)))
+	mux.HandleFunc("/api/webhooks/", requiresDB(h, koschTierNoQuota("enterprise", h.WebhookEndpointItem)))
 }
