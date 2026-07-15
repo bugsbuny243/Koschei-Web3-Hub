@@ -122,8 +122,10 @@ func (w *SecurityRadarWorker) pollSource(ctx context.Context, source SecurityRad
 		if err != nil {
 			return err
 		}
-		bundle := AnalyzeSecurityRadars(SecurityRadarRequest{Target: source.Address, Network: source.Network, Mode: "alchemy_polling"})
-		verdict := securityRadarModuleVerdict(bundle, source.ModuleID)
+		analysis := AnalyzeArvisRadarsContext(pollCtx, SecurityRadarRequest{
+			Target: source.Address, Network: source.Network, Mode: "live_stream:" + source.ModuleID,
+		})
+		verdict := securityRadarModuleVerdict(analysis.Bundle, source.ModuleID)
 		_, err = w.Store.InsertVerdict(ctx, SecurityRadarVerdictRecord{
 			EventID:        eventID,
 			ModuleID:       verdict.ModuleID,

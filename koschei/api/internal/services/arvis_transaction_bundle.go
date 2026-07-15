@@ -33,17 +33,7 @@ func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadar
 	replaceArvisArm(arms, buildCreatorLinkTransactionArm(req, txEvidence, generatedAt))
 	replaceFundingClusterArmPreservingHolderEvidence(arms, buildFundingClusterTransactionArm(req, txEvidence, generatedAt))
 
-	withoutFinal := make([]SecurityRadarVerdict, 0, len(arms)-1)
-	for _, arm := range arms {
-		if arm.ModuleID != ModuleFinalVerdictEngine {
-			withoutFinal = append(withoutFinal, arm)
-		}
-	}
-	finalArm := buildFinalArm(req, withoutFinal, generatedAt)
-	replaceArvisArm(arms, finalArm)
-	final := finalVerdictFromArm(finalArm)
 	verified := verifiedArvisEvidenceCount(arms)
-
 	bundle.Metadata["arvis_arms"] = arms
 	bundle.Metadata["verified_arm_count"] = verified
 	bundle.Metadata["runtime_arm_count"] = verified
@@ -53,14 +43,9 @@ func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadar
 	bundle.Metadata["transaction_signer_count"] = len(txEvidence.Signers)
 	bundle.Metadata["pump_program_related"] = txEvidence.PumpRelated
 	bundle.Metadata["raydium_program_related"] = txEvidence.RaydiumRelated
-	bundle.Metadata["final_grade"] = final.Grade
-	bundle.Metadata["final_risk_index"] = final.RiskIndex
-	bundle.Metadata["final_risk_level"] = final.RiskLevel
-	bundle.Metadata["final_recommendation"] = final.Recommendation
-	bundle.CustomerRecommendation = final.Recommendation
-	if final.Signed {
-		bundle.CustomerSummary = fmt.Sprintf("ARVIS verified %d of 13 evidence arms, including parsed transaction and program-relation evidence, and produced one signed verdict.", verified)
-	}
+	bundle.Metadata["final_verdict_source"] = "EvaluateUnifiedRadarVerdict"
+	bundle.CustomerRecommendation = "evaluate_unified_rules"
+	bundle.CustomerSummary = fmt.Sprintf("ARVIS collected parsed transaction evidence in %d of 14 single-responsibility arms; no arm issued a grade.", verified)
 	return bundle
 }
 

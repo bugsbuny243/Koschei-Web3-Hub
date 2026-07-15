@@ -124,3 +124,31 @@ func (h *Handler) refundPremiumOutputReservation(ctx context.Context, reservatio
 	}
 	return tx.Commit()
 }
+
+func (h *Handler) refundKOSCHScanQuota(ctx context.Context, reservation premiumOutputReservation) error {
+	tx, err := h.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(lower($1)||':'||$2,0))`, reservation.Email, reservation.QuotaDayKey); err != nil {
+		return err
+	}
+	var refunded bool
+	if err := tx.QueryRowContext(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM credit_events
+			WHERE lower(email)=lower($1) AND reason=$2 AND event_type='kosch_quota_refund'
+		)`, reservation.Email, reservation.QuotaEventReason).Scan(&refunded); err != nil {
+		return err
+	}
+	if refunded {
+		return tx.Commit()
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO credit_events(email,amount,reason,event_type)
+		VALUES(lower($1),1,$2,'kosch_quota_refund')`, reservation.Email, reservation.QuotaEventReason); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

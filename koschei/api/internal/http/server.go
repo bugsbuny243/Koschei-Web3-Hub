@@ -25,6 +25,9 @@ type serverConfig struct {
 
 type Option func(*serverConfig)
 
+type routeGate func(http.HandlerFunc) http.HandlerFunc
+type tierRouteGate func(string, http.HandlerFunc) http.HandlerFunc
+
 func WithReadDB(db *sql.DB) Option { return func(c *serverConfig) { c.dbRead = db } }
 func WithCache(value cache.Cache) Option {
 	return func(c *serverConfig) {
@@ -85,7 +88,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	return securityHeaders(cors(apiReadiness(db, mux), corsOrigin))
 }
 
-func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess func(http.HandlerFunc) http.HandlerFunc) {
+func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess routeGate) {
 	mux.HandleFunc("/health", h.Health)
 	mux.HandleFunc("/api/config", method("GET", h.Config))
 	mux.HandleFunc("/api/auth/provision", method("POST", h.Provision))

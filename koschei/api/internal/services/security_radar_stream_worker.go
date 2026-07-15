@@ -193,11 +193,11 @@ func (w *SecurityRadarStreamWorker) persistEvent(ctx context.Context, event Secu
 	if _, err := w.Store.InsertStreamEvent(ctx, event); err != nil { log.Printf("security radar stream insert failed: %v", err); return }
 	if event.ModuleID != ModulePumpSybilRadar && event.ModuleID != ModuleRaydiumPoolGuardian { return }
 	if strings.TrimSpace(event.Target) == "" || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) { return }
-	bundle := AnalyzeSecurityRadars(SecurityRadarRequest{Target: event.Target, Network: event.Network, Mode: "sbx1_stream"})
-	verdict := securityRadarModuleVerdict(bundle, event.ModuleID)
+	analysis := AnalyzeArvisRadarsContext(ctx, SecurityRadarRequest{Target: event.Target, Network: event.Network, Mode: "live_stream:" + event.ModuleID})
+	verdict := securityRadarModuleVerdict(analysis.Bundle, event.ModuleID)
 	signals := mergeRadarMaps(verdict.Signals, map[string]any{"stream_event_type": event.EventType, "stream_mode": event.StreamMode, "stream_provider": event.Provider, "stream_signature": event.Signature, "stream_evidence_quality": event.EvidenceQuality})
 	if !shouldPublishSBX1CustomerVerdict(event, verdict, signals) {
-		log.Printf("security radar SBX-1 raw-only event retained signature=%s target=%s data_quality=%s risk=%d", event.Signature, event.Target, anyString(signals["data_quality"]), verdict.RiskIndex)
+		log.Printf("security radar SBX-1 raw-only event retained signature=%s target=%s data_quality=%s evidence_status=%s", event.Signature, event.Target, anyString(signals["data_quality"]), anyString(signals["evidence_status"]))
 		return
 	}
 	eventID, err := w.Store.InsertEvent(ctx, SecurityRadarEventRecord{ModuleID: verdict.ModuleID, Target: verdict.Target, TargetType: event.TargetType, Network: verdict.Network, Signature: firstRadarValue(event.Signature, verdict.Signature), SourceAddress: event.ProgramID, EventType: event.EventType, Slot: event.Slot, Signals: signals, RawSummary: event.Decoded, Source: "sbx1_stream"})
@@ -210,20 +210,20 @@ func shouldPublishSBX1CustomerVerdict(event SecurityRadarStreamEventRecord, verd
 	if strings.TrimSpace(event.Target) == "" || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) {
 		return false
 	}
+	if !SecurityRadarVerdictHasVerifiedEvidence(verdict) {
+		return false
+	}
 	if strings.EqualFold(strings.TrimSpace(event.EvidenceQuality), "transaction_enriched_mint") {
 		return true
 	}
-	if ok, _ := signals["real_onchain_evidence"].(bool); ok {
-		if strings.EqualFold(anyString(signals["data_quality"]), "live_rpc_evidence") {
-			if mint, _ := signals["is_token_mint"].(bool); mint {
-				return true
-			}
-		}
-		if verdict.RiskIndex >= 35 {
-			return true
-		}
+	if ok, _ := signals["real_onchain_evidence"].(bool); !ok {
+		return false
 	}
-	return false
+	if !strings.EqualFold(anyString(signals["data_quality"]), "live_rpc_evidence") {
+		return false
+	}
+	mint, _ := signals["is_token_mint"].(bool)
+	return mint
 }
 
 func (w *SecurityRadarStreamWorker) enrichEventTarget(ctx context.Context, event SecurityRadarStreamEventRecord) SecurityRadarStreamEventRecord {

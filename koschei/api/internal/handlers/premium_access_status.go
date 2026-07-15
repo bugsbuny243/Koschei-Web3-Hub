@@ -51,7 +51,7 @@ func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "access": status})
 }
 
-func decidePremiumAccess(token tokenAccessEvaluation) premiumAccessStatus {
+func decidePremiumAccess(token tokenAccessEvaluation, quotaValues ...scanQuotaStatus) premiumAccessStatus {
 	status := premiumAccessStatus{
 		Active: false, Source: "none", TokenGateEnabled: token.GateEnabled,
 		TokenConfigured: token.Configured, WalletVerified: token.WalletVerified,
@@ -66,6 +66,15 @@ func decidePremiumAccess(token tokenAccessEvaluation) premiumAccessStatus {
 	if token.GateEnabled && token.Configured && token.WalletVerified && tokenTierRank(token.Tier) >= tokenTierRank("basic") {
 		status.Active = true
 		status.Source = "token"
+		quota := newScanQuotaStatus(token.Tier, configuredKOSCHDailyQuota(token.Tier), time.Now().UTC())
+		if len(quotaValues) > 0 {
+			quota = quotaValues[0]
+		}
+		status.QuotaDaily = quota.Limit
+		status.QuotaUsedToday = quota.Used
+		status.QuotaRemainingToday = quota.Remaining
+		reset := quota.ResetsAt
+		status.QuotaResetsAt = &reset
 	}
 	status.QuotaDaily = configuredKOSCHDailyQuota(status.TokenTier)
 	_, status.QuotaResetsAt = utcQuotaWindow(time.Now().UTC())

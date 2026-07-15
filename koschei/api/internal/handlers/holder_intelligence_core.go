@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -55,13 +54,15 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 	source := h.radarDetailSourceContext(parent, target, network)
 	launch := h.analyzeLaunchForensics(parent, target, roles, cluster, source)
 	analysis = services.ApplyLaunchForensicsToAnalysis(analysis, req, launch)
+	market := radarDetailMarketSnapshot(parent, target)
+	creator := strings.TrimSpace(creatorIntelCleanString(source["creator_wallet"]))
+	analysis = services.ApplyCreatorAndLiquidityEvidenceToAnalysis(analysis, req, creator, market, launch)
 	bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
 	arms := services.ArvisArmsFromBundle(bundle)
 	if len(arms) == 0 {
 		arms = analysis.Arms
 	}
 	final := services.ArvisFinalFromBundle(bundle)
-	market := radarDetailMarketSnapshot(parent, target)
 	intelligence := services.ApplyLaunchForensicsToHolderIntelligence(
 		services.BuildHolderIntelligence(roles, cluster, market, time.Now().UTC()),
 		launch,
@@ -135,18 +136,9 @@ func holderIntelligenceCoreRepeatRisk(core holderIntelligenceCoreResult) int {
 	return strongest
 }
 
-func applyRepeatDominantRiskToLegacyScore(score int, core holderIntelligenceCoreResult) int {
-	repeatRisk := holderIntelligenceCoreRepeatRisk(core)
-	if repeatRisk <= 0 {
-		return score
-	}
-	ceiling := 100 - repeatRisk
-	if ceiling < 0 {
-		ceiling = 0
-	}
-	if score > ceiling {
-		return ceiling
-	}
+// Deprecated compatibility helper. Repeat-actor evidence no longer changes a
+// legacy 0-100 score; it is consumed only by the unified rules engine.
+func applyRepeatDominantRiskToLegacyScore(score int, _ holderIntelligenceCoreResult) int {
 	return score
 }
 
@@ -223,8 +215,8 @@ func (h *Handler) scanCustomerToken(ctx context.Context, network, mint string) (
 }
 
 func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligenceCoreResult) customerTokenScanResult {
-	// The legacy raw token-account percentages are never authoritative once this
-	// mapper runs. Only owner-normalized values from the shared core are scored.
+	// Legacy public token fundamentals remain isolated from the ARVIS arm
+	// contract. Repeat-actor evidence is no longer converted into a numeric score.
 	base.Token.LargestHolderPercent = 0
 	base.Token.TopTenPercent = 0
 	if top1, top10, ok := holderIntelligenceCoreConcentration(core); ok {
@@ -232,13 +224,7 @@ func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligen
 		base.Token.TopTenPercent = roundPercent(top10)
 	}
 	rescored := web3.ScoreTokenRisk(base.Token)
-	rescored.Score = applyRepeatDominantRiskToLegacyScore(rescored.Score, core)
 	rescored.RiskLevel = tokenRiskLevel(rescored.Score)
-	if repeatRisk := holderIntelligenceCoreRepeatRisk(core); repeatRisk > 0 {
-		rescored.Findings = appendUniqueHolderCoreEvidence(rescored.Findings,
-			fmt.Sprintf("Repeat-dominant holder evidence applies a %d/100 cross-token actor risk weight from the stored Koschei observation window.", repeatRisk),
-		)
-	}
 	if strings.TrimSpace(base.Disclaimer) != "" {
 		rescored.Disclaimer = base.Disclaimer
 	}
@@ -250,17 +236,17 @@ func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligen
 		)
 	}
 	return customerTokenScanResult{
-		TokenRiskResult:      rescored,
-		HolderDistribution:   core.Distribution,
-		HolderIntelligence:   core.Intelligence,
-		HolderCluster:        core.Cluster,
-		LaunchForensics:      core.LaunchForensics,
-		VerifiedEvidence:     holderIntelligenceCoreEvidence(core),
-		Explanation:          holderIntelligenceCoreExplanation(core),
-		ExplanationV2:        holderIntelligenceCoreExplanationV2(core),
+		TokenRiskResult: rescored,
+		HolderDistribution: core.Distribution,
+		HolderIntelligence: core.Intelligence,
+		HolderCluster: core.Cluster,
+		LaunchForensics: core.LaunchForensics,
+		VerifiedEvidence: holderIntelligenceCoreEvidence(core),
+		Explanation: holderIntelligenceCoreExplanation(core),
+		ExplanationV2: holderIntelligenceCoreExplanationV2(core),
 		HolderAnalysisStatus: holderIntelligenceCoreStatus(core),
-		FinalPolicy:          policy,
-		VerdictWithheld:      policy == "withhold",
+		FinalPolicy: policy,
+		VerdictWithheld: policy == "withhold",
 	}
 }
 

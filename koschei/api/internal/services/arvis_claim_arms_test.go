@@ -12,7 +12,7 @@ func TestClaimSurfaceRejectsPlainText(t *testing.T) {
 	}
 }
 
-func TestSafeHTTPSClaimSurfaceProducesVerifiedMonitorEvidence(t *testing.T) {
+func TestSafeHTTPSClaimSurfaceProducesVerifiedEvidenceOnly(t *testing.T) {
 	evidence := parseArvisClaimSurface("https://example.com/claim?id=42")
 	if !evidence.Available || !evidence.HTTPS || evidence.IPLiteralHost || evidence.PunycodeHost {
 		t.Fatalf("unexpected parsed evidence: %#v", evidence)
@@ -22,8 +22,8 @@ func TestSafeHTTPSClaimSurfaceProducesVerifiedMonitorEvidence(t *testing.T) {
 	if !SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		t.Fatal("valid parsed URL evidence must be verified")
 	}
-	if arm.RiskIndex >= 35 {
-		t.Fatalf("ordinary HTTPS surface should remain monitor-level, got %d", arm.RiskIndex)
+	if arm.RiskIndex != 0 || arm.Grade != "-" {
+		t.Fatalf("claim arm issued score or grade: %#v", arm)
 	}
 	if onchain, _ := arm.Signals["real_onchain_evidence"].(bool); onchain {
 		t.Fatal("URL parser evidence must not be labeled on-chain")
@@ -33,7 +33,7 @@ func TestSafeHTTPSClaimSurfaceProducesVerifiedMonitorEvidence(t *testing.T) {
 	}
 }
 
-func TestSuspiciousClaimSurfaceProducesHighRiskEvidence(t *testing.T) {
+func TestSuspiciousClaimSurfacePreservesStructuralFactsWithoutScore(t *testing.T) {
 	raw := "http://192.0.2.7:8080/airdrop/claim?seedphrase=alpha&approve_transaction=1&redirect_uri=https%3A%2F%2Fexample.org"
 	evidence := parseArvisClaimSurface(raw)
 	if !evidence.Available || !evidence.IPLiteralHost || evidence.HTTPS {
@@ -42,15 +42,23 @@ func TestSuspiciousClaimSurfaceProducesHighRiskEvidence(t *testing.T) {
 	req := SecurityRadarRequest{Target: raw, Network: "solana-mainnet"}
 	shield := buildWalletlessClaimArm(req, evidence, time.Now().UTC().Format(time.RFC3339))
 	surface := buildClaimSurfaceArm(req, evidence, time.Now().UTC().Format(time.RFC3339))
-	if !shield.Signed || !surface.Signed {
-		t.Fatal("parsed suspicious surfaces must produce signed structural evidence")
+	for _, arm := range []SecurityRadarVerdict{shield, surface} {
+		if !arm.Signed {
+			t.Fatalf("parsed suspicious surface must produce signed evidence: %#v", arm)
+		}
+		if arm.RiskIndex != 0 || arm.Grade != "-" {
+			t.Fatalf("claim arm issued score or grade: %#v", arm)
+		}
 	}
-	if shield.RiskIndex < 65 || surface.RiskIndex < 65 {
-		t.Fatalf("expected high risk, got shield=%d surface=%d", shield.RiskIndex, surface.RiskIndex)
+	if terms, _ := shield.Signals["secret_request_terms"].([]string); len(terms) == 0 {
+		t.Fatalf("secret-request evidence missing: %#v", shield.Signals)
+	}
+	if ip, _ := surface.Signals["ip_literal_host"].(bool); !ip {
+		t.Fatalf("IP-literal evidence missing: %#v", surface.Signals)
 	}
 }
 
-func TestVerifiedFinalArmAcceptsOffchainEvidence(t *testing.T) {
+func TestVerifiedFinalArmCannotPromoteOffchainEvidenceToGrade(t *testing.T) {
 	req := SecurityRadarRequest{Target: "https://example.com/claim", Network: "solana-mainnet"}
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
 	claim := verifiedEvidenceArm("Claim Surface Risk", ModuleClaimSurfaceRisk, req, 44, map[string]any{
@@ -58,15 +66,11 @@ func TestVerifiedFinalArmAcceptsOffchainEvidence(t *testing.T) {
 		"real_offchain_evidence": true,
 		"real_onchain_evidence": false,
 	}, []string{"parsed URL"}, generatedAt)
-	missing := unavailableArm("Holder Concentration", ModuleHolderConcentration, req, generatedAt, "mint required")
-	final := buildVerifiedFinalArm(req, []SecurityRadarVerdict{claim, missing}, generatedAt)
-	if !final.Signed || final.RiskIndex != 44 {
-		t.Fatalf("unexpected final verdict: %#v", final)
+	final := buildVerifiedFinalArm(req, []SecurityRadarVerdict{claim}, generatedAt)
+	if final.Signed || final.RiskIndex != 0 || final.Grade != "-" {
+		t.Fatalf("compatibility final promoted evidence into a grade: %#v", final)
 	}
-	if onchain, _ := final.Signals["real_onchain_evidence"].(bool); onchain {
-		t.Fatal("off-chain-only final verdict must not claim on-chain evidence")
-	}
-	if offchain, _ := final.Signals["real_offchain_evidence"].(bool); !offchain {
-		t.Fatal("off-chain final evidence flag missing")
+	if source, _ := final.Signals["verdict_source"].(string); source != "EvaluateUnifiedRadarVerdict" {
+		t.Fatalf("unexpected final source: %q", source)
 	}
 }
