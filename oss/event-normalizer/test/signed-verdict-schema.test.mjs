@@ -17,6 +17,10 @@ test("signed verdict schema accepts '-' without numeric risk fields", () => {
     evidence: ["No grade-changing rule was triggered in the evaluated evidence set."],
     rule_version: "koschei-unified-radar-rules-v1.0.0",
     signed: true,
+    signature: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    signature_algorithm: "ed25519",
+    key_id: "koschei-test-key-v1",
+    payload_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     triggered_rules: [],
     decision_path: ["No grade-changing rule was satisfied; absence of evidence is not an A grade."]
   };
@@ -27,7 +31,7 @@ test("signed verdict schema accepts '-' without numeric risk fields", () => {
 });
 
 test("signed verdict schema no longer requires or defines risk_index", () => {
-  assert.deepEqual(schema.required, ["grade", "evidence", "rule_version", "signed"]);
+  assert.deepEqual(schema.required, ["grade", "evidence", "rule_version", "signed", "signature", "signature_algorithm", "key_id", "payload_hash"]);
   assert.equal(Object.hasOwn(schema.properties, "risk_index"), false);
   assert.equal(Object.hasOwn(schema.properties, "risk_level"), false);
   assert.ok(schema.properties.triggered_rules);

@@ -22,7 +22,11 @@ const validVerdict = {
     summary: "The creator appeared across multiple token dossiers."
   }],
   decision_path: ["One observed compounding rule is visible."],
-  signed: true
+  signed: true,
+  signature: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+  signature_algorithm: "ed25519",
+  key_id: "koschei-test-key-v1",
+  payload_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 };
 
 const noGradeVerdict = {
