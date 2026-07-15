@@ -81,14 +81,25 @@ func (h *Handler) TokenAccessStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "access": evaluation})
 }
 
+type tokenAccessEvaluator func(context.Context, string) (tokenAccessEvaluation, error)
+
 func (h *Handler) RequireTokenTier(required string, next http.HandlerFunc) http.HandlerFunc {
+	return h.requireTokenTierWithEvaluator(required, h.evaluateTokenAccess, next)
+}
+
+func (h *Handler) requireTokenTierWithEvaluator(required string, evaluate tokenAccessEvaluator, next http.HandlerFunc) http.HandlerFunc {
+	required = strings.ToLower(strings.TrimSpace(required))
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := userFromContext(r.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		evaluation, err := h.evaluateTokenAccess(r.Context(), claims.Sub)
+		if tokenTierRank(required) == 0 {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "invalid_required_token_tier"})
+			return
+		}
+		evaluation, err := evaluate(r.Context(), claims.Sub)
 		if err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "token_access_unavailable"})
 			return
@@ -109,7 +120,10 @@ func (h *Handler) RequireTokenTier(required string, next http.HandlerFunc) http.
 			})
 			return
 		}
-		next(w, r)
+		ctx := withTokenAccessRequestContext(r.Context(), tokenAccessRequestContext{
+			Evaluation: evaluation, AuthSubject: claims.Sub, Email: claims.Email,
+		})
+		next(w, r.WithContext(ctx))
 	}
 }
 
