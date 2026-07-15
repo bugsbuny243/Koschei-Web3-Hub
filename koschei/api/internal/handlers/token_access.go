@@ -250,7 +250,7 @@ func configuredKoscheiTokenGateEnabled() bool {
 
 func configuredTokenThresholds(decimals int) (map[string]string, map[string]*big.Int, error) {
 	values := map[string]string{
-		"basic":      tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "0.000001"),
+		"basic":      tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "25000"),
 		"pro":        tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_PRO", "250000"),
 		"enterprise": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_ENTERPRISE", "2000000"),
 	}
