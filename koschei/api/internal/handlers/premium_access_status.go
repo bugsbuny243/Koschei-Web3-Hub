@@ -45,7 +45,7 @@ func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
 			email = entitlementEmailFromSubject(claims.Sub)
 		}
 		if email != "" {
-			quota, err = (postgresScanQuotaLedger{DB: h.DB}).Status(r.Context(), email, tokenAccess.Tier, configuredKOSCHDailyQuota(tokenAccess.Tier), time.Now().UTC())
+			quota, err = h.koschScanQuotaStatus(r.Context(), email, tokenAccess.Tier, configuredKOSCHDailyQuota(tokenAccess.Tier), time.Now().UTC())
 			if err != nil {
 				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_unavailable"})
 				return
