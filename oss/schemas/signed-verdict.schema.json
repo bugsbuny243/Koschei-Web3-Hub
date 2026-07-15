@@ -2,12 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tradepigloball.co/schemas/signed-verdict.schema.json",
   "title": "Koschei ARVIS Signed Verdict",
-  "description": "Evidence-backed final verdict contract for Solana developer integrations.",
+  "description": "Evidence-backed, deterministic and scoreless final verdict contract for Solana developer integrations.",
   "type": "object",
   "required": [
     "grade",
-    "risk_index",
-    "risk_level",
     "evidence",
     "rule_version",
     "signed"
@@ -15,11 +13,10 @@
   "properties": {
     "target": { "type": "string", "minLength": 1 },
     "network": { "type": "string", "default": "solana-mainnet" },
-    "grade": { "type": "string", "pattern": "^[A-F]$" },
-    "risk_index": { "type": "integer", "minimum": 0, "maximum": 100 },
-    "risk_level": {
+    "grade": {
       "type": "string",
-      "enum": ["low", "medium", "high", "critical"]
+      "pattern": "^[A-F-]$",
+      "description": "A-F is the deterministic letter verdict. '-' means no grade-changing rule was triggered; absence of evidence is not an A grade."
     },
     "verdict": { "type": "string" },
     "recommendation": { "type": "string" },
@@ -27,6 +24,29 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "triggered_rules": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "title", "evidence_status"],
+        "properties": {
+          "rule_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "tier": { "type": "string" },
+          "evidence_status": { "type": "string", "enum": ["VERIFIED", "OBSERVED", "INFERRED", "UNVERIFIED", "verified", "observed", "inferred", "unverified"] },
+          "grade_effect": { "type": "string" },
+          "summary": { "type": "string" },
+          "signatures": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": true
+      }
+    },
+    "decision_path": {
+      "type": "array",
+      "minItems": 1,
       "items": { "type": "string", "minLength": 1 }
     },
     "rule_version": { "type": "string", "minLength": 1 },
