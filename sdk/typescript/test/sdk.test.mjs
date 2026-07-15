@@ -13,50 +13,52 @@ const validVerdict = {
   target: "SOLANA_TARGET",
   network: "solana-mainnet",
   grade: "C",
-  risk_index: 45,
-  risk_level: "medium",
   evidence: ["mint authority is active"],
+  triggered_rules: [{ rule_id: "R-01", title: "Mint authority active", evidence_status: "VERIFIED" }],
+  decision_path: ["R-01 was verified.", "Grade C ceiling applied."],
   rule_version: "arvis-live",
   signed: true
 };
 
-test("validates a complete signed verdict", () => {
+test("validates a complete scoreless signed verdict", () => {
   const result = validateSignedVerdict(validVerdict);
   assert.equal(result.ok, true);
   assert.equal(result.errors.length, 0);
   assert.equal(isSignedVerdict(validVerdict), true);
 });
 
-test("rejects unsigned or incomplete verdicts", () => {
-  const result = validateSignedVerdict({
-    signed: false,
-    risk_index: 120,
-    grade: "Z",
-    risk_level: "unknown"
-  });
-  assert.equal(result.ok, false);
-  assert.ok(result.errors.includes("signed must be true"));
-  assert.ok(result.errors.includes("risk_index must be between 0 and 100"));
-  assert.ok(result.errors.includes("evidence must be a non-empty array of strings"));
+test("accepts dash grade when no grade-changing rule fired", () => {
+  const verdict = {
+    ...validVerdict,
+    grade: "-",
+    triggered_rules: [],
+    decision_path: ["No grade-changing rule was satisfied; absence of evidence is not an A grade."]
+  };
+  const result = validateSignedVerdict(verdict);
+  assert.equal(result.ok, true);
+  assert.equal(evaluateVerdictPolicy(verdict).decision, "withhold");
 });
 
-test("rejects fractional risk indexes", () => {
-  const result = validateSignedVerdict({ ...validVerdict, risk_index: 45.5 });
+test("rejects unsigned or incomplete verdicts", () => {
+  const result = validateSignedVerdict({ signed: false, grade: "Z" });
   assert.equal(result.ok, false);
-  assert.ok(result.errors.includes("risk_index must be an integer"));
+  assert.ok(result.errors.includes("signed must be true"));
+  assert.ok(result.errors.includes("evidence must be a non-empty array of strings"));
+  assert.ok(result.errors.includes("rule_version is required"));
 });
 
 test("evaluates block, warn, allow and withhold policy outcomes", () => {
-  assert.equal(evaluateVerdictPolicy({ ...validVerdict, risk_index: 85, risk_level: "critical" }).decision, "block");
+  assert.equal(evaluateVerdictPolicy({ ...validVerdict, grade: "D" }).decision, "block");
   assert.equal(evaluateVerdictPolicy(validVerdict).decision, "warn");
-  assert.equal(evaluateVerdictPolicy({ ...validVerdict, grade: "A", risk_index: 12, risk_level: "low" }).decision, "allow");
+  assert.equal(evaluateVerdictPolicy({ ...validVerdict, grade: "A" }).decision, "allow");
+  assert.equal(evaluateVerdictPolicy({ ...validVerdict, grade: "-" }).decision, "withhold");
   assert.equal(evaluateVerdictPolicy({ signed: false }).decision, "withhold");
 });
 
-test("supports custom policy thresholds", () => {
+test("supports custom grade policy", () => {
   const decision = evaluateVerdictPolicy(
-    { ...validVerdict, grade: "B", risk_index: 35, risk_level: "low" },
-    { warnAt: 30, blockAt: 90, blockLevels: ["critical"], warnLevels: [] }
+    { ...validVerdict, grade: "B" },
+    { blockGrades: ["E", "F"], warnGrades: ["B", "C", "D"] }
   );
   assert.equal(decision.decision, "warn");
 });
