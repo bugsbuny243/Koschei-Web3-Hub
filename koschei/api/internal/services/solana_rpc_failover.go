@@ -36,7 +36,9 @@ func (t *solanaFailoverTransport) RoundTrip(req *http.Request) (*http.Response, 
 				failureErr = fmt.Errorf("http status %d", status)
 			}
 		}
-		web3.LogRPCFailure(method, req.URL.String(), status, failureErr)
+		if !solanaAdaptiveBatchDegradationStatus(req, status) {
+			web3.LogRPCFailure(method, req.URL.String(), status, failureErr)
+		}
 	}
 	if !solanaFailoverEnabled() || !solanaFailoverRequired(resp, err) {
 		return resp, err
@@ -100,4 +102,11 @@ func solanaFailoverRequired(resp *http.Response, err error) bool {
 	default:
 		return false
 	}
+}
+
+func solanaAdaptiveBatchDegradationStatus(req *http.Request, status int) bool {
+	if req == nil || req.Header.Get("X-Koschei-RPC-Adaptive-Batch") != "1" {
+		return false
+	}
+	return status == http.StatusForbidden || status == http.StatusRequestEntityTooLarge
 }
