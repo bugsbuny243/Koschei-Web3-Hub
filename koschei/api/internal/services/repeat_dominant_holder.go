@@ -2,7 +2,6 @@ package services
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 )
@@ -23,9 +22,11 @@ type RepeatDominantHolderEvidence struct {
 	TokenCount        int                         `json:"token_count"`
 	ObservationDays   int                         `json:"observation_days"`
 	ObservationWindow string                      `json:"observation_window"`
-	RiskWeight        int                         `json:"risk_weight"`
-	Matches           []RepeatDominantHolderMatch `json:"matches"`
-	EvidenceLine      string                      `json:"evidence_line"`
+	// Deprecated compatibility diagnostic. It is not consumed by an ARVIS arm
+	// or the unified final verdict.
+	RiskWeight   int                         `json:"risk_weight,omitempty"`
+	Matches      []RepeatDominantHolderMatch `json:"matches"`
+	EvidenceLine string                      `json:"evidence_line"`
 }
 
 func RepeatDominantRiskWeight(currentPercentage float64, tokenCount int) int {
@@ -92,95 +93,76 @@ func ApplyRepeatDominantHolderEvidenceToHolderIntelligence(in HolderIntelligence
 	return in
 }
 
+// ApplyRepeatDominantHolderEvidenceToAnalysis replaces the dedicated Repeat
+// Actor Scan placeholder. It no longer mutates Intelligence Graph and never
+// rebuilds a highest-score final arm.
 func ApplyRepeatDominantHolderEvidenceToAnalysis(analysis ArvisAnalysis, req SecurityRadarRequest, evidence []RepeatDominantHolderEvidence) ArvisAnalysis {
 	if len(evidence) == 0 {
 		return analysis
 	}
-	strongest := 0
 	lines := []string{}
 	owners := []string{}
+	maxTokenCount := 0
 	for _, item := range evidence {
-		if item.RiskWeight > strongest {
-			strongest = item.RiskWeight
-		}
 		if strings.TrimSpace(item.EvidenceLine) != "" {
 			lines = append(lines, item.EvidenceLine)
 		}
 		if strings.TrimSpace(item.OwnerWallet) != "" {
 			owners = append(owners, item.OwnerWallet)
 		}
+		if item.TokenCount > maxTokenCount {
+			maxTokenCount = item.TokenCount
+		}
 	}
-	if strongest <= 0 {
-		return analysis
-	}
-
-	arms := make([]SecurityRadarVerdict, 0, len(analysis.Arms)+1)
-	graphFound := false
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
-	for _, arm := range analysis.Arms {
-		if arm.ModuleID == ModuleFinalVerdictEngine {
-			continue
-		}
-		if arm.ModuleID != ModuleIntelligenceGraph {
-			arms = append(arms, arm)
-			continue
-		}
-		graphFound = true
-		if arm.Signals == nil {
-			arm.Signals = map[string]any{}
-		}
-		arm.Signals["repeat_dominant_holder"] = true
-		arm.Signals["repeat_dominant_holders"] = evidence
-		arm.Signals["repeat_dominant_owner_wallets"] = owners
-		arm.Signals["repeat_dominant_observation_days"] = RepeatDominantObservationDays
-		arm.Signals["repeat_dominant_risk_weight"] = strongest
-		arm.Signals["stored_scan_evidence"] = true
-		arm.Signals["real_onchain_evidence"] = true
-		risk := arm.RiskIndex
-		if strongest > risk {
-			risk = strongest
-		}
-		updated := evidenceArm(arm.Module, arm.ModuleID, req, risk, arm.Signals, append(append([]string{}, arm.Evidence...), lines...), generatedAt)
-		updated.Verdict = "Aynı zincir üstü holder cüzdanı, Koschei'nin saklanan gözlem penceresinde birden fazla tokenda baskın owner olarak doğrulandı."
-		updated.Recommendation = "Bu cüzdanın diğer tokenlardaki yoğunlaşma ve likidite etkisini birlikte inceleyin; ilişki kimlik veya niyet kanıtı değildir."
-		arms = append(arms, updated)
+	signals := map[string]any{
+		"module_id": ModuleRepeatActorScan,
+		"real_onchain_evidence": true,
+		"stored_scan_evidence": true,
+		"evidence_status": "observed",
+		"repeat_dominant_holder": true,
+		"repeat_dominant_holders": evidence,
+		"repeat_dominant_owner_wallets": owners,
+		"repeat_dominant_observation_days": RepeatDominantObservationDays,
+		"max_repeat_token_count": maxTokenCount,
+		"persistent_actor_index": true,
+		"identity_or_intent_claim": false,
+		"numeric_score_disabled": true,
+		"grade_effect": "none_at_arm_layer",
 	}
-	if !graphFound {
-		signals := map[string]any{
-			"real_onchain_evidence":            true,
-			"stored_scan_evidence":             true,
-			"repeat_dominant_holder":           true,
-			"repeat_dominant_holders":          evidence,
-			"repeat_dominant_owner_wallets":    owners,
-			"repeat_dominant_observation_days": RepeatDominantObservationDays,
-			"repeat_dominant_risk_weight":      strongest,
-		}
-		graph := evidenceArm("Intelligence Graph", ModuleIntelligenceGraph, req, strongest, signals, lines, generatedAt)
-		graph.Verdict = "Aynı zincir üstü holder cüzdanı, Koschei'nin saklanan gözlem penceresinde birden fazla tokenda baskın owner olarak doğrulandı."
-		graph.Recommendation = "Bu cüzdanın diğer tokenlardaki yoğunlaşma ve likidite etkisini birlikte inceleyin; ilişki kimlik veya niyet kanıtı değildir."
-		arms = append(arms, graph)
-	}
+	repeatArm := evidenceArm("Repeat Actor Scan", ModuleRepeatActorScan, req, 0, signals, lines, generatedAt)
+	repeatArm.Verdict = "Aynı zincir üstü holder cüzdanı, Koschei'nin kalıcı gözlem hafızasında birden fazla tokenda baskın owner olarak gözlendi."
+	repeatArm.Recommendation = "Use the unified rules engine to combine repeat-actor evidence with creator, funding, holder and liquidity evidence."
 
-	sort.SliceStable(arms, func(i, j int) bool {
-		return arms[i].ModuleID < arms[j].ModuleID
-	})
-	finalArm := buildFinalArm(req, arms, generatedAt)
-	arms = append(arms, finalArm)
-	final := finalVerdictFromArm(finalArm)
-	analysis.Arms = arms
-	analysis.Final = final
+	arms := ArvisArmsFromBundle(analysis.Bundle)
+	if len(arms) == 0 {
+		arms = append([]SecurityRadarVerdict{}, analysis.Arms...)
+	}
+	updated := make([]SecurityRadarVerdict, 0, len(arms))
+	found := false
+	for _, arm := range arms {
+		if arm.ModuleID == ModuleRepeatActorScan {
+			updated = append(updated, repeatArm)
+			found = true
+			continue
+		}
+		updated = append(updated, arm)
+	}
+	if !found {
+		updated = append(updated, repeatArm)
+	}
+	analysis.Arms = updated
+	analysis.Final = arvisCompatibilityFinal()
 	if analysis.Bundle.Metadata == nil {
 		analysis.Bundle.Metadata = map[string]any{}
 	}
-	analysis.Bundle.Metadata["arvis_arms"] = arms
+	analysis.Bundle.Metadata["arvis_arms"] = updated
 	analysis.Bundle.Metadata["repeat_dominant_holders"] = evidence
 	analysis.Bundle.Metadata["repeat_dominant_holder_count"] = len(evidence)
-	analysis.Bundle.Metadata["final_grade"] = final.Grade
-	analysis.Bundle.Metadata["final_risk_index"] = final.RiskIndex
-	analysis.Bundle.Metadata["final_risk_level"] = final.RiskLevel
-	analysis.Bundle.Metadata["final_recommendation"] = final.Recommendation
-	analysis.Bundle.Metadata["verified_arm_count"] = verifiedArvisEvidenceCount(arms)
-	analysis.Bundle.CustomerSummary = fmt.Sprintf("ARVIS connected %d repeat-dominant holder observation(s) from the last %d days of stored Koschei scans.", len(evidence), RepeatDominantObservationDays)
-	analysis.Bundle.CustomerRecommendation = final.Recommendation
+	analysis.Bundle.Metadata["verified_arm_count"] = verifiedArvisEvidenceCount(updated)
+	analysis.Bundle.Metadata["runtime_arm_count"] = verifiedArvisEvidenceCount(updated)
+	analysis.Bundle.Metadata["final_verdict_source"] = "EvaluateUnifiedRadarVerdict"
+	analysis.Bundle.CustomerSummary = fmt.Sprintf("ARVIS connected %d repeat-dominant holder observation(s) from persistent Koschei actor memory.", len(evidence))
+	analysis.Bundle.CustomerRecommendation = "evaluate_unified_rules"
 	return analysis
 }
