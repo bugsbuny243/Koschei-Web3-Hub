@@ -1,29 +1,45 @@
 package handlers
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
-// RequireAPIKeyKOSCH binds developer API usage to the same verified KOSCH
-// holder policy as customer-session product routes. API keys remain identity
-// credentials; they do not bypass holder verification.
+// RequireAPIKeyKOSCH remains a basic-tier compatibility wrapper. New developer
+// API routes use RequireAPIKeyTokenTier("enterprise", ...).
 func (h *Handler) RequireAPIKeyKOSCH(next http.HandlerFunc) http.HandlerFunc {
+	return h.RequireAPIKeyTokenTier("basic", next)
+}
+
+// RequireAPIKeyTokenTier binds an authenticated API key to the verified KOSCH
+// tier of its owning account. API keys are identity credentials; they never
+// bypass wallet verification or token eligibility.
+func (h *Handler) RequireAPIKeyTokenTier(required string, next http.HandlerFunc) http.HandlerFunc {
+	required = strings.ToLower(strings.TrimSpace(required))
 	return func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := apiPrincipalFromContext(r.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
-		active, err := h.hasTokenTierAccess(r.Context(), principal.AuthSubject, "basic")
+		if tokenTierRank(required) == 0 {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "invalid_required_token_tier"})
+			return
+		}
+		evaluation, err := h.evaluateTokenAccess(r.Context(), principal.AuthSubject)
 		if err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "kosch_access_unavailable"})
 			return
 		}
-		if !active {
-			writeJSON(w, http.StatusForbidden, map[string]string{
-				"error":   "kosch_holder_required",
-				"message": "Verified KOSCH holder access is required for developer API usage.",
+		if !evaluation.GateEnabled || !evaluation.Configured || !evaluation.WalletVerified || tokenTierRank(evaluation.Tier) < tokenTierRank(required) {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"error": "token_tier_required", "required_tier": required, "current_tier": evaluation.Tier,
 			})
 			return
 		}
-		next(w, r)
+		ctx := withTokenAccessRequestContext(r.Context(), tokenAccessRequestContext{
+			Evaluation: evaluation, AuthSubject: principal.AuthSubject, Email: principal.Email,
+		})
+		next(w, r.WithContext(ctx))
 	}
 }
