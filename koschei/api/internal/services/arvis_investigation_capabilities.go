@@ -13,16 +13,18 @@ type ArvisInvestigationCapability struct {
 	ID                    string   `json:"id"`
 	Label                 string   `json:"label"`
 	Status                string   `json:"status"`
+	TargetStatus          string   `json:"target_status"`
 	PrimaryModules        []string `json:"primary_modules,omitempty"`
 	CanonicalSections     []string `json:"canonical_sections"`
 	ActorRulesetVersion   string   `json:"actor_ruleset_version"`
 	UnifiedRulesetVersion string   `json:"unified_radar_ruleset_version"`
 	EvidencePolicy        string   `json:"evidence_policy"`
 	NextEvidenceNeed      string   `json:"next_evidence_need,omitempty"`
+	MaxStrengthGate       []string `json:"max_strength_gate"`
 }
 
 func ArvisInvestigationCapabilities() []ArvisInvestigationCapability {
-	return []ArvisInvestigationCapability{
+	capabilities := []ArvisInvestigationCapability{
 		{
 			ID: "solana_token_intelligence", Label: "Solana token intelligence", Status: ArvisCapabilityStrong,
 			PrimaryModules:      []string{ModuleTokenAuthorityScanner, ModuleHolderConcentration, ModuleProgramRelationScan},
@@ -107,4 +109,64 @@ func ArvisInvestigationCapabilities() []ArvisInvestigationCapability {
 			NextEvidenceNeed: "Define bridge, mixer, peel-chain and stablecoin conversion evidence-row schemas before any production verdict integration.",
 		},
 	}
+	for i := range capabilities {
+		capabilities[i].TargetStatus = ArvisCapabilityStrong
+		capabilities[i].MaxStrengthGate = arvisCapabilityMaxStrengthGate(capabilities[i].ID)
+	}
+	return capabilities
+}
+
+func arvisCapabilityMaxStrengthGate(id string) []string {
+	common := []string{
+		"Preserve the 14-arm ARVIS contract and deterministic unified Radar verdict ownership.",
+		"Attach only VERIFIED or OBSERVED evidence to claims; keep INFERRED evidence watch-only and UNVERIFIED evidence out of verified claims.",
+		"Carry signature, slot, timestamp, source, destination, amount, program and verification status for serious claims.",
+	}
+	specific := map[string][]string{
+		"solana_token_intelligence": {
+			"Parse mint, authority, freeze, supply, holder and program evidence from live Solana RPC or signed transaction evidence.",
+			"Keep token capability findings evidence-only until unified deterministic rules evaluate them.",
+		},
+		"holder_funding_sybil": {
+			"Resolve holder roles and mint-specific token accounts before interpreting holder concentration.",
+			"Require direct funding signatures or repeated OBSERVED cluster evidence before linking wallets beyond watch flags.",
+		},
+		"creator_repeat_actor_memory": {
+			"Persist creator, deployer, dominant-holder and recipient roles in durable actor-index rows.",
+			"Prove cross-token reuse with stored evidence keys and signatures, not broad recipient wallet-history scans.",
+		},
+		"launch_sniper_intelligence": {
+			"Use mint-specific ATA and launch ledger evidence for initial recipient analysis.",
+			"Separate synchronized timing evidence from common-ownership attribution unless direct links exist.",
+		},
+		"liquidity_drain_attribution": {
+			"Attach parsed liquidity add/remove signatures, pool reserve deltas, LP authority and actor linkage.",
+			"Trigger creator liquidity-removal hard rules only from VERIFIED transaction-backed evidence.",
+		},
+		"transaction_intent": {
+			"Classify intent from parsed instructions, signer set, writable accounts, program IDs and token/SOL balance deltas.",
+			"Extend route-specific claim, swap, approval, close-account, mint, burn and transfer semantics without issuing a grade.",
+		},
+		"mev_sandwich": {
+			"Attach route, slippage, priority fee, bundle, pool-state before/after and affected swap evidence.",
+			"Report confirmed sandwich claims only when before/after route evidence is VERIFIED.",
+		},
+		"market_manipulation": {
+			"Map wash/self-flow, coordinated exits, volume/liquidity gaps and holder pressure into versioned deterministic behavior rules.",
+			"Never label manipulation from a single inferred pattern without transaction-backed evidence rows.",
+		},
+		"watch_intelligence": {
+			"Connect watchlist observations to durable actor memory while preserving opt-in scanning.",
+			"Keep watch flags separate from grade-affecting verified rules.",
+		},
+		"cross_chain_intelligence": {
+			"Add verified bridge, source-chain, destination-chain, stablecoin conversion and exchange/OTC evidence ingestion.",
+			"Require chain-specific transaction evidence before linking Solana and non-Solana actors.",
+		},
+		"unverified_cross_chain_crime_patterns": {
+			"Define mixer entry/exit, peel-chain, bridge-laundering and CEX/OTC movement evidence-row schemas.",
+			"Promote criminal-pattern claims only after verified signatures prove the path; otherwise keep them unavailable.",
+		},
+	}
+	return append(common, specific[id]...)
 }

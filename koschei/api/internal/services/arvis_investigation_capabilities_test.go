@@ -24,6 +24,12 @@ func TestArvisInvestigationCapabilitiesExposeEvidenceFirstBuildout(t *testing.T)
 		if capability.EvidencePolicy == "" {
 			t.Fatalf("%s missing evidence policy", capability.ID)
 		}
+		if capability.TargetStatus != ArvisCapabilityStrong {
+			t.Fatalf("%s target status=%q", capability.ID, capability.TargetStatus)
+		}
+		if len(capability.MaxStrengthGate) == 0 {
+			t.Fatalf("%s missing max-strength gate", capability.ID)
+		}
 		if _, exists := seen[capability.ID]; exists {
 			t.Fatalf("duplicate capability id %s", capability.ID)
 		}
@@ -46,6 +52,9 @@ func TestArvisInvestigationCapabilitiesExposeEvidenceFirstBuildout(t *testing.T)
 	}
 	if seen["unverified_cross_chain_crime_patterns"].Status != ArvisCapabilityUnavailable {
 		t.Fatalf("criminal-pattern claims must remain unavailable without verified rows: %#v", seen["unverified_cross_chain_crime_patterns"])
+	}
+	if seen["unverified_cross_chain_crime_patterns"].TargetStatus != ArvisCapabilityStrong {
+		t.Fatalf("criminal-pattern target should define the max-strength gate without faking current status: %#v", seen["unverified_cross_chain_crime_patterns"])
 	}
 }
 

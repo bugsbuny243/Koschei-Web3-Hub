@@ -31,6 +31,17 @@ This buildout starts from the current repository audit without deleting legacy p
 | Cross-chain intelligence | Schema-only | Cross-chain and bridge schema traces | Add verified bridge/chain evidence ingestion before surfacing cross-chain criminal-pattern claims. |
 | Cross-chain criminal patterns | Not a verified claim | No production evidence arm yet | Define bridge, mixer, peel-chain and stablecoin-conversion evidence-row schemas first. |
 
+## Maximum-strength target
+
+The product target for every capability is the same: `strong_evidence_arm`. This is the safe equivalent of a "30/30" target, but it is not a production score and must never be shown as current strength unless the required evidence exists.
+
+Every capability can reach maximum strength only when it satisfies all of these gates:
+
+1. The 14-arm ARVIS contract and deterministic unified Radar verdict ownership remain intact.
+2. Serious claims carry signature, slot, timestamp, source, destination, amount, program and verification status.
+3. `INFERRED` evidence remains watch-only and `UNVERIFIED` evidence remains outside verified claims and grades.
+4. Capability-specific gates are met in the machine-readable `max_strength_gate` list exposed by ARVIS metadata.
+
 ## Immediate implementation order
 
 1. Preserve and expose the investigation capability map in ARVIS metadata so owner/research surfaces can show what is verified, partial, planned or unavailable without fabricating production claims.
