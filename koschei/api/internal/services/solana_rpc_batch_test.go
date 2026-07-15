@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +22,7 @@ func prepareSolanaRPCBatchTest(t *testing.T) {
 
 func TestSolanaRPCBatchForbiddenTripsCircuit(t *testing.T) {
 	prepareSolanaRPCBatchTest(t)
+	ctx := context.Background()
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -29,11 +31,11 @@ func TestSolanaRPCBatchForbiddenTripsCircuit(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := SolanaGetTransactionsJSONParsedBatch(t.Context(), server.URL, []string{"sig-1", "sig-2"})
+	_, err := SolanaGetTransactionsJSONParsedBatch(ctx, server.URL, []string{"sig-1", "sig-2"})
 	if !IsSolanaRPCBatchUnavailable(err) {
 		t.Fatalf("expected batch-unavailable error, got %v", err)
 	}
-	_, err = SolanaGetTransactionsJSONParsedBatch(t.Context(), server.URL, []string{"sig-3"})
+	_, err = SolanaGetTransactionsJSONParsedBatch(ctx, server.URL, []string{"sig-3"})
 	if !IsSolanaRPCBatchUnavailable(err) {
 		t.Fatalf("expected open circuit on second call, got %v", err)
 	}
@@ -44,6 +46,7 @@ func TestSolanaRPCBatchForbiddenTripsCircuit(t *testing.T) {
 
 func TestSolanaRPCBatchConcurrentForbiddenSendsOneRequest(t *testing.T) {
 	prepareSolanaRPCBatchTest(t)
+	ctx := context.Background()
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -56,7 +59,7 @@ func TestSolanaRPCBatchConcurrentForbiddenSendsOneRequest(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := SolanaGetTransactionsJSONParsedBatch(t.Context(), server.URL, []string{"sig"})
+			_, err := SolanaGetTransactionsJSONParsedBatch(ctx, server.URL, []string{"sig"})
 			if !IsSolanaRPCBatchUnavailable(err) {
 				t.Errorf("expected batch-unavailable error, got %v", err)
 			}
@@ -70,6 +73,7 @@ func TestSolanaRPCBatchConcurrentForbiddenSendsOneRequest(t *testing.T) {
 
 func TestSolanaRPCBatchSplitsRequestEntityTooLarge(t *testing.T) {
 	prepareSolanaRPCBatchTest(t)
+	ctx := context.Background()
 	t.Setenv("SOLANA_RPC_TX_BATCH_SIZE", "8")
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -95,7 +99,7 @@ func TestSolanaRPCBatchSplitsRequestEntityTooLarge(t *testing.T) {
 	}))
 	defer server.Close()
 
-	out, err := SolanaGetTransactionsJSONParsedBatch(t.Context(), server.URL, []string{"sig-1", "sig-2", "sig-3", "sig-4"})
+	out, err := SolanaGetTransactionsJSONParsedBatch(ctx, server.URL, []string{"sig-1", "sig-2", "sig-3", "sig-4"})
 	if err != nil {
 		t.Fatalf("split batch failed: %v", err)
 	}
@@ -109,6 +113,7 @@ func TestSolanaRPCBatchSplitsRequestEntityTooLarge(t *testing.T) {
 
 func TestSolanaRPCBatchPreservesSuccessfulChunksBeforeCircuit(t *testing.T) {
 	prepareSolanaRPCBatchTest(t)
+	ctx := context.Background()
 	t.Setenv("SOLANA_RPC_TX_BATCH_SIZE", "2")
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +139,7 @@ func TestSolanaRPCBatchPreservesSuccessfulChunksBeforeCircuit(t *testing.T) {
 	}))
 	defer server.Close()
 
-	out, err := SolanaGetTransactionsJSONParsedBatch(t.Context(), server.URL, []string{"sig-1", "sig-2", "sig-3", "sig-4"})
+	out, err := SolanaGetTransactionsJSONParsedBatch(ctx, server.URL, []string{"sig-1", "sig-2", "sig-3", "sig-4"})
 	if !IsSolanaRPCBatchUnavailable(err) {
 		t.Fatalf("expected second chunk to open circuit, got %v", err)
 	}
