@@ -1,16 +1,23 @@
 package handlers
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 type premiumAccessStatus struct {
-	Active            bool   `json:"active"`
-	Source            string `json:"source"`
-	TokenGateEnabled  bool   `json:"token_gate_enabled"`
-	TokenConfigured   bool   `json:"token_configured"`
-	WalletVerified    bool   `json:"wallet_verified"`
-	TokenTier         string `json:"token_tier"`
-	TokenAmount       string `json:"token_amount"`
-	RequiredTokenTier string `json:"required_token_tier"`
+	Active              bool      `json:"active"`
+	Source              string    `json:"source"`
+	TokenGateEnabled    bool      `json:"token_gate_enabled"`
+	TokenConfigured     bool      `json:"token_configured"`
+	WalletVerified      bool      `json:"wallet_verified"`
+	TokenTier           string    `json:"token_tier"`
+	TokenAmount         string    `json:"token_amount"`
+	RequiredTokenTier   string    `json:"required_token_tier"`
+	QuotaDaily          int       `json:"quota_daily"`
+	QuotaUsedToday      int       `json:"quota_used_today"`
+	QuotaRemainingToday int       `json:"quota_remaining_today"`
+	QuotaResetsAt       time.Time `json:"quota_resets_at"`
 }
 
 func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
@@ -30,22 +37,25 @@ func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":     true,
-		"access": decidePremiumAccess(tokenAccess),
-	})
+	status := decidePremiumAccess(tokenAccess)
+	quota, err := h.KOSCHQuotaStatus(r.Context(), claims.Sub, status.TokenTier, time.Now().UTC())
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_unavailable"})
+		return
+	}
+	status.QuotaDaily = quota.Daily
+	status.QuotaUsedToday = quota.Used
+	status.QuotaRemainingToday = quota.Remaining
+	status.QuotaResetsAt = quota.ResetsAt
+
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "access": status})
 }
 
 func decidePremiumAccess(token tokenAccessEvaluation) premiumAccessStatus {
 	status := premiumAccessStatus{
-		Active:            false,
-		Source:            "none",
-		TokenGateEnabled:  token.GateEnabled,
-		TokenConfigured:   token.Configured,
-		WalletVerified:    token.WalletVerified,
-		TokenTier:         token.Tier,
-		TokenAmount:       token.Amount,
-		RequiredTokenTier: "basic",
+		Active: false, Source: "none", TokenGateEnabled: token.GateEnabled,
+		TokenConfigured: token.Configured, WalletVerified: token.WalletVerified,
+		TokenTier: token.Tier, TokenAmount: token.Amount, RequiredTokenTier: "basic",
 	}
 	if status.TokenTier == "" {
 		status.TokenTier = "none"
@@ -57,5 +67,8 @@ func decidePremiumAccess(token tokenAccessEvaluation) premiumAccessStatus {
 		status.Active = true
 		status.Source = "token"
 	}
+	status.QuotaDaily = configuredKOSCHDailyQuota(status.TokenTier)
+	_, status.QuotaResetsAt = utcQuotaWindow(time.Now().UTC())
+	status.QuotaRemainingToday = status.QuotaDaily
 	return status
 }
