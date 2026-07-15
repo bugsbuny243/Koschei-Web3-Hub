@@ -20,15 +20,6 @@ type koschQuotaStatus struct {
 	ResetsAt  time.Time `json:"quota_resets_at"`
 }
 
-type koschQuotaReservation struct {
-	ID          string
-	AuthSubject string
-	QuotaDate   time.Time
-	Tier        string
-	Limit       int
-	Reason      string
-}
-
 type quotaResponseWriter struct {
 	http.ResponseWriter
 	status int
@@ -117,9 +108,9 @@ func (h *Handler) currentQuotaTier(ctx context.Context, authSubject string) (str
 	return strings.ToLower(strings.TrimSpace(evaluation.Tier)), nil
 }
 
-func (h *Handler) reserveKOSCHScanQuota(ctx context.Context, authSubject, tier, reason string, now time.Time) (koschQuotaReservation, koschQuotaStatus, error) {
+func (h *Handler) reserveKOSCHScanQuota(ctx context.Context, authSubject, tier, reason string, now time.Time) (premiumOutputReservation, koschQuotaStatus, error) {
 	if h == nil || h.DB == nil {
-		return koschQuotaReservation{}, koschQuotaStatus{}, errors.New("database unavailable")
+		return premiumOutputReservation{}, koschQuotaStatus{}, errors.New("database unavailable")
 	}
 	authSubject = strings.TrimSpace(authSubject)
 	tier = strings.ToLower(strings.TrimSpace(tier))
@@ -127,7 +118,7 @@ func (h *Handler) reserveKOSCHScanQuota(ctx context.Context, authSubject, tier, 
 	start, reset := utcQuotaWindow(now)
 	status := koschQuotaStatus{Tier: tier, Daily: limit, ResetsAt: reset}
 	if authSubject == "" || limit <= 0 {
-		return koschQuotaReservation{}, status, errors.New("eligible KOSCH tier required")
+		return premiumOutputReservation{}, status, errors.New("eligible KOSCH tier required")
 	}
 	if reason = strings.TrimSpace(reason); reason == "" {
 		reason = "scan"
@@ -135,7 +126,7 @@ func (h *Handler) reserveKOSCHScanQuota(ctx context.Context, authSubject, tier, 
 
 	tx, err := h.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return koschQuotaReservation{}, status, err
+		return premiumOutputReservation{}, status, err
 	}
 	defer tx.Rollback()
 
@@ -155,10 +146,10 @@ func (h *Handler) reserveKOSCHScanQuota(ctx context.Context, authSubject, tier, 
 		_ = tx.QueryRowContext(ctx, `SELECT used_count FROM kosch_daily_quota_usage WHERE auth_subject=$1 AND quota_date=$2`, authSubject, start).Scan(&used)
 		status.Used = used
 		status.Remaining = maxQuotaInt(limit-used, 0)
-		return koschQuotaReservation{}, status, tokenAccessError{Status: http.StatusTooManyRequests, Code: "quota_exceeded"}
+		return premiumOutputReservation{}, status, tokenAccessError{Status: http.StatusTooManyRequests, Code: "quota_exceeded"}
 	}
 	if err != nil {
-		return koschQuotaReservation{}, status, err
+		return premiumOutputReservation{}, status, err
 	}
 
 	var reservationID string
@@ -168,29 +159,36 @@ func (h *Handler) reserveKOSCHScanQuota(ctx context.Context, authSubject, tier, 
 		VALUES ($1,$2,$3,$4,$5,'reserved')
 		RETURNING id::text`, authSubject, start, tier, limit, reason).Scan(&reservationID)
 	if err != nil {
-		return koschQuotaReservation{}, status, err
+		return premiumOutputReservation{}, status, err
 	}
 	if err := tx.Commit(); err != nil {
-		return koschQuotaReservation{}, status, err
+		return premiumOutputReservation{}, status, err
 	}
 	status.Used = used
 	status.Remaining = maxQuotaInt(limit-used, 0)
-	return koschQuotaReservation{ID: reservationID, AuthSubject: authSubject, QuotaDate: start, Tier: tier, Limit: limit, Reason: reason}, status, nil
+	return premiumOutputReservation{
+		QuotaReservationID: reservationID,
+		AuthSubject: authSubject,
+		QuotaDate: start,
+		Tier: tier,
+		QuotaLimit: limit,
+		Reason: reason,
+	}, status, nil
 }
 
-func (h *Handler) finalizeKOSCHScanQuota(ctx context.Context, reservation koschQuotaReservation) error {
-	if h == nil || h.DB == nil || strings.TrimSpace(reservation.ID) == "" {
+func (h *Handler) finalizeKOSCHQuotaReservation(ctx context.Context, reservation premiumOutputReservation) error {
+	if h == nil || h.DB == nil || strings.TrimSpace(reservation.QuotaReservationID) == "" {
 		return nil
 	}
 	_, err := h.DB.ExecContext(ctx, `
 		UPDATE kosch_daily_quota_reservations
 		SET status='consumed',finalized_at=now()
-		WHERE id=$1::uuid AND status='reserved'`, reservation.ID)
+		WHERE id=$1::uuid AND status='reserved'`, reservation.QuotaReservationID)
 	return err
 }
 
-func (h *Handler) refundKOSCHScanQuota(ctx context.Context, reservation koschQuotaReservation, reason string) error {
-	if h == nil || h.DB == nil || strings.TrimSpace(reservation.ID) == "" {
+func (h *Handler) refundKOSCHQuotaReservation(ctx context.Context, reservation premiumOutputReservation, reason string) error {
+	if h == nil || h.DB == nil || strings.TrimSpace(reservation.QuotaReservationID) == "" {
 		return nil
 	}
 	tx, err := h.DB.BeginTx(ctx, nil)
@@ -201,13 +199,16 @@ func (h *Handler) refundKOSCHScanQuota(ctx context.Context, reservation koschQuo
 	res, err := tx.ExecContext(ctx, `
 		UPDATE kosch_daily_quota_reservations
 		SET status='refunded',reason=CASE WHEN $2='' THEN reason ELSE $2 END,finalized_at=now()
-		WHERE id=$1::uuid AND status='reserved'`, reservation.ID, strings.TrimSpace(reason))
+		WHERE id=$1::uuid AND status='reserved'`, reservation.QuotaReservationID, strings.TrimSpace(reason))
 	if err != nil {
 		return err
 	}
 	rows, err := res.RowsAffected()
-	if err != nil || rows == 0 {
+	if err != nil {
 		return err
+	}
+	if rows == 0 {
+		return nil
 	}
 	_, err = tx.ExecContext(ctx, `
 		UPDATE kosch_daily_quota_usage
@@ -265,7 +266,7 @@ func (h *Handler) EnforceScanQuota(next http.HandlerFunc) http.HandlerFunc {
 		writer := &quotaResponseWriter{ResponseWriter: w}
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				_ = h.refundKOSCHScanQuota(context.Background(), reservation, "handler_panic_refund")
+				_ = h.refundPremiumOutputReservation(context.Background(), reservation, "handler_panic_refund")
 				panic(recovered)
 			}
 			statusCode := writer.status
@@ -273,9 +274,9 @@ func (h *Handler) EnforceScanQuota(next http.HandlerFunc) http.HandlerFunc {
 				statusCode = http.StatusOK
 			}
 			if statusCode >= 400 {
-				_ = h.refundKOSCHScanQuota(context.Background(), reservation, fmt.Sprintf("http_%d_refund", statusCode))
+				_ = h.refundPremiumOutputReservation(context.Background(), reservation, fmt.Sprintf("http_%d_refund", statusCode))
 			} else {
-				_ = h.finalizeKOSCHScanQuota(context.Background(), reservation)
+				_ = h.finalizePremiumOutputReservation(context.Background(), reservation)
 			}
 		}()
 		next(writer, r)
