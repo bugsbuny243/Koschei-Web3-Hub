@@ -46,12 +46,14 @@ func (h *Handler) CreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	if name == "" {
 		name = "Varsayılan API Anahtarı"
 	}
-	if req.MonthlyLimit <= 0 {
-		req.MonthlyLimit = 1000
-	}
-	if req.RateLimitPerMinute <= 0 {
-		req.RateLimitPerMinute = 60
-	}
+
+	requestedMonthly := req.MonthlyLimit
+	requestedRPM := req.RateLimitPerMinute
+	evaluation, evaluationErr := h.evaluateTokenAccess(r.Context(), claims.Sub)
+	tier := apiKeyEffectiveTier(evaluation, evaluationErr)
+	caps := apiKeyCapsForTier(tier)
+	effectiveMonthly, effectiveRPM := clampAPIKeyLimits(requestedMonthly, requestedRPM, caps)
+
 	raw, err := newRawAPIKey()
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "key_generation_failed"})
@@ -64,14 +66,30 @@ func (h *Handler) CreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	hash := hashAPIKey(raw)
 	var id string
 	if err := h.DB.QueryRowContext(r.Context(), `
-		INSERT INTO api_keys (auth_subject,email,name,key_prefix,key_hash,monthly_limit,rate_limit_per_minute)
-		VALUES ($1,lower($2),$3,$4,$5,$6,$7)
-		RETURNING id::text`, claims.Sub, claims.Email, name, prefix, hash, req.MonthlyLimit, req.RateLimitPerMinute).Scan(&id); err != nil {
+		INSERT INTO api_keys (auth_subject,email,name,key_prefix,key_hash,monthly_limit,monthly_quota,rate_limit_per_minute)
+		VALUES ($1,lower($2),$3,$4,$5,$6,$6,$7)
+		RETURNING id::text`, claims.Sub, claims.Email, name, prefix, hash, effectiveMonthly, effectiveRPM).Scan(&id); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "api_key_created", "customer", "info", map[string]any{"api_key_id": id, "name": name, "monthly_limit": req.MonthlyLimit, "rate_limit_per_minute": req.RateLimitPerMinute}))
-	writeJSON(w, http.StatusCreated, map[string]any{"id": id, "name": name, "key": raw, "warning": "Bu anahtar sadece şimdi gösterilir."})
+	services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "api_key_created", "customer", "info", map[string]any{
+		"api_key_id":                        id,
+		"name":                              name,
+		"tier":                              tier,
+		"requested_monthly_limit":           requestedMonthly,
+		"requested_rate_limit_per_minute":   requestedRPM,
+		"monthly_limit":                     effectiveMonthly,
+		"rate_limit_per_minute":             effectiveRPM,
+	}))
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"id":                    id,
+		"name":                  name,
+		"key":                   raw,
+		"tier":                  tier,
+		"monthly_limit":         effectiveMonthly,
+		"rate_limit_per_minute": effectiveRPM,
+		"warning":               "Bu anahtar sadece şimdi gösterilir.",
+	})
 }
 
 func (h *Handler) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
@@ -263,6 +281,7 @@ func (h *Handler) APIKeyAuth(next http.HandlerFunc) http.HandlerFunc {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_api_key"})
 			return
 		}
+		p = clampAPIPrincipalToAbsoluteCaps(p)
 		_, _ = h.DB.ExecContext(r.Context(), `UPDATE api_keys SET last_used_at=now() WHERE id=$1`, p.KeyID)
 		r = r.WithContext(context.WithValue(r.Context(), apiPrincipalContextKey{}, p))
 		if !h.enforceAPIAccessPolicy(w, r, p) {
