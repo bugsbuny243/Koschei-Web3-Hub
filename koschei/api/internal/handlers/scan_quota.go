@@ -126,11 +126,8 @@ func enforceScanQuota(ledger scanQuotaLedger, next http.HandlerFunc) http.Handle
 		if email == "" {
 			email = entitlementEmailFromSubject(access.AuthSubject)
 		}
-		if email == "" {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_identity_unavailable"})
-			return
-		}
-
+		// An external Neon subject may not carry an email claim. The existing
+		// reservation flow resolves that subject through app_user_profiles.
 		reservation, status, err := ledger.Reserve(r.Context(), access.AuthSubject, email, tier, limit, time.Now().UTC())
 		if errors.Is(err, errScanQuotaExceeded) {
 			writeJSON(w, http.StatusTooManyRequests, map[string]any{
