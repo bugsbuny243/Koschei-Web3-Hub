@@ -39,7 +39,7 @@ const result = await arvis.shieldPreflight({
   wallet: "OPTIONAL_WALLET"
 });
 
-console.log(result.action, result.grade, result.risk_index);
+console.log(result.action, result.grade, result.triggered_rules);
 ```
 
 ## Signed verdict validation
@@ -51,18 +51,24 @@ const validation = validateSignedVerdict(result);
 if (!validation.ok) {
   console.log({ action: "withhold", errors: validation.errors });
 } else {
-  console.log(validation.verdict.grade, validation.verdict.evidence);
+  console.log(
+    validation.verdict.grade,
+    validation.verdict.triggered_rules,
+    validation.verdict.decision_path
+  );
 }
 ```
 
 Structural validation requires:
 
 - `signed === true`
-- an A-F grade
-- a finite 0-100 risk index
-- a supported risk level
-- an evidence array
+- an A-F grade, or `-` when no grade-changing rule was triggered
+- a non-empty evidence array
 - a rule version
+- valid deterministic rule objects when `triggered_rules` is present
+- non-empty decision steps when `decision_path` is present
+
+A `-` grade is not an A grade and does not mean the target is safe. The default SDK policy withholds when no grade-changing rule was triggered.
 
 This function validates the developer contract. It does not replace cryptographic verification when a signature-verification mechanism is available.
 
@@ -109,4 +115,4 @@ const result = await radar.radarCheck({
 
 ## Trust rule
 
-A result is not a final signed verdict merely because it contains a numeric score. Consumers should validate signed status, grade, evidence and rule metadata, and withhold the final UI decision when required fields are missing.
+A result is not a final signed verdict because it contains a score. Koschei does not use a numeric final risk score. Consumers validate signed status, grade, evidence, triggered rules and decision path, and withhold the final UI decision when required fields are missing.
