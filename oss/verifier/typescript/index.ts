@@ -1,10 +1,16 @@
+export interface VerdictRuleLike {
+  rule_id?: unknown;
+  evidence_status?: unknown;
+}
+
 export interface VerdictLike {
   grade?: unknown;
-  risk_index?: unknown;
-  risk_level?: unknown;
   signed?: unknown;
+  signature?: unknown;
   evidence?: unknown;
   rule_version?: unknown;
+  triggered_rules?: unknown;
+  decision_path?: unknown;
 }
 
 export interface VerificationResult {
@@ -12,46 +18,60 @@ export interface VerificationResult {
   errors: string[];
 }
 
-const levels = new Set(["low", "medium", "high", "critical"]);
+const evidenceStatuses = new Set(["verified", "observed", "inferred", "unverified"]);
 
 export function verifySignedVerdict(value: unknown): VerificationResult {
   const errors: string[] = [];
 
-  if (!value || typeof value !== "object") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { valid: false, errors: ["verdict must be an object"] };
   }
 
   const verdict = value as VerdictLike;
 
-  if (typeof verdict.grade !== "string" || !/^[A-F]$/.test(verdict.grade)) {
-    errors.push("grade must be a single letter from A to F");
+  if (typeof verdict.grade !== "string" || !/^[A-F-]$/.test(verdict.grade)) {
+    errors.push("grade must be A through F or '-' when no grade-changing rule was triggered");
   }
 
-  if (
-    typeof verdict.risk_index !== "number" ||
-    !Number.isFinite(verdict.risk_index) ||
-    verdict.risk_index < 0 ||
-    verdict.risk_index > 100
-  ) {
-    errors.push("risk_index must be a finite number from 0 to 100");
+  if (typeof verdict.signed !== "boolean") {
+    errors.push("signed must be a boolean");
+  } else if (verdict.signed && (typeof verdict.signature !== "string" || verdict.signature.trim() === "")) {
+    errors.push("signature is required when signed is true");
   }
 
-  if (typeof verdict.risk_level !== "string" || !levels.has(verdict.risk_level)) {
-    errors.push("risk_level must be low, medium, high or critical");
+  if (!Array.isArray(verdict.evidence) || verdict.evidence.some(item => typeof item !== "string" || item.trim() === "")) {
+    errors.push("evidence must be an array of non-empty strings");
   }
 
-  if (verdict.signed !== true) {
-    errors.push("signed must be true");
+  if (typeof verdict.rule_version !== "string" || verdict.rule_version.trim() === "") {
+    errors.push("rule_version is required");
   }
 
-  if (verdict.evidence !== undefined) {
-    if (!Array.isArray(verdict.evidence) || verdict.evidence.some(item => typeof item !== "string")) {
-      errors.push("evidence must be an array of strings");
+  if (verdict.triggered_rules !== undefined) {
+    if (!Array.isArray(verdict.triggered_rules)) {
+      errors.push("triggered_rules must be an array when present");
+    } else {
+      verdict.triggered_rules.forEach((item, index) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+          errors.push(`triggered_rules[${index}] must be an object`);
+          return;
+        }
+        const rule = item as VerdictRuleLike;
+        if (typeof rule.rule_id !== "string" || rule.rule_id.trim() === "") {
+          errors.push(`triggered_rules[${index}].rule_id is required`);
+        }
+        if (typeof rule.evidence_status !== "string" || !evidenceStatuses.has(rule.evidence_status)) {
+          errors.push(`triggered_rules[${index}].evidence_status is invalid`);
+        }
+      });
     }
   }
 
-  if (verdict.rule_version !== undefined && typeof verdict.rule_version !== "string") {
-    errors.push("rule_version must be a string when present");
+  if (
+    verdict.decision_path !== undefined &&
+    (!Array.isArray(verdict.decision_path) || verdict.decision_path.some(item => typeof item !== "string" || item.trim() === ""))
+  ) {
+    errors.push("decision_path must be an array of non-empty strings when present");
   }
 
   return { valid: errors.length === 0, errors };
