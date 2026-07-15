@@ -296,10 +296,3 @@ func quotaReservationID() (string, error) {
 	}
 	return hex.EncodeToString(buffer), nil
 }
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
