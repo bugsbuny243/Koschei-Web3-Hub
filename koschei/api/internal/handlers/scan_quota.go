@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -32,23 +31,35 @@ type scanQuotaStatus struct {
 	ResetsAt  time.Time `json:"resets_at"`
 }
 
-type scanQuotaReservation struct {
-	Email       string
-	DayKey      string
-	EventReason string
-	Tier        string
-	Limit       int
-	ResetsAt    time.Time
-}
-
 type scanQuotaLedger interface {
-	Reserve(context.Context, string, string, int, time.Time) (scanQuotaReservation, scanQuotaStatus, error)
-	Refund(context.Context, scanQuotaReservation) error
+	Reserve(context.Context, string, string, string, int, time.Time) (premiumOutputReservation, scanQuotaStatus, error)
+	Refund(context.Context, premiumOutputReservation) error
 	Status(context.Context, string, string, int, time.Time) (scanQuotaStatus, error)
 }
 
-type postgresScanQuotaLedger struct {
-	DB *sql.DB
+type handlerScanQuotaLedger struct {
+	Handler *Handler
+}
+
+func (l handlerScanQuotaLedger) Reserve(ctx context.Context, authSubject, email, tier string, limit int, now time.Time) (premiumOutputReservation, scanQuotaStatus, error) {
+	if l.Handler == nil {
+		return premiumOutputReservation{}, newScanQuotaStatus(tier, limit, now), errors.New("handler unavailable")
+	}
+	return l.Handler.reserveKOSCHScanQuota(ctx, authSubject, email, tier, limit, now)
+}
+
+func (l handlerScanQuotaLedger) Refund(ctx context.Context, reservation premiumOutputReservation) error {
+	if l.Handler == nil {
+		return nil
+	}
+	return l.Handler.refundPremiumOutputReservation(ctx, reservation, "kosch_daily_scan_refund")
+}
+
+func (l handlerScanQuotaLedger) Status(ctx context.Context, email, tier string, limit int, now time.Time) (scanQuotaStatus, error) {
+	if l.Handler == nil {
+		return newScanQuotaStatus(tier, limit, now), nil
+	}
+	return l.Handler.koschScanQuotaStatus(ctx, email, tier, limit, now)
 }
 
 func configuredKOSCHDailyQuota(tier string) int {
@@ -93,7 +104,7 @@ func tokenAccessRequestFromContext(ctx context.Context) (tokenAccessRequestConte
 }
 
 func (h *Handler) EnforceScanQuota(next http.HandlerFunc) http.HandlerFunc {
-	return enforceScanQuota(postgresScanQuotaLedger{DB: h.DB}, next)
+	return enforceScanQuota(handlerScanQuotaLedger{Handler: h}, next)
 }
 
 func enforceScanQuota(ledger scanQuotaLedger, next http.HandlerFunc) http.HandlerFunc {
@@ -120,7 +131,7 @@ func enforceScanQuota(ledger scanQuotaLedger, next http.HandlerFunc) http.Handle
 			return
 		}
 
-		reservation, status, err := ledger.Reserve(r.Context(), email, tier, limit, time.Now().UTC())
+		reservation, status, err := ledger.Reserve(r.Context(), access.AuthSubject, email, tier, limit, time.Now().UTC())
 		if errors.Is(err, errScanQuotaExceeded) {
 			writeJSON(w, http.StatusTooManyRequests, map[string]any{
 				"error": "quota_exceeded", "tier": tier, "limit": status.Limit,
@@ -166,122 +177,10 @@ func (w *quotaResponseWriter) Write(body []byte) (int, error) {
 	return w.ResponseWriter.Write(body)
 }
 
-func refundQuotaDetached(ledger scanQuotaLedger, reservation scanQuotaReservation) {
+func refundQuotaDetached(ledger scanQuotaLedger, reservation premiumOutputReservation) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	_ = ledger.Refund(ctx, reservation)
-}
-
-func (p postgresScanQuotaLedger) Reserve(ctx context.Context, email, tier string, limit int, now time.Time) (scanQuotaReservation, scanQuotaStatus, error) {
-	status := newScanQuotaStatus(tier, limit, now)
-	if p.DB == nil {
-		return scanQuotaReservation{}, status, errors.New("database unavailable")
-	}
-	email = strings.ToLower(strings.TrimSpace(email))
-	if email == "" || limit <= 0 {
-		return scanQuotaReservation{}, status, errors.New("invalid quota reservation")
-	}
-	start, reset, dayKey := utcQuotaWindow(now)
-	status.ResetsAt = reset
-	tx, err := p.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return scanQuotaReservation{}, status, err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(lower($1)||':'||$2,0))`, email, dayKey); err != nil {
-		return scanQuotaReservation{}, status, err
-	}
-	used, err := quotaUsedTx(ctx, tx, email, dayKey, start, reset)
-	if err != nil {
-		return scanQuotaReservation{}, status, err
-	}
-	status.Used = used
-	status.Remaining = maxInt(limit-used, 0)
-	if used >= limit {
-		return scanQuotaReservation{}, status, errScanQuotaExceeded
-	}
-	id, err := quotaReservationID()
-	if err != nil {
-		return scanQuotaReservation{}, status, err
-	}
-	reason := dayKey + ":" + id
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO credit_events(email,amount,reason,event_type)
-		VALUES(lower($1),-1,$2,'kosch_quota_reserve')`, email, reason); err != nil {
-		return scanQuotaReservation{}, status, err
-	}
-	if err := tx.Commit(); err != nil {
-		return scanQuotaReservation{}, status, err
-	}
-	status.Used++
-	status.Remaining = maxInt(limit-status.Used, 0)
-	return scanQuotaReservation{Email: email, DayKey: dayKey, EventReason: reason, Tier: tier, Limit: limit, ResetsAt: reset}, status, nil
-}
-
-func (p postgresScanQuotaLedger) Refund(ctx context.Context, reservation scanQuotaReservation) error {
-	if p.DB == nil || strings.TrimSpace(reservation.EventReason) == "" || strings.TrimSpace(reservation.Email) == "" {
-		return nil
-	}
-	tx, err := p.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended(lower($1)||':'||$2,0))`, reservation.Email, reservation.DayKey); err != nil {
-		return err
-	}
-	var refunded bool
-	if err := tx.QueryRowContext(ctx, `
-		SELECT EXISTS(
-			SELECT 1 FROM credit_events
-			WHERE lower(email)=lower($1) AND reason=$2 AND event_type='kosch_quota_refund'
-		)`, reservation.Email, reservation.EventReason).Scan(&refunded); err != nil {
-		return err
-	}
-	if refunded {
-		return tx.Commit()
-	}
-	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO credit_events(email,amount,reason,event_type)
-		VALUES(lower($1),1,$2,'kosch_quota_refund')`, reservation.Email, reservation.EventReason); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-func (p postgresScanQuotaLedger) Status(ctx context.Context, email, tier string, limit int, now time.Time) (scanQuotaStatus, error) {
-	status := newScanQuotaStatus(tier, limit, now)
-	if p.DB == nil || strings.TrimSpace(email) == "" || limit <= 0 {
-		return status, nil
-	}
-	start, reset, dayKey := utcQuotaWindow(now)
-	status.ResetsAt = reset
-	var used int
-	err := p.DB.QueryRowContext(ctx, `
-		SELECT GREATEST(COALESCE(-SUM(amount),0),0)::int
-		FROM credit_events
-		WHERE lower(email)=lower($1)
-		  AND reason LIKE $2 || ':%'
-		  AND created_at >= $3 AND created_at < $4
-		  AND event_type IN ('kosch_quota_reserve','kosch_quota_refund')`, email, dayKey, start, reset).Scan(&used)
-	if err != nil {
-		return status, err
-	}
-	status.Used = used
-	status.Remaining = maxInt(limit-used, 0)
-	return status, nil
-}
-
-func quotaUsedTx(ctx context.Context, tx *sql.Tx, email, dayKey string, start, reset time.Time) (int, error) {
-	var used int
-	err := tx.QueryRowContext(ctx, `
-		SELECT GREATEST(COALESCE(-SUM(amount),0),0)::int
-		FROM credit_events
-		WHERE lower(email)=lower($1)
-		  AND reason LIKE $2 || ':%'
-		  AND created_at >= $3 AND created_at < $4
-		  AND event_type IN ('kosch_quota_reserve','kosch_quota_refund')`, email, dayKey, start, reset).Scan(&used)
-	return used, err
 }
 
 func newScanQuotaStatus(tier string, limit int, now time.Time) scanQuotaStatus {
