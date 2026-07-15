@@ -30,7 +30,10 @@ export interface SignedVerdict {
   triggered_rules?: TriggeredRule[];
   decision_path?: string[];
   signed: true;
-  signature?: string;
+  signature: string;
+  signature_algorithm: "ed25519";
+  key_id: string;
+  payload_hash: string;
   created_at?: string;
   [key: string]: unknown;
 }
@@ -63,6 +66,22 @@ export function validateSignedVerdict(value: unknown): VerdictValidationResult {
   const errors: string[] = [];
 
   if (candidate.signed !== true) errors.push("signed must be true");
+
+  if (typeof candidate.signature !== "string" || candidate.signature.trim() === "") {
+    errors.push("signature is required when signed is true");
+  }
+
+  if (candidate.signature_algorithm !== "ed25519") {
+    errors.push("signature_algorithm must be ed25519");
+  }
+
+  if (typeof candidate.key_id !== "string" || candidate.key_id.trim() === "") {
+    errors.push("key_id is required");
+  }
+
+  if (typeof candidate.payload_hash !== "string" || !/^sha256:[0-9a-f]{64}$/.test(candidate.payload_hash)) {
+    errors.push("payload_hash must be sha256:<64 lowercase hex chars>");
+  }
 
   if (typeof candidate.grade !== "string" || !/^[A-F-]$/.test(candidate.grade)) {
     errors.push("grade must be A through F or '-' when no grade-changing rule was triggered");

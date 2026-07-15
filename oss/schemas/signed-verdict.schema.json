@@ -8,52 +8,105 @@
     "grade",
     "evidence",
     "rule_version",
-    "signed"
+    "signed",
+    "signature",
+    "signature_algorithm",
+    "key_id",
+    "payload_hash"
   ],
   "properties": {
-    "target": { "type": "string", "minLength": 1 },
-    "network": { "type": "string", "default": "solana-mainnet" },
+    "target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "network": {
+      "type": "string",
+      "default": "solana-mainnet"
+    },
     "grade": {
       "type": "string",
       "pattern": "^[A-F-]$",
       "description": "Letter grade from A to F. '-' means no grade-changing rule was triggered; absence of evidence is not an A grade."
     },
-    "verdict": { "type": "string" },
-    "recommendation": { "type": "string" },
+    "verdict": {
+      "type": "string"
+    },
+    "recommendation": {
+      "type": "string"
+    },
     "evidence": {
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
-    "rule_version": { "type": "string", "minLength": 1 },
+    "rule_version": {
+      "type": "string",
+      "minLength": 1
+    },
     "triggered_rules": {
       "type": "array",
       "description": "Deterministic rules that contributed to the verdict. INFERRED watch flags must not appear as grade-changing rules.",
       "items": {
         "type": "object",
-        "required": ["rule_id", "evidence_status"],
+        "required": [
+          "rule_id",
+          "evidence_status"
+        ],
         "properties": {
-          "rule_id": { "type": "string", "minLength": 1 },
-          "title": { "type": "string" },
-          "tier": { "type": "string" },
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "string"
+          },
           "evidence_status": {
             "type": "string",
-            "enum": ["verified", "observed", "inferred", "unverified"]
+            "enum": [
+              "verified",
+              "observed",
+              "inferred",
+              "unverified"
+            ]
           },
-          "grade_effect": { "type": "string" },
-          "grade_cap": { "type": "string", "pattern": "^[A-F-]$" },
-          "count": { "type": "integer", "minimum": 0 },
-          "summary": { "type": "string" },
+          "grade_effect": {
+            "type": "string"
+          },
+          "grade_cap": {
+            "type": "string",
+            "pattern": "^[A-F-]$"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "summary": {
+            "type": "string"
+          },
           "evidence_keys": {
             "type": "array",
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "signatures": {
             "type": "array",
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "facts": { "type": "object" }
+          "facts": {
+            "type": "object"
+          }
         },
         "additionalProperties": true
       }
@@ -61,11 +114,34 @@
     "decision_path": {
       "type": "array",
       "description": "Ordered deterministic explanation of how the ruleset reached or withheld the grade.",
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     },
-    "signed": { "const": true },
-    "signature": { "type": "string", "minLength": 1 },
-    "created_at": { "type": "string", "format": "date-time" }
+    "signed": {
+      "const": true
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 64,
+      "description": "Ed25519 signature over the canonical verdict payload, encoded as base64/base64url or hex."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "signature_algorithm": {
+      "const": "ed25519"
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
   },
   "additionalProperties": true
 }

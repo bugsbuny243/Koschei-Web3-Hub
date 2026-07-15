@@ -11,7 +11,11 @@ const validVerdict = {
   risk_level: "low",
   evidence: ["mint authority revoked"],
   rule_version: "arvis-live",
-  signed: true
+  signed: true,
+  signature: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+  signature_algorithm: "ed25519",
+  key_id: "koschei-test-key-v1",
+  payload_hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 };
 
 test("CLI accepts a structurally valid signed verdict", () => {

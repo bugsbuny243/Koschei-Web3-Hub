@@ -191,8 +191,9 @@ func (h *Handler) buildCreatorWalletIntelligence(ctx context.Context, target, ne
 	result["funding_wallets"] = funderRows
 	result["holder_links"] = holderLinks
 	result["transactions"] = transactions
-	score, level := creatorIntelScore(result, saleLike, earlySale, transferOut, len(holderLinks), holders)
-	result["risk_index"], result["risk_level"] = score, level
+	result["ruleset_version"] = "actor-investigation-v1.0"
+	result["unified_radar_ruleset_version"] = "unified-radar-v1.0"
+	result["risk_impact"] = "determined_by_unified_ruleset"
 	result["findings"] = creatorIntelFindings(result, saleLike, earlySale, transferOut, len(holderLinks), holders, recipientRows)
 	result["summary"] = creatorIntelSummary(result)
 	result["limitations"] = []string{
@@ -206,8 +207,9 @@ func (h *Handler) buildCreatorWalletIntelligence(ctx context.Context, target, ne
 func creatorIntelFinalizePartial(result map[string]any, holders creatorIntelHolderResult, limitation string) map[string]any {
 	result["rpc_available"] = false
 	result["status"] = "partial"
-	score, level := creatorIntelScore(result, 0, 0, 0, 0, holders)
-	result["risk_index"], result["risk_level"] = score, level
+	result["ruleset_version"] = "actor-investigation-v1.0"
+	result["unified_radar_ruleset_version"] = "unified-radar-v1.0"
+	result["risk_impact"] = "determined_by_unified_ruleset"
 	result["findings"] = creatorIntelFindings(result, 0, 0, 0, 0, holders, nil)
 	result["summary"] = creatorIntelSummary(result)
 	result["limitations"] = []string{limitation}
@@ -263,7 +265,7 @@ func creatorIntelHolderOwners(ctx context.Context, target, creator string) creat
 		if owner != "" {
 			out.OwnerIndex[owner] = row
 		}
-		if strings.EqualFold(owner, creator) {
+		if owner == creator {
 			out.CreatorIsTopHolder = true
 			out.CreatorRank = i + 1
 			out.CreatorPercentage += pct
@@ -285,9 +287,9 @@ func (h *Handler) creatorIntelObservedLaunches(ctx context.Context, target, netw
 		SELECT target, min(created_at), max(COALESCE(source,'')), max(COALESCE(signature,'')), count(*)
 		FROM security_radar_events
 		WHERE network=$2 AND (
-			lower(COALESCE(signals->>'creator_wallet',''))=lower($1)
-			OR lower(COALESCE(signals->>'deployer_wallet',''))=lower($1)
-			OR (lower(COALESCE(source_address,''))=lower($1) AND lower(COALESCE(source,''))='pumpportal')
+			COALESCE(signals->>'creator_wallet','')=$1
+			OR COALESCE(signals->>'deployer_wallet','')=$1
+			OR (COALESCE(source_address,'')=$1 AND lower(COALESCE(source,''))='pumpportal')
 		)
 		GROUP BY target
 		ORDER BY min(created_at) DESC
@@ -305,8 +307,8 @@ func (h *Handler) creatorIntelObservedLaunches(ctx context.Context, target, netw
 		if rows.Scan(&mint, &observed, &source, &signature, &eventCount) != nil {
 			continue
 		}
-		items = append(items, map[string]any{"target": mint, "observed_at": observed.UTC(), "source": source, "signature": signature, "event_count": eventCount, "is_current_target": strings.EqualFold(mint, target)})
-		if strings.EqualFold(mint, target) {
+		items = append(items, map[string]any{"target": mint, "observed_at": observed.UTC(), "source": source, "signature": signature, "event_count": eventCount, "is_current_target": mint == target})
+		if mint == target {
 			current = observed.UTC()
 		}
 	}
@@ -331,7 +333,7 @@ func creatorIntelOwnerTokenTotals(raw any, target string) map[string]float64 {
 	items, _ := raw.([]any)
 	for _, rawItem := range items {
 		item := creatorIntelMap(rawItem)
-		if !strings.EqualFold(creatorIntelCleanString(item["mint"]), target) {
+		if creatorIntelCleanString(item["mint"]) != target {
 			continue
 		}
 		owner := creatorIntelCleanString(item["owner"])
@@ -498,53 +500,6 @@ func creatorIntelHolderLinks(recipients []map[string]any) []map[string]any {
 	return out
 }
 
-func creatorIntelScore(result map[string]any, saleLike, earlySale, transferOut, holderLinks int, holders creatorIntelHolderResult) (int, string) {
-	score, previous := 0, creatorIntelInt(result["previous_launch_count"])
-	switch {
-	case previous >= 10:
-		score += 20
-	case previous >= 3:
-		score += 12
-	case previous >= 1:
-		score += 5
-	}
-	if holders.CreatorIsTopHolder {
-		switch {
-		case holders.CreatorPercentage >= 50:
-			score += 40
-		case holders.CreatorPercentage >= 20:
-			score += 28
-		default:
-			score += 15
-		}
-	}
-	if earlySale >= 3 {
-		score += 40
-	} else if earlySale >= 1 {
-		score += 30
-	} else if saleLike >= 1 {
-		score += 15
-	}
-	if transferOut >= 3 {
-		score += 10
-	}
-	if holderLinks >= 1 {
-		score += 20
-	}
-	if score > 100 {
-		score = 100
-	}
-	level := "low"
-	if score >= 75 {
-		level = "critical"
-	} else if score >= 55 {
-		level = "high"
-	} else if score >= 30 {
-		level = "medium"
-	}
-	return score, level
-}
-
 func creatorIntelFindings(result map[string]any, saleLike, earlySale, transferOut, holderLinks int, holders creatorIntelHolderResult, recipients []map[string]any) []string {
 	findings := []string{}
 	previous := creatorIntelInt(result["previous_launch_count"])
@@ -578,8 +533,6 @@ func creatorIntelFindings(result map[string]any, saleLike, earlySale, transferOu
 
 func creatorIntelSummary(result map[string]any) string {
 	creator := creatorIntelCleanString(result["creator_wallet"])
-	level := strings.ToUpper(creatorIntelCleanString(result["risk_level"]))
-	score := creatorIntelInt(result["risk_index"])
 	previous := creatorIntelInt(result["previous_launch_count"])
 	early := creatorIntelInt(result["early_sale_like_transactions"])
 	sale := creatorIntelInt(result["sale_like_transactions"])
@@ -587,7 +540,7 @@ func creatorIntelSummary(result map[string]any) string {
 	if rows, ok := result["holder_links"].([]map[string]any); ok {
 		links = len(rows)
 	}
-	parts := []string{fmt.Sprintf("Creator/deployer davranış katmanı: %s %d/100.", level, score)}
+	parts := []string{"Creator/deployer davranış katmanı yalnız kanıt fact'leri üretir; risk etkisi unified Radar ruleset v1.0 tarafından belirlenir."}
 	if previous > 0 {
 		parts = append(parts, fmt.Sprintf("Koschei gözlemlerinde %d önceki launch ilişkisi var.", previous))
 	}
@@ -612,7 +565,7 @@ func creatorIntelSummary(result map[string]any) string {
 func creatorIntelPreviousLaunchCount(items []map[string]any, target string) int {
 	count := 0
 	for _, item := range items {
-		if !strings.EqualFold(creatorIntelCleanString(item["target"]), target) {
+		if creatorIntelCleanString(item["target"]) != target {
 			count++
 		}
 	}
@@ -685,7 +638,7 @@ func creatorIntelStringSlice(raw any) []string {
 
 func creatorIntelContains(items []string, target string) bool {
 	for _, item := range items {
-		if strings.EqualFold(item, target) {
+		if item == target {
 			return true
 		}
 	}

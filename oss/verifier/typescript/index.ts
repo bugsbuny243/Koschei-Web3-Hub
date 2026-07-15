@@ -5,6 +5,10 @@ export interface VerdictLike {
   rule_version?: unknown;
   triggered_rules?: unknown;
   decision_path?: unknown;
+  signature?: unknown;
+  signature_algorithm?: unknown;
+  key_id?: unknown;
+  payload_hash?: unknown;
 }
 
 export interface VerificationResult {
@@ -27,6 +31,22 @@ export function verifySignedVerdict(value: unknown): VerificationResult {
 
   if (verdict.signed !== true) {
     errors.push("signed must be true");
+  }
+
+  if (typeof verdict.signature !== "string" || verdict.signature.trim() === "") {
+    errors.push("signature is required when signed is true");
+  }
+
+  if (verdict.signature_algorithm !== "ed25519") {
+    errors.push("signature_algorithm must be ed25519");
+  }
+
+  if (typeof verdict.key_id !== "string" || verdict.key_id.trim() === "") {
+    errors.push("key_id is required");
+  }
+
+  if (typeof verdict.payload_hash !== "string" || !/^sha256:[0-9a-f]{64}$/.test(verdict.payload_hash)) {
+    errors.push("payload_hash must be sha256:<64 lowercase hex chars>");
   }
 
   if (

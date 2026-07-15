@@ -1,6 +1,9 @@
 package handlers
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestCreatorIntelParsedTokenOwner(t *testing.T) {
 	raw := map[string]any{
@@ -16,12 +19,22 @@ func TestCreatorIntelParsedTokenOwner(t *testing.T) {
 	}
 }
 
-func TestCreatorIntelScoreEscalatesVerifiedBehavior(t *testing.T) {
-	result := map[string]any{"previous_launch_count": 4}
-	holders := creatorIntelHolderResult{CreatorIsTopHolder: true, CreatorRank: 1, CreatorPercentage: 58.4}
-	score, level := creatorIntelScore(result, 2, 1, 3, 1, holders)
-	if score < 75 || level != "critical" {
-		t.Fatalf("expected critical creator behavior, got score=%d level=%s", score, level)
+func TestCreatorIntelSummaryIsScorelessEvidenceLayer(t *testing.T) {
+	result := map[string]any{
+		"creator_wallet":               "CreatorWallet111111111111111111111111111",
+		"previous_launch_count":        4,
+		"early_sale_like_transactions": 1,
+		"creator_is_top_holder":        true,
+		"creator_holder_rank":          1,
+		"creator_holder_percentage":    58.4,
+		"holder_links":                 []map[string]any{{"wallet": "HolderWallet111"}},
+	}
+	summary := creatorIntelSummary(result)
+	if strings.Contains(summary, "/100") || strings.Contains(summary, "CRITICAL") || strings.Contains(summary, "HIGH") {
+		t.Fatalf("creator intelligence summary must remain scoreless, got %q", summary)
+	}
+	if !strings.Contains(summary, "unified Radar ruleset v1.0") {
+		t.Fatalf("summary must delegate risk impact to unified ruleset, got %q", summary)
 	}
 }
 
