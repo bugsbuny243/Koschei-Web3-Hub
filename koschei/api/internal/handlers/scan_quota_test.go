@@ -17,12 +17,15 @@ type fakeScanQuotaLedger struct {
 	reserves      int
 }
 
-func (f *fakeScanQuotaLedger) Reserve(context.Context, string, string, int, time.Time) (scanQuotaReservation, scanQuotaStatus, error) {
+func (f *fakeScanQuotaLedger) Reserve(context.Context, string, string, string, int, time.Time) (premiumOutputReservation, scanQuotaStatus, error) {
 	f.reserves++
-	return scanQuotaReservation{Email: "user@example.com", DayKey: "kosch_daily_scan:2026-07-15", EventReason: "kosch_daily_scan:2026-07-15:test"}, f.reserveStatus, f.reserveErr
+	return premiumOutputReservation{
+		Email: "user@example.com", QuotaDayKey: "kosch_daily_scan:2026-07-15",
+		QuotaEventReason: "kosch_daily_scan:2026-07-15:test",
+	}, f.reserveStatus, f.reserveErr
 }
 
-func (f *fakeScanQuotaLedger) Refund(context.Context, scanQuotaReservation) error {
+func (f *fakeScanQuotaLedger) Refund(context.Context, premiumOutputReservation) error {
 	f.refunds++
 	return nil
 }
