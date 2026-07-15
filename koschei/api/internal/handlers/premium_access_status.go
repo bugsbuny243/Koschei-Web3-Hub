@@ -2,22 +2,23 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"time"
 )
 
 type premiumAccessStatus struct {
-	Active              bool      `json:"active"`
-	Source              string    `json:"source"`
-	TokenGateEnabled    bool      `json:"token_gate_enabled"`
-	TokenConfigured     bool      `json:"token_configured"`
-	WalletVerified      bool      `json:"wallet_verified"`
-	TokenTier           string    `json:"token_tier"`
-	TokenAmount         string    `json:"token_amount"`
-	RequiredTokenTier   string    `json:"required_token_tier"`
-	QuotaDaily          int       `json:"quota_daily"`
-	QuotaUsedToday      int       `json:"quota_used_today"`
-	QuotaRemainingToday int       `json:"quota_remaining_today"`
-	QuotaResetsAt       time.Time `json:"quota_resets_at"`
+	Active              bool       `json:"active"`
+	Source              string     `json:"source"`
+	TokenGateEnabled    bool       `json:"token_gate_enabled"`
+	TokenConfigured     bool       `json:"token_configured"`
+	WalletVerified      bool       `json:"wallet_verified"`
+	TokenTier           string     `json:"token_tier"`
+	TokenAmount         string     `json:"token_amount"`
+	RequiredTokenTier   string     `json:"required_token_tier"`
+	QuotaDaily          int        `json:"quota_daily"`
+	QuotaUsedToday      int        `json:"quota_used_today"`
+	QuotaRemainingToday int        `json:"quota_remaining_today"`
+	QuotaResetsAt       *time.Time `json:"quota_resets_at,omitempty"`
 }
 
 func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
@@ -37,25 +38,47 @@ func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status := decidePremiumAccess(tokenAccess)
-	quota, err := h.KOSCHQuotaStatus(r.Context(), claims.Sub, status.TokenTier, time.Now().UTC())
-	if err != nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_unavailable"})
-		return
+	quota := newScanQuotaStatus(tokenAccess.Tier, configuredKOSCHDailyQuota(tokenAccess.Tier), time.Now().UTC())
+	if tokenTierRank(tokenAccess.Tier) >= tokenTierRank("basic") {
+		email := strings.ToLower(strings.TrimSpace(claims.Email))
+		if email == "" {
+			email = entitlementEmailFromSubject(claims.Sub)
+		}
+		if email == "" && h != nil && h.DB != nil {
+			_ = h.DB.QueryRowContext(r.Context(), `
+				SELECT lower(email)
+				FROM app_user_profiles
+				WHERE auth_subject=$1 AND status='active'
+				ORDER BY updated_at DESC, created_at DESC
+				LIMIT 1`, claims.Sub).Scan(&email)
+		}
+		if email == "" {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_identity_unavailable"})
+			return
+		}
+		quota, err = h.koschScanQuotaStatus(r.Context(), email, tokenAccess.Tier, configuredKOSCHDailyQuota(tokenAccess.Tier), time.Now().UTC())
+		if err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_unavailable"})
+			return
+		}
 	}
-	status.QuotaDaily = quota.Daily
-	status.QuotaUsedToday = quota.Used
-	status.QuotaRemainingToday = quota.Remaining
-	status.QuotaResetsAt = quota.ResetsAt
 
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "access": status})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":     true,
+		"access": decidePremiumAccess(tokenAccess, quota),
+	})
 }
 
 func decidePremiumAccess(token tokenAccessEvaluation, quotaValues ...scanQuotaStatus) premiumAccessStatus {
 	status := premiumAccessStatus{
-		Active: false, Source: "none", TokenGateEnabled: token.GateEnabled,
-		TokenConfigured: token.Configured, WalletVerified: token.WalletVerified,
-		TokenTier: token.Tier, TokenAmount: token.Amount, RequiredTokenTier: "basic",
+		Active:            false,
+		Source:            "none",
+		TokenGateEnabled:  token.GateEnabled,
+		TokenConfigured:   token.Configured,
+		WalletVerified:    token.WalletVerified,
+		TokenTier:         token.Tier,
+		TokenAmount:       token.Amount,
+		RequiredTokenTier: "basic",
 	}
 	if status.TokenTier == "" {
 		status.TokenTier = "none"
@@ -76,8 +99,5 @@ func decidePremiumAccess(token tokenAccessEvaluation, quotaValues ...scanQuotaSt
 		reset := quota.ResetsAt
 		status.QuotaResetsAt = &reset
 	}
-	status.QuotaDaily = configuredKOSCHDailyQuota(status.TokenTier)
-	_, status.QuotaResetsAt = utcQuotaWindow(time.Now().UTC())
-	status.QuotaRemainingToday = status.QuotaDaily
 	return status
 }
