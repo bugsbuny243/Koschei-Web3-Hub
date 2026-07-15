@@ -5,12 +5,18 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"time"
 )
 
 type premiumOutputReservation struct {
-	EntitlementID string
-	Email         string
-	Reason        string
+	EntitlementID      string
+	Email              string
+	Reason             string
+	QuotaReservationID string
+	AuthSubject        string
+	QuotaDate          time.Time
+	Tier               string
+	QuotaLimit         int
 }
 
 func (h *Handler) reservePremiumOutput(ctx context.Context, authSubject, email, reason string) (premiumOutputReservation, error) {
@@ -74,7 +80,17 @@ func (h *Handler) reservePremiumOutput(ctx context.Context, authSubject, email, 
 	return premiumOutputReservation{EntitlementID: entitlementID, Email: normalizedEmail, Reason: reason}, nil
 }
 
+func (h *Handler) finalizePremiumOutputReservation(ctx context.Context, reservation premiumOutputReservation) error {
+	if strings.TrimSpace(reservation.QuotaReservationID) != "" {
+		return h.finalizeKOSCHQuotaReservation(ctx, reservation)
+	}
+	return nil
+}
+
 func (h *Handler) refundPremiumOutputReservation(ctx context.Context, reservation premiumOutputReservation, refundReason string) error {
+	if strings.TrimSpace(reservation.QuotaReservationID) != "" {
+		return h.refundKOSCHQuotaReservation(ctx, reservation, refundReason)
+	}
 	if h == nil || h.DB == nil || strings.TrimSpace(reservation.EntitlementID) == "" {
 		return nil
 	}
