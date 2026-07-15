@@ -66,20 +66,20 @@ func (h *Handler) CreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	hash := hashAPIKey(raw)
 	var id string
 	if err := h.DB.QueryRowContext(r.Context(), `
-		INSERT INTO api_keys (auth_subject,email,name,key_prefix,key_hash,monthly_limit,rate_limit_per_minute)
-		VALUES ($1,lower($2),$3,$4,$5,$6,$7)
+		INSERT INTO api_keys (auth_subject,email,name,key_prefix,key_hash,monthly_limit,monthly_quota,rate_limit_per_minute)
+		VALUES ($1,lower($2),$3,$4,$5,$6,$6,$7)
 		RETURNING id::text`, claims.Sub, claims.Email, name, prefix, hash, effectiveMonthly, effectiveRPM).Scan(&id); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
 	services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "api_key_created", "customer", "info", map[string]any{
-		"api_key_id":                    id,
-		"name":                          name,
-		"tier":                          tier,
-		"requested_monthly_limit":       requestedMonthly,
-		"requested_rate_limit_per_minute": requestedRPM,
-		"monthly_limit":                 effectiveMonthly,
-		"rate_limit_per_minute":         effectiveRPM,
+		"api_key_id":                        id,
+		"name":                              name,
+		"tier":                              tier,
+		"requested_monthly_limit":           requestedMonthly,
+		"requested_rate_limit_per_minute":   requestedRPM,
+		"monthly_limit":                     effectiveMonthly,
+		"rate_limit_per_minute":             effectiveRPM,
 	}))
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":                    id,
