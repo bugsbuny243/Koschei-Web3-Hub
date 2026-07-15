@@ -39,28 +39,34 @@ func TestRequireTokenTierRejectsBasicHolderFromProRoute(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
+		var result any
 		switch request.Method {
 		case "getTokenSupply":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"jsonrpc": "2.0", "id": request.ID,
-				"result": map[string]any{"value": map[string]any{
-					"amount": "1000000000000000", "decimals": 6, "uiAmountString": "1000000000",
-				}},
-			})
+			result = map[string]any{"value": map[string]any{
+				"amount": "1000000000000000", "decimals": 6, "uiAmountString": "1000000000",
+			}}
 		case "getTokenAccountsByOwner":
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"jsonrpc": "2.0", "id": request.ID,
-				"result": map[string]any{"value": []any{map[string]any{
+			result = map[string]any{"value": []any{
+				map[string]any{
 					"pubkey": "BasicATA1111111111111111111111111111111",
-					"account": map[string]any{"data": map[string]any{"parsed": map[string]any{"info": map[string]any{
-						"mint": "11111111111111111111111111111111",
-						"tokenAmount": map[string]any{"amount": "25000000000", "decimals": 6, "uiAmountString": "25000"},
-					}}}},
-				}},
-			})
+					"account": map[string]any{
+						"data": map[string]any{
+							"parsed": map[string]any{
+								"info": map[string]any{
+									"mint": "11111111111111111111111111111111",
+									"tokenAmount": map[string]any{
+										"amount": "25000000000", "decimals": 6, "uiAmountString": "25000",
+									},
+								},
+							},
+						},
+					},
+				},
+			}}
 		default:
-			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": request.ID, "result": map[string]any{}})
+			result = map[string]any{}
 		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": request.ID, "result": result})
 	}))
 	defer rpcServer.Close()
 	t.Setenv("SOLANA_RPC_URL", rpcServer.URL)
