@@ -32,6 +32,15 @@ func TestEvidenceArmSignsEvidenceWithoutIssuingGrade(t *testing.T) {
 	if disabled, _ := arm.Signals["numeric_score_disabled"].(bool); !disabled {
 		t.Fatalf("numeric-score policy missing: %#v", arm.Signals)
 	}
+	if arm.Signals["actor_ruleset_version"] != ActorDefenseRulesetVersion {
+		t.Fatalf("actor ruleset missing: %#v", arm.Signals)
+	}
+	if arm.Signals["unified_radar_ruleset"] != UnifiedRadarRulesetVersion {
+		t.Fatalf("unified ruleset missing: %#v", arm.Signals)
+	}
+	if arm.Signals["evidence_row_standard"] == "" {
+		t.Fatalf("evidence-row standard missing: %#v", arm.Signals)
+	}
 }
 
 func TestFinalArvisArmIsOnlyCompatibilityAdapter(t *testing.T) {
