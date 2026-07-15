@@ -35,6 +35,13 @@ type tokenAccessEvaluation struct {
 	SnapshotExpires *time.Time        `json:"snapshot_expires_at,omitempty"`
 }
 
+type tokenAccessContextKey struct{}
+
+func tokenAccessFromContext(ctx context.Context) (tokenAccessEvaluation, bool) {
+	evaluation, ok := ctx.Value(tokenAccessContextKey{}).(tokenAccessEvaluation)
+	return evaluation, ok
+}
+
 type tokenAccessSupplyResult struct {
 	Value struct {
 		Amount         string `json:"amount"`
@@ -82,10 +89,15 @@ func (h *Handler) TokenAccessStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) RequireTokenTier(required string, next http.HandlerFunc) http.HandlerFunc {
+	required = strings.ToLower(strings.TrimSpace(required))
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := userFromContext(r.Context())
 		if !ok {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+			return
+		}
+		if tokenTierRank(required) == 0 {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "invalid_token_tier_configuration"})
 			return
 		}
 		evaluation, err := h.evaluateTokenAccess(r.Context(), claims.Sub)
@@ -109,7 +121,8 @@ func (h *Handler) RequireTokenTier(required string, next http.HandlerFunc) http.
 			})
 			return
 		}
-		next(w, r)
+		ctx := context.WithValue(r.Context(), tokenAccessContextKey{}, evaluation)
+		next(w, r.WithContext(ctx))
 	}
 }
 
@@ -236,7 +249,7 @@ func configuredKoscheiTokenGateEnabled() bool {
 
 func configuredTokenThresholds(decimals int) (map[string]string, map[string]*big.Int, error) {
 	values := map[string]string{
-		"basic":      tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "0.000001"),
+		"basic":      tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "25000"),
 		"pro":        tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_PRO", "250000"),
 		"enterprise": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_ENTERPRISE", "2000000"),
 	}
