@@ -49,6 +49,8 @@ func (h *Handler) reservePremiumOutput(ctx context.Context, authSubject, email, 
 			FROM entitlements
 			WHERE lower(email)=lower($1)
 			  AND status='active'
+			  AND quota_day IS NULL
+			  AND quota_kind IS NULL
 			  AND COALESCE(plan_id,'') <> ''
 			  AND COALESCE(plan_id,'') <> 'free'
 			  AND COALESCE(outputs_remaining,0) > 0
