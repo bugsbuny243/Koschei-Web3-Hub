@@ -374,14 +374,18 @@ func buildFinalArm(req SecurityRadarRequest, _ []SecurityRadarVerdict, generated
 
 func armSignals(req SecurityRadarRequest, p radarEvidenceProfile, moduleID string) map[string]any {
 	s := map[string]any{
-		"module_id":              moduleID,
-		"arm_evidence_available": true,
-		"real_onchain_evidence":  p.LiveRPC,
-		"data_quality":           p.DataQuality,
-		"evidence_status":        p.EvidenceStatus,
-		"rpc_errors":             p.Errors,
-		"grade_effect":           "none_at_arm_layer",
-		"numeric_score_disabled": true,
+		"module_id":                 moduleID,
+		"arm_evidence_available":    true,
+		"real_onchain_evidence":     p.LiveRPC,
+		"data_quality":              p.DataQuality,
+		"evidence_status":           p.EvidenceStatus,
+		"rpc_errors":                p.Errors,
+		"grade_effect":              "none_at_arm_layer",
+		"numeric_score_disabled":    true,
+		"actor_ruleset_version":     ActorDefenseRulesetVersion,
+		"unified_radar_ruleset":     UnifiedRadarRulesetVersion,
+		"evidence_row_standard":     "signature, slot, timestamp, source, destination, amount, program, verification_status",
+		"unverified_claims_allowed": false,
 	}
 	if sourceModule := arvisSourceModule(req.Mode); sourceModule != "" {
 		s["source_module"] = sourceModule
@@ -399,6 +403,10 @@ func evidenceArm(module, moduleID string, req SecurityRadarRequest, risk int, si
 	}
 	signals["numeric_score_disabled"] = true
 	signals["grade_effect"] = "none_at_arm_layer"
+	signals["actor_ruleset_version"] = ActorDefenseRulesetVersion
+	signals["unified_radar_ruleset"] = UnifiedRadarRulesetVersion
+	signals["evidence_row_standard"] = "signature, slot, timestamp, source, destination, amount, program, verification_status"
+	signals["unverified_claims_allowed"] = false
 	if sourceModule := arvisSourceModule(req.Mode); sourceModule != "" {
 		signals["source_module"] = sourceModule
 	}
@@ -418,6 +426,9 @@ func unavailableArm(module, moduleID string, req SecurityRadarRequest, generated
 		"module_id": moduleID, "real_onchain_evidence": false,
 		"arm_evidence_available": false, "evidence_status": "insufficient_evidence",
 		"numeric_score_disabled": true, "grade_effect": "none_at_arm_layer",
+		"actor_ruleset_version": ActorDefenseRulesetVersion, "unified_radar_ruleset": UnifiedRadarRulesetVersion,
+		"evidence_row_standard":     "signature, slot, timestamp, source, destination, amount, program, verification_status",
+		"unverified_claims_allowed": false,
 	}
 	if sourceModule := arvisSourceModule(req.Mode); sourceModule != "" {
 		signals["source_module"] = sourceModule

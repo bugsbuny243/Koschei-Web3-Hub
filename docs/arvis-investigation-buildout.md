@@ -24,7 +24,7 @@ This buildout starts from the current repository audit without deleting legacy p
 | Creator / repeat actor memory | Partial evidence path | Creator Link Analysis and Repeat Actor Scan | Attach persistent actor-index rows without broad recipient wallet-history scans. |
 | Launch / sniper intelligence | Strong evidence arm | Launch Distribution and Sniper Timing Detector | Keep launch distribution mint-specific and ATA-based. |
 | Liquidity drain attribution | Partial evidence path | Liquidity Movement and Raydium Pool Guardian | Connect pool reserve deltas, LP authority and creator/dominant-holder actor relations. |
-| Transaction intent | Partial evidence path | Program Relation Scan, Claim Surface Risk and Walletless Claim Shield | Promote parsed instruction, signer, writable-account and balance-delta fields into a canonical transaction-intent evidence object. |
+| Transaction intent | Strong evidence arm | Program Relation Scan, Claim Surface Risk and Walletless Claim Shield | Extend parsed instruction, signer, writable-account and balance-delta intent evidence with route-specific claim, swap and approval semantics. |
 | MEV / sandwich | Partial evidence path | MEV Shield | Attach route, slippage and pool-state before/after observations before any sandwich claim. |
 | Market manipulation | Planned evidence path | Funding cluster, liquidity and holder behavior rules | Map wash/self-flow, coordinated exits and volume/liquidity gaps into deterministic behavior rules. |
 | Watch intelligence | Partial evidence path | Intelligence Graph, Repeat Actor Scan and watchlist observations | Connect watch observations to durable actor memory without making inferred evidence grade-affecting. |
@@ -34,8 +34,7 @@ This buildout starts from the current repository audit without deleting legacy p
 ## Immediate implementation order
 
 1. Preserve and expose the investigation capability map in ARVIS metadata so owner/research surfaces can show what is verified, partial, planned or unavailable without fabricating production claims.
-2. Promote transaction-intent evidence into a canonical evidence object while preserving the existing 14-arm contract.
+2. Extend transaction-intent evidence with route-specific claim, swap and approval semantics while preserving the existing 14-arm contract.
 3. Connect creator/repeat actor memory to durable actor-index rows.
 4. Extend liquidity attribution with signed add/remove, reserve delta, LP authority and actor-link evidence.
 5. Only after the above, add cross-chain ingestion with strict evidence rows for bridge, mixer, peel-chain, stablecoin conversion and CEX/OTC movement claims.
-

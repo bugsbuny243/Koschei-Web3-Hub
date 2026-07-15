@@ -53,6 +53,7 @@ func AnalyzeArvisRadarsWithTransactions(req SecurityRadarRequest) ArvisAnalysis 
 	replaceArvisArm(arms, buildLiquidityMovementTransactionArm(req, txEvidence, generatedAt))
 	replaceArvisArm(arms, buildCreatorLinkTransactionArm(req, txEvidence, generatedAt))
 	replaceFundingClusterArmPreservingHolderEvidence(arms, buildFundingClusterTransactionArm(req, txEvidence, generatedAt))
+	replaceArvisArm(arms, buildTransactionIntentProgramArm(req, txEvidence, generatedAt))
 
 	withoutFinal := make([]SecurityRadarVerdict, 0, len(arms)-1)
 	for _, arm := range arms {
@@ -457,8 +458,144 @@ func buildFundingClusterTransactionArm(req SecurityRadarRequest, tx arvisTransac
 	return evidenceArm("Funding Cluster Detector", ModuleFundingClusterDetector, req, risk, s, e, generatedAt)
 }
 
+func buildTransactionIntentProgramArm(req SecurityRadarRequest, tx arvisTransactionEvidence, generatedAt string) SecurityRadarVerdict {
+	if !tx.Available || len(tx.ProgramIDs) == 0 {
+		return unavailableArm("Program Relation Scan", ModuleProgramRelationScan, req, generatedAt, "Parsed transaction program, signer and instruction evidence is required for transaction intent.")
+	}
+	intent, reasons := classifyTransactionIntent(tx)
+	s := transactionArmSignals(tx, ModuleProgramRelationScan)
+	s["account_owner"] = ""
+	s["account_executable"] = false
+	s["is_token_mint"] = false
+	s["transaction_intent"] = intent
+	s["transaction_intent_reasons"] = reasons
+	s["signers"] = tx.Signers
+	s["signer_count"] = len(tx.Signers)
+	s["writable_account_count"] = tx.WritableCount
+	s["inner_instruction_count"] = tx.InnerInstructionCount
+	s["token_mints"] = tx.TokenMints
+	s["token_balance_changes"] = tx.TokenBalanceChanges
+	s["lamport_deltas"] = tx.LamportDeltas
+	s["scope_note"] = "Instruction intent is parsed transaction evidence; it is not actor identity, guilt or market-manipulation attribution."
+	e := []string{
+		fmt.Sprintf("Transaction intent classified as %s from parsed instruction and program evidence.", intent),
+		fmt.Sprintf("Observed %d signer(s), %d writable account(s), %d program id(s) and %d inner instruction(s).", len(tx.Signers), tx.WritableCount, len(tx.ProgramIDs), tx.InnerInstructionCount),
+		"Intent classification is evidence-only and cannot issue, raise, lower or override a grade.",
+	}
+	for _, reason := range reasons {
+		e = append(e, "Intent evidence: "+reason)
+	}
+	arm := evidenceArm("Program Relation Scan", ModuleProgramRelationScan, req, 0, s, e, generatedAt)
+	arm.Verdict = "Parsed transaction intent evidence attached to Program Relation Scan; final grade remains owned by EvaluateUnifiedRadarVerdict."
+	arm.Recommendation = "Review signer, writable account, program and balance-delta evidence before making any transaction-intent claim."
+	return arm
+}
+
+func classifyTransactionIntent(tx arvisTransactionEvidence) (string, []string) {
+	reasons := []string{}
+	if tx.InitializeMint {
+		reasons = append(reasons, "initializeMint instruction observed")
+	}
+	if tx.CreateAccount {
+		reasons = append(reasons, "account creation instruction observed")
+	}
+	if tx.RaydiumRelated {
+		reasons = append(reasons, "Raydium-related program or log evidence observed")
+	}
+	if tx.PumpRelated {
+		reasons = append(reasons, "Pump-related program or log evidence observed")
+	}
+	if tx.ComputeBudgetRelated {
+		reasons = append(reasons, "Compute Budget program observed")
+	}
+	if tx.JitoRelated {
+		reasons = append(reasons, "Jito or bundle log evidence observed")
+	}
+	if len(nonZeroTokenBalanceChanges(tx.TokenBalanceChanges)) > 0 {
+		reasons = append(reasons, "token balance delta evidence observed")
+	}
+	if len(nonZeroLamportDeltas(tx.LamportDeltas)) > 0 {
+		reasons = append(reasons, "SOL balance delta evidence observed")
+	}
+	for _, instructionType := range tx.InstructionTypes {
+		switch {
+		case strings.Contains(instructionType, "swap"), strings.Contains(instructionType, "buy"), strings.Contains(instructionType, "sell"):
+			reasons = append(reasons, "trade/swap instruction type observed: "+instructionType)
+		case strings.Contains(instructionType, "transfer"):
+			reasons = append(reasons, "transfer instruction type observed: "+instructionType)
+		case strings.Contains(instructionType, "mintto"), strings.Contains(instructionType, "burn"), strings.Contains(instructionType, "closeaccount"):
+			reasons = append(reasons, "token-supply/account lifecycle instruction observed: "+instructionType)
+		}
+	}
+	switch {
+	case tx.InitializeMint || tx.CreateAccount:
+		return "mint_or_account_initialization", reasons
+	case tx.RaydiumRelated && len(tx.TokenMints) >= 2:
+		return "liquidity_or_swap_interaction", reasons
+	case tx.PumpRelated:
+		return "pump_launch_or_trade_interaction", reasons
+	case hasInstructionContaining(tx.InstructionTypes, "swap", "buy", "sell"):
+		return "trade_or_swap", reasons
+	case hasInstructionContaining(tx.InstructionTypes, "transfer") || len(nonZeroTokenBalanceChanges(tx.TokenBalanceChanges)) > 0 || len(nonZeroLamportDeltas(tx.LamportDeltas)) > 0:
+		return "asset_transfer", reasons
+	case tx.ComputeBudgetRelated || tx.JitoRelated:
+		return "priority_or_bundle_routing", reasons
+	default:
+		return "program_interaction", reasons
+	}
+}
+
+func hasInstructionContaining(values []string, needles ...string) bool {
+	for _, value := range values {
+		for _, needle := range needles {
+			if strings.Contains(value, needle) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func nonZeroTokenBalanceChanges(values map[string]float64) map[string]float64 {
+	out := map[string]float64{}
+	for key, value := range values {
+		if math.Abs(value) > 0 {
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func nonZeroLamportDeltas(values map[string]int64) map[string]int64 {
+	out := map[string]int64{}
+	for key, value := range values {
+		if value != 0 {
+			out[key] = value
+		}
+	}
+	return out
+}
+
 func transactionArmSignals(tx arvisTransactionEvidence, moduleID string) map[string]any {
-	return map[string]any{"module_id": moduleID, "real_onchain_evidence": true, "arm_evidence_available": true, "evidence_status": "verified_parsed_transaction", "data_quality": "parsed_transaction_evidence", "score_source": "solana_getTransaction_jsonParsed", "transaction_signature": tx.Signature, "slot": tx.Slot, "block_time": tx.BlockTime, "program_ids": tx.ProgramIDs, "instruction_types": tx.InstructionTypes}
+	return map[string]any{
+		"module_id":                 moduleID,
+		"real_onchain_evidence":     true,
+		"arm_evidence_available":    true,
+		"evidence_status":           "verified_parsed_transaction",
+		"data_quality":              "parsed_transaction_evidence",
+		"evidence_source":           "solana_getTransaction_jsonParsed",
+		"transaction_signature":     tx.Signature,
+		"slot":                      tx.Slot,
+		"block_time":                tx.BlockTime,
+		"program_ids":               tx.ProgramIDs,
+		"instruction_types":         tx.InstructionTypes,
+		"actor_ruleset_version":     ActorDefenseRulesetVersion,
+		"unified_radar_ruleset":     UnifiedRadarRulesetVersion,
+		"evidence_row_standard":     "signature, slot, timestamp, source, destination, amount, program, verification_status",
+		"numeric_score_disabled":    true,
+		"grade_effect":              "none_at_arm_layer",
+		"unverified_claims_allowed": false,
+	}
 }
 
 func replaceArvisArm(arms []SecurityRadarVerdict, replacement SecurityRadarVerdict) {

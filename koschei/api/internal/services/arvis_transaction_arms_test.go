@@ -85,4 +85,41 @@ func TestTransactionArmsRequireParsedEvidence(t *testing.T) {
 	if arm := buildFundingClusterTransactionArm(req, missing, generatedAt); arm.Signed {
 		t.Fatal("funding arm must remain unsigned without parsed transaction evidence")
 	}
+	if arm := buildTransactionIntentProgramArm(req, missing, generatedAt); arm.Signed {
+		t.Fatal("transaction intent must remain unsigned without parsed transaction evidence")
+	}
+}
+
+func TestTransactionIntentProgramArmClassifiesParsedIntent(t *testing.T) {
+	req := SecurityRadarRequest{Target: "target", Network: "solana-mainnet"}
+	generatedAt := time.Now().UTC().Format(time.RFC3339)
+	tx := arvisTransactionEvidence{
+		Available: true, Signature: "sig-intent", Slot: 123, BlockTime: 456,
+		Signers:             []string{"Signer111111111111111111111111111111111"},
+		ProgramIDs:          []string{"ComputeBudget111111111111111111111111111111", "675kPX9MHTjS2zt1qfr1NYhd1B9M9QGK6cEcDDCo2t9"},
+		InstructionTypes:    []string{"swapBaseIn", "transferChecked"},
+		TokenMints:          []string{"So11111111111111111111111111111111111111112", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"},
+		TokenBalanceChanges: map[string]float64{"So11111111111111111111111111111111111111112": -1.5, "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB": 250},
+		LamportDeltas:       map[string]int64{"Signer111111111111111111111111111111111": -5000},
+		WritableCount:       4, InnerInstructionCount: 2, RaydiumRelated: true, ComputeBudgetRelated: true,
+	}
+	arm := buildTransactionIntentProgramArm(req, tx, generatedAt)
+	if !arm.Signed {
+		t.Fatalf("expected signed transaction intent arm: %#v", arm)
+	}
+	if arm.ModuleID != ModuleProgramRelationScan {
+		t.Fatalf("intent must strengthen Program Relation without adding a 15th arm: %s", arm.ModuleID)
+	}
+	if arm.RiskIndex != 0 || arm.Grade != "-" {
+		t.Fatalf("intent arm issued score/grade: %#v", arm)
+	}
+	if got, _ := arm.Signals["transaction_intent"].(string); got != "liquidity_or_swap_interaction" {
+		t.Fatalf("unexpected transaction intent %q", got)
+	}
+	if reasons, _ := arm.Signals["transaction_intent_reasons"].([]string); len(reasons) == 0 {
+		t.Fatalf("missing transaction intent reasons: %#v", arm.Signals)
+	}
+	if note, _ := arm.Signals["scope_note"].(string); note == "" {
+		t.Fatalf("missing evidence-only scope note: %#v", arm.Signals)
+	}
 }

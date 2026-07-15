@@ -61,12 +61,12 @@ func ArvisInvestigationCapabilities() []ArvisInvestigationCapability {
 			NextEvidenceNeed: "Connect pool reserve deltas, LP authority and creator/dominant-holder actor relations to the Liquidity Movement arm.",
 		},
 		{
-			ID: "transaction_intent", Label: "Transaction intent", Status: ArvisCapabilityPartial,
+			ID: "transaction_intent", Label: "Transaction intent", Status: ArvisCapabilityStrong,
 			PrimaryModules:      []string{ModuleProgramRelationScan, ModuleClaimSurfaceRisk, ModuleWalletlessClaimShield},
 			CanonicalSections:   []string{"ACTOR_INVESTIGATION_ENGINE.md#1", "ACTOR_INVESTIGATION_ENGINE.md#2", "ACTOR_INVESTIGATION_ENGINE.md#4"},
 			ActorRulesetVersion: ActorDefenseRulesetVersion, UnifiedRulesetVersion: UnifiedRadarRulesetVersion,
 			EvidencePolicy:   "Intent must be derived from parsed instruction, signer, writable account and token/SOL delta evidence, not natural-language guesses.",
-			NextEvidenceNeed: "Promote parsed transaction intent fields into one canonical transaction-intent evidence object while preserving the 14-arm contract.",
+			NextEvidenceNeed: "Extend the parsed transaction intent object with route-specific claim, swap and approval semantics while preserving the 14-arm contract.",
 		},
 		{
 			ID: "mev_sandwich", Label: "MEV / sandwich", Status: ArvisCapabilityPartial,
