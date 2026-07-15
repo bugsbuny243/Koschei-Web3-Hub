@@ -1,15 +1,26 @@
-export type RiskLevel = "low" | "medium" | "high" | "critical" | string;
+export type VerdictGrade = "A" | "B" | "C" | "D" | "E" | "F" | "-";
 export type RiskDecision = "block" | "warn" | "allow" | "withhold";
+
+export interface TriggeredRule {
+  rule_id: string;
+  title: string;
+  tier?: string;
+  evidence_status: string;
+  grade_effect?: string;
+  summary?: string;
+  signatures?: string[];
+  [key: string]: unknown;
+}
 
 export interface SignedVerdict {
   target?: string;
   network?: string;
-  grade?: string;
-  risk_index?: number;
-  risk_level?: RiskLevel;
+  grade?: VerdictGrade;
   verdict?: string;
   recommendation?: string;
   evidence?: string[];
+  triggered_rules?: TriggeredRule[];
+  decision_path?: string[];
   rule_version?: string;
   signed?: boolean;
   signature?: string;
@@ -24,10 +35,8 @@ export interface VerdictValidationResult {
 }
 
 export interface RiskPolicy {
-  blockAt?: number;
-  warnAt?: number;
-  blockLevels?: RiskLevel[];
-  warnLevels?: RiskLevel[];
+  blockGrades?: VerdictGrade[];
+  warnGrades?: VerdictGrade[];
   requireSigned?: boolean;
   requireEvidence?: boolean;
 }
@@ -35,9 +44,8 @@ export interface RiskPolicy {
 export interface RiskPolicyResult {
   decision: RiskDecision;
   reason: string;
-  riskIndex?: number;
-  riskLevel?: RiskLevel;
-  grade?: string;
+  grade?: VerdictGrade;
+  triggeredRules?: TriggeredRule[];
   validation: VerdictValidationResult;
 }
 
@@ -232,19 +240,13 @@ export class ArvisClient {
   ): Promise<T> {
     const headers = new Headers({ Accept: "application/json", ...input.headers });
 
-    if (input.body !== undefined) {
-      headers.set("Content-Type", "application/json");
-    }
+    if (input.body !== undefined) headers.set("Content-Type", "application/json");
 
     if (input.auth === "apiKey") {
-      if (!this.apiKey) {
-        throw new Error("ARVIS API key is required for this endpoint.");
-      }
+      if (!this.apiKey) throw new Error("ARVIS API key is required for this endpoint.");
       headers.set("X-API-Key", this.apiKey);
     } else {
-      if (!this.bearerToken) {
-        throw new Error("ARVIS bearer token is required for this endpoint.");
-      }
+      if (!this.bearerToken) throw new Error("ARVIS bearer token is required for this endpoint.");
       headers.set("Authorization", `Bearer ${this.bearerToken}`);
     }
 
@@ -289,21 +291,8 @@ export function validateSignedVerdict(value: unknown): VerdictValidationResult {
   const errors: string[] = [];
 
   if (verdict.signed !== true) errors.push("signed must be true");
-  if (typeof verdict.risk_index !== "number" || !Number.isFinite(verdict.risk_index)) {
-    errors.push("risk_index must be a finite number");
-  } else if (!Number.isInteger(verdict.risk_index)) {
-    errors.push("risk_index must be an integer");
-  } else if (verdict.risk_index < 0 || verdict.risk_index > 100) {
-    errors.push("risk_index must be between 0 and 100");
-  }
-  if (typeof verdict.grade !== "string" || !/^[A-F]$/.test(verdict.grade)) {
-    errors.push("grade must be A through F");
-  }
-  if (
-    typeof verdict.risk_level !== "string" ||
-    !["low", "medium", "high", "critical"].includes(verdict.risk_level)
-  ) {
-    errors.push("risk_level must be low, medium, high, or critical");
+  if (typeof verdict.grade !== "string" || !/^[A-F-]$/.test(verdict.grade)) {
+    errors.push("grade must be A through F or '-' when no grade-changing rule was triggered");
   }
   if (
     !Array.isArray(verdict.evidence) ||
@@ -314,6 +303,15 @@ export function validateSignedVerdict(value: unknown): VerdictValidationResult {
   }
   if (typeof verdict.rule_version !== "string" || verdict.rule_version.trim() === "") {
     errors.push("rule_version is required");
+  }
+  if (verdict.triggered_rules !== undefined && !Array.isArray(verdict.triggered_rules)) {
+    errors.push("triggered_rules must be an array when present");
+  }
+  if (
+    verdict.decision_path !== undefined &&
+    (!Array.isArray(verdict.decision_path) || verdict.decision_path.some((item) => typeof item !== "string" || item.trim() === ""))
+  ) {
+    errors.push("decision_path must be an array of non-empty strings when present");
   }
 
   return errors.length === 0
@@ -336,39 +334,42 @@ export function evaluateVerdictPolicy(value: unknown, policy: RiskPolicy = {}): 
   }
 
   const verdict = validation.verdict;
-  const riskIndex = verdict.risk_index as number;
-  const riskLevel = verdict.risk_level as RiskLevel;
-  const blockAt = clampThreshold(policy.blockAt ?? 70);
-  const warnAt = Math.min(blockAt, clampThreshold(policy.warnAt ?? 40));
-  const blockLevels = policy.blockLevels ?? ["high", "critical"];
-  const warnLevels = policy.warnLevels ?? ["medium"];
+  const grade = verdict.grade as VerdictGrade;
+  const blockGrades = new Set(policy.blockGrades ?? ["D", "E", "F"]);
+  const warnGrades = new Set(policy.warnGrades ?? ["B", "C"]);
 
-  if (blockLevels.includes(riskLevel) || riskIndex >= blockAt) {
+  if (grade === "-") {
     return {
-      decision: "block",
-      reason: `Risk ${riskLevel} / ${riskIndex} meets the blocking policy.`,
-      riskIndex,
-      riskLevel,
-      grade: verdict.grade,
+      decision: "withhold",
+      reason: "No grade-changing rule was triggered; absence of evidence is not an A grade.",
+      grade,
+      triggeredRules: verdict.triggered_rules ?? [],
       validation
     };
   }
-  if (warnLevels.includes(riskLevel) || riskIndex >= warnAt) {
+  if (blockGrades.has(grade)) {
+    return {
+      decision: "block",
+      reason: `Grade ${grade} meets the deterministic blocking policy.`,
+      grade,
+      triggeredRules: verdict.triggered_rules ?? [],
+      validation
+    };
+  }
+  if (warnGrades.has(grade)) {
     return {
       decision: "warn",
-      reason: `Risk ${riskLevel} / ${riskIndex} meets the warning policy.`,
-      riskIndex,
-      riskLevel,
-      grade: verdict.grade,
+      reason: `Grade ${grade} meets the deterministic warning policy.`,
+      grade,
+      triggeredRules: verdict.triggered_rules ?? [],
       validation
     };
   }
   return {
     decision: "allow",
-    reason: `Risk ${riskLevel} / ${riskIndex} is below configured warning thresholds.`,
-    riskIndex,
-    riskLevel,
-    grade: verdict.grade,
+    reason: `Grade ${grade} is below configured warning rules.`,
+    grade,
+    triggeredRules: verdict.triggered_rules ?? [],
     validation
   };
 }
@@ -378,11 +379,6 @@ function idempotencyHeaders(value?: string): Record<string, string> | undefined 
   if (!normalized) return undefined;
   if (normalized.length > 128) throw new Error("Idempotency key must be 128 characters or fewer.");
   return { "Idempotency-Key": normalized };
-}
-
-function clampThreshold(value: number): number {
-  if (!Number.isFinite(value)) return 100;
-  return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function delay(ms: number): Promise<void> {
