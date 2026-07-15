@@ -34,9 +34,10 @@ type quotaResponseWriter struct {
 }
 
 func (w *quotaResponseWriter) WriteHeader(status int) {
-	if w.status == 0 {
-		w.status = status
+	if w.status != 0 {
+		return
 	}
+	w.status = status
 	w.ResponseWriter.WriteHeader(status)
 }
 
@@ -85,8 +86,12 @@ func quotaUTCWindow(now time.Time) (time.Time, time.Time) {
 	return start, start.Add(24 * time.Hour)
 }
 
+type scanQuotaIdentity func(*http.Request) (string, string, error)
+type scanQuotaReserve func(context.Context, string, string, string) (premiumOutputReservation, koschQuotaStatus, error)
+type scanQuotaRefund func(context.Context, premiumOutputReservation, string) error
+
 func (h *Handler) EnforceScanQuota(next http.HandlerFunc) http.HandlerFunc {
-	return h.enforceScanQuota(func(r *http.Request) (string, string, error) {
+	identity := func(r *http.Request) (string, string, error) {
 		claims, ok := userFromContext(r.Context())
 		if !ok {
 			return "", "", errors.New("unauthorized")
@@ -99,11 +104,12 @@ func (h *Handler) EnforceScanQuota(next http.HandlerFunc) http.HandlerFunc {
 			return "", "", err
 		}
 		return claims.Sub, evaluation.Tier, nil
-	}, next)
+	}
+	return enforceScanQuotaWith(identity, h.reserveKOSCHDailyQuota, h.refundPremiumOutputReservation, next)
 }
 
 func (h *Handler) EnforceAPIKeyScanQuota(next http.HandlerFunc) http.HandlerFunc {
-	return h.enforceScanQuota(func(r *http.Request) (string, string, error) {
+	identity := func(r *http.Request) (string, string, error) {
 		principal, ok := apiPrincipalFromContext(r.Context())
 		if !ok {
 			return "", "", errors.New("unauthorized")
@@ -116,26 +122,27 @@ func (h *Handler) EnforceAPIKeyScanQuota(next http.HandlerFunc) http.HandlerFunc
 			return "", "", err
 		}
 		return principal.AuthSubject, evaluation.Tier, nil
-	}, next)
+	}
+	return enforceScanQuotaWith(identity, h.reserveKOSCHDailyQuota, h.refundPremiumOutputReservation, next)
 }
 
-func (h *Handler) enforceScanQuota(identity func(*http.Request) (string, string, error), next http.HandlerFunc) http.HandlerFunc {
+func enforceScanQuotaWith(identity scanQuotaIdentity, reserve scanQuotaReserve, refund scanQuotaRefund, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authSubject, tier, err := identity(r)
 		if err != nil {
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_unavailable"})
 			return
 		}
-		reservation, status, err := h.reserveKOSCHDailyQuota(r.Context(), authSubject, tier, r.Method+" "+r.URL.Path)
+		reservation, status, err := reserve(r.Context(), authSubject, tier, r.Method+" "+r.URL.Path)
 		if err != nil {
 			var exceeded koschQuotaExceededError
 			if errors.As(err, &exceeded) {
 				writeJSON(w, http.StatusTooManyRequests, map[string]any{
-					"error":      "quota_exceeded",
-					"tier":       exceeded.Status.Tier,
-					"limit":      exceeded.Status.DailyLimit,
-					"used":       exceeded.Status.UsedToday,
-					"resets_at":  exceeded.Status.ResetsAt,
+					"error":     "quota_exceeded",
+					"tier":      exceeded.Status.Tier,
+					"limit":     exceeded.Status.DailyLimit,
+					"used":      exceeded.Status.UsedToday,
+					"resets_at": exceeded.Status.ResetsAt,
 				})
 				return
 			}
@@ -146,9 +153,12 @@ func (h *Handler) enforceScanQuota(identity func(*http.Request) (string, string,
 		recorder := &quotaResponseWriter{ResponseWriter: w}
 		completed := false
 		defer func() {
-			if !completed || recorder.Status() >= http.StatusBadRequest {
-				_ = h.refundPremiumOutputReservation(context.Background(), reservation, "kosch_scan_quota_refund")
+			if completed && recorder.Status() < http.StatusBadRequest {
+				return
 			}
+			refundCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = refund(refundCtx, reservation, "kosch_scan_quota_refund")
 		}()
 		next(recorder, r.WithContext(context.WithValue(r.Context(), koschQuotaContextKey{}, status)))
 		completed = true
