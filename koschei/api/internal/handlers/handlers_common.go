@@ -28,6 +28,7 @@ type Handler struct {
 	SolanaRPC     *web3.SolanaRPC
 	JobStore      *jobs.Store
 	JobQueue      jobs.Queue
+	CourtClient   CourtNarrativeClient
 }
 
 func (h *Handler) dbAvailable(ctx context.Context) error {
