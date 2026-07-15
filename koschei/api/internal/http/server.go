@@ -57,18 +57,29 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	}
 	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue}
 	mux := http.NewServeMux()
+
+	koschTierAccess := func(tier string, next http.HandlerFunc) http.HandlerFunc {
+		return handlers.RequireAuth(h.RequireTokenTier(tier, next))
+	}
+	koschTier := func(tier string, next http.HandlerFunc) http.HandlerFunc {
+		return handlers.RequireAuth(h.RequireTokenTier(tier, h.EnforceScanQuota(next)))
+	}
 	koschAccess := func(next http.HandlerFunc) http.HandlerFunc {
-		return handlers.RequireAuth(h.RequireActiveEntitlement(next))
+		return koschTier("basic", next)
 	}
-	apiKey := func(next http.HandlerFunc) http.HandlerFunc {
-		return h.APIKeyAuth(h.RequireAPIKeyKOSCH(h.APIRateLimit(next)))
+	apiKeyEnterprise := func(next http.HandlerFunc) http.HandlerFunc {
+		return h.APIKeyAuth(h.RequireAPIKeyTokenTier("enterprise", h.APIRateLimit(next)))
 	}
+	apiKeyEnterpriseMetered := func(next http.HandlerFunc) http.HandlerFunc {
+		return h.APIKeyAuth(h.RequireAPIKeyTokenTier("enterprise", h.APIRateLimit(h.EnforceAPIKeyScanQuota(next))))
+	}
+
 	registerCoreRoutes(mux, h, koschAccess)
-	registerAccountRoutes(mux, h, koschAccess)
+	registerAccountRoutes(mux, h, koschTierAccess)
 	registerOwnerRoutes(mux, h, staticDir)
-	registerProductRoutes(mux, h, koschAccess)
-	registerDeveloperAPIRoutes(mux, h, apiKey)
-	registerWatchlistRoutes(mux, h, koschAccess)
+	registerProductRoutes(mux, h, koschTier)
+	registerDeveloperAPIRoutes(mux, h, apiKeyEnterprise, apiKeyEnterpriseMetered)
+	registerWatchlistRoutes(mux, h, koschTierAccess, koschTier)
 	registerStatic(mux, staticDir)
 	return securityHeaders(cors(apiReadiness(db, mux), corsOrigin))
 }
@@ -108,9 +119,9 @@ func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess fun
 	mux.HandleFunc("/api/agent/chain-health", requiresDB(h, koschAccess(method("POST", h.AgentTool))))
 }
 
-func registerAccountRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess func(http.HandlerFunc) http.HandlerFunc) {
-	mux.HandleFunc("/api/account/api-keys", requiresDB(h, koschAccess(h.APIKeysCollection)))
-	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, koschAccess(method("POST", h.RevokeAPIKey))))
+func registerAccountRoutes(mux *http.ServeMux, h *handlers.Handler, koschTierAccess func(string, http.HandlerFunc) http.HandlerFunc) {
+	mux.HandleFunc("/api/account/api-keys", requiresDB(h, koschTierAccess("enterprise", h.APIKeysCollection)))
+	mux.HandleFunc("/api/account/api-keys/", requiresDB(h, koschTierAccess("enterprise", method("POST", h.RevokeAPIKey))))
 }
 
 func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir string) {
@@ -143,30 +154,31 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
 }
 
-func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, koschAccess func(http.HandlerFunc) http.HandlerFunc) {
-	// Free core: no account or KOSCH balance required. This is intentionally
-	// limited to deterministic read-only token fundamentals and public preflight.
+func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, koschTier func(string, http.HandlerFunc) http.HandlerFunc) {
+	// Free core: no account, KOSCH balance or quota required.
 	mux.HandleFunc("/api/token/scan", method("POST", h.TokenScan))
-
-	// Premium: KOSCH unlocks deeper history, graph, exposure and automation.
-	mux.HandleFunc("/api/v1/token/extensions", requiresDB(h, koschAccess(method("POST", h.TokenScan))))
-	mux.HandleFunc("/api/v1/address-poisoning/check", requiresDB(h, koschAccess(method("POST", h.AddressPoisoningCheck))))
 	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
-	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, koschAccess(method("GET", h.SecurityRadarFeed))))
-	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, koschAccess(method("POST", h.SecurityRadarCheck))))
-	mux.HandleFunc("/api/v1/radar/detail", requiresDB(h, koschAccess(method("GET", h.SecurityRadarDetailV3))))
-	mux.HandleFunc("/api/v1/radar/creator-intelligence", requiresDB(h, koschAccess(method("GET", h.OwnerCreatorIntelligence))))
-	mux.HandleFunc("/api/v1/radar/actor-intelligence", requiresDB(h, koschAccess(method("GET", h.OwnerActorSecurityIntelligence))))
-	mux.HandleFunc("/api/v1/radar/graph", requiresDB(h, koschAccess(method("GET", h.SecurityRadarGraph))))
-	mux.HandleFunc("/api/v1/radar/exposure", requiresDB(h, koschAccess(method("GET", h.SecurityRadarExposureReport))))
+
+	// Basic: standard premium checks and detail.
+	mux.HandleFunc("/api/v1/token/extensions", requiresDB(h, koschTier("basic", method("POST", h.TokenScan))))
+	mux.HandleFunc("/api/v1/address-poisoning/check", requiresDB(h, koschTier("basic", method("POST", h.AddressPoisoningCheck))))
+	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, koschTier("basic", method("POST", h.SecurityRadarCheck))))
+	mux.HandleFunc("/api/v1/radar/detail", requiresDB(h, koschTier("basic", method("GET", h.SecurityRadarDetailV3))))
+
+	// Pro: cross-token actor history, graph, exposure and feed surfaces.
+	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, koschTier("pro", method("GET", h.SecurityRadarFeed))))
+	mux.HandleFunc("/api/v1/radar/creator-intelligence", requiresDB(h, koschTier("pro", method("GET", h.OwnerCreatorIntelligence))))
+	mux.HandleFunc("/api/v1/radar/actor-intelligence", requiresDB(h, koschTier("pro", method("GET", h.OwnerActorSecurityIntelligence))))
+	mux.HandleFunc("/api/v1/radar/graph", requiresDB(h, koschTier("pro", method("GET", h.SecurityRadarGraph))))
+	mux.HandleFunc("/api/v1/radar/exposure", requiresDB(h, koschTier("pro", method("GET", h.SecurityRadarExposureReport))))
 }
 
-func registerDeveloperAPIRoutes(mux *http.ServeMux, h *handlers.Handler, apiKey func(http.HandlerFunc) http.HandlerFunc) {
-	mux.HandleFunc("/api/v1/scan/token", requiresDB(h, apiKey(method("POST", h.B2BTokenScan))))
-	mux.HandleFunc("/api/v1/usage", requiresDB(h, apiKey(method("GET", h.APIUsage))))
-	mux.HandleFunc("/api/v1/shield/preflight", requiresDB(h, apiKey(method("POST", h.ShieldPreflight))))
-	mux.HandleFunc("/api/v1/shield/transaction", requiresDB(h, apiKey(method("POST", h.ShieldPreflight))))
-	mux.HandleFunc("/api/v1/shield/address-poisoning", requiresDB(h, apiKey(method("POST", h.AddressPoisoningCheck))))
+func registerDeveloperAPIRoutes(mux *http.ServeMux, h *handlers.Handler, apiKeyEnterprise, apiKeyEnterpriseMetered func(http.HandlerFunc) http.HandlerFunc) {
+	mux.HandleFunc("/api/v1/scan/token", requiresDB(h, apiKeyEnterpriseMetered(method("POST", h.B2BTokenScan))))
+	mux.HandleFunc("/api/v1/usage", requiresDB(h, apiKeyEnterprise(method("GET", h.APIUsage))))
+	mux.HandleFunc("/api/v1/shield/preflight", requiresDB(h, apiKeyEnterpriseMetered(method("POST", h.ShieldPreflight))))
+	mux.HandleFunc("/api/v1/shield/transaction", requiresDB(h, apiKeyEnterpriseMetered(method("POST", h.ShieldPreflight))))
+	mux.HandleFunc("/api/v1/shield/address-poisoning", requiresDB(h, apiKeyEnterpriseMetered(method("POST", h.AddressPoisoningCheck))))
 }
 
 func registerStatic(mux *http.ServeMux, staticDir string) {
