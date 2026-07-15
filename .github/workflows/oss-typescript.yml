@@ -5,12 +5,16 @@ on:
     paths:
       - "sdk/typescript/**"
       - "oss/event-normalizer/**"
+      - "oss/schemas/**"
+      - "oss/verifier/**"
       - ".github/workflows/oss-typescript.yml"
   push:
     branches: [main]
     paths:
       - "sdk/typescript/**"
       - "oss/event-normalizer/**"
+      - "oss/schemas/**"
+      - "oss/verifier/**"
       - ".github/workflows/oss-typescript.yml"
 
 permissions:
