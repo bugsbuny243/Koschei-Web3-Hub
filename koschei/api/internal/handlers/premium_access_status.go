@@ -44,12 +44,22 @@ func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
 		if email == "" {
 			email = entitlementEmailFromSubject(claims.Sub)
 		}
-		if email != "" {
-			quota, err = h.koschScanQuotaStatus(r.Context(), email, tokenAccess.Tier, configuredKOSCHDailyQuota(tokenAccess.Tier), time.Now().UTC())
-			if err != nil {
-				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_unavailable"})
-				return
-			}
+		if email == "" && h != nil && h.DB != nil {
+			_ = h.DB.QueryRowContext(r.Context(), `
+				SELECT lower(email)
+				FROM app_user_profiles
+				WHERE auth_subject=$1 AND status='active'
+				ORDER BY updated_at DESC, created_at DESC
+				LIMIT 1`, claims.Sub).Scan(&email)
+		}
+		if email == "" {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_identity_unavailable"})
+			return
+		}
+		quota, err = h.koschScanQuotaStatus(r.Context(), email, tokenAccess.Tier, configuredKOSCHDailyQuota(tokenAccess.Tier), time.Now().UTC())
+		if err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_unavailable"})
+			return
 		}
 	}
 
