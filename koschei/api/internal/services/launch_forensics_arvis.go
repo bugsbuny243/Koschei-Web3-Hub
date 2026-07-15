@@ -5,68 +5,85 @@ import (
 	"time"
 )
 
-// ApplyLaunchForensicsToAnalysis adds one deterministic evidence arm and
-// rebuilds the existing final engine. Thresholds and correlation rules remain
-// unchanged; only proven launch timing/funding evidence can raise risk.
+// ApplyLaunchForensicsToAnalysis replaces the Launch Distribution placeholder
+// with mint-specific ATA/ledger evidence. It never rebuilds a final score: the
+// unified deterministic rules engine remains the only verdict source.
 func ApplyLaunchForensicsToAnalysis(analysis ArvisAnalysis, req SecurityRadarRequest, forensics LaunchForensicsAnalysis) ArvisAnalysis {
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
 	arms := ArvisArmsFromBundle(analysis.Bundle)
 	if len(arms) == 0 {
 		arms = append([]SecurityRadarVerdict{}, analysis.Arms...)
 	}
-	withoutFinal := make([]SecurityRadarVerdict, 0, len(arms)+1)
+	updated := make([]SecurityRadarVerdict, 0, len(arms))
+	found := false
 	for _, arm := range arms {
-		if arm.ModuleID != ModuleFinalVerdictEngine {
-			withoutFinal = append(withoutFinal, arm)
+		if arm.ModuleID != ModuleLaunchDistribution {
+			updated = append(updated, arm)
+			continue
 		}
+		found = true
+		updated = append(updated, launchDistributionArm(req, forensics, generatedAt))
 	}
-	launchArm := unavailableArm("Launch Forensics", ModuleLaunchForensics, req, generatedAt, "Live ledger or ATA target-token history is required; missing launch history is not a safety signal.")
-	if forensics.Available {
-		risk := forensics.StructuralFloor
-		signals := map[string]any{
-			"real_onchain_evidence": true, "verified_evidence": true,
-			"evidence_status":                    "verified_launch_forensics",
-			"data_source":                        forensics.DataSource,
-			"owners_with_trade_history":          forensics.OwnersWithTradeHistory,
-			"sniper_count":                       forensics.SniperCount,
-			"rhythm_bot_count":                   forensics.RhythmBotCount,
-			"creator_linked_count":               forensics.CreatorLinkedCount,
-			"funding_owners_attempted":           forensics.FundingOwnersAttempted,
-			"funding_owners_resolved":            forensics.FundingOwnersResolved,
-			"launch_forensics_risk_contribution": forensics.RiskContribution,
-			"launch_forensics_structural_floor":  forensics.StructuralFloor,
-			"absence_is_safety_signal":           false,
-		}
-		evidence := append([]string{}, forensics.Findings...)
-		if len(evidence) == 0 && forensics.Summary != "" {
-			evidence = append(evidence, forensics.Summary)
-		}
-		launchArm = evidenceArm("Launch Forensics", ModuleLaunchForensics, req, risk, signals, evidence, generatedAt)
-		launchArm.Verdict = fmt.Sprintf("Launch Forensics verified %d holder trade histories: %d sniper, %d rhythm-bot and %d creator-linked relations.", forensics.OwnersWithTradeHistory, forensics.SniperCount, forensics.RhythmBotCount, forensics.CreatorLinkedCount)
+	if !found {
+		updated = append(updated, launchDistributionArm(req, forensics, generatedAt))
 	}
-	withoutFinal = append(withoutFinal, launchArm)
-	finalArm := buildFinalArm(req, withoutFinal, generatedAt)
-	arms = append(withoutFinal, finalArm)
-	final := finalVerdictFromArm(finalArm)
-	verified := verifiedArvisEvidenceCount(arms)
+	analysis.Arms = updated
+	analysis.Final = arvisCompatibilityFinal()
+	if analysis.Bundle.Metadata == nil {
+		analysis.Bundle.Metadata = map[string]any{}
+	}
+	analysis.Bundle.Metadata["arvis_arms"] = updated
+	analysis.Bundle.Metadata["architecture_arm_count"] = 14
+	analysis.Bundle.Metadata["evidence_arm_count"] = 14
+	analysis.Bundle.Metadata["verified_arm_count"] = verifiedArvisEvidenceCount(updated)
+	analysis.Bundle.Metadata["runtime_arm_count"] = verifiedArvisEvidenceCount(updated)
+	analysis.Bundle.Metadata["launch_distribution"] = forensics
+	analysis.Bundle.Metadata["final_verdict_source"] = "EvaluateUnifiedRadarVerdict"
+	analysis.Bundle.CustomerRecommendation = "evaluate_unified_rules"
+	return analysis
+}
 
-	bundle := analysis.Bundle
-	if bundle.Metadata == nil {
-		bundle.Metadata = map[string]any{}
+func launchDistributionArm(req SecurityRadarRequest, forensics LaunchForensicsAnalysis, generatedAt string) SecurityRadarVerdict {
+	if !forensics.Available {
+		v := unavailableArm("Launch Distribution", ModuleLaunchDistribution, req, generatedAt, "Live ledger or mint-specific ATA recipient history is required; missing history is not a safety signal.")
+		v.Signals["launch_forensics"] = forensics
+		for _, limitation := range forensics.Limitations {
+			v.Evidence = append(v.Evidence, "Limitation: "+limitation)
+		}
+		return v
 	}
-	bundle.Metadata["arvis_arms"] = arms
-	bundle.Metadata["architecture_arm_count"] = 15
-	bundle.Metadata["evidence_arm_count"] = 14
-	bundle.Metadata["verified_arm_count"] = verified
-	bundle.Metadata["runtime_arm_count"] = verified
-	bundle.Metadata["launch_forensics"] = forensics
-	bundle.Metadata["final_grade"] = final.Grade
-	bundle.Metadata["final_risk_index"] = final.RiskIndex
-	bundle.Metadata["final_risk_level"] = final.RiskLevel
-	bundle.Metadata["final_recommendation"] = final.Recommendation
-	bundle.CustomerRecommendation = final.Recommendation
-	if final.Signed {
-		bundle.CustomerSummary = fmt.Sprintf("ARVIS verified %d of 14 evidence arms, including deterministic Launch Forensics, and produced one evidence-backed verdict.", verified)
+	signals := map[string]any{
+		"module_id": ModuleLaunchDistribution,
+		"real_onchain_evidence": true,
+		"verified_evidence": true,
+		"evidence_status": "verified_launch_distribution",
+		"data_source": forensics.DataSource,
+		"owners_requested": forensics.OwnersRequested,
+		"owners_with_trade_history": forensics.OwnersWithTradeHistory,
+		"ledger_trade_count": forensics.LedgerTradeCount,
+		"launch_slot": forensics.LaunchSlot,
+		"launch_time": forensics.LaunchTime,
+		"profiles": forensics.Profiles,
+		"timeline": forensics.Timeline,
+		"sniper_count": forensics.SniperCount,
+		"rhythm_bot_count": forensics.RhythmBotCount,
+		"creator_linked_count": forensics.CreatorLinkedCount,
+		"rpc_calls_used": forensics.RPCCallsUsed,
+		"funding_rpc_calls_used": forensics.FundingRPCCallsUsed,
+		"ata_only_policy": true,
+		"recipient_wide_wallet_history_forbidden": true,
+		"numeric_score_disabled": true,
+		"grade_effect": "none_at_arm_layer",
 	}
-	return ArvisAnalysis{Bundle: bundle, Arms: arms, Final: final}
+	evidence := append([]string{}, forensics.Findings...)
+	if len(evidence) == 0 && forensics.Summary != "" {
+		evidence = append(evidence, forensics.Summary)
+	}
+	for _, limitation := range forensics.Limitations {
+		evidence = append(evidence, "Limitation: "+limitation)
+	}
+	arm := evidenceArm("Launch Distribution", ModuleLaunchDistribution, req, 0, signals, evidence, generatedAt)
+	arm.Verdict = fmt.Sprintf("Launch Distribution observed mint-specific history for %d owner wallets; this arm reports evidence and does not issue a grade.", forensics.OwnersWithTradeHistory)
+	arm.Recommendation = "Compare initial recipients with current top holders and persistent repeat-actor evidence."
+	return arm
 }
