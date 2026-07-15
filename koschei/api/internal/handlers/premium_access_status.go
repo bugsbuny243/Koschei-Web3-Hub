@@ -1,16 +1,23 @@
 package handlers
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 type premiumAccessStatus struct {
-	Active            bool   `json:"active"`
-	Source            string `json:"source"`
-	TokenGateEnabled  bool   `json:"token_gate_enabled"`
-	TokenConfigured   bool   `json:"token_configured"`
-	WalletVerified    bool   `json:"wallet_verified"`
-	TokenTier         string `json:"token_tier"`
-	TokenAmount       string `json:"token_amount"`
-	RequiredTokenTier string `json:"required_token_tier"`
+	Active              bool      `json:"active"`
+	Source              string    `json:"source"`
+	TokenGateEnabled    bool      `json:"token_gate_enabled"`
+	TokenConfigured     bool      `json:"token_configured"`
+	WalletVerified      bool      `json:"wallet_verified"`
+	TokenTier           string    `json:"token_tier"`
+	TokenAmount         string    `json:"token_amount"`
+	RequiredTokenTier   string    `json:"required_token_tier"`
+	QuotaDaily          int       `json:"quota_daily"`
+	QuotaUsedToday      int       `json:"quota_used_today"`
+	QuotaRemainingToday int       `json:"quota_remaining_today"`
+	QuotaResetsAt       time.Time `json:"quota_resets_at"`
 }
 
 func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
@@ -30,9 +37,24 @@ func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	status := decidePremiumAccess(tokenAccess)
+	if status.Active {
+		quota, err := h.currentKOSCHDailyQuota(r.Context(), claims.Sub, status.TokenTier)
+		if err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "quota_unavailable"})
+			return
+		}
+		status.QuotaDaily = quota.DailyLimit
+		status.QuotaUsedToday = quota.UsedToday
+		status.QuotaRemainingToday = quota.Remaining
+		status.QuotaResetsAt = quota.ResetsAt
+	} else {
+		_, status.QuotaResetsAt = quotaUTCWindow(time.Now().UTC())
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":     true,
-		"access": decidePremiumAccess(tokenAccess),
+		"access": status,
 	})
 }
 
