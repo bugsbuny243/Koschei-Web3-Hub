@@ -101,11 +101,13 @@ func AnalyzeArvisRadarsContext(ctx context.Context, req SecurityRadarRequest) Ar
 			"provider": SecurityRadarProvider, "watch_mode": req.Mode, "rule_version": SecurityRadarRuleVersion,
 			"architecture_arm_count": 14, "evidence_arm_count": 14, "verified_arm_count": verified,
 			"runtime_arm_count": verified, "arvis_arms": arms, "source_module": sourceModule,
-			"intelligence_graph": graph,
-			"graph_is_presentation_layer": true,
-			"final_verdict_source": "EvaluateUnifiedRadarVerdict",
-			"numeric_arm_scoring_disabled": true,
-			"data_quality": profile.DataQuality, "evidence_status": profile.EvidenceStatus,
+			"intelligence_graph":             graph,
+			"graph_is_presentation_layer":    true,
+			"final_verdict_source":           "EvaluateUnifiedRadarVerdict",
+			"numeric_arm_scoring_disabled":   true,
+			"investigation_capabilities":     ArvisInvestigationCapabilities(),
+			"investigation_capability_scope": ArvisCapabilityRulesetScope,
+			"data_quality":                   profile.DataQuality, "evidence_status": profile.EvidenceStatus,
 			"holder_cluster_analysis": profile.HolderCluster,
 		},
 	}
@@ -139,7 +141,7 @@ func ArvisFinalFromBundle(_ SecurityRadarBundle) SecurityRadarFinalVerdict {
 func arvisCompatibilityFinal() SecurityRadarFinalVerdict {
 	return SecurityRadarFinalVerdict{
 		Grade: "-", RiskIndex: 0, RiskLevel: "unknown",
-		Verdict: "No ARVIS arm may issue a final grade. EvaluateUnifiedRadarVerdict is authoritative.",
+		Verdict:        "No ARVIS arm may issue a final grade. EvaluateUnifiedRadarVerdict is authoritative.",
 		Recommendation: "evaluate_unified_rules", RuleVersion: UnifiedRadarRulesetVersion,
 		Signed: false,
 	}
@@ -216,14 +218,14 @@ func buildIntelligenceGraphArm(req SecurityRadarRequest, p radarEvidenceProfile,
 		return unavailableArm("Intelligence Graph", ModuleIntelligenceGraph, req, generatedAt, "Account/program or transaction relation evidence is required.")
 	}
 	s := map[string]any{
-		"module_id": ModuleIntelligenceGraph,
-		"presentation_layer": true,
+		"module_id":             ModuleIntelligenceGraph,
+		"presentation_layer":    true,
 		"real_onchain_evidence": true,
-		"evidence_status": "observed",
-		"nodes": []map[string]any{{"id": req.Target, "kind": "target"}, {"id": p.AccountOwner, "kind": "program"}},
-		"edges": []map[string]any{{"source": req.Target, "destination": p.AccountOwner, "relation": "owned_by_program", "evidence_status": "observed"}},
-		"latest_signature": p.LatestSignature,
-		"latest_slot": p.LatestSlot,
+		"evidence_status":       "observed",
+		"nodes":                 []map[string]any{{"id": req.Target, "kind": "target"}, {"id": p.AccountOwner, "kind": "program"}},
+		"edges":                 []map[string]any{{"source": req.Target, "destination": p.AccountOwner, "relation": "owned_by_program", "evidence_status": "observed"}},
+		"latest_signature":      p.LatestSignature,
+		"latest_slot":           p.LatestSlot,
 	}
 	e := []string{
 		fmt.Sprintf("Account owner relation observed: %s.", firstRadarValue(p.AccountOwner, "unknown")),
@@ -372,13 +374,13 @@ func buildFinalArm(req SecurityRadarRequest, _ []SecurityRadarVerdict, generated
 
 func armSignals(req SecurityRadarRequest, p radarEvidenceProfile, moduleID string) map[string]any {
 	s := map[string]any{
-		"module_id": moduleID,
+		"module_id":              moduleID,
 		"arm_evidence_available": true,
-		"real_onchain_evidence": p.LiveRPC,
-		"data_quality": p.DataQuality,
-		"evidence_status": p.EvidenceStatus,
-		"rpc_errors": p.Errors,
-		"grade_effect": "none_at_arm_layer",
+		"real_onchain_evidence":  p.LiveRPC,
+		"data_quality":           p.DataQuality,
+		"evidence_status":        p.EvidenceStatus,
+		"rpc_errors":             p.Errors,
+		"grade_effect":           "none_at_arm_layer",
 		"numeric_score_disabled": true,
 	}
 	if sourceModule := arvisSourceModule(req.Mode); sourceModule != "" {
@@ -403,7 +405,7 @@ func evidenceArm(module, moduleID string, req SecurityRadarRequest, risk int, si
 	v := SecurityRadarVerdict{
 		Module: module, ModuleID: moduleID, Target: req.Target, Network: req.Network,
 		Grade: "-", RiskIndex: 0, RiskLevel: "evidence_only",
-		Verdict: "Evidence collected; final grade is produced only by EvaluateUnifiedRadarVerdict.",
+		Verdict:        "Evidence collected; final grade is produced only by EvaluateUnifiedRadarVerdict.",
 		Recommendation: "evaluate_unified_rules", Signals: signals, Evidence: evidence,
 		GeneratedAt: generatedAt, RuleVersion: SecurityRadarRuleVersion, Signed: true,
 	}
