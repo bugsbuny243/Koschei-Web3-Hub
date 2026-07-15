@@ -28,6 +28,31 @@ test('INFERRED-only concentration is yellow checklist with no leverage',()=>{
   assert.equal(vm.leverage.some(x=>x.id==='top-owner'),false);
 });
 
+test('raw-only 70% concentration is yellow raw checklist with no leverage',()=>{
+  const vm=mapVerdictCard({final_verdict:{grade:'D'},modules:[{module_id:'holder_concentration',evidence_status:'VERIFIED',metrics:{top_holder_percentage:70}}]});
+  const row=vm.checklist.find(x=>x.id==='concentration');
+  assert.equal(row.status,'yellow');
+  assert.equal(row.value,'70% (raw)');
+  assert.equal(vm.leverage.some(x=>x.id==='top-owner'),false);
+});
+
+test('owner-resolved 58.7% concentration renders top-owner leverage',()=>{
+  const vm=mapVerdictCard({final_verdict:{grade:'D'},modules:[{module_id:'holder_concentration',evidence_status:'VERIFIED',metrics:{owner_resolved_top_holder_pct:58.7}}]});
+  const row=vm.checklist.find(x=>x.id==='concentration');
+  assert.equal(row.status,'red');
+  assert.equal(row.value,'58.7%');
+  assert.equal(vm.leverage.some(x=>x.id==='top-owner'),true);
+  assert.match(vm.leverage.find(x=>x.id==='top-owner').text,/58.7%/);
+});
+
+test('owner-resolved 12% concentration has checklist value but no leverage',()=>{
+  const vm=mapVerdictCard({final_verdict:{grade:'B'},modules:[{module_id:'holder_concentration',evidence_status:'VERIFIED',metrics:{owner_resolved_top_holder_pct:12}}]});
+  const row=vm.checklist.find(x=>x.id==='concentration');
+  assert.equal(row.status,'green');
+  assert.equal(row.value,'12%');
+  assert.equal(vm.leverage.some(x=>x.id==='top-owner'),false);
+});
+
 test('historical fixture view-model snapshot',()=>{
   const fixture=JSON.parse(readFileSync(new URL('../__fixtures__/historical-scan.json',import.meta.url)));
   const vm=mapVerdictCard(fixture);
