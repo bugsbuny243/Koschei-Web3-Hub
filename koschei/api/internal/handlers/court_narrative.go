@@ -18,32 +18,43 @@ type CourtNarrativeClient interface {
 }
 
 type CourtReadOnlyInput struct {
-	Target        string                       `json:"target"`
-	Network       string                       `json:"network"`
-	SignedVerdict services.UnifiedRadarVerdict `json:"signed_verdict"`
-	VerdictCard   map[string]any               `json:"verdict_card"`
+	Target         string                       `json:"target"`
+	Network        string                       `json:"network"`
+	SignedVerdict  services.UnifiedRadarVerdict `json:"signed_verdict"`
+	VerdictCard    map[string]any               `json:"verdict_card"`
+	EvidencePacket map[string]any               `json:"evidence_packet,omitempty"`
 }
 
 type CourtOpinion struct {
-	Model  string `json:"model"`
-	Stance string `json:"stance"`
-	Text   string `json:"text"`
+	Provider    string   `json:"provider,omitempty"`
+	Model       string   `json:"model"`
+	Stance      string   `json:"stance"`
+	Text        string   `json:"text"`
+	EvidenceIDs []string `json:"evidence_ids,omitempty"`
+	Limitations []string `json:"limitations,omitempty"`
 }
+
 type CourtPanel struct {
-	Models []string `json:"models"`
-	Stance string   `json:"stance"`
-	Text   string   `json:"text"`
+	Models      []string       `json:"models"`
+	Stance      string         `json:"stance"`
+	Text        string         `json:"text"`
+	Opinions    []CourtOpinion `json:"opinions,omitempty"`
+	Limitations []string       `json:"limitations,omitempty"`
 }
+
 type courtTierOverrideKey struct{}
 
 type CourtReport struct {
 	Status       string         `json:"status"`
 	TierApplied  string         `json:"tier_applied"`
+	CaseID       string         `json:"case_id,omitempty"`
 	Prosecutors  []CourtOpinion `json:"prosecutors,omitempty"`
 	Panel        *CourtPanel    `json:"panel,omitempty"`
 	Senior       *CourtPanel    `json:"senior,omitempty"`
 	Disagreement bool           `json:"disagreement"`
 	Authority    string         `json:"authority"`
+	Errors       []string       `json:"errors,omitempty"`
+	GeneratedAt  time.Time      `json:"generated_at"`
 }
 
 func (h *Handler) courtNarrative(ctx context.Context, in CourtReadOnlyInput, requestedExtended bool) *CourtReport {
@@ -51,58 +62,69 @@ func (h *Handler) courtNarrative(ctx context.Context, in CourtReadOnlyInput, req
 		return nil
 	}
 	tier := h.courtTier(ctx)
-	status := "skipped"
-	report := &CourtReport{Status: status, TierApplied: tier, Authority: "the signed deterministic verdict is final; court output is commentary/explanation"}
-	if tier == "free" || tier == "basic" {
-		return report
+	report := &CourtReport{
+		Status: "skipped",
+		TierApplied: tier,
+		CaseID: courtCaseID(in),
+		Authority: "the signed deterministic verdict is final; court output is commentary/explanation",
+		Errors: []string{},
+		GeneratedAt: time.Now().UTC(),
 	}
-	if h.CourtClient == nil {
+	if tier == "free" || tier == "basic" || h == nil || h.CourtClient == nil {
 		return report
 	}
 	applied, exhausted := h.applyCourtBudget(ctx, tier)
 	if exhausted {
 		report.Status = "budget_exhausted"
 		report.TierApplied = applied
-		tier = applied
+		return report
 	}
+	tier = applied
 	if tier != "pro" && tier != "enterprise" {
 		return report
 	}
 	if !envBool("KOSCHEI_COURT_PROSECUTORS_ENABLED", true) {
 		return report
 	}
-	kimi, err := h.CourtClient.ProsecutorOpinion(ctx, in, "kimi-k2.6")
-	if err != nil {
+
+	for _, role := range []string{"kimi-k2.6", "minimax-m3"} {
+		opinion, err := h.CourtClient.ProsecutorOpinion(ctx, in, role)
+		if err != nil {
+			report.Errors = append(report.Errors, role+": "+err.Error())
+			continue
+		}
+		report.Prosecutors = append(report.Prosecutors, normalizeCourtOpinion(opinion, role))
+	}
+	if len(report.Prosecutors) == 0 {
 		report.Status = "error"
 		return report
 	}
-	mini, err := h.CourtClient.ProsecutorOpinion(ctx, in, "minimax-m3")
-	if err != nil {
-		report.Status = "error"
-		return report
-	}
-	report.Prosecutors = []CourtOpinion{normalizeCourtOpinion(kimi, "kimi-k2.6"), normalizeCourtOpinion(mini, "minimax-m3")}
 	report.Disagreement = prosecutorsDisagree(report.Prosecutors)
 	gradeChanging := len(in.SignedVerdict.TriggeredRules) > 0 || strings.TrimSpace(in.SignedVerdict.Grade) != "-"
 	panelRan := false
-	if (gradeChanging || report.Disagreement) && envBool("KOSCHEI_COURT_PANEL_ENABLED", true) {
+	panelRequired := gradeChanging || report.Disagreement || len(report.Prosecutors) < 2
+	if panelRequired && envBool("KOSCHEI_COURT_PANEL_ENABLED", true) {
 		panel, err := h.CourtClient.PanelOpinion(ctx, in, report.Prosecutors)
 		if err != nil {
-			report.Status = "error"
-			return report
+			report.Errors = append(report.Errors, "first_instance_panel: "+err.Error())
+		} else {
+			report.Panel = &panel
+			panelRan = true
 		}
-		report.Panel = &panel
-		panelRan = true
 	}
 	if tier == "enterprise" && envBool("KOSCHEI_COURT_SENIOR_ENABLED", true) && (isDF(in.SignedVerdict.Grade) || panelRan || requestedExtended) {
 		senior, err := h.CourtClient.SeniorOpinion(ctx, in, report.Prosecutors, report.Panel)
 		if err != nil {
-			report.Status = "error"
-			return report
+			report.Errors = append(report.Errors, "senior_panel: "+err.Error())
+		} else {
+			report.Senior = &senior
 		}
-		report.Senior = &senior
 	}
-	report.Status = "ready"
+	if len(report.Errors) > 0 {
+		report.Status = "partial"
+	} else {
+		report.Status = "ready"
+	}
 	return report
 }
 
@@ -123,6 +145,7 @@ func (h *Handler) courtTier(ctx context.Context) string {
 	}
 	return normalizeCourtTier(ev.Tier)
 }
+
 func normalizeCourtTier(t string) string {
 	switch strings.ToLower(strings.TrimSpace(t)) {
 	case "basic", "pro", "enterprise":
@@ -131,6 +154,7 @@ func normalizeCourtTier(t string) string {
 		return "free"
 	}
 }
+
 func envBool(k string, d bool) bool {
 	raw := strings.ToLower(strings.TrimSpace(os.Getenv(k)))
 	if raw == "" {
@@ -138,22 +162,38 @@ func envBool(k string, d bool) bool {
 	}
 	return raw == "1" || raw == "true" || raw == "yes" || raw == "on"
 }
+
 func normalizeCourtOpinion(o CourtOpinion, model string) CourtOpinion {
-	o.Model = firstNonEmptyString(o.Model, model)
-	s := strings.ToLower(strings.TrimSpace(o.Stance))
-	if s != "elevated" && s != "neutral" && s != "insufficient" {
-		s = "insufficient"
-	}
-	o.Stance = s
+	o.Model = firstNonEmptyString(strings.TrimSpace(o.Model), model)
+	o.Stance = normalizeCourtStance(o.Stance)
+	o.Text = strings.TrimSpace(o.Text)
+	o.EvidenceIDs = courtUniqueStrings(o.EvidenceIDs, 64)
+	o.Limitations = courtUniqueStrings(o.Limitations, 32)
 	return o
 }
+
 func prosecutorsDisagree(p []CourtOpinion) bool {
 	if len(p) < 2 {
 		return false
 	}
 	return strings.TrimSpace(p[0].Stance) != strings.TrimSpace(p[1].Stance)
 }
-func isDF(g string) bool { g = strings.ToUpper(strings.TrimSpace(g)); return g == "D" || g == "F" }
+
+func isDF(g string) bool {
+	g = strings.ToUpper(strings.TrimSpace(g))
+	return g == "D" || g == "F"
+}
+
+func courtCaseID(in CourtReadOnlyInput) string {
+	signature := strings.TrimSpace(in.SignedVerdict.Signature)
+	if signature == "" {
+		return ""
+	}
+	if len(signature) > 18 {
+		signature = signature[:18]
+	}
+	return "ARVIS-" + strings.ToUpper(signature)
+}
 
 func (h *Handler) applyCourtBudget(ctx context.Context, tier string) (string, bool) {
 	limit := courtDailyLimit(tier)
@@ -173,6 +213,7 @@ func (h *Handler) applyCourtBudget(ctx context.Context, tier string) (string, bo
 	}
 	return tier, false
 }
+
 func courtDailyLimit(tier string) int {
 	raw := os.Getenv("KOSCHEI_COURT_QUOTA_" + strings.ToUpper(tier) + "_DAILY")
 	if raw == "" {
@@ -190,6 +231,7 @@ func courtDailyLimit(tier string) int {
 	}
 	return v
 }
+
 func lowerCourtTier(t string) string {
 	if t == "enterprise" {
 		return "pro"
@@ -205,7 +247,12 @@ func (h *Handler) courtScheduledReport(ctx context.Context) *CourtReport {
 		return nil
 	}
 	tier := h.courtTier(ctx)
-	report := &CourtReport{Status: "skipped", TierApplied: tier, Authority: "the signed deterministic verdict is final; court output is commentary/explanation"}
+	report := &CourtReport{
+		Status: "skipped",
+		TierApplied: tier,
+		Authority: "the signed deterministic verdict is final; court output is commentary/explanation",
+		GeneratedAt: time.Now().UTC(),
+	}
 	if tier == "free" || tier == "basic" || h.CourtClient == nil {
 		return report
 	}
