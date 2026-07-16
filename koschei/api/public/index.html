@@ -3,77 +3,89 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Koschei ARVIS ile Solana tokenlarını, şüpheli bağlantıları, cüzdan adreslerini ve işlemleri imzalamadan önce kontrol edin.">
-<title>Koschei ARVIS | Solana Güvenlik Merkezi</title>
+<meta name="description" content="Koschei ARVIS, Solana tokenları ve işlemleri için kanıta dayalı güvenlik, threat anticipation ve imzalı risk dosyaları üretir.">
+<meta name="theme-color" content="#02050a">
+<title>Koschei ARVIS | Kanıta Dayalı Web3 Güvenlik Sistemi</title>
 <link rel="canonical" href="https://tradepigloball.co/">
-<link rel="stylesheet" href="/css/koschei-global-shell.css?v=3">
+<link rel="stylesheet" href="/css/koschei-global-shell.css?v=4">
 <style>
-:root{--line:#25f5e533;--text:#f7fbff;--muted:#9eb0c2;--green:#18ffb2;--cyan:#24eaff;--violet:#9b7cff;--red:#ff4d6d;--amber:#ffce66;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,sans-serif;background:radial-gradient(circle at 10% 0,#18ffb22c,transparent 32%),radial-gradient(circle at 88% 5%,#8b5cff28,transparent 30%),linear-gradient(135deg,#020409,#071522 58%,#02050b)}a{color:inherit;text-decoration:none}button,textarea,select{font:inherit}.page{width:min(1180px,calc(100% - 24px));margin:auto;padding:20px 0 46px}.surface,.card,.scanner{border:1px solid var(--line);background:linear-gradient(145deg,#ffffff16,#071421d0);box-shadow:0 30px 90px #0008,inset 0 0 38px #24eaff07}.top{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 14px;border-radius:24px;margin-bottom:24px}.brand{display:flex;align-items:center;gap:10px;font-weight:1000}.mark{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;color:#03110d;background:linear-gradient(135deg,var(--green),var(--cyan))}.nav,.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);border-radius:999px;padding:10px 14px;color:var(--muted);font-weight:900;display:inline-flex;align-items:center;justify-content:center;min-height:48px;background:#ffffff08}.btn.primary{border:0;color:#03110d;background:linear-gradient(135deg,var(--green),var(--cyan))}.btn.hot{border:0;color:#05060d;background:linear-gradient(135deg,#fff,var(--violet))}.hero{display:grid;grid-template-columns:1fr 420px;gap:16px;align-items:stretch}.hero>article,.scanner{padding:clamp(24px,4vw,44px);border-radius:34px}.eyebrow{display:inline-flex;padding:7px 11px;border:1px solid #18ffb244;border-radius:999px;background:#18ffb216;color:#bfffe8;font:900 11px var(--mono);letter-spacing:.1em;text-transform:uppercase}h1,h2,h3,p{margin:0}h1{margin:18px 0 14px;font-size:clamp(44px,7vw,82px);line-height:.94;letter-spacing:-.07em}.gradient{background:linear-gradient(135deg,#fff,#bfffe8 45%,#82ddff);-webkit-background-clip:text;background-clip:text;color:transparent}.sub{color:var(--muted);font-size:16px;line-height:1.75}.scanner h2{font-size:28px;letter-spacing:-.035em;margin:12px 0}.scanner textarea{width:100%;min-height:146px;resize:vertical;color:var(--text);background:#02070d;border:1px solid var(--line);border-radius:18px;padding:14px;font:14px var(--mono);outline:none}.scanner select{width:100%;margin-top:10px;color:var(--text);background:#02070d;border:1px solid var(--line);border-radius:16px;padding:12px;outline:none}.scanner .run{width:100%;margin-top:10px;border:0;border-radius:16px;min-height:52px;color:#02110d;background:linear-gradient(135deg,var(--green),var(--cyan));font-weight:1000;cursor:pointer}.scanner .run:disabled{opacity:.65;cursor:wait}.result{margin-top:12px;border:1px solid #ffffff14;border-radius:18px;padding:14px;background:#ffffff08;display:none}.result.show{display:block}.score{font-size:42px;font-weight:1000}.score.good{color:var(--green)}.score.warn{color:var(--amber)}.score.bad{color:var(--red)}.line{border-top:1px solid #ffffff12;margin-top:10px;padding-top:10px;color:#cfe1eb;line-height:1.45}.proof{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}.metric{padding:16px;border:1px solid #ffffff14;border-radius:20px;background:#ffffff07}.metric label{display:block;color:var(--muted);font:900 10px var(--mono);text-transform:uppercase;letter-spacing:.08em}.metric b{display:block;margin-top:7px;color:var(--green);font-size:30px}.metric small{display:block;color:var(--muted);margin-top:4px}.section{margin-top:26px}.section h2{font-size:clamp(32px,5vw,54px);letter-spacing:-.05em;margin:8px 0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}.card{padding:22px;border-radius:26px}.card h3{font-size:20px;margin-bottom:9px}.card p,.card li{color:var(--muted);line-height:1.62}.protect{display:grid;grid-template-columns:1fr 320px;gap:14px;align-items:center;padding:clamp(22px,4vw,34px);border-radius:30px}.protect .box{border:1px solid #ffffff16;background:#ffffff08;border-radius:22px;padding:18px}.protect code{display:block;font-family:var(--mono);color:#c8faff;word-break:break-word}.token{display:grid;grid-template-columns:.9fr 1.1fr;gap:14px}.pill{display:inline-flex;gap:8px;align-items:center;border:1px solid #ffffff16;background:#ffffff08;border-radius:999px;padding:9px 12px;color:#dffdf4;font-weight:900;margin:4px 4px 0 0}.timeline{display:grid;gap:10px;margin-top:16px}.step{display:grid;grid-template-columns:48px 1fr;gap:12px;align-items:start;padding:16px;border-radius:22px;border:1px solid #ffffff14;background:#ffffff07}.step strong{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,var(--green),var(--cyan));color:#02100c}.step b{display:block;margin-bottom:5px}.step span{color:var(--muted);line-height:1.55}.trust{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}.trust div{padding:17px;border-radius:22px}.trust b{display:block;color:#bfffe8;margin-bottom:6px}.trust span{color:var(--muted);line-height:1.5;font-size:13px}.statement{margin-top:16px;padding:20px;border-radius:24px;border:1px solid #18ffb245;background:#18ffb20d;color:#dffdf4;font-size:18px;line-height:1.55}
-@media(max-width:960px){.hero,.grid,.trust,.token,.protect{grid-template-columns:1fr}.proof{grid-template-columns:repeat(2,1fr)}.top{align-items:flex-start;flex-direction:column}.nav{width:100%}.nav .btn{flex:1}}
-@media(max-width:560px){.page{width:calc(100% - 14px)}.hero>article,.scanner{padding:20px;border-radius:26px}.proof{grid-template-columns:repeat(2,1fr)}.actions .btn{width:100%}.card p,.trust span{font-size:15px}.metric{padding:13px}.metric b{font-size:24px}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;min-height:100vh;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit;text-decoration:none}button,textarea,select{font:inherit}.page{margin:auto;padding:18px 0 54px}.surface,.card,.scanner{border:1px solid var(--k-line);border-radius:26px}.top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.brand{display:flex;align-items:center;gap:11px}.mark{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;color:#02110d;background:linear-gradient(135deg,var(--k-green),var(--k-cyan));font-weight:1000}.nav,.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:10px 14px;border:1px solid var(--k-line);border-radius:999px;background:#ffffff09;color:var(--k-text);font-weight:900}.hero-copy h1{margin:18px 0 14px;font-size:clamp(48px,7.5vw,88px);line-height:.92}.sub{font-size:16px;line-height:1.72}.scanner h2{margin:12px 0;font-size:30px}.scanner textarea{width:100%;min-height:150px;resize:vertical;padding:15px;border-radius:18px;color:var(--k-text);font:14px var(--k-mono)}.scanner select{width:100%;margin-top:10px;padding:13px;border-radius:16px;color:var(--k-text)}.scanner .run{width:100%;min-height:54px;margin-top:10px;border:0;border-radius:16px;color:#02110d;font-weight:1000;cursor:pointer}.result{display:none;margin-top:12px;padding:14px;border:1px solid #ffffff14;border-radius:18px;background:#ffffff07}.result.show{display:block}.score{font-size:42px;font-weight:1000}.score.good{color:var(--k-green)}.score.warn{color:var(--k-amber)}.score.bad{color:var(--k-red)}.line{margin-top:10px;padding-top:10px;border-top:1px solid #ffffff12;color:#cfe1eb;line-height:1.48}.proof{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}.metric{padding:17px;border:1px solid #ffffff14;border-radius:20px;background:#ffffff07}.metric label{display:block;color:var(--k-muted);font:900 10px var(--k-mono);text-transform:uppercase;letter-spacing:.08em}.metric b{display:block;margin-top:7px;color:var(--k-green);font-size:31px}.metric small{display:block;margin-top:4px;color:var(--k-muted)}.section-title{margin:8px 0 0;font-size:clamp(34px,5vw,58px)}.trust{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}.trust>div{padding:18px;border-radius:22px}.trust b{display:block;color:#c9fff1;margin-bottom:7px}.trust span{color:var(--k-muted);font-size:13px;line-height:1.55}@media(max-width:900px){.proof,.trust{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.proof,.trust{grid-template-columns:1fr}.actions .btn{width:100%}}
 </style>
+<link rel="stylesheet" href="/css/koschei-product-v2.css?v=1">
 </head>
-<body>
+<body class="koschei-v2">
 <main class="page">
 <nav class="top surface">
-<a class="brand" href="/"><span class="mark">K</span><span>Koschei ARVIS</span></a>
-<div class="nav"><a class="btn" href="/scan">Token Tara</a><a class="btn" href="/transaction-shield">İşlem Kalkanı</a><a class="btn" href="/safe-check">Güvenli Kontrol</a><a class="btn" href="/security-radar">Radar</a><a class="btn" href="/dashboard">Panel</a><a class="btn" href="/kosch">KOSCH</a></div>
+<a class="brand" href="/"><span class="mark">K</span><span><strong>Koschei ARVIS</strong><br><small class="muted">Evidence Intelligence System</small></span></a>
+<div class="nav"><a class="btn" href="/scan">Token Tara</a><a class="btn" href="/safe-check">Safe Check</a><a class="btn" href="/transaction-shield">İşlem Kalkanı</a><a class="btn" href="/security-radar">Security Radar</a><a class="btn" href="/dashboard">Panel</a></div>
 </nav>
 
-<section class="hero">
-<article class="surface">
-<span class="eyebrow">Ücretsiz Web3 güvenlik kontrolü</span>
-<h1><span class="gradient">İmzalamadan önce kontrol et.</span></h1>
-<p class="sub">Şüpheli bağlantıyı, token adresini, alıcı cüzdanını veya imza metnini Koschei ARVIS’e gönder. ARVIS riski kanıtlarıyla açıklar ve işlem yapmadan önce seni uyarır.</p>
-<div class="actions"><a class="btn primary" href="#instant-check">Hemen kontrol et</a><a class="btn hot" href="/scan">Token tara</a><a class="btn" href="/transaction-shield">İşlemi simüle et</a></div>
+<section class="product-masthead" data-reveal>
+<article class="surface hero-copy">
+<span class="eyebrow">Kanıta dayalı Web3 güvenlik sistemi</span>
+<h1><span class="gradient">Niyet tahmin etmez.<br>Riski kanıtlar.</span></h1>
+<p class="sub">Koschei ARVIS; token, cüzdan, işlem ve aktör verilerini tek bir imzalı güvenlik dosyasına dönüştürür. Yalnız bugünkü riski değil, açık kalan rug yollarını, piyasa etkileme kapasitesini ve bir sonraki kritik zincir üstü sinyali de gösterir.</p>
+<div class="actions" style="margin-top:22px"><a class="btn primary" href="#instant-check">Ücretsiz kontrol et</a><a class="btn hot" href="/security-radar">Tam risk dosyasını aç</a></div>
+<div class="product-proofline"><span class="evidence-chip">Deterministik verdict</span><span class="evidence-chip">Threat anticipation</span><span class="evidence-chip">İmzalı kanıt</span><span class="evidence-chip warn">Eksik veri görünür</span></div>
 </article>
 <aside class="scanner" id="instant-check">
-<span class="eyebrow">Hızlı güvenlik kontrolü</span>
+<span class="eyebrow">Free Safe Check · sıfır model çağrısı</span>
 <h2>Şüpheli hedefi yapıştır</h2>
+<p class="sub">Bağlantı, token minti, cüzdan, alıcı adresi veya işlem niyetini hızlı deterministik preflight ile kontrol et.</p>
 <textarea id="target" placeholder="Bağlantı, token mint, cüzdan adresi, alıcı adresi veya imza metni girin"></textarea>
 <select id="intent"><option value="claim">Airdrop veya ödül talebi</option><option value="connect">Cüzdan bağlantısı</option><option value="buy">Token satın alma</option><option value="send">Transfer veya alıcı adresi</option><option value="sign">İmza veya işlem</option><option value="research">Sadece araştırma</option></select>
 <button class="run" id="run">ARVIS ile kontrol et</button>
 <div class="result" id="result"></div>
+<div class="signal-stack" style="margin-top:12px"><div class="signal-card"><strong class="live-indicator" data-koschei-live>ARVIS durumu kontrol ediliyor</strong><span>Seed phrase, private key veya kör imza istenmez.</span></div></div>
 </aside>
 </section>
 
-<section class="section"><div class="proof">
+<section class="proof" data-reveal>
 <div class="metric"><label>Tamamlanan işlemler</label><b id="completed">—</b><small>işlenen görev</small></div>
 <div class="metric"><label>İmzalı kararlar</label><b id="verdicts">—</b><small>kanıtlı sonuç</small></div>
 <div class="metric"><label>Yeniden denenebilir</label><b id="retryable">—</b><small>geçici hata</small></div>
 <div class="metric"><label>Başarısız</label><b id="exhausted">—</b><small>tamamlanamayan görev</small></div>
-</div></section>
-
-<section class="section protect surface">
-<div><span class="eyebrow">Kanıta dayalı güvenlik</span><h2>Token, cüzdan ve işlemleri tek yerde incele.</h2><p class="sub">Koschei; token authority bilgilerini, holder yoğunluğunu, Token-2022 özelliklerini, şüpheli bağlantıları, alıcı adreslerini ve işlem simülasyonlarını aynı güvenlik katmanında birleştirir.</p><div class="actions"><a class="btn primary" href="/scan">Token taraması</a><a class="btn" href="/transaction-shield">İşlem kalkanı</a></div></div>
-<div class="box"><span class="eyebrow">ARVIS güvenlik kuralı</span><code>Seed phrase yok. Private key yok. Kör imza yok.</code><p class="sub" style="margin-top:12px">Kanıt yoksa kesin hüküm yok. Risk varsa nedeni açıkça gösterilir.</p></div>
 </section>
 
-<section class="section">
-<span class="eyebrow">ARVIS modülleri</span>
-<h2>Hasar oluşmadan önce riski açıklar.</h2>
-<div class="grid">
-<article class="card"><h3>Token Güvenlik Taraması</h3><p>Mint ve freeze authority, arz, holder yoğunluğu ve Token-2022 davranışlarını canlı zincir verisiyle inceler.</p></article>
-<article class="card"><h3>İşlem Kalkanı</h3><p>Serialized Solana işlemini imzalamadan ve göndermeden önce simüle eder; çağrılan programları ve tehlikeli talimatları açıklar.</p></article>
-<article class="card"><h3>Güvenli Kontrol</h3><p>Şüpheli bağlantı, claim sayfası, cüzdan bağlantısı ve imza niyeti için hızlı ön kontrol sağlar.</p></article>
-<article class="card"><h3>Adres Zehirleme Kalkanı</h3><p>Transferden önce benzer görünen sahte alıcı adreslerini ve adres zehirleme riskini denetler.</p></article>
-<article class="card"><h3>Canlı Güvenlik Radarı</h3><p>Solana yüzeylerindeki kanıtları, imzalı kararları ve aktör ilişkilerini tek sonuçta birleştirir.</p></article>
-<article class="card"><h3>İzleme ve API</h3><p>Watchlist, webhook ve geliştirici API’siyle risk değişimlerini otomatik olarak izler.</p></article>
+<section class="product-section" data-reveal>
+<div class="product-section-head"><div><span class="eyebrow">Bir risk dosyası nasıl oluşur?</span><h2 class="section-title">Ham zincir verisinden aksiyon alınabilir karara.</h2><p>Koschei, modeli gerçeğin yerine koymaz. Önce kanıtı doğrular; sonra kapasiteyi, açık yolu ve izlenecek sinyali sınıflandırır.</p></div></div>
+<div class="case-flow">
+<div class="case-step"><span class="step-no">1</span><small>Target</small><b>Hedefi sınıflandır</b><p>Token, wallet, program, işlem veya bağlantı yüzeyi.</p></div>
+<div class="case-step"><span class="step-no">2</span><small>Evidence</small><b>Kanıt kollarını çalıştır</b><p>Authority, holder, funding, creator, flow, launch ve program ilişkileri.</p></div>
+<div class="case-step"><span class="step-no">3</span><small>Anticipation</small><b>Açık yolları çıkar</b><p>Dominant-holder exit, likidite kontrolü, koordineli çıkış ve diğer teknik yollar.</p></div>
+<div class="case-step"><span class="step-no">4</span><small>Verdict</small><b>İmzalı kararı üret</b><p>Tek deterministik ruleset; eksik veri güvenli kabul edilmez.</p></div>
+<div class="case-step"><span class="step-no">5</span><small>Action</small><b>Sonraki sinyali izle</b><p>Owner hareketi, LP değişimi, DEX çıkışı ve aktör tekrarları.</p></div>
 </div>
 </section>
 
-<section class="section token">
-<article class="surface" style="padding:26px;border-radius:30px"><span class="eyebrow">KOSCH erişimi</span><h2>Gelişmiş ARVIS özelliklerini açar.</h2><p class="sub">KOSCH; derin Radar sonuçları, aktör grafiği, geçmiş kararlar, watchlist, webhook ve geliştirici API’si gibi gelişmiş özelliklere erişim sağlar.</p><div style="margin-top:14px"><span class="pill">Temel</span><span class="pill">Pro</span><span class="pill">Kurumsal</span></div><div class="actions"><a class="btn primary" href="/kosch">KOSCH şeffaflık sayfası</a><a class="btn" href="/kosch-access">Erişimi doğrula</a></div></article>
-<article class="surface" style="padding:26px;border-radius:30px"><span class="eyebrow">Kullanım akışı</span><div class="timeline"><div class="step"><strong>1</strong><span><b>Hedefi kontrol et</b>Token, bağlantı, adres veya işlemi ARVIS’e gönder.</span></div><div class="step"><strong>2</strong><span><b>Kanıtı incele</b>Risk notunu, nedenlerini ve önerilen aksiyonu gör.</span></div><div class="step"><strong>3</strong><span><b>Sürekli izle</b>Watchlist ve webhook ile önemli değişikliklerden haberdar ol.</span></div></div></article>
+<section class="product-section" data-reveal>
+<div class="product-section-head"><div><span class="eyebrow">Koschei neyi gösterir?</span><h2 class="section-title">“Riskli” demekle kalmaz; nedenini açar.</h2></div></div>
+<div class="proof-wall">
+<div class="proof-item"><span class="proof-icon">%</span><b>Kontrol kapasitesi</b><p>Gerçek owner dağılımını, protokol/burn ayrımını ve baskın pozisyonun likiditeye oranını gösterir.</p></div>
+<div class="proof-item"><span class="proof-icon">⇢</span><b>Açık rug yolları</b><p>Mint inflation, freeze abuse, dominant-holder exit ve likidite çekimi yollarını açık, kapalı veya bilinmiyor olarak sınıflandırır.</p></div>
+<div class="proof-item"><span class="proof-icon">⌁</span><b>Aktör ve funding ilişkisi</b><p>Ortak fonlayıcı, senkron alım, cüzdan içi transfer ve ortak çıkış davranışını delilleriyle bağlar.</p></div>
+<div class="proof-item"><span class="proof-icon">↗</span><b>Erken uyarı</b><p>Owner balance düşüşü, wallet fragmentation, LP hareketi ve ilk DEX çıkışı gibi kritik tetikleri izler.</p></div>
+<div class="proof-item"><span class="proof-icon">✓</span><b>İmzalı verdict</b><p>Grade yalnız deterministik ruleset’ten çıkar. AI açıklama yazabilir ama kanıt veya karar uyduramaz.</p></div>
+<div class="proof-item"><span class="proof-icon">◫</span><b>Görsel dava dosyası</b><p>Holder, funding, timeline ve graph exhibit’leri gerçek node, edge ve işlem verisinden oluşturulur.</p></div>
+</div>
 </section>
 
-<section class="section">
-<span class="eyebrow">Kimler kullanır?</span>
-<h2>Yatırımcılar, kullanıcılar, geliştiriciler ve güvenlik ekipleri.</h2>
-<div class="trust"><div class="surface"><b>Yatırımcılar</b><span>Token almadan önce authority, holder ve likidite riskini inceler.</span></div><div class="surface"><b>Normal kullanıcılar</b><span>Bağlanmadan, transfer etmeden veya imzalamadan önce şüpheli hedefi kontrol eder.</span></div><div class="surface"><b>Geliştiriciler</b><span>Hazır API ve risk çıktılarıyla güvenlik katmanını ürünlerine ekler.</span></div><div class="surface"><b>Güvenlik ekipleri</b><span>Token, cüzdan, işlem ve aktör verilerini tek merkezde izler.</span></div></div>
-<div class="statement">Koschei söylenti üretmez; doğrulanmış kanıtı gösterir.</div>
+<section class="product-section" data-reveal>
+<div class="product-section-head"><div><span class="eyebrow">Ürün katmanları</span><h2 class="section-title">Maliyet, derinlik ve karar seviyesi birlikte büyür.</h2></div></div>
+<div class="tier-grid">
+<article class="tier-card"><span class="tier-kicker">Sıfır model çağrısı</span><div class="tier-name">Free</div><p>İmzalamadan önce hızlı deterministik güvenlik kontrolü.</p><ul><li>Safe Check</li><li>Temel token taraması</li><li>Authority ve holder sinyalleri</li><li>Kanıt yoksa hüküm yok</li></ul><div class="tier-foot">Maliyet: yaklaşık sıfır</div></article>
+<article class="tier-card featured"><span class="tier-kicker">İmzalı intelligence</span><div class="tier-name">Basic</div><p>Tam ARVIS taraması, signed verdict ve Threat Anticipation dosyası.</p><ul><li>14 evidence arm</li><li>Verdict Card</li><li>Açık/kapalı risk yolları</li><li>Eksik delil listesi</li></ul><div class="tier-foot">Kanıt tam, anlatı minimal</div></article>
+<article class="tier-card"><span class="tier-kicker">Koşullu derin inceleme</span><div class="tier-name">Pro</div><p>Aktör hafızası, graph, exposure, watch ve savcı inceleme katmanı.</p><ul><li>Creator / funding dossier</li><li>Cross-token actor memory</li><li>Koşullu prosecutor review</li><li>Watchlist ve alarm</li></ul><div class="tier-foot">Derinlik yalnız gerektiğinde</div></article>
+<article class="tier-card enterprise"><span class="tier-kicker">Tam mahkeme dosyası</span><div class="tier-name">Enterprise</div><p>Üst heyet, geniş rapor, exhibit paketi ve geliştirici entegrasyonu.</p><ul><li>Senior review katmanı</li><li>Çoğunluk ve muhalefet görüşü</li><li>Deterministik görsel exhibit</li><li>API ve webhook</li></ul><div class="tier-foot">En pahalı katman en yüksek tier’da</div></article>
+</div>
 </section>
+
+<section class="product-section" data-reveal>
+<div class="statement">Koschei’nin sözü basit: <strong>“Niyet tahmin etmez; riski kanıtlar.”</strong></div>
+<div class="trust"><div class="surface"><b>Yatırımcılar</b><span>Token almadan önce control capacity, holder ve likidite yollarını inceler.</span></div><div class="surface"><b>Normal kullanıcılar</b><span>Bağlanmadan, transfer etmeden veya imzalamadan önce hedefi kontrol eder.</span></div><div class="surface"><b>Geliştiriciler</b><span>İmzalı risk çıktısını API ile ürünlerine taşır.</span></div><div class="surface"><b>Güvenlik ekipleri</b><span>Aktör, işlem ve threat-case akışlarını tek merkezde izler.</span></div></div>
+</section>
+
+<footer class="product-footer"><span>© Koschei ARVIS · Solana-first evidence intelligence</span><nav><a href="/scan">Ücretsiz Tarama</a><a href="/security-radar">Security Radar</a><a href="/kosch">KOSCH</a><a href="/docs/api">API</a></nav></footer>
 </main>
 <script>
 (function(){
@@ -82,12 +94,13 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function kind(score,level,decision){score=Number(score||0);const s=String(level+' '+decision).toLowerCase();return score>=75||s.includes('high')||s.includes('block')?'bad':score>=45||s.includes('medium')||s.includes('warn')||s.includes('review')?'warn':'good'}
 function decisionLabel(value){const v=String(value||'review').toLowerCase();if(v==='blocked'||v==='block')return'ENGELLE';if(v==='warn')return'UYARI';if(v==='allow')return'İZİN VER';return'İNCELE'}
 function levelLabel(value){const v=String(value||'unknown').toLowerCase();return({critical:'kritik',high:'yüksek',medium:'orta',low:'düşük',unknown:'belirsiz'})[v]||v}
-function render(data){const score=data.score??data.risk_index??0,level=data.risk_level||'unknown',decision=data.decision||data.policy||'review',k=kind(score,level,decision),reasons=Array.isArray(data.reasons)?data.reasons:[],steps=Array.isArray(data.next_steps)?data.next_steps:[];result.className='result show';result.innerHTML='<div class="score '+k+'">'+esc(score)+'</div><b>'+decisionLabel(decision)+' · '+esc(levelLabel(level))+'</b><p class="sub" style="margin-top:6px">'+esc(data.human_message||data.verdict||'ARVIS ön kontrolü tamamlandı.')+'</p>'+reasons.concat(steps).slice(0,5).map(x=>'<div class="line">'+esc(x)+'</div>').join('')+'<div class="actions" style="margin-top:12px"><a class="btn primary" href="/safe-check">Ayrıntılı kontrol</a><a class="btn" href="/dashboard">Derin tarama</a></div>'}
+function render(data){const score=data.score??data.risk_index??0,level=data.risk_level||'unknown',decision=data.decision||data.policy||'review',k=kind(score,level,decision),reasons=Array.isArray(data.reasons)?data.reasons:[],steps=Array.isArray(data.next_steps)?data.next_steps:[];result.className='result show';result.innerHTML='<div class="score '+k+'">'+esc(score)+'</div><b>'+decisionLabel(decision)+' · '+esc(levelLabel(level))+'</b><p class="sub" style="margin-top:6px">'+esc(data.human_message||data.verdict||'ARVIS ön kontrolü tamamlandı.')+'</p>'+reasons.concat(steps).slice(0,5).map(x=>'<div class="line">'+esc(x)+'</div>').join('')+'<div class="actions" style="margin-top:12px"><a class="btn primary" href="/safe-check">Ayrıntılı kontrol</a><a class="btn" href="/security-radar?target='+encodeURIComponent(target.value.trim())+'">Derin tarama</a></div>'}
 run.onclick=async()=>{const t=target.value.trim();if(!t){result.className='result show';result.innerHTML='<div class="line">Önce kontrol edilecek bağlantı, token, adres veya imza metnini gir.</div>';return}run.disabled=true;run.textContent='Kontrol ediliyor…';result.className='result show';result.innerHTML='<div class="line">ARVIS kanıtları inceliyor…</div>';try{const res=await fetch('/api/arvis/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:t,intent:intent.value,note:'landing_instant_safe_check'})});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||'failed');render(data)}catch(e){result.innerHTML='<div class="line">Güvenlik kontrolü şu anda tamamlanamadı. Şüpheli işlemi yapma ve daha sonra tekrar dene.</div>'}finally{run.disabled=false;run.textContent='ARVIS ile kontrol et'}};
 })();
 (async()=>{try{const r=await fetch('/health',{cache:'no-store'});const d=await r.json();const a=d.arvis||{};const f=a.failures||{};const tr=n=>Number(n||0).toLocaleString('tr-TR');document.getElementById('completed').textContent=tr(a.processing_completed);document.getElementById('verdicts').textContent=tr(a.visible_verdicts||a.processing_completed_recent);document.getElementById('retryable').textContent=tr(f.retryable);document.getElementById('exhausted').textContent=tr(f.exhausted)}catch{}})();
 </script>
 <script src="/js/koschei-global-shell.js?v=4"></script>
+<script src="/js/koschei-product-v2.js?v=1"></script>
 <script src="/js/feedback-button.js?v=1"></script>
 </body>
 </html>
