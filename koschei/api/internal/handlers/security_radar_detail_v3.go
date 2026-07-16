@@ -61,6 +61,7 @@ func (h *Handler) SecurityRadarDetailV3(w http.ResponseWriter, r *http.Request) 
 		"holder_intelligence": holderIntelligence,
 		"holder_cluster":      holderCluster,
 		"launch_forensics":    launchForensics,
+		"threat_anticipation": core.ThreatAnticipation,
 		"actor_intelligence":  actorIntelligence,
 		"market":              market,
 		"structural_memory":   structural,
@@ -73,6 +74,8 @@ func (h *Handler) SecurityRadarDetailV3(w http.ResponseWriter, r *http.Request) 
 		"evidence_policy": map[string]any{
 			"hide_verified_details": false,
 			"no_evidence_no_claim":  true,
+			"numeric_rug_probability_disabled": true,
+			"threat_capacity_is_not_intent": true,
 			"creator_wallet_scope":  "source-reported or on-chain relation; not proof of wrongdoing or real-world identity",
 			"actor_relation_scope":  "wallet funding, token flow and launch relations are evidence-scoped; no real-world identity claim",
 			"financial_advice":      false,
