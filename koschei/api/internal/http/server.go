@@ -171,12 +171,13 @@ func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, koschTier ti
 	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, koschTier("basic", method("POST", h.SecurityRadarCheck))))
 	mux.HandleFunc("/api/v1/radar/detail", requiresDB(h, koschTier("basic", method("GET", h.SecurityRadarDetailV3))))
 
-	// Pro: cross-token history, persistent actor memory, graph and exposure.
+	// Pro: cross-token history, persistent actor memory, graph, exposure and court review.
 	mux.HandleFunc("/api/v1/radar/feed", requiresDB(h, koschTier("pro", method("GET", h.SecurityRadarFeed))))
 	mux.HandleFunc("/api/v1/radar/creator-intelligence", requiresDB(h, koschTier("pro", method("GET", h.OwnerCreatorIntelligence))))
 	mux.HandleFunc("/api/v1/radar/actor-intelligence", requiresDB(h, koschTier("pro", method("GET", h.OwnerActorSecurityIntelligence))))
 	mux.HandleFunc("/api/v1/radar/graph", requiresDB(h, koschTier("pro", method("GET", h.SecurityRadarGraph))))
 	mux.HandleFunc("/api/v1/radar/exposure", requiresDB(h, koschTier("pro", method("GET", h.SecurityRadarExposureReport))))
+	mux.HandleFunc("/api/v1/radar/court", requiresDB(h, koschTier("pro", method("POST", h.SecurityRadarCourt))))
 }
 
 func registerDeveloperAPIRoutes(mux *http.ServeMux, h *handlers.Handler, enterprise routeGate, enterpriseMetered routeGate) {
