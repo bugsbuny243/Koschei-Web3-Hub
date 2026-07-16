@@ -13,6 +13,7 @@
       gathering:'EVIDENCE GATHERING',
       disc:'Koschei reports verified on-chain capability and behavior. It does not predict intent and is not investment advice.',
       leverage:'Owner control surface',checklist:'20 signals',noData:'no data',notYet:'not yet analyzed',active:'active',revoked:'revoked',tokens:'tokens',
+      findingTitles:{dominant_holder_exit:'DOMINANT-HOLDER EXIT CAPACITY',liquidity_removal:'LIQUIDITY CONTROL EXPOSURE',creator_sell_acceleration:'CREATOR SELL ACCELERATION',coordinated_holder_exit:'COORDINATED HOLDER EXIT SIGNAL',mint_inflation:'MINT AUTHORITY EXPOSURE',freeze_abuse:'FREEZE AUTHORITY EXPOSURE'},
       labels:{launch:'Launch time / age',mint:'Mint authority',freeze:'Freeze authority',wash:'Wash-trading / self-transfer volume',address:'Address behavior',liquidity:'Liquidity amount + lock status',funding:'Creator funding origin',concentration:'Holder concentration (owner-resolved)',sniper:'Sniper timing',firstBuyer:'First-buyer linkage (Sybil)',track:'Creator track record',creatorSell:'Creator sell behavior',dominantExit:'Dominant holder exit',liqMove:'Liquidity movement',program:'Program / contract relations',metadata:'Metadata / impersonation check',claim:'Claim / airdrop surface',mev:'MEV exposure',distribution:'Launch distribution fairness',signed:'Signed final verdict'},
       rows:{mint:'Owner can mint additional supply while mint authority remains active.',freeze:'Owner can freeze holder accounts while freeze authority remains active.',holder:'A single owner-resolved wallet controls {value}% of circulating supply and can materially affect market price.',lp:'Liquidity is verified as unlocked; the withdrawal path remains technically available.',repeat:'This creator cluster previously launched {value} tokens.'}
     },
@@ -24,6 +25,7 @@
       gathering:'KANIT TOPLANIYOR',
       disc:'Koschei doğrulanmış zincir üstü kabiliyet ve davranışı raporlar. Niyet tahmin etmez ve yatırım tavsiyesi değildir.',
       leverage:'Owner kontrol yüzeyi',checklist:'20 sinyal',noData:'veri yok',notYet:'henüz analiz edilmedi',active:'aktif',revoked:'iptal edildi',tokens:'token',
+      findingTitles:{dominant_holder_exit:'BASKIN HOLDER ÇIKIŞ KAPASİTESİ',liquidity_removal:'LİKİDİTE KONTROL MARUZİYETİ',creator_sell_acceleration:'CREATOR SATIŞ HIZLANMASI',coordinated_holder_exit:'KOORDİNELİ HOLDER ÇIKIŞ SİNYALİ',mint_inflation:'MINT YETKİSİ MARUZİYETİ',freeze_abuse:'FREEZE YETKİSİ MARUZİYETİ'},
       labels:{launch:'Başlangıç zamanı / yaş',mint:'Mint authority',freeze:'Freeze authority',wash:'Wash-trading / self-transfer hacmi',address:'Adres davranışı',liquidity:'Likidite miktarı + kilit durumu',funding:'Creator funding kaynağı',concentration:'Holder yoğunluğu (owner-resolved)',sniper:'Sniper zamanlaması',firstBuyer:'İlk alıcı bağlantısı (Sybil)',track:'Creator geçmişi',creatorSell:'Creator satış davranışı',dominantExit:'Baskın holder çıkışı',liqMove:'Likidite hareketi',program:'Program / kontrat ilişkileri',metadata:'Metadata / taklit kontrolü',claim:'Claim / airdrop yüzeyi',mev:'MEV maruziyeti',distribution:'Launch dağılım adaleti',signed:'İmzalı final verdict'},
       rows:{mint:'Mint authority aktif kaldığı sürece owner ek arz basabilir.',freeze:'Freeze authority aktif kaldığı sürece owner holder hesaplarını dondurabilir.',holder:'Owner-resolved tek bir cüzdan dolaşımdaki arzın %{value} kadarını kontrol ediyor ve piyasa fiyatını maddi ölçüde etkileyebilir.',lp:'Likiditenin kilitsiz olduğu doğrulandı; çekim yolu teknik olarak açıktır.',repeat:'Bu creator cluster daha önce {value} token başlattı.'}
     }
@@ -37,6 +39,7 @@
   const isWatch=e=>['OBSERVED','INFERRED'].includes(upper(e?.evidence_status||e?.verification_status||e?.status));
   const metrics=e=>obj(e?.metrics||e?.signals||e);
   const num=v=>{const n=Number(v);return Number.isFinite(n)?n:null};
+  const fmt=(value,locale)=>{const n=num(value);return n===null?'—':new Intl.NumberFormat(locale,{maximumFractionDigits:4}).format(n)};
   function findEvidence(payload,keys){
     const modules=arr(payload.modules).concat(arr(obj(payload.legacy_14_arm_radar).modules));
     const all=[...arr(payload.evidence),...modules,...arr(obj(payload.behavior_signals).signals)];
@@ -53,6 +56,24 @@
   }
   const knownValue=(value,lang)=>{const text=String(value??'').trim().toLowerCase();return text!==''&&text!=='—'&&text!==lang.noData.toLowerCase()&&text!==lang.notYet.toLowerCase()};
   function statusFor(e,triggered,value,lang){if(!e||!knownValue(value,lang))return'gray';if(isVerified(e))return triggered?'red':'green';if(isWatch(e))return'yellow';return'gray'}
+  function caseFinding(payload,langKey,lang){
+    const threat=obj(payload.threat_anticipation),exit=obj(threat.exit_capacity),paths=arr(threat.pathways);
+    const byId=id=>paths.find(path=>String(path?.id||'')===id);
+    const active=path=>path&&['open','observed','watch'].includes(String(path.status||'').toLowerCase());
+    const priority=['liquidity_removal','creator_sell_acceleration','coordinated_holder_exit','dominant_holder_exit','mint_inflation','freeze_abuse'].find(id=>active(byId(id)));
+    if(!priority)return null;
+    const title=lang.findingTitles[priority]||lang.signedFinding;
+    if(priority==='dominant_holder_exit'){
+      const pct=fmt(exit.owner_percentage,langKey==='tr'?'tr-TR':'en-US');
+      const multiple=fmt(exit.position_liquidity_multiple,langKey==='tr'?'tr-TR':'en-US');
+      const copy=langKey==='tr'
+        ?`Owner-resolved cüzdan arzın %${pct} kadarını kontrol ediyor; referans pozisyon gözlenen likiditenin ${multiple} katı. Bu kapasite bulgusudur, satış niyeti değildir.`
+        :`The owner-resolved wallet controls ${pct}% of supply; its reference position is ${multiple}x observed liquidity. This is a capacity finding, not evidence of intent to sell.`;
+      return{title,copy};
+    }
+    const path=byId(priority);
+    return{title,copy:String(path?.summary||lang.signedNoGrade)};
+  }
   function mapVerdictCard(payload,options={}){
     payload=obj(payload);const langKey=options.lang==='tr'?'tr':'en';const lang=LANG[langKey];const final=obj(payload.final_verdict);const signals=obj(final.signals||payload.signals);const distribution=obj(payload.holder_distribution);const structural=obj(payload.structural_memory);const holder=obj(obj(payload.legacy_14_arm_radar).holder_intelligence||payload.holder_intelligence);
     const authority=moduleBy(payload,'token_authority_scanner');const authorityM=metrics(authority);const holderEv=moduleBy(payload,'holder_concentration')||moduleBy(payload,'holder');const holderM={...holder,...metrics(holderEv)};
@@ -69,7 +90,7 @@
     if(mintActive)push('mint-authority',lang.rows.mint,authority,mintActive);if(freezeActive)push('freeze-authority',lang.rows.freeze,authority,freezeActive);if(ownerResolvedTopNum!==null&&ownerResolvedTopNum>=50)push('top-owner',lang.rows.holder.replace('{value}',ownerResolvedPct),holderEv,ownerResolvedPct);if(lpUnlocked)push('lp-unlocked',lang.rows.lp,lpEv);if(Number(repeatCount)>=1)push('repeat-actor',lang.rows.repeat.replace('{value}',repeatCount),repeatEv,repeatCount);
     const noGrade=String(final.verdict||final.grade||'').toLowerCase().includes('no_grade_trigger')||!final.grade||final.grade==='-';const grade=String(final.grade||'').match(/[A-F]/i)?.[0]?.toUpperCase()||'';const age=ageFrom(payload,langKey==='tr');const signed=final.signed===true||Boolean(final.signature);
     let header;
-    if(noGrade&&signed)header={state:'signed_finding',tone:'neutral',icon:'✓',title:lang.signedFinding,copy:lang.signedNoGrade};
+    if(noGrade&&signed){const finding=caseFinding(payload,langKey,lang);header={state:'signed_finding',tone:finding?'yellow':'neutral',icon:'✓',title:finding?.title||lang.signedFinding,copy:finding?.copy||lang.signedNoGrade,kicker:lang.signedFinding}}
     else if(noGrade)header={state:'gathering',tone:'neutral',icon:'⏳',title:lang.gathering,copy:age?lang.gatherAge.replace('{age}',age):lang.gatherNoAge};
     else header={state:'graded',tone:({A:'green',B:'green',C:'yellow',D:'orange',F:'red'}[grade]||'neutral'),grade,title:grade||'—',copy:final.verdict||''};
     header.ruleset_version=final.ruleset_version||payload.ruleset_version||'—';header.actor_ruleset_version=final.actor_ruleset_version||payload.actor_ruleset_version||'—';header.signature_short=short(final.signature||payload.signature);header.generated_at=final.generated_at||payload.generated_at||'';
@@ -86,7 +107,7 @@
       ['metadata',L.metadata,null,lang.notYet,false],['claim',L.claim,moduleBy(payload,'claim'),first(metrics(moduleBy(payload,'claim')).summary,'—'),false],['mev',L.mev,moduleBy(payload,'mev'),first(metrics(moduleBy(payload,'mev')).summary,'—'),false],['distribution',L.distribution,moduleBy(payload,'launch_distribution'),first(metrics(moduleBy(payload,'launch_distribution')).summary,'—'),false],
       ['signed',L.signed,{evidence_status:final.signature?'VERIFIED':'EVIDENCE_PENDING'},`${header.ruleset_version} · ${header.signature_short||lang.noData}`,false]
     ];
-    return{schema_version:'koschei-verdict-card-v2',actor_ruleset_version:header.actor_ruleset_version,unified_radar_ruleset_version:header.ruleset_version,header,leverage_title:lang.leverage,leverage,checklist_title:lang.checklist,checklist:specs.map(([id,label,e,value,trig,statusOverride])=>({id,label,value:value==='—'?lang.noData:value,status:statusOverride||statusFor(e,trig,value==='—'?lang.noData:value,lang),evidence_anchor:`#evidence-${id}`})),disclaimer:lang.disc};
+    return{schema_version:'koschei-verdict-card-v3',actor_ruleset_version:header.actor_ruleset_version,unified_radar_ruleset_version:header.ruleset_version,header,leverage_title:lang.leverage,leverage,checklist_title:lang.checklist,checklist:specs.map(([id,label,e,value,trig,statusOverride])=>({id,label,value:value==='—'?lang.noData:value,status:statusOverride||statusFor(e,trig,value==='—'?lang.noData:value,lang),evidence_anchor:`#evidence-${id}`})),disclaimer:lang.disc};
   }
   return{mapVerdictCard,LANG};
 });
