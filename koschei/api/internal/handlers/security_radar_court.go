@@ -55,15 +55,12 @@ func (h *Handler) SecurityRadarCourt(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]any{
 			"ok": false,
 			"error": "real_data_unavailable",
-			"message": services.SecurityRadarInsufficientEvidenceMessage,
+			"message": "ARVIS Tribunal requires a signed, live-evidence deterministic verdict. Missing data is not treated as a safe finding.",
 			"target": target,
-			"charged": false,
 		})
 		return
 	}
-	if services.SecurityRadarHasLiveEvidence(core.Bundle) {
-		_ = h.saveSecurityRadarBundle(ctx, courtRequestIdentity(ctx), "customer_court_review", core.Bundle)
-	}
+	_ = h.saveSecurityRadarBundle(ctx, courtRequestIdentity(ctx), "customer_court_review", core.Bundle)
 
 	db := h.DBRead
 	if db == nil {
