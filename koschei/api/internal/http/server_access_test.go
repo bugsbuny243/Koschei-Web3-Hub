@@ -19,7 +19,7 @@ func TestProductRouteTierMapAndFreeCore(t *testing.T) {
 	}
 	registerProductRoutes(mux, h, gate)
 
-	want := []string{"basic", "basic", "basic", "basic", "pro", "pro", "pro", "pro", "pro"}
+	want := []string{"basic", "basic", "basic", "basic", "pro", "pro", "pro", "pro", "pro", "pro"}
 	if !reflect.DeepEqual(tiers, want) {
 		t.Fatalf("route tiers=%v want=%v", tiers, want)
 	}

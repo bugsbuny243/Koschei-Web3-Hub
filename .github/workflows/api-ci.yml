@@ -92,7 +92,10 @@ jobs:
           node --check public/js/owner-launch-forensics.js
           node --check public/js/owner-defense-network.js
           node --check public/js/owner-actor-distribution.js
+          node --check public/js/verdict-card.js
           node --check public/js/owner-unified-radar.js
+          node --check public/js/owner-court-ui.js
+          node --check public/js/owner-radar-mobile-fix.js
           node --check public/js/owner-command-center-v2.js
       - name: Check Turkish public copy
         run: |
