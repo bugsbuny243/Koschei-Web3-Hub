@@ -120,6 +120,10 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 	sellVerification := services.VerifyCreatorSellTransactions(ctx, creatorIntelRPCURL(), sales)
 	behavior := services.EvaluateUnifiedRadarBehavior(target, creator, core.Market, core.Intelligence, core.Cluster, sales, now)
 	behavior = services.HardenUnifiedRadarBehavior(behavior, sellVerification, core.Cluster)
+	threatAnticipation := services.BuildThreatAnticipation(services.ThreatAnticipationInput{
+		Target: target, Market: core.Market, Holder: core.Intelligence, Cluster: core.Cluster,
+		Arms: core.Arms, Behavior: behavior,
+	})
 	behaviorPersistence := "not_applicable"
 	if store != nil && len(behavior.Evidence) > 0 {
 		behaviorPersistence = "persisted"
@@ -191,6 +195,7 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 		"final_verdict":             unifiedVerdict,
 		"final_verdict_persistence": unifiedPersistence,
 		"final_verdict_history":     unifiedHistory,
+		"threat_anticipation":       threatAnticipation,
 		"legacy_14_arm_radar":       legacy,
 		"actor_investigation": map[string]any{
 			"wallet":                   creator,
@@ -206,6 +211,8 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 			"court_receives_signed_verdict_read_only":                     true,
 			"court_returns_narrative_only":                                true,
 			"numeric_final_score_disabled":                                true,
+			"numeric_rug_probability_disabled":                            true,
+			"threat_capacity_is_not_intent":                               true,
 			"no_evidence_no_claim":                                        true,
 			"inferred_watch_only":                                         true,
 			"unverified_excluded":                                         true,
