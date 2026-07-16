@@ -12,17 +12,18 @@ import (
 )
 
 type ownerUnifiedRadarRequest struct {
-	Target       string `json:"target"`
-	Address      string `json:"address"`
-	Network      string `json:"network"`
-	LiveEvidence *bool  `json:"live_evidence,omitempty"`
+	Target        string `json:"target"`
+	Address       string `json:"address"`
+	Network       string `json:"network"`
+	LiveEvidence  *bool  `json:"live_evidence,omitempty"`
+	Court         *bool  `json:"court,omitempty"`
+	ExtendedCourt *bool  `json:"extended_court,omitempty"`
 }
 
 // OwnerUnifiedRadarScan is the single owner-facing manual Radar entry point.
 // Token targets join the existing 14 ARVIS arms, persistent actor memory and
 // four deterministic market/holder behavior rules. Wallet targets use the same
 // response contract but correctly mark token-only arms as not applicable.
-// No automatic worker is started by this endpoint.
 func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) {
 	var input ownerUnifiedRadarRequest
 	if err := decodeJSON(r, &input); err != nil {
@@ -38,10 +39,18 @@ func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) 
 	if network == "" {
 		network = "solana-mainnet"
 	}
+	courtRequested := envBool("KOSCHEI_OWNER_COURT_AUTO_ENABLED", false)
+	if input.Court != nil {
+		courtRequested = *input.Court
+	}
+	extendedCourt := envBool("KOSCHEI_OWNER_COURT_EXTENDED", false)
+	if input.ExtendedCourt != nil {
+		extendedCourt = *input.ExtendedCourt
+	}
 	classification := classifyRadarTarget(r.Context(), target)
 	switch classification.Type {
 	case radarTargetTokenMint:
-		h.ownerUnifiedTokenRadar(w, r, target, network, classification)
+		h.ownerUnifiedTokenRadar(w, r, target, network, classification, courtRequested, extendedCourt)
 	case radarTargetWallet, radarTargetTokenAccount:
 		wallet := target
 		if classification.Type == radarTargetTokenAccount {
@@ -59,7 +68,7 @@ func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) 
 		if input.LiveEvidence != nil {
 			liveEvidence = *input.LiveEvidence
 		}
-		h.ownerUnifiedWalletRadar(w, r, target, wallet, network, classification, liveEvidence)
+		h.ownerUnifiedWalletRadar(w, r, target, wallet, network, classification, liveEvidence, courtRequested, extendedCourt)
 	default:
 		status := http.StatusUnprocessableEntity
 		if classification.Type == radarTargetUnknown {
@@ -73,8 +82,12 @@ func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request, target, network string, classification radarTargetClassification) {
-	ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
+func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request, target, network string, classification radarTargetClassification, courtRequested, extendedCourt bool) {
+	timeout := 180 * time.Second
+	if courtRequested {
+		timeout = 360 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	core := h.runHolderIntelligenceCore(ctx, target, network, "owner_unified_manual_scan")
 	if services.SecurityRadarHasLiveEvidence(core.Bundle) {
@@ -99,9 +112,7 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 		RelatedActors: []services.ActorDefenseRelatedActor{}, Evidence: []services.ActorDefenseEvidenceRecord{},
 		Coverage: map[string]any{}, Policy: map[string]any{}, GeneratedAt: time.Now().UTC(),
 	}
-	actorTrack := services.ActorDefenseTrack{
-		Network: network, TargetKind: "wallet", TargetID: creator, Dossier: map[string]any{},
-	}
+	actorTrack := services.ActorDefenseTrack{Network: network, TargetKind: "wallet", TargetID: creator, Dossier: map[string]any{}}
 	actorStoreStatus := "creator_unavailable"
 	var store *services.ActorDefenseStore
 	if db != nil && creator != "" {
@@ -151,73 +162,85 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 	unifiedVerdict := services.EvaluateUnifiedRadarVerdict(target, actorVerdict, behavior)
 	unifiedPersistence, unifiedHistory := h.persistUnifiedRadarVerdict(ctx, db, network, "token", target, unifiedVerdict, behavior)
 	courtInput := CourtReadOnlyInput{
-		Target: target, Network: network, SignedVerdict: unifiedVerdict,
+		Target: target,
+		Network: network,
+		SignedVerdict: unifiedVerdict,
 		VerdictCard: map[string]any{"grade": unifiedVerdict.Grade, "verdict": unifiedVerdict.Verdict, "signed": unifiedVerdict.Signed, "signature": unifiedVerdict.Signature},
+		EvidencePacket: map[string]any{
+			"threat_anticipation": threatAnticipation,
+			"behavior_signals": behavior,
+			"actor_rule_verdict": actorVerdict,
+			"actor_evidence": combinedEvidence,
+			"holder_intelligence": core.Intelligence,
+			"holder_cluster": core.Cluster,
+			"market": core.Market,
+			"modules": modules,
+			"evidence": radarDetailEvidence(core.Arms),
+			"graph": graph,
+		},
 	}
-	court := h.courtScheduledReport(ctx)
-	if court != nil && court.Status == "scheduled" {
-		asyncCtx := context.WithValue(context.Background(), courtTierOverrideKey{}, court.TierApplied)
-		go func() { _ = h.courtNarrative(asyncCtx, courtInput, false) }()
+	var court *CourtReport
+	if courtRequested {
+		courtCtx := context.WithValue(ctx, courtTierOverrideKey{}, "enterprise")
+		court = h.courtNarrative(courtCtx, courtInput, extendedCourt)
+		if court == nil {
+			court = ownerCourtUnavailableReport("disabled")
+		}
 	}
 
 	legacy := map[string]any{
 		"architecture_arm_count": 14,
-		"final_verdict":          legacyFinal,
-		"warning":                warning,
-		"holder_distribution":    core.Distribution,
-		"holder_intelligence":    core.Intelligence,
-		"holder_cluster":         core.Cluster,
-		"launch_forensics":       core.LaunchForensics,
-		"market":                 core.Market,
-		"structural_memory":      structural,
-		"source_context":         core.SourceContext,
-		"modules":                modules,
-		"evidence":               radarDetailEvidence(core.Arms),
-		"graph":                  graph,
-		"compatibility_note":     "Legacy arm risk indexes remain internal module diagnostics; the unified final verdict is letter-only and deterministic.",
+		"final_verdict": legacyFinal,
+		"warning": warning,
+		"holder_distribution": core.Distribution,
+		"holder_intelligence": core.Intelligence,
+		"holder_cluster": core.Cluster,
+		"launch_forensics": core.LaunchForensics,
+		"market": core.Market,
+		"structural_memory": structural,
+		"source_context": core.SourceContext,
+		"modules": modules,
+		"evidence": radarDetailEvidence(core.Arms),
+		"graph": graph,
+		"compatibility_note": "Legacy arm risk indexes remain internal module diagnostics; the unified final verdict is letter-only and deterministic.",
 	}
 	response := map[string]any{
-		"ok":                    true,
-		"schema_version":        "koschei-unified-radar-v1",
-		"target":                target,
-		"network":               network,
-		"generated_at":          time.Now().UTC().Format(time.RFC3339),
+		"ok": true,
+		"schema_version": "koschei-unified-radar-v1",
+		"target": target,
+		"network": network,
+		"generated_at": time.Now().UTC().Format(time.RFC3339),
 		"target_classification": classification,
-		"analysis_scope":        "token_plus_actor_plus_market_behavior",
-		"manual_only":           true,
-		"automatic_scanning":    false,
-		"architecture": map[string]any{
-			"legacy_arvis_arms":    14,
-			"actor_investigation":  true,
-			"behavior_rules":       4,
-			"single_final_verdict": true,
-		},
-		"final_verdict":             unifiedVerdict,
+		"analysis_scope": "token_plus_actor_plus_market_behavior",
+		"manual_only": true,
+		"automatic_scanning": false,
+		"architecture": map[string]any{"legacy_arvis_arms": 14, "actor_investigation": true, "behavior_rules": 4, "single_final_verdict": true, "court_requested": courtRequested},
+		"final_verdict": unifiedVerdict,
 		"final_verdict_persistence": unifiedPersistence,
-		"final_verdict_history":     unifiedHistory,
-		"threat_anticipation":       threatAnticipation,
-		"legacy_14_arm_radar":       legacy,
+		"final_verdict_history": unifiedHistory,
+		"threat_anticipation": threatAnticipation,
+		"legacy_14_arm_radar": legacy,
 		"actor_investigation": map[string]any{
-			"wallet":                   creator,
-			"dossier":                  actorDossier,
-			"rule_verdict":             actorVerdict,
-			"store_status":             actorStoreStatus,
+			"wallet": creator,
+			"dossier": actorDossier,
+			"rule_verdict": actorVerdict,
+			"store_status": actorStoreStatus,
 			"rule_verdict_persistence": actorVerdictPersistence,
 		},
-		"behavior_signals":                      behavior,
+		"behavior_signals": behavior,
 		"creator_sell_transaction_verification": sellVerification,
-		"behavior_evidence_persistence":         behaviorPersistence,
+		"behavior_evidence_persistence": behaviorPersistence,
 		"evidence_policy": map[string]any{
-			"court_receives_signed_verdict_read_only":                     true,
-			"court_returns_narrative_only":                                true,
-			"numeric_final_score_disabled":                                true,
-			"numeric_rug_probability_disabled":                            true,
-			"threat_capacity_is_not_intent":                               true,
-			"no_evidence_no_claim":                                        true,
-			"inferred_watch_only":                                         true,
-			"unverified_excluded":                                         true,
-			"ai_may_explain_but_cannot_grade":                             true,
-			"creator_sell_acceleration_is_observed":                       true,
+			"court_receives_signed_verdict_read_only": true,
+			"court_returns_narrative_only": true,
+			"numeric_final_score_disabled": true,
+			"numeric_rug_probability_disabled": true,
+			"threat_capacity_is_not_intent": true,
+			"no_evidence_no_claim": true,
+			"inferred_watch_only": true,
+			"unverified_excluded": true,
+			"ai_may_explain_but_cannot_grade": true,
+			"creator_sell_acceleration_is_observed": true,
 			"verified_behavior_evidence_requires_complete_canonical_line": true,
 		},
 	}
@@ -227,7 +250,7 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 	writeJSON(w, http.StatusOK, response)
 }
 
-func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request, requestedTarget, wallet, network string, classification radarTargetClassification, liveEvidence bool) {
+func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request, requestedTarget, wallet, network string, classification radarTargetClassification, liveEvidence, courtRequested, extendedCourt bool) {
 	db := h.DBRead
 	if db == nil {
 		db = h.DB
@@ -236,7 +259,11 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Unified Radar database is unavailable")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
+	timeout := 180 * time.Second
+	if courtRequested {
+		timeout = 360 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	store := services.NewActorDefenseStore(db)
 	initial, err := store.LoadPersistentWalletDossier(ctx, wallet, network, 150)
@@ -245,10 +272,7 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 		return
 	}
 	coverage := actorDefenseLiveCoverage{Status: "stored_evidence_only", Limitations: []string{}}
-	funding := services.ActorFundingOrigin{
-		Wallet: wallet, Status: "stored_evidence_only", VerificationStatus: "unverified",
-		TrailStatus: "not_investigated", IdentityScope: "onchain_wallet_only", Limitations: []string{},
-	}
+	funding := services.ActorFundingOrigin{Wallet: wallet, Status: "stored_evidence_only", VerificationStatus: "unverified", TrailStatus: "not_investigated", IdentityScope: "onchain_wallet_only", Limitations: []string{}}
 	fundingPersistence := "not_requested"
 	if liveEvidence {
 		funding, fundingPersistence = h.collectActorFundingOrigin(ctx, store, wallet, network)
@@ -267,51 +291,76 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 	behavior := services.EvaluateUnifiedRadarBehavior("", wallet, services.TokenMarketSnapshot{}, services.HolderIntelligence{}, services.HolderClusterAnalysis{}, services.CreatorSellAcceleration{}, time.Now().UTC())
 	unifiedVerdict := services.EvaluateUnifiedRadarVerdict(wallet, actorVerdict, behavior)
 	unifiedPersistence, unifiedHistory := h.persistUnifiedRadarVerdict(ctx, db, network, "wallet", wallet, unifiedVerdict, behavior)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":                    true,
-		"schema_version":        "koschei-unified-radar-v1",
-		"target":                requestedTarget,
-		"wallet":                wallet,
-		"network":               network,
-		"generated_at":          time.Now().UTC().Format(time.RFC3339),
+	var court *CourtReport
+	if courtRequested {
+		courtInput := CourtReadOnlyInput{
+			Target: wallet,
+			Network: network,
+			SignedVerdict: unifiedVerdict,
+			VerdictCard: map[string]any{"grade": unifiedVerdict.Grade, "verdict": unifiedVerdict.Verdict, "signed": unifiedVerdict.Signed, "signature": unifiedVerdict.Signature},
+			EvidencePacket: map[string]any{"actor_dossier": final, "funding_origin": funding, "live_evidence": coverage, "actor_rule_verdict": actorVerdict, "behavior_signals": behavior},
+		}
+		courtCtx := context.WithValue(ctx, courtTierOverrideKey{}, "enterprise")
+		court = h.courtNarrative(courtCtx, courtInput, extendedCourt)
+		if court == nil {
+			court = ownerCourtUnavailableReport("disabled")
+		}
+	}
+	response := map[string]any{
+		"ok": true,
+		"schema_version": "koschei-unified-radar-v1",
+		"target": requestedTarget,
+		"wallet": wallet,
+		"network": network,
+		"generated_at": time.Now().UTC().Format(time.RFC3339),
 		"target_classification": classification,
-		"analysis_scope":        "wallet_actor_investigation",
-		"manual_only":           true,
-		"automatic_scanning":    false,
+		"analysis_scope": "wallet_actor_investigation",
+		"manual_only": true,
+		"automatic_scanning": false,
 		"architecture": map[string]any{
-			"legacy_arvis_arms":            14,
-			"legacy_arms_applicability":    "token_mint_required",
-			"actor_investigation":          true,
-			"behavior_rules":               4,
+			"legacy_arvis_arms": 14,
+			"legacy_arms_applicability": "token_mint_required",
+			"actor_investigation": true,
+			"behavior_rules": 4,
 			"behavior_rules_applicability": "token_mint_required",
-			"single_final_verdict":         true,
+			"single_final_verdict": true,
+			"court_requested": courtRequested,
 		},
-		"final_verdict":             unifiedVerdict,
+		"final_verdict": unifiedVerdict,
 		"final_verdict_persistence": unifiedPersistence,
-		"final_verdict_history":     unifiedHistory,
-		"legacy_14_arm_radar": map[string]any{
-			"applicable": false,
-			"reason":     "The legacy 14 token arms require a token mint. They remain part of the same Radar architecture but are not fabricated for wallet targets.",
-			"modules":    []any{},
-		},
+		"final_verdict_history": unifiedHistory,
+		"legacy_14_arm_radar": map[string]any{"applicable": false, "reason": "The legacy 14 token arms require a token mint. They remain part of the same Radar architecture but are not fabricated for wallet targets.", "modules": []any{}},
 		"actor_investigation": map[string]any{
-			"wallet":                     wallet,
-			"dossier":                    final,
-			"funding_origin":             funding,
+			"wallet": wallet,
+			"dossier": final,
+			"funding_origin": funding,
 			"funding_origin_persistence": fundingPersistence,
-			"live_evidence":              coverage,
-			"rule_verdict":               actorVerdict,
-			"rule_verdict_persistence":   persistence,
+			"live_evidence": coverage,
+			"rule_verdict": actorVerdict,
+			"rule_verdict_persistence": persistence,
 		},
 		"behavior_signals": behavior,
 		"evidence_policy": map[string]any{
-			"numeric_final_score_disabled":    true,
-			"no_evidence_no_claim":            true,
-			"inferred_watch_only":             true,
-			"unverified_excluded":             true,
+			"numeric_final_score_disabled": true,
+			"no_evidence_no_claim": true,
+			"inferred_watch_only": true,
+			"unverified_excluded": true,
 			"ai_may_explain_but_cannot_grade": true,
 		},
-	})
+	}
+	if court != nil {
+		response["court"] = court
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func ownerCourtUnavailableReport(status string) *CourtReport {
+	return &CourtReport{
+		Status: status,
+		TierApplied: "enterprise",
+		Authority: "the signed deterministic verdict is final; court output is commentary/explanation",
+		GeneratedAt: time.Now().UTC(),
+	}
 }
 
 func (h *Handler) persistUnifiedRadarVerdict(ctx context.Context, db *sql.DB, network, targetKind, targetID string, verdict services.UnifiedRadarVerdict, behavior services.UnifiedRadarBehaviorReport) (string, []services.UnifiedRadarVerdictHistoryRecord) {
