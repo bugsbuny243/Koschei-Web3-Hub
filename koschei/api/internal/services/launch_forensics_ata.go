@@ -144,10 +144,9 @@ func analyzeLaunchOwnerATA(ctx context.Context, rpcURL, mint string, candidate l
 			break
 		}
 		keys = keys[:granted]
-		transactions, err := SolanaGetTransactionsJSONParsedBatch(ctx, rpcURL, keys)
-		if err != nil {
-			base.Evidence = append(base.Evidence, "ATA parsed transaction batch alınamadı: "+compactClusterError(err))
-			continue
+		transactions, batchErr := SolanaGetTransactionsJSONParsedBatch(ctx, rpcURL, keys)
+		if batchErr != nil {
+			base.Evidence = append(base.Evidence, "ATA parsed transaction batch alınamadı: "+compactClusterError(batchErr))
 		}
 		base.TransactionsParsed += len(transactions)
 		for _, signature := range signatures[start : start+granted] {
@@ -171,6 +170,13 @@ func analyzeLaunchOwnerATA(ctx context.Context, rpcURL, mint string, candidate l
 				Slot: holderClusterInt64(txMap["slot"]), BlockTime: launchUnixTime(blockTime),
 				Signature: signature.Signature, Source: "ata_history", Program: launchCounterpartyProgram(txMap),
 			})
+		}
+		if IsSolanaRPCBatchUnavailable(batchErr) {
+			base.Evidence = append(base.Evidence, "RPC provider batch erişimini reddetti; kalan ATA işlemleri tekrar denenmeden kısmi kanıt korundu.")
+			break
+		}
+		if batchErr != nil && len(transactions) == 0 {
+			continue
 		}
 	}
 	classified := classifyLaunchActors(trades, launchSlot, launchTime, cfg.SniperSlotWindow)

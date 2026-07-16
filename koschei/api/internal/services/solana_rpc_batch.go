@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -43,37 +44,94 @@ type solanaRPCBatchTransactionResponse struct {
 	Error   *solanaRPCError         `json:"error"`
 }
 
-type solanaRPCBatchModeEntry struct {
-	Mode      string
-	ExpiresAt time.Time
+type solanaRPCBatchUnavailableError struct {
+	Provider   string
+	StatusCode int
+	Reason     string
+	RetryAt    time.Time
 }
 
-var solanaRPCBatchModeCache = struct {
-	sync.Mutex
-	Items map[string]solanaRPCBatchModeEntry
-}{Items: map[string]solanaRPCBatchModeEntry{}}
+func (e *solanaRPCBatchUnavailableError) Error() string {
+	if e == nil {
+		return "solana rpc batch unavailable"
+	}
+	message := "solana rpc batch unavailable"
+	if e.Provider != "" {
+		message += " for " + e.Provider
+	}
+	if e.StatusCode > 0 {
+		message += fmt.Sprintf(" (http %d)", e.StatusCode)
+	}
+	if e.Reason != "" {
+		message += ": " + e.Reason
+	}
+	if !e.RetryAt.IsZero() {
+		message += "; retry after " + e.RetryAt.UTC().Format(time.RFC3339)
+	}
+	return message
+}
 
-const solanaRPCBatchModeTTL = 15 * time.Minute
+func IsSolanaRPCBatchUnavailable(err error) bool {
+	var target *solanaRPCBatchUnavailableError
+	return errors.As(err, &target)
+}
+
+var solanaRPCBatchCircuit = struct {
+	sync.Mutex
+	Disabled map[string]solanaRPCBatchUnavailableError
+}{Disabled: map[string]solanaRPCBatchUnavailableError{}}
+
+// A single process-wide gate prevents several ATA workers from discovering the
+// same provider rejection simultaneously. Once the first 403/413 trips the
+// circuit, queued workers degrade locally without sending another HTTP request.
+var solanaRPCBatchGate sync.Mutex
 
 // SolanaGetTransactionsJSONParsedBatch groups getTransaction requests into
-// adaptive HTTP/JSON-RPC batches. A missing or failed member is omitted from
-// the returned map; callers preserve partial evidence instead of failing the
-// full scan.
+// bounded HTTP/JSON-RPC batches. Missing members and successful chunks are
+// preserved. Providers that reject batch traffic are circuit-broken so one
+// manual investigation cannot turn into a retry storm.
 func SolanaGetTransactionsJSONParsedBatch(ctx context.Context, rpcURL string, signatures []string) (map[string]SolanaTransactionResult, error) {
 	rpcURL = strings.TrimSpace(rpcURL)
 	if rpcURL == "" {
 		return nil, fmt.Errorf("solana rpc url is empty")
 	}
-	clean := make([]string, 0, len(signatures))
-	seen := map[string]bool{}
-	for _, signature := range signatures {
-		signature = strings.TrimSpace(signature)
-		if signature == "" || seen[signature] {
-			continue
-		}
-		seen[signature] = true
-		clean = append(clean, signature)
+	clean := cleanSolanaBatchSignatures(signatures)
+	if len(clean) == 0 {
+		return map[string]SolanaTransactionResult{}, nil
 	}
+	if !solanaRPCBatchEnabled() {
+		return map[string]SolanaTransactionResult{}, &solanaRPCBatchUnavailableError{
+			Provider: solanaRPCBatchProviderKey(rpcURL), Reason: "disabled by SOLANA_RPC_BATCH_ENABLED",
+		}
+	}
+
+	solanaRPCBatchGate.Lock()
+	defer solanaRPCBatchGate.Unlock()
+
+	if unavailable, ok := currentSolanaRPCBatchCircuit(rpcURL, time.Now().UTC()); ok {
+		return map[string]SolanaTransactionResult{}, &unavailable
+	}
+
+	out := map[string]SolanaTransactionResult{}
+	batchSize := solanaRPCTransactionBatchSize()
+	for start := 0; start < len(clean); start += batchSize {
+		if ctx.Err() != nil {
+			return out, ctx.Err()
+		}
+		end := start + batchSize
+		if end > len(clean) {
+			end = len(clean)
+		}
+		chunk, err := solanaGetTransactionsJSONParsedBatchChunk(ctx, rpcURL, clean[start:end])
+		mergeSolanaTransactionResults(out, chunk)
+		if err != nil {
+			return out, err
+		}
+	}
+	return out, nil
+}
+
+func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL string, clean []string) (map[string]SolanaTransactionResult, error) {
 	if len(clean) == 0 {
 		return map[string]SolanaTransactionResult{}, nil
 	}
@@ -196,10 +254,33 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 			if attempt < maxRetries {
 				continue
 			}
-			return nil, res.StatusCode, fmt.Errorf("solana rpc batch http status %d: %s", res.StatusCode, string(body))
+			return nil, fmt.Errorf("solana rpc batch http status %d: %s", res.StatusCode, compactSolanaBatchBody(body))
+		}
+		if res.StatusCode == http.StatusRequestEntityTooLarge {
+			// Some providers accept JSON-RPC batches but enforce a smaller member
+			// count. Split once recursively; a one-member 413 means batch mode is
+			// unusable and trips the provider circuit.
+			if len(clean) > 1 {
+				mid := len(clean) / 2
+				left, leftErr := solanaGetTransactionsJSONParsedBatchChunk(ctx, rpcURL, clean[:mid])
+				right := map[string]SolanaTransactionResult{}
+				var rightErr error
+				if leftErr == nil {
+					right, rightErr = solanaGetTransactionsJSONParsedBatchChunk(ctx, rpcURL, clean[mid:])
+				}
+				mergeSolanaTransactionResults(left, right)
+				if leftErr != nil {
+					return left, leftErr
+				}
+				return left, rightErr
+			}
+			return nil, tripSolanaRPCBatchCircuit(rpcURL, res.StatusCode, "provider rejected a single-member batch")
+		}
+		if res.StatusCode == http.StatusForbidden || res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusMethodNotAllowed || res.StatusCode == http.StatusNotImplemented {
+			return nil, tripSolanaRPCBatchCircuit(rpcURL, res.StatusCode, "provider does not permit JSON-RPC batch requests")
 		}
 		if res.StatusCode < 200 || res.StatusCode >= 300 {
-			return nil, res.StatusCode, fmt.Errorf("solana rpc batch http status %d: %s", res.StatusCode, string(body))
+			return nil, fmt.Errorf("solana rpc batch http status %d: %s", res.StatusCode, compactSolanaBatchBody(body))
 		}
 		var responses []solanaRPCBatchTransactionResponse
 		if err := json.Unmarshal(body, &responses); err != nil {
@@ -217,7 +298,6 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 				continue
 			}
 			if response.Result == nil {
-				web3.LogRPCFailure("getTransaction", actualEndpoint, res.StatusCode, fmt.Errorf("rpc result unavailable"))
 				continue
 			}
 			out[signatures[response.ID-1]] = response.Result
@@ -292,4 +372,101 @@ func resetSolanaRPCBatchModeCacheForTest() {
 	solanaRPCBatchModeCache.Lock()
 	solanaRPCBatchModeCache.Items = map[string]solanaRPCBatchModeEntry{}
 	solanaRPCBatchModeCache.Unlock()
+}
+
+func cleanSolanaBatchSignatures(signatures []string) []string {
+	clean := make([]string, 0, len(signatures))
+	seen := map[string]bool{}
+	for _, signature := range signatures {
+		signature = strings.TrimSpace(signature)
+		if signature == "" || seen[signature] {
+			continue
+		}
+		seen[signature] = true
+		clean = append(clean, signature)
+	}
+	return clean
+}
+
+func mergeSolanaTransactionResults(dst, src map[string]SolanaTransactionResult) {
+	if dst == nil {
+		return
+	}
+	for signature, transaction := range src {
+		dst[signature] = transaction
+	}
+}
+
+func solanaRPCBatchProviderKey(rpcURL string) string {
+	if host := strings.TrimSpace(web3.RPCProviderHost(rpcURL)); host != "" {
+		return host
+	}
+	return strings.TrimSpace(rpcURL)
+}
+
+func currentSolanaRPCBatchCircuit(rpcURL string, now time.Time) (solanaRPCBatchUnavailableError, bool) {
+	key := solanaRPCBatchProviderKey(rpcURL)
+	solanaRPCBatchCircuit.Lock()
+	defer solanaRPCBatchCircuit.Unlock()
+	entry, ok := solanaRPCBatchCircuit.Disabled[key]
+	if !ok {
+		return solanaRPCBatchUnavailableError{}, false
+	}
+	if !entry.RetryAt.IsZero() && !entry.RetryAt.After(now) {
+		delete(solanaRPCBatchCircuit.Disabled, key)
+		return solanaRPCBatchUnavailableError{}, false
+	}
+	return entry, true
+}
+
+func tripSolanaRPCBatchCircuit(rpcURL string, statusCode int, reason string) error {
+	key := solanaRPCBatchProviderKey(rpcURL)
+	entry := solanaRPCBatchUnavailableError{
+		Provider: key, StatusCode: statusCode, Reason: reason,
+		RetryAt: time.Now().UTC().Add(solanaRPCBatchCooldown()),
+	}
+	solanaRPCBatchCircuit.Lock()
+	solanaRPCBatchCircuit.Disabled[key] = entry
+	solanaRPCBatchCircuit.Unlock()
+	return &entry
+}
+
+func solanaRPCTransactionBatchSize() int {
+	return solanaRPCBatchEnvInt("SOLANA_RPC_TX_BATCH_SIZE", 8, 1, 20)
+}
+
+func solanaRPCBatchCooldown() time.Duration {
+	seconds := solanaRPCBatchEnvInt("SOLANA_RPC_BATCH_COOLDOWN_SECONDS", 600, 30, 3600)
+	return time.Duration(seconds) * time.Second
+}
+
+func solanaRPCBatchEnabled() bool {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv("SOLANA_RPC_BATCH_ENABLED")))
+	return raw != "false" && raw != "0" && raw != "off" && raw != "disabled"
+}
+
+func solanaRPCBatchEnvInt(name string, fallback, min, max int) int {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return fallback
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < min || value > max {
+		return fallback
+	}
+	return value
+}
+
+func compactSolanaBatchBody(body []byte) string {
+	value := strings.Join(strings.Fields(string(body)), " ")
+	if len(value) > 240 {
+		value = value[:240]
+	}
+	return value
+}
+
+func resetSolanaRPCBatchCircuitForTest() {
+	solanaRPCBatchCircuit.Lock()
+	solanaRPCBatchCircuit.Disabled = map[string]solanaRPCBatchUnavailableError{}
+	solanaRPCBatchCircuit.Unlock()
 }
