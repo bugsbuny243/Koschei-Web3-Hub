@@ -7,6 +7,10 @@
     const n = Number(value);
     return Number.isFinite(n) ? n.toLocaleString('tr-TR', { maximumFractionDigits: digits }) : '—';
   };
+  const money = value => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }) : '—';
+  };
   const short = value => {
     const text = String(value || '');
     return text.length > 30 ? `${text.slice(0, 13)}…${text.slice(-10)}` : (text || '—');
@@ -169,6 +173,24 @@
     return `<div class="barline"><label>${esc(label)}</label><div class="track"><div class="fill ${pct >= badAt ? 'bad' : ''}" style="width:${pct}%"></div></div><b>%${num(pct, 2)}</b></div>`;
   }
 
+  function threatPill(status) {
+    const text = String(status || 'unknown').toLowerCase();
+    const cls = ['open', 'observed'].includes(text) ? 'red' : ['closed', 'not_observed'].includes(text) ? 'green' : 'amber';
+    const label = ({open:'AÇIK',observed:'GÖZLENDİ',closed:'KAPALI',not_observed:'GÖZLENMEDİ',watch:'İZLE',limited:'SINIRLI',unknown:'BİLİNMİYOR'}[text] || text.toUpperCase());
+    return `<span class="pill ${cls}">${esc(label)}</span>`;
+  }
+
+  function threatPanel(report) {
+    if (!report || typeof report !== 'object' || !Object.keys(report).length) return '';
+    const exit = report.exit_capacity || {};
+    const rug = report.rug_pathway_assessment || {};
+    const pathways = Array.isArray(report.pathways) ? report.pathways : [];
+    const scenarios = Array.isArray(report.scenarios) ? report.scenarios : [];
+    const watches = Array.isArray(report.watch_signals) ? report.watch_signals : [];
+    const missing = Array.isArray(report.missing_evidence) ? report.missing_evidence : [];
+    const multiple = exit.position_liquidity_multiple == null ? '—' : `${num(exit.position_liquidity_multiple, 2)}x`;
+    return `<section class="panel full" id="threat-anticipation"><span class="eyebrow">KOSCHEI THREAT ANTICIPATION · ${esc(report.version || 'v1')}</span><h3>Risk nasıl gerçekleşebilir?</h3><p class="fine">Niyet tahmini ve sayısal rug olasılığı yoktur. Bu bölüm yalnız gözlenen kontrol kapasitesini, teknik yolları ve bir sonraki kanıt tetiklerini sınıflandırır.</p><div class="creator-warning"><span class="eyebrow">PRIMARY EXPOSURE</span><h3>${esc(report.primary_exposure || 'Öncelikli yol belirlenemedi.')}</h3><p>${esc(exit.interpretation || 'Çıkış kapasitesi hesaplanamadı.')}</p></div><section class="statgrid"><article class="stat"><label>Baskın owner</label><strong>%${num(exit.owner_percentage, 4)}</strong><small>${exit.owner_resolved ? 'owner-resolved' : 'owner çözümü eksik'}</small></article><article class="stat"><label>Owner pozisyonu</label><strong>${exit.owner_reference_usd_value == null ? '—' : money(exit.owner_reference_usd_value)}</strong><small>referans değer</small></article><article class="stat"><label>Likidite</label><strong>${money(exit.liquidity_usd)}</strong><small>gözlenen market snapshot</small></article><article class="stat"><label>Pozisyon / likidite</label><strong>${esc(multiple)}</strong><small>garanti edilen satış geliri değildir</small></article></section><div class="insights">${pathways.map(path => `<div class="insight ${['open','observed'].includes(path.status) ? 'bad' : path.status === 'closed' ? 'good' : ''}"><div class="actions">${threatPill(path.status)}<span class="pill violet">${esc(path.evidence_status || 'unverified')}</span></div><b>${esc(path.label)}</b><p>${esc(path.summary || '')}</p></div>`).join('') || '<div class="insight">Yol sınıflandırması üretilemedi.</div>'}</div><details open><summary>Rug yolu özeti</summary><p>${esc(rug.conclusion || '')}</p></details>${scenarios.length ? `<details><summary>Muhtemel sonraki davranış yolları</summary><div class="insights">${scenarios.map(item => `<div class="insight"><b>${esc(item.title)}</b><p>${esc(item.basis || '')}</p><small>${(item.next_signals || []).map(esc).join(' · ')}</small></div>`).join('')}</div></details>` : ''}${watches.length ? `<details><summary>Erken uyarı tetikleri</summary><div class="insights">${watches.map(item => `<div class="insight"><div class="actions"><span class="pill ${item.severity === 'critical' ? 'red' : 'amber'}">${esc(item.severity || 'watch')}</span></div><b>${esc(item.title)}</b><p>${esc(item.trigger || '')}</p><small>${esc(item.evidence_source || '')}</small></div>`).join('')}</div></details>` : ''}${missing.length ? `<details><summary>Eksik deliller</summary><ul>${missing.map(item => `<li>${esc(item)}</li>`).join('')}</ul></details>` : ''}</section>`;
+  }
 
   function renderVerdictCard(data) {
     if (!window.KoscheiVerdictCard) return '';
@@ -224,6 +246,8 @@
         <article class="panel"><span class="eyebrow">HOLDER CONCENTRATION</span><h3>Arz yoğunlaşması</h3><div class="bars">${bar('TOP 1', top1, 35)}${bar('TOP 3', distribution.top_3_percentage, 50)}${bar('TOP 10', top10, 75)}${bar('TOP 20', distribution.top_20_percentage, 85)}</div><p class="fine">Top 3 ve Top 20, canlı RPC largest-accounts listesinden hesaplanır. Veri yoksa sayı uydurulmaz.</p></article>
         <article class="panel"><span class="eyebrow">AUTHORITY STATUS</span><h3>Yetki durumu</h3><div class="authority"><div class="authority-card ${authorityKnown && !mintAuthority ? 'ok' : mintAuthority ? 'bad' : ''}"><label>Mint authority</label><strong>${boolText(mintAuthority, authorityKnown)}</strong></div><div class="authority-card ${authorityKnown && !freezeAuthority ? 'ok' : freezeAuthority ? 'bad' : ''}"><label>Freeze authority</label><strong>${boolText(freezeAuthority, authorityKnown)}</strong></div></div></article>
       </section>
+
+      ${threatPanel(data.threat_anticipation)}
 
       <section class="two-col">
         <article class="panel"><span class="eyebrow">WARNING EXPLANATION</span><h3>Neden işaretlendi?</h3><div class="insights">${reasons.map(reason => `<div class="insight bad">${esc(reason)}</div>`).join('') || '<div class="insight">Ek risk açıklaması yok.</div>'}</div></article>

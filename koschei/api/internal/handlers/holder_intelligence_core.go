@@ -25,6 +25,7 @@ type holderIntelligenceCoreResult struct {
 	Intelligence          services.HolderIntelligence
 	LaunchForensics       services.LaunchForensicsAnalysis
 	RepeatDominantHolders []services.RepeatDominantHolderEvidence
+	ThreatAnticipation    services.ThreatAnticipationReport
 	SourceContext         map[string]any
 }
 
@@ -92,10 +93,14 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 	if h != nil && h.DB != nil {
 		services.NewSecurityRadarStore(h.DB).CaptureLaunchForensicsFloor(parent, target, network, launch)
 	}
+	threatAnticipation := services.BuildThreatAnticipation(services.ThreatAnticipationInput{
+		Target: target, Market: market, Holder: intelligence, Cluster: cluster, Arms: arms,
+	})
 	return holderIntelligenceCoreResult{
 		Request: req, Analysis: analysis, Bundle: bundle, Arms: arms, Final: final,
 		Roles: roles, Distribution: distribution, Cluster: cluster, Market: market,
-		Intelligence: intelligence, LaunchForensics: launch, RepeatDominantHolders: repeatDominant, SourceContext: source,
+		Intelligence: intelligence, LaunchForensics: launch, RepeatDominantHolders: repeatDominant,
+		ThreatAnticipation: threatAnticipation, SourceContext: source,
 	}
 }
 
@@ -193,16 +198,17 @@ func holderIntelligenceCoreExplanation(core holderIntelligenceCoreResult) string
 
 type customerTokenScanResult struct {
 	web3.TokenRiskResult
-	HolderDistribution   map[string]any                   `json:"holder_distribution"`
-	HolderIntelligence   services.HolderIntelligence      `json:"holder_intelligence"`
-	HolderCluster        services.HolderClusterAnalysis   `json:"holder_cluster"`
-	LaunchForensics      services.LaunchForensicsAnalysis `json:"launch_forensics"`
-	VerifiedEvidence     []string                         `json:"verified_evidence"`
-	Explanation          string                           `json:"explanation"`
-	ExplanationV2        scanExplanationV2                `json:"explanation_v2"`
-	HolderAnalysisStatus string                           `json:"holder_analysis_status"`
-	FinalPolicy          string                           `json:"final_policy"`
-	VerdictWithheld      bool                             `json:"verdict_withheld"`
+	HolderDistribution   map[string]any                    `json:"holder_distribution"`
+	HolderIntelligence   services.HolderIntelligence       `json:"holder_intelligence"`
+	HolderCluster        services.HolderClusterAnalysis    `json:"holder_cluster"`
+	LaunchForensics      services.LaunchForensicsAnalysis  `json:"launch_forensics"`
+	ThreatAnticipation   services.ThreatAnticipationReport `json:"threat_anticipation"`
+	VerifiedEvidence     []string                          `json:"verified_evidence"`
+	Explanation          string                            `json:"explanation"`
+	ExplanationV2        scanExplanationV2                 `json:"explanation_v2"`
+	HolderAnalysisStatus string                            `json:"holder_analysis_status"`
+	FinalPolicy          string                            `json:"final_policy"`
+	VerdictWithheld      bool                              `json:"verdict_withheld"`
 }
 
 func (h *Handler) scanCustomerToken(ctx context.Context, network, mint string) (customerTokenScanResult, error) {
@@ -241,6 +247,7 @@ func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligen
 		HolderIntelligence: core.Intelligence,
 		HolderCluster: core.Cluster,
 		LaunchForensics: core.LaunchForensics,
+		ThreatAnticipation: core.ThreatAnticipation,
 		VerifiedEvidence: holderIntelligenceCoreEvidence(core),
 		Explanation: holderIntelligenceCoreExplanation(core),
 		ExplanationV2: holderIntelligenceCoreExplanationV2(core),
