@@ -58,7 +58,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	if config.solanaRPC == nil {
 		config.solanaRPC = web3.NewSolanaRPC(config.cache)
 	}
-	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue}
+	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue, CourtClient: handlers.NewCourtNarrativeClientFromEnv()}
 	mux := http.NewServeMux()
 
 	koschTierAccess := func(tier string, next http.HandlerFunc) http.HandlerFunc {
