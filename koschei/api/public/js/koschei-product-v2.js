@@ -3,7 +3,6 @@
   if(window.__koscheiProductV2)return;
   window.__koscheiProductV2=true;
   const ready=fn=>document.readyState==='loading'?document.addEventListener('DOMContentLoaded',fn,{once:true}):fn();
-  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[char]));
 
   function installReveal(){
     const nodes=[...document.querySelectorAll('[data-reveal]')];
@@ -45,7 +44,10 @@
 
   function installExternalSafety(){
     document.querySelectorAll('a[target="_blank"]').forEach(link=>{
-      if(!link.rel.includes('noopener'))link.rel=(link.rel+' noopener noreferrer').trim();
+      const rel=new Set(String(link.rel||'').split(/\s+/).filter(Boolean));
+      rel.add('noopener');
+      rel.add('noreferrer');
+      link.rel=[...rel].join(' ');
     });
   }
 
