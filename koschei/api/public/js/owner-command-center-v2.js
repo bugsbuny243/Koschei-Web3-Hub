@@ -17,7 +17,9 @@
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
   function jump(id){
-    const target=document.querySelector(`[data-nav="${CSS.escape(id)}"]`);
+    const page=pages.find(item=>item.id===id);
+    if(!page)return;
+    const target=[...document.querySelectorAll('[data-nav]')].find(node=>node.dataset.nav===page.id);
     if(target)target.click();
     closePalette();
   }
