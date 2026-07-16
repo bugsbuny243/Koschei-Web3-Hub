@@ -86,6 +86,18 @@ var solanaRPCBatchCircuit = struct {
 // circuit, queued workers degrade locally without sending another HTTP request.
 var solanaRPCBatchGate sync.Mutex
 
+type solanaRPCBatchModeEntry struct {
+	Mode      string
+	ExpiresAt time.Time
+}
+
+const solanaRPCBatchModeTTL = 15 * time.Minute
+
+var solanaRPCBatchModeCache = struct {
+	sync.Mutex
+	Items map[string]solanaRPCBatchModeEntry
+}{Items: map[string]solanaRPCBatchModeEntry{}}
+
 // SolanaGetTransactionsJSONParsedBatch groups getTransaction requests into
 // bounded HTTP/JSON-RPC batches. Missing members and successful chunks are
 // preserved. Providers that reject batch traffic are circuit-broken so one
@@ -161,32 +173,18 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 			end = len(clean)
 		}
 		chunk := clean[index:end]
-		results, status, err := solanaGetTransactionsJSONParsedBatchChunk(ctx, rpcURL, chunk)
+		results, status, err := solanaGetTransactionsJSONParsedBatchRequest(ctx, rpcURL, chunk)
 		if err != nil {
 			lastErr = err
 		}
-		if status == http.StatusForbidden || status == http.StatusRequestEntityTooLarge {
-			if chunkSize > 1 && modeOverride != "batch" {
-				nextChunkSize := len(chunk) / 2
-				if nextChunkSize < 1 {
-					nextChunkSize = 1
-				}
-				if !degradationLogged {
-					log.Printf("rpc batch degraded host=%s reason=%d chunk=%d→%d", host, status, chunkSize, nextChunkSize)
-					degradationLogged = true
-				}
-				chunkSize = nextChunkSize
-				continue
+		if status == http.StatusRequestEntityTooLarge && err != nil && modeOverride != "batch" {
+			if !degradationLogged {
+				log.Printf("rpc batch degraded host=%s reason=%d chunk=%d→single", host, status, chunkSize)
+				degradationLogged = true
 			}
-			if modeOverride != "batch" {
-				if !degradationLogged {
-					log.Printf("rpc batch degraded host=%s reason=%d chunk=%d→single", host, status, chunkSize)
-					degradationLogged = true
-				}
-				solanaRPCBatchRememberMode(host, "single")
-				degradedToSingles = true
-				continue
-			}
+			solanaRPCBatchRememberMode(host, "single")
+			degradedToSingles = true
+			continue
 		}
 		if err != nil {
 			if len(out) == 0 {
@@ -206,7 +204,7 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 	return out, nil
 }
 
-func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL string, signatures []string) (map[string]SolanaTransactionResult, int, error) {
+func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL string, signatures []string) (map[string]SolanaTransactionResult, int, error) {
 	requests := make([]solanaRPCRequest, 0, len(signatures))
 	for i, signature := range signatures {
 		requests = append(requests, solanaRPCRequest{JSONRPC: "2.0", ID: i + 1, Method: "getTransaction", Params: []any{signature, map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": 0}}})
@@ -254,33 +252,33 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 			if attempt < maxRetries {
 				continue
 			}
-			return nil, fmt.Errorf("solana rpc batch http status %d: %s", res.StatusCode, compactSolanaBatchBody(body))
+			return nil, res.StatusCode, fmt.Errorf("solana rpc batch http status %d: %s", res.StatusCode, compactSolanaBatchBody(body))
 		}
 		if res.StatusCode == http.StatusRequestEntityTooLarge {
 			// Some providers accept JSON-RPC batches but enforce a smaller member
 			// count. Split once recursively; a one-member 413 means batch mode is
 			// unusable and trips the provider circuit.
-			if len(clean) > 1 {
-				mid := len(clean) / 2
-				left, leftErr := solanaGetTransactionsJSONParsedBatchChunk(ctx, rpcURL, clean[:mid])
+			if len(signatures) > 1 {
+				mid := len(signatures) / 2
+				left, _, leftErr := solanaGetTransactionsJSONParsedBatchRequest(ctx, rpcURL, signatures[:mid])
 				right := map[string]SolanaTransactionResult{}
 				var rightErr error
 				if leftErr == nil {
-					right, rightErr = solanaGetTransactionsJSONParsedBatchChunk(ctx, rpcURL, clean[mid:])
+					right, _, rightErr = solanaGetTransactionsJSONParsedBatchRequest(ctx, rpcURL, signatures[mid:])
 				}
 				mergeSolanaTransactionResults(left, right)
 				if leftErr != nil {
-					return left, leftErr
+					return left, res.StatusCode, leftErr
 				}
-				return left, rightErr
+				return left, res.StatusCode, rightErr
 			}
-			return nil, tripSolanaRPCBatchCircuit(rpcURL, res.StatusCode, "provider rejected a single-member batch")
+			return nil, res.StatusCode, tripSolanaRPCBatchCircuit(rpcURL, res.StatusCode, "provider rejected a single-member batch")
 		}
 		if res.StatusCode == http.StatusForbidden || res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusMethodNotAllowed || res.StatusCode == http.StatusNotImplemented {
-			return nil, tripSolanaRPCBatchCircuit(rpcURL, res.StatusCode, "provider does not permit JSON-RPC batch requests")
+			return nil, res.StatusCode, tripSolanaRPCBatchCircuit(rpcURL, res.StatusCode, "provider does not permit JSON-RPC batch requests")
 		}
 		if res.StatusCode < 200 || res.StatusCode >= 300 {
-			return nil, fmt.Errorf("solana rpc batch http status %d: %s", res.StatusCode, compactSolanaBatchBody(body))
+			return nil, res.StatusCode, fmt.Errorf("solana rpc batch http status %d: %s", res.StatusCode, compactSolanaBatchBody(body))
 		}
 		var responses []solanaRPCBatchTransactionResponse
 		if err := json.Unmarshal(body, &responses); err != nil {
