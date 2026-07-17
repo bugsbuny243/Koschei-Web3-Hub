@@ -10,8 +10,8 @@ import (
 )
 
 // holderIntelligenceCoreResult is the reusable holder-analysis boundary. It
-// preserves raw account evidence in Roles while exposing owner-normalized
-// concentration, bounded history and launch forensics through Intelligence.
+// preserves raw account evidence while exposing owner-normalized concentration,
+// launch history, direct LP evidence and optional market context.
 type holderIntelligenceCoreResult struct {
 	Request               services.SecurityRadarRequest
 	Analysis              services.ArvisAnalysis
@@ -24,6 +24,8 @@ type holderIntelligenceCoreResult struct {
 	Market                services.TokenMarketSnapshot
 	Intelligence          services.HolderIntelligence
 	LaunchForensics       services.LaunchForensicsAnalysis
+	LPControl             services.LPControlEvidence
+	JupiterContext        services.JupiterMarketContext
 	RepeatDominantHolders []services.RepeatDominantHolderEvidence
 	ThreatAnticipation    services.ThreatAnticipationReport
 	SourceContext         map[string]any
@@ -65,8 +67,7 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 	}
 	final := services.ArvisFinalFromBundle(bundle)
 	intelligence := services.ApplyLaunchForensicsToHolderIntelligence(
-		services.BuildHolderIntelligence(roles, cluster, market, time.Now().UTC()),
-		launch,
+		services.BuildHolderIntelligence(roles, cluster, market, time.Now().UTC()), launch,
 	)
 	repeatDominant := []services.RepeatDominantHolderEvidence{}
 	if h != nil {
@@ -92,6 +93,26 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 			}
 		}
 	}
+
+	lpControl := services.LPControlEvidence{
+		Status: "not_requested_preflight", ObservedAt: time.Now().UTC(),
+		LargestLPHolders: []services.LPHolderEvidence{}, EvidenceKeys: []string{}, Limitations: []string{},
+	}
+	jupiter := services.JupiterMarketContext{
+		Status: "not_requested_preflight", RouteLabels: []string{}, Limitations: []string{},
+	}
+	if phase2MarketContextAllowed(mode) && h != nil {
+		lpControl = h.collectLPControlEvidence(parent, network, target, creator, market, source)
+		analysis = services.ApplyLPControlEvidenceToAnalysis(analysis, req, lpControl)
+		bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
+		arms = services.ArvisArmsFromBundle(bundle)
+		if len(arms) == 0 {
+			arms = analysis.Arms
+		}
+		final = services.ArvisFinalFromBundle(bundle)
+		jupiter = h.collectJupiterMarketContext(parent, network, target, intelligence, market)
+	}
+
 	if h != nil && h.DB != nil {
 		services.NewSecurityRadarStore(h.DB).CaptureLaunchForensicsFloor(parent, target, network, launch)
 	}
@@ -101,9 +122,15 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 	return holderIntelligenceCoreResult{
 		Request: req, Analysis: analysis, Bundle: bundle, Arms: arms, Final: final,
 		Roles: roles, Distribution: distribution, Cluster: cluster, Market: market,
-		Intelligence: intelligence, LaunchForensics: launch, RepeatDominantHolders: repeatDominant,
+		Intelligence: intelligence, LaunchForensics: launch, LPControl: lpControl,
+		JupiterContext: jupiter, RepeatDominantHolders: repeatDominant,
 		ThreatAnticipation: threatAnticipation, SourceContext: source,
 	}
+}
+
+func phase2MarketContextAllowed(mode string) bool {
+	value := strings.ToLower(strings.TrimSpace(mode))
+	return !strings.Contains(value, "preflight") && !strings.Contains(value, "safe_check") && !strings.Contains(value, "safe-check")
 }
 
 func holderIntelligenceCoreConcentration(core holderIntelligenceCoreResult) (float64, float64, bool) {
@@ -144,10 +171,8 @@ func holderIntelligenceCoreRepeatRisk(core holderIntelligenceCoreResult) int {
 }
 
 // Deprecated compatibility helper. Repeat-actor evidence no longer changes a
-// legacy 0-100 score; it is consumed only by the unified rules engine.
-func applyRepeatDominantRiskToLegacyScore(score int, _ holderIntelligenceCoreResult) int {
-	return score
-}
+// legacy score; it is consumed only by the unified rules engine.
+func applyRepeatDominantRiskToLegacyScore(score int, _ holderIntelligenceCoreResult) int { return score }
 
 func holderIntelligenceCoreEvidence(core holderIntelligenceCoreResult) []string {
 	values := []string{}
@@ -171,14 +196,10 @@ func holderIntelligenceCoreEvidence(core holderIntelligenceCoreResult) []string 
 
 func appendUniqueHolderCoreEvidence(dst []string, values ...string) []string {
 	seen := map[string]bool{}
-	for _, value := range dst {
-		seen[strings.TrimSpace(value)] = true
-	}
+	for _, value := range dst { seen[strings.TrimSpace(value)] = true }
 	for _, value := range values {
 		value = strings.TrimSpace(value)
-		if value == "" || seen[value] {
-			continue
-		}
+		if value == "" || seen[value] { continue }
 		seen[value] = true
 		dst = append(dst, value)
 	}
@@ -193,10 +214,7 @@ func holderIntelligenceCoreExplanationV2(core holderIntelligenceCoreResult) scan
 		RepeatDominant: core.RepeatDominantHolders,
 	})
 }
-
-func holderIntelligenceCoreExplanation(core holderIntelligenceCoreResult) string {
-	return holderIntelligenceCoreExplanationV2(core).Text
-}
+func holderIntelligenceCoreExplanation(core holderIntelligenceCoreResult) string { return holderIntelligenceCoreExplanationV2(core).Text }
 
 type customerTokenScanResult struct {
 	web3.TokenRiskResult
@@ -216,18 +234,13 @@ type customerTokenScanResult struct {
 
 func (h *Handler) scanCustomerToken(ctx context.Context, network, mint string) (customerTokenScanResult, error) {
 	base, err := h.tokenService().ScanToken(ctx, network, mint)
-	if err != nil {
-		return customerTokenScanResult{}, err
-	}
+	if err != nil { return customerTokenScanResult{}, err }
 	core := h.runHolderIntelligenceCore(ctx, mint, network, "customer_token_scan")
 	assembly := h.assembleUnifiedInvestigationReport(ctx, core)
 	return applyHolderCoreToTokenRisk(base, core, assembly.Report), nil
 }
 
 func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligenceCoreResult, investigationReport map[string]any) customerTokenScanResult {
-	// Legacy public token fundamentals remain for backwards compatibility. The
-	// visible full report and every institutional/API caller consume the shared
-	// InvestigationReport contract instead of this legacy numeric surface.
 	base.Token.LargestHolderPercent = 0
 	base.Token.TopTenPercent = 0
 	if top1, top10, ok := holderIntelligenceCoreConcentration(core); ok {
@@ -236,36 +249,23 @@ func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligen
 	}
 	rescored := web3.ScoreTokenRisk(base.Token)
 	rescored.RiskLevel = tokenRiskLevel(rescored.Score)
-	if strings.TrimSpace(base.Disclaimer) != "" {
-		rescored.Disclaimer = base.Disclaimer
-	}
+	if strings.TrimSpace(base.Disclaimer) != "" { rescored.Disclaimer = base.Disclaimer }
 	rescored.Findings = appendUniqueHolderCoreEvidence(rescored.Findings, holderIntelligenceCoreEvidence(core)...)
 	policy := holderIntelligenceCorePolicy(core)
 	if policy == "withhold" {
-		rescored.Findings = appendUniqueHolderCoreEvidence(rescored.Findings,
-			"Holder verdict withheld: unresolved or incomplete holder evidence is not a low-risk signal.",
-		)
+		rescored.Findings = appendUniqueHolderCoreEvidence(rescored.Findings, "Holder verdict withheld: unresolved or incomplete holder evidence is not a low-risk signal.")
 	}
 	return customerTokenScanResult{
-		TokenRiskResult: rescored,
-		HolderDistribution: core.Distribution,
-		HolderIntelligence: core.Intelligence,
-		HolderCluster: core.Cluster,
-		LaunchForensics: core.LaunchForensics,
-		ThreatAnticipation: core.ThreatAnticipation,
-		VerifiedEvidence: holderIntelligenceCoreEvidence(core),
-		Explanation: holderIntelligenceCoreExplanation(core),
-		ExplanationV2: holderIntelligenceCoreExplanationV2(core),
-		HolderAnalysisStatus: holderIntelligenceCoreStatus(core),
-		FinalPolicy: policy,
-		VerdictWithheld: policy == "withhold",
-		InvestigationReport: investigationReport,
+		TokenRiskResult: rescored, HolderDistribution: core.Distribution,
+		HolderIntelligence: core.Intelligence, HolderCluster: core.Cluster,
+		LaunchForensics: core.LaunchForensics, ThreatAnticipation: core.ThreatAnticipation,
+		VerifiedEvidence: holderIntelligenceCoreEvidence(core), Explanation: holderIntelligenceCoreExplanation(core),
+		ExplanationV2: holderIntelligenceCoreExplanationV2(core), HolderAnalysisStatus: holderIntelligenceCoreStatus(core),
+		FinalPolicy: policy, VerdictWithheld: policy == "withhold", InvestigationReport: investigationReport,
 	}
 }
 
 func holderIntelligenceCoreShieldAction(core holderIntelligenceCoreResult) string {
-	if holderIntelligenceCorePolicy(core) == "withhold" || !core.Final.Signed {
-		return "withhold"
-	}
+	if holderIntelligenceCorePolicy(core) == "withhold" || !core.Final.Signed { return "withhold" }
 	return shieldAction(core.Final.RiskLevel, core.Final.RiskIndex)
 }
