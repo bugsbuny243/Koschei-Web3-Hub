@@ -53,6 +53,14 @@ func lpControlPoolArm(req SecurityRadarRequest, lp LPControlEvidence, generatedA
 		arm.Signals["lp_control"] = lp
 		return arm
 	}
+	if !lp.Available {
+		arm := evidencePendingArm(moduleName, ModuleRaydiumPoolGuardian, req, generatedAt, lpControlReason(lp), firstRadarValue(lp.ReasonCode, "pool_control_incomplete"))
+		arm.Signals["execution_status"] = ArvisExecutionInsufficient
+		arm.Signals["pool_address"] = lp.PoolAddress
+		arm.Signals["pool_program"] = lp.PoolProgram
+		arm.Signals["lp_control"] = lp
+		return arm
+	}
 	status := "observed"
 	verified := lp.Status == LPControlVerifiedBurned || lp.Status == LPControlVerifiedLocked || lp.Status == LPControlVerifiedPermanentLocked
 	if verified { status = "verified" }
@@ -135,6 +143,14 @@ func lpControlLiquidityArm(req SecurityRadarRequest, lp LPControlEvidence, gener
 		arm.Signals["lp_control"] = lp
 		return arm
 	}
+	if !lp.Available {
+		arm := evidencePendingArm("Liquidity Movement", ModuleLiquidityMovement, req, generatedAt, lpControlReason(lp), firstRadarValue(lp.ReasonCode, "reserve_collection_incomplete"))
+		arm.Signals["execution_status"] = ArvisExecutionInsufficient
+		arm.Signals["pool_address"] = lp.PoolAddress
+		arm.Signals["pool_program"] = lp.PoolProgram
+		arm.Signals["lp_control"] = lp
+		return arm
+	}
 	arm := lpControlPoolArm(req, lp, generatedAt)
 	arm.Module = "Liquidity Movement"
 	arm.ModuleID = ModuleLiquidityMovement
@@ -142,7 +158,7 @@ func lpControlLiquidityArm(req SecurityRadarRequest, lp LPControlEvidence, gener
 	arm.Signals["liquidity_movement_transaction_verified"] = len(lp.LiquidityMovements) > 0
 	arm.Signals["movement_evidence_status"] = func() string { if len(lp.LiquidityMovements) > 0 { return "verified" }; return "not_observed_in_bounded_window" }()
 	arm.Signals["reserve_snapshot_verified"] = lp.ReadSlot > 0 && lp.TokenVault != "" && lp.QuoteVault != ""
-	arm.Verdict = "Pool reserve balances were read at the reported slot. Add/remove liquidity is reported only when a parsed pool transaction carries same-direction vault deltas or an explicit single-sided liquidity instruction."
+	arm.Verdict = "Pool reserve balances were read at the reported slot. Add/remove liquidity is reported only when an explicit liquidity instruction trace carries compatible vault deltas."
 	return arm
 }
 
