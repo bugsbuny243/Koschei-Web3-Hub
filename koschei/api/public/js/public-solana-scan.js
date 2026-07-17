@@ -3,6 +3,7 @@
 const OFFICIAL_KOSCH_MINT='HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump';
 const $=id=>document.getElementById(id),esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const form=$('scanForm'),submit=$('submit'),target=$('target'),kind=$('kind'),note=$('note'),empty=$('empty'),result=$('result'),share=$('shareResult'),openExplorer=$('openExplorer');
+const requestGuard=window.KoscheiPublicScanGuard;
 let lastShareURL='';
 const clamp=n=>Math.max(0,Math.min(100,Math.round(Number(n)||0)));
 const grade=r=>r>=85?'F':r>=70?'E':r>=50?'D':r>=35?'C':r>=20?'B':'A';
@@ -35,16 +36,31 @@ function renderPreflight(data,value){
 }
 async function runScan(){
   const value=target.value.trim();if(!value)return;
+  const tokenScan=kind.value==='token';
+  const requestToken=tokenScan&&requestGuard?requestGuard.begin(result,value):null;
   submit.disabled=true;submit.textContent='ARVIS kanıtları topluyor…';empty.hidden=false;empty.innerHTML='<h2>Teknik araştırma çalışıyor</h2><p>Collector sonuçları, holder kontrolü, canlı işlem penceresi ve piyasa bağlamı aynı raporda birleştiriliyor.</p>';result.hidden=true;share.hidden=true;openExplorer.hidden=true;
   try{
-    if(kind.value==='token'){
+    if(tokenScan){
       const data=await fetchJSON('/api/token/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mint:value,network:'solana-mainnet'})});
-      if(!renderTechnicalReport(data.investigation_report,value))throw new Error('investigation_report_missing');
+      const report=data.investigation_report;
+      const decision=requestToken?requestGuard.accept(requestToken,report):{accepted:true};
+      if(!decision.accepted){
+        if(decision.reason==='stale_response')return;
+        throw new Error(`scan_target_mismatch:${decision.expected}:${decision.returned}`);
+      }
+      if(!renderTechnicalReport(report,value))throw new Error('investigation_report_missing');
     }else{
       const data=await fetchJSON('/api/arvis/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:value,kind:kind.value,intent:note.value.trim(),note:note.value.trim()})});renderPreflight(data,value);
     }
-  }catch(error){empty.hidden=false;empty.innerHTML='<h2>Tarama tamamlanamadı</h2><p>Bu hedef için teknik rapor üretilemedi. İşlem yapmadan önce tekrar dene.</p>'}
-  finally{submit.disabled=false;submit.textContent='ARVIS taramasını başlat'}
+  }catch(error){
+    if(requestToken&&requestGuard&&!requestGuard.isActive(requestToken))return;
+    empty.hidden=false;
+    empty.innerHTML=String(error?.message||'').startsWith('scan_target_mismatch:')?'<h2>Tarama hedefi uyuşmadı</h2><p>Eski veya farklı hedefe ait sonuç ekrana basılmadı.</p>':'<h2>Tarama tamamlanamadı</h2><p>Bu hedef için teknik rapor üretilemedi. İşlem yapmadan önce tekrar dene.</p>';
+  }finally{
+    const ownsUI=!requestToken||!requestGuard||requestGuard.isActive(requestToken);
+    if(requestToken&&requestGuard)requestGuard.finish(requestToken);
+    if(ownsUI){submit.disabled=false;submit.textContent='ARVIS taramasını başlat'}
+  }
 }
 form.addEventListener('submit',event=>{event.preventDefault();runScan()});
 result.addEventListener('click',async event=>{const button=event.target.closest('[data-copy-ref]');if(!button)return;try{await navigator.clipboard.writeText(button.dataset.copyRef||'');const previous=button.innerHTML;button.textContent='Kopyalandı';setTimeout(()=>{button.innerHTML=previous},900)}catch{}});
