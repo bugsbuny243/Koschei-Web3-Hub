@@ -18,6 +18,7 @@
 :is(#ownerRadarResult,#ownerBrainScanResult) .vc-header{display:grid;grid-template-columns:88px minmax(0,1fr);gap:16px;align-items:start}
 :is(#ownerRadarResult,#ownerBrainScanResult) .vc-grade{min-width:0}
 :is(#ownerRadarResult,#ownerBrainScanResult) .vc-hourglass.signed_finding{color:var(--green);font-size:34px}
+:is(#ownerRadarResult,#ownerBrainScanResult) .vc-coverage{margin-top:9px;padding:8px 10px;border:1px solid #38f2d733;border-radius:11px;background:#38f2d70a;color:#bcefe8;font:800 10px var(--mono);line-height:1.5}
 :is(#ownerRadarResult,#ownerBrainScanResult) .evidence-coverage{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:13px 0}
 :is(#ownerRadarResult,#ownerBrainScanResult) .coverage-chip{display:flex;align-items:center;justify-content:center;min-height:34px;padding:7px 8px;border:1px solid var(--line-soft);border-radius:11px;background:#ffffff05;color:var(--muted);font-size:10px;font-weight:900;text-align:center}
 :is(#ownerRadarResult,#ownerBrainScanResult) .coverage-chip.verified{color:var(--green);border-color:#18ffb22c;background:#18ffb20b}
@@ -63,6 +64,7 @@
   :is(#ownerRadarResult,#ownerBrainScanResult) .vc-hourglass{font-size:28px}
   :is(#ownerRadarResult,#ownerBrainScanResult) .verdict-card h2{font-size:21px;overflow-wrap:anywhere}
   :is(#ownerRadarResult,#ownerBrainScanResult) .vc-meta{display:block;line-height:1.45;overflow-wrap:anywhere}
+  :is(#ownerRadarResult,#ownerBrainScanResult) .vc-coverage{font-size:9px}
   :is(#ownerRadarResult,#ownerBrainScanResult) .evidence-coverage{grid-template-columns:repeat(2,minmax(0,1fr))}
   :is(#ownerRadarResult,#ownerBrainScanResult) .vc-row{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:8px;align-items:center;min-width:0}
   :is(#ownerRadarResult,#ownerBrainScanResult) .vc-row b{min-width:0;overflow-wrap:anywhere}
