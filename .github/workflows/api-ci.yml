@@ -93,12 +93,16 @@ jobs:
           node --check public/js/owner-defense-network.js
           node --check public/js/owner-actor-distribution.js
           node --check public/js/verdict-card.js
+          node --check public/js/verdict-card-market-context.js
+          node --check public/js/verdict-card-evidence-refs.js
           node --check public/js/owner-unified-radar.js
+          node --check public/js/owner-verdict-card-coverage.js
           node --check public/js/owner-court-ui.js
           node --check public/js/owner-radar-mobile-fix.js
           node --check public/js/owner-radar-case-identity.js
           node --check public/js/owner-command-center-v2.js
           node scripts/verify-verdict-card.js
+          node scripts/verify-verdict-card-evidence-refs.js
       - name: Check Turkish public copy
         run: |
           grep -q '<html lang="tr">' public/index.html
