@@ -12,6 +12,7 @@
   const text=value=>String(value??'').trim();
   const unique=values=>[...new Set(values.map(text).filter(Boolean))].sort();
   const positiveSlots=values=>[...new Set(values.map(Number).filter(value=>Number.isSafeInteger(value)&&value>0))].sort((a,b)=>a-b);
+  const number=value=>{const parsed=Number(value);return Number.isFinite(parsed)?parsed:null};
   function normalize(value){
     value=obj(value);
     return{
@@ -37,6 +38,17 @@
         row.status='gray';
         row.value=options.lang==='tr'?'Kanıt referansı bu taramada tamamlanmadı':'Evidence reference did not complete in this scan';
       }
+    }
+    const corpus=obj(payload.holder_concentration_context),concentration=arr(vm?.checklist).find(row=>row.id==='concentration');
+    if(concentration&&corpus.available===true&&number(corpus.top_percentile)!==null&&number(corpus.sample_count)!==null){
+      const locale=options.lang==='tr'?'tr-TR':'en-US';
+      const share=new Intl.NumberFormat(locale,{maximumFractionDigits:4}).format(Number(corpus.top_share_pct));
+      const percentile=new Intl.NumberFormat(locale,{maximumFractionDigits:2}).format(Number(corpus.top_percentile));
+      const sample=new Intl.NumberFormat(locale,{maximumFractionDigits:0}).format(Number(corpus.sample_count));
+      const line=options.lang==='tr'?`Owner payı %${share}; taranan farklı mint corpus’unda en yoğun üst %${percentile} diliminde (n=${sample})`:`Owner share ${share}%; top ${percentile}% most concentrated among distinct scanned mints (n=${sample})`;
+      concentration.value=`${concentration.value} · ${line}`;
+      concentration.detail=concentration.detail?`${concentration.detail} · ${line}`:line;
+      concentration.corpus_context=corpus;
     }
     const coverage={verified:0,observed:0,window_open:0,not_applicable:0,arm_pending:0};
     for(const row of arr(vm?.checklist))coverage[row.state]=(coverage[row.state]||0)+1;
