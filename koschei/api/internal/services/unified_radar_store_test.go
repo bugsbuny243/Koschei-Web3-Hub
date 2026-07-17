@@ -51,3 +51,9 @@ func TestNormalizeUnifiedGradeDoesNotInventA(t *testing.T) {
 		t.Fatalf("unknown grade=%q", got)
 	}
 }
+
+func TestNormalizeUnifiedGradePreservesF(t *testing.T) {
+	if got := normalizeUnifiedGrade("f"); got != "F" {
+		t.Fatalf("F grade normalized to %q", got)
+	}
+}

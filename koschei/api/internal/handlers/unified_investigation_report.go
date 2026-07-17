@@ -70,6 +70,7 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 	}
 	behavior := services.EvaluateUnifiedRadarBehavior(target, creator, core.Market, core.Intelligence, core.Cluster, sales, now)
 	behavior = services.HardenUnifiedRadarBehavior(behavior, storedVerification, core.Cluster)
+	behavior = services.ApplyOwnerConcentrationRuleV110(behavior, core.Intelligence, now)
 	threat := services.BuildThreatAnticipation(services.ThreatAnticipationInput{
 		Target: target, Market: core.Market, Holder: core.Intelligence, Cluster: core.Cluster,
 		Arms: core.Arms, Behavior: behavior,
@@ -77,12 +78,18 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 	combinedEvidence := append([]services.ActorDefenseEvidenceRecord{}, actorDossier.Evidence...)
 	combinedEvidence = append(combinedEvidence, behavior.Evidence...)
 	actorVerdict := services.EvaluateActorDefenseRules(actorTrack, combinedEvidence)
-	unifiedVerdict := services.EvaluateUnifiedRadarVerdict(target, actorVerdict, behavior)
+	unifiedVerdict := services.EvaluateUnifiedRadarVerdictV110(target, actorVerdict, behavior)
+	if h.DB != nil {
+		_ = services.CaptureHolderConcentrationObservation(ctx, h.DB, network, target, core.Intelligence, now)
+	}
+	holderConcentrationContext := services.LoadHolderConcentrationContext(ctx, db, core.Intelligence)
 	modules := radarDetailModules(core.Arms)
 	coverage := services.BuildArvisInvestigationCoverage(core.Arms)
 	structural := h.radarDetailStructuralContext(ctx, target, network)
 	graph := h.radarDetailGraph(ctx, target)
 	tradeLedger := h.unifiedTradeLedgerAggregates(ctx, target)
+	transactionEvidence := h.loadUnifiedTransactionEvidence(ctx, target, 50)
+	evidenceReferences := buildUnifiedEvidenceReferences(core, creator, transactionEvidence, behavior, unifiedVerdict)
 
 	report := map[string]any{
 		"ok": true, "schema_version": unifiedInvestigationSchemaVersion,
@@ -91,11 +98,13 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 		"final_verdict": unifiedVerdict, "threat_anticipation": threat,
 		"investigation_coverage": coverage, "holder_distribution": core.Distribution,
 		"holder_intelligence": core.Intelligence, "holder_cluster": core.Cluster,
+		"holder_concentration_context": holderConcentrationContext,
 		"launch_forensics": core.LaunchForensics, "market": core.Market,
 		"lp_control": core.LPControl, "jupiter_market_context": core.JupiterContext,
 		"source_context": core.SourceContext, "structural_memory": structural,
 		"modules": modules, "evidence_arms": modules, "evidence": radarDetailEvidence(core.Arms),
 		"behavior_signals": behavior, "trade_ledger_aggregates": tradeLedger,
+		"transaction_evidence": transactionEvidence, "evidence_references": evidenceReferences,
 		"actor_investigation": map[string]any{
 			"wallet": creator, "dossier": actorDossier, "rule_verdict": actorVerdict, "store_status": actorStoreStatus,
 		},
@@ -106,8 +115,10 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 			"threat_capacity_is_not_intent": true, "no_evidence_no_claim": true,
 			"identity_scope": "onchain_wallet_only", "caller_type_changes_evidence": false,
 			"jupiter_context_can_change_verdict": false, "lp_control_arm_can_change_grade": false,
+			"corpus_percentile_can_change_verdict": false,
 		},
 	}
+	_ = h.persistDossierSourceSnapshot(ctx, report)
 	return unifiedInvestigationAssembly{
 		Report: report, Core: core, DB: db, Store: store, Creator: creator,
 		ActorDossier: actorDossier, ActorTrack: actorTrack, ActorVerdict: actorVerdict,

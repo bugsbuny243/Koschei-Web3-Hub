@@ -24,16 +24,21 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 	if db == nil {
 		return func() {}
 	}
-	// Retention is pure database hygiene. It stays active even when every
-	// quota-consuming automatic scanner is disabled.
+	// Retention and corpus aggregation are pure database hygiene. They stay
+	// active even when every quota-consuming automatic scanner is disabled.
 	stopRetention := StartSecurityRadarRetentionWorker(ctx, db)
+	stopCorpus := StartHolderConcentrationCorpusWorker(ctx, db)
+	stopDatabaseWorkers := func() {
+		stopCorpus()
+		stopRetention()
+	}
 	if !AutomaticBackgroundScanningEnabled() {
 		log.Printf("security radar automatic workers disabled by KOSCHEI_AUTOMATIC_SCANNING_ENABLED")
-		return stopRetention
+		return stopDatabaseWorkers
 	}
 	if SolanaRPCLimitSaverEnabled() && !ForceBackgroundRadarEnabled() {
 		log.Printf("broad security radar RPC workers paused: SOLANA_RPC_LIMIT_SAVER_ENABLED=true; manual scans remain available")
-		return stopRetention
+		return stopDatabaseWorkers
 	}
 	stopHeartbeat := StartArvisRadarHeartbeat(ctx, db)
 	stopStreamVerdicts := StartArvisStreamVerdictWorker(ctx, db)
@@ -42,7 +47,7 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 		stopStreamRecovery()
 		stopStreamVerdicts()
 		stopHeartbeat()
-		stopRetention()
+		stopDatabaseWorkers()
 	}
 	if !SecurityRadarAutoEnabled() {
 		return stopAll
