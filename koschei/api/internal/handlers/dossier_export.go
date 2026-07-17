@@ -38,14 +38,19 @@ func (h *Handler) DossierExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if stored, ok := h.loadStoredDossierBytes(r.Context(), bundle.CaseRef); ok {
-		writeDossierJSON(w, bundle, stored)
+		writeDossierJSON(w, stored)
 		return
 	}
 	if err := h.storeDossierBundle(r.Context(), snapshot, bundle, canonical, dossierRequester(r)); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "dossier_store_failed"})
 		return
 	}
-	writeDossierJSON(w, bundle, canonical)
+	stored, ok := h.loadStoredDossierBytes(r.Context(), bundle.CaseRef)
+	if !ok {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "dossier_store_verification_failed"})
+		return
+	}
+	writeDossierJSON(w, stored)
 }
 
 func assembleDossierBundle(snapshot dossierSnapshot) (dossierBundle, []byte, error) {
@@ -98,7 +103,12 @@ func assembleDossierBundle(snapshot dossierSnapshot) (dossierBundle, []byte, err
 	return bundle, canonical, nil
 }
 
-func writeDossierJSON(w http.ResponseWriter, bundle dossierBundle, canonical []byte) {
+func writeDossierJSON(w http.ResponseWriter, canonical []byte) {
+	var bundle dossierBundle
+	if json.Unmarshal(canonical, &bundle) != nil || bundle.CaseRef == "" || bundle.BundleHash == "" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "dossier_canonical_bundle_invalid"})
+		return
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=koschei-%s.json", bundle.CaseRef))
 	w.Header().Set("ETag", `"`+bundle.BundleHash+`"`)
