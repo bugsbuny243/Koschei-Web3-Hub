@@ -48,3 +48,20 @@ INSERT INTO holder_concentration_corpus_stats
 (stats_key, sample_count, bucket_width, bucket_counts, calculated_at)
 VALUES ('owner_resolved_top_share_v1', 0, 1, '[]'::jsonb, now())
 ON CONFLICT (stats_key) DO NOTHING;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'security_unified_radar_grade_check'
+          AND conrelid = 'security_unified_radar_verdicts'::regclass
+    ) THEN
+        ALTER TABLE security_unified_radar_verdicts
+            DROP CONSTRAINT security_unified_radar_grade_check;
+    END IF;
+    ALTER TABLE security_unified_radar_verdicts
+        ADD CONSTRAINT security_unified_radar_grade_check
+        CHECK (grade IN ('-','A','B','C','D','E','F'));
+EXCEPTION WHEN duplicate_object THEN
+    NULL;
+END $$;
