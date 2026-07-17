@@ -44,33 +44,35 @@ func (h *Handler) SecurityRadarDetailV3(w http.ResponseWriter, r *http.Request) 
 	persisted := h.radarDetailPersistedVerdict(r.Context(), target)
 	final := radarDetailFinalMap(freshFinal, persisted)
 	modules := radarDetailModules(arms)
+	coverage := services.BuildArvisInvestigationCoverage(arms)
 	allEvidence := radarDetailEvidence(arms)
 	warning := radarDetailWarning(final, distribution, structural, modules, sourceContext)
 	graph := h.radarDetailGraph(r.Context(), target)
 	explanationV2 := holderIntelligenceCoreExplanationV2(core)
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":                  true,
-		"schema_version":      "koschei-radar-detail-v3",
-		"target":              target,
-		"network":             network,
-		"generated_at":        time.Now().UTC().Format(time.RFC3339),
-		"final_verdict":       final,
-		"warning":             warning,
-		"holder_distribution": distribution,
-		"holder_intelligence": holderIntelligence,
-		"holder_cluster":      holderCluster,
-		"launch_forensics":    launchForensics,
-		"threat_anticipation": core.ThreatAnticipation,
-		"actor_intelligence":  actorIntelligence,
-		"market":              market,
-		"structural_memory":   structural,
-		"source_context":      sourceContext,
-		"modules":             modules,
-		"evidence":            allEvidence,
-		"explanation_v2":      explanationV2,
-		"narrative":           explanationV2.Text,
-		"graph":               graph,
+		"ok":                     true,
+		"schema_version":         "koschei-radar-detail-v3",
+		"target":                 target,
+		"network":                network,
+		"generated_at":           time.Now().UTC().Format(time.RFC3339),
+		"final_verdict":          final,
+		"warning":                warning,
+		"investigation_coverage": coverage,
+		"holder_distribution":    distribution,
+		"holder_intelligence":    holderIntelligence,
+		"holder_cluster":         holderCluster,
+		"launch_forensics":       launchForensics,
+		"threat_anticipation":    core.ThreatAnticipation,
+		"actor_intelligence":     actorIntelligence,
+		"market":                 market,
+		"structural_memory":      structural,
+		"source_context":         sourceContext,
+		"modules":                modules,
+		"evidence":               allEvidence,
+		"explanation_v2":         explanationV2,
+		"narrative":              explanationV2.Text,
+		"graph":                  graph,
 		"evidence_policy": map[string]any{
 			"hide_verified_details": false,
 			"no_evidence_no_claim":  true,
