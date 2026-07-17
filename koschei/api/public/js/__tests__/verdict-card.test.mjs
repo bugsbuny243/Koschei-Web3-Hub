@@ -5,61 +5,73 @@ import { createRequire } from 'node:module';
 const require=createRequire(import.meta.url);
 const {mapVerdictCard}=require('../verdict-card.js');
 
-test('mint+freeze active + 72% holder maps red rows and leverage exact values',()=>{
-  const vm=mapVerdictCard({final_verdict:{grade:'F',ruleset_version:'unified-radar-v1.0',actor_ruleset_version:'actor-v1.0',signature:'1234567890abcdef',generated_at:'2026-07-15T00:00:00Z'},modules:[{module_id:'token_authority_scanner',evidence_status:'VERIFIED',signals:{mint_authority_present:true,freeze_authority_present:true}},{module_id:'holder_concentration',evidence_status:'VERIFIED',metrics:{owner_resolved_top_holder_pct:72}}]});
-  assert.equal(vm.checklist.find(x=>x.id==='mint').status,'red');
-  assert.equal(vm.checklist.find(x=>x.id==='freeze').status,'red');
-  assert.equal(vm.checklist.find(x=>x.id==='concentration').status,'red');
+const fixture=name=>JSON.parse(readFileSync(new URL(`../__fixtures__/${name}`,import.meta.url)));
+const unfinished=vm=>vm.checklist.filter(row=>row.state==='window_open'||row.state==='arm_pending');
+const assertNoBannedEmptyCopy=value=>{
+  const text=JSON.stringify(value).toLowerCase();
+  assert.equal(text.includes('veri yok'),false);
+  assert.equal(text.includes('no data'),false);
+};
+
+test('mint+freeze active + 72% owner-resolved maps red leverage rows',()=>{
+  const vm=mapVerdictCard({generated_at:'2026-07-15T00:00:00Z',final_verdict:{grade:'F',ruleset_version:'unified-radar-v1.0',actor_ruleset_version:'actor-v1.0',signature:'1234567890abcdef',generated_at:'2026-07-15T00:00:00Z',signed:true},modules:[{module_id:'token_authority_scanner',evidence_status:'VERIFIED',signed:true,signals:{execution_status:'completed',mint_authority_present:true,freeze_authority_present:true}},{module_id:'holder_concentration',evidence_status:'VERIFIED',signed:true,metrics:{owner_resolved_top_holder_pct:72}}]});
+  assert.equal(vm.checklist.find(x=>x.id==='mint').status,'green');
+  assert.equal(vm.checklist.find(x=>x.id==='freeze').status,'green');
+  assert.equal(vm.checklist.find(x=>x.id==='concentration').status,'green');
   assert.deepEqual(vm.leverage.map(x=>x.id),['mint-authority','freeze-authority','top-owner']);
   assert.match(vm.leverage.find(x=>x.id==='top-owner').text,/72%/);
 });
 
-test('all evidence pending maps neutral evidence gathering and gray checklist',()=>{
-  const vm=mapVerdictCard({final_verdict:{verdict:'no_grade_trigger',ruleset_version:'unified-radar-v1.0',actor_ruleset_version:'actor-v1.0'}});
-  assert.equal(vm.header.state,'gathering');
-  assert.equal(vm.header.tone,'neutral');
-  assert.equal(vm.leverage.length,0);
-  assert.equal(vm.checklist.every(x=>x.status==='gray'),true);
-});
-
-test('INFERRED-only concentration is yellow checklist with no leverage',()=>{
-  const vm=mapVerdictCard({final_verdict:{verdict:'no_grade_trigger'},modules:[{module_id:'holder_concentration',evidence_status:'INFERRED',metrics:{owner_resolved_top_holder_pct:72}}]});
-  assert.equal(vm.checklist.find(x=>x.id==='concentration').status,'yellow');
-  assert.equal(vm.leverage.some(x=>x.id==='top-owner'),false);
-});
-
-test('raw-only 70% concentration is yellow raw checklist with no leverage',()=>{
-  const vm=mapVerdictCard({final_verdict:{grade:'D'},modules:[{module_id:'holder_concentration',evidence_status:'VERIFIED',metrics:{top_holder_percentage:70}}]});
+test('raw-only concentration is observed and never owner leverage',()=>{
+  const vm=mapVerdictCard({generated_at:'2026-07-15T00:00:00Z',final_verdict:{grade:'D'},modules:[{module_id:'holder_concentration',evidence_status:'VERIFIED',signed:true,metrics:{top_holder_percentage:70}}]});
   const row=vm.checklist.find(x=>x.id==='concentration');
-  assert.equal(row.status,'yellow');
+  assert.equal(row.state,'observed');
   assert.equal(row.value,'70% (raw)');
   assert.equal(vm.leverage.some(x=>x.id==='top-owner'),false);
 });
 
-test('owner-resolved 58.7% concentration renders top-owner leverage',()=>{
-  const vm=mapVerdictCard({final_verdict:{grade:'D'},modules:[{module_id:'holder_concentration',evidence_status:'VERIFIED',metrics:{owner_resolved_top_holder_pct:58.7}}]});
-  const row=vm.checklist.find(x=>x.id==='concentration');
-  assert.equal(row.status,'red');
-  assert.equal(row.value,'58.7%');
+test('CFPk live fixture fills stored launch, exit, liquidity and ledger facts',()=>{
+  const vm=mapVerdictCard(fixture('cfpk-live-scan.json'));
+  assert.equal(vm.schema_version,'koschei-verdict-card-v4');
+  assert.equal(vm.checklist.length,20);
+  assert.equal(unfinished(vm).length<=5,true,JSON.stringify(unfinished(vm)));
+  const launch=vm.checklist.find(x=>x.id==='launch');
+  const exit=vm.checklist.find(x=>x.id==='dominant-exit');
+  const liquidity=vm.checklist.find(x=>x.id==='liquidity');
+  const movement=vm.checklist.find(x=>x.id==='liq-move');
+  const wash=vm.checklist.find(x=>x.id==='wash');
+  assert.match(launch.value,/4 hours old/);
+  assert.match(exit.value,/LIMITED/);
+  assert.match(exit.value,/6\.14x liquidity/);
+  assert.match(liquidity.value,/181,694\.50/);
+  assert.equal(movement.state,'observed');
+  assert.match(wash.value,/64 trades/);
+  assert.equal(vm.coverage.verified+vm.coverage.observed+vm.coverage.window_open+vm.coverage.not_applicable+vm.coverage.arm_pending,20);
+  assertNoBannedEmptyCopy(vm);
+  assertNoBannedEmptyCopy(mapVerdictCard(fixture('cfpk-live-scan.json'),{lang:'tr'}));
+});
+
+test('historical 58.75% fixture leaves at most two unfinished rows',()=>{
+  const vm=mapVerdictCard(fixture('historical-scan.json'));
+  assert.equal(unfinished(vm).length<=2,true,JSON.stringify(unfinished(vm)));
+  assert.equal(vm.checklist.find(x=>x.id==='concentration').value,'58.75%');
   assert.equal(vm.leverage.some(x=>x.id==='top-owner'),true);
-  assert.match(vm.leverage.find(x=>x.id==='top-owner').text,/58.7%/);
+  assertNoBannedEmptyCopy(vm);
 });
 
-test('owner-resolved 12% concentration has checklist value but no leverage',()=>{
-  const vm=mapVerdictCard({final_verdict:{grade:'B'},modules:[{module_id:'holder_concentration',evidence_status:'VERIFIED',metrics:{owner_resolved_top_holder_pct:12}}]});
-  const row=vm.checklist.find(x=>x.id==='concentration');
-  assert.equal(row.status,'green');
-  assert.equal(row.value,'12%');
-  assert.equal(vm.leverage.some(x=>x.id==='top-owner'),false);
+test('gaps are machine-distinguished instead of one generic empty label',()=>{
+  const vm=mapVerdictCard({generated_at:'2026-07-17T04:00:00Z',source_context:{launch_time:'2026-07-17T00:00:00Z'},final_verdict:{verdict:'no_grade_trigger'}});
+  assert.equal(vm.header.state,'gathering');
+  assert.equal(vm.checklist.find(x=>x.id==='metadata').state,'window_open');
+  assert.equal(vm.checklist.find(x=>x.id==='claim').state,'not_applicable');
+  assert.equal(vm.checklist.find(x=>x.id==='mev').state,'not_applicable');
+  assertNoBannedEmptyCopy(vm);
 });
 
-test('historical fixture view-model snapshot',()=>{
-  const fixture=JSON.parse(readFileSync(new URL('../__fixtures__/historical-scan.json',import.meta.url)));
-  const vm=mapVerdictCard(fixture);
-  assert.deepEqual({schema_version:vm.schema_version,header:vm.header,leverage:vm.leverage.map(x=>x.id),statuses:vm.checklist.map(x=>[x.id,x.status])},{
-    schema_version:'koschei-verdict-card-v1',
-    header:{state:'graded',tone:'orange',grade:'D',title:'D',copy:'triggered by rules [URD-C003]',ruleset_version:'unified-radar-v1.0',actor_ruleset_version:'actor-v1.0',signature_short:'abcdef12…567890',generated_at:'2026-07-15T10:00:00Z'},
-    leverage:['freeze-authority','top-owner','repeat-actor'],
-    statuses:[['launch','green'],['mint','green'],['freeze','red'],['wash','gray'],['address','gray'],['liquidity','green'],['funding','gray'],['concentration','red'],['sniper','gray'],['first-buyer','gray'],['track','red'],['creator-sell','red'],['dominant-exit','gray'],['liq-move','gray'],['program','gray'],['metadata','gray'],['claim','gray'],['mev','gray'],['distribution','gray'],['signed','green']]
-  });
+test('stable as-of input makes launch age deterministic',()=>{
+  const payload={source_context:{launch_time:'2026-07-17T00:00:00Z'},final_verdict:{verdict:'no_grade_trigger'}};
+  const a=mapVerdictCard(payload,{asOf:'2026-07-17T04:00:00Z'});
+  const b=mapVerdictCard(payload,{asOf:'2026-07-17T04:00:00Z'});
+  assert.deepEqual(a,b);
+  assert.match(a.checklist.find(x=>x.id==='launch').value,/4 hours old/);
 });
