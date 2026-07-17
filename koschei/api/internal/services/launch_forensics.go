@@ -236,7 +236,7 @@ func loadLaunchForensicsConfig() launchForensicsConfig {
 		ATAMaxPages:       holderScanEnvInt("ARVIS_ATA_MAX_PAGES", 3, 1, 10),
 		RPCBudget:         holderScanEnvInt("ARVIS_SCAN_RPC_BUDGET", 600, 25, 5000),
 		FundingCheckCount: holderScanEnvInt("ARVIS_FUNDING_CHECK_COUNT", 10, 0, 20),
-		FundingRPCBudget:  holderScanEnvInt("ARVIS_FUNDING_RPC_BUDGET", 100, 10, 1000),
+		FundingRPCBudget:  holderScanEnvInt("ARVIS_FUNDING_RPC_BUDGET", 100, 25, 2000),
 		SniperSlotWindow:  holderScanEnvInt("ARVIS_SNIPER_SLOT_WINDOW", 3, 0, 100),
 		FundingSigLimit:   holderScanEnvInt("ARVIS_FUNDING_SIG_LIMIT", 25, 5, 100),
 		FundingTxParse:    holderScanEnvInt("ARVIS_FUNDING_TX_PARSE", 6, 1, 20),

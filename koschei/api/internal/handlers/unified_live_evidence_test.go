@@ -1,11 +1,26 @@
 package handlers
 
 import (
+	"context"
+	"strings"
 	"testing"
 	"time"
 
 	"koschei/api/internal/services"
 )
+
+func TestUnifiedLiveEvidenceDeadlineKeepsPartialLimitation(t *testing.T) {
+	t.Setenv("SOLANA_RPC_URL", "http://127.0.0.1:1")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	report := (&Handler{}).collectUnifiedTokenLiveEvidence(ctx, holderIntelligenceCoreResult{
+		Request: services.SecurityRadarRequest{Target: "Mint111"}, SourceContext: map[string]any{"creator_wallet": "Creator111"},
+	})
+	if report.Status != "partial_timeout" { t.Fatalf("status = %q, want partial_timeout", report.Status) }
+	if len(report.Limitations) == 0 || !strings.Contains(report.Limitations[0], "ended before every wallet target completed") {
+		t.Fatalf("limitations = %#v", report.Limitations)
+	}
+}
 
 func unifiedLiveTestTransaction(wallet, counterparty, mint string, walletPre, walletPost, counterpartyPre, counterpartyPost float64, instructionType string) services.SolanaTransactionResult {
 	balances := func(walletAmount, counterpartyAmount float64) []any {
