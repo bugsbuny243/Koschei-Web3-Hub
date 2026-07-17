@@ -22,6 +22,37 @@
   const gradeLabel=grade=>grade&&grade!=='-'?`GRADE ${grade}`:'GRADE YOK';
   const threatLabel=value=>({open:'AÇIK',closed:'KAPALI',observed:'GÖZLENDİ',watch:'İZLE',unknown:'BİLİNMİYOR',limited:'SINIRLI',not_observed:'GÖZLENMEDİ'}[String(value||'').toLowerCase()]||String(value||'BİLİNMİYOR').toUpperCase());
 
+  const dexLabel=value=>({pumpswap:'PumpSwap',raydium:'Raydium',meteora:'Meteora',orca:'Orca'}[String(value||'').toLowerCase()]||String(value||''));
+  const utc=value=>{const date=value?new Date(value):null;return !date||Number.isNaN(date.getTime())?'—':`${new Intl.DateTimeFormat('tr-TR',{timeZone:'UTC',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(date)} UTC`};
+  function targetIdentity(payload){
+    const supplied=obj(payload.target_identity),legacy=obj(payload.legacy_14_arm_radar),market=obj(supplied.market||legacy.market),pair=obj(supplied.pair);
+    const mint=String(supplied.mint||payload.target||'').trim(),name=String(supplied.name||market.name||'').trim(),symbol=String(supplied.symbol||market.symbol||'').trim();
+    return{chain:'Solana',mint,name,symbol,logo_url:String(supplied.logo_url||market.logo_url||''),metadata_status:String(supplied.metadata_status||((name||symbol)?'observed':'unknown')).toLowerCase(),metadata_source:String(supplied.metadata_source||((name||symbol)?market.provider||'Mevcut scan metadata':'')).trim(),pair:{address:pair.address||market.best_pair_address||'',dex:pair.dex||market.best_pair_dex||'',base_symbol:pair.base_symbol||market.best_pair_base_symbol||symbol,quote_symbol:pair.quote_symbol||market.best_pair_quote_symbol||''},market:{market_cap_usd:market.market_cap_usd,volume_24h_usd:market.volume_24h_usd,liquidity_usd:market.liquidity_usd},scanned_at:supplied.scanned_at||payload.generated_at||obj(payload.final_verdict).generated_at};
+  }
+  function renderTargetIdentity(payload){
+    if(obj(payload.legacy_14_arm_radar).applicable===false)return'';
+    const identity=targetIdentity(payload),known=identity.metadata_status!=='unknown'&&(identity.name||identity.symbol),title=known?`${identity.name||identity.symbol}${identity.symbol?` ($${identity.symbol})`:''}`:'ADI DOĞRULANAMAYAN TOKEN';
+    const pair=identity.pair.dex&&identity.pair.base_symbol&&identity.pair.quote_symbol?`${dexLabel(identity.pair.dex)} · ${identity.pair.base_symbol}/${identity.pair.quote_symbol}`:'Doğrulanamadı';
+    const logo=identity.logo_url?`<img class="target-logo-image" src="${esc(identity.logo_url)}" alt="" referrerpolicy="no-referrer" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span class="target-logo-fallback" hidden>◎</span>`:'<span class="target-logo-fallback">◎</span>';
+    return`<article class="card target-identity-card" id="target-identity-card"><div class="target-identity-head"><div class="target-logo">${logo}</div><div class="target-title"><span class="eyebrow">HEDEF KİMLİĞİ</span><h2>${esc(title)} <small>— Solana</small></h2><div class="target-mobile-sub">${identity.symbol?`$${esc(identity.symbol)} · `:''}Solana</div><div class="target-mint"><code title="${esc(identity.mint)}">${esc(identity.mint)}</code><button class="btn small" type="button" data-copy-mint="${esc(identity.mint)}" aria-label="Mint adresini kopyala">Kopyala</button></div></div></div><div class="target-identity-metrics"><div><label>Pair</label><b>${esc(pair)}</b></div><div><label>Piyasa değeri</label><b>${money(identity.market.market_cap_usd)}</b></div><div><label>24s hacim</label><b>${money(identity.market.volume_24h_usd)}</b></div><div><label>Likidite</label><b>${money(identity.market.liquidity_usd)}</b></div><div><label>Tarama zamanı</label><b>${esc(utc(identity.scanned_at))}</b></div><div><label>${known?'Metadata kaynağı':'Metadata durumu'}</label><b>${esc(known?(identity.metadata_source||'Mevcut scan metadata'): 'UNKNOWN')}</b></div></div><div class="target-share-actions"><button class="btn small" type="button" data-download-share>Rapor görselini indir</button><button class="btn small" type="button" data-share-report>Paylaş / Tweet</button></div><canvas data-target-share-canvas width="1200" height="1200" hidden></canvas></article>`;
+  }
+
+  function drawTargetShare(canvas,payload){
+    const i=targetIdentity(payload),known=i.metadata_status!=='unknown'&&(i.name||i.symbol),pair=i.pair.dex&&i.pair.base_symbol&&i.pair.quote_symbol?`${dexLabel(i.pair.dex)} · ${i.pair.base_symbol}/${i.pair.quote_symbol}`:'Doğrulanamadı',verdict=obj(payload.final_verdict),c=canvas.getContext('2d');
+    c.fillStyle='#02070d';c.fillRect(0,0,1200,1200);c.strokeStyle='#1de6c855';c.lineWidth=3;c.strokeRect(35,35,1130,1130);c.fillStyle='#18ffb2';c.font='900 28px Arial';c.fillText('KOSCHEI ARVIS · HEDEF KİMLİĞİ',75,100);c.fillStyle='#fff';c.font='900 50px Arial';c.fillText((known?(i.name||i.symbol):'ADI DOĞRULANAMAYAN TOKEN').slice(0,36),75,185);c.fillStyle='#8fa4b5';c.font='800 28px Arial';c.fillText(`${i.symbol?'$'+i.symbol+' · ':''}Solana`,75,230);
+    const rows=[['MINT',i.mint],['PAIR',pair],['PİYASA DEĞERİ',money(i.market.market_cap_usd)],['24S HACİM',money(i.market.volume_24h_usd)],['LİKİDİTE',money(i.market.liquidity_usd)],['TARAMA ZAMANI',utc(i.scanned_at)],['METADATA',known?(i.metadata_source||'Mevcut scan metadata'):'UNKNOWN']];
+    rows.forEach((row,index)=>{const y=315+index*88;c.fillStyle='#708797';c.font='700 18px Arial';c.fillText(row[0],75,y);c.fillStyle='#fff';c.font=index===0?'700 21px monospace':'800 26px Arial';c.fillText(String(row[1]||'—').slice(0,index===0?52:58),75,y+34)});
+    c.strokeStyle='#ff526f66';c.strokeRect(70,955,1060,145);c.fillStyle='#ff526f';c.font='900 46px Arial';c.fillText(`${gradeLabel(verdict.grade)} · ${String(verdict.verdict||'').replaceAll('_',' ').toUpperCase()}`,95,1025);c.fillStyle='#9bb2c2';c.font='700 18px Arial';c.fillText(`Ruleset ${verdict.ruleset_version||'—'}`,95,1068);
+  }
+
+  function bindTargetIdentity(root,payload){
+    const card=root.querySelector('#target-identity-card'),canvas=card?.querySelector('[data-target-share-canvas]');if(!card||!canvas)return;drawTargetShare(canvas,payload);
+    card.querySelector('[data-copy-mint]')?.addEventListener('click',event=>navigator.clipboard?.writeText(event.currentTarget.dataset.copyMint||''));
+    const file=()=>new Promise(resolve=>canvas.toBlob(blob=>resolve(blob),'image/png'));
+    card.querySelector('[data-download-share]')?.addEventListener('click',()=>{const link=document.createElement('a');link.download=`koschei-arvis-${targetIdentity(payload).mint.slice(0,10)||'report'}.png`;link.href=canvas.toDataURL('image/png');link.click()});
+    card.querySelector('[data-share-report]')?.addEventListener('click',async()=>{const blob=await file(),share={title:'Koschei ARVIS Raporu',text:`${targetIdentity(payload).name||targetIdentity(payload).mint} · Solana · ${utc(targetIdentity(payload).scanned_at)}`,files:blob?[new File([blob],'koschei-arvis.png',{type:'image/png'})]:[]};if(navigator.canShare?.(share))await navigator.share(share);else{const link=document.createElement('a');link.href=canvas.toDataURL('image/png');link.download='koschei-arvis-share.png';link.click()}});
+  }
+
   const criticalCoverage={
     token_authority_scanner:'Token authority',holder_concentration:'Owner-resolved holder',liquidity_movement:'Likidite derinliği ve kontrolü',
     creator_link_analysis:'Creator/deployer ilişkisi',funding_cluster_detector:'Holder funding ilişkileri',launch_distribution:'Launch / ilk alıcı geçmişi',repeat_actor_scan:'Kalıcı aktör hafızası'
@@ -106,7 +137,8 @@
 
   function renderUnified(root,payload){
     root=rootFor(root);if(!root)return;
-    root.innerHTML=`${renderInvestigationCoverage(payload.legacy_14_arm_radar)}${renderVerdictCard(payload)}<div class="grid compact-grid section-gap" id="full-report-detail"><div class="span-12">${renderVerdict(payload.final_verdict)}</div><div class="span-12">${renderBehavior(payload.behavior_signals)}</div><div class="span-12">${renderThreatAnticipation(payload.threat_anticipation)}</div><div class="span-12">${renderLegacy(payload.legacy_14_arm_radar)}</div></div>`;
+    root.innerHTML=`${renderInvestigationCoverage(payload.legacy_14_arm_radar)}${renderTargetIdentity(payload)}${renderVerdictCard(payload)}<div class="grid compact-grid section-gap" id="full-report-detail"><div class="span-12">${renderVerdict(payload.final_verdict)}</div><div class="span-12">${renderBehavior(payload.behavior_signals)}</div><div class="span-12">${renderThreatAnticipation(payload.threat_anticipation)}</div><div class="span-12">${renderLegacy(payload.legacy_14_arm_radar)}</div></div>`;
+    bindTargetIdentity(root,payload);
     renderActor(root,payload);
   }
 

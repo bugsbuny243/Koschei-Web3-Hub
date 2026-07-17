@@ -115,6 +115,13 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 	unifiedPersistence, unifiedHistory := h.persistUnifiedRadarVerdict(ctx, assembly.DB, network, "token", target, assembly.UnifiedVerdict, assembly.Behavior)
 
 	report := assembly.Report
+	scannedAt := time.Now().UTC()
+	if generated, ok := report["generated_at"].(string); ok {
+		if parsed, err := time.Parse(time.RFC3339, generated); err == nil {
+			scannedAt = parsed
+		}
+	}
+	report["target_identity"] = services.BuildTargetIdentity(target, core.Market, scannedAt)
 	report["target_classification"] = classification
 	report["manual_only"] = true
 	report["automatic_scanning"] = false
@@ -128,18 +135,18 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 	report["legacy_14_arm_radar"] = map[string]any{
 		"architecture_arm_count": 14,
 		"investigation_coverage": services.BuildArvisInvestigationCoverage(core.Arms),
-		"final_verdict": legacyFinal,
-		"warning": radarDetailWarning(legacyFinal, core.Distribution, assembly.Structural, assembly.Modules, core.SourceContext),
-		"holder_distribution": core.Distribution,
-		"holder_intelligence": core.Intelligence,
-		"holder_cluster": core.Cluster,
-		"launch_forensics": core.LaunchForensics,
-		"market": core.Market,
-		"structural_memory": assembly.Structural,
-		"source_context": core.SourceContext,
-		"modules": assembly.Modules,
-		"evidence": radarDetailEvidence(core.Arms),
-		"graph": assembly.Graph,
+		"final_verdict":          legacyFinal,
+		"warning":                radarDetailWarning(legacyFinal, core.Distribution, assembly.Structural, assembly.Modules, core.SourceContext),
+		"holder_distribution":    core.Distribution,
+		"holder_intelligence":    core.Intelligence,
+		"holder_cluster":         core.Cluster,
+		"launch_forensics":       core.LaunchForensics,
+		"market":                 core.Market,
+		"structural_memory":      assembly.Structural,
+		"source_context":         core.SourceContext,
+		"modules":                assembly.Modules,
+		"evidence":               radarDetailEvidence(core.Arms),
+		"graph":                  assembly.Graph,
 	}
 
 	// Optional model orchestration remains an internal, read-only appendix. It is
@@ -208,19 +215,19 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 	response := map[string]any{
 		"ok": true, "schema_version": "koschei-unified-investigation-v1",
 		"target": requestedTarget, "wallet": wallet, "network": network,
-		"generated_at": time.Now().UTC().Format(time.RFC3339),
+		"generated_at":          time.Now().UTC().Format(time.RFC3339),
 		"target_classification": classification, "analysis_scope": "wallet_actor_investigation",
 		"manual_only": true, "automatic_scanning": false,
-		"final_verdict": unifiedVerdict,
+		"final_verdict":             unifiedVerdict,
 		"final_verdict_persistence": unifiedPersistence,
-		"final_verdict_history": unifiedHistory,
-		"legacy_14_arm_radar": map[string]any{"applicable": false, "reason": "Token-specific collectors are not fabricated for a wallet-only target.", "modules": []any{}},
+		"final_verdict_history":     unifiedHistory,
+		"legacy_14_arm_radar":       map[string]any{"applicable": false, "reason": "Token-specific collectors are not fabricated for a wallet-only target.", "modules": []any{}},
 		"actor_investigation": map[string]any{
 			"wallet": wallet, "dossier": final, "funding_origin": funding,
 			"funding_origin_persistence": fundingPersistence, "live_evidence": coverage,
 			"rule_verdict": actorVerdict, "rule_verdict_persistence": persistence,
 		},
-		"behavior_signals": behavior,
+		"behavior_signals":            behavior,
 		"investigation_output_policy": services.SharedInvestigationOutputPolicy(),
 		"evidence_policy": map[string]any{
 			"numeric_final_score_disabled": true, "no_evidence_no_claim": true,
@@ -233,9 +240,9 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 
 func ownerCourtUnavailableReport(status string) *CourtReport {
 	return &CourtReport{
-		Status: status,
+		Status:      status,
 		TierApplied: "enterprise",
-		Authority: "the signed deterministic verdict is final; model output is commentary/explanation",
+		Authority:   "the signed deterministic verdict is final; model output is commentary/explanation",
 		GeneratedAt: time.Now().UTC(),
 	}
 }
