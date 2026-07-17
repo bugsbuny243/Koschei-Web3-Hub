@@ -7,6 +7,14 @@
 :is(#ownerRadarResult,#ownerBrainScanResult) .radar-case-identity .case-target{font-size:13px;line-height:1.55;overflow-wrap:anywhere;word-break:break-word}
 :is(#ownerRadarResult,#ownerBrainScanResult) .radar-case-identity .case-meta{display:flex;flex-wrap:wrap;gap:8px;color:var(--muted);font-size:10px}
 :is(#ownerRadarResult,#ownerBrainScanResult) .radar-case-identity .case-meta span{padding:6px 8px;border:1px solid var(--line-soft);border-radius:999px;background:#ffffff05}
+:is(#ownerRadarResult,#ownerBrainScanResult) .investigation-coverage-card{border-color:#38f2d74d;background:linear-gradient(145deg,#071b22,#07121b)}
+:is(#ownerRadarResult,#ownerBrainScanResult) .investigation-coverage-card.partial_investigation{border-color:#ffc95c55}
+:is(#ownerRadarResult,#ownerBrainScanResult) .investigation-coverage-card.insufficient_coverage{border-color:#ff526f55}
+:is(#ownerRadarResult,#ownerBrainScanResult) .coverage-metrics{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+:is(#ownerRadarResult,#ownerBrainScanResult) .coverage-metrics>div{min-width:0;padding:12px;border:1px solid var(--line-soft);border-radius:13px;background:#ffffff05}
+:is(#ownerRadarResult,#ownerBrainScanResult) .coverage-metrics label{display:block;color:var(--muted);font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.07em}
+:is(#ownerRadarResult,#ownerBrainScanResult) .coverage-metrics b{display:block;margin-top:5px;color:var(--text);font-size:21px}
+:is(#ownerRadarResult,#ownerBrainScanResult) .coverage-complete{border-color:#18ffb238;background:#18ffb20b}
 :is(#ownerRadarResult,#ownerBrainScanResult) .vc-header{display:grid;grid-template-columns:88px minmax(0,1fr);gap:16px;align-items:start}
 :is(#ownerRadarResult,#ownerBrainScanResult) .vc-grade{min-width:0}
 :is(#ownerRadarResult,#ownerBrainScanResult) .vc-hourglass.signed_finding{color:var(--green);font-size:34px}
@@ -31,6 +39,10 @@
 :is(#ownerRadarResult,#ownerBrainScanResult) .missing-evidence-list{margin:12px 0 0;padding-left:20px;color:#dbe8f0}
 :is(#ownerRadarResult,#ownerBrainScanResult) .missing-evidence-list li{margin:7px 0;line-height:1.5}
 
+@media(max-width:1100px){
+  :is(#ownerRadarResult,#ownerBrainScanResult) .coverage-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+
 @media(max-width:900px){
   :is(#ownerRadarResult,#ownerBrainScanResult) .legacy-section .grid.compact-grid>.card{grid-column:span 6}
 }
@@ -43,6 +55,9 @@
   :is(#ownerRadarResult,#ownerBrainScanResult) .card{padding:13px;border-radius:17px}
   :is(#ownerRadarResult,#ownerBrainScanResult) .card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
   :is(#ownerRadarResult,#ownerBrainScanResult) .card-head h2{font-size:17px}
+  :is(#ownerRadarResult,#ownerBrainScanResult) .coverage-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  :is(#ownerRadarResult,#ownerBrainScanResult) .coverage-metrics>div{padding:10px}
+  :is(#ownerRadarResult,#ownerBrainScanResult) .coverage-metrics b{font-size:18px}
   :is(#ownerRadarResult,#ownerBrainScanResult) .vc-header{grid-template-columns:58px minmax(0,1fr);gap:11px}
   :is(#ownerRadarResult,#ownerBrainScanResult) .vc-grade{min-height:58px}
   :is(#ownerRadarResult,#ownerBrainScanResult) .vc-hourglass{font-size:28px}
