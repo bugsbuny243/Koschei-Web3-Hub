@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const baseURL=String(process.env.KOSCHEI_BASE_URL||'https://tradepigloball.co').replace(/\/$/,'');
 const ownerSecret=String(process.env.KOSCHEI_OWNER_SECRET||'').trim();
+const allowPartial=/^(1|true|yes)$/i.test(String(process.env.KOSCHEI_ACCEPTANCE_ALLOW_PARTIAL||''));
 const inputPath=process.argv[2];
 
 if(!ownerSecret)throw new Error('KOSCHEI_OWNER_SECRET is required');
@@ -47,7 +48,9 @@ const summary={
   passed:results.filter(item=>item.status==='pass').length,
   partial:results.filter(item=>item.status==='partial').length,
   failed:results.filter(item=>item.status==='fail').length,
-  blocker_codes:[...new Set(results.flatMap(item=>item.blockers.map(blocker=>blocker.code)).filter(Boolean))].sort()
+  allow_partial:allowPartial,
+  blocker_codes:[...new Set(results.flatMap(item=>item.blockers.map(blocker=>blocker.code)).filter(Boolean))].sort(),
+  warning_codes:[...new Set(results.flatMap(item=>item.warnings.map(warning=>warning.code)).filter(Boolean))].sort()
 };
 process.stdout.write(`${JSON.stringify({summary})}\n`);
-if(summary.failed>0)process.exitCode=1;
+if(summary.failed>0||(!allowPartial&&summary.partial>0))process.exitCode=1;
