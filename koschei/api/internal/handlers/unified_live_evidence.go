@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	unifiedLiveSignatureLimit   = 30
-	unifiedLiveTransactionLimit = 12
-	unifiedLaunchSignatureLimit = 100
-	unifiedLaunchParseLimit     = 16
+	unifiedLiveSignatureLimit    = 30
+	unifiedLiveTransactionLimit  = 12
+	unifiedLaunchSignatureLimit  = 100
+	unifiedLaunchParseLimit      = 16
 )
 
 type unifiedLiveWalletTarget struct {
@@ -34,32 +34,48 @@ type unifiedLiveWalletCoverage struct {
 }
 
 type unifiedLaunchSignerObservation struct {
-	Available      bool     `json:"available"`
-	Status         string   `json:"status"`
-	Wallet         string   `json:"wallet,omitempty"`
-	Signature      string   `json:"signature,omitempty"`
-	Slot           int64    `json:"slot,omitempty"`
-	ObservedAt     string   `json:"observed_at,omitempty"`
+	Available        bool     `json:"available"`
+	Status           string   `json:"status"`
+	Wallet           string   `json:"wallet,omitempty"`
+	Signature        string   `json:"signature,omitempty"`
+	Slot             int64    `json:"slot,omitempty"`
+	ObservedAt       string   `json:"observed_at,omitempty"`
 	InstructionTypes []string `json:"instruction_types"`
-	EvidenceKey    string   `json:"evidence_key,omitempty"`
-	Limitations    []string `json:"limitations"`
+	EvidenceKey      string   `json:"evidence_key,omitempty"`
+	Limitations      []string `json:"limitations"`
+}
+
+type unifiedLiveTransactionRow struct {
+	Signature        string   `json:"signature"`
+	Slot             int64    `json:"slot,omitempty"`
+	BlockTime        string   `json:"block_time,omitempty"`
+	Wallet           string   `json:"wallet"`
+	Role             string   `json:"role"`
+	Direction        string   `json:"direction"`
+	TokenDelta       float64  `json:"token_delta"`
+	SwapRelated      bool     `json:"swap_related"`
+	Counterparties   []string `json:"counterparties"`
+	InstructionTypes []string `json:"instruction_types"`
+	TokenMints       []string `json:"token_mints"`
+	EvidenceKey      string   `json:"evidence_key"`
+	Source           string   `json:"source"`
 }
 
 type unifiedLiveInvestigationReport struct {
-	Status             string                          `json:"status"`
-	Mint               string                          `json:"mint"`
-	RPCConfigured      bool                            `json:"rpc_configured"`
-	WalletsRequested   int                             `json:"wallets_requested"`
-	WalletsCompleted   int                             `json:"wallets_completed"`
-	SignaturesSeen     int                             `json:"signatures_seen"`
-	TransactionsParsed int                             `json:"transactions_parsed"`
-	RelevantTransactions int                           `json:"relevant_transactions"`
-	RPCFailures        int                             `json:"rpc_failures"`
-	LaunchSigner       unifiedLaunchSignerObservation  `json:"launch_signer"`
-	WalletCoverage     []unifiedLiveWalletCoverage     `json:"wallet_coverage"`
-	Transactions       []unifiedTransactionEvidence    `json:"transactions"`
-	GeneratedAt        time.Time                       `json:"generated_at"`
-	Limitations        []string                        `json:"limitations"`
+	Status               string                         `json:"status"`
+	Mint                 string                         `json:"mint"`
+	RPCConfigured        bool                           `json:"rpc_configured"`
+	WalletsRequested     int                            `json:"wallets_requested"`
+	WalletsCompleted     int                            `json:"wallets_completed"`
+	SignaturesSeen       int                            `json:"signatures_seen"`
+	TransactionsParsed   int                            `json:"transactions_parsed"`
+	RelevantTransactions int                            `json:"relevant_transactions"`
+	RPCFailures          int                            `json:"rpc_failures"`
+	LaunchSigner         unifiedLaunchSignerObservation `json:"launch_signer"`
+	WalletCoverage       []unifiedLiveWalletCoverage    `json:"wallet_coverage"`
+	Transactions         []unifiedLiveTransactionRow    `json:"transactions"`
+	GeneratedAt          time.Time                      `json:"generated_at"`
+	Limitations          []string                       `json:"limitations"`
 }
 
 func unifiedLiveEvidenceAllowed(mode string) bool {
@@ -74,7 +90,7 @@ func (h *Handler) collectUnifiedTokenLiveEvidence(ctx context.Context, core hold
 	now := time.Now().UTC()
 	out := unifiedLiveInvestigationReport{
 		Status: "source_unavailable", Mint: strings.TrimSpace(core.Request.Target),
-		WalletCoverage: []unifiedLiveWalletCoverage{}, Transactions: []unifiedTransactionEvidence{},
+		WalletCoverage: []unifiedLiveWalletCoverage{}, Transactions: []unifiedLiveTransactionRow{},
 		GeneratedAt: now, Limitations: []string{},
 		LaunchSigner: unifiedLaunchSignerObservation{Status: "not_checked", InstructionTypes: []string{}, Limitations: []string{}},
 	}
@@ -114,14 +130,13 @@ func (h *Handler) collectUnifiedTokenLiveEvidence(ctx context.Context, core hold
 		out.WalletCoverage = append(out.WalletCoverage, coverage)
 		out.SignaturesSeen += coverage.SignaturesSeen
 		out.TransactionsParsed += coverage.TransactionsParsed
-		out.RelevantTransactions += coverage.RelevantTransactions
 		out.RPCFailures += coverage.RPCFailures
-		if coverage.Status == "complete" || coverage.Status == "complete_no_relevant_token_delta" {
+		if coverage.Status == "complete" || coverage.Status == "complete_no_relevant_token_delta" || coverage.Status == "complete_no_successful_signatures" {
 			out.WalletsCompleted++
 		}
 		out.Transactions = append(out.Transactions, rows...)
 	}
-	out.Transactions = normalizeUnifiedTransactionEvidence(out.Transactions)
+	out.Transactions = normalizeUnifiedLiveTransactionRows(out.Transactions)
 	out.RelevantTransactions = len(out.Transactions)
 	if out.WalletsCompleted == out.WalletsRequested {
 		out.Status = "complete"
@@ -173,11 +188,9 @@ func unifiedLiveWalletTargets(holder services.HolderIntelligence, creator string
 	return out
 }
 
-func collectUnifiedWalletTransactions(ctx context.Context, rpcURL, mint string, target unifiedLiveWalletTarget) (unifiedLiveWalletCoverage, []unifiedTransactionEvidence) {
-	coverage := unifiedLiveWalletCoverage{
-		Wallet: target.Wallet, Role: target.Role, Status: "rpc_failed", Limitations: []string{},
-	}
-	rows := []unifiedTransactionEvidence{}
+func collectUnifiedWalletTransactions(ctx context.Context, rpcURL, mint string, target unifiedLiveWalletTarget) (unifiedLiveWalletCoverage, []unifiedLiveTransactionRow) {
+	coverage := unifiedLiveWalletCoverage{Wallet: target.Wallet, Role: target.Role, Status: "rpc_failed", Limitations: []string{}}
+	rows := []unifiedLiveTransactionRow{}
 	signatures, err := services.SolanaGetSignaturesForAddress(ctx, rpcURL, target.Wallet, unifiedLiveSignatureLimit)
 	if err != nil {
 		coverage.RPCFailures++
@@ -247,11 +260,11 @@ func fetchUnifiedTransactions(ctx context.Context, rpcURL string, signatures []s
 	return out, lastErr
 }
 
-func parseUnifiedLiveTransaction(mint string, target unifiedLiveWalletTarget, signature services.SolanaSignatureInfo, tx services.SolanaTransactionResult) (unifiedTransactionEvidence, bool) {
+func parseUnifiedLiveTransaction(mint string, target unifiedLiveWalletTarget, signature services.SolanaSignatureInfo, tx services.SolanaTransactionResult) (unifiedLiveTransactionRow, bool) {
 	txMap := map[string]any(tx)
 	meta := creatorIntelMap(txMap["meta"])
 	if meta["err"] != nil {
-		return unifiedTransactionEvidence{}, false
+		return unifiedLiveTransactionRow{}, false
 	}
 	message := creatorIntelMap(creatorIntelMap(txMap["transaction"])["message"])
 	instructionTypes, instructionMints := creatorIntelInstructions(message, meta)
@@ -259,7 +272,7 @@ func parseUnifiedLiveTransaction(mint string, target unifiedLiveWalletTarget, si
 	deltas := creatorIntelOwnerTokenDeltas(meta, mint)
 	delta := deltas[target.Wallet]
 	if math.Abs(delta) < 0.000000001 {
-		return unifiedTransactionEvidence{}, false
+		return unifiedLiveTransactionRow{}, false
 	}
 	swapRelated := creatorIntelSwapRelated(logs, instructionTypes)
 	direction := "transfer_in"
@@ -282,26 +295,20 @@ func parseUnifiedLiveTransaction(mint string, target unifiedLiveWalletTarget, si
 		}
 	}
 	sort.Strings(counterparties)
-	blockTime := time.Time{}
+	blockTime := ""
 	if raw := creatorIntelInt64(txMap["blockTime"]); raw > 0 {
-		blockTime = time.Unix(raw, 0).UTC()
+		blockTime = time.Unix(raw, 0).UTC().Format(time.RFC3339)
 	} else if signature.BlockTime != nil && *signature.BlockTime > 0 {
-		blockTime = time.Unix(*signature.BlockTime, 0).UTC()
+		blockTime = time.Unix(*signature.BlockTime, 0).UTC().Format(time.RFC3339)
 	}
-	row := unifiedTransactionEvidence{
-		Signature: strings.TrimSpace(signature.Signature), Slot: signature.Slot,
-		Trader: strings.TrimSpace(target.Wallet), Direction: direction, Role: target.Role,
+	row := unifiedLiveTransactionRow{
+		Signature: strings.TrimSpace(signature.Signature), Slot: signature.Slot, BlockTime: blockTime,
+		Wallet: strings.TrimSpace(target.Wallet), Role: target.Role, Direction: direction,
 		TokenDelta: creatorIntelRound(delta, 8), SwapRelated: swapRelated,
-		Counterparties: counterparties, InstructionTypes: instructionTypes,
+		Counterparties: counterparties, InstructionTypes: instructionTypes, TokenMints: instructionMints,
 		Source: "solana_jsonparsed_manual_full_scan",
 	}
-	if !blockTime.IsZero() {
-		row.BlockTime = &blockTime
-	}
-	row.EvidenceKey = row.Signature + ":" + row.Trader + ":" + row.Direction
-	if len(instructionMints) > 0 {
-		row.TokenMints = instructionMints
-	}
+	row.EvidenceKey = row.Signature + ":" + row.Wallet + ":" + row.Direction
 	return row, row.Signature != ""
 }
 
@@ -395,11 +402,11 @@ func unifiedTransactionReferencesMint(meta map[string]any, instructionMints []st
 	return false
 }
 
-func normalizeUnifiedTransactionEvidence(values []unifiedTransactionEvidence) []unifiedTransactionEvidence {
+func normalizeUnifiedLiveTransactionRows(values []unifiedLiveTransactionRow) []unifiedLiveTransactionRow {
 	seen := map[string]bool{}
-	out := []unifiedTransactionEvidence{}
+	out := []unifiedLiveTransactionRow{}
 	for _, value := range values {
-		key := strings.TrimSpace(value.Signature) + "|" + strings.TrimSpace(value.Trader) + "|" + strings.TrimSpace(value.Direction)
+		key := strings.TrimSpace(value.Signature) + "|" + strings.TrimSpace(value.Wallet) + "|" + strings.TrimSpace(value.Direction)
 		if key == "||" || seen[key] {
 			continue
 		}
@@ -418,21 +425,42 @@ func normalizeUnifiedTransactionEvidence(values []unifiedTransactionEvidence) []
 	return out
 }
 
+func unifiedLiveRowsToEvidence(values []unifiedLiveTransactionRow) []unifiedTransactionEvidence {
+	out := make([]unifiedTransactionEvidence, 0, len(values))
+	for _, value := range values {
+		var blockTime *time.Time
+		if parsed := dossierParseTime(value.BlockTime); !parsed.IsZero() {
+			copy := parsed.UTC()
+			blockTime = &copy
+		}
+		out = append(out, unifiedTransactionEvidence{
+			Signature: value.Signature, Slot: value.Slot, Trader: value.Wallet,
+			Direction: value.Direction, BlockTime: blockTime, Source: value.Source,
+		})
+	}
+	return out
+}
+
 func mergeUnifiedTransactionEvidence(stored, live []unifiedTransactionEvidence) []unifiedTransactionEvidence {
-	all := append([]unifiedTransactionEvidence{}, stored...)
-	all = append(all, live...)
-	return normalizeUnifiedTransactionEvidence(all)
+	seen := map[string]bool{}
+	out := []unifiedTransactionEvidence{}
+	for _, value := range append(append([]unifiedTransactionEvidence{}, stored...), live...) {
+		key := strings.TrimSpace(value.Signature) + "|" + strings.TrimSpace(value.Trader) + "|" + strings.TrimSpace(value.Direction)
+		if key == "||" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, value)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Slot == out[j].Slot { return out[i].Signature < out[j].Signature }
+		return out[i].Slot > out[j].Slot
+	})
+	return out
 }
 
 func summarizeUnifiedTransactionEvidence(values []unifiedTransactionEvidence) map[string]any {
-	out := map[string]any{
-		"available": len(values) > 0, "status": "bounded_live_transaction_window",
-		"trade_count": int64(len(values)), "buy_count": int64(0), "sell_count": int64(0),
-		"transfer_in_count": int64(0), "transfer_out_count": int64(0),
-		"unique_trader_count": int64(0), "round_trip_wallet_count": int64(0),
-		"wash_classification": "not_proven",
-		"interpretation": "Counts are bounded live wallet observations; they are not complete market-wide trade history.",
-	}
+	buy, sell, transferIn, transferOut := int64(0), int64(0), int64(0), int64(0)
 	walletSides := map[string]map[string]bool{}
 	for _, row := range values {
 		wallet := strings.TrimSpace(row.Trader)
@@ -441,17 +469,52 @@ func summarizeUnifiedTransactionEvidence(values []unifiedTransactionEvidence) ma
 			walletSides[wallet][row.Direction] = true
 		}
 		switch row.Direction {
-		case "buy": out["buy_count"] = out["buy_count"].(int64)+1
-		case "sell": out["sell_count"] = out["sell_count"].(int64)+1
-		case "transfer_in": out["transfer_in_count"] = out["transfer_in_count"].(int64)+1
-		case "transfer_out": out["transfer_out_count"] = out["transfer_out_count"].(int64)+1
+		case "buy": buy++
+		case "sell": sell++
+		case "transfer_in": transferIn++
+		case "transfer_out": transferOut++
 		}
 	}
 	roundTrip := int64(0)
 	for _, sides := range walletSides {
 		if (sides["buy"] || sides["transfer_in"]) && (sides["sell"] || sides["transfer_out"]) { roundTrip++ }
 	}
-	out["unique_trader_count"] = int64(len(walletSides))
-	out["round_trip_wallet_count"] = roundTrip
-	return out
+	return map[string]any{
+		"available": len(values) > 0, "status": "bounded_live_transaction_window",
+		"trade_count": int64(len(values)), "buy_count": buy, "sell_count": sell,
+		"transfer_in_count": transferIn, "transfer_out_count": transferOut,
+		"unique_trader_count": int64(len(walletSides)), "round_trip_wallet_count": roundTrip,
+		"wash_classification": "not_proven",
+		"interpretation": "Counts are bounded live wallet observations; they are not complete market-wide trade history.",
+	}
+}
+
+func applyUnifiedLiveEvidenceReferences(refs map[string]unifiedEvidenceReference, live unifiedLiveInvestigationReport) map[string]unifiedEvidenceReference {
+	if refs == nil { refs = map[string]unifiedEvidenceReference{} }
+	if live.LaunchSigner.Available {
+		launchRef := unifiedEvidenceReference{
+			Wallets: []string{live.LaunchSigner.Wallet}, Signatures: []string{live.LaunchSigner.Signature},
+			Slots: []int64{live.LaunchSigner.Slot}, EvidenceKeys: []string{live.LaunchSigner.EvidenceKey},
+		}
+		refs["launch"] = mergeUnifiedEvidenceReferences(refs["launch"], launchRef)
+		refs["track"] = mergeUnifiedEvidenceReferences(refs["track"], launchRef)
+	}
+	for _, row := range live.Transactions {
+		ref := unifiedEvidenceReference{
+			Wallets: append([]string{row.Wallet}, row.Counterparties...),
+			Signatures: []string{row.Signature}, Slots: []int64{row.Slot}, EvidenceKeys: []string{row.EvidenceKey},
+		}
+		refs["address"] = mergeUnifiedEvidenceReferences(refs["address"], ref)
+		refs["wash"] = mergeUnifiedEvidenceReferences(refs["wash"], ref)
+		if strings.Contains(row.Role, "creator") || strings.Contains(row.Role, "launch_signer") {
+			refs["track"] = mergeUnifiedEvidenceReferences(refs["track"], ref)
+			if row.Direction == "sell" || row.Direction == "transfer_out" {
+				refs["creator-sell"] = mergeUnifiedEvidenceReferences(refs["creator-sell"], ref)
+			}
+		}
+		if row.Role == "risk_bearing_holder" && (row.Direction == "sell" || row.Direction == "transfer_out") {
+			refs["dominant-exit"] = mergeUnifiedEvidenceReferences(refs["dominant-exit"], ref)
+		}
+	}
+	return refs
 }
