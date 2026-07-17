@@ -77,9 +77,11 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 		if historyDB != nil {
 			store := services.NewSecurityRadarStore(historyDB)
 			_ = store.CaptureHolderSnapshots(parent, target, network, intelligence)
-			if found, err := store.RepeatDominantHolders(parent, intelligence, target, services.RepeatDominantObservationDays); err == nil && len(found) > 0 {
+			if found, err := store.RepeatDominantHolders(parent, intelligence, target, services.RepeatDominantObservationDays); err == nil {
 				repeatDominant = found
-				intelligence = services.ApplyRepeatDominantHolderEvidenceToHolderIntelligence(intelligence, found)
+				if len(found) > 0 {
+					intelligence = services.ApplyRepeatDominantHolderEvidenceToHolderIntelligence(intelligence, found)
+				}
 				analysis = services.ApplyRepeatDominantHolderEvidenceToAnalysis(analysis, req, found)
 				bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
 				arms = services.ArvisArmsFromBundle(bundle)
