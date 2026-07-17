@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - "koschei/api/**"
+      - "oss/verifier/**"
       - "Dockerfile"
       - ".github/workflows/api-ci.yml"
   pull_request:
     paths:
       - "koschei/api/**"
+      - "oss/verifier/**"
       - "Dockerfile"
       - ".github/workflows/api-ci.yml"
 
@@ -101,8 +103,11 @@ jobs:
           node --check public/js/owner-radar-mobile-fix.js
           node --check public/js/owner-radar-case-identity.js
           node --check public/js/owner-command-center-v2.js
+          node --check ../../oss/verifier/typescript/verify-dossier.mjs
+          node --check scripts/verify-dossier-contract.mjs
           node scripts/verify-verdict-card.js
           node scripts/verify-verdict-card-evidence-refs.js
+          node scripts/verify-dossier-contract.mjs
       - name: Check Turkish public copy
         run: |
           grep -q '<html lang="tr">' public/index.html
