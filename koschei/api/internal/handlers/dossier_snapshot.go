@@ -26,10 +26,10 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 	verdictID := strings.TrimSpace(dossierString(final["id"]))
 	_, err = h.DB.ExecContext(ctx, `
 		INSERT INTO dossier_source_snapshots
-		(mint,network,verdict_id,verdict_signature,ruleset_version,produced_at,source_hash,source_payload)
-		VALUES ($1,$2,NULLIF($3,''),$4,$5,$6,$7,$8::jsonb)
+		(mint,network,verdict_id,verdict_signature,ruleset_version,produced_at,source_hash,canonical_source,source_payload)
+		VALUES ($1,$2,NULLIF($3,''),$4,$5,$6,$7,$8,$9::jsonb)
 		ON CONFLICT (verdict_signature) DO NOTHING`,
-		mint, network, verdictID, signature, ruleset, producedAt.UTC(), sourceHash, string(canonical),
+		mint, network, verdictID, signature, ruleset, producedAt.UTC(), sourceHash, canonical, string(canonical),
 	)
 	return err
 }
@@ -38,7 +38,7 @@ func (h *Handler) loadDossierSnapshot(ctx context.Context, mint, verdictID strin
 	if h == nil || h.DB == nil { return dossierSnapshot{}, errDossierSourceIncomplete }
 	query := `
 		SELECT id::text,mint,network,COALESCE(verdict_id,''),verdict_signature,
-		       ruleset_version,produced_at,source_hash,source_payload
+		       ruleset_version,produced_at,source_hash,canonical_source
 		FROM dossier_source_snapshots
 		WHERE mint=$1`
 	args := []any{strings.TrimSpace(mint)}
@@ -48,20 +48,19 @@ func (h *Handler) loadDossierSnapshot(ctx context.Context, mint, verdictID strin
 	}
 	query += ` ORDER BY produced_at DESC,id DESC LIMIT 1`
 	var snapshot dossierSnapshot
-	var raw []byte
+	var canonical []byte
 	if err := h.DB.QueryRowContext(ctx, query, args...).Scan(
 		&snapshot.ID, &snapshot.Mint, &snapshot.Network, &snapshot.VerdictID,
 		&snapshot.VerdictSignature, &snapshot.RulesetVersion, &snapshot.ProducedAt,
-		&snapshot.SourceHash, &raw,
+		&snapshot.SourceHash, &canonical,
 	); err != nil {
 		return dossierSnapshot{}, errDossierSourceIncomplete
 	}
-	if json.Unmarshal(raw, &snapshot.Report) != nil || snapshot.Report == nil {
-		return dossierSnapshot{}, errDossierSourceIncomplete
-	}
-	canonical, err := json.Marshal(snapshot.Report)
-	if err != nil || dossierSHA256(canonical) != snapshot.SourceHash {
+	if dossierSHA256(canonical) != snapshot.SourceHash {
 		return dossierSnapshot{}, errDossierSourceHash
+	}
+	if json.Unmarshal(canonical, &snapshot.Report) != nil || snapshot.Report == nil {
+		return dossierSnapshot{}, errDossierSourceIncomplete
 	}
 	return snapshot, nil
 }
