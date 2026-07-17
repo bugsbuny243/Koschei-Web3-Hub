@@ -36,10 +36,21 @@ Each accepted row contains:
 - signature and slot;
 - observed block time;
 - signer wallet when available;
+- deterministic creator relation (`verified_pool_creator_signer`, `verified_investigated_creator_signer`, `verified_creator_lp_holder_signer`, or `not_observed`);
+- source and destination accounts derived from the verified movement direction;
 - pool and program;
 - token and quote vault deltas;
 - instruction types;
 - evidence key.
+- verification status (`VERIFIED`).
+
+For fungible-LP pools the report also exposes the largest resolved LP-token
+account, its owner wallet, observed supply share and classification (holder,
+creator, burn address or supported locker). Raydium CPMM now decodes the pool
+creator and quote mint from the pinned pool layout, so quote-vault reserve
+deltas and creator-signer relations are evaluated against the actual pool
+accounts rather than a market label. Burn and owner shares remain explicitly
+bounded to the LP token accounts returned by Solana's largest-account RPC.
 
 No observed row means only that no qualifying trace was found in the bounded window. It is not a claim about older activity.
 

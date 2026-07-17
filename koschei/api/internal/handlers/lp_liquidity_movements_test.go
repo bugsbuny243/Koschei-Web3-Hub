@@ -23,14 +23,14 @@ func liquidityMovementTestTransaction(lp services.LPControlEvidence, actor strin
 	return services.SolanaTransactionResult{
 		"blockTime": float64(1_752_739_200),
 		"meta": map[string]any{
-			"err": nil,
-			"preTokenBalances": balances(tokenPre, quotePre),
+			"err":               nil,
+			"preTokenBalances":  balances(tokenPre, quotePre),
 			"postTokenBalances": balances(tokenPost, quotePost),
-			"logMessages": []any{"Program log: Instruction: " + instruction},
+			"logMessages":       []any{"Program log: Instruction: " + instruction},
 			"innerInstructions": []any{},
 		},
 		"transaction": map[string]any{"message": map[string]any{
-			"accountKeys": keys,
+			"accountKeys":  keys,
 			"instructions": []any{map[string]any{"parsed": map[string]any{"type": instruction, "info": map[string]any{}}}},
 		}},
 	}
@@ -45,21 +45,39 @@ func liquidityMovementTestLP() services.LPControlEvidence {
 
 func TestParseLiquidityMovementDetectsAddWithExplicitInstructionAndVaultDeltas(t *testing.T) {
 	lp := liquidityMovementTestLP()
+	lp.PoolCreator = "Actor111"
 	tx := liquidityMovementTestTransaction(lp, "Actor111", 100, 150, 20, 30, "deposit")
 	movement, ok := parseLiquidityMovement(lp, services.SolanaSignatureInfo{Signature: "AddSig111", Slot: 1200}, tx)
-	if !ok { t.Fatal("add liquidity was not returned") }
+	if !ok {
+		t.Fatal("add liquidity was not returned")
+	}
 	if movement.Kind != "add_liquidity" || movement.TokenDelta != 50 || movement.QuoteDelta != 10 || movement.ActorWallet != "Actor111" {
 		t.Fatalf("movement=%#v", movement)
 	}
-	if movement.EvidenceKey != "liquidity_movement:add_liquidity:AddSig111:1200" { t.Fatalf("key=%q", movement.EvidenceKey) }
+	if movement.EvidenceKey != "liquidity_movement:add_liquidity:AddSig111:1200" {
+		t.Fatalf("key=%q", movement.EvidenceKey)
+	}
+	if movement.VerificationStatus != "VERIFIED" || movement.SourceWallet != "Actor111" || movement.DestinationWallet != lp.PoolAddress {
+		t.Fatalf("evidence row=%#v", movement)
+	}
+	if !movement.CreatorRelated || movement.CreatorRelation != "verified_pool_creator_signer" {
+		t.Fatalf("creator relation=%#v", movement)
+	}
 }
 
 func TestParseLiquidityMovementDetectsRemoveWithExplicitInstructionAndVaultDeltas(t *testing.T) {
 	lp := liquidityMovementTestLP()
+	lp.CreatorWallet = "Actor222"
 	tx := liquidityMovementTestTransaction(lp, "Actor222", 150, 100, 30, 20, "withdraw")
 	movement, ok := parseLiquidityMovement(lp, services.SolanaSignatureInfo{Signature: "RemoveSig111", Slot: 1201}, tx)
 	if !ok || movement.Kind != "remove_liquidity" || movement.TokenDelta != -50 || movement.QuoteDelta != -10 {
 		t.Fatalf("movement=%#v ok=%t", movement, ok)
+	}
+	if movement.SourceWallet != lp.PoolAddress || movement.DestinationWallet != "Actor222" || movement.VerificationStatus != "VERIFIED" {
+		t.Fatalf("evidence row=%#v", movement)
+	}
+	if !movement.CreatorRelated || movement.CreatorRelation != "verified_investigated_creator_signer" {
+		t.Fatalf("creator relation=%#v", movement)
 	}
 }
 
