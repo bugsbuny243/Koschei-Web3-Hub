@@ -29,7 +29,7 @@ func TestLaunchForensicsCompletesLaunchCollectors(t *testing.T) {
 		OwnersRequested: 4, OwnersWithTradeHistory: 4, LedgerTradeCount: 7,
 		LaunchSlot: 123, LaunchTime: "2026-07-17T00:00:00Z", SniperCount: 1,
 		RhythmBotCount: 1, FlipperCount: 1, AccumulatorCount: 1, CreatorLinkedCount: 1,
-		Profiles: []LaunchActorProfile{}, Timeline: []LaunchTimelineEntry{}, Findings: []string{"launch evidence"}, Limitations: []string{},
+		Profiles: []LaunchActorProfile{}, Timeline: []LaunchTimelineEvent{}, Findings: []string{"launch evidence"}, Limitations: []string{},
 	}
 	analysis = ApplyLaunchForensicsToAnalysis(analysis, req, forensics)
 	seen := map[string]SecurityRadarVerdict{}
@@ -99,5 +99,8 @@ func TestCoverageMetadataIsAttachedAfterExtensions(t *testing.T) {
 	coverage, ok := raw.(ArvisInvestigationCoverage)
 	if !ok || coverage.CapabilityTotal != 14 {
 		t.Fatalf("coverage metadata=%#v", raw)
+	}
+	if _, ok := analysis.Bundle.Metadata["investigation_output_policy"]; !ok {
+		t.Fatal("investigation output policy metadata missing")
 	}
 }
