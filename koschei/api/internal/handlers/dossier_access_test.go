@@ -27,8 +27,8 @@ func TestStoredEnterpriseGateAllowsEnterpriseWithoutRPC(t *testing.T) {
 	h := &Handler{}
 	handler := h.requireStoredTokenTierWithEvaluator("enterprise", evaluator, func(w http.ResponseWriter, r *http.Request) {
 		reached = true
-		ctx, ok := tokenAccessRequestContextFromRequest(r.Context())
-		if !ok || ctx.Evaluation.Tier != "enterprise" { t.Fatalf("request context=%#v ok=%t", ctx, ok) }
+		value, ok := r.Context().Value(tokenAccessRequestContextKey{}).(tokenAccessRequestContext)
+		if !ok || value.Evaluation.Tier != "enterprise" { t.Fatalf("request context=%#v ok=%t", value, ok) }
 		w.WriteHeader(http.StatusNoContent)
 	})
 	response := httptest.NewRecorder()
