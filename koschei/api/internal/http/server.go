@@ -82,6 +82,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	registerOwnerRoutes(mux, h, staticDir)
 	registerProductRoutes(mux, h, koschTier)
 	registerDeveloperAPIRoutes(mux, h, apiKeyEnterprise, apiKeyEnterpriseMetered)
+	registerDossierRoutes(mux, h)
 	registerWatchlistRoutes(mux, h,
 		func(next http.HandlerFunc) http.HandlerFunc { return koschTier("pro", next) },
 		func(next http.HandlerFunc) http.HandlerFunc { return koschTierAccess("enterprise", next) },
