@@ -71,7 +71,8 @@ func attachLiquidityMovementEvidence(ctx context.Context, lp services.LPControlE
 	}
 	lp.Limitations = append(lp.Limitations,
 		"Liquidity movement inspection is bounded to the most recent pool signatures and successfully parsed transactions.",
-		"No movement row means no add/remove reserve pattern was observed in the bounded window; it is not proof that older liquidity activity does not exist.",
+		"A movement row requires an explicit add/remove/lock instruction trace plus compatible vault deltas; reserve direction alone is never classified as liquidity movement.",
+		"No movement row means no qualifying add/remove trace was observed in the bounded window; it is not proof that older liquidity activity does not exist.",
 	)
 	return lp
 }
@@ -113,19 +114,19 @@ func parseLiquidityMovement(lp services.LPControlEvidence, signature services.So
 func liquidityMovementKind(text string, tokenDelta, quoteDelta float64) string {
 	const epsilon = 0.000000001
 	tokenPresent, quotePresent := math.Abs(tokenDelta) > epsilon, math.Abs(quoteDelta) > epsilon
-	if tokenPresent && quotePresent {
-		if tokenDelta > 0 && quoteDelta > 0 { return "add_liquidity" }
-		if tokenDelta < 0 && quoteDelta < 0 { return "remove_liquidity" }
-		// Opposing reserve deltas describe a swap, not a liquidity movement.
+	normalized := strings.NewReplacer("_", "", "-", "", " ", "").Replace(strings.ToLower(text))
+	add := strings.Contains(normalized, "addliquidity") || strings.Contains(normalized, "deposit") || strings.Contains(normalized, "createpool") || strings.Contains(normalized, "initializepool")
+	remove := strings.Contains(normalized, "removeliquidity") || strings.Contains(normalized, "withdraw") || strings.Contains(normalized, "closeliquidityposition")
+	lock := strings.Contains(normalized, "permanentlock") || strings.Contains(normalized, "lockposition") || strings.Contains(normalized, "lockliquidity")
+	if lock { return "lock_liquidity" }
+	if tokenPresent && quotePresent && tokenDelta*quoteDelta < 0 {
+		// Opposing reserve deltas describe a swap, regardless of surrounding text.
 		return ""
 	}
-	normalized := strings.NewReplacer("_", "", "-", "", " ", "").Replace(strings.ToLower(text))
-	add := strings.Contains(normalized, "addliquidity") || strings.Contains(normalized, "deposit") || strings.Contains(normalized, "createpool")
-	remove := strings.Contains(normalized, "removeliquidity") || strings.Contains(normalized, "withdraw")
-	lock := strings.Contains(normalized, "permanentlock") || strings.Contains(normalized, "lockposition")
-	if lock { return "lock_liquidity" }
-	if add && ((tokenPresent && tokenDelta > 0) || (quotePresent && quoteDelta > 0)) { return "add_liquidity" }
-	if remove && ((tokenPresent && tokenDelta < 0) || (quotePresent && quoteDelta < 0)) { return "remove_liquidity" }
+	positiveCompatible := (tokenPresent && tokenDelta > 0) || (quotePresent && quoteDelta > 0)
+	negativeCompatible := (tokenPresent && tokenDelta < 0) || (quotePresent && quoteDelta < 0)
+	if add && positiveCompatible { return "add_liquidity" }
+	if remove && negativeCompatible { return "remove_liquidity" }
 	return ""
 }
 
