@@ -84,6 +84,8 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 	structural := h.radarDetailStructuralContext(ctx, target, network)
 	graph := h.radarDetailGraph(ctx, target)
 	tradeLedger := h.unifiedTradeLedgerAggregates(ctx, target)
+	transactionEvidence := h.loadUnifiedTransactionEvidence(ctx, target, 50)
+	evidenceReferences := buildUnifiedEvidenceReferences(core, creator, transactionEvidence, behavior, unifiedVerdict)
 
 	report := map[string]any{
 		"ok": true, "schema_version": unifiedInvestigationSchemaVersion,
@@ -97,6 +99,7 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 		"source_context": core.SourceContext, "structural_memory": structural,
 		"modules": modules, "evidence_arms": modules, "evidence": radarDetailEvidence(core.Arms),
 		"behavior_signals": behavior, "trade_ledger_aggregates": tradeLedger,
+		"transaction_evidence": transactionEvidence, "evidence_references": evidenceReferences,
 		"actor_investigation": map[string]any{
 			"wallet": creator, "dossier": actorDossier, "rule_verdict": actorVerdict, "store_status": actorStoreStatus,
 		},
