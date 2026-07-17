@@ -198,7 +198,7 @@ func UnifiedRadarVerdictFingerprint(network, targetKind, targetID string, verdic
 
 func normalizeUnifiedGrade(value string) string {
 	switch strings.ToUpper(strings.TrimSpace(value)) {
-	case "A", "B", "C", "D", "E":
+	case "A", "B", "C", "D", "E", "F":
 		return strings.ToUpper(strings.TrimSpace(value))
 	default:
 		return "-"
