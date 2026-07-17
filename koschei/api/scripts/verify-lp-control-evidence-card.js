@@ -29,6 +29,6 @@ for(const expected of ['meteora_damm_v2','POSITION NFT','25%','8 parsed','10 sig
   if(!meteora.includes(expected))throw new Error(`Meteora card missing: ${expected}`);
 }
 if(meteora.includes('LP mint</label>'))throw new Error('position-NFT pool rendered an LP mint field');
-if(!card.render({lp_control:{status:'not_applicable'}})==='')throw new Error('not-applicable pool should not render without an address');
+if(card.render({lp_control:{status:'not_applicable'}})!=='')throw new Error('not-applicable pool should not render without an address');
 
 console.log('LP control evidence card contract: ok');
