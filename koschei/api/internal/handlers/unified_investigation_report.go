@@ -36,10 +36,20 @@ type unifiedInvestigationAssembly struct {
 // the technical result. Operational metadata is added outside Report.
 func (h *Handler) buildUnifiedInvestigationReport(ctx context.Context, target, network, mode string) unifiedInvestigationAssembly {
 	core := h.runHolderIntelligenceCore(ctx, target, network, mode)
-	return h.assembleUnifiedInvestigationReport(ctx, core)
+	return h.assembleUnifiedInvestigationReportMode(ctx, core, mode)
 }
 
+// assembleUnifiedInvestigationReport preserves the mode embedded by the shared
+// holder core. Tests with an empty mode remain stored-only and never call RPC.
 func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core holderIntelligenceCoreResult) unifiedInvestigationAssembly {
+	mode := strings.TrimSpace(core.Request.Mode)
+	if mode == "" {
+		mode = "stored_only_projection"
+	}
+	return h.assembleUnifiedInvestigationReportMode(ctx, core, mode)
+}
+
+func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, core holderIntelligenceCoreResult, mode string) unifiedInvestigationAssembly {
 	target := strings.TrimSpace(core.Request.Target)
 	network := strings.TrimSpace(core.Request.Network)
 	if network == "" { network = "solana-mainnet" }
@@ -66,7 +76,7 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 	sales := services.LoadCreatorSellAcceleration(ctx, db, target, creator, now)
 	storedVerification := services.CreatorSellVerification{
 		CandidateSignatures: append([]string{}, sales.Signatures...), VerifiedSignatures: []string{},
-		Limitations: []string{"Transaction-level creator-sell verification was not requested by this stored-data report assembly."},
+		Limitations: []string{"Acceleration thresholds use the stored trade ledger; live full-scan transaction rows are reported separately and do not rewrite the rule."},
 	}
 	behavior := services.EvaluateUnifiedRadarBehavior(target, creator, core.Market, core.Intelligence, core.Cluster, sales, now)
 	behavior = services.HardenUnifiedRadarBehavior(behavior, storedVerification, core.Cluster)
@@ -89,7 +99,20 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 	graph := h.radarDetailGraph(ctx, target)
 	tradeLedger := h.unifiedTradeLedgerAggregates(ctx, target)
 	transactionEvidence := h.loadUnifiedTransactionEvidence(ctx, target, 50)
+	liveEvidence := unifiedLiveInvestigationReport{
+		Status: "not_requested", Mint: target, WalletCoverage: []unifiedLiveWalletCoverage{},
+		Transactions: []unifiedLiveTransactionRow{}, GeneratedAt: now, Limitations: []string{},
+		LaunchSigner: unifiedLaunchSignerObservation{Status: "not_requested", InstructionTypes: []string{}, Limitations: []string{}},
+	}
+	if unifiedLiveEvidenceAllowed(mode) {
+		liveEvidence = h.collectUnifiedTokenLiveEvidence(ctx, core)
+		transactionEvidence = mergeUnifiedTransactionEvidence(transactionEvidence, unifiedLiveRowsToEvidence(liveEvidence.Transactions))
+		if len(transactionEvidence) > 0 {
+			tradeLedger = summarizeUnifiedTransactionEvidence(transactionEvidence)
+		}
+	}
 	evidenceReferences := buildUnifiedEvidenceReferences(core, creator, transactionEvidence, behavior, unifiedVerdict)
+	evidenceReferences = applyUnifiedLiveEvidenceReferences(evidenceReferences, liveEvidence)
 
 	report := map[string]any{
 		"ok": true, "schema_version": unifiedInvestigationSchemaVersion,
@@ -105,8 +128,10 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 		"modules": modules, "evidence_arms": modules, "evidence": radarDetailEvidence(core.Arms),
 		"behavior_signals": behavior, "trade_ledger_aggregates": tradeLedger,
 		"transaction_evidence": transactionEvidence, "evidence_references": evidenceReferences,
+		"full_scan_live_evidence": liveEvidence,
 		"actor_investigation": map[string]any{
-			"wallet": creator, "dossier": actorDossier, "rule_verdict": actorVerdict, "store_status": actorStoreStatus,
+			"wallet": creator, "dossier": actorDossier, "rule_verdict": actorVerdict,
+			"store_status": actorStoreStatus, "live_wallet_evidence": liveEvidence.WalletCoverage,
 		},
 		"graph": graph,
 		"investigation_output_policy": services.SharedInvestigationOutputPolicy(),
@@ -116,6 +141,7 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 			"identity_scope": "onchain_wallet_only", "caller_type_changes_evidence": false,
 			"jupiter_context_can_change_verdict": false, "lp_control_arm_can_change_grade": false,
 			"corpus_percentile_can_change_verdict": false,
+			"live_transaction_rows_can_change_grade": false,
 		},
 	}
 	_ = h.persistDossierSourceSnapshot(ctx, report)
