@@ -103,7 +103,7 @@ jobs:
           (case_ref,mint,verdict_signature,source_snapshot_id,bundle_hash,canonical_bundle,bundle_json,requested_by)
           SELECT
             'KD1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','ci-mint','ci-verdict-signature',id,
-            'sha256:44136fa355b3678a1146e8649e94fb4fc21fe77e8310c060f61caaff8a',
+            'sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
             convert_to('{}','UTF8'),'{}'::jsonb,'ci'
           FROM dossier_source_snapshots WHERE verdict_signature='ci-verdict-signature';
 
