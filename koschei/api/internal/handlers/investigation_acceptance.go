@@ -40,25 +40,25 @@ type InvestigationCallerParity struct {
 }
 
 type InvestigationAcceptanceResult struct {
-	Version      string                         `json:"version"`
-	Status       string                         `json:"status"`
-	Profile      string                         `json:"profile"`
-	Target       string                         `json:"target"`
-	Expected     string                         `json:"expected_target"`
-	Ruleset      string                         `json:"ruleset,omitempty"`
-	Signature    string                         `json:"signature,omitempty"`
-	GeneratedAt  time.Time                      `json:"generated_at"`
-	Metrics      InvestigationAcceptanceMetrics `json:"metrics"`
-	CallerParity InvestigationCallerParity      `json:"caller_parity"`
+	Version      string                           `json:"version"`
+	Status       string                           `json:"status"`
+	Profile      string                           `json:"profile"`
+	Target       string                           `json:"target"`
+	Expected     string                           `json:"expected_target"`
+	Ruleset      string                           `json:"ruleset,omitempty"`
+	Signature    string                           `json:"signature,omitempty"`
+	GeneratedAt  time.Time                        `json:"generated_at"`
+	Metrics      InvestigationAcceptanceMetrics   `json:"metrics"`
+	CallerParity InvestigationCallerParity        `json:"caller_parity"`
 	Blockers     []InvestigationAcceptanceFinding `json:"blockers"`
 	Warnings     []InvestigationAcceptanceFinding `json:"warnings"`
 }
 
 type investigationAcceptanceRequirements struct {
-	MinCompleted          int
-	MinEvidenceProducing  int
-	MinConcreteSignals    int
-	RequireLiveWindow     bool
+	MinCompleted         int
+	MinEvidenceProducing int
+	MinConcreteSignals   int
+	RequireLiveWindow    bool
 }
 
 func investigationAcceptanceProfile(value string) (string, investigationAcceptanceRequirements) {
@@ -76,14 +76,14 @@ func investigationAcceptanceProfile(value string) (string, investigationAcceptan
 func evaluateInvestigationAcceptance(report map[string]any, expectedTarget, profile string) InvestigationAcceptanceResult {
 	profile, requirements := investigationAcceptanceProfile(profile)
 	result := InvestigationAcceptanceResult{
-		Version: investigationAcceptanceVersion,
-		Status: "pass",
-		Profile: profile,
-		Target: strings.TrimSpace(dossierString(report["target"])),
-		Expected: strings.TrimSpace(expectedTarget),
+		Version:     investigationAcceptanceVersion,
+		Status:      "pass",
+		Profile:     profile,
+		Target:      strings.TrimSpace(dossierString(report["target"])),
+		Expected:    strings.TrimSpace(expectedTarget),
 		GeneratedAt: time.Now().UTC(),
-		Blockers: []InvestigationAcceptanceFinding{},
-		Warnings: []InvestigationAcceptanceFinding{},
+		Blockers:    []InvestigationAcceptanceFinding{},
+		Warnings:    []InvestigationAcceptanceFinding{},
 	}
 
 	if dossierString(report["schema_version"]) != unifiedInvestigationSchemaVersion {
@@ -142,7 +142,7 @@ func evaluateInvestigationAcceptance(report map[string]any, expectedTarget, prof
 	result.Metrics.LiveWalletWindows = len(walletCoverage)
 	for _, item := range walletCoverage {
 		status := strings.ToLower(dossierString(dossierMap(item)["status"]))
-		if status == "completed" || status == "observed" || status == "no_relevant_mint_activity" {
+		if status == "complete" || status == "complete_no_relevant_token_delta" || status == "complete_no_successful_signatures" {
 			result.Metrics.CompletedWalletWindows++
 		}
 	}
@@ -151,11 +151,21 @@ func evaluateInvestigationAcceptance(report map[string]any, expectedTarget, prof
 	for index, item := range transactions {
 		row := dossierMap(item)
 		missing := []string{}
-		if dossierString(row["signature"]) == "" { missing = append(missing, "signature") }
-		if dossierInt64(row["slot"]) <= 0 { missing = append(missing, "slot") }
-		if dossierString(row["wallet"]) == "" { missing = append(missing, "wallet") }
-		if dossierString(row["direction"]) == "" { missing = append(missing, "direction") }
-		if dossierString(row["evidence_key"]) == "" { missing = append(missing, "evidence_key") }
+		if dossierString(row["signature"]) == "" {
+			missing = append(missing, "signature")
+		}
+		if dossierInt64(row["slot"]) <= 0 {
+			missing = append(missing, "slot")
+		}
+		if dossierString(row["wallet"]) == "" {
+			missing = append(missing, "wallet")
+		}
+		if dossierString(row["direction"]) == "" {
+			missing = append(missing, "direction")
+		}
+		if dossierString(row["evidence_key"]) == "" {
+			missing = append(missing, "evidence_key")
+		}
 		if len(missing) > 0 {
 			result.Blockers = append(result.Blockers, InvestigationAcceptanceFinding{Code: "live_transaction_incomplete", Section: fmt.Sprintf("full_scan_live_evidence.transactions[%d]", index), Message: "Live transaction row is missing: " + strings.Join(missing, ", ")})
 		}
@@ -198,9 +208,9 @@ func investigationCallerParity(report map[string]any) InvestigationCallerParity 
 	apiResult := customerTokenScanResult{InvestigationReport: report}
 	api, _ := json.Marshal(unifiedInvestigationTechnicalProjection(apiResult.InvestigationReport))
 	hashes := map[string]string{
-		"owner": acceptanceSHA256(owner),
+		"owner":  acceptanceSHA256(owner),
 		"public": acceptanceSHA256(public),
-		"api": acceptanceSHA256(api),
+		"api":    acceptanceSHA256(api),
 	}
 	return InvestigationCallerParity{Passed: string(owner) == string(public) && string(owner) == string(api), Projection: "unified_investigation_technical_projection", Hashes: hashes}
 }
@@ -221,7 +231,8 @@ func dossierInt64(value any) int64 {
 	case float64:
 		return int64(typed)
 	case json.Number:
-		parsed, _ := typed.Int64(); return parsed
+		parsed, _ := typed.Int64()
+		return parsed
 	default:
 		return 0
 	}
