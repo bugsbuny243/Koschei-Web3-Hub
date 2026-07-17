@@ -31,7 +31,7 @@ func (h *Handler) OwnerActorDefenseQueue(w http.ResponseWriter, r *http.Request)
 	limit := actorDefenseQueueQueryInt(r, "limit", 50)
 	offset := actorDefenseQueueQueryInt(r, "offset", 0)
 
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(services.LoadArvisScanBudgets().ActorQueueTimeoutSeconds)*time.Second)
 	defer cancel()
 	queue, err := services.NewActorDefenseStore(db).ListVerificationQueue(ctx, network, state, limit, offset)
 	if err != nil {

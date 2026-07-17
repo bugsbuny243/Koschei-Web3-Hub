@@ -87,6 +87,7 @@ func unifiedLiveEvidenceAllowed(mode string) bool {
 }
 
 func (h *Handler) collectUnifiedTokenLiveEvidence(ctx context.Context, core holderIntelligenceCoreResult) unifiedLiveInvestigationReport {
+	budgets := services.LoadArvisScanBudgets()
 	now := time.Now().UTC()
 	out := unifiedLiveInvestigationReport{
 		Status: "source_unavailable", Mint: strings.TrimSpace(core.Request.Target),
@@ -104,7 +105,7 @@ func (h *Handler) collectUnifiedTokenLiveEvidence(ctx context.Context, core hold
 	creator := strings.TrimSpace(creatorIntelCleanString(core.SourceContext["creator_wallet"]))
 	launchSigner := unifiedLaunchSignerObservation{Status: "not_required", InstructionTypes: []string{}, Limitations: []string{}}
 	if creator == "" {
-		launchCtx, cancel := context.WithTimeout(ctx, 24*time.Second)
+		launchCtx, cancel := context.WithTimeout(ctx, time.Duration(budgets.LaunchTimeoutSeconds)*time.Second)
 		launchSigner = discoverUnifiedLaunchSigner(launchCtx, rpcURL, out.Mint)
 		cancel()
 	}
@@ -124,7 +125,7 @@ func (h *Handler) collectUnifiedTokenLiveEvidence(ctx context.Context, core hold
 			out.Limitations = append(out.Limitations, "The bounded live transaction window ended before every wallet target completed.")
 			break
 		}
-		walletCtx, cancel := context.WithTimeout(ctx, 28*time.Second)
+		walletCtx, cancel := context.WithTimeout(ctx, time.Duration(budgets.WalletTimeoutSeconds)*time.Second)
 		coverage, rows := collectUnifiedWalletTransactions(walletCtx, rpcURL, out.Mint, target)
 		cancel()
 		out.WalletCoverage = append(out.WalletCoverage, coverage)

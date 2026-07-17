@@ -57,7 +57,7 @@ func (h *Handler) OwnerCreatorIntelligence(w http.ResponseWriter, r *http.Reques
 		}})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(services.LoadArvisScanBudgets().CreatorTimeoutSeconds)*time.Second)
 	defer cancel()
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "intelligence": h.buildCreatorWalletIntelligence(ctx, target, network, creator, source)})
 }

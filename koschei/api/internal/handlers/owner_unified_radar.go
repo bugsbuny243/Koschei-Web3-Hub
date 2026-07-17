@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"database/sql"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -36,6 +37,8 @@ func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) 
 	if network == "" {
 		network = "solana-mainnet"
 	}
+	budgets := services.LoadArvisScanBudgets()
+	log.Printf("arvis scan budgets: wallet=%ds launch=%ds creator=%ds rpc=%d funding=%d", budgets.WalletTimeoutSeconds, budgets.LaunchTimeoutSeconds, budgets.CreatorTimeoutSeconds, budgets.RPCBudget, budgets.FundingRPCBudget)
 	courtRequested := envBool("KOSCHEI_OWNER_COURT_AUTO_ENABLED", false)
 	if input.Court != nil {
 		courtRequested = *input.Court
