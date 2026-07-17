@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS dossier_source_snapshots (
     ruleset_version text NOT NULL,
     produced_at timestamptz NOT NULL,
     source_hash text NOT NULL,
+    canonical_source bytea NOT NULL,
     source_payload jsonb NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT dossier_source_snapshots_signature_unique UNIQUE (verdict_signature),
