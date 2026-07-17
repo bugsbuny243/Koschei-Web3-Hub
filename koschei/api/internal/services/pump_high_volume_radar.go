@@ -285,6 +285,9 @@ func pumpHighVolumePageSize() int {
 }
 
 func pumpHighVolumeMaxReportsPerCycle() int {
+	if OwnerUnlimitedAutomaticScanningEnabled() {
+		return 0
+	}
 	if raw := strings.TrimSpace(os.Getenv("PUMP_HIGH_VOLUME_MAX_REPORTS_PER_CYCLE")); raw != "" {
 		if value, err := strconv.Atoi(raw); err == nil && value >= 1 && value <= 20 {
 			return value
@@ -431,7 +434,7 @@ func (w *PumpHighVolumeRadarWorker) RunOnce(ctx context.Context) error {
 			log.Printf("pump high-volume cooldown lookup failed mint=%s: %v", item.Candidate.Mint, recentErr)
 			continue
 		}
-		if recent || attempted || reports >= w.MaxReportsPerCycle {
+		if recent || attempted || (w.MaxReportsPerCycle > 0 && reports >= w.MaxReportsPerCycle) {
 			continue
 		}
 		if markErr := w.Store.MarkPumpHighVolumeAttempted(ctx, eventID); markErr != nil {
