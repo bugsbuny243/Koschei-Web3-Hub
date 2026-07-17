@@ -35,6 +35,9 @@ type TokenMarketSnapshot struct {
 	PairCount            int       `json:"pair_count"`
 	BestPairAddress      string    `json:"best_pair_address,omitempty"`
 	BestPairDEX          string    `json:"best_pair_dex,omitempty"`
+	BestPairBaseSymbol   string    `json:"best_pair_base_symbol,omitempty"`
+	BestPairQuoteSymbol  string    `json:"best_pair_quote_symbol,omitempty"`
+	LogoURL              string    `json:"logo_url,omitempty"`
 	BestPairLiquidityUSD float64   `json:"best_pair_liquidity_usd"`
 	BestPairVolume24hUSD float64   `json:"best_pair_volume_24h_usd"`
 	ObservedAt           time.Time `json:"observed_at"`
@@ -68,6 +71,9 @@ type tokenMarketPair struct {
 	} `json:"liquidity"`
 	MarketCap float64 `json:"marketCap"`
 	FDV       float64 `json:"fdv"`
+	Info      struct {
+		ImageURL string `json:"imageUrl"`
+	} `json:"info"`
 }
 
 type TokenMarketClient struct {
@@ -206,6 +212,9 @@ func (c *TokenMarketClient) Fetch(ctx context.Context, mint string) TokenMarketS
 		out.FDVUSD = positiveTokenMarketNumber(pair.FDV)
 		out.BestPairAddress = strings.TrimSpace(pair.PairAddress)
 		out.BestPairDEX = strings.TrimSpace(pair.DexID)
+		out.BestPairBaseSymbol = strings.TrimSpace(pair.BaseToken.Symbol)
+		out.BestPairQuoteSymbol = strings.TrimSpace(pair.QuoteToken.Symbol)
+		out.LogoURL = strings.TrimSpace(pair.Info.ImageURL)
 		out.BestPairLiquidityUSD = liquidity
 		out.BestPairVolume24hUSD = volume
 	}
