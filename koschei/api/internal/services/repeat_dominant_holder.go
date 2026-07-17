@@ -94,12 +94,10 @@ func ApplyRepeatDominantHolderEvidenceToHolderIntelligence(in HolderIntelligence
 }
 
 // ApplyRepeatDominantHolderEvidenceToAnalysis replaces the dedicated Repeat
-// Actor Scan placeholder. It no longer mutates Intelligence Graph and never
-// rebuilds a highest-score final arm.
+// Actor Scan placeholder. A bounded no-match query is represented as completed
+// without a finding instead of being mislabeled as missing evidence. It never
+// mutates Intelligence Graph or the unified final verdict.
 func ApplyRepeatDominantHolderEvidenceToAnalysis(analysis ArvisAnalysis, req SecurityRadarRequest, evidence []RepeatDominantHolderEvidence) ArvisAnalysis {
-	if len(evidence) == 0 {
-		return analysis
-	}
 	lines := []string{}
 	owners := []string{}
 	maxTokenCount := 0
@@ -115,12 +113,17 @@ func ApplyRepeatDominantHolderEvidenceToAnalysis(analysis ArvisAnalysis, req Sec
 		}
 	}
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
+	findingObserved := len(evidence) > 0
 	signals := map[string]any{
 		"module_id": ModuleRepeatActorScan,
 		"real_onchain_evidence": true,
 		"stored_scan_evidence": true,
 		"evidence_status": "observed",
-		"repeat_dominant_holder": true,
+		"execution_status": ArvisExecutionCompleted,
+		"collector_attempted": true,
+		"applicable": true,
+		"finding_observed": findingObserved,
+		"repeat_dominant_holder": findingObserved,
 		"repeat_dominant_holders": evidence,
 		"repeat_dominant_owner_wallets": owners,
 		"repeat_dominant_observation_days": RepeatDominantObservationDays,
@@ -130,9 +133,18 @@ func ApplyRepeatDominantHolderEvidenceToAnalysis(analysis ArvisAnalysis, req Sec
 		"numeric_score_disabled": true,
 		"grade_effect": "none_at_arm_layer",
 	}
+	if !findingObserved {
+		lines = append(lines, fmt.Sprintf("Koschei persistent holder memory was queried for the bounded %d-day observation window; no repeat-dominant holder match was observed. This bounded negative finding is not a safety claim.", RepeatDominantObservationDays))
+		signals["evidence_status"] = "observed_no_repeat_match"
+	}
 	repeatArm := evidenceArm("Repeat Actor Scan", ModuleRepeatActorScan, req, 0, signals, lines, generatedAt)
-	repeatArm.Verdict = "Aynı zincir üstü holder cüzdanı, Koschei'nin kalıcı gözlem hafızasında birden fazla tokenda baskın owner olarak gözlendi."
-	repeatArm.Recommendation = "Use the unified rules engine to combine repeat-actor evidence with creator, funding, holder and liquidity evidence."
+	if findingObserved {
+		repeatArm.Verdict = "Aynı zincir üstü holder cüzdanı, Koschei'nin kalıcı gözlem hafızasında birden fazla tokenda baskın owner olarak gözlendi."
+		repeatArm.Recommendation = "Use the unified rules engine to combine repeat-actor evidence with creator, funding, holder and liquidity evidence."
+	} else {
+		repeatArm.Verdict = "Persistent actor-memory query completed; no repeat-dominant holder match was observed in the bounded evidence window."
+		repeatArm.Recommendation = "Continue persistent observation; absence inside the bounded window is not proof of absence outside it."
+	}
 
 	arms := ArvisArmsFromBundle(analysis.Bundle)
 	if len(arms) == 0 {
@@ -162,7 +174,11 @@ func ApplyRepeatDominantHolderEvidenceToAnalysis(analysis ArvisAnalysis, req Sec
 	analysis.Bundle.Metadata["verified_arm_count"] = verifiedArvisEvidenceCount(updated)
 	analysis.Bundle.Metadata["runtime_arm_count"] = verifiedArvisEvidenceCount(updated)
 	analysis.Bundle.Metadata["final_verdict_source"] = "EvaluateUnifiedRadarVerdict"
-	analysis.Bundle.CustomerSummary = fmt.Sprintf("ARVIS connected %d repeat-dominant holder observation(s) from persistent Koschei actor memory.", len(evidence))
+	if findingObserved {
+		analysis.Bundle.CustomerSummary = fmt.Sprintf("ARVIS connected %d repeat-dominant holder observation(s) from persistent Koschei actor memory.", len(evidence))
+	} else {
+		analysis.Bundle.CustomerSummary = fmt.Sprintf("ARVIS completed the %d-day persistent holder-memory query without a repeat-dominant match.", RepeatDominantObservationDays)
+	}
 	analysis.Bundle.CustomerRecommendation = "evaluate_unified_rules"
-	return analysis
+	return ApplyArvisInvestigationCoverage(analysis)
 }
