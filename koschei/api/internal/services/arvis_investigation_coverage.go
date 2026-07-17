@@ -3,11 +3,11 @@ package services
 import "strings"
 
 const (
-	ArvisExecutionCompleted          = "completed"
-	ArvisExecutionNotApplicable      = "not_applicable"
-	ArvisExecutionEvidencePending    = "evidence_pending"
-	ArvisExecutionSourceUnavailable  = "source_unavailable"
-	ArvisExecutionInsufficient       = "insufficient_evidence"
+	ArvisExecutionCompleted         = "completed"
+	ArvisExecutionNotApplicable     = "not_applicable"
+	ArvisExecutionEvidencePending   = "evidence_pending"
+	ArvisExecutionSourceUnavailable = "source_unavailable"
+	ArvisExecutionInsufficient      = "insufficient_evidence"
 )
 
 type ArvisArmCoverage struct {
@@ -80,7 +80,7 @@ func BuildArvisInvestigationCoverage(arms []SecurityRadarVerdict) ArvisInvestiga
 			if arm.Signed && len(arm.Evidence) > 0 {
 				coverage.EvidenceProducing++
 			}
-			if arvisSignalBool(arm.Signals, "finding_observed") == false && arvisSignalPresent(arm.Signals, "finding_observed") {
+			if !arvisSignalBool(arm.Signals, "finding_observed") && arvisSignalPresent(arm.Signals, "finding_observed") {
 				coverage.CompletedWithoutMatch++
 			}
 		case ArvisExecutionNotApplicable:
@@ -120,6 +120,7 @@ func ApplyArvisInvestigationCoverage(analysis ArvisAnalysis) ArvisAnalysis {
 		analysis.Bundle.Metadata = map[string]any{}
 	}
 	analysis.Bundle.Metadata["investigation_coverage"] = coverage
+	analysis.Bundle.Metadata["investigation_output_policy"] = SharedInvestigationOutputPolicy()
 	analysis.Bundle.Metadata["architecture_arm_count"] = coverage.CapabilityTotal
 	analysis.Bundle.Metadata["runtime_arm_count"] = coverage.Attempted
 	analysis.Bundle.Metadata["evidence_producing_arm_count"] = coverage.EvidenceProducing
