@@ -1,12 +1,27 @@
 {
+  "schema_version":"koschei-unified-investigation-v1",
   "target":"HistMint111111111111111111111111111111111",
-  "final_verdict":{"grade":"D","verdict":"triggered by rules [URD-C003]","ruleset_version":"unified-radar-v1.0","actor_ruleset_version":"actor-v1.0","signature":"abcdef1234567890abcdef1234567890","generated_at":"2026-07-15T10:00:00Z","signals":{}},
-  "source_context":{"launch_time":"2026-07-15T08:00:00Z"},
+  "generated_at":"2026-07-15T10:00:00Z",
+  "final_verdict":{"grade":"D","verdict":"triggered by rules [URD-C003]","ruleset_version":"unified-radar-v1.0","actor_ruleset_version":"actor-v1.0","signature":"abcdef1234567890abcdef1234567890","generated_at":"2026-07-15T10:00:00Z","signed":true,"signals":{}},
+  "source_context":{"launch_time":"2026-07-15T08:00:00Z","creator_wallet":"CreatorHist111111111111111111111111111111"},
+  "launch_forensics":{"available":true,"launch_time":"2026-07-15T08:00:00Z","launch_slot":321,"owners_requested":6,"owners_with_trade_history":6,"ledger_trade_count":42,"sniper_count":1,"creator_linked_count":1},
+  "market":{"available":true,"liquidity_usd":12500,"best_pair_address":"PairHist111111111111111111111111111111111","best_pair_dex":"raydium"},
+  "holder_intelligence":{"available":true,"top_owner_percentage":58.75},
   "modules":[
-    {"module_id":"token_authority_scanner","evidence_status":"VERIFIED","signals":{"mint_authority_present":false,"freeze_authority_present":true}},
-    {"module_id":"holder_concentration","evidence_status":"VERIFIED","metrics":{"owner_resolved_top_holder_pct":61.5}},
-    {"module_id":"repeat_actor_scan","evidence_status":"VERIFIED","metrics":{"created_token_count":3}},
-    {"module_id":"pool_guardian","evidence_status":"VERIFIED","metrics":{"liquidity_usd":12500,"lock_status":"locked","lp_unlocked":false}}
+    {"module_id":"token_authority_scanner","evidence_status":"VERIFIED","signed":true,"signals":{"execution_status":"completed","mint_authority_present":false,"freeze_authority_present":true,"token_program":"spl-token"},"evidence":["authority parsed"]},
+    {"module_id":"holder_concentration","evidence_status":"VERIFIED","signed":true,"metrics":{"owner_resolved_top_holder_pct":58.75},"evidence":["owner resolved"]},
+    {"module_id":"repeat_actor_scan","evidence_status":"VERIFIED","signed":true,"metrics":{"created_token_count":3},"evidence":["history queried"]},
+    {"module_id":"liquidity_movement","evidence_status":"OBSERVED","signed":true,"verdict":"$12,500 observed liquidity; lock status pending","metrics":{"liquidity_usd":12500,"execution_status":"completed"},"evidence":["market pair observed"]},
+    {"module_id":"funding_cluster_detector","evidence_status":"OBSERVED","signed":true,"metrics":{"execution_status":"completed","resolved_owner_count":4},"evidence":["funding window checked"]},
+    {"module_id":"sniper_timing_detector","evidence_status":"OBSERVED","signed":true,"signals":{"execution_status":"completed"},"evidence":["launch timing observed"]},
+    {"module_id":"pump_sybil_radar","evidence_status":"OBSERVED","signed":true,"signals":{"execution_status":"completed"},"evidence":["first buyers checked"]},
+    {"module_id":"launch_distribution","evidence_status":"OBSERVED","signed":true,"signals":{"execution_status":"completed"},"evidence":["distribution checked"]},
+    {"module_id":"program_relation","evidence_status":"VERIFIED","signed":true,"metrics":{"program":"spl-token"},"evidence":["program resolved"]},
+    {"module_id":"claim_surface","signals":{"execution_status":"not_applicable","applicable":false}},
+    {"module_id":"mev_shield","signals":{"execution_status":"not_applicable","applicable":false}}
   ],
-  "behavior_signals":{"signals":[{"rule_id":"URD-C003","evidence_status":"VERIFIED","triggered":true,"metrics":{"summary":"creator sell acceleration observed"}}]}
+  "trade_ledger_aggregates":{"available":true,"trade_count":42,"buy_count":24,"sell_count":18,"unique_trader_count":15,"round_trip_wallet_count":7,"wash_classification":"not_proven"},
+  "actor_investigation":{"dossier":{"tokens":[{"mint":"HistMint111111111111111111111111111111111"}],"related_actors":[{"wallet":"Related111"}],"evidence":[{"evidence_key":"ev-1"}],"track":{"created_token_count":3}}},
+  "threat_anticipation":{"exit_capacity":{"available":true,"capacity":"limited","owner_percentage":58.75,"owner_reference_usd_value":9000,"liquidity_usd":12500,"position_liquidity_multiple":0.72,"owner_resolved":true},"pathways":[{"id":"dominant_holder_exit","status":"open","capacity":"limited","evidence_status":"OBSERVED","summary":"Owner exit capacity is limited by observed liquidity."}]},
+  "behavior_signals":{"signals":[{"rule_id":"URD-C003","evidence_status":"OBSERVED","triggered":true,"summary":"creator sell acceleration observed","metrics":{"recent_sell_count":3}}]}
 }

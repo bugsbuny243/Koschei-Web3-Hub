@@ -1,134 +1,40 @@
 (()=>{
 'use strict';
 const OFFICIAL_KOSCH_MINT='HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump';
-const $=id=>document.getElementById(id);
-const form=$('scanForm'),submit=$('submit'),target=$('target'),kind=$('kind'),note=$('note');
-const empty=$('empty'),result=$('result'),share=$('shareResult'),openExplorer=$('openExplorer');
+const $=id=>document.getElementById(id),esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const form=$('scanForm'),submit=$('submit'),target=$('target'),kind=$('kind'),note=$('note'),empty=$('empty'),result=$('result'),share=$('shareResult'),openExplorer=$('openExplorer');
 let lastShareURL='';
 const clamp=n=>Math.max(0,Math.min(100,Math.round(Number(n)||0)));
 const grade=r=>r>=85?'F':r>=70?'E':r>=50?'D':r>=35?'C':r>=20?'B':'A';
 const level=r=>r>=85?'critical':r>=65?'high':r>=35?'medium':'low';
-const action=r=>r>=85?'UZAK DUR':r>=65?'YÜKSEK DİKKAT':r>=35?'DİKKAT':'İZLE';
-const decision=r=>r>=85?'blocked':r>=65?'warn':r>=35?'review':'allow';
-const unique=items=>[...new Set((items||[]).map(v=>String(v||'').trim()).filter(Boolean))];
-const trFinding=value=>{
-  const v=String(value||'').trim();
-  const map={
-    'Mint authority is active and can create additional supply.':'Mint authority açık; ek token basılabilir.',
-    'Mint authority is disabled.':'Mint authority kapalı.',
-    'Freeze authority is active and can freeze token accounts.':'Freeze authority açık; token hesapları dondurulabilir.',
-    'Freeze authority is disabled.':'Freeze authority kapalı.',
-    'The largest token account controls at least half of the supply.':'En büyük token hesabı arzın en az yarısını kontrol ediyor.',
-    'The largest token account has a significant concentration.':'En büyük token hesabında belirgin arz yoğunluğu var.',
-    'The ten largest token accounts control most of the supply.':'İlk 10 token hesabı arzın büyük bölümünü kontrol ediyor.'
-  };
-  return map[v]||v;
-};
-function tokenVerdict(tokenData,badgeData,mint){
-  const fallbackRisk=clamp(100-clamp(tokenData.score));
-  const signed=Boolean(badgeData&&badgeData.ok&&badgeData.signed&&badgeData.signature);
-  const risk=signed?clamp(badgeData.risk_index):fallbackRisk;
-  const evidence=unique([
-    ...(tokenData.findings||[]).map(trFinding),
-    signed&&badgeData.verdict?String(badgeData.verdict):'',
-    signed&&badgeData.recommendation?`ARVIS aksiyonu: ${badgeData.recommendation}`:''
-  ]).slice(0,3);
-  if(!evidence.length)evidence.push('Canlı Solana RPC taraması tamamlandı; belirgin authority veya yoğunluk kanıtı dönmedi.');
-  return {
-    target:mint,risk,grade:signed?(badgeData.grade||grade(risk)):grade(risk),riskLevel:signed?(badgeData.risk_level||level(risk)):level(risk),
-    action:action(risk),decision:decision(risk),evidence,
-    coverage:['Canlı token supply','Mint/freeze authority','Top token-account yoğunluğu',tokenData.token_2022?'Token-2022 extension analizi':'SPL token program kontrolü',signed?'İmzalı ARVIS verdict':'ARVIS imzası alınamadı'],
-    official:mint===OFFICIAL_KOSCH_MINT,
-    message:signed?`ARVIS canlı Solana kanıtıyla imzalı ${badgeData.grade||grade(risk)} notu üretti. ${action(risk)}.`:'Canlı temel tarama tamamlandı; imzalı ARVIS verdict alınamadığı için sonuç ön değerlendirmedir.',
-    explorer:`https://solscan.io/token/${encodeURIComponent(mint)}`,
-    signed,signature:signed?String(badgeData.signature):'',ruleVersion:signed?String(badgeData.rule_version||''):''
-  };
-}
-function preflightVerdict(data,value){
-  const risk=clamp(data.score);
-  return {
-    target:value,risk,grade:grade(risk),riskLevel:level(risk),action:action(risk),decision:data.decision||decision(risk),
-    evidence:unique(data.reasons).slice(0,3),coverage:['URL/intent heuristics','İmza ve izin dili','Koschei yapısal hafızası (varsa)'],
-    official:value===OFFICIAL_KOSCH_MINT,message:data.human_message||`ARVIS ön kontrolü ${grade(risk)} notu üretti.`,explorer:'',signed:false,signature:'',ruleVersion:''
-  };
-}
-function setList(id,items,fallback){
-  const el=$(id);el.innerHTML='';
-  (items&&items.length?items:[fallback]).forEach(text=>{const li=document.createElement('li');li.textContent=text;el.appendChild(li)});
-}
-function renderHistory(data){
-  const section=$('historySection'),list=$('historyList'),summary=$('historySummary');
-  if(!section||!list||!summary)return;
-  const items=Array.isArray(data&&data.items)?data.items:[];
-  if(!items.length){section.hidden=true;return}
-  section.hidden=false;list.innerHTML='';
-  const change=Number(data.risk_change||0);
-  summary.textContent=items.length>1?(change===0?'Son iki imzalı verdict aynı risk seviyesinde.':`Önceki imzalı verdict’e göre risk ${change>0?`${change} puan yükseldi`:`${Math.abs(change)} puan düştü`}.`):'Bu mint için ilk imzalı verdict kaydedildi.';
-  items.slice(0,6).forEach(item=>{
-    const li=document.createElement('li');
-    const when=item.created_at?new Date(item.created_at).toLocaleString('tr-TR'):'';
-    li.textContent=`${item.grade||grade(item.risk_index)} · ${clamp(item.risk_index)}/100 · ${String(item.risk_level||'').toUpperCase()} · ${when}`;
-    list.appendChild(li);
-  });
-}
-function render(v){
+function fetchJSON(url,options){return fetch(url,options).then(async response=>{const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'scan_failed');return data})}
+function stateLabel(state){return({verified:'DOĞRULANDI',observed:'GÖZLENDİ',window_open:'İZLEME PENCERESİ',not_applicable:'UYGULANAMAZ',arm_pending:'KANIT KOLU EKSİK'}[state]||String(state||'').toUpperCase())}
+function renderTechnicalReport(report,mint){
+  if(!report||!window.KoscheiVerdictCard)return false;
+  const vm=window.KoscheiVerdictCard.mapVerdictCard(report,{lang:'tr'}),h=vm.header;
   empty.hidden=true;result.hidden=false;
-  $('grade').textContent=v.grade;
-  $('riskScore').textContent=`${v.risk}/100`;
-  $('action').textContent=v.action;
-  $('action').className=`badge ${v.riskLevel}`;
-  $('message').textContent=v.message;
-  $('scanTarget').textContent=v.target;
-  $('officialKosch').hidden=!v.official;
-  setList('evidence',v.evidence,'Doğrulanmış kanıt dönmedi.');
-  setList('coverage',v.coverage,'Kapsam bilgisi dönmedi.');
-  const meta=$('verdictMeta');
-  if(meta){
-    meta.textContent=v.signed?`İmzalı · ${v.ruleVersion||'ARVIS rule'} · ${v.signature.slice(0,16)}…${v.signature.slice(-10)}`:'İmza yok · ön değerlendirme';
-    meta.dataset.signed=v.signed?'true':'false';
-  }
-  lastShareURL=`${location.origin}/scan/${encodeURIComponent(v.target)}`;
-  share.hidden=false;
-  openExplorer.hidden=!v.explorer;
-  if(v.explorer)openExplorer.href=v.explorer;
-  history.replaceState({},'',`/scan/${encodeURIComponent(v.target)}`);
+  result.innerHTML=`<article class="public-investigation-card"><div class="resultHead"><div class="grade">${esc(h.grade||h.icon||'✓')}</div><div><div class="risk">${esc(h.title)}</div><div class="badge medium">İMZALI TEKNİK RAPOR</div></div></div><p class="sub" style="margin-top:16px">${esc(h.copy)}</p><div class="target">${esc(report.target||mint)}</div><div class="verdictMeta" data-signed="${h.signature_short?'true':'false'}">Ruleset ${esc(h.ruleset_version)} · imza ${esc(h.signature_short||'bekliyor')} · ${esc(h.generated_at||'')}</div><div class="official" ${mint===OFFICIAL_KOSCH_MINT?'':'hidden'}><strong>Resmî KOSCH mint eşleşti.</strong><br>Bu etiket yalnız varlık kimliğini doğrular.</div><div class="section"><h3>Kanıt kapsamı</h3><p class="historySummary">${esc(vm.coverage.text)}</p></div><div class="section"><h3>${esc(vm.checklist_title)}</h3><div class="public-signal-list">${vm.checklist.map(row=>`<a class="public-signal ${esc(row.state)}" id="evidence-${esc(row.id)}" href="${esc(row.evidence_anchor)}"><span><b>${esc(row.label)}</b><small>${esc(stateLabel(row.state))}</small></span><em>${esc(row.value)}</em></a>`).join('')}</div></div><div class="section"><h3>${esc(vm.leverage_title)}</h3>${vm.leverage.length?`<ul class="list">${vm.leverage.map(row=>`<li>${esc(row.text)}</li>`).join('')}</ul>`:'<p class="historySummary">Doğrulanmış aktif kontrol satırı gözlenmedi; bu ifade risksiz anlamına gelmez.</p>'}</div><p class="fine">${esc(vm.disclaimer)}</p></article>`;
+  lastShareURL=`${location.origin}/scan/${encodeURIComponent(report.target||mint)}`;share.hidden=false;openExplorer.hidden=false;openExplorer.href=`https://solscan.io/token/${encodeURIComponent(mint)}`;history.replaceState({},'',`/scan/${encodeURIComponent(mint)}`);return true;
 }
-async function fetchJSON(url,options){
-  const response=await fetch(url,options);
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(data.error||'scan_failed');
-  return data;
+function renderPreflight(data,value){
+  const risk=clamp(data.score),g=grade(risk);empty.hidden=true;result.hidden=false;
+  result.innerHTML=`<div class="resultHead"><div class="grade">${esc(g)}</div><div><div class="risk">HIZLI ÖN KONTROL</div><div class="badge ${esc(level(risk))}">${esc(String(data.decision||'review').toUpperCase())}</div></div></div><p class="sub" style="margin-top:16px">${esc(data.human_message||'Ön kontrol tamamlandı.')}</p><div class="target">${esc(value)}</div><div class="section"><h3>Gözlenen nedenler</h3><ul class="list">${(Array.isArray(data.reasons)?data.reasons:[]).slice(0,8).map(item=>`<li>${esc(item)}</li>`).join('')||'<li>Ön kontrol ek neden satırı üretmedi.</li>'}</ul></div><p class="fine">Safe Check hızlı preflight’tır; tam token araştırması değildir.</p>`;
+  lastShareURL=location.href;share.hidden=false;openExplorer.hidden=true;
 }
 async function runScan(){
-  const value=target.value.trim();
-  if(!value)return;
-  submit.disabled=true;submit.textContent='ARVIS zinciri tarıyor…';
-  empty.hidden=false;empty.innerHTML='<h2>Canlı Solana kanıtı toplanıyor</h2><p>Authority, supply, holder yoğunluğu ve imzalı verdict kontrol ediliyor.</p>';
-  result.hidden=true;share.hidden=true;openExplorer.hidden=true;
-  if($('historySection'))$('historySection').hidden=true;
+  const value=target.value.trim();if(!value)return;
+  submit.disabled=true;submit.textContent='ARVIS kanıtları topluyor…';empty.hidden=false;empty.innerHTML='<h2>Teknik araştırma çalışıyor</h2><p>Collector sonuçları, holder kontrolü, piyasa bağlamı, davranış kuralları ve açık yollar aynı raporda birleştiriliyor.</p>';result.hidden=true;share.hidden=true;openExplorer.hidden=true;
   try{
-    const tokenMode=kind.value==='token';
-    if(tokenMode){
-      const tokenPromise=fetchJSON('/api/token/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mint:value,network:'solana-mainnet'})});
-      const badgePromise=fetchJSON(`/api/v1/risk/badge?address=${encodeURIComponent(value)}&network=solana-mainnet`).catch(()=>null);
-      const [tokenData,badgeData]=await Promise.all([tokenPromise,badgePromise]);
-      render(tokenVerdict(tokenData,badgeData,value));
-      fetchJSON(`/api/public/scan-history?mint=${encodeURIComponent(value)}&limit=12`).then(renderHistory).catch(()=>{});
+    if(kind.value==='token'){
+      const data=await fetchJSON('/api/token/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mint:value,network:'solana-mainnet'})});
+      if(!renderTechnicalReport(data.investigation_report,value))throw new Error('investigation_report_missing');
     }else{
-      const data=await fetchJSON('/api/arvis/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:value,kind:kind.value,intent:note.value.trim(),note:note.value.trim()})});
-      render(preflightVerdict(data,value));
+      const data=await fetchJSON('/api/arvis/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:value,kind:kind.value,intent:note.value.trim(),note:note.value.trim()})});renderPreflight(data,value);
     }
-  }catch(error){
-    empty.hidden=false;empty.innerHTML='<h2>Tarama tamamlanamadı</h2><p>Bu hedef için canlı kanıt alınamadı. İşlem yapmadan önce tekrar dene.</p>';
-  }finally{submit.disabled=false;submit.textContent='Ücretsiz ARVIS taraması'}
+  }catch(error){empty.hidden=false;empty.innerHTML='<h2>Tarama tamamlanamadı</h2><p>Bu hedef için teknik rapor üretilemedi. İşlem yapmadan önce tekrar dene.</p>'}
+  finally{submit.disabled=false;submit.textContent='ARVIS taramasını başlat'}
 }
 form.addEventListener('submit',event=>{event.preventDefault();runScan()});
-share.addEventListener('click',async()=>{
-  const payload={title:'Koschei ARVIS Solana güvenlik taraması',text:`ARVIS sonucu: ${$('grade').textContent} · ${$('riskScore').textContent} · ${$('action').textContent}`,url:lastShareURL};
-  try{if(navigator.share){await navigator.share(payload)}else{await navigator.clipboard.writeText(lastShareURL);share.textContent='Link kopyalandı'}}catch{}
-});
-const params=new URLSearchParams(location.search);
-const pathMint=location.pathname.startsWith('/scan/')?decodeURIComponent(location.pathname.slice(6).split('/')[0]||''):'';
-const initial=pathMint||params.get('mint')||params.get('target')||'';
-if(initial){target.value=initial;kind.value='token';runScan()}
+share.addEventListener('click',async()=>{const payload={title:'Koschei ARVIS teknik araştırma raporu',text:'Koschei ARVIS teknik araştırma sonucu',url:lastShareURL};try{if(navigator.share)await navigator.share(payload);else{await navigator.clipboard.writeText(lastShareURL);share.textContent='Link kopyalandı'}}catch{}});
+const params=new URLSearchParams(location.search),pathMint=location.pathname.startsWith('/scan/')?decodeURIComponent(location.pathname.slice(6).split('/')[0]||''):'';const initial=pathMint||params.get('mint')||params.get('target')||'';if(initial){target.value=initial;kind.value='token';runScan()}
 })();

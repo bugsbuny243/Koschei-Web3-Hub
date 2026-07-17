@@ -10,7 +10,7 @@ import (
 
 func TestCustomerTokenMappingKeepsRepeatActorEvidenceOutOfLegacyScore(t *testing.T) {
 	baselineCore := fixtureHolderCore()
-	baseline := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, baselineCore)
+	baseline := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, baselineCore, nil)
 
 	core := fixtureHolderCore()
 	core.RepeatDominantHolders = []services.RepeatDominantHolderEvidence{{
@@ -21,7 +21,7 @@ func TestCustomerTokenMappingKeepsRepeatActorEvidenceOutOfLegacyScore(t *testing
 		ObservationWindow: "son 30 gün Koschei gözlemi",
 		EvidenceLine:      "REPEAT DOMINANT HOLDER: OwnerA iki tokenda gözlendi.",
 	}}
-	got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core)
+	got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core, nil)
 	if got.Score != baseline.Score || got.RiskLevel != baseline.RiskLevel {
 		t.Fatalf("repeat actor evidence changed legacy score: baseline=%d/%s got=%d/%s", baseline.Score, baseline.RiskLevel, got.Score, got.RiskLevel)
 	}

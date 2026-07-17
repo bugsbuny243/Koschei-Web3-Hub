@@ -52,6 +52,7 @@ type tokenScanResponse struct {
 	HolderAnalysisStatus  string                           `json:"holder_analysis_status"`
 	VerdictWithheld       bool                             `json:"verdict_withheld"`
 	Disclaimer            string                           `json:"disclaimer"`
+	InvestigationReport   map[string]any                   `json:"investigation_report"`
 }
 
 type rpcEnvelope struct {
@@ -108,6 +109,7 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 	_ = h.callSolanaRPC(r.Context(), client, rpcURL, req.Network, "getAccountInfo", []interface{}{mint, map[string]string{"encoding": "jsonParsed"}}, &account)
 
 	holderCore := h.runHolderIntelligenceCore(r.Context(), mint, req.Network, "customer_token_scan")
+	assembly := h.assembleUnifiedInvestigationReport(r.Context(), holderCore)
 	topOne, topTen, holderConcentrationAvailable := holderIntelligenceCoreConcentration(holderCore)
 
 	score := 100
@@ -215,6 +217,7 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 		HolderAnalysisStatus:  holderIntelligenceCoreStatus(holderCore),
 		VerdictWithheld:       holderPolicy == "withhold",
 		Disclaimer:            disclaimer,
+		InvestigationReport:   assembly.Report,
 	})
 }
 

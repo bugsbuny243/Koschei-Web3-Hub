@@ -4,7 +4,7 @@
   window.__ownerCommandCenterV2=true;
   const pages=[
     {id:'command',icon:'⌂',label:'Operasyon özeti',copy:'KPI, canlı servisler ve hızlı geçişler'},
-    {id:'arvis',icon:'◉',label:'ARVIS tam tarama',copy:'Kanıt, threat anticipation ve imzalı karar'},
+    {id:'arvis',icon:'◉',label:'ARVIS tam tarama',copy:'Kanıt, threat anticipation ve imzalı sonuç'},
     {id:'customers',icon:'◎',label:'Müşteriler',copy:'Hesap, cüzdan ve erişim durumu'},
     {id:'access',icon:'◈',label:'KOSCH erişim',copy:'Holder, tier ve kota görünümü'},
     {id:'feedback',icon:'✦',label:'Geri bildirim',copy:'Müşteri sinyalleri ve ürün talepleri'},
@@ -84,16 +84,16 @@
   }
 
   function missionBrief(){
-    return `<section class="owner-mission-brief" data-owner-enhanced="mission"><article class="owner-mission-copy"><span class="eyebrow">Koschei Threat Operations</span><h2>Kanıtı topla, açık yolu gör, doğru kararı hızlandır.</h2><p>Owner merkezi artık yalnız servis sayılarını göstermiyor. ARVIS taraması; holder kontrolü, likidite yolu, aktör ilişkisi, threat anticipation ve imzalı verdict zincirini tek operasyon akışında topluyor.</p><div class="owner-mission-tags"><span>Deterministik verdict</span><span>Threat anticipation</span><span>Evidence-first</span><span>Tier-gated court</span></div></article><aside class="owner-mission-actions"><button class="owner-jump" type="button" data-owner-jump="arvis"><i>◉</i><span><b>Yeni dava aç</b><small>Mint, cüzdan, program veya işlem tara.</small></span><em>→</em></button><button class="owner-jump" type="button" data-owner-jump="security"><i>◇</i><span><b>Güvenlik olayları</b><small>Son denetim ve alarm kayıtlarını incele.</small></span><em>→</em></button><button class="owner-jump" type="button" data-owner-jump="system"><i>⚙</i><span><b>Sistem sağlığı</b><small>RPC, veritabanı ve servis durumunu kontrol et.</small></span><em>→</em></button></aside></section>`;
+    return `<section class="owner-mission-brief" data-owner-enhanced="mission"><article class="owner-mission-copy"><span class="eyebrow">Koschei Threat Operations</span><h2>Kanıtı topla, açık yolu gör, teknik sonucu hızlandır.</h2><p>Owner merkezi artık yalnız servis sayılarını göstermiyor. ARVIS taraması; holder kontrolü, likidite yolu, aktör ilişkisi, threat anticipation ve imzalı sonuç zincirini tek operasyon akışında topluyor.</p><div class="owner-mission-tags"><span>Deterministik sonuç</span><span>Threat anticipation</span><span>Evidence-first</span><span>Aynı kanıt sözleşmesi</span></div></article><aside class="owner-mission-actions"><button class="owner-jump" type="button" data-owner-jump="arvis"><i>◉</i><span><b>Yeni araştırma başlat</b><small>Mint, cüzdan, program veya işlem tara.</small></span><em>→</em></button><button class="owner-jump" type="button" data-owner-jump="security"><i>◇</i><span><b>Güvenlik olayları</b><small>Son denetim ve alarm kayıtlarını incele.</small></span><em>→</em></button><button class="owner-jump" type="button" data-owner-jump="system"><i>⚙</i><span><b>Sistem sağlığı</b><small>RPC, veritabanı ve servis durumunu kontrol et.</small></span><em>→</em></button></aside></section>`;
   }
 
   function caseFlow(){
     const steps=[
       ['01','Hedef','Mint, wallet, program veya işlem'],
-      ['02','Kanıt kolları','Authority, holder, funding, creator, flow'],
+      ['02','Kanıt collectorları','Authority, holder, funding, creator, flow'],
       ['03','Threat anticipation','Açık, kapalı, observed ve unknown yollar'],
-      ['04','İmzalı verdict','Tek deterministik karar ve evidence policy'],
-      ['05','Court katmanı','Tier uygunsa savcı ve üst heyet anlatısı']
+      ['04','İmzalı sonuç','Tek deterministik sonuç ve evidence policy'],
+      ['05','Bağımsız kontrol','Aynı kanıt paketinin çoklu-model tutarlılık incelemesi']
     ];
     return `<section class="owner-case-flow" data-owner-enhanced="case-flow">${steps.map(step=>`<div class="owner-case-step"><small>${step[0]}</small><b>${step[1]}</b><span>${step[2]}</span></div>`).join('')}</section>`;
   }

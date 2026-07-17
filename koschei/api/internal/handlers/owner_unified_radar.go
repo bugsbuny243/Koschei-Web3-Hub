@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -20,10 +19,8 @@ type ownerUnifiedRadarRequest struct {
 	ExtendedCourt *bool  `json:"extended_court,omitempty"`
 }
 
-// OwnerUnifiedRadarScan is the single owner-facing manual Radar entry point.
-// Token targets join the existing 14 ARVIS arms, persistent actor memory and
-// four deterministic market/holder behavior rules. Wallet targets use the same
-// response contract but correctly mark token-only arms as not applicable.
+// OwnerUnifiedRadarScan is the owner-facing manual entry point. Token targets
+// use the same technical investigation report as public and API callers.
 func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) {
 	var input ownerUnifiedRadarRequest
 	if err := decodeJSON(r, &input); err != nil {
@@ -89,165 +86,79 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
-	core := h.runHolderIntelligenceCore(ctx, target, network, "owner_unified_manual_scan")
+	assembly := h.buildUnifiedInvestigationReport(ctx, target, network, "owner_unified_manual_scan")
+	core := assembly.Core
 	if services.SecurityRadarHasLiveEvidence(core.Bundle) {
 		_ = h.saveSecurityRadarBundle(ctx, ownerChatIdentity(), "owner_unified_manual_scan", core.Bundle)
 	}
-	modules := radarDetailModules(core.Arms)
-	legacyFinal := radarDetailFinalMap(core.Final, h.radarDetailPersistedVerdict(ctx, target))
-	structural := h.radarDetailStructuralContext(ctx, target, network)
-	warning := radarDetailWarning(legacyFinal, core.Distribution, structural, modules, core.SourceContext)
-	graph := h.radarDetailGraph(ctx, target)
-	creator := strings.TrimSpace(fmt.Sprint(core.SourceContext["creator_wallet"]))
-	if creator == "<nil>" {
-		creator = ""
-	}
 
-	db := h.DBRead
-	if db == nil {
-		db = h.DB
-	}
-	actorDossier := services.ActorDefenseDossier{
-		Wallet: creator, Network: network, Tokens: []services.ActorDefenseTokenObservation{},
-		RelatedActors: []services.ActorDefenseRelatedActor{}, Evidence: []services.ActorDefenseEvidenceRecord{},
-		Coverage: map[string]any{}, Policy: map[string]any{}, GeneratedAt: time.Now().UTC(),
-	}
-	actorTrack := services.ActorDefenseTrack{Network: network, TargetKind: "wallet", TargetID: creator, Dossier: map[string]any{}}
-	actorStoreStatus := "creator_unavailable"
-	var store *services.ActorDefenseStore
-	if db != nil && creator != "" {
-		store = services.NewActorDefenseStore(db)
-		if loaded, err := store.LoadPersistentWalletDossier(ctx, creator, network, 150); err == nil {
-			actorDossier = loaded
-			actorTrack = loaded.Track
-			actorStoreStatus = "loaded"
-		} else {
-			actorStoreStatus = "load_failed"
-		}
-	}
-
-	now := time.Now().UTC()
-	sales := services.LoadCreatorSellAcceleration(ctx, db, target, creator, now)
-	sellVerification := services.VerifyCreatorSellTransactions(ctx, creatorIntelRPCURL(), sales)
-	behavior := services.EvaluateUnifiedRadarBehavior(target, creator, core.Market, core.Intelligence, core.Cluster, sales, now)
-	behavior = services.HardenUnifiedRadarBehavior(behavior, sellVerification, core.Cluster)
-	threatAnticipation := services.BuildThreatAnticipation(services.ThreatAnticipationInput{
-		Target: target, Market: core.Market, Holder: core.Intelligence, Cluster: core.Cluster,
-		Arms: core.Arms, Behavior: behavior,
-	})
 	behaviorPersistence := "not_applicable"
-	if store != nil && len(behavior.Evidence) > 0 {
+	if assembly.Store != nil && len(assembly.Behavior.Evidence) > 0 {
 		behaviorPersistence = "persisted"
-		for _, item := range behavior.Evidence {
+		for _, item := range assembly.Behavior.Evidence {
 			item.Network = network
-			if err := store.UpsertEvidence(ctx, item); err != nil {
+			if err := assembly.Store.UpsertEvidence(ctx, item); err != nil {
 				behaviorPersistence = "partial_failure"
 			}
 		}
-		if loaded, err := store.LoadPersistentWalletDossier(ctx, creator, network, 150); err == nil {
-			actorDossier = loaded
-			actorTrack = loaded.Track
-		}
 	}
-	combinedEvidence := append([]services.ActorDefenseEvidenceRecord{}, actorDossier.Evidence...)
-	combinedEvidence = append(combinedEvidence, behavior.Evidence...)
-	actorVerdict := services.EvaluateActorDefenseRules(actorTrack, combinedEvidence)
 	actorVerdictPersistence := "not_applicable"
-	if store != nil && strings.TrimSpace(actorTrack.TargetID) != "" {
+	if assembly.Store != nil && strings.TrimSpace(assembly.ActorTrack.TargetID) != "" {
 		actorVerdictPersistence = "persisted"
-		if err := store.PersistRuleVerdict(ctx, actorTrack, actorVerdict); err != nil {
+		if err := assembly.Store.PersistRuleVerdict(ctx, assembly.ActorTrack, assembly.ActorVerdict); err != nil {
 			actorVerdictPersistence = "failed"
 		}
 	}
-	unifiedVerdict := services.EvaluateUnifiedRadarVerdict(target, actorVerdict, behavior)
-	unifiedPersistence, unifiedHistory := h.persistUnifiedRadarVerdict(ctx, db, network, "token", target, unifiedVerdict, behavior)
-	courtInput := CourtReadOnlyInput{
-		Target: target,
-		Network: network,
-		SignedVerdict: unifiedVerdict,
-		VerdictCard: map[string]any{"grade": unifiedVerdict.Grade, "verdict": unifiedVerdict.Verdict, "signed": unifiedVerdict.Signed, "signature": unifiedVerdict.Signature},
-		EvidencePacket: map[string]any{
-			"threat_anticipation": threatAnticipation,
-			"behavior_signals": behavior,
-			"actor_rule_verdict": actorVerdict,
-			"actor_evidence": combinedEvidence,
-			"holder_intelligence": core.Intelligence,
-			"holder_cluster": core.Cluster,
-			"market": core.Market,
-			"modules": modules,
-			"evidence": radarDetailEvidence(core.Arms),
-			"graph": graph,
-		},
-	}
-	var court *CourtReport
-	if courtRequested {
-		courtCtx := context.WithValue(ctx, courtTierOverrideKey{}, "enterprise")
-		court = h.courtNarrative(courtCtx, courtInput, extendedCourt)
-		if court == nil {
-			court = ownerCourtUnavailableReport("disabled")
-		}
-	}
+	unifiedPersistence, unifiedHistory := h.persistUnifiedRadarVerdict(ctx, assembly.DB, network, "token", target, assembly.UnifiedVerdict, assembly.Behavior)
 
-	legacy := map[string]any{
+	report := assembly.Report
+	report["target_classification"] = classification
+	report["manual_only"] = true
+	report["automatic_scanning"] = false
+	report["final_verdict_persistence"] = unifiedPersistence
+	report["final_verdict_history"] = unifiedHistory
+	report["behavior_evidence_persistence"] = behaviorPersistence
+	if actor, ok := report["actor_investigation"].(map[string]any); ok {
+		actor["rule_verdict_persistence"] = actorVerdictPersistence
+	}
+	legacyFinal := radarDetailFinalMap(core.Final, h.radarDetailPersistedVerdict(ctx, target))
+	report["legacy_14_arm_radar"] = map[string]any{
 		"architecture_arm_count": 14,
+		"investigation_coverage": services.BuildArvisInvestigationCoverage(core.Arms),
 		"final_verdict": legacyFinal,
-		"warning": warning,
+		"warning": radarDetailWarning(legacyFinal, core.Distribution, assembly.Structural, assembly.Modules, core.SourceContext),
 		"holder_distribution": core.Distribution,
 		"holder_intelligence": core.Intelligence,
 		"holder_cluster": core.Cluster,
 		"launch_forensics": core.LaunchForensics,
 		"market": core.Market,
-		"structural_memory": structural,
+		"structural_memory": assembly.Structural,
 		"source_context": core.SourceContext,
-		"modules": modules,
+		"modules": assembly.Modules,
 		"evidence": radarDetailEvidence(core.Arms),
-		"graph": graph,
-		"compatibility_note": "Legacy arm risk indexes remain internal module diagnostics; the unified final verdict is letter-only and deterministic.",
+		"graph": assembly.Graph,
 	}
-	response := map[string]any{
-		"ok": true,
-		"schema_version": "koschei-unified-radar-v1",
-		"target": target,
-		"network": network,
-		"generated_at": time.Now().UTC().Format(time.RFC3339),
-		"target_classification": classification,
-		"analysis_scope": "token_plus_actor_plus_market_behavior",
-		"manual_only": true,
-		"automatic_scanning": false,
-		"architecture": map[string]any{"legacy_arvis_arms": 14, "actor_investigation": true, "behavior_rules": 4, "single_final_verdict": true, "court_requested": courtRequested},
-		"final_verdict": unifiedVerdict,
-		"final_verdict_persistence": unifiedPersistence,
-		"final_verdict_history": unifiedHistory,
-		"threat_anticipation": threatAnticipation,
-		"legacy_14_arm_radar": legacy,
-		"actor_investigation": map[string]any{
-			"wallet": creator,
-			"dossier": actorDossier,
-			"rule_verdict": actorVerdict,
-			"store_status": actorStoreStatus,
-			"rule_verdict_persistence": actorVerdictPersistence,
-		},
-		"behavior_signals": behavior,
-		"creator_sell_transaction_verification": sellVerification,
-		"behavior_evidence_persistence": behaviorPersistence,
-		"evidence_policy": map[string]any{
-			"court_receives_signed_verdict_read_only": true,
-			"court_returns_narrative_only": true,
-			"numeric_final_score_disabled": true,
-			"numeric_rug_probability_disabled": true,
-			"threat_capacity_is_not_intent": true,
-			"no_evidence_no_claim": true,
-			"inferred_watch_only": true,
-			"unverified_excluded": true,
-			"ai_may_explain_but_cannot_grade": true,
-			"creator_sell_acceleration_is_observed": true,
-			"verified_behavior_evidence_requires_complete_canonical_line": true,
-		},
+
+	// Optional model orchestration remains an internal, read-only appendix. It is
+	// not part of the canonical technical result and cannot change the verdict.
+	if courtRequested {
+		courtInput := CourtReadOnlyInput{
+			Target: target, Network: network, SignedVerdict: assembly.UnifiedVerdict,
+			VerdictCard: map[string]any{"grade": assembly.UnifiedVerdict.Grade, "verdict": assembly.UnifiedVerdict.Verdict, "signed": assembly.UnifiedVerdict.Signed, "signature": assembly.UnifiedVerdict.Signature},
+			EvidencePacket: map[string]any{
+				"threat_anticipation": assembly.Threat, "behavior_signals": assembly.Behavior,
+				"actor_rule_verdict": assembly.ActorVerdict, "actor_evidence": assembly.CombinedEvidence,
+				"holder_intelligence": core.Intelligence, "holder_cluster": core.Cluster,
+				"market": core.Market, "modules": assembly.Modules,
+				"evidence": radarDetailEvidence(core.Arms), "graph": assembly.Graph,
+			},
+		}
+		courtCtx := context.WithValue(ctx, courtTierOverrideKey{}, "enterprise")
+		if appendix := h.courtNarrative(courtCtx, courtInput, extendedCourt); appendix != nil {
+			report["independent_review"] = appendix
+		}
 	}
-	if court != nil {
-		response["court"] = court
-	}
-	writeJSON(w, http.StatusOK, response)
+	writeJSON(w, http.StatusOK, report)
 }
 
 func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request, requestedTarget, wallet, network string, classification radarTargetClassification, liveEvidence, courtRequested, extendedCourt bool) {
@@ -291,65 +202,28 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 	behavior := services.EvaluateUnifiedRadarBehavior("", wallet, services.TokenMarketSnapshot{}, services.HolderIntelligence{}, services.HolderClusterAnalysis{}, services.CreatorSellAcceleration{}, time.Now().UTC())
 	unifiedVerdict := services.EvaluateUnifiedRadarVerdict(wallet, actorVerdict, behavior)
 	unifiedPersistence, unifiedHistory := h.persistUnifiedRadarVerdict(ctx, db, network, "wallet", wallet, unifiedVerdict, behavior)
-	var court *CourtReport
-	if courtRequested {
-		courtInput := CourtReadOnlyInput{
-			Target: wallet,
-			Network: network,
-			SignedVerdict: unifiedVerdict,
-			VerdictCard: map[string]any{"grade": unifiedVerdict.Grade, "verdict": unifiedVerdict.Verdict, "signed": unifiedVerdict.Signed, "signature": unifiedVerdict.Signature},
-			EvidencePacket: map[string]any{"actor_dossier": final, "funding_origin": funding, "live_evidence": coverage, "actor_rule_verdict": actorVerdict, "behavior_signals": behavior},
-		}
-		courtCtx := context.WithValue(ctx, courtTierOverrideKey{}, "enterprise")
-		court = h.courtNarrative(courtCtx, courtInput, extendedCourt)
-		if court == nil {
-			court = ownerCourtUnavailableReport("disabled")
-		}
-	}
 	response := map[string]any{
-		"ok": true,
-		"schema_version": "koschei-unified-radar-v1",
-		"target": requestedTarget,
-		"wallet": wallet,
-		"network": network,
+		"ok": true, "schema_version": "koschei-unified-investigation-v1",
+		"target": requestedTarget, "wallet": wallet, "network": network,
 		"generated_at": time.Now().UTC().Format(time.RFC3339),
-		"target_classification": classification,
-		"analysis_scope": "wallet_actor_investigation",
-		"manual_only": true,
-		"automatic_scanning": false,
-		"architecture": map[string]any{
-			"legacy_arvis_arms": 14,
-			"legacy_arms_applicability": "token_mint_required",
-			"actor_investigation": true,
-			"behavior_rules": 4,
-			"behavior_rules_applicability": "token_mint_required",
-			"single_final_verdict": true,
-			"court_requested": courtRequested,
-		},
+		"target_classification": classification, "analysis_scope": "wallet_actor_investigation",
+		"manual_only": true, "automatic_scanning": false,
 		"final_verdict": unifiedVerdict,
 		"final_verdict_persistence": unifiedPersistence,
 		"final_verdict_history": unifiedHistory,
-		"legacy_14_arm_radar": map[string]any{"applicable": false, "reason": "The legacy 14 token arms require a token mint. They remain part of the same Radar architecture but are not fabricated for wallet targets.", "modules": []any{}},
+		"legacy_14_arm_radar": map[string]any{"applicable": false, "reason": "Token-specific collectors are not fabricated for a wallet-only target.", "modules": []any{}},
 		"actor_investigation": map[string]any{
-			"wallet": wallet,
-			"dossier": final,
-			"funding_origin": funding,
-			"funding_origin_persistence": fundingPersistence,
-			"live_evidence": coverage,
-			"rule_verdict": actorVerdict,
-			"rule_verdict_persistence": persistence,
+			"wallet": wallet, "dossier": final, "funding_origin": funding,
+			"funding_origin_persistence": fundingPersistence, "live_evidence": coverage,
+			"rule_verdict": actorVerdict, "rule_verdict_persistence": persistence,
 		},
 		"behavior_signals": behavior,
+		"investigation_output_policy": services.SharedInvestigationOutputPolicy(),
 		"evidence_policy": map[string]any{
-			"numeric_final_score_disabled": true,
-			"no_evidence_no_claim": true,
-			"inferred_watch_only": true,
-			"unverified_excluded": true,
-			"ai_may_explain_but_cannot_grade": true,
+			"numeric_final_score_disabled": true, "no_evidence_no_claim": true,
+			"inferred_watch_only": true, "unverified_excluded": true,
+			"identity_scope": "onchain_wallet_only", "caller_type_changes_evidence": false,
 		},
-	}
-	if court != nil {
-		response["court"] = court
 	}
 	writeJSON(w, http.StatusOK, response)
 }
@@ -358,7 +232,7 @@ func ownerCourtUnavailableReport(status string) *CourtReport {
 	return &CourtReport{
 		Status: status,
 		TierApplied: "enterprise",
-		Authority: "the signed deterministic verdict is final; court output is commentary/explanation",
+		Authority: "the signed deterministic verdict is final; model output is commentary/explanation",
 		GeneratedAt: time.Now().UTC(),
 	}
 }

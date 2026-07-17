@@ -77,9 +77,11 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 		if historyDB != nil {
 			store := services.NewSecurityRadarStore(historyDB)
 			_ = store.CaptureHolderSnapshots(parent, target, network, intelligence)
-			if found, err := store.RepeatDominantHolders(parent, intelligence, target, services.RepeatDominantObservationDays); err == nil && len(found) > 0 {
+			if found, err := store.RepeatDominantHolders(parent, intelligence, target, services.RepeatDominantObservationDays); err == nil {
 				repeatDominant = found
-				intelligence = services.ApplyRepeatDominantHolderEvidenceToHolderIntelligence(intelligence, found)
+				if len(found) > 0 {
+					intelligence = services.ApplyRepeatDominantHolderEvidenceToHolderIntelligence(intelligence, found)
+				}
 				analysis = services.ApplyRepeatDominantHolderEvidenceToAnalysis(analysis, req, found)
 				bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
 				arms = services.ArvisArmsFromBundle(bundle)
@@ -209,6 +211,7 @@ type customerTokenScanResult struct {
 	HolderAnalysisStatus string                            `json:"holder_analysis_status"`
 	FinalPolicy          string                            `json:"final_policy"`
 	VerdictWithheld      bool                              `json:"verdict_withheld"`
+	InvestigationReport  map[string]any                    `json:"investigation_report"`
 }
 
 func (h *Handler) scanCustomerToken(ctx context.Context, network, mint string) (customerTokenScanResult, error) {
@@ -217,12 +220,14 @@ func (h *Handler) scanCustomerToken(ctx context.Context, network, mint string) (
 		return customerTokenScanResult{}, err
 	}
 	core := h.runHolderIntelligenceCore(ctx, mint, network, "customer_token_scan")
-	return applyHolderCoreToTokenRisk(base, core), nil
+	assembly := h.assembleUnifiedInvestigationReport(ctx, core)
+	return applyHolderCoreToTokenRisk(base, core, assembly.Report), nil
 }
 
-func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligenceCoreResult) customerTokenScanResult {
-	// Legacy public token fundamentals remain isolated from the ARVIS arm
-	// contract. Repeat-actor evidence is no longer converted into a numeric score.
+func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligenceCoreResult, investigationReport map[string]any) customerTokenScanResult {
+	// Legacy public token fundamentals remain for backwards compatibility. The
+	// visible full report and every institutional/API caller consume the shared
+	// InvestigationReport contract instead of this legacy numeric surface.
 	base.Token.LargestHolderPercent = 0
 	base.Token.TopTenPercent = 0
 	if top1, top10, ok := holderIntelligenceCoreConcentration(core); ok {
@@ -254,6 +259,7 @@ func applyHolderCoreToTokenRisk(base web3.TokenRiskResult, core holderIntelligen
 		HolderAnalysisStatus: holderIntelligenceCoreStatus(core),
 		FinalPolicy: policy,
 		VerdictWithheld: policy == "withhold",
+		InvestigationReport: investigationReport,
 	}
 }
 

@@ -35,7 +35,7 @@ func TestCustomerTokenMappingUsesOwnerNormalizedConcentration(t *testing.T) {
 	base := web3.TokenRiskResult{Token: web3.NormalizedTokenData{
 		Mint: "Mint", Network: "solana-mainnet", LargestHolderPercent: 99, TopTenPercent: 99,
 	}}
-	got := applyHolderCoreToTokenRisk(base, fixtureHolderCore())
+	got := applyHolderCoreToTokenRisk(base, fixtureHolderCore(), map[string]any{"schema_version": unifiedInvestigationSchemaVersion})
 	if got.Token.LargestHolderPercent != 60 || got.Token.TopTenPercent != 100 {
 		t.Fatalf("legacy fields were not populated from normalized owners: %#v", got.Token)
 	}
@@ -45,6 +45,9 @@ func TestCustomerTokenMappingUsesOwnerNormalizedConcentration(t *testing.T) {
 	if got.HolderIntelligence.Rows[0].TokenAccountCount != 2 || got.FinalPolicy != "evidence_backed" || got.VerdictWithheld {
 		t.Fatalf("normalized holder result missing: %#v", got)
 	}
+	if got.InvestigationReport["schema_version"] != unifiedInvestigationSchemaVersion {
+		t.Fatalf("shared investigation report missing: %#v", got.InvestigationReport)
+	}
 }
 
 func TestCustomerAndOwnerSurfacesShareNormalizedConcentration(t *testing.T) {
@@ -53,7 +56,7 @@ func TestCustomerAndOwnerSurfacesShareNormalizedConcentration(t *testing.T) {
 	if !ok {
 		t.Fatal("shared holder core did not expose concentration")
 	}
-	customer := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core)
+	customer := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core, nil)
 	if customer.Token.LargestHolderPercent != roundPercent(ownerTop1) || customer.Token.TopTenPercent != roundPercent(ownerTop10) {
 		t.Fatalf("customer concentration diverged from OwnerRadar core: customer=%#v owner=%.4f/%.4f", customer.Token, ownerTop1, ownerTop10)
 	}
@@ -66,7 +69,7 @@ func TestCustomerMappingPreservesDeepAndShallowObservationMetadata(t *testing.T)
 		ObservationTier: "shallow", ObservationStatus: "signature_only_observation",
 		SignaturesFetched: 20, ParsedTransactions: 2, ObservationWindowExhausted: true,
 	})
-	got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core)
+	got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core, nil)
 	if got.HolderIntelligence.Rows[0].ObservationTier != "deep" || got.HolderIntelligence.Rows[0].SignaturesFetched != 100 || got.HolderIntelligence.Rows[0].ParsedTransactions != 10 {
 		t.Fatalf("deep observation metadata was lost: %#v", got.HolderIntelligence.Rows[0])
 	}
@@ -90,7 +93,7 @@ func TestCustomerTokenMappingCarriesLaunchAndCreatorEvidence(t *testing.T) {
 	core.Intelligence.Rows[0].LaunchEntryRank = 1
 	core.Intelligence.Rows[0].LaunchCreatorLinked = true
 	core.Intelligence.Rows[0].LaunchFundingStatus = "creator_linked"
-	got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core)
+	got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core, nil)
 	if !got.LaunchForensics.Available || !got.HolderIntelligence.Rows[0].LaunchCreatorLinked {
 		t.Fatalf("launch forensics did not reach customer result: %#v", got)
 	}
@@ -105,7 +108,7 @@ func TestHolderCoreWithholdsUnavailableOrBlockingEvidence(t *testing.T) {
 	core.Intelligence.FinalVerdictBlocked = true
 	core.Roles.BlockingEvidenceGap = true
 	core.Final = services.SecurityRadarFinalVerdict{Signed: true, RiskLevel: "low", RiskIndex: 5}
-	got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core)
+	got := applyHolderCoreToTokenRisk(web3.TokenRiskResult{Token: web3.NormalizedTokenData{}}, core, nil)
 	if got.FinalPolicy != "withhold" || !got.VerdictWithheld || holderIntelligenceCoreShieldAction(core) != "withhold" {
 		t.Fatalf("blocking evidence was converted into a reassuring verdict: %#v", got)
 	}

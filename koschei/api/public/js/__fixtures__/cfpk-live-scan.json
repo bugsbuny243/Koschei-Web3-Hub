@@ -1,0 +1,27 @@
+{
+  "schema_version":"koschei-unified-investigation-v1",
+  "target":"CFPkPq1eYPR8GLzEo59wUbbMioX4bshaTQiSGzTSpump",
+  "generated_at":"2026-07-16T19:13:00Z",
+  "final_verdict":{"grade":"-","verdict":"no_grade_trigger","ruleset_version":"koschei-unified-radar-rules-v1.0.0","actor_ruleset_version":"koschei-actor-defense-rules-v1.0.0","signature":"0123456789abcdef0123456789abcdefe64d25","generated_at":"2026-07-16T19:13:00Z","signed":true},
+  "source_context":{"launch_time":"2026-07-16T15:13:00Z","creator_wallet":"CreatorCFPk11111111111111111111111111111111","launch_platform":"pump.fun"},
+  "launch_forensics":{"available":true,"launch_time":"2026-07-16T15:13:00Z","launch_slot":355000001,"owners_requested":8,"owners_with_trade_history":8,"ledger_trade_count":64,"sniper_count":2,"creator_linked_count":1},
+  "market":{"available":true,"liquidity_usd":181694.5,"market_cap_usd":3098320,"volume_24h_usd":925000,"best_pair_address":"PairCFPk111111111111111111111111111111111","best_pair_dex":"pumpswap"},
+  "holder_intelligence":{"available":true,"top_owner_percentage":36.0263},
+  "modules":[
+    {"module_id":"token_authority_scanner","evidence_status":"VERIFIED","signed":true,"signals":{"execution_status":"completed","mint_authority_present":false,"freeze_authority_present":false,"token_program":"spl-token"},"evidence":["Mint and freeze authority parsed."]},
+    {"module_id":"holder_concentration","evidence_status":"VERIFIED","signed":true,"metrics":{"owner_resolved_top_holder_pct":36.0263},"evidence":["Owner-resolved concentration computed."]},
+    {"module_id":"liquidity_movement","evidence_status":"OBSERVED","signed":true,"verdict":"Observed market liquidity is $181,694.50; LP control remains unresolved.","metrics":{"execution_status":"completed","liquidity_usd":181694.5,"best_pair_address":"PairCFPk111111111111111111111111111111111"},"evidence":["Market pair and liquidity snapshot observed."]},
+    {"module_id":"funding_cluster_detector","evidence_status":"OBSERVED","signed":true,"signals":{"execution_status":"completed","finding_observed":false},"metrics":{"resolved_owner_count":6},"evidence":["Funding window completed without a shared-funder match."]},
+    {"module_id":"sniper_timing_detector","evidence_status":"OBSERVED","signed":true,"signals":{"execution_status":"completed"},"evidence":["Two launch-window buyers matched sniper timing criteria."]},
+    {"module_id":"pump_sybil_radar","evidence_status":"OBSERVED","signed":true,"signals":{"execution_status":"completed"},"evidence":["First-buyer and creator-link window inspected."]},
+    {"module_id":"launch_distribution","evidence_status":"OBSERVED","signed":true,"signals":{"execution_status":"completed"},"evidence":["Launch distribution assembled from stored ledger and ATA history."]},
+    {"module_id":"repeat_actor_scan","evidence_status":"VERIFIED","signed":true,"signals":{"execution_status":"completed","finding_observed":false},"metrics":{"created_token_count":0},"evidence":["Bounded actor-history query completed without a prior-token match."]},
+    {"module_id":"program_relation","evidence_status":"VERIFIED","signed":true,"metrics":{"program":"spl-token"},"evidence":["Token program resolved."]},
+    {"module_id":"claim_surface","signals":{"execution_status":"not_applicable","applicable":false}},
+    {"module_id":"mev_shield","signals":{"execution_status":"not_applicable","applicable":false}}
+  ],
+  "trade_ledger_aggregates":{"available":true,"status":"observed_trade_ledger_aggregates","trade_count":64,"buy_count":39,"sell_count":25,"unique_trader_count":28,"round_trip_wallet_count":11,"wash_classification":"not_proven"},
+  "actor_investigation":{"dossier":{"tokens":[{"mint":"CFPkPq1eYPR8GLzEo59wUbbMioX4bshaTQiSGzTSpump"}],"related_actors":[],"evidence":[{"evidence_key":"launch:cfpk:1"},{"evidence_key":"holder:cfpk:1"}],"track":{"created_token_count":0}}},
+  "threat_anticipation":{"status":"evidence_backed_pathway_analysis","exit_capacity":{"available":true,"status":"observed_owner_capacity","capacity":"limited","owner_percentage":36.0263,"owner_reference_usd_value":1116150.23,"liquidity_usd":181694.5,"position_liquidity_multiple":6.14,"owner_resolved":true},"pathways":[{"id":"dominant_holder_exit","status":"open","capacity":"limited","evidence_status":"OBSERVED","summary":"The owner-resolved position can materially affect observed liquidity; capacity is LIMITED."}]},
+  "behavior_signals":{"signals":[{"rule_id":"URD-C003","evidence_status":"OBSERVED","triggered":false,"summary":"Creator sell window completed; acceleration threshold was not met.","metrics":{"recent_sell_count":0}}]}
+}
