@@ -74,6 +74,57 @@ jobs:
             echo "PASS ${migration}" >> "${result_file}"
           done
           cat "${result_file}"
+      - name: Validate immutable dossier storage
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql --host=127.0.0.1 --port=5432 --username=postgres --dbname=koschei_ci --set=ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO dossier_source_snapshots
+          (mint,network,verdict_signature,ruleset_version,produced_at,source_hash,canonical_source,source_payload)
+          VALUES (
+            'ci-mint','solana-mainnet','ci-verdict-signature','ci-ruleset',now(),
+            'sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+            convert_to('{}','UTF8'),'{}'::jsonb
+          );
+
+          DO $$
+          DECLARE blocked boolean := false;
+          BEGIN
+            BEGIN
+              UPDATE dossier_source_snapshots SET mint='mutated' WHERE verdict_signature='ci-verdict-signature';
+            EXCEPTION WHEN OTHERS THEN
+              IF position('immutable dossier records' in SQLERRM)=0 THEN RAISE; END IF;
+              blocked := true;
+            END;
+            IF NOT blocked THEN RAISE EXCEPTION 'source snapshot update was not blocked'; END IF;
+          END $$;
+
+          INSERT INTO dossier_exports
+          (case_ref,mint,verdict_signature,source_snapshot_id,bundle_hash,canonical_bundle,bundle_json,requested_by)
+          SELECT
+            'KD1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','ci-mint','ci-verdict-signature',id,
+            'sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a',
+            convert_to('{}','UTF8'),'{}'::jsonb,'ci'
+          FROM dossier_source_snapshots WHERE verdict_signature='ci-verdict-signature';
+
+          DO $$
+          DECLARE update_blocked boolean := false; delete_blocked boolean := false;
+          BEGIN
+            BEGIN
+              UPDATE dossier_exports SET mint='mutated' WHERE case_ref='KD1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+            EXCEPTION WHEN OTHERS THEN
+              IF position('immutable dossier records' in SQLERRM)=0 THEN RAISE; END IF;
+              update_blocked := true;
+            END;
+            BEGIN
+              DELETE FROM dossier_exports WHERE case_ref='KD1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+            EXCEPTION WHEN OTHERS THEN
+              IF position('immutable dossier records' in SQLERRM)=0 THEN RAISE; END IF;
+              delete_blocked := true;
+            END;
+            IF NOT update_blocked OR NOT delete_blocked THEN RAISE EXCEPTION 'dossier export mutation was not blocked'; END IF;
+          END $$;
+          SQL
       - name: Upload migration validation log
         if: always()
         uses: actions/upload-artifact@v4
