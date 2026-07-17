@@ -43,7 +43,7 @@ func liquidityMovementTestLP() services.LPControlEvidence {
 	}
 }
 
-func TestParseLiquidityMovementDetectsAddFromSameDirectionVaultDeltas(t *testing.T) {
+func TestParseLiquidityMovementDetectsAddWithExplicitInstructionAndVaultDeltas(t *testing.T) {
 	lp := liquidityMovementTestLP()
 	tx := liquidityMovementTestTransaction(lp, "Actor111", 100, 150, 20, 30, "deposit")
 	movement, ok := parseLiquidityMovement(lp, services.SolanaSignatureInfo{Signature: "AddSig111", Slot: 1200}, tx)
@@ -54,7 +54,7 @@ func TestParseLiquidityMovementDetectsAddFromSameDirectionVaultDeltas(t *testing
 	if movement.EvidenceKey != "liquidity_movement:add_liquidity:AddSig111:1200" { t.Fatalf("key=%q", movement.EvidenceKey) }
 }
 
-func TestParseLiquidityMovementDetectsRemoveFromSameDirectionVaultDeltas(t *testing.T) {
+func TestParseLiquidityMovementDetectsRemoveWithExplicitInstructionAndVaultDeltas(t *testing.T) {
 	lp := liquidityMovementTestLP()
 	tx := liquidityMovementTestTransaction(lp, "Actor222", 150, 100, 30, 20, "withdraw")
 	movement, ok := parseLiquidityMovement(lp, services.SolanaSignatureInfo{Signature: "RemoveSig111", Slot: 1201}, tx)
@@ -71,12 +71,20 @@ func TestParseLiquidityMovementRejectsSwapOpposingVaultDeltas(t *testing.T) {
 	}
 }
 
+func TestParseLiquidityMovementRejectsSameDirectionDeltasWithoutLiquidityInstruction(t *testing.T) {
+	lp := liquidityMovementTestLP()
+	tx := liquidityMovementTestTransaction(lp, "FeeCollector111", 100, 150, 20, 30, "collectProtocolFees")
+	if movement, ok := parseLiquidityMovement(lp, services.SolanaSignatureInfo{Signature: "FeeSig111", Slot: 1203}, tx); ok {
+		t.Fatalf("same-direction reserve deltas without add/remove instruction were accepted: %#v", movement)
+	}
+}
+
 func TestLiquidityMovementRequiresPoolAndPinnedProgramReferences(t *testing.T) {
 	lp := liquidityMovementTestLP()
 	tx := liquidityMovementTestTransaction(lp, "Actor111", 100, 150, 20, 30, "deposit")
 	message := creatorIntelMap(creatorIntelMap(map[string]any(tx)["transaction"])["message"])
 	message["accountKeys"] = []any{map[string]any{"pubkey": "Actor111", "signer": true}, map[string]any{"pubkey": lp.PoolAddress, "signer": false}, map[string]any{"pubkey": lp.TokenVault, "signer": false}, map[string]any{"pubkey": lp.QuoteVault, "signer": false}}
-	if movement, ok := parseLiquidityMovement(lp, services.SolanaSignatureInfo{Signature: "MissingProgram", Slot: 1203}, tx); ok {
+	if movement, ok := parseLiquidityMovement(lp, services.SolanaSignatureInfo{Signature: "MissingProgram", Slot: 1204}, tx); ok {
 		t.Fatalf("movement without program reference accepted: %#v", movement)
 	}
 }
