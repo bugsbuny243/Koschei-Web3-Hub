@@ -16,6 +16,9 @@ func SecurityRadarAutoEnabled() bool {
 	if !AutomaticBackgroundScanningEnabled() {
 		return false
 	}
+	if OwnerUnlimitedAutomaticScanningEnabled() {
+		return true
+	}
 	value := strings.TrimSpace(os.Getenv("KOSCHEI_AUTO_RADAR_ENABLED"))
 	return strings.EqualFold(value, "1") || strings.EqualFold(value, "true")
 }

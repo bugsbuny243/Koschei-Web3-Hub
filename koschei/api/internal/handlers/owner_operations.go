@@ -59,7 +59,15 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 
 	radar := h.securityRadarStreamStats(ctx)
 	radarStatus := firstMapString(radar, "pipeline_status")
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("SOLANA_RPC_LIMIT_SAVER_ENABLED")), "true") {
+	radar["automatic_scanning"] = services.AutomaticBackgroundScanningEnabled()
+	radar["unlimited_owner_test_mode"] = services.OwnerUnlimitedAutomaticScanningEnabled()
+	if services.OwnerUnlimitedAutomaticScanningEnabled() {
+		radarStatus = "owner_auto_unlimited"
+		radar["background_streams_paused"] = false
+		radar["local_rpc_budget_enabled"] = false
+		radar["report_cycle_limit"] = nil
+		radar["pipeline_status"] = radarStatus
+	} else if strings.EqualFold(strings.TrimSpace(os.Getenv("SOLANA_RPC_LIMIT_SAVER_ENABLED")), "true") {
 		radar["background_streams_paused"] = true
 		radar["manual_scans_available"] = true
 		if services.PumpHighVolumeRadarEnabled() {
