@@ -94,17 +94,31 @@ func TestMeteoraDAMMV2CollectorReportsPermanentLockWithoutInventingLPMint(t *tes
 	if got.PoolLiquidityRaw != "1000" || got.PermanentLockedLiquidityRaw != "250" { t.Fatalf("raw liquidity=%#v", got) }
 }
 
-func TestMeteoraDLMMIdentityIsObservedWithoutLayoutGuess(t *testing.T) {
-	data := make([]byte, 64)
+func TestMeteoraDLMMCollectorDecodesPinnedBytemuckMintAndVaultOffsets(t *testing.T) {
+	data := make([]byte, 216)
+	tokenXBytes, mint := protocolTestKey(15); copy(data[88:120], tokenXBytes)
+	tokenYBytes, quoteMint := protocolTestKey(45); copy(data[120:152], tokenYBytes)
+	reserveXBytes, reserveX := protocolTestKey(75); copy(data[152:184], reserveXBytes)
+	reserveYBytes, reserveY := protocolTestKey(105); copy(data[184:216], reserveYBytes)
+	balanceCalls := 0
 	rpc := func(_ context.Context, _ string, method string, _ any, out any) error {
-		if method != "getAccountInfo" { return errors.New("unexpected RPC") }
-		response := out.(*rpcAccountInfoResponse); response.Context.Slot = 1100
-		response.Value = &struct { Owner string `json:"owner"`; Data any `json:"data"` }{Owner: meteoraDLMMProgram, Data: []any{base64.StdEncoding.EncodeToString(data), "base64"}}
+		switch method {
+		case "getAccountInfo":
+			response := out.(*rpcAccountInfoResponse); response.Context.Slot = 1100
+			response.Value = &struct { Owner string `json:"owner"`; Data any `json:"data"` }{Owner: meteoraDLMMProgram, Data: []any{base64.StdEncoding.EncodeToString(data), "base64"}}
+		case "getTokenAccountBalance":
+			balanceCalls++; response := out.(*rpcTokenBalanceResponse); response.Context.Slot = 1101
+			if balanceCalls == 1 { response.Value.UIAmountString = "7000" } else { response.Value.UIAmountString = "350" }
+		default:
+			return errors.New("DLMM pool must not request LP mint RPC: " + method)
+		}
 		return nil
 	}
-	got := collectProtocolLPControlEvidence(context.Background(), rpc, "solana-mainnet", "Mint", "", "DLMM111")
-	if !got.Available || got.PoolType != "meteora_dlmm" || got.ReasonCode != "meteora_dlmm_layout_not_decoded" { t.Fatalf("result=%#v", got) }
-	if got.TokenVault != "" || got.LPMint != "" { t.Fatalf("unverified layout produced invented fields: %#v", got) }
+	got := collectProtocolLPControlEvidence(context.Background(), rpc, "solana-mainnet", mint, "", "DLMM111")
+	if !got.Available || got.PoolType != "meteora_dlmm" || got.ReasonCode != "dlmm_position_ownership_not_enumerated" { t.Fatalf("result=%#v", got) }
+	if got.ControlModel != "position_nft" || got.LPMint != "" { t.Fatalf("model=%#v", got) }
+	if got.TokenVault != reserveX || got.QuoteVault != reserveY || got.QuoteMint != quoteMint { t.Fatalf("vaults=%#v", got) }
+	if got.TokenReserve != 7000 || got.QuoteReserve != 350 { t.Fatalf("reserves=%#v", got) }
 }
 
 func putUint128LE(target []byte, value uint64) {
