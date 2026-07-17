@@ -3,7 +3,7 @@
   const kit=window.OwnerRadarKit;
   if(!kit||window.__ownerFullScanTruthUIInstalled)return;
   window.__ownerFullScanTruthUIInstalled=true;
-  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[char]));
+  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const arr=value=>Array.isArray(value)?value:[];
   const obj=value=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
   const num=value=>new Intl.NumberFormat('tr-TR',{maximumFractionDigits:4}).format(Number(value||0));
