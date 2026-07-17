@@ -136,6 +136,7 @@ jobs:
       - name: Check public JavaScript
         run: |
           node --check public/js/public-solana-scan.js
+          node --check public/js/public-scan-request-guard.js
           node --check public/js/public-solana-scan-tr.js
           node --check public/js/public-transaction-shield.js
           node --check public/js/kosch-transparency.js
@@ -158,6 +159,8 @@ jobs:
           node --check public/js/owner-command-center-v2.js
           node --check ../../oss/verifier/typescript/verify-dossier.mjs
           node --check scripts/verify-dossier-contract.mjs
+          node --check scripts/run-production-investigation-acceptance.mjs
+          node scripts/verify-public-scan-request-guard.js
           node scripts/verify-verdict-card.js
           node scripts/verify-verdict-card-evidence-refs.js
           node scripts/verify-live-evidence-card.js
@@ -169,6 +172,7 @@ jobs:
           grep -q '<html lang="tr">' public/safe-check.html
           grep -q '<html lang="tr">' public/security-radar.html
           grep -q 'unified-live-evidence-card.js' public/scan.html
+          grep -q 'public-scan-request-guard.js' public/scan.html
           grep -q 'owner-full-scan-truth-ui.js' public/owner-production.html
           ! grep -Eqi 'Paste it before|Token ikinci planda|KOSCH stays as|What ARVIS does|Who it is for|Power users|Automatic flow' public/index.html
           ! grep -Eqi 'Login yok|Wallet connect yok|Read-only analiz|İmzalı verdict geçmişi' public/scan.html
