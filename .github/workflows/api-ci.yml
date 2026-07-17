@@ -149,6 +149,7 @@ jobs:
           node --check public/js/verdict-card.js
           node --check public/js/verdict-card-market-context.js
           node --check public/js/verdict-card-evidence-refs.js
+          node --check public/js/lp-control-evidence-card.js
           node --check public/js/unified-live-evidence-card.js
           node --check public/js/full-scan-truth-contract.js
           node --check public/js/owner-unified-radar.js
@@ -165,6 +166,7 @@ jobs:
           node scripts/verify-full-scan-truth-contract.js
           node scripts/verify-verdict-card.js
           node scripts/verify-verdict-card-evidence-refs.js
+          node scripts/verify-lp-control-evidence-card.js
           node scripts/verify-live-evidence-card.js
           node scripts/verify-dossier-contract.mjs
       - name: Check Turkish public copy
@@ -173,6 +175,8 @@ jobs:
           grep -q '<html lang="tr">' public/scan.html
           grep -q '<html lang="tr">' public/safe-check.html
           grep -q '<html lang="tr">' public/security-radar.html
+          grep -q 'lp-control-evidence-card.js' public/scan.html
+          grep -q 'lp-control-evidence-card.js' public/owner-production.html
           grep -q 'unified-live-evidence-card.js' public/scan.html
           grep -q 'public-scan-request-guard.js' public/scan.html
           grep -q 'full-scan-truth-contract.js' public/owner-production.html
