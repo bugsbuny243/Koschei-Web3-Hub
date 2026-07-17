@@ -37,10 +37,12 @@
   }
   function decorate(root,payload){
     root=rootFor(root);if(!root)return;
+    root.querySelector('#lp-control-evidence')?.remove();
     root.querySelector('#full-scan-live-evidence')?.remove();
+    const lpHTML=window.KoscheiLPControlCard?.render(payload,{lang:'tr'})||'';
     const liveHTML=window.KoscheiLiveEvidenceCard?.render(payload,{lang:'tr'})||'';
     const verdict=root.querySelector('#verdict-card');
-    if(liveHTML&&verdict)verdict.insertAdjacentHTML('afterend',liveHTML);
+    if((lpHTML||liveHTML)&&verdict)verdict.insertAdjacentHTML('afterend',`${lpHTML}${liveHTML}`);
     const capability=cardByEyebrow(root,'ARVIS ARAŞTIRMA YETENEKLERİ');
     const capabilityHTML=renderCapabilities(payload);if(capability&&capabilityHTML)capability.outerHTML=capabilityHTML;
     const behavior=cardByEyebrow(root,'DAVRANIŞ KURALLARI');
