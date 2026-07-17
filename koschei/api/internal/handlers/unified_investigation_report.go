@@ -70,6 +70,7 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 	}
 	behavior := services.EvaluateUnifiedRadarBehavior(target, creator, core.Market, core.Intelligence, core.Cluster, sales, now)
 	behavior = services.HardenUnifiedRadarBehavior(behavior, storedVerification, core.Cluster)
+	behavior = services.ApplyOwnerConcentrationRuleV110(behavior, core.Intelligence, now)
 	threat := services.BuildThreatAnticipation(services.ThreatAnticipationInput{
 		Target: target, Market: core.Market, Holder: core.Intelligence, Cluster: core.Cluster,
 		Arms: core.Arms, Behavior: behavior,
@@ -77,7 +78,7 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 	combinedEvidence := append([]services.ActorDefenseEvidenceRecord{}, actorDossier.Evidence...)
 	combinedEvidence = append(combinedEvidence, behavior.Evidence...)
 	actorVerdict := services.EvaluateActorDefenseRules(actorTrack, combinedEvidence)
-	unifiedVerdict := services.EvaluateUnifiedRadarVerdict(target, actorVerdict, behavior)
+	unifiedVerdict := services.EvaluateUnifiedRadarVerdictV110(target, actorVerdict, behavior)
 	modules := radarDetailModules(core.Arms)
 	coverage := services.BuildArvisInvestigationCoverage(core.Arms)
 	structural := h.radarDetailStructuralContext(ctx, target, network)
