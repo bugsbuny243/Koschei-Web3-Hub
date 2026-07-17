@@ -39,10 +39,14 @@ func (h *Handler) buildUnifiedInvestigationReport(ctx context.Context, target, n
 	return h.assembleUnifiedInvestigationReportMode(ctx, core, mode)
 }
 
-// assembleUnifiedInvestigationReport remains a stored-only helper for unit tests
-// and callers that already collected their evidence explicitly.
+// assembleUnifiedInvestigationReport preserves the mode embedded by the shared
+// holder core. Tests with an empty mode remain stored-only and never call RPC.
 func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core holderIntelligenceCoreResult) unifiedInvestigationAssembly {
-	return h.assembleUnifiedInvestigationReportMode(ctx, core, "stored_only_projection")
+	mode := strings.TrimSpace(core.Request.Mode)
+	if mode == "" {
+		mode = "stored_only_projection"
+	}
+	return h.assembleUnifiedInvestigationReportMode(ctx, core, mode)
 }
 
 func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, core holderIntelligenceCoreResult, mode string) unifiedInvestigationAssembly {
