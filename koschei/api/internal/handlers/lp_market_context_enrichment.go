@@ -15,18 +15,35 @@ import (
 func (h *Handler) collectCompleteLPControlEvidence(ctx context.Context, network, mint, creator string, market services.TokenMarketSnapshot, source map[string]any) services.LPControlEvidence {
 	rpc := h.lpRPC()
 	lp := collectLPControlEvidence(ctx, rpc, network, mint, creator, market, source)
-	if lp.ReasonCode == "amm_v4_layout_not_resolved" {
+	switch lp.ReasonCode {
+	case "amm_v4_layout_not_resolved":
 		lp = collectRaydiumAMMV4Evidence(ctx, rpc, network, mint, creator, strings.TrimSpace(market.BestPairAddress))
+	case "primary_pool_not_raydium", "unrecognized_raydium_pool_program":
+		lp = collectProtocolLPControlEvidence(ctx, rpc, network, mint, creator, strings.TrimSpace(market.BestPairAddress))
 	}
 	lp.TokenMint = strings.TrimSpace(mint)
+	if lp.PoolProgram == raydiumCPMMProgram || lp.PoolProgram == raydiumAMMV4Program {
+		lp.ControlModel = "lp_token"
+		lp.PositionModel = "fungible_lp_token"
+		lp.LPSupplySource = "mint_supply"
+	}
+	if lp.EffectiveQuoteReserve == 0 { lp.EffectiveQuoteReserve = lp.QuoteReserve }
 	if lp.Available && lp.TokenReserve > 0 && market.PriceUSD > 0 {
-		// Constant-product pools are approximately balanced by value at the read
-		// slot. Raw reserves remain primary; the USD line is explicitly derived
-		// from a direct token-vault reserve and the timestamped market price.
+		// The token-vault reserve and timestamped reference price are primary.
+		// The x2 value is an explicitly labelled balanced-pool estimate.
 		lp.ReserveLiquidityUSD = math.Round(lp.TokenReserve*market.PriceUSD*2*100) / 100
 		lp.ReserveValueSource = "direct_token_vault_reserve_x_market_price_x2"
 		lp.EvidenceKeys = append(lp.EvidenceKeys, fmt.Sprintf("reserve_value:%s@%d", lp.TokenVault, lp.ReadSlot))
 	}
+	lp = resolveStreamflowLPTimeLock(ctx, rpc, network, lp)
+	if lp.Available || lp.PoolProgram == meteoraDLMMProgram {
+		lp = attachLiquidityMovementEvidence(ctx, lp)
+	}
+	lp.EvidenceKeys = uniqueStrings(lp.EvidenceKeys)
+	return lp
+}
+
+func resolveStreamflowLPTimeLock(ctx context.Context, rpc solanaRPCCall, network string, lp services.LPControlEvidence) services.LPControlEvidence {
 	if lp.LockerAccount == "" || lp.LockerProgram != streamflowProgram || rpc == nil { return lp }
 	var account rpcAccountInfoResponse
 	if err := rpc(ctx, network, "getAccountInfo", []any{lp.LockerAccount, map[string]any{"encoding":"base64","commitment":"confirmed"}}, &account); err != nil || account.Value == nil {
@@ -52,7 +69,9 @@ func collectRaydiumAMMV4Evidence(ctx context.Context, rpc solanaRPCCall, network
 	out := services.LPControlEvidence{
 		Status: services.LPControlUnverified, ReasonCode: "amm_v4_collection_incomplete",
 		PoolAddress: pool, PoolProgram: raydiumAMMV4Program, PoolType: "raydium_amm_v4",
-		TokenMint: mint, ObservedAt: time.Now().UTC(), LargestLPHolders: []services.LPHolderEvidence{}, EvidenceKeys: []string{}, Limitations: []string{},
+		ControlModel: "lp_token", PositionModel: "fungible_lp_token", TokenMint: mint,
+		ObservedAt: time.Now().UTC(), LargestLPHolders: []services.LPHolderEvidence{},
+		LiquidityMovements: []services.LiquidityMovementEvidence{}, EvidenceKeys: []string{}, Limitations: []string{},
 	}
 	if rpc == nil || pool == "" { out.Status = services.LPControlSourceUnavailable; return out }
 	var account rpcAccountInfoResponse
@@ -74,9 +93,8 @@ func collectRaydiumAMMV4Evidence(ctx context.Context, rpc solanaRPCCall, network
 	// base vault, quote vault, base mint, quote mint and LP mint pubkeys.
 	baseVault, quoteVault := base58Encode(data[336:368]), base58Encode(data[368:400])
 	baseMint, quoteMint := base58Encode(data[400:432]), base58Encode(data[432:464])
-	lpMint := base58Encode(data[464:496])
+	out.LPMint = base58Encode(data[464:496])
 	out.ReadSlot = account.Context.Slot
-	out.LPMint = lpMint
 	if baseMint == mint {
 		out.TokenVault, out.QuoteVault, out.QuoteMint = baseVault, quoteVault, quoteMint
 	} else if quoteMint == mint {
@@ -90,13 +108,17 @@ func collectRaydiumAMMV4Evidence(ctx context.Context, rpc solanaRPCCall, network
 }
 
 func populateDecodedLPControl(ctx context.Context, rpc solanaRPCCall, network, creator string, out services.LPControlEvidence) services.LPControlEvidence {
+	if out.ControlModel == "" { out.ControlModel = "lp_token" }
+	if out.PositionModel == "" { out.PositionModel = "fungible_lp_token" }
+	out.LPSupplySource = "mint_supply"
 	var tokenReserve, quoteReserve rpcTokenBalanceResponse
 	if err := rpc(ctx, network, "getTokenAccountBalance", []any{out.TokenVault, map[string]any{"commitment":"confirmed"}}, &tokenReserve); err == nil {
 		out.TokenReserve = tokenReserve.Value.number(); if tokenReserve.Context.Slot > out.ReadSlot { out.ReadSlot = tokenReserve.Context.Slot }
-	}
+	} else { out.Limitations = append(out.Limitations, "The token vault reserve could not be read.") }
 	if err := rpc(ctx, network, "getTokenAccountBalance", []any{out.QuoteVault, map[string]any{"commitment":"confirmed"}}, &quoteReserve); err == nil {
-		out.QuoteReserve = quoteReserve.Value.number(); if quoteReserve.Context.Slot > out.ReadSlot { out.ReadSlot = quoteReserve.Context.Slot }
-	}
+		out.QuoteReserve = quoteReserve.Value.number(); out.EffectiveQuoteReserve = out.QuoteReserve
+		if quoteReserve.Context.Slot > out.ReadSlot { out.ReadSlot = quoteReserve.Context.Slot }
+	} else { out.Limitations = append(out.Limitations, "The quote vault reserve could not be read.") }
 	var supply rpcTokenSupplyResponse
 	if err := rpc(ctx, network, "getTokenSupply", []any{out.LPMint, map[string]any{"commitment":"confirmed"}}, &supply); err != nil {
 		out.Status, out.ReasonCode = services.LPControlSourceUnavailable, "lp_supply_unavailable"
