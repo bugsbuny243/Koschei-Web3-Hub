@@ -18,32 +18,34 @@ const (
 // intentionally insufficient.
 func ApplyOwnerConcentrationRuleV110(report UnifiedRadarBehaviorReport, holder HolderIntelligence, now time.Time) UnifiedRadarBehaviorReport {
 	if now.IsZero() { now = time.Now().UTC() }
+	topOwner := ""
+	for _, row := range holder.Rows {
+		if row.OwnerResolved && row.RiskBearing && !row.ExcludedFromHolderRisk && strings.TrimSpace(row.OwnerWallet) != "" {
+			topOwner = strings.TrimSpace(row.OwnerWallet)
+			break
+		}
+	}
+	resolvedScope := holder.Available && holder.OwnerAggregationApplied && holder.CirculatingSupply > 0 && topOwner != ""
 	signal := UnifiedRadarSignal{
-		RuleID: UnifiedRuleOwnerConcentration,
-		Title: "Owner-resolved dominant concentration",
+		RuleID: UnifiedRuleOwnerConcentration, Title: "Owner-resolved dominant concentration",
 		EvidenceStatus: "unverified", Triggered: false, GradeEffect: "none",
 		Scope: "owner_resolved_infrastructure_excluded_circulating_supply",
 		Metrics: map[string]any{
 			"owner_resolved_top_share_pct": holder.TopOwnerPercentage,
 			"owner_aggregation_applied": holder.OwnerAggregationApplied,
-			"infrastructure_excluded": holder.InfrastructureExclusionApplied,
+			"risk_bearing_owner_resolved": topOwner != "",
+			"top_owner_wallet": topOwner,
 		},
 		Thresholds: map[string]any{"d_cap_pct": UnifiedOwnerConcentrationDCap, "f_cap_pct": UnifiedOwnerConcentrationFCap},
 		EvidenceKeys: []string{}, Signatures: []string{}, Limitations: []string{}, ObservedAt: now.UTC(),
 	}
-	if !holder.Available || !holder.OwnerAggregationApplied || !holder.InfrastructureExclusionApplied || holder.CirculatingSupply <= 0 {
+	if !resolvedScope {
 		signal.Summary = "Owner-resolved, infrastructure-excluded concentration was unavailable; raw account concentration cannot trigger URD-C005."
-		signal.Limitations = append(signal.Limitations, "C005 requires owner resolution and infrastructure exclusion.")
+		signal.Limitations = append(signal.Limitations, "C005 requires an owner-resolved risk-bearing row and owner aggregation.")
 	} else {
 		signal.EvidenceStatus = "verified"
+		signal.EvidenceKeys = []string{"owner:"+topOwner}
 		share := holder.TopOwnerPercentage
-		for _, row := range holder.Rows {
-			if row.OwnerResolved && row.RiskBearing && strings.TrimSpace(row.OwnerWallet) != "" {
-				signal.EvidenceKeys = append(signal.EvidenceKeys, "owner:"+strings.TrimSpace(row.OwnerWallet))
-				break
-			}
-		}
-		if len(signal.EvidenceKeys) == 0 { signal.EvidenceKeys = []string{"owner-resolved-concentration:"+report.Mint} }
 		switch {
 		case share >= UnifiedOwnerConcentrationFCap:
 			signal.Triggered, signal.GradeEffect = true, "hard_cap_F"
@@ -61,9 +63,6 @@ func ApplyOwnerConcentrationRuleV110(report UnifiedRadarBehaviorReport, holder H
 	return report
 }
 
-// EvaluateUnifiedRadarVerdictV110 preserves all v1.0 decisions and applies the
-// explicit C005 hard ceiling. Existing signing is reused without changing its
-// implementation or key semantics.
 func EvaluateUnifiedRadarVerdictV110(target string, actor ActorDefenseRuleVerdict, behavior UnifiedRadarBehaviorReport) UnifiedRadarVerdict {
 	out := EvaluateUnifiedRadarVerdict(target, actor, behavior)
 	out.RulesetVersion = UnifiedRadarRulesetVersionV110
