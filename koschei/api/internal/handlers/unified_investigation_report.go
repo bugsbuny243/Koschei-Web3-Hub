@@ -79,6 +79,10 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 	combinedEvidence = append(combinedEvidence, behavior.Evidence...)
 	actorVerdict := services.EvaluateActorDefenseRules(actorTrack, combinedEvidence)
 	unifiedVerdict := services.EvaluateUnifiedRadarVerdictV110(target, actorVerdict, behavior)
+	if h.DB != nil {
+		_ = services.CaptureHolderConcentrationObservation(ctx, h.DB, network, target, core.Intelligence, now)
+	}
+	holderConcentrationContext := services.LoadHolderConcentrationContext(ctx, db, core.Intelligence)
 	modules := radarDetailModules(core.Arms)
 	coverage := services.BuildArvisInvestigationCoverage(core.Arms)
 	structural := h.radarDetailStructuralContext(ctx, target, network)
@@ -94,6 +98,7 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 		"final_verdict": unifiedVerdict, "threat_anticipation": threat,
 		"investigation_coverage": coverage, "holder_distribution": core.Distribution,
 		"holder_intelligence": core.Intelligence, "holder_cluster": core.Cluster,
+		"holder_concentration_context": holderConcentrationContext,
 		"launch_forensics": core.LaunchForensics, "market": core.Market,
 		"lp_control": core.LPControl, "jupiter_market_context": core.JupiterContext,
 		"source_context": core.SourceContext, "structural_memory": structural,
@@ -110,6 +115,7 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 			"threat_capacity_is_not_intent": true, "no_evidence_no_claim": true,
 			"identity_scope": "onchain_wallet_only", "caller_type_changes_evidence": false,
 			"jupiter_context_can_change_verdict": false, "lp_control_arm_can_change_grade": false,
+			"corpus_percentile_can_change_verdict": false,
 		},
 	}
 	return unifiedInvestigationAssembly{
