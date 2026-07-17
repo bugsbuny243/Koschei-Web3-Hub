@@ -43,9 +43,7 @@ func (h *Handler) buildUnifiedInvestigationReport(ctx context.Context, target, n
 // holder core. Tests with an empty mode remain stored-only and never call RPC.
 func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core holderIntelligenceCoreResult) unifiedInvestigationAssembly {
 	mode := strings.TrimSpace(core.Request.Mode)
-	if mode == "" {
-		mode = "stored_only_projection"
-	}
+	if mode == "" { mode = "stored_only_projection" }
 	return h.assembleUnifiedInvestigationReportMode(ctx, core, mode)
 }
 
@@ -89,9 +87,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	combinedEvidence = append(combinedEvidence, behavior.Evidence...)
 	actorVerdict := services.EvaluateActorDefenseRules(actorTrack, combinedEvidence)
 	unifiedVerdict := services.EvaluateUnifiedRadarVerdictV110(target, actorVerdict, behavior)
-	if h.DB != nil {
-		_ = services.CaptureHolderConcentrationObservation(ctx, h.DB, network, target, core.Intelligence, now)
-	}
+	if h.DB != nil { _ = services.CaptureHolderConcentrationObservation(ctx, h.DB, network, target, core.Intelligence, now) }
 	holderConcentrationContext := services.LoadHolderConcentrationContext(ctx, db, core.Intelligence)
 	modules := radarDetailModules(core.Arms)
 	coverage := services.BuildArvisInvestigationCoverage(core.Arms)
@@ -107,12 +103,11 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	if unifiedLiveEvidenceAllowed(mode) {
 		liveEvidence = h.collectUnifiedTokenLiveEvidence(ctx, core)
 		transactionEvidence = mergeUnifiedTransactionEvidence(transactionEvidence, unifiedLiveRowsToEvidence(liveEvidence.Transactions))
-		if len(transactionEvidence) > 0 {
-			tradeLedger = summarizeUnifiedTransactionEvidence(transactionEvidence)
-		}
+		if len(transactionEvidence) > 0 { tradeLedger = summarizeUnifiedTransactionEvidence(transactionEvidence) }
 	}
 	evidenceReferences := buildUnifiedEvidenceReferences(core, creator, transactionEvidence, behavior, unifiedVerdict)
 	evidenceReferences = applyUnifiedLiveEvidenceReferences(evidenceReferences, liveEvidence)
+	evidenceReferences = applyLPControlEvidenceReferences(evidenceReferences, core.LPControl)
 
 	report := map[string]any{
 		"ok": true, "schema_version": unifiedInvestigationSchemaVersion,
@@ -162,10 +157,7 @@ func (h *Handler) unifiedTradeLedgerAggregates(ctx context.Context, mint string)
 	}
 	db := h.DBRead
 	if db == nil { db = h.DB }
-	if db == nil || strings.TrimSpace(mint) == "" {
-		out["status"] = "trade_ledger_unavailable"
-		return out
-	}
+	if db == nil || strings.TrimSpace(mint) == "" { out["status"] = "trade_ledger_unavailable"; return out }
 	var tradeCount, buyCount, sellCount, uniqueTraders, roundTrip int64
 	var firstSeen, lastSeen sql.NullTime
 	err := db.QueryRowContext(ctx, `
