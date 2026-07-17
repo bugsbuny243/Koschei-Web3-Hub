@@ -3,52 +3,83 @@ package services
 import "time"
 
 const (
-	LPControlVerifiedBurned    = "burned"
-	LPControlVerifiedLocked    = "locked_until"
-	LPControlHeldByCreator     = "held_by_creator"
-	LPControlUnverified        = "unverified"
-	LPControlNotApplicable     = "not_applicable"
-	LPControlSourceUnavailable = "source_unavailable"
+	LPControlVerifiedBurned          = "burned"
+	LPControlVerifiedLocked          = "locked_until"
+	LPControlVerifiedPermanentLocked = "permanently_locked"
+	LPControlHeldByCreator           = "held_by_creator"
+	LPControlUnverified              = "unverified"
+	LPControlNotApplicable           = "not_applicable"
+	LPControlSourceUnavailable       = "source_unavailable"
 )
 
 // LPControlEvidence is informational evidence only. It cannot issue a grade and
 // never infers intent from LP ownership alone.
 type LPControlEvidence struct {
-	Available           bool               `json:"available"`
-	Status              string             `json:"status"`
-	ReasonCode          string             `json:"reason_code,omitempty"`
-	PoolAddress         string             `json:"pool_address,omitempty"`
-	PoolProgram         string             `json:"pool_program,omitempty"`
-	PoolType            string             `json:"pool_type,omitempty"`
-	TokenMint           string             `json:"token_mint,omitempty"`
-	QuoteMint           string             `json:"quote_mint,omitempty"`
-	LPMint              string             `json:"lp_mint,omitempty"`
-	TokenVault          string             `json:"token_vault,omitempty"`
-	QuoteVault          string             `json:"quote_vault,omitempty"`
-	ReadSlot            uint64             `json:"read_slot,omitempty"`
-	TokenReserve        float64            `json:"token_reserve,omitempty"`
-	QuoteReserve        float64            `json:"quote_reserve,omitempty"`
-	ReserveLiquidityUSD float64            `json:"reserve_liquidity_usd,omitempty"`
-	ReserveValueSource  string             `json:"reserve_value_source,omitempty"`
-	LPSupply            float64            `json:"lp_supply,omitempty"`
-	BurnedSharePct      float64            `json:"burned_share_pct,omitempty"`
-	LargestLPHolders    []LPHolderEvidence `json:"largest_lp_holders"`
-	LockerProgram       string             `json:"locker_program,omitempty"`
-	LockerAccount       string             `json:"locker_account,omitempty"`
-	LockedUntil         *time.Time         `json:"locked_until,omitempty"`
-	CreatorLPSharePct   float64            `json:"creator_lp_share_pct,omitempty"`
-	ObservedAt          time.Time          `json:"observed_at"`
-	EvidenceKeys        []string           `json:"evidence_keys"`
-	Limitations         []string           `json:"limitations"`
+	Available                    bool                        `json:"available"`
+	Status                       string                      `json:"status"`
+	ReasonCode                   string                      `json:"reason_code,omitempty"`
+	PoolAddress                  string                      `json:"pool_address,omitempty"`
+	PoolProgram                  string                      `json:"pool_program,omitempty"`
+	PoolType                     string                      `json:"pool_type,omitempty"`
+	ControlModel                 string                      `json:"control_model,omitempty"`
+	PositionModel                string                      `json:"position_model,omitempty"`
+	PoolCreator                  string                      `json:"pool_creator,omitempty"`
+	CanonicalPool                bool                        `json:"canonical_pool"`
+	TokenMint                    string                      `json:"token_mint,omitempty"`
+	QuoteMint                    string                      `json:"quote_mint,omitempty"`
+	LPMint                       string                      `json:"lp_mint,omitempty"`
+	TokenVault                   string                      `json:"token_vault,omitempty"`
+	QuoteVault                   string                      `json:"quote_vault,omitempty"`
+	ReadSlot                     uint64                      `json:"read_slot,omitempty"`
+	TokenReserve                 float64                     `json:"token_reserve,omitempty"`
+	QuoteReserve                 float64                     `json:"quote_reserve,omitempty"`
+	VirtualQuoteReserve          float64                     `json:"virtual_quote_reserve,omitempty"`
+	EffectiveQuoteReserve        float64                     `json:"effective_quote_reserve,omitempty"`
+	ReserveLiquidityUSD          float64                     `json:"reserve_liquidity_usd,omitempty"`
+	ReserveValueSource           string                      `json:"reserve_value_source,omitempty"`
+	LPSupply                     float64                     `json:"lp_supply,omitempty"`
+	LPSupplySource               string                      `json:"lp_supply_source,omitempty"`
+	BurnedSharePct               float64                     `json:"burned_share_pct,omitempty"`
+	LargestLPHolders             []LPHolderEvidence          `json:"largest_lp_holders"`
+	LockerProgram                string                      `json:"locker_program,omitempty"`
+	LockerAccount                string                      `json:"locker_account,omitempty"`
+	LockedUntil                  *time.Time                  `json:"locked_until,omitempty"`
+	CreatorLPSharePct            float64                     `json:"creator_lp_share_pct,omitempty"`
+	PoolLiquidityRaw             string                      `json:"pool_liquidity_raw,omitempty"`
+	PermanentLockedLiquidityRaw  string                      `json:"permanent_locked_liquidity_raw,omitempty"`
+	PermanentLockedSharePct      float64                     `json:"permanent_locked_share_pct,omitempty"`
+	MovementStatus               string                      `json:"movement_status,omitempty"`
+	MovementWindowSignatures     int                         `json:"movement_window_signatures"`
+	MovementWindowParsed         int                         `json:"movement_window_parsed"`
+	MovementWindowFailures       int                         `json:"movement_window_failures"`
+	LiquidityMovements           []LiquidityMovementEvidence `json:"liquidity_movements"`
+	ObservedAt                   time.Time                   `json:"observed_at"`
+	EvidenceKeys                 []string                    `json:"evidence_keys"`
+	Limitations                  []string                    `json:"limitations"`
 }
 
 type LPHolderEvidence struct {
-	TokenAccount  string  `json:"token_account"`
-	OwnerWallet   string  `json:"owner_wallet,omitempty"`
-	Amount        float64 `json:"amount"`
-	SharePct      float64 `json:"share_pct"`
-	AccountOwner  string  `json:"account_owner,omitempty"`
-	Classification string `json:"classification,omitempty"`
+	TokenAccount   string  `json:"token_account"`
+	OwnerWallet    string  `json:"owner_wallet,omitempty"`
+	Amount         float64 `json:"amount"`
+	SharePct       float64 `json:"share_pct"`
+	AccountOwner   string  `json:"account_owner,omitempty"`
+	Classification string  `json:"classification,omitempty"`
+}
+
+type LiquidityMovementEvidence struct {
+	Kind              string   `json:"kind"`
+	Signature         string   `json:"signature"`
+	Slot              int64    `json:"slot,omitempty"`
+	BlockTime         string   `json:"block_time,omitempty"`
+	ActorWallet       string   `json:"actor_wallet,omitempty"`
+	PoolAddress       string   `json:"pool_address"`
+	Program           string   `json:"program"`
+	TokenDelta        float64  `json:"token_delta,omitempty"`
+	QuoteDelta        float64  `json:"quote_delta,omitempty"`
+	InstructionTypes  []string `json:"instruction_types"`
+	EvidenceKey       string   `json:"evidence_key"`
+	Source            string   `json:"source"`
 }
 
 // JupiterMarketContext is optional context. Provider failure never changes core
