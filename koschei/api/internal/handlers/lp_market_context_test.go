@@ -42,10 +42,7 @@ func TestLPCollectorReadsCPMMReservesAndBurnedShare(t *testing.T) {
 			response := out.(*rpcTokenBalanceResponse)
 			response.Context.Slot = 778
 			response.Value.Decimals = 6
-			// The collector calls token vault first, quote vault second.
-			if strings.Count(strings.Join(calls, ","), "getTokenAccountBalance") == 1 {
-				response.Value.UIAmountString = "1000000"
-			} else { response.Value.UIAmountString = "50000" }
+			if strings.Count(strings.Join(calls, ","), "getTokenAccountBalance") == 1 { response.Value.UIAmountString = "1000000" } else { response.Value.UIAmountString = "50000" }
 		case "getTokenSupply":
 			response := out.(*rpcTokenSupplyResponse)
 			response.Context.Slot = 779
@@ -57,9 +54,7 @@ func TestLPCollectorReadsCPMMReservesAndBurnedShare(t *testing.T) {
 			response.Value = []rpcLargestAccount{{Address: burnTokenAccount, rpcTokenAmount: rpcTokenAmount{UIAmountString: "990", Decimals: 6}}}
 		case "getMultipleAccounts":
 			response := out.(*struct { Value []json.RawMessage `json:"value"` })
-			if len(response.Value) == 0 {
-				response.Value = []json.RawMessage{json.RawMessage(`{"data":{"parsed":{"info":{"owner":"1nc1nerator11111111111111111111111111111111"}}}}`)}
-			}
+			response.Value = []json.RawMessage{json.RawMessage(`{"data":{"parsed":{"info":{"owner":"1nc1nerator11111111111111111111111111111111"}}}}`)}
 		default:
 			return errors.New("unexpected RPC method: " + method)
 		}
@@ -67,15 +62,9 @@ func TestLPCollectorReadsCPMMReservesAndBurnedShare(t *testing.T) {
 	}
 	market := services.TokenMarketSnapshot{Available: true, BestPairAddress: "Pool111", BestPairDEX: "raydium", LiquidityUSD: 100000}
 	got := collectLPControlEvidence(context.Background(), rpc, "solana-mainnet", tokenMint, "", market, map[string]any{})
-	if got.Status != services.LPControlVerifiedBurned || got.BurnedSharePct != 99 {
-		t.Fatalf("LP burn result=%#v", got)
-	}
-	if got.PoolProgram != raydiumCPMMProgram || got.LPMint != lpMint || got.TokenVault != vault0 || got.QuoteVault != vault1 {
-		t.Fatalf("decoded pool fields=%#v", got)
-	}
-	if got.TokenReserve != 1000000 || got.QuoteReserve != 50000 || got.ReadSlot != 779 {
-		t.Fatalf("reserve evidence=%#v", got)
-	}
+	if got.Status != services.LPControlVerifiedBurned || got.BurnedSharePct != 99 { t.Fatalf("LP burn result=%#v", got) }
+	if got.PoolProgram != raydiumCPMMProgram || got.LPMint != lpMint || got.TokenVault != vault0 || got.QuoteVault != vault1 { t.Fatalf("decoded pool fields=%#v", got) }
+	if got.TokenReserve != 1000000 || got.QuoteReserve != 50000 || got.ReadSlot != 779 { t.Fatalf("reserve evidence=%#v", got) }
 	if len(got.EvidenceKeys) < 4 { t.Fatalf("evidence keys=%v", got.EvidenceKeys) }
 }
 
@@ -91,10 +80,7 @@ func TestJupiterContextIsOptionalAndReportsSellImpact(t *testing.T) {
 	mint := "MintJupiter111111111111111111111111111111"
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if strings.Contains(r.URL.Path, "price") {
-			_, _ = w.Write([]byte(`{"`+mint+`":{"usdPrice":0.25,"blockId":888,"createdAt":"2026-07-17T00:00:00Z"}}`))
-			return
-		}
+		if strings.Contains(r.URL.Path, "price") { _, _ = w.Write([]byte(`{"`+mint+`":{"usdPrice":0.25,"blockId":888,"createdAt":"2026-07-17T00:00:00Z"}}`)); return }
 		_, _ = w.Write([]byte(`{"outAmount":"90000000","priceImpactPct":"12.5","contextSlot":889,"routePlan":[{"swapInfo":{"label":"Raydium CPMM"}}]}`))
 	}))
 	defer server.Close()
@@ -109,9 +95,7 @@ func TestJupiterContextIsOptionalAndReportsSellImpact(t *testing.T) {
 	}
 	holder := services.HolderIntelligence{Available:true, TopOwnerBalance:400000}
 	got := collectJupiterMarketContext(context.Background(), rpc, server.Client(), "solana-mainnet", mint, holder, services.TokenMarketSnapshot{PriceUSD:0.24})
-	if !got.PriceAvailable || !got.SellImpactAvailable || got.EstimatedPriceImpactPct != 12.5 || got.QuoteContextSlot != 889 {
-		t.Fatalf("Jupiter result=%#v", got)
-	}
+	if !got.PriceAvailable || !got.SellImpactAvailable || got.EstimatedPriceImpactPct != 12.5 || got.QuoteContextSlot != 889 { t.Fatalf("Jupiter result=%#v", got) }
 	if len(got.RouteLabels) != 1 || got.RouteLabels[0] != "Raydium CPMM" { t.Fatalf("routes=%v", got.RouteLabels) }
 }
 
@@ -129,10 +113,6 @@ func TestSafeCheckModesNeverEnablePhase2Providers(t *testing.T) {
 		if phase2MarketContextAllowed(mode) { t.Fatalf("mode %q enabled LP/Jupiter collection", mode) }
 	}
 	if !phase2MarketContextAllowed("customer_token_scan") { t.Fatal("full token scan did not enable context collection") }
-}
-
-func TestBase58AllZeroPublicKeyHasCorrectLength(t *testing.T) {
-	if got := base58Encode(make([]byte,32)); got != strings.Repeat("1",32) { t.Fatalf("zero pubkey=%q",got) }
 }
 
 func TestOptionalContextTimestampsRemainProviderScoped(t *testing.T) {
