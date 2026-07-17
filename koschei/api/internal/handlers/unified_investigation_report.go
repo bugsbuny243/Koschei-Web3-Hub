@@ -118,6 +118,7 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 			"corpus_percentile_can_change_verdict": false,
 		},
 	}
+	_ = h.persistDossierSourceSnapshot(ctx, report)
 	return unifiedInvestigationAssembly{
 		Report: report, Core: core, DB: db, Store: store, Creator: creator,
 		ActorDossier: actorDossier, ActorTrack: actorTrack, ActorVerdict: actorVerdict,
