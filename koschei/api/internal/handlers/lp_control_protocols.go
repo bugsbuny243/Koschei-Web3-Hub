@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	pumpSwapProgram       = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+	pumpSwapProgram      = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 	meteoraDAMMV2Program = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
 	meteoraDLMMProgram   = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
 )
@@ -21,7 +21,8 @@ const (
 func collectProtocolLPControlEvidence(ctx context.Context, rpc solanaRPCCall, network, mint, creator, pool string) services.LPControlEvidence {
 	out := services.LPControlEvidence{
 		Status: services.LPControlUnverified, PoolAddress: strings.TrimSpace(pool), TokenMint: strings.TrimSpace(mint),
-		ObservedAt: time.Now().UTC(), LargestLPHolders: []services.LPHolderEvidence{},
+		CreatorWallet: strings.TrimSpace(creator),
+		ObservedAt:    time.Now().UTC(), LargestLPHolders: []services.LPHolderEvidence{},
 		LiquidityMovements: []services.LiquidityMovementEvidence{}, EvidenceKeys: []string{}, Limitations: []string{},
 	}
 	if rpc == nil || out.PoolAddress == "" {
@@ -95,7 +96,9 @@ func decodePumpSwapLPControl(ctx context.Context, rpc solanaRPCCall, network, cr
 			out.EvidenceKeys = append(out.EvidenceKeys, "pumpswap_virtual_quote_reserve:"+virtualRaw.String())
 		}
 	}
-	if out.EffectiveQuoteReserve == 0 { out.EffectiveQuoteReserve = out.QuoteReserve }
+	if out.EffectiveQuoteReserve == 0 {
+		out.EffectiveQuoteReserve = out.QuoteReserve
+	}
 	if out.CanonicalPool && out.BurnedSharePct == 0 {
 		out.Limitations = append(out.Limitations, "Canonical pool identity does not by itself prove the current LP burn share; the reported share comes only from resolved LP-token holders.")
 	}
@@ -187,38 +190,58 @@ func populatePositionPoolReserves(ctx context.Context, rpc solanaRPCCall, networ
 	var tokenReserve, quoteReserve rpcTokenBalanceResponse
 	if err := rpc(ctx, network, "getTokenAccountBalance", []any{out.TokenVault, map[string]any{"commitment": "confirmed"}}, &tokenReserve); err == nil {
 		out.TokenReserve = tokenReserve.Value.number()
-		if tokenReserve.Context.Slot > out.ReadSlot { out.ReadSlot = tokenReserve.Context.Slot }
-	} else { out.Limitations = append(out.Limitations, "The token vault reserve could not be read.") }
+		if tokenReserve.Context.Slot > out.ReadSlot {
+			out.ReadSlot = tokenReserve.Context.Slot
+		}
+	} else {
+		out.Limitations = append(out.Limitations, "The token vault reserve could not be read.")
+	}
 	if err := rpc(ctx, network, "getTokenAccountBalance", []any{out.QuoteVault, map[string]any{"commitment": "confirmed"}}, &quoteReserve); err == nil {
 		out.QuoteReserve = quoteReserve.Value.number()
 		out.EffectiveQuoteReserve = out.QuoteReserve
-		if quoteReserve.Context.Slot > out.ReadSlot { out.ReadSlot = quoteReserve.Context.Slot }
-	} else { out.Limitations = append(out.Limitations, "The quote vault reserve could not be read.") }
+		if quoteReserve.Context.Slot > out.ReadSlot {
+			out.ReadSlot = quoteReserve.Context.Slot
+		}
+	} else {
+		out.Limitations = append(out.Limitations, "The quote vault reserve could not be read.")
+	}
 	return out
 }
 
 func tokenMintDecimals(ctx context.Context, rpc solanaRPCCall, network, mint string) int {
-	if rpc == nil || strings.TrimSpace(mint) == "" { return 0 }
+	if rpc == nil || strings.TrimSpace(mint) == "" {
+		return 0
+	}
 	var supply rpcTokenSupplyResponse
-	if rpc(ctx, network, "getTokenSupply", []any{mint, map[string]any{"commitment": "confirmed"}}, &supply) != nil { return 0 }
+	if rpc(ctx, network, "getTokenSupply", []any{mint, map[string]any{"commitment": "confirmed"}}, &supply) != nil {
+		return 0
+	}
 	return supply.Value.Decimals
 }
 
 func unsignedLittleEndian128(data []byte) *big.Int {
-	if len(data) < 16 { return new(big.Int) }
+	if len(data) < 16 {
+		return new(big.Int)
+	}
 	reversed := make([]byte, 16)
-	for i := 0; i < 16; i++ { reversed[15-i] = data[i] }
+	for i := 0; i < 16; i++ {
+		reversed[15-i] = data[i]
+	}
 	return new(big.Int).SetBytes(reversed)
 }
 
 func signedLittleEndian128(data []byte) *big.Int {
 	value := unsignedLittleEndian128(data)
-	if len(data) >= 16 && data[15]&0x80 != 0 { value.Sub(value, new(big.Int).Lsh(big.NewInt(1), 128)) }
+	if len(data) >= 16 && data[15]&0x80 != 0 {
+		value.Sub(value, new(big.Int).Lsh(big.NewInt(1), 128))
+	}
 	return value
 }
 
 func scaleBigInteger(value *big.Int, decimals int) float64 {
-	if value == nil || value.Sign() <= 0 { return 0 }
+	if value == nil || value.Sign() <= 0 {
+		return 0
+	}
 	denominator := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(decimals)), nil)
 	result, _ := new(big.Rat).SetFrac(value, denominator).Float64()
 	return creatorIntelRound(result, 8)

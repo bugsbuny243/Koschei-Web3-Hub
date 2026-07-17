@@ -54,6 +54,9 @@ func resetSolanaRPCBudgetForTest() {
 }
 
 func SolanaRPCLimitSaverEnabled() bool {
+	if OwnerUnlimitedAutomaticScanningEnabled() {
+		return false
+	}
 	raw := strings.TrimSpace(os.Getenv("SOLANA_RPC_LIMIT_SAVER_ENABLED"))
 	if raw != "" {
 		enabled, err := strconv.ParseBool(raw)
@@ -65,10 +68,16 @@ func SolanaRPCLimitSaverEnabled() bool {
 }
 
 func ForceBackgroundRadarEnabled() bool {
+	if OwnerUnlimitedAutomaticScanningEnabled() {
+		return true
+	}
 	return envBool("KOSCHEI_AUTO_RADAR_FORCE_BACKGROUND") || envBool("RADAR_STREAM_FORCE_ENABLED") || envBool("ARVIS_BACKGROUND_RPC_ENRICHMENT_ENABLED")
 }
 
 func solanaRPCBudgetEnabled() bool {
+	if OwnerUnlimitedAutomaticScanningEnabled() {
+		return false
+	}
 	raw := strings.TrimSpace(os.Getenv("SOLANA_RPC_BUDGET_ENABLED"))
 	if raw != "" {
 		enabled, err := strconv.ParseBool(raw)

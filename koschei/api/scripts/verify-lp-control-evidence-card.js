@@ -10,10 +10,11 @@ const pump=card.render({lp_control:{
   pool_address:'PumpPool111',pool_program:'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',read_slot:900,canonical_pool:true,
   token_vault:'TokenVault111',quote_vault:'QuoteVault111',token_reserve:2000,quote_reserve:100,virtual_quote_reserve:5,
   reserve_liquidity_usd:4000,lp_mint:'LPMint111',lp_supply:1000,burned_share_pct:90,creator_lp_share_pct:0,
+	creator_relation:'verified_pool_creator',dominant_lp_owner:'LPControlOwner111',dominant_lp_share_pct:90,dominant_lp_classification:'burn_address',
   movement_status:'observed',movement_window_signatures:20,movement_window_parsed:12,movement_window_failures:0,
-  liquidity_movements:[{kind:'remove_liquidity',signature:'RemoveLiquiditySignature111',slot:901,block_time:'2026-07-17T18:00:00Z',actor_wallet:'Actor111',token_delta:-50,quote_delta:-10}]
+  liquidity_movements:[{kind:'remove_liquidity',signature:'RemoveLiquiditySignature111',slot:901,block_time:'2026-07-17T18:00:00Z',actor_wallet:'Actor111',creator_relation:'verified_pool_creator_signer',verification_status:'VERIFIED',token_delta:-50,quote_delta:-10}]
 }},{lang:'tr'});
-for(const expected of ['LİKİDİTE KONTROL KANITI','pumpswap_amm','PumpPool','TokenVault','90%','REMOVE LIQUIDITY','RemoveLiquidity','slot 901']){
+for(const expected of ['LİKİDİTE KONTROL KANITI','pumpswap_amm','PumpPool','TokenVault','90%','Dominant LP owner','LPControlOwner','verified_pool_creator','REMOVE LIQUIDITY','VERIFIED','RemoveLiquidity','slot 901']){
   if(!pump.includes(expected))throw new Error(`PumpSwap card missing: ${expected}`);
 }
 if(pump.includes('veri yok')||pump.includes('analiz yapılmadı'))throw new Error('empty narrative leaked into LP card');
