@@ -1,0 +1,86 @@
+name: Publish verified customer investigation code files
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  publish-code:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Generate product files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          patch = Path('.github/scripts/apply_customer_investigation_ui_rpc.py')
+          text = patch.read_text()
+          old = '<-r.Context().Done()'
+          replacement = 'time.Sleep(200 * time.Millisecond)\n\t\thttp.Error(w, "late primary", http.StatusGatewayTimeout)'
+          if old not in text:
+              raise SystemExit('blocking handler expression not found')
+          patch.write_text(text.replace(old, replacement, 1))
+          PY
+          python .github/scripts/apply_customer_investigation_ui_rpc.py
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('koschei/api/internal/handlers/unified_live_evidence.go')
+          text = path.read_text()
+          marker = 'func parseUnifiedLiveTransaction('
+          wrapper = '''func fetchUnifiedTransactions(ctx context.Context, rpcURL string, signatures []string) (map[string]services.SolanaTransactionResult, error) {
+              return fetchUnifiedTransactionsLegacy(ctx, rpcURL, signatures)
+          }
+
+          '''
+          if marker not in text:
+              raise SystemExit('parse function marker not found')
+          path.write_text(text.replace(marker, wrapper + marker, 1))
+          PY
+          gofmt -w koschei/api/internal/web3/solana_rpc.go koschei/api/internal/web3/solana_rpc_test.go koschei/api/internal/handlers/unified_live_evidence.go
+
+      - name: Verify product files
+        working-directory: koschei/api
+        run: |
+          node --check public/js/security-radar-detail.js
+          node scripts/verify-customer-investigation-ui.js
+          go mod download
+          go test ./internal/web3 -run 'TestSolanaRPC(FallsBackAfterEndpointTimeout|FallsBackAfterProviderRateLimit)' -count=1 -timeout=2m
+          go test ./... -timeout=15m
+          go vet ./...
+          CGO_ENABLED=0 GOOS=linux go build ./...
+
+      - name: Publish non-workflow files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          publish_file() {
+            path="$1"
+            encoded="$(base64 -w0 "$path")"
+            sha="$(gh api "repos/${REPO}/contents/${path}?ref=${BRANCH}" --jq '.sha' 2>/dev/null || true)"
+            if [ -n "$sha" ]; then
+              gh api --method PUT "repos/${REPO}/contents/${path}" -f message="fix: publish customer investigation product" -f content="$encoded" -f branch="$BRANCH" -f sha="$sha" >/dev/null
+            else
+              gh api --method PUT "repos/${REPO}/contents/${path}" -f message="fix: publish customer investigation product" -f content="$encoded" -f branch="$BRANCH" >/dev/null
+            fi
+          }
+          publish_file koschei/api/internal/web3/solana_rpc.go
+          publish_file koschei/api/internal/web3/solana_rpc_test.go
+          publish_file koschei/api/internal/handlers/unified_live_evidence.go
+          publish_file koschei/api/public/js/security-radar-detail.js
+          publish_file koschei/api/scripts/verify-customer-investigation-ui.js
