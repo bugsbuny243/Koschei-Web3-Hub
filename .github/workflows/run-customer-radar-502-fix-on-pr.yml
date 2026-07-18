@@ -22,27 +22,8 @@ jobs:
         with:
           go-version-file: koschei/api/go.mod
 
-      - name: Execute prepared patch
-        shell: python
-        run: |
-          from pathlib import Path
-          import subprocess
-          import sys
-          import traceback
-
-          try:
-              subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', 'pyyaml'])
-              import yaml
-              source = Path('.github/workflows/apply-customer-radar-502-fix.yml')
-              workflow = yaml.safe_load(source.read_text())
-              steps = workflow['jobs']['patch-and-test']['steps']
-              script = next(step['run'] for step in steps if step.get('name') == 'Apply handler fix')
-              Path('workflow-patch-error.txt').unlink(missing_ok=True)
-              exec(compile(script, str(source), 'exec'), {'__name__': '__main__'})
-              Path('.github/workflows/run-customer-radar-502-fix-on-pr.yml').unlink()
-          except Exception:
-              Path('workflow-patch-error.txt').write_text(traceback.format_exc())
-              raise
+      - name: Execute deterministic patch
+        run: python scripts/apply_customer_radar_502_fix.py
 
       - name: Format changed Go files
         run: gofmt -w internal/handlers/security_radar.go internal/handlers/security_radar_court.go internal/handlers/customer_investigation_response.go internal/handlers/customer_investigation_response_test.go
@@ -58,14 +39,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "fix: return customer investigation instead of 502"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
-
-      - name: Commit diagnostic
-        if: failure()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add workflow-patch-error.txt
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "chore: capture customer radar patch failure"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
