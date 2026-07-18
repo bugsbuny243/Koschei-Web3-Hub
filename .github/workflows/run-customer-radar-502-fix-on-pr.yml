@@ -27,15 +27,20 @@ jobs:
         run: |
           from pathlib import Path
           import textwrap
+          import traceback
 
-          source = Path('.github/workflows/apply-customer-radar-502-fix.yml')
-          text = source.read_text()
-          marker = '      - name: Apply handler fix\n        shell: python\n        run: |\n'
-          start = text.index(marker) + len(marker)
-          end = text.index('\n      - name: Format changed Go files', start)
-          script = textwrap.dedent(text[start:end])
-          exec(compile(script, str(source), 'exec'), {'__name__': '__main__'})
-          Path('.github/workflows/run-customer-radar-502-fix-on-pr.yml').unlink()
+          try:
+              source = Path('.github/workflows/apply-customer-radar-502-fix.yml')
+              text = source.read_text()
+              marker = '      - name: Apply handler fix\n        shell: python\n        run: |\n'
+              start = text.index(marker) + len(marker)
+              end = text.index('\n      - name: Format changed Go files', start)
+              script = textwrap.dedent(text[start:end])
+              exec(compile(script, str(source), 'exec'), {'__name__': '__main__'})
+              Path('.github/workflows/run-customer-radar-502-fix-on-pr.yml').unlink()
+          except Exception:
+              Path('workflow-patch-error.txt').write_text(traceback.format_exc())
+              raise
 
       - name: Format changed Go files
         run: gofmt -w internal/handlers/security_radar.go internal/handlers/security_radar_court.go internal/handlers/customer_investigation_response.go internal/handlers/customer_investigation_response_test.go
@@ -51,4 +56,14 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "fix: return customer investigation instead of 502"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+
+      - name: Commit diagnostic
+        if: failure()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add workflow-patch-error.txt
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: capture customer radar patch failure"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
