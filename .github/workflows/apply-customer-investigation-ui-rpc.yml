@@ -1,21 +1,21 @@
 name: Apply customer investigation UI and RPC resilience
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/customer-investigation-ui-rpc-resilience
+      - main
 
 permissions:
   contents: write
 
 jobs:
   apply-and-verify:
-    if: github.actor != 'github-actions[bot]'
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: fix/customer-investigation-ui-rpc-resilience
+          ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
       - uses: actions/setup-go@v5
@@ -61,7 +61,7 @@ jobs:
       - name: Commit verified changes
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "4189822+github-actions[bot]@users.noreply.github.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "fix: render customer investigation and harden RPC fallback"
-          git push origin HEAD:fix/customer-investigation-ui-rpc-resilience
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
