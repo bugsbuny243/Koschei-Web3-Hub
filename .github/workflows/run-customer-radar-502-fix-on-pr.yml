@@ -26,16 +26,18 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
-          import textwrap
+          import subprocess
+          import sys
           import traceback
 
           try:
+              subprocess.check_call([sys.executable, '-m', 'pip', 'install', '--quiet', 'pyyaml'])
+              import yaml
               source = Path('.github/workflows/apply-customer-radar-502-fix.yml')
-              text = source.read_text()
-              marker = '      - name: Apply handler fix\n        shell: python\n        run: |\n'
-              start = text.index(marker) + len(marker)
-              end = text.index('\n      - name: Format changed Go files', start)
-              script = textwrap.dedent(text[start:end])
+              workflow = yaml.safe_load(source.read_text())
+              steps = workflow['jobs']['patch-and-test']['steps']
+              script = next(step['run'] for step in steps if step.get('name') == 'Apply handler fix')
+              Path('workflow-patch-error.txt').unlink(missing_ok=True)
               exec(compile(script, str(source), 'exec'), {'__name__': '__main__'})
               Path('.github/workflows/run-customer-radar-502-fix-on-pr.yml').unlink()
           except Exception:
