@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/runner/work/_temp/232c87ff-294f-4450-8f7a-013a151e64e9.py", line 12, in <module>
+    exec(compile(script, str(source), 'exec'), {'__name__': '__main__'})
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ".github/workflows/apply-customer-radar-502-fix.yml", line 1
+    name: Apply customer Radar 502 fix
+             ^
+IndentationError: unexpected indent
