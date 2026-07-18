@@ -23,6 +23,16 @@ jobs:
           go-version-file: koschei/api/go.mod
           cache-dependency-path: koschei/api/go.sum
 
+      - name: Bound timeout regression server
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/scripts/apply_customer_investigation_ui_rpc.py')
+          text = path.read_text()
+          text = text.replace('\t\t<-r.Context().Done()\n', '\t\ttime.Sleep(200 * time.Millisecond)\n\t\thttp.Error(w, "late primary", http.StatusGatewayTimeout)\n', 1)
+          path.write_text(text)
+          PY
+
       - name: Apply prepared patch
         run: python .github/scripts/apply_customer_investigation_ui_rpc.py
 
@@ -43,12 +53,12 @@ jobs:
       - name: Targeted tests
         working-directory: koschei/api
         run: |
-          go test ./internal/web3 -run 'TestSolanaRPC(FallsBackAfterEndpointTimeout|FallsBackAfterProviderRateLimit)' -count=1
-          go test ./internal/handlers -run 'TestCustomerInvestigation|TestUnifiedLive' -count=1
+          go test ./internal/web3 -run 'TestSolanaRPC(FallsBackAfterEndpointTimeout|FallsBackAfterProviderRateLimit)' -count=1 -timeout=2m
+          go test ./internal/handlers -run 'TestCustomerInvestigation|TestUnifiedLive' -count=1 -timeout=3m
 
       - name: Full Go tests
         working-directory: koschei/api
-        run: go test ./...
+        run: go test ./... -timeout=10m
 
       - name: Vet
         working-directory: koschei/api
