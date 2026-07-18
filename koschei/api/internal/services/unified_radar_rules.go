@@ -15,14 +15,15 @@ import (
 const UnifiedRadarRulesetVersion = "koschei-unified-radar-rules-v1.0.0"
 
 const (
-	UnifiedRuleVolumeLiquidityGap       = "URD-C001"
-	UnifiedRuleHolderLiquidityPressure = "URD-C002"
-	UnifiedRuleCreatorSellAcceleration = "URD-C003"
-	UnifiedRuleDominantHolderFirstExit = "URD-C004"
+	UnifiedRuleVolumeLiquidityGap              = "URD-C001"
+	UnifiedRuleHolderLiquidityPressure         = "URD-C002"
+	UnifiedRuleCreatorSellAcceleration         = "URD-C003"
+	UnifiedRuleDominantHolderFirstExit         = "URD-C004"
+	UnifiedRuleCrossTokenCreatorHolderTransfer = "URD-C006"
 )
 
 const (
-	UnifiedVolumeLiquidityGapRatio       = 8.0
+	UnifiedVolumeLiquidityGapRatio      = 8.0
 	UnifiedHolderLiquidityPressureRatio = 0.50
 	UnifiedCreatorSellAccelerationRatio = 2.0
 	UnifiedCreatorSellMinimumCount      = 2
@@ -51,19 +52,19 @@ type CreatorSellAcceleration struct {
 }
 
 type UnifiedRadarSignal struct {
-	RuleID             string         `json:"rule_id"`
-	Title              string         `json:"title"`
-	EvidenceStatus     string         `json:"evidence_status"`
-	Triggered          bool           `json:"triggered"`
-	GradeEffect        string         `json:"grade_effect"`
-	Scope              string         `json:"scope"`
-	Summary            string         `json:"summary"`
-	Metrics            map[string]any `json:"metrics"`
-	Thresholds         map[string]any `json:"thresholds"`
-	EvidenceKeys       []string       `json:"evidence_keys"`
-	Signatures         []string       `json:"signatures"`
-	ObservedAt         time.Time      `json:"observed_at"`
-	Limitations        []string       `json:"limitations"`
+	RuleID         string         `json:"rule_id"`
+	Title          string         `json:"title"`
+	EvidenceStatus string         `json:"evidence_status"`
+	Triggered      bool           `json:"triggered"`
+	GradeEffect    string         `json:"grade_effect"`
+	Scope          string         `json:"scope"`
+	Summary        string         `json:"summary"`
+	Metrics        map[string]any `json:"metrics"`
+	Thresholds     map[string]any `json:"thresholds"`
+	EvidenceKeys   []string       `json:"evidence_keys"`
+	Signatures     []string       `json:"signatures"`
+	ObservedAt     time.Time      `json:"observed_at"`
+	Limitations    []string       `json:"limitations"`
 }
 
 type UnifiedRadarBehaviorReport struct {
@@ -79,17 +80,17 @@ type UnifiedRadarBehaviorReport struct {
 }
 
 type UnifiedRadarVerdict struct {
-	Grade          string                `json:"grade"`
-	Verdict        string                `json:"verdict"`
-	RulesetVersion string                `json:"ruleset_version"`
-	ActorRuleset   string                `json:"actor_ruleset_version"`
-	TriggeredRules []ActorDefenseRuleHit `json:"triggered_rules"`
-	WatchFlags     []ActorDefenseRuleHit `json:"watch_flags"`
-	DecisionPath   []string              `json:"decision_path"`
-	NarrativeSource string               `json:"narrative_source"`
-	Signed         bool                  `json:"signed"`
-	Signature      string                `json:"signature,omitempty"`
-	GeneratedAt    time.Time             `json:"generated_at"`
+	Grade           string                `json:"grade"`
+	Verdict         string                `json:"verdict"`
+	RulesetVersion  string                `json:"ruleset_version"`
+	ActorRuleset    string                `json:"actor_ruleset_version"`
+	TriggeredRules  []ActorDefenseRuleHit `json:"triggered_rules"`
+	WatchFlags      []ActorDefenseRuleHit `json:"watch_flags"`
+	DecisionPath    []string              `json:"decision_path"`
+	NarrativeSource string                `json:"narrative_source"`
+	Signed          bool                  `json:"signed"`
+	Signature       string                `json:"signature,omitempty"`
+	GeneratedAt     time.Time             `json:"generated_at"`
 }
 
 func LoadCreatorSellAcceleration(ctx context.Context, db *sql.DB, mint, creator string, now time.Time) CreatorSellAcceleration {
@@ -255,8 +256,8 @@ func unifiedVolumeLiquiditySignal(mint string, market TokenMarketSnapshot, now t
 	signal := UnifiedRadarSignal{
 		RuleID: UnifiedRuleVolumeLiquidityGap, Title: "24h volume / liquidity gap",
 		EvidenceStatus: "unverified", GradeEffect: "none", Scope: "market_snapshot",
-		Metrics: map[string]any{"volume_24h_usd": market.Volume24hUSD, "liquidity_usd": market.LiquidityUSD},
-		Thresholds: map[string]any{"minimum_ratio": UnifiedVolumeLiquidityGapRatio},
+		Metrics:      map[string]any{"volume_24h_usd": market.Volume24hUSD, "liquidity_usd": market.LiquidityUSD},
+		Thresholds:   map[string]any{"minimum_ratio": UnifiedVolumeLiquidityGapRatio},
 		EvidenceKeys: []string{}, Signatures: []string{}, Limitations: []string{}, ObservedAt: now,
 	}
 	if !market.Available || market.LiquidityUSD <= 0 {
@@ -285,8 +286,8 @@ func unifiedHolderLiquiditySignal(mint string, market TokenMarketSnapshot, holde
 	signal := UnifiedRadarSignal{
 		RuleID: UnifiedRuleHolderLiquidityPressure, Title: "Dominant-holder position / liquidity depth",
 		EvidenceStatus: "unverified", GradeEffect: "none", Scope: "owner_aggregated_holder_value_vs_reported_liquidity",
-		Metrics: map[string]any{"liquidity_usd": market.LiquidityUSD, "top_holder_percentage": holder.TopOwnerPercentage},
-		Thresholds: map[string]any{"minimum_position_to_liquidity_ratio": UnifiedHolderLiquidityPressureRatio},
+		Metrics:      map[string]any{"liquidity_usd": market.LiquidityUSD, "top_holder_percentage": holder.TopOwnerPercentage},
+		Thresholds:   map[string]any{"minimum_position_to_liquidity_ratio": UnifiedHolderLiquidityPressureRatio},
 		EvidenceKeys: []string{}, Signatures: []string{}, Limitations: []string{}, ObservedAt: now,
 	}
 	if !holder.Available || market.LiquidityUSD <= 0 {
@@ -337,8 +338,8 @@ func unifiedCreatorSellSignal(mint, creator string, sales CreatorSellAcceleratio
 		},
 		Thresholds: map[string]any{
 			"recent_window_minutes": 60, "baseline_window_hours": 6,
-			"minimum_recent_sell_count": UnifiedCreatorSellMinimumCount,
-			"minimum_recent_sell_sol": UnifiedCreatorSellMinimumSOL,
+			"minimum_recent_sell_count":     UnifiedCreatorSellMinimumCount,
+			"minimum_recent_sell_sol":       UnifiedCreatorSellMinimumSOL,
 			"minimum_acceleration_multiple": UnifiedCreatorSellAccelerationRatio,
 		},
 		EvidenceKeys: []string{}, Signatures: append([]string{}, sales.Signatures...),
@@ -456,6 +457,15 @@ func unifiedSignalEvidence(creator, mint string, signal UnifiedRadarSignal) (Act
 	if slot, ok := unifiedInt64(signal.Metrics["slot"]); ok {
 		item.Slot = slot
 	}
+	if signal.RuleID == UnifiedRuleCrossTokenCreatorHolderTransfer {
+		item.TokenAmount, _ = unifiedFloat64(signal.Metrics["amount"])
+		if item.Metadata == nil {
+			item.Metadata = map[string]any{}
+		}
+		item.Metadata["source_wallet"] = unifiedMetricString(signal.Metrics, "source_wallet")
+		item.Metadata["destination_wallet"] = unifiedMetricString(signal.Metrics, "destination_wallet")
+		item.Metadata["program"] = unifiedMetricString(signal.Metrics, "program")
+	}
 	return item, true
 }
 
@@ -469,6 +479,8 @@ func unifiedSignalRelation(ruleID string) string {
 		return "creator_sell_acceleration"
 	case UnifiedRuleDominantHolderFirstExit:
 		return "dominant_holder_first_exit"
+	case UnifiedRuleCrossTokenCreatorHolderTransfer:
+		return "cross_token_creator_holder_transfer"
 	default:
 		return "unified_radar_observation"
 	}
@@ -515,6 +527,21 @@ func unifiedInt64(value any) (int64, bool) {
 		return int64(typed), true
 	case float64:
 		return int64(typed), true
+	default:
+		return 0, false
+	}
+}
+
+func unifiedFloat64(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return typed, true
+	case float32:
+		return float64(typed), true
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
 	default:
 		return 0, false
 	}

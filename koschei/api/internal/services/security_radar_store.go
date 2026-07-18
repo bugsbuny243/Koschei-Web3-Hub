@@ -458,3 +458,46 @@ func (s *SecurityRadarStore) repeatDominantHolderMatches(ctx context.Context, ow
 	}
 	return out, rows.Err()
 }
+
+func (s *SecurityRadarStore) RepeatDominantHolderMatchesExceptMint(ctx context.Context, owner, currentMint string, windowDays int) ([]RepeatDominantHolderMatch, error) {
+	owner = strings.TrimSpace(owner)
+	currentMint = strings.TrimSpace(currentMint)
+	if windowDays <= 0 {
+		windowDays = RepeatDominantObservationDays
+	}
+	if s == nil || s.DB == nil {
+		return nil, fmt.Errorf("security radar database is unavailable")
+	}
+	if owner == "" {
+		return nil, fmt.Errorf("owner wallet is required")
+	}
+	rows, err := s.DB.QueryContext(ctx, `
+        WITH latest AS (
+            SELECT DISTINCT ON (target)
+                target, percentage, holder_rank, scanned_at
+            FROM security_radar_holder_snapshots
+            WHERE owner_wallet=$1
+              AND target <> $2
+              AND holder_rank BETWEEN 1 AND 5
+              AND scanned_at >= now() - make_interval(days => $3)
+            ORDER BY target, scanned_at DESC, id DESC
+        )
+        SELECT target, percentage, holder_rank, scanned_at
+        FROM latest
+        ORDER BY percentage DESC, scanned_at DESC`, owner, currentMint, windowDays)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []RepeatDominantHolderMatch{}
+	for rows.Next() {
+		var item RepeatDominantHolderMatch
+		var scannedAt time.Time
+		if err := rows.Scan(&item.Mint, &item.Percentage, &item.Rank, &scannedAt); err != nil {
+			return nil, err
+		}
+		item.ScannedAt = scannedAt.UTC().Format(time.RFC3339)
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
