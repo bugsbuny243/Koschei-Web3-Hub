@@ -33,6 +33,68 @@
     try { return JSON.stringify(value ?? {}, null, 2); } catch { return '{}'; }
   };
 
+  function gradeTone(final = {}) {
+    if (final.signed !== true) return 'unknown';
+    const grade = String(final.grade || '').toUpperCase();
+    if (['D', 'E', 'F'].includes(grade)) return 'bad';
+    if (['C', 'C-', 'D+'].includes(grade)) return 'warn';
+    return 'good';
+  }
+
+  function normalizeCustomerInvestigation(envelope, target) {
+    const report = envelope?.investigation_report;
+    if (!report || typeof report !== 'object' || Array.isArray(report)) return null;
+    const final = report.final_verdict || envelope.final_verdict || {};
+    const behaviorSignals = Array.isArray(report.behavior_signals?.signals) ? report.behavior_signals.signals : [];
+    const triggered = Array.isArray(final.triggered_rules) ? final.triggered_rules : [];
+    const pathways = Array.isArray(report.threat_anticipation?.pathways) ? report.threat_anticipation.pathways : [];
+    const reasons = triggered.map(item => item.summary || item.title || item.rule_id).filter(Boolean);
+    if (!reasons.length) reasons.push(...behaviorSignals.filter(item => item.triggered === true).map(item => item.summary || item.title).filter(Boolean));
+    const positives = pathways.filter(item => item.status === 'closed').map(item => item.summary || item.label).filter(Boolean);
+    return {
+      ...report,
+      target: report.target || target,
+      final_verdict: final,
+      customer_scan_status: envelope.status || (final.signed ? 'ready' : 'evidence_pending'),
+      customer_scan_message: envelope.message || '',
+      has_live_evidence: envelope.has_live_evidence === true,
+      charged: envelope.charged === true,
+      warning: report.warning || {
+        label: envelope.status === 'evidence_pending' ? 'KANIT EKSİKLERİYLE TAMAMLANDI' : 'KOSCHEI UNIFIED VERDICT',
+        reasons,
+        positive_signals: positives,
+        interpretation: envelope.message || 'Koschei kanıtı, karşı kanıtı ve eksik delilleri birlikte raporlar; niyet veya gerçek kişi kimliği iddiası üretmez.'
+      }
+    };
+  }
+
+  function investigationStatusPanel(data) {
+    const status = String(data.customer_scan_status || '').toLowerCase();
+    if (!status) return '';
+    const pending = status === 'evidence_pending';
+    return `<section class="creator-warning"><span class="eyebrow">KOSCHEI SORUŞTURMA DURUMU</span><h3>${pending ? 'Kanıt boşlukları var — güvenli hükmü verilmedi' : 'Birleşik soruşturma tamamlandı'}</h3><p>${esc(data.customer_scan_message || (pending ? 'Erişilemeyen kaynaklar açıkça eksik delil olarak tutuldu.' : 'İmzalı deterministik hüküm ve kanıt dosyası hazırlandı.'))}</p><div class="actions"><span class="pill ${pending ? 'amber' : 'green'}">${esc(status.toUpperCase())}</span><span class="pill ${data.has_live_evidence ? 'green' : 'amber'}">CANLI KANIT ${data.has_live_evidence ? 'VAR' : 'KISMİ/YOK'}</span><span class="pill">${data.charged ? 'HAK KULLANILDI' : 'ÜCRETLENDİRİLMEDİ'}</span></div></section>`;
+  }
+
+  function lpControlPanel(lp) {
+    if (!lp || typeof lp !== 'object') return '';
+    const holders = Array.isArray(lp.largest_lp_holders) ? lp.largest_lp_holders : [];
+    const limitations = Array.isArray(lp.limitations) ? lp.limitations : [];
+    return `<section class="panel full"><span class="eyebrow">LP CONTROL DOSYASI</span><h3>Likidite kimin kontrolünde?</h3><section class="statgrid"><article class="stat"><label>Durum</label><strong>${esc(lp.status || 'unverified')}</strong><small>${esc(lp.reason_code || 'kanıt kodu yok')}</small></article><article class="stat"><label>Havuz</label><strong>${esc(short(lp.pool_address))}</strong><small>${esc(lp.pool_type || lp.pool_program || 'program çözülemedi')}</small></article><article class="stat"><label>Creator LP payı</label><strong>%${num(lp.creator_lp_share_pct, 4)}</strong><small>owner-resolved LP</small></article><article class="stat"><label>Yakılmış LP</label><strong>%${num(lp.burned_share_pct, 4)}</strong><small>${lp.locked_until ? `kilit: ${esc(lp.locked_until)}` : 'unlock doğrulanmadı'}</small></article></section><div class="two-col"><article class="panel"><h3>Rezervler</h3><div class="mini"><span>Token rezervi</span><b>${num(lp.token_reserve, 6)}</b></div><div class="mini"><span>Quote rezervi</span><b>${num(lp.quote_reserve, 6)}</b></div><div class="mini"><span>Doğrudan rezerv değeri</span><b>${money(lp.reserve_liquidity_usd)}</b></div></article><article class="panel"><h3>En büyük LP sahipleri</h3>${holders.length ? `<div class="account-list">${holders.slice(0, 8).map((item, index) => `<div class="account-row"><b>#${index + 1}</b><code>${esc(short(item.owner_wallet || item.token_account))}</code><span>${esc(item.classification || 'holder')}</span><strong>%${num(item.share_pct, 4)}</strong></div>`).join('')}</div>` : '<div class="empty">LP holder sahipliği doğrulanamadı.</div>'}</article></div>${limitations.length ? `<details><summary>LP delil sınırları</summary><ul>${limitations.map(item => `<li>${esc(item)}</li>`).join('')}</ul></details>` : ''}</section>`;
+  }
+
+  function behaviorPanel(behavior) {
+    const signals = Array.isArray(behavior?.signals) ? behavior.signals : [];
+    if (!signals.length) return '';
+    return `<section class="panel full"><span class="eyebrow">İDDİA VE KARŞI KANIT MATRİSİ</span><h3>Deterministik davranış kuralları</h3><div class="insights">${signals.map(item => `<div class="insight ${item.triggered ? 'bad' : item.evidence_status === 'observed' ? 'good' : ''}"><div class="actions"><span class="pill ${item.triggered ? 'red' : 'green'}">${item.triggered ? 'TETİKLENDİ' : 'TETİKLENMEDİ'}</span><span class="pill violet">${esc(item.rule_id || item.evidence_status || 'rule')}</span></div><b>${esc(item.title || item.rule_id)}</b><p>${esc(item.summary || '')}</p></div>`).join('')}</div></section>`;
+  }
+
+  function liveEvidencePanel(live) {
+    if (!live || typeof live !== 'object') return '';
+    const transactions = Array.isArray(live.transactions) ? live.transactions : [];
+    const limitations = Array.isArray(live.limitations) ? live.limitations : [];
+    return `<section class="panel full"><span class="eyebrow">CANLI İŞLEM DELİLİ</span><h3>Creator ve risk-bearing holder hareketleri</h3><section class="statgrid"><article class="stat"><label>Cüzdan</label><strong>${num(live.wallets_completed, 0)}/${num(live.wallets_requested, 0)}</strong><small>${esc(live.status || 'unknown')}</small></article><article class="stat"><label>İmza</label><strong>${num(live.signatures_seen, 0)}</strong><small>bounded recent window</small></article><article class="stat"><label>Parse edilen işlem</label><strong>${num(live.transactions_parsed, 0)}</strong><small>JSON parsed</small></article><article class="stat"><label>İlgili hareket</label><strong>${num(live.relevant_transactions, 0)}</strong><small>RPC hata: ${num(live.rpc_failures, 0)}</small></article></section>${transactions.length ? `<div class="evidence-list">${transactions.map(item => `<div class="evidence-row verified"><b>${esc(item.direction || 'transfer')}</b><span>${esc(short(item.wallet))} · ${num(item.token_delta, 6)} token · ${esc(item.role || '')}</span><small>${esc(short(item.signature))}</small></div>`).join('')}</div>` : '<div class="empty">Sınırlı pencerede ilgili token hareketi alınamadı; bu, eski hareket olmadığı anlamına gelmez.</div>'}${limitations.length ? `<details><summary>Canlı tarama sınırları</summary><ul>${limitations.map(item => `<li>${esc(item)}</li>`).join('')}</ul></details>` : ''}</section>`;
+  }
+
   const state = { cards: new Map(), access: false, currentTarget: '' };
 
   async function api(path, options = {}) {
@@ -210,7 +272,11 @@
     const modules = Array.isArray(data.modules) ? data.modules : [];
     const graph = data.graph || {};
     const signals = final.signals || fallbackItem.signals || {};
-    const risk = Number(final.risk_index ?? fallbackItem.risk_index ?? 0);
+    const rawRisk = final.risk_index ?? fallbackItem.risk_index;
+    const hasNumericRisk = rawRisk !== undefined && rawRisk !== null && rawRisk !== '' && Number.isFinite(Number(rawRisk));
+    const risk = hasNumericRisk ? Number(rawRisk) : 0;
+    const grade = String(final.grade || fallbackItem.grade || '—').toUpperCase();
+    const tone = hasNumericRisk ? riskClass(risk) : gradeTone(final);
     const creator = source.creator_wallet || signals.creator_wallet || signals.deployer_wallet || signals.creator || '';
     const tokenName = source.token_name || signals.token_name || signals.name || '';
     const tokenSymbol = source.token_symbol || signals.token_symbol || signals.symbol || '';
@@ -228,9 +294,10 @@
     $('reportBody').className = 'detail-body';
     $('reportBody').innerHTML = `
       ${renderVerdictCard({...data, final_verdict: final})}
-      <section class="verdict-head ${riskClass(risk)}">
-        <div class="scorebox"><strong>${esc(risk)}</strong><span>RISK / 100</span></div>
-        <div><span class="eyebrow">${esc(warning.label || final.risk_level || 'ARVIS VERDICT')}</span><h2>${esc(final.verdict || fallbackItem.verdict || 'İmzalı ARVIS kararı')}</h2><div class="target-full">${esc(data.target || fallbackItem.target)}</div><p class="muted">${esc(final.recommendation || fallbackItem.recommendation || 'Tüm kanıtları inceleyin.')}</p><div class="actions"><span class="pill ${risk >= 65 ? 'red' : risk >= 35 ? 'amber' : 'green'}">${esc(final.risk_level || fallbackItem.risk_level || 'unknown')}</span><span class="pill">${esc(final.grade || fallbackItem.grade || '—')}</span><span class="pill violet">${esc(source.launch_platform || 'Solana')}</span></div></div>
+      ${investigationStatusPanel(data)}
+      <section class="verdict-head ${tone}">
+        <div class="scorebox">${hasNumericRisk ? `<strong>${esc(risk)}</strong><span>RISK / 100</span>` : `<strong>${esc(grade)}</strong><span>UNIFIED GRADE</span>`}</div>
+        <div><span class="eyebrow">${esc(warning.label || final.risk_level || 'KOSCHEI UNIFIED VERDICT')}</span><h2>${esc(final.verdict || fallbackItem.verdict || 'Kanıt değerlendirmesi sürüyor')}</h2><div class="target-full">${esc(data.target || fallbackItem.target)}</div><p class="muted">${esc(final.recommendation || fallbackItem.recommendation || warning.interpretation || 'Tüm kanıtları ve eksik delilleri inceleyin.')}</p><div class="actions"><span class="pill ${tone === 'bad' ? 'red' : tone === 'good' ? 'green' : 'amber'}">${esc(hasNumericRisk ? (final.risk_level || fallbackItem.risk_level || 'unknown') : final.signed ? 'SIGNED' : 'EVIDENCE PENDING')}</span><span class="pill">${esc(grade)}</span><span class="pill violet">${esc(source.launch_platform || 'Solana')}</span></div></div>
       </section>
 
       ${creator ? `<section class="creator-warning"><span class="eyebrow">CREATOR / DEPLOYER RELATION</span><h3>${esc(source.creator_label || 'Source-reported creator/deployer wallet')}</h3><code>${esc(creator)}</code><p>${esc(source.creator_scope || 'Observed source relation. This is not proof of wrongdoing or real-world identity.')}</p></section>` : ''}
@@ -248,6 +315,9 @@
       </section>
 
       ${threatPanel(data.threat_anticipation)}
+      ${lpControlPanel(data.lp_control)}
+      ${behaviorPanel(data.behavior_signals)}
+      ${liveEvidencePanel(data.full_scan_live_evidence)}
 
       <section class="two-col">
         <article class="panel"><span class="eyebrow">WARNING EXPLANATION</span><h3>Neden işaretlendi?</h3><div class="insights">${reasons.map(reason => `<div class="insight bad">${esc(reason)}</div>`).join('') || '<div class="insight">Ek risk açıklaması yok.</div>'}</div></article>
@@ -298,6 +368,13 @@
         body: JSON.stringify({ target, network: 'solana-mainnet', mode: 'manual_dashboard_check' })
       });
       if (!response.ok) throw new Error(data.message || data.error || 'Tarama tamamlanamadı.');
+      const directReport = normalizeCustomerInvestigation(data, target);
+      if (directReport) {
+        renderDetail(directReport, data.final_verdict || {});
+        notice(data.status === 'evidence_pending' ? 'Soruşturma tamamlandı; erişilemeyen kanıtlar açıkça işaretlendi.' : 'Birleşik soruşturma ve yatırım riski dosyası hazırlandı.');
+        loadFeed().catch(() => {});
+        return;
+      }
       const items = await loadFeed();
       const item = items.find(row => String(row.target || '').toLowerCase() === target.toLowerCase()) || data.final_verdict || {};
       await openDetail(target, item);

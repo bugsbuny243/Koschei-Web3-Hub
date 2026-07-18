@@ -74,6 +74,42 @@ func TestSolanaRPCFallsBackAfterProviderRateLimit(t *testing.T) {
 	}
 }
 
+func TestSolanaRPCFallsBackAfterEndpointTimeout(t *testing.T) {
+	var primaryCalls atomic.Int32
+	primary := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		primaryCalls.Add(1)
+		time.Sleep(200 * time.Millisecond)
+		http.Error(w, "late primary", http.StatusGatewayTimeout)
+	}))
+	defer primary.Close()
+
+	var fallbackCalls atomic.Int32
+	fallback := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fallbackCalls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"jsonrpc":"2.0","id":1,"result":{"value":"fallback-ok"}}`)
+	}))
+	defer fallback.Close()
+
+	t.Setenv("SOLANA_RPC_URL", primary.URL)
+	t.Setenv("SOLANA_RPC_FALLBACK_URL", fallback.URL)
+	t.Setenv("SOLANA_RPC_ENDPOINT_TIMEOUT_MS", "75")
+	rpc := &SolanaRPC{Client: fallback.Client(), Cache: cache.NewNoop(), KeyPrefix: "test"}
+	var out struct {
+		Value string `json:"value"`
+	}
+	started := time.Now()
+	if err := rpc.Call(context.Background(), "solana-mainnet", "getVersion", []any{}, &out, time.Second); err != nil {
+		t.Fatalf("expected timeout fallback success, got %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("fallback took too long: %s", elapsed)
+	}
+	if out.Value != "fallback-ok" || primaryCalls.Load() != 1 || fallbackCalls.Load() != 1 {
+		t.Fatalf("unexpected fallback result=%q primary=%d fallback=%d", out.Value, primaryCalls.Load(), fallbackCalls.Load())
+	}
+}
+
 func TestUniqueRPCURLsRemovesDuplicates(t *testing.T) {
 	got := uniqueRPCURLs("https://rpc.test", " https://rpc.test ", "", "https://fallback.test")
 	if len(got) != 2 {

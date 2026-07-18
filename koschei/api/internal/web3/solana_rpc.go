@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -101,6 +102,15 @@ func SolanaRPCFallbackURL(network string) string {
 	return "https://api.devnet.solana.com"
 }
 
+func solanaRPCEndpointTimeout() time.Duration {
+	if raw := strings.TrimSpace(os.Getenv("SOLANA_RPC_ENDPOINT_TIMEOUT_MS")); raw != "" {
+		if value, err := strconv.Atoi(raw); err == nil && value >= 50 && value <= 30000 {
+			return time.Duration(value) * time.Millisecond
+		}
+	}
+	return 6 * time.Second
+}
+
 func isSolanaMainnet(network string) bool {
 	switch strings.ToLower(strings.TrimSpace(network)) {
 	case "solana-mainnet", "mainnet", "mainnet-beta":
@@ -169,8 +179,16 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	}
 
 	var lastErr error
+	endpointTimeout := solanaRPCEndpointTimeout()
 	for _, endpoint := range uniqueRPCURLs(s.URL(network), SolanaRPCFallbackURL(network)) {
-		if err := callSolanaRPC(ctx, client, endpoint, method, body, target); err != nil {
+		attemptCtx := ctx
+		cancel := func() {}
+		if endpointTimeout > 0 {
+			attemptCtx, cancel = context.WithTimeout(ctx, endpointTimeout)
+		}
+		err := callSolanaRPC(attemptCtx, client, endpoint, method, body, target)
+		cancel()
+		if err != nil {
 			lastErr = err
 			if ctx.Err() != nil {
 				return ctx.Err()

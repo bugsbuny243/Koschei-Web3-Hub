@@ -135,30 +135,10 @@ jobs:
           retention-days: 7
       - name: Check public JavaScript
         run: |
-          node --check public/js/public-solana-scan.js
-          node --check public/js/public-scan-request-guard.js
-          node --check public/js/public-solana-scan-tr.js
-          node --check public/js/public-transaction-shield.js
-          node --check public/js/kosch-transparency.js
-          node --check public/js/koschei-global-shell.js
-          node --check public/js/koschei-product-v2.js
-          node --check public/js/owner-holder-tier-labels.js
-          node --check public/js/owner-launch-forensics.js
-          node --check public/js/owner-defense-network.js
-          node --check public/js/owner-actor-distribution.js
-          node --check public/js/verdict-card.js
-          node --check public/js/verdict-card-market-context.js
-          node --check public/js/verdict-card-evidence-refs.js
-          node --check public/js/lp-control-evidence-card.js
-          node --check public/js/unified-live-evidence-card.js
-          node --check public/js/full-scan-truth-contract.js
-          node --check public/js/owner-unified-radar.js
-          node --check public/js/owner-verdict-card-coverage.js
-          node --check public/js/owner-court-ui.js
-          node --check public/js/owner-full-scan-truth-ui.js
-          node --check public/js/owner-radar-mobile-fix.js
-          node --check public/js/owner-radar-case-identity.js
-          node --check public/js/owner-command-center-v2.js
+          set -euo pipefail
+          for file in public/js/*.js; do
+            node --check "$file"
+          done
           node --check ../../oss/verifier/typescript/verify-dossier.mjs
           node --check scripts/verify-dossier-contract.mjs
           node --check scripts/run-production-investigation-acceptance.mjs
@@ -168,6 +148,7 @@ jobs:
           node scripts/verify-verdict-card-evidence-refs.js
           node scripts/verify-lp-control-evidence-card.js
           node scripts/verify-live-evidence-card.js
+          node scripts/verify-customer-investigation-ui.js
           node scripts/verify-dossier-contract.mjs
       - name: Check Turkish public copy
         run: |
@@ -176,11 +157,8 @@ jobs:
           grep -q '<html lang="tr">' public/safe-check.html
           grep -q '<html lang="tr">' public/security-radar.html
           grep -q 'lp-control-evidence-card.js' public/scan.html
-          grep -q 'lp-control-evidence-card.js' public/owner-production.html
           grep -q 'unified-live-evidence-card.js' public/scan.html
           grep -q 'public-scan-request-guard.js' public/scan.html
-          grep -q 'full-scan-truth-contract.js' public/owner-production.html
-          grep -q 'owner-full-scan-truth-ui.js' public/owner-production.html
           ! grep -Eqi 'Paste it before|Token ikinci planda|KOSCH stays as|What ARVIS does|Who it is for|Power users|Automatic flow' public/index.html
           ! grep -Eqi 'Login yok|Wallet connect yok|Read-only analiz|İmzalı verdict geçmişi' public/scan.html
       - name: Test

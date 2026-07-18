@@ -2,19 +2,21 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"koschei/api/internal/services"
 )
 
 const (
-	unifiedLiveSignatureLimit    = 30
-	unifiedLiveTransactionLimit  = 12
-	unifiedLaunchSignatureLimit  = 100
-	unifiedLaunchParseLimit      = 16
+	unifiedLiveSignatureLimit   = 30
+	unifiedLiveTransactionLimit = 12
+	unifiedLaunchSignatureLimit = 100
+	unifiedLaunchParseLimit     = 16
 )
 
 type unifiedLiveWalletTarget struct {
@@ -96,18 +98,25 @@ func (h *Handler) collectUnifiedTokenLiveEvidence(ctx context.Context, core hold
 		LaunchSigner: unifiedLaunchSignerObservation{Status: "not_checked", InstructionTypes: []string{}, Limitations: []string{}},
 	}
 	rpcURL := strings.TrimSpace(creatorIntelRPCURL())
-	if rpcURL == "" {
+	if rpcURL == "" && (h == nil || h.SolanaRPC == nil) {
 		out.Limitations = append(out.Limitations, "Solana RPC is unavailable; no live transaction rows were collected.")
 		return out
 	}
 	out.RPCConfigured = true
+	network := strings.TrimSpace(core.Request.Network)
+	if network == "" {
+		network = "solana-mainnet"
+	}
 
 	creator := strings.TrimSpace(creatorIntelCleanString(core.SourceContext["creator_wallet"]))
 	launchSigner := unifiedLaunchSignerObservation{Status: "not_required", InstructionTypes: []string{}, Limitations: []string{}}
-	if creator == "" {
+	if creator == "" && rpcURL != "" {
 		launchCtx, cancel := context.WithTimeout(ctx, time.Duration(budgets.LaunchTimeoutSeconds)*time.Second)
 		launchSigner = discoverUnifiedLaunchSigner(launchCtx, rpcURL, out.Mint)
 		cancel()
+	} else if creator == "" {
+		launchSigner.Status = "source_unavailable"
+		launchSigner.Limitations = append(launchSigner.Limitations, "Launch signer discovery requires a configured direct RPC URL.")
 	}
 	out.LaunchSigner = launchSigner
 
@@ -126,7 +135,7 @@ func (h *Handler) collectUnifiedTokenLiveEvidence(ctx context.Context, core hold
 			break
 		}
 		walletCtx, cancel := context.WithTimeout(ctx, time.Duration(budgets.WalletTimeoutSeconds)*time.Second)
-		coverage, rows := collectUnifiedWalletTransactions(walletCtx, rpcURL, out.Mint, target)
+		coverage, rows := h.collectUnifiedWalletTransactions(walletCtx, network, rpcURL, out.Mint, target)
 		cancel()
 		out.WalletCoverage = append(out.WalletCoverage, coverage)
 		out.SignaturesSeen += coverage.SignaturesSeen
@@ -189,13 +198,13 @@ func unifiedLiveWalletTargets(holder services.HolderIntelligence, creator string
 	return out
 }
 
-func collectUnifiedWalletTransactions(ctx context.Context, rpcURL, mint string, target unifiedLiveWalletTarget) (unifiedLiveWalletCoverage, []unifiedLiveTransactionRow) {
+func (h *Handler) collectUnifiedWalletTransactions(ctx context.Context, network, rpcURL, mint string, target unifiedLiveWalletTarget) (unifiedLiveWalletCoverage, []unifiedLiveTransactionRow) {
 	coverage := unifiedLiveWalletCoverage{Wallet: target.Wallet, Role: target.Role, Status: "rpc_failed", Limitations: []string{}}
 	rows := []unifiedLiveTransactionRow{}
-	signatures, err := services.SolanaGetSignaturesForAddress(ctx, rpcURL, target.Wallet, unifiedLiveSignatureLimit)
+	signatures, err := h.unifiedLiveSignatures(ctx, network, rpcURL, target.Wallet, unifiedLiveSignatureLimit)
 	if err != nil {
 		coverage.RPCFailures++
-		coverage.Limitations = append(coverage.Limitations, "Wallet signatures could not be read from the configured Solana RPC provider.")
+		coverage.Limitations = append(coverage.Limitations, "Wallet signatures could not be read from either configured Solana RPC provider.")
 		return coverage, rows
 	}
 	coverage.SignaturesSeen = len(signatures)
@@ -215,10 +224,10 @@ func collectUnifiedWalletTransactions(ctx context.Context, rpcURL, mint string, 
 		coverage.Status = "complete_no_successful_signatures"
 		return coverage, rows
 	}
-	transactions, batchErr := fetchUnifiedTransactions(ctx, rpcURL, keys)
+	transactions, batchErr := h.fetchUnifiedTransactions(ctx, network, rpcURL, keys)
 	if batchErr != nil {
 		coverage.RPCFailures++
-		coverage.Limitations = append(coverage.Limitations, "Some recent transactions could not be parsed: "+creatorIntelCompactError(batchErr))
+		coverage.Limitations = append(coverage.Limitations, "Some recent transactions could not be parsed after primary/fallback RPC attempts: "+creatorIntelCompactError(batchErr))
 	}
 	for _, signature := range keys {
 		tx, ok := transactions[signature]
@@ -231,14 +240,102 @@ func collectUnifiedWalletTransactions(ctx context.Context, rpcURL, mint string, 
 		}
 	}
 	coverage.RelevantTransactions = len(rows)
-	coverage.Status = "complete"
-	if len(rows) == 0 {
+	switch {
+	case len(transactions) < len(keys):
+		coverage.Status = "partial_rpc"
+	case len(rows) == 0:
 		coverage.Status = "complete_no_relevant_token_delta"
+	default:
+		coverage.Status = "complete"
 	}
 	return coverage, rows
 }
 
-func fetchUnifiedTransactions(ctx context.Context, rpcURL string, signatures []string) (map[string]services.SolanaTransactionResult, error) {
+func (h *Handler) unifiedLiveSignatures(ctx context.Context, network, rpcURL, wallet string, limit int) ([]services.SolanaSignatureInfo, error) {
+	if h != nil && h.SolanaRPC != nil {
+		var out []services.SolanaSignatureInfo
+		err := h.SolanaRPC.Call(ctx, network, "getSignaturesForAddress", []any{wallet, map[string]any{"limit": limit}}, &out, time.Minute)
+		return out, err
+	}
+	return services.SolanaGetSignaturesForAddress(ctx, rpcURL, wallet, limit)
+}
+
+type unifiedTransactionFetchResult struct {
+	signature string
+	tx        services.SolanaTransactionResult
+	err       error
+}
+
+func (h *Handler) fetchUnifiedTransactions(ctx context.Context, network, rpcURL string, signatures []string) (map[string]services.SolanaTransactionResult, error) {
+	if h == nil || h.SolanaRPC == nil {
+		return fetchUnifiedTransactionsLegacy(ctx, rpcURL, signatures)
+	}
+	out := map[string]services.SolanaTransactionResult{}
+	if len(signatures) == 0 {
+		return out, nil
+	}
+	workers := 3
+	if len(signatures) < workers {
+		workers = len(signatures)
+	}
+	jobs := make(chan string)
+	results := make(chan unifiedTransactionFetchResult, len(signatures))
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for signature := range jobs {
+				var tx services.SolanaTransactionResult
+				err := h.SolanaRPC.Call(ctx, network, "getTransaction", []any{signature, map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": 0}}, &tx, 24*time.Hour)
+				select {
+				case results <- unifiedTransactionFetchResult{signature: signature, tx: tx, err: err}:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+	go func() {
+		defer close(jobs)
+		for _, signature := range signatures {
+			select {
+			case jobs <- signature:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	failures := 0
+	var lastErr error
+	for result := range results {
+		if result.err != nil {
+			failures++
+			lastErr = result.err
+			continue
+		}
+		if result.tx != nil {
+			out[result.signature] = result.tx
+		}
+	}
+	if failures > 0 {
+		if lastErr == nil {
+			lastErr = ctx.Err()
+		}
+		return out, fmt.Errorf("%d of %d transaction RPC calls failed: %w", failures, len(signatures), lastErr)
+	}
+	if ctx.Err() != nil && len(out) < len(signatures) {
+		return out, ctx.Err()
+	}
+	return out, nil
+}
+
+func fetchUnifiedTransactionsLegacy(ctx context.Context, rpcURL string, signatures []string) (map[string]services.SolanaTransactionResult, error) {
 	out, err := services.SolanaGetTransactionsJSONParsedBatch(ctx, rpcURL, signatures)
 	if err == nil || len(out) > 0 {
 		return out, err
@@ -259,6 +356,10 @@ func fetchUnifiedTransactions(ctx context.Context, rpcURL string, signatures []s
 		}
 	}
 	return out, lastErr
+}
+
+func fetchUnifiedTransactions(ctx context.Context, rpcURL string, signatures []string) (map[string]services.SolanaTransactionResult, error) {
+	return fetchUnifiedTransactionsLegacy(ctx, rpcURL, signatures)
 }
 
 func parseUnifiedLiveTransaction(mint string, target unifiedLiveWalletTarget, signature services.SolanaSignatureInfo, tx services.SolanaTransactionResult) (unifiedLiveTransactionRow, bool) {
@@ -454,7 +555,9 @@ func mergeUnifiedTransactionEvidence(stored, live []unifiedTransactionEvidence) 
 		out = append(out, value)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].Slot == out[j].Slot { return out[i].Signature < out[j].Signature }
+		if out[i].Slot == out[j].Slot {
+			return out[i].Signature < out[j].Signature
+		}
 		return out[i].Slot > out[j].Slot
 	})
 	return out
@@ -466,19 +569,27 @@ func summarizeUnifiedTransactionEvidence(values []unifiedTransactionEvidence) ma
 	for _, row := range values {
 		wallet := strings.TrimSpace(row.Trader)
 		if wallet != "" {
-			if walletSides[wallet] == nil { walletSides[wallet] = map[string]bool{} }
+			if walletSides[wallet] == nil {
+				walletSides[wallet] = map[string]bool{}
+			}
 			walletSides[wallet][row.Direction] = true
 		}
 		switch row.Direction {
-		case "buy": buy++
-		case "sell": sell++
-		case "transfer_in": transferIn++
-		case "transfer_out": transferOut++
+		case "buy":
+			buy++
+		case "sell":
+			sell++
+		case "transfer_in":
+			transferIn++
+		case "transfer_out":
+			transferOut++
 		}
 	}
 	roundTrip := int64(0)
 	for _, sides := range walletSides {
-		if (sides["buy"] || sides["transfer_in"]) && (sides["sell"] || sides["transfer_out"]) { roundTrip++ }
+		if (sides["buy"] || sides["transfer_in"]) && (sides["sell"] || sides["transfer_out"]) {
+			roundTrip++
+		}
 	}
 	return map[string]any{
 		"available": len(values) > 0, "status": "bounded_live_transaction_window",
@@ -486,12 +597,14 @@ func summarizeUnifiedTransactionEvidence(values []unifiedTransactionEvidence) ma
 		"transfer_in_count": transferIn, "transfer_out_count": transferOut,
 		"unique_trader_count": int64(len(walletSides)), "round_trip_wallet_count": roundTrip,
 		"wash_classification": "not_proven",
-		"interpretation": "Counts are bounded live wallet observations; they are not complete market-wide trade history.",
+		"interpretation":      "Counts are bounded live wallet observations; they are not complete market-wide trade history.",
 	}
 }
 
 func applyUnifiedLiveEvidenceReferences(refs map[string]unifiedEvidenceReference, live unifiedLiveInvestigationReport) map[string]unifiedEvidenceReference {
-	if refs == nil { refs = map[string]unifiedEvidenceReference{} }
+	if refs == nil {
+		refs = map[string]unifiedEvidenceReference{}
+	}
 	if live.LaunchSigner.Available {
 		launchRef := unifiedEvidenceReference{
 			Wallets: []string{live.LaunchSigner.Wallet}, Signatures: []string{live.LaunchSigner.Signature},
@@ -502,7 +615,7 @@ func applyUnifiedLiveEvidenceReferences(refs map[string]unifiedEvidenceReference
 	}
 	for _, row := range live.Transactions {
 		ref := unifiedEvidenceReference{
-			Wallets: append([]string{row.Wallet}, row.Counterparties...),
+			Wallets:    append([]string{row.Wallet}, row.Counterparties...),
 			Signatures: []string{row.Signature}, Slots: []int64{row.Slot}, EvidenceKeys: []string{row.EvidenceKey},
 		}
 		refs["address"] = mergeUnifiedEvidenceReferences(refs["address"], ref)
