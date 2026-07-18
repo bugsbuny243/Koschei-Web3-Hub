@@ -29,8 +29,11 @@ jobs:
           from pathlib import Path
           path = Path('.github/scripts/apply_customer_investigation_ui_rpc.py')
           text = path.read_text()
-          text = text.replace('\t\t<-r.Context().Done()\n', '\t\ttime.Sleep(200 * time.Millisecond)\n\t\thttp.Error(w, "late primary", http.StatusGatewayTimeout)\n', 1)
-          path.write_text(text)
+          old = r'\t\t<-r.Context().Done()\n'
+          new = r'\t\ttime.Sleep(200 * time.Millisecond)\n\t\thttp.Error(w, "late primary", http.StatusGatewayTimeout)\n'
+          if old not in text:
+              raise RuntimeError('escaped blocking handler marker not found')
+          path.write_text(text.replace(old, new, 1))
           PY
 
       - name: Apply prepared patch
