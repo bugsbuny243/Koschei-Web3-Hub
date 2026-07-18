@@ -54,15 +54,8 @@ func AnalyzeArvisRadarsContext(ctx context.Context, req SecurityRadarRequest) Ar
 	profile := collectRadarEvidenceContext(ctx, req)
 	sourceModule := arvisSourceModule(req.Mode)
 
-	pump := unavailableArm("Pump.fun Sybil Radar", ModulePumpSybilRadar, req, generatedAt, "Verified Pump program and parsed Pump launch evidence are required.")
-	if sourceModule == ModulePumpSybilRadar && profile.LiveRPC && profile.RecentSignatureCount > 0 {
-		pump = buildPumpProgramArm(req, profile, generatedAt)
-	}
-
-	raydium := unavailableArm("Raydium Pool Guardian", ModuleRaydiumPoolGuardian, req, generatedAt, "Verified Raydium pool-program evidence is required.")
-	if sourceModule == ModuleRaydiumPoolGuardian && profile.LiveRPC && profile.AccountExists {
-		raydium = buildRaydiumProgramArm(req, profile, generatedAt)
-	}
+	pump := buildPumpProgramApplicabilityArm(req, profile, generatedAt)
+	raydium := buildRaydiumProgramApplicabilityArm(req, profile, generatedAt)
 
 	claimShield := unavailableArm("Walletless Claim Shield", ModuleWalletlessClaimShield, req, generatedAt, "A parsed claim instruction is required; token-holder evidence is not a claim-surface substitute.")
 	mev := unavailableArm("MEV Shield", ModuleMEVShield, req, generatedAt, "A signed transaction, route and pool context are required for MEV analysis.")
@@ -184,15 +177,52 @@ func arvisSourceModule(mode string) string {
 	}
 }
 
+func buildPumpProgramApplicabilityArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
+	if !p.LiveRPC || p.RecentSignatureCount <= 0 {
+		return evidencePendingArm("Pump.fun Sybil Radar", ModulePumpSybilRadar, req, generatedAt, "Pump-program relation requires live RPC signature observations for this token.", "pump_signature_evidence_unavailable")
+	}
+	if !pumpProgramRelationObserved(req, p) {
+		return notApplicableArm("Pump.fun Sybil Radar", ModulePumpSybilRadar, req, generatedAt, "No Pump program relation was observed for this token from account/program evidence.", "no_pump_program_relation")
+	}
+	return buildPumpProgramArm(req, p, generatedAt)
+}
+
+func buildRaydiumProgramApplicabilityArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
+	if !p.LiveRPC || !p.AccountExists {
+		return evidencePendingArm("Raydium Pool Guardian", ModuleRaydiumPoolGuardian, req, generatedAt, "Raydium pool applicability requires live RPC account evidence for this token.", "raydium_account_evidence_unavailable")
+	}
+	if !raydiumProgramRelationObserved(p) {
+		return notApplicableArm("Raydium Pool Guardian", ModuleRaydiumPoolGuardian, req, generatedAt, "No AMM pool or Raydium program relation was observed for this token in the current evidence context.", "no_amm_pool")
+	}
+	return buildRaydiumProgramArm(req, p, generatedAt)
+}
+
+func pumpProgramRelationObserved(req SecurityRadarRequest, p radarEvidenceProfile) bool {
+	owner := strings.TrimSpace(p.AccountOwner)
+	if owner == defaultPumpProgramID || owner == defaultPumpSwapProgramID || owner == pumpBondingCurveProgramID || owner == pumpLiquidityProgramID {
+		return true
+	}
+	// Pump.fun mint addresses are conventionally emitted with the `pump` suffix;
+	// this is treated only as an observed program-relation hint and never as a
+	// grade-bearing claim. Parsed transaction/program arms can later replace it
+	// with signature-backed VERIFIED evidence.
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.Target)), "pump")
+}
+
+func raydiumProgramRelationObserved(p radarEvidenceProfile) bool {
+	return isKnownRaydiumProgram(p.AccountOwner)
+}
+
 func buildPumpProgramArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
 	s := armSignals(req, p, ModulePumpSybilRadar)
-	s["source_verified_program_event"] = true
+	s["source_verified_program_event"] = arvisSourceModule(req.Mode) == ModulePumpSybilRadar
+	s["program_relation_observed"] = true
 	s["recent_signature_count"] = p.RecentSignatureCount
 	s["signature_window_seconds"] = p.SignatureWindowSeconds
 	s["failed_signature_count"] = p.FailedSignatureCount
 	s["scope_note"] = "Pump-specific program/timing evidence only; holder concentration belongs exclusively to Holder Concentration."
 	e := []string{
-		"Target was resolved from a verified Pump program stream event.",
+		"Pump program relation was observed from the token evidence context.",
 		fmt.Sprintf("Pump target signature window contains %d observations across %d seconds.", p.RecentSignatureCount, p.SignatureWindowSeconds),
 	}
 	return evidenceArm("Pump.fun Sybil Radar", ModulePumpSybilRadar, req, 0, s, e, generatedAt)
@@ -200,12 +230,13 @@ func buildPumpProgramArm(req SecurityRadarRequest, p radarEvidenceProfile, gener
 
 func buildRaydiumProgramArm(req SecurityRadarRequest, p radarEvidenceProfile, generatedAt string) SecurityRadarVerdict {
 	s := armSignals(req, p, ModuleRaydiumPoolGuardian)
-	s["source_verified_program_event"] = true
+	s["source_verified_program_event"] = arvisSourceModule(req.Mode) == ModuleRaydiumPoolGuardian
+	s["program_relation_observed"] = true
 	s["account_owner"] = p.AccountOwner
 	s["account_executable"] = p.AccountExecutable
 	s["scope_note"] = "Raydium program/pool evidence only; authorities and holder concentration belong to their own arms."
 	e := []string{
-		"Target was resolved from a verified Raydium program stream event.",
+		"Raydium program relation was observed from the token evidence context.",
 		fmt.Sprintf("Observed account owner program: %s.", firstRadarValue(p.AccountOwner, "unknown")),
 	}
 	return evidenceArm("Raydium Pool Guardian", ModuleRaydiumPoolGuardian, req, 0, s, e, generatedAt)

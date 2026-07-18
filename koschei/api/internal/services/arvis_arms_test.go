@@ -68,3 +68,42 @@ func TestArvisBundleExposesFourteenArms(t *testing.T) {
 		t.Fatalf("expected 14 arms, got %d", len(got))
 	}
 }
+
+func TestArvisPumpAndRaydiumApplicabilityUsesEvidenceNotMode(t *testing.T) {
+	req := SecurityRadarRequest{Target: "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump", Network: "solana-mainnet", Mode: "owner_manual"}
+	profile := radarEvidenceProfile{LiveRPC: true, AccountExists: true, AccountOwner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", RecentSignatureCount: 12, DataQuality: "live_rpc_evidence", EvidenceStatus: "verified_rpc_observation"}
+	pump := buildPumpProgramApplicabilityArm(req, profile, "2026-07-18T00:00:00Z")
+	raydium := buildRaydiumProgramApplicabilityArm(req, profile, "2026-07-18T00:00:00Z")
+	if !pump.Signed {
+		t.Fatalf("pump arm did not build from evidence in manual mode: %#v", pump)
+	}
+	if status := arvisSignalString(raydium.Signals, "execution_status"); status != ArvisExecutionNotApplicable {
+		t.Fatalf("raydium status=%q arm=%#v", status, raydium)
+	}
+	if code := arvisSignalString(raydium.Signals, "reason_code"); code != "no_amm_pool" {
+		t.Fatalf("raydium reason=%q", code)
+	}
+}
+
+func TestArvisPumpAndRaydiumCanBothBuildForMigratedPoolEvidence(t *testing.T) {
+	req := SecurityRadarRequest{Target: "MigratedMint111111111111111111111111111111pump", Network: "solana-mainnet", Mode: "owner_manual"}
+	profile := radarEvidenceProfile{LiveRPC: true, AccountExists: true, AccountOwner: defaultRaydiumProgramID, RecentSignatureCount: 8, DataQuality: "live_rpc_evidence", EvidenceStatus: "verified_rpc_observation"}
+	pump := buildPumpProgramApplicabilityArm(req, profile, "2026-07-18T00:00:00Z")
+	raydium := buildRaydiumProgramApplicabilityArm(req, profile, "2026-07-18T00:00:00Z")
+	if !pump.Signed || !raydium.Signed {
+		t.Fatalf("expected both arms to build: pump=%#v raydium=%#v", pump, raydium)
+	}
+}
+
+func TestArvisPumpAndRaydiumDistinctNotApplicableReasons(t *testing.T) {
+	req := SecurityRadarRequest{Target: "PlainMint111111111111111111111111111111111", Network: "solana-mainnet", Mode: "owner_manual"}
+	profile := radarEvidenceProfile{LiveRPC: true, AccountExists: true, AccountOwner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", RecentSignatureCount: 5, DataQuality: "live_rpc_evidence", EvidenceStatus: "verified_rpc_observation"}
+	pump := buildPumpProgramApplicabilityArm(req, profile, "2026-07-18T00:00:00Z")
+	raydium := buildRaydiumProgramApplicabilityArm(req, profile, "2026-07-18T00:00:00Z")
+	if arvisSignalString(pump.Signals, "reason_code") != "no_pump_program_relation" {
+		t.Fatalf("pump reason=%#v", pump.Signals)
+	}
+	if arvisSignalString(raydium.Signals, "reason_code") != "no_amm_pool" {
+		t.Fatalf("raydium reason=%#v", raydium.Signals)
+	}
+}
