@@ -113,6 +113,7 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "target is required")
 		return
 	}
+	input.Network = strings.TrimSpace(input.Network)
 	if input.Network == "" {
 		input.Network = "solana-mainnet"
 	}
@@ -126,25 +127,31 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, statusCode, map[string]any{"ok": false, "error": "token_mint_required", "message": radarTargetRejectionMessage(classification), "target": target, "target_classification": classification, "charged": false, "final_verdict": map[string]any{"risk_index": nil, "risk_level": "unknown", "signed": false, "recommendation": classification.Type + "_intelligence_required"}})
 		return
 	}
+
 	mode := firstNonEmptyString(input.Mode, "manual_dashboard_check")
-	services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_requested", "customer", "info", map[string]any{"network": input.Network, "mode": mode}))
-	analysis := services.AnalyzeArvisRadars(services.SecurityRadarRequest{Target: target, Network: input.Network, Mode: mode})
-	bundle := services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
-	final := services.ArvisFinalFromBundle(bundle)
-	arms := services.ArvisArmsFromBundle(bundle)
-	if !services.SecurityRadarHasLiveEvidence(bundle) || !final.Signed {
-		services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_no_evidence", "customer", "warning", map[string]any{"network": input.Network, "target": target}))
-		writeJSON(w, http.StatusBadGateway, map[string]any{"ok": false, "error": "real_data_unavailable", "message": services.SecurityRadarInsufficientEvidenceMessage, "bundle": bundle, "arms": arms, "final_verdict": final, "charged": false})
-		return
+	services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_requested", "customer", "info", map[string]any{"network": input.Network, "mode": mode, "target": target}))
+	ctx, cancel := context.WithTimeout(r.Context(), 240*time.Second)
+	defer cancel()
+
+	assembly := h.buildUnifiedInvestigationReport(ctx, target, input.Network, mode)
+	hasLiveEvidence := services.SecurityRadarHasLiveEvidence(assembly.Core.Bundle)
+	if !hasLiveEvidence {
+		services.WriteSecurityAuditEvent(ctx, h.DB, securityAuditFromRequest(r, "radar_check_evidence_pending", "customer", "warning", map[string]any{"network": input.Network, "target": target}))
 	}
-	_ = h.saveSecurityRadarBundle(r.Context(), claims.Sub, "manual_check", bundle)
-	if err := h.consumePremiumOutput(claims.Sub, claimEmail, "security_radar_check"); err != nil {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-		return
+	_ = h.saveSecurityRadarBundle(ctx, claims.Sub, "manual_check", assembly.Core.Bundle)
+
+	charged := false
+	if hasLiveEvidence {
+		if err := h.consumePremiumOutput(claims.Sub, claimEmail, "security_radar_check"); err != nil {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			return
+		}
+		charged = true
 	}
-	h.logTool(claimEmail, "security_radar_check", "completed")
+	status := customerInvestigationStatus(assembly.UnifiedVerdict, hasLiveEvidence)
+	h.logTool(claimEmail, "security_radar_check", status)
 	h.trackEvent(claimEmail, "security_radar_check", r.URL.Path)
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "bundle": bundle, "arms": arms, "final_verdict": final})
+	writeJSON(w, http.StatusOK, customerInvestigationEnvelope(assembly, charged))
 }
 
 func (h *Handler) SecurityRiskBadge(w http.ResponseWriter, r *http.Request) {
