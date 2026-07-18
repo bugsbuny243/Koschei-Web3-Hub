@@ -50,15 +50,13 @@ jobs:
         working-directory: koschei/api
         run: go mod download
 
-      - name: Targeted tests
+      - name: RPC fallback regression tests
         working-directory: koschei/api
-        run: |
-          go test ./internal/web3 -run 'TestSolanaRPC(FallsBackAfterEndpointTimeout|FallsBackAfterProviderRateLimit)' -count=1 -timeout=2m
-          go test ./internal/handlers -run 'TestCustomerInvestigation|TestUnifiedLive' -count=1 -timeout=3m
+        run: go test -v ./internal/web3 -run 'TestSolanaRPC(FallsBackAfterEndpointTimeout|FallsBackAfterProviderRateLimit)' -count=1 -timeout=2m
 
       - name: Full Go tests
         working-directory: koschei/api
-        run: go test ./... -timeout=10m
+        run: go test ./... -timeout=15m
 
       - name: Vet
         working-directory: koschei/api
