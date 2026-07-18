@@ -1,0 +1,57 @@
+name: Diagnose customer investigation full tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Prepare finite timeout test
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('.github/scripts/apply_customer_investigation_ui_rpc.py')
+          text = path.read_text()
+          old = '<-r.Context().Done()'
+          replacement = 'time.Sleep(200 * time.Millisecond)\n\t\thttp.Error(w, "late primary", http.StatusGatewayTimeout)'
+          if old not in text:
+              raise SystemExit('blocking handler expression not found')
+          path.write_text(text.replace(old, replacement, 1))
+          PY
+          python .github/scripts/apply_customer_investigation_ui_rpc.py
+          gofmt -w koschei/api/internal/web3/solana_rpc.go koschei/api/internal/web3/solana_rpc_test.go koschei/api/internal/handlers/unified_live_evidence.go
+
+      - name: Download modules
+        working-directory: koschei/api
+        run: go mod download
+
+      - name: Capture full tests
+        working-directory: koschei/api
+        run: |
+          set -o pipefail
+          go test -json ./... -timeout=15m 2>&1 | tee "${RUNNER_TEMP}/customer-investigation-go-test.jsonl"
+
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: customer-investigation-go-test
+          path: ${{ runner.temp }}/customer-investigation-go-test.jsonl
+          if-no-files-found: error
+          retention-days: 3
