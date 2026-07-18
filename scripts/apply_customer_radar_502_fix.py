@@ -1,0 +1,294 @@
+from pathlib import Path
+
+
+def replace_function(path: str, start_marker: str, end_marker: str, replacement: str) -> None:
+    file = Path(path)
+    text = file.read_text()
+    start = text.index(start_marker)
+    end = text.index(end_marker, start)
+    file.write_text(text[:start] + replacement.rstrip() + "\n\n" + text[end + 1 :])
+
+
+replace_function(
+    "koschei/api/internal/handlers/security_radar.go",
+    "func (h *Handler) SecurityRadarCheck(",
+    "\nfunc (h *Handler) SecurityRiskBadge",
+    r'''func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
+	claims, ok := userFromContext(r.Context())
+	if !ok {
+		writeAPIError(w, http.StatusUnauthorized, APICodeUnauthorized, "Unauthorized")
+		return
+	}
+	claimEmail := normalizedClaimEmail(claims)
+	if _, err := h.requirePremiumOutput(claims.Sub, claimEmail); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
+	}
+	var input securityRadarInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Invalid request body")
+		return
+	}
+	target := strings.TrimSpace(firstNonEmptyString(input.Target, input.Address))
+	if target == "" {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "target is required")
+		return
+	}
+	input.Network = strings.TrimSpace(input.Network)
+	if input.Network == "" {
+		input.Network = "solana-mainnet"
+	}
+	classification := classifyRadarTarget(r.Context(), target)
+	if !radarTargetTokenVerdictAllowed(classification) {
+		services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_wrong_target_type", "customer", "warning", map[string]any{"network": input.Network, "target": target, "target_type": classification.Type}))
+		statusCode := http.StatusUnprocessableEntity
+		if classification.Type == radarTargetUnknown {
+			statusCode = http.StatusServiceUnavailable
+		}
+		writeJSON(w, statusCode, map[string]any{"ok": false, "error": "token_mint_required", "message": radarTargetRejectionMessage(classification), "target": target, "target_classification": classification, "charged": false, "final_verdict": map[string]any{"risk_index": nil, "risk_level": "unknown", "signed": false, "recommendation": classification.Type + "_intelligence_required"}})
+		return
+	}
+
+	mode := firstNonEmptyString(input.Mode, "manual_dashboard_check")
+	services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_requested", "customer", "info", map[string]any{"network": input.Network, "mode": mode, "target": target}))
+	ctx, cancel := context.WithTimeout(r.Context(), 240*time.Second)
+	defer cancel()
+
+	assembly := h.buildUnifiedInvestigationReport(ctx, target, input.Network, mode)
+	hasLiveEvidence := services.SecurityRadarHasLiveEvidence(assembly.Core.Bundle)
+	if !hasLiveEvidence {
+		services.WriteSecurityAuditEvent(ctx, h.DB, securityAuditFromRequest(r, "radar_check_evidence_pending", "customer", "warning", map[string]any{"network": input.Network, "target": target}))
+	}
+	_ = h.saveSecurityRadarBundle(ctx, claims.Sub, "manual_check", assembly.Core.Bundle)
+
+	charged := false
+	if hasLiveEvidence {
+		if err := h.consumePremiumOutput(claims.Sub, claimEmail, "security_radar_check"); err != nil {
+			writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+			return
+		}
+		charged = true
+	}
+	status := customerInvestigationStatus(assembly.UnifiedVerdict, hasLiveEvidence)
+	h.logTool(claimEmail, "security_radar_check", status)
+	h.trackEvent(claimEmail, "security_radar_check", r.URL.Path)
+	writeJSON(w, http.StatusOK, customerInvestigationEnvelope(assembly, charged))
+}''',
+)
+
+replace_function(
+    "koschei/api/internal/handlers/security_radar_court.go",
+    "func (h *Handler) SecurityRadarCourt(",
+    "\nfunc courtRequestIdentity",
+    r'''func (h *Handler) SecurityRadarCourt(w http.ResponseWriter, r *http.Request) {
+	var input securityRadarCourtRequest
+	if err := decodeJSON(r, &input); err != nil {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Invalid request body")
+		return
+	}
+	target := strings.TrimSpace(firstNonEmptyString(input.Target, input.Address))
+	if target == "" {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "target is required")
+		return
+	}
+	network := strings.TrimSpace(input.Network)
+	if network == "" {
+		network = "solana-mainnet"
+	}
+	classification := classifyRadarTarget(r.Context(), target)
+	if !radarTargetTokenVerdictAllowed(classification) {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+			"ok": false, "error": "token_mint_required",
+			"message": radarTargetRejectionMessage(classification),
+			"target": target, "target_classification": classification,
+		})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 360*time.Second)
+	defer cancel()
+	assembly := h.buildUnifiedInvestigationReport(ctx, target, network, "customer_court_review")
+	core := assembly.Core
+	hasLiveEvidence := services.SecurityRadarHasLiveEvidence(core.Bundle)
+	_ = h.saveSecurityRadarBundle(ctx, courtRequestIdentity(ctx), "customer_court_review", core.Bundle)
+
+	unifiedVerdict := assembly.UnifiedVerdict
+	unifiedPersistence, unifiedHistory := h.persistUnifiedRadarVerdict(ctx, assembly.DB, network, "token", target, unifiedVerdict, assembly.Behavior)
+	courtInput := CourtReadOnlyInput{
+		Target: target,
+		Network: network,
+		SignedVerdict: unifiedVerdict,
+		VerdictCard: map[string]any{
+			"grade": unifiedVerdict.Grade,
+			"verdict": unifiedVerdict.Verdict,
+			"signed": unifiedVerdict.Signed,
+			"signature": unifiedVerdict.Signature,
+		},
+		EvidencePacket: map[string]any{
+			"investigation_report": assembly.Report,
+			"threat_anticipation": assembly.Threat,
+			"behavior_signals": assembly.Behavior,
+			"actor_rule_verdict": assembly.ActorVerdict,
+			"actor_evidence": assembly.CombinedEvidence,
+			"holder_intelligence": core.Intelligence,
+			"holder_cluster": core.Cluster,
+			"market": core.Market,
+			"modules": assembly.Modules,
+			"evidence": radarDetailEvidence(core.Arms),
+			"graph": assembly.Graph,
+		},
+	}
+	court := h.courtNarrative(ctx, courtInput, input.Extended)
+	if court == nil || court.Status == "skipped" {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"ok": false,
+			"error": "court_unavailable",
+			"message": "ARVIS Tribunal is disabled or its provider client is not configured.",
+			"investigation_status": customerInvestigationStatus(unifiedVerdict, hasLiveEvidence),
+			"has_live_evidence": hasLiveEvidence,
+			"final_verdict": unifiedVerdict,
+			"threat_anticipation": assembly.Threat,
+			"investigation_report": assembly.Report,
+			"court": court,
+		})
+		return
+	}
+	status := http.StatusOK
+	if court.Status == "error" {
+		status = http.StatusBadGateway
+	}
+	writeJSON(w, status, map[string]any{
+		"ok": court.Status != "error",
+		"schema_version": "koschei-arvis-court-v1",
+		"target": target,
+		"network": network,
+		"tier_applied": court.TierApplied,
+		"investigation_status": customerInvestigationStatus(unifiedVerdict, hasLiveEvidence),
+		"has_live_evidence": hasLiveEvidence,
+		"final_verdict": unifiedVerdict,
+		"final_verdict_persistence": unifiedPersistence,
+		"final_verdict_history": unifiedHistory,
+		"threat_anticipation": assembly.Threat,
+		"investigation_report": assembly.Report,
+		"court": court,
+		"evidence_policy": map[string]any{
+			"signed_deterministic_verdict_is_authoritative": true,
+			"court_is_read_only_commentary": true,
+			"numeric_final_score_disabled": true,
+			"numeric_rug_probability_disabled": true,
+			"no_evidence_no_claim": true,
+			"unsigned_investigation_is_not_server_failure": true,
+		},
+	})
+}''',
+)
+
+court_file = Path("koschei/api/internal/handlers/security_radar_court.go")
+court_file.write_text(court_file.read_text().replace('\t"fmt"\n', ''))
+
+Path("koschei/api/internal/handlers/customer_investigation_response.go").write_text(
+    r'''package handlers
+
+import "koschei/api/internal/services"
+
+func customerInvestigationStatus(final services.UnifiedRadarVerdict, hasLiveEvidence bool) string {
+	if final.Signed && hasLiveEvidence {
+		return "ready"
+	}
+	return "evidence_pending"
+}
+
+func customerInvestigationEnvelope(assembly unifiedInvestigationAssembly, charged bool) map[string]any {
+	hasLiveEvidence := services.SecurityRadarHasLiveEvidence(assembly.Core.Bundle)
+	status := customerInvestigationStatus(assembly.UnifiedVerdict, hasLiveEvidence)
+	message := "Full investigation completed."
+	if status == "evidence_pending" {
+		message = "Investigation completed with evidence gaps; missing evidence is not treated as a safe finding."
+	}
+	return map[string]any{
+		"ok": true,
+		"status": status,
+		"message": message,
+		"target": assembly.Core.Request.Target,
+		"network": assembly.Core.Request.Network,
+		"has_live_evidence": hasLiveEvidence,
+		"charged": charged,
+		"bundle": assembly.Core.Bundle,
+		"arms": assembly.Core.Arms,
+		"final_verdict": assembly.UnifiedVerdict,
+		"investigation_report": assembly.Report,
+		"evidence_policy": map[string]any{
+			"unsigned_investigation_is_not_server_failure": true,
+			"missing_evidence_is_not_safe": true,
+			"numeric_final_score_disabled": true,
+			"numeric_rug_probability_disabled": true,
+		},
+	}
+}
+'''
+)
+
+Path("koschei/api/internal/handlers/customer_investigation_response_test.go").write_text(
+    r'''package handlers
+
+import (
+	"testing"
+
+	"koschei/api/internal/services"
+)
+
+func TestCustomerInvestigationStatusRequiresSignedLiveVerdict(t *testing.T) {
+	tests := []struct {
+		name string
+		final services.UnifiedRadarVerdict
+		live bool
+		want string
+	}{
+		{name: "unsigned live evidence remains pending", final: services.UnifiedRadarVerdict{Grade: "-", Signed: false}, live: true, want: "evidence_pending"},
+		{name: "signed result without live evidence remains pending", final: services.UnifiedRadarVerdict{Grade: "B", Signed: true}, live: false, want: "evidence_pending"},
+		{name: "signed live verdict is ready", final: services.UnifiedRadarVerdict{Grade: "B", Signed: true}, live: true, want: "ready"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := customerInvestigationStatus(test.final, test.live); got != test.want {
+				t.Fatalf("status=%q want=%q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestCustomerInvestigationEnvelopeUnsignedReturnsReportNotError(t *testing.T) {
+	assembly := unifiedInvestigationAssembly{
+		Report: map[string]any{"ok": true, "schema_version": unifiedInvestigationSchemaVersion},
+		Core: holderIntelligenceCoreResult{
+			Request: services.SecurityRadarRequest{Target: "Mint111", Network: "solana-mainnet"},
+		},
+		UnifiedVerdict: services.UnifiedRadarVerdict{Grade: "-", Signed: false, Verdict: "single_observation"},
+	}
+	got := customerInvestigationEnvelope(assembly, false)
+	if got["ok"] != true {
+		t.Fatalf("expected successful report envelope: %#v", got)
+	}
+	if got["status"] != "evidence_pending" {
+		t.Fatalf("status=%v", got["status"])
+	}
+	if _, exists := got["error"]; exists {
+		t.Fatalf("unsigned investigation must not become an error envelope: %#v", got)
+	}
+	if got["investigation_report"] == nil {
+		t.Fatal("investigation report missing")
+	}
+	if got["charged"] != false {
+		t.Fatalf("evidence-pending source-unavailable report must not be charged: %#v", got)
+	}
+}
+'''
+)
+
+for path in (
+    ".github/workflows/apply-customer-radar-502-fix.yml",
+    ".github/workflows/run-customer-radar-502-fix-on-pr.yml",
+    "workflow-patch-error.txt",
+    "scripts/apply_customer_radar_502_fix.py",
+):
+    Path(path).unlink(missing_ok=True)
