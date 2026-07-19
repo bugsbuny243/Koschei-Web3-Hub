@@ -66,6 +66,7 @@ func (h *Handler) cachedArvisHealth(ctx context.Context) map[string]any {
 		"recognized_events":       stats["recognized_events"],
 		"enriched_mints":          stats["enriched_mints"],
 		"visible_verdicts":        stats["visible_verdicts"],
+		"signed_verdicts_total":   stats["signed_verdicts_total"],
 		"processing_active":       stats["processing_active"],
 		"processing_completed":    stats["processing_completed"],
 		"processing_insufficient": stats["processing_insufficient"],

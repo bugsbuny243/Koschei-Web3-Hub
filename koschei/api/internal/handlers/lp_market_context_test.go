@@ -114,7 +114,7 @@ func TestJupiterContextIsOptionalAndReportsSellImpact(t *testing.T) {
 			_, _ = w.Write([]byte(`{"` + mint + `":{"usdPrice":0.25,"blockId":888,"createdAt":"2026-07-17T00:00:00Z"}}`))
 			return
 		}
-		_, _ = w.Write([]byte(`{"outAmount":"90000000","priceImpactPct":"12.5","contextSlot":889,"routePlan":[{"swapInfo":{"label":"Raydium CPMM"}}]}`))
+		_, _ = w.Write([]byte(`{"outAmount":"90000000","priceImpactPct":"0.125","contextSlot":889,"routePlan":[{"swapInfo":{"label":"Raydium CPMM"}}]}`))
 	}))
 	defer server.Close()
 	t.Setenv("JUPITER_PRICE_URL", server.URL+"/price")

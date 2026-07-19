@@ -337,7 +337,10 @@ func collectJupiterMarketContext(ctx context.Context, rpc solanaRPCCall, client 
 					if getOptionalJSON(ctx, client, quoteEndpoint.String(), &quote) == nil && quote.OutAmount != "" {
 						out.Available, out.SellImpactAvailable = true, true
 						out.SellInputAmountRaw, out.SellOutputAmountRaw, out.SellOutputMint = amount, quote.OutAmount, jupiterUSDCMint
-						out.EstimatedPriceImpactPct, _ = strconv.ParseFloat(strings.TrimSpace(quote.PriceImpactPct), 64)
+						impactRatio, parseImpactErr := strconv.ParseFloat(strings.TrimSpace(quote.PriceImpactPct), 64)
+						if parseImpactErr == nil {
+							out.EstimatedPriceImpactPct = roundCollectorPct(math.Max(0, math.Min(1, impactRatio)) * 100)
+						}
 						out.QuoteContextSlot, out.QuoteObservedAt = quote.ContextSlot, time.Now().UTC()
 						for _, route := range quote.RoutePlan {
 							if label := strings.TrimSpace(route.SwapInfo.Label); label != "" {

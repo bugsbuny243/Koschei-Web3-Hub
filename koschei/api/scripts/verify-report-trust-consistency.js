@@ -1,0 +1,12 @@
+const fs = require('fs');
+function need(file, text) {
+  const body = fs.readFileSync(file, 'utf8');
+  if (!body.includes(text)) throw new Error(`${file} missing ${text}`);
+}
+need('public/js/public-solana-scan.js', 'Bekleyen kanıt kolları ve izleme pencereleri');
+need('public/js/public-solana-scan.js', 'HIZLI ÖN KONTROL');
+need('public/js/lp-control-evidence-card.js', 'Havuz hareket geçmişi bu taramada doğrulanamadı');
+need('public/index.html', 'signed_verdicts_total');
+need('public/index.html', 'KAPSAM SINIRI');
+need('public/safe-check.html', 'Holder ve likidite bu sonuçta değerlendirilmedi.');
+console.log('report trust consistency contract verified');
