@@ -1,0 +1,115 @@
+name: Defense OS Proof Semantics Fix
+
+on:
+  push:
+    branches:
+      - feat/solana-defense-os-phases-2-5
+    paths:
+      - .github/workflows/defense-os-proof-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: contains(github.event.head_commit.message, 'Add temporary proof semantics fixer')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/solana-defense-os-phases-2-5
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+      - name: Harden proof and JSON semantics
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          handler = Path('koschei/api/internal/handlers/defense_os.go')
+          s = handler.read_text()
+          old = '''\tstatus := map[string]string{"passed": "verified", "failed": "failed", "partial": "partial", "blocked": "blocked", "tool_unavailable": "blocked"}[verification.Status]
+\tif status == "" { status = "partial" }
+\tvar before sql.NullString
+\t_ = h.DB.QueryRowContext(r.Context(), `SELECT verification_ref FROM defense_verification_runs WHERE finding_ref=$1 AND patch_ref IS NULL ORDER BY created_at DESC LIMIT 1`, findingRef).Scan(&before)
+\tevidence := []string{"verification:" + verification.VerificationRef, "patch:" + patchRef, "artifact:" + verification.SourceArtifactRef}
+\tlimitations := verification.Limitations
+'''
+          new = '''\tstatus := map[string]string{"passed": "partial", "failed": "failed", "partial": "partial", "blocked": "blocked", "tool_unavailable": "blocked"}[verification.Status]
+\tif status == "" {
+\t\tstatus = "partial"
+\t}
+\tvar before, beforeStatus sql.NullString
+\t_ = h.DB.QueryRowContext(r.Context(), `SELECT verification_ref,status FROM defense_verification_runs WHERE finding_ref=$1 AND patch_ref IS NULL ORDER BY created_at DESC LIMIT 1`, findingRef).Scan(&before, &beforeStatus)
+\tevidence := []string{"verification:" + verification.VerificationRef, "patch:" + patchRef, "artifact:" + verification.SourceArtifactRef}
+\tlimitations := append([]string{}, verification.Limitations...)
+\tlimitations = append(limitations, "Generic build or test success is not proof that an exploit path was closed. Verified proof-of-fix requires a versioned reproduction invariant with an unpatched baseline and a patched counter-run.")
+\tif !before.Valid {
+\t\tlimitations = append(limitations, "No unpatched baseline verification was bound to this finding.")
+\t} else {
+\t\tevidence = append(evidence, "baseline_verification:"+before.String, "baseline_status:"+beforeStatus.String)
+\t}
+'''
+          if old not in s:
+              raise SystemExit('proof block not found')
+          s = s.replace(old, new, 1)
+          old_training = '''\tif status == "verified" {
+\t\t_ = h.persistTrainingExample(r, "proof_of_fix", verification.ProgramID, map[string]any{"finding_ref": findingRef, "source_artifact_ref": verification.SourceArtifactRef}, map[string]any{"patch_ref": patchRef, "proof_ref": ref, "verification_ref": verification.VerificationRef}, evidence, "candidate")
+\t}
+'''
+          if old_training not in s:
+              raise SystemExit('proof training block not found')
+          s = s.replace(old_training, '', 1)
+          handler.write_text(s)
+
+          router = Path('koschei/api/internal/router/ai_router.go')
+          s = router.read_text()
+          old = '''\tdec:=json.NewDecoder(strings.NewReader(content[start:end+1])); dec.DisallowUnknownFields(); if err:=dec.Decode(dst);err!=nil{return fmt.Errorf("invalid structured provider output: %w",err)}; return nil
+'''
+          new = '''\tdec := json.NewDecoder(strings.NewReader(content[start : end+1]))
+\tdec.DisallowUnknownFields()
+\tif err := dec.Decode(dst); err != nil {
+\t\treturn fmt.Errorf("invalid structured provider output: %w", err)
+\t}
+\tvar trailing any
+\tif err := dec.Decode(&trailing); err != io.EOF {
+\t\treturn errors.New("provider returned multiple JSON values")
+\t}
+\treturn nil
+'''
+          if old not in s:
+              raise SystemExit('router decode block not found')
+          s = s.replace(old, new, 1)
+          router.write_text(s)
+
+          test = Path('koschei/api/internal/router/ai_router_structured_test.go')
+          s = test.read_text()
+          marker = '''\tif err := DecodeJSONObject("{\\\"summary\\\":\\\"ok\\\",\\\"extra\\\":true}", &out); err == nil {
+\t\tt.Fatal("unknown structured field was accepted")
+\t}
+'''
+          addition = marker + '''\tif err := DecodeJSONObject("{\\\"summary\\\":\\\"one\\\"}{\\\"summary\\\":\\\"two\\\"}", &out); err == nil {
+\t\tt.Fatal("multiple JSON values were accepted")
+\t}
+'''
+          if marker not in s:
+              raise SystemExit('structured output test marker not found')
+          test.write_text(s.replace(marker, addition, 1))
+
+          doc = Path('docs/solana-defense-os-phases-2-5.md')
+          s = doc.read_text()
+          s = s.replace('A successful approved patch verification can create an immutable proof-of-fix record. The proof remains non-authoritative for the token verdict until a future versioned deterministic acceptance rule explicitly consumes it.', 'An approved patch verification creates an immutable proof record, but this release keeps it `partial`. It cannot become `verified` until a versioned exploit-reproduction invariant binds an unpatched baseline to a patched counter-run. The record remains non-authoritative for the token verdict.')
+          doc.write_text(s)
+          PY
+          gofmt -w koschei/api/internal/handlers/defense_os.go koschei/api/internal/router/ai_router.go koschei/api/internal/router/ai_router_structured_test.go
+          cd koschei/api
+          go test ./internal/defense ./internal/router ./internal/handlers ./internal/http
+          go vet ./internal/defense ./internal/router ./internal/handlers ./internal/http
+      - name: Commit fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add koschei/api/internal/handlers/defense_os.go koschei/api/internal/router/ai_router.go koschei/api/internal/router/ai_router_structured_test.go docs/solana-defense-os-phases-2-5.md
+          git commit -m 'Keep proof-of-fix partial until exploit invariant verification'
+          git push origin HEAD:feat/solana-defense-os-phases-2-5
