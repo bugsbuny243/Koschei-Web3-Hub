@@ -8,6 +8,7 @@
   const obj=value=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
   const short=(value,length=56)=>{const text=String(value||'');return text.length>length?`${text.slice(0,length-12)}…${text.slice(-9)}`:text||'—'};
   const rootFor=value=>typeof value==='string'?document.getElementById(value):value;
+  const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const statusLabel=value=>({ready:'BAĞIMSIZ İNCELEME TAMAMLANDI',partial:'KISMİ İNCELEME',error:'İNCELEME HATASI',disabled:'DERİN İNCELEME KAPALI',skipped:'UYGULANMADI',budget_exhausted:'GÜNLÜK LİMİT DOLDU'}[String(value||'').toLowerCase()]||String(value||'BİLİNMİYOR').toUpperCase());
   const stanceLabel=value=>({elevated:'YÜKSELTİLMİŞ İNCELEME',neutral:'NÖTR ANALİZ',insufficient:'KANIT YETERSİZ'}[String(value||'').toLowerCase()]||String(value||'KANIT YETERSİZ').toUpperCase());
   const tone=value=>{const text=String(value||'').toLowerCase();if(text==='ready'||text==='neutral')return'ok';if(text==='error'||text==='elevated')return'bad';return'warn'};
@@ -57,24 +58,51 @@
     appendCourt(root,payload);
   }
 
+  function renderJobProgress(root,job){
+    const status=String(job.status||'queued').toLowerCase();
+    const progress=Math.max(0,Math.min(100,Number(job.progress||0)));
+    const label=status==='queued'?'Kuyrukta':status==='running'?'Soruşturuluyor':status==='completed'?'Tamamlandı':status==='failed'?'Başarısız':status;
+    root.innerHTML=`<div class="card loading"><b>Kalıcı Koschei soruşturması: ${esc(label)}</b><br><span>İlerleme: ${esc(progress)}% · Deneme: ${esc(job.attempts||0)}</span><br><span>Bu iş tarayıcı bağlantısından bağımsız çalışır. Mint → creator → oluşturulan tokenlar → funding → recipient → holder → LP kanıt zinciri tamamlanıyor.</span></div>`;
+  }
+
+  async function pollCanonicalJob(pollUrl,root){
+    for(;;){
+      const response=await fetch(pollUrl,{method:'GET',credentials:'same-origin',cache:'no-store'});
+      let data={};
+      try{data=await response.json()}catch{}
+      if(!response.ok||data.ok===false)throw new Error(data.message||data.detail||data.error||`Job sorgusu başarısız (${response.status})`);
+      const job=obj(data.job);
+      renderJobProgress(root,job);
+      const status=String(job.status||'').toLowerCase();
+      if(status==='completed'){
+        const result=obj(job.result);
+        if(!Object.keys(result).length)throw new Error('Soruşturma tamamlandı ancak canonical sonuç paketi boş döndü.');
+        renderUnified(root,result);
+        return result;
+      }
+      if(status==='failed')throw new Error(job.error_message||job.error_code||'Kalıcı soruşturma işi başarısız oldu.');
+      await sleep(status==='queued'?1800:2500);
+    }
+  }
+
   async function scan(target,rootId){
     const root=rootFor(rootId);
     if(!root)throw new Error('Radar sonuç alanı bulunamadı.');
-    root.innerHTML='<div class="card loading">ARVIS kanıt collectorlarını çalıştırıyor; ardından bağımsız analiz ve teknik tutarlılık katmanları imzalı kanıt paketini okuyacak…</div>';
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),390000);
+    root.innerHTML='<div class="card loading">Kalıcı canonical soruşturma işi oluşturuluyor…</div>';
     try{
-      const response=await fetch('/api/owner/radar/unified',{method:'POST',credentials:'same-origin',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({target,network:'solana-mainnet',live_evidence:true,court:true,extended_court:true})});
+      const response=await fetch('/api/owner/radar/jobs',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({target,network:'solana-mainnet',max_depth:1})});
       let data={};
       try{data=await response.json()}catch{}
-      if(!response.ok||data.ok===false)throw new Error(data.message||data.detail||data.error||`İstek başarısız (${response.status})`);
-      renderUnified(root,data);
-      return data;
+      if(!response.ok||data.ok===false)throw new Error(data.message||data.detail||data.error||`İş oluşturulamadı (${response.status})`);
+      const pollUrl=String(data.poll_url||'');
+      if(!pollUrl)throw new Error('Canonical job poll adresi üretilmedi.');
+      renderJobProgress(root,obj(data.job));
+      return await pollCanonicalJob(pollUrl,root);
     }catch(error){
-      const message=error?.name==='AbortError'?'Geniş analiz 390 saniyede tamamlanamadı.':(error?.message||'Geniş analiz başarısız oldu.');
+      const message=error?.message||'Kalıcı soruşturma başlatılamadı.';
       root.innerHTML=`<div class="card error-state"><div><b>Geniş araştırma raporu tamamlanamadı.</b><span>${esc(message)}</span></div></div>`;
       throw error;
-    }finally{clearTimeout(timer)}
+    }
   }
 
   window.OwnerRadarKit={...kit,scan,renderUnified,renderCourt};
