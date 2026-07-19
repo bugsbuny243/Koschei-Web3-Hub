@@ -16,9 +16,9 @@ type actorExternalDiscoveryRun struct {
 	Limitations         []string                        `json:"limitations"`
 }
 
-func (h *Handler) collectActorExternalDiscovery(ctx context.Context, store *services.ActorDefenseStore, wallet, network string) actorExternalDiscoveryRun {
+func newActorExternalDiscoveryRun(wallet string) actorExternalDiscoveryRun {
 	wallet = strings.TrimSpace(wallet)
-	out := actorExternalDiscoveryRun{
+	return actorExternalDiscoveryRun{
 		Status: "not_requested",
 		Discovery: services.SolscanActorDiscovery{
 			Status: "not_requested", Provider: "solscan_pro_api_v2", Wallet: wallet,
@@ -28,6 +28,11 @@ func (h *Handler) collectActorExternalDiscovery(ctx context.Context, store *serv
 		},
 		Limitations: []string{},
 	}
+}
+
+func (h *Handler) collectActorExternalDiscovery(ctx context.Context, store *services.ActorDefenseStore, wallet, network string) actorExternalDiscoveryRun {
+	wallet = strings.TrimSpace(wallet)
+	out := newActorExternalDiscoveryRun(wallet)
 	if wallet == "" {
 		out.Status = "wallet_required"
 		out.Limitations = append(out.Limitations, "Solscan actor discovery için wallet hedefi çözümlenemedi.")
