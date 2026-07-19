@@ -81,9 +81,14 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	}
 	actorTrack := services.ActorDefenseTrack{Network: network, TargetKind: "wallet", TargetID: creator, Dossier: map[string]any{}}
 	actorStoreStatus := "creator_unavailable"
+	creatorRelation := newActorCreatorRelationRun(creator, target)
+	distributionRun := newActorDistributionIntegrationRun(creator, target)
 	var store *services.ActorDefenseStore
 	if db != nil && creator != "" {
 		store = services.NewActorDefenseStore(db)
+		if liveRequested {
+			creatorRelation = h.persistCanonicalCreatorMintRelation(ctx, store, core, creator, network)
+		}
 		if loaded, err := store.LoadPersistentWalletDossier(ctx, creator, network, 150); err == nil {
 			actorDossier, actorTrack, actorStoreStatus = loaded, loaded.Track, "loaded"
 		} else {
@@ -107,12 +112,13 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	externalDiscovery := newActorExternalDiscoveryRun(creator)
 
 	// A token scan must not stop after discovering the creator address. Full/live
-	// modes now invoke external discovery plus the existing wallet-first actor
-	// collectors, persist their evidence, and reload the dossier before rules run.
+	// modes invoke creator relation persistence, Solscan discovery, funding origin,
+	// wallet evidence and the existing mint-specific distribution investigator.
 	// Safe Check and stored-only projections remain network-call free.
 	if liveRequested && creator != "" {
 		externalDiscovery = h.collectActorExternalDiscovery(ctx, store, creator, network)
 		actorRun.Limitations = append(actorRun.Limitations, externalDiscovery.Limitations...)
+		actorRun.Limitations = append(actorRun.Limitations, creatorRelation.Limitations...)
 	}
 	if liveRequested {
 		switch {
@@ -126,8 +132,8 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			actorRun.Status = "collecting"
 			actorRun.FundingOrigin, actorRun.FundingOriginPersistence = h.collectActorFundingOrigin(ctx, store, creator, network)
 
-			// Solscan observations and funding evidence can enrich the persistent
-			// dossier before transaction parsing starts.
+			// Solscan observations, current creator relation and funding evidence can
+			// enrich the dossier before transaction parsing starts.
 			if loaded, err := store.LoadPersistentWalletDossier(ctx, creator, network, 200); err == nil {
 				actorDossier, actorTrack = loaded, loaded.Track
 				actorStoreStatus = "discovery_funding_refreshed"
@@ -136,12 +142,14 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			}
 
 			actorRun.LiveEvidence = h.collectActorDefenseLiveEvidence(ctx, store, actorDossier)
-			if loaded, err := store.LoadPersistentWalletDossier(ctx, creator, network, 250); err == nil {
+			distributionRun = h.collectCanonicalActorDistribution(ctx, store, creatorRelation, network)
+			actorRun.Limitations = append(actorRun.Limitations, distributionRun.Limitations...)
+			if loaded, err := store.LoadPersistentWalletDossier(ctx, creator, network, 200); err == nil {
 				actorDossier, actorTrack = loaded, loaded.Track
-				actorStoreStatus = "live_refreshed"
+				actorStoreStatus = "live_distribution_refreshed"
 			} else {
 				actorStoreStatus = "live_refresh_failed"
-				actorRun.Limitations = append(actorRun.Limitations, "Canlı actor kanıtı toplandıktan sonra kalıcı dossier yenilenemedi.")
+				actorRun.Limitations = append(actorRun.Limitations, "Canlı actor ve dağıtım kanıtı toplandıktan sonra kalıcı dossier yenilenemedi.")
 			}
 
 			switch actorRun.LiveEvidence.Status {
@@ -150,6 +158,9 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			case "not_requested", "stored_evidence_only":
 				actorRun.Status = actorRun.LiveEvidence.Status
 			default:
+				actorRun.Status = "partial"
+			}
+			if distributionRun.Status == "partial_persistence" || distributionRun.Status == "creator_mint_relation_unresolved" {
 				actorRun.Status = "partial"
 			}
 		}
@@ -230,10 +241,12 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 		"actor_investigation": map[string]any{
 			"wallet": creator, "dossier": actorDossier, "rule_verdict": actorVerdict,
 			"store_status": actorStoreStatus, "integration_run": actorRun,
+			"current_creator_relation": creatorRelation,
 			"external_discovery": externalDiscovery,
 			"funding_origin": actorRun.FundingOrigin,
 			"funding_origin_persistence": actorRun.FundingOriginPersistence,
 			"actor_live_evidence": actorRun.LiveEvidence,
+			"current_token_distribution": distributionRun,
 			// Backward-compatible token live-wallet coverage retained for existing UI clients.
 			"live_wallet_evidence": liveEvidence.WalletCoverage,
 			"rule_verdict_persistence": actorRun.RuleVerdictPersistence,
@@ -245,6 +258,8 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			"threat_capacity_is_not_intent": true, "no_evidence_no_claim": true,
 			"identity_scope": "onchain_wallet_only", "caller_type_changes_evidence": false,
 			"external_attribution_is_observed_only": true,
+			"recipient_full_wallet_history": false,
+			"recipient_investigation_scope": "mint_specific_token_accounts",
 			"jupiter_context_can_change_verdict": false, "lp_control_arm_can_change_grade": false,
 			"corpus_percentile_can_change_verdict": false,
 			"live_transaction_rows_can_change_grade": false,
