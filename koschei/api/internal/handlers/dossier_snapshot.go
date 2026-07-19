@@ -22,6 +22,12 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 		}
 		h.attachDefenseAgentRuntime(ctx, report, target, network, generatedAt)
 	}
+
+	// Diagnostics mutate the exact canonical report before hashing. Actor evidence
+	// graph and capability reachability therefore become part of the immutable
+	// dossier source instead of a UI-only projection.
+	attachCanonicalInvestigationDiagnostics(report)
+
 	if h.DB == nil {
 		return nil
 	}
