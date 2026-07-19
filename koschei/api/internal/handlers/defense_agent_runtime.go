@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"koschei/api/internal/defense"
@@ -10,7 +11,7 @@ import (
 func (h *Handler) attachDefenseAgentRuntime(ctx context.Context, report map[string]any, target, network string, now time.Time) defense.RuntimeReport {
 	runtime := defense.DisabledReport(target, network, now)
 	if envBool("KOSCHEI_DEFENSE_AGENT_RUNTIME_ENABLED", false) {
-		runtime = defense.RunShadow(target, network, report, now)
+		runtime = defense.RunShadow(target, network, defenseRuntimeProjection(report), now)
 		if h.DB == nil {
 			defense.SetPersistenceStatus(&runtime, "database_unavailable")
 		} else if persisted, err := defense.PersistRuntimeReport(ctx, h.DB, runtime); err == nil {
@@ -30,4 +31,19 @@ func (h *Handler) attachDefenseAgentRuntime(ctx context.Context, report map[stri
 	policy["defense_agent_runtime_can_execute_mainnet"] = false
 	policy["defense_agent_runtime_can_modify_source"] = false
 	return runtime
+}
+
+func defenseRuntimeProjection(report map[string]any) map[string]any {
+	if report == nil {
+		return map[string]any{}
+	}
+	encoded, err := json.Marshal(report)
+	if err != nil {
+		return report
+	}
+	var normalized map[string]any
+	if json.Unmarshal(encoded, &normalized) != nil || normalized == nil {
+		return report
+	}
+	return normalized
 }
