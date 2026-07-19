@@ -42,7 +42,7 @@
       resultLabel(payload),
       evidenceLabel(payload)
     ];
-    if (signature) rows.push(`Doğrulama: ${short(signature)}`);
+    if (signature && signature !== '—') rows.push(`Doğrulama: ${short(signature)}`);
     rows.push('Eksik kanıt güvenli sayılmaz. #Koschei #SolanaSecurity');
     const text = rows.join('\n');
     return text.length > 260 ? `${text.slice(0, 257).trimEnd()}…` : text;
@@ -61,5 +61,46 @@
     return intent;
   }
 
-  window.KoscheiInvestigationShare = Object.freeze({ publicResultURL, buildText, buildIntent, open });
+  function installRadarShare() {
+    if (!/^\/security-radar(?:\.html)?\/?$/.test(location.pathname)) return;
+    const reportBody = document.getElementById('reportBody');
+    const reportBox = reportBody?.closest('.reportbox');
+    if (!reportBody || !reportBox || document.getElementById('shareRadarResult')) return;
+
+    const button = document.createElement('button');
+    button.id = 'shareRadarResult';
+    button.type = 'button';
+    button.className = 'btn';
+    button.textContent = "X'te paylaş";
+    button.hidden = true;
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.style.marginBottom = '14px';
+    actions.appendChild(button);
+    reportBox.insertBefore(actions, reportBody);
+
+    let payload = {};
+    const refresh = () => {
+      const target = clean(reportBody.querySelector('.target-full')?.textContent);
+      if (!target) {
+        button.hidden = true;
+        payload = {};
+        return;
+      }
+      const grade = clean(reportBody.querySelector('.scorebox strong')?.textContent);
+      const signature = clean(reportBody.querySelector('.signature')?.textContent).replace(/^İmza:\s*/i, '');
+      const statusText = clean(reportBody.querySelector('.creator-warning .pill')?.textContent || reportBody.querySelector('.verdict-head .pill')?.textContent).toLowerCase();
+      const status = statusText.includes('pending') || statusText.includes('eksik') ? 'evidence_pending' : 'ready';
+      payload = { target, kind: 'token', grade, signature, status, url: publicResultURL(target, 'token') };
+      button.hidden = false;
+    };
+
+    button.addEventListener('click', () => open(payload));
+    new MutationObserver(refresh).observe(reportBody, { childList: true, subtree: true, characterData: true });
+    refresh();
+  }
+
+  window.KoscheiInvestigationShare = Object.freeze({ publicResultURL, buildText, buildIntent, open, installRadarShare });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installRadarShare, { once: true });
+  else installRadarShare();
 })();
