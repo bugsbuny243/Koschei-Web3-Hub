@@ -8,12 +8,13 @@ import (
 )
 
 type actorExternalDiscoveryRun struct {
-	Status              string                          `json:"status"`
-	Discovery           services.SolscanActorDiscovery `json:"discovery"`
-	EvidenceProduced    int                             `json:"evidence_produced"`
-	EvidencePersisted   int                             `json:"evidence_persisted"`
-	PersistenceFailures int                             `json:"persistence_failures"`
-	Limitations         []string                        `json:"limitations"`
+	Status               string                          `json:"status"`
+	Discovery            services.SolscanActorDiscovery `json:"discovery"`
+	CreatedMintPortfolio actorCreatedMintIntegrationRun `json:"created_mint_portfolio"`
+	EvidenceProduced     int                             `json:"evidence_produced"`
+	EvidencePersisted    int                             `json:"evidence_persisted"`
+	PersistenceFailures  int                             `json:"persistence_failures"`
+	Limitations          []string                        `json:"limitations"`
 }
 
 func newActorExternalDiscoveryRun(wallet string) actorExternalDiscoveryRun {
@@ -26,6 +27,7 @@ func newActorExternalDiscoveryRun(wallet string) actorExternalDiscoveryRun {
 			TokenAccounts: []services.SolscanTokenAccountObservation{},
 			EndpointStatus: map[string]string{}, Limitations: []string{},
 		},
+		CreatedMintPortfolio: newActorCreatedMintIntegrationRun(wallet),
 		Limitations: []string{},
 	}
 }
@@ -39,10 +41,18 @@ func (h *Handler) collectActorExternalDiscovery(ctx context.Context, store *serv
 		return out
 	}
 
+	// Created-mint discovery is a sibling Solscan query with server-side signer and
+	// program filters. Its candidates are independently verified through Solana RPC.
+	out.CreatedMintPortfolio = h.collectActorCreatedMintPortfolio(ctx, store, wallet, network)
+	out.Limitations = append(out.Limitations, out.CreatedMintPortfolio.Limitations...)
+
 	out.Discovery = services.FetchSolscanActorDiscovery(ctx, wallet, 40)
 	out.Status = out.Discovery.Status
 	out.Limitations = append(out.Limitations, out.Discovery.Limitations...)
 	if !out.Discovery.Available {
+		if out.CreatedMintPortfolio.Discovery.Available {
+			out.Status = "partial_created_mint_portfolio"
+		}
 		return out
 	}
 
