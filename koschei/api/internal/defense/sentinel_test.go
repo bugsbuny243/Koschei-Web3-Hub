@@ -72,7 +72,7 @@ func TestProgramMonitorUpsertAndDisable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !monitor.Active || monitor.IntervalSeconds != 120 || monitor.LastStatus != "pending" || monitor.Network != "solana-mainnet" {
+	if !monitor.Active || monitor.IntervalSeconds != 120 || monitor.LastStatus != "pending" || monitor.Network != "mainnet" {
 		t.Fatalf("unexpected monitor: %+v", monitor)
 	}
 	disabled, err := DisableProgramMonitor(ctx, db, monitor.MonitorRef)
