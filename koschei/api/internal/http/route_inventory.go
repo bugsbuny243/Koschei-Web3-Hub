@@ -29,7 +29,8 @@ func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 			"Legacy Shopier, Paddle, package purchase and owner payment routes are not registered.",
 			"Evidence-backed verdicts must not be signed without verified evidence.",
 			"Recipient fate investigation is mint-specific ATA-only and never queries recipient-wide signature history.",
-			"The owner unified Radar is manual-only and joins 14 legacy ARVIS arms, actor investigation and four deterministic behavior rules.",
+			"Canonical investigation jobs accept token mint, wallet or token-account targets and continue after the HTTP request ends.",
+			"Owner, customer and automatic Pump discovery routes feed the same canonical investigation worker.",
 		},
 	})
 }
@@ -51,13 +52,15 @@ func productionRouteInventory() []routeInventoryGroup {
 		}},
 		{Name: "owner", Auth: "owner_session", Routes: []string{
 			"POST /api/owner/login", "POST /api/owner/logout", "GET /api/owner/command-center", "GET /api/owner/route-map",
-			"POST /api/owner/radar/unified", "GET /api/owner/defense/tracks", "POST /api/owner/defense/investigate", "POST /api/owner/defense/distribution",
+			"POST /api/owner/radar/unified", "POST /api/owner/radar/jobs", "GET /api/owner/radar/jobs/{id}",
+			"GET /api/owner/defense/tracks", "POST /api/owner/defense/investigate", "POST /api/owner/defense/distribution",
 			"GET /api/owner/users", "POST /api/owner/users/ban", "POST /api/owner/users/remove", "POST /api/owner/command",
 			"POST /api/owner/brain", "/api/owner/chat", "GET /api/owner/health", "GET /api/owner/status",
 		}},
 		{Name: "premium_radar_and_reports", Auth: "customer_session_plus_kosch", Routes: []string{
 			"POST /api/v1/token/extensions", "POST /api/v1/address-poisoning/check",
-			"GET /api/v1/radar/feed", "POST /api/v1/radar/check", "GET /api/v1/radar/graph", "GET /api/v1/radar/exposure",
+			"GET /api/v1/radar/feed", "POST /api/v1/radar/check", "POST /api/v1/radar/jobs", "GET /api/v1/radar/jobs/{id}",
+			"POST /api/jobs/token-scan", "GET /api/jobs/{id}", "GET /api/v1/radar/graph", "GET /api/v1/radar/exposure",
 		}},
 		{Name: "developer_api", Auth: "api_key_plus_live_kosch_holder", Routes: []string{
 			"POST /api/v1/scan/token", "GET /api/v1/usage", "POST /api/v1/shield/preflight",
