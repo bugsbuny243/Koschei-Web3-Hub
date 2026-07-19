@@ -10,7 +10,7 @@ const pump=card.render({lp_control:{
   pool_address:'PumpPool111',pool_program:'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA',read_slot:900,canonical_pool:true,
   token_vault:'TokenVault111',quote_vault:'QuoteVault111',token_reserve:2000,quote_reserve:100,virtual_quote_reserve:5,
   reserve_liquidity_usd:4000,lp_mint:'LPMint111',lp_supply:1000,burned_share_pct:90,creator_lp_share_pct:0,
-	creator_relation:'verified_pool_creator',dominant_lp_owner:'LPControlOwner111',dominant_lp_share_pct:90,dominant_lp_classification:'burn_address',
+  creator_relation:'verified_pool_creator',dominant_lp_owner:'LPControlOwner111',dominant_lp_share_pct:90,dominant_lp_classification:'burn_address',
   movement_status:'observed',movement_window_signatures:20,movement_window_parsed:12,movement_window_failures:0,
   liquidity_movements:[{kind:'remove_liquidity',signature:'RemoveLiquiditySignature111',slot:901,block_time:'2026-07-17T18:00:00Z',actor_wallet:'Actor111',creator_relation:'verified_pool_creator_signer',verification_status:'VERIFIED',token_delta:-50,quote_delta:-10}]
 }},{lang:'tr'});
@@ -26,10 +26,19 @@ const meteora=card.render({lp_control:{
   pool_liquidity_raw:'1000',permanent_locked_liquidity_raw:'250',permanent_locked_share_pct:25,
   movement_status:'complete_no_movement_observed',movement_window_signatures:10,movement_window_parsed:8,movement_window_failures:0,liquidity_movements:[]
 }},{lang:'tr'});
-for(const expected of ['meteora_damm_v2','POSITION NFT','25%','8 parsed','10 signatures']){
+for(const expected of ['meteora_damm_v2','POSITION NFT','25%','Sınırlı pencerede add/remove hareketi gözlenmedi','10 imza görüldü','8 işlem ayrıştırıldı','Teknik toplama ayrıntısı']){
   if(!meteora.includes(expected))throw new Error(`Meteora card missing: ${expected}`);
 }
 if(meteora.includes('LP mint</label>'))throw new Error('position-NFT pool rendered an LP mint field');
+
+const failed=card.render({lp_control:{
+  status:'unverified',pool_type:'pumpswap_amm',pool_address:'FailedPool111',pool_program:'Program111',
+  movement_status:'collection_failed',movement_window_signatures:0,movement_window_parsed:0,movement_window_failures:1,liquidity_movements:[]
+}},{lang:'tr'});
+for(const expected of ['Havuz hareket geçmişi bu taramada doğrulanamadı','likidite hareketi olmadığı anlamına gelmez','1 kaynak hatası']){
+  if(!failed.includes(expected))throw new Error(`failed-source copy missing: ${expected}`);
+}
+if(failed.includes('0 parsed · 0 signatures · 1 failures'))throw new Error('naked technical failure counter leaked into customer view');
 if(card.render({lp_control:{status:'not_applicable'}})!=='')throw new Error('not-applicable pool should not render without an address');
 
 console.log('LP control evidence card contract: ok');
