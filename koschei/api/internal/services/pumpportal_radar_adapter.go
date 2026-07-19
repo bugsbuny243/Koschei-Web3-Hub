@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -97,10 +99,9 @@ func (a *PumpPortalRadarAdapter) HandleEvent(ctx context.Context, ev PumpPortalE
 		return err
 	}
 
-	// Discovery is intentionally cheap. PumpPortal new-token/migration events
-	// are stored for coverage, while the selective 24h USD volume worker decides
-	// whether this mint may consume Solana RPC for a complete ARVIS report.
-	// HARD RULE: do not run a full scan for every new Pump token.
+	// Discovery is intentionally cheap. PumpPortal new-token/migration events are
+	// stored for coverage; the selective 24h volume scheduler decides which mint
+	// may consume RPC through the canonical investigation job worker.
 	return nil
 }
 
@@ -185,11 +186,23 @@ func StartPumpPortalRadarIfEnabled(ctx context.Context, db *sql.DB) func() {
 		log.Printf("pumpportal discovery + non-blocking trade ledger started websocket=%s", cfg.redactedWebsocketHost())
 	}
 	if volumeEnabled {
-		worker := NewPumpHighVolumeRadarWorker(store, nil)
-		go worker.Start(workerCtx)
-		log.Printf("pump selective automatic radar started: volume_window=24h currency=USD threshold=%.0f poll=%s max_reports_per_cycle=%d rpc_saver=%t", worker.ThresholdUSD, worker.PollEvery, worker.MaxReportsPerCycle, SolanaRPCLimitSaverEnabled())
+		if canonicalInvestigationWorkerActive() {
+			log.Printf("legacy inline pump high-volume scanner paused: canonical investigation job scheduler owns selective deep scans")
+		} else {
+			worker := NewPumpHighVolumeRadarWorker(store, nil)
+			go worker.Start(workerCtx)
+			log.Printf("pump selective automatic radar started: volume_window=24h currency=USD threshold=%.0f poll=%s max_reports_per_cycle=%d rpc_saver=%t", worker.ThresholdUSD, worker.PollEvery, worker.MaxReportsPerCycle, SolanaRPCLimitSaverEnabled())
+		}
 	}
 	return cancel
+}
+
+func canonicalInvestigationWorkerActive() bool {
+	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_CANONICAL_JOB_WORKER_ENABLED")); raw != "" {
+		value, err := strconv.ParseBool(raw)
+		return err == nil && value
+	}
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
 }
 
 func resolvePumpPortalMint(ev PumpPortalEvent) string {
