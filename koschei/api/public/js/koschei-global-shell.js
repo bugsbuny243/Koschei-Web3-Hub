@@ -86,6 +86,15 @@
     };
   }
 
+  function loadInvestigationShare(current){
+    if(current!=='/security-radar'||window.KoscheiInvestigationShare||document.querySelector('script[data-koschei-investigation-share]'))return;
+    var script=document.createElement('script');
+    script.src='/js/investigation-share.js?v=1';
+    script.async=true;
+    script.dataset.koscheiInvestigationShare='true';
+    document.head.appendChild(script);
+  }
+
   ready(function(){
     var links=[['/scan','Token Tara'],['/transaction-shield','İşlem Kalkanı'],['/safe-check','Güvenli Kontrol'],['/security-radar','Güvenlik Radarı'],['/dashboard','Panel'],['/kosch','KOSCH']];
     var current=(location.pathname||'/').replace(/\.html$/,'').replace(/\/$/,'')||'/';
@@ -103,6 +112,7 @@
     if(current==='/security-radar')document.title='Koschei ARVIS — Tam Güvenlik Radarı';
     translate(document.body);
     installLandingQuickCheck(current);
+    loadInvestigationShare(current);
     var observer=new MutationObserver(function(records){records.forEach(function(record){record.addedNodes.forEach(function(node){if(node.nodeType===1)translate(node);else if(node.nodeType===3&&node.parentElement){var next=translateString(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;}});});});
     observer.observe(document.body,{childList:true,subtree:true,characterData:false});
   });
