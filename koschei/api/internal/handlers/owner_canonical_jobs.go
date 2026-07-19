@@ -72,7 +72,7 @@ func (h *Handler) OwnerCreateCanonicalInvestigationJob(w http.ResponseWriter, r 
 		Network: network, Target: resolvedTarget, Request: payload,
 	}, dedupe)
 	if err != nil {
-		writeAPIError(w, http.StatusInternalServerError, APICodeInternal, "Canonical investigation job could not be created")
+		writeAPIError(w, http.StatusInternalServerError, APICodeInternalError, "Canonical investigation job could not be created")
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{
