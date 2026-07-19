@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,6 +15,8 @@ import (
 )
 
 var errScanQuotaExceeded = errors.New("scan quota exceeded")
+
+const quotaDecisionBodyLimit = 4 << 20
 
 type tokenAccessRequestContext struct {
 	Evaluation  tokenAccessEvaluation
@@ -145,24 +148,26 @@ func enforceScanQuota(ledger scanQuotaLedger, next http.HandlerFunc) http.Handle
 		w.Header().Set("X-Koschei-Quota-Reset", status.ResetsAt.Format(time.RFC3339))
 
 		tracker := &quotaResponseWriter{ResponseWriter: w, status: http.StatusOK}
-		succeeded := false
+		consumeReservation := false
 		defer func() {
 			if recovered := recover(); recovered != nil {
 				refundQuotaDetached(ledger, reservation)
 				panic(recovered)
 			}
-			if !succeeded {
+			if !consumeReservation {
 				refundQuotaDetached(ledger, reservation)
 			}
 		}()
 		next(tracker, r)
-		succeeded = tracker.status >= 200 && tracker.status < 400
+		consumeReservation = tracker.shouldConsumeQuota()
 	}
 }
 
 type quotaResponseWriter struct {
 	http.ResponseWriter
-	status int
+	status        int
+	bodySample    []byte
+	bodyTruncated bool
 }
 
 func (w *quotaResponseWriter) WriteHeader(status int) {
@@ -171,7 +176,37 @@ func (w *quotaResponseWriter) WriteHeader(status int) {
 }
 
 func (w *quotaResponseWriter) Write(body []byte) (int, error) {
+	remaining := quotaDecisionBodyLimit - len(w.bodySample)
+	if remaining > 0 {
+		if len(body) <= remaining {
+			w.bodySample = append(w.bodySample, body...)
+		} else {
+			w.bodySample = append(w.bodySample, body[:remaining]...)
+			w.bodyTruncated = true
+		}
+	} else if len(body) > 0 {
+		w.bodyTruncated = true
+	}
 	return w.ResponseWriter.Write(body)
+}
+
+func (w *quotaResponseWriter) shouldConsumeQuota() bool {
+	if w == nil || w.status < http.StatusOK || w.status >= http.StatusBadRequest {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(w.Header().Get("X-Koschei-Quota-Consume")), "false") {
+		return false
+	}
+	if w.bodyTruncated || len(w.bodySample) == 0 {
+		return true
+	}
+	var envelope struct {
+		Charged *bool `json:"charged"`
+	}
+	if err := json.Unmarshal(w.bodySample, &envelope); err == nil && envelope.Charged != nil {
+		return *envelope.Charged
+	}
+	return true
 }
 
 func refundQuotaDetached(ledger scanQuotaLedger, reservation premiumOutputReservation) {
