@@ -15,4 +15,7 @@ func TestDecodeJSONObject(t *testing.T) {
 	if err := DecodeJSONObject("{\"summary\":\"ok\",\"extra\":true}", &out); err == nil {
 		t.Fatal("unknown structured field was accepted")
 	}
+	if err := DecodeJSONObject("{\"summary\":\"one\"}{\"summary\":\"two\"}", &out); err == nil {
+		t.Fatal("multiple JSON values were accepted")
+	}
 }
