@@ -101,6 +101,11 @@ func main() {
 	}
 	defer jobQueue.Close()
 
+	// Existing web3_jobs rows now have a real consumer. Deep canonical scans are
+	// detached from HTTP request lifetime and processed sequentially by default.
+	stopCanonicalWorker := handlers.StartCanonicalInvestigationJobWorker(appCtx, conn, readConn, solanaRPC, jobStore)
+	defer stopCanonicalWorker()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
