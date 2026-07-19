@@ -1,8 +1,8 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -76,7 +76,7 @@ func (h *Handler) OwnerCreateCanonicalInvestigationJob(w http.ResponseWriter, r 
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{
-		"ok": true, "created": created, "job": jobs.Public(job),
+		"ok": true, "created": created, "job": canonicalOwnerJobResponse(job),
 		"target": target, "resolved_target": resolvedTarget,
 		"target_classification": classification,
 		"poll_url": "/api/owner/radar/jobs/" + job.ID,
@@ -98,7 +98,32 @@ func (h *Handler) OwnerGetCanonicalInvestigationJob(w http.ResponseWriter, r *ht
 		writeAPIError(w, http.StatusNotFound, APICodeNotFound, "Job not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "job": jobs.Public(job)})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "job": canonicalOwnerJobResponse(job)})
+}
+
+func canonicalOwnerJobResponse(job jobs.Job) map[string]any {
+	out := map[string]any{
+		"id": job.ID,
+		"job_type": job.Type,
+		"status": job.Status,
+		"network": job.Network,
+		"target": job.Target,
+		"progress": job.Progress,
+		"attempts": job.Attempts,
+		"queued_at": job.QueuedAt,
+		"updated_at": job.UpdatedAt,
+	}
+	if len(job.ResultPayload) > 0 && string(job.ResultPayload) != "null" {
+		var result any
+		if json.Unmarshal(job.ResultPayload, &result) == nil {
+			out["result"] = result
+		}
+	}
+	if strings.TrimSpace(job.ErrorCode) != "" {
+		out["error_code"] = job.ErrorCode
+		out["error_message"] = job.ErrorMessage
+	}
+	return out
 }
 
 func lastCanonicalJobPathSegment(value string) string {
@@ -111,8 +136,4 @@ func lastCanonicalJobPathSegment(value string) string {
 		return ""
 	}
 	return id
-}
-
-func canonicalJobProgressLabel(progress int) string {
-	return strconv.Itoa(progress) + "%"
 }
