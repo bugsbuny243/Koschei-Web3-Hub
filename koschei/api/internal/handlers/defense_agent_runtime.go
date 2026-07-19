@@ -10,15 +10,16 @@ import (
 
 func (h *Handler) attachDefenseAgentRuntime(ctx context.Context, report map[string]any, target, network string, now time.Time) defense.RuntimeReport {
 	runtime := defense.DisabledReport(target, network, now)
-	if envBool("KOSCHEI_DEFENSE_AGENT_RUNTIME_ENABLED", false) {
-		runtime = defense.RunShadow(target, network, defenseRuntimeProjection(report), now)
-		if h.DB == nil {
-			defense.SetPersistenceStatus(&runtime, "database_unavailable")
-		} else if persisted, err := defense.PersistRuntimeReport(ctx, h.DB, runtime); err == nil {
-			runtime = persisted
-		} else {
-			defense.SetPersistenceStatus(&runtime, "persist_failed")
-		}
+	if !envBool("KOSCHEI_DEFENSE_AGENT_RUNTIME_ENABLED", false) {
+		return runtime
+	}
+	runtime = defense.RunShadow(target, network, defenseRuntimeProjection(report), now)
+	if h.DB == nil {
+		defense.SetPersistenceStatus(&runtime, "database_unavailable")
+	} else if persisted, err := defense.PersistRuntimeReport(ctx, h.DB, runtime); err == nil {
+		runtime = persisted
+	} else {
+		defense.SetPersistenceStatus(&runtime, "persist_failed")
 	}
 	report["defense_agent_runtime"] = runtime
 	policy, ok := report["evidence_policy"].(map[string]any)
