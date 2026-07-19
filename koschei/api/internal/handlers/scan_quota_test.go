@@ -107,6 +107,28 @@ func TestSuccessfulWorkKeepsQuotaReservation(t *testing.T) {
 	}
 }
 
+func TestEvidencePendingResponseRefundsQuotaReservation(t *testing.T) {
+	ledger := &fakeScanQuotaLedger{reserveStatus: scanQuotaStatus{Tier: "basic", Limit: 5, Used: 1, Remaining: 4, ResetsAt: time.Now().UTC().Add(time.Hour)}}
+	rr := httptest.NewRecorder()
+	enforceScanQuota(ledger, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "evidence_pending", "charged": false})
+	})(rr, requestWithTokenAccess("basic"))
+	if ledger.reserves != 1 || ledger.refunds != 1 {
+		t.Fatalf("reserve=%d refund=%d", ledger.reserves, ledger.refunds)
+	}
+}
+
+func TestExplicitChargedResponseKeepsQuotaReservation(t *testing.T) {
+	ledger := &fakeScanQuotaLedger{reserveStatus: scanQuotaStatus{Tier: "basic", Limit: 5, Used: 1, Remaining: 4, ResetsAt: time.Now().UTC().Add(time.Hour)}}
+	rr := httptest.NewRecorder()
+	enforceScanQuota(ledger, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "status": "ready", "charged": true})
+	})(rr, requestWithTokenAccess("basic"))
+	if ledger.reserves != 1 || ledger.refunds != 0 {
+		t.Fatalf("reserve=%d refund=%d", ledger.reserves, ledger.refunds)
+	}
+}
+
 func TestUTCQuotaWindowResetsAtNextDay(t *testing.T) {
 	start, reset, key := utcQuotaWindow(time.Date(2026, 7, 15, 23, 59, 59, 0, time.FixedZone("west", -7*3600)))
 	if start.Location() != time.UTC || reset.Sub(start) != 24*time.Hour || key != "kosch_daily_scan:2026-07-16" {
