@@ -44,6 +44,7 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 	if !roles.Available { distribution, roles = radarDetailHolderDistribution(parent, target) }
 	cluster := services.ArvisHolderClusterFromBundle(bundle)
 	source := h.radarDetailSourceContext(parent, target, network)
+	source = h.resolveCanonicalCreatorSourceContext(parent, target, network, mode, source)
 	launch := h.analyzeLaunchForensics(parent, target, roles, cluster, source)
 	analysis = services.ApplyLaunchForensicsToAnalysis(analysis, req, launch)
 	market := radarDetailMarketSnapshot(parent, target)
