@@ -54,6 +54,20 @@ CREATE TABLE IF NOT EXISTS defense_patch_proposals (
 CREATE INDEX IF NOT EXISTS defense_patch_proposals_program_idx
     ON defense_patch_proposals (program_id, network, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS defense_patch_approvals (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    approval_ref text NOT NULL UNIQUE,
+    patch_ref text NOT NULL REFERENCES defense_patch_proposals(patch_ref) ON DELETE RESTRICT,
+    approved_by text NOT NULL DEFAULT 'owner',
+    approval_reason text NOT NULL,
+    approval_hash text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT defense_patch_approvals_ref_format CHECK (approval_ref ~ '^KPA1-[0-9a-f]{32}$'),
+    CONSTRAINT defense_patch_approvals_hash_format CHECK (approval_hash ~ '^sha256:[0-9a-f]{64}$'),
+    CONSTRAINT defense_patch_approvals_nonempty CHECK (btrim(approved_by) <> '' AND btrim(approval_reason) <> '')
+);
+CREATE INDEX IF NOT EXISTS defense_patch_approvals_patch_idx ON defense_patch_approvals (patch_ref, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS defense_proof_of_fix (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     proof_ref text NOT NULL UNIQUE,
@@ -82,6 +96,9 @@ CREATE TRIGGER defense_verification_runs_immutable BEFORE UPDATE OR DELETE ON de
 FOR EACH ROW EXECUTE FUNCTION reject_defense_runtime_mutation();
 DROP TRIGGER IF EXISTS defense_patch_proposals_immutable ON defense_patch_proposals;
 CREATE TRIGGER defense_patch_proposals_immutable BEFORE UPDATE OR DELETE ON defense_patch_proposals
+FOR EACH ROW EXECUTE FUNCTION reject_defense_runtime_mutation();
+DROP TRIGGER IF EXISTS defense_patch_approvals_immutable ON defense_patch_approvals;
+CREATE TRIGGER defense_patch_approvals_immutable BEFORE UPDATE OR DELETE ON defense_patch_approvals
 FOR EACH ROW EXECUTE FUNCTION reject_defense_runtime_mutation();
 DROP TRIGGER IF EXISTS defense_proof_of_fix_immutable ON defense_proof_of_fix;
 CREATE TRIGGER defense_proof_of_fix_immutable BEFORE UPDATE OR DELETE ON defense_proof_of_fix
