@@ -100,3 +100,35 @@ func TestUnifiedInvestigationLiveModeMarksMissingCreatorExplicitly(t *testing.T)
 		t.Fatal("missing creator did not produce an investigation limitation")
 	}
 }
+
+func TestUnifiedInvestigationProjectsCreatorFieldsFromCanonicalActorResult(t *testing.T) {
+	creator := "CreatorProjection1111111111111111111111111111"
+	core := holderIntelligenceCoreResult{
+		Request: services.SecurityRadarRequest{
+			Target:  "MintProjection111111111111111111111111111111",
+			Network: "solana-mainnet",
+			Mode:    "stored_only_projection",
+		},
+		SourceContext: map[string]any{"creator_wallet": creator},
+		Cluster:       services.HolderClusterAnalysis{Findings: []string{}},
+	}
+
+	assembly := (&Handler{}).assembleUnifiedInvestigationReport(context.Background(), core)
+	intelligence, ok := assembly.Report["creator_intelligence"].(map[string]any)
+	if !ok {
+		t.Fatalf("creator_intelligence projection missing: %#v", assembly.Report["creator_intelligence"])
+	}
+	if !dossierBool(intelligence["available"]) || dossierString(intelligence["creator_wallet"]) != creator {
+		t.Fatalf("creator_intelligence projection invalid: %#v", intelligence)
+	}
+	if _, exists := intelligence["integration_run"]; !exists {
+		t.Fatalf("creator_intelligence lost canonical integration run: %#v", intelligence)
+	}
+	distribution, ok := assembly.Report["creator_distribution"].(map[string]any)
+	if !ok {
+		t.Fatalf("creator_distribution projection missing: %#v", assembly.Report["creator_distribution"])
+	}
+	if dossierString(distribution["status"]) != "not_requested" || dossierBool(distribution["available"]) {
+		t.Fatalf("stored-only distribution projection should remain unavailable: %#v", distribution)
+	}
+}
