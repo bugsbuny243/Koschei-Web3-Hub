@@ -135,7 +135,10 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 			break
 		}
 		plan := plans[i]
-		row := analyzeHolderClusterWalletTiered(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
+		row, enhancedOK := analyzeHolderClusterWalletEnhanced(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
+		if !enhancedOK {
+			row = analyzeHolderClusterWalletTiered(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
+		}
 		if row.Tier == "deep" {
 			out.DeepOwnersScanned++
 		} else {
