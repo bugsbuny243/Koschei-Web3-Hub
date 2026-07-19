@@ -23,10 +23,14 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 		h.attachDefenseAgentRuntime(ctx, report, target, network, generatedAt)
 	}
 
-	// Diagnostics mutate the exact canonical report before hashing. Actor evidence
-	// graph and capability reachability therefore become part of the immutable
-	// dossier source instead of a UI-only projection.
-	attachCanonicalInvestigationDiagnostics(report)
+	// Diagnostics mutate the exact canonical report before hashing. Wallet targets
+	// never fabricate token-only ARVIS coverage; token targets keep the complete
+	// token + actor reachability contract.
+	if strings.EqualFold(strings.TrimSpace(dossierString(report["analysis_scope"])), "wallet_actor_investigation") {
+		attachCanonicalWalletIntegrationCoverage(report)
+	} else {
+		attachCanonicalInvestigationDiagnostics(report)
+	}
 
 	if h.DB == nil {
 		return nil
@@ -36,8 +40,8 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 	if signature == "" || !dossierBool(final["signed"]) {
 		return nil
 	}
-	mint := strings.TrimSpace(dossierString(report["target"]))
-	if mint == "" {
+	target := strings.TrimSpace(dossierString(report["target"]))
+	if target == "" {
 		return nil
 	}
 	network := firstNonEmptyString(dossierString(report["network"]), "solana-mainnet")
@@ -60,7 +64,7 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 		(mint,network,verdict_id,verdict_signature,ruleset_version,produced_at,source_hash,canonical_source,source_payload)
 		VALUES ($1,$2,NULLIF($3,''),$4,$5,$6,$7,$8,$9::jsonb)
 		ON CONFLICT (verdict_signature) DO NOTHING`,
-		mint, network, verdictID, signature, ruleset, producedAt.UTC(), sourceHash, canonical, string(canonical),
+		target, network, verdictID, signature, ruleset, producedAt.UTC(), sourceHash, canonical, string(canonical),
 	)
 	return err
 }
