@@ -19,15 +19,11 @@ func TestAttachDefenseAgentRuntimeIsDisabledByDefault(t *testing.T) {
 	if got.Enabled || got.Status != defense.RuntimeDisabled {
 		t.Fatalf("runtime should remain disabled by default: %+v", got)
 	}
-	policy := report["evidence_policy"].(map[string]any)
-	for _, key := range []string{
-		"defense_agent_runtime_can_change_verdict",
-		"defense_agent_runtime_can_execute_mainnet",
-		"defense_agent_runtime_can_modify_source",
-	} {
-		if value, ok := policy[key].(bool); !ok || value {
-			t.Fatalf("fail-closed policy missing for %s: %#v", key, policy[key])
-		}
+	if _, exists := report["defense_agent_runtime"]; exists {
+		t.Fatalf("disabled runtime mutated the existing Unified Investigation")
+	}
+	if policy := report["evidence_policy"].(map[string]any); len(policy) != 0 {
+		t.Fatalf("disabled runtime changed the legacy evidence policy: %#v", policy)
 	}
 }
 
@@ -53,6 +49,16 @@ func TestAttachDefenseAgentRuntimeAddsShadowFileWithoutDatabase(t *testing.T) {
 	attached, ok := report["defense_agent_runtime"].(defense.RuntimeReport)
 	if !ok || attached.CaseRef != got.CaseRef {
 		t.Fatalf("runtime report was not attached to Unified Investigation: %#v", report["defense_agent_runtime"])
+	}
+	policy := report["evidence_policy"].(map[string]any)
+	for _, key := range []string{
+		"defense_agent_runtime_can_change_verdict",
+		"defense_agent_runtime_can_execute_mainnet",
+		"defense_agent_runtime_can_modify_source",
+	} {
+		if value, ok := policy[key].(bool); !ok || value {
+			t.Fatalf("fail-closed policy missing for %s: %#v", key, policy[key])
+		}
 	}
 }
 
