@@ -1,0 +1,17 @@
+package http
+
+import (
+	"net/http"
+
+	"koschei/api/internal/handlers"
+)
+
+func registerDefenseOSRoutes(mux *http.ServeMux, h *handlers.Handler) {
+	mux.HandleFunc("/api/owner/defense/artifacts", requiresDB(h, ownerOnly(h, h.OwnerDefenseArtifacts)))
+	mux.HandleFunc("/api/owner/defense/knowledge", requiresDB(h, ownerOnly(h, h.OwnerDefenseKnowledge)))
+	mux.HandleFunc("/api/owner/defense/lab", requiresDB(h, ownerOnly(h, h.OwnerDefenseLab)))
+	mux.HandleFunc("/api/owner/defense/deployment", requiresDB(h, ownerOnly(h, h.OwnerDefenseDeployment)))
+	mux.HandleFunc("/api/owner/defense/source-import", requiresDB(h, ownerOnly(h, h.OwnerDefenseSourceImport)))
+	mux.HandleFunc("/api/owner/defense/worker-jobs", requiresDB(h, ownerOnly(h, h.OwnerDefenseWorkerJobs)))
+	mux.HandleFunc("/api/owner/defense/reproduction", requiresDB(h, ownerOnly(h, h.OwnerDefenseReproduction)))
+}
