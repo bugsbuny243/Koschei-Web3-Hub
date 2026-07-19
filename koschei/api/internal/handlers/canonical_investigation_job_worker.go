@@ -50,12 +50,12 @@ type canonicalInvestigationChildQueue struct {
 }
 
 type canonicalInvestigationJobWorker struct {
-	Handler      *Handler
-	Store        *jobs.Store
-	PollEvery    time.Duration
-	StaleAfter   time.Duration
-	Heartbeat    time.Duration
-	ChildLimit   int
+	Handler    *Handler
+	Store      *jobs.Store
+	PollEvery  time.Duration
+	StaleAfter time.Duration
+	Heartbeat  time.Duration
+	ChildLimit int
 }
 
 func CanonicalInvestigationJobWorkerEnabled() bool {
@@ -172,37 +172,62 @@ func (w *canonicalInvestigationJobWorker) processJob(ctx context.Context, job jo
 	}
 	network := strings.TrimSpace(firstNonEmptyString(payload.Network, job.Network, "solana-mainnet"))
 	classification := classifyRadarTarget(ctx, target)
-	if classification.Type != radarTargetTokenMint {
-		return nil, fmt.Errorf("canonical background worker requires a verified token mint; classification=%s", classification.Type)
-	}
 	mode := strings.TrimSpace(payload.Mode)
 	if mode == "" {
 		mode = "background_canonical_investigation"
 	}
 	_ = w.Store.UpdateProgress(ctx, job.ID, 12)
-	assembly := w.Handler.buildUnifiedInvestigationReport(ctx, target, network, mode)
-	_ = w.Store.UpdateProgress(ctx, job.ID, 75)
 
-	if services.SecurityRadarHasLiveEvidence(assembly.Core.Bundle) {
-		if err := w.Handler.saveSecurityRadarBundle(ctx, "system:canonical_job_worker", mode, assembly.Core.Bundle); err != nil {
-			return nil, fmt.Errorf("persist canonical radar bundle: %w", err)
-		}
-	}
-	behaviorPersistence := "not_applicable"
-	if assembly.Store != nil && len(assembly.Behavior.Evidence) > 0 {
-		behaviorPersistence = "persisted"
-		for _, item := range assembly.Behavior.Evidence {
-			item.Network = network
-			if err := assembly.Store.UpsertEvidence(ctx, item); err != nil {
-				behaviorPersistence = "partial_failure"
+	var report map[string]any
+	switch classification.Type {
+	case radarTargetTokenMint:
+		assembly := w.Handler.buildUnifiedInvestigationReport(ctx, target, network, mode)
+		_ = w.Store.UpdateProgress(ctx, job.ID, 75)
+		if services.SecurityRadarHasLiveEvidence(assembly.Core.Bundle) {
+			if err := w.Handler.saveSecurityRadarBundle(ctx, "system:canonical_job_worker", mode, assembly.Core.Bundle); err != nil {
+				return nil, fmt.Errorf("persist canonical radar bundle: %w", err)
 			}
 		}
+		behaviorPersistence := "not_applicable"
+		if assembly.Store != nil && len(assembly.Behavior.Evidence) > 0 {
+			behaviorPersistence = "persisted"
+			for _, item := range assembly.Behavior.Evidence {
+				item.Network = network
+				if err := assembly.Store.UpsertEvidence(ctx, item); err != nil {
+					behaviorPersistence = "partial_failure"
+				}
+			}
+		}
+		unifiedPersistence, unifiedHistory := w.Handler.persistUnifiedRadarVerdict(
+			ctx, assembly.DB, network, "token", target, assembly.UnifiedVerdict, assembly.Behavior,
+		)
+		report = assembly.Report
+		report["final_verdict_persistence"] = unifiedPersistence
+		report["final_verdict_history"] = unifiedHistory
+		report["behavior_evidence_persistence"] = behaviorPersistence
+		attachCanonicalInvestigationDiagnostics(report)
+	case radarTargetWallet:
+		var err error
+		report, err = w.Handler.buildUnifiedWalletInvestigationReport(ctx, target, target, network, true)
+		if err != nil {
+			return nil, fmt.Errorf("build canonical wallet investigation: %w", err)
+		}
+		_ = w.Store.UpdateProgress(ctx, job.ID, 75)
+	case radarTargetTokenAccount:
+		wallet := strings.TrimSpace(classification.TokenOwnerWallet)
+		if wallet == "" {
+			return nil, fmt.Errorf("token account owner wallet could not be resolved")
+		}
+		var err error
+		report, err = w.Handler.buildUnifiedWalletInvestigationReport(ctx, target, wallet, network, true)
+		if err != nil {
+			return nil, fmt.Errorf("build token-account owner investigation: %w", err)
+		}
+		_ = w.Store.UpdateProgress(ctx, job.ID, 75)
+	default:
+		return nil, fmt.Errorf("canonical worker supports token mint, wallet or token account; classification=%s", classification.Type)
 	}
-	unifiedPersistence, unifiedHistory := w.Handler.persistUnifiedRadarVerdict(
-		ctx, assembly.DB, network, "token", target, assembly.UnifiedVerdict, assembly.Behavior,
-	)
 
-	report := assembly.Report
 	report["target_classification"] = classification
 	report["background_job"] = map[string]any{
 		"job_id": job.ID, "job_type": job.Type, "attempt": job.Attempts,
@@ -211,12 +236,8 @@ func (w *canonicalInvestigationJobWorker) processJob(ctx context.Context, job jo
 		"parent_target": payload.ParentTarget, "parent_actor": payload.ParentActor,
 		"depth": payload.Depth, "max_depth": canonicalPayloadMaxDepth(payload),
 	}
-	report["final_verdict_persistence"] = unifiedPersistence
-	report["final_verdict_history"] = unifiedHistory
-	report["behavior_evidence_persistence"] = behaviorPersistence
 	childQueue := w.scheduleCreatedMintChildren(ctx, job, payload, report)
 	report["recursive_child_queue"] = childQueue
-	attachCanonicalInvestigationDiagnostics(report)
 	return report, nil
 }
 
