@@ -13,6 +13,12 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 	if h == nil || report == nil {
 		return nil
 	}
+
+	// The canonical actor engine already collected and persisted creator evidence.
+	// Project that same result to stable top-level fields for API/UI consumers;
+	// never start a second RPC crawl merely to populate presentation aliases.
+	attachCreatorReportProjections(report)
+
 	if _, attached := report["defense_agent_runtime"]; !attached {
 		target := strings.TrimSpace(dossierString(report["target"]))
 		network := firstNonEmptyString(dossierString(report["network"]), "solana-mainnet")
@@ -67,6 +73,85 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 		target, network, verdictID, signature, ruleset, producedAt.UTC(), sourceHash, canonical, string(canonical),
 	)
 	return err
+}
+
+func attachCreatorReportProjections(report map[string]any) {
+	if report == nil || strings.EqualFold(strings.TrimSpace(dossierString(report["analysis_scope"])), "wallet_actor_investigation") {
+		return
+	}
+	actor := dossierMap(report["actor_investigation"])
+	wallet := strings.TrimSpace(dossierString(actor["wallet"]))
+
+	if _, exists := report["creator_intelligence"]; !exists {
+		if wallet == "" {
+			report["creator_intelligence"] = map[string]any{
+				"available": false,
+				"status": "creator_wallet_not_observed",
+				"creator_wallet": "",
+			}
+		} else {
+			run := canonicalProjectionMap(actor["integration_run"])
+			status := firstNonEmptyString(
+				dossierString(run["status"]),
+				dossierString(actor["store_status"]),
+				"observed",
+			)
+			report["creator_intelligence"] = map[string]any{
+				"available": true,
+				"status": status,
+				"creator_wallet": wallet,
+				"dossier": actor["dossier"],
+				"rule_verdict": actor["rule_verdict"],
+				"integration_run": actor["integration_run"],
+				"external_discovery": actor["external_discovery"],
+				"funding_origin": actor["funding_origin"],
+				"actor_live_evidence": actor["actor_live_evidence"],
+				"source": "canonical_actor_investigation",
+			}
+		}
+	}
+
+	if _, exists := report["creator_distribution"]; exists {
+		return
+	}
+	distribution, exists := actor["current_token_distribution"]
+	if !exists || distribution == nil {
+		report["creator_distribution"] = map[string]any{
+			"available": false,
+			"status": "creator_mint_relation_not_resolved",
+		}
+		return
+	}
+	distributionMap := canonicalProjectionMap(distribution)
+	status := firstNonEmptyString(dossierString(distributionMap["status"]), "not_requested")
+	available := status != "not_requested" &&
+		status != "creator_mint_relation_unavailable" &&
+		status != "creator_mint_relation_unresolved" &&
+		status != "persistence_unavailable"
+	report["creator_distribution"] = map[string]any{
+		"available": available,
+		"status": status,
+		"report": distribution,
+		"source": "canonical_actor_distribution",
+	}
+}
+
+func canonicalProjectionMap(value any) map[string]any {
+	if value == nil {
+		return map[string]any{}
+	}
+	if mapped, ok := value.(map[string]any); ok && mapped != nil {
+		return mapped
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return map[string]any{}
+	}
+	mapped := map[string]any{}
+	if json.Unmarshal(encoded, &mapped) != nil {
+		return map[string]any{}
+	}
+	return mapped
 }
 
 func (h *Handler) loadDossierSnapshot(ctx context.Context, mint, verdictID string) (dossierSnapshot, error) {
