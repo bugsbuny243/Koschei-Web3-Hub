@@ -44,14 +44,16 @@ type ActorEvidenceGraph struct {
 }
 
 // BuildActorEvidenceGraph is a pure projection over persistent evidence. It does
-// not infer ownership, identity or intent. The edge verification class is copied
-// directly from the evidence contract.
+// not infer ownership, identity or intent. Edges are created only from explicit
+// ActorDefenseEvidenceRecord rows; dossier inventory can add nodes but never an
+// unsupported relation edge.
 func BuildActorEvidenceGraph(dossier ActorDefenseDossier) ActorEvidenceGraph {
 	actor := strings.TrimSpace(dossier.Wallet)
 	out := ActorEvidenceGraph{
 		ActorWallet: actor, Nodes: []ActorEvidenceGraphNode{}, Edges: []ActorEvidenceGraphEdge{},
 		Policy: map[string]any{
 			"no_evidence_no_edge": true,
+			"inventory_does_not_create_edges": true,
 			"external_attribution_is_observed_only": true,
 			"identity_or_wrongdoing_claim": false,
 		},
@@ -78,16 +80,25 @@ func BuildActorEvidenceGraph(dossier ActorDefenseDossier) ActorEvidenceGraph {
 	}
 	upsertNode(actor, "wallet", "investigated_actor", "verified", map[string]any{"root": true})
 	for _, token := range dossier.Tokens {
-		upsertNode(token.Mint, "token", "created_token", token.VerificationStatus, map[string]any{
-			"creation_signature": token.CreationSignature,
+		status := "observed"
+		if strings.TrimSpace(token.CreatorSignature) == "" {
+			status = "unverified"
+		}
+		upsertNode(token.Mint, "token", actorGraphTokenRole(token.Roles), status, map[string]any{
+			"roles": token.Roles,
+			"creator_signature": token.CreatorSignature,
+			"holder_rank": token.HolderRank,
+			"holder_percentage": token.HolderPercentage,
 			"first_observed_at": token.FirstObservedAt,
 			"last_observed_at": token.LastObservedAt,
 		})
 	}
 	for _, related := range dossier.RelatedActors {
-		upsertNode(related.Wallet, "wallet", related.Role, related.VerificationStatus, map[string]any{
-			"token_mint": related.TokenMint, "occurrence_count": related.OccurrenceCount,
-			"first_observed_at": related.FirstObservedAt, "last_observed_at": related.LastObservedAt,
+		upsertNode(related.Wallet, "wallet", "repeat_related_actor", "observed", map[string]any{
+			"shared_token_count": related.SharedTokenCount,
+			"max_holder_percentage": related.MaxPercentage,
+			"first_observed_at": related.FirstObservedAt,
+			"last_observed_at": related.LastObservedAt,
 		})
 	}
 
@@ -115,7 +126,7 @@ func BuildActorEvidenceGraph(dossier ActorDefenseDossier) ActorEvidenceGraph {
 			VerificationStatus: normalizeActorGraphStatus(evidence.VerificationStatus),
 			Signature: strings.TrimSpace(evidence.Signature), Slot: evidence.Slot,
 			ObservedAt: evidence.ObservedAt, TokenMint: strings.TrimSpace(evidence.TokenMint),
-			TokenAmount: evidence.TokenAmount, NativeAmount: evidence.NativeAmount,
+			TokenAmount: evidence.TokenAmount, NativeAmount: evidence.AmountNative,
 			SourceProvider: strings.TrimSpace(evidence.Source), Metadata: metadata,
 		}
 		key := strings.ToLower(edge.Source + "|" + edge.Target + "|" + edge.Relation + "|" + edge.Signature + "|" + evidence.EvidenceKey)
@@ -159,6 +170,17 @@ func BuildActorEvidenceGraph(dossier ActorDefenseDossier) ActorEvidenceGraph {
 	out.EdgeCount = len(out.Edges)
 	out.Available = out.EdgeCount > 0
 	return out
+}
+
+func actorGraphTokenRole(roles []string) string {
+	for _, preferred := range []string{"creator_deployer", "dominant_holder", "trader"} {
+		for _, role := range roles {
+			if strings.EqualFold(strings.TrimSpace(role), preferred) {
+				return preferred
+			}
+		}
+	}
+	return "related_token"
 }
 
 func actorGraphNodeKind(value string) string {
