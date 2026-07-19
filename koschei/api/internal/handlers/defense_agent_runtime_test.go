@@ -8,6 +8,10 @@ import (
 	"koschei/api/internal/defense"
 )
 
+type defenseRuntimeLPFixture struct {
+	PoolProgram string `json:"pool_program"`
+}
+
 func TestAttachDefenseAgentRuntimeIsDisabledByDefault(t *testing.T) {
 	t.Setenv("KOSCHEI_DEFENSE_AGENT_RUNTIME_ENABLED", "false")
 	report := map[string]any{"evidence_policy": map[string]any{}}
@@ -31,8 +35,8 @@ func TestAttachDefenseAgentRuntimeAddsShadowFileWithoutDatabase(t *testing.T) {
 	t.Setenv("KOSCHEI_DEFENSE_AGENT_RUNTIME_ENABLED", "true")
 	report := map[string]any{
 		"evidence_policy": map[string]any{},
-		"lp_control": map[string]any{
-			"pool_program": "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
+		"lp_control": defenseRuntimeLPFixture{
+			PoolProgram: "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA",
 		},
 	}
 	got := (&Handler{}).attachDefenseAgentRuntime(
@@ -42,6 +46,9 @@ func TestAttachDefenseAgentRuntimeAddsShadowFileWithoutDatabase(t *testing.T) {
 	)
 	if !got.Enabled || !got.ShadowMode || got.VerdictAuthority {
 		t.Fatalf("shadow runtime was not attached safely: %+v", got)
+	}
+	if got.Status != defense.RuntimePartial || len(got.EvidenceIDs) == 0 {
+		t.Fatalf("typed LP program evidence was not resolved: %+v", got)
 	}
 	if got.PersistenceStatus != "database_unavailable" {
 		t.Fatalf("missing database must be explicit without breaking the report: %+v", got)
