@@ -12,6 +12,7 @@ The defense-agent runtime is shadow-only in version 1.
 - It cannot call a compiler, fuzzer, sandbox, model or external artifact source yet.
 - Missing program artifacts remain `evidence_pending`; they are never interpreted as safety.
 - Runtime or persistence failure never removes the existing token, actor, LP, market or threat report.
+- When the feature flag is disabled, the existing Unified Investigation payload is not mutated.
 
 The existing Koschei deterministic engine remains the only verdict authority.
 
@@ -54,13 +55,13 @@ Every tool contract is read-only and has `can_change_verdict=false`. Sandbox-req
 
 ## Unified Investigation contract
 
-Every report receives:
+When the feature flag is enabled, the report receives:
 
 ```json
 {
   "defense_agent_runtime": {
     "schema_version": "koschei-defense-agent-runtime-v1",
-    "execution_mode": "disabled|shadow",
+    "execution_mode": "shadow",
     "verdict_authority": false,
     "can_execute_mainnet": false,
     "can_modify_source": false,
@@ -72,7 +73,7 @@ Every report receives:
 }
 ```
 
-The evidence policy also states that the runtime cannot change the verdict, execute on mainnet or modify source.
+The evidence policy also states that the runtime cannot change the verdict, execute on mainnet or modify source. When the flag is disabled, neither this block nor the additional policy fields are added.
 
 ## Immutable persistence
 
