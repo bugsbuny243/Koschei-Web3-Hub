@@ -10,7 +10,7 @@ func TestBuildActorEvidenceGraphPreservesEvidenceDirectionAndStatus(t *testing.T
 	dossier := ActorDefenseDossier{
 		Wallet: "Creator111",
 		Tokens: []ActorDefenseTokenObservation{
-			{Mint: "Mint111", VerificationStatus: "verified", CreationSignature: "CreateSig111", FirstObservedAt: now, LastObservedAt: now},
+			{Mint: "Mint111", Roles: []string{"creator_deployer"}, CreatorSignature: "CreateSig111", FirstObservedAt: now, LastObservedAt: now},
 		},
 		RelatedActors: []ActorDefenseRelatedActor{},
 		Evidence: []ActorDefenseEvidenceRecord{
@@ -22,7 +22,7 @@ func TestBuildActorEvidenceGraphPreservesEvidenceDirectionAndStatus(t *testing.T
 			{
 				ActorWallet: "Creator111", CounterpartKind: "wallet", CounterpartID: "Funder111",
 				Relation: "funded_by", VerificationStatus: "verified", Signature: "FundSig111", Slot: 90,
-				ObservedAt: now.Add(-time.Minute), NativeAmount: 1.25, Source: "solana_jsonparsed_instruction", Metadata: map[string]any{},
+				ObservedAt: now.Add(-time.Minute), AmountNative: 1.25, Source: "solana_jsonparsed_instruction", Metadata: map[string]any{},
 			},
 			{
 				ActorWallet: "Creator111", CounterpartKind: "service", CounterpartID: "Creator111",
@@ -42,6 +42,9 @@ func TestBuildActorEvidenceGraphPreservesEvidenceDirectionAndStatus(t *testing.T
 			foundFunding = true
 			if edge.Source != "Funder111" || edge.Target != "Creator111" {
 				t.Fatalf("funding edge direction is wrong: %#v", edge)
+			}
+			if edge.NativeAmount != 1.25 {
+				t.Fatalf("funding amount was lost: %#v", edge)
 			}
 		}
 	}
