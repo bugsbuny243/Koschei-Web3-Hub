@@ -105,6 +105,8 @@ func main() {
 	// detached from HTTP request lifetime and processed sequentially by default.
 	stopCanonicalWorker := handlers.StartCanonicalInvestigationJobWorker(appCtx, conn, readConn, solanaRPC, jobStore)
 	defer stopCanonicalWorker()
+	stopCanonicalPumpScheduler := handlers.StartCanonicalPumpJobScheduler(appCtx, conn, jobStore)
+	defer stopCanonicalPumpScheduler()
 
 	port := os.Getenv("PORT")
 	if port == "" {
