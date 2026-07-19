@@ -104,11 +104,16 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 		RuleVerdictPersistence:   "not_requested",
 		Limitations:              []string{},
 	}
+	externalDiscovery := newActorExternalDiscoveryRun(creator)
 
 	// A token scan must not stop after discovering the creator address. Full/live
-	// modes now invoke the existing wallet-first actor collectors, persist their
-	// evidence, and reload the dossier before deterministic actor rules run. Safe
-	// Check and stored-only projections remain RPC-free.
+	// modes now invoke external discovery plus the existing wallet-first actor
+	// collectors, persist their evidence, and reload the dossier before rules run.
+	// Safe Check and stored-only projections remain network-call free.
+	if liveRequested && creator != "" {
+		externalDiscovery = h.collectActorExternalDiscovery(ctx, store, creator, network)
+		actorRun.Limitations = append(actorRun.Limitations, externalDiscovery.Limitations...)
+	}
 	if liveRequested {
 		switch {
 		case creator == "":
@@ -121,13 +126,13 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			actorRun.Status = "collecting"
 			actorRun.FundingOrigin, actorRun.FundingOriginPersistence = h.collectActorFundingOrigin(ctx, store, creator, network)
 
-			// Funding evidence can enrich the persistent dossier before transaction
-			// parsing starts, so reload it once between the two collectors.
+			// Solscan observations and funding evidence can enrich the persistent
+			// dossier before transaction parsing starts.
 			if loaded, err := store.LoadPersistentWalletDossier(ctx, creator, network, 200); err == nil {
 				actorDossier, actorTrack = loaded, loaded.Track
-				actorStoreStatus = "funding_refreshed"
+				actorStoreStatus = "discovery_funding_refreshed"
 			} else {
-				actorRun.Limitations = append(actorRun.Limitations, "Funding-origin toplandıktan sonra actor dossier yenilenemedi.")
+				actorRun.Limitations = append(actorRun.Limitations, "Discovery ve funding-origin toplandıktan sonra actor dossier yenilenemedi.")
 			}
 
 			actorRun.LiveEvidence = h.collectActorDefenseLiveEvidence(ctx, store, actorDossier)
@@ -225,6 +230,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 		"actor_investigation": map[string]any{
 			"wallet": creator, "dossier": actorDossier, "rule_verdict": actorVerdict,
 			"store_status": actorStoreStatus, "integration_run": actorRun,
+			"external_discovery": externalDiscovery,
 			"funding_origin": actorRun.FundingOrigin,
 			"funding_origin_persistence": actorRun.FundingOriginPersistence,
 			"actor_live_evidence": actorRun.LiveEvidence,
@@ -238,6 +244,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			"numeric_final_score_disabled": true, "numeric_rug_probability_disabled": true,
 			"threat_capacity_is_not_intent": true, "no_evidence_no_claim": true,
 			"identity_scope": "onchain_wallet_only", "caller_type_changes_evidence": false,
+			"external_attribution_is_observed_only": true,
 			"jupiter_context_can_change_verdict": false, "lp_control_arm_can_change_grade": false,
 			"corpus_percentile_can_change_verdict": false,
 			"live_transaction_rows_can_change_grade": false,
