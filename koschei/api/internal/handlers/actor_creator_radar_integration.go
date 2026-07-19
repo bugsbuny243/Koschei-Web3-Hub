@@ -10,21 +10,21 @@ import (
 )
 
 type actorCreatorRelationRun struct {
-	Status             string                              `json:"status"`
-	Target             services.ActorDistributionTarget   `json:"target"`
-	Evidence           services.ActorDefenseEvidenceRecord `json:"evidence"`
-	Persistence        string                              `json:"persistence"`
-	Limitations        []string                            `json:"limitations"`
+	Status      string                              `json:"status"`
+	Target      services.ActorDistributionTarget   `json:"target"`
+	Evidence    services.ActorDefenseEvidenceRecord `json:"evidence"`
+	Persistence string                              `json:"persistence"`
+	Limitations []string                            `json:"limitations"`
 }
 
 type actorDistributionIntegrationRun struct {
-	Status              string                               `json:"status"`
-	Target              services.ActorDistributionTarget    `json:"target"`
+	Status              string                                `json:"status"`
+	Target              services.ActorDistributionTarget     `json:"target"`
 	Report              services.ActorInitialRecipientReport `json:"report"`
-	EvidenceProduced    int                                  `json:"evidence_produced"`
-	EvidencePersisted   int                                  `json:"evidence_persisted"`
-	PersistenceFailures int                                  `json:"persistence_failures"`
-	Limitations         []string                             `json:"limitations"`
+	EvidenceProduced    int                                   `json:"evidence_produced"`
+	EvidencePersisted   int                                   `json:"evidence_persisted"`
+	PersistenceFailures int                                   `json:"persistence_failures"`
+	Limitations         []string                              `json:"limitations"`
 }
 
 func newActorCreatorRelationRun(creator, mint string) actorCreatorRelationRun {
@@ -69,7 +69,7 @@ func (h *Handler) persistCanonicalCreatorMintRelation(ctx context.Context, store
 		out.Limitations = append(out.Limitations, "Creator wallet veya token mint çözümlenemedi.")
 		return out
 	}
-	if store == nil {
+	if store == nil || store.DB == nil {
 		out.Status = "persistence_unavailable"
 		out.Limitations = append(out.Limitations, "Actor evidence store kullanılamıyor.")
 		return out
@@ -88,6 +88,39 @@ func (h *Handler) persistCanonicalCreatorMintRelation(ctx context.Context, store
 			observedAt = parsed.UTC()
 		}
 	}
+
+	// Older source-context projections omitted slot. Recover the canonical event
+	// fields directly from the radar ledger before deciding the evidence class.
+	if signature == "" || slot <= 0 {
+		var eventSignature string
+		var eventSlot int64
+		var eventObservedAt time.Time
+		err := store.DB.QueryRowContext(ctx, `
+			SELECT COALESCE(signature,''),COALESCE(slot,0),created_at
+			FROM security_radar_events
+			WHERE network=$1 AND lower(target)=lower($2)
+			  AND (
+				COALESCE(signals->>'creator_wallet','')=$3 OR
+				COALESCE(signals->>'deployer_wallet','')=$3 OR
+				(source='pumpportal' AND source_address=$3)
+			  )
+			ORDER BY
+			  CASE WHEN event_type='pumpportal_high_volume_24h' THEN 0 WHEN source='pumpportal' THEN 1 ELSE 2 END,
+			  created_at DESC
+			LIMIT 1`, network, mint, creator).Scan(&eventSignature, &eventSlot, &eventObservedAt)
+		if err == nil {
+			if signature == "" {
+				signature = strings.TrimSpace(eventSignature)
+			}
+			if slot <= 0 {
+				slot = eventSlot
+			}
+			if !eventObservedAt.IsZero() {
+				observedAt = eventObservedAt.UTC()
+			}
+		}
+	}
+
 	verifiedFlag, _ := source["creator_relation_verified"].(bool)
 	verificationStatus := "observed"
 	if verifiedFlag && signature != "" && slot > 0 {
@@ -140,9 +173,15 @@ func (h *Handler) persistCanonicalCreatorMintRelation(ctx context.Context, store
 	out.Status = verificationStatus
 	if verificationStatus != "verified" {
 		gaps := []string{}
-		if !verifiedFlag { gaps = append(gaps, "verified_source_flag") }
-		if signature == "" { gaps = append(gaps, "signature") }
-		if slot <= 0 { gaps = append(gaps, "slot") }
+		if !verifiedFlag {
+			gaps = append(gaps, "verified_source_flag")
+		}
+		if signature == "" {
+			gaps = append(gaps, "signature")
+		}
+		if slot <= 0 {
+			gaps = append(gaps, "slot")
+		}
 		out.Limitations = append(out.Limitations, "Creator → mint ilişkisi OBSERVED kaldı; eksik doğrulama alanları: "+strings.Join(gaps, ", ")+".")
 	}
 	return out
