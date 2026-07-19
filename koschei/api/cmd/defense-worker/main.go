@@ -40,6 +40,17 @@ func main() {
 		}
 		workerID = "defense-" + host
 	}
+	attestCtx, attestCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	attestations, attestErr := defense.AttestLocalToolchain(attestCtx, conn, workerID)
+	attestCancel()
+	if attestErr != nil {
+		log.Printf("defense worker toolchain attestation failed: %v", attestErr)
+	} else {
+		for _, item := range attestations {
+			log.Printf("defense worker toolchain tool=%s available=%t version=%q", item.ToolName, item.Available, item.VersionOutput)
+		}
+	}
+
 	pollInterval := envDurationSeconds("KOSCHEI_DEFENSE_WORKER_POLL_SECONDS", 2, 1, 60)
 	jobTimeout := envDurationSeconds("KOSCHEI_DEFENSE_WORKER_JOB_TIMEOUT_SECONDS", 900, 30, 3600)
 	lease := jobTimeout + 60*time.Second
