@@ -28,11 +28,28 @@ type ChatResponse struct {
 	Content  string `json:"content"`
 }
 
+type EmbedRequest struct {
+	Input   string
+	Model   string
+	Timeout time.Duration
+}
+
+type EmbedResponse struct {
+	Provider  string    `json:"provider"`
+	Model     string    `json:"model"`
+	Embedding []float64 `json:"embedding"`
+}
+
 type chatCompletionPayload struct {
 	Model       string              `json:"model"`
 	Messages    []map[string]string `json:"messages"`
 	MaxTokens   int                 `json:"max_tokens,omitempty"`
 	Temperature float64             `json:"temperature"`
+}
+
+type embeddingPayload struct {
+	Model string   `json:"model"`
+	Input []string `json:"input"`
 }
 
 // Chat routes every server-side ARVIS/LLM request through one policy layer.
@@ -52,11 +69,91 @@ func Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, req.Timeout)
 	defer cancel()
-
 	if strings.TrimSpace(os.Getenv("TOGETHER_API_KEY")) == "" {
 		return ChatResponse{}, errors.New("TOGETHER_API_KEY is not configured")
 	}
 	return callTogether(ctx, req)
+}
+
+func Embed(ctx context.Context, req EmbedRequest) (EmbedResponse, error) {
+	req.Input = strings.TrimSpace(req.Input)
+	if req.Input == "" {
+		return EmbedResponse{}, errors.New("embedding input is required")
+	}
+	if len(req.Input) > 20000 {
+		return EmbedResponse{}, errors.New("embedding input too large")
+	}
+	if req.Timeout <= 0 {
+		req.Timeout = 15 * time.Second
+	}
+	apiKey := strings.TrimSpace(os.Getenv("TOGETHER_API_KEY"))
+	if apiKey == "" {
+		return EmbedResponse{}, errors.New("TOGETHER_API_KEY is not configured")
+	}
+	model := strings.TrimSpace(req.Model)
+	if model == "" {
+		model = firstEnv("TOGETHER_MODEL_EMBEDDING", "TOGETHER_EMBEDDING_MODEL")
+	}
+	if model == "" {
+		model = "BAAI/bge-large-en-v1.5"
+	}
+	ctx, cancel := context.WithTimeout(ctx, req.Timeout)
+	defer cancel()
+	body, err := json.Marshal(embeddingPayload{Model: model, Input: []string{req.Input}})
+	if err != nil {
+		return EmbedResponse{}, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.together.xyz/v1/embeddings", bytes.NewReader(body))
+	if err != nil {
+		return EmbedResponse{}, err
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return EmbedResponse{}, err
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return EmbedResponse{}, fmt.Errorf("embedding provider returned %d", resp.StatusCode)
+	}
+	var decoded struct {
+		Data []struct {
+			Embedding []float64 `json:"embedding"`
+		} `json:"data"`
+		Model string `json:"model"`
+	}
+	if json.Unmarshal(data, &decoded) != nil || len(decoded.Data) == 0 || len(decoded.Data[0].Embedding) == 0 {
+		return EmbedResponse{}, errors.New("embedding provider returned no vector")
+	}
+	if decoded.Model != "" {
+		model = decoded.Model
+	}
+	return EmbedResponse{Provider: "together", Model: model, Embedding: decoded.Data[0].Embedding}, nil
+}
+
+// DecodeJSONObject accepts an optional fenced response but requires exactly one complete JSON object.
+func DecodeJSONObject(content string, dst any) error {
+	content = strings.TrimSpace(content)
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+	start, end := strings.Index(content, "{"), strings.LastIndex(content, "}")
+	if start < 0 || end < start {
+		return errors.New("provider did not return a JSON object")
+	}
+	dec := json.NewDecoder(strings.NewReader(content[start : end+1]))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		return fmt.Errorf("invalid structured provider output: %w", err)
+	}
+	var trailing any
+	if err := dec.Decode(&trailing); err != io.EOF {
+		return errors.New("provider returned multiple JSON values")
+	}
+	return nil
 }
 
 func callTogether(ctx context.Context, req ChatRequest) (ChatResponse, error) {
@@ -130,8 +227,8 @@ func postChat(ctx context.Context, endpoint, apiKey string, payload chatCompleti
 
 func firstEnv(keys ...string) string {
 	for _, key := range keys {
-		if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-			return v
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
 		}
 	}
 	return ""
