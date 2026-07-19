@@ -1,117 +1,139 @@
 (()=>{
-'use strict';
+  'use strict';
 
-const kit=window.OwnerRadarKit;
-if(!kit)return;
-const originalScan=kit.scan.bind(kit);
-const originalRender=kit.render.bind(kit);
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const arr=v=>Array.isArray(v)?v:[];
-const obj=v=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
-const num=(v,d=4)=>new Intl.NumberFormat('tr-TR',{maximumFractionDigits:d}).format(Number(v||0));
-const dt=v=>{if(!v)return'—';const d=new Date(v);return Number.isNaN(d.getTime())?'—':new Intl.DateTimeFormat('tr-TR',{dateStyle:'short',timeStyle:'short'}).format(d)};
-const short=(v,n=36)=>{v=String(v||'');return v.length>n?v.slice(0,n-10)+'…'+v.slice(-7):v||'—'};
-const tone=level=>['critical','high'].includes(String(level||'').toLowerCase())?'bad':String(level||'').toLowerCase()==='medium'?'warn':'ok';
+  const kit=window.OwnerRadarKit;
+  if(!kit||window.__ownerCreatorIntelligenceInstalled)return;
+  window.__ownerCreatorIntelligenceInstalled=true;
 
-async function request(path){
-  const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),26000);
-  try{
-    const response=await fetch(path,{credentials:'same-origin',signal:controller.signal});
-    let data={};try{data=await response.json()}catch{}
-    if(!response.ok||data.ok===false)throw new Error(data.message||data.detail||data.error||`İstek başarısız (${response.status})`);
-    return data;
-  }catch(error){
-    if(error.name==='AbortError')throw new Error('Creator davranış analizi zaman aşımına uğradı.');
-    throw error;
-  }finally{clearTimeout(timeout)}
-}
+  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const arr=value=>Array.isArray(value)?value:[];
+  const obj=value=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+  const num=(value,digits=0)=>{const n=Number(value);return Number.isFinite(n)?new Intl.NumberFormat('tr-TR',{maximumFractionDigits:digits}).format(n):'—'};
+  const short=(value,length=42)=>{const valueText=String(value||'');return valueText.length>length?`${valueText.slice(0,length-11)}…${valueText.slice(-8)}`:valueText||'—'};
+  const text=(...values)=>values.map(value=>String(value??'').trim()).find(Boolean)||'';
+  const rootFor=value=>typeof value==='string'?document.getElementById(value):value;
+  const statusClass=value=>{const status=String(value||'').toLowerCase();if(status.includes('fail')||status.includes('error')||status.includes('unavailable'))return'bad';if(status.includes('verified')||status.includes('complete')||status.includes('persisted')||status.includes('resolved'))return'ok';return'warn'};
+  const badge=value=>`<span class="badge ${statusClass(value)}">${esc(String(value||'unknown').replaceAll('_',' ').toUpperCase())}</span>`;
+  const metric=(label,value,foot='')=>`<div><label>${esc(label)}</label><b>${esc(value)}</b>${foot?`<small>${esc(foot)}</small>`:''}</div>`;
 
-function badge(level){return`<span class="badge ${tone(level)}">${esc(String(level||'unknown').toUpperCase())}</span>`}
-function stat(title,value,detail,toneClass='tone-cyan'){return`<article class="card kpi"><div class="kpi-label">${esc(title)}</div><div class="kpi-value ${toneClass}">${esc(value)}</div><div class="kpi-foot">${esc(detail)}</div></article>`}
-
-function creatorPanelHTML(ci){
-  ci=obj(ci);
-  if(ci.available===false)return`<section class="card section-gap"><div class="card-head"><div><span class="eyebrow">Creator intelligence</span><h2>Creator davranış katmanı çalışmadı</h2></div>${badge('unknown')}</div><p class="muted">${esc(ci.summary||'Creator/deployer cüzdanı doğrulanamadı.')}</p></section>`;
-  const findings=arr(ci.findings),launches=arr(ci.observed_launches),recipients=arr(ci.recipient_wallets),funders=arr(ci.funding_wallets),links=arr(ci.holder_links),txs=arr(ci.transactions),holders=arr(ci.holder_accounts),limitations=arr(ci.limitations);
-  const level=String(ci.risk_level||'unknown').toLowerCase();
-  const riskTone=tone(level)==='bad'?'tone-red':tone(level)==='warn'?'tone-amber':'tone-green';
-  return`<section class="card section-gap" data-creator-intelligence style="border-color:${tone(level)==='bad'?'#ff526f66':tone(level)==='warn'?'#ffc95c55':'#18ffb244'}">
-    <div class="card-head"><div><span class="eyebrow">CREATOR / DEPLOYER BEHAVIOR FILE</span><h2>${esc(String(level).toUpperCase())} · ${num(ci.risk_index,0)}/100</h2><div class="mono muted">${esc(ci.creator_wallet||'—')}</div></div>${badge(level)}</div>
-    <p class="muted">${esc(ci.summary||'Creator davranış özeti üretilemedi.')}</p>
-    <div class="grid compact-grid">
-      ${stat('Önceki launch',num(ci.previous_launch_count,0),'Koschei tarafından gözlemlenen diğer tokenlar',Number(ci.previous_launch_count)>=3?'tone-red':'tone-cyan')}
-      ${stat('Erken sale-like',num(ci.early_sale_like_transactions,0),'Launch sonrası ilk 24 saat',Number(ci.early_sale_like_transactions)>0?'tone-red':'tone-green')}
-      ${stat('Yakın sale-like',num(ci.sale_like_transactions,0),'İncelenen işlem penceresi',Number(ci.sale_like_transactions)>0?'tone-amber':'tone-green')}
-      ${stat('Transfer çıkışı',num(ci.transfer_out_transactions,0),`${num(ci.current_token_outflow,8)} token çıkışı`,Number(ci.transfer_out_transactions)>=3?'tone-amber':'tone-cyan')}
-      ${stat('Top-holder bağı',ci.creator_is_top_holder?`#${num(ci.creator_holder_rank,0)}`:'Yok',ci.creator_is_top_holder?`Creator payı yaklaşık ${num(ci.creator_holder_percentage)}%`:'Çözümlenen Top-20 içinde doğrudan eşleşme yok',ci.creator_is_top_holder?'tone-red':'tone-green')}
-      ${stat('Dağıtım bağı',num(links.length,0),'Creator alıcısı ile Top-20 holder eşleşmesi',links.length?'tone-red':'tone-green')}
-    </div>
-    <div class="section-gap" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-download-creator-poster type="button">Creator Görselini İndir</button></div>
-    <canvas data-creator-poster width="1200" height="1500" style="width:min(100%,600px);display:block;margin:14px auto;border:1px solid #1de6c833;border-radius:18px;background:#02070d"></canvas>
-    <details class="owner-details section-gap" open><summary><span><b>Koschei ne buldu?</b><small>Her madde ayrı kanıt sınıfıdır.</small></span><span>⌄</span></summary><div class="clean-list section-gap">${findings.map((x,i)=>`<div class="summary-row"><span>#${i+1}</span><b style="text-align:left">${esc(x)}</b>${badge(level)}</div>`).join('')||'<div class="empty">Creator davranış bulgusu yok.</div>'}</div></details>
-    <details class="owner-details section-gap" open><summary><span><b>Launch geçmişi</b><small>${num(launches.length,0)} Koschei gözlemi</small></span><span>⌄</span></summary>${launches.length?`<div class="table-wrap section-gap"><table class="table"><thead><tr><th>Token</th><th>Kaynak</th><th>İlk gözlem</th><th>Olay</th><th>Durum</th></tr></thead><tbody>${launches.map(x=>`<tr><td class="mono">${esc(x.target)}</td><td>${esc(x.source||'—')}</td><td>${dt(x.observed_at)}</td><td>${num(x.event_count,0)}</td><td>${x.is_current_target?'<span class="badge ok">Mevcut token</span>':'<span class="badge warn">Önceki launch</span>'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty section-gap">Koschei gözlemlerinde başka launch bulunmadı.</div>'}</details>
-    <details class="owner-details section-gap" open><summary><span><b>Creator’dan çıkan tokenlar</b><small>${num(recipients.length,0)} alıcı cüzdan</small></span><span>⌄</span></summary>${recipients.length?`<div class="table-wrap section-gap"><table class="table"><thead><tr><th>Cüzdan</th><th>Token</th><th>İşlem</th><th>Top-holder eşleşmesi</th><th>Son gözlem</th></tr></thead><tbody>${recipients.map(x=>`<tr><td class="mono">${esc(x.wallet)}</td><td>${num(x.amount,8)}</td><td>${num(x.transactions,0)}</td><td>${x.matches_top_holder?`<span class="badge bad">#${num(x.holder_rank,0)} · ${num(x.holder_percentage)}%</span>`:'<span class="badge ok">Yok</span>'}</td><td>${dt(x.last_observed_at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty section-gap">İncelenen pencerede creator’dan token alan cüzdan gözlemlenmedi.</div>'}</details>
-    <details class="owner-details section-gap"><summary><span><b>Funding cüzdanları</b><small>${num(funders.length,0)} olası fonlayıcı</small></span><span>⌄</span></summary>${funders.length?`<div class="table-wrap section-gap"><table class="table"><thead><tr><th>Cüzdan</th><th>SOL çıkışı</th><th>İşlem</th><th>Son gözlem</th></tr></thead><tbody>${funders.map(x=>`<tr><td class="mono">${esc(x.wallet)}</td><td>${num(x.amount,8)} SOL</td><td>${num(x.transactions,0)}</td><td>${dt(x.last_observed_at)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty section-gap">Yakın işlem penceresinde belirgin funding bağı gözlemlenmedi.</div>'}</details>
-    <details class="owner-details section-gap"><summary><span><b>İşlem kanıtları</b><small>${num(txs.length,0)} sınıflandırılmış transaction</small></span><span>⌄</span></summary>${txs.length?`<div class="table-wrap section-gap"><table class="table"><thead><tr><th>Zaman</th><th>İmza</th><th>Sınıf</th><th>Token delta</th><th>Swap</th></tr></thead><tbody>${txs.map(x=>`<tr><td>${dt(x.observed_at)}</td><td class="mono">${esc(short(x.signature,34))}</td><td>${esc(x.classification)}</td><td>${num(x.creator_token_delta,8)}</td><td>${x.swap_related?'<span class="badge warn">Evet</span>':'<span class="badge ok">Hayır</span>'}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty section-gap">Sınıflandırılabilir yakın transaction bulunmadı.</div>'}</details>
-    <details class="owner-details section-gap"><summary><span><b>Top-20 owner çözümlemesi</b><small>${num(holders.length,0)} token account</small></span><span>⌄</span></summary>${holders.length?`<div class="table-wrap section-gap"><table class="table"><thead><tr><th>#</th><th>Owner wallet</th><th>Token account</th><th>Pay</th></tr></thead><tbody>${holders.map(x=>`<tr><td>${num(x.rank,0)}</td><td class="mono">${esc(x.owner_wallet||'Çözülemedi')}</td><td class="mono">${esc(short(x.token_account,32))}</td><td>${num(x.percentage)}%</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty section-gap">Holder owner eşlemesi alınamadı.</div>'}</details>
-    <div class="disclaimer section-gap">${esc(ci.evidence_scope||'Cüzdan ilişkileri kötü niyet veya gerçek kişi kimliği kanıtı değildir.')}</div>
-    ${limitations.length?`<div class="muted small section-gap"><b>Sınırlar:</b> ${limitations.map(esc).join(' · ')}</div>`:''}
-  </section>`;
-}
-
-function appendCreatorPanel(root,ci,data){
-  root.querySelector('[data-creator-intelligence]')?.remove();
-  root.insertAdjacentHTML('beforeend',creatorPanelHTML(ci));
-  const canvas=root.querySelector('[data-creator-poster]');
-  if(canvas)drawCreatorPoster(canvas,data,ci);
-  root.querySelector('[data-download-creator-poster]')?.addEventListener('click',()=>downloadCreatorPoster(canvas,data,ci));
-}
-
-function wrapText(ctx,text,x,y,maxWidth,lineHeight,maxLines=5){
-  const words=String(text||'').split(/\s+/);let line='',used=0;
-  for(const word of words){const next=line?line+' '+word:word;if(ctx.measureText(next).width>maxWidth&&line){ctx.fillText(line,x,y);y+=lineHeight;used++;line=word;if(used>=maxLines)return y}else line=next}
-  if(line&&used<maxLines){ctx.fillText(line,x,y);y+=lineHeight}return y;
-}
-
-function drawCreatorPoster(canvas,data,ci){
-  if(!canvas)return;
-  const c=canvas.getContext('2d'),level=String(ci.risk_level||'unknown').toUpperCase(),danger=['HIGH','CRITICAL'].includes(level),accent=danger?'#ff526f':level==='MEDIUM'?'#ffc95c':'#18ffb2';
-  const g=c.createLinearGradient(0,0,1200,1500);g.addColorStop(0,'#02070d');g.addColorStop(.55,'#071824');g.addColorStop(1,'#020409');c.fillStyle=g;c.fillRect(0,0,1200,1500);c.strokeStyle='#1de6c855';c.lineWidth=3;c.strokeRect(28,28,1144,1444);
-  c.fillStyle='#18ffb2';c.font='900 28px Arial';c.fillText('KOSCHEI WEB3',70,90);c.fillStyle='#fff';c.font='900 65px Arial';c.fillText('CREATOR INTELLIGENCE',70,170);c.fillStyle=accent;c.font='900 40px Arial';c.fillText(`${level} · ${Number(ci.risk_index||0)}/100`,70,235);
-  c.fillStyle='#8fffe5';c.font='800 20px Arial';c.fillText('CREATOR / DEPLOYER WALLET',70,295);c.fillStyle='#fff';c.font='22px monospace';wrapText(c,ci.creator_wallet,70,335,1060,31,2);
-  c.strokeStyle='#1de6c833';c.strokeRect(70,405,1060,240);const stats=[['PREVIOUS LAUNCH',ci.previous_launch_count],['EARLY SALE-LIKE',ci.early_sale_like_transactions],['SALE-LIKE',ci.sale_like_transactions],['HOLDER LINKS',arr(ci.holder_links).length]];stats.forEach((x,i)=>{const px=100+i*255;c.fillStyle='#8fa4b5';c.font='700 17px Arial';c.fillText(x[0],px,465);c.fillStyle=accent;c.font='900 48px Arial';c.fillText(String(Number(x[1]||0)),px,535)});
-  c.fillStyle='#8fa4b5';c.font='700 18px Arial';c.fillText('CREATOR TOP-HOLDER MATCH',100,600);c.fillStyle=ci.creator_is_top_holder?'#ff526f':'#18ffb2';c.font='900 25px Arial';c.fillText(ci.creator_is_top_holder?`YES · RANK #${Number(ci.creator_holder_rank||0)} · ${Number(ci.creator_holder_percentage||0).toFixed(2)}%`:'NO DIRECT TOP-20 MATCH',430,600);
-  c.strokeStyle='#1de6c833';c.strokeRect(70,690,1060,490);c.fillStyle='#8fffe5';c.font='800 22px Arial';c.fillText('BEHAVIOR FINDINGS',100,745);c.fillStyle='#fff';c.font='26px Arial';let y=800;for(const finding of arr(ci.findings).slice(0,6)){c.fillStyle=accent;c.fillText('•',100,y);c.fillStyle='#fff';y=wrapText(c,finding,135,y,930,36,3)+16;if(y>1110)break}
-  c.fillStyle='#8fa4b5';c.font='20px Arial';wrapText(c,'Evidence-scoped wallet behavior analysis. Sale-like and wallet-link signals are not proof of fraud or real-world identity.',100,1245,990,31,3);
-  c.fillStyle='#18ffb2';c.font='800 20px monospace';c.fillText('EVIDENCE FIRST · NO HYPE · NOT FINANCIAL ADVICE',70,1395);c.fillStyle='#6f8797';c.font='16px monospace';c.fillText(short(data.target,70),70,1435);
-}
-
-function downloadCreatorPoster(canvas,data,ci){
-  if(!canvas)return;drawCreatorPoster(canvas,data,ci);const a=document.createElement('a');a.download=`koschei-creator-${String(data.target||'report').slice(0,10)}.png`;a.href=canvas.toDataURL('image/png');a.click();
-}
-
-async function enrich(data,root){
-  const creator=obj(data.source_context).creator_wallet;
-  if(!creator)return data;
-  const loading=document.createElement('div');loading.className='card loading section-gap';loading.dataset.creatorLoading='1';loading.textContent='Creator/deployer geçmişi, satış davranışı ve holder bağlantıları inceleniyor…';root.appendChild(loading);
-  try{
-    const response=await request(`/api/owner/creator-intelligence?target=${encodeURIComponent(data.target)}&creator=${encodeURIComponent(creator)}&network=${encodeURIComponent(data.network||'solana-mainnet')}`);
-    const ci=obj(response.intelligence);data.creator_intelligence=ci;
-    if(ci.summary)data.narrative=[data.narrative,ci.summary].filter(Boolean).join(' ');
-    originalRender(root,data);appendCreatorPanel(root,ci,data);return data;
-  }catch(error){
-    loading.remove();root.insertAdjacentHTML('beforeend',`<div class="error-box section-gap">Creator davranış katmanı tamamlanamadı: ${esc(error.message)}</div>`);return data;
+  function uniqueCandidates(portfolio){
+    const verified=arr(portfolio.verified_candidates).map(item=>({...obj(item),verification_status:'verified'}));
+    const observed=arr(obj(portfolio.discovery).candidates);
+    const seen=new Set();
+    return [...verified,...observed].filter(item=>{
+      const key=`${item.mint||''}|${item.signature||''}`;
+      if(!item.mint||seen.has(key))return false;
+      seen.add(key);
+      return true;
+    });
   }
-}
 
-kit.scan=async(target,rootId)=>{
-  const root=typeof rootId==='string'?document.getElementById(rootId):rootId;
-  const data=await originalScan(target,rootId);
-  if(!root)return data;
-  return enrich(data,root);
-};
-kit.render=(root,data)=>{originalRender(root,data);if(data?.creator_intelligence)appendCreatorPanel(root,data.creator_intelligence,data)};
-kit.drawCreatorPoster=drawCreatorPoster;
-kit.downloadCreatorPoster=downloadCreatorPoster;
+  function candidateRows(portfolio){
+    const rows=uniqueCandidates(portfolio);
+    if(!rows.length)return'<div class="empty">Creator tarafından oluşturulduğu keşfedilen mint bulunmadı veya Solscan/RPC kanıtı alınamadı.</div>';
+    return `<div class="table-wrap"><table class="table"><thead><tr><th>Mint</th><th>Program / instruction</th><th>İmza</th><th>Slot</th><th>Doğrulama</th></tr></thead><tbody>${rows.slice(0,50).map(row=>`<tr><td class="mono"><b>${esc(short(row.mint,36))}</b></td><td><b>${esc(short(row.program,28))}</b><div class="muted small">${esc(row.instruction_type||'create')}</div></td><td class="mono">${esc(short(row.signature,30))}</td><td>${num(row.slot)}</td><td>${badge(row.verification_status||'observed')}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function recipientRows(report){
+    const recipients=arr(report.recipients);
+    if(!recipients.length)return'<div class="empty">Creator ATA geçmişinde ilk recipient transferi doğrulanmadı.</div>';
+    return `<div class="table-wrap"><table class="table"><thead><tr><th># / recipient</th><th>İlk miktar</th><th>Güncel bakiye</th><th>Top-holder bağı</th><th>Kanıt</th></tr></thead><tbody>${recipients.slice(0,20).map(row=>`<tr><td><b>#${num(row.sequence)}</b><div class="mono">${esc(short(row.wallet,34))}</div><div class="muted small">${esc(String(row.fate||'unknown').replaceAll('_',' '))}</div></td><td><b>${num(row.amount,6)}</b></td><td><b>${num(row.current_balance,6)}</b><div class="muted small">${esc(String(row.current_balance_status||'unknown').replaceAll('_',' '))}</div></td><td>${row.matches_top_holder?`<span class="badge bad">TOP #${num(row.top_holder_rank)}</span><div class="muted small">%${num(row.top_holder_percentage,4)}</div>`:'<span class="muted">Eşleşme yok</span>'}</td><td class="mono">${esc(short(row.signature,28))}<div class="muted small">slot ${num(row.slot)}</div></td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function relationRows(dossier){
+    const actors=arr(dossier.related_actors);
+    if(!actors.length)return'<div class="empty">Kalıcı dossier içinde önemli karşı aktör ilişkisi yok.</div>';
+    return `<div class="table-wrap"><table class="table"><thead><tr><th>Aktör</th><th>İlişki</th><th>Tekrar</th><th>Kanıt durumu</th></tr></thead><tbody>${actors.slice(0,30).map(row=>`<tr><td class="mono">${esc(short(text(row.wallet,row.actor_wallet,row.counterpart_id,row.address),34))}</td><td>${esc(text(row.relation,row.role,row.kind,'unknown'))}</td><td>${num(row.occurrence_count||row.count||1)}</td><td>${badge(text(row.verification_status,row.status,'observed'))}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function fundingPanel(funding){
+    funding=obj(funding);
+    const wallet=text(funding.source_wallet,funding.funder_wallet,funding.funding_wallet,funding.origin_wallet,funding.counterpart_wallet);
+    const signature=text(funding.signature,funding.transaction_signature);
+    const amount=funding.amount_sol??funding.amount??funding.lamports;
+    return `<div class="metadata section-gap">${metric('Durum',text(funding.status,'not observed'))}${metric('Doğrulama',text(funding.verification_status,'unverified'))}${metric('İlk fonlayıcı',short(wallet,34))}${metric('Miktar',amount==null?'—':String(amount))}${metric('İmza',short(signature,30))}${metric('İz durumu',text(funding.trail_status,'not investigated'))}</div>`;
+  }
+
+  function appendCreatorIntelligence(root,payload){
+    root=rootFor(root);
+    if(!root)return;
+    root.querySelector('[data-canonical-creator-intelligence]')?.remove();
+
+    payload=obj(payload);
+    const actor=obj(payload.actor_investigation);
+    const intelligence=obj(payload.creator_intelligence);
+    const distribution=obj(payload.creator_distribution);
+    const source=obj(payload.source_context);
+    const dossier=obj(intelligence.dossier||actor.dossier);
+    const external=obj(intelligence.external_discovery||actor.external_discovery);
+    const discovery=obj(external.discovery);
+    const portfolio=obj(external.created_mint_portfolio);
+    const funding=obj(intelligence.funding_origin||actor.funding_origin);
+    const relation=obj(intelligence.current_creator_relation||actor.current_creator_relation);
+    const distributionContainer=Object.keys(distribution).length?distribution:obj(actor.current_token_distribution);
+    const distributionReport=obj(distributionContainer.report);
+    const creator=text(intelligence.creator_wallet,actor.wallet,dossier.wallet,source.creator_wallet);
+    const actorLimitations=[...arr(intelligence.limitations),...arr(obj(actor.integration_run).limitations),...arr(external.limitations)];
+    const distributionLimitations=[...arr(distributionContainer.limitations),...arr(distributionReport.limitations)];
+
+    const panel=document.createElement('section');
+    panel.className='card section-gap';
+    panel.dataset.canonicalCreatorIntelligence='1';
+    panel.innerHTML=`
+      <div class="card-head"><div><span class="eyebrow">KOSCHEI CREATOR / ACTOR INTELLIGENCE</span><h2>Creator'ın zincir üstü dosyası</h2><p class="muted">Bu bölüm holder/cluster özetinin tekrarı değildir. Creator wallet, oluşturulan mintler, funding, ilişkili aktörler ve ilk dağıtım kanıtını gösterir.</p></div>${badge(text(intelligence.status,obj(actor.integration_run).status,'unknown'))}</div>
+      <div class="metadata section-gap">
+        ${metric('Creator wallet',short(creator,42))}
+        ${metric('Dossier token',num(arr(dossier.tokens).length))}
+        ${metric('İlişkili aktör',num(arr(dossier.related_actors).length))}
+        ${metric('Actor evidence',num(arr(dossier.evidence).length))}
+        ${metric('Store',text(intelligence.store_status,actor.store_status,'unknown'))}
+        ${metric('Current mint relation',text(relation.status,relation.persistence,'unknown'))}
+      </div>
+
+      <details class="owner-details section-gap" open><summary><span><b>Creator mint portföyü</b><small>Solscan keşfi → Helius/RPC signer ve create-instruction doğrulaması.</small></span><span>⌄</span></summary>
+        <div class="metadata section-gap">
+          ${metric('Portföy durumu',text(portfolio.status,'not requested'))}
+          ${metric('Sayfa',num(obj(portfolio.discovery).pages_fetched))}
+          ${metric('İşlem görüldü',num(obj(portfolio.discovery).transactions_seen))}
+          ${metric('Aday',num(arr(obj(portfolio.discovery).candidates).length))}
+          ${metric('Doğrulanan',num(portfolio.candidates_verified))}
+          ${metric('Doğrulama hatası',num(portfolio.verification_failures))}
+        </div>
+        <div class="section-gap">${candidateRows(portfolio)}</div>
+      </details>
+
+      <details class="owner-details section-gap" open><summary><span><b>Funding origin ve dış attribution</b><small>Servis etiketi tek başına kimlik veya kötü niyet kanıtı değildir.</small></span><span>⌄</span></summary>
+        ${fundingPanel(funding)}
+        <div class="metadata section-gap">
+          ${metric('Solscan discovery',text(external.status,discovery.status,'not requested'))}
+          ${metric('Transaction adayı',num(arr(discovery.transaction_candidates).length))}
+          ${metric('Token account',num(arr(discovery.token_accounts).length))}
+          ${metric('Kalıcı dış kanıt',num(external.evidence_persisted))}
+        </div>
+      </details>
+
+      <details class="owner-details section-gap" open><summary><span><b>Creator → mevcut mint → ilk recipient dağıtımı</b><small>Creator ATA geçmişi ve aynı-mint recipient bakiyesi; recipient-wide kör tarama yapılmaz.</small></span><span>⌄</span></summary>
+        <div class="metadata section-gap">
+          ${metric('Durum',text(distributionContainer.status,distributionReport.status,'not requested'))}
+          ${metric('Scope',text(distributionReport.distribution_scope,'unknown'))}
+          ${metric('Kaynak ATA',num(arr(distributionReport.source_token_accounts).length))}
+          ${metric('İmza / tx',`${num(distributionReport.signatures_scanned)} / ${num(distributionReport.transactions_parsed)}`)}
+          ${metric('Recipient',num(arr(distributionReport.recipients).length))}
+          ${metric('Kalıcı kanıt',`${num(distributionContainer.evidence_persisted)} / ${num(distributionContainer.evidence_produced)}`)}
+        </div>
+        <div class="section-gap">${recipientRows(distributionReport)}</div>
+      </details>
+
+      <details class="owner-details section-gap"><summary><span><b>Cross-token ilişkili aktörler</b><small>Kalıcı actor dossier içindeki tekrar eden counterpart kayıtları.</small></span><span>⌄</span></summary><div class="section-gap">${relationRows(dossier)}</div></details>
+      ${actorLimitations.length?`<div class="warning-box section-gap"><b>Actor soruşturması sınırları</b><br>${actorLimitations.map(esc).join(' · ')}</div>`:''}
+      ${distributionLimitations.length?`<div class="warning-box section-gap"><b>Dağıtım sınırları</b><br>${distributionLimitations.map(esc).join(' · ')}</div>`:''}`;
+    root.appendChild(panel);
+  }
+
+  const baseRender=typeof kit.render==='function'?kit.render.bind(kit):null;
+  const baseUnified=typeof kit.renderUnified==='function'?kit.renderUnified.bind(kit):null;
+  function render(root,payload){if(baseRender)baseRender(root,payload);appendCreatorIntelligence(root,payload);}
+  function renderUnified(root,payload){if(baseUnified)baseUnified(root,payload);else if(baseRender)baseRender(root,payload);appendCreatorIntelligence(root,payload);}
+
+  window.OwnerRadarKit={...kit,render,renderUnified,renderCreatorIntelligence:appendCreatorIntelligence};
 })();
