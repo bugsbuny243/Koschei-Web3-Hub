@@ -21,17 +21,20 @@ type arvisPreflightRequest struct {
 }
 
 type arvisPreflightResponse struct {
-	OK             bool     `json:"ok"`
-	Decision       string   `json:"decision"`
-	RiskLevel      string   `json:"risk_level"`
-	Score          int      `json:"score"`
-	Reasons        []string `json:"reasons"`
-	NextSteps      []string `json:"next_steps"`
-	HumanMessage   string   `json:"human_message"`
-	AIProvider     string   `json:"ai_provider,omitempty"`
-	AIModel        string   `json:"ai_model,omitempty"`
-	AIExplanation  string   `json:"ai_explanation,omitempty"`
-	CreditsCharged bool     `json:"credits_charged"`
+	OK              bool     `json:"ok"`
+	Decision        string   `json:"decision"`
+	RiskLevel       string   `json:"risk_level"`
+	Score           int      `json:"score"`
+	Reasons         []string `json:"reasons"`
+	NextSteps       []string `json:"next_steps"`
+	HumanMessage    string   `json:"human_message"`
+	AIProvider      string   `json:"ai_provider,omitempty"`
+	AIModel         string   `json:"ai_model,omitempty"`
+	AIExplanation   string   `json:"ai_explanation,omitempty"`
+	CreditsCharged  bool     `json:"credits_charged"`
+	Scope           string   `json:"scope"`
+	CoverageWarning string   `json:"coverage_warning,omitempty"`
+	NotChecked      []string `json:"not_checked"`
 }
 
 var solanaPreflightAddressLike = regexp.MustCompile(`^[1-9A-HJ-NP-Za-km-z]{32,44}$`)
@@ -58,6 +61,7 @@ func (h *Handler) ARVISPreflight(w http.ResponseWriter, r *http.Request) {
 	// HARD RULE: a cached, fresh, verified structural floor may raise Safe
 	// Check, but must never lower a stronger local phishing/signature verdict.
 	resp = h.alignARVISPreflightWithStructuralBaseline(r.Context(), req, resp)
+	resp = applyARVISPreflightScope(req, resp)
 	if aiProviderConfigured() && resp.RiskLevel != "low" && !isOfficialKOSCHMint(req.Target) {
 		prompt := "Target: " + strings.TrimSpace(req.Target) + "\nKind: " + strings.TrimSpace(req.Kind) + "\nIntent: " + strings.TrimSpace(req.Intent) + "\nNote: " + strings.TrimSpace(req.Note) + "\nLocal decision: " + resp.Decision + "\nLocal reasons: " + strings.Join(resp.Reasons, "; ")
 		ai, err := router.Chat(r.Context(), router.ChatRequest{System: arvisPreflightSystemPrompt, Prompt: prompt, MaxTokens: 450, Temperature: 0.1, Timeout: 18 * time.Second})
@@ -87,6 +91,32 @@ func (h *Handler) alignARVISPreflightWithStructuralBaseline(ctx context.Context,
 		return resp
 	}
 	return applyARVISStructuralBaseline(resp, floor, level, observedAt)
+}
+
+func applyARVISPreflightScope(req arvisPreflightRequest, resp arvisPreflightResponse) arvisPreflightResponse {
+	resp.Scope = "preflight_only"
+	resp.NotChecked = []string{}
+	target := strings.TrimSpace(req.Target)
+	if !solanaPreflightAddressLike.MatchString(target) {
+		return resp
+	}
+	resp.NotChecked = []string{
+		"Owner-resolved holder dağılımı",
+		"LP sahipliği, yakım, kilit ve unlock koşulları",
+		"Creator geçmişi, funding ve bağlantılı cüzdanlar",
+		"Canlı satış, çıkış ve likidite hareketleri",
+	}
+	resp.CoverageWarning = "Bu hızlı ön kontrol holder dağılımını, LP kontrolünü, creator geçmişini ve canlı çıkış kapasitesini çalıştırmaz. Bu skor yatırım güvenliği hükmü değildir."
+	if resp.Decision == "allow" {
+		resp.Decision = "review"
+	}
+	if resp.RiskLevel == "low" {
+		resp.RiskLevel = "unknown"
+	}
+	if !strings.Contains(resp.HumanMessage, "yatırım güvenliği hükmü değildir") {
+		resp.HumanMessage = strings.TrimSpace(resp.HumanMessage + " Holder ve likidite kapsamı çalıştırılmadı; bu sonuç yatırım güvenliği hükmü değildir.")
+	}
+	return resp
 }
 
 func applyARVISStructuralBaseline(resp arvisPreflightResponse, floor int, level string, observedAt time.Time) arvisPreflightResponse {

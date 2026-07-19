@@ -245,6 +245,7 @@ func (h *Handler) securityRadarStreamStats(ctx context.Context) map[string]any {
 	count("recognized_events", `SELECT count(*) FROM security_radar_stream_events WHERE module_id <> 'unknown'`)
 	count("enriched_mints", `SELECT count(*) FROM security_radar_stream_events WHERE evidence_quality='transaction_enriched_mint'`)
 	count("visible_verdicts", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND signed=true AND created_at > now() - interval '24 hours' AND `+verifiedSQL)
+	count("signed_verdicts_total", `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND signed=true AND `+verifiedSQL)
 	count("runtime_engines", `SELECT count(DISTINCT module_id) FROM security_radar_verdicts WHERE module_id <> 'final_verdict_engine' AND source='arvis_stream' AND signed=true AND created_at > now() - interval '15 minutes' AND `+verifiedSQL)
 	text("last_stream_event_at", `SELECT COALESCE(max(created_at)::text,'') FROM security_radar_stream_events`)
 	text("last_stream_signature", `SELECT COALESCE(signature,'') FROM security_radar_stream_events WHERE signature IS NOT NULL ORDER BY created_at DESC LIMIT 1`)
