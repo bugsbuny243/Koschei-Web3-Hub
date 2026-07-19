@@ -1,0 +1,290 @@
+package services
+
+// Helius Enhanced Transactions API collector for holder cluster analysis.
+//
+// One GET to /v0/addresses/{wallet}/transactions returns up to 100 parsed
+// transactions. The legacy path spends 1 RPC call for signatures plus 1 RPC
+// call per transaction; this path spends 1 HTTP call per 100 transactions.
+//
+// Design rules honored:
+//   - Falls back to the legacy tiered path when no Helius key is resolvable
+//     or the API call fails. Nothing breaks if Helius is removed.
+//   - Never fabricates evidence: statuses and evidence wording mirror the
+//     bounded-observation language of the tiered path.
+//   - Budget accounting still goes through holderScanRPCBudget so the
+//     existing degradation semantics stay intact.
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
+)
+
+const (
+	heliusEnhancedBaseURL  = "https://api.helius.xyz/v0/addresses"
+	heliusEnhancedPageSize = 100
+	heliusEnhancedMaxPages = 3
+)
+
+type heliusTokenTransfer struct {
+	FromUserAccount string  `json:"fromUserAccount"`
+	ToUserAccount   string  `json:"toUserAccount"`
+	TokenAmount     float64 `json:"tokenAmount"`
+	Mint            string  `json:"mint"`
+}
+
+type heliusNativeTransfer struct {
+	FromUserAccount string `json:"fromUserAccount"`
+	ToUserAccount   string `json:"toUserAccount"`
+	Amount          int64  `json:"amount"` // lamports
+}
+
+type heliusInstruction struct {
+	ProgramID string `json:"programId"`
+}
+
+type heliusEnhancedTransaction struct {
+	Signature        string                 `json:"signature"`
+	Slot             int64                  `json:"slot"`
+	Timestamp        int64                  `json:"timestamp"`
+	TransactionError any                    `json:"transactionError"`
+	TokenTransfers   []heliusTokenTransfer  `json:"tokenTransfers"`
+	NativeTransfers  []heliusNativeTransfer `json:"nativeTransfers"`
+	Instructions     []heliusInstruction    `json:"instructions"`
+}
+
+// heliusEnhancedAPIKey resolves the Helius API key. Resolution order:
+// explicit HELIUS_API_KEY env, then the api-key query parameter of the
+// configured Solana RPC URL when that URL points at a Helius host.
+func heliusEnhancedAPIKey(rpcURL string) string {
+	if key := strings.TrimSpace(os.Getenv("HELIUS_API_KEY")); key != "" {
+		return key
+	}
+	parsed, err := url.Parse(strings.TrimSpace(rpcURL))
+	if err != nil || parsed == nil {
+		return ""
+	}
+	if !strings.Contains(strings.ToLower(parsed.Hostname()), "helius") {
+		return ""
+	}
+	return strings.TrimSpace(parsed.Query().Get("api-key"))
+}
+
+func fetchHeliusEnhancedTransactionsPage(ctx context.Context, apiKey, address, before string, limit int) ([]heliusEnhancedTransaction, error) {
+	if limit <= 0 || limit > heliusEnhancedPageSize {
+		limit = heliusEnhancedPageSize
+	}
+	endpoint := fmt.Sprintf("%s/%s/transactions", heliusEnhancedBaseURL, url.PathEscape(strings.TrimSpace(address)))
+	query := url.Values{}
+	query.Set("api-key", apiKey)
+	query.Set("limit", fmt.Sprintf("%d", limit))
+	if strings.TrimSpace(before) != "" {
+		query.Set("before", strings.TrimSpace(before))
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, endpoint+"?"+query.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(res.Body, 8<<20))
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("helius enhanced api status %d: %s", res.StatusCode, compactClusterError(fmt.Errorf("%s", strings.TrimSpace(string(body)))))
+	}
+	var out []heliusEnhancedTransaction
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("helius enhanced api decode: %w", err)
+	}
+	return out, nil
+}
+
+// analyzeHolderClusterWalletEnhanced is the Enhanced-API twin of
+// analyzeHolderClusterWalletTiered. The second return value reports whether
+// the enhanced path produced a usable row; on false the caller must run the
+// legacy tiered path instead.
+func analyzeHolderClusterWalletEnhanced(ctx context.Context, rpcURL, mint string, account HolderRoleAccount, launchBlockTime int64, holderWallets map[string]bool, plan holderScanPlan, budget *holderScanRPCBudget) (HolderClusterWallet, bool) {
+	apiKey := heliusEnhancedAPIKey(rpcURL)
+	if apiKey == "" {
+		return HolderClusterWallet{}, false
+	}
+
+	percentage := account.CirculatingPercentage
+	if percentage <= 0 {
+		percentage = account.RawPercentage
+	}
+	row := HolderClusterWallet{
+		Rank: account.Rank, Wallet: account.OwnerWallet, HolderPercentage: holderClusterRound(percentage, 4),
+		Status: "signature_history_unavailable", Tier: "enhanced", BudgetDegraded: plan.BudgetDegraded,
+		FlowObservations: []HolderClusterFlowObservation{}, Evidence: []string{},
+	}
+
+	requested := plan.SignatureLimit
+	if requested <= 0 {
+		requested = heliusEnhancedPageSize
+	}
+
+	transactions := []heliusEnhancedTransaction{}
+	before := ""
+	for page := 0; page < heliusEnhancedMaxPages && len(transactions) < requested; page++ {
+		if !budget.Reserve(1) {
+			row.BudgetDegraded = true
+			row.Evidence = append(row.Evidence, "RPC budget reached during enhanced history collection; partial evidence is preserved.")
+			break
+		}
+		remaining := requested - len(transactions)
+		batch, err := fetchHeliusEnhancedTransactionsPage(ctx, apiKey, account.OwnerWallet, before, remaining)
+		if err != nil {
+			if len(transactions) == 0 {
+				// Total failure on the first page: let the legacy path try.
+				return HolderClusterWallet{}, false
+			}
+			row.Evidence = append(row.Evidence, "Enhanced history pagination stopped early: "+compactClusterError(err))
+			break
+		}
+		transactions = append(transactions, batch...)
+		if len(batch) < heliusEnhancedPageSize {
+			break // wallet history exhausted
+		}
+		before = batch[len(batch)-1].Signature
+	}
+
+	row.SignaturesFetched = len(transactions)
+	row.SignaturesObserved = len(transactions)
+	row.WindowExhausted = len(transactions) < requested
+	row.HistoryExhausted = row.WindowExhausted
+	if len(transactions) == 0 {
+		row.Status = "no_observed_signatures"
+		row.Evidence = append(row.Evidence, "No transactions were returned in the enhanced holder history window; this is not a safety signal.")
+		return row, true
+	}
+
+	var oldestTime, newestTime, oldestSlot int64
+	for _, tx := range transactions {
+		if tx.Timestamp <= 0 {
+			continue
+		}
+		if newestTime == 0 || tx.Timestamp > newestTime {
+			newestTime = tx.Timestamp
+		}
+		if oldestTime == 0 || tx.Timestamp < oldestTime {
+			oldestTime = tx.Timestamp
+			oldestSlot = tx.Slot
+		}
+	}
+	row.OldestObservedSlot = oldestSlot
+	row.OldestObservedAt = holderClusterUnixTime(oldestTime)
+	row.NewestObservedAt = holderClusterUnixTime(newestTime)
+	if row.WindowExhausted && launchBlockTime > 0 && oldestTime > 0 {
+		delta := oldestTime - launchBlockTime
+		row.FreshNearLaunch = delta >= -86400 && delta <= 86400
+	}
+
+	for _, tx := range transactions {
+		if tx.TransactionError != nil || strings.TrimSpace(tx.Signature) == "" {
+			continue
+		}
+		row.ParsedTransactions++
+		row.TxsParsed = row.ParsedTransactions
+
+		programIDs := []string{}
+		for _, instruction := range tx.Instructions {
+			if id := strings.TrimSpace(instruction.ProgramID); id != "" {
+				programIDs = append(programIDs, id)
+			}
+		}
+
+		// Target-token outflow observations from parsed token transfers.
+		outflowSeen := false
+		for _, transfer := range tx.TokenTransfers {
+			if !strings.EqualFold(strings.TrimSpace(transfer.Mint), strings.TrimSpace(mint)) {
+				continue
+			}
+			if !strings.EqualFold(transfer.FromUserAccount, account.OwnerWallet) || transfer.TokenAmount <= holderClusterFlowEpsilon {
+				continue
+			}
+			destination := strings.TrimSpace(transfer.ToUserAccount)
+			kind := "external_token_recipient"
+			switch {
+			case destination == "":
+				if len(programIDs) == 0 {
+					continue
+				}
+				destination = programIDs[0]
+				kind = "dex_program_exit_context"
+			case holderWallets[destination]:
+				kind = "holder_to_holder"
+			}
+			outflowSeen = true
+			row.FlowObservations = append(row.FlowObservations, HolderClusterFlowObservation{
+				SourceWallet: account.OwnerWallet,
+				Destination:  destination,
+				Kind:         kind,
+				Amount:       holderClusterRound(transfer.TokenAmount, 9),
+				Slot:         tx.Slot,
+				Signature:    tx.Signature,
+				ProgramIDs:   append([]string{}, programIDs...),
+				Evidence: []string{
+					"Target-token transfer out of the holder wallet was parsed from the Helius Enhanced Transactions API; this is route context, not proof of a sale or common ownership.",
+				},
+			})
+		}
+		_ = outflowSeen
+
+		// Funding source: earliest observed native inflow to the owner wallet.
+		if row.FundingSource == "" {
+			for _, native := range tx.NativeTransfers {
+				if !strings.EqualFold(native.ToUserAccount, account.OwnerWallet) || native.Amount <= 0 {
+					continue
+				}
+				source := strings.TrimSpace(native.FromUserAccount)
+				if source == "" || strings.EqualFold(source, account.OwnerWallet) {
+					continue
+				}
+				row.FundingSource = source
+				row.FundingAmountSOL = holderClusterRound(float64(native.Amount)/1e9, 9)
+				row.FundingObservedAt = holderClusterUnixTime(tx.Timestamp)
+				break
+			}
+		}
+
+		// Acquisition: earliest slot where the owner received the target mint.
+		for _, transfer := range tx.TokenTransfers {
+			if !strings.EqualFold(strings.TrimSpace(transfer.Mint), strings.TrimSpace(mint)) {
+				continue
+			}
+			if !strings.EqualFold(transfer.ToUserAccount, account.OwnerWallet) || transfer.TokenAmount <= holderClusterFlowEpsilon {
+				continue
+			}
+			if row.AcquisitionSlot == 0 || (tx.Slot > 0 && tx.Slot < row.AcquisitionSlot) {
+				row.AcquisitionSlot = tx.Slot
+				row.AcquisitionObservedAt = holderClusterUnixTime(tx.Timestamp)
+			}
+		}
+	}
+
+	if row.ParsedTransactions > 0 {
+		row.Status = "verified_bounded_observation"
+	} else {
+		row.Status = "signature_only_observation"
+	}
+	row.Evidence = append(row.Evidence, fmt.Sprintf("enhanced tier observed %d transactions and parsed %d via the Helius Enhanced Transactions API; window_exhausted=%t.", row.SignaturesFetched, row.TxsParsed, row.WindowExhausted))
+	if row.FreshNearLaunch {
+		row.Evidence = append(row.Evidence, "Oldest observed wallet activity falls within 24 hours of the bounded token launch estimate.")
+	}
+	return row, true
+}
