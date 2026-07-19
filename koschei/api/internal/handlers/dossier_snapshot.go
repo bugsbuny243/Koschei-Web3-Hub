@@ -4,24 +4,49 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 )
 
 // persistDossierSourceSnapshot freezes the exact signed technical report. It is
 // best-effort for the scan path; export never rescans when a snapshot is absent.
 func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[string]any) error {
-	if h == nil || h.DB == nil || report == nil { return nil }
+	if h == nil || report == nil {
+		return nil
+	}
+	if _, attached := report["defense_agent_runtime"]; !attached {
+		target := strings.TrimSpace(dossierString(report["target"]))
+		network := firstNonEmptyString(dossierString(report["network"]), "solana-mainnet")
+		generatedAt := dossierParseTime(dossierString(report["generated_at"]))
+		if generatedAt.IsZero() {
+			generatedAt = time.Now().UTC()
+		}
+		h.attachDefenseAgentRuntime(ctx, report, target, network, generatedAt)
+	}
+	if h.DB == nil {
+		return nil
+	}
 	final := dossierMap(report["final_verdict"])
 	signature := strings.TrimSpace(dossierString(final["signature"]))
-	if signature == "" || !dossierBool(final["signed"]) { return nil }
+	if signature == "" || !dossierBool(final["signed"]) {
+		return nil
+	}
 	mint := strings.TrimSpace(dossierString(report["target"]))
-	if mint == "" { return nil }
+	if mint == "" {
+		return nil
+	}
 	network := firstNonEmptyString(dossierString(report["network"]), "solana-mainnet")
 	ruleset := strings.TrimSpace(dossierString(final["ruleset_version"]))
-	if ruleset == "" { return errDossierSourceIncomplete }
+	if ruleset == "" {
+		return errDossierSourceIncomplete
+	}
 	producedAt := dossierParseTime(firstNonEmptyString(dossierString(final["generated_at"]), dossierString(report["generated_at"])))
-	if producedAt.IsZero() { return errDossierSourceIncomplete }
+	if producedAt.IsZero() {
+		return errDossierSourceIncomplete
+	}
 	canonical, err := json.Marshal(report)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	sourceHash := dossierSHA256(canonical)
 	verdictID := strings.TrimSpace(dossierString(final["id"]))
 	_, err = h.DB.ExecContext(ctx, `
@@ -35,7 +60,9 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 }
 
 func (h *Handler) loadDossierSnapshot(ctx context.Context, mint, verdictID string) (dossierSnapshot, error) {
-	if h == nil || h.DB == nil { return dossierSnapshot{}, errDossierSourceIncomplete }
+	if h == nil || h.DB == nil {
+		return dossierSnapshot{}, errDossierSourceIncomplete
+	}
 	query := `
 		SELECT id::text,mint,network,COALESCE(verdict_id,''),verdict_signature,
 		       ruleset_version,produced_at,source_hash,canonical_source
