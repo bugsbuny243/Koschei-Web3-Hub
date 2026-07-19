@@ -48,7 +48,7 @@ func TestAttachCanonicalInvestigationDiagnosticsBuildsActorGraphAndCompleteCover
 			},
 			"funding_origin": map[string]any{"status": "verified", "verification_status": "verified"},
 			"actor_live_evidence": map[string]any{"status": "complete", "evidence_persisted": 1},
-			"current_token_distribution": map[string]any{"status": "verified_bounded_observation", "recipients": []any{"Recipient111"}},
+			"current_token_distribution": map[string]any{"status": "verified", "recipients": []any{"Recipient111"}},
 			"rule_verdict": map[string]any{"signed": true, "signature": "ActorSig111", "ruleset_version": "actor-rules-v1"},
 		},
 	}
