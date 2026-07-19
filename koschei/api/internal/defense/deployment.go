@@ -32,31 +32,31 @@ type DeploymentResolveInput struct {
 }
 
 type DeploymentSnapshot struct {
-	SnapshotRef          string   `json:"snapshot_ref"`
-	ProgramID            string   `json:"program_id"`
-	Network              string   `json:"network"`
-	LoaderID             string   `json:"loader_id"`
-	LoaderKind           string   `json:"loader_kind"`
-	ProgramDataAddress   string   `json:"programdata_address,omitempty"`
-	AccountSlot          uint64   `json:"account_slot"`
-	DeploymentSlot       uint64   `json:"deployment_slot,omitempty"`
-	UpgradeAuthority     string   `json:"upgrade_authority,omitempty"`
-	UpgradeAuthorityOpen bool     `json:"upgrade_authority_open"`
-	Executable           bool     `json:"executable"`
-	FullBinaryHash       string   `json:"full_binary_hash"`
-	CanonicalBinaryHash  string   `json:"canonical_binary_hash"`
-	FullBinarySize       int      `json:"full_binary_size"`
-	CanonicalBinarySize  int      `json:"canonical_binary_size"`
-	TrailingZeroBytes    int      `json:"trailing_zero_bytes"`
-	BinaryArtifactRef    string   `json:"binary_artifact_ref,omitempty"`
-	ManifestArtifactRef  string   `json:"manifest_artifact_ref,omitempty"`
-	SourceCommit         string   `json:"source_commit,omitempty"`
-	MatchStatus          string   `json:"match_status"`
-	MatchEvidenceStatus  string   `json:"match_evidence_status"`
-	EvidenceRefs         []string `json:"evidence_refs"`
-	Limitations          []string `json:"limitations"`
-	SnapshotHash         string   `json:"snapshot_hash"`
-	VerdictAuthority     bool     `json:"verdict_authority"`
+	SnapshotRef          string    `json:"snapshot_ref"`
+	ProgramID            string    `json:"program_id"`
+	Network              string    `json:"network"`
+	LoaderID             string    `json:"loader_id"`
+	LoaderKind           string    `json:"loader_kind"`
+	ProgramDataAddress   string    `json:"programdata_address,omitempty"`
+	AccountSlot          uint64    `json:"account_slot"`
+	DeploymentSlot       uint64    `json:"deployment_slot,omitempty"`
+	UpgradeAuthority     string    `json:"upgrade_authority,omitempty"`
+	UpgradeAuthorityOpen bool      `json:"upgrade_authority_open"`
+	Executable           bool      `json:"executable"`
+	FullBinaryHash       string    `json:"full_binary_hash"`
+	CanonicalBinaryHash  string    `json:"canonical_binary_hash"`
+	FullBinarySize       int       `json:"full_binary_size"`
+	CanonicalBinarySize  int       `json:"canonical_binary_size"`
+	TrailingZeroBytes    int       `json:"trailing_zero_bytes"`
+	BinaryArtifactRef    string    `json:"binary_artifact_ref,omitempty"`
+	ManifestArtifactRef  string    `json:"manifest_artifact_ref,omitempty"`
+	SourceCommit         string    `json:"source_commit,omitempty"`
+	MatchStatus          string    `json:"match_status"`
+	MatchEvidenceStatus  string    `json:"match_evidence_status"`
+	EvidenceRefs         []string  `json:"evidence_refs"`
+	Limitations          []string  `json:"limitations"`
+	SnapshotHash         string    `json:"snapshot_hash"`
+	VerdictAuthority     bool      `json:"verdict_authority"`
 	CreatedAt            time.Time `json:"created_at"`
 }
 
@@ -337,14 +337,14 @@ func matchDeploymentManifest(ctx context.Context, db *sql.DB, ref string, deploy
 		return result
 	}
 	var manifest struct {
-		SchemaVersion          string `json:"schema_version"`
-		ProgramID              string `json:"program_id"`
-		Network                string `json:"network"`
-		SourceCommit           string `json:"source_commit"`
-		CompiledBinarySHA256   string `json:"compiled_binary_sha256"`
-		BinarySHA256           string `json:"binary_sha256"`
-		FullBinarySHA256       string `json:"full_binary_sha256"`
-		CanonicalBinarySHA256  string `json:"canonical_binary_sha256"`
+		SchemaVersion         string `json:"schema_version"`
+		ProgramID             string `json:"program_id"`
+		Network               string `json:"network"`
+		SourceCommit          string `json:"source_commit"`
+		CompiledBinarySHA256  string `json:"compiled_binary_sha256"`
+		BinarySHA256          string `json:"binary_sha256"`
+		FullBinarySHA256      string `json:"full_binary_sha256"`
+		CanonicalBinarySHA256 string `json:"canonical_binary_sha256"`
 	}
 	if err := json.Unmarshal(artifact.Content, &manifest); err != nil {
 		result.Limitations = []string{"Build manifest content is not valid JSON."}
@@ -425,7 +425,7 @@ func base58Encode(input []byte) string {
 	if len(input) == 0 {
 		return ""
 	}
-	digits := []byte{0}
+	digits := []byte{}
 	for _, value := range input {
 		carry := int(value)
 		for i := 0; i < len(digits); i++ {
