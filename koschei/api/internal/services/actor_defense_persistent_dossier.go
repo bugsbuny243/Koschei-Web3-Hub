@@ -20,8 +20,8 @@ func (s *ActorDefenseStore) LoadPersistentWalletDossier(ctx context.Context, wal
 	if wallet == "" {
 		return ActorDefenseDossier{}, fmt.Errorf("actor wallet is required")
 	}
-	if relationLimit <= 0 || relationLimit > 200 {
-		relationLimit = 50
+	if relationLimit <= 0 || relationLimit > 1000 {
+		relationLimit = 500
 	}
 
 	builders := map[string]*actorDefenseTokenBuilder{}
