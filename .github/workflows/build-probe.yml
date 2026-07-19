@@ -1,0 +1,29 @@
+name: Build Probe
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/**"
+      - ".github/workflows/build-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Download modules
+        run: go mod download
+      - name: Build
+        run: go build ./...
