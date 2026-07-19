@@ -1,0 +1,137 @@
+package handlers
+
+import (
+	"context"
+	"strings"
+
+	"koschei/api/internal/services"
+)
+
+type actorCreatedMintIntegrationRun struct {
+	Status                   string                               `json:"status"`
+	Discovery                services.SolscanCreatedMintDiscovery `json:"discovery"`
+	ObservedEvidenceProduced int                                  `json:"observed_evidence_produced"`
+	ObservedEvidencePersisted int                                 `json:"observed_evidence_persisted"`
+	CandidatesRequested      int                                  `json:"candidates_requested"`
+	CandidatesVerified       int                                  `json:"candidates_verified"`
+	VerificationFailures     int                                  `json:"verification_failures"`
+	VerifiedEvidencePersisted int                                 `json:"verified_evidence_persisted"`
+	PersistenceFailures      int                                  `json:"persistence_failures"`
+	VerifiedCandidates       []services.ActorCreatedMintCandidate `json:"verified_candidates"`
+	Limitations              []string                             `json:"limitations"`
+}
+
+func newActorCreatedMintIntegrationRun(wallet string) actorCreatedMintIntegrationRun {
+	return actorCreatedMintIntegrationRun{
+		Status: "not_requested",
+		Discovery: services.SolscanCreatedMintDiscovery{
+			Status: "not_requested", Provider: "solscan_enhanced_transactions",
+			Wallet: strings.TrimSpace(wallet), Candidates: []services.ActorCreatedMintCandidate{}, Limitations: []string{},
+		},
+		VerifiedCandidates: []services.ActorCreatedMintCandidate{}, Limitations: []string{},
+	}
+}
+
+// collectActorCreatedMintPortfolio uses Solscan only to discover filtered
+// candidate transactions. Each candidate is re-read from the canonical Solana
+// RPC and must independently satisfy the signer + create/initializeMint parser
+// before it becomes VERIFIED actor evidence.
+func (h *Handler) collectActorCreatedMintPortfolio(ctx context.Context, store *services.ActorDefenseStore, wallet, network string) actorCreatedMintIntegrationRun {
+	wallet = strings.TrimSpace(wallet)
+	out := newActorCreatedMintIntegrationRun(wallet)
+	if wallet == "" {
+		out.Status = "wallet_required"
+		out.Limitations = append(out.Limitations, "Created-mint portfolio için creator wallet zorunludur.")
+		return out
+	}
+
+	out.Discovery = services.FetchSolscanCreatedMintDiscovery(ctx, wallet)
+	out.Status = out.Discovery.Status
+	out.Limitations = append(out.Limitations, out.Discovery.Limitations...)
+	observedEvidence := services.ActorCreatedMintCandidateEvidence(wallet, network, out.Discovery.Candidates)
+	out.ObservedEvidenceProduced = len(observedEvidence)
+	if store != nil {
+		for _, item := range observedEvidence {
+			if err := store.UpsertEvidence(ctx, item); err != nil {
+				out.PersistenceFailures++
+				continue
+			}
+			out.ObservedEvidencePersisted++
+		}
+	} else if len(observedEvidence) > 0 {
+		out.Limitations = append(out.Limitations, "Created-mint adayları bulundu ancak actor evidence store kullanılamıyor.")
+	}
+	if !out.Discovery.Available || len(out.Discovery.Candidates) == 0 {
+		return out
+	}
+
+	rpcURL := strings.TrimSpace(creatorIntelRPCURL())
+	if rpcURL == "" {
+		out.Status = "rpc_verification_unavailable"
+		out.Limitations = append(out.Limitations, "Created-mint adayları Solscan ile bulundu ancak doğrulama RPC'si yapılandırılmamış.")
+		return out
+	}
+	verifyLimit := actorDefenseEnvInt("ACTOR_CREATED_MINT_VERIFY_LIMIT", 40, 1, 200)
+	candidates := out.Discovery.Candidates
+	if len(candidates) > verifyLimit {
+		candidates = candidates[:verifyLimit]
+		out.Limitations = append(out.Limitations, "Created-mint doğrulaması bu çalışmada ilk "+creatorIntelCleanString(verifyLimit)+" adayla sınırlandı; kalan adaylar OBSERVED olarak korundu.")
+	}
+	out.CandidatesRequested = len(candidates)
+	for _, candidate := range candidates {
+		if ctx.Err() != nil {
+			out.Limitations = append(out.Limitations, "Created-mint RPC doğrulaması request context sona erdiği için kısmi kaldı.")
+			break
+		}
+		if strings.TrimSpace(candidate.Signature) == "" {
+			out.VerificationFailures++
+			continue
+		}
+		tx, err := services.SolanaGetTransactionJSONParsed(ctx, rpcURL, candidate.Signature)
+		if err != nil {
+			out.VerificationFailures++
+			continue
+		}
+		verifiedRows := services.ExtractActorCreatedMintCandidates(
+			[]map[string]any{map[string]any(tx)},
+			wallet,
+			"solana_jsonparsed_instruction",
+		)
+		verified := services.ActorCreatedMintCandidate{}
+		for _, row := range verifiedRows {
+			if strings.TrimSpace(row.Mint) == strings.TrimSpace(candidate.Mint) {
+				verified = row
+				break
+			}
+		}
+		if strings.TrimSpace(verified.Mint) == "" {
+			out.VerificationFailures++
+			continue
+		}
+		verified.VerificationStatus = "verified"
+		verified.Source = "solana_jsonparsed_instruction"
+		out.CandidatesVerified++
+		out.VerifiedCandidates = append(out.VerifiedCandidates, verified)
+		for _, evidence := range services.ActorCreatedMintCandidateEvidence(wallet, network, []services.ActorCreatedMintCandidate{verified}) {
+			if store == nil {
+				out.PersistenceFailures++
+				continue
+			}
+			if err := store.UpsertEvidence(ctx, evidence); err != nil {
+				out.PersistenceFailures++
+				continue
+			}
+			out.VerifiedEvidencePersisted++
+		}
+	}
+
+	switch {
+	case out.CandidatesVerified == out.CandidatesRequested && out.PersistenceFailures == 0:
+		out.Status = "verified"
+	case out.CandidatesVerified > 0:
+		out.Status = "partially_verified"
+	case out.CandidatesRequested > 0:
+		out.Status = "verification_failed"
+	}
+	return out
+}

@@ -195,11 +195,17 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 	coverage := actorDefenseLiveCoverage{Status: "stored_evidence_only", Limitations: []string{}}
 	funding := services.ActorFundingOrigin{Wallet: wallet, Status: "stored_evidence_only", VerificationStatus: "unverified", TrailStatus: "not_investigated", IdentityScope: "onchain_wallet_only", Limitations: []string{}}
 	fundingPersistence := "not_requested"
+	externalDiscovery := newActorExternalDiscoveryRun(wallet)
+	working := initial
 	if liveEvidence {
+		externalDiscovery = h.collectActorExternalDiscovery(ctx, store, wallet, network)
 		funding, fundingPersistence = h.collectActorFundingOrigin(ctx, store, wallet, network)
-		coverage = h.collectActorDefenseLiveEvidence(ctx, store, initial)
+		if refreshed, refreshErr := store.LoadPersistentWalletDossier(ctx, wallet, network, 200); refreshErr == nil {
+			working = refreshed
+		}
+		coverage = h.collectActorDefenseLiveEvidence(ctx, store, working)
 	}
-	final, err := store.LoadPersistentWalletDossier(ctx, wallet, network, 200)
+	final, err := store.LoadPersistentWalletDossier(ctx, wallet, network, 250)
 	if err != nil {
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Actor dossier could not be refreshed")
 		return
@@ -223,15 +229,17 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 		"final_verdict_history":     unifiedHistory,
 		"legacy_14_arm_radar":       map[string]any{"applicable": false, "reason": "Token-specific collectors are not fabricated for a wallet-only target.", "modules": []any{}},
 		"actor_investigation": map[string]any{
-			"wallet": wallet, "dossier": final, "funding_origin": funding,
-			"funding_origin_persistence": fundingPersistence, "live_evidence": coverage,
-			"rule_verdict": actorVerdict, "rule_verdict_persistence": persistence,
+			"wallet": wallet, "dossier": final, "external_discovery": externalDiscovery,
+			"funding_origin": funding, "funding_origin_persistence": fundingPersistence,
+			"live_evidence": coverage, "rule_verdict": actorVerdict,
+			"rule_verdict_persistence": persistence,
 		},
 		"behavior_signals":            behavior,
 		"investigation_output_policy": services.SharedInvestigationOutputPolicy(),
 		"evidence_policy": map[string]any{
 			"numeric_final_score_disabled": true, "no_evidence_no_claim": true,
 			"inferred_watch_only": true, "unverified_excluded": true,
+			"external_attribution_is_observed_only": true,
 			"identity_scope": "onchain_wallet_only", "caller_type_changes_evidence": false,
 		},
 	}

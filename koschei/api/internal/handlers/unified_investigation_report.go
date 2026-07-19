@@ -92,6 +92,22 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	modules := radarDetailModules(core.Arms)
 	coverage := services.BuildArvisInvestigationCoverage(core.Arms)
 	structural := h.radarDetailStructuralContext(ctx, target, network)
+	creatorIntelligence := map[string]any{"available": false, "status": "creator_wallet_not_observed", "creator_wallet": creator}
+	if creator != "" {
+		creatorIntelligence = h.buildCreatorWalletIntelligence(ctx, target, network, creator, core.SourceContext)
+	}
+	creatorDistribution := map[string]any{"available": false, "status": "creator_mint_relation_not_resolved"}
+	if store != nil && creator != "" && target != "" {
+		if resolved, err := store.ResolvePersistentCreatorMint(ctx, creator, target, network); err == nil {
+			recipients := services.InvestigateActorInitialRecipients(ctx, creatorIntelRPCURL(), resolved.CreatorWallet, resolved.Mint, resolved.CreationSignature, services.ActorInitialRecipientOptions{
+				MaxRecipients:        actorDefenseEnvInt("ACTOR_RECIPIENT_LIMIT", 20, 1, 20),
+				SignaturePageSize:    actorDefenseEnvInt("ACTOR_RECIPIENT_SIGNATURE_PAGE_SIZE", 250, 50, 1000),
+				MaxPagesPerTokenATA:  actorDefenseEnvInt("ACTOR_RECIPIENT_MAX_PAGES_PER_ATA", 8, 1, 20),
+				MaxTransactionsParse: actorDefenseEnvInt("ACTOR_RECIPIENT_TRANSACTION_LIMIT", 160, 10, 500),
+			})
+			creatorDistribution = map[string]any{"available": true, "status": "resolved", "report": recipients}
+		}
+	}
 	graph := h.radarDetailGraph(ctx, target)
 	tradeLedger := h.unifiedTradeLedgerAggregates(ctx, target)
 	transactionEvidence := h.loadUnifiedTransactionEvidence(ctx, target, 50)
@@ -129,6 +145,8 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			"store_status": actorStoreStatus, "live_wallet_evidence": liveEvidence.WalletCoverage,
 		},
 		"graph": graph,
+		"creator_intelligence": creatorIntelligence,
+		"creator_distribution": creatorDistribution,
 		"investigation_output_policy": services.SharedInvestigationOutputPolicy(),
 		"evidence_policy": map[string]any{
 			"numeric_final_score_disabled": true, "numeric_rug_probability_disabled": true,

@@ -45,3 +45,58 @@ func TestUnifiedInvestigationTechnicalResultIsCallerNeutral(t *testing.T) {
 		t.Fatalf("caller-neutral policy missing: %#v", ownerProjection["investigation_output_policy"])
 	}
 }
+
+func TestUnifiedInvestigationStoredOnlyKeepsActorCollectorsRPCFree(t *testing.T) {
+	core := holderIntelligenceCoreResult{
+		Request: services.SecurityRadarRequest{
+			Target:  "MintStoredOnly11111111111111111111111111111",
+			Network: "solana-mainnet",
+			Mode:    "stored_only_projection",
+		},
+		SourceContext: map[string]any{
+			"creator_wallet": "CreatorStoredOnly111111111111111111111111111",
+		},
+		Cluster: services.HolderClusterAnalysis{Findings: []string{}},
+	}
+
+	assembly := (&Handler{}).assembleUnifiedInvestigationReport(context.Background(), core)
+	actor, ok := assembly.Report["actor_investigation"].(map[string]any)
+	if !ok {
+		t.Fatalf("actor investigation section missing: %#v", assembly.Report["actor_investigation"])
+	}
+	run, ok := actor["integration_run"].(unifiedActorInvestigationRun)
+	if !ok {
+		t.Fatalf("actor integration run missing: %#v", actor["integration_run"])
+	}
+	if run.LiveRequested {
+		t.Fatal("stored-only projection requested live actor evidence")
+	}
+	if run.LiveEvidence.Status != "not_requested" {
+		t.Fatalf("stored-only projection changed live actor status: %s", run.LiveEvidence.Status)
+	}
+}
+
+func TestUnifiedInvestigationLiveModeMarksMissingCreatorExplicitly(t *testing.T) {
+	core := holderIntelligenceCoreResult{
+		Request: services.SecurityRadarRequest{
+			Target:  "MintWithoutCreator111111111111111111111111111",
+			Network: "solana-mainnet",
+			Mode:    "owner_unified_manual_scan",
+		},
+		SourceContext: map[string]any{},
+		Cluster:       services.HolderClusterAnalysis{Findings: []string{}},
+	}
+
+	assembly := (&Handler{}).assembleUnifiedInvestigationReport(context.Background(), core)
+	actor := assembly.Report["actor_investigation"].(map[string]any)
+	run := actor["integration_run"].(unifiedActorInvestigationRun)
+	if !run.LiveRequested {
+		t.Fatal("live unified scan did not request actor investigation")
+	}
+	if run.Status != "creator_unavailable" {
+		t.Fatalf("missing creator should be explicit, got %q", run.Status)
+	}
+	if len(run.Limitations) == 0 {
+		t.Fatal("missing creator did not produce an investigation limitation")
+	}
+}

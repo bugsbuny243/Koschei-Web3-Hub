@@ -19,7 +19,10 @@ func TestProductRouteTierMapAndFreeCore(t *testing.T) {
 	}
 	registerProductRoutes(mux, h, gate)
 
-	want := []string{"basic", "basic", "basic", "basic", "pro", "pro", "pro", "pro", "pro", "pro"}
+	// Basic includes the existing three security products plus the canonical
+	// durable-job create routes and radar detail. Job reads remain authenticated
+	// but are not counted here because they do not consume a new scan quota.
+	want := []string{"basic", "basic", "basic", "basic", "basic", "basic", "pro", "pro", "pro", "pro", "pro", "pro"}
 	if !reflect.DeepEqual(tiers, want) {
 		t.Fatalf("route tiers=%v want=%v", tiers, want)
 	}
