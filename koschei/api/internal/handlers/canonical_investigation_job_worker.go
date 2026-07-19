@@ -28,6 +28,7 @@ type canonicalInvestigationJobPayload struct {
 	Network       string `json:"network,omitempty"`
 	Mode          string `json:"mode,omitempty"`
 	RootTarget    string `json:"root_target,omitempty"`
+	RootJobID     string `json:"root_job_id,omitempty"`
 	ParentTarget  string `json:"parent_target,omitempty"`
 	ParentActor   string `json:"parent_actor,omitempty"`
 	Source        string `json:"source,omitempty"`
@@ -78,11 +79,11 @@ func StartCanonicalInvestigationJobWorker(ctx context.Context, db, readDB *sql.D
 	}
 	workerCtx, cancel := context.WithCancel(ctx)
 	worker := &canonicalInvestigationJobWorker{
-		Handler: &Handler{DB: db, DBRead: readDB, SolanaRPC: solanaRPC, JobStore: store},
-		Store: store,
-		PollEvery: time.Duration(canonicalWorkerEnvInt("KOSCHEI_CANONICAL_JOB_POLL_SECONDS", 2, 1, 60)) * time.Second,
+		Handler:    &Handler{DB: db, DBRead: readDB, SolanaRPC: solanaRPC, JobStore: store},
+		Store:      store,
+		PollEvery:  time.Duration(canonicalWorkerEnvInt("KOSCHEI_CANONICAL_JOB_POLL_SECONDS", 2, 1, 60)) * time.Second,
 		StaleAfter: time.Duration(canonicalWorkerEnvInt("KOSCHEI_CANONICAL_JOB_STALE_SECONDS", 7200, 300, 86400)) * time.Second,
-		Heartbeat: time.Duration(canonicalWorkerEnvInt("KOSCHEI_CANONICAL_JOB_HEARTBEAT_SECONDS", 30, 10, 300)) * time.Second,
+		Heartbeat:  time.Duration(canonicalWorkerEnvInt("KOSCHEI_CANONICAL_JOB_HEARTBEAT_SECONDS", 30, 10, 300)) * time.Second,
 		ChildLimit: canonicalWorkerEnvInt("ACTOR_CHILD_MINT_JOB_LIMIT", 40, 1, 200),
 	}
 	go worker.Start(workerCtx)
@@ -228,20 +229,21 @@ func (w *canonicalInvestigationJobWorker) processJob(ctx context.Context, job jo
 		return nil, fmt.Errorf("canonical worker supports token mint, wallet or token account; classification=%s", classification.Type)
 	}
 
+	rootJobID := strings.TrimSpace(firstNonEmptyString(payload.RootJobID, job.ID))
 	report["target_classification"] = classification
 	report["background_job"] = map[string]any{
-		"job_id": job.ID, "job_type": job.Type, "attempt": job.Attempts,
+		"job_id": job.ID, "root_job_id": rootJobID, "job_type": job.Type, "attempt": job.Attempts,
 		"source": payload.Source, "source_event_id": payload.SourceEventID,
 		"root_target": firstNonEmptyString(payload.RootTarget, target),
 		"parent_target": payload.ParentTarget, "parent_actor": payload.ParentActor,
 		"depth": payload.Depth, "max_depth": canonicalPayloadMaxDepth(payload),
 	}
-	childQueue := w.scheduleCreatedMintChildren(ctx, job, payload, report)
+	childQueue := w.scheduleCreatedMintChildren(ctx, job, payload, rootJobID, report)
 	report["recursive_child_queue"] = childQueue
 	return report, nil
 }
 
-func (w *canonicalInvestigationJobWorker) scheduleCreatedMintChildren(ctx context.Context, parent jobs.Job, payload canonicalInvestigationJobPayload, report map[string]any) canonicalInvestigationChildQueue {
+func (w *canonicalInvestigationJobWorker) scheduleCreatedMintChildren(ctx context.Context, parent jobs.Job, payload canonicalInvestigationJobPayload, rootJobID string, report map[string]any) canonicalInvestigationChildQueue {
 	maxDepth := canonicalPayloadMaxDepth(payload)
 	out := canonicalInvestigationChildQueue{
 		Depth: payload.Depth, MaxDepth: maxDepth,
@@ -257,6 +259,7 @@ func (w *canonicalInvestigationJobWorker) scheduleCreatedMintChildren(ctx contex
 	candidates := canonicalSlice(portfolio["verified_candidates"])
 	out.CandidatesObserved = len(candidates)
 	rootTarget := strings.TrimSpace(firstNonEmptyString(payload.RootTarget, parent.Target))
+	rootJobID = strings.TrimSpace(firstNonEmptyString(rootJobID, payload.RootJobID, parent.ID))
 	seen := map[string]bool{}
 	for _, raw := range candidates {
 		candidate := canonicalMap(raw)
@@ -271,10 +274,10 @@ func (w *canonicalInvestigationJobWorker) scheduleCreatedMintChildren(ctx contex
 			continue
 		}
 		childDepth := payload.Depth + 1
-		dedupe := strings.Join([]string{rootTarget, strconv.Itoa(childDepth), mint}, "|")
+		dedupe := strings.Join([]string{rootJobID, rootTarget, strconv.Itoa(childDepth), mint}, "|")
 		childPayload := canonicalInvestigationJobPayload{
 			Mint: mint, Network: parent.Network, Mode: "background_recursive_token_scan",
-			RootTarget: rootTarget, ParentTarget: parent.Target,
+			RootTarget: rootTarget, RootJobID: rootJobID, ParentTarget: parent.Target,
 			ParentActor: strings.TrimSpace(canonicalString(actor["wallet"])),
 			Source: "created_mint_portfolio", Depth: childDepth, MaxDepth: maxDepth, DedupeKey: dedupe,
 		}
