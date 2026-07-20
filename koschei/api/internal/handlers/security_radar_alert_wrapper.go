@@ -6,19 +6,24 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 
 	"koschei/api/internal/alerts"
 )
 
+const maxSecurityRadarAlertBody = 1 << 20
+
 // SecurityRadarCheckWithAlerts preserves the existing investigation response
 // contract and adds a durable alert only after a signed, evidence-ready verdict
 // has been produced. The alert pipeline never changes the deterministic grade.
 func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Request) {
-	rawBody, err := io.ReadAll(r.Body)
+	rawBody, err := io.ReadAll(io.LimitReader(r.Body, maxSecurityRadarAlertBody+1))
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Invalid request body")
+		return
+	}
+	if len(rawBody) > maxSecurityRadarAlertBody {
+		writeAPIError(w, http.StatusRequestEntityTooLarge, APICodeInvalidInput, "Request body is too large")
 		return
 	}
 	r.Body = io.NopCloser(bytes.NewReader(rawBody))
@@ -79,14 +84,9 @@ func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope
 	grade := strings.TrimSpace(stringFromMap(final, "grade"))
 	verdict := strings.TrimSpace(stringFromMap(final, "verdict"))
 	recommendation := strings.TrimSpace(stringFromMap(final, "recommendation"))
-	riskIndex := numberFromMap(final, "risk_index")
 	claims, _ := userFromContext(r.Context())
 	if target == "" {
 		target = strings.TrimSpace(stringFromMap(envelope, "target"))
-	}
-	dedupe := "arvis-verdict:" + signature
-	if signature == "" {
-		dedupe = "arvis-verdict:" + target + ":" + riskLevel + ":" + strconv.Itoa(riskIndex)
 	}
 	message := verdict
 	if message == "" {
@@ -94,27 +94,41 @@ func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope
 	}
 	id, err := alerts.Emit(r.Context(), h.DB, alerts.Event{
 		AuthSubject: claims.Sub,
-		Source: "arvis",
-		EventType: alerts.EventARVISVerdictCreated,
-		Severity: riskLevel,
-		Target: target,
-		Title: "ARVIS signed verdict: " + strings.ToUpper(riskLevel),
-		Message: message,
-		DedupeKey: dedupe,
+		Source:      "arvis",
+		EventType:   alerts.EventARVISVerdictCreated,
+		Severity:    riskLevel,
+		Target:      target,
+		Title:       "ARVIS signed verdict: " + strings.ToUpper(riskLevel),
+		Message:     message,
+		DedupeKey:   arvisAlertDedupeKey(claims.Sub, signature, target, riskLevel, grade),
 		EvidenceRef: signature,
-		Payload: map[string]any{
-			"target": target,
-			"grade": grade,
-			"risk_index": riskIndex,
-			"risk_level": riskLevel,
-			"recommendation": recommendation,
-			"signature": signature,
-		},
+		Payload:     arvisAlertPayload(target, grade, riskLevel, recommendation, signature),
 	})
 	if err != nil {
 		return ""
 	}
 	return id
+}
+
+func arvisAlertDedupeKey(authSubject, signature, target, riskLevel, grade string) string {
+	scope := strings.TrimSpace(authSubject)
+	if scope == "" {
+		scope = "unscoped"
+	}
+	if signature = strings.TrimSpace(signature); signature != "" {
+		return "arvis-verdict:" + scope + ":" + signature
+	}
+	return "arvis-verdict:" + scope + ":" + strings.TrimSpace(target) + ":" + strings.TrimSpace(riskLevel) + ":" + strings.TrimSpace(grade)
+}
+
+func arvisAlertPayload(target, grade, riskLevel, recommendation, signature string) map[string]any {
+	return map[string]any{
+		"target":         target,
+		"grade":          grade,
+		"risk_level":     riskLevel,
+		"recommendation": recommendation,
+		"signature":      signature,
+	}
 }
 
 func stringFromMap(values map[string]any, key string) string {
@@ -123,21 +137,4 @@ func stringFromMap(values map[string]any, key string) string {
 	}
 	value, _ := values[key].(string)
 	return value
-}
-
-func numberFromMap(values map[string]any, key string) int {
-	if values == nil {
-		return 0
-	}
-	switch value := values[key].(type) {
-	case float64:
-		return int(value)
-	case int:
-		return value
-	case json.Number:
-		n, _ := value.Int64()
-		return int(n)
-	default:
-		return 0
-	}
 }
