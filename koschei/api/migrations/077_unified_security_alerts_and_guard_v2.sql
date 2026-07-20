@@ -65,6 +65,20 @@ CREATE INDEX IF NOT EXISTS security_alert_deliveries_due_idx
     ON security_alert_deliveries (status, next_attempt_at, created_at)
     WHERE status IN ('pending','retry');
 
+CREATE TABLE IF NOT EXISTS security_alert_webhook_subscriptions (
+    endpoint_id uuid NOT NULL REFERENCES webhook_endpoints(id) ON DELETE CASCADE,
+    auth_subject text NOT NULL,
+    event_type text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (endpoint_id,event_type),
+    CONSTRAINT security_alert_webhook_event_type_check CHECK (
+        event_type IN ('security.alert.created','arvis.verdict.created','transaction.guard.decision')
+    )
+);
+
+CREATE INDEX IF NOT EXISTS security_alert_webhook_subscriptions_owner_idx
+    ON security_alert_webhook_subscriptions (auth_subject,created_at DESC);
+
 CREATE OR REPLACE FUNCTION enqueue_security_alert_webhooks()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -95,12 +109,12 @@ BEGIN
             )
         )
     FROM webhook_endpoints e
+    JOIN security_alert_webhook_subscriptions s
+      ON s.endpoint_id=e.id AND s.auth_subject=e.auth_subject
     WHERE e.auth_subject = NEW.auth_subject
       AND e.status = 'active'
-      AND (
-          'security.alert.created' = ANY(e.event_types)
-          OR NEW.event_type = ANY(e.event_types)
-      )
+      AND (s.event_type='security.alert.created' OR s.event_type=NEW.event_type)
+    GROUP BY e.id,e.auth_subject
     ON CONFLICT (endpoint_id, event_id, event_type) DO NOTHING;
 
     RETURN NEW;
