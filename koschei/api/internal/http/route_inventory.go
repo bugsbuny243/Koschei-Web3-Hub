@@ -31,6 +31,7 @@ func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 			"Recipient fate investigation is mint-specific ATA-only and never queries recipient-wide signature history.",
 			"Canonical investigation jobs accept token mint, wallet or token-account targets and continue after the HTTP request ends.",
 			"Owner, customer and automatic Pump discovery routes feed the same canonical investigation worker.",
+			"Signed medium-or-higher ARVIS verdicts and non-allow transaction guard decisions enter the durable alert pipeline.",
 		},
 	})
 }
@@ -68,7 +69,7 @@ func productionRouteInventory() []routeInventoryGroup {
 		}},
 		{Name: "watchlist_and_webhooks", Auth: "customer_session_plus_kosch", Routes: []string{
 			"/api/watchlist", "POST /api/watchlist/refresh", "/api/watchlist/alerts", "/api/watchlist/{id}",
-			"/api/webhooks", "/api/webhooks/{id}", "/api/webhooks/deliveries", "/api/webhooks/deliveries/{id}",
+			"/api/webhooks", "/api/webhooks/{id}", "GET|POST /api/webhooks/security-alerts", "/api/webhooks/deliveries", "/api/webhooks/deliveries/{id}",
 		}},
 	}
 }
