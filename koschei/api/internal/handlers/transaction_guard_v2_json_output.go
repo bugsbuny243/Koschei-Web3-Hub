@@ -3,9 +3,9 @@ package handlers
 import "encoding/json"
 
 // MarshalJSON keeps caller-declared token metadata separate from the RPC-
-// verified balance delta. Until the raw token-account mint bytes are compared
-// with the declaration, the response must not imply that the mint itself was
-// verified by Koschei.
+// verified balance delta. MintVerified becomes true only after the declared
+// address is compared with the raw token-account mint bytes on every available
+// pre/post side.
 func (value transactionGuardAccountDelta) MarshalJSON() ([]byte, error) {
 	type accountDeltaOutput struct {
 		Address           string `json:"address"`
@@ -27,7 +27,7 @@ func (value transactionGuardAccountDelta) MarshalJSON() ([]byte, error) {
 		EvidenceStatus    string `json:"evidence_status"`
 	}
 	return json.Marshal(accountDeltaOutput{
-		Address: value.Address, DeclaredMint: value.Mint, MintVerified: false,
+		Address: value.Address, DeclaredMint: value.Mint, MintVerified: value.MintVerified,
 		Role: value.Role, Decimals: value.Decimals,
 		PreAmountRaw: value.PreAmountRaw, PostAmountRaw: value.PostAmountRaw, DeltaRaw: value.DeltaRaw,
 		SpentRaw: value.SpentRaw, ReceivedRaw: value.ReceivedRaw,
