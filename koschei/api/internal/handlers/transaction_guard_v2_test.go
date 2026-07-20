@@ -9,6 +9,8 @@ import (
 	"koschei/api/internal/services"
 )
 
+const guardTestSPLTokenProgramID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+
 func TestTransactionGuardRequestRejectsInvalidProgramIdentity(t *testing.T) {
 	var input transactionGuardV2Request
 	err := json.Unmarshal([]byte(`{"transaction":"dGVzdA==","expected_programs":["not-a-solana-program"]}`), &input)
@@ -89,7 +91,7 @@ func TestFinalizeGuardAssessmentWithholdsIncompleteEvidence(t *testing.T) {
 func guardAccountInfo(amount uint64) *services.SolanaAccountInfo {
 	data := make([]byte, 165)
 	binary.LittleEndian.PutUint64(data[64:72], amount)
-	return &services.SolanaAccountInfo{Data: []any{base64.StdEncoding.EncodeToString(data), "base64"}}
+	return &services.SolanaAccountInfo{Owner: guardTestSPLTokenProgramID, Data: []any{base64.StdEncoding.EncodeToString(data), "base64"}}
 }
 
 func hasGuardFinding(findings []transactionFirewallFinding, code string) bool {
