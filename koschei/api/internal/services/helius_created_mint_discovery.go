@@ -8,11 +8,11 @@ package services
 // discovery works with the RPC provider Koschei already uses — no Solscan Pro
 // subscription required.
 //
-// Helius Enhanced tags token creation with a transaction type (TOKEN_MINT /
-// CREATE) and exposes the minted address in tokenTransfers[0].mint, so no raw
-// message/accountKeys parsing is needed. Output is the same
-// ActorCreatedMintCandidate type the Solscan path produces, so every downstream
-// consumer (RPC re-verification, evidence persistence) is unchanged.
+// Helius Enhanced tags are used only for bounded discovery. Mint selection is
+// heuristic and deliberately excludes common quote assets before preferring a
+// pump-suffixed mint. Canonical RPC must still prove the actor signer and the
+// exact Pump create or SPL/Token-2022 initializeMint instruction before the
+// relationship becomes VERIFIED evidence.
 //
 // Design rules honored:
 //   - Reuses heliusEnhancedAPIKey + fetchHeliusEnhancedTransactionsPage. No new
@@ -126,10 +126,9 @@ func FetchHeliusCreatedMintDiscovery(ctx context.Context, rpcURL, wallet string)
 	return out
 }
 
-// extractHeliusCreatedMintCandidates identifies token-creation transactions
-// signed by the creator from a Helius Enhanced batch. Helius already classifies
-// the transaction type, so this trusts the TOKEN_MINT/CREATE tag plus a pump/
-// token source and reads the minted address from tokenTransfers.
+// extractHeliusCreatedMintCandidates identifies bounded discovery candidates.
+// feePayer matching is only a routing heuristic; it is not signer or creator
+// proof. Canonical RPC verification upstream must establish the exact role.
 func extractHeliusCreatedMintCandidates(transactions []heliusEnhancedTypedTransaction, actorWallet string) []ActorCreatedMintCandidate {
 	actorWallet = strings.TrimSpace(actorWallet)
 	if actorWallet == "" {
@@ -140,9 +139,8 @@ func extractHeliusCreatedMintCandidates(transactions []heliusEnhancedTypedTransa
 		if strings.TrimSpace(tx.Signature) == "" {
 			continue
 		}
-		// Creator attribution: the fee payer is the transaction signer on
-		// pump.fun single-signer creations. This is a discovery hint; upstream
-		// RPC re-verification confirms the actual create-instruction signer.
+		// Fee-payer equality only narrows the discovery window. Relayers and
+		// sponsored transactions mean it cannot establish creator attribution.
 		if !strings.EqualFold(strings.TrimSpace(tx.FeePayer), actorWallet) {
 			continue
 		}
@@ -156,20 +154,18 @@ func extractHeliusCreatedMintCandidates(transactions []heliusEnhancedTypedTransa
 			continue
 		}
 
-		mint := ""
-		for _, transfer := range tx.TokenTransfers {
-			if m := strings.TrimSpace(transfer.Mint); m != "" {
-				mint = m
-				break
-			}
-		}
+		mint := heliusCreatedMintCandidateFromTransfers(tx.TokenTransfers)
 		if mint == "" {
 			continue // no mint resolvable; not a usable candidate
 		}
 
 		program := ""
-		if len(tx.Instructions) > 0 {
-			program = strings.TrimSpace(tx.Instructions[0].ProgramID)
+		for _, instruction := range tx.Instructions {
+			id := strings.TrimSpace(instruction.ProgramID)
+			if id == canonicalPumpFunProgramID || id == canonicalSPLTokenProgramID || id == canonicalToken2022ProgramID {
+				program = id
+				break
+			}
 		}
 		if strings.Contains(source, "pump") && program == "" {
 			program = canonicalPumpFunProgramID
@@ -188,7 +184,7 @@ func extractHeliusCreatedMintCandidates(transactions []heliusEnhancedTypedTransa
 			ObservedAt:         observedAt,
 			Program:            program,
 			InstructionType:    strings.ToLower(txType),
-			ActorSigned:        true, // fee payer == actor; RPC re-verify confirms
+			ActorSigned:        false, // discovery does not prove signer identity
 			VerificationStatus: "discovery_candidate",
 			Source:             "helius_enhanced_transactions",
 		})
@@ -196,10 +192,39 @@ func extractHeliusCreatedMintCandidates(transactions []heliusEnhancedTypedTransa
 	return results
 }
 
-// fetchHeliusEnhancedTypedTransactionsPage is the typed-decode variant of
-// fetchHeliusEnhancedTransactionsPage: same endpoint and pagination, but it
-// decodes the type/feePayer/source fields needed for creation attribution.
-func fetchHeliusEnhancedTypedTransactionsPage(ctx context.Context, apiKey, address, before string, limit int) ([]heliusEnhancedTypedTransaction, error) {
+const (
+	canonicalWrappedSOLMint = "So11111111111111111111111111111111111111112"
+	canonicalUSDCMint       = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+	canonicalUSDTMint       = "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+)
+
+func heliusCreatedMintCandidateFromTransfers(transfers []heliusTokenTransfer) string {
+	fallback := ""
+	for _, transfer := range transfers {
+		mint := strings.TrimSpace(transfer.Mint)
+		if mint == "" || heliusCreatedMintQuoteAsset(mint) {
+			continue
+		}
+		if strings.HasSuffix(strings.ToLower(mint), "pump") {
+			return mint
+		}
+		if fallback == "" {
+			fallback = mint
+		}
+	}
+	return fallback
+}
+
+func heliusCreatedMintQuoteAsset(mint string) bool {
+	switch strings.TrimSpace(mint) {
+	case canonicalWrappedSOLMint, canonicalUSDCMint, canonicalUSDTMint:
+		return true
+	default:
+		return false
+	}
+}
+
+func heliusEnhancedTypedTransactionsURL(apiKey, address, before string, limit int) string {
 	if limit <= 0 || limit > heliusEnhancedPageSize {
 		limit = heliusEnhancedPageSize
 	}
@@ -208,11 +233,19 @@ func fetchHeliusEnhancedTypedTransactionsPage(ctx context.Context, apiKey, addre
 	query.Set("api-key", apiKey)
 	query.Set("limit", fmt.Sprintf("%d", limit))
 	if strings.TrimSpace(before) != "" {
-		query.Set("before", strings.TrimSpace(before))
+		query.Set("before-signature", strings.TrimSpace(before))
 	}
+	return endpoint + "?" + query.Encode()
+}
+
+// fetchHeliusEnhancedTypedTransactionsPage is the typed-decode variant of
+// fetchHeliusEnhancedTransactionsPage: same endpoint and pagination, but it
+// decodes the type/feePayer/source fields needed for creation attribution.
+func fetchHeliusEnhancedTypedTransactionsPage(ctx context.Context, apiKey, address, before string, limit int) ([]heliusEnhancedTypedTransaction, error) {
+	endpoint := heliusEnhancedTypedTransactionsURL(apiKey, address, before, limit)
 	reqCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, endpoint+"?"+query.Encode(), nil)
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"os"
 	"strings"
 
 	"koschei/api/internal/services"
@@ -33,8 +32,8 @@ func newActorCreatedMintIntegrationRun(wallet string) actorCreatedMintIntegratio
 	}
 }
 
-// collectActorCreatedMintPortfolio uses Solscan only to discover filtered
-// candidate transactions. Each candidate is re-read from the canonical Solana
+// collectActorCreatedMintPortfolio uses bounded external discovery providers to
+// find candidate transactions. Each candidate is re-read from the canonical Solana
 // RPC and must independently satisfy the signer + create/initializeMint parser
 // before it becomes VERIFIED actor evidence.
 func (h *Handler) collectActorCreatedMintPortfolio(ctx context.Context, store *services.ActorDefenseStore, wallet, network string) actorCreatedMintIntegrationRun {
@@ -50,7 +49,7 @@ func (h *Handler) collectActorCreatedMintPortfolio(ctx context.Context, store *s
 	// Fall back to Helius when Solscan is unconfigured or produced no usable
 	// discovery — Koschei already uses Helius, so no Solscan Pro key is required.
 	if !out.Discovery.Available || len(out.Discovery.Candidates) == 0 {
-		if helius := services.FetchHeliusCreatedMintDiscovery(ctx, strings.TrimSpace(os.Getenv("SOLANA_RPC_URL")), wallet); helius.Available {
+		if helius := services.FetchHeliusCreatedMintDiscovery(ctx, strings.TrimSpace(creatorIntelRPCURL()), wallet); helius.Available {
 			out.Discovery = helius
 		}
 	}
@@ -76,7 +75,7 @@ func (h *Handler) collectActorCreatedMintPortfolio(ctx context.Context, store *s
 	rpcURL := strings.TrimSpace(creatorIntelRPCURL())
 	if rpcURL == "" {
 		out.Status = "rpc_verification_unavailable"
-		out.Limitations = append(out.Limitations, "Created-mint adayları Solscan ile bulundu ancak doğrulama RPC'si yapılandırılmamış.")
+		out.Limitations = append(out.Limitations, "Created-mint adayları keşif sağlayıcısından bulundu ancak doğrulama RPC'si yapılandırılmamış.")
 		return out
 	}
 	verifyLimit := actorDefenseEnvInt("ACTOR_CREATED_MINT_VERIFY_LIMIT", 40, 1, 200)
