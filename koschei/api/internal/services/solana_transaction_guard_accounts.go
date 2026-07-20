@@ -8,7 +8,12 @@ import (
 	"strings"
 )
 
-const maxTransactionGuardAccounts = 32
+const (
+	maxTransactionGuardAccounts = 32
+	splTokenProgramID            = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+	token2022ProgramID           = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+	minimumTokenAccountSize      = 165
+)
 
 type SolanaSimulationAccountsResult struct {
 	Context struct {
@@ -82,14 +87,22 @@ func SolanaTokenAccountRawAmount(info *SolanaAccountInfo) (uint64, error) {
 	if info == nil {
 		return 0, fmt.Errorf("token account is unavailable")
 	}
+	if !isGuardTokenProgram(info.Owner) {
+		return 0, fmt.Errorf("account is not owned by an SPL token program")
+	}
 	data, err := solanaAccountDataBytes(info.Data)
 	if err != nil {
 		return 0, err
 	}
-	if len(data) < 72 {
+	if len(data) < minimumTokenAccountSize {
 		return 0, fmt.Errorf("token account data is too short")
 	}
 	return binary.LittleEndian.Uint64(data[64:72]), nil
+}
+
+func isGuardTokenProgram(owner string) bool {
+	owner = strings.TrimSpace(owner)
+	return owner == splTokenProgramID || owner == token2022ProgramID
 }
 
 func solanaAccountDataBytes(raw any) ([]byte, error) {
