@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -43,6 +44,7 @@ type transactionGuardAccount struct {
 type transactionGuardAccountDelta struct {
 	Address           string `json:"address"`
 	Mint              string `json:"mint,omitempty"`
+	MintVerified      bool   `json:"-"`
 	Role              string `json:"role"`
 	Decimals          *int   `json:"decimals,omitempty"`
 	PreAmountRaw      string `json:"pre_amount_raw"`
@@ -128,7 +130,7 @@ func (h *Handler) TransactionGuardV2(w http.ResponseWriter, r *http.Request) {
 			h.finishTransactionGuardResponse(w, r, input, requestID, started, assessment, transactionGuardProgramPolicy{Complete: false}, intentPolicy, "")
 			return
 		}
-		assessment = assessTransactionSimulation(simulation)
+		assessment = assessTransactionGuardSimulation(simulation)
 	} else {
 		pre, ordered, err := services.SolanaGetMultipleAccountsBase64(ctx, os.Getenv("SOLANA_RPC_URL"), addresses)
 		if err != nil {
@@ -143,8 +145,11 @@ func (h *Handler) TransactionGuardV2(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		assessment = assessmentFromAccountSimulation(simulation)
-		intentPolicy, findings := evaluateTransactionGuardAccounts(input.Accounts, ordered, simulatedOrder, pre.Value, simulation.Value.Accounts)
-		assessment.Findings = append(assessment.Findings, findings...)
+		if assessment.SimulationOK {
+			var findings []transactionFirewallFinding
+			intentPolicy, findings = evaluateTransactionGuardAccounts(input.Accounts, ordered, simulatedOrder, pre.Value, simulation.Value.Accounts)
+			assessment.Findings = append(assessment.Findings, findings...)
+		}
 	}
 
 	programPolicy, programFindings := evaluateTransactionGuardPrograms(assessment.ProgramIDs, input.ExpectedPrograms, input.RequiredPrograms, input.BlockedPrograms)
@@ -208,6 +213,14 @@ func validateTransactionGuardInput(input *transactionGuardV2Request) error {
 	return nil
 }
 
+func assessTransactionGuardSimulation(simulation services.SolanaSimulationResult) transactionFirewallAssessment {
+	assessment := assessTransactionSimulation(simulation)
+	// Program policy is security-sensitive and must inspect the complete RPC log
+	// surface. Only the response copy is capped by sanitizeFirewallLogs.
+	assessment.ProgramIDs = extractFirewallProgramIDs(simulation.Value.Logs)
+	return assessment
+}
+
 func assessmentFromAccountSimulation(simulation services.SolanaSimulationAccountsResult) transactionFirewallAssessment {
 	var base services.SolanaSimulationResult
 	base.Context.Slot = simulation.Context.Slot
@@ -218,7 +231,7 @@ func assessmentFromAccountSimulation(simulation services.SolanaSimulationAccount
 	base.Value.ReturnData = simulation.Value.ReturnData
 	base.Value.InnerInstructions = simulation.Value.InnerInstructions
 	base.Value.ReplacementBlockhash = simulation.Value.ReplacementBlockhash
-	return assessTransactionSimulation(base)
+	return assessTransactionGuardSimulation(base)
 }
 
 func unavailableGuardAssessment(err error) transactionFirewallAssessment {
@@ -278,23 +291,51 @@ func evaluateTransactionGuardAccounts(specs []transactionGuardAccount, preOrder,
 		pi, pok := preIndex[spec.Address]
 		qi, qok := postIndex[spec.Address]
 		if !pok || !qok || pi >= len(pre) || qi >= len(post) {
-			result.PolicyStatus = "withhold"
-			result.EvidenceStatus = "account_missing"
-			policy.Complete = false
-			policy.Accounts = append(policy.Accounts, result)
-			findings = append(findings, transactionFirewallFinding{Code: "guard_account_missing", Severity: "high", Title: "Guarded account evidence is unavailable", Evidence: spec.Address, Score: 30})
+			appendGuardAccountWithhold(&policy, &findings, result, "account_missing", "guard_account_missing", "Guarded account evidence is unavailable")
 			continue
 		}
-		preAmount, preErr := services.SolanaTokenAccountRawAmount(pre[pi])
-		postAmount, postErr := services.SolanaTokenAccountRawAmount(post[qi])
-		if preErr != nil || postErr != nil {
-			result.PolicyStatus = "withhold"
-			result.EvidenceStatus = "account_decode_failed"
-			policy.Complete = false
-			policy.Accounts = append(policy.Accounts, result)
-			findings = append(findings, transactionFirewallFinding{Code: "guard_account_decode_failed", Severity: "high", Title: "Guarded token account could not be decoded", Evidence: spec.Address, Score: 30})
+
+		preSnapshot, prePresent, preErr := guardTokenAccountSide(pre[pi], spec.Role == "output")
+		postSnapshot, postPresent, postErr := guardTokenAccountSide(post[qi], spec.Role == "input")
+		if preErr != nil || postErr != nil || (!prePresent && !postPresent) {
+			appendGuardAccountWithhold(&policy, &findings, result, "account_decode_failed", "guard_account_decode_failed", "Guarded token account could not be decoded")
 			continue
 		}
+		if prePresent && postPresent && !bytes.Equal(preSnapshot.Mint[:], postSnapshot.Mint[:]) {
+			result.PolicyStatus = "fail"
+			result.EvidenceStatus = "account_mint_changed"
+			policy.Accounts = append(policy.Accounts, result)
+			findings = append(findings, transactionFirewallFinding{Code: "guard_account_mint_changed", Severity: "critical", Title: "Guarded token account mint changed", Evidence: spec.Address, Score: 100})
+			continue
+		}
+
+		if spec.Mint != "" {
+			expectedMint, err := decodeSolanaPublicKey(spec.Mint)
+			if err != nil || (prePresent && !bytes.Equal(preSnapshot.Mint[:], expectedMint)) || (postPresent && !bytes.Equal(postSnapshot.Mint[:], expectedMint)) {
+				result.PolicyStatus = "fail"
+				result.EvidenceStatus = "mint_mismatch"
+				policy.Accounts = append(policy.Accounts, result)
+				findings = append(findings, transactionFirewallFinding{Code: "guard_account_mint_mismatch", Severity: "critical", Title: "Guarded token account mint does not match the declared asset", Evidence: spec.Address, Score: 100})
+				continue
+			}
+			result.MintVerified = true
+		}
+
+		preAmount := uint64(0)
+		postAmount := uint64(0)
+		if prePresent {
+			preAmount = preSnapshot.Amount
+		}
+		if postPresent {
+			postAmount = postSnapshot.Amount
+		}
+		if !prePresent {
+			result.EvidenceStatus = "verified_rpc_simulation_created_account"
+		}
+		if !postPresent {
+			result.EvidenceStatus = "verified_rpc_simulation_closed_account"
+		}
+
 		preBig := new(big.Int).SetUint64(preAmount)
 		postBig := new(big.Int).SetUint64(postAmount)
 		delta := new(big.Int).Sub(new(big.Int).Set(postBig), preBig)
@@ -341,6 +382,25 @@ func evaluateTransactionGuardAccounts(specs []transactionGuardAccount, preOrder,
 	return policy, findings
 }
 
+func guardTokenAccountSide(info *services.SolanaAccountInfo, allowMissing bool) (services.SolanaTokenAccountSnapshot, bool, error) {
+	if info == nil {
+		if allowMissing {
+			return services.SolanaTokenAccountSnapshot{}, false, nil
+		}
+		return services.SolanaTokenAccountSnapshot{}, false, fmt.Errorf("token account side is unavailable")
+	}
+	snapshot, err := services.SolanaTokenAccountSnapshotFromInfo(info)
+	return snapshot, true, err
+}
+
+func appendGuardAccountWithhold(policy *transactionGuardIntentPolicy, findings *[]transactionFirewallFinding, result transactionGuardAccountDelta, evidenceStatus, code, title string) {
+	result.PolicyStatus = "withhold"
+	result.EvidenceStatus = evidenceStatus
+	policy.Complete = false
+	policy.Accounts = append(policy.Accounts, result)
+	*findings = append(*findings, transactionFirewallFinding{Code: code, Severity: "high", Title: title, Evidence: result.Address, Score: 30})
+}
+
 func finalizeGuardAssessment(assessment transactionFirewallAssessment, program transactionGuardProgramPolicy, intent transactionGuardIntentPolicy) transactionFirewallAssessment {
 	score := 0
 	for _, finding := range assessment.Findings {
@@ -351,7 +411,7 @@ func finalizeGuardAssessment(assessment transactionFirewallAssessment, program t
 	}
 	assessment.RiskIndex = score
 	assessment.Action, assessment.RiskLevel = firewallDecision(score)
-	if !assessment.SimulationOK {
+	if guardProviderUnavailable(assessment) {
 		assessment.Action = "withhold"
 		assessment.RiskLevel = "unknown"
 	}
@@ -372,40 +432,55 @@ func finalizeGuardAssessment(assessment transactionFirewallAssessment, program t
 	return assessment
 }
 
+func guardProviderUnavailable(assessment transactionFirewallAssessment) bool {
+	value, ok := assessment.SimulationErr.(map[string]any)
+	if !ok {
+		return false
+	}
+	code, _ := value["code"].(string)
+	return strings.EqualFold(strings.TrimSpace(code), "rpc_unavailable")
+}
+
+func guardHTTPStatus(assessment transactionFirewallAssessment) int {
+	if guardProviderUnavailable(assessment) {
+		return http.StatusServiceUnavailable
+	}
+	return http.StatusOK
+}
+
 func (h *Handler) finishTransactionGuardResponse(w http.ResponseWriter, r *http.Request, input transactionGuardV2Request, requestID string, started time.Time, assessment transactionFirewallAssessment, programPolicy transactionGuardProgramPolicy, intentPolicy transactionGuardIntentPolicy, alertID string) {
 	guardComplete := assessment.SimulationOK && programPolicy.Complete && intentPolicy.Complete
 	h.saveTransactionGuardV2Report(r.Context(), requestID, input, assessment, programPolicy, intentPolicy, guardComplete, alertID)
 	response := map[string]any{
-		"ok": assessment.SimulationOK,
-		"request_id": requestID,
-		"product": "Koschei Transaction Guard",
-		"guard_version": transactionGuardVersion,
-		"mode": transactionFirewallMode,
-		"shadow_mode": true,
-		"enforcement_enabled": false,
-		"billable": false,
-		"network": input.Network,
-		"encoding": input.Encoding,
-		"wallet": strings.TrimSpace(input.Wallet),
+		"ok":                      !guardProviderUnavailable(assessment),
+		"request_id":              requestID,
+		"product":                 "Koschei Transaction Guard",
+		"guard_version":           transactionGuardVersion,
+		"mode":                    transactionFirewallMode,
+		"shadow_mode":             true,
+		"enforcement_enabled":     false,
+		"billable":                false,
+		"network":                 input.Network,
+		"encoding":                input.Encoding,
+		"wallet":                  strings.TrimSpace(input.Wallet),
 		"transaction_fingerprint": transactionFingerprint(input.Transaction),
-		"action": assessment.Action,
-		"risk_level": assessment.RiskLevel,
-		"risk_index": assessment.RiskIndex,
-		"summary": assessment.Summary,
-		"findings": assessment.Findings,
-		"guard_complete": guardComplete,
-		"program_policy": programPolicy,
-		"intent_policy": intentPolicy,
-		"alert_event_id": alertID,
-		"simulation": map[string]any{"ok": assessment.SimulationOK, "error": assessment.SimulationErr, "units_consumed": assessment.UnitsConsumed, "logs_count": len(assessment.Logs), "logs": assessment.Logs},
+		"action":                  assessment.Action,
+		"risk_level":              assessment.RiskLevel,
+		"risk_index":              assessment.RiskIndex,
+		"summary":                 assessment.Summary,
+		"findings":                assessment.Findings,
+		"guard_complete":          guardComplete,
+		"program_policy":          programPolicy,
+		"intent_policy":           intentPolicy,
+		"alert_event_id":          alertID,
+		"simulation": map[string]any{
+			"ok": assessment.SimulationOK, "error": assessment.SimulationErr, "units_consumed": assessment.UnitsConsumed,
+			"logs_count": len(assessment.Logs), "logs": assessment.Logs,
+		},
 		"latency_ms": time.Since(started).Milliseconds(),
-		"warning": "Shadow mode only: Koschei does not sign, submit or custody this transaction.",
+		"warning":    "Shadow mode only: Koschei does not sign, submit or custody this transaction.",
 	}
-	status := http.StatusOK
-	if !assessment.SimulationOK {
-		status = http.StatusServiceUnavailable
-	}
-	writeJSON(w, status, response)
+	writeJSON(w, guardHTTPStatus(assessment), response)
 }
 
 func (h *Handler) emitTransactionGuardAlert(ctx context.Context, requestID string, input transactionGuardV2Request, assessment transactionFirewallAssessment, program transactionGuardProgramPolicy, intent transactionGuardIntentPolicy) string {
@@ -419,15 +494,18 @@ func (h *Handler) emitTransactionGuardAlert(ctx context.Context, requestID strin
 	}
 	id, err := alerts.Emit(ctx, h.DB, alerts.Event{
 		AuthSubject: principal.AuthSubject,
-		Source: "transaction_guard",
-		EventType: alerts.EventTransactionGuardDecision,
-		Severity: severity,
-		Target: firstNonEmptyString(strings.TrimSpace(input.Wallet), transactionFingerprint(input.Transaction)),
-		Title: "Transaction Guard: " + strings.ToUpper(assessment.Action),
-		Message: assessment.Summary,
-		DedupeKey: "transaction-guard:" + requestID,
+		Source:      "transaction_guard",
+		EventType:   alerts.EventTransactionGuardDecision,
+		Severity:    severity,
+		Target:      firstNonEmptyString(strings.TrimSpace(input.Wallet), transactionFingerprint(input.Transaction)),
+		Title:       "Transaction Guard: " + strings.ToUpper(assessment.Action),
+		Message:     assessment.Summary,
+		DedupeKey:   "transaction-guard:" + requestID,
 		EvidenceRef: requestID,
-		Payload: map[string]any{"request_id": requestID, "action": assessment.Action, "risk_index": assessment.RiskIndex, "program_policy": program, "intent_policy": intent, "findings": assessment.Findings},
+		Payload: map[string]any{
+			"request_id": requestID, "action": assessment.Action, "risk_index": assessment.RiskIndex,
+			"program_policy": program, "intent_policy": intent, "findings": assessment.Findings,
+		},
 	})
 	if err != nil {
 		return ""
