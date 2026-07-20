@@ -32,6 +32,11 @@ type SolanaSimulationAccountsValue struct {
 	ReplacementBlockhash any                  `json:"replacementBlockhash"`
 }
 
+type SolanaTokenAccountSnapshot struct {
+	Mint   [32]byte
+	Amount uint64
+}
+
 func SolanaGetMultipleAccountsBase64(ctx context.Context, rpcURL string, addresses []string) (SolanaMultipleAccountInfoResult, []string, error) {
 	rpcURL = resolvedSolanaRPCURL(rpcURL)
 	clean := cleanGuardAccountAddresses(addresses)
@@ -83,21 +88,29 @@ func SolanaSimulateTransactionWithAccountsBase64(ctx context.Context, rpcURL, tr
 	return result, clean, err
 }
 
-func SolanaTokenAccountRawAmount(info *SolanaAccountInfo) (uint64, error) {
+func SolanaTokenAccountSnapshotFromInfo(info *SolanaAccountInfo) (SolanaTokenAccountSnapshot, error) {
+	var snapshot SolanaTokenAccountSnapshot
 	if info == nil {
-		return 0, fmt.Errorf("token account is unavailable")
+		return snapshot, fmt.Errorf("token account is unavailable")
 	}
 	if !isGuardTokenProgram(info.Owner) {
-		return 0, fmt.Errorf("account is not owned by an SPL token program")
+		return snapshot, fmt.Errorf("account is not owned by an SPL token program")
 	}
 	data, err := solanaAccountDataBytes(info.Data)
 	if err != nil {
-		return 0, err
+		return snapshot, err
 	}
 	if len(data) < minimumTokenAccountSize {
-		return 0, fmt.Errorf("token account data is too short")
+		return snapshot, fmt.Errorf("token account data is too short")
 	}
-	return binary.LittleEndian.Uint64(data[64:72]), nil
+	copy(snapshot.Mint[:], data[:32])
+	snapshot.Amount = binary.LittleEndian.Uint64(data[64:72])
+	return snapshot, nil
+}
+
+func SolanaTokenAccountRawAmount(info *SolanaAccountInfo) (uint64, error) {
+	snapshot, err := SolanaTokenAccountSnapshotFromInfo(info)
+	return snapshot.Amount, err
 }
 
 func isGuardTokenProgram(owner string) bool {
