@@ -33,10 +33,31 @@ const (
 )
 
 type heliusTokenTransfer struct {
-	FromUserAccount string  `json:"fromUserAccount"`
-	ToUserAccount   string  `json:"toUserAccount"`
-	TokenAmount     float64 `json:"tokenAmount"`
-	Mint            string  `json:"mint"`
+	FromTokenAccount string  `json:"fromTokenAccount"`
+	ToTokenAccount   string  `json:"toTokenAccount"`
+	FromUserAccount  string  `json:"fromUserAccount"`
+	ToUserAccount    string  `json:"toUserAccount"`
+	TokenAmount      float64 `json:"tokenAmount"`
+	Mint             string  `json:"mint"`
+	TokenStandard    string  `json:"tokenStandard"`
+	Decimals         *int    `json:"decimals"`
+}
+
+type heliusRawTokenAmount struct {
+	TokenAmount string `json:"tokenAmount"`
+	Decimals    *int   `json:"decimals"`
+}
+
+type heliusTokenBalanceChange struct {
+	UserAccount    string               `json:"userAccount"`
+	TokenAccount   string               `json:"tokenAccount"`
+	Mint           string               `json:"mint"`
+	RawTokenAmount heliusRawTokenAmount `json:"rawTokenAmount"`
+}
+
+type heliusAccountData struct {
+	Account             string                     `json:"account"`
+	TokenBalanceChanges []heliusTokenBalanceChange `json:"tokenBalanceChanges"`
 }
 
 type heliusNativeTransfer struct {
@@ -56,6 +77,7 @@ type heliusEnhancedTransaction struct {
 	TransactionError any                    `json:"transactionError"`
 	TokenTransfers   []heliusTokenTransfer  `json:"tokenTransfers"`
 	NativeTransfers  []heliusNativeTransfer `json:"nativeTransfers"`
+	AccountData      []heliusAccountData    `json:"accountData"`
 	Instructions     []heliusInstruction    `json:"instructions"`
 }
 
@@ -113,6 +135,65 @@ func fetchHeliusEnhancedTransactionsPage(ctx context.Context, apiKey, address, b
 	return out, nil
 }
 
+func holderClusterObservationFromHeliusTransfer(transfer heliusTokenTransfer, tx heliusEnhancedTransaction, sourceWallet, mint string, holderWallets map[string]bool, programIDs []string, assetMetadata heliusAssetMetadata) (HolderClusterFlowObservation, bool) {
+	if !strings.EqualFold(strings.TrimSpace(transfer.Mint), strings.TrimSpace(mint)) {
+		return HolderClusterFlowObservation{}, false
+	}
+	if !strings.EqualFold(strings.TrimSpace(transfer.FromUserAccount), strings.TrimSpace(sourceWallet)) || transfer.TokenAmount <= holderClusterFlowEpsilon {
+		return HolderClusterFlowObservation{}, false
+	}
+
+	destination := strings.TrimSpace(transfer.ToUserAccount)
+	kind := "external_token_recipient"
+	switch {
+	case destination != "" && holderWallets[destination]:
+		kind = "holder_to_holder"
+	case destination != "":
+		// Keep the external recipient owner.
+	case strings.TrimSpace(transfer.ToTokenAccount) != "":
+		destination = strings.TrimSpace(transfer.ToTokenAccount)
+		kind = "token_account_recipient_unresolved"
+	case len(programIDs) > 0:
+		destination = programIDs[0]
+		kind = "dex_program_exit_context"
+	default:
+		return HolderClusterFlowObservation{}, false
+	}
+
+	tokenStandard := strings.TrimSpace(transfer.TokenStandard)
+	if tokenStandard == "" {
+		tokenStandard = strings.TrimSpace(assetMetadata.TokenStandard)
+	}
+	decimals := heliusTransferDecimals(tx, transfer)
+	if decimals == nil {
+		decimals = firstHolderClusterDecimals(assetMetadata.Decimals)
+	}
+	observation := HolderClusterFlowObservation{
+		SourceWallet:            strings.TrimSpace(sourceWallet),
+		Destination:             destination,
+		Mint:                    strings.TrimSpace(transfer.Mint),
+		SourceTokenAccount:      strings.TrimSpace(transfer.FromTokenAccount),
+		DestinationTokenAccount: strings.TrimSpace(transfer.ToTokenAccount),
+		TokenStandard:           tokenStandard,
+		Decimals:                decimals,
+		Kind:                    kind,
+		Amount:                  holderClusterRound(transfer.TokenAmount, 9),
+		Slot:                    tx.Slot,
+		Signature:               strings.TrimSpace(tx.Signature),
+		ProgramIDs:              append([]string{}, programIDs...),
+		Evidence: []string{
+			"Target-token transfer out of the holder wallet was parsed from the Helius Enhanced Transactions API; this is route context, not proof of a sale or common ownership.",
+		},
+	}
+	if observation.SourceTokenAccount != "" || observation.DestinationTokenAccount != "" {
+		observation.Evidence = append(observation.Evidence, "Helius token-account endpoints were preserved alongside the resolved user-account endpoints.")
+	}
+	if observation.TokenStandard != "" || observation.Decimals != nil {
+		observation.Evidence = append(observation.Evidence, "Helius token metadata was preserved for amount interpretation and asset-standard filtering.")
+	}
+	return observation, true
+}
+
 // analyzeHolderClusterWalletEnhanced is the Enhanced-API twin of
 // analyzeHolderClusterWalletTiered. The second return value reports whether
 // the enhanced path produced a usable row; on false the caller must run the
@@ -137,6 +218,7 @@ func analyzeHolderClusterWalletEnhanced(ctx context.Context, rpcURL, mint string
 	if requested <= 0 {
 		requested = heliusEnhancedPageSize
 	}
+	assetMetadata := resolveHeliusAssetMetadata(ctx, apiKey, mint, budget)
 
 	transactions := []heliusEnhancedTransaction{}
 	before := ""
@@ -209,41 +291,11 @@ func analyzeHolderClusterWalletEnhanced(ctx context.Context, rpcURL, mint string
 		}
 
 		// Target-token outflow observations from parsed token transfers.
-		outflowSeen := false
 		for _, transfer := range tx.TokenTransfers {
-			if !strings.EqualFold(strings.TrimSpace(transfer.Mint), strings.TrimSpace(mint)) {
-				continue
+			if observation, ok := holderClusterObservationFromHeliusTransfer(transfer, tx, account.OwnerWallet, mint, holderWallets, programIDs, assetMetadata); ok {
+				row.FlowObservations = append(row.FlowObservations, observation)
 			}
-			if !strings.EqualFold(transfer.FromUserAccount, account.OwnerWallet) || transfer.TokenAmount <= holderClusterFlowEpsilon {
-				continue
-			}
-			destination := strings.TrimSpace(transfer.ToUserAccount)
-			kind := "external_token_recipient"
-			switch {
-			case destination == "":
-				if len(programIDs) == 0 {
-					continue
-				}
-				destination = programIDs[0]
-				kind = "dex_program_exit_context"
-			case holderWallets[destination]:
-				kind = "holder_to_holder"
-			}
-			outflowSeen = true
-			row.FlowObservations = append(row.FlowObservations, HolderClusterFlowObservation{
-				SourceWallet: account.OwnerWallet,
-				Destination:  destination,
-				Kind:         kind,
-				Amount:       holderClusterRound(transfer.TokenAmount, 9),
-				Slot:         tx.Slot,
-				Signature:    tx.Signature,
-				ProgramIDs:   append([]string{}, programIDs...),
-				Evidence: []string{
-					"Target-token transfer out of the holder wallet was parsed from the Helius Enhanced Transactions API; this is route context, not proof of a sale or common ownership.",
-				},
-			})
 		}
-		_ = outflowSeen
 
 		// Funding source: earliest observed native inflow to the owner wallet.
 		if row.FundingSource == "" {

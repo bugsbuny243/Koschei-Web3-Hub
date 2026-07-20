@@ -13,14 +13,19 @@ const holderClusterFlowEpsilon = 0.000000001
 // HolderClusterFlowObservation records one evidence-scoped target-token outflow.
 // It never claims real-world identity, ownership or wash trading on its own.
 type HolderClusterFlowObservation struct {
-	SourceWallet string   `json:"source_wallet"`
-	Destination  string   `json:"destination"`
-	Kind         string   `json:"kind"`
-	Amount       float64  `json:"amount"`
-	Slot         int64    `json:"slot,omitempty"`
-	Signature    string   `json:"signature,omitempty"`
-	ProgramIDs   []string `json:"program_ids"`
-	Evidence     []string `json:"evidence"`
+	SourceWallet            string   `json:"source_wallet"`
+	Destination             string   `json:"destination"`
+	Mint                    string   `json:"mint,omitempty"`
+	SourceTokenAccount      string   `json:"source_token_account,omitempty"`
+	DestinationTokenAccount string   `json:"destination_token_account,omitempty"`
+	TokenStandard           string   `json:"token_standard,omitempty"`
+	Decimals                *int     `json:"decimals,omitempty"`
+	Kind                    string   `json:"kind"`
+	Amount                  float64  `json:"amount"`
+	Slot                    int64    `json:"slot,omitempty"`
+	Signature               string   `json:"signature,omitempty"`
+	ProgramIDs              []string `json:"program_ids"`
+	Evidence                []string `json:"evidence"`
 }
 
 // HolderClusterFlowAnalysis summarizes direct holder transfers and repeated
@@ -72,17 +77,25 @@ func observeHolderClusterWalletFlow(tx map[string]any, signature, mint, sourceWa
 			continue
 		}
 		seen[key] = true
+		sourceTokenAccount, destinationTokenAccount, decimals := holderClusterDirectTransferMetadata(tx, mint, sourceWallet, destination)
 		observation := HolderClusterFlowObservation{
-			SourceWallet: sourceWallet,
-			Destination:  destination,
-			Kind:         kind,
-			Amount:       holderClusterRound(amount, 9),
-			Slot:         slot,
-			Signature:    signature,
-			ProgramIDs:   append([]string{}, programIDs...),
+			SourceWallet:            sourceWallet,
+			Destination:             destination,
+			Mint:                    strings.TrimSpace(mint),
+			SourceTokenAccount:      sourceTokenAccount,
+			DestinationTokenAccount: destinationTokenAccount,
+			Decimals:                decimals,
+			Kind:                    kind,
+			Amount:                  holderClusterRound(amount, 9),
+			Slot:                    slot,
+			Signature:               signature,
+			ProgramIDs:              append([]string{}, programIDs...),
 			Evidence: []string{
 				fmt.Sprintf("Target-token balance decreased for %s while %s increased in the same parsed transaction.", sourceWallet, destination),
 			},
+		}
+		if sourceTokenAccount != "" && destinationTokenAccount != "" {
+			observation.Evidence = append(observation.Evidence, "The parsed token instruction resolved both source and destination token accounts to their controlling owner wallets.")
 		}
 		if len(programIDs) > 0 {
 			observation.Evidence = append(observation.Evidence, "Known pool/DEX program context was present; this is route context, not proof of a sale or common ownership.")
@@ -94,20 +107,157 @@ func observeHolderClusterWalletFlow(tx map[string]any, signature, mint, sourceWa
 	// even when RPC token-balance rows do not expose a recipient owner. Program
 	// identity alone is deliberately excluded from common-exit scoring.
 	if len(out) == 0 && len(programIDs) > 0 {
+		sourceTokenAccount, decimals := holderClusterUniqueOwnerTokenAccount(tx, mint, sourceWallet)
 		out = append(out, HolderClusterFlowObservation{
-			SourceWallet: sourceWallet,
-			Destination:  programIDs[0],
-			Kind:         "dex_program_exit_context",
-			Amount:       holderClusterRound(-sourceDelta, 9),
-			Slot:         slot,
-			Signature:    signature,
-			ProgramIDs:   append([]string{}, programIDs...),
+			SourceWallet:       sourceWallet,
+			Destination:        programIDs[0],
+			Mint:               strings.TrimSpace(mint),
+			SourceTokenAccount: sourceTokenAccount,
+			Decimals:           decimals,
+			Kind:               "dex_program_exit_context",
+			Amount:             holderClusterRound(-sourceDelta, 9),
+			Slot:               slot,
+			Signature:          signature,
+			ProgramIDs:         append([]string{}, programIDs...),
 			Evidence: []string{
 				"A negative target-token balance delta was observed with known pool/DEX program context, but no recipient owner was exposed by the bounded RPC response.",
 			},
 		})
 	}
 	return out
+}
+
+type holderClusterFlowTokenAccount struct {
+	Owner    string
+	Mint     string
+	Decimals *int
+}
+
+func holderClusterDirectTransferMetadata(tx map[string]any, mint, sourceWallet, destinationWallet string) (string, string, *int) {
+	meta := holderClusterMap(tx["meta"])
+	message := holderClusterMap(holderClusterMap(tx["transaction"])["message"])
+	keys := holderClusterAccountKeys(message["accountKeys"])
+	accounts := holderClusterFlowTokenAccounts(meta, keys)
+	for _, instruction := range holderClusterFlowInstructions(message, meta) {
+		parsed := holderClusterMap(instruction["parsed"])
+		kind := strings.ToLower(strings.TrimSpace(holderClusterString(parsed["type"])))
+		if kind != "transfer" && kind != "transferchecked" {
+			continue
+		}
+		info := holderClusterMap(parsed["info"])
+		sourceAccount := strings.TrimSpace(holderClusterString(info["source"]))
+		destinationAccount := strings.TrimSpace(holderClusterString(info["destination"]))
+		if sourceAccount == "" || destinationAccount == "" {
+			continue
+		}
+		source := accounts[sourceAccount]
+		destination := accounts[destinationAccount]
+		transferMint := strings.TrimSpace(holderClusterString(info["mint"]))
+		if transferMint == "" {
+			transferMint = firstNonEmptyString(source.Mint, destination.Mint)
+		}
+		if !strings.EqualFold(transferMint, mint) || !strings.EqualFold(source.Owner, sourceWallet) || !strings.EqualFold(destination.Owner, destinationWallet) {
+			continue
+		}
+		decimals := holderClusterFlowInstructionDecimals(info)
+		if decimals == nil {
+			decimals = firstHolderClusterDecimals(source.Decimals, destination.Decimals)
+		}
+		return sourceAccount, destinationAccount, decimals
+	}
+	return "", "", nil
+}
+
+func holderClusterUniqueOwnerTokenAccount(tx map[string]any, mint, owner string) (string, *int) {
+	meta := holderClusterMap(tx["meta"])
+	message := holderClusterMap(holderClusterMap(tx["transaction"])["message"])
+	accounts := holderClusterFlowTokenAccounts(meta, holderClusterAccountKeys(message["accountKeys"]))
+	matches := []string{}
+	var decimals *int
+	for account, item := range accounts {
+		if !strings.EqualFold(item.Mint, mint) || !strings.EqualFold(item.Owner, owner) {
+			continue
+		}
+		matches = append(matches, account)
+		decimals = firstHolderClusterDecimals(decimals, item.Decimals)
+	}
+	if len(matches) != 1 {
+		return "", decimals
+	}
+	return matches[0], decimals
+}
+
+func holderClusterFlowTokenAccounts(meta map[string]any, keys []string) map[string]holderClusterFlowTokenAccount {
+	out := map[string]holderClusterFlowTokenAccount{}
+	collect := func(raw any) {
+		for _, item := range holderClusterSlice(raw) {
+			row := holderClusterMap(item)
+			rawIndex, ok := row["accountIndex"]
+			if !ok {
+				continue
+			}
+			index := int(holderClusterInt64(rawIndex))
+			if index < 0 || index >= len(keys) || strings.TrimSpace(keys[index]) == "" {
+				continue
+			}
+			current := out[keys[index]]
+			if owner := strings.TrimSpace(holderClusterString(row["owner"])); owner != "" {
+				current.Owner = owner
+			}
+			if mint := strings.TrimSpace(holderClusterString(row["mint"])); mint != "" {
+				current.Mint = mint
+			}
+			amount := holderClusterMap(row["uiTokenAmount"])
+			if rawDecimals, ok := amount["decimals"]; ok {
+				value := int(holderClusterInt64(rawDecimals))
+				current.Decimals = &value
+			}
+			out[keys[index]] = current
+		}
+	}
+	collect(meta["preTokenBalances"])
+	collect(meta["postTokenBalances"])
+	return out
+}
+
+func holderClusterFlowInstructions(message, meta map[string]any) []map[string]any {
+	out := []map[string]any{}
+	appendRows := func(raw any) {
+		for _, item := range holderClusterSlice(raw) {
+			if row := holderClusterMap(item); len(row) > 0 {
+				out = append(out, row)
+			}
+		}
+	}
+	appendRows(message["instructions"])
+	for _, item := range holderClusterSlice(meta["innerInstructions"]) {
+		appendRows(holderClusterMap(item)["instructions"])
+	}
+	return out
+}
+
+func holderClusterFlowInstructionDecimals(info map[string]any) *int {
+	tokenAmount := holderClusterMap(info["tokenAmount"])
+	if raw, ok := tokenAmount["decimals"]; ok {
+		value := int(holderClusterInt64(raw))
+		return &value
+	}
+	if raw, ok := info["decimals"]; ok {
+		value := int(holderClusterInt64(raw))
+		return &value
+	}
+	return nil
+}
+
+func firstHolderClusterDecimals(values ...*int) *int {
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+		copy := *value
+		return &copy
+	}
+	return nil
 }
 
 func summarizeHolderClusterFlow(wallets []HolderClusterWallet) HolderClusterFlowAnalysis {
