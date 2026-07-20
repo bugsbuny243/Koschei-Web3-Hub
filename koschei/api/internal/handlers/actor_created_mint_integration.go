@@ -2,23 +2,24 @@ package handlers
 
 import (
 	"context"
+	"os"
 	"strings"
 
 	"koschei/api/internal/services"
 )
 
 type actorCreatedMintIntegrationRun struct {
-	Status                   string                               `json:"status"`
-	Discovery                services.SolscanCreatedMintDiscovery `json:"discovery"`
-	ObservedEvidenceProduced int                                  `json:"observed_evidence_produced"`
-	ObservedEvidencePersisted int                                 `json:"observed_evidence_persisted"`
-	CandidatesRequested      int                                  `json:"candidates_requested"`
-	CandidatesVerified       int                                  `json:"candidates_verified"`
-	VerificationFailures     int                                  `json:"verification_failures"`
-	VerifiedEvidencePersisted int                                 `json:"verified_evidence_persisted"`
-	PersistenceFailures      int                                  `json:"persistence_failures"`
-	VerifiedCandidates       []services.ActorCreatedMintCandidate `json:"verified_candidates"`
-	Limitations              []string                             `json:"limitations"`
+	Status                    string                               `json:"status"`
+	Discovery                 services.SolscanCreatedMintDiscovery `json:"discovery"`
+	ObservedEvidenceProduced  int                                  `json:"observed_evidence_produced"`
+	ObservedEvidencePersisted int                                  `json:"observed_evidence_persisted"`
+	CandidatesRequested       int                                  `json:"candidates_requested"`
+	CandidatesVerified        int                                  `json:"candidates_verified"`
+	VerificationFailures      int                                  `json:"verification_failures"`
+	VerifiedEvidencePersisted int                                  `json:"verified_evidence_persisted"`
+	PersistenceFailures       int                                  `json:"persistence_failures"`
+	VerifiedCandidates        []services.ActorCreatedMintCandidate `json:"verified_candidates"`
+	Limitations               []string                             `json:"limitations"`
 }
 
 func newActorCreatedMintIntegrationRun(wallet string) actorCreatedMintIntegrationRun {
@@ -46,6 +47,13 @@ func (h *Handler) collectActorCreatedMintPortfolio(ctx context.Context, store *s
 	}
 
 	out.Discovery = services.FetchSolscanCreatedMintDiscovery(ctx, wallet)
+	// Fall back to Helius when Solscan is unconfigured or produced no usable
+	// discovery — Koschei already uses Helius, so no Solscan Pro key is required.
+	if !out.Discovery.Available || len(out.Discovery.Candidates) == 0 {
+		if helius := services.FetchHeliusCreatedMintDiscovery(ctx, strings.TrimSpace(os.Getenv("SOLANA_RPC_URL")), wallet); helius.Available {
+			out.Discovery = helius
+		}
+	}
 	out.Status = out.Discovery.Status
 	out.Limitations = append(out.Limitations, out.Discovery.Limitations...)
 	observedEvidence := services.ActorCreatedMintCandidateEvidence(wallet, network, out.Discovery.Candidates)
