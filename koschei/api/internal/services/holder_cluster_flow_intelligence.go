@@ -10,8 +10,10 @@ import (
 
 const holderClusterFlowEpsilon = 0.000000001
 
-// HolderClusterFlowObservation records one evidence-scoped target-token outflow.
-// It never claims real-world identity, ownership or wash trading on its own.
+// HolderClusterFlowObservation records one evidence-scoped target-token
+// transfer. It never claims real-world identity, ownership or wash trading on
+// its own. Entity and risk fields are populated only from positively-resolved
+// third-party identity metadata.
 type HolderClusterFlowObservation struct {
 	SourceWallet            string   `json:"source_wallet"`
 	Destination             string   `json:"destination"`
@@ -20,6 +22,18 @@ type HolderClusterFlowObservation struct {
 	DestinationTokenAccount string   `json:"destination_token_account,omitempty"`
 	TokenStandard           string   `json:"token_standard,omitempty"`
 	Decimals                *int     `json:"decimals,omitempty"`
+	Direction               string   `json:"direction,omitempty"`
+	FromEntity              string   `json:"from_entity,omitempty"`
+	ToEntity                string   `json:"to_entity,omitempty"`
+	FromEntityCategory      string   `json:"from_entity_category,omitempty"`
+	ToEntityCategory        string   `json:"to_entity_category,omitempty"`
+	FromEntitySource        string   `json:"from_entity_source,omitempty"`
+	ToEntitySource          string   `json:"to_entity_source,omitempty"`
+	TransferType            string   `json:"transfer_type,omitempty"`
+	RiskFlag                string   `json:"risk_flag,omitempty"`
+	RiskFlagEndpoint        string   `json:"risk_flag_endpoint,omitempty"`
+	RiskFlagAddress         string   `json:"risk_flag_address,omitempty"`
+	RiskFlagSource          string   `json:"risk_flag_source,omitempty"`
 	Kind                    string   `json:"kind"`
 	Amount                  float64  `json:"amount"`
 	Slot                    int64    `json:"slot,omitempty"`
@@ -31,34 +45,44 @@ type HolderClusterFlowObservation struct {
 // HolderClusterFlowAnalysis summarizes direct holder transfers and repeated
 // token exit destinations observed inside the bounded transaction window.
 type HolderClusterFlowAnalysis struct {
-	Available               bool                           `json:"available"`
-	Status                  string                         `json:"status"`
-	Confidence              string                         `json:"confidence"`
-	TransactionsWithOutflow int                            `json:"transactions_with_outflow"`
-	WalletsWithOutflow      int                            `json:"wallets_with_outflow"`
-	DEXExitObservationCount int                            `json:"dex_exit_observation_count"`
-	CommonExitGroupCount    int                            `json:"common_exit_group_count"`
-	LargestCommonExitGroup  int                            `json:"largest_common_exit_group"`
-	InternalTransferCount   int                            `json:"internal_transfer_count"`
-	CircularWalletCount     int                            `json:"circular_wallet_count"`
-	LinkedHolderPercentage  float64                        `json:"linked_holder_percentage"`
-	RiskContribution        int                            `json:"risk_contribution"`
-	LinkedWallets           []string                       `json:"linked_wallets"`
-	CircularWallets         []string                       `json:"circular_wallets"`
-	CommonExitGroups        []HolderClusterGroup           `json:"common_exit_groups"`
-	InternalTransfers       []HolderClusterFlowObservation `json:"internal_transfers"`
-	Observations            []HolderClusterFlowObservation `json:"observations"`
-	Findings                []string                       `json:"findings"`
-	Limitations             []string                       `json:"limitations"`
+	Available                   bool                           `json:"available"`
+	Status                      string                         `json:"status"`
+	Confidence                  string                         `json:"confidence"`
+	TransactionsWithOutflow     int                            `json:"transactions_with_outflow"`
+	WalletsWithOutflow          int                            `json:"wallets_with_outflow"`
+	DEXExitObservationCount     int                            `json:"dex_exit_observation_count"`
+	CEXInflowObservationCount   int                            `json:"cex_inflow_observation_count"`
+	CEXOutflowObservationCount  int                            `json:"cex_outflow_observation_count"`
+	RiskFlagObservationCount    int                            `json:"risk_flag_observation_count"`
+	CommonExitGroupCount        int                            `json:"common_exit_group_count"`
+	LargestCommonExitGroup      int                            `json:"largest_common_exit_group"`
+	InternalTransferCount       int                            `json:"internal_transfer_count"`
+	CircularWalletCount         int                            `json:"circular_wallet_count"`
+	LinkedHolderPercentage      float64                        `json:"linked_holder_percentage"`
+	RiskContribution            int                            `json:"risk_contribution"`
+	LinkedWallets               []string                       `json:"linked_wallets"`
+	CircularWallets             []string                       `json:"circular_wallets"`
+	CommonExitGroups            []HolderClusterGroup           `json:"common_exit_groups"`
+	InternalTransfers           []HolderClusterFlowObservation `json:"internal_transfers"`
+	Observations                []HolderClusterFlowObservation `json:"observations"`
+	Findings                    []string                       `json:"findings"`
+	Limitations                 []string                       `json:"limitations"`
 }
 
-func observeHolderClusterWalletFlow(tx map[string]any, signature, mint, sourceWallet string, holderWallets map[string]bool) []HolderClusterFlowObservation {
+func observeHolderClusterWalletFlow(tx map[string]any, signature, mint, holderWallet string, holderWallets map[string]bool) []HolderClusterFlowObservation {
 	deltas := holderClusterTokenOwnerDeltas(tx, mint)
-	sourceDelta := deltas[sourceWallet]
-	if sourceDelta >= -holderClusterFlowEpsilon {
+	holderDelta := deltas[holderWallet]
+	switch {
+	case holderDelta < -holderClusterFlowEpsilon:
+		return holderClusterOutboundObservations(tx, signature, mint, holderWallet, holderWallets, deltas, holderDelta)
+	case holderDelta > holderClusterFlowEpsilon:
+		return holderClusterInboundObservations(tx, signature, mint, holderWallet, holderWallets, deltas, holderDelta)
+	default:
 		return []HolderClusterFlowObservation{}
 	}
+}
 
+func holderClusterOutboundObservations(tx map[string]any, signature, mint, sourceWallet string, holderWallets map[string]bool, deltas map[string]float64, sourceDelta float64) []HolderClusterFlowObservation {
 	programIDs := holderClusterKnownExitPrograms(tx)
 	slot := holderClusterInt64(tx["slot"])
 	out := []HolderClusterFlowObservation{}
@@ -85,6 +109,7 @@ func observeHolderClusterWalletFlow(tx map[string]any, signature, mint, sourceWa
 			SourceTokenAccount:      sourceTokenAccount,
 			DestinationTokenAccount: destinationTokenAccount,
 			Decimals:                decimals,
+			Direction:               "outbound",
 			Kind:                    kind,
 			Amount:                  holderClusterRound(amount, 9),
 			Slot:                    slot,
@@ -114,6 +139,7 @@ func observeHolderClusterWalletFlow(tx map[string]any, signature, mint, sourceWa
 			Mint:               strings.TrimSpace(mint),
 			SourceTokenAccount: sourceTokenAccount,
 			Decimals:           decimals,
+			Direction:          "outbound",
 			Kind:               "dex_program_exit_context",
 			Amount:             holderClusterRound(-sourceDelta, 9),
 			Slot:               slot,
@@ -121,6 +147,72 @@ func observeHolderClusterWalletFlow(tx map[string]any, signature, mint, sourceWa
 			ProgramIDs:         append([]string{}, programIDs...),
 			Evidence: []string{
 				"A negative target-token balance delta was observed with known pool/DEX program context, but no recipient owner was exposed by the bounded RPC response.",
+			},
+		})
+	}
+	return out
+}
+
+func holderClusterInboundObservations(tx map[string]any, signature, mint, destinationWallet string, holderWallets map[string]bool, deltas map[string]float64, destinationDelta float64) []HolderClusterFlowObservation {
+	programIDs := holderClusterKnownExitPrograms(tx)
+	slot := holderClusterInt64(tx["slot"])
+	out := []HolderClusterFlowObservation{}
+	seen := map[string]bool{}
+	for source, delta := range deltas {
+		if strings.EqualFold(source, destinationWallet) || delta >= -holderClusterFlowEpsilon {
+			continue
+		}
+		kind := "inbound_token_sender_context"
+		if holderWallets[source] {
+			kind = "holder_to_holder_inbound_context"
+		}
+		amount := math.Min(destinationDelta, -delta)
+		key := kind + "|" + source + "|" + signature
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		sourceTokenAccount, destinationTokenAccount, decimals := holderClusterDirectTransferMetadata(tx, mint, source, destinationWallet)
+		observation := HolderClusterFlowObservation{
+			SourceWallet:            source,
+			Destination:             destinationWallet,
+			Mint:                    strings.TrimSpace(mint),
+			SourceTokenAccount:      sourceTokenAccount,
+			DestinationTokenAccount: destinationTokenAccount,
+			Decimals:                decimals,
+			Direction:               "inbound",
+			Kind:                    kind,
+			Amount:                  holderClusterRound(amount, 9),
+			Slot:                    slot,
+			Signature:               signature,
+			ProgramIDs:              append([]string{}, programIDs...),
+			Evidence: []string{
+				fmt.Sprintf("Target-token balance increased for %s while %s decreased in the same parsed transaction.", destinationWallet, source),
+				"Inbound context is preserved for entity direction classification and is excluded from common-exit and circular-flow scoring.",
+			},
+		}
+		if sourceTokenAccount != "" && destinationTokenAccount != "" {
+			observation.Evidence = append(observation.Evidence, "The parsed token instruction resolved both source and destination token accounts to their controlling owner wallets.")
+		}
+		out = append(out, observation)
+	}
+	if len(out) == 0 && len(programIDs) > 0 {
+		destinationTokenAccount, decimals := holderClusterUniqueOwnerTokenAccount(tx, mint, destinationWallet)
+		out = append(out, HolderClusterFlowObservation{
+			SourceWallet:            programIDs[0],
+			Destination:             destinationWallet,
+			Mint:                    strings.TrimSpace(mint),
+			DestinationTokenAccount: destinationTokenAccount,
+			Decimals:                decimals,
+			Direction:               "inbound",
+			Kind:                    "dex_program_inflow_context",
+			Amount:                  holderClusterRound(destinationDelta, 9),
+			Slot:                    slot,
+			Signature:               signature,
+			ProgramIDs:              append([]string{}, programIDs...),
+			Evidence: []string{
+				"A positive target-token balance delta was observed with known pool/DEX program context, but no sender owner was exposed by the bounded RPC response.",
+				"Inbound DEX context is excluded from common-exit and circular-flow scoring.",
 			},
 		})
 	}
@@ -280,7 +372,7 @@ func summarizeHolderClusterFlow(wallets []HolderClusterWallet) HolderClusterFlow
 		out.Observations = append(out.Observations, wallet.FlowObservations...)
 	}
 	if len(out.Observations) == 0 {
-		out.Limitations = append(out.Limitations, "No parsed target-token outflow relation was observed in the bounded holder transaction window.")
+		out.Limitations = append(out.Limitations, "No parsed target-token transfer relation was observed in the bounded holder transaction window.")
 		return out
 	}
 
@@ -291,11 +383,23 @@ func summarizeHolderClusterFlow(wallets []HolderClusterWallet) HolderClusterFlow
 	commonExitSources := map[string]map[string]bool{}
 	internalSeen := map[string]bool{}
 	for _, observation := range out.Observations {
+		switch observation.TransferType {
+		case "CEX_IN":
+			out.CEXInflowObservationCount++
+		case "CEX_OUT":
+			out.CEXOutflowObservationCount++
+		}
+		if observation.RiskFlag != "" {
+			out.RiskFlagObservationCount++
+		}
+		if holderFlowObservationDirection(observation) == "inbound" {
+			continue
+		}
 		outgoingWallets[observation.SourceWallet] = true
 		if observation.Signature != "" {
 			outflowTransactions[observation.Signature] = true
 		}
-		if len(observation.ProgramIDs) > 0 {
+		if holderFlowObservationIsDEX(observation) {
 			out.DEXExitObservationCount++
 		}
 		switch observation.Kind {
@@ -306,10 +410,9 @@ func summarizeHolderClusterFlow(wallets []HolderClusterWallet) HolderClusterFlow
 				out.InternalTransfers = append(out.InternalTransfers, observation)
 			}
 		case "external_token_recipient":
-			// A shared recipient inside a known DEX/pool route is commonly a vault
-			// or pool authority. Keep it as route context, but never score it as
-			// evidence of coordinated control.
-			if len(observation.ProgramIDs) > 0 {
+			// A positively-resolved CEX destination or a known DEX/pool route is
+			// retained as flow context but is not treated as common-control evidence.
+			if holderFlowObservationIsDEX(observation) || observation.TransferType == "CEX_OUT" {
 				continue
 			}
 			if commonExitSources[observation.Destination] == nil {
@@ -416,8 +519,9 @@ func summarizeHolderClusterFlow(wallets []HolderClusterWallet) HolderClusterFlow
 	}
 	out.Findings = holderClusterFlowFindings(out)
 	out.Limitations = append(out.Limitations,
-		"Common exit means the same parsed target-token recipient owner was observed; an exchange, pool authority or service wallet can produce the same pattern.",
-		"Known DEX/pool program presence is retained as route context but is not scored as common control by itself.",
+		"Common exit means the same parsed target-token recipient owner was observed; positively-resolved CEX and known DEX/pool routes are excluded from common-control scoring.",
+		"CEX_IN and CEX_OUT require a positive Helius Wallet Identity classification; an unlabeled exchange address remains ordinary inflow/outflow context.",
+		"DRAINER, MIXER and SUSPICIOUS flags are emitted only from explicit third-party identity taxonomy labels and do not independently change the flow risk score.",
 		"Circular holder-to-holder transfer relations are not labelled wash trading without repeated swap, consideration and return-flow evidence.",
 	)
 	return out
@@ -425,6 +529,15 @@ func summarizeHolderClusterFlow(wallets []HolderClusterWallet) HolderClusterFlow
 
 func holderClusterFlowFindings(out HolderClusterFlowAnalysis) []string {
 	findings := []string{fmt.Sprintf("Observed %d target-token outflow transactions across %d holder wallets in the bounded window.", out.TransactionsWithOutflow, out.WalletsWithOutflow)}
+	if out.CEXOutflowObservationCount > 0 {
+		findings = append(findings, fmt.Sprintf("%d target-token transfers were classified as CEX_OUT from positively-resolved destination entities.", out.CEXOutflowObservationCount))
+	}
+	if out.CEXInflowObservationCount > 0 {
+		findings = append(findings, fmt.Sprintf("%d target-token transfers were classified as CEX_IN from positively-resolved source entities.", out.CEXInflowObservationCount))
+	}
+	if out.RiskFlagObservationCount > 0 {
+		findings = append(findings, fmt.Sprintf("%d transfer observations contain an explicit third-party DRAINER, MIXER or SUSPICIOUS endpoint label.", out.RiskFlagObservationCount))
+	}
 	if out.LargestCommonExitGroup >= 2 {
 		findings = append(findings, fmt.Sprintf("The largest verified common-exit recipient group contains %d holder wallets.", out.LargestCommonExitGroup))
 	}
