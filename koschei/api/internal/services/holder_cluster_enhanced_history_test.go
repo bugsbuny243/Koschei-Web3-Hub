@@ -18,9 +18,16 @@ func TestHeliusTokenTransferPreservesAccountsAndMetadata(t *testing.T) {
 				"fromUserAccount":"WalletA",
 				"toUserAccount":"WalletB",
 				"tokenAmount":12.5,
-				"mint":"Mint",
-				"tokenStandard":"Fungible",
-				"decimals":6
+				"mint":"Mint"
+			}],
+			"accountData":[{
+				"account":"SourceATA",
+				"tokenBalanceChanges":[{
+					"userAccount":"WalletA",
+					"tokenAccount":"SourceATA",
+					"mint":"Mint",
+					"rawTokenAmount":{"tokenAmount":"12500000","decimals":6}
+				}]
 			}]
 		}
 	]`)
@@ -35,10 +42,12 @@ func TestHeliusTokenTransferPreservesAccountsAndMetadata(t *testing.T) {
 	if transfer.FromTokenAccount != "SourceATA" || transfer.ToTokenAccount != "DestinationATA" {
 		t.Fatalf("token accounts were not decoded: %#v", transfer)
 	}
-	if transfer.TokenStandard != "Fungible" || transfer.Decimals == nil || *transfer.Decimals != 6 {
-		t.Fatalf("token metadata was not decoded: %#v", transfer)
+	decimals := heliusTransferDecimals(transactions[0], transfer)
+	if decimals == nil || *decimals != 6 {
+		t.Fatalf("accountData decimals were not decoded: %#v", transactions[0].AccountData)
 	}
 
+	fallbackDecimals := 9
 	observation, ok := holderClusterObservationFromHeliusTransfer(
 		transfer,
 		transactions[0],
@@ -46,6 +55,7 @@ func TestHeliusTokenTransferPreservesAccountsAndMetadata(t *testing.T) {
 		"Mint",
 		map[string]bool{"WalletA": true, "WalletB": true},
 		nil,
+		heliusAssetMetadata{TokenStandard: "FungibleToken", Decimals: &fallbackDecimals, Available: true},
 	)
 	if !ok {
 		t.Fatal("expected enhanced transfer observation")
@@ -56,7 +66,7 @@ func TestHeliusTokenTransferPreservesAccountsAndMetadata(t *testing.T) {
 	if observation.SourceTokenAccount != "SourceATA" || observation.DestinationTokenAccount != "DestinationATA" {
 		t.Fatalf("token-account endpoints were not preserved: %#v", observation)
 	}
-	if observation.Mint != "Mint" || observation.TokenStandard != "Fungible" || observation.Decimals == nil || *observation.Decimals != 6 {
+	if observation.Mint != "Mint" || observation.TokenStandard != "FungibleToken" || observation.Decimals == nil || *observation.Decimals != 6 {
 		t.Fatalf("token metadata was not preserved: %#v", observation)
 	}
 	if observation.Amount != 12.5 || observation.Signature != "sig-helius" || observation.Slot != 999 {
@@ -72,8 +82,6 @@ func TestHeliusTransferKeepsZeroDecimalsAndUnresolvedRecipientATA(t *testing.T) 
 		FromUserAccount:  "WalletA",
 		TokenAmount:      1,
 		Mint:             "NFTMint",
-		TokenStandard:    "NonFungible",
-		Decimals:         &zero,
 	}
 	observation, ok := holderClusterObservationFromHeliusTransfer(
 		transfer,
@@ -82,6 +90,7 @@ func TestHeliusTransferKeepsZeroDecimalsAndUnresolvedRecipientATA(t *testing.T) 
 		"NFTMint",
 		map[string]bool{"WalletA": true},
 		nil,
+		heliusAssetMetadata{TokenStandard: "NonFungible", Decimals: &zero, Available: true},
 	)
 	if !ok {
 		t.Fatal("expected token-account scoped observation")
