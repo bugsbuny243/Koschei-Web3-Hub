@@ -41,6 +41,148 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Generate repository inventory audit
+        run: |
+          cd ../..
+          python3 - <<'PY'
+          import collections
+          import json
+          import pathlib
+          import subprocess
+
+          root = pathlib.Path.cwd().resolve()
+          raw = subprocess.check_output(["git", "ls-files", "-z"], cwd=root)
+          files = sorted(pathlib.PurePosixPath(p.decode("utf-8")) for p in raw.split(b"\0") if p)
+          code_exts = {
+              ".go", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx",
+              ".sql", ".html", ".css", ".scss", ".sh", ".bash", ".py",
+              ".yml", ".yaml", ".json", ".toml", ".mod", ".sum",
+          }
+          doc_exts = {".md", ".txt", ".rst"}
+          directories = set()
+          extension = collections.defaultdict(lambda: {"files": 0, "physical_lines": 0, "nonblank_lines": 0})
+          top_level = collections.defaultdict(lambda: {"files": 0, "text_files": 0, "binary_files": 0, "text_lines": 0, "code_files": 0, "code_lines": 0})
+          package_dirs = set()
+          largest = []
+          text_files = binary_files = total_text_lines = total_nonblank_text_lines = 0
+          code_files = code_lines = code_nonblank_lines = 0
+          production_code_files = production_code_lines = 0
+          test_code_files = test_code_lines = 0
+          docs_files = docs_lines = 0
+          chainalysis_matches = []
+          radar_paths = []
+          defense_paths = []
+          arvis_paths = []
+
+          for rel in files:
+              parts = rel.parts
+              for i in range(1, len(parts)):
+                  directories.add(pathlib.PurePosixPath(*parts[:i]).as_posix())
+              top = parts[0] if len(parts) > 1 else "(root)"
+              top_level[top]["files"] += 1
+              path = root / rel
+              data = path.read_bytes()
+              largest.append((len(data), rel.as_posix()))
+              is_binary = b"\0" in data
+              if is_binary:
+                  binary_files += 1
+                  top_level[top]["binary_files"] += 1
+                  continue
+              text_files += 1
+              top_level[top]["text_files"] += 1
+              text = data.decode("utf-8", errors="replace")
+              lines = text.splitlines()
+              physical = len(lines)
+              nonblank = sum(1 for line in lines if line.strip())
+              total_text_lines += physical
+              total_nonblank_text_lines += nonblank
+              top_level[top]["text_lines"] += physical
+              suffix = rel.suffix.lower() or "(none)"
+              extension[suffix]["files"] += 1
+              extension[suffix]["physical_lines"] += physical
+              extension[suffix]["nonblank_lines"] += nonblank
+              lower_path = rel.as_posix().lower()
+              lower_text = text.lower()
+              if "chainalysis" in lower_path or "chainalysis" in lower_text:
+                  line_numbers = [i + 1 for i, line in enumerate(lines) if "chainalysis" in line.lower()]
+                  chainalysis_matches.append({"path": rel.as_posix(), "lines": line_numbers[:50]})
+              if "security_radar" in lower_path or "security-radar" in lower_path:
+                  radar_paths.append(rel.as_posix())
+              if "defense" in lower_path:
+                  defense_paths.append(rel.as_posix())
+              if "arvis" in lower_path:
+                  arvis_paths.append(rel.as_posix())
+              if rel.suffix.lower() == ".go":
+                  package_dirs.add(rel.parent.as_posix())
+              if rel.suffix.lower() in code_exts:
+                  code_files += 1
+                  code_lines += physical
+                  code_nonblank_lines += nonblank
+                  top_level[top]["code_files"] += 1
+                  top_level[top]["code_lines"] += physical
+                  path_parts_lower = {part.lower() for part in rel.parts}
+                  is_test = rel.name.endswith("_test.go") or "test" in path_parts_lower or "tests" in path_parts_lower or "__tests__" in path_parts_lower
+                  if is_test:
+                      test_code_files += 1
+                      test_code_lines += physical
+                  else:
+                      production_code_files += 1
+                      production_code_lines += physical
+              elif rel.suffix.lower() in doc_exts:
+                  docs_files += 1
+                  docs_lines += physical
+
+          summary = {
+              "head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
+              "definitions": {
+                  "tracked_directories": "Unique non-root directory paths implied by git-tracked files; .git and runner-generated directories excluded.",
+                  "code_lines": "Physical lines in tracked files with code/config extensions listed in code_extensions; binaries excluded.",
+                  "production_code_lines": "Code lines excluding *_test.go and paths named test/tests/__tests__.",
+              },
+              "code_extensions": sorted(code_exts),
+              "tracked_files": len(files),
+              "tracked_directories": len(directories),
+              "text_files": text_files,
+              "binary_files": binary_files,
+              "total_text_lines": total_text_lines,
+              "total_nonblank_text_lines": total_nonblank_text_lines,
+              "code_files": code_files,
+              "code_physical_lines": code_lines,
+              "code_nonblank_lines": code_nonblank_lines,
+              "production_code_files": production_code_files,
+              "production_code_physical_lines": production_code_lines,
+              "test_code_files": test_code_files,
+              "test_code_physical_lines": test_code_lines,
+              "documentation_files": docs_files,
+              "documentation_physical_lines": docs_lines,
+              "go_package_directories": len(package_dirs),
+              "by_extension": dict(sorted(extension.items(), key=lambda item: (-item[1]["physical_lines"], item[0]))),
+              "by_top_level": dict(sorted(top_level.items())),
+              "largest_tracked_files": [{"bytes": size, "path": path} for size, path in sorted(largest, reverse=True)[:30]],
+              "keyword_inventory": {
+                  "security_radar_path_count": len(radar_paths),
+                  "security_radar_paths": sorted(radar_paths),
+                  "arvis_path_count": len(arvis_paths),
+                  "arvis_paths": sorted(arvis_paths),
+                  "defense_path_count": len(defense_paths),
+                  "defense_paths": sorted(defense_paths),
+                  "chainalysis_matches": chainalysis_matches,
+              },
+          }
+          out_json = pathlib.Path("/tmp/repo-inventory.json")
+          out_json.write_text(json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          pathlib.Path("/tmp/repo-paths.txt").write_text("\n".join(p.as_posix() for p in files) + "\n", encoding="utf-8")
+          print(json.dumps({k: summary[k] for k in ["head", "tracked_files", "tracked_directories", "code_physical_lines", "production_code_physical_lines", "test_code_physical_lines"]}, ensure_ascii=False))
+          PY
+      - name: Upload repository inventory audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-inventory-audit
+          path: |
+            /tmp/repo-inventory.json
+            /tmp/repo-paths.txt
+          if-no-files-found: error
+          retention-days: 1
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
