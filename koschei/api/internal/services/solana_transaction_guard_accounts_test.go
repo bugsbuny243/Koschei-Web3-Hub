@@ -1,21 +1,28 @@
 package services
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/binary"
 	"testing"
 )
 
-func TestSolanaTokenAccountRawAmount(t *testing.T) {
+func TestSolanaTokenAccountSnapshotReadsMintAndAmount(t *testing.T) {
 	data := make([]byte, minimumTokenAccountSize)
+	mint := bytes.Repeat([]byte{0x2a}, 32)
+	copy(data[:32], mint)
 	binary.LittleEndian.PutUint64(data[64:72], 987654321)
 	info := &SolanaAccountInfo{Owner: splTokenProgramID, Data: []any{base64.StdEncoding.EncodeToString(data), "base64"}}
-	amount, err := SolanaTokenAccountRawAmount(info)
+	snapshot, err := SolanaTokenAccountSnapshotFromInfo(info)
 	if err != nil {
-		t.Fatalf("SolanaTokenAccountRawAmount() error = %v", err)
+		t.Fatalf("SolanaTokenAccountSnapshotFromInfo() error = %v", err)
 	}
-	if amount != 987654321 {
-		t.Fatalf("amount = %d, want 987654321", amount)
+	if snapshot.Amount != 987654321 || !bytes.Equal(snapshot.Mint[:], mint) {
+		t.Fatalf("snapshot=%#v", snapshot)
+	}
+	amount, err := SolanaTokenAccountRawAmount(info)
+	if err != nil || amount != snapshot.Amount {
+		t.Fatalf("raw amount=%d error=%v", amount, err)
 	}
 }
 
