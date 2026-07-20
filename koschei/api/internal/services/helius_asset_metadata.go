@@ -60,7 +60,9 @@ func resolveHeliusAssetMetadata(ctx context.Context, apiKey, mint string, budget
 	if cached, ok := cachedHeliusAssetMetadata(mint); ok {
 		return cached
 	}
-	if budget != nil && !budget.Reserve(1) {
+	// Asset metadata is optional enrichment. Preserve at least one provider call
+	// for the actual holder-history page when the per-scan budget is nearly spent.
+	if budget != nil && (budget.Remaining() <= 1 || !budget.Reserve(1)) {
 		return heliusAssetMetadata{}
 	}
 	metadata, err := fetchHeliusAssetMetadata(ctx, apiKey, mint)
