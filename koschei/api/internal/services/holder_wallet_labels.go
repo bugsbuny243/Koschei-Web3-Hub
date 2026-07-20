@@ -38,6 +38,7 @@ type WalletLabel struct {
 	Name     string   `json:"name,omitempty"`     // e.g. "Binance Hot Wallet 1"
 	Entity   string   `json:"entity,omitempty"`   // e.g. "Binance"
 	Category string   `json:"category,omitempty"` // e.g. "CEX", "MARKET_MAKER", "PROGRAM"
+	Labels   []string `json:"labels,omitempty"`   // explicit third-party taxonomy labels
 	Tags     []string `json:"tags,omitempty"`
 	Source   string   `json:"source"` // always "helius_identity" for provenance
 }
@@ -134,7 +135,7 @@ func ResolveWalletLabel(ctx context.Context, rpcURL, address string) *WalletLabe
 	if category == "" && len(decoded.Labels) > 0 {
 		category = strings.TrimSpace(decoded.Labels[0])
 	}
-	if name == "" && entity == "" && category == "" {
+	if name == "" && entity == "" && category == "" && len(decoded.Labels) == 0 && len(decoded.Tags) == 0 {
 		labelCacheSet(address, nil) // resolved but genuinely unlabeled
 		return nil
 	}
@@ -144,7 +145,8 @@ func ResolveWalletLabel(ctx context.Context, rpcURL, address string) *WalletLabe
 		Name:     name,
 		Entity:   entity,
 		Category: category,
-		Tags:     decoded.Tags,
+		Labels:   append([]string{}, decoded.Labels...),
+		Tags:     append([]string{}, decoded.Tags...),
 		Source:   "helius_identity",
 	}
 	labelCacheSet(address, label)
