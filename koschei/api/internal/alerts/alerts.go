@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	EventSecurityAlertCreated     = "security.alert.created"
-	EventARVISVerdictCreated      = "arvis.verdict.created"
+	EventSecurityAlertCreated      = "security.alert.created"
+	EventARVISVerdictCreated       = "arvis.verdict.created"
 	EventTransactionGuardDecision = "transaction.guard.decision"
 )
 
@@ -109,7 +109,7 @@ func normalizeEvent(event Event) Event {
 }
 
 func defaultDedupeKey(event Event) string {
-	material := strings.Join([]string{event.Source, event.EventType, event.Target, event.Severity, event.Title, event.EvidenceRef}, "\n")
+	material := strings.Join([]string{event.AuthSubject, event.Source, event.EventType, event.Target, event.Severity, event.Title, event.EvidenceRef}, "\n")
 	sum := sha256.Sum256([]byte(material))
 	return "alert:" + hex.EncodeToString(sum[:])
 }
