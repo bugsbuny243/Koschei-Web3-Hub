@@ -1,6 +1,11 @@
 package alerts
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"net/url"
+	"testing"
+)
 
 func TestNormalizeEventProducesStableDedupeKey(t *testing.T) {
 	first := normalizeEvent(Event{Source: " arvis ", EventType: "ARVIS.VERDICT.CREATED", Severity: "warning", Target: "mint", Title: "Risk", Message: "Evidence"})
@@ -31,5 +36,33 @@ func TestAllowedDiscordHostAcceptsOnlyOfficialHosts(t *testing.T) {
 	}
 	if allowedDiscordHost("chat.invalid") {
 		t.Fatal("non-Discord host was accepted")
+	}
+}
+
+func TestAllowedDiscordWebhookURLRequiresOfficialWebhookPath(t *testing.T) {
+	valid, _ := url.Parse("https://discord.com/api/webhooks/123/token")
+	if !allowedDiscordWebhookURL(valid) {
+		t.Fatal("valid Discord webhook URL was rejected")
+	}
+	for _, raw := range []string{
+		"http://discord.com/api/webhooks/123/token",
+		"https://discord.com/channels/123",
+		"https://chat.invalid/api/webhooks/123/token",
+		"https://user@discord.com/api/webhooks/123/token",
+	} {
+		candidate, _ := url.Parse(raw)
+		if allowedDiscordWebhookURL(candidate) {
+			t.Fatalf("unsafe Discord URL was accepted: %s", raw)
+		}
+	}
+}
+
+func TestSafeProviderFailureNeverReturnsProviderURLOrToken(t *testing.T) {
+	raw := errors.New("Post https://api.telegram.org/bot123456:SECRET/sendMessage: connection refused")
+	if got := safeProviderFailure(raw); got != "alert provider request failed" {
+		t.Fatalf("provider failure = %q", got)
+	}
+	if got := safeProviderFailure(context.DeadlineExceeded); got != "alert provider request timed out" {
+		t.Fatalf("deadline failure = %q", got)
 	}
 }
