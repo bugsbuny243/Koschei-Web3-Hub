@@ -30,9 +30,11 @@ type holderScanPlan struct {
 }
 
 type holderScanRPCBudget struct {
-	mu    sync.Mutex
-	limit int
-	used  int
+	mu            sync.Mutex
+	limit         int
+	used          int
+	identityLimit int
+	identityUsed  int
 }
 
 func loadHolderScanTierConfig() holderScanTierConfig {
@@ -62,7 +64,7 @@ func newHolderScanRPCBudget(limit int) *holderScanRPCBudget {
 	if limit <= 0 {
 		limit = 600
 	}
-	return &holderScanRPCBudget{limit: limit}
+	return &holderScanRPCBudget{limit: limit, identityLimit: holderFlowIdentityLookupLimit}
 }
 
 func (b *holderScanRPCBudget) Reserve(calls int) bool {
@@ -75,6 +77,19 @@ func (b *holderScanRPCBudget) Reserve(calls int) bool {
 		return false
 	}
 	b.used += calls
+	return true
+}
+
+func (b *holderScanRPCBudget) ReserveIdentity(calls int) bool {
+	if b == nil || calls <= 0 {
+		return true
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.identityLimit <= 0 || b.identityUsed+calls > b.identityLimit {
+		return false
+	}
+	b.identityUsed += calls
 	return true
 }
 
@@ -280,6 +295,7 @@ func analyzeHolderClusterWalletTiered(ctx context.Context, rpcURL, mint string, 
 			}
 		}
 	}
+	row.FlowObservations = enrichHolderClusterFlowObservations(ctx, rpcURL, holderWallets, row.FlowObservations, budget)
 	if row.ParsedTransactions > 0 {
 		row.Status = "verified_bounded_observation"
 	} else {
