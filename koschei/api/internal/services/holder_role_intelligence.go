@@ -29,6 +29,9 @@ type HolderRoleAccount struct {
 	Confidence             string   `json:"confidence"`
 	ExcludedFromHolderRisk bool     `json:"excluded_from_holder_risk"`
 	Evidence               []string `json:"evidence"`
+	Label                  string   `json:"label,omitempty"`        // resolved entity label, e.g. "Binance · CEX"
+	LabelEntity            string   `json:"label_entity,omitempty"` // raw entity, e.g. "Binance"
+	LabelSource            string   `json:"label_source,omitempty"` // provenance, e.g. "helius_identity"
 }
 
 // HolderRoleAnalysis preserves raw supply concentration while also producing
@@ -126,6 +129,16 @@ func AnalyzeSolanaHolderRoles(ctx context.Context, rpcURL string, totalSupply fl
 			Rank: i + 1, TokenAccount: account.Address, OwnerWallet: owners[i], OwnerProgram: ownerProgram,
 			Balance: holderRoleRound(balance, 8), RawPercentage: holderRoleRound(rawPct, 4),
 			Role: role, Confidence: confidence, ExcludedFromHolderRisk: excluded, Evidence: evidence,
+		}
+		if owners[i] != "" && ctx.Err() == nil {
+			if label := ResolveWalletLabel(ctx, rpcURL, owners[i]); label != nil {
+				if display := walletLabelDisplay(label); display != "" {
+					row.Label = display
+					row.LabelEntity = label.Entity
+					row.LabelSource = label.Source
+					row.Evidence = append(row.Evidence, "Wallet resolves to a known entity in the Helius identity database: "+display+". Label is sourced from a third-party dataset, not a Koschei claim.")
+				}
+			}
 		}
 		if excluded {
 			excludedBalance += balance
