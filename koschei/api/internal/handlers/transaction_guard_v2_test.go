@@ -3,10 +3,27 @@ package handlers
 import (
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"testing"
 
 	"koschei/api/internal/services"
 )
+
+func TestTransactionGuardRequestRejectsInvalidProgramIdentity(t *testing.T) {
+	var input transactionGuardV2Request
+	err := json.Unmarshal([]byte(`{"transaction":"dGVzdA==","expected_programs":["not-a-solana-program"]}`), &input)
+	if err == nil {
+		t.Fatal("invalid expected program was accepted")
+	}
+}
+
+func TestTransactionGuardRequestAcceptsValidIdentityPolicy(t *testing.T) {
+	var input transactionGuardV2Request
+	err := json.Unmarshal([]byte(`{"transaction":"dGVzdA==","wallet":"11111111111111111111111111111111","expected_programs":["ComputeBudget111111111111111111111111111111"],"accounts":[{"address":"33333333333333333333333333333333","mint":"44444444444444444444444444444444","role":"observe"}]}`), &input)
+	if err != nil {
+		t.Fatalf("valid identity policy was rejected: %v", err)
+	}
+}
 
 func TestEvaluateTransactionGuardProgramsDetectsBlockedAndUnexpected(t *testing.T) {
 	blocked := "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
