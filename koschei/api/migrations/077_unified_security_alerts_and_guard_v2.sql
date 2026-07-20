@@ -1,3 +1,17 @@
+CREATE OR REPLACE FUNCTION security_alert_severity_rank(value text)
+RETURNS integer
+LANGUAGE sql
+IMMUTABLE
+AS $$
+    SELECT CASE lower(COALESCE(value,''))
+        WHEN 'critical' THEN 5
+        WHEN 'high' THEN 4
+        WHEN 'medium' THEN 3
+        WHEN 'low' THEN 2
+        ELSE 1
+    END;
+$$;
+
 CREATE TABLE IF NOT EXISTS security_alert_events (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     auth_subject text,
