@@ -1,3 +1,4 @@
+# Required pull-request gate for API, migrations, and security-sensitive runtime changes.
 name: API CI
 
 on:
