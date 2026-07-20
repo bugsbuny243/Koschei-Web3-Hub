@@ -5,14 +5,15 @@ import "encoding/json"
 // MarshalJSON keeps caller-declared token metadata separate from the RPC-
 // verified balance delta. MintVerified becomes true only after the declared
 // address is compared with the raw token-account mint bytes on every available
-// pre/post side.
+// pre/post side. Decimals remain caller-declared until mint metadata is resolved.
 func (value transactionGuardAccountDelta) MarshalJSON() ([]byte, error) {
 	type accountDeltaOutput struct {
 		Address           string `json:"address"`
 		DeclaredMint      string `json:"declared_mint,omitempty"`
 		MintVerified      bool   `json:"mint_verified"`
 		Role              string `json:"role"`
-		Decimals          *int   `json:"decimals,omitempty"`
+		DeclaredDecimals  *int   `json:"declared_decimals,omitempty"`
+		DecimalsVerified  bool   `json:"decimals_verified"`
 		PreAmountRaw      string `json:"pre_amount_raw"`
 		PostAmountRaw     string `json:"post_amount_raw"`
 		DeltaRaw          string `json:"delta_raw"`
@@ -28,7 +29,7 @@ func (value transactionGuardAccountDelta) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(accountDeltaOutput{
 		Address: value.Address, DeclaredMint: value.Mint, MintVerified: value.MintVerified,
-		Role: value.Role, Decimals: value.Decimals,
+		Role: value.Role, DeclaredDecimals: value.Decimals, DecimalsVerified: false,
 		PreAmountRaw: value.PreAmountRaw, PostAmountRaw: value.PostAmountRaw, DeltaRaw: value.DeltaRaw,
 		SpentRaw: value.SpentRaw, ReceivedRaw: value.ReceivedRaw,
 		MaximumSpendRaw: value.MaximumSpendRaw, MinimumReceiveRaw: value.MinimumReceiveRaw,
