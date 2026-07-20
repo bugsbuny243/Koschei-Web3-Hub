@@ -89,6 +89,52 @@ func TestHolderClusterTokenOwnerDeltas(t *testing.T) {
 	}
 }
 
+func TestObserveHolderClusterWalletFlowPreservesTokenAccountsAndDecimals(t *testing.T) {
+	tx := map[string]any{
+		"slot": int64(321),
+		"transaction": map[string]any{"message": map[string]any{
+			"accountKeys": []any{
+				map[string]any{"pubkey": "SourceATA"},
+				map[string]any{"pubkey": "DestinationATA"},
+				map[string]any{"pubkey": "WalletA"},
+			},
+			"instructions": []any{map[string]any{
+				"program": "spl-token",
+				"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+				"parsed": map[string]any{"type": "transferChecked", "info": map[string]any{
+					"source": "SourceATA", "destination": "DestinationATA", "authority": "WalletA", "mint": "Mint",
+					"tokenAmount": map[string]any{"amount": "4000000", "decimals": float64(6), "uiAmount": 4.0},
+				}},
+			}},
+		}},
+		"meta": map[string]any{
+			"preTokenBalances": []any{
+				map[string]any{"accountIndex": float64(0), "mint": "Mint", "owner": "WalletA", "uiTokenAmount": map[string]any{"amount": "10000000", "decimals": float64(6), "uiAmountString": "10"}},
+				map[string]any{"accountIndex": float64(1), "mint": "Mint", "owner": "WalletB", "uiTokenAmount": map[string]any{"amount": "2000000", "decimals": float64(6), "uiAmountString": "2"}},
+			},
+			"postTokenBalances": []any{
+				map[string]any{"accountIndex": float64(0), "mint": "Mint", "owner": "WalletA", "uiTokenAmount": map[string]any{"amount": "6000000", "decimals": float64(6), "uiAmountString": "6"}},
+				map[string]any{"accountIndex": float64(1), "mint": "Mint", "owner": "WalletB", "uiTokenAmount": map[string]any{"amount": "6000000", "decimals": float64(6), "uiAmountString": "6"}},
+			},
+			"innerInstructions": []any{},
+		},
+	}
+	observations := observeHolderClusterWalletFlow(tx, "sig-transfer", "Mint", "WalletA", map[string]bool{"WalletA": true, "WalletB": true})
+	if len(observations) != 1 {
+		t.Fatalf("observations=%d %#v", len(observations), observations)
+	}
+	observation := observations[0]
+	if observation.SourceTokenAccount != "SourceATA" || observation.DestinationTokenAccount != "DestinationATA" {
+		t.Fatalf("token accounts not preserved: %#v", observation)
+	}
+	if observation.Mint != "Mint" || observation.Decimals == nil || *observation.Decimals != 6 {
+		t.Fatalf("token metadata not preserved: %#v", observation)
+	}
+	if observation.Destination != "WalletB" || observation.Kind != "holder_to_holder" || observation.Amount != 4 {
+		t.Fatalf("unexpected flow observation: %#v", observation)
+	}
+}
+
 func TestHolderClusterTransactionIndexesCoverNewestOldestAndLaunch(t *testing.T) {
 	newestTime := int64(300)
 	launchTime := int64(200)
