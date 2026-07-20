@@ -5,6 +5,27 @@ import (
 	"testing"
 )
 
+func TestClientIPIgnoresForwardedHeaderWithoutAllowlist(t *testing.T) {
+	t.Setenv("TRUSTED_PROXY_CIDRS", "")
+	t.Setenv("KOSCHEI_TRUSTED_PROXY_CIDRS", "")
+	r := httptest.NewRequest("GET", "https://example.test", nil)
+	r.RemoteAddr = "10.2.3.4:443"
+	r.Header.Set("X-Forwarded-For", "198.51.100.7")
+	if got := ClientIP(r); got != "10.2.3.4" {
+		t.Fatalf("ClientIP() = %q, want direct peer when no proxies are trusted", got)
+	}
+}
+
+func TestClientIPSupportsExactTrustedProxyAddress(t *testing.T) {
+	t.Setenv("TRUSTED_PROXY_CIDRS", "10.2.3.4")
+	r := httptest.NewRequest("GET", "https://example.test", nil)
+	r.RemoteAddr = "10.2.3.4:443"
+	r.Header.Set("X-Forwarded-For", "198.51.100.7")
+	if got := ClientIP(r); got != "198.51.100.7" {
+		t.Fatalf("ClientIP() = %q, want forwarded client behind exact trusted proxy", got)
+	}
+}
+
 func TestClientIPIgnoresForwardedHeaderFromUntrustedPeer(t *testing.T) {
 	t.Setenv("TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
 	r := httptest.NewRequest("GET", "https://example.test", nil)
