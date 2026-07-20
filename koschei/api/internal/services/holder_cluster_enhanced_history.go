@@ -43,6 +43,23 @@ type heliusTokenTransfer struct {
 	Decimals         *int    `json:"decimals"`
 }
 
+type heliusRawTokenAmount struct {
+	TokenAmount string `json:"tokenAmount"`
+	Decimals    *int   `json:"decimals"`
+}
+
+type heliusTokenBalanceChange struct {
+	UserAccount    string               `json:"userAccount"`
+	TokenAccount   string               `json:"tokenAccount"`
+	Mint           string               `json:"mint"`
+	RawTokenAmount heliusRawTokenAmount `json:"rawTokenAmount"`
+}
+
+type heliusAccountData struct {
+	Account             string                     `json:"account"`
+	TokenBalanceChanges []heliusTokenBalanceChange `json:"tokenBalanceChanges"`
+}
+
 type heliusNativeTransfer struct {
 	FromUserAccount string `json:"fromUserAccount"`
 	ToUserAccount   string `json:"toUserAccount"`
@@ -60,6 +77,7 @@ type heliusEnhancedTransaction struct {
 	TransactionError any                    `json:"transactionError"`
 	TokenTransfers   []heliusTokenTransfer  `json:"tokenTransfers"`
 	NativeTransfers  []heliusNativeTransfer `json:"nativeTransfers"`
+	AccountData      []heliusAccountData    `json:"accountData"`
 	Instructions     []heliusInstruction    `json:"instructions"`
 }
 
@@ -117,7 +135,7 @@ func fetchHeliusEnhancedTransactionsPage(ctx context.Context, apiKey, address, b
 	return out, nil
 }
 
-func holderClusterObservationFromHeliusTransfer(transfer heliusTokenTransfer, tx heliusEnhancedTransaction, sourceWallet, mint string, holderWallets map[string]bool, programIDs []string) (HolderClusterFlowObservation, bool) {
+func holderClusterObservationFromHeliusTransfer(transfer heliusTokenTransfer, tx heliusEnhancedTransaction, sourceWallet, mint string, holderWallets map[string]bool, programIDs []string, assetMetadata heliusAssetMetadata) (HolderClusterFlowObservation, bool) {
 	if !strings.EqualFold(strings.TrimSpace(transfer.Mint), strings.TrimSpace(mint)) {
 		return HolderClusterFlowObservation{}, false
 	}
@@ -142,14 +160,22 @@ func holderClusterObservationFromHeliusTransfer(transfer heliusTokenTransfer, tx
 		return HolderClusterFlowObservation{}, false
 	}
 
+	tokenStandard := strings.TrimSpace(transfer.TokenStandard)
+	if tokenStandard == "" {
+		tokenStandard = strings.TrimSpace(assetMetadata.TokenStandard)
+	}
+	decimals := heliusTransferDecimals(tx, transfer)
+	if decimals == nil {
+		decimals = firstHolderClusterDecimals(assetMetadata.Decimals)
+	}
 	observation := HolderClusterFlowObservation{
 		SourceWallet:            strings.TrimSpace(sourceWallet),
 		Destination:             destination,
 		Mint:                    strings.TrimSpace(transfer.Mint),
 		SourceTokenAccount:      strings.TrimSpace(transfer.FromTokenAccount),
 		DestinationTokenAccount: strings.TrimSpace(transfer.ToTokenAccount),
-		TokenStandard:           strings.TrimSpace(transfer.TokenStandard),
-		Decimals:                firstHolderClusterDecimals(transfer.Decimals),
+		TokenStandard:           tokenStandard,
+		Decimals:                decimals,
 		Kind:                    kind,
 		Amount:                  holderClusterRound(transfer.TokenAmount, 9),
 		Slot:                    tx.Slot,
@@ -192,6 +218,7 @@ func analyzeHolderClusterWalletEnhanced(ctx context.Context, rpcURL, mint string
 	if requested <= 0 {
 		requested = heliusEnhancedPageSize
 	}
+	assetMetadata := resolveHeliusAssetMetadata(ctx, apiKey, mint, budget)
 
 	transactions := []heliusEnhancedTransaction{}
 	before := ""
@@ -265,7 +292,7 @@ func analyzeHolderClusterWalletEnhanced(ctx context.Context, rpcURL, mint string
 
 		// Target-token outflow observations from parsed token transfers.
 		for _, transfer := range tx.TokenTransfers {
-			if observation, ok := holderClusterObservationFromHeliusTransfer(transfer, tx, account.OwnerWallet, mint, holderWallets, programIDs); ok {
+			if observation, ok := holderClusterObservationFromHeliusTransfer(transfer, tx, account.OwnerWallet, mint, holderWallets, programIDs, assetMetadata); ok {
 				row.FlowObservations = append(row.FlowObservations, observation)
 			}
 		}
