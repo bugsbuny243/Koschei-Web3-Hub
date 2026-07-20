@@ -19,8 +19,8 @@ func TestSecurityRadarCheckWithAlertsRejectsOversizedBody(t *testing.T) {
 }
 
 func TestARVISAlertDedupeKeyIsTenantScoped(t *testing.T) {
-	first := arvisAlertDedupeKey("customer-a", "signature-1", "mint", "high", "D")
-	second := arvisAlertDedupeKey("customer-b", "signature-1", "mint", "high", "D")
+	first := arvisAlertDedupeKey("customer-a", "signature-1")
+	second := arvisAlertDedupeKey("customer-b", "signature-1")
 	if first == second {
 		t.Fatalf("tenant-scoped keys collided: %q", first)
 	}
@@ -30,11 +30,11 @@ func TestARVISAlertDedupeKeyIsTenantScoped(t *testing.T) {
 }
 
 func TestARVISAlertPayloadRemainsScoreFree(t *testing.T) {
-	payload := arvisAlertPayload("mint", "D", "high", "avoid", "signature")
+	payload := arvisAlertPayload("mint", "D", "high", "avoid", "signature", "radar-v1")
 	if _, exists := payload["risk_index"]; exists {
 		t.Fatalf("numeric final score leaked into Radar alert: %#v", payload)
 	}
-	if payload["grade"] != "D" || payload["signature"] != "signature" {
+	if payload["grade"] != "D" || payload["signature"] != "signature" || payload["rule_version"] != "radar-v1" {
 		t.Fatalf("evidence identity missing: %#v", payload)
 	}
 }
