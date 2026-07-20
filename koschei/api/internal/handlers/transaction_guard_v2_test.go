@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"koschei/api/internal/services"
@@ -24,6 +25,20 @@ func TestTransactionGuardRequestAcceptsValidIdentityPolicy(t *testing.T) {
 	err := json.Unmarshal([]byte(`{"transaction":"dGVzdA==","wallet":"11111111111111111111111111111111","expected_programs":["ComputeBudget111111111111111111111111111111"],"accounts":[{"address":"33333333333333333333333333333333","mint":"44444444444444444444444444444444","role":"observe"}]}`), &input)
 	if err != nil {
 		t.Fatalf("valid identity policy was rejected: %v", err)
+	}
+}
+
+func TestTransactionGuardAccountDeltaLabelsMintAsDeclared(t *testing.T) {
+	encoded, err := json.Marshal(transactionGuardAccountDelta{Address: "33333333333333333333333333333333", Mint: "44444444444444444444444444444444", Role: "observe", PolicyStatus: "pass", EvidenceStatus: "verified_rpc_simulation"})
+	if err != nil {
+		t.Fatalf("marshal account delta: %v", err)
+	}
+	text := string(encoded)
+	if !strings.Contains(text, `"declared_mint":"44444444444444444444444444444444"`) || !strings.Contains(text, `"mint_verified":false`) {
+		t.Fatalf("mint evidence labels are missing: %s", text)
+	}
+	if strings.Contains(text, `"mint":"`) {
+		t.Fatalf("unverified mint was serialized as verified field: %s", text)
 	}
 }
 
