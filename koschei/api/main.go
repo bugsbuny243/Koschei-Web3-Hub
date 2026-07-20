@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"koschei/api/internal/alerts"
 	"koschei/api/internal/cache"
 	"koschei/api/internal/db"
 	"koschei/api/internal/handlers"
@@ -94,6 +95,8 @@ func main() {
 
 	stopWebhookDeliveries := webhooks.StartDeliveryWorker(appCtx, conn)
 	defer stopWebhookDeliveries()
+	stopSecurityAlertDeliveries := alerts.StartDeliveryWorker(appCtx, conn)
+	defer stopSecurityAlertDeliveries()
 	jobStore := jobs.NewStore(conn)
 	jobQueue := jobs.Queue(jobs.NoopQueue{})
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
