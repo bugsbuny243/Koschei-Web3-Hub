@@ -81,7 +81,11 @@ func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope
 		return ""
 	}
 	signature := strings.TrimSpace(stringFromMap(final, "signature"))
+	if signature == "" {
+		return ""
+	}
 	grade := strings.TrimSpace(stringFromMap(final, "grade"))
+	ruleVersion := strings.TrimSpace(stringFromMap(final, "rule_version"))
 	verdict := strings.TrimSpace(stringFromMap(final, "verdict"))
 	recommendation := strings.TrimSpace(stringFromMap(final, "recommendation"))
 	claims, _ := userFromContext(r.Context())
@@ -100,9 +104,9 @@ func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope
 		Target:      target,
 		Title:       "ARVIS signed verdict: " + strings.ToUpper(riskLevel),
 		Message:     message,
-		DedupeKey:   arvisAlertDedupeKey(claims.Sub, signature, target, riskLevel, grade),
+		DedupeKey:   arvisAlertDedupeKey(claims.Sub, signature),
 		EvidenceRef: signature,
-		Payload:     arvisAlertPayload(target, grade, riskLevel, recommendation, signature),
+		Payload:     arvisAlertPayload(target, grade, riskLevel, recommendation, signature, ruleVersion),
 	})
 	if err != nil {
 		return ""
@@ -110,24 +114,22 @@ func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope
 	return id
 }
 
-func arvisAlertDedupeKey(authSubject, signature, target, riskLevel, grade string) string {
+func arvisAlertDedupeKey(authSubject, signature string) string {
 	scope := strings.TrimSpace(authSubject)
 	if scope == "" {
 		scope = "unscoped"
 	}
-	if signature = strings.TrimSpace(signature); signature != "" {
-		return "arvis-verdict:" + scope + ":" + signature
-	}
-	return "arvis-verdict:" + scope + ":" + strings.TrimSpace(target) + ":" + strings.TrimSpace(riskLevel) + ":" + strings.TrimSpace(grade)
+	return "arvis-verdict:" + scope + ":" + strings.TrimSpace(signature)
 }
 
-func arvisAlertPayload(target, grade, riskLevel, recommendation, signature string) map[string]any {
+func arvisAlertPayload(target, grade, riskLevel, recommendation, signature, ruleVersion string) map[string]any {
 	return map[string]any{
 		"target":         target,
 		"grade":          grade,
 		"risk_level":     riskLevel,
 		"recommendation": recommendation,
 		"signature":      signature,
+		"rule_version":   ruleVersion,
 	}
 }
 
