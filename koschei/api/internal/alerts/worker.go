@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -138,7 +139,7 @@ func processDelivery(ctx context.Context, db *sql.DB, client *http.Client, item 
 
 	resp, err := client.Do(req)
 	if err != nil {
-		markFailure(ctx, db, item, 0, sanitizeError(err), true)
+		markFailure(ctx, db, item, 0, safeProviderFailure(err), true)
 		return
 	}
 	defer resp.Body.Close()
@@ -161,14 +162,14 @@ func channelRequest(item deliveryRecord) (string, map[string]any, error) {
 			return "", nil, fmt.Errorf("telegram alert configuration is unavailable")
 		}
 		return "https://api.telegram.org/bot" + token + "/sendMessage", map[string]any{
-			"chat_id": chatID,
-			"text": message,
+			"chat_id":                  chatID,
+			"text":                     message,
 			"disable_web_page_preview": true,
 		}, nil
 	case "discord":
 		endpoint := strings.TrimSpace(os.Getenv("DISCORD_WEBHOOK_URL"))
 		parsed, err := url.Parse(endpoint)
-		if err != nil || !allowedDiscordHost(parsed.Hostname()) {
+		if err != nil || !allowedDiscordWebhookURL(parsed) {
 			return "", nil, fmt.Errorf("discord alert configuration is unavailable")
 		}
 		return endpoint, map[string]any{"content": message}, nil
@@ -180,6 +181,14 @@ func channelRequest(item deliveryRecord) (string, map[string]any, error) {
 func allowedDiscordHost(host string) bool {
 	host = strings.ToLower(strings.TrimSpace(host))
 	return host == "discord.com" || host == "www.discord.com" || host == "discordapp.com" || host == "www.discordapp.com"
+}
+
+func allowedDiscordWebhookURL(value *url.URL) bool {
+	if value == nil || !strings.EqualFold(value.Scheme, "https") || value.User != nil || value.Fragment != "" || !allowedDiscordHost(value.Hostname()) {
+		return false
+	}
+	path := strings.TrimSpace(value.EscapedPath())
+	return strings.HasPrefix(path, "/api/webhooks/") && len(strings.TrimPrefix(path, "/api/webhooks/")) >= 3
 }
 
 func alertMessage(item deliveryRecord) string {
@@ -231,11 +240,15 @@ func retryAt(now time.Time, attempt int) time.Time {
 	return now.Add(delays[index])
 }
 
-func sanitizeError(err error) string {
-	if err == nil {
+func safeProviderFailure(err error) string {
+	switch {
+	case err == nil:
 		return ""
+	case errors.Is(err, context.DeadlineExceeded):
+		return "alert provider request timed out"
+	case errors.Is(err, context.Canceled):
+		return "alert provider request was canceled"
+	default:
+		return "alert provider request failed"
 	}
-	value := strings.ReplaceAll(err.Error(), "\n", " ")
-	value = strings.ReplaceAll(value, "\r", " ")
-	return truncate(value, 1000)
 }
