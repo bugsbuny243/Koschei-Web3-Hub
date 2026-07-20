@@ -2,10 +2,9 @@ package handlers
 
 import (
 	"net/http"
-	"os"
 	"strings"
-	"time"
 
+	"koschei/api/internal/requestmeta"
 	"koschei/api/internal/services"
 )
 
@@ -34,10 +33,16 @@ func (h *Handler) OwnerLoginAudited(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	secure := strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
-	http.SetCookie(w, &http.Cookie{Name: "koschei_owner_secret", Value: ownerSecret, Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, Expires: time.Now().Add(12 * time.Hour)})
-	http.SetCookie(w, &http.Cookie{Name: "koschei_owner_wallet", Value: firstNonEmpty(ownerWallet, loginWallet), Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, Expires: time.Now().Add(12 * time.Hour)})
-	services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "owner_login_success", "owner", "info", map[string]any{"wallet_present": loginWallet != ""}))
+
+	sessionWallet := firstNonEmpty(ownerWallet, loginWallet)
+	token, expiresAt, err := h.issueOwnerSession(r.Context(), sessionWallet, r)
+	if err != nil {
+		services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "owner_login_failed", "owner", "error", map[string]any{"reason": "session_issue_failed"}))
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "owner_session_unavailable"})
+		return
+	}
+	setOwnerSessionCookies(w, token, sessionWallet, expiresAt)
+	services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "owner_login_success", "owner", "info", map[string]any{"wallet_present": sessionWallet != "", "session_storage": ownerSessionStorageName(h)}))
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "Owner oturumu açıldı."})
 }
 
@@ -46,17 +51,12 @@ func securityAuditFromRequest(r *http.Request, eventType, actorType, severity st
 }
 
 func requestAuditIP(r *http.Request) string {
-	if r == nil {
-		return "unknown"
+	return requestmeta.ClientIP(r)
+}
+
+func ownerSessionStorageName(h *Handler) string {
+	if h != nil && h.DB != nil {
+		return "database_hash"
 	}
-	if xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For")); xff != "" && len(xff) < 256 {
-		first := strings.TrimSpace(strings.Split(xff, ",")[0])
-		if first != "" {
-			return first
-		}
-	}
-	if strings.TrimSpace(r.RemoteAddr) != "" && len(r.RemoteAddr) < 128 {
-		return strings.TrimSpace(r.RemoteAddr)
-	}
-	return "unknown"
+	return "development_memory_hash"
 }

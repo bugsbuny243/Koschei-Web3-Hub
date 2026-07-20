@@ -17,31 +17,34 @@ func (h *Handler) ownerAuth(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 
-	suppliedSecret := strings.TrimSpace(r.Header.Get("x-koschei-secret"))
-	if suppliedSecret == "" {
-		suppliedSecret = strings.TrimSpace(r.Header.Get("x-owner-secret"))
-	}
-	if suppliedSecret == "" {
-		if c, err := r.Cookie("koschei_owner_secret"); err == nil {
-			suppliedSecret = strings.TrimSpace(c.Value)
+	sessionWallet, sessionOK := h.ownerSessionFromRequest(r.Context(), r)
+	credentialOK := sessionOK
+	if !credentialOK {
+		suppliedSecret := strings.TrimSpace(r.Header.Get("x-koschei-secret"))
+		if suppliedSecret == "" {
+			suppliedSecret = strings.TrimSpace(r.Header.Get("x-owner-secret"))
 		}
+		if suppliedSecret == "" {
+			suppliedSecret = strings.TrimSpace(r.Header.Get("x-admin-password"))
+		}
+		credentialOK = suppliedSecret != "" && constantTimeStringEqual(suppliedSecret, ownerSecret)
 	}
-	if suppliedSecret == "" {
-		suppliedSecret = strings.TrimSpace(r.Header.Get("x-admin-password"))
-	}
-	if !constantTimeStringEqual(suppliedSecret, ownerSecret) {
+	if !credentialOK {
 		http.NotFound(w, r)
 		return false
 	}
 
-	wallet := normalizeWallet(r.Header.Get("x-owner-wallet"))
-	if wallet == "" {
-		if c, err := r.Cookie("koschei_owner_wallet"); err == nil {
-			wallet = normalizeWallet(c.Value)
+	wallet := sessionWallet
+	if !sessionOK {
+		wallet = normalizeWallet(r.Header.Get("x-owner-wallet"))
+		if wallet == "" {
+			if c, err := r.Cookie("koschei_owner_wallet"); err == nil {
+				wallet = normalizeWallet(c.Value)
+			}
 		}
-	}
-	if wallet == "" {
-		wallet = walletFromBearer(r)
+		if wallet == "" {
+			wallet = walletFromBearer(r)
+		}
 	}
 	if ownerWallet != "" && wallet != "" && wallet != ownerWallet {
 		http.NotFound(w, r)
