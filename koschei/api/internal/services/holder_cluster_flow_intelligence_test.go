@@ -130,8 +130,66 @@ func TestObserveHolderClusterWalletFlowPreservesTokenAccountsAndDecimals(t *test
 	if observation.Mint != "Mint" || observation.Decimals == nil || *observation.Decimals != 6 {
 		t.Fatalf("token metadata not preserved: %#v", observation)
 	}
-	if observation.Destination != "WalletB" || observation.Kind != "holder_to_holder" || observation.Amount != 4 {
+	if observation.Destination != "WalletB" || observation.Kind != "holder_to_holder" || observation.Direction != "outbound" || observation.Amount != 4 {
 		t.Fatalf("unexpected flow observation: %#v", observation)
+	}
+}
+
+func TestObserveHolderClusterWalletFlowPreservesInboundContext(t *testing.T) {
+	tx := map[string]any{
+		"slot": int64(654),
+		"transaction": map[string]any{"message": map[string]any{
+			"accountKeys": []any{map[string]any{"pubkey": "CEXATA"}, map[string]any{"pubkey": "HolderATA"}, map[string]any{"pubkey": "CEXWallet"}},
+			"instructions": []any{map[string]any{
+				"program": "spl-token", "programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+				"parsed": map[string]any{"type": "transferChecked", "info": map[string]any{
+					"source": "CEXATA", "destination": "HolderATA", "authority": "CEXWallet", "mint": "Mint",
+					"tokenAmount": map[string]any{"amount": "4000000", "decimals": float64(6), "uiAmount": 4.0},
+				}},
+			}},
+		}},
+		"meta": map[string]any{
+			"preTokenBalances": []any{
+				map[string]any{"accountIndex": float64(0), "mint": "Mint", "owner": "CEXWallet", "uiTokenAmount": map[string]any{"decimals": float64(6), "uiAmountString": "10"}},
+				map[string]any{"accountIndex": float64(1), "mint": "Mint", "owner": "WalletA", "uiTokenAmount": map[string]any{"decimals": float64(6), "uiAmountString": "2"}},
+			},
+			"postTokenBalances": []any{
+				map[string]any{"accountIndex": float64(0), "mint": "Mint", "owner": "CEXWallet", "uiTokenAmount": map[string]any{"decimals": float64(6), "uiAmountString": "6"}},
+				map[string]any{"accountIndex": float64(1), "mint": "Mint", "owner": "WalletA", "uiTokenAmount": map[string]any{"decimals": float64(6), "uiAmountString": "6"}},
+			},
+			"innerInstructions": []any{},
+		},
+	}
+	observations := observeHolderClusterWalletFlow(tx, "sig-inbound", "Mint", "WalletA", map[string]bool{"WalletA": true})
+	if len(observations) != 1 {
+		t.Fatalf("inbound observations=%d %#v", len(observations), observations)
+	}
+	observation := observations[0]
+	if observation.SourceWallet != "CEXWallet" || observation.Destination != "WalletA" || observation.Direction != "inbound" {
+		t.Fatalf("inbound direction not preserved: %#v", observation)
+	}
+	if observation.SourceTokenAccount != "CEXATA" || observation.DestinationTokenAccount != "HolderATA" || observation.Amount != 4 {
+		t.Fatalf("inbound token evidence not preserved: %#v", observation)
+	}
+}
+
+func TestHolderClusterFlowCountsCEXAndRiskWithoutScoringInbound(t *testing.T) {
+	wallets := []HolderClusterWallet{{
+		Wallet: "WalletA", HolderPercentage: 10,
+		FlowObservations: []HolderClusterFlowObservation{
+			{SourceWallet: "WalletA", Destination: "CEXWallet", Direction: "outbound", Kind: "external_token_recipient", TransferType: "CEX_OUT", Signature: "sig-out"},
+			{SourceWallet: "CEXWallet", Destination: "WalletA", Direction: "inbound", Kind: "inbound_token_sender_context", TransferType: "CEX_IN", RiskFlag: "MIXER", Signature: "sig-in"},
+		},
+	}}
+	flow := summarizeHolderClusterFlow(wallets)
+	if flow.CEXOutflowObservationCount != 1 || flow.CEXInflowObservationCount != 1 || flow.RiskFlagObservationCount != 1 {
+		t.Fatalf("unexpected entity counters: %#v", flow)
+	}
+	if flow.TransactionsWithOutflow != 1 || flow.WalletsWithOutflow != 1 {
+		t.Fatalf("inbound context polluted outflow counters: %#v", flow)
+	}
+	if flow.CommonExitGroupCount != 0 || flow.RiskContribution != 0 {
+		t.Fatalf("CEX/risk labels must remain non-scoring context: %#v", flow)
 	}
 }
 
