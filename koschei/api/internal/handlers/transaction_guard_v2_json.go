@@ -17,7 +17,7 @@ func (input *transactionGuardV2Request) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	if wallet := strings.TrimSpace(decoded.Wallet); wallet != "" && !looksLikeGuardPubkey(wallet) {
+	if wallet := strings.TrimSpace(decoded.Wallet); wallet != "" && !isValidSolanaAddress(wallet) {
 		return fmt.Errorf("wallet has an invalid Solana address")
 	}
 	for name, values := range map[string][]string{
@@ -26,13 +26,16 @@ func (input *transactionGuardV2Request) UnmarshalJSON(data []byte) error {
 		"blocked_programs":  decoded.BlockedPrograms,
 	} {
 		for index, value := range values {
-			if !looksLikeGuardPubkey(strings.TrimSpace(value)) {
+			if !isValidSolanaAddress(strings.TrimSpace(value)) {
 				return fmt.Errorf("%s[%d] has an invalid Solana program address", name, index)
 			}
 		}
 	}
 	for index, account := range decoded.Accounts {
-		if mint := strings.TrimSpace(account.Mint); mint != "" && !looksLikeGuardPubkey(mint) {
+		if !isValidSolanaAddress(strings.TrimSpace(account.Address)) {
+			return fmt.Errorf("accounts[%d].address has an invalid Solana address", index)
+		}
+		if mint := strings.TrimSpace(account.Mint); mint != "" && !isValidSolanaAddress(mint) {
 			return fmt.Errorf("accounts[%d].mint has an invalid Solana address", index)
 		}
 	}
