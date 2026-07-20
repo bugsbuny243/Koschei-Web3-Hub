@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"sort"
@@ -19,6 +21,10 @@ var supportedSecurityAlertEvents = map[string]bool{
 	alerts.EventSecurityAlertCreated:      true,
 	alerts.EventARVISVerdictCreated:       true,
 	alerts.EventTransactionGuardDecision: true,
+}
+
+type securityAlertSubscriptionQueryer interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }
 
 func (h *Handler) SecurityAlertWebhookSubscription(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +94,7 @@ func (h *Handler) SecurityAlertWebhookSubscription(w http.ResponseWriter, r *htt
 				return
 			}
 		}
-		selected, err := loadSecurityAlertSubscriptions(r, tx, input.EndpointID, claims.Sub)
+		selected, err := loadSecurityAlertSubscriptions(r.Context(), tx, input.EndpointID, claims.Sub)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
@@ -118,7 +124,7 @@ func (h *Handler) writeSecurityAlertWebhookSubscription(w http.ResponseWriter, r
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "webhook_not_found"})
 		return
 	}
-	selected, err := loadSecurityAlertSubscriptions(r, h.DB, endpointID, authSubject)
+	selected, err := loadSecurityAlertSubscriptions(r.Context(), h.DB, endpointID, authSubject)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
@@ -126,32 +132,8 @@ func (h *Handler) writeSecurityAlertWebhookSubscription(w http.ResponseWriter, r
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "endpoint_id": endpointID, "security_event_types": selected, "supported_security_event_types": sortedSupportedSecurityAlertEvents()})
 }
 
-type securityAlertSubscriptionQueryer interface {
-	QueryContext(ctx interfaceContext, query string, args ...any) (interfaceRows, error)
-}
-
-// The small local interfaces below keep this file usable with both *sql.DB and
-// *sql.Tx without exposing storage details to the HTTP layer.
-type interfaceContext interface {
-	Done() <-chan struct{}
-	Err() error
-	Deadline() (deadline interfaceTime, ok bool)
-	Value(key any) any
-}
-
-type interfaceTime interface{}
-
-type interfaceRows interface {
-	Next() bool
-	Scan(dest ...any) error
-	Close() error
-	Err() error
-}
-
-func loadSecurityAlertSubscriptions(r *http.Request, queryer interface {
-	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
-}, endpointID, authSubject string) ([]string, error) {
-	rows, err := queryer.QueryContext(r.Context(), `
+func loadSecurityAlertSubscriptions(ctx context.Context, queryer securityAlertSubscriptionQueryer, endpointID, authSubject string) ([]string, error) {
+	rows, err := queryer.QueryContext(ctx, `
 		SELECT event_type FROM security_alert_webhook_subscriptions
 		WHERE endpoint_id=$1 AND auth_subject=$2 ORDER BY event_type`, endpointID, authSubject)
 	if err != nil {
