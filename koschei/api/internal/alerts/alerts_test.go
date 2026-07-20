@@ -8,13 +8,24 @@ import (
 )
 
 func TestNormalizeEventProducesStableDedupeKey(t *testing.T) {
-	first := normalizeEvent(Event{Source: " arvis ", EventType: "ARVIS.VERDICT.CREATED", Severity: "warning", Target: "mint", Title: "Risk", Message: "Evidence"})
-	second := normalizeEvent(Event{Source: "arvis", EventType: "arvis.verdict.created", Severity: "medium", Target: "mint", Title: "Risk", Message: "Evidence"})
+	first := normalizeEvent(Event{AuthSubject: "customer-a", Source: " arvis ", EventType: "ARVIS.VERDICT.CREATED", Severity: "warning", Target: "mint", Title: "Risk", Message: "Evidence"})
+	second := normalizeEvent(Event{AuthSubject: "customer-a", Source: "arvis", EventType: "arvis.verdict.created", Severity: "medium", Target: "mint", Title: "Risk", Message: "Evidence"})
 	if first.DedupeKey == "" || first.DedupeKey != second.DedupeKey {
 		t.Fatalf("dedupe keys differ: %q %q", first.DedupeKey, second.DedupeKey)
 	}
 	if first.Severity != "medium" {
 		t.Fatalf("severity = %q", first.Severity)
+	}
+}
+
+func TestDefaultDedupeKeyIsTenantScoped(t *testing.T) {
+	base := Event{Source: "arvis", EventType: EventARVISVerdictCreated, Severity: "high", Target: "mint", Title: "Risk", EvidenceRef: "signature"}
+	first := base
+	first.AuthSubject = "customer-a"
+	second := base
+	second.AuthSubject = "customer-b"
+	if defaultDedupeKey(first) == defaultDedupeKey(second) {
+		t.Fatal("default alert dedupe key collided across tenants")
 	}
 }
 
