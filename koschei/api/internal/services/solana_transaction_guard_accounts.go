@@ -28,14 +28,15 @@ type SolanaSimulationAccountsValue struct {
 }
 
 func SolanaGetMultipleAccountsBase64(ctx context.Context, rpcURL string, addresses []string) (SolanaMultipleAccountInfoResult, []string, error) {
+	rpcURL = resolvedSolanaRPCURL(rpcURL)
 	clean := cleanGuardAccountAddresses(addresses)
-	if strings.TrimSpace(rpcURL) == "" {
+	if rpcURL == "" {
 		return SolanaMultipleAccountInfoResult{}, nil, fmt.Errorf("solana rpc url is empty")
 	}
 	if len(clean) == 0 {
 		return SolanaMultipleAccountInfoResult{}, nil, fmt.Errorf("transaction guard account list is empty")
 	}
-	result, err := solanaRPCDo[SolanaMultipleAccountInfoResult](ctx, strings.TrimSpace(rpcURL), "getMultipleAccounts", []any{
+	result, err := solanaRPCDo[SolanaMultipleAccountInfoResult](ctx, rpcURL, "getMultipleAccounts", []any{
 		clean,
 		map[string]any{"encoding": "base64", "commitment": "processed"},
 	})
@@ -43,7 +44,7 @@ func SolanaGetMultipleAccountsBase64(ctx context.Context, rpcURL string, address
 }
 
 func SolanaSimulateTransactionWithAccountsBase64(ctx context.Context, rpcURL, transaction, encoding string, addresses []string) (SolanaSimulationAccountsResult, []string, error) {
-	rpcURL = strings.TrimSpace(rpcURL)
+	rpcURL = resolvedSolanaRPCURL(rpcURL)
 	transaction = strings.TrimSpace(transaction)
 	encoding = strings.ToLower(strings.TrimSpace(encoding))
 	clean := cleanGuardAccountAddresses(addresses)
