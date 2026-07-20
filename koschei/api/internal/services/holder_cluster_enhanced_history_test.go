@@ -60,7 +60,7 @@ func TestHeliusTokenTransferPreservesAccountsAndMetadata(t *testing.T) {
 	if !ok {
 		t.Fatal("expected enhanced transfer observation")
 	}
-	if observation.SourceWallet != "WalletA" || observation.Destination != "WalletB" || observation.Kind != "holder_to_holder" {
+	if observation.SourceWallet != "WalletA" || observation.Destination != "WalletB" || observation.Kind != "holder_to_holder" || observation.Direction != "outbound" {
 		t.Fatalf("wallet endpoints were not preserved: %#v", observation)
 	}
 	if observation.SourceTokenAccount != "SourceATA" || observation.DestinationTokenAccount != "DestinationATA" {
@@ -100,5 +100,36 @@ func TestHeliusTransferKeepsZeroDecimalsAndUnresolvedRecipientATA(t *testing.T) 
 	}
 	if observation.Decimals == nil || *observation.Decimals != 0 || observation.TokenStandard != "NonFungible" {
 		t.Fatalf("zero-decimal token metadata was lost: %#v", observation)
+	}
+}
+
+func TestHeliusTransferPreservesInboundContext(t *testing.T) {
+	decimals := 6
+	transfer := heliusTokenTransfer{
+		FromTokenAccount: "CEXATA",
+		ToTokenAccount:   "HolderATA",
+		FromUserAccount:  "CEXWallet",
+		ToUserAccount:    "WalletA",
+		TokenAmount:      42,
+		Mint:             "Mint",
+		Decimals:         &decimals,
+	}
+	observation, ok := holderClusterInboundObservationFromHeliusTransfer(
+		transfer,
+		heliusEnhancedTransaction{Signature: "sig-in", Slot: 2000},
+		"WalletA",
+		"Mint",
+		map[string]bool{"WalletA": true},
+		nil,
+		heliusAssetMetadata{},
+	)
+	if !ok {
+		t.Fatal("expected inbound enhanced observation")
+	}
+	if observation.SourceWallet != "CEXWallet" || observation.Destination != "WalletA" || observation.Direction != "inbound" || observation.Kind != "inbound_token_sender_context" {
+		t.Fatalf("inbound endpoints were not preserved: %#v", observation)
+	}
+	if observation.SourceTokenAccount != "CEXATA" || observation.DestinationTokenAccount != "HolderATA" || observation.Amount != 42 {
+		t.Fatalf("inbound transfer metadata mismatch: %#v", observation)
 	}
 }
