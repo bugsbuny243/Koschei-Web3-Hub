@@ -22,3 +22,14 @@ func TestShouldQueueSystemChannelsUsesHighDefault(t *testing.T) {
 		t.Fatal("high and critical alerts should reach system channels by default")
 	}
 }
+
+func TestAllowedDiscordHostAcceptsOnlyOfficialHosts(t *testing.T) {
+	for _, host := range []string{"discord.com", "www.discord.com", "discordapp.com"} {
+		if !allowedDiscordHost(host) {
+			t.Fatalf("official host %q was rejected", host)
+		}
+	}
+	if allowedDiscordHost("chat.invalid") {
+		t.Fatal("non-Discord host was accepted")
+	}
+}
