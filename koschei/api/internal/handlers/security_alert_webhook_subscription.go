@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"net/http"
 	"sort"
@@ -57,29 +56,48 @@ func (h *Handler) SecurityAlertWebhookSubscription(w http.ResponseWriter, r *htt
 		if input.Enabled != nil {
 			enabled = *input.Enabled
 		}
-		current, err := loadWebhookEventTypes(r, h.DB, input.EndpointID, claims.Sub)
-		if errors.Is(err, sql.ErrNoRows) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "webhook_not_found"})
-			return
-		}
+
+		tx, err := h.DB.BeginTx(r.Context(), nil)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
-		updated := mutateWebhookEvents(current, events, enabled)
-		res, err := h.DB.ExecContext(r.Context(), `
-			UPDATE webhook_endpoints SET event_types=$1,updated_at=now()
-			WHERE id=$2 AND auth_subject=$3`, stringSliceToPGArray(updated), input.EndpointID, claims.Sub)
+		defer tx.Rollback()
+		var endpointExists bool
+		if err := tx.QueryRowContext(r.Context(), `
+			SELECT EXISTS(SELECT 1 FROM webhook_endpoints WHERE id=$1 AND auth_subject=$2)`, input.EndpointID, claims.Sub).Scan(&endpointExists); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+			return
+		}
+		if !endpointExists {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "webhook_not_found"})
+			return
+		}
+		for _, eventType := range events {
+			if enabled {
+				if _, err := tx.ExecContext(r.Context(), `
+					INSERT INTO security_alert_webhook_subscriptions (endpoint_id,auth_subject,event_type)
+					VALUES ($1,$2,$3) ON CONFLICT (endpoint_id,event_type) DO NOTHING`, input.EndpointID, claims.Sub, eventType); err != nil {
+					writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+					return
+				}
+			} else if _, err := tx.ExecContext(r.Context(), `
+				DELETE FROM security_alert_webhook_subscriptions
+				WHERE endpoint_id=$1 AND auth_subject=$2 AND event_type=$3`, input.EndpointID, claims.Sub, eventType); err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+				return
+			}
+		}
+		selected, err := loadSecurityAlertSubscriptions(r, tx, input.EndpointID, claims.Sub)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
-		count, _ := res.RowsAffected()
-		if count == 0 {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "webhook_not_found"})
+		if err := tx.Commit(); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "endpoint_id": input.EndpointID, "enabled": enabled, "event_types": updated, "security_event_types": selectedSecurityAlertEvents(updated)})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "endpoint_id": input.EndpointID, "enabled": enabled, "security_event_types": selected, "supported_security_event_types": sortedSupportedSecurityAlertEvents()})
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
@@ -90,25 +108,65 @@ func (h *Handler) writeSecurityAlertWebhookSubscription(w http.ResponseWriter, r
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_webhook_id"})
 		return
 	}
-	current, err := loadWebhookEventTypes(r, h.DB, endpointID, authSubject)
-	if errors.Is(err, sql.ErrNoRows) {
+	var endpointExists bool
+	if err := h.DB.QueryRowContext(r.Context(), `
+		SELECT EXISTS(SELECT 1 FROM webhook_endpoints WHERE id=$1 AND auth_subject=$2)`, endpointID, authSubject).Scan(&endpointExists); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
+		return
+	}
+	if !endpointExists {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "webhook_not_found"})
 		return
 	}
+	selected, err := loadSecurityAlertSubscriptions(r, h.DB, endpointID, authSubject)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "endpoint_id": endpointID, "event_types": current, "security_event_types": selectedSecurityAlertEvents(current), "supported_security_event_types": sortedSupportedSecurityAlertEvents()})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "endpoint_id": endpointID, "security_event_types": selected, "supported_security_event_types": sortedSupportedSecurityAlertEvents()})
 }
 
-func loadWebhookEventTypes(r *http.Request, db *sql.DB, endpointID, authSubject string) ([]string, error) {
-	var raw string
-	err := db.QueryRowContext(r.Context(), `SELECT event_types::text FROM webhook_endpoints WHERE id=$1 AND auth_subject=$2`, endpointID, authSubject).Scan(&raw)
+type securityAlertSubscriptionQueryer interface {
+	QueryContext(ctx interfaceContext, query string, args ...any) (interfaceRows, error)
+}
+
+// The small local interfaces below keep this file usable with both *sql.DB and
+// *sql.Tx without exposing storage details to the HTTP layer.
+type interfaceContext interface {
+	Done() <-chan struct{}
+	Err() error
+	Deadline() (deadline interfaceTime, ok bool)
+	Value(key any) any
+}
+
+type interfaceTime interface{}
+
+type interfaceRows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Close() error
+	Err() error
+}
+
+func loadSecurityAlertSubscriptions(r *http.Request, queryer interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}, endpointID, authSubject string) ([]string, error) {
+	rows, err := queryer.QueryContext(r.Context(), `
+		SELECT event_type FROM security_alert_webhook_subscriptions
+		WHERE endpoint_id=$1 AND auth_subject=$2 ORDER BY event_type`, endpointID, authSubject)
 	if err != nil {
 		return nil, err
 	}
-	return parsePGTextArray(raw), nil
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var eventType string
+		if err := rows.Scan(&eventType); err != nil {
+			return nil, err
+		}
+		out = append(out, eventType)
+	}
+	return out, rows.Err()
 }
 
 func normalizeSecurityAlertEvents(input []string) ([]string, error) {
@@ -129,40 +187,6 @@ func normalizeSecurityAlertEvents(input []string) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
-}
-
-func mutateWebhookEvents(current, selected []string, enabled bool) []string {
-	set := map[string]bool{}
-	for _, eventType := range current {
-		eventType = strings.TrimSpace(eventType)
-		if eventType != "" {
-			set[eventType] = true
-		}
-	}
-	for _, eventType := range selected {
-		if enabled {
-			set[eventType] = true
-		} else {
-			delete(set, eventType)
-		}
-	}
-	out := make([]string, 0, len(set))
-	for eventType := range set {
-		out = append(out, eventType)
-	}
-	sort.Strings(out)
-	return out
-}
-
-func selectedSecurityAlertEvents(current []string) []string {
-	out := []string{}
-	for _, eventType := range current {
-		if supportedSecurityAlertEvents[eventType] {
-			out = append(out, eventType)
-		}
-	}
-	sort.Strings(out)
-	return out
 }
 
 func sortedSupportedSecurityAlertEvents() []string {
