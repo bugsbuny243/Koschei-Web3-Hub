@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS defense_toolchain_policies (
     worker_image_digest text NOT NULL,
     required_tools jsonb NOT NULL,
     policy_hash text NOT NULL,
-    active boolean NOT NULL DEFAULT false,
     verdict_authority boolean NOT NULL DEFAULT false,
     created_by text NOT NULL DEFAULT 'owner',
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -16,9 +15,6 @@ CREATE TABLE IF NOT EXISTS defense_toolchain_policies (
     CONSTRAINT defense_toolchain_policies_policy_hash_format CHECK (policy_hash ~ '^sha256:[0-9a-f]{64}$'),
     CONSTRAINT defense_toolchain_policies_non_authoritative CHECK (verdict_authority = false)
 );
-
-CREATE UNIQUE INDEX IF NOT EXISTS defense_toolchain_policies_one_active_idx
-    ON defense_toolchain_policies ((active)) WHERE active = true;
 
 CREATE INDEX IF NOT EXISTS defense_toolchain_policies_created_idx
     ON defense_toolchain_policies (created_at DESC);
