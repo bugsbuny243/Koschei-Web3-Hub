@@ -1,133 +1,137 @@
-# Koschei Solana Defense Intelligence OS — Master Roadmap
+# Koschei Solana Defense Intelligence OS — Canonical Roadmap
 
-This document is the durable source of truth for the Defense OS phase sequence. It reconstructs the implemented GitHub history and makes future phases explicit so the roadmap is not lost inside a chat transcript.
+This file is the durable phase index for the Defense OS. Conversation history is not the source of truth; merged code, migrations, tests and the phase documents are.
 
 ## Constitutional boundary
 
-The roadmap is governed by `ACTOR_INVESTIGATION_ENGINE.md` v1.0, especially:
+Across every phase:
 
-- §1 question 10: separate verified, observed, inferred and unknown claims;
-- §3: preserve evidence levels and graceful degradation;
-- §4: serious claims require complete evidence rows;
-- §5: only deterministic versioned rules may affect a verdict.
+- the signed deterministic Koschei investigation verdict remains the only verdict authority;
+- Defense OS evidence uses `verdict_authority=false`;
+- missing evidence remains pending, unavailable or insufficient;
+- AI may explain or propose, but cannot create a finding, raise or lower a grade, approve a patch or claim proof-of-fix;
+- no Defense OS path may hold a wallet key, sign a transaction, submit a mainnet transaction or deploy a production patch;
+- source, IDL, bytecode, toolchain, execution and reproduction evidence remain distinct and independently attributable.
 
-Defense OS output has `verdict_authority=false`. It may provide technical evidence to an investigation, but it cannot create, raise, lower or override an ARVIS or Unified Radar grade. No Defense OS phase may sign or submit a mainnet transaction, obtain a wallet private key, or apply a production patch automatically.
+## Completed phases
 
-## Status vocabulary
+### Phase 1 — Immutable Defense Agent Shadow Runtime
 
-- **COMPLETE** — merged implementation and persistence contract exist.
-- **IN PROGRESS** — implementation is actively being built and is not a completed product claim.
-- **PLANNED** — architectural intent only; no production capability claim.
+Read-only agent and tool envelopes, immutable run records, Program Archaeologist, Static Analyzer and Reproduction Agent roles, and a deterministic program-surface resolver attached in shadow mode.
 
-## Implemented foundation
+Status: **complete**.
 
-### Phase 1 — Immutable Defense Agent Shadow Runtime — COMPLETE
+### Phase 2 — Immutable Artifact Intake + Knowledge Fabric
 
-Read-only Program Archaeologist, Static Analyzer and Reproduction Agent roles; hashed tool envelopes; immutable agent/tool records; no execution or verdict authority.
+Immutable source bundles, source manifests, Anchor IDLs, sBPF artifacts, build manifests and knowledge documents, all bound to hashes and provenance.
 
-### Phase 2 — Immutable Artifact Intake + Knowledge Fabric — COMPLETE
+Status: **complete**.
 
-Hash-addressed source bundles, manifests, Anchor IDLs, sBPF artifacts and knowledge documents with provenance and trust metadata.
+### Phase 3 — Program Security Lab
 
-### Phase 3 — Program Security Lab — COMPLETE
+Temporal program/instruction/account graph and conservative deterministic Solana/Anchor detector rules. Static observations remain hypotheses until stronger evidence exists.
 
-Temporal program/instruction/account graph and conservative deterministic Solana/Anchor surface detectors. Static findings remain hypotheses until stronger evidence exists.
+Status: **complete**.
 
-### Phase 4 — Local Verification + Review-Only Repair — COMPLETE
+### Phase 4 — Local Verification + Review-Only Repair
 
-Bounded command sandbox, schema-bound repair proposals and immutable owner approval. Generic build success is not proof of exploitability or proof-of-fix.
+Bounded source sandbox, fixed command allowlist, structured patch proposals and immutable owner approval. Generic build/test success remains partial evidence.
 
-### Phase 5 — Learning Flywheel — COMPLETE
+Status: **complete**.
 
-Immutable benchmark cases, deterministic precision/recall evaluation, defensive synthetic mutations and human-reviewed dataset export.
+### Phase 5 — Learning Flywheel
 
-### Phase 6 — Deployed Bytecode Verification — COMPLETE
+Immutable benchmark cases, deterministic evaluation, non-production defensive mutations and reviewed training-example export.
 
-Upgradeable-loader resolution, ProgramData and upgrade-authority evidence, canonical sBPF hashes and optional build-manifest byte equality checks.
+Status: **complete**.
 
-### Phase 7 — Exact-Commit Public Source Import — COMPLETE
+### Phase 6 — Deployed Bytecode Verification
 
-Bounded GitHub archive import pinned to an exact commit SHA with strict host, redirect, path, binary and size policies. Imported source is not executed.
+Read-only Program/ProgramData resolution, deployment and upgrade-authority evidence, canonical sBPF hashing and optional build-manifest byte equality checks.
 
-### Phase 8 — Isolated Defense Worker — COMPLETE
+Status: **complete**.
 
-Separate worker process and image, durable PostgreSQL queue, leases, stale recovery and fixed command allowlisting. The web service never executes source.
+### Phase 7 — Exact-Commit Source Import
 
-### Phase 9 — Versioned Paired Reproduction — COMPLETE
+Bounded public GitHub import pinned to an exact commit with host, redirect, archive, path, file-count and content safety controls.
 
-Exact baseline/patched command and marker binding. A proof-of-fix requires both immutable runs; ordinary tests are insufficient.
+Status: **complete**.
 
-### Phase 10 — Program Deployment Sentinel — COMPLETE
+### Phase 8 — Separate Defense Worker
 
-Read-only monitoring of loader, ProgramData, canonical bytecode, upgrade authority and build-manifest state with immutable change events.
+Durable PostgreSQL queue, leases, stale recovery, append-only worker events and a separate worker process. The web service never executes imported source.
 
-### Phase 11 — Anchor Harness Planner + Toolchain Attestation — COMPLETE
+Status: **complete**.
 
-Deterministic non-executable plans from Anchor IDL metadata, human-confirmation invariant templates and bounded worker probes for Rust, Cargo, Solana, Anchor and Trident.
+### Phase 9 — Versioned Paired Reproduction
 
-## Execution and fuzzing track
+Owner-approved reproduction invariants, exact finding/source/command binding, distinct unpatched and patched runs, exact marker requirements and immutable proof records.
 
-### Phase 12 — Pinned Toolchain and Fail-Closed Execution Gate — IN PROGRESS
+Status: **complete**.
 
-Phase 12 is split so planning cannot silently become execution.
+### Phase 10 — Program Deployment Sentinel
 
-#### Phase 12A — Immutable execution profile foundation
+Read-only scheduled deployment snapshots and immutable change events for loader, ProgramData, bytecode, upgrade authority and manifest-match state.
 
-- hash the exact executable used for every toolchain attestation;
-- bind attestations to an operator-supplied immutable worker image digest;
-- require an immutable harness source bundle tied to one Phase 11 plan;
-- require explicit owner-confirmed invariant statements;
-- create a deterministic engine command policy;
-- persist a versioned execution profile as either `ready` or `blocked`;
-- reject worker authorization when worker ID, image digest or profile state differs;
-- provide no execution route in this subphase.
+Status: **complete**.
 
-#### Phase 12B — Deterministic harness materialization
+### Phase 11 — Anchor Harness Planner + Toolchain Attestation
 
-PLANNED. Materialize a reviewable LiteSVM-compatible project from a manually prepared immutable harness bundle. Record generated files and dependency locks as immutable artifacts. Network access remains disabled.
+Deterministic non-executable harness plans derived from Anchor IDLs, human-confirmation invariant templates and immutable worker toolchain probes.
 
-#### Phase 12C — First isolated deterministic run
-
-PLANNED. Add a worker action that can consume only a Phase 12A-authorized profile and a Phase 12B materialized harness. Persist bounded stdout/stderr, command, duration, exit status, input hashes and worker/toolchain pins.
-
-### Phase 13 — LiteSVM Invariant Execution — PLANNED
-
-Execute confirmed no-panic, signer-substitution, read-only-account and allowed-state-transition invariants. A passing run is technical evidence only; it does not establish complete program safety.
-
-### Phase 14 — Stateful Trident Fuzzing — PLANNED
-
-Generate bounded stateful sequences from confirmed grammars, persist seeds and minimized failure traces, and distinguish environment failures from program failures.
-
-### Phase 15 — Differential Upgrade Regression — PLANNED
-
-Run identical invariant corpora against baseline and candidate deployments/source builds. Record state/output differences without inferring intent.
-
-### Phase 16 — Failure Minimization and Reproducible PoC — PLANNED
-
-Minimize a failing instruction sequence while preserving exact artifacts, accounts, arguments, seed and toolchain pins. Any exploitability claim still requires human review and evidence-policy checks.
-
-### Phase 17 — Reachability and Asset-Impact Evidence — PLANNED
-
-Connect reproduced technical behavior to deployed bytecode, reachable instruction surfaces and bounded asset-impact evidence. Capability is not intent and external labels do not prove control.
-
-### Phase 18 — Review-Only Repair Validation — PLANNED
-
-Bind a proposed patch to the reproduced failure, run paired baseline/patched evidence and produce a reviewable proof package. Koschei does not apply the patch to production.
-
-### Phase 19 — Continuous Program Defense — PLANNED
-
-Sentinel-triggered regression scheduling after verified deployment changes, with tenant-scoped alerts and deduplicated immutable evidence.
-
-### Phase 20 — Production Acceptance and Governance — PLANNED
-
-Real-program acceptance corpus, false-positive review, resource ceilings, rollback drills, operator runbooks and explicit enablement gates. No phase becomes customer-visible merely because code exists.
-
-## Current checkpoint
-
-Phases 1–11 are merged. Phase 12A is the active work item. Until 12B and 12C are implemented and validated, Koschei must continue to report:
+Every Phase 11 plan remains:
 
 ```text
-harness_execution_available=false
-mainnet_transaction_sent=false
+execution_ready=false
+manual_guidance_required=true
 verdict_authority=false
 ```
+
+Status: **complete**.
+
+## Active phase
+
+### Phase 12 — Pinned Toolchain + Safe Deterministic Harness Execution
+
+Phase 12 converts an explicitly approved Phase 11 plan into a bounded deterministic execution request without weakening the Phase 9 reproduction contract.
+
+Required deliverables:
+
+1. an immutable pinned-toolchain policy containing exact accepted versions and hashes;
+2. fail-closed comparison between the active worker attestation set and that policy;
+3. owner confirmation of concrete fixtures, account states, instruction arguments and accepted invariants;
+4. an execution manifest bound to plan, source artifact, IDL artifact, program ID, network, toolchain policy and fixed command profile;
+5. execution only in the separate Defense Worker with no network, no wallet material, read-only source input, bounded writable scratch space, CPU/time/output limits and a fixed environment;
+6. deterministic LiteSVM baseline execution as the first engine;
+7. immutable stdout/stderr hashes, exit state, fixture hashes, state-delta hashes and engine/toolchain evidence;
+8. fail-closed status when evidence is incomplete or the environment differs from the pinned policy;
+9. no exploitability, asset-impact or proof-of-fix claim from a harness run alone;
+10. Trident/stateful fuzzing remains disabled until a later explicit phase.
+
+Initial Phase 12 status: **in progress**.
+
+## Planned phases after Phase 12
+
+### Phase 13 — Stateful Adversarial Sequence Engine
+
+Pinned Trident or equivalent stateful fuzzing, bounded sequence grammars, deterministic seeds, corpus retention and reproducible crash/minimal-sequence evidence.
+
+### Phase 14 — Reachability and Asset-Impact Proof Layer
+
+Bind a static finding to a concrete instruction path, controlled account state and measurable unauthorized state or asset delta. Capability alone is not exploitability.
+
+### Phase 15 — Differential Patch Verification
+
+Run exact baseline and patched programs against the same immutable fixtures, seeds and invariants. A patch must remove the target failure without violating accepted invariants.
+
+### Phase 16 — Continuous Program Defense
+
+Sentinel changes may queue bounded re-analysis and approved regression suites. Deployment changes never silently inherit prior proof.
+
+### Phase 17 — Human Review and Release Governance
+
+Review queues, evidence signing, separation of duties, approval thresholds and explicit export of a technical security dossier. Koschei still does not deploy patches.
+
+## Phase transition rule
+
+A phase is complete only when its code, migration, tests, documentation and evidence boundaries are merged and the required CI gates pass. Feature presence alone does not complete a phase.
