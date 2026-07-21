@@ -2,6 +2,7 @@ package defense
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -62,7 +63,8 @@ func TestHashDefenseExecutableUsesExactBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := file.Write([]byte("exact-tool-bytes")); err != nil {
+	content := []byte("exact-tool-bytes")
+	if _, err := file.Write(content); err != nil {
 		t.Fatal(err)
 	}
 	if err := file.Close(); err != nil {
@@ -72,7 +74,8 @@ func TestHashDefenseExecutableUsesExactBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if digest != hashValue([]byte("exact-tool-bytes")) {
+	expected := sha256.Sum256(content)
+	if digest != fmt.Sprintf("sha256:%x", expected) {
 		t.Fatalf("unexpected executable digest: %s", digest)
 	}
 }
