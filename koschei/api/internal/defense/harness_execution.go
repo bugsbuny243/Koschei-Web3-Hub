@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -35,50 +37,50 @@ type HarnessToolPin struct {
 }
 
 type HarnessExecutionProfileInput struct {
-	PlanRef              string                      `json:"plan_ref"`
-	HarnessArtifactRef   string                      `json:"harness_artifact_ref"`
-	Engine               string                      `json:"engine"`
-	WorkerID             string                      `json:"worker_id"`
-	WorkerImageDigest    string                      `json:"worker_image_digest"`
-	ConfirmedInvariants  []ConfirmedHarnessInvariant `json:"confirmed_invariants"`
-	MaxDurationSeconds   int                         `json:"max_duration_seconds"`
-	MaxOutputBytes       int                         `json:"max_output_bytes"`
+	PlanRef             string                      `json:"plan_ref"`
+	HarnessArtifactRef  string                      `json:"harness_artifact_ref"`
+	Engine              string                      `json:"engine"`
+	WorkerID            string                      `json:"worker_id"`
+	WorkerImageDigest   string                      `json:"worker_image_digest"`
+	ConfirmedInvariants []ConfirmedHarnessInvariant `json:"confirmed_invariants"`
+	MaxDurationSeconds  int                         `json:"max_duration_seconds"`
+	MaxOutputBytes      int                         `json:"max_output_bytes"`
 }
 
 type HarnessExecutionProfile struct {
-	ProfileRef            string                      `json:"profile_ref"`
-	ProfileVersion        string                      `json:"profile_version"`
-	PlanRef               string                      `json:"plan_ref"`
-	HarnessArtifactRef    string                      `json:"harness_artifact_ref"`
-	ProgramID             string                      `json:"program_id"`
-	Network               string                      `json:"network"`
-	Engine                string                      `json:"engine"`
-	WorkerID              string                      `json:"worker_id"`
-	WorkerImageDigest     string                      `json:"worker_image_digest"`
-	RequiredTools         []string                    `json:"required_tools"`
-	ToolPins              []HarnessToolPin            `json:"tool_pins"`
-	ConfirmedInvariants   []ConfirmedHarnessInvariant `json:"confirmed_invariants"`
-	CommandPolicy         map[string]any              `json:"command_policy"`
-	MaxDurationSeconds    int                         `json:"max_duration_seconds"`
-	MaxOutputBytes        int                         `json:"max_output_bytes"`
-	ReadinessStatus       string                      `json:"readiness_status"`
-	ExecutionAllowed      bool                        `json:"execution_allowed"`
-	EvidenceRefs          []string                    `json:"evidence_refs"`
-	Limitations           []string                    `json:"limitations"`
-	ProfileHash           string                      `json:"profile_hash"`
-	VerdictAuthority      bool                        `json:"verdict_authority"`
-	CreatedAt             time.Time                   `json:"created_at"`
+	ProfileRef           string                      `json:"profile_ref"`
+	ProfileVersion       string                      `json:"profile_version"`
+	PlanRef              string                      `json:"plan_ref"`
+	HarnessArtifactRef   string                      `json:"harness_artifact_ref"`
+	ProgramID            string                      `json:"program_id"`
+	Network              string                      `json:"network"`
+	Engine               string                      `json:"engine"`
+	WorkerID             string                      `json:"worker_id"`
+	WorkerImageDigest    string                      `json:"worker_image_digest"`
+	RequiredTools        []string                    `json:"required_tools"`
+	ToolPins             []HarnessToolPin            `json:"tool_pins"`
+	ConfirmedInvariants  []ConfirmedHarnessInvariant `json:"confirmed_invariants"`
+	CommandPolicy        map[string]any              `json:"command_policy"`
+	MaxDurationSeconds   int                         `json:"max_duration_seconds"`
+	MaxOutputBytes       int                         `json:"max_output_bytes"`
+	ReadinessStatus      string                      `json:"readiness_status"`
+	ExecutionAllowed     bool                        `json:"execution_allowed"`
+	EvidenceRefs         []string                    `json:"evidence_refs"`
+	Limitations          []string                    `json:"limitations"`
+	ProfileHash          string                      `json:"profile_hash"`
+	VerdictAuthority     bool                        `json:"verdict_authority"`
+	CreatedAt            time.Time                   `json:"created_at"`
 }
 
 type harnessPlanExecutionSource struct {
-	PlanRef             string
-	PlanVersion         string
-	ProgramID           string
-	Network             string
-	IDLArtifactRef      string
-	SourceArtifactRef   string
-	PlanHash            string
-	InvariantTemplates  []HarnessInvariantTemplate
+	PlanRef            string
+	PlanVersion        string
+	ProgramID          string
+	Network            string
+	IDLArtifactRef     string
+	SourceArtifactRef  string
+	PlanHash           string
+	InvariantTemplates []HarnessInvariantTemplate
 }
 
 // CreateHarnessExecutionProfile evaluates and persists an immutable execution
@@ -154,9 +156,14 @@ func CreateHarnessExecutionProfile(ctx context.Context, db *sql.DB, input Harnes
 			return HarnessExecutionProfile{}, loadErr
 		}
 		toolPins = append(toolPins, HarnessToolPin{
-			AttestationRef: attestation.AttestationRef, ToolName: attestation.ToolName, VersionOutput: attestation.VersionOutput,
-			VersionHash: attestation.VersionHash, BinaryPath: attestation.BinaryPath, BinaryHash: attestation.BinaryHash,
-			WorkerImageDigest: attestation.WorkerImageDigest, ObservedAt: attestation.ObservedAt,
+			AttestationRef: attestation.AttestationRef,
+			ToolName:          attestation.ToolName,
+			VersionOutput:     attestation.VersionOutput,
+			VersionHash:       attestation.VersionHash,
+			BinaryPath:        attestation.BinaryPath,
+			BinaryHash:        attestation.BinaryHash,
+			WorkerImageDigest: attestation.WorkerImageDigest,
+			ObservedAt:        attestation.ObservedAt,
 		})
 		if !attestation.Available {
 			limitations = append(limitations, fmt.Sprintf("Required tool %s is unavailable on the selected worker.", toolName))
@@ -181,7 +188,11 @@ func CreateHarnessExecutionProfile(ctx context.Context, db *sql.DB, input Harnes
 		executionAllowed = true
 	}
 
-	evidenceRefs := []string{"harness_plan:" + plan.PlanRef, "artifact:" + plan.IDLArtifactRef, "artifact:" + harnessArtifact.ArtifactRef}
+	evidenceRefs := []string{
+		"harness_plan:" + plan.PlanRef,
+		"artifact:" + plan.IDLArtifactRef,
+		"artifact:" + harnessArtifact.ArtifactRef,
+	}
 	if plan.SourceArtifactRef != "" {
 		evidenceRefs = append(evidenceRefs, "artifact:"+plan.SourceArtifactRef)
 	}
@@ -227,10 +238,11 @@ func CreateHarnessExecutionProfile(ctx context.Context, db *sql.DB, input Harnes
 		 execution_allowed,evidence_refs,limitations,profile_hash,verdict_authority,created_by,created_at)
 		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,$13::jsonb,$14,$15,$16,$17,
 		 $18::jsonb,$19::jsonb,$20,false,'owner',$21)
-		ON CONFLICT(profile_ref) DO NOTHING`, profileRef, HarnessExecutionProfileVersion, plan.PlanRef, harnessArtifact.ArtifactRef,
-		plan.ProgramID, plan.Network, input.Engine, input.WorkerID, input.WorkerImageDigest, string(requiredToolsRaw), string(toolPinsRaw),
-		string(confirmedRaw), string(commandPolicyRaw), input.MaxDurationSeconds, input.MaxOutputBytes, status, executionAllowed,
-		string(evidenceRaw), string(limitationsRaw), profileHash, now)
+		ON CONFLICT(profile_ref) DO NOTHING`,
+		profileRef, HarnessExecutionProfileVersion, plan.PlanRef, harnessArtifact.ArtifactRef, plan.ProgramID, plan.Network,
+		input.Engine, input.WorkerID, input.WorkerImageDigest, string(requiredToolsRaw), string(toolPinsRaw), string(confirmedRaw),
+		string(commandPolicyRaw), input.MaxDurationSeconds, input.MaxOutputBytes, status, executionAllowed, string(evidenceRaw),
+		string(limitationsRaw), profileHash, now)
 	if err != nil {
 		return HarnessExecutionProfile{}, err
 	}
@@ -301,7 +313,9 @@ func ListHarnessExecutionProfiles(ctx context.Context, db *sql.DB, planRef, work
 
 // AuthorizeHarnessExecution is the mandatory future worker boundary. Phase 12A
 // exposes no execution action, but later phases must call this function with the
-// live worker identity before any command is launched.
+// live worker identity before any command is launched. It re-resolves and hashes
+// every required executable to close the gap between startup attestation and
+// execution time.
 func AuthorizeHarnessExecution(ctx context.Context, db *sql.DB, profileRef, workerID, workerImageDigest string) (HarnessExecutionProfile, error) {
 	profile, err := LoadHarnessExecutionProfile(ctx, db, profileRef)
 	if err != nil {
@@ -317,15 +331,60 @@ func AuthorizeHarnessExecution(ctx context.Context, db *sql.DB, profileRef, work
 	if workerImageDigest == "" || workerImageDigest != profile.WorkerImageDigest {
 		return HarnessExecutionProfile{}, errors.New("worker image digest does not match the execution profile")
 	}
+	if err := validateRuntimeHarnessToolPins(profile); err != nil {
+		return HarnessExecutionProfile{}, err
+	}
 	return profile, nil
+}
+
+func validateRuntimeHarnessToolPins(profile HarnessExecutionProfile) error {
+	if len(profile.RequiredTools) == 0 || len(profile.ToolPins) != len(profile.RequiredTools) {
+		return errors.New("execution profile tool pin set is incomplete")
+	}
+	pins := make(map[string]HarnessToolPin, len(profile.ToolPins))
+	for _, pin := range profile.ToolPins {
+		name := strings.TrimSpace(pin.ToolName)
+		if name == "" || pins[name].ToolName != "" {
+			return errors.New("execution profile contains an invalid or duplicate tool pin")
+		}
+		if pin.WorkerImageDigest != profile.WorkerImageDigest {
+			return fmt.Errorf("tool %s image digest does not match the execution profile", name)
+		}
+		if normalizeDefenseSHA256Digest(pin.BinaryHash) == "" || normalizeDefenseSHA256Digest(pin.VersionHash) == "" {
+			return fmt.Errorf("tool %s lacks a valid executable or version hash", name)
+		}
+		pins[name] = pin
+	}
+	for _, required := range profile.RequiredTools {
+		pin, ok := pins[required]
+		if !ok {
+			return fmt.Errorf("required tool %s is not pinned", required)
+		}
+		resolved, err := exec.LookPath(required)
+		if err != nil || strings.TrimSpace(resolved) == "" {
+			return fmt.Errorf("required tool %s cannot be resolved at execution time", required)
+		}
+		if filepath.Clean(resolved) != filepath.Clean(pin.BinaryPath) {
+			return fmt.Errorf("required tool %s resolved path changed after attestation", required)
+		}
+		currentHash, err := hashDefenseExecutable(resolved)
+		if err != nil {
+			return fmt.Errorf("required tool %s cannot be hashed at execution time", required)
+		}
+		if currentHash != pin.BinaryHash {
+			return fmt.Errorf("required tool %s executable hash changed after attestation", required)
+		}
+	}
+	return nil
 }
 
 func loadHarnessPlanExecutionSource(ctx context.Context, db *sql.DB, planRef string) (harnessPlanExecutionSource, error) {
 	var plan harnessPlanExecutionSource
 	var planRaw []byte
 	err := db.QueryRowContext(ctx, `SELECT plan_ref,plan_version,program_id,network,idl_artifact_ref,COALESCE(source_artifact_ref,''),plan_hash,plan_json
-		FROM defense_harness_plans WHERE plan_ref=$1`, strings.TrimSpace(planRef)).Scan(&plan.PlanRef, &plan.PlanVersion,
-		&plan.ProgramID, &plan.Network, &plan.IDLArtifactRef, &plan.SourceArtifactRef, &plan.PlanHash, &planRaw)
+		FROM defense_harness_plans WHERE plan_ref=$1`, strings.TrimSpace(planRef)).Scan(
+		&plan.PlanRef, &plan.PlanVersion, &plan.ProgramID, &plan.Network, &plan.IDLArtifactRef, &plan.SourceArtifactRef,
+		&plan.PlanHash, &planRaw)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return harnessPlanExecutionSource{}, errors.New("harness plan not found")
@@ -388,13 +447,13 @@ func harnessCommandPolicy(engine string) map[string]any {
 		command = "trident fuzz run"
 	}
 	return map[string]any{
-		"policy_version":          "koschei-harness-command-policy-v1",
-		"engine":                  engine,
-		"commands":                []string{command},
-		"arbitrary_commands":      false,
-		"network_access":          false,
-		"wallet_keys":             false,
-		"mainnet_rpc":             false,
+		"policy_version":           "koschei-harness-command-policy-v1",
+		"engine":                   engine,
+		"commands":                 []string{command},
+		"arbitrary_commands":       false,
+		"network_access":           false,
+		"wallet_keys":              false,
+		"mainnet_rpc":              false,
 		"mainnet_transaction_sent": false,
 	}
 }
