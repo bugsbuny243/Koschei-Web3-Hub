@@ -7,17 +7,19 @@ import (
 	"testing"
 )
 
-func TestSolanaTokenAccountSnapshotReadsMintAndAmount(t *testing.T) {
+func TestSolanaTokenAccountSnapshotReadsMintOwnerAndAmount(t *testing.T) {
 	data := make([]byte, minimumTokenAccountSize)
 	mint := bytes.Repeat([]byte{0x2a}, 32)
+	owner := bytes.Repeat([]byte{0x3b}, 32)
 	copy(data[:32], mint)
+	copy(data[32:64], owner)
 	binary.LittleEndian.PutUint64(data[64:72], 987654321)
 	info := &SolanaAccountInfo{Owner: splTokenProgramID, Data: []any{base64.StdEncoding.EncodeToString(data), "base64"}}
 	snapshot, err := SolanaTokenAccountSnapshotFromInfo(info)
 	if err != nil {
 		t.Fatalf("SolanaTokenAccountSnapshotFromInfo() error = %v", err)
 	}
-	if snapshot.Amount != 987654321 || !bytes.Equal(snapshot.Mint[:], mint) {
+	if snapshot.Amount != 987654321 || !bytes.Equal(snapshot.Mint[:], mint) || !bytes.Equal(snapshot.Owner[:], owner) {
 		t.Fatalf("snapshot=%#v", snapshot)
 	}
 	amount, err := SolanaTokenAccountRawAmount(info)
