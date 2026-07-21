@@ -26,6 +26,7 @@ func registerWatchlistRoutes(mux *http.ServeMux, h *handlers.Handler, proMetered
 
 	// Webhook management requires Enterprise eligibility but does not consume a
 	// scan unit. The scans that produce webhook events are metered separately.
+	mux.HandleFunc("/api/webhooks/security-alerts", requiresDB(h, enterprise(h.SecurityAlertWebhookSubscription)))
 	mux.HandleFunc("/api/webhooks/deliveries", requiresDB(h, enterprise(h.WebhookDeliveries)))
 	mux.HandleFunc("/api/webhooks/deliveries/", requiresDB(h, enterprise(h.WebhookDeliveryItem)))
 	mux.HandleFunc("/api/webhooks", requiresDB(h, enterprise(h.WebhookEndpoints)))

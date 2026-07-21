@@ -135,7 +135,7 @@ func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, koschTier ti
 	mux.HandleFunc("/api/v1/risk/badge", method("GET", h.SecurityRiskBadge))
 	mux.HandleFunc("/api/v1/token/extensions", requiresDB(h, koschTier("basic", method("POST", h.TokenScan))))
 	mux.HandleFunc("/api/v1/address-poisoning/check", requiresDB(h, koschTier("basic", method("POST", h.AddressPoisoningCheck))))
-	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, koschTier("basic", method("POST", h.SecurityRadarCheck))))
+	mux.HandleFunc("/api/v1/radar/check", requiresDB(h, koschTier("basic", method("POST", h.SecurityRadarCheckWithAlerts))))
 	mux.HandleFunc("/api/v1/radar/jobs", requiresDB(h, koschTier("basic", method("POST", h.CreateWeb3Job))))
 	mux.HandleFunc("/api/v1/radar/jobs/", requiresDB(h, handlers.RequireAuth(method("GET", h.GetWeb3Job))))
 	mux.HandleFunc("/api/jobs/token-scan", requiresDB(h, koschTier("basic", method("POST", h.CreateWeb3Job))))
@@ -153,7 +153,7 @@ func registerDeveloperAPIRoutes(mux *http.ServeMux, h *handlers.Handler, enterpr
 	mux.HandleFunc("/api/v1/scan/token", requiresDB(h, enterpriseMetered(method("POST", h.B2BTokenScan))))
 	mux.HandleFunc("/api/v1/usage", requiresDB(h, enterprise(method("GET", h.APIUsage))))
 	mux.HandleFunc("/api/v1/shield/preflight", requiresDB(h, enterpriseMetered(method("POST", h.ShieldPreflight))))
-	mux.HandleFunc("/api/v1/shield/transaction", requiresDB(h, enterpriseMetered(method("POST", h.ShieldPreflight))))
+	mux.HandleFunc("/api/v1/shield/transaction", requiresDB(h, enterpriseMetered(method("POST", h.TransactionGuardV2Configured))))
 	mux.HandleFunc("/api/v1/shield/address-poisoning", requiresDB(h, enterpriseMetered(method("POST", h.AddressPoisoningCheck))))
 }
 

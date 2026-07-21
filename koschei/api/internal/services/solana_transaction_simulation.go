@@ -24,7 +24,7 @@ type SolanaSimulationValue struct {
 }
 
 func SolanaSimulateTransaction(ctx context.Context, rpcURL, transaction, encoding string) (SolanaSimulationResult, error) {
-	rpcURL = strings.TrimSpace(rpcURL)
+	rpcURL = resolvedSolanaRPCURL(rpcURL)
 	transaction = strings.TrimSpace(transaction)
 	encoding = strings.ToLower(strings.TrimSpace(encoding))
 	if rpcURL == "" {
