@@ -72,8 +72,10 @@ func AttestPinnedLocalToolchain(ctx context.Context, db *sql.DB, workerID string
 		binaryPath = strings.TrimSpace(binaryPath)
 		binaryHash := ""
 		if lookErr != nil || binaryPath == "" {
+			binaryPath = ""
 			limitations = append(limitations, "Tool executable could not be resolved in the worker PATH.")
 		} else if digest, err := hashDefenseExecutable(binaryPath); err != nil {
+			binaryPath = ""
 			limitations = append(limitations, "Tool executable could not be hashed.")
 		} else {
 			binaryHash = digest
