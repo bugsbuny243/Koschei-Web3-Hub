@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25.12-alpine AS builder
 WORKDIR /app
 COPY koschei/api/go.mod koschei/api/go.sum ./
 COPY koschei/api/internal/xsync ./internal/xsync
