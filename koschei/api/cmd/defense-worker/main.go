@@ -41,13 +41,13 @@ func main() {
 		workerID = "defense-" + host
 	}
 	attestCtx, attestCancel := context.WithTimeout(context.Background(), 30*time.Second)
-	attestations, attestErr := defense.AttestLocalToolchain(attestCtx, conn, workerID)
+	attestations, attestErr := defense.AttestPinnedLocalToolchain(attestCtx, conn, workerID)
 	attestCancel()
 	if attestErr != nil {
 		log.Printf("defense worker toolchain attestation failed: %v", attestErr)
 	} else {
 		for _, item := range attestations {
-			log.Printf("defense worker toolchain tool=%s available=%t version=%q", item.ToolName, item.Available, item.VersionOutput)
+			log.Printf("defense worker toolchain tool=%s available=%t pinned=%t version=%q image=%q", item.ToolName, item.Available, item.Pinned, item.VersionOutput, item.WorkerImageDigest)
 		}
 	}
 
