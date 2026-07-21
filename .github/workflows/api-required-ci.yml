@@ -214,7 +214,20 @@ jobs:
           GOBIN="${RUNNER_TEMP}/security-bin" go install github.com/securego/gosec/v2/cmd/gosec@latest
       - name: Reachable vulnerability scan
         run: |
-          "${RUNNER_TEMP}/security-bin/govulncheck" ./...
+          set -o pipefail
+          "${RUNNER_TEMP}/security-bin/govulncheck" ./... 2>&1 | tee "${RUNNER_TEMP}/govulncheck.txt"
       - name: High-confidence static security scan
+        if: always()
         run: |
-          "${RUNNER_TEMP}/security-bin/gosec" -severity high -confidence high -exclude-generated ./...
+          set -o pipefail
+          "${RUNNER_TEMP}/security-bin/gosec" -severity high -confidence high -exclude-generated ./... 2>&1 | tee "${RUNNER_TEMP}/gosec.txt"
+      - name: Upload security scanner logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-security-scanner-logs
+          path: |
+            ${{ runner.temp }}/govulncheck.txt
+            ${{ runner.temp }}/gosec.txt
+          if-no-files-found: warn
+          retention-days: 7
