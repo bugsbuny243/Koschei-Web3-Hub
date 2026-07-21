@@ -29,6 +29,20 @@ func TestDefaultDedupeKeyIsTenantScoped(t *testing.T) {
 	}
 }
 
+func TestCustomDedupeKeyIsTenantScoped(t *testing.T) {
+	first := normalizeEvent(Event{AuthSubject: "customer-a", Source: "arvis", EventType: EventARVISVerdictCreated, Severity: "high", Title: "Risk", DedupeKey: "signed-verdict:abc"})
+	second := normalizeEvent(Event{AuthSubject: "customer-b", Source: "arvis", EventType: EventARVISVerdictCreated, Severity: "high", Title: "Risk", DedupeKey: "signed-verdict:abc"})
+	if first.DedupeKey == second.DedupeKey {
+		t.Fatal("caller-supplied alert dedupe key collided across tenants")
+	}
+	if first.DedupeKey != scopedCustomDedupeKey("customer-a", "signed-verdict:abc") {
+		t.Fatalf("unexpected tenant key: %q", first.DedupeKey)
+	}
+	if got := scopedCustomDedupeKey("", "operator-global-key"); got != "operator-global-key" {
+		t.Fatalf("unscoped operator key changed: %q", got)
+	}
+}
+
 func TestShouldQueueSystemChannelsUsesHighDefault(t *testing.T) {
 	t.Setenv("SECURITY_ALERT_MIN_SEVERITY", "")
 	if shouldQueueSystemChannels("medium") {
