@@ -202,12 +202,3 @@ func hasGuardFinding(findings []transactionFirewallFinding, code string) bool {
 	}
 	return false
 }
-
-func containsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
-}
