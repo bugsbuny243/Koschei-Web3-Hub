@@ -34,6 +34,7 @@ type SolanaSimulationAccountsValue struct {
 
 type SolanaTokenAccountSnapshot struct {
 	Mint   [32]byte
+	Owner  [32]byte
 	Amount uint64
 }
 
@@ -104,6 +105,7 @@ func SolanaTokenAccountSnapshotFromInfo(info *SolanaAccountInfo) (SolanaTokenAcc
 		return snapshot, fmt.Errorf("token account data is too short")
 	}
 	copy(snapshot.Mint[:], data[:32])
+	copy(snapshot.Owner[:], data[32:64])
 	snapshot.Amount = binary.LittleEndian.Uint64(data[64:72])
 	return snapshot, nil
 }
