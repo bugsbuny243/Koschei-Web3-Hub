@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -77,6 +79,42 @@ func TestHashDefenseExecutableUsesExactBytes(t *testing.T) {
 	expected := sha256.Sum256(content)
 	if digest != fmt.Sprintf("sha256:%x", expected) {
 		t.Fatalf("unexpected executable digest: %s", digest)
+	}
+}
+
+func TestRuntimeHarnessToolPinsRejectExecutableMutation(t *testing.T) {
+	dir := t.TempDir()
+	imageDigest := "sha256:" + strings.Repeat("a", 64)
+	profile := HarnessExecutionProfile{
+		WorkerImageDigest: imageDigest,
+		RequiredTools:     []string{"cargo", "rustc"},
+	}
+	for _, toolName := range profile.RequiredTools {
+		path := filepath.Join(dir, toolName)
+		if err := os.WriteFile(path, []byte("tool:"+toolName+":v1"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		digest, err := hashDefenseExecutable(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		profile.ToolPins = append(profile.ToolPins, HarnessToolPin{
+			ToolName:          toolName,
+			VersionHash:       hashValue(toolName + " 1.0.0"),
+			BinaryPath:        path,
+			BinaryHash:        digest,
+			WorkerImageDigest: imageDigest,
+		})
+	}
+	t.Setenv("PATH", dir)
+	if err := validateRuntimeHarnessToolPins(profile); err != nil {
+		t.Fatalf("unchanged pinned executables were rejected: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "cargo"), []byte("tool:cargo:mutated"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateRuntimeHarnessToolPins(profile); err == nil {
+		t.Fatal("mutated executable retained harness authorization")
 	}
 }
 
@@ -169,23 +207,29 @@ func insertPinnedToolchainTestAttestation(t *testing.T, ctx context.Context, db 
 	observedAt := time.Now().UTC()
 	version := toolName + " 1.0.0"
 	versionHash := hashValue(version)
-	binaryPath := "/usr/local/bin/" + toolName
-	binaryHash := hashValue([]byte("binary:" + toolName))
+	binaryPath, err := exec.LookPath(toolName)
+	if err != nil {
+		t.Fatalf("required CI tool %s is unavailable: %v", toolName, err)
+	}
+	binaryHash, err := hashDefenseExecutable(binaryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	payload := map[string]any{
-		"worker_id": workerID,
+		"worker_id":           workerID,
 		"worker_image_digest": imageDigest,
-		"tool_name": toolName,
-		"command": toolName + " --version",
-		"available": true,
-		"version_hash": versionHash,
-		"binary_path": binaryPath,
-		"binary_hash": binaryHash,
-		"observed_at": observedAt.Format(time.RFC3339Nano),
+		"tool_name":           toolName,
+		"command":             toolName + " --version",
+		"available":           true,
+		"version_hash":        versionHash,
+		"binary_path":         binaryPath,
+		"binary_hash":         binaryHash,
+		"observed_at":         observedAt.Format(time.RFC3339Nano),
 	}
 	attestationRef := prefixedID("KTA1-", payload)
 	attestationHash := hashJSON(payload)
 	limitationsRaw, _ := json.Marshal([]string{})
-	_, err := db.ExecContext(ctx, `INSERT INTO defense_toolchain_attestations
+	_, err = db.ExecContext(ctx, `INSERT INTO defense_toolchain_attestations
 		(attestation_ref,worker_id,tool_name,command,available,version_output,version_hash,evidence_status,limitations,
 		 attestation_hash,verdict_authority,observed_at,worker_image_digest,binary_path,binary_hash)
 		VALUES($1,$2,$3,$4,true,$5,$6,'observed',$7::jsonb,$8,false,$9,$10,$11,$12)`,
