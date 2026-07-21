@@ -20,12 +20,17 @@ func (h *Handler) OwnerDefenseHarness(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 		if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("view")), "toolchains") {
-			items, err := defense.ListToolchainAttestations(r.Context(), h.DB, r.URL.Query().Get("worker_id"), limit)
+			items, err := defense.ListPinnedToolchainAttestations(r.Context(), h.DB, r.URL.Query().Get("worker_id"), limit)
 			if err != nil {
 				writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "toolchain_attestation_list_failed"})
 				return
 			}
-			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "toolchains": items, "verdict_authority": false})
+			writeJSON(w, http.StatusOK, map[string]any{
+				"ok": true,
+				"toolchains": items,
+				"execution_requires_pinned_tools": true,
+				"verdict_authority": false,
+			})
 			return
 		}
 		items, err := defense.ListHarnessPlans(r.Context(), h.DB, r.URL.Query().Get("program_id"), limit)
