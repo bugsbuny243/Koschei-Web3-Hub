@@ -18,7 +18,7 @@ func (h *Handler) TransactionGuardV2Configured(w http.ResponseWriter, r *http.Re
 		})
 		return
 	}
-	h.TransactionGuardV2(w, r)
+	h.TransactionGuardV2EvidenceFirst(w, r)
 }
 
 func validateGuardOperatorBlocklist(raw string) error {
