@@ -29,9 +29,13 @@ func TestDefaultDedupeKeyIsTenantScoped(t *testing.T) {
 	}
 }
 
-func TestCustomDedupeKeyIsTenantScoped(t *testing.T) {
+func TestCustomDedupeKeyIsStableWithinTenantAndScopedAcrossTenants(t *testing.T) {
 	first := normalizeEvent(Event{AuthSubject: "customer-a", Source: "arvis", EventType: EventARVISVerdictCreated, Severity: "high", Title: "Risk", DedupeKey: "signed-verdict:abc"})
+	repeat := normalizeEvent(Event{AuthSubject: "customer-a", Source: "arvis", EventType: EventARVISVerdictCreated, Severity: "critical", Title: "Updated risk", DedupeKey: " signed-verdict:abc "})
 	second := normalizeEvent(Event{AuthSubject: "customer-b", Source: "arvis", EventType: EventARVISVerdictCreated, Severity: "high", Title: "Risk", DedupeKey: "signed-verdict:abc"})
+	if first.DedupeKey != repeat.DedupeKey {
+		t.Fatalf("same-tenant custom key was not stable: %q %q", first.DedupeKey, repeat.DedupeKey)
+	}
 	if first.DedupeKey == second.DedupeKey {
 		t.Fatal("caller-supplied alert dedupe key collided across tenants")
 	}
