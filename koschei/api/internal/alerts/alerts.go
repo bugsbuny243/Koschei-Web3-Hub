@@ -103,7 +103,7 @@ func normalizeEvent(event Event) Event {
 	if strings.TrimSpace(event.DedupeKey) == "" {
 		event.DedupeKey = defaultDedupeKey(event)
 	} else {
-		event.DedupeKey = truncate(strings.TrimSpace(event.DedupeKey), 256)
+		event.DedupeKey = scopedCustomDedupeKey(event.AuthSubject, event.DedupeKey)
 	}
 	return event
 }
@@ -112,6 +112,20 @@ func defaultDedupeKey(event Event) string {
 	material := strings.Join([]string{event.AuthSubject, event.Source, event.EventType, event.Target, event.Severity, event.Title, event.EvidenceRef}, "\n")
 	sum := sha256.Sum256([]byte(material))
 	return "alert:" + hex.EncodeToString(sum[:])
+}
+
+// scopedCustomDedupeKey prevents a caller-supplied key from colliding across
+// customer tenants. System events without an auth subject keep their explicit
+// key so operator-controlled global deduplication remains available.
+func scopedCustomDedupeKey(authSubject, key string) string {
+	key = truncate(strings.TrimSpace(key), 256)
+	authSubject = strings.TrimSpace(authSubject)
+	if authSubject == "" {
+		return key
+	}
+	material := authSubject + "\n" + key
+	sum := sha256.Sum256([]byte(material))
+	return "tenant-alert:" + hex.EncodeToString(sum[:])
 }
 
 func normalizeSeverity(value string) string {
