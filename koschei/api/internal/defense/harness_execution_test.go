@@ -2,6 +2,7 @@ package defense
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -160,16 +161,34 @@ func TestHarnessExecutionProfileStaysBlockedUntilToolchainIsPinned(t *testing.T)
 	}
 }
 
-func insertPinnedToolchainTestAttestation(t *testing.T, ctx context.Context, db interface {
-	ExecContext(context.Context, string, ...any) (interface{ RowsAffected() (int64, error) }, error)
-}, workerID, imageDigest, toolName string) {
+func insertPinnedToolchainTestAttestation(t *testing.T, ctx context.Context, db *sql.DB, workerID, imageDigest, toolName string) {
 	t.Helper()
-	// This helper uses a narrow interface for documentation only; sql.DB's
-	// concrete Result type does not satisfy nested interfaces in Go. The actual
-	// insertion is implemented below through the package test database helper.
-	_ = ctx
-	_ = db
-	_ = workerID
-	_ = imageDigest
-	_ = toolName
+	observedAt := time.Now().UTC()
+	version := toolName + " 1.0.0"
+	versionHash := hashValue(version)
+	binaryPath := "/usr/local/bin/" + toolName
+	binaryHash := hashValue([]byte("binary:" + toolName))
+	payload := map[string]any{
+		"worker_id": workerID,
+		"worker_image_digest": imageDigest,
+		"tool_name": toolName,
+		"command": toolName + " --version",
+		"available": true,
+		"version_hash": versionHash,
+		"binary_path": binaryPath,
+		"binary_hash": binaryHash,
+		"observed_at": observedAt.Format(time.RFC3339Nano),
+	}
+	attestationRef := prefixedID("KTA1-", payload)
+	attestationHash := hashJSON(payload)
+	limitationsRaw, _ := json.Marshal([]string{})
+	_, err := db.ExecContext(ctx, `INSERT INTO defense_toolchain_attestations
+		(attestation_ref,worker_id,tool_name,command,available,version_output,version_hash,evidence_status,limitations,
+		 attestation_hash,verdict_authority,observed_at,worker_image_digest,binary_path,binary_hash)
+		VALUES($1,$2,$3,$4,true,$5,$6,'observed',$7::jsonb,$8,false,$9,$10,$11,$12)`,
+		attestationRef, workerID, toolName, toolName+" --version", version, versionHash, string(limitationsRaw),
+		attestationHash, observedAt, imageDigest, binaryPath, binaryHash)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
