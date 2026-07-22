@@ -26,7 +26,10 @@ func TestBuildLiteSVMEnvironmentDoesNotInheritSecretsOrNetworkSettings(t *testin
 		{ToolName: "cargo", BinaryPath: cargo},
 		{ToolName: "rustc", BinaryPath: rustc},
 	}}
-	scratch := t.TempDir()
+	scratch, err := filepath.Abs(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	env, err := buildLiteSVMEnvironment(plan, scratch)
 	if err != nil {
 		t.Fatal(err)
