@@ -1,6 +1,6 @@
 # Koschei Solana Defense Intelligence OS — Phase 12C
 
-Status: implementation contract  
+Status: implementation in progress  
 Base: `main@28f1505e5943a65a960eb9c13cfaed95b7d6d8c5`  
 Actor contract: `ACTOR_INVESTIGATION_ENGINE.md` v1.0  
 Unified Radar ruleset: `koschei-unified-radar-rules-v1.0.0`
@@ -67,9 +67,12 @@ KOSCHEI_DEFENSE_HARNESS_EXECUTION_ENABLED=false
 KOSCHEI_DEFENSE_LITESVM_EXECUTION_ENABLED=false
 KOSCHEI_DEFENSE_WORKER_ENABLED=false
 KOSCHEI_DEFENSE_SANDBOX_ENABLED=false
+KOSCHEI_DEFENSE_NETWORK_ISOLATED=false
 ```
 
-The API may enqueue only when both execution gates are explicitly true. The worker must refuse startup or execution when its worker/sandbox gates are not true.
+The API may enqueue only when both execution gates and the existing worker-queue gate are explicitly true. The separate worker requires its worker/sandbox gates and must also require explicit no-egress deployment evidence through `KOSCHEI_DEFENSE_NETWORK_ISOLATED=true` before accepting the Phase 12C action.
+
+The flag records operator-confirmed configuration only. It is not accepted as proof of infrastructure isolation by itself, and every attempt retains that limitation.
 
 No implementation PR enables these variables in production.
 
@@ -94,7 +97,7 @@ The materialization must match the profile by:
 - Cargo manifest and lock hashes;
 - materialized bundle hash.
 
-A mismatch is persisted as a rejected attempt and no command is launched.
+A mismatch is rejected and no command is launched. Once enough immutable identity is available, a rejected launch attempt is persisted rather than being promoted into a program finding.
 
 ## Mandatory runtime authorization
 
@@ -121,20 +124,22 @@ cargo test --locked --offline
 
 The command is represented as a fixed argv vector and is never launched through a shell.
 
-The environment is an explicit allowlist. At minimum it must:
+The environment is an explicit allowlist. It:
 
-- set deterministic locale/time values;
-- remove proxy and network configuration variables;
-- point Cargo/Rust writable state only into the bounded scratch directory;
-- avoid inheriting wallet, RPC, provider and deployment secrets;
-- set `CARGO_NET_OFFLINE=true`;
-- preserve no arbitrary caller-provided variables.
+- fixes locale, timezone, terminal and source-date values;
+- removes proxy, provider, RPC, deployment and wallet variables by not inheriting the parent environment;
+- points writable Cargo/Rust/target/temp state only into the bounded scratch directory;
+- binds the persisted environment hash to the exact template, pinned tool paths and fixed settings;
+- sets `CARGO_NET_OFFLINE=true`;
+- preserves no arbitrary caller-provided variables.
 
-The persisted record contains an environment hash, not secret values.
+The persisted record contains the environment hash, not secret values.
+
+A worker image that lacks the dependencies required by the immutable lock file may fail with `dependency_unavailable_offline`. This failure is explicit evidence of unavailable offline dependencies; it never triggers a network fallback. A successful production reference run therefore requires a separately reviewed immutable dependency-cache or equivalent image-baked dependency policy before the execution gates are enabled.
 
 ## Sandbox boundary
 
-The worker execution profile must provide:
+The worker execution profile provides:
 
 - no outbound network at the deployment/container boundary;
 - immutable read-only materialized project input;
@@ -143,18 +148,18 @@ The worker execution profile must provide:
 - bounded wall time from the immutable profile;
 - bounded stdout and stderr from the immutable profile;
 - process-group termination on timeout or cancellation;
-- cleanup of scratch material after result persistence preparation.
+- cleanup of input and scratch material after result preparation.
 
-Application-level `network_access=false` is evidence of configured intent, not proof that infrastructure isolation exists. The result must state the observed/configured sandbox evidence and its limitations separately.
+Application-level `network_access=false` and `KOSCHEI_DEFENSE_NETWORK_ISOLATED=true` are evidence of configured intent, not proof that infrastructure isolation exists. The result states the configured sandbox evidence and its limitations separately.
 
 ## Immutable attempt record
 
-Add migration `081_defense_litesvm_execution_attempts.sql`.
+Migration `081_defense_litesvm_execution_attempts.sql` adds the append-only attempt store and a partial unique index preventing duplicate active jobs for one immutable request hash.
 
-Each attempt is append-only and contains at least:
+Each attempt contains at least:
 
 - attempt reference and schema version;
-- request/job reference;
+- request/job reference and attempt number;
 - profile reference and hash;
 - materialization reference and hash;
 - source and materialized artifact references and hashes;
@@ -180,27 +185,27 @@ Each attempt is append-only and contains at least:
 
 Rows are immutable through the existing Defense OS mutation-rejection trigger.
 
-The result identity must not depend on database row IDs. Repeated runs are separate immutable attempts, but identical deterministic outputs must produce the same evidence/result hash when timestamps and attempt identity are excluded from that hash payload.
+The result identity does not depend on database row IDs. Repeated runs are separate immutable attempts, but identical deterministic outputs produce the same evidence/result hash when timestamps, duration and attempt identity are excluded from the hash payload.
 
 ## Worker queue integration
 
-Do not weaken the existing `verify_bundle` worker action.
+The existing `verify_bundle` worker action remains unchanged in authority and behavior.
 
-Add a separate action:
+Phase 12C adds a separate action:
 
 ```text
 run_litesvm_harness
 ```
 
-The new action accepts only profile/materialization references. It accepts no command list, replacement files, finding reference or patch reference.
+The new action accepts only profile/materialization references. It accepts no command list, replacement files, finding reference or patch reference. The queue replaces no caller field; it binds the fixed command internally after the request passes validation.
 
-The queue request hash is deterministic over immutable input references and the fixed action. Idempotency must prevent accidental duplicate active jobs for the same profile/materialization pair while allowing a deliberate later rerun after a terminal state.
+The request hash is deterministic over immutable input references and the fixed action. A PostgreSQL partial unique index prevents accidental duplicate queued/running jobs for the same request while allowing a deliberate later rerun after a terminal state.
 
-The web/API process may enqueue and read status only. `ProcessWorkerJob` launches the command only in the separate Defense Worker process.
+The web/API process may enqueue and read status only. The only command-launch path is `ExecuteLiteSVMWorkerJob` called through the separate Defense Worker runtime.
 
 ## Owner API
 
-Add owner-only:
+Owner-only:
 
 ```text
 GET|POST /api/owner/defense/litesvm-execution
@@ -216,35 +221,58 @@ POST body:
 }
 ```
 
+The request decoder rejects unknown fields and multiple JSON values. This makes command, argument and environment injection impossible through the dedicated endpoint.
+
 GET supports bounded lookup/listing by attempt, job, profile and materialization references.
 
 The endpoint:
 
 - requires owner session and database;
-- is disabled unless both Phase 12C execution gates are true;
+- is disabled unless the Phase 12C execution gates and worker queue gate are true;
 - never executes synchronously;
 - never accepts a command or environment payload;
 - returns explicit no-mainnet/no-verdict-authority flags.
 
+## Current implementation slice
+
+Implemented on the Phase 12C draft branch:
+
+- migration 081 immutable attempt schema;
+- deterministic active-job idempotency;
+- fixed-action queue validation;
+- exact profile/materialization/artifact/file/Cargo hash preparation checks;
+- immediate live worker/tool re-authorization through the Phase 12A boundary;
+- direct pinned-Cargo argv launch in the separate worker;
+- explicit allowlisted environment;
+- read-only input and bounded scratch directories;
+- process-group cancellation/timeout handling;
+- bounded stdout/stderr and deterministic hashes;
+- immutable result persistence and repeatable result hash;
+- dedicated owner control-plane endpoint;
+- default-off web and worker gates;
+- focused fail-closed tests.
+
+The branch remains draft until the complete required test/security/build gates pass and the immutable dependency-cache policy needed for the owner-approved reference success case is settled.
+
 ## Expected file ownership
 
-Implementation should remain bounded primarily to:
+Implementation remains bounded primarily to:
 
 - `koschei/api/migrations/081_defense_litesvm_execution_attempts.sql`;
 - `koschei/api/internal/defense/litesvm_execution.go`;
-- `koschei/api/internal/defense/litesvm_execution_test.go`;
-- `koschei/api/internal/defense/worker.go` and focused tests;
-- `koschei/api/cmd/defense-worker/main.go` only for live image/gate wiring if required;
-- `koschei/api/internal/handlers/defense_litesvm_execution.go` and tests;
-- `koschei/api/internal/http/defense_os_routes.go` and route inventory tests;
-- `.env.example` and Defense OS documentation;
-- required CI path/build coverage only if not already present.
+- `koschei/api/internal/defense/litesvm_runner.go`;
+- focused Defense tests;
+- `koschei/api/internal/defense/worker.go`;
+- `koschei/api/cmd/defense-worker/main.go`;
+- `koschei/api/internal/handlers/defense_litesvm_execution.go`;
+- `koschei/api/internal/http/defense_routes.go`;
+- Defense OS environment and phase documentation.
 
-Do not refactor unrelated ARVIS, auth, entitlement, alert, Radar, transaction-guard or legacy verification paths.
+Unrelated ARVIS, auth, entitlement, alert, Radar, transaction-guard and legacy verification paths are not refactored.
 
 ## Fail-closed error taxonomy
 
-Use stable internal error/status codes for at least:
+Stable result/termination states include:
 
 - `execution_gate_disabled`;
 - `profile_blocked`;
@@ -299,6 +327,6 @@ Phase 12C is complete only after:
 - all required CI gates pass;
 - migration 081 is deployed successfully;
 - all execution gates remain off during deployment validation;
-- one owner-approved reference harness is run on the isolated worker;
-- the second run produces the same deterministic evidence/result hash for the same materialized inputs, excluding attempt identity and timestamps;
+- one owner-approved reference harness runs on the isolated worker with an immutable reviewed dependency policy;
+- the second run produces the same deterministic evidence/result hash for the same materialized inputs, excluding attempt identity, timestamps and duration;
 - no mainnet, wallet or verdict-authority boundary is weakened.
