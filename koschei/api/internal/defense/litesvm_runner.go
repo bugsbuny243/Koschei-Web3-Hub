@@ -20,6 +20,7 @@ const liteSVMSandboxPreflightTimeout = 15 * time.Second
 type LiteSVMWorkerRuntime struct {
 	WorkerID                string
 	WorkerImageDigest       string
+	WorkRoot                string
 	WorkerEnabled           bool
 	SandboxEnabled          bool
 	HarnessExecutionEnabled bool
@@ -63,6 +64,10 @@ func ExecuteLiteSVMWorkerJob(ctx context.Context, db *sql.DB, job WorkerJob, run
 	if strings.TrimSpace(runtime.WorkerID) == "" || normalizeDefenseSHA256Digest(runtime.WorkerImageDigest) == "" {
 		return LiteSVMExecutionAttempt{}, errors.New("live worker identity or image digest is unavailable")
 	}
+	workRoot, err := validateLiteSVMWorkRoot(runtime.WorkRoot)
+	if err != nil {
+		return LiteSVMExecutionAttempt{}, err
+	}
 	if job.Action != WorkerActionRunLiteSVMHarness || job.ProfileRef == "" || job.MaterializationRef == "" {
 		return LiteSVMExecutionAttempt{}, errors.New("LiteSVM worker job is incomplete")
 	}
@@ -72,20 +77,12 @@ func ExecuteLiteSVMWorkerJob(ctx context.Context, db *sql.DB, job WorkerJob, run
 	}
 
 	startedAt := time.Now().UTC()
-	inputRoot, err := filepath.Abs(os.TempDir())
-	if err != nil {
-		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
-	}
-	inputRoot, err = os.MkdirTemp(inputRoot, "koschei-litesvm-input-")
+	inputRoot, err := os.MkdirTemp(workRoot, "input-")
 	if err != nil {
 		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
 	}
 	defer removeLiteSVMTree(inputRoot)
-	scratchRoot, err := filepath.Abs(os.TempDir())
-	if err != nil {
-		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
-	}
-	scratchRoot, err = os.MkdirTemp(scratchRoot, "koschei-litesvm-scratch-")
+	scratchRoot, err := os.MkdirTemp(workRoot, "scratch-")
 	if err != nil {
 		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
 	}
@@ -227,7 +224,8 @@ func buildLiteSVMBubblewrapArgs(plan LiteSVMExecutionPlan, inputRoot, scratchRoo
 	}
 	if strings.TrimSpace(fmt.Sprint(plan.SandboxPolicy["policy_version"])) != liteSVMSandboxPolicyVersion ||
 		plan.SandboxPolicy["shell"] != false || plan.SandboxPolicy["unshare_all"] != true ||
-		plan.SandboxPolicy["clear_environment"] != true || plan.SandboxPolicy["read_only_root"] != true {
+		plan.SandboxPolicy["clear_environment"] != true || plan.SandboxPolicy["read_only_root"] != true ||
+		plan.SandboxPolicy["host_work_root_masked"] != true {
 		return nil, errors.New("Bubblewrap sandbox policy does not match Phase 12C")
 	}
 	args := []string{
@@ -240,6 +238,9 @@ func buildLiteSVMBubblewrapArgs(plan LiteSVMExecutionPlan, inputRoot, scratchRoo
 		"--tmpfs", "/tmp",
 		"--tmpfs", "/run",
 		"--tmpfs", "/var/tmp",
+		"--tmpfs", "/sys",
+		"--tmpfs", "/root",
+		"--tmpfs", "/home",
 		"--hostname", "koschei-defense",
 		"--clearenv",
 	}
@@ -250,8 +251,13 @@ func buildLiteSVMBubblewrapArgs(plan LiteSVMExecutionPlan, inputRoot, scratchRoo
 	}
 	inputRoot = filepath.Clean(inputRoot)
 	scratchRoot = filepath.Clean(scratchRoot)
-	if !filepath.IsAbs(inputRoot) || !filepath.IsAbs(scratchRoot) || inputRoot == scratchRoot {
-		return nil, errors.New("Bubblewrap input and scratch roots must be distinct absolute paths")
+	workRoot := filepath.Dir(inputRoot)
+	if !filepath.IsAbs(inputRoot) || !filepath.IsAbs(scratchRoot) || inputRoot == scratchRoot ||
+		workRoot != filepath.Dir(scratchRoot) {
+		return nil, errors.New("Bubblewrap input and scratch roots must be distinct children of one absolute work root")
+	}
+	if _, err := validateLiteSVMWorkRoot(workRoot); err != nil {
+		return nil, err
 	}
 	if err := validateLiteSVMEnvironment(plan, environment); err != nil {
 		return nil, err
@@ -261,6 +267,9 @@ func buildLiteSVMBubblewrapArgs(plan LiteSVMExecutionPlan, inputRoot, scratchRoo
 		"--dir", "/tmp/koschei-scratch",
 		"--ro-bind", inputRoot, "/tmp/koschei-workspace",
 		"--bind", scratchRoot, "/tmp/koschei-scratch",
+		// Mask the original host-side input/scratch paths after their dedicated
+		// mounts are installed so source cannot address them through the root bind.
+		"--tmpfs", workRoot,
 		"--chdir", "/tmp/koschei-workspace",
 	)
 	for _, entry := range environment {
@@ -270,6 +279,8 @@ func buildLiteSVMBubblewrapArgs(plan LiteSVMExecutionPlan, inputRoot, scratchRoo
 		}
 		args = append(args, "--setenv", key, value)
 	}
+	// Mask the launcher itself inside the sandbox to prevent nested Bubblewrap.
+	args = append(args, "--ro-bind", "/dev/null", plan.SandboxExecutablePath)
 	args = append(args, "--", plan.CargoExecutablePath, "test", "--locked", "--offline")
 	return args, nil
 }
@@ -304,11 +315,13 @@ func buildLiteSVMEnvironment(plan LiteSVMExecutionPlan, scratchRoot string) ([]s
 
 func validateLiteSVMEnvironment(plan LiteSVMExecutionPlan, environment []string) error {
 	actual := map[string]string{}
+	seen := map[string]bool{}
 	for _, entry := range environment {
 		key, value, ok := strings.Cut(entry, "=")
-		if !ok || key == "" || actual[key] != "" {
+		if !ok || key == "" || seen[key] {
 			return errors.New("LiteSVM environment contains an invalid or duplicate key")
 		}
+		seen[key] = true
 		actual[key] = value
 	}
 	if hashValue(actual) != plan.EnvironmentHash || len(actual) != len(plan.EnvironmentTemplate) {
@@ -330,6 +343,33 @@ func validateLiteSVMEnvironment(plan LiteSVMExecutionPlan, environment []string)
 		return errors.New("LiteSVM environment is not bound to the isolated scratch mount")
 	}
 	return nil
+}
+
+func validateLiteSVMWorkRoot(value string) (string, error) {
+	value = filepath.Clean(strings.TrimSpace(value))
+	if value == "" || value == "." || value == string(os.PathSeparator) || !filepath.IsAbs(value) {
+		return "", errors.New("KOSCHEI_DEFENSE_WORK_ROOT must be a dedicated absolute path")
+	}
+	for _, blocked := range []string{"/tmp", "/run", "/var/tmp", "/dev", "/proc", "/sys", "/root", "/home"} {
+		if value == blocked || strings.HasPrefix(value, blocked+string(os.PathSeparator)) {
+			return "", errors.New("KOSCHEI_DEFENSE_WORK_ROOT cannot be inside a masked or sensitive sandbox path")
+		}
+	}
+	if err := os.MkdirAll(value, 0o700); err != nil {
+		return "", err
+	}
+	info, err := os.Lstat(value)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm()&0o077 != 0 {
+		return "", errors.New("KOSCHEI_DEFENSE_WORK_ROOT must be a private non-symlink directory")
+	}
+	resolved, err := filepath.EvalSymlinks(value)
+	if err != nil || filepath.Clean(resolved) != value {
+		return "", errors.New("KOSCHEI_DEFENSE_WORK_ROOT must not traverse symlinks")
+	}
+	return value, nil
 }
 
 func persistLiteSVMRejectedProcessResult(ctx context.Context, db *sql.DB, plan LiteSVMExecutionPlan, attemptNumber int, startedAt, completedAt time.Time, exitCode int, stdout, stderr *boundedExecutionBuffer, reason string) (LiteSVMExecutionAttempt, error) {
