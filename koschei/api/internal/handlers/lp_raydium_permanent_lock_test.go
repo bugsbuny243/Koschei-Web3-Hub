@@ -10,7 +10,7 @@ import (
 	"koschei/api/internal/services"
 )
 
-func TestFinalizeRaydiumPermanentLPLockAggregatesOnlyPinnedCustody(t *testing.T) {
+func TestFinalizeRaydiumPermanentLPLockAggregatesOnlyPinnedCPMMCustody(t *testing.T) {
 	lp := services.LPControlEvidence{
 		Available: true,
 		Status: services.LPControlVerifiedBurned,
@@ -31,7 +31,7 @@ func TestFinalizeRaydiumPermanentLPLockAggregatesOnlyPinnedCustody(t *testing.T)
 	}
 
 	got := finalizeRaydiumPermanentLPLock(lp)
-	if got.Status != services.LPControlVerifiedPermanentLocked || got.ReasonCode != "raydium_burn_and_earn_permanent_lock_observed" {
+	if got.Status != services.LPControlVerifiedPermanentLocked || got.ReasonCode != "raydium_cpmm_burn_and_earn_permanent_lock_observed" {
 		t.Fatalf("permanent lock status was not verified: %#v", got)
 	}
 	if got.LockedLPAmount != 500 || got.LockedLPSharePct != 50 {
@@ -39,6 +39,9 @@ func TestFinalizeRaydiumPermanentLPLockAggregatesOnlyPinnedCustody(t *testing.T)
 	}
 	if strings.Join(got.LockedLPTokenAccounts, ",") != "LockedTokenA,LockedTokenB" {
 		t.Fatalf("locked token accounts = %v", got.LockedLPTokenAccounts)
+	}
+	if strings.Join(got.LockedLPAuthorityAccounts, ",") != "LockerPDAOne,LockerPDATwo" || got.LockerAccount != "" {
+		t.Fatalf("locked authority accounts = %v singular=%q", got.LockedLPAuthorityAccounts, got.LockerAccount)
 	}
 	if got.BurnedSharePct != 10 {
 		t.Fatalf("independent burn evidence was lost: %.4f", got.BurnedSharePct)
@@ -53,7 +56,7 @@ func TestFinalizeRaydiumPermanentLPLockAggregatesOnlyPinnedCustody(t *testing.T)
 	}
 }
 
-func TestFinalizeRaydiumPermanentLPLockRejectsLabelsWithoutPinnedProgram(t *testing.T) {
+func TestFinalizeRaydiumPermanentLPLockRejectsUnsupportedPoolModels(t *testing.T) {
 	base := services.LPControlEvidence{
 		Available: true,
 		Status: services.LPControlUnverified,
@@ -73,11 +76,31 @@ func TestFinalizeRaydiumPermanentLPLockRejectsLabelsWithoutPinnedProgram(t *test
 	}
 
 	base.LockerProgram = raydiumLPLockProgram
-	base.PoolProgram = pumpSwapProgram
 	base.LargestLPHolders[0].AccountOwner = raydiumLPLockProgram
-	got = finalizeRaydiumPermanentLPLock(base)
+	for _, unsupportedProgram := range []string{raydiumAMMV4Program, pumpSwapProgram} {
+		base.PoolProgram = unsupportedProgram
+		got = finalizeRaydiumPermanentLPLock(base)
+		if got.Status != services.LPControlUnverified || got.LockedLPSharePct != 0 {
+			t.Fatalf("unsupported pool program %s was upgraded by the CPMM lock rule: %#v", unsupportedProgram, got)
+		}
+	}
+}
+
+func TestFinalizeRaydiumPermanentLPLockWithholdsInconsistentSupply(t *testing.T) {
+	lp := services.LPControlEvidence{
+		Available: true, Status: services.LPControlUnverified, PoolProgram: raydiumCPMMProgram,
+		ControlModel: "lp_token", LPSupply: 100, LockerProgram: raydiumLPLockProgram,
+		LargestLPHolders: []services.LPHolderEvidence{{
+			TokenAccount: "LockedToken", OwnerWallet: "LockerPDA", Amount: 101,
+			AccountOwner: raydiumLPLockProgram, Classification: "raydium_burn_and_earn",
+		}},
+	}
+	got := finalizeRaydiumPermanentLPLock(lp)
 	if got.Status != services.LPControlUnverified || got.LockedLPSharePct != 0 {
-		t.Fatalf("non-Raydium pool was upgraded by the Raydium lock rule: %#v", got)
+		t.Fatalf("inconsistent holder/supply snapshots were verified: %#v", got)
+	}
+	if !containsSubstringValue(got.Limitations, "exceeded the observed LP mint supply") {
+		t.Fatalf("inconsistent supply limitation missing: %v", got.Limitations)
 	}
 }
 
@@ -146,11 +169,23 @@ func TestPopulateDecodedLPControlResolvesBurnAndEarnAuthorityProgram(t *testing.
 	if len(got.LockedLPTokenAccounts) != 1 || got.LockedLPTokenAccounts[0] != "LockedLPTokenAccount" {
 		t.Fatalf("locked token accounts = %v", got.LockedLPTokenAccounts)
 	}
+	if len(got.LockedLPAuthorityAccounts) != 1 || got.LockedLPAuthorityAccounts[0] != "RaydiumLockPDA" || got.LockerAccount != "RaydiumLockPDA" {
+		t.Fatalf("locked authority evidence = %v singular=%q", got.LockedLPAuthorityAccounts, got.LockerAccount)
+	}
 }
 
 func containsStringValue(values []string, expected string) bool {
 	for _, value := range values {
 		if value == expected {
+			return true
+		}
+	}
+	return false
+}
+
+func containsSubstringValue(values []string, expected string) bool {
+	for _, value := range values {
+		if strings.Contains(value, expected) {
 			return true
 		}
 	}
