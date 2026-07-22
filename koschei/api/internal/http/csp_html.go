@@ -27,22 +27,20 @@ const (
 )
 
 var (
-	cspScriptTagPattern = regexp.MustCompile(`(?is)<script\b[^>]*>`)
-	cspStyleTagPattern = regexp.MustCompile(`(?is)<style\b[^>]*>`)
-	cspNonceAttributePattern = regexp.MustCompile(`(?is)\bnonce\s*=`)
-	cspScriptSourcePattern = regexp.MustCompile(`(?is)\bsrc\s*=`)
+	cspNonceAttributePattern = regexp.MustCompile(`(?is)\s+nonce\s*=`)
+	cspScriptSourcePattern = regexp.MustCompile(`(?is)\s+src\s*=`)
 	cspInlineAttributePattern = regexp.MustCompile(`(?is)\s+(on[a-z0-9_-]+|style)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+))`)
 	cspJavaScriptURLPattern = regexp.MustCompile(`(?is)\b(?:href|src|action|formaction)\s*=\s*(?:"\s*javascript:|'\s*javascript:|javascript:)`)
 )
 
 type cspHTMLResponseWriter struct {
-	writer      http.ResponseWriter
-	request     *http.Request
-	status      int
-	mode        int
-	committed   bool
-	hijacked    bool
-	body        bytes.Buffer
+	writer       http.ResponseWriter
+	request      *http.Request
+	status       int
+	mode         int
+	committed    bool
+	hijacked     bool
+	body         bytes.Buffer
 	bodyTooLarge bool
 }
 
@@ -212,9 +210,6 @@ func (w *cspHTMLResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if !ok {
 		return nil, nil, errors.New("response writer does not support hijacking")
 	}
-	if err := w.switchToPassthrough(); err != nil {
-		return nil, nil, err
-	}
 	w.hijacked = true
 	return hijacker.Hijack()
 }
@@ -251,19 +246,73 @@ func secureHTMLDocument(raw []byte, nonce string) ([]byte, []string, []string, e
 		return nil, nil, nil, errors.New("javascript URL attributes are not allowed")
 	}
 	scriptAttributeHashes, styleAttributeHashes := collectInlineAttributeHashes(document)
-	document = cspScriptTagPattern.ReplaceAllStringFunc(document, func(tag string) string {
-		if cspScriptSourcePattern.MatchString(tag) || cspNonceAttributePattern.MatchString(tag) {
-			return tag
-		}
-		return addCSPNonceAttribute(tag, nonce)
-	})
-	document = cspStyleTagPattern.ReplaceAllStringFunc(document, func(tag string) string {
-		if cspNonceAttributePattern.MatchString(tag) {
-			return tag
-		}
-		return addCSPNonceAttribute(tag, nonce)
-	})
+	document = nonceHTMLTags(document, "script", true, nonce)
+	document = nonceHTMLTags(document, "style", false, nonce)
 	return []byte(document), scriptAttributeHashes, styleAttributeHashes, nil
+}
+
+func nonceHTMLTags(document, tagName string, inlineOnly bool, nonce string) string {
+	needle := "<" + strings.ToLower(tagName)
+	lower := strings.ToLower(document)
+	var output strings.Builder
+	output.Grow(len(document) + 128)
+	last := 0
+	scan := 0
+	for scan < len(document) {
+		relative := strings.Index(lower[scan:], needle)
+		if relative < 0 {
+			break
+		}
+		start := scan + relative
+		afterName := start + len(needle)
+		if afterName < len(document) && !isHTMLTagNameBoundary(document[afterName]) {
+			scan = afterName
+			continue
+		}
+		end := findHTMLTagEnd(document, afterName)
+		if end < 0 {
+			break
+		}
+		tag := document[start : end+1]
+		replacement := tag
+		if !cspNonceAttributePattern.MatchString(tag) && (!inlineOnly || !cspScriptSourcePattern.MatchString(tag)) {
+			replacement = addCSPNonceAttribute(tag, nonce)
+		}
+		output.WriteString(document[last:start])
+		output.WriteString(replacement)
+		last = end + 1
+		scan = end + 1
+	}
+	if last == 0 {
+		return document
+	}
+	output.WriteString(document[last:])
+	return output.String()
+}
+
+func isHTMLTagNameBoundary(value byte) bool {
+	return value == '>' || value == '/' || value == ' ' || value == '\t' || value == '\r' || value == '\n' || value == '\f'
+}
+
+func findHTMLTagEnd(document string, start int) int {
+	var quote byte
+	for index := start; index < len(document); index++ {
+		current := document[index]
+		if quote != 0 {
+			if current == quote {
+				quote = 0
+			}
+			continue
+		}
+		if current == '\'' || current == '"' {
+			quote = current
+			continue
+		}
+		if current == '>' {
+			return index
+		}
+	}
+	return -1
 }
 
 func addCSPNonceAttribute(tag, nonce string) string {
