@@ -55,73 +55,73 @@ type LiteSVMExecutionPlan struct {
 }
 
 type LiteSVMExecutionOutcome struct {
-	AttemptNumber    int       `json:"attempt_number"`
-	Status           string    `json:"status"`
-	StartedAt        time.Time `json:"started_at"`
-	CompletedAt      time.Time `json:"completed_at"`
-	ExitCode         *int      `json:"exit_code,omitempty"`
-	TerminationReason string   `json:"termination_reason"`
-	Stdout           string    `json:"stdout"`
-	Stderr           string    `json:"stderr"`
-	StdoutTruncated  bool      `json:"stdout_truncated"`
-	StderrTruncated  bool      `json:"stderr_truncated"`
-	SourceExecuted   bool      `json:"source_executed"`
-	HarnessExecuted  bool      `json:"harness_executed"`
-	Limitations      []string  `json:"limitations"`
+	AttemptNumber     int       `json:"attempt_number"`
+	Status            string    `json:"status"`
+	StartedAt         time.Time `json:"started_at"`
+	CompletedAt       time.Time `json:"completed_at"`
+	ExitCode          *int      `json:"exit_code,omitempty"`
+	TerminationReason string    `json:"termination_reason"`
+	Stdout            string    `json:"stdout"`
+	Stderr            string    `json:"stderr"`
+	StdoutTruncated   bool      `json:"stdout_truncated"`
+	StderrTruncated   bool      `json:"stderr_truncated"`
+	SourceExecuted    bool      `json:"source_executed"`
+	HarnessExecuted   bool      `json:"harness_executed"`
+	Limitations       []string  `json:"limitations"`
 }
 
 type LiteSVMExecutionAttempt struct {
-	AttemptRef               string                      `json:"attempt_ref"`
-	AttemptVersion           string                      `json:"attempt_version"`
-	JobRef                   string                      `json:"job_ref"`
-	AttemptNumber            int                         `json:"attempt_number"`
-	ProfileRef               string                      `json:"profile_ref"`
-	ProfileHash              string                      `json:"profile_hash"`
-	MaterializationRef       string                      `json:"materialization_ref"`
-	MaterializationHash      string                      `json:"materialization_hash"`
-	SourceHarnessArtifactRef string                      `json:"source_harness_artifact_ref"`
-	SourceHarnessArtifactHash string                     `json:"source_harness_artifact_hash"`
-	MaterializedArtifactRef  string                      `json:"materialized_artifact_ref"`
-	MaterializedArtifactHash string                      `json:"materialized_artifact_hash"`
-	ProgramID                string                      `json:"program_id"`
-	Network                  string                      `json:"network"`
-	Engine                   string                      `json:"engine"`
-	WorkerID                 string                      `json:"worker_id"`
-	WorkerImageDigest        string                      `json:"worker_image_digest"`
-	ToolAttestationRefs      []string                    `json:"tool_attestation_refs"`
-	ExecutableEvidence       []LiteSVMExecutableEvidence `json:"executable_evidence"`
-	CommandArgv              []string                    `json:"command_argv"`
-	CommandHash              string                      `json:"command_hash"`
-	EnvironmentHash          string                      `json:"environment_hash"`
-	InputHash                string                      `json:"input_hash"`
-	CargoManifestHash        string                      `json:"cargo_manifest_hash"`
-	CargoLockHash            string                      `json:"cargo_lock_hash"`
-	MaxDurationSeconds       int                         `json:"max_duration_seconds"`
-	MaxOutputBytes           int                         `json:"max_output_bytes"`
-	StartedAt                time.Time                   `json:"started_at"`
-	CompletedAt              time.Time                   `json:"completed_at"`
-	DurationMS               int64                       `json:"duration_ms"`
-	Status                   string                      `json:"status"`
-	ExitCode                 *int                        `json:"exit_code,omitempty"`
-	TerminationReason        string                      `json:"termination_reason"`
-	Stdout                   string                      `json:"stdout"`
-	Stderr                   string                      `json:"stderr"`
-	StdoutHash               string                      `json:"stdout_hash"`
-	StderrHash               string                      `json:"stderr_hash"`
-	StdoutTruncated          bool                        `json:"stdout_truncated"`
-	StderrTruncated          bool                        `json:"stderr_truncated"`
-	EvidenceRefs             []string                    `json:"evidence_refs"`
-	Limitations              []string                    `json:"limitations"`
-	NetworkAccess            bool                        `json:"network_access"`
-	DependencyResolution     bool                        `json:"dependency_resolution"`
-	WalletMaterialAccessed   bool                        `json:"wallet_material_accessed"`
-	MainnetRPCAccessed       bool                        `json:"mainnet_rpc_accessed"`
-	MainnetTransactionSent   bool                        `json:"mainnet_transaction_sent"`
-	SourceExecuted           bool                        `json:"source_executed"`
-	HarnessExecuted          bool                        `json:"harness_executed"`
-	ResultHash               string                      `json:"result_hash"`
-	VerdictAuthority         bool                        `json:"verdict_authority"`
-	CreatedAt                time.Time                   `json:"created_at"`
+	AttemptRef                string                      `json:"attempt_ref"`
+	AttemptVersion            string                      `json:"attempt_version"`
+	JobRef                    string                      `json:"job_ref"`
+	AttemptNumber             int                         `json:"attempt_number"`
+	ProfileRef                string                      `json:"profile_ref"`
+	ProfileHash               string                      `json:"profile_hash"`
+	MaterializationRef        string                      `json:"materialization_ref"`
+	MaterializationHash       string                      `json:"materialization_hash"`
+	SourceHarnessArtifactRef  string                      `json:"source_harness_artifact_ref"`
+	SourceHarnessArtifactHash string                      `json:"source_harness_artifact_hash"`
+	MaterializedArtifactRef   string                      `json:"materialized_artifact_ref"`
+	MaterializedArtifactHash  string                      `json:"materialized_artifact_hash"`
+	ProgramID                 string                      `json:"program_id"`
+	Network                   string                      `json:"network"`
+	Engine                    string                      `json:"engine"`
+	WorkerID                  string                      `json:"worker_id"`
+	WorkerImageDigest         string                      `json:"worker_image_digest"`
+	ToolAttestationRefs       []string                    `json:"tool_attestation_refs"`
+	ExecutableEvidence        []LiteSVMExecutableEvidence `json:"executable_evidence"`
+	CommandArgv               []string                    `json:"command_argv"`
+	CommandHash               string                      `json:"command_hash"`
+	EnvironmentHash           string                      `json:"environment_hash"`
+	InputHash                 string                      `json:"input_hash"`
+	CargoManifestHash         string                      `json:"cargo_manifest_hash"`
+	CargoLockHash             string                      `json:"cargo_lock_hash"`
+	MaxDurationSeconds        int                         `json:"max_duration_seconds"`
+	MaxOutputBytes            int                         `json:"max_output_bytes"`
+	StartedAt                 time.Time                   `json:"started_at"`
+	CompletedAt               time.Time                   `json:"completed_at"`
+	DurationMS                int64                       `json:"duration_ms"`
+	Status                    string                      `json:"status"`
+	ExitCode                  *int                        `json:"exit_code,omitempty"`
+	TerminationReason         string                      `json:"termination_reason"`
+	Stdout                    string                      `json:"stdout"`
+	Stderr                    string                      `json:"stderr"`
+	StdoutHash                string                      `json:"stdout_hash"`
+	StderrHash                string                      `json:"stderr_hash"`
+	StdoutTruncated           bool                        `json:"stdout_truncated"`
+	StderrTruncated           bool                        `json:"stderr_truncated"`
+	EvidenceRefs              []string                    `json:"evidence_refs"`
+	Limitations               []string                    `json:"limitations"`
+	NetworkAccess             bool                        `json:"network_access"`
+	DependencyResolution      bool                        `json:"dependency_resolution"`
+	WalletMaterialAccessed    bool                        `json:"wallet_material_accessed"`
+	MainnetRPCAccessed        bool                        `json:"mainnet_rpc_accessed"`
+	MainnetTransactionSent    bool                        `json:"mainnet_transaction_sent"`
+	SourceExecuted            bool                        `json:"source_executed"`
+	HarnessExecuted           bool                        `json:"harness_executed"`
+	ResultHash                string                      `json:"result_hash"`
+	VerdictAuthority          bool                        `json:"verdict_authority"`
+	CreatedAt                 time.Time                   `json:"created_at"`
 }
 
 // PrepareLiteSVMExecution performs the mandatory fail-closed evidence checks
@@ -181,7 +181,8 @@ func PrepareLiteSVMExecution(ctx context.Context, db *sql.DB, jobRef, profileRef
 
 	executables := make([]LiteSVMExecutableEvidence, 0, len(profile.ToolPins))
 	toolRefs := make([]string, 0, len(profile.ToolPins))
-	cargoPath, cargoHash := "", ""
+	cargoPath, cargoHash, rustcPath := "", "", ""
+	toolDirs := []string{}
 	for _, pin := range profile.ToolPins {
 		evidence := LiteSVMExecutableEvidence{
 			ToolName: strings.TrimSpace(pin.ToolName), AttestationRef: strings.TrimSpace(pin.AttestationRef),
@@ -190,25 +191,44 @@ func PrepareLiteSVMExecution(ctx context.Context, db *sql.DB, jobRef, profileRef
 		}
 		executables = append(executables, evidence)
 		toolRefs = append(toolRefs, pin.AttestationRef)
-		if evidence.ToolName == "cargo" {
+		if evidence.BinaryPath != "" {
+			pathParts := strings.Split(strings.ReplaceAll(evidence.BinaryPath, "\\", "/"), "/")
+			if len(pathParts) > 1 {
+				toolDirs = append(toolDirs, strings.Join(pathParts[:len(pathParts)-1], "/"))
+			}
+		}
+		switch evidence.ToolName {
+		case "cargo":
 			cargoPath, cargoHash = evidence.BinaryPath, evidence.BinaryHash
+		case "rustc":
+			rustcPath = evidence.BinaryPath
 		}
 	}
 	sort.Slice(executables, func(i, j int) bool { return executables[i].ToolName < executables[j].ToolName })
 	toolRefs = uniqueStrings(toolRefs)
-	if cargoPath == "" || normalizeDefenseSHA256Digest(cargoHash) == "" {
-		return LiteSVMExecutionPlan{}, errors.New("pinned Cargo executable evidence is missing")
+	toolDirs = uniqueStrings(toolDirs)
+	sort.Strings(toolDirs)
+	if cargoPath == "" || rustcPath == "" || normalizeDefenseSHA256Digest(cargoHash) == "" || len(toolDirs) == 0 {
+		return LiteSVMExecutionPlan{}, errors.New("pinned Cargo/Rust executable evidence is missing")
 	}
 	environmentTemplate := map[string]string{
 		"CARGO_HOME": "$SCRATCH/cargo-home",
 		"CARGO_NET_OFFLINE": "true",
+		"CARGO_TARGET_DIR": "$SCRATCH/target",
 		"CARGO_TERM_COLOR": "never",
+		"GIT_CONFIG_NOSYSTEM": "1",
+		"GIT_TERMINAL_PROMPT": "0",
 		"HOME": "$SCRATCH/home",
 		"KOSCHEI_DEFENSE_ISOLATED": "1",
 		"LANG": "C.UTF-8",
 		"LC_ALL": "C.UTF-8",
+		"PATH": strings.Join(toolDirs, ":"),
 		"RUST_BACKTRACE": "0",
+		"RUSTC": rustcPath,
 		"RUSTUP_HOME": "$SCRATCH/rustup-home",
+		"SOURCE_DATE_EPOCH": "0",
+		"TERM": "dumb",
+		"TMPDIR": "$SCRATCH/tmp",
 		"TZ": "UTC",
 	}
 	commandArgv := append([]string(nil), fixedLiteSVMCommandArgv...)
