@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+const liteSVMSandboxPreflightTimeout = 15 * time.Second
+
 type LiteSVMWorkerRuntime struct {
 	WorkerID                string
 	WorkerImageDigest       string
@@ -49,7 +51,8 @@ func ProcessWorkerJobWithRuntime(ctx context.Context, db *sql.DB, job WorkerJob,
 }
 
 // ExecuteLiteSVMWorkerJob is the only Phase 12C process-launch boundary. It
-// launches the pinned Cargo executable directly, never through a shell.
+// launches the pinned Bubblewrap executable directly, never Cargo or a shell.
+// Cargo runs only as the fixed final command inside a new namespace set.
 func ExecuteLiteSVMWorkerJob(ctx context.Context, db *sql.DB, job WorkerJob, runtime LiteSVMWorkerRuntime) (LiteSVMExecutionAttempt, error) {
 	if !runtime.WorkerEnabled || !runtime.SandboxEnabled || !runtime.HarnessExecutionEnabled || !runtime.LiteSVMExecutionEnabled {
 		return LiteSVMExecutionAttempt{}, errors.New("Phase 12C worker execution gates are disabled")
@@ -69,12 +72,20 @@ func ExecuteLiteSVMWorkerJob(ctx context.Context, db *sql.DB, job WorkerJob, run
 	}
 
 	startedAt := time.Now().UTC()
-	inputRoot, err := os.MkdirTemp("", "koschei-litesvm-input-")
+	inputRoot, err := filepath.Abs(os.TempDir())
+	if err != nil {
+		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
+	}
+	inputRoot, err = os.MkdirTemp(inputRoot, "koschei-litesvm-input-")
 	if err != nil {
 		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
 	}
 	defer removeLiteSVMTree(inputRoot)
-	scratchRoot, err := os.MkdirTemp("", "koschei-litesvm-scratch-")
+	scratchRoot, err := filepath.Abs(os.TempDir())
+	if err != nil {
+		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
+	}
+	scratchRoot, err = os.MkdirTemp(scratchRoot, "koschei-litesvm-scratch-")
 	if err != nil {
 		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
 	}
@@ -89,15 +100,21 @@ func ExecuteLiteSVMWorkerJob(ctx context.Context, db *sql.DB, job WorkerJob, run
 	if err != nil {
 		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
 	}
+	if err := preflightLiteSVMSandbox(ctx, plan, environment); err != nil {
+		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
+	}
+	args, err := buildLiteSVMBubblewrapArgs(plan, inputRoot, scratchRoot, environment, false)
+	if err != nil {
+		return persistLiteSVMStartRejection(ctx, db, plan, job.Attempts, startedAt, "sandbox_unavailable", err)
+	}
 
 	maxDuration := time.Duration(plan.MaxDurationSeconds) * time.Second
 	runCtx, cancel := context.WithTimeout(ctx, maxDuration)
 	defer cancel()
 	stdout := newBoundedExecutionBuffer(plan.MaxOutputBytes)
 	stderr := newBoundedExecutionBuffer(plan.MaxOutputBytes)
-	cmd := exec.Command(plan.CargoExecutablePath, "test", "--locked", "--offline")
-	cmd.Dir = inputRoot
-	cmd.Env = environment
+	cmd := exec.Command(plan.SandboxExecutablePath, args...)
+	cmd.Env = []string{}
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -113,7 +130,7 @@ func ExecuteLiteSVMWorkerJob(ctx context.Context, db *sql.DB, job WorkerJob, run
 	select {
 	case runErr = <-done:
 	case <-runCtx.Done():
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		killExecutionProcessGroup(cmd)
 		runErr = <-done
 		if errors.Is(ctx.Err(), context.Canceled) {
 			status = "cancelled"
@@ -123,17 +140,24 @@ func ExecuteLiteSVMWorkerJob(ctx context.Context, db *sql.DB, job WorkerJob, run
 			terminationReason = "execution_timeout"
 		}
 	}
+	// Bubblewrap uses --die-with-parent, but also kill the host process group after
+	// every terminal result so a broken test cannot retain detached descendants.
+	killExecutionProcessGroup(cmd)
 	completedAt := time.Now().UTC()
 	exitCode := 0
 	if cmd.ProcessState != nil {
 		exitCode = cmd.ProcessState.ExitCode()
 	}
 	if status == "completed" && runErr != nil {
+		if isBubblewrapSetupFailure(stderr.String()) {
+			return persistLiteSVMRejectedProcessResult(ctx, db, plan, job.Attempts, startedAt, completedAt, exitCode, stdout, stderr, "sandbox_unavailable")
+		}
 		status = "failed"
 		terminationReason = classifyLiteSVMProcessFailure(stdout.String(), stderr.String())
 	}
 	limitations := []string{
-		"The worker reported a configured no-egress deployment boundary; application evidence alone cannot prove infrastructure isolation.",
+		"The command ran in a Bubblewrap network/PID namespace and the worker reported a configured no-egress deployment boundary; application evidence cannot independently prove the external deployment policy.",
+		"CPU, memory and writable-storage ceilings also depend on the separately reviewed worker/container resource policy.",
 		"A single deterministic harness result does not establish exploitability, reachability, asset impact, proof-of-fix or program safety.",
 	}
 	if stdout.Truncated() || stderr.Truncated() {
@@ -160,12 +184,178 @@ func ExecuteLiteSVMWorkerJob(ctx context.Context, db *sql.DB, job WorkerJob, run
 	return attempt, nil
 }
 
+func preflightLiteSVMSandbox(ctx context.Context, plan LiteSVMExecutionPlan, environment []string) error {
+	preflightCtx, cancel := context.WithTimeout(ctx, liteSVMSandboxPreflightTimeout)
+	defer cancel()
+	args, err := buildLiteSVMBubblewrapArgs(plan, "", "", environment, true)
+	if err != nil {
+		return err
+	}
+	stdout := newBoundedExecutionBuffer(16 * 1024)
+	stderr := newBoundedExecutionBuffer(16 * 1024)
+	cmd := exec.Command(plan.SandboxExecutablePath, args...)
+	cmd.Env = []string{}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		killExecutionProcessGroup(cmd)
+		if err != nil {
+			return fmt.Errorf("bubblewrap namespace preflight failed: %s", boundedFailureText(stderr.String()))
+		}
+		return nil
+	case <-preflightCtx.Done():
+		killExecutionProcessGroup(cmd)
+		<-done
+		return errors.New("bubblewrap namespace preflight timed out")
+	}
+}
+
+func buildLiteSVMBubblewrapArgs(plan LiteSVMExecutionPlan, inputRoot, scratchRoot string, environment []string, preflight bool) ([]string, error) {
+	if strings.TrimSpace(plan.SandboxExecutablePath) == "" || !filepath.IsAbs(plan.SandboxExecutablePath) ||
+		normalizeDefenseSHA256Digest(plan.SandboxExecutableHash) == "" {
+		return nil, errors.New("pinned Bubblewrap executable evidence is unavailable")
+	}
+	if len(plan.SandboxPolicy) == 0 || plan.SandboxPolicyHash == "" || plan.SandboxPolicyHash != hashValue(plan.SandboxPolicy) {
+		return nil, errors.New("Bubblewrap sandbox policy evidence is invalid")
+	}
+	if strings.TrimSpace(fmt.Sprint(plan.SandboxPolicy["policy_version"])) != liteSVMSandboxPolicyVersion ||
+		plan.SandboxPolicy["shell"] != false || plan.SandboxPolicy["unshare_all"] != true ||
+		plan.SandboxPolicy["clear_environment"] != true || plan.SandboxPolicy["read_only_root"] != true {
+		return nil, errors.New("Bubblewrap sandbox policy does not match Phase 12C")
+	}
+	args := []string{
+		"--unshare-all",
+		"--die-with-parent",
+		"--new-session",
+		"--ro-bind", "/", "/",
+		"--proc", "/proc",
+		"--dev", "/dev",
+		"--tmpfs", "/tmp",
+		"--tmpfs", "/run",
+		"--tmpfs", "/var/tmp",
+		"--hostname", "koschei-defense",
+		"--clearenv",
+	}
+	if preflight {
+		args = append(args, "--setenv", "PATH", filepath.Dir(plan.SandboxExecutablePath))
+		args = append(args, "--", plan.SandboxExecutablePath, "--version")
+		return args, nil
+	}
+	inputRoot = filepath.Clean(inputRoot)
+	scratchRoot = filepath.Clean(scratchRoot)
+	if !filepath.IsAbs(inputRoot) || !filepath.IsAbs(scratchRoot) || inputRoot == scratchRoot {
+		return nil, errors.New("Bubblewrap input and scratch roots must be distinct absolute paths")
+	}
+	if err := validateLiteSVMEnvironment(plan, environment); err != nil {
+		return nil, err
+	}
+	args = append(args,
+		"--dir", "/tmp/koschei-workspace",
+		"--dir", "/tmp/koschei-scratch",
+		"--ro-bind", inputRoot, "/tmp/koschei-workspace",
+		"--bind", scratchRoot, "/tmp/koschei-scratch",
+		"--chdir", "/tmp/koschei-workspace",
+	)
+	for _, entry := range environment {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok || strings.TrimSpace(key) == "" {
+			return nil, errors.New("invalid LiteSVM environment entry")
+		}
+		args = append(args, "--setenv", key, value)
+	}
+	args = append(args, "--", plan.CargoExecutablePath, "test", "--locked", "--offline")
+	return args, nil
+}
+
+func buildLiteSVMEnvironment(plan LiteSVMExecutionPlan, scratchRoot string) ([]string, error) {
+	scratchRoot = filepath.Clean(scratchRoot)
+	if !filepath.IsAbs(scratchRoot) {
+		return nil, errors.New("LiteSVM scratch root must be absolute")
+	}
+	for _, relative := range []string{"home", "cargo-home", "rustup-home", "target", "tmp"} {
+		if err := os.MkdirAll(filepath.Join(scratchRoot, relative), 0o700); err != nil {
+			return nil, err
+		}
+	}
+	if len(plan.EnvironmentTemplate) == 0 || plan.EnvironmentHash == "" || plan.EnvironmentHash != hashValue(plan.EnvironmentTemplate) {
+		return nil, errors.New("LiteSVM environment template evidence is invalid")
+	}
+	keys := make([]string, 0, len(plan.EnvironmentTemplate))
+	for key := range plan.EnvironmentTemplate {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, key+"="+plan.EnvironmentTemplate[key])
+	}
+	if err := validateLiteSVMEnvironment(plan, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func validateLiteSVMEnvironment(plan LiteSVMExecutionPlan, environment []string) error {
+	actual := map[string]string{}
+	for _, entry := range environment {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok || key == "" || actual[key] != "" {
+			return errors.New("LiteSVM environment contains an invalid or duplicate key")
+		}
+		actual[key] = value
+	}
+	if hashValue(actual) != plan.EnvironmentHash || len(actual) != len(plan.EnvironmentTemplate) {
+		return errors.New("LiteSVM environment differs from the immutable template")
+	}
+	for key, value := range plan.EnvironmentTemplate {
+		if actual[key] != value {
+			return errors.New("LiteSVM environment differs from the immutable template")
+		}
+	}
+	for _, forbidden := range []string{"DATABASE_URL", "TOGETHER_API_KEY", "SOLANA_RPC_URL", "HELIUS_API_KEY", "ALCHEMY_API_KEY", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"} {
+		if _, ok := actual[forbidden]; ok {
+			return fmt.Errorf("forbidden environment key present: %s", forbidden)
+		}
+	}
+	if actual["CARGO_NET_OFFLINE"] != "true" || actual["KOSCHEI_DEFENSE_ISOLATED"] != "1" ||
+		actual["HOME"] != "/tmp/koschei-scratch/home" || actual["CARGO_HOME"] != "/tmp/koschei-scratch/cargo-home" ||
+		actual["CARGO_TARGET_DIR"] != "/tmp/koschei-scratch/target" || actual["TMPDIR"] != "/tmp/koschei-scratch/tmp" {
+		return errors.New("LiteSVM environment is not bound to the isolated scratch mount")
+	}
+	return nil
+}
+
+func persistLiteSVMRejectedProcessResult(ctx context.Context, db *sql.DB, plan LiteSVMExecutionPlan, attemptNumber int, startedAt, completedAt time.Time, exitCode int, stdout, stderr *boundedExecutionBuffer, reason string) (LiteSVMExecutionAttempt, error) {
+	return PersistLiteSVMExecutionAttempt(ctx, db, plan, LiteSVMExecutionOutcome{
+		AttemptNumber: attemptNumber,
+		Status: "rejected",
+		StartedAt: startedAt,
+		CompletedAt: completedAt,
+		ExitCode: &exitCode,
+		TerminationReason: reason,
+		Stdout: stdout.String(),
+		Stderr: stderr.String(),
+		StdoutTruncated: stdout.Truncated(),
+		StderrTruncated: stderr.Truncated(),
+		SourceExecuted: false,
+		HarnessExecuted: false,
+		Limitations: []string{"Bubblewrap failed before the fixed Cargo command could be treated as launched."},
+	})
+}
+
 func persistLiteSVMStartRejection(ctx context.Context, db *sql.DB, plan LiteSVMExecutionPlan, attemptNumber int, startedAt time.Time, reason string, cause error) (LiteSVMExecutionAttempt, error) {
 	limitations := []string{}
 	if cause != nil {
-		limitations = append(limitations, strings.TrimSpace(cause.Error()))
+		limitations = append(limitations, boundedFailureText(cause.Error()))
 	}
-	attempt, err := PersistLiteSVMExecutionAttempt(ctx, db, plan, LiteSVMExecutionOutcome{
+	return PersistLiteSVMExecutionAttempt(ctx, db, plan, LiteSVMExecutionOutcome{
 		AttemptNumber: attemptNumber,
 		Status: "rejected",
 		StartedAt: startedAt,
@@ -175,75 +365,6 @@ func persistLiteSVMStartRejection(ctx context.Context, db *sql.DB, plan LiteSVME
 		HarnessExecuted: false,
 		Limitations: limitations,
 	})
-	if err != nil {
-		return LiteSVMExecutionAttempt{}, err
-	}
-	return attempt, nil
-}
-
-func buildLiteSVMEnvironment(plan LiteSVMExecutionPlan, scratchRoot string) ([]string, error) {
-	scratchRoot = filepath.Clean(scratchRoot)
-	if !filepath.IsAbs(scratchRoot) {
-		return nil, errors.New("LiteSVM scratch root must be absolute")
-	}
-	directories := map[string]string{
-		"HOME": filepath.Join(scratchRoot, "home"),
-		"CARGO_HOME": filepath.Join(scratchRoot, "cargo-home"),
-		"RUSTUP_HOME": filepath.Join(scratchRoot, "rustup-home"),
-		"CARGO_TARGET_DIR": filepath.Join(scratchRoot, "target"),
-		"TMPDIR": filepath.Join(scratchRoot, "tmp"),
-	}
-	for _, path := range directories {
-		if err := os.MkdirAll(path, 0o700); err != nil {
-			return nil, err
-		}
-	}
-	rustcPath := ""
-	toolDirs := []string{}
-	for _, evidence := range plan.ExecutableEvidence {
-		if evidence.BinaryPath == "" || !filepath.IsAbs(evidence.BinaryPath) {
-			return nil, fmt.Errorf("pinned tool path is not absolute: %s", evidence.ToolName)
-		}
-		toolDirs = append(toolDirs, filepath.Dir(evidence.BinaryPath))
-		if evidence.ToolName == "rustc" {
-			rustcPath = evidence.BinaryPath
-		}
-	}
-	toolDirs = uniqueStrings(toolDirs)
-	sort.Strings(toolDirs)
-	if rustcPath == "" || len(toolDirs) == 0 {
-		return nil, errors.New("pinned Rust tool environment is incomplete")
-	}
-	env := map[string]string{
-		"HOME": directories["HOME"],
-		"CARGO_HOME": directories["CARGO_HOME"],
-		"RUSTUP_HOME": directories["RUSTUP_HOME"],
-		"CARGO_TARGET_DIR": directories["CARGO_TARGET_DIR"],
-		"TMPDIR": directories["TMPDIR"],
-		"PATH": strings.Join(toolDirs, string(os.PathListSeparator)),
-		"RUSTC": rustcPath,
-		"CARGO_NET_OFFLINE": "true",
-		"CARGO_TERM_COLOR": "never",
-		"GIT_CONFIG_NOSYSTEM": "1",
-		"GIT_TERMINAL_PROMPT": "0",
-		"KOSCHEI_DEFENSE_ISOLATED": "1",
-		"LANG": "C.UTF-8",
-		"LC_ALL": "C.UTF-8",
-		"RUST_BACKTRACE": "0",
-		"SOURCE_DATE_EPOCH": "0",
-		"TERM": "dumb",
-		"TZ": "UTC",
-	}
-	keys := make([]string, 0, len(env))
-	for key := range env {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	out := make([]string, 0, len(keys))
-	for _, key := range keys {
-		out = append(out, key+"="+env[key])
-	}
-	return out, nil
 }
 
 func makeLiteSVMInputReadOnly(root string) error {
@@ -273,6 +394,19 @@ func removeLiteSVMTree(root string) {
 	_ = os.RemoveAll(root)
 }
 
+func killExecutionProcessGroup(cmd *exec.Cmd) {
+	if cmd == nil || cmd.Process == nil {
+		return
+	}
+	_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+}
+
+func isBubblewrapSetupFailure(stderr string) bool {
+	value := strings.ToLower(strings.TrimSpace(stderr))
+	return strings.HasPrefix(value, "bwrap:") || strings.Contains(value, "bubblewrap") ||
+		strings.Contains(value, "creating new namespace failed") || strings.Contains(value, "operation not permitted")
+}
+
 func classifyLiteSVMProcessFailure(stdout, stderr string) string {
 	combined := strings.ToLower(stdout + "\n" + stderr)
 	patterns := []string{
@@ -288,6 +422,14 @@ func classifyLiteSVMProcessFailure(stdout, stderr string) string {
 		}
 	}
 	return "process_failed"
+}
+
+func boundedFailureText(value string) string {
+	value = strings.TrimSpace(strings.ToValidUTF8(value, "\uFFFD"))
+	if len(value) > 2000 {
+		value = value[:2000]
+	}
+	return value
 }
 
 type boundedExecutionBuffer struct {
