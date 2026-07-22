@@ -1,8 +1,11 @@
 package http
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -13,7 +16,7 @@ import (
 func TestSecurityHeadersTransformsInlineHTMLWithoutUnsafeInline(t *testing.T) {
 	handler := securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte(`<!doctype html><html><head><style>body{color:white}</style></head><body><button style="color:red" onclick="doThing()">run</button><script>window.ready=true</script><script src="https://www.googletagmanager.com/gtag/js"></script></body></html>`))
+		_, _ = w.Write([]byte(`<!doctype html><html><head><style>body{color:white}</style><style data-nonce="metadata">p{color:blue}</style></head><body><button style="color:red" onclick="doThing()">run</button><script>window.ready=true</script><script data-src="lazy">window.lazy=true</script><script src="https://www.googletagmanager.com/gtag/js"></script></body></html>`))
 	}))
 
 	recorder := httptest.NewRecorder()
@@ -43,8 +46,14 @@ func TestSecurityHeadersTransformsInlineHTMLWithoutUnsafeInline(t *testing.T) {
 	if !strings.Contains(body, `<style nonce="`+nonceMatch[1]+`">`) {
 		t.Fatalf("inline style did not receive the response nonce: %s", body)
 	}
+	if !strings.Contains(body, `<style data-nonce="metadata" nonce="`+nonceMatch[1]+`">`) {
+		t.Fatalf("data-nonce incorrectly suppressed the CSP nonce: %s", body)
+	}
 	if !strings.Contains(body, `<script nonce="`+nonceMatch[1]+`">window.ready=true</script>`) {
 		t.Fatalf("inline script did not receive the response nonce: %s", body)
+	}
+	if !strings.Contains(body, `<script data-src="lazy" nonce="`+nonceMatch[1]+`">window.lazy=true</script>`) {
+		t.Fatalf("data-src incorrectly suppressed the CSP nonce: %s", body)
 	}
 	if strings.Contains(body, `src="https://www.googletagmanager.com/gtag/js" nonce=`) {
 		t.Fatalf("allowlisted external script unexpectedly received a nonce: %s", body)
@@ -92,6 +101,20 @@ func TestSecurityHeadersFailClosedOnJavaScriptURL(t *testing.T) {
 	}
 }
 
+func TestCSPHijackDoesNotCommitHTTPResponse(t *testing.T) {
+	underlying := &cspHijackTestWriter{header: http.Header{}}
+	wrapped := newCSPHTMLResponseWriter(underlying, httptest.NewRequest(http.MethodGet, "https://tradepigloball.co/socket", nil))
+	if _, _, err := wrapped.Hijack(); !errors.Is(err, errCSPHijackTest) {
+		t.Fatalf("Hijack error = %v, want sentinel", err)
+	}
+	if underlying.writeHeaderCalls != 0 || underlying.writeCalls != 0 {
+		t.Fatalf("Hijack committed an HTTP response: headers=%d writes=%d", underlying.writeHeaderCalls, underlying.writeCalls)
+	}
+	if _, err := wrapped.Write([]byte(`{"ok":true}`)); err != nil {
+		t.Fatalf("failed hijack poisoned the response writer: %v", err)
+	}
+}
+
 func TestBuildAllowedOriginsRejectsPublicHTTP(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	origins := buildAllowedOrigins(strings.Join([]string{
@@ -136,4 +159,29 @@ func TestAllowedCORSOriginRequiresCanonicalExactOrigin(t *testing.T) {
 			t.Fatalf("non-canonical origin %q was accepted as %q", input, got)
 		}
 	}
+}
+
+var errCSPHijackTest = errors.New("hijack sentinel")
+
+type cspHijackTestWriter struct {
+	header           http.Header
+	writeHeaderCalls int
+	writeCalls       int
+}
+
+func (w *cspHijackTestWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *cspHijackTestWriter) Write(p []byte) (int, error) {
+	w.writeCalls++
+	return len(p), nil
+}
+
+func (w *cspHijackTestWriter) WriteHeader(status int) {
+	w.writeHeaderCalls++
+}
+
+func (w *cspHijackTestWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, errCSPHijackTest
 }
