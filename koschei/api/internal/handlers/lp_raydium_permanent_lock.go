@@ -48,9 +48,15 @@ func finalizeRaydiumPermanentLPLock(lp services.LPControlEvidence) services.LPCo
 		lp.Limitations = uniqueStrings(lp.Limitations)
 		return lp
 	}
+	lockedShareRaw := lockedAmount / lp.LPSupply * 100
+	if lp.BurnedSharePct+lockedShareRaw > 100.001 {
+		lp.Limitations = append(lp.Limitations, "Observed burn-address and Burn & Earn LP shares exceeded 100% of the LP mint supply; permanent lock percentage was withheld because the RPC snapshots were inconsistent.")
+		lp.Limitations = uniqueStrings(lp.Limitations)
+		return lp
+	}
 
 	lp.LockedLPAmount = creatorIntelRound(lockedAmount, 8)
-	lp.LockedLPSharePct = roundCollectorPct(lockedAmount / lp.LPSupply * 100)
+	lp.LockedLPSharePct = roundCollectorPct(lockedShareRaw)
 	if lp.LockedLPSharePct > 100 {
 		lp.LockedLPSharePct = 100
 	}
