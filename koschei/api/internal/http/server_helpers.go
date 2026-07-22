@@ -108,11 +108,14 @@ func cors(next http.Handler, origin string) http.Handler {
 }
 
 func buildAllowedOrigins(configured string) map[string]struct{} {
-	origins := map[string]struct{}{"https://tradepigloball.co": {}, "https://www.tradepigloball.co": {}, "http://tradepigloball.co": {}, "http://www.tradepigloball.co": {}}
+	origins := map[string]struct{}{
+		"https://tradepigloball.co":     {},
+		"https://www.tradepigloball.co": {},
+	}
+	allowLoopbackHTTP := !strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
 	for _, item := range strings.Split(configured, ",") {
-		item = strings.TrimSpace(item)
-		if item != "" {
-			origins[strings.TrimRight(item, "/")] = struct{}{}
+		if canonical := canonicalCORSOrigin(item, allowLoopbackHTTP); canonical != "" {
+			origins[canonical] = struct{}{}
 		}
 	}
 	return origins
