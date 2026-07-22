@@ -210,8 +210,11 @@ func (w *cspHTMLResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	if !ok {
 		return nil, nil, errors.New("response writer does not support hijacking")
 	}
-	w.hijacked = true
-	return hijacker.Hijack()
+	connection, readWriter, err := hijacker.Hijack()
+	if err == nil {
+		w.hijacked = true
+	}
+	return connection, readWriter, err
 }
 
 func (w *cspHTMLResponseWriter) Push(target string, options *http.PushOptions) error {
