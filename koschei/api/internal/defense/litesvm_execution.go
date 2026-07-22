@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -15,6 +17,7 @@ import (
 const (
 	WorkerActionRunLiteSVMHarness   = "run_litesvm_harness"
 	LiteSVMExecutionAttemptVersion = "v1.0.0"
+	liteSVMSandboxPolicyVersion     = "koschei-bwrap-litesvm-v1"
 )
 
 var fixedLiteSVMCommandArgv = []string{"cargo", "test", "--locked", "--offline"}
@@ -29,29 +32,33 @@ type LiteSVMExecutableEvidence struct {
 }
 
 type LiteSVMExecutionPlan struct {
-	JobRef                  string                      `json:"job_ref"`
-	Profile                 HarnessExecutionProfile     `json:"profile"`
-	Materialization         HarnessMaterialization      `json:"materialization"`
-	SourceHarnessArtifact   Artifact                    `json:"-"`
-	MaterializedArtifact    Artifact                    `json:"-"`
-	Bundle                  map[string]string           `json:"-"`
-	CommandArgv             []string                    `json:"command_argv"`
-	CommandHash             string                      `json:"command_hash"`
-	EnvironmentTemplate     map[string]string           `json:"environment_template"`
-	EnvironmentHash         string                      `json:"environment_hash"`
-	InputHash               string                      `json:"input_hash"`
-	ToolAttestationRefs     []string                    `json:"tool_attestation_refs"`
-	ExecutableEvidence      []LiteSVMExecutableEvidence `json:"executable_evidence"`
-	CargoExecutablePath     string                      `json:"cargo_executable_path"`
-	CargoExecutableHash     string                      `json:"cargo_executable_hash"`
-	MaxDurationSeconds      int                         `json:"max_duration_seconds"`
-	MaxOutputBytes          int                         `json:"max_output_bytes"`
-	NetworkAccess           bool                        `json:"network_access"`
-	DependencyResolution    bool                        `json:"dependency_resolution"`
-	WalletMaterialAccessed  bool                        `json:"wallet_material_accessed"`
-	MainnetRPCAccessed      bool                        `json:"mainnet_rpc_accessed"`
-	MainnetTransactionSent  bool                        `json:"mainnet_transaction_sent"`
-	VerdictAuthority        bool                        `json:"verdict_authority"`
+	JobRef                   string                      `json:"job_ref"`
+	Profile                  HarnessExecutionProfile     `json:"profile"`
+	Materialization          HarnessMaterialization      `json:"materialization"`
+	SourceHarnessArtifact    Artifact                    `json:"-"`
+	MaterializedArtifact     Artifact                    `json:"-"`
+	Bundle                   map[string]string           `json:"-"`
+	CommandArgv              []string                    `json:"command_argv"`
+	CommandHash              string                      `json:"command_hash"`
+	SandboxPolicy            map[string]any              `json:"sandbox_policy"`
+	SandboxPolicyHash        string                      `json:"sandbox_policy_hash"`
+	EnvironmentTemplate      map[string]string           `json:"environment_template"`
+	EnvironmentHash          string                      `json:"environment_hash"`
+	InputHash                string                      `json:"input_hash"`
+	ToolAttestationRefs      []string                    `json:"tool_attestation_refs"`
+	ExecutableEvidence       []LiteSVMExecutableEvidence `json:"executable_evidence"`
+	CargoExecutablePath      string                      `json:"cargo_executable_path"`
+	CargoExecutableHash      string                      `json:"cargo_executable_hash"`
+	SandboxExecutablePath    string                      `json:"sandbox_executable_path"`
+	SandboxExecutableHash    string                      `json:"sandbox_executable_hash"`
+	MaxDurationSeconds       int                         `json:"max_duration_seconds"`
+	MaxOutputBytes           int                         `json:"max_output_bytes"`
+	NetworkAccess            bool                        `json:"network_access"`
+	DependencyResolution     bool                        `json:"dependency_resolution"`
+	WalletMaterialAccessed   bool                        `json:"wallet_material_accessed"`
+	MainnetRPCAccessed       bool                        `json:"mainnet_rpc_accessed"`
+	MainnetTransactionSent   bool                        `json:"mainnet_transaction_sent"`
+	VerdictAuthority         bool                        `json:"verdict_authority"`
 }
 
 type LiteSVMExecutionOutcome struct {
@@ -92,6 +99,8 @@ type LiteSVMExecutionAttempt struct {
 	ExecutableEvidence        []LiteSVMExecutableEvidence `json:"executable_evidence"`
 	CommandArgv               []string                    `json:"command_argv"`
 	CommandHash               string                      `json:"command_hash"`
+	SandboxPolicy             map[string]any              `json:"sandbox_policy"`
+	SandboxPolicyHash         string                      `json:"sandbox_policy_hash"`
 	EnvironmentHash           string                      `json:"environment_hash"`
 	InputHash                 string                      `json:"input_hash"`
 	CargoManifestHash         string                      `json:"cargo_manifest_hash"`
@@ -125,8 +134,7 @@ type LiteSVMExecutionAttempt struct {
 }
 
 // PrepareLiteSVMExecution performs the mandatory fail-closed evidence checks
-// immediately before a future worker command launch. It does not create a
-// process and is safe to call only from the separate Defense Worker.
+// immediately before a worker command launch. It does not create a process.
 func PrepareLiteSVMExecution(ctx context.Context, db *sql.DB, jobRef, profileRef, materializationRef, workerID, workerImageDigest string) (LiteSVMExecutionPlan, error) {
 	if db == nil {
 		return LiteSVMExecutionPlan{}, errors.New("database unavailable")
@@ -179,24 +187,13 @@ func PrepareLiteSVMExecution(ctx context.Context, db *sql.DB, jobRef, profileRef
 		return LiteSVMExecutionPlan{}, err
 	}
 
-	executables := make([]LiteSVMExecutableEvidence, 0, len(profile.ToolPins))
-	toolRefs := make([]string, 0, len(profile.ToolPins))
+	executables := make([]LiteSVMExecutableEvidence, 0, len(profile.ToolPins)+1)
+	toolRefs := make([]string, 0, len(profile.ToolPins)+1)
 	cargoPath, cargoHash, rustcPath := "", "", ""
-	toolDirs := []string{}
 	for _, pin := range profile.ToolPins {
-		evidence := LiteSVMExecutableEvidence{
-			ToolName: strings.TrimSpace(pin.ToolName), AttestationRef: strings.TrimSpace(pin.AttestationRef),
-			VersionHash: pin.VersionHash, BinaryPath: pin.BinaryPath, BinaryHash: pin.BinaryHash,
-			WorkerImageDigest: pin.WorkerImageDigest,
-		}
+		evidence := executableEvidenceFromPin(pin)
 		executables = append(executables, evidence)
-		toolRefs = append(toolRefs, pin.AttestationRef)
-		if evidence.BinaryPath != "" {
-			pathParts := strings.Split(strings.ReplaceAll(evidence.BinaryPath, "\\", "/"), "/")
-			if len(pathParts) > 1 {
-				toolDirs = append(toolDirs, strings.Join(pathParts[:len(pathParts)-1], "/"))
-			}
-		}
+		toolRefs = append(toolRefs, evidence.AttestationRef)
 		switch evidence.ToolName {
 		case "cargo":
 			cargoPath, cargoHash = evidence.BinaryPath, evidence.BinaryHash
@@ -204,35 +201,51 @@ func PrepareLiteSVMExecution(ctx context.Context, db *sql.DB, jobRef, profileRef
 			rustcPath = evidence.BinaryPath
 		}
 	}
+	bwrapEvidence, err := authorizeLiveSandboxExecutable(ctx, db, workerID, workerImageDigest)
+	if err != nil {
+		return LiteSVMExecutionPlan{}, err
+	}
+	executables = append(executables, bwrapEvidence)
+	toolRefs = append(toolRefs, bwrapEvidence.AttestationRef)
 	sort.Slice(executables, func(i, j int) bool { return executables[i].ToolName < executables[j].ToolName })
 	toolRefs = uniqueStrings(toolRefs)
-	toolDirs = uniqueStrings(toolDirs)
-	sort.Strings(toolDirs)
-	if cargoPath == "" || rustcPath == "" || normalizeDefenseSHA256Digest(cargoHash) == "" || len(toolDirs) == 0 {
+	if cargoPath == "" || rustcPath == "" || normalizeDefenseSHA256Digest(cargoHash) == "" {
 		return LiteSVMExecutionPlan{}, errors.New("pinned Cargo/Rust executable evidence is missing")
 	}
+
+	toolDirs := []string{}
+	for _, evidence := range executables {
+		if evidence.BinaryPath == "" || !filepath.IsAbs(evidence.BinaryPath) {
+			return LiteSVMExecutionPlan{}, fmt.Errorf("pinned tool path is not absolute: %s", evidence.ToolName)
+		}
+		toolDirs = append(toolDirs, filepath.Dir(evidence.BinaryPath))
+	}
+	toolDirs = uniqueStrings(toolDirs)
+	sort.Strings(toolDirs)
 	environmentTemplate := map[string]string{
-		"CARGO_HOME": "$SCRATCH/cargo-home",
+		"CARGO_HOME": "/tmp/koschei-scratch/cargo-home",
 		"CARGO_NET_OFFLINE": "true",
-		"CARGO_TARGET_DIR": "$SCRATCH/target",
+		"CARGO_TARGET_DIR": "/tmp/koschei-scratch/target",
 		"CARGO_TERM_COLOR": "never",
 		"GIT_CONFIG_NOSYSTEM": "1",
 		"GIT_TERMINAL_PROMPT": "0",
-		"HOME": "$SCRATCH/home",
+		"HOME": "/tmp/koschei-scratch/home",
 		"KOSCHEI_DEFENSE_ISOLATED": "1",
 		"LANG": "C.UTF-8",
 		"LC_ALL": "C.UTF-8",
 		"PATH": strings.Join(toolDirs, ":"),
 		"RUST_BACKTRACE": "0",
 		"RUSTC": rustcPath,
-		"RUSTUP_HOME": "$SCRATCH/rustup-home",
+		"RUSTUP_HOME": "/tmp/koschei-scratch/rustup-home",
 		"SOURCE_DATE_EPOCH": "0",
 		"TERM": "dumb",
-		"TMPDIR": "$SCRATCH/tmp",
+		"TMPDIR": "/tmp/koschei-scratch/tmp",
 		"TZ": "UTC",
 	}
 	commandArgv := append([]string(nil), fixedLiteSVMCommandArgv...)
 	commandHash := hashValue(commandArgv)
+	sandboxPolicy := liteSVMBubblewrapPolicy(environmentTemplate, cargoPath, bwrapEvidence.BinaryPath)
+	sandboxPolicyHash := hashValue(sandboxPolicy)
 	environmentHash := hashValue(environmentTemplate)
 	inputHash := hashValue(map[string]any{
 		"profile_ref": profile.ProfileRef,
@@ -249,18 +262,94 @@ func PrepareLiteSVMExecution(ctx context.Context, db *sql.DB, jobRef, profileRef
 		"worker_image_digest": workerImageDigest,
 		"executable_evidence": executables,
 		"command_hash": commandHash,
+		"sandbox_policy_hash": sandboxPolicyHash,
 		"environment_hash": environmentHash,
 	})
 	return LiteSVMExecutionPlan{
 		JobRef: job.JobRef, Profile: profile, Materialization: materialization,
 		SourceHarnessArtifact: sourceArtifact, MaterializedArtifact: materializedArtifact, Bundle: bundle,
-		CommandArgv: commandArgv, CommandHash: commandHash, EnvironmentTemplate: environmentTemplate,
+		CommandArgv: commandArgv, CommandHash: commandHash, SandboxPolicy: sandboxPolicy,
+		SandboxPolicyHash: sandboxPolicyHash, EnvironmentTemplate: environmentTemplate,
 		EnvironmentHash: environmentHash, InputHash: inputHash, ToolAttestationRefs: toolRefs,
 		ExecutableEvidence: executables, CargoExecutablePath: cargoPath, CargoExecutableHash: cargoHash,
+		SandboxExecutablePath: bwrapEvidence.BinaryPath, SandboxExecutableHash: bwrapEvidence.BinaryHash,
 		MaxDurationSeconds: profile.MaxDurationSeconds, MaxOutputBytes: profile.MaxOutputBytes,
 		NetworkAccess: false, DependencyResolution: false, WalletMaterialAccessed: false,
 		MainnetRPCAccessed: false, MainnetTransactionSent: false, VerdictAuthority: false,
 	}, nil
+}
+
+func executableEvidenceFromPin(pin HarnessToolPin) LiteSVMExecutableEvidence {
+	return LiteSVMExecutableEvidence{
+		ToolName: strings.TrimSpace(pin.ToolName), AttestationRef: strings.TrimSpace(pin.AttestationRef),
+		VersionHash: pin.VersionHash, BinaryPath: pin.BinaryPath, BinaryHash: pin.BinaryHash,
+		WorkerImageDigest: pin.WorkerImageDigest,
+	}
+}
+
+func authorizeLiveSandboxExecutable(ctx context.Context, db *sql.DB, workerID, workerImageDigest string) (LiteSVMExecutableEvidence, error) {
+	attestation, err := loadLatestPinnedToolAttestation(ctx, db, workerID, "bwrap")
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return LiteSVMExecutableEvidence{}, errors.New("pinned bubblewrap attestation is unavailable")
+		}
+		return LiteSVMExecutableEvidence{}, err
+	}
+	if !attestation.Available || !attestation.Pinned || attestation.WorkerImageDigest != workerImageDigest ||
+		normalizeDefenseSHA256Digest(attestation.VersionHash) == "" || normalizeDefenseSHA256Digest(attestation.BinaryHash) == "" ||
+		strings.TrimSpace(attestation.BinaryPath) == "" {
+		return LiteSVMExecutableEvidence{}, errors.New("pinned bubblewrap evidence does not match the live worker image")
+	}
+	resolved, err := exec.LookPath("bwrap")
+	if err != nil || strings.TrimSpace(resolved) == "" {
+		return LiteSVMExecutableEvidence{}, errors.New("bubblewrap cannot be resolved at execution time")
+	}
+	if filepath.Clean(resolved) != filepath.Clean(attestation.BinaryPath) {
+		return LiteSVMExecutableEvidence{}, errors.New("bubblewrap resolved path changed after attestation")
+	}
+	currentHash, err := hashDefenseExecutable(resolved)
+	if err != nil || currentHash != attestation.BinaryHash {
+		return LiteSVMExecutableEvidence{}, errors.New("bubblewrap executable hash changed after attestation")
+	}
+	return LiteSVMExecutableEvidence{
+		ToolName: "bwrap", AttestationRef: attestation.AttestationRef, VersionHash: attestation.VersionHash,
+		BinaryPath: attestation.BinaryPath, BinaryHash: attestation.BinaryHash,
+		WorkerImageDigest: attestation.WorkerImageDigest,
+	}, nil
+}
+
+func liteSVMBubblewrapPolicy(environment map[string]string, cargoPath, bwrapPath string) map[string]any {
+	keys := make([]string, 0, len(environment))
+	for key := range environment {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	setEnv := make([]map[string]string, 0, len(keys))
+	for _, key := range keys {
+		setEnv = append(setEnv, map[string]string{"name": key, "value": environment[key]})
+	}
+	return map[string]any{
+		"policy_version": liteSVMSandboxPolicyVersion,
+		"launcher": bwrapPath,
+		"logical_command": append([]string(nil), fixedLiteSVMCommandArgv...),
+		"cargo_executable": cargoPath,
+		"unshare_all": true,
+		"new_session": true,
+		"die_with_parent": true,
+		"clear_environment": true,
+		"read_only_root": true,
+		"new_proc_mount": true,
+		"new_device_mount": true,
+		"ephemeral_tmp": true,
+		"input_mount": map[string]string{"source": "$INPUT", "destination": "/tmp/koschei-workspace", "mode": "read_only"},
+		"scratch_mount": map[string]string{"source": "$SCRATCH", "destination": "/tmp/koschei-scratch", "mode": "read_write"},
+		"working_directory": "/tmp/koschei-workspace",
+		"environment": setEnv,
+		"network_namespace": "isolated",
+		"pid_namespace": "isolated",
+		"parent_environment_inherited": false,
+		"shell": false,
+	}
 }
 
 func validateMaterializedHarnessForExecution(profile HarnessExecutionProfile, materialization HarnessMaterialization, sourceArtifact, materializedArtifact Artifact) (map[string]string, error) {
@@ -357,13 +446,14 @@ func policyBoolFalse(policy map[string]any, key string) bool {
 }
 
 // PersistLiteSVMExecutionAttempt stores one append-only Phase 12C result. The
-// deterministic result hash excludes attempt identity and timestamps so a
-// repeated run over identical evidence can be compared directly.
+// deterministic result hash excludes attempt identity and timestamps.
 func PersistLiteSVMExecutionAttempt(ctx context.Context, db *sql.DB, plan LiteSVMExecutionPlan, outcome LiteSVMExecutionOutcome) (LiteSVMExecutionAttempt, error) {
 	if db == nil {
 		return LiteSVMExecutionAttempt{}, errors.New("database unavailable")
 	}
-	if plan.JobRef == "" || plan.Profile.ProfileRef == "" || plan.Materialization.MaterializationRef == "" || plan.MaterializedArtifact.ArtifactRef == "" {
+	if plan.JobRef == "" || plan.Profile.ProfileRef == "" || plan.Materialization.MaterializationRef == "" ||
+		plan.MaterializedArtifact.ArtifactRef == "" || len(plan.SandboxPolicy) == 0 ||
+		plan.SandboxPolicyHash == "" || plan.SandboxPolicyHash != hashValue(plan.SandboxPolicy) {
 		return LiteSVMExecutionAttempt{}, errors.New("LiteSVM execution plan is incomplete")
 	}
 	outcome.Status = strings.ToLower(strings.TrimSpace(outcome.Status))
@@ -409,6 +499,7 @@ func PersistLiteSVMExecutionAttempt(ctx context.Context, db *sql.DB, plan LiteSV
 		"harness_materialization:" + plan.Materialization.MaterializationRef,
 		"artifact:" + plan.SourceHarnessArtifact.ArtifactRef,
 		"artifact:" + plan.MaterializedArtifact.ArtifactRef,
+		"sandbox_policy:" + plan.SandboxPolicyHash,
 	}, prefixedEvidenceRefs("toolchain_attestation:", plan.ToolAttestationRefs)...))
 	resultPayload := map[string]any{
 		"schema_version": "koschei-litesvm-execution-result-v1",
@@ -420,6 +511,7 @@ func PersistLiteSVMExecutionAttempt(ctx context.Context, db *sql.DB, plan LiteSV
 		"worker_image_digest": plan.Profile.WorkerImageDigest,
 		"executable_evidence": plan.ExecutableEvidence,
 		"command_hash": plan.CommandHash,
+		"sandbox_policy_hash": plan.SandboxPolicyHash,
 		"environment_hash": plan.EnvironmentHash,
 		"input_hash": plan.InputHash,
 		"status": outcome.Status,
@@ -450,6 +542,7 @@ func PersistLiteSVMExecutionAttempt(ctx context.Context, db *sql.DB, plan LiteSV
 	toolRefsRaw, _ := json.Marshal(plan.ToolAttestationRefs)
 	executablesRaw, _ := json.Marshal(plan.ExecutableEvidence)
 	argvRaw, _ := json.Marshal(plan.CommandArgv)
+	sandboxRaw, _ := json.Marshal(plan.SandboxPolicy)
 	evidenceRaw, _ := json.Marshal(evidenceRefs)
 	limitationsRaw, _ := json.Marshal(limitations)
 	var exitCode any
@@ -460,24 +553,25 @@ func PersistLiteSVMExecutionAttempt(ctx context.Context, db *sql.DB, plan LiteSV
 		(attempt_ref,attempt_version,job_ref,attempt_number,profile_ref,profile_hash,materialization_ref,materialization_hash,
 		 source_harness_artifact_ref,source_harness_artifact_hash,materialized_artifact_ref,materialized_artifact_hash,
 		 program_id,network,engine,worker_id,worker_image_digest,tool_attestation_refs,executable_evidence,command_argv,
-		 command_hash,environment_hash,input_hash,cargo_manifest_hash,cargo_lock_hash,max_duration_seconds,max_output_bytes,
-		 started_at,completed_at,duration_ms,status,exit_code,termination_reason,stdout_text,stderr_text,stdout_hash,stderr_hash,
-		 stdout_truncated,stderr_truncated,evidence_refs,limitations,network_access,dependency_resolution,wallet_material_accessed,
-		 mainnet_rpc_accessed,mainnet_transaction_sent,source_executed,harness_executed,result_hash,verdict_authority,created_by)
+		 command_hash,sandbox_policy,sandbox_policy_hash,environment_hash,input_hash,cargo_manifest_hash,cargo_lock_hash,
+		 max_duration_seconds,max_output_bytes,started_at,completed_at,duration_ms,status,exit_code,termination_reason,
+		 stdout_text,stderr_text,stdout_hash,stderr_hash,stdout_truncated,stderr_truncated,evidence_refs,limitations,
+		 network_access,dependency_resolution,wallet_material_accessed,mainnet_rpc_accessed,mainnet_transaction_sent,
+		 source_executed,harness_executed,result_hash,verdict_authority,created_by)
 		VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'litesvm',$15,$16,$17::jsonb,$18::jsonb,$19::jsonb,
-		 $20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39::jsonb,$40::jsonb,
-		 false,false,false,false,false,$41,$42,$43,false,'defense-worker')
+		 $20,$21::jsonb,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40::jsonb,$41::jsonb,
+		 false,false,false,false,false,$42,$43,$44,false,'defense-worker')
 		ON CONFLICT(attempt_ref) DO NOTHING`,
 		attemptRef, LiteSVMExecutionAttemptVersion, plan.JobRef, outcome.AttemptNumber, plan.Profile.ProfileRef,
 		plan.Profile.ProfileHash, plan.Materialization.MaterializationRef, plan.Materialization.MaterializationHash,
 		plan.SourceHarnessArtifact.ArtifactRef, plan.SourceHarnessArtifact.ContentHash, plan.MaterializedArtifact.ArtifactRef,
 		plan.MaterializedArtifact.ContentHash, plan.Profile.ProgramID, plan.Profile.Network, plan.Profile.WorkerID,
 		plan.Profile.WorkerImageDigest, string(toolRefsRaw), string(executablesRaw), string(argvRaw), plan.CommandHash,
-		plan.EnvironmentHash, plan.InputHash, plan.Materialization.CargoManifestHash, plan.Materialization.CargoLockHash,
-		plan.MaxDurationSeconds, plan.MaxOutputBytes, outcome.StartedAt, outcome.CompletedAt, durationMS, outcome.Status,
-		exitCode, outcome.TerminationReason, stdout, stderr, stdoutHash, stderrHash, outcome.StdoutTruncated,
-		outcome.StderrTruncated, string(evidenceRaw), string(limitationsRaw), outcome.SourceExecuted,
-		outcome.HarnessExecuted, resultHash)
+		string(sandboxRaw), plan.SandboxPolicyHash, plan.EnvironmentHash, plan.InputHash, plan.Materialization.CargoManifestHash,
+		plan.Materialization.CargoLockHash, plan.MaxDurationSeconds, plan.MaxOutputBytes, outcome.StartedAt,
+		outcome.CompletedAt, durationMS, outcome.Status, exitCode, outcome.TerminationReason, stdout, stderr, stdoutHash,
+		stderrHash, outcome.StdoutTruncated, outcome.StderrTruncated, string(evidenceRaw), string(limitationsRaw),
+		outcome.SourceExecuted, outcome.HarnessExecuted, resultHash)
 	if err != nil {
 		return LiteSVMExecutionAttempt{}, err
 	}
@@ -489,27 +583,29 @@ func LoadLiteSVMExecutionAttempt(ctx context.Context, db *sql.DB, attemptRef str
 		return LiteSVMExecutionAttempt{}, errors.New("database unavailable")
 	}
 	var item LiteSVMExecutionAttempt
-	var toolRefsRaw, executablesRaw, argvRaw, evidenceRaw, limitationsRaw []byte
+	var toolRefsRaw, executablesRaw, argvRaw, sandboxRaw, evidenceRaw, limitationsRaw []byte
 	var exitCode sql.NullInt64
 	err := db.QueryRowContext(ctx, `SELECT attempt_ref,attempt_version,job_ref,attempt_number,profile_ref,profile_hash,
 		materialization_ref,materialization_hash,source_harness_artifact_ref,source_harness_artifact_hash,
 		materialized_artifact_ref,materialized_artifact_hash,program_id,network,engine,worker_id,worker_image_digest,
-		tool_attestation_refs,executable_evidence,command_argv,command_hash,environment_hash,input_hash,cargo_manifest_hash,
-		cargo_lock_hash,max_duration_seconds,max_output_bytes,started_at,completed_at,duration_ms,status,exit_code,
-		termination_reason,stdout_text,stderr_text,stdout_hash,stderr_hash,stdout_truncated,stderr_truncated,evidence_refs,
-		limitations,network_access,dependency_resolution,wallet_material_accessed,mainnet_rpc_accessed,
-		mainnet_transaction_sent,source_executed,harness_executed,result_hash,verdict_authority,created_at
+		tool_attestation_refs,executable_evidence,command_argv,command_hash,sandbox_policy,sandbox_policy_hash,
+		environment_hash,input_hash,cargo_manifest_hash,cargo_lock_hash,max_duration_seconds,max_output_bytes,
+		started_at,completed_at,duration_ms,status,exit_code,termination_reason,stdout_text,stderr_text,stdout_hash,
+		stderr_hash,stdout_truncated,stderr_truncated,evidence_refs,limitations,network_access,dependency_resolution,
+		wallet_material_accessed,mainnet_rpc_accessed,mainnet_transaction_sent,source_executed,harness_executed,
+		result_hash,verdict_authority,created_at
 		FROM defense_litesvm_execution_attempts WHERE attempt_ref=$1`, strings.TrimSpace(attemptRef)).Scan(
 		&item.AttemptRef, &item.AttemptVersion, &item.JobRef, &item.AttemptNumber, &item.ProfileRef, &item.ProfileHash,
 		&item.MaterializationRef, &item.MaterializationHash, &item.SourceHarnessArtifactRef, &item.SourceHarnessArtifactHash,
 		&item.MaterializedArtifactRef, &item.MaterializedArtifactHash, &item.ProgramID, &item.Network, &item.Engine,
 		&item.WorkerID, &item.WorkerImageDigest, &toolRefsRaw, &executablesRaw, &argvRaw, &item.CommandHash,
-		&item.EnvironmentHash, &item.InputHash, &item.CargoManifestHash, &item.CargoLockHash, &item.MaxDurationSeconds,
-		&item.MaxOutputBytes, &item.StartedAt, &item.CompletedAt, &item.DurationMS, &item.Status, &exitCode,
-		&item.TerminationReason, &item.Stdout, &item.Stderr, &item.StdoutHash, &item.StderrHash, &item.StdoutTruncated,
-		&item.StderrTruncated, &evidenceRaw, &limitationsRaw, &item.NetworkAccess, &item.DependencyResolution,
-		&item.WalletMaterialAccessed, &item.MainnetRPCAccessed, &item.MainnetTransactionSent, &item.SourceExecuted,
-		&item.HarnessExecuted, &item.ResultHash, &item.VerdictAuthority, &item.CreatedAt)
+		&sandboxRaw, &item.SandboxPolicyHash, &item.EnvironmentHash, &item.InputHash, &item.CargoManifestHash,
+		&item.CargoLockHash, &item.MaxDurationSeconds, &item.MaxOutputBytes, &item.StartedAt, &item.CompletedAt,
+		&item.DurationMS, &item.Status, &exitCode, &item.TerminationReason, &item.Stdout, &item.Stderr,
+		&item.StdoutHash, &item.StderrHash, &item.StdoutTruncated, &item.StderrTruncated, &evidenceRaw,
+		&limitationsRaw, &item.NetworkAccess, &item.DependencyResolution, &item.WalletMaterialAccessed,
+		&item.MainnetRPCAccessed, &item.MainnetTransactionSent, &item.SourceExecuted, &item.HarnessExecuted,
+		&item.ResultHash, &item.VerdictAuthority, &item.CreatedAt)
 	if err != nil {
 		return LiteSVMExecutionAttempt{}, err
 	}
@@ -520,6 +616,7 @@ func LoadLiteSVMExecutionAttempt(ctx context.Context, db *sql.DB, attemptRef str
 	_ = json.Unmarshal(toolRefsRaw, &item.ToolAttestationRefs)
 	_ = json.Unmarshal(executablesRaw, &item.ExecutableEvidence)
 	_ = json.Unmarshal(argvRaw, &item.CommandArgv)
+	_ = json.Unmarshal(sandboxRaw, &item.SandboxPolicy)
 	_ = json.Unmarshal(evidenceRaw, &item.EvidenceRefs)
 	_ = json.Unmarshal(limitationsRaw, &item.Limitations)
 	return item, nil
