@@ -115,7 +115,7 @@ func ExecuteLiteSVMWorkerJob(ctx context.Context, db *sql.DB, job WorkerJob, run
 	case <-runCtx.Done():
 		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		runErr = <-done
-		if errors.Is(ctx.Err(), context.Canceled) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if errors.Is(ctx.Err(), context.Canceled) {
 			status = "cancelled"
 			terminationReason = "execution_cancelled"
 		} else {
