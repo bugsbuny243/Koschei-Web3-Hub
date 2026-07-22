@@ -147,7 +147,8 @@ The worker execution profile provides:
 - path validation preventing escape from both roots;
 - bounded wall time from the immutable profile;
 - bounded stdout and stderr from the immutable profile;
-- process-group termination on timeout or cancellation;
+- process-group termination on profile timeout, parent deadline or cancellation;
+- profile/parent deadline is persisted as `timed_out`, while explicit parent cancellation is persisted as `cancelled`;
 - cleanup of input and scratch material after result preparation.
 
 Application-level `network_access=false` and `KOSCHEI_DEFENSE_NETWORK_ISOLATED=true` are evidence of configured intent, not proof that infrastructure isolation exists. The result states the configured sandbox evidence and its limitations separately.
