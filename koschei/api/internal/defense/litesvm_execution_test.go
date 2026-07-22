@@ -3,6 +3,9 @@ package defense
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -64,6 +67,7 @@ func TestPrepareLiteSVMExecutionReauthorizesExactEvidence(t *testing.T) {
 	defer cancel()
 
 	profile := createMaterializationTestProfile(t, ctx, db, validLiteSVMCargoManifest(), validLiteSVMCargoLock(), "#[test]\nfn invariant() { assert!(true); }\n")
+	bwrapPath := installPinnedBwrapTestAttestation(t, ctx, db, profile.WorkerID, profile.WorkerImageDigest)
 	materialization, err := CreateHarnessMaterialization(ctx, db, HarnessMaterializationInput{ProfileRef: profile.ProfileRef})
 	if err != nil {
 		t.Fatal(err)
@@ -83,17 +87,28 @@ func TestPrepareLiteSVMExecutionReauthorizesExactEvidence(t *testing.T) {
 	if strings.Join(plan.CommandArgv, " ") != "cargo test --locked --offline" || plan.CommandHash == "" || plan.EnvironmentHash == "" || plan.InputHash == "" {
 		t.Fatalf("prepared command evidence is incomplete: %+v", plan)
 	}
-	if plan.CargoExecutablePath == "" || plan.CargoExecutableHash == "" || len(plan.ExecutableEvidence) != 2 || len(plan.Bundle) != materialization.FileCount {
+	if plan.CargoExecutablePath == "" || plan.CargoExecutableHash == "" || plan.SandboxExecutablePath != bwrapPath ||
+		plan.SandboxExecutableHash == "" || plan.SandboxPolicyHash == "" || len(plan.ExecutableEvidence) != 3 ||
+		len(plan.Bundle) != materialization.FileCount {
 		t.Fatalf("prepared executable/materialization evidence is incomplete: %+v", plan)
 	}
-	if plan.EnvironmentTemplate["CARGO_NET_OFFLINE"] != "true" || plan.EnvironmentTemplate["CARGO_TARGET_DIR"] != "$SCRATCH/target" || plan.EnvironmentTemplate["RUSTC"] == "" {
-		t.Fatalf("prepared environment template is incomplete: %+v", plan.EnvironmentTemplate)
+	if plan.EnvironmentTemplate["CARGO_NET_OFFLINE"] != "true" ||
+		plan.EnvironmentTemplate["CARGO_TARGET_DIR"] != "/tmp/koschei-scratch/target" ||
+		plan.EnvironmentTemplate["RUSTC"] == "" || plan.SandboxPolicy["unshare_all"] != true ||
+		plan.SandboxPolicy["shell"] != false {
+		t.Fatalf("prepared sandbox/environment policy is incomplete: env=%+v sandbox=%+v", plan.EnvironmentTemplate, plan.SandboxPolicy)
 	}
 	if plan.NetworkAccess || plan.DependencyResolution || plan.WalletMaterialAccessed || plan.MainnetRPCAccessed || plan.MainnetTransactionSent || plan.VerdictAuthority {
 		t.Fatalf("prepared plan crossed a Phase 12C boundary: %+v", plan)
 	}
 	if _, err := PrepareLiteSVMExecution(ctx, db, job.JobRef, profile.ProfileRef, materialization.MaterializationRef, profile.WorkerID, "sha256:"+strings.Repeat("f", 64)); err == nil {
 		t.Fatal("mismatched live worker image was authorized")
+	}
+	if err := os.WriteFile(bwrapPath, []byte("#!/bin/sh\necho mutated\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := PrepareLiteSVMExecution(ctx, db, job.JobRef, profile.ProfileRef, materialization.MaterializationRef, profile.WorkerID, profile.WorkerImageDigest); err == nil || !strings.Contains(strings.ToLower(err.Error()), "bubblewrap executable hash changed") {
+		t.Fatalf("mutated sandbox launcher was authorized: %v", err)
 	}
 }
 
@@ -104,6 +119,7 @@ func TestLiteSVMExecutionAttemptIsImmutableAndResultHashIsRepeatable(t *testing.
 	defer cancel()
 
 	profile := createMaterializationTestProfile(t, ctx, db, validLiteSVMCargoManifest(), validLiteSVMCargoLock(), "#[test]\nfn invariant() { assert!(true); }\n")
+	installPinnedBwrapTestAttestation(t, ctx, db, profile.WorkerID, profile.WorkerImageDigest)
 	materialization, err := CreateHarnessMaterialization(ctx, db, HarnessMaterializationInput{ProfileRef: profile.ProfileRef})
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +142,9 @@ func TestLiteSVMExecutionAttemptIsImmutableAndResultHashIsRepeatable(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.AttemptRef == "" || first.ResultHash == "" || first.NetworkAccess || first.DependencyResolution || first.WalletMaterialAccessed || first.MainnetRPCAccessed || first.MainnetTransactionSent || first.VerdictAuthority {
+	if first.AttemptRef == "" || first.ResultHash == "" || first.SandboxPolicyHash == "" ||
+		first.NetworkAccess || first.DependencyResolution || first.WalletMaterialAccessed || first.MainnetRPCAccessed ||
+		first.MainnetTransactionSent || first.VerdictAuthority {
 		t.Fatalf("persisted attempt crossed an execution boundary: %+v", first)
 	}
 	if _, err := db.ExecContext(ctx, `UPDATE defense_litesvm_execution_attempts SET status='failed' WHERE attempt_ref=$1`, first.AttemptRef); err == nil {
@@ -169,6 +187,47 @@ func TestBoundLiteSVMOutputIsUTF8SafeAndDeterministic(t *testing.T) {
 	if !truncated || !secondTruncated || first != second || !strings.HasPrefix(input, first) || len(first) > 16 {
 		t.Fatalf("unexpected bounded output: first=%q second=%q", first, second)
 	}
+}
+
+func installPinnedBwrapTestAttestation(t *testing.T, ctx context.Context, db *sql.DB, workerID, imageDigest string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bwrap")
+	content := []byte("#!/bin/sh\necho 'bubblewrap 1.0.0'\n")
+	if err := os.WriteFile(path, content, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	binaryHash, err := hashDefenseExecutable(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observedAt := time.Now().UTC()
+	version := "bubblewrap 1.0.0"
+	versionHash := hashValue(version)
+	payload := map[string]any{
+		"worker_id": workerID,
+		"worker_image_digest": imageDigest,
+		"tool_name": "bwrap",
+		"command": "bwrap --version",
+		"available": true,
+		"version_hash": versionHash,
+		"binary_path": path,
+		"binary_hash": binaryHash,
+		"observed_at": observedAt.Format(time.RFC3339Nano),
+	}
+	attestationRef := prefixedID("KTA1-", payload)
+	limitationsRaw, _ := json.Marshal([]string{})
+	_, err = db.ExecContext(ctx, `INSERT INTO defense_toolchain_attestations
+		(attestation_ref,worker_id,tool_name,command,available,version_output,version_hash,evidence_status,limitations,
+		 attestation_hash,verdict_authority,observed_at,worker_image_digest,binary_path,binary_hash)
+		VALUES($1,$2,'bwrap','bwrap --version',true,$3,$4,'observed',$5::jsonb,$6,false,$7,$8,$9,$10)`,
+		attestationRef, workerID, version, versionHash, string(limitationsRaw), hashJSON(payload), observedAt,
+		imageDigest, path, binaryHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func finishLiteSVMTestJob(db *sql.DB, jobRef string) {
