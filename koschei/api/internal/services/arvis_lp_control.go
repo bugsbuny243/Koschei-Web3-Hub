@@ -111,6 +111,9 @@ func lpControlPoolArm(req SecurityRadarRequest, lp LPControlEvidence, generatedA
 		"dominant_lp_share_pct":          lp.DominantLPSharePct,
 		"dominant_lp_classification":     lp.DominantLPClassification,
 		"creator_relation":               lp.CreatorRelation,
+		"locked_lp_amount":               lp.LockedLPAmount,
+		"locked_lp_share_pct":            lp.LockedLPSharePct,
+		"locked_lp_token_accounts":       append([]string{}, lp.LockedLPTokenAccounts...),
 		"pool_liquidity_raw":             lp.PoolLiquidityRaw,
 		"permanent_locked_liquidity_raw": lp.PermanentLockedLiquidityRaw,
 		"permanent_locked_share_pct":     lp.PermanentLockedSharePct,
@@ -135,6 +138,9 @@ func lpControlPoolArm(req SecurityRadarRequest, lp LPControlEvidence, generatedA
 	if lp.ControlModel == "lp_token" {
 		evidence = append(evidence, fmt.Sprintf("LP mint %s supply %.8f; burn-address share %.4f%%; creator-observed share %.4f%%.", lp.LPMint, lp.LPSupply, lp.BurnedSharePct, lp.CreatorLPSharePct))
 		evidence = append(evidence, fmt.Sprintf("Dominant resolved LP owner %s controls %.4f%% via token account %s (%s); creator relation %s.", lp.DominantLPOwner, lp.DominantLPSharePct, lp.DominantLPTokenAccount, lp.DominantLPClassification, lp.CreatorRelation))
+		if lp.LockedLPSharePct > 0 {
+			evidence = append(evidence, fmt.Sprintf("Pinned Raydium Burn & Earn custody was resolved for %.8f LP tokens (%.4f%% of observed mint supply) across %d LP token accounts; locker authority %s, program %s.", lp.LockedLPAmount, lp.LockedLPSharePct, len(lp.LockedLPTokenAccounts), lp.LockerAccount, lp.LockerProgram))
+		}
 	}
 	if lp.ControlModel == "position_nft" {
 		evidence = append(evidence, fmt.Sprintf("Position model %s; pool liquidity raw %s; permanent locked liquidity raw %s (%.4f%%).", lp.PositionModel, lp.PoolLiquidityRaw, lp.PermanentLockedLiquidityRaw, lp.PermanentLockedSharePct))
