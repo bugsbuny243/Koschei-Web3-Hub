@@ -53,6 +53,7 @@ type LPControlEvidence struct {
 	LockedLPAmount              float64                     `json:"locked_lp_amount,omitempty"`
 	LockedLPSharePct            float64                     `json:"locked_lp_share_pct,omitempty"`
 	LockedLPTokenAccounts       []string                    `json:"locked_lp_token_accounts"`
+	LockedLPAuthorityAccounts   []string                    `json:"locked_lp_authority_accounts"`
 	CreatorLPSharePct           float64                     `json:"creator_lp_share_pct,omitempty"`
 	PoolLiquidityRaw            string                      `json:"pool_liquidity_raw,omitempty"`
 	PermanentLockedLiquidityRaw string                      `json:"permanent_locked_liquidity_raw,omitempty"`
