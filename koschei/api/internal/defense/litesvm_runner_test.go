@@ -13,19 +13,7 @@ func TestBuildLiteSVMEnvironmentDoesNotInheritSecretsOrNetworkSettings(t *testin
 	t.Setenv("TOGETHER_API_KEY", "secret")
 	t.Setenv("SOLANA_RPC_URL", "https://rpc.invalid")
 	t.Setenv("HTTPS_PROXY", "https://proxy.invalid")
-	toolDir := t.TempDir()
-	cargo := filepath.Join(toolDir, "cargo")
-	rustc := filepath.Join(toolDir, "rustc")
-	if err := os.WriteFile(cargo, []byte("cargo"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(rustc, []byte("rustc"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	plan := LiteSVMExecutionPlan{ExecutableEvidence: []LiteSVMExecutableEvidence{
-		{ToolName: "cargo", BinaryPath: cargo},
-		{ToolName: "rustc", BinaryPath: rustc},
-	}}
+	plan := testLiteSVMSandboxPlan(t)
 	scratch, err := filepath.Abs(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -35,12 +23,20 @@ func TestBuildLiteSVMEnvironmentDoesNotInheritSecretsOrNetworkSettings(t *testin
 		t.Fatal(err)
 	}
 	joined := "\n" + strings.Join(env, "\n") + "\n"
-	for _, forbidden := range []string{"TOGETHER_API_KEY=", "SOLANA_RPC_URL=", "HTTPS_PROXY=", "HTTP_PROXY=", "ALL_PROXY="} {
+	for _, forbidden := range []string{"TOGETHER_API_KEY=", "SOLANA_RPC_URL=", "HTTPS_PROXY=", "HTTP_PROXY=", "ALL_PROXY=", "DATABASE_URL="} {
 		if strings.Contains(joined, "\n"+forbidden) {
 			t.Fatalf("isolated environment inherited forbidden variable %s: %v", forbidden, env)
 		}
 	}
-	for _, required := range []string{"CARGO_NET_OFFLINE=true", "KOSCHEI_DEFENSE_ISOLATED=1", "TZ=UTC", "SOURCE_DATE_EPOCH=0", "RUSTC=" + rustc} {
+	for _, required := range []string{
+		"CARGO_NET_OFFLINE=true",
+		"KOSCHEI_DEFENSE_ISOLATED=1",
+		"TZ=UTC",
+		"SOURCE_DATE_EPOCH=0",
+		"RUSTC=" + plan.EnvironmentTemplate["RUSTC"],
+		"HOME=/tmp/koschei-scratch/home",
+		"CARGO_TARGET_DIR=/tmp/koschei-scratch/target",
+	} {
 		if !strings.Contains(joined, "\n"+required+"\n") {
 			t.Fatalf("isolated environment is missing %s: %v", required, env)
 		}
@@ -50,6 +46,60 @@ func TestBuildLiteSVMEnvironmentDoesNotInheritSecretsOrNetworkSettings(t *testin
 		if err != nil || !info.IsDir() {
 			t.Fatalf("bounded scratch directory %s was not created: %v", dir, err)
 		}
+	}
+}
+
+func TestBuildLiteSVMBubblewrapArgsUsesNamespacesAndNoShell(t *testing.T) {
+	plan := testLiteSVMSandboxPlan(t)
+	input := t.TempDir()
+	scratch := t.TempDir()
+	env, err := buildLiteSVMEnvironment(plan, scratch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args, err := buildLiteSVMBubblewrapArgs(plan, input, scratch, env, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := " " + strings.Join(args, " ") + " "
+	for _, required := range []string{
+		" --unshare-all ",
+		" --die-with-parent ",
+		" --new-session ",
+		" --ro-bind / / ",
+		" --proc /proc ",
+		" --dev /dev ",
+		" --tmpfs /tmp ",
+		" --clearenv ",
+		" --ro-bind " + input + " /tmp/koschei-workspace ",
+		" --bind " + scratch + " /tmp/koschei-scratch ",
+		" --chdir /tmp/koschei-workspace ",
+		" -- " + plan.CargoExecutablePath + " test --locked --offline ",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("Bubblewrap argv is missing %q: %v", required, args)
+		}
+	}
+	for _, forbidden := range []string{" sh ", " bash ", " -c ", " curl ", " wget "} {
+		if strings.Contains(joined, forbidden) {
+			t.Fatalf("Bubblewrap argv contains forbidden shell/network token %q: %v", forbidden, args)
+		}
+	}
+	if args[len(args)-4] != plan.CargoExecutablePath || strings.Join(args[len(args)-3:], " ") != "test --locked --offline" {
+		t.Fatalf("fixed final command moved or changed: %v", args)
+	}
+}
+
+func TestBubblewrapPreflightContainsNoSourceMount(t *testing.T) {
+	plan := testLiteSVMSandboxPlan(t)
+	args, err := buildLiteSVMBubblewrapArgs(plan, "", "", nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(args, " ")
+	if strings.Contains(joined, "koschei-workspace") || strings.Contains(joined, "koschei-scratch") ||
+		!strings.Contains(joined, "--unshare-all") || !strings.HasSuffix(joined, plan.SandboxExecutablePath+" --version") {
+		t.Fatalf("sandbox preflight crossed the source boundary: %v", args)
 	}
 }
 
@@ -65,9 +115,9 @@ func TestProcessWorkerJobWithRuntimeFailsClosedBeforeLiteSVMPreparation(t *testi
 		NetworkIsolated: true,
 	}
 	cases := []struct {
-		name string
+		name   string
 		mutate func(*LiteSVMWorkerRuntime)
-		want string
+		want   string
 	}{
 		{name: "worker disabled", mutate: func(v *LiteSVMWorkerRuntime) { v.WorkerEnabled = false }, want: "gates are disabled"},
 		{name: "sandbox disabled", mutate: func(v *LiteSVMWorkerRuntime) { v.SandboxEnabled = false }, want: "gates are disabled"},
@@ -103,6 +153,9 @@ func TestLiteSVMFailureClassificationIsConservative(t *testing.T) {
 	if got := classifyLiteSVMProcessFailure("test failed", "assertion failed"); got != "process_failed" {
 		t.Fatalf("program/test failure was misclassified: %s", got)
 	}
+	if !isBubblewrapSetupFailure("bwrap: Creating new namespace failed: Operation not permitted") {
+		t.Fatal("Bubblewrap setup failure was not recognized as a pre-source rejection")
+	}
 }
 
 func TestBoundedExecutionBufferConsumesFullWritesAndCapsStoredBytes(t *testing.T) {
@@ -114,5 +167,49 @@ func TestBoundedExecutionBufferConsumesFullWritesAndCapsStoredBytes(t *testing.T
 	}
 	if !buffer.Truncated() || len(buffer.String()) != 16*1024 {
 		t.Fatalf("bounded writer did not cap output: stored=%d truncated=%t", len(buffer.String()), buffer.Truncated())
+	}
+}
+
+func testLiteSVMSandboxPlan(t *testing.T) LiteSVMExecutionPlan {
+	t.Helper()
+	toolDir := t.TempDir()
+	cargo := filepath.Join(toolDir, "cargo")
+	rustc := filepath.Join(toolDir, "rustc")
+	bwrap := filepath.Join(toolDir, "bwrap")
+	for path, content := range map[string]string{cargo: "cargo", rustc: "rustc", bwrap: "bwrap"} {
+		if err := os.WriteFile(path, []byte(content), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	environment := map[string]string{
+		"CARGO_HOME": "/tmp/koschei-scratch/cargo-home",
+		"CARGO_NET_OFFLINE": "true",
+		"CARGO_TARGET_DIR": "/tmp/koschei-scratch/target",
+		"CARGO_TERM_COLOR": "never",
+		"GIT_CONFIG_NOSYSTEM": "1",
+		"GIT_TERMINAL_PROMPT": "0",
+		"HOME": "/tmp/koschei-scratch/home",
+		"KOSCHEI_DEFENSE_ISOLATED": "1",
+		"LANG": "C.UTF-8",
+		"LC_ALL": "C.UTF-8",
+		"PATH": toolDir,
+		"RUST_BACKTRACE": "0",
+		"RUSTC": rustc,
+		"RUSTUP_HOME": "/tmp/koschei-scratch/rustup-home",
+		"SOURCE_DATE_EPOCH": "0",
+		"TERM": "dumb",
+		"TMPDIR": "/tmp/koschei-scratch/tmp",
+		"TZ": "UTC",
+	}
+	policy := liteSVMBubblewrapPolicy(environment, cargo, bwrap)
+	return LiteSVMExecutionPlan{
+		CargoExecutablePath: cargo,
+		CargoExecutableHash: "sha256:" + strings.Repeat("a", 64),
+		SandboxExecutablePath: bwrap,
+		SandboxExecutableHash: "sha256:" + strings.Repeat("b", 64),
+		EnvironmentTemplate: environment,
+		EnvironmentHash: hashValue(environment),
+		SandboxPolicy: policy,
+		SandboxPolicyHash: hashValue(policy),
 	}
 }
