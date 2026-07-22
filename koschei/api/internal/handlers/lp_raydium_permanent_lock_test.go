@@ -105,9 +105,8 @@ func TestFinalizeRaydiumPermanentLPLockWithholdsInconsistentSupply(t *testing.T)
 }
 
 func TestPopulateDecodedLPControlResolvesBurnAndEarnAuthorityProgram(t *testing.T) {
-	multipleAccountCalls := 0
 	balanceCalls := 0
-	rpc := func(_ context.Context, _ string, method string, _ any, out any) error {
+	rpc := func(_ context.Context, _ string, method string, params any, out any) error {
 		switch method {
 		case "getTokenAccountBalance":
 			balanceCalls++
@@ -130,17 +129,28 @@ func TestPopulateDecodedLPControlResolvesBurnAndEarnAuthorityProgram(t *testing.
 				{Address: "OrdinaryLPTokenAccount", rpcTokenAmount: rpcTokenAmount{UIAmountString: "100"}},
 			}
 		case "getMultipleAccounts":
-			multipleAccountCalls++
+			arguments, ok := params.([]any)
+			if !ok || len(arguments) == 0 {
+				return errors.New("getMultipleAccounts params missing")
+			}
+			addresses, ok := arguments[0].([]string)
+			if !ok {
+				return errors.New("getMultipleAccounts addresses malformed")
+			}
 			response := out.(*struct{ Value []json.RawMessage `json:"value"` })
-			if multipleAccountCalls == 1 {
-				response.Value = []json.RawMessage{
-					json.RawMessage(`{"data":{"parsed":{"info":{"owner":"RaydiumLockPDA"}}}}`),
-					json.RawMessage(`{"data":{"parsed":{"info":{"owner":"OrdinaryWallet"}}}}`),
-				}
-			} else {
-				response.Value = []json.RawMessage{
-					json.RawMessage(`{"owner":"` + raydiumLPLockProgram + `"}`),
-					json.RawMessage(`{"owner":"11111111111111111111111111111111"}`),
+			response.Value = make([]json.RawMessage, 0, len(addresses))
+			for _, address := range addresses {
+				switch address {
+				case "LockedLPTokenAccount":
+					response.Value = append(response.Value, json.RawMessage(`{"data":{"parsed":{"info":{"owner":"RaydiumLockPDA"}}}}`))
+				case "OrdinaryLPTokenAccount":
+					response.Value = append(response.Value, json.RawMessage(`{"data":{"parsed":{"info":{"owner":"OrdinaryWallet"}}}}`))
+				case "RaydiumLockPDA":
+					response.Value = append(response.Value, json.RawMessage(`{"owner":"`+raydiumLPLockProgram+`"}`))
+				case "OrdinaryWallet":
+					response.Value = append(response.Value, json.RawMessage(`{"owner":"11111111111111111111111111111111"}`))
+				default:
+					response.Value = append(response.Value, json.RawMessage(`null`))
 				}
 			}
 		default:
