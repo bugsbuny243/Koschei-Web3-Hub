@@ -2,6 +2,7 @@ package defense
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +34,7 @@ func TestLiteSVMWorkerRequestRejectsInjectionAndDeduplicatesActiveJobs(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer finishLiteSVMTestJob(db, first.JobRef)
 	second, err := EnqueueWorkerJob(ctx, db, WorkerJobRequest{
 		Action: WorkerActionRunLiteSVMHarness, ProfileRef: profile.ProfileRef,
 		MaterializationRef: materialization.MaterializationRef,
@@ -73,6 +75,7 @@ func TestPrepareLiteSVMExecutionReauthorizesExactEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer finishLiteSVMTestJob(db, job.JobRef)
 	plan, err := PrepareLiteSVMExecution(ctx, db, job.JobRef, profile.ProfileRef, materialization.MaterializationRef, profile.WorkerID, profile.WorkerImageDigest)
 	if err != nil {
 		t.Fatal(err)
@@ -82,6 +85,9 @@ func TestPrepareLiteSVMExecutionReauthorizesExactEvidence(t *testing.T) {
 	}
 	if plan.CargoExecutablePath == "" || plan.CargoExecutableHash == "" || len(plan.ExecutableEvidence) != 2 || len(plan.Bundle) != materialization.FileCount {
 		t.Fatalf("prepared executable/materialization evidence is incomplete: %+v", plan)
+	}
+	if plan.EnvironmentTemplate["CARGO_NET_OFFLINE"] != "true" || plan.EnvironmentTemplate["CARGO_TARGET_DIR"] != "$SCRATCH/target" || plan.EnvironmentTemplate["RUSTC"] == "" {
+		t.Fatalf("prepared environment template is incomplete: %+v", plan.EnvironmentTemplate)
 	}
 	if plan.NetworkAccess || plan.DependencyResolution || plan.WalletMaterialAccessed || plan.MainnetRPCAccessed || plan.MainnetTransactionSent || plan.VerdictAuthority {
 		t.Fatalf("prepared plan crossed a Phase 12C boundary: %+v", plan)
@@ -134,6 +140,7 @@ func TestLiteSVMExecutionAttemptIsImmutableAndResultHashIsRepeatable(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer finishLiteSVMTestJob(db, secondJob.JobRef)
 	if secondJob.JobRef == firstJob.JobRef {
 		t.Fatal("terminal execution did not permit a deliberate later rerun")
 	}
@@ -162,4 +169,11 @@ func TestBoundLiteSVMOutputIsUTF8SafeAndDeterministic(t *testing.T) {
 	if !truncated || !secondTruncated || first != second || !strings.HasPrefix(input, first) || len(first) > 16 {
 		t.Fatalf("unexpected bounded output: first=%q second=%q", first, second)
 	}
+}
+
+func finishLiteSVMTestJob(db *sql.DB, jobRef string) {
+	if db == nil || strings.TrimSpace(jobRef) == "" {
+		return
+	}
+	_, _ = db.Exec(`UPDATE defense_worker_jobs SET status='completed',completed_at=COALESCE(completed_at,now()),lease_expires_at=NULL,updated_at=now() WHERE job_ref=$1 AND status IN ('queued','running')`, jobRef)
 }
