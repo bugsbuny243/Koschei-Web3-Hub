@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"koschei/api/internal/services"
@@ -14,10 +15,7 @@ const unresolvedLockerLimitation = "A known locker-program-owned account was obs
 // is intentionally excluded because Burn & Earn does not support that pool
 // model; Raydium CLMM requires separate position-NFT evidence.
 func finalizeRaydiumPermanentLPLock(lp services.LPControlEvidence) services.LPControlEvidence {
-	if lp.ControlModel != "lp_token" || lp.PoolProgram != raydiumCPMMProgram {
-		return lp
-	}
-	if strings.TrimSpace(lp.LockerProgram) != raydiumLPLockProgram || lp.LPSupply <= 0 {
+	if lp.ControlModel != "lp_token" || lp.PoolProgram != raydiumCPMMProgram || lp.LPSupply <= 0 {
 		return lp
 	}
 
@@ -43,7 +41,9 @@ func finalizeRaydiumPermanentLPLock(lp services.LPControlEvidence) services.LPCo
 	if lockedAmount <= 0 || len(lockedAccounts) == 0 || len(lockerOwners) == 0 {
 		return lp
 	}
-	if lockedAmount > lp.LPSupply+1e-8 {
+
+	supplyTolerance := math.Max(1e-8, math.Abs(lp.LPSupply)*1e-9)
+	if lockedAmount-lp.LPSupply > supplyTolerance {
 		lp.Limitations = append(lp.Limitations, "Resolved Burn & Earn LP balances exceeded the observed LP mint supply; permanent lock percentage was withheld because the RPC snapshots were inconsistent.")
 		lp.Limitations = uniqueStrings(lp.Limitations)
 		return lp
@@ -51,8 +51,12 @@ func finalizeRaydiumPermanentLPLock(lp services.LPControlEvidence) services.LPCo
 
 	lp.LockedLPAmount = creatorIntelRound(lockedAmount, 8)
 	lp.LockedLPSharePct = roundCollectorPct(lockedAmount / lp.LPSupply * 100)
+	if lp.LockedLPSharePct > 100 {
+		lp.LockedLPSharePct = 100
+	}
 	lp.LockedLPTokenAccounts = lockedAccounts
 	lp.LockedLPAuthorityAccounts = lockerOwners
+	lp.LockerProgram = raydiumLPLockProgram
 	if len(lockerOwners) == 1 {
 		lp.LockerAccount = lockerOwners[0]
 	} else {
