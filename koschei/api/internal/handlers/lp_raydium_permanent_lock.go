@@ -9,12 +9,12 @@ import (
 
 const unresolvedLockerLimitation = "A known locker-program-owned account was observed, but an unlock timestamp was not decoded; lock duration remains unverified."
 
-// finalizeRaydiumPermanentLPLock upgrades only direct fungible-LP custody
-// evidence for the pinned Raydium Burn & Earn program. It does not treat a
-// market label, an arbitrary locker name or a transaction signer as current
-// permanent custody.
+// finalizeRaydiumPermanentLPLock upgrades only direct CPMM fungible-LP
+// custody evidence for the pinned Raydium Burn & Earn program. Raydium AMM v4
+// is intentionally excluded because Burn & Earn does not support that pool
+// model; Raydium CLMM requires separate position-NFT evidence.
 func finalizeRaydiumPermanentLPLock(lp services.LPControlEvidence) services.LPControlEvidence {
-	if lp.ControlModel != "lp_token" || (lp.PoolProgram != raydiumCPMMProgram && lp.PoolProgram != raydiumAMMV4Program) {
+	if lp.ControlModel != "lp_token" || lp.PoolProgram != raydiumCPMMProgram {
 		return lp
 	}
 	if strings.TrimSpace(lp.LockerProgram) != raydiumLPLockProgram || lp.LPSupply <= 0 {
@@ -40,30 +40,35 @@ func finalizeRaydiumPermanentLPLock(lp services.LPControlEvidence) services.LPCo
 	}
 	lockedAccounts = uniqueStrings(lockedAccounts)
 	lockerOwners = uniqueStrings(lockerOwners)
-	if lockedAmount <= 0 || len(lockedAccounts) == 0 {
+	if lockedAmount <= 0 || len(lockedAccounts) == 0 || len(lockerOwners) == 0 {
+		return lp
+	}
+	if lockedAmount > lp.LPSupply+1e-8 {
+		lp.Limitations = append(lp.Limitations, "Resolved Burn & Earn LP balances exceeded the observed LP mint supply; permanent lock percentage was withheld because the RPC snapshots were inconsistent.")
+		lp.Limitations = uniqueStrings(lp.Limitations)
 		return lp
 	}
 
 	lp.LockedLPAmount = creatorIntelRound(lockedAmount, 8)
 	lp.LockedLPSharePct = roundCollectorPct(lockedAmount / lp.LPSupply * 100)
-	if lp.LockedLPSharePct > 100 {
-		lp.LockedLPSharePct = 100
-	}
 	lp.LockedLPTokenAccounts = lockedAccounts
+	lp.LockedLPAuthorityAccounts = lockerOwners
 	if len(lockerOwners) == 1 {
 		lp.LockerAccount = lockerOwners[0]
+	} else {
+		lp.LockerAccount = ""
 	}
 	lp.Available = true
 	lp.Status = services.LPControlVerifiedPermanentLocked
-	lp.ReasonCode = "raydium_burn_and_earn_permanent_lock_observed"
+	lp.ReasonCode = "raydium_cpmm_burn_and_earn_permanent_lock_observed"
 	lp.EvidenceKeys = append(lp.EvidenceKeys,
 		fmt.Sprintf("raydium_burn_and_earn_program:%s", raydiumLPLockProgram),
-		fmt.Sprintf("raydium_permanent_locked_lp_share:%.4f@%d", lp.LockedLPSharePct, lp.ReadSlot),
+		fmt.Sprintf("raydium_cpmm_permanent_locked_lp_share:%.4f@%d", lp.LockedLPSharePct, lp.ReadSlot),
 	)
 	lp.EvidenceKeys = uniqueStrings(lp.EvidenceKeys)
 	lp.Limitations = removeLPControlLimitation(lp.Limitations, unresolvedLockerLimitation)
 	lp.Limitations = append(lp.Limitations,
-		"Permanent lock status is limited to the resolved LP token accounts whose authority account is owned by the pinned Raydium Burn & Earn program; unenumerated LP accounts are not inferred.",
+		"Permanent lock status is limited to resolved CPMM LP token accounts whose authority account is owned by the pinned Raydium Burn & Earn program; unenumerated LP accounts are not inferred.",
 	)
 	lp.Limitations = uniqueStrings(lp.Limitations)
 	return lp
