@@ -1,3 +1,7 @@
+CREATE UNIQUE INDEX IF NOT EXISTS defense_worker_jobs_active_litesvm_request_unique
+    ON defense_worker_jobs (request_hash)
+    WHERE action = 'run_litesvm_harness' AND status IN ('queued','running');
+
 CREATE TABLE IF NOT EXISTS defense_litesvm_execution_attempts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     attempt_ref text NOT NULL UNIQUE,
