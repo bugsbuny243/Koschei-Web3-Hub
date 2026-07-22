@@ -1,3 +1,9 @@
+ALTER TABLE defense_toolchain_attestations
+    DROP CONSTRAINT IF EXISTS defense_toolchain_attestations_tool_check;
+ALTER TABLE defense_toolchain_attestations
+    ADD CONSTRAINT defense_toolchain_attestations_tool_check
+    CHECK (tool_name IN ('rustc','cargo','bwrap','solana','anchor','litesvm','trident'));
+
 CREATE UNIQUE INDEX IF NOT EXISTS defense_worker_jobs_active_litesvm_request_unique
     ON defense_worker_jobs (request_hash)
     WHERE action = 'run_litesvm_harness' AND status IN ('queued','running');
@@ -25,6 +31,8 @@ CREATE TABLE IF NOT EXISTS defense_litesvm_execution_attempts (
     executable_evidence jsonb NOT NULL DEFAULT '[]'::jsonb,
     command_argv jsonb NOT NULL,
     command_hash text NOT NULL,
+    sandbox_policy jsonb NOT NULL,
+    sandbox_policy_hash text NOT NULL,
     environment_hash text NOT NULL,
     input_hash text NOT NULL,
     cargo_manifest_hash text NOT NULL,
@@ -68,6 +76,8 @@ CREATE TABLE IF NOT EXISTS defense_litesvm_execution_attempts (
     CONSTRAINT defense_litesvm_execution_attempts_executable_evidence_array CHECK (jsonb_typeof(executable_evidence) = 'array'),
     CONSTRAINT defense_litesvm_execution_attempts_argv_array CHECK (jsonb_typeof(command_argv) = 'array' AND jsonb_array_length(command_argv) = 4),
     CONSTRAINT defense_litesvm_execution_attempts_command_hash_format CHECK (command_hash ~ '^sha256:[0-9a-f]{64}$'),
+    CONSTRAINT defense_litesvm_execution_attempts_sandbox_policy_object CHECK (jsonb_typeof(sandbox_policy) = 'object'),
+    CONSTRAINT defense_litesvm_execution_attempts_sandbox_policy_hash_format CHECK (sandbox_policy_hash ~ '^sha256:[0-9a-f]{64}$'),
     CONSTRAINT defense_litesvm_execution_attempts_environment_hash_format CHECK (environment_hash ~ '^sha256:[0-9a-f]{64}$'),
     CONSTRAINT defense_litesvm_execution_attempts_input_hash_format CHECK (input_hash ~ '^sha256:[0-9a-f]{64}$'),
     CONSTRAINT defense_litesvm_execution_attempts_cargo_manifest_hash_format CHECK (cargo_manifest_hash ~ '^sha256:[0-9a-f]{64}$'),
