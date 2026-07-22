@@ -6,13 +6,30 @@ Koschei collects protocol-specific pool evidence during full token investigation
 
 | Protocol | Pool identity | Vault reserves | Control model | Lock / burn evidence |
 |---|---|---|---|---|
-| Raydium CPMM | Pinned program owner and decoded pool account | Direct token-account balances | Fungible LP token | LP supply, resolved largest LP holders, burn-address share, creator-observed share, supported locker program |
-| Raydium AMM v4 | Pinned program owner and fixed LiquidityStateV4 fields | Direct token-account balances | Fungible LP token | LP supply, resolved largest LP holders, burn-address share, creator-observed share, supported locker program |
+| Raydium CPMM | Pinned program owner and decoded pool account | Direct token-account balances | Fungible LP token | LP supply, resolved largest LP holders, burn-address share, creator-observed share, pinned Burn & Earn custody share, supported time-lock programs |
+| Raydium AMM v4 | Pinned program owner and fixed LiquidityStateV4 fields | Direct token-account balances | Fungible LP token | LP supply, resolved largest LP holders, burn-address share, creator-observed share, pinned Burn & Earn custody share, supported time-lock programs |
 | PumpSwap | Official Pool account layout and canonical pool index | Direct base/quote vault balances plus separately labelled virtual quote reserve | Fungible LP token | LP supply, resolved largest LP holders, burn-address share, creator-observed share |
 | Meteora DAMM v2 | Official Pool account layout | Direct token A/B vault balances | Position NFT | Pool liquidity and permanent-locked liquidity are read from the pool account; no LP mint is invented |
 | Meteora DLMM | Official bytemuck `LbPair` layout | Direct reserve X/Y token-account balances | Position account | Pool and reserve evidence is collected; position-owner enumeration remains withheld |
 
 An unsupported program, account-owner mismatch, short account payload or mint mismatch remains `insufficient_evidence` or `source_unavailable`. A pool address alone never completes the collector.
+
+## Raydium fungible-LP permanent lock evidence
+
+For Raydium CPMM and AMM v4 pools, Koschei reports `permanently_locked` only when all of the following are observed together:
+
+1. the pool account is owned by a pinned Raydium CPMM or AMM v4 program;
+2. the pool exposes a decoded fungible LP mint;
+3. an LP token account is returned by the bounded `getTokenLargestAccounts` request;
+4. that token account's authority wallet is resolved from parsed SPL-token account data;
+5. the authority account itself is owned by the pinned Raydium Burn & Earn program;
+6. the LP amount is positive and the observed LP mint supply is available.
+
+The report stores the summed `locked_lp_amount`, `locked_lp_share_pct`, the contributing LP token accounts, locker authority, pinned program and slot-bound evidence keys. An arbitrary label, transaction signer, market-provider locker label or account owned by another program cannot satisfy this rule.
+
+Burn-address share and Burn & Earn custody share remain separate evidence. When both are observed, both numeric fields are retained; the overall control status reports the verified permanent custody surface. The percentage is explicitly bounded to LP token accounts returned by the largest-account RPC and is not a claim that every LP account was enumerated.
+
+Streamflow remains a separate time-lock model. A Streamflow-owned authority is reported as `locked_until` only when its schedule account yields a conservatively decoded future unlock time; it is never promoted through the Raydium permanent-lock rule.
 
 ## Recent liquidity movement window
 
@@ -41,7 +58,7 @@ Each accepted row contains:
 - pool and program;
 - token and quote vault deltas;
 - instruction types;
-- evidence key.
+- evidence key;
 - verification status (`VERIFIED`).
 
 For fungible-LP pools the report also exposes the largest resolved LP-token
