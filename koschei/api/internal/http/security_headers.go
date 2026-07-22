@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-const koscheiCSP = "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; font-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:; connect-src 'self' https: wss:; form-action 'self'; upgrade-insecure-requests"
-
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -18,29 +16,50 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
 		w.Header().Set("X-Permitted-Cross-Domain-Policies", "none")
-		w.Header().Set("Content-Security-Policy", koscheiCSP)
+		w.Header().Set("Content-Security-Policy", koscheiBaseCSP())
 		if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
 		}
-		next.ServeHTTP(w, r)
+		secured := newCSPHTMLResponseWriter(w, r)
+		next.ServeHTTP(secured, r)
+		secured.finish()
 	})
 }
 
 func allowedCORSOrigin(origin string, allowed map[string]struct{}) string {
+	canonical := canonicalCORSOrigin(origin, true)
+	if canonical == "" {
+		return ""
+	}
+	if _, ok := allowed[canonical]; ok {
+		return canonical
+	}
+	return ""
+}
+
+func canonicalCORSOrigin(origin string, allowLoopbackHTTP bool) string {
 	origin = strings.TrimRight(strings.TrimSpace(origin), "/")
 	if origin == "" {
 		return ""
 	}
-	if _, ok := allowed[origin]; ok {
-		return origin
-	}
 	u, err := url.Parse(origin)
-	if err != nil || u.Scheme == "" || u.Host == "" {
+	if err != nil || u.Scheme == "" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" {
 		return ""
 	}
-	clean := u.Scheme + "://" + u.Host
-	if _, ok := allowed[clean]; ok {
-		return clean
+	scheme := strings.ToLower(strings.TrimSpace(u.Scheme))
+	host := strings.ToLower(strings.TrimSpace(u.Host))
+	switch scheme {
+	case "https":
+		return "https://" + host
+	case "http":
+		if allowLoopbackHTTP && isLoopbackCORSHost(u.Hostname()) {
+			return "http://" + host
+		}
 	}
 	return ""
+}
+
+func isLoopbackCORSHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	return host == "localhost" || strings.HasSuffix(host, ".localhost") || host == "127.0.0.1" || host == "::1"
 }
