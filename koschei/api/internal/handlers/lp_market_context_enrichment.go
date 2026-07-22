@@ -38,6 +38,7 @@ func (h *Handler) collectCompleteLPControlEvidence(ctx context.Context, network,
 		lp.EvidenceKeys = append(lp.EvidenceKeys, fmt.Sprintf("reserve_value:%s@%d", lp.TokenVault, lp.ReadSlot))
 	}
 	lp = resolveStreamflowLPTimeLock(ctx, rpc, network, lp)
+	lp = finalizeRaydiumPermanentLPLock(lp)
 	if lp.Available || lp.PoolProgram == meteoraDLMMProgram {
 		lp = attachLiquidityMovementEvidence(ctx, lp)
 	}
@@ -76,7 +77,7 @@ func collectRaydiumAMMV4Evidence(ctx context.Context, rpc solanaRPCCall, network
 		Status: services.LPControlUnverified, ReasonCode: "amm_v4_collection_incomplete",
 		PoolAddress: pool, PoolProgram: raydiumAMMV4Program, PoolType: "raydium_amm_v4",
 		ControlModel: "lp_token", PositionModel: "fungible_lp_token", TokenMint: mint, CreatorWallet: strings.TrimSpace(creator),
-		ObservedAt: time.Now().UTC(), LargestLPHolders: []services.LPHolderEvidence{},
+		ObservedAt: time.Now().UTC(), LargestLPHolders: []services.LPHolderEvidence{}, LockedLPTokenAccounts: []string{},
 		LiquidityMovements: []services.LiquidityMovementEvidence{}, EvidenceKeys: []string{}, Limitations: []string{},
 	}
 	if rpc == nil || pool == "" {
@@ -124,6 +125,9 @@ func populateDecodedLPControl(ctx context.Context, rpc solanaRPCCall, network, c
 	}
 	if out.PositionModel == "" {
 		out.PositionModel = "fungible_lp_token"
+	}
+	if out.LockedLPTokenAccounts == nil {
+		out.LockedLPTokenAccounts = []string{}
 	}
 	out.LPSupplySource = "mint_supply"
 	var tokenReserve, quoteReserve rpcTokenBalanceResponse
