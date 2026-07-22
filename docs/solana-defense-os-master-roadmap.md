@@ -89,26 +89,42 @@ verdict_authority=false
 
 Status: **complete**.
 
+### Phase 12A — Pinned Toolchain + Fail-Closed Execution Profile
+
+Exact executable SHA-256 evidence, immutable worker-image binding, owner-confirmed invariants, fixed LiteSVM/Trident command policies, immutable ready/blocked profiles, stale-image rejection and execution-time binary rehash authorization.
+
+Phase 12A exposes no harness execution action.
+
+Status: **complete**.
+
 ## Active phase
 
-### Phase 12 — Pinned Toolchain + Safe Deterministic Harness Execution
+### Phase 12B — Deterministic Offline Harness Materialization
 
-Phase 12 converts an explicitly approved Phase 11 plan into a bounded deterministic execution request without weakening the Phase 9 reproduction contract.
+Phase 12B consumes one ready LiteSVM profile and its owner-prepared immutable harness bundle. It produces a second normalized immutable artifact without downloading dependencies or executing source.
 
 Required deliverables:
 
-1. an immutable pinned-toolchain policy containing exact accepted versions and hashes;
-2. fail-closed comparison between the active worker attestation set and that policy;
-3. owner confirmation of concrete fixtures, account states, instruction arguments and accepted invariants;
-4. an execution manifest bound to plan, source artifact, IDL artifact, program ID, network, toolchain policy and fixed command profile;
-5. execution only in the separate Defense Worker with no network, no wallet material, read-only source input, bounded writable scratch space, CPU/time/output limits and a fixed environment;
-6. deterministic LiteSVM baseline execution as the first engine;
-7. immutable stdout/stderr hashes, exit state, fixture hashes, state-delta hashes and engine/toolchain evidence;
-8. fail-closed status when evidence is incomplete or the environment differs from the pinned policy;
-9. no exploitability, asset-impact or proof-of-fix claim from a harness run alone;
-10. Trident/stateful fuzzing remains disabled until a later explicit phase.
+1. root `Cargo.toml` and immutable `Cargo.lock` validation;
+2. direct LiteSVM dependency and matching lock-package evidence;
+3. rejection of Git dependencies and path dependencies that escape the bundle;
+4. deterministic path and text normalization;
+5. raw SHA-256 for every normalized file, Cargo manifest and Cargo lock;
+6. generated timestamp-free `koschei/materialization.json` bound to profile and source hashes;
+7. immutable materialized source-bundle artifact with `artifact_role=materialized_harness`;
+8. immutable migration-backed materialization record;
+9. explicit `dependency_resolution=false`, `source_executed=false`, `harness_executed=false` and `verdict_authority=false`;
+10. no command queue or worker execution route in this subphase.
 
-Initial Phase 12 status: **in progress**.
+Status: **in progress**.
+
+## Remaining Phase 12 work
+
+### Phase 12C — First Isolated Deterministic LiteSVM Run
+
+Planned. A separate worker action may consume only a Phase 12A-authorized profile and a Phase 12B materialized artifact. It must revalidate the live worker image and executable hashes immediately before launching the fixed offline command.
+
+The run must persist bounded stdout/stderr, exit state, duration, input hashes, materialization hash, worker identity, tool pins and explicit no-mainnet evidence.
 
 ## Planned phases after Phase 12
 
