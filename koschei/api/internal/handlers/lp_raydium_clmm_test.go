@@ -48,7 +48,11 @@ func TestCollectRaydiumCLMMLockEvidenceVerifiesFullCustodyChain(t *testing.T) {
 	if position.TickLowerIndex != -120 || position.TickUpperIndex != 240 || position.VerificationStatus != "VERIFIED" {
 		t.Fatalf("position range/status mismatch: %#v", position)
 	}
-	if !containsStringValue(got.EvidenceKeys, fmt.Sprintf("raydium_clmm_lock:%s@%d", fixture.lockAccount, fixture.readSlot)) {
+	finalSlot := fixture.readSlot + 2
+	if got.ReadSlot != finalSlot || position.ReadSlot != finalSlot {
+		t.Fatalf("CLMM evidence did not retain the newest monotonic context: got=%d position=%d want=%d", got.ReadSlot, position.ReadSlot, finalSlot)
+	}
+	if !containsStringValue(got.EvidenceKeys, fmt.Sprintf("raydium_clmm_lock:%s@%d", fixture.lockAccount, finalSlot)) {
 		t.Fatalf("lock evidence key missing: %v", got.EvidenceKeys)
 	}
 }
@@ -68,6 +72,17 @@ func TestCollectRaydiumCLMMLockEvidenceRejectsBrokenCustodyOrPoolLink(t *testing
 				t.Fatalf("broken custody chain did not fail closed: %#v", got)
 			}
 		})
+	}
+}
+
+func TestCollectRaydiumCLMMLockEvidenceRejectsStaleLinkedAccountContext(t *testing.T) {
+	fixture := newCLMMLockFixture()
+	got := collectProtocolLPControlEvidence(context.Background(), fixture.rpc(t, clmmFixtureOptions{staleLinkedContext: true}), "solana-mainnet", fixture.tokenMint, fixture.creator, fixture.pool)
+	if got.Status == services.LPControlVerifiedPermanentLocked || got.LockedPositionCount != 0 {
+		t.Fatalf("stale linked-account context was accepted: %#v", got)
+	}
+	if got.PositionEnumerationStatus != "source_unavailable" || got.ReasonCode != "raydium_clmm_positions_unavailable" {
+		t.Fatalf("stale linked-account context did not fail closed: %#v", got)
 	}
 }
 
@@ -97,9 +112,10 @@ func TestDecodeRaydiumCLMMPoolRejectsWrongDiscriminator(t *testing.T) {
 }
 
 type clmmFixtureOptions struct {
-	custodyOwner    string
-	positionPool    string
-	lockRecordCount int
+	custodyOwner       string
+	positionPool       string
+	lockRecordCount    int
+	staleLinkedContext bool
 }
 
 type clmmLockFixture struct {
@@ -169,6 +185,7 @@ func (fixture clmmLockFixture) rpc(t *testing.T, options clmmFixtureOptions) sol
 	if options.lockRecordCount == 0 {
 		options.lockRecordCount = 1
 	}
+	multipleAccountCalls := 0
 	return func(_ context.Context, _ string, method string, params any, out any) error {
 		switch method {
 		case "getAccountInfo":
@@ -178,7 +195,7 @@ func (fixture clmmLockFixture) rpc(t *testing.T, options clmmFixtureOptions) sol
 		case "getTokenAccountBalance":
 			return assignCLMMRPC(out, map[string]any{"context": map[string]any{"slot": fixture.readSlot - 1}, "value": map[string]any{"uiAmountString": "1000"}})
 		case "getProgramAccounts":
-			assertCLMMProgramAccountFilters(t, params, fixture.pool)
+			assertCLMMProgramAccountFilters(t, params, fixture.pool, fixture.readSlot-1)
 			values := make([]any, options.lockRecordCount)
 			for index := range values {
 				values[index] = map[string]any{"pubkey": fixture.lockAccount, "account": map[string]any{
@@ -197,6 +214,15 @@ func (fixture clmmLockFixture) rpc(t *testing.T, options clmmFixtureOptions) sol
 			}
 			config, _ := arguments[1].(map[string]any)
 			encoding, _ := config["encoding"].(string)
+			expectedMinSlot := fixture.readSlot + uint64(multipleAccountCalls)
+			if config["minContextSlot"] != expectedMinSlot {
+				return fmt.Errorf("unexpected getMultipleAccounts minContextSlot: got=%v want=%d", config["minContextSlot"], expectedMinSlot)
+			}
+			responseSlot := expectedMinSlot + 1
+			if options.staleLinkedContext && multipleAccountCalls == 0 {
+				responseSlot = expectedMinSlot - 1
+			}
+			multipleAccountCalls++
 			values := make([]any, 0, len(addresses))
 			for _, address := range addresses {
 				switch encoding {
@@ -218,7 +244,7 @@ func (fixture clmmLockFixture) rpc(t *testing.T, options clmmFixtureOptions) sol
 					return fmt.Errorf("unexpected encoding: %s", encoding)
 				}
 			}
-			return assignCLMMRPC(out, map[string]any{"value": values})
+			return assignCLMMRPC(out, map[string]any{"context": map[string]any{"slot": responseSlot}, "value": values})
 		default:
 			return fmt.Errorf("unexpected RPC method: %s", method)
 		}
@@ -230,14 +256,14 @@ func assignCLMMRPC(out any, value any) error {
 	return json.Unmarshal(raw, out)
 }
 
-func assertCLMMProgramAccountFilters(t *testing.T, params any, pool string) {
+func assertCLMMProgramAccountFilters(t *testing.T, params any, pool string, minContextSlot uint64) {
 	t.Helper()
 	arguments, ok := params.([]any)
 	if !ok || len(arguments) != 2 || arguments[0] != raydiumLPLockProgram {
 		t.Fatalf("unexpected getProgramAccounts params: %#v", params)
 	}
 	config, ok := arguments[1].(map[string]any)
-	if !ok || config["withContext"] != true {
+	if !ok || config["withContext"] != true || config["minContextSlot"] != minContextSlot {
 		t.Fatalf("getProgramAccounts is not context-bound: %#v", config)
 	}
 	dataSlice, _ := config["dataSlice"].(map[string]any)
