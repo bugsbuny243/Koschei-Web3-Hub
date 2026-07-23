@@ -95,7 +95,7 @@ func TestPrepareLiteSVMExecutionReauthorizesExactEvidence(t *testing.T) {
 	if plan.EnvironmentTemplate["CARGO_NET_OFFLINE"] != "true" ||
 		plan.EnvironmentTemplate["CARGO_TARGET_DIR"] != "/tmp/koschei-scratch/target" ||
 		plan.EnvironmentTemplate["RUSTC"] == "" || plan.SandboxPolicy["unshare_all"] != true ||
-		plan.SandboxPolicy["shell"] != false {
+		plan.SandboxPolicy["host_work_root_masked"] != true || plan.SandboxPolicy["shell"] != false {
 		t.Fatalf("prepared sandbox/environment policy is incomplete: env=%+v sandbox=%+v", plan.EnvironmentTemplate, plan.SandboxPolicy)
 	}
 	if plan.NetworkAccess || plan.DependencyResolution || plan.WalletMaterialAccessed || plan.MainnetRPCAccessed || plan.MainnetTransactionSent || plan.VerdictAuthority {
@@ -128,6 +128,7 @@ func TestLiteSVMExecutionAttemptIsImmutableAndResultHashIsRepeatable(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer finishLiteSVMTestJob(db, firstJob.JobRef)
 	firstPlan, err := PrepareLiteSVMExecution(ctx, db, firstJob.JobRef, profile.ProfileRef, materialization.MaterializationRef, profile.WorkerID, profile.WorkerImageDigest)
 	if err != nil {
 		t.Fatal(err)
