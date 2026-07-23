@@ -4,6 +4,12 @@ ALTER TABLE defense_toolchain_attestations
     ADD CONSTRAINT defense_toolchain_attestations_tool_check
     CHECK (tool_name IN ('rustc','cargo','bwrap','solana','anchor','litesvm','trident'));
 
+ALTER TABLE defense_worker_jobs
+    DROP CONSTRAINT IF EXISTS defense_worker_jobs_action_check;
+ALTER TABLE defense_worker_jobs
+    ADD CONSTRAINT defense_worker_jobs_action_check
+    CHECK (action IN ('verify_bundle','run_litesvm_harness'));
+
 CREATE UNIQUE INDEX IF NOT EXISTS defense_worker_jobs_active_litesvm_request_unique
     ON defense_worker_jobs (request_hash)
     WHERE action = 'run_litesvm_harness' AND status IN ('queued','running');
