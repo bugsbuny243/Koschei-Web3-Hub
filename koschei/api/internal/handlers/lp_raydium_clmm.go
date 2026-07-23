@@ -33,6 +33,7 @@ type raydiumCLMMLockCandidate struct {
 	LockedNFTAccount string
 	FeeNFTMint       string
 	RecentEpoch      uint64
+	ReadSlot         uint64
 }
 
 type rpcProgramAccountsContextResponse struct {
@@ -47,8 +48,9 @@ type rpcProgramAccountsContextResponse struct {
 }
 
 type clmmFetchedAccount struct {
-	Owner string
-	Data  any
+	Owner    string
+	Data     any
+	ReadSlot uint64
 }
 
 // decodeRaydiumCLMMLPControl decodes the official CLMM PoolState and performs
@@ -162,6 +164,7 @@ func collectRaydiumCLMMLockedPositions(ctx context.Context, rpc solanaRPCCall, n
 			LockedNFTAccount: base58Encode(data[105:137]),
 			FeeNFTMint: base58Encode(data[137:169]),
 			RecentEpoch: binary.LittleEndian.Uint64(data[169:177]),
+			ReadSlot: response.Context.Slot,
 		}
 		if candidate.LockAccount == "" || candidate.PoolID != out.PoolAddress || isDefaultSolanaAddress(candidate.PositionOwner) || isDefaultSolanaAddress(candidate.PositionID) || isDefaultSolanaAddress(candidate.LockedNFTAccount) || isDefaultSolanaAddress(candidate.FeeNFTMint) {
 			invalidLockRecords++
@@ -236,9 +239,9 @@ func collectRaydiumCLMMLockedPositions(ctx context.Context, rpc solanaRPCCall, n
 		}
 		totalLockedLiquidity.Add(totalLockedLiquidity, liquidity)
 		evidenceKeys := []string{
-			fmt.Sprintf("raydium_clmm_lock:%s@%d", candidate.LockAccount, out.ReadSlot),
-			fmt.Sprintf("raydium_clmm_position:%s:%s@%d", candidate.PositionID, liquidity.String(), out.ReadSlot),
-			fmt.Sprintf("raydium_clmm_custody:%s:%s@%d", candidate.LockedNFTAccount, positionNFTMint, out.ReadSlot),
+			fmt.Sprintf("raydium_clmm_lock:%s@%d", candidate.LockAccount, candidate.ReadSlot),
+			fmt.Sprintf("raydium_clmm_position:%s:%s@%d", candidate.PositionID, liquidity.String(), positionAccount.ReadSlot),
+			fmt.Sprintf("raydium_clmm_custody:%s:%s@%d", candidate.LockedNFTAccount, positionNFTMint, custodyAccount.ReadSlot),
 		}
 		out.LockedPositions = append(out.LockedPositions, services.CLMMLockedPositionEvidence{
 			LockedPositionAccount: candidate.LockAccount,
@@ -252,7 +255,7 @@ func collectRaydiumCLMMLockedPositions(ctx context.Context, rpc solanaRPCCall, n
 			TickUpperIndex: tickUpper,
 			LiquidityRaw: liquidity.String(),
 			RecentEpoch: candidate.RecentEpoch,
-			ReadSlot: out.ReadSlot,
+			ReadSlot: maxCLMMReadSlot(candidate.ReadSlot, positionAccount.ReadSlot, custodyAccount.ReadSlot),
 			VerificationStatus: "VERIFIED",
 			EvidenceKeys: evidenceKeys,
 		})
@@ -281,7 +284,7 @@ func collectRaydiumCLMMLockedPositions(ctx context.Context, rpc solanaRPCCall, n
 	out.Limitations = append(out.Limitations,
 		"Locked CLMM liquidity is the sum of verified position-state liquidity integers. It is not converted to a pool percentage because CLMM PoolState liquidity is active-tick liquidity rather than total position liquidity.",
 		fmt.Sprintf("The lock query was restricted to the pinned Burn & Earn program, exact account size and this pool, with a fail-closed limit of %d current records.", raydiumCLMMLockResultLimit),
-		"Linked position and custody reads were required to come from monotonically non-decreasing RPC contexts using minContextSlot.",
+		"Linked position and custody reads were required to come from monotonically non-decreasing RPC contexts using minContextSlot; each custody edge retains its exact response slot.",
 	)
 	out.Limitations = uniqueStrings(out.Limitations)
 	return out
@@ -328,7 +331,11 @@ func fetchCLMMAccountsInBatches(ctx context.Context, rpc solanaRPCCall, network 
 			if json.Unmarshal(raw, &account) != nil {
 				continue
 			}
-			out[batch[index]] = clmmFetchedAccount{Owner: strings.TrimSpace(account.Owner), Data: account.Data}
+			out[batch[index]] = clmmFetchedAccount{
+				Owner: strings.TrimSpace(account.Owner),
+				Data: account.Data,
+				ReadSlot: response.Context.Slot,
+			}
 		}
 	}
 	return out, latestSlot, nil
@@ -372,4 +379,14 @@ func anchorAccountDiscriminatorMatches(data []byte, accountName string) bool {
 func isDefaultSolanaAddress(value string) bool {
 	value = strings.TrimSpace(value)
 	return value == "" || value == "11111111111111111111111111111111"
+}
+
+func maxCLMMReadSlot(values ...uint64) uint64 {
+	var maximum uint64
+	for _, value := range values {
+		if value > maximum {
+			maximum = value
+		}
+	}
+	return maximum
 }
