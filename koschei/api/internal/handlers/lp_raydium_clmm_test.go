@@ -48,12 +48,19 @@ func TestCollectRaydiumCLMMLockEvidenceVerifiesFullCustodyChain(t *testing.T) {
 	if position.TickLowerIndex != -120 || position.TickUpperIndex != 240 || position.VerificationStatus != "VERIFIED" {
 		t.Fatalf("position range/status mismatch: %#v", position)
 	}
-	finalSlot := fixture.readSlot + 2
-	if got.ReadSlot != finalSlot || position.ReadSlot != finalSlot {
-		t.Fatalf("CLMM evidence did not retain the newest monotonic context: got=%d position=%d want=%d", got.ReadSlot, position.ReadSlot, finalSlot)
+	positionSlot := fixture.readSlot + 1
+	custodySlot := fixture.readSlot + 2
+	if got.ReadSlot != custodySlot || position.ReadSlot != custodySlot {
+		t.Fatalf("CLMM evidence did not retain the newest monotonic context: got=%d position=%d want=%d", got.ReadSlot, position.ReadSlot, custodySlot)
 	}
-	if !containsStringValue(got.EvidenceKeys, fmt.Sprintf("raydium_clmm_lock:%s@%d", fixture.lockAccount, finalSlot)) {
-		t.Fatalf("lock evidence key missing: %v", got.EvidenceKeys)
+	for _, key := range []string{
+		fmt.Sprintf("raydium_clmm_lock:%s@%d", fixture.lockAccount, fixture.readSlot),
+		fmt.Sprintf("raydium_clmm_position:%s:%s@%d", fixture.positionAccount, fixture.positionLiquidity.String(), positionSlot),
+		fmt.Sprintf("raydium_clmm_custody:%s:%s@%d", fixture.lockedNFTAccount, fixture.positionNFTMint, custodySlot),
+	} {
+		if !containsStringValue(got.EvidenceKeys, key) {
+			t.Fatalf("exact-slot CLMM evidence key missing %q: %v", key, got.EvidenceKeys)
+		}
 	}
 }
 
