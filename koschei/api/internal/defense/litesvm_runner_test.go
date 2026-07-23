@@ -51,15 +51,22 @@ func TestBuildLiteSVMEnvironmentDoesNotInheritSecretsOrNetworkSettings(t *testin
 
 func TestBuildLiteSVMBubblewrapArgsUsesNamespacesAndNoShell(t *testing.T) {
 	plan := testLiteSVMSandboxPlan(t)
-	workRoot, err := os.MkdirTemp(".", ".koschei-litesvm-test-")
+	base := strings.TrimSpace(os.Getenv("RUNNER_TOOL_CACHE"))
+	if base == "" {
+		base = "/opt/hostedtoolcache"
+	}
+	workRoot, err := os.MkdirTemp(base, "koschei-litesvm-test-")
 	if err != nil {
-		t.Fatal(err)
+		t.Skipf("no writable non-masked sandbox test root: %v", err)
 	}
 	workRoot, err = filepath.Abs(workRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(workRoot)
+	if err := os.Chmod(workRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	input := filepath.Join(workRoot, "input")
 	scratch := filepath.Join(workRoot, "scratch")
 	for _, path := range []string{input, scratch} {
