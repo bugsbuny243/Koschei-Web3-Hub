@@ -115,10 +115,19 @@ func collectRaydiumCLMMLockedPositions(ctx context.Context, rpc solanaRPCCall, n
 			map[string]any{"memcmp": map[string]any{"offset": 41, "bytes": out.PoolAddress}},
 		},
 	}
+	if out.ReadSlot > 0 {
+		config["minContextSlot"] = out.ReadSlot
+	}
 	if err := rpc(ctx, network, "getProgramAccounts", []any{raydiumLPLockProgram, config}, &response); err != nil {
 		out.PositionEnumerationStatus = "source_unavailable"
 		out.ReasonCode = "raydium_clmm_lock_index_unavailable"
 		out.Limitations = append(out.Limitations, compactCollectorError(err))
+		return out
+	}
+	if out.ReadSlot > 0 && response.Context.Slot < out.ReadSlot {
+		out.PositionEnumerationStatus = "source_unavailable"
+		out.ReasonCode = "raydium_clmm_lock_context_stale"
+		out.Limitations = append(out.Limitations, "The Raydium CLMM lock index response was older than the already observed pool evidence and was withheld.")
 		return out
 	}
 	if response.Context.Slot > out.ReadSlot {
@@ -173,19 +182,25 @@ func collectRaydiumCLMMLockedPositions(ctx context.Context, rpc solanaRPCCall, n
 		positionIDs = append(positionIDs, candidate.PositionID)
 		lockedNFTAccounts = append(lockedNFTAccounts, candidate.LockedNFTAccount)
 	}
-	positions, err := fetchCLMMAccountsInBatches(ctx, rpc, network, positionIDs, "base64")
+	positions, positionSlot, err := fetchCLMMAccountsInBatches(ctx, rpc, network, positionIDs, "base64", out.ReadSlot)
 	if err != nil {
 		out.PositionEnumerationStatus = "source_unavailable"
 		out.ReasonCode = "raydium_clmm_positions_unavailable"
 		out.Limitations = append(out.Limitations, compactCollectorError(err))
 		return out
 	}
-	custodyAccounts, err := fetchCLMMAccountsInBatches(ctx, rpc, network, lockedNFTAccounts, "jsonParsed")
+	if positionSlot > out.ReadSlot {
+		out.ReadSlot = positionSlot
+	}
+	custodyAccounts, custodySlot, err := fetchCLMMAccountsInBatches(ctx, rpc, network, lockedNFTAccounts, "jsonParsed", out.ReadSlot)
 	if err != nil {
 		out.PositionEnumerationStatus = "source_unavailable"
 		out.ReasonCode = "raydium_clmm_custody_accounts_unavailable"
 		out.Limitations = append(out.Limitations, compactCollectorError(err))
 		return out
+	}
+	if custodySlot > out.ReadSlot {
+		out.ReadSlot = custodySlot
 	}
 
 	totalLockedLiquidity := new(big.Int)
@@ -266,14 +281,16 @@ func collectRaydiumCLMMLockedPositions(ctx context.Context, rpc solanaRPCCall, n
 	out.Limitations = append(out.Limitations,
 		"Locked CLMM liquidity is the sum of verified position-state liquidity integers. It is not converted to a pool percentage because CLMM PoolState liquidity is active-tick liquidity rather than total position liquidity.",
 		fmt.Sprintf("The lock query was restricted to the pinned Burn & Earn program, exact account size and this pool, with a fail-closed limit of %d current records.", raydiumCLMMLockResultLimit),
+		"Linked position and custody reads were required to come from monotonically non-decreasing RPC contexts using minContextSlot.",
 	)
 	out.Limitations = uniqueStrings(out.Limitations)
 	return out
 }
 
-func fetchCLMMAccountsInBatches(ctx context.Context, rpc solanaRPCCall, network string, addresses []string, encoding string) (map[string]clmmFetchedAccount, error) {
+func fetchCLMMAccountsInBatches(ctx context.Context, rpc solanaRPCCall, network string, addresses []string, encoding string, minContextSlot uint64) (map[string]clmmFetchedAccount, uint64, error) {
 	addresses = uniqueStrings(addresses)
 	out := make(map[string]clmmFetchedAccount, len(addresses))
+	latestSlot := minContextSlot
 	for start := 0; start < len(addresses); start += 100 {
 		end := start + 100
 		if end > len(addresses) {
@@ -281,13 +298,24 @@ func fetchCLMMAccountsInBatches(ctx context.Context, rpc solanaRPCCall, network 
 		}
 		batch := addresses[start:end]
 		var response struct {
-			Value []json.RawMessage `json:"value"`
+			Context rpcContext        `json:"context"`
+			Value   []json.RawMessage `json:"value"`
 		}
-		if err := rpc(ctx, network, "getMultipleAccounts", []any{batch, map[string]any{"encoding": encoding, "commitment": "confirmed"}}, &response); err != nil {
-			return nil, err
+		config := map[string]any{"encoding": encoding, "commitment": "confirmed"}
+		if latestSlot > 0 {
+			config["minContextSlot"] = latestSlot
+		}
+		if err := rpc(ctx, network, "getMultipleAccounts", []any{batch, config}, &response); err != nil {
+			return nil, 0, err
+		}
+		if latestSlot > 0 && response.Context.Slot < latestSlot {
+			return nil, 0, errors.New("getMultipleAccounts returned a stale CLMM context")
+		}
+		if response.Context.Slot > latestSlot {
+			latestSlot = response.Context.Slot
 		}
 		if len(response.Value) != len(batch) {
-			return nil, errors.New("getMultipleAccounts returned an incomplete CLMM batch")
+			return nil, 0, errors.New("getMultipleAccounts returned an incomplete CLMM batch")
 		}
 		for index, raw := range response.Value {
 			if len(raw) == 0 || string(raw) == "null" {
@@ -303,7 +331,7 @@ func fetchCLMMAccountsInBatches(ctx context.Context, rpc solanaRPCCall, network 
 			out[batch[index]] = clmmFetchedAccount{Owner: strings.TrimSpace(account.Owner), Data: account.Data}
 		}
 	}
-	return out, nil
+	return out, latestSlot, nil
 }
 
 func verifiedCLMMCustodyTokenAccount(account clmmFetchedAccount, expectedMint string) bool {
