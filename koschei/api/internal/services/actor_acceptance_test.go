@@ -79,8 +79,8 @@ func TestEvaluateActorAcceptanceWithholdsIncompleteClaims(t *testing.T) {
 	if result.Items[2].Status != ActorAcceptanceFail || result.Items[2].EvidenceState != "not_verified" {
 		t.Fatalf("created-token observation must not pass without a complete evidence line: %+v", result.Items[2])
 	}
-	if result.Items[8].Status != ActorAcceptanceFail || result.Items[8].Summary != "Direct creator → dominant-holder relation: NOT VERIFIED" {
-		t.Fatalf("direct relation must be explicit NOT VERIFIED: %+v", result.Items[8])
+	if result.Items[8].Status != ActorAcceptancePass || result.Items[8].EvidenceState != "not_verified" || result.Items[8].Summary != "Direct creator → dominant-holder relation: NOT VERIFIED" {
+		t.Fatalf("direct relation must pass the explicit-withholding contract: %+v", result.Items[8])
 	}
 	if result.Items[9].Status != ActorAcceptanceFail {
 		t.Fatalf("numberless no-grade verdict must not satisfy acceptance: %+v", result.Items[9])
@@ -96,8 +96,26 @@ func TestActorAcceptanceDirectRelationRequiresVerifiedEvidence(t *testing.T) {
 		Dossier: ActorDefenseDossier{Evidence: []ActorDefenseEvidenceRecord{row}},
 		FundingOrigin: ActorFundingOrigin{Status: "not_investigated", TrailStatus: "not_investigated"},
 	})
-	if result.Items[8].Status != ActorAcceptanceFail || result.Items[8].EvidenceState != "not_verified" {
-		t.Fatalf("inferred direct relation must remain withheld: %+v", result.Items[8])
+	if result.Items[8].Status != ActorAcceptancePass || result.Items[8].EvidenceState != "not_verified" {
+		t.Fatalf("inferred direct relation must remain explicitly withheld: %+v", result.Items[8])
+	}
+}
+
+func TestActorAcceptanceRejectsMissingProgramMetadata(t *testing.T) {
+	observed := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
+	row := actorAcceptanceTestEvidence("creator", "mint", "created_token", "sig", 10, observed, "pump.fun", 0, "mint")
+	delete(row.Metadata, "program")
+	result := EvaluateActorAcceptance(ActorAcceptanceInput{
+		Wallet: "creator", Network: "solana-mainnet", TargetKind: "wallet",
+		Dossier: ActorDefenseDossier{
+			Track: ActorDefenseTrack{CreatedTokenCount: 1},
+			Tokens: []ActorDefenseTokenObservation{{Mint: "mint", Roles: []string{"creator_deployer"}}},
+			Evidence: []ActorDefenseEvidenceRecord{row},
+		},
+		FundingOrigin: ActorFundingOrigin{Status: "not_investigated", TrailStatus: "not_investigated"},
+	})
+	if result.Items[2].Status != ActorAcceptanceFail || len(result.Items[2].Evidence) != 0 {
+		t.Fatalf("missing program metadata must fail closed: %+v", result.Items[2])
 	}
 }
 
