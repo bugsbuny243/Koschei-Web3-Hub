@@ -32,8 +32,8 @@ function base32NoPadding(bytes) {
   return output;
 }
 
-export function dossierCaseRef(targetID, signature) {
-  const digest = createHash('sha256').update(`${String(targetID ?? '').trim()}\n${String(signature ?? '').trim()}`).digest();
+export function dossierCaseRef(targetID, snapshotIdentity) {
+  const digest = createHash('sha256').update(`${String(targetID ?? '').trim()}\n${String(snapshotIdentity ?? '').trim()}`).digest();
   return `KD1-${base32NoPadding(digest.subarray(0, 20)).toLowerCase()}`;
 }
 
@@ -85,7 +85,8 @@ export function verifyDossierObject(bundle) {
 
   const targetID = bundle.target?.id || bundle.token?.mint;
   const verdictSignature = bundle.verification?.verdict_signature || bundle.verdict?.signature;
-  const expectedCaseRef = dossierCaseRef(targetID, verdictSignature);
+  const snapshotIdentity = bundle.verification?.snapshot_identity || verdictSignature;
+  const expectedCaseRef = dossierCaseRef(targetID, snapshotIdentity);
   if (bundle.case_ref !== expectedCaseRef) errors.push('case_ref_mismatch');
 
   verifyRows(bundle, errors);
