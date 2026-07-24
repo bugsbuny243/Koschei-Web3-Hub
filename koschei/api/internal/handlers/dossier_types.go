@@ -15,9 +15,9 @@ const (
 )
 
 var (
-	errDossierSourceIncomplete = errors.New("dossier_source_incomplete")
-	errDossierReferenceMissing = errors.New("populated_signal_missing_refs")
-	errDossierSourceHash       = errors.New("dossier_source_hash_mismatch")
+	errDossierSourceIncomplete  = errors.New("dossier_source_incomplete")
+	errDossierReferenceMissing  = errors.New("populated_signal_missing_refs")
+	errDossierSourceHash        = errors.New("dossier_source_hash_mismatch")
 	errDossierAcceptanceMissing = errors.New("actor_acceptance_missing")
 )
 
@@ -43,33 +43,33 @@ type DossierSignalRow struct {
 	AcceptanceStatus string      `json:"acceptance_status,omitempty"`
 	Value            any         `json:"value,omitempty"`
 	Refs             DossierRefs `json:"refs"`
-	Limitations      []string    `json:"limitations,omitempty"`
+	Limitations      []string    `json:"limitations"`
 }
 
 type dossierBody struct {
-	DossierVersion       string         `json:"dossier_version"`
-	CaseRef              string         `json:"case_ref"`
-	ProducedAt           time.Time      `json:"produced_at"`
-	SourceSnapshotHash   string         `json:"source_snapshot_hash"`
-	Target               any            `json:"target,omitempty"`
-	Token                any            `json:"token,omitempty"`
-	Verdict              any            `json:"verdict"`
-	VerdictCard          any            `json:"verdict_card"`
-	ThreatAnticipation   any            `json:"threat_anticipation,omitempty"`
-	EvidenceArms         any            `json:"evidence_arms,omitempty"`
-	TransactionEvidence any            `json:"transaction_evidence,omitempty"`
-	EvidenceReferences  any            `json:"evidence_references,omitempty"`
-	ActorDossier         any            `json:"actor_dossier,omitempty"`
-	ActorAcceptance      any            `json:"actor_acceptance,omitempty"`
-	CreatedTokenHistory  any            `json:"created_token_history,omitempty"`
-	FundingOrigin        any            `json:"funding_origin,omitempty"`
-	CrossTokenConnections any           `json:"cross_token_connections,omitempty"`
-	EvidenceLog          any            `json:"evidence_log,omitempty"`
-	SectionLimitations   any            `json:"section_limitations,omitempty"`
-	HolderContext        any            `json:"holder_concentration_context,omitempty"`
-	TechnicalReport      map[string]any `json:"technical_report"`
-	Verification         any            `json:"verification"`
-	Limitations          []string       `json:"limitations"`
+	DossierVersion        string         `json:"dossier_version"`
+	CaseRef               string         `json:"case_ref"`
+	ProducedAt            time.Time      `json:"produced_at"`
+	SourceSnapshotHash    string         `json:"source_snapshot_hash"`
+	Target                any            `json:"target,omitempty"`
+	Token                 any            `json:"token,omitempty"`
+	Verdict               any            `json:"verdict"`
+	VerdictCard           any            `json:"verdict_card"`
+	ThreatAnticipation    any            `json:"threat_anticipation,omitempty"`
+	EvidenceArms          any            `json:"evidence_arms,omitempty"`
+	TransactionEvidence  any            `json:"transaction_evidence,omitempty"`
+	EvidenceReferences   any            `json:"evidence_references,omitempty"`
+	ActorDossier          any            `json:"actor_dossier,omitempty"`
+	ActorAcceptance       any            `json:"actor_acceptance,omitempty"`
+	CreatedTokenHistory   any            `json:"created_token_history,omitempty"`
+	FundingOrigin         any            `json:"funding_origin,omitempty"`
+	CrossTokenConnections any            `json:"cross_token_connections,omitempty"`
+	EvidenceLog           any            `json:"evidence_log,omitempty"`
+	SectionLimitations    any            `json:"section_limitations,omitempty"`
+	HolderContext         any            `json:"holder_concentration_context,omitempty"`
+	TechnicalReport       map[string]any `json:"technical_report"`
+	Verification          any            `json:"verification"`
+	Limitations           []string       `json:"limitations"`
 }
 
 type dossierBundle struct {
