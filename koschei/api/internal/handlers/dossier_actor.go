@@ -80,18 +80,56 @@ func actorDossierTarget(snapshot dossierSnapshot) map[string]any {
 		wallet = strings.TrimSpace(snapshot.Mint)
 	}
 	return map[string]any{
-		"kind":    "wallet",
-		"id":      wallet,
-		"network": snapshot.Network,
+		"kind":             "wallet",
+		"id":               wallet,
+		"network":          snapshot.Network,
 		"requested_target": strings.TrimSpace(dossierString(snapshot.Report["target"])),
-		"identity_scope": "onchain_wallet_only",
+		"identity_scope":   "onchain_wallet_only",
 	}
 }
 
 func actorDossierCreatedTokens(report map[string]any) any {
 	actor := dossierMap(report["actor_investigation"])
 	dossier := dossierMap(actor["dossier"])
-	return dossierFirst(dossier["tokens"], []any{})
+	createdItem := actorDossierAcceptanceItem(report, "AC-03")
+	creationEvidence := dossierSlice(createdItem["evidence"])
+	rows := []any{}
+	for _, raw := range dossierSlice(dossier["tokens"]) {
+		token := dossierMap(raw)
+		if !actorDossierHasRole(token["roles"], "creator_deployer") {
+			continue
+		}
+		mint := strings.TrimSpace(dossierString(token["mint"]))
+		matched := []any{}
+		state := "unverified"
+		for _, evidenceRaw := range creationEvidence {
+			evidence := dossierMap(evidenceRaw)
+			if mint == "" {
+				continue
+			}
+			if strings.EqualFold(mint, dossierString(evidence["token_mint"])) || strings.EqualFold(mint, dossierString(evidence["destination_wallet"])) {
+				matched = append(matched, evidence)
+				state = normalizeActorDossierState(dossierString(evidence["verification_status"]))
+			}
+		}
+		limitations := []string{}
+		if len(matched) == 0 {
+			limitations = append(limitations, "Creator-role observation exists, but a complete creator-to-mint evidence line is unavailable in this bundle.")
+		}
+		rows = append(rows, map[string]any{
+			"mint":                mint,
+			"name":                token["name"],
+			"symbol":              token["symbol"],
+			"roles":               token["roles"],
+			"creation_signature":  token["creator_signature"],
+			"first_observed_at":   token["first_observed_at"],
+			"last_observed_at":    token["last_observed_at"],
+			"verification_status": state,
+			"evidence":            matched,
+			"limitations":         limitations,
+		})
+	}
+	return rows
 }
 
 func actorDossierFundingOrigin(report map[string]any) any {
@@ -105,10 +143,31 @@ func actorDossierConnections(report map[string]any) map[string]any {
 	actor := dossierMap(report["actor_investigation"])
 	dossier := dossierMap(actor["dossier"])
 	track := dossierMap(dossier["track"])
+	acceptance := actorDossierAcceptanceItem(report, "AC-08")
+	related := []any{}
+	for _, raw := range dossierSlice(dossier["related_actors"]) {
+		item := dossierMap(raw)
+		related = append(related, map[string]any{
+			"wallet": item["wallet"],
+			"shared_token_count": item["shared_token_count"],
+			"max_holder_percentage": item["max_holder_percentage"],
+			"first_observed_at": item["first_observed_at"],
+			"last_observed_at": item["last_observed_at"],
+			"verification_status": "observed",
+			"source": "persistent_actor_index",
+			"limitation": "Observed recurrence is not identity, intent or common-control proof.",
+		})
+	}
 	return map[string]any{
-		"related_actors": dossierFirst(dossier["related_actors"], []any{}),
+		"acceptance_status": acceptance["status"],
+		"evidence_state": acceptance["evidence_state"],
+		"summary": acceptance["summary"],
+		"evidence": dossierFirst(acceptance["evidence"], []any{}),
+		"limitations": dossierStrings(acceptance["limitations"]),
+		"related_actor_observations": related,
 		"evidence_graph": dossierFirst(actor["evidence_graph"], map[string]any{}),
 		"counts": map[string]any{
+			"verification_status": "observed",
 			"created_tokens": track["created_token_count"],
 			"dominant_holder_tokens": track["dominant_holder_token_count"],
 			"related_actors": track["related_actor_count"],
@@ -154,6 +213,26 @@ func actorDossierSectionLimitations(report map[string]any) map[string]any {
 			"Collection remains bounded by persisted source windows and mint-specific ATA policy; missing rows are not treated as absence of activity.",
 		},
 	}
+}
+
+func actorDossierAcceptanceItem(report map[string]any, id string) map[string]any {
+	acceptance := dossierMap(report["actor_acceptance"])
+	for _, raw := range dossierSlice(acceptance["items"]) {
+		item := dossierMap(raw)
+		if strings.EqualFold(strings.TrimSpace(dossierString(item["id"])), strings.TrimSpace(id)) {
+			return item
+		}
+	}
+	return map[string]any{}
+}
+
+func actorDossierHasRole(value any, role string) bool {
+	for _, candidate := range dossierStrings(value) {
+		if strings.EqualFold(candidate, strings.TrimSpace(role)) {
+			return true
+		}
+	}
+	return false
 }
 
 func validateActorDossierRows(rows []DossierSignalRow) error {
