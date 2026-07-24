@@ -63,6 +63,16 @@ The bundle contains:
 9. source snapshot hash, bundle hash and independent verifier command;
 10. the full frozen technical report.
 
+## Verdict signature and snapshot identity
+
+The deterministic verdict signature and the immutable case snapshot identity are retained separately.
+
+- `verification.verdict_signature` is the unchanged Unified Radar verdict identity.
+- `verification.snapshot_identity` binds that verdict identity to the actor acceptance hash.
+- the `KD1-...` case reference binds the resolved wallet to `snapshot_identity`.
+
+This prevents a later acceptance/evidence change from being hidden behind an unchanged grade or verdict signature. Token dossiers retain their existing behavior because their snapshot identity remains the verdict signature.
+
 ## Evidence-state rule
 
 Every acceptance claim shows both:
@@ -98,7 +108,7 @@ Export never starts a new RPC scan to repair missing evidence.
 node oss/verifier/typescript/verify-dossier.mjs ./actor-dossier.json
 ```
 
-The verifier checks the bundle hash, target-plus-verdict case reference, ten-item actor row contract, evidence references, actor evidence log and section-local limitations.
+The verifier checks the bundle hash, target-plus-snapshot case reference, ten-item actor row contract, evidence references, actor evidence log and section-local limitations.
 
 ## Production record
 
