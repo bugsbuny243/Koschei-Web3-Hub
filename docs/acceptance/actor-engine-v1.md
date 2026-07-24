@@ -29,16 +29,17 @@ The route uses the existing wallet-first actor collectors and deterministic acto
 
 ## One-command reference run
 
+Run from `koschei/api` after the route is deployed:
+
 ```bash
-curl --fail-with-body --silent --show-error \
-  -X POST "${KOSCHEI_BASE_URL:-https://tradepigloball.co}/api/owner/defense/actor-acceptance" \
-  -H 'Content-Type: application/json' \
-  -H "x-koschei-secret: ${KOSCHEI_OWNER_SECRET}" \
-  --data '{"target":"yHCxHBEaJW5tbndqC8JciSThr7U1cqLpdcsvHcx6PRe","network":"solana-mainnet","live_evidence":true}' \
-  | tee actor-engine-v1-yHCx.json
+KOSCHEI_OWNER_SECRET='...' \
+KOSCHEI_BASE_URL='https://tradepigloball.co' \
+node scripts/run-actor-acceptance.mjs \
+  yHCxHBEaJW5tbndqC8JciSThr7U1cqLpdcsvHcx6PRe \
+  actor-engine-v1-yHCx.json
 ```
 
-The same persisted dossier, funding evidence and deterministic verdict projection must produce the same `acceptance_hash`. Collection changes may legitimately produce a new hash because the evidence set changed; timestamps created only by the acceptance evaluator are excluded.
+The runner calls the owner route twice, validates all ten ordered items and rejects a changed `acceptance_hash`. The same persisted dossier, funding evidence and deterministic verdict projection must produce the same identity. Collection changes may legitimately produce a new hash because the evidence set changed; timestamps created only by the acceptance evaluator are excluded.
 
 ## Ten acceptance items
 
@@ -52,7 +53,7 @@ The same persisted dossier, funding evidence and deterministic verdict projectio
 | `AC-06` | Recipient-to-top-holder comparison is materialized, including valid zero-match results. |
 | `AC-07` | Liquidity add/remove claims require complete signature-backed evidence; otherwise this item remains `not_investigated`. |
 | `AC-08` | Creator recurrence and holder/related-actor recurrence both require complete cross-token evidence lines. |
-| `AC-09` | Direct creator-to-dominant-holder relation is either VERIFIED or exactly `Direct creator → dominant-holder relation: NOT VERIFIED`. |
+| `AC-09` | Direct creator-to-dominant-holder relation is either VERIFIED or exactly `Direct creator → dominant-holder relation: NOT VERIFIED`. Explicit withholding satisfies the acceptance behavior without creating a chain claim. |
 | `AC-10` | One numberless deterministic verdict includes grade, triggered rule IDs, ruleset version and evidence references. |
 
 ## Canonical chain evidence line
@@ -70,7 +71,7 @@ A chain claim can pass only when its evidence line contains:
 - `evidence_key`
 - `evidence_source`
 
-Control-plane checks such as route input and target classification are labelled `kind=control`; they are never presented as transaction evidence.
+Control-plane checks such as route input and target classification are labelled `kind=control`; they are never presented as transaction evidence. An explicit `NOT VERIFIED` result carries no fabricated transaction row.
 
 ## Narrow-slice boundary
 
@@ -91,7 +92,7 @@ The first production result must be appended here only after:
 
 1. the branch passes complete Go test, vet and build gates;
 2. the route is deployed;
-3. the owner-only command above is run twice;
+3. the two-run verifier above succeeds;
 4. both responses have the same `acceptance_hash` when the underlying evidence set is unchanged;
 5. every failing or not-investigated item is retained with its reason.
 
