@@ -137,6 +137,7 @@ func TestActorSnapshotIdentityChangesWithAcceptanceEvidence(t *testing.T) {
 	first := dossierSnapshotIdentity(snapshot.Report, "UnifiedVerdict111")
 	acceptance := dossierMap(snapshot.Report["actor_acceptance"])
 	acceptance["acceptance_hash"] = "sha256:" + strings.Repeat("f", 64)
+	snapshot.Report["actor_acceptance"] = acceptance
 	second := dossierSnapshotIdentity(snapshot.Report, "UnifiedVerdict111")
 	if first == second {
 		t.Fatal("acceptance change did not change immutable actor snapshot identity")
@@ -162,6 +163,9 @@ func TestAssembleActorDossierRejectsVerifiedItemWithoutRefs(t *testing.T) {
 	first := dossierMap(items[0])
 	first["evidence"] = []any{}
 	first["evidence_state"] = "verified"
+	items[0] = first
+	acceptance["items"] = items
+	snapshot.Report["actor_acceptance"] = acceptance
 	_, _, err := assembleDossierBundle(snapshot)
 	if !errors.Is(err, errDossierReferenceMissing) {
 		t.Fatalf("err=%v", err)
