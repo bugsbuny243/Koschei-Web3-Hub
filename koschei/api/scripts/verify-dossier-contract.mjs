@@ -40,7 +40,7 @@ const tokenBody = {
   actor_dossier: {},
   holder_concentration_context: { available: true, sample_count: 50000 },
   technical_report: { target: mint },
-  verification: { verdict_signature: signature },
+  verification: { verdict_signature: signature, snapshot_identity: signature },
   limitations: ['Capability-not-intent', 'Identity boundary', 'Evidence-window boundary']
 };
 const bundle = hashBundle(tokenBody);
@@ -59,6 +59,7 @@ if (missingResult.ok || !missingResult.errors.includes('populated_signal_missing
 
 const wallet = 'yHCxHBEaJW5tbndqC8JciSThr7U1cqLpdcsvHcx6PRe';
 const actorSignature = 'ActorUnifiedVerdict111';
+const actorSnapshotIdentity = `actor-case:${'c'.repeat(64)}`;
 const actorRows = ACTOR_DOSSIER_ROW_IDS.map((id, index) => ({
   id,
   label: `Actor acceptance ${index + 1}`,
@@ -72,7 +73,7 @@ const actorRows = ACTOR_DOSSIER_ROW_IDS.map((id, index) => ({
 }));
 const actorBody = {
   dossier_version: 'koschei-dossier-v1',
-  case_ref: dossierCaseRef(wallet, actorSignature),
+  case_ref: dossierCaseRef(wallet, actorSnapshotIdentity),
   produced_at: '2026-07-17T08:00:00Z',
   source_snapshot_hash: `sha256:${'b'.repeat(64)}`,
   target: { kind: 'wallet', id: wallet, network: 'solana-mainnet', identity_scope: 'onchain_wallet_only' },
@@ -80,15 +81,15 @@ const actorBody = {
   verdict_card: { mapper_id: 'koschei-actor-acceptance-card', mapper_version: 'test', signal_rows: actorRows },
   actor_dossier: { wallet },
   actor_acceptance: { contract_version: 'koschei-actor-acceptance-v1', items: actorRows },
-  created_token_history: [{ mint: 'Mint111' }],
+  created_token_history: [{ mint: 'Mint111', verification_status: 'verified' }],
   funding_origin: { status: 'not_investigated', verification_status: 'unverified' },
-  cross_token_connections: { related_actors: [] },
+  cross_token_connections: { evidence_state: 'not_investigated', related_actor_observations: [] },
   evidence_log: [{ signature: 'CreateSig111', slot: 101, verification_status: 'verified' }],
   section_limitations: {
     acceptance_items: {}, funding_origin: ['Not investigated.'], created_token_history: [], cross_token_connections: [], evidence_log: []
   },
   technical_report: { target: wallet, analysis_scope: 'wallet_actor_investigation' },
-  verification: { verdict_signature: actorSignature },
+  verification: { verdict_signature: actorSignature, snapshot_identity: actorSnapshotIdentity },
   limitations: ['Capability-not-intent', 'Identity boundary', 'Evidence-window boundary']
 };
 const actorBundle = hashBundle(actorBody);
