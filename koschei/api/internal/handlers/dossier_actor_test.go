@@ -71,7 +71,7 @@ func actorDossierTestSnapshot(t *testing.T) dossierSnapshot {
 	}
 	return dossierSnapshot{
 		ID: "22222222-2222-4222-8222-222222222222",
-		Mint: wallet, Network: "solana-mainnet", VerdictSignature: "UnifiedVerdict111",
+		Mint: wallet, Network: "solana-mainnet", VerdictSignature: dossierSnapshotIdentity(report, "UnifiedVerdict111"),
 		RulesetVersion: "koschei-unified-radar-rules-v1.0.0", ProducedAt: observed,
 		SourceHash: dossierSHA256(raw), Report: report,
 	}
@@ -94,6 +94,10 @@ func TestAssembleActorDossierBundleIsDeterministicAndSelfContained(t *testing.T)
 	if dossierString(target["kind"]) != "wallet" || dossierString(target["id"]) != snapshot.Mint {
 		t.Fatalf("unexpected actor target: %#v", target)
 	}
+	verification := dossierMap(first.Verification)
+	if dossierString(verification["verdict_signature"]) != "UnifiedVerdict111" || dossierString(verification["snapshot_identity"]) != snapshot.VerdictSignature {
+		t.Fatalf("verdict and snapshot identities were not separated: %#v", verification)
+	}
 	rows := dossierSlice(dossierMap(first.VerdictCard)["signal_rows"])
 	if len(rows) != 10 {
 		t.Fatalf("actor signal rows=%d", len(rows))
@@ -113,6 +117,10 @@ func TestAssembleActorDossierBundleIsDeterministicAndSelfContained(t *testing.T)
 	if first.ActorAcceptance == nil || first.CreatedTokenHistory == nil || first.FundingOrigin == nil || first.CrossTokenConnections == nil || first.EvidenceLog == nil {
 		t.Fatal("actor case is missing a self-contained section")
 	}
+	created := dossierSlice(first.CreatedTokenHistory)
+	if len(created) != 1 || dossierString(dossierMap(created[0])["verification_status"]) != "verified" {
+		t.Fatalf("created-token evidence status is missing: %#v", created)
+	}
 	sections := dossierMap(first.SectionLimitations)
 	for _, key := range []string{"acceptance_items", "funding_origin", "created_token_history", "cross_token_connections", "evidence_log"} {
 		if _, ok := sections[key]; !ok {
@@ -121,6 +129,20 @@ func TestAssembleActorDossierBundleIsDeterministicAndSelfContained(t *testing.T)
 	}
 	if !strings.Contains(dossierPretty(first.ActorAcceptance), "Direct creator → dominant-holder relation: NOT VERIFIED") {
 		t.Fatal("explicit direct-relation withholding is missing")
+	}
+}
+
+func TestActorSnapshotIdentityChangesWithAcceptanceEvidence(t *testing.T) {
+	snapshot := actorDossierTestSnapshot(t)
+	first := dossierSnapshotIdentity(snapshot.Report, "UnifiedVerdict111")
+	acceptance := dossierMap(snapshot.Report["actor_acceptance"])
+	acceptance["acceptance_hash"] = "sha256:" + strings.Repeat("f", 64)
+	second := dossierSnapshotIdentity(snapshot.Report, "UnifiedVerdict111")
+	if first == second {
+		t.Fatal("acceptance change did not change immutable actor snapshot identity")
+	}
+	if !strings.HasPrefix(first, "actor-case:") || !strings.HasPrefix(second, "actor-case:") {
+		t.Fatalf("unexpected actor snapshot identities: %q %q", first, second)
 	}
 }
 
