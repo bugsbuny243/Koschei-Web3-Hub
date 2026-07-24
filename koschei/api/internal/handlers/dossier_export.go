@@ -61,6 +61,11 @@ func assembleDossierBundle(snapshot dossierSnapshot) (dossierBundle, []byte, err
 	if snapshot.Report == nil || strings.TrimSpace(snapshot.Mint) == "" || strings.TrimSpace(snapshot.VerdictSignature) == "" {
 		return dossierBundle{}, nil, errDossierSourceIncomplete
 	}
+	final := dossierMap(snapshot.Report["final_verdict"])
+	verdictSignature := strings.TrimSpace(dossierString(final["signature"]))
+	if verdictSignature == "" {
+		return dossierBundle{}, nil, errDossierSourceIncomplete
+	}
 	rows := buildDossierSignalRows(snapshot.Report)
 	actorCase := isActorDossierReport(snapshot.Report)
 	if actorCase {
@@ -76,27 +81,27 @@ func assembleDossierBundle(snapshot dossierSnapshot) (dossierBundle, []byte, err
 				return dossierBundle{}, nil, fmt.Errorf("%w: %s", errDossierReferenceMissing, row.ID)
 			}
 		}
-	}
 
 	caseRef := dossierCaseRef(snapshot.Mint, snapshot.VerdictSignature)
 	body := dossierBody{
-		DossierVersion: dossierVersion,
-		CaseRef: caseRef,
-		ProducedAt: snapshot.ProducedAt.UTC(),
+		DossierVersion:      dossierVersion,
+		CaseRef:             caseRef,
+		ProducedAt:          snapshot.ProducedAt.UTC(),
 		SourceSnapshotHash: snapshot.SourceHash,
-		Verdict: snapshot.Report["final_verdict"],
+		Verdict:             snapshot.Report["final_verdict"],
 		VerdictCard: map[string]any{
-			"mapper_id": "koschei-verdict-card",
+			"mapper_id":      "koschei-verdict-card",
 			"mapper_version": dossierMapperVersion,
-			"signal_rows": rows,
+			"signal_rows":    rows,
 		},
 		TechnicalReport: snapshot.Report,
 		Verification: map[string]any{
 			"verifier_repo_url": dossierVerifierRepo,
-			"verdict_signature": snapshot.VerdictSignature,
+			"verdict_signature": verdictSignature,
+			"snapshot_identity": snapshot.VerdictSignature,
 			"hash_algorithm": "SHA-256",
 			"bundle_hash_scope": "UTF-8 JSON encoding of the dossier body with bundle_hash excluded; Go struct field order is fixed and map keys are lexicographically sorted by encoding/json.",
-			"case_ref_rule": "KD1- + lower-case base32(no padding) of the first 20 SHA-256 bytes of target_id + newline + verdict_signature.",
+			"case_ref_rule": "KD1- + lower-case base32(no padding) of the first 20 SHA-256 bytes of target_id + newline + snapshot_identity.",
 			"command": "node oss/verifier/typescript/verify-dossier.mjs ./dossier.json",
 		},
 		Limitations: append([]string{}, dossierLimitations...),
@@ -104,9 +109,9 @@ func assembleDossierBundle(snapshot dossierSnapshot) (dossierBundle, []byte, err
 	if actorCase {
 		body.Target = actorDossierTarget(snapshot)
 		body.VerdictCard = map[string]any{
-			"mapper_id": "koschei-actor-acceptance-card",
+			"mapper_id":      "koschei-actor-acceptance-card",
 			"mapper_version": dossierActorMapperVersion,
-			"signal_rows": rows,
+			"signal_rows":    rows,
 		}
 		body.ActorDossier = snapshot.Report["actor_investigation"]
 		body.ActorAcceptance = snapshot.Report["actor_acceptance"]
@@ -118,11 +123,11 @@ func assembleDossierBundle(snapshot dossierSnapshot) (dossierBundle, []byte, err
 	} else {
 		body.Target = map[string]any{"kind": "token_mint", "id": snapshot.Mint, "network": snapshot.Network}
 		body.Token = map[string]any{
-			"mint": snapshot.Mint,
-			"network": snapshot.Network,
-			"market_snapshot": snapshot.Report["market"],
-			"launch_metadata": snapshot.Report["launch_forensics"],
-			"source_context": snapshot.Report["source_context"],
+			"mint":              snapshot.Mint,
+			"network":           snapshot.Network,
+			"market_snapshot":   snapshot.Report["market"],
+			"launch_metadata":   snapshot.Report["launch_forensics"],
+			"source_context":    snapshot.Report["source_context"],
 		}
 		body.ThreatAnticipation = snapshot.Report["threat_anticipation"]
 		body.EvidenceArms = dossierFirst(snapshot.Report["evidence_arms"], snapshot.Report["modules"], []any{})
