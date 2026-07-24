@@ -20,7 +20,7 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 	attachCreatorReportProjections(report)
 
 	if _, attached := report["defense_agent_runtime"]; !attached {
-		target := strings.TrimSpace(dossierString(report["target"]))
+		target := dossierSnapshotTarget(report)
 		network := firstNonEmptyString(dossierString(report["network"]), "solana-mainnet")
 		generatedAt := dossierParseTime(dossierString(report["generated_at"]))
 		if generatedAt.IsZero() {
@@ -46,7 +46,7 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 	if signature == "" || !dossierBool(final["signed"]) {
 		return nil
 	}
-	target := strings.TrimSpace(dossierString(report["target"]))
+	target := dossierSnapshotTarget(report)
 	if target == "" {
 		return nil
 	}
@@ -73,6 +73,15 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 		target, network, verdictID, signature, ruleset, producedAt.UTC(), sourceHash, canonical, string(canonical),
 	)
 	return err
+}
+
+func dossierSnapshotTarget(report map[string]any) string {
+	if strings.EqualFold(strings.TrimSpace(dossierString(report["analysis_scope"])), "wallet_actor_investigation") {
+		if wallet := strings.TrimSpace(dossierString(report["wallet"])); wallet != "" {
+			return wallet
+		}
+	}
+	return strings.TrimSpace(dossierString(report["target"]))
 }
 
 func attachCreatorReportProjections(report map[string]any) {
