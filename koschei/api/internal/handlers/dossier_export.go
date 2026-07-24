@@ -81,6 +81,7 @@ func assembleDossierBundle(snapshot dossierSnapshot) (dossierBundle, []byte, err
 				return dossierBundle{}, nil, fmt.Errorf("%w: %s", errDossierReferenceMissing, row.ID)
 			}
 		}
+	}
 
 	caseRef := dossierCaseRef(snapshot.Mint, snapshot.VerdictSignature)
 	body := dossierBody{
@@ -123,11 +124,11 @@ func assembleDossierBundle(snapshot dossierSnapshot) (dossierBundle, []byte, err
 	} else {
 		body.Target = map[string]any{"kind": "token_mint", "id": snapshot.Mint, "network": snapshot.Network}
 		body.Token = map[string]any{
-			"mint":              snapshot.Mint,
-			"network":           snapshot.Network,
-			"market_snapshot":   snapshot.Report["market"],
-			"launch_metadata":   snapshot.Report["launch_forensics"],
-			"source_context":    snapshot.Report["source_context"],
+			"mint":            snapshot.Mint,
+			"network":         snapshot.Network,
+			"market_snapshot": snapshot.Report["market"],
+			"launch_metadata": snapshot.Report["launch_forensics"],
+			"source_context":  snapshot.Report["source_context"],
 		}
 		body.ThreatAnticipation = snapshot.Report["threat_anticipation"]
 		body.EvidenceArms = dossierFirst(snapshot.Report["evidence_arms"], snapshot.Report["modules"], []any{})
