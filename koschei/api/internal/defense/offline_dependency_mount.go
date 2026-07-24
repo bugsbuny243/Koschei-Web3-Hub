@@ -9,22 +9,35 @@ import (
 
 const offlineDependencySandboxCargoConfigPath = "/tmp/koschei-scratch/cargo-home/config.toml"
 
-// AppendOfflineDependencySandboxArgs adds only read-only dependency mounts to a
-// Bubblewrap argv. The caller must place these mounts after the bounded scratch
-// bind and before the fixed Cargo command.
+// AppendOfflineDependencySandboxArgs inserts only read-only dependency mounts
+// before Bubblewrap's fixed final command. When no command separator exists it
+// appends the mounts, which is useful while constructing a policy incrementally.
 func AppendOfflineDependencySandboxArgs(args []string, authorization OfflineDependencyRuntimeAuthorization) ([]string, error) {
 	if err := validateOfflineDependencyRuntimeAuthorization(authorization); err != nil {
 		return nil, err
 	}
-	out := append([]string(nil), args...)
-	out = append(out,
+	mounts := []string{
 		"--dir", OfflineDependencyRootPath,
 		"--dir", OfflineDependencyVendorPath,
 		"--ro-bind", authorization.VendorPath, OfflineDependencyVendorPath,
 		"--ro-bind", authorization.InventoryPath, OfflineDependencyInventoryPath,
 		"--ro-bind", authorization.CargoConfigPath, OfflineDependencyCargoConfigPath,
 		"--ro-bind", authorization.CargoConfigPath, offlineDependencySandboxCargoConfigPath,
-	)
+	}
+	separator := -1
+	for index, value := range args {
+		if value == "--" {
+			separator = index
+			break
+		}
+	}
+	if separator < 0 {
+		return append(append([]string(nil), args...), mounts...), nil
+	}
+	out := make([]string, 0, len(args)+len(mounts))
+	out = append(out, args[:separator]...)
+	out = append(out, mounts...)
+	out = append(out, args[separator:]...)
 	return out, nil
 }
 
