@@ -36,11 +36,11 @@ type ActorAcceptanceEvidenceLine struct {
 	Timestamp          time.Time `json:"timestamp,omitempty"`
 	SourceWallet       string    `json:"source_wallet"`
 	DestinationWallet  string    `json:"destination_wallet"`
-	Amount              string    `json:"amount"`
-	Program             string    `json:"program"`
-	VerificationStatus  string    `json:"verification_status"`
-	TokenMint           string    `json:"token_mint,omitempty"`
-	EvidenceSource      string    `json:"evidence_source,omitempty"`
+	Amount             string    `json:"amount"`
+	Program            string    `json:"program"`
+	VerificationStatus string    `json:"verification_status"`
+	TokenMint          string    `json:"token_mint,omitempty"`
+	EvidenceSource     string    `json:"evidence_source,omitempty"`
 }
 
 type ActorAcceptanceItem struct {
@@ -65,17 +65,17 @@ type ActorAcceptanceVerdict struct {
 }
 
 type ActorAcceptanceResult struct {
-	ContractVersion     string                   `json:"contract_version"`
-	ActorRulesetVersion string                   `json:"actor_ruleset_version"`
-	Wallet              string                   `json:"wallet"`
-	Network             string                   `json:"network"`
-	Status              string                   `json:"status"`
-	PassCount           int                      `json:"pass_count"`
-	FailCount           int                      `json:"fail_count"`
-	NotInvestigatedCount int                     `json:"not_investigated_count"`
-	Items               []ActorAcceptanceItem    `json:"items"`
-	Verdict             ActorAcceptanceVerdict   `json:"verdict"`
-	AcceptanceHash      string                   `json:"acceptance_hash"`
+	ContractVersion      string                 `json:"contract_version"`
+	ActorRulesetVersion  string                 `json:"actor_ruleset_version"`
+	Wallet               string                 `json:"wallet"`
+	Network              string                 `json:"network"`
+	Status               string                 `json:"status"`
+	PassCount            int                    `json:"pass_count"`
+	FailCount            int                    `json:"fail_count"`
+	NotInvestigatedCount int                    `json:"not_investigated_count"`
+	Items                []ActorAcceptanceItem  `json:"items"`
+	Verdict              ActorAcceptanceVerdict `json:"verdict"`
+	AcceptanceHash       string                 `json:"acceptance_hash"`
 }
 
 func EvaluateActorAcceptance(input ActorAcceptanceInput) ActorAcceptanceResult {
@@ -96,12 +96,12 @@ func EvaluateActorAcceptance(input ActorAcceptanceInput) ActorAcceptanceResult {
 	}
 
 	result := ActorAcceptanceResult{
-		ContractVersion: ActorAcceptanceContractVersion,
+		ContractVersion:     ActorAcceptanceContractVersion,
 		ActorRulesetVersion: ActorDefenseRulesetVersion,
-		Wallet: wallet,
-		Network: network,
-		Items: items,
-		Verdict: verdict,
+		Wallet:              wallet,
+		Network:             network,
+		Items:               items,
+		Verdict:             verdict,
 	}
 	for _, item := range items {
 		switch item.Status {
@@ -215,7 +215,7 @@ func actorAcceptanceDirectCreatorHolder(dossier ActorDefenseDossier) ActorAccept
 	if len(verified) > 0 {
 		return actorAcceptanceItem("AC-09", "Direct creator to dominant-holder relation is proven or explicitly withheld", ActorAcceptancePass, "verified", "Direct creator-to-holder relation is transaction-backed.", verified)
 	}
-	return actorAcceptanceItemWithLimit("AC-09", "Direct creator to dominant-holder relation is proven or explicitly withheld", ActorAcceptanceFail, "not_verified", "Direct creator → dominant-holder relation: NOT VERIFIED", "The result is explicit and is not replaced by probability, identity or intent language.")
+	return actorAcceptanceItem("AC-09", "Direct creator to dominant-holder relation is proven or explicitly withheld", ActorAcceptancePass, "not_verified", "Direct creator → dominant-holder relation: NOT VERIFIED", []ActorAcceptanceEvidenceLine{})
 }
 
 func actorAcceptanceVerdictItem(verdict ActorAcceptanceVerdict) ActorAcceptanceItem {
@@ -340,9 +340,15 @@ func actorAcceptanceHash(result ActorAcceptanceResult) string {
 
 func actorAcceptanceSortEvidence(items []ActorAcceptanceEvidenceLine) {
 	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].Kind != items[j].Kind { return items[i].Kind < items[j].Kind }
-		if items[i].Slot != items[j].Slot { return items[i].Slot < items[j].Slot }
-		if items[i].Signature != items[j].Signature { return items[i].Signature < items[j].Signature }
+		if items[i].Kind != items[j].Kind {
+			return items[i].Kind < items[j].Kind
+		}
+		if items[i].Slot != items[j].Slot {
+			return items[i].Slot < items[j].Slot
+		}
+		if items[i].Signature != items[j].Signature {
+			return items[i].Signature < items[j].Signature
+		}
 		return items[i].EvidenceKey < items[j].EvidenceKey
 	})
 }
@@ -350,7 +356,9 @@ func actorAcceptanceSortEvidence(items []ActorAcceptanceEvidenceLine) {
 func actorAcceptanceRelationIn(value string, allowed ...string) bool {
 	value = strings.ToLower(strings.TrimSpace(value))
 	for _, candidate := range allowed {
-		if value == strings.ToLower(strings.TrimSpace(candidate)) { return true }
+		if value == strings.ToLower(strings.TrimSpace(candidate)) {
+			return true
+		}
 	}
 	return false
 }
@@ -359,25 +367,42 @@ func actorAcceptanceTokenRoleCount(items []ActorDefenseTokenObservation, role st
 	count := 0
 	for _, item := range items {
 		for _, candidate := range item.Roles {
-			if strings.EqualFold(strings.TrimSpace(candidate), strings.TrimSpace(role)) { count++; break }
+			if strings.EqualFold(strings.TrimSpace(candidate), strings.TrimSpace(role)) {
+				count++
+				break
+			}
 		}
 	}
 	return count
 }
 
 func actorAcceptanceMetadataString(metadata map[string]any, key string) string {
-	if metadata == nil { return "" }
-	return strings.TrimSpace(fmt.Sprint(metadata[key]))
+	if metadata == nil {
+		return ""
+	}
+	value, ok := metadata[key]
+	if !ok || value == nil {
+		return ""
+	}
+	out := strings.TrimSpace(fmt.Sprint(value))
+	if out == "<nil>" {
+		return ""
+	}
+	return out
 }
 
 func actorAcceptanceMetadataHas(metadata map[string]any, key string) bool {
-	if metadata == nil { return false }
+	if metadata == nil {
+		return false
+	}
 	_, ok := metadata[key]
 	return ok
 }
 
 func actorAcceptanceMetadataBool(metadata map[string]any, key string) bool {
-	if metadata == nil { return false }
+	if metadata == nil {
+		return false
+	}
 	switch value := metadata[key].(type) {
 	case bool:
 		return value
@@ -390,7 +415,9 @@ func actorAcceptanceMetadataBool(metadata map[string]any, key string) bool {
 
 func actorAcceptanceFirstLimitation(items []string, fallback string) string {
 	for _, item := range items {
-		if strings.TrimSpace(item) != "" { return strings.TrimSpace(item) }
+		if strings.TrimSpace(item) != "" {
+			return strings.TrimSpace(item)
+		}
 	}
 	return fallback
 }
