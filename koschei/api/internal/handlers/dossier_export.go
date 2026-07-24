@@ -149,10 +149,14 @@ func writeDossierJSON(w http.ResponseWriter, canonical []byte) {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "dossier_canonical_bundle_invalid"})
 		return
 	}
+	publicPath := "/dossier/" + bundle.CaseRef
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=koschei-%s.json", bundle.CaseRef))
 	w.Header().Set("ETag", `"`+bundle.BundleHash+`"`)
+	w.Header().Set("Content-Location", publicPath)
+	w.Header().Set("Link", `<`+publicPath+`>; rel="alternate"; type="text/html"`)
 	w.Header().Set("X-Koschei-Case-Ref", bundle.CaseRef)
+	w.Header().Set("X-Koschei-Public-Dossier", publicPath)
 	_, _ = w.Write(canonical)
 }
 
