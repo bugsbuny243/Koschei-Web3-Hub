@@ -11,7 +11,7 @@
 </head>
 <body class="safety-page koschei-v2">
 <main class="safety-wrap">
-<nav class="safety-nav"><a class="safety-brand" href="/"><span class="safety-mark">K</span><span><strong>Koschei ARVIS</strong><small>B2B Transaction Guard</small></span></a><div class="safety-links"><a class="safety-btn" href="/transaction-shield">Public Transaction Shield</a><a class="safety-btn" href="/scan?mode=deep">Deep Scan</a><a class="safety-btn" href="/developers">Developers</a><a class="safety-btn" href="/account">API Keys</a></div></nav>
+<nav class="safety-nav"><a class="safety-brand" href="/"><span class="safety-mark">K</span><span><strong>Koschei ARVIS</strong><small>B2B Transaction Guard</small></span></a><div class="safety-links"><a class="safety-btn" href="/dashboard#transaction-preflight">Customer Preflight</a><a class="safety-btn" href="/dashboard#capabilities">Security Capabilities</a><a class="safety-btn" href="/developers">Developers</a><a class="safety-btn" href="/account">API Keys</a></div></nav>
 <header class="safety-hero"><span class="safety-kicker">B2B TRANSACTION GUARD · SHADOW MODE</span><h1>Run the policy evidence before your system signs.</h1><p>This operator surface calls the authenticated Transaction Guard endpoint with a serialized Solana transaction and an API key you enter for the current page session. Koschei simulates and evaluates the transaction but does not sign, submit, store, or automatically block it.</p><div class="safety-proofline"><span class="safety-chip">X-API-Key endpoint</span><span class="safety-chip">Read-only simulation</span><span class="safety-chip">No transaction send</span><span class="safety-chip">API key not persisted</span><span class="safety-chip warn">Missing signal ≠ safe</span></div></header>
 <section class="firewall-shell">
 <article class="safety-panel">
@@ -31,7 +31,7 @@
 </section>
 <section class="safety-panel" style="margin-top:14px"><span class="safety-kicker">DECISION CONTRACT</span><h2>The engine result remains visible. Signing guidance is stricter.</h2><div class="safety-rules"><div class="safety-rule"><b>ALLOW</b><span>Displayed as PREFLIGHT CLEAR only when a real risk index exists and risk level is explicitly LOW.</span></div><div class="safety-rule"><b>WARN / BLOCK</b><span>Reviewable or deterministic blocking evidence remains visible and is never softened by the UI.</span></div><div class="safety-rule"><b>WITHHOLD</b><span>Provider outage or required evidence gap. No missing signal is interpreted as safe.</span></div></div></section>
 <p class="safety-fine">Transaction Guard is technical decision support for integration operators. Keep production API keys server-side in real applications; this browser surface is an operator testing tool, not a pattern for embedding server credentials in a public frontend.</p>
-<footer class="safety-footer"><span>Koschei Transaction Guard · B2B shadow simulation</span><nav><a href="/transaction-shield">Public Shield</a><a href="/scan?mode=deep">Deep Scan</a><a href="/developers">Developers</a><a href="/docs/api">API Docs</a></nav></footer>
+<footer class="safety-footer"><span>Koschei Transaction Guard · B2B shadow simulation</span><nav><a href="/dashboard#transaction-preflight">Customer Preflight</a><a href="/dashboard#capabilities">Security Capabilities</a><a href="/developers">Developers</a><a href="/docs/api">API Docs</a></nav></footer>
 </main>
 <script src="/js/koschei-global-shell.js?v=4"></script>
 <script src="/js/koschei-product-v2.js?v=1"></script>
