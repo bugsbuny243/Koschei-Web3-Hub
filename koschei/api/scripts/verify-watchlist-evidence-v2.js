@@ -17,12 +17,14 @@ function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`$
 requireText(html,'PROFESSIONAL SAAS · METERED STRUCTURAL MONITORING','Professional metered access copy');
 requireText(html,'requires the Professional plan','Professional access boundary');
 requireText(html,'Paid monitoring and webhook access are governed by the same Professional entitlement.','single paid-plan boundary');
-requireText(html,'href="/scan?mode=deep"','canonical Deep Scan route');
+requireText(html,'href="/dashboard#capabilities"','Customer Panel capability route');
+requireText(html,'Use the Customer Panel capability surface whenever you need the current evidence boundary.','investigation relationship boundary');
 requireText(html,'id="watchThreshold" type="number" min="1" max="100" value="50" required','explicit threshold input');
 requireText(html,'id="watchTargetCount">—/—','unknown initial target count');
 requireText(html,'id="watchAlertCount">—/—','unknown initial alert count');
 requireText(html,'/js/koschei-auth.js?v=33','frozen auth client');
 requireText(html,'/js/customer-watchlist-v2.js?v=2','hardened watchlist controller');
+forbid(html,/\/scan\?mode=deep/,'retired Deep Scan route');
 forbid(html,/KOSCH tier|holder tier|Enterprise-entitlement/i,'removed package/token-backed watchlist access copy');
 forbid(html,/<script(?![^>]*\bsrc=)[^>]*>/i,'inline runtime script');
 forbid(html,/\son[a-z]+\s*=/i,'inline event handler');
