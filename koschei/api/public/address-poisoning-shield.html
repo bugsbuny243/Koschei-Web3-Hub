@@ -13,7 +13,7 @@
 <main class="safety-wrap">
 <nav class="safety-nav">
 <a class="safety-brand" href="/"><span class="safety-mark">K</span><span><strong>Koschei ARVIS</strong><small>Recipient Shield</small></span></a>
-<div class="safety-links"><a class="safety-btn" href="/safe-check">Safe Check</a><a class="safety-btn" href="/transaction-shield">Transaction Shield</a><a class="safety-btn" href="/scan?mode=deep">Deep Scan</a><a class="safety-btn" href="/dashboard">Workspace</a></div>
+<div class="safety-links"><a class="safety-btn" href="/dashboard#capabilities">Security Capabilities</a><a class="safety-btn" href="/dashboard#transaction-preflight">Transaction Preflight</a><a class="safety-btn" href="/dashboard">Customer Panel</a></div>
 </nav>
 <header class="safety-hero">
 <span class="safety-kicker">PRE-SEND RECIPIENT PROTECTION · ADDRESS POISONING</span>
@@ -31,7 +31,7 @@
 <div class="safety-field"><label for="wallet">Your wallet</label><input class="safety-input safety-mono" id="wallet" autocomplete="off" required placeholder="Your Solana wallet address"></div>
 <div class="safety-field"><label for="candidate">Candidate recipient</label><input class="safety-input safety-mono" id="candidate" autocomplete="off" required placeholder="Full recipient address to verify"></div>
 <div class="safety-field"><label for="contacts">Trusted addresses · optional</label><textarea class="safety-textarea safety-mono" id="contacts" spellcheck="false" placeholder="One trusted address per line"></textarea></div>
-<div class="safety-actions"><button class="safety-btn primary" id="recipientRun" type="submit">Check recipient</button><a class="safety-btn" href="/safe-check">Open Safe Check</a></div>
+<div class="safety-actions"><button class="safety-btn primary" id="recipientRun" type="submit">Check recipient</button><a class="safety-btn" href="/dashboard#capabilities">View Security Capabilities</a></div>
 </form>
 <div class="safety-boundary"><b>Read-only boundary:</b> Recipient Shield reads public addresses and recent contact evidence. It does not request a seed phrase, private key, wallet approval, transaction signature, or transfer authority.</div>
 <div class="safety-rules"><div class="safety-rule"><b>Prefix collision</b><span>Detects candidates that imitate the visible beginning of a known address.</span></div><div class="safety-rule"><b>Suffix collision</b><span>Checks the visible tail attackers often copy to fool shortened wallet displays.</span></div><div class="safety-rule"><b>Contact evidence</b><span>Separates collected RPC contact evidence from limited or unavailable coverage.</span></div></div>
@@ -47,7 +47,7 @@
 <div class="safety-rules"><div class="safety-rule"><b>DO NOT SEND</b><span>Strong lookalike evidence or a blocking engine policy. Verify through a trusted out-of-band channel.</span></div><div class="safety-rule"><b>VERIFY FULL ADDRESS</b><span>Warning state, or engine ALLOW without the complete low-risk RPC contact evidence required for a clear display.</span></div><div class="safety-rule"><b>PREFLIGHT CLEAR</b><span>Displayed only when engine policy is ALLOW, risk is explicitly LOW, a real risk index exists, and RPC contact evidence was collected.</span></div></div>
 </section>
 <p class="safety-fine">Recipient Shield is technical decision support. It does not accuse a wallet owner of fraud or wrongdoing, and it does not replace independent confirmation of a material transfer destination.</p>
-<footer class="safety-footer"><span>Koschei Recipient Shield · pre-send address verification</span><nav><a href="/">Home</a><a href="/safe-check">Safe Check</a><a href="/transaction-shield">Transaction Shield</a><a href="/cases">Evidence Center</a></nav></footer>
+<footer class="safety-footer"><span>Koschei Recipient Shield · pre-send address verification</span><nav><a href="/">Home</a><a href="/dashboard#capabilities">Security Capabilities</a><a href="/dashboard#transaction-preflight">Transaction Preflight</a><a href="/cases">Evidence Center</a></nav></footer>
 </main>
 <script src="/js/koschei-auth.js?v=33"></script>
 <script src="/js/koschei-global-shell.js?v=4"></script>
