@@ -39,9 +39,16 @@ func TestCurrentPublicSurfacesAreSourceEnglish(t *testing.T) {
 	}
 }
 
-func TestRetiredClassicScanPageStaysRemoved(t *testing.T) {
-	if _, err := os.Stat("public/scan.html"); err == nil {
-		t.Fatal("retired classic scan page returned")
+func TestRetiredStandaloneCustomerPagesStayRemoved(t *testing.T) {
+	for _, path := range []string{
+		"public/scan.html",
+		"public/reports.html",
+		"public/watchlist.html",
+		"public/arvis-chat.html",
+	} {
+		if _, err := os.Stat(path); err == nil {
+			t.Fatalf("retired standalone customer page returned: %s", path)
+		}
 	}
 }
 
