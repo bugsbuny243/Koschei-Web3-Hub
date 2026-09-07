@@ -63,14 +63,21 @@ func TestStaticSurfaceAllowlistRejectsAccidentalFilesAndUnknownRoutes(t *testing
 	}
 }
 
-func TestStaticSurfaceAllowlistKeepsLegacyScannerRoutesRouterOwned(t *testing.T) {
+func TestStaticSurfaceAllowlistKeepsRetiredCustomerRoutesRouterOwned(t *testing.T) {
 	staticDir := t.TempDir()
 	writeStaticFixture(t, staticDir, "index.html", "home")
 	writeStaticFixture(t, staticDir, "dashboard.html", "dashboard")
-	// If these stale files accidentally return, the router must still own the
-	// legacy URLs and redirect to the canonical Customer Panel anchors.
-	writeStaticFixture(t, staticDir, "scan.html", "stale scan")
-	writeStaticFixture(t, staticDir, "safe-check.html", "stale safe check")
+	// If any retired file accidentally returns, the router must still own its
+	// compatibility URL and keep the single Customer Panel as the operation UI.
+	for _, name := range []string{
+		"scan.html",
+		"safe-check.html",
+		"reports.html",
+		"watchlist.html",
+		"arvis-chat.html",
+	} {
+		writeStaticFixture(t, staticDir, name, "stale standalone surface")
+	}
 
 	srv := httptest.NewServer(NewServer(nil, "", "", "", staticDir))
 	t.Cleanup(srv.Close)
@@ -85,6 +92,12 @@ func TestStaticSurfaceAllowlistKeepsLegacyScannerRoutesRouterOwned(t *testing.T)
 		{path: "/transaction-shield", location: "/dashboard#transaction-preflight"},
 		{path: "/safe-check", location: "/dashboard#capabilities"},
 		{path: "/security-radar", location: "/dashboard#capabilities"},
+		{path: "/reports", location: "/dashboard#evidence"},
+		{path: "/reports.html", location: "/dashboard#evidence"},
+		{path: "/watchlist", location: "/dashboard#evidence"},
+		{path: "/watchlist.html", location: "/dashboard#evidence"},
+		{path: "/arvis-chat", location: "/dashboard#intelligence"},
+		{path: "/arvis-chat.html", location: "/dashboard#intelligence"},
 	} {
 		req, err := http.NewRequest(http.MethodGet, srv.URL+test.path, nil)
 		if err != nil {
