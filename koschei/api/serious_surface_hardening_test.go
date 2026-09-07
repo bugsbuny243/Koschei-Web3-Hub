@@ -62,6 +62,8 @@ func TestCustomerPanelExposesOnlyLiveRuntimeControls(t *testing.T) {
 		"intentionally stateless",
 		"PERSISTENCE OFF",
 		"Feedback storage",
+		"LIVE · SOLANA MAINNET · READ ONLY",
+		`id="transactionPreflightForm"`,
 		"Koschei analyzes and simulates. It does not sign, submit, relay or broadcast customer transactions.",
 	} {
 		if !strings.Contains(htmlText, required) {
@@ -91,8 +93,10 @@ func TestCustomerPanelExposesOnlyLiveRuntimeControls(t *testing.T) {
 	}
 
 	jsText := string(js)
-	if !strings.Contains(jsText, "fetch('/health'") {
-		t.Error("dashboard runtime missing live health contract")
+	for _, required := range []string{"fetch('/health'", "fetch('/api/public/transaction-simulate'", "renderPreflightResult", "WITHHELD"} {
+		if !strings.Contains(jsText, required) {
+			t.Errorf("dashboard runtime missing live contract %q", required)
+		}
 	}
 	for _, forbidden := range []string{"/api/v1/radar/exposure", "/api/analytics/event", "feedbackContainsSecretLanguage", "sendBundle", "JITO_BUNDLE_URL", "Math.random("} {
 		if strings.Contains(jsText, forbidden) {
