@@ -34,18 +34,27 @@ func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 		}
 	}
 
-	reports := mustReadCommercialSurface(t, "public/js/customer-reports-v2.js")
+	dashboard := mustReadCommercialSurface(t, "public/dashboard.html")
 	for _, required := range []string{
-		"function historyAccessError(statusCode)",
-		"Sign in to view your investigation history.",
-		"Investigation history requires an active Professional entitlement.",
+		"Durable history",
+		"Continuous monitoring",
+		"Persisted alerts",
+		"NOT LIVE",
+		"PERSISTENCE OFF",
+		"The current production process is intentionally stateless",
 	} {
-		if !strings.Contains(reports, required) {
-			t.Errorf("reports error boundary missing %q", required)
+		if !strings.Contains(dashboard, required) {
+			t.Errorf("dashboard commercial truth boundary missing %q", required)
 		}
 	}
-	if strings.Contains(reports, "access+text(data?.message||data?.error") {
-		t.Error("reports still concatenates backend machine errors into customer access copy")
+	for _, retired := range []string{
+		"public/js/customer-reports-v2.js",
+		"public/js/customer-watchlist-v2.js",
+		"public/js/customer-arvis-chat-v1.js",
+	} {
+		if _, err := os.Stat(retired); err == nil {
+			t.Errorf("retired persistence-backed customer runtime returned: %s", retired)
+		}
 	}
 
 	navigation := mustReadCommercialSurface(t, "public/js/unified-scan-navigation.js")
