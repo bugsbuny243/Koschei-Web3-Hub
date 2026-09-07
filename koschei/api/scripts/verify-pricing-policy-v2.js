@@ -24,8 +24,10 @@ requireText(html,'The server decides access. The browser never invents it.','ser
 requireText(html,'PROFESSIONAL</strong>','Professional policy card');
 requireText(html,'SERVER-SIDE','server authority card');
 requireText(html,'FAIL-CLOSED','evidence boundary card');
+requireText(html,'/dashboard#capabilities','Customer Panel capability route');
 requireText(html,'/css/koschei.css?v=1','universe stylesheet');
 
+forbid(html,/\/scan\?mode=deep/,'retired Deep Scan navigation');
 forbid(html,/<h2>Free Core<\/h2>/i,'free investigation tier');
 forbid(html,/Request early access/i,'retired early access form');
 forbid(html,/COMMERCIAL CHECKOUT PAUSED/i,'retired paused-checkout marketing');
