@@ -13,13 +13,10 @@ func TestGlobalShellProducesEnglishNavigationAndMessages(t *testing.T) {
 	}
 	text := string(body)
 	for _, required := range []string{
+		"['/','Home']",
+		"['/dashboard','Customer Panel']",
 		"['/live','Live SOC']",
 		"['/cases','Cases']",
-		"['/scan','Token Scan']",
-		"['/transaction-shield','Transaction Shield']",
-		"['/safe-check','Safe Check']",
-		"['/scan?mode=deep','Deep Scan']",
-		"['/dashboard','Workspace']",
 		"nav.setAttribute('aria-label','Main navigation')",
 		"document.documentElement.lang='en'",
 		"The evidence service did not respond within",
@@ -31,13 +28,16 @@ func TestGlobalShellProducesEnglishNavigationAndMessages(t *testing.T) {
 	}
 	for _, forbidden := range []string{
 		"document.documentElement.lang='tr'",
-		"['/scan','Token Tara']",
+		"['/scan','Token Scan']",
+		"['/transaction-shield','Transaction Shield']",
+		"['/safe-check','Safe Check']",
+		"['/scan?mode=deep','Deep Scan']",
 		"nav.setAttribute('aria-label','Ana menü')",
 		"run.textContent='Kontrol ediliyor…'",
 		"Koschei ARVIS · Solana güvenlik merkezi</span>",
 	} {
 		if strings.Contains(text, forbidden) {
-			t.Errorf("global shell still produces Turkish UI contract %q", forbidden)
+			t.Errorf("global shell contains retired or Turkish UI contract %q", forbidden)
 		}
 	}
 }
