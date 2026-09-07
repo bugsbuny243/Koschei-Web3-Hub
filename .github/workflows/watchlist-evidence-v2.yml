@@ -3,10 +3,12 @@ name: Watchlist Evidence-State V2 Acceptance
 on:
   pull_request:
     paths:
-      - 'koschei/api/public/watchlist.html'
-      - 'koschei/api/public/js/customer-watchlist-v2.js'
+      - 'koschei/api/public/dashboard.html'
+      - 'koschei/api/public/js/customer-workspace-v2.js'
       - 'koschei/api/scripts/verify-watchlist-evidence-v2.js'
       - 'koschei/api/internal/http/server.go'
+      - 'koschei/api/internal/http/static_aliases.go'
+      - 'koschei/api/internal/http/static_surface_allowlist.go'
       - 'koschei/api/internal/http/watchlist_routes.go'
       - 'koschei/api/internal/handlers/watchlist.go'
       - 'koschei/api/internal/handlers/watchlist_monitor.go'
@@ -24,7 +26,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Check watchlist JavaScript syntax
-        run: node --check koschei/api/public/js/customer-watchlist-v2.js
-      - name: Verify fail-closed watchlist evidence contract
+      - name: Check dashboard workspace JavaScript syntax
+        run: node --check koschei/api/public/js/customer-workspace-v2.js
+      - name: Verify fail-closed watchlist backend and stateless surface contract
         run: node koschei/api/scripts/verify-watchlist-evidence-v2.js
