@@ -42,7 +42,7 @@ func TestOwnerStaticRouteServesLoginUI(t *testing.T) {
 	}
 }
 
-func TestCleanRoutesExposeAllPublicModules(t *testing.T) {
+func TestCleanRoutesExposeApprovedAuxiliaryAndCanonicalSurfaces(t *testing.T) {
 	staticDir := t.TempDir()
 	files := map[string]string{
 		"index.html":             "index",
@@ -69,10 +69,8 @@ func TestCleanRoutesExposeAllPublicModules(t *testing.T) {
 		"program-scanner.html":   "program",
 		"radar.html":             "radar",
 		"register.html":          "register",
-		"reports.html":           "reports",
 		"smart-money.html":       "smart-money",
 		"support.html":           "support",
-		"watchlist.html":         "watchlist",
 	}
 	for name, body := range files {
 		if err := os.WriteFile(filepath.Join(staticDir, name), []byte(body), 0o644); err != nil {
@@ -87,6 +85,7 @@ func TestCleanRoutesExposeAllPublicModules(t *testing.T) {
 		"/account":           "account",
 		"/agent-api":         "agent-api",
 		"/airdrop-checker":   "dashboard",
+		"/arvis-chat":        "dashboard",
 		"/chains":            "chains",
 		"/cross-chain-risk":  "dashboard",
 		"/dashboard":         "dashboard",
@@ -108,6 +107,7 @@ func TestCleanRoutesExposeAllPublicModules(t *testing.T) {
 		"/project-radar":     "dashboard",
 		"/radar":             "dashboard",
 		"/register":          "register",
+		"/reports":           "dashboard",
 		"/risk":              "dashboard",
 		"/risk-v2":           "dashboard",
 		"/smart-money":       "dashboard",
@@ -118,7 +118,7 @@ func TestCleanRoutesExposeAllPublicModules(t *testing.T) {
 		"/tx-decoder":        "dashboard",
 		"/tx-decoder-pro":    "dashboard",
 		"/wallet-score":      "dashboard",
-		"/watchlist":         "watchlist",
+		"/watchlist":         "dashboard",
 	}
 	for route, want := range cases {
 		route, want := route, want
