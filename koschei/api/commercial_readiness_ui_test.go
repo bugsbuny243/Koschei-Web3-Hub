@@ -9,20 +9,21 @@ import (
 func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 	pricing := mustReadCommercialSurface(t, "public/pricing.html")
 	for _, required := range []string{
-		"ONE ACCESS CONTRACT · PROFESSIONAL",
-		"Enter the ARVIS universe.",
-		`data-polar-plan="professional"`,
-		"Professional is the only paid customer plan.",
+		"CURRENT DEPLOYMENT · COMMERCIAL TRUTH",
+		"Do not sell what the runtime cannot deliver.",
+		"Professional remains the current server-side entitlement contract",
+		"Commercial authorization exists. Commercial checkout is not live.",
+		"Starter and Enterprise remain product-package directions, not active sale packages in this deployment.",
 		"The server decides access. The browser never invents it.",
-		"polar-checkout-v1.js",
+		"NOT LIVE · DB-backed secure checkout in the current stateless process",
 	} {
 		if !strings.Contains(pricing, required) {
 			t.Errorf("pricing missing %q", required)
 		}
 	}
 	for _, forbidden := range []string{
-		"COMMERCIAL CHECKOUT PAUSED",
-		"Evidence first. Paid checkout later.",
+		`data-polar-plan="professional"`,
+		"polar-checkout-v1.js",
 		`id="earlyAccessForm"`,
 		"<h2>Free Core</h2>",
 		"$299 / month",
@@ -30,7 +31,7 @@ func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 		"$4,999 / month",
 	} {
 		if strings.Contains(pricing, forbidden) {
-			t.Errorf("pricing still exposes retired commercial surface %q", forbidden)
+			t.Errorf("pricing exposes unavailable or retired commercial surface %q", forbidden)
 		}
 	}
 
@@ -51,9 +52,11 @@ func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 		"public/js/customer-reports-v2.js",
 		"public/js/customer-watchlist-v2.js",
 		"public/js/customer-arvis-chat-v1.js",
+		"public/js/customer-arvis-metaverse-v1.js",
+		"public/js/polar-checkout-v1.js",
 	} {
 		if _, err := os.Stat(retired); err == nil {
-			t.Errorf("retired persistence-backed customer runtime returned: %s", retired)
+			t.Errorf("retired or unavailable customer runtime returned: %s", retired)
 		}
 	}
 
