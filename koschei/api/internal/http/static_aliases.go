@@ -67,6 +67,17 @@ func registerStaticAliases(mux *http.ServeMux, staticDir string) {
 		registerStaticFileAlias(mux, route, filepath.Join(staticDir, "dashboard.html"))
 	}
 
+	// Persistence-backed customer operations remain valid backend contracts but
+	// are not live in the intentionally stateless production process. Keep their
+	// legacy URLs as compatibility redirects into the single Customer Panel
+	// instead of serving standalone controls that can only return 503 today.
+	for _, route := range []string{"/reports", "/reports/", "/reports.html", "/watchlist", "/watchlist/", "/watchlist.html"} {
+		registerCanonicalRedirect(mux, route, "/dashboard#evidence")
+	}
+	for _, route := range []string{"/arvis-chat", "/arvis-chat/", "/arvis-chat.html"} {
+		registerCanonicalRedirect(mux, route, "/dashboard#intelligence")
+	}
+
 	// Former standalone customer functions no longer get a second product page.
 	// Feedback and Exposure both require persistence-backed state in the current
 	// implementation, while production is intentionally stateless. Their legacy
