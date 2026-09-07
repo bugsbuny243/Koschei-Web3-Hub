@@ -1,0 +1,24 @@
+name: Canonical Product Contract V7 Acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'koschei/api/public/security-ecosystem.json'
+      - 'koschei/api/public/index.html'
+      - 'koschei/api/public/dashboard.html'
+      - 'koschei/api/internal/http/static_aliases.go'
+      - 'koschei/api/scripts/verify-canonical-product-contract-v7.js'
+      - '.github/workflows/canonical-product-contract-v7.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-product-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify canonical product contract v7
+        run: node koschei/api/scripts/verify-canonical-product-contract-v7.js
