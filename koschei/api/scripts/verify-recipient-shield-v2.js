@@ -11,7 +11,6 @@ function requireOrder(source,first,second,label){const a=source.indexOf(first),b
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
 
 requireText(html,'<html lang="en">','recipient html language');
-requireText(html,'/css/koschei.css?v=1','global shell');
 requireText(html,'/css/koschei.css?v=1','shared safety styles');
 requireText(html,'id="recipientForm"','recipient form');
 requireText(html,'id="wallet"','wallet input');
@@ -22,10 +21,14 @@ requireText(html,'id="recipientNotice"','recipient notice');
 requireText(html,'id="recipientResult" aria-live="polite"','accessible result surface');
 requireText(html,'Missing contact evidence ≠ safe','missing-evidence boundary');
 requireText(html,'PREFLIGHT CLEAR','strict clear-state explanation');
+requireText(html,'/dashboard#capabilities','Customer Panel capability route');
+requireText(html,'/dashboard#transaction-preflight','Customer Panel preflight route');
 requireText(html,'/js/koschei-auth.js?v=33','existing frozen auth client');
 requireText(html,'/js/address-poisoning-shield-v2.js?v=1','recipient controller');
 requireOrder(html,'/js/koschei-auth.js?v=33','/js/address-poisoning-shield-v2.js?v=1','auth client before page controller');
-if(html.includes('/security-radar'))throw new Error('recipient shield must not revive duplicate security-radar route');
+for(const retired of ['/safe-check','/transaction-shield','/scan?mode=deep','/security-radar']){
+  if(html.includes(retired))throw new Error(`recipient shield must not revive retired route ${retired}`);
+}
 forbid(html,/\son[a-z]+\s*=/i,'inline event handler');
 forbid(html,/<script(?![^>]*\bsrc=)[^>]*>/i,'inline script');
 
