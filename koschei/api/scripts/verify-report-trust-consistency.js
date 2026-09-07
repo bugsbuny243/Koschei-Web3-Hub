@@ -14,8 +14,9 @@ function reject(file, text) {
   if (body.includes(text)) throw new Error(`${file} contains retired ${text}`);
 }
 
-// Investigation/report evidence contract remains unchanged while the legacy
-// investigation console remains available behind compatibility routes.
+// Legacy scan artifacts remain temporarily in-tree for a dependency-prune wave,
+// but they no longer own a customer route. Preserve their evidence contracts
+// until their direct verifier/test dependencies are retired with the files.
 need('public/js/public-solana-scan.js', 'Pending evidence arms and monitoring windows');
 need('public/js/public-solana-scan.js', 'Missing evidence = no safety decision');
 need('public/js/public-solana-scan.js', '/api/public/transaction-simulate');
@@ -46,13 +47,18 @@ reject('public/index.html', 'Ethereum</b><small>LIVE');
 reject('public/index.html', 'TRON</b><small>LIVE');
 
 // Persistence-backed dashboard controls must stay absent while production is
-// intentionally stateless. The panel exposes the capability boundary rather
-// than issuing guaranteed-503 requests or pretending data was stored.
+// intentionally stateless. Read-only Solana transaction simulation is a live,
+// stateless capability and now belongs to the Customer Panel.
 need('public/dashboard.html', 'PERSISTENCE OFF');
 need('public/dashboard.html', 'Durable history');
 need('public/dashboard.html', 'Feedback storage');
+need('public/dashboard.html', 'id="transaction-preflight"');
+need('public/dashboard.html', 'LIVE · SOLANA MAINNET · READ ONLY');
+need('public/dashboard.html', 'NO SIGNING · NO BROADCAST');
 reject('public/dashboard.html', 'id="feedbackForm"');
 reject('public/dashboard.html', 'id="exposureForm"');
+need('public/js/koschei-dashboard.js', "/api/public/transaction-simulate");
+need('public/js/koschei-dashboard.js', 'renderPreflightResult');
 reject('public/js/koschei-dashboard.js', '/api/analytics/event');
 reject('public/js/koschei-dashboard.js', '/api/v1/radar/exposure');
 need('public/js/customer-workspace-v2.js', "read('/api/me')");
@@ -78,4 +84,4 @@ if ((dashboard.match(/<link rel="stylesheet"/g) || []).length !== 1) {
   throw new Error('public/dashboard.html must load exactly one stylesheet');
 }
 
-console.log('Professional investigation/report trust and stateless customer-panel contract verified');
+console.log('Professional investigation/report trust and canonical dashboard preflight contract verified');
