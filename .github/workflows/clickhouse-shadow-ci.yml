@@ -54,6 +54,15 @@ jobs:
       - name: Download modules
         run: go mod download
 
+      - name: Require gofmt-clean ClickHouse paths
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l internal/clickhouse cmd/clickhouse-shadow cmd/clickhouse-schema)"
+          if [ -n "${unformatted}" ]; then
+            printf '%s\n' "${unformatted}"
+            exit 1
+          fi
+
       - name: Verify reviewed migration checksum
         run: |
           set -euo pipefail
