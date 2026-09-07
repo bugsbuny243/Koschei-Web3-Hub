@@ -1,16 +1,16 @@
 {
   "ok": true,
   "product": "Koschei ARVIS",
-  "surface": "Security Evidence Ecosystem",
-  "version": "security-ecosystem-v6-canonical-scan-boundary",
-  "positioning": "Koschei ARVIS remains a production-independent deterministic Solana security product. Koschei Sentinel and the Koschei language mature separately in offline incubation until explicit future integration gates pass.",
+  "surface": "Security Validation & Risk Intelligence",
+  "version": "security-ecosystem-v7-two-surface-boundary",
+  "positioning": "Koschei Web3 is an evidence-first Web3 security validation and risk-intelligence platform. Solana is the live production core; additional chains are expansion targets. Koschei Sentinel and Koschei Lang remain external/incubating systems and have no customer-runtime verdict authority.",
   "ecosystem": {
     "contract": "/docs/koschei-ecosystem-contract-v1.md",
     "runtime_integration_state": "incubation_only",
     "projects": [
       {
         "id": "koschei-web3-hub",
-        "role": "deterministic Solana evidence, durable security memory and signed verdicts",
+        "role": "Web3 security validation, risk intelligence, evidence and defense verification",
         "status": "production_independent",
         "repository": "https://github.com/bugsbuny243/Koschei-Web3-Hub"
       },
@@ -22,7 +22,7 @@
       },
       {
         "id": "koschei-sentinel",
-        "role": "offline evidence-grounded Solana security model training and evaluation",
+        "role": "offline evidence-grounded security model training and evaluation",
         "status": "incubating_not_runtime_integrated",
         "repository": "https://github.com/bugsbuny243/koschei-sentinel"
       }
@@ -50,23 +50,20 @@
     "shared_identity_is_not_runtime_integration": true
   },
   "access_model": {
-    "provider": "free core plus KOSCH premium",
-    "mode": "public_basic_verified_holder_premium",
-    "free_core": [
-      "public safe check",
-      "basic token fundamentals"
+    "mode": "two_surface_customer_product",
+    "primary_product_surfaces": [
+      "/",
+      "/dashboard"
     ],
-    "premium": [
-      "deep scan",
-      "exposure reports",
-      "graph",
-      "watchlist",
-      "webhooks",
-      "developer API",
-      "advanced deterministic agents"
+    "live_customer_capabilities": [
+      "read-only Solana transaction simulation"
     ],
-    "wallet_proof": "Phantom one-time message signature",
-    "legacy_payment_providers": [],
+    "persistence_backed_capabilities": "withheld_when_runtime_persistence_is_unavailable",
+    "planned_packages": [
+      "starter",
+      "professional",
+      "enterprise"
+    ],
     "package_outputs": false
   },
   "provider_policy": {
@@ -202,20 +199,12 @@
     }
   ],
   "customer_surfaces": [
-    "/dashboard",
-    "/safe-check",
-    "/scan?mode=deep",
-    "/exposure-report",
-    "/reports",
-    "/kosch",
-    "/api/token/scan",
-    "/api/v1/risk/badge",
-    "/widget.js"
+    "/",
+    "/dashboard"
   ],
   "immutable_rules": [
     "No evidence, no claim",
-    "Basic security checks remain public and rate limited",
-    "KOSCH unlocks documented premium depth; it does not remove free access",
+    "Missing evidence remains unknown or withheld rather than becoming a safety claim",
     "KOSCH holdings cannot change evidence, grades, signatures, compiler rules, model promotion or integration readiness",
     "Sentinel is not connected to customer runtime during incubation",
     "Koschei language is not a Web3 production dependency during incubation",
