@@ -41,7 +41,7 @@ func TestPublicSiteKeepsTwoPrimaryStylesAndOneLegacyCompatibilityBundle(t *testi
 
 	expectedPrimary := map[string]string{
 		filepath.Clean("public/index.html"):     "/css/koschei-home.css?v=1",
-		filepath.Clean("public/dashboard.html"): "/css/koschei-dashboard.css?v=2",
+		filepath.Clean("public/dashboard.html"): "/css/koschei-dashboard.css?v=3",
 	}
 
 	err = filepath.WalkDir("public", func(path string, entry os.DirEntry, walkErr error) error {
