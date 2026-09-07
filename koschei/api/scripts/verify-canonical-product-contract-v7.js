@@ -6,6 +6,7 @@ const manifest=JSON.parse(fs.readFileSync(path.join(root,'public','security-ecos
 const aliases=fs.readFileSync(path.join(root,'internal','http','static_aliases.go'),'utf8');
 const home=fs.readFileSync(path.join(root,'public','index.html'),'utf8');
 const dashboard=fs.readFileSync(path.join(root,'public','dashboard.html'),'utf8');
+const shell=fs.readFileSync(path.join(root,'public','js','koschei-global-shell.js'),'utf8');
 
 function requireValue(condition,label){if(!condition)throw new Error(label);}
 function requireText(source,needle,label){if(!source.includes(needle))throw new Error(`${label}: missing ${needle}`);}
@@ -42,6 +43,14 @@ requireText(home,'See the blind spot.','Home surface contract');
 requireText(dashboard,'id="transaction-preflight"','Customer Panel preflight mount');
 requireText(dashboard,'LIVE · SOLANA MAINNET · READ ONLY','Customer Panel live capability truth');
 requireText(dashboard,'NO SIGNING · NO BROADCAST','transaction authority boundary');
+
+requireText(shell,"var links=[['/','Home'],['/dashboard','Customer Panel'],['/live','Live SOC'],['/cases','Cases']];",'two-surface global navigation');
+requireText(shell,'installBoundedAPIFetch();','bounded API fetch compatibility');
+requireText(shell,'translate(document.body);','translation compatibility');
+rejectText(shell,"['/scan','Token Scan']",'retired scanner global navigation');
+rejectText(shell,"['/scan?mode=deep','Deep Scan']",'retired deep-scan global navigation');
+rejectText(shell,"['/transaction-shield','Transaction Shield']",'retired transaction-shield global navigation');
+rejectText(shell,"['/safe-check','Safe Check']",'retired safe-check global navigation');
 
 requireText(aliases,'"/scan", "/scan/", "/scan.html", "/transaction-shield"','transaction compatibility routes');
 requireText(aliases,'registerCanonicalRedirect(mux, route, "/dashboard#transaction-preflight")','transaction compatibility target');
