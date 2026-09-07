@@ -13,23 +13,27 @@ function requireText(source,needle,label){if(!source.includes(needle))throw new 
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
 
 requireText(html,'<html lang="en">','Token-2022 scanner language');
-requireText(html,'Starter SaaS plan or higher','Starter SaaS access copy');
+requireText(html,'Professional entitlement','Professional SaaS access copy');
+requireText(html,'persistence-backed Professional Token-2022 route','persistence-backed route disclosure');
+requireText(html,'If that runtime is unavailable, this surface remains unavailable; it does not fall back to a synthetic result.','runtime unavailable boundary');
 requireText(html,'Dedicated /api/v1/token/extensions','dedicated route copy');
 requireText(html,'Unresolved extension state → WITHHOLD','withhold policy copy');
-requireText(html,'/scan?mode=deep','canonical Deep Scan route');
+requireText(html,'/dashboard#capabilities','Customer Panel capability route');
 requireText(html,'/pricing','canonical plans route');
 requireText(html,'KOSCH holdings and legacy holder tiers do not authorize or upgrade this surface.','explicit token separation');
 requireText(html,'/js/koschei-auth.js?v=33','frozen auth client');
 requireText(html,'/js/token-2022-scanner-v2.js?v=1','external Token-2022 controller');
+if(html.includes('/scan?mode=deep'))throw new Error('Token-2022 scanner must not advertise retired Deep Scan');
 if(html.includes('/security-radar'))throw new Error('Token-2022 scanner must not advertise legacy security-radar');
 if(html.includes('/kosch-access'))throw new Error('Token-2022 scanner must not advertise legacy kosch-access');
+forbid(html,/Starter SaaS|Starter-SaaS|Starter SaaS plan or higher/i,'stale Starter access claim');
 forbid(html,/Basic-tier|Basic tier|Verify KOSCH Access|customer-session \+ KOSCH|premium Basic-tier gate|KOSCH protected/i,'stale token-backed commercial access claim');
 forbid(html,/<script(?![^>]*\bsrc=)[^>]*>/i,'inline runtime script');
 forbid(html,/\son[a-z]+\s*=/i,'inline event handler');
 
 requireText(server,'planTier := func(plan string, next http.HandlerFunc) http.HandlerFunc','central SaaS plan gate');
 requireText(server,'return handlers.RequireAuth(h.RequirePlanTier(plan, h.EnforcePlanOutput(next)))','central SaaS plan + output enforcement');
-requireText(server,'mux.HandleFunc("/api/v1/token/extensions", solana(risk(requiresDB(h, planTier("starter", method("POST", h.TokenScan))))))','dedicated Starter TokenScan route');
+requireText(server,'mux.HandleFunc("/api/v1/token/extensions", solana(risk(requiresDB(h, planTier("professional", method("POST", h.TokenScan))))))','dedicated Professional TokenScan route');
 requireText(server,'mux.HandleFunc("/api/token/scan", solana(risk(method("POST", h.TokenScan))))','public compatibility TokenScan route');
 forbid(server,/koschTier\(|RequireTokenTier|EnforceScanQuota/,'legacy token authorization in boot chain');
 
@@ -43,8 +47,8 @@ requireText(extensions,'Severity    string         `json:"severity"`','extension
 requireText(extensions,'RiskPenalty int            `json:"risk_penalty"`','extension penalty field');
 requireText(extensions,'Summary     string         `json:"summary"`','extension summary field');
 
-requireText(js,"KoscheiAuth.apiCall('/api/v1/token/extensions'",'dedicated premium Token-2022 request');
-if(js.includes("apiCall('/api/token/scan'"))throw new Error('premium Token-2022 page must not call generic compatibility scan route');
+requireText(js,"KoscheiAuth.apiCall('/api/v1/token/extensions'",'dedicated Professional Token-2022 request');
+if(js.includes("apiCall('/api/token/scan'"))throw new Error('Professional Token-2022 page must not call generic compatibility scan route');
 requireText(js,"KoscheiAuth.requireAuth('/login.html')",'customer session requirement');
 requireText(js,"data?.verdict_withheld===true||data?.extension_evidence_complete===false",'withheld evidence display gate');
 requireText(js,"raw==='allow'&&(score===null||level!=='low')",'incomplete allow downgrade');
@@ -69,4 +73,4 @@ requireText(css,'.token2022-verdict.warn','withhold/warn state styles');
 requireText(css,'.token2022-verdict.bad','block state styles');
 requireText(css,'.token2022-extension.high','high extension styles');
 requireText(css,'@media(max-width:650px)','mobile Token-2022 layout');
-console.log('Token-2022 scanner v2 + Starter SaaS contract: ok');
+console.log('Token-2022 scanner v2 + Professional persistence-backed contract: ok');
