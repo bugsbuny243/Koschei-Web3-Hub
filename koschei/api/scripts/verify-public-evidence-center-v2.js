@@ -14,13 +14,14 @@ function visibleSource(html){return html.replace(/<span hidden data-public-smoke
 for(const [html,label] of [[cases,'cases html'],[live,'live html']]){
   requireText(html,'<html lang="en">',label);
   requireText(html,'/css/koschei.css?v=1',label);
-  requireText(html,'/css/koschei.css?v=1',label);
   if(/[İıŞşĞğÇçÖöÜü]/.test(visibleSource(html)))throw new Error(`${label}: visible public copy must remain English`);
+  if(html.includes('/scan?mode=deep'))throw new Error(`${label}: retired Deep Scan navigation returned`);
 }
 requireText(cases,'data-public-smoke-transition="cases">Yayınlanmış Güvenlik Vakaları','cases transitional smoke marker');
 requireText(live,'data-public-smoke-transition="live">Canlı SOC','live transitional smoke marker');
 requireText(cases,'Published evidence.','cases evidence headline');
 requireText(live,'No synthetic activity.','live no-synthetic-activity headline');
+requireText(live,'/dashboard#capabilities','live Customer Panel capability route');
 requireText(cases,'id="case-search"','cases search');
 requireText(cases,'id="case-grade"','cases grade filter');
 requireText(live,'id="live-search"','live search');
