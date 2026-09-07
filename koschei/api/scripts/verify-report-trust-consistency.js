@@ -14,20 +14,24 @@ function reject(file, text) {
   if (body.includes(text)) throw new Error(`${file} contains retired ${text}`);
 }
 
-// Legacy scan artifacts remain temporarily in-tree for a dependency-prune wave,
-// but they no longer own a customer route. Preserve their evidence contracts
-// until their direct verifier/test dependencies are retired with the files.
+// Evidence renderer assets are retained until their remaining compatibility
+// consumers are audited, but the classic scan page itself is no longer a
+// customer product surface.
 need('public/js/public-solana-scan.js', 'Pending evidence arms and monitoring windows');
 need('public/js/public-solana-scan.js', 'Missing evidence = no safety decision');
 need('public/js/public-solana-scan.js', '/api/public/transaction-simulate');
 need('public/js/lp-control-evidence-card.js', 'Havuz hareket geçmişi bu taramada doğrulanamadı');
-need('public/scan.html', 'PROFESSIONAL · CLASSIC INVESTIGATION CONSOLE');
-need('public/scan.html', 'Missing evidence is shown as a limitation, not converted into a safety claim.');
-need('public/scan.html', 'Transaction simulation never signs or broadcasts.');
-need('public/scan.html', 'Free Quick Check execution has been removed');
-need('public/scan.html', '/css/koschei.css?v=1');
-reject('public/scan.html', 'data-scan-mode="quick"');
-reject('public/scan.html', 'Professional+');
+if (fs.existsSync('public/scan.html')) throw new Error('retired classic scan page returned');
+for (const retired of [
+  'public/js/customer-transaction-preflight-v1.js',
+  'public/js/customer-investigation-ux-v2.js',
+  'scripts/verify-customer-transaction-preflight-ui-v1.js',
+  'scripts/verify-customer-investigation-ux-v2.js',
+]) {
+  if (fs.existsSync(retired)) throw new Error(`retired scan-only artifact returned: ${retired}`);
+}
+need('internal/http/static_aliases.go', '"/scan.html"');
+need('internal/http/static_aliases.go', '"/dashboard#transaction-preflight"');
 
 // The public product homepage is one clean surface and points customers to the
 // single operational customer panel.
@@ -48,7 +52,7 @@ reject('public/index.html', 'TRON</b><small>LIVE');
 
 // Persistence-backed dashboard controls must stay absent while production is
 // intentionally stateless. Read-only Solana transaction simulation is a live,
-// stateless capability and now belongs to the Customer Panel.
+// stateless capability and belongs to the Customer Panel.
 need('public/dashboard.html', 'PERSISTENCE OFF');
 need('public/dashboard.html', 'Durable history');
 need('public/dashboard.html', 'Feedback storage');
@@ -57,7 +61,7 @@ need('public/dashboard.html', 'LIVE · SOLANA MAINNET · READ ONLY');
 need('public/dashboard.html', 'NO SIGNING · NO BROADCAST');
 reject('public/dashboard.html', 'id="feedbackForm"');
 reject('public/dashboard.html', 'id="exposureForm"');
-need('public/js/koschei-dashboard.js', "/api/public/transaction-simulate");
+need('public/js/koschei-dashboard.js', '/api/public/transaction-simulate');
 need('public/js/koschei-dashboard.js', 'renderPreflightResult');
 reject('public/js/koschei-dashboard.js', '/api/analytics/event');
 reject('public/js/koschei-dashboard.js', '/api/v1/radar/exposure');
@@ -84,4 +88,4 @@ if ((dashboard.match(/<link rel="stylesheet"/g) || []).length !== 1) {
   throw new Error('public/dashboard.html must load exactly one stylesheet');
 }
 
-console.log('Professional investigation/report trust and canonical dashboard preflight contract verified');
+console.log('Two-surface product trust and canonical dashboard preflight contract verified');
