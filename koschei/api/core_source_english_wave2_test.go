@@ -17,17 +17,20 @@ func TestCoreCustomerSurfacesAreSourceEnglishWave2(t *testing.T) {
 			"missing evidence stays unknown",
 			"Customer Panel",
 		},
+		"public/dashboard.html": {
+			"Security Overview",
+			"ARVIS Intelligence",
+			"Runtime Truth",
+			"Transaction Preflight",
+			"PERSISTENCE OFF",
+			"Evidence first",
+		},
 		"public/account.html": {
 			"Professional Access",
 			"Verify with Phantom",
 			"Identity only.",
 			"Current customer access",
 			"Professional is the single operational customer plan",
-		},
-		"public/reports.html": {
-			"Investigation History",
-			"History without invented evidence.",
-			"SIGNED means the completed result explicitly carries",
 		},
 	}
 
