@@ -88,13 +88,17 @@ func TestDashboardIsSingleCustomerSecurityPanel(t *testing.T) {
 		"Feedback storage",
 		"Exposure Report",
 		"Report a gap",
+		"Transaction Preflight",
+		"LIVE · SOLANA MAINNET · READ ONLY",
+		"NO SIGNING · NO BROADCAST",
+		"transactionPreflightForm",
 		"PERSISTENCE OFF",
 		"Production truth only.",
 		"Solana is the live chain core.",
 		"NOT LIVE",
-		"/css/koschei-dashboard.css?v=2",
+		"/css/koschei-dashboard.css?v=3",
 		"/js/customer-workspace-v2.js?v=3",
-		"/js/koschei-dashboard.js?v=4",
+		"/js/koschei-dashboard.js?v=5",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("dashboard missing customer panel contract %q", required)
