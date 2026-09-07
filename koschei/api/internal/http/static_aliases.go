@@ -34,7 +34,11 @@ func registerStaticAliases(mux *http.ServeMux, staticDir string) {
 	for _, route := range []string{"/scan", "/scan/", "/scan.html", "/transaction-shield", "/transaction-shield/", "/transaction-shield.html"} {
 		registerCanonicalRedirect(mux, route, "/dashboard#transaction-preflight")
 	}
-	for _, route := range []string{"/safe-check", "/safe-check/", "/safe-check.html", "/security-radar", "/security-radar/", "/security-radar.html"} {
+	for _, route := range []string{
+		"/safe-check", "/safe-check/", "/safe-check.html",
+		"/security-radar", "/security-radar/", "/security-radar.html",
+		"/launches", "/launches/", "/launches.html",
+	} {
 		registerCanonicalRedirect(mux, route, "/dashboard#capabilities")
 	}
 
