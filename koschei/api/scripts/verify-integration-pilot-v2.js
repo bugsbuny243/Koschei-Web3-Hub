@@ -12,15 +12,15 @@ function requireText(source,needle,label){if(!source.includes(needle))throw new 
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
 
 requireText(html,'<html lang="en">','pilot language');
-requireText(html,'/scan?mode=deep','canonical Deep Scan route');
-requireText(html,'/kosch','canonical KOSCH route');
+requireText(html,'/dashboard#capabilities','Customer Panel capability route');
 requireText(html,'/transaction-firewall','B2B guard route');
 requireText(html,'id="pilotForm"','pilot form');
 requireText(html,'id="website"','honeypot field');
 requireText(html,'id="pilotNotice"','accessible intake notice');
-requireText(html,'does not provision API access, change KOSCH tier, create a customer entitlement','intake entitlement boundary');
+requireText(html,'does not provision API access, create a customer entitlement, or alter ARVIS evidence/verdict rules.','intake entitlement boundary');
 requireText(html,'Do not submit a seed phrase, private key, API secret, authorization token, or customer personal data.','secret/privacy boundary');
 requireText(html,'/js/integration-pilot-v2.js?v=1','external pilot controller');
+if(html.includes('/scan?mode=deep'))throw new Error('pilot must not advertise retired Deep Scan');
 if(html.includes('/security-radar'))throw new Error('pilot must not advertise legacy security-radar');
 if(html.includes('/kosch-access'))throw new Error('pilot must not advertise legacy kosch-access');
 forbid(html,/<script(?![^>]*\bsrc=)[^>]*>/i,'inline runtime script');
