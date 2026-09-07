@@ -9,13 +9,13 @@ const handler=fs.readFileSync(path.join(root,'internal','handlers','customer_inv
 const jobsHandler=fs.readFileSync(path.join(root,'internal','handlers','web3_jobs.go'),'utf8');
 const server=fs.readFileSync(path.join(root,'internal','http','server.go'),'utf8');
 const inventory=fs.readFileSync(path.join(root,'internal','http','route_inventory.go'),'utf8');
-const reportsHTML=fs.readFileSync(path.join(root,'public','reports.html'),'utf8');
-const reportsJS=fs.readFileSync(path.join(root,'public','js','customer-reports-v2.js'),'utf8');
+const aliases=fs.readFileSync(path.join(root,'internal','http','static_aliases.go'),'utf8');
 const dashboard=fs.readFileSync(path.join(root,'public','dashboard.html'),'utf8');
 const workspaceJS=fs.readFileSync(path.join(root,'public','js','customer-workspace-v2.js'),'utf8');
 
 function requireText(source,needle,label){if(!source.includes(needle))throw new Error(`${label}: missing ${needle}`);}
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
+function requireAbsent(relative,label){if(fs.existsSync(path.join(root,relative)))throw new Error(`${label}: retired file still exists: ${relative}`);}
 
 requireText(migration,'CREATE TABLE IF NOT EXISTS web3_jobs','durable job table');
 requireText(migration,'result_payload JSONB','durable result payload');
@@ -51,38 +51,15 @@ if(server.includes('/api/v1/investigations/history'))throw new Error('server: do
 requireText(inventory,'"GET /api/v1/radar/jobs/"','machine-readable radar jobs GET route');
 if(inventory.includes('/api/v1/investigations/history'))throw new Error('inventory: parallel history endpoint must not be advertised');
 
-requireText(reportsHTML,'PROFESSIONAL · DURABLE CANONICAL JOB HISTORY','history Professional access copy');
-requireText(reportsHTML,'History access requires an active Professional entitlement.','history entitlement boundary');
-requireText(reportsHTML,'Commercial access is determined only by the active server-side entitlement.','history authority copy');
-requireText(reportsHTML,'signed=true','history strict signed copy');
-requireText(reportsHTML,'/js/customer-reports-v2.js?v=2','history controller');
-requireText(reportsHTML,'/arvis-chat','ARVIS investigation route');
-forbid(reportsHTML,/\bKOSCH\b|token holdings|STARTER\+|ENTERPRISE\+|Basic KOSCH tier/i,'legacy authorization copy');
-
-requireText(reportsJS,"KoscheiAuth.apiCall('/api/v1/radar/jobs/'",'history source');
-requireText(reportsJS,"data?.schema_version!=='koschei-customer-investigation-history-v1'",'history schema gate');
-requireText(reportsJS,"data?.source!=='web3_jobs'",'history source gate');
-requireText(reportsJS,"data?.job_type!=='canonical_investigation'",'history job-type gate');
-requireText(reportsJS,"if(!Array.isArray(history))",'history unavailable-not-empty boundary');
-requireText(reportsJS,"if(signed===true&&signature&&ruleset)return {kind:'signed',label:'SIGNED'",'history strict signed gate');
-requireText(reportsJS,"if(signed===true)return {kind:'incomplete',label:'SIGNATURE INCOMPLETE'}",'history incomplete signature state');
-requireText(reportsJS,"if(value===null||value===undefined||value==='')return null",'history null numeric boundary');
-requireText(reportsJS,"state==='completed'&&item?.result_available!==true",'completed-without-result warning');
-requireText(reportsJS,"KoscheiAuth.requireAuth('/login.html')",'history canonical login continuation');
-requireText(reportsJS,'Investigation history requires an active Professional entitlement.','Professional access error');
-if(reportsJS.includes('/api/v1/unified/reports'))throw new Error('history must not call dead unified-reports frontend contract');
-if(reportsJS.includes('/api/v1/investigations/history'))throw new Error('history must use the canonical radar jobs collection');
-forbid(reportsJS,/\.innerHTML\s*=/,'history API-derived innerHTML');
-forbid(reportsJS,/\bfetch\s*\(/,'history raw fetch');
-forbid(reportsJS,/Authorization/i,'history manual bearer auth');
-forbid(reportsJS,/\blocalStorage\b|\bsessionStorage\b/,'history browser auth persistence');
-forbid(reportsJS,/Math\.random\s*\(/,'history synthetic evidence');
-forbid(reportsJS,/\b(?:signMessage|signTransaction|signAllTransactions|signAndSendTransaction|sendTransaction)\b/,'history wallet authority');
-
 // The durable backend contract remains preserved for a future persistence plane,
-// but the current production process is intentionally stateless. The customer
-// panel must therefore disclose the capability as unavailable instead of calling
-// the DB-backed collection and interpreting a 503 as account history.
+// but current production is intentionally stateless. Customer history therefore
+// belongs to the Customer Panel truth surface and must not survive as a separate
+// control that can only return dependency-unavailable responses.
+requireAbsent('public/reports.html','standalone reports surface');
+requireAbsent('public/js/customer-reports-v2.js','standalone reports runtime');
+for(const route of ['/reports', '/reports/', '/reports.html'])requireText(aliases,`"${route}"`,'reports compatibility redirect');
+requireText(aliases,'registerCanonicalRedirect(mux, route, "/dashboard#evidence")','reports dashboard evidence redirect');
+
 requireText(dashboard,'Durable history','Workspace durable-history capability label');
 requireText(dashboard,'PERSISTENCE OFF','Workspace persistence boundary');
 requireText(dashboard,'id="workspaceLatestReport"','Workspace persistence-truth mount');
@@ -95,4 +72,4 @@ for(const forbiddenRoute of ['/api/v1/radar/jobs/','/api/v1/investigations/histo
   if(workspaceJS.includes(forbiddenRoute))throw new Error(`Workspace must not call persistence-backed history route while stateless: ${forbiddenRoute}`);
 }
 forbid(workspaceJS,/Math\.random\s*\(/,'Workspace synthetic history evidence');
-console.log('canonical investigation history backend + stateless workspace contract: ok');
+console.log('canonical investigation history backend + retired standalone surface + stateless workspace contract: ok');
