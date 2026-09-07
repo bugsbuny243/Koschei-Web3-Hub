@@ -6,8 +6,8 @@ window.__koscheiCustomerCommandCenterV1=true;
 const routes=[
   {label:'Command Center',href:'/dashboard',access:'PROFESSIONAL'},
   {label:'ARVIS Investigation',href:'/arvis-chat',mode:'primary',access:'PROFESSIONAL'},
-  {label:'Deep Investigation',href:'/scan?mode=deep',access:'PROFESSIONAL'},
-  {label:'Transaction Preflight',href:'/scan?mode=transaction',access:'PROFESSIONAL'},
+  {label:'Deep Investigation',href:'/dashboard#capabilities',access:'PROFESSIONAL'},
+  {label:'Transaction Preflight',href:'/dashboard#transaction-preflight',access:'PROFESSIONAL'},
   {label:'Evidence History',href:'/reports',access:'PROFESSIONAL'},
   {label:'Watchlist & Alerts',href:'/watchlist',access:'PROFESSIONAL'},
   {label:'Evidence Cases',href:'/cases',access:'PUBLIC PROOF'},
@@ -26,7 +26,7 @@ function ensureUniverse(){
 function activeFor(href){
   const current=location.pathname;
   if(href==='/dashboard')return current==='/dashboard';
-  const path=href.split('?')[0];
+  const path=href.split('?')[0].split('#')[0];
   return path!=='/'&&current.startsWith(path);
 }
 
