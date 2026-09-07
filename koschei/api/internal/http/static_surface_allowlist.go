@@ -17,7 +17,6 @@ var allowedStandalonePages = []string{
 	"address-poisoning-shield.html",
 	"agent-api.html",
 	"architecture.html",
-	"arvis-chat.html",
 	"cases.html",
 	"chain-health.html",
 	"chains.html",
@@ -38,14 +37,12 @@ var allowedStandalonePages = []string{
 	"privacy.html",
 	"refund-policy.html",
 	"register.html",
-	"reports.html",
 	"reset-password.html",
 	"solana-security-tools.html",
 	"support.html",
 	"terms.html",
 	"token-2022-scanner.html",
 	"transaction-firewall.html",
-	"watchlist.html",
 	"webhooks.html",
 }
 
@@ -104,7 +101,6 @@ func registerStaticAllowlisted(mux *http.ServeMux, staticDir string) {
 
 func registerAllowedStandalonePages(mux *http.ServeMux, staticDir string) {
 	for _, filename := range allowedStandalonePages {
-		filename := filename
 		fullPath := filepath.Join(staticDir, filename)
 		htmlRoute := "/" + filename
 		cleanRoute := "/" + strings.TrimSuffix(filename, ".html")
