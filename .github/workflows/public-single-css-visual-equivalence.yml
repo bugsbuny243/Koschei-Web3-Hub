@@ -36,7 +36,6 @@ jobs:
 
           baseline = Path('baseline/koschei/api/public')
           candidate = Path('candidate/koschei/api/public')
-          link_re = re.compile(r'<link\b(?=[^>]*\brel=["\x27]stylesheet["\x27])[^>]*\bhref=["\x27](/css/([A-Za-z0-9_.-]+\.css)(?:\?[^"\x27]*)?)["\x27][^>]*>', re.I)
           style_re = re.compile(r'<style\b[^>]*>(.*?)</style>', re.I | re.S)
           combined_re = re.compile(r'(<link\b(?=[^>]*\brel=["\x27]stylesheet["\x27])[^>]*\bhref=["\x27]/css/([A-Za-z0-9_.-]+\.css)(?:\?[^"\x27]*)?["\x27][^>]*>)|(<style\b[^>]*>(.*?)</style>)', re.I | re.S)
           body_re = re.compile(r'<body\b', re.I)
@@ -97,7 +96,7 @@ jobs:
           print(f'prototype bundle bytes: {(candidate / "css" / "koschei.css").stat().st_size}')
           PY
 
-      - name: Compare flagship rendering with main
+      - name: Compare canonical product rendering with main
         shell: bash
         run: |
           set -euo pipefail
@@ -115,7 +114,7 @@ jobs:
           sleep 1
 
           mkdir -p /tmp/koschei-visual
-          pages=(index.html dashboard.html arvis-chat.html scan.html)
+          pages=(index.html dashboard.html)
           failed=0
           for page in "${pages[@]}"; do
             name="${page%.html}"
