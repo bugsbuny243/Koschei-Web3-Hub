@@ -21,13 +21,13 @@ requireText(html,'Route registration does not by itself mean','route/readiness b
 requireText(html,'KOSCH holdings do not authorize, upgrade, discount, or meter commercial access.','token separation');
 requireText(html,'Professional entitlement + API key','Professional API boundary');
 requireText(html,'Legacy paths no longer mean free execution.','legacy operational gate boundary');
-requireText(html,'/scan?mode=deep','canonical Deep Scan route');
+requireText(html,'/dashboard#capabilities','Customer Panel capability route');
 requireText(html,'/docs/api','API docs route');
 requireText(html,'/pilot','pilot route');
 requireText(html,'/transaction-firewall','B2B guard route');
 requireText(html,'/js/koschei-global-shell.js?v=4','global shell v4');
 requireText(html,'/css/koschei.css?v=1','developer styles');
-requireText(html,'/css/koschei.css?v=1','universe styles');
+if(html.includes('/scan?mode=deep'))throw new Error('developers must not advertise retired Deep Scan');
 if(html.includes('/security-radar'))throw new Error('developers must not advertise legacy security-radar');
 forbid(html,/customer session \+ KOSCH|API key \+ live KOSCH|verified KOSCH holder|live KOSCH eligibility|KOSCH tier/i,'token-backed developer authorization copy');
 forbid(html,/STARTER|ENTERPRISE|Free Core|SAAS EARLY ACCESS/i,'retired commercial plan copy');
