@@ -61,13 +61,19 @@ rejectText(aliases,'registerScanModeRedirect','retired scan-mode router');
 
 for(const retired of [
   'public/scan.html',
+  'public/safe-check.html',
+  'public/transaction-shield.html',
+  'public/security-radar.html',
   'public/launches.html',
   'public/security-ecosystem.html',
   'public/exposure-report.html',
   'public/feedback.html',
   'public/token-vesting.html',
+  'public/js/public-safe-check-v2.js',
+  'public/js/public-transaction-shield-v2.js',
+  'public/js/security-radar-detail.js',
 ]){
-  if(fs.existsSync(path.join(root,retired)))throw new Error(`retired standalone product surface returned: ${retired}`);
+  if(fs.existsSync(path.join(root,retired)))throw new Error(`retired standalone product surface/runtime returned: ${retired}`);
 }
 
 console.log('canonical product contract v7 two-surface boundary: ok');
