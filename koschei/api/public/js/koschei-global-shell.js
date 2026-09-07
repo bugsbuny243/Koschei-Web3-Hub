@@ -94,14 +94,13 @@
   }
 
   function isActiveNavItem(href,current){
-    var mode=new URLSearchParams(location.search||'').get('mode');
-    if(href==='/scan?mode=deep')return current==='/scan'&&mode==='deep';
-    if(href==='/scan')return current==='/scan'&&mode!=='deep';
     return current===href;
   }
 
   ready(function(){
-    var links=[['/live','Live SOC'],['/cases','Cases'],['/scan','Token Scan'],['/transaction-shield','Transaction Shield'],['/safe-check','Safe Check'],['/scan?mode=deep','Deep Scan'],['/dashboard','Workspace'],['/pricing','Plans']];
+    // Product navigation has exactly two product destinations. Live SOC and
+    // Cases are public proof surfaces, not alternate customer workspaces.
+    var links=[['/','Home'],['/dashboard','Customer Panel'],['/live','Live SOC'],['/cases','Cases']];
     var current=(location.pathname||'/').replace(/\.html$/,'').replace(/\/$/,'')||'/';
     var existing=document.querySelector('.top .nav, header.top nav.nav, nav.top .nav');
     var nav=existing||document.createElement('nav');
@@ -110,9 +109,9 @@
     while(nav.firstChild)nav.removeChild(nav.firstChild);
     links.forEach(function(item){var anchor=document.createElement('a');anchor.href=item[0];anchor.textContent=item[1];if(isActiveNavItem(item[0],current))anchor.setAttribute('aria-current','page');nav.appendChild(anchor);});
     if(!existing){var top=document.querySelector('header.top,.top');if(top){nav.className+=' detached';top.parentNode.insertBefore(nav,top.nextSibling);}}
-    if(current==='/dashboard'&&!document.querySelector('.koschei-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip';strip.innerHTML='<div><b>Ask Koschei before buying or signing.</b><span>ARVIS investigation and transaction evidence stay inside the Koschei Web3 security workflow.</span></div><span><a href="/scan">ARVIS Investigation</a> <a href="/transaction-shield">Transaction Shield</a></span>';var stripAnchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(stripAnchor&&stripAnchor.parentNode){stripAnchor.parentNode.insertBefore(strip,stripAnchor.nextSibling);}}
+    if(current==='/dashboard'&&!document.querySelector('.koschei-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip';strip.innerHTML='<div><b>Evidence first. Missing evidence stays unknown.</b><span>Transaction preflight and capability truth live in the Customer Panel.</span></div><span><a href="/">Home</a> <a href="/dashboard#transaction-preflight">Transaction Preflight</a></span>';var stripAnchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(stripAnchor&&stripAnchor.parentNode){stripAnchor.parentNode.insertBefore(strip,stripAnchor.nextSibling);}}
     var bottom=document.querySelector('nav.bottom');if(bottom)bottom.remove();
-    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei Web3 · ARVIS Intelligence</span><span><a href="/live">Live SOC</a> · <a href="/cases">Cases</a> · <a href="/scan">ARVIS Investigation</a> · <a href="/transaction-shield">Transaction Shield</a> · <a href="/safe-check">Safe Check</a> · <a href="/pricing">Plans</a></span>';document.body.appendChild(footer);}
+    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei Web3 · ARVIS Intelligence</span><span><a href="/">Home</a> · <a href="/dashboard">Customer Panel</a> · <a href="/live">Live SOC</a> · <a href="/cases">Cases</a></span>';document.body.appendChild(footer);}
     if(current==='/safe-check')document.title='Safe Check — Koschei Web3 / ARVIS';
     if(current==='/security-radar')document.title='ARVIS Security Radar — Koschei Web3';
     translate(document.body);
