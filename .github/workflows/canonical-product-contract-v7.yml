@@ -6,6 +6,7 @@ on:
       - 'koschei/api/public/security-ecosystem.json'
       - 'koschei/api/public/index.html'
       - 'koschei/api/public/dashboard.html'
+      - 'koschei/api/public/js/koschei-global-shell.js'
       - 'koschei/api/internal/http/static_aliases.go'
       - 'koschei/api/scripts/verify-canonical-product-contract-v7.js'
       - '.github/workflows/canonical-product-contract-v7.yml'
@@ -20,5 +21,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Check global shell JavaScript syntax
+        run: node --check koschei/api/public/js/koschei-global-shell.js
       - name: Verify canonical product contract v7
         run: node koschei/api/scripts/verify-canonical-product-contract-v7.js
