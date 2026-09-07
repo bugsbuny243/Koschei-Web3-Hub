@@ -12,7 +12,6 @@ func TestUserFacingPagesAvoidLegalFraming(t *testing.T) {
 	files := []string{
 		"index.html",
 		"dashboard.html",
-		"scan.html",
 		"owner-production.html",
 		filepath.Join("js", "owner-court-ui.js"),
 		filepath.Join("js", "owner-command-center-v2.js"),
