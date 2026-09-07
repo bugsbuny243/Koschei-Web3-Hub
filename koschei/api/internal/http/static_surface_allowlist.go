@@ -50,14 +50,14 @@ var allowedStandalonePages = []string{
 }
 
 var allowedRootStaticAssets = map[string]struct{}{
-	"/agent-widget.js":              {},
-	"/widget.js":                    {},
-	"/full-scan-contract-v1.json":   {},
-	"/security-ecosystem.json":      {},
-	"/sitemap.xml":                  {},
-	"/validation-key.txt":           {},
-	"/app/login":                    {},
-	"/owner/login":                  {},
+	"/agent-widget.js":            {},
+	"/widget.js":                  {},
+	"/full-scan-contract-v1.json": {},
+	"/security-ecosystem.json":    {},
+	"/sitemap.xml":                {},
+	"/validation-key.txt":         {},
+	"/app/login":                  {},
+	"/owner/login":                {},
 }
 
 func registerStaticAllowlisted(mux *http.ServeMux, staticDir string) {
