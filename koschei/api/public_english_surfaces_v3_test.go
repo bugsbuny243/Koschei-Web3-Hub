@@ -69,27 +69,30 @@ func TestCanonicalInvestigationSurfaceMountsProfessionalModesAndEvidenceControll
 	}
 }
 
-func TestDashboardIsARVISProfessionalSecurityWorkspace(t *testing.T) {
+func TestDashboardIsCurrentCustomerSecurityWorkspace(t *testing.T) {
 	body, err := os.ReadFile("public/dashboard.html")
 	if err != nil {
 		t.Fatalf("read dashboard: %v", err)
 	}
 	text := string(body)
 	for _, required := range []string{
-		"Professional Security Command Center",
-		"PROFESSIONAL · ARVIS COMMAND UNIVERSE",
-		"Investigate. Correlate. Prove.",
-		"ARVIS Investigation",
-		"Investigation History",
-		"Monitoring & developer access",
+		"Koschei Web3 | Customer Panel",
+		"Customer security workspace",
+		"Security Overview",
+		"ARVIS intelligence map",
+		"Live operational truth",
+		"Live account state",
+		"Security Capabilities",
+		"Missing evidence remains unknown.",
+		"Solana is the live chain core.",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("dashboard missing workspace contract %q", required)
 		}
 	}
-	for _, forbidden := range []string{`id="mint"`, `id="scan"`, "/api/token/scan", "data-customer-arvis-result", "Signed report vault"} {
+	for _, forbidden := range []string{`id="mint"`, `id="scan"`, "/api/token/scan", "data-customer-arvis-result", "Signed report vault", "PROFESSIONAL · ARVIS COMMAND UNIVERSE"} {
 		if strings.Contains(text, forbidden) {
-			t.Errorf("dashboard contains duplicate or overstated scan/report behavior %q", forbidden)
+			t.Errorf("dashboard contains duplicate or retired workspace behavior %q", forbidden)
 		}
 	}
 }

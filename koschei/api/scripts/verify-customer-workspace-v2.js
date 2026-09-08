@@ -4,33 +4,38 @@ const path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'public','dashboard.html'),'utf8');
 const js=fs.readFileSync(path.join(root,'public','js','customer-workspace-v2.js'),'utf8');
-const css=fs.readFileSync(path.join(root,'public','css','koschei.css'),'utf8');
+const css=fs.readFileSync(path.join(root,'public','css','koschei-dashboard.css'),'utf8');
 
 function requireText(source,needle,label){if(!source.includes(needle))throw new Error(`${label}: missing ${needle}`);}
+function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
 
-requireText(html,'/css/koschei.css?v=1','dashboard html');
-requireText(html,'/css/koschei.css?v=1','enterprise dashboard style');
-requireText(html,'/css/koschei.css?v=1','customer command center style');
-requireText(html,'/css/koschei.css?v=1','command universe style');
-requireText(html,'/js/customer-command-center-v1.js?v=3','customer command center behavior');
-requireText(html,'/js/customer-command-universe-v2.js?v=1','command universe behavior');
-requireText(html,'/js/customer-workspace-v2.js?v=2','dashboard html');
-requireText(html,'id="workspaceMissionControl"','operations mount');
+// Current customer workspace surface. The dashboard is intentionally a clean,
+// scoped product surface rather than the retired command-universe shell.
+requireText(html,'/css/koschei-dashboard.css?v=1','dashboard scoped style');
+requireText(html,'/js/customer-workspace-v2.js?v=2','dashboard account-data controller');
+requireText(html,'/js/koschei-dashboard.js?v=1','dashboard presentation controller');
 requireText(html,'id="workspaceLatestReport"','latest investigation mount');
 requireText(html,'id="workspaceAlerts"','alerts mount');
-requireText(html,'RECENT INVESTIGATION','recent investigation copy');
+requireText(html,'id="workspaceLiveState"','live account-state mount');
+requireText(html,'RECENT CANONICAL INVESTIGATION','recent canonical investigation copy');
 requireText(html,'Investigation jobs','history KPI copy');
 requireText(html,'Professional access','Professional access KPI');
-requireText(html,'PROFESSIONAL · ARVIS COMMAND UNIVERSE','ARVIS universe boundary');
-requireText(html,'Investigate. Correlate. Prove.','workspace universe headline');
-requireText(html,'ARVIS case workspace','primary investigation surface');
-requireText(html,'Professional Security Command Center','Professional command center copy');
-requireText(html,'No fake telemetry.','no synthetic telemetry boundary');
+requireText(html,'Customer security workspace','customer workspace boundary');
+requireText(html,'Security Overview','current dashboard headline');
+requireText(html,'ARVIS intelligence map','ARVIS intelligence surface');
+requireText(html,'Live operational truth','operational truth surface');
+requireText(html,'No fake telemetry','no synthetic telemetry boundary');
+requireText(html,'Missing evidence remains unknown.','evidence-gap boundary');
 requireText(html,'Solana is the live chain core.','live-chain boundary');
-requireText(html,'EXPANSION / COMING','future-chain boundary');
-if(/ARVIS early access|Preview monitored targets|STARTER\+|ENTERPRISE\+/i.test(html))throw new Error('workspace contains retired commercial or preview copy');
-if(/holder access|Checking holder access/i.test(html))throw new Error('workspace contains legacy holder access copy');
+requireText(html,'Other chains <em>architecture direction</em></span><b>NOT LIVE</b>','future-chain boundary');
+requireText(html,'Status: building. No live capability is fabricated in the customer interface.','defense-validation capability boundary');
+requireText(html,'Status: expansion architecture. Networks beyond the current live core are not presented as active coverage.','cross-chain capability boundary');
+forbid(html,/PROFESSIONAL · ARVIS COMMAND UNIVERSE|customer-command-universe-v2\.js|customer-command-center-v1\.js|id="workspaceMissionControl"/,'retired command-universe contract');
+forbid(html,/ARVIS early access|Preview monitored targets|STARTER\+|ENTERPRISE\+/i,'retired commercial or preview copy');
+forbid(html,/holder access|Checking holder access/i,'legacy holder access copy');
 
+// Account state remains sourced from authenticated server APIs. Missing sources
+// stay unavailable instead of being filled with synthetic metrics.
 requireText(js,"read('/api/auth/premium-access')",'Professional access source');
 requireText(js,"read('/api/v1/radar/jobs/')",'canonical history source');
 requireText(js,"read('/api/watchlist')",'watchlist source');
@@ -50,43 +55,14 @@ requireText(js,'No active paid SaaS entitlement.','inactive server entitlement b
 requireText(js,'Professional plan required.','Professional watchlist boundary');
 requireText(js,"encodeURIComponent(target)",'safe target navigation');
 requireText(js,"!text(item.read_at)",'existing alert unread handling');
-requireText(css,'.workspace-live','operations styles');
-requireText(css,'.workspace-alert','alert styles');
-requireText(css,'.workspace-report-card','investigation card styles');
-const shellCss=fs.readFileSync(path.join(root,'public','css','koschei.css'),'utf8');
-const shellJs=fs.readFileSync(path.join(root,'public','js','customer-command-center-v1.js'),'utf8');
-const universe=fs.readFileSync(path.join(root,'public','css','koschei.css'),'utf8');
-const commandUniverseJs=fs.readFileSync(path.join(root,'public','js','customer-command-universe-v2.js'),'utf8');
-requireText(shellCss,'.customer-app-shell','app shell');
-requireText(shellCss,'.customer-sidebar','sidebar');
-requireText(shellCss,'.customer-command-palette','navigation command palette style');
-requireText(shellCss,'.customer-capability-access','capability access label style');
-requireText(shellJs,"{label:'Command Center',href:'/dashboard',access:'PROFESSIONAL'}",'Professional command center capability');
-requireText(shellJs,"{label:'ARVIS Investigation',href:'/arvis-chat',mode:'primary',access:'PROFESSIONAL'}",'ARVIS capability');
-requireText(shellJs,"{label:'Evidence History',href:'/reports',access:'PROFESSIONAL'}",'history capability');
-requireText(shellJs,"{label:'Watchlist & Alerts',href:'/watchlist',access:'PROFESSIONAL'}",'monitoring capability');
-requireText(shellJs,"{label:'API Reference',href:'/docs/api',access:'PROFESSIONAL API'}",'Professional API capability');
-requireText(shellJs,"{label:'Evidence Cases',href:'/cases',access:'PUBLIC PROOF'}",'public proof capability');
-requireText(shellJs,"{label:'Account & Access',href:'/account',access:'ACCOUNT'}",'account capability');
-requireText(shellJs,'Professional is the single operational customer entitlement.','single-entitlement boundary');
-requireText(shellJs,"main.wrap, main.page, main.ops-page",'shared customer surface mount');
-requireText(shellJs,".top, .ops-nav",'shared customer header mount');
-requireText(shellJs,'customer-command-palette','navigation command palette');
-requireText(shellJs,"event.key.toLowerCase()==='k'",'keyboard command palette shortcut');
-requireText(shellJs,"event.key==='Escape'",'command palette escape close');
-requireText(commandUniverseJs,"document.getElementById('commandPipelineState')",'command universe binds service state');
-requireText(commandUniverseJs,"document.getElementById('commandAccountState')",'command universe binds account state');
-requireText(universe,'body.koschei-universe','universe style contract');
-for(const page of ['scan.html','reports.html','watchlist.html','account.html']){const pageHtml=fs.readFileSync(path.join(root,'public',page),'utf8');requireText(pageHtml,'/css/koschei.css?v=1',page+' shared shell style');requireText(pageHtml,'/js/customer-command-center-v1.js?v=3',page+' shared shell behavior');}
-if(/fetch\s*\(/.test(shellJs))throw new Error('command center shell must not create parallel unauthenticated data calls');
-if(shellJs.includes('Math.random('))throw new Error('command center shell must not fabricate product state');
-if(/premium-access|sessionStorage|localStorage/.test(shellJs))throw new Error('navigation shell must not derive or cache entitlement authority');
-if(/data-plan-gated|disabled\s*=/.test(shellJs))throw new Error('capability labels must not become client-side authorization gates');
-if(commandUniverseJs.includes('Math.random('))throw new Error('command universe must not fabricate telemetry');
+requireText(js,'availableSources=[accessResult.ok,historyAvailable,watchResult.ok,alertsResult.ok]','source availability truth');
 if(js.includes('/api/v1/unified/reports'))throw new Error('workspace must not call removed unified-reports frontend contract');
 if(js.includes('/api/v1/investigations/history'))throw new Error('workspace must use the canonical radar jobs collection');
 if(/token_tier|token_amount|holder access/i.test(js))throw new Error('workspace must not derive access from token holdings');
 if(js.includes('Math.random('))throw new Error('workspace must not fabricate live metrics');
-if(/fetch\s*\(/.test(js))throw new Error('workspace account data must use KoscheiAuth.apiCall instead of unauthenticated fetch');
-if(!html.includes('If a source is unavailable, the workspace leaves it unavailable instead of inventing a status.'))throw new Error('dashboard must expose the no-fake-data boundary');
-console.log('customer workspace Professional command universe contract: ok');
+if(/\bfetch\s*\(/.test(js))throw new Error('workspace account data must use KoscheiAuth.apiCall instead of unauthenticated fetch');
+
+// Scoped dashboard bundle must retain the live-account and evidence card styles.
+for(const marker of ['.workspace-live','.workspace-alert','.workspace-report-card','.workspace-kpi','.intel-map','.status-row'])requireText(css,marker,`dashboard style ${marker}`);
+
+console.log('customer workspace current evidence-first contract: ok');
