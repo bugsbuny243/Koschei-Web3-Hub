@@ -136,6 +136,9 @@ func TestTransactionGuardUnifiedSecurityDoesNotClaimCapabilityWhenPostStateUnava
 		time.Date(2026, 9, 8, 1, 5, 0, 0, time.UTC),
 	)
 
+	if projection.BindingStatus != "consistent" || len(projection.BindingIssues) != 0 {
+		t.Fatalf("projection bindings=%#v", projection.BindingIssues)
+	}
 	if len(projection.Capabilities) != 0 {
 		t.Fatalf("missing post-state must not produce a prospective capability: %#v", projection.Capabilities)
 	}
@@ -182,6 +185,9 @@ func TestTransactionGuardUnifiedSecurityCanProjectObservedPermanentDelegateWitho
 		time.Date(2026, 9, 8, 1, 10, 0, 0, time.UTC),
 	)
 
+	if projection.BindingStatus != "consistent" || len(projection.BindingIssues) != 0 {
+		t.Fatalf("projection bindings=%#v", projection.BindingIssues)
+	}
 	if len(projection.Capabilities) != 1 {
 		t.Fatalf("capabilities=%#v", projection.Capabilities)
 	}
