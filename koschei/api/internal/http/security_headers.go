@@ -20,10 +20,41 @@ func securityHeaders(next http.Handler) http.Handler {
 		if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
 		}
+		if sensitiveStaticProbePath(r.URL.Path) {
+			w.Header().Set("Cache-Control", "no-store")
+			http.NotFound(w, r)
+			return
+		}
 		secured := newCSPHTMLResponseWriter(w, r)
 		next.ServeHTTP(secured, r)
 		secured.finish()
 	})
+}
+
+// sensitiveStaticProbePath rejects common repository, environment, credential and
+// server-configuration paths before they can reach the public FileServer/SPA
+// fallback. We intentionally return an ordinary 404 so the public surface does
+// not disclose whether a similarly named private file exists on the host.
+//
+// /.well-known is deliberately not treated as a blanket dotfile: standards such
+// as ACME and security.txt may legitimately use that namespace.
+func sensitiveStaticProbePath(rawPath string) bool {
+	for _, segment := range strings.Split(strings.ReplaceAll(strings.ToLower(rawPath), "\\", "/"), "/") {
+		segment = strings.TrimSpace(segment)
+		if segment == "" || segment == "." || segment == ".." || segment == ".well-known" {
+			continue
+		}
+		if segment == ".env" || strings.HasPrefix(segment, ".env.") || strings.HasPrefix(segment, ".env-") {
+			return true
+		}
+		switch segment {
+		case ".git", ".svn", ".hg", ".ssh", ".aws", ".docker", ".kube",
+			".npmrc", ".yarnrc", ".pypirc", ".netrc", ".htaccess", ".htpasswd",
+			".ds_store", "id_rsa", "id_ed25519", "credentials.json", "service-account.json":
+			return true
+		}
+	}
+	return false
 }
 
 func allowedCORSOrigin(origin string, allowed map[string]struct{}) string {
