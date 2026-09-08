@@ -1,0 +1,79 @@
+name: Public Registry Publisher CI
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/internal/handlers/public_dossier_registry_drive.go"
+      - "koschei/api/internal/handlers/public_dossier_registry_*_test.go"
+      - "koschei/api/internal/http/server_helpers.go"
+      - "koschei/api/internal/http/public_registry_readiness_test.go"
+      - "koschei/api/cmd/public-registry-publisher/**"
+      - "docs/public-registry-runtime.md"
+      - ".github/workflows/public-registry-publisher-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/handlers/public_dossier_registry_drive.go"
+      - "koschei/api/internal/handlers/public_dossier_registry_*_test.go"
+      - "koschei/api/internal/http/server_helpers.go"
+      - "koschei/api/internal/http/public_registry_readiness_test.go"
+      - "koschei/api/cmd/public-registry-publisher/**"
+      - "docs/public-registry-runtime.md"
+      - ".github/workflows/public-registry-publisher-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify fail-closed public registry publisher
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Download modules
+        working-directory: koschei/api
+        run: go mod download
+
+      - name: Require touched Go files to be formatted
+        working-directory: koschei/api
+        run: |
+          set -euo pipefail
+          files=(
+            internal/handlers/public_dossier_registry_drive.go
+            internal/handlers/public_dossier_registry_publisher_test.go
+            internal/http/public_registry_readiness_test.go
+            cmd/public-registry-publisher/main.go
+            cmd/public-registry-publisher/main_test.go
+          )
+          unformatted="$(gofmt -l "${files[@]}")"
+          test -z "${unformatted}" || { printf 'unformatted files:\n%s\n' "${unformatted}" >&2; exit 1; }
+
+      - name: Test registry snapshot contracts
+        working-directory: koschei/api
+        run: go test ./internal/handlers -run '^(TestParsePublicDossierRegistrySnapshot|TestPublicDossierRegistrySnapshot)' -count=1
+
+      - name: Test stateless readiness boundary
+        working-directory: koschei/api
+        run: go test ./internal/http -run '^(TestPublicCasesOwnsDatabaseOptionalDegradedMode|TestAPIReadinessPassesPublicCasesWithoutDatabase)$' -count=1
+
+      - name: Test publisher command configuration
+        working-directory: koschei/api
+        run: go test ./cmd/public-registry-publisher -count=1
+
+      - name: Vet publisher path
+        working-directory: koschei/api
+        run: go vet ./cmd/public-registry-publisher ./internal/http ./internal/handlers
+
+      - name: Build publisher command
+        working-directory: koschei/api
+        run: CGO_ENABLED=0 GOOS=linux go build ./cmd/public-registry-publisher
