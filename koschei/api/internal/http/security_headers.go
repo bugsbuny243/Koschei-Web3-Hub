@@ -50,8 +50,15 @@ func sensitiveStaticProbePath(rawPath string) bool {
 		switch segment {
 		case ".git", ".svn", ".hg", ".ssh", ".aws", ".docker", ".kube",
 			".npmrc", ".yarnrc", ".pypirc", ".netrc", ".htaccess", ".htpasswd",
-			".ds_store", "id_rsa", "id_ed25519", "credentials.json", "service-account.json":
+			".ds_store", "id_rsa", "id_ed25519", "credentials.json", "service-account.json",
+			"vercel.json", "railway.json", "railway.toml", "dockerfile", "docker-compose.yml",
+			"docker-compose.yaml", "go.mod", "go.sum":
 			return true
+		}
+		for _, suffix := range []string{".pem", ".key", ".p12", ".pfx"} {
+			if strings.HasSuffix(segment, suffix) {
+				return true
+			}
 		}
 	}
 	return false

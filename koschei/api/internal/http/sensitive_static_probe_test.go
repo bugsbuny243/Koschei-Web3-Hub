@@ -19,6 +19,18 @@ func TestSensitiveStaticProbePathRejectsSecretAndRepositoryPaths(t *testing.T) {
 		"/id_ed25519",
 		"/service-account.json",
 		"//.env",
+		"/vercel.json",
+		"/railway.json",
+		"/RAILWAY.TOML",
+		"/Dockerfile",
+		"/docker-compose.yml",
+		"/docker-compose.yaml",
+		"/go.mod",
+		"/go.sum",
+		"/keys/service-account.pem",
+		"/keys/archive.key",
+		"/keys/client.p12",
+		"/keys/client.pfx",
 	} {
 		if !sensitiveStaticProbePath(probe) {
 			t.Errorf("probe %q was not rejected", probe)
@@ -32,6 +44,14 @@ func TestSensitiveStaticProbePathPreservesWellKnownNamespace(t *testing.T) {
 		"/.well-known/acme-challenge/token",
 		"/assets/app.js",
 		"/dashboard",
+		"/scan",
+		"/reports",
+		"/watchlist",
+		"/arvis-chat",
+		"/validation-key.txt",
+		"/full-scan-contract-v1.json",
+		"/security-ecosystem.json",
+		"/sitemap.xml",
 	} {
 		if sensitiveStaticProbePath(path) {
 			t.Errorf("legitimate public path %q was rejected", path)
@@ -51,6 +71,9 @@ func TestSecurityHeadersReturns404BeforeSensitiveProbeCanReachStaticFallback(t *
 		"https://tradepigloball.co/.env",
 		"https://tradepigloball.co/.git/config",
 		"https://tradepigloball.co/.env%2elocal",
+		"https://tradepigloball.co/vercel.json",
+		"https://tradepigloball.co/railway.toml",
+		"https://tradepigloball.co/keys/service.pem",
 	} {
 		called = false
 		recorder := httptest.NewRecorder()
