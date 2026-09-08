@@ -13,6 +13,7 @@ import (
 	"koschei/api/internal/executioncontainment"
 	"koschei/api/internal/executionproof"
 	"koschei/api/internal/securityevidence"
+	"koschei/api/internal/services"
 )
 
 const (
@@ -59,17 +60,18 @@ type defenseValidationAPICase struct {
 }
 
 type defenseValidationAPIResponse struct {
-	OK                        bool                               `json:"ok"`
-	Product                   string                             `json:"product"`
-	EvidenceModel             string                             `json:"evidence_model"`
-	ScenarioContractHash      string                             `json:"scenario_contract_hash"`
-	VerifiedExecutions        int                                `json:"verified_executions"`
-	VerifiedObservations      int                                `json:"verified_observations"`
-	Report                    defense.DefenseValidationReportV02 `json:"report"`
-	MainnetTransactionSent    bool                               `json:"mainnet_transaction_sent"`
-	ExecutionAuthority        bool                               `json:"execution_authority"`
-	ProductionControlMutation bool                               `json:"production_control_mutation"`
-	Limitations               []string                           `json:"limitations"`
+	OK                        bool                                  `json:"ok"`
+	Product                   string                                `json:"product"`
+	EvidenceModel             string                                `json:"evidence_model"`
+	ScenarioContractHash      string                                `json:"scenario_contract_hash"`
+	VerifiedExecutions        int                                   `json:"verified_executions"`
+	VerifiedObservations      int                                   `json:"verified_observations"`
+	Report                    defense.DefenseValidationReportV02    `json:"report"`
+	UnifiedSecurityContract   services.UnifiedSecurityInvestigation `json:"unified_security_contract"`
+	MainnetTransactionSent    bool                                  `json:"mainnet_transaction_sent"`
+	ExecutionAuthority        bool                                  `json:"execution_authority"`
+	ProductionControlMutation bool                                  `json:"production_control_mutation"`
+	Limitations               []string                              `json:"limitations"`
 }
 
 // DefenseValidationV1 validates an already-collected, isolated defense test run.
@@ -286,6 +288,10 @@ func evaluateDefenseValidationAPIRequest(input defenseValidationAPIRequest) (def
 	if err != nil {
 		return defenseValidationAPIResponse{}, fmt.Errorf("defense validation report rejected: %w", err)
 	}
+	unifiedSecurity, err := buildDefenseValidationUnifiedSecurityProjection(input, report)
+	if err != nil {
+		return defenseValidationAPIResponse{}, fmt.Errorf("unified defense validation projection rejected: %w", err)
+	}
 
 	return defenseValidationAPIResponse{
 		OK:                        true,
@@ -295,6 +301,7 @@ func evaluateDefenseValidationAPIRequest(input defenseValidationAPIRequest) (def
 		VerifiedExecutions:        len(cases),
 		VerifiedObservations:      len(observations),
 		Report:                    report,
+		UnifiedSecurityContract:   unifiedSecurity,
 		MainnetTransactionSent:    false,
 		ExecutionAuthority:        false,
 		ProductionControlMutation: false,

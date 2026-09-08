@@ -1,0 +1,100 @@
+name: Unified Security Contract CI
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/internal/services/unified_security_contract.go"
+      - "koschei/api/internal/services/unified_security_contract_test.go"
+      - "koschei/api/internal/services/unified_security_preflight.go"
+      - "koschei/api/internal/services/unified_security_preflight_test.go"
+      - "koschei/api/internal/services/unified_security_signed_evidence.go"
+      - "koschei/api/internal/services/unified_security_signed_evidence_test.go"
+      - "koschei/api/internal/handlers/transaction_guard_unified_security_bridge.go"
+      - "koschei/api/internal/handlers/transaction_guard_unified_security_bridge_test.go"
+      - "koschei/api/internal/handlers/transaction_guard_v3_response.go"
+      - "koschei/api/internal/handlers/defense_validation_api.go"
+      - "koschei/api/internal/handlers/defense_validation_unified_security_bridge.go"
+      - "koschei/api/internal/handlers/defense_validation_unified_security_bridge_test.go"
+      - "koschei/api/docs/unified-attack-path-security-model.md"
+      - ".github/workflows/unified-security-contract-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/services/unified_security_contract.go"
+      - "koschei/api/internal/services/unified_security_contract_test.go"
+      - "koschei/api/internal/services/unified_security_preflight.go"
+      - "koschei/api/internal/services/unified_security_preflight_test.go"
+      - "koschei/api/internal/services/unified_security_signed_evidence.go"
+      - "koschei/api/internal/services/unified_security_signed_evidence_test.go"
+      - "koschei/api/internal/handlers/transaction_guard_unified_security_bridge.go"
+      - "koschei/api/internal/handlers/transaction_guard_unified_security_bridge_test.go"
+      - "koschei/api/internal/handlers/transaction_guard_v3_response.go"
+      - "koschei/api/internal/handlers/defense_validation_api.go"
+      - "koschei/api/internal/handlers/defense_validation_unified_security_bridge.go"
+      - "koschei/api/internal/handlers/defense_validation_unified_security_bridge_test.go"
+      - "koschei/api/docs/unified-attack-path-security-model.md"
+      - ".github/workflows/unified-security-contract-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate unified security evidence contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Require contract and bridge files gofmt-clean
+        run: |
+          set -euo pipefail
+          files=(
+            internal/services/unified_security_contract.go
+            internal/services/unified_security_contract_test.go
+            internal/services/unified_security_preflight.go
+            internal/services/unified_security_preflight_test.go
+            internal/services/unified_security_signed_evidence.go
+            internal/services/unified_security_signed_evidence_test.go
+            internal/handlers/transaction_guard_unified_security_bridge.go
+            internal/handlers/transaction_guard_unified_security_bridge_test.go
+            internal/handlers/transaction_guard_v3_response.go
+            internal/handlers/defense_validation_api.go
+            internal/handlers/defense_validation_unified_security_bridge.go
+            internal/handlers/defense_validation_unified_security_bridge_test.go
+          )
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [ -n "${unformatted}" ]; then
+            printf '%s\n' "${unformatted}"
+            gofmt -d "${files[@]}"
+            exit 1
+          fi
+
+      - name: Run unified security contract tests
+        run: go test ./internal/services -run '^TestUnified|^TestTrustBoundaryTransition|^TestProspective' -count=1
+
+      - name: Run transaction guard unified projection tests
+        run: go test ./internal/handlers -run '^TestTransactionGuardUnifiedSecurity' -count=1
+
+      - name: Run defense validation unified projection tests
+        run: go test ./internal/handlers -run '^TestDefenseValidationUnifiedSecurity|^TestDefenseValidationUnifiedOutcome' -count=1
+
+      - name: Compile services package
+        run: go test ./internal/services -run '^$' -count=1
+
+      - name: Compile handlers package
+        run: go test ./internal/handlers -run '^$' -count=1

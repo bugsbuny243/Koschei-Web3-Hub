@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const transactionGuardV3AnalysisVersion = "v3-foundation-11"
+const transactionGuardV3AnalysisVersion = "v3-foundation-12"
 
 func applyTransactionGuardV3Decode(assessment transactionFirewallAssessment, intent *transactionGuardIntentPolicy, decoded transactionGuardDecodedTransaction, decodedFindings []transactionFirewallFinding) transactionFirewallAssessment {
 	assessment.ProgramIDs = normalizeGuardProgramList(append(assessment.ProgramIDs, decoded.ProgramIDs...))
@@ -90,6 +90,7 @@ func (h *Handler) finishTransactionGuardV3ResponseWithWitness(w http.ResponseWri
 	actorIncidentMemory := h.collectTransactionGuardActorIncidentMemory(r.Context(), input.Network, fingerprint, actorMemoryGraph)
 	confirmedIncidentCorpus := h.collectTransactionGuardConfirmedIncidentCorpus(r.Context(), input.Network, fingerprint, decoded, input.Wallet)
 	attackPath := buildTransactionGuardAttackPaths(input.Wallet, assessment, decoded, cpiFlow, authoritySurface)
+	unifiedSecurity := buildTransactionGuardUnifiedSecurityProjection(input, requestID, fingerprint, authoritySurface, attackPath, time.Now().UTC())
 	originalAction := assessment.Action
 	assessment, enforcement := applyTransactionGuardEnforcementRequirementWithWitness(input, requestID, assessment, guardComplete, time.Now().UTC(), &stateWitness)
 	if originalAction == "allow" && assessment.Action != "allow" && alertID == "" {
@@ -120,6 +121,7 @@ func (h *Handler) finishTransactionGuardV3ResponseWithWitness(w http.ResponseWri
 		"guard_complete":                      guardComplete,
 		"attack_path_complete":                attackPath.Complete,
 		"attack_path":                         attackPath,
+		"unified_security_contract":           unifiedSecurity,
 		"transaction_value_evidence_complete": valueEvidence.Complete,
 		"transaction_value_evidence":          valueEvidence,
 		"program_trust_graph_complete":        programTrustGraph.Complete,
@@ -153,7 +155,7 @@ func (h *Handler) finishTransactionGuardV3ResponseWithWitness(w http.ResponseWri
 			"logs_count": len(assessment.Logs), "logs": assessment.Logs,
 		},
 		"latency_ms": time.Since(started).Milliseconds(),
-		"warning":    "Koschei does not sign, submit or custody the transaction; attack paths are evidence-linked pre-signing hypotheses rather than claims of identity, malicious intent or guaranteed post-signing causation; actor-memory, incident-memory and confirmed-corpus matches provide retained on-chain historical context only; permits authorize only the exact transaction fingerprint until expiry, and state-bound permits also bind the observed account-state witness.",
+		"warning":    "Koschei does not sign, submit or custody the transaction; attack paths are evidence-linked pre-signing hypotheses rather than claims of identity, malicious intent or guaranteed post-signing causation; projected capabilities are prospective simulation outcomes, not claims of currently active authority; actor-memory, incident-memory and confirmed-corpus matches provide retained on-chain historical context only; permits authorize only the exact transaction fingerprint until expiry, and state-bound permits also bind the observed account-state witness.",
 	}
 	attachTransactionGuardEnforcementResponse(response, enforcement)
 	writeJSON(w, transactionGuardHTTPStatusWithEnforcement(assessment, enforcement), response)
