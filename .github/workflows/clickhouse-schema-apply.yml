@@ -1,0 +1,60 @@
+name: ClickHouse Schema Apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type APPLY to run additive ClickHouse schema migration"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clickhouse-schema-production
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Apply additive ClickHouse schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require explicit apply confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test "${CONFIRM}" = "APPLY"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Validate required connection secrets are present
+        env:
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${CLICKHOUSE_HTTP_URL}"
+          test -n "${CLICKHOUSE_USER}"
+          test -n "${CLICKHOUSE_PASSWORD}"
+
+      - name: Apply migration and verify schema contract
+        working-directory: koschei/api
+        env:
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_DATABASE: koschei_web3
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+          CLICKHOUSE_TIMEOUT_MS: "10000"
+          KOSCHEI_CLICKHOUSE_SCHEMA_APPLY: "1"
+        run: go run ./cmd/clickhouse-schema
