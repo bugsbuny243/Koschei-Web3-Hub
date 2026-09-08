@@ -14,7 +14,11 @@ import (
 const (
 	arvisHealthCacheTTL = 15 * time.Second
 	publicHealthTimeout = 2 * time.Second
+	evidenceHealthURL   = "/health?evidence=refresh"
 )
+
+// Collection must not hold the snapshot lock or queue concurrent public probes.
+var arvisHealthRefresh sync.Mutex
 
 var arvisHealthCache = struct {
 	sync.RWMutex
@@ -22,16 +26,24 @@ var arvisHealthCache = struct {
 	expiresAt time.Time
 }{}
 
-// Health is the public liveness/readiness endpoint used by Railway and external
+// Health is the public liveness endpoint used by Railway and external
 // transport monitors. Koschei Web3 is intentionally stateless for application
 // blockchain/radar/evidence data, so PostgreSQL is not a readiness dependency.
+// Customer indicators explicitly request a bounded observation refresh; plain
+// /health never collects evidence or waits for the collection lock.
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
+	arvis := cachedArvisHealthSnapshot()
+	if r.Method == http.MethodGet && r.URL.Query().Get("evidence") == "refresh" {
+		ctx, cancel := context.WithTimeout(r.Context(), publicHealthTimeout)
+		defer cancel()
+		arvis = h.cachedArvisHealth(ctx)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":      "ok",
 		"persistence": "stateless",
 		"database":    "not_used",
 		"service":     "koschei-web3",
-		"arvis":       cachedArvisHealthSnapshot(),
+		"arvis":       arvis,
 	})
 }
 
@@ -41,7 +53,7 @@ func cachedArvisHealthSnapshot() map[string]any {
 	if arvisHealthCache.data == nil {
 		return map[string]any{
 			"pipeline_status": "live_provider_mode",
-			"details_url":     "/api/web3/health",
+			"details_url":     evidenceHealthURL,
 			"cached":          false,
 		}
 	}
@@ -51,28 +63,33 @@ func cachedArvisHealthSnapshot() map[string]any {
 	}
 	out["cached"] = true
 	out["cache_expires_at"] = arvisHealthCache.expiresAt.UTC().Format(time.RFC3339)
-	out["details_url"] = "/api/web3/health"
+	out["details_url"] = evidenceHealthURL
+	// A cached observation is not evidence of current pipeline availability once
+	// its collection TTL has elapsed. Keep liveness cheap; do not collect here.
+	if !time.Now().Before(arvisHealthCache.expiresAt) {
+		out["pipeline_status"] = "stale"
+	}
 	return out
 }
 
 func (h *Handler) cachedArvisHealth(ctx context.Context) map[string]any {
-	now := time.Now()
 	arvisHealthCache.RLock()
-	if arvisHealthCache.data != nil && now.Before(arvisHealthCache.expiresAt) {
-		data := arvisHealthCache.data
-		arvisHealthCache.RUnlock()
-		return data
-	}
+	fresh := arvisHealthCache.data != nil && time.Now().Before(arvisHealthCache.expiresAt)
 	arvisHealthCache.RUnlock()
-
-	arvisHealthCache.Lock()
-	defer arvisHealthCache.Unlock()
-	if arvisHealthCache.data != nil && now.Before(arvisHealthCache.expiresAt) {
-		return arvisHealthCache.data
+	if fresh || !arvisHealthRefresh.TryLock() {
+		return cachedArvisHealthSnapshot()
 	}
+	defer arvisHealthRefresh.Unlock()
+	arvisHealthCache.RLock()
+	fresh = arvisHealthCache.data != nil && time.Now().Before(arvisHealthCache.expiresAt)
+	arvisHealthCache.RUnlock()
+	if fresh {
+		return cachedArvisHealthSnapshot()
+	}
+
 	stats := h.securityRadarStreamStats(ctx)
 	data := map[string]any{
-		"pipeline_status":         stats["pipeline_status"],
+		"pipeline_status":         measuredArvisHealthStatus(stats),
 		"architecture_arm_count":  stats["architecture_arm_count"],
 		"runtime_engines":         stats["runtime_engines"],
 		"raw_stream_events":       stats["raw_stream_events"],
@@ -91,9 +108,38 @@ func (h *Handler) cachedArvisHealth(ctx context.Context) map[string]any {
 		"failures":                h.arvisFailureHealth(ctx),
 		"cached_for_seconds":      int(arvisHealthCacheTTL.Seconds()),
 	}
+	if ctx.Err() != nil {
+		// A cancelled or incomplete refresh must not publish a healthy snapshot.
+		return map[string]any{"pipeline_status": "unavailable", "cached": false, "details_url": evidenceHealthURL}
+	}
+	arvisHealthCache.Lock()
 	arvisHealthCache.data = data
-	arvisHealthCache.expiresAt = now.Add(arvisHealthCacheTTL)
-	return data
+	arvisHealthCache.expiresAt = time.Now().Add(arvisHealthCacheTTL)
+	arvisHealthCache.Unlock()
+	return cachedArvisHealthSnapshot()
+}
+
+func measuredArvisHealthStatus(stats map[string]any) string {
+	status, _ := stats["pipeline_status"].(string)
+	if status == "" {
+		return "unverified"
+	}
+	if status != "healthy" {
+		return status
+	}
+	// The collector omits failed SQL observations. Missing failure/lease metrics
+	// cannot count as zero when deciding whether a pipeline is healthy.
+	for _, key := range []string{
+		"raw_stream_events", "enriched_mints", "processing_active",
+		"processing_stale_active", "processing_completed",
+		"processing_completed_recent", "processing_failed_recent",
+		"last_stream_event_at", "last_processed_at",
+	} {
+		if _, observed := stats[key]; !observed {
+			return "unverified"
+		}
+	}
+	return status
 }
 
 func resetArvisHealthCache() {

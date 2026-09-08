@@ -28,21 +28,25 @@ function installNavigation(){
 async function hydrateHealth(){
   const pipeline=$('commandPipelineState');
   const top=$('topStatus');
+  const showPipeline=ready=>{
+    if(pipeline){pipeline.textContent=ready?'ARVIS PIPELINE OPERATIONAL':'DEGRADED / UNVERIFIED';pipeline.closest('.status-row')?.setAttribute('data-tone',ready?'ready':'unknown');}
+    if(top){top.dataset.state=ready?'live':'degraded';top.querySelector('span').textContent=ready?'Evidence pipeline operational':'Pipeline degraded / unverified';}
+  };
   const controller=new AbortController();
   const timer=window.setTimeout(()=>controller.abort('health_timeout'),10000);
   try{
-    const response=await fetch('/health',{cache:'no-store',credentials:'same-origin',signal:controller.signal});
+    const response=await fetch('/health?evidence=refresh',{cache:'no-store',credentials:'same-origin',signal:controller.signal});
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||data.details||`HTTP ${response.status}`);
     const arvis=data.arvis||{};
-    const raw=text(arvis.pipeline_status||arvis.status||data.status||'unknown').toLowerCase();
-    const ready=['ready','healthy','live','connected','ok','manual'].some(state=>raw.includes(state));
-    if(pipeline){pipeline.textContent=ready?'ARVIS PIPELINE READY':'DEGRADED / UNVERIFIED';pipeline.closest('.status-row')?.setAttribute('data-tone',ready?'ready':'unknown');}
-    if(top){top.dataset.state=ready?'live':'degraded';top.querySelector('span').textContent=ready?'Production pipeline ready':'Pipeline degraded / unverified';}
+    const expiresAt=typeof arvis.cache_expires_at==='string'?Date.parse(arvis.cache_expires_at):NaN;
+    const ready=['healthy','operational'].includes(arvis.pipeline_status)&&arvis.cached===true&&expiresAt>Date.now();
+    showPipeline(ready);
+    if(ready)window.setTimeout(()=>showPipeline(false),Math.min(Math.max(0,expiresAt-Date.now()),2147483647));
   }catch(error){
     if(pipeline){pipeline.textContent='UNAVAILABLE';pipeline.closest('.status-row')?.setAttribute('data-tone','unknown');}
     if(top){top.dataset.state='degraded';top.querySelector('span').textContent='Evidence service unavailable';top.title=text(error?.message||error);}
-  }finally{window.clearTimeout(timer);}
+  }finally{window.clearTimeout(timer);window.setTimeout(hydrateHealth,15000);}
 }
 
 function syncAccountState(){
