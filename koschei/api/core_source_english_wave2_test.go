@@ -9,13 +9,13 @@ import (
 func TestCoreCustomerSurfacesAreSourceEnglishWave2(t *testing.T) {
 	files := map[string][]string{
 		"public/index.html": {
-			"Koschei Web3 | The Universe",
-			"Web3 defenses?<br>Who tests them?",
-			"One address. Full threat context.",
-			"Solana is the live production core today.",
-			"Every material conclusion should descend to evidence",
-			"unknown stays unknown",
-			"data-koschei-home-scan",
+			"Koschei Web3 | Security Validation & Risk Intelligence",
+			"See the blind spot.",
+			"Solana live production core",
+			"Material conclusions stay traceable to evidence; missing evidence stays unknown.",
+			"ARVIS is not a generic risk-score machine.",
+			"Attack Path",
+			"STRUCTURE ONLY · NOT LIVE TELEMETRY",
 		},
 		"public/account.html": {
 			"Professional Access",
