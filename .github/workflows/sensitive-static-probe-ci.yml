@@ -1,0 +1,48 @@
+name: Sensitive Static Probe CI
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/internal/http/security_headers.go"
+      - "koschei/api/internal/http/sensitive_static_probe_test.go"
+      - ".github/workflows/sensitive-static-probe-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/http/security_headers.go"
+      - "koschei/api/internal/http/sensitive_static_probe_test.go"
+      - ".github/workflows/sensitive-static-probe-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify secret-path probes cannot reach static fallback
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Download modules
+        working-directory: koschei/api
+        run: go mod download
+      - name: Require formatting
+        working-directory: koschei/api
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l internal/http/security_headers.go internal/http/sensitive_static_probe_test.go)"
+          test -z "${unformatted}" || { printf 'unformatted files:\n%s\n' "${unformatted}" >&2; exit 1; }
+      - name: Run focused regression tests
+        working-directory: koschei/api
+        run: go test ./internal/http -run '^(TestSensitiveStaticProbePath|TestSecurityHeadersReturns404BeforeSensitiveProbeCanReachStaticFallback|TestSecurityHeadersAllowsWellKnownPathToReachRouter)' -count=1
+      - name: Vet HTTP package
+        working-directory: koschei/api
+        run: go vet ./internal/http
+      - name: Compile HTTP tests
+        working-directory: koschei/api
+        run: go test ./internal/http -run '^$' -count=1
