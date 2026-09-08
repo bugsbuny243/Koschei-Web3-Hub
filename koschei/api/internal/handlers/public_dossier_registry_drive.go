@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +16,11 @@ import (
 )
 
 const publicCaseRegistryDriveObjectName = "koschei-public-case-registry-v1.json"
+
+const (
+	defaultPublicCaseRegistrySnapshotMaxRows = 10_000
+	hardPublicCaseRegistrySnapshotMaxRows    = 100_000
+)
 
 type publicDossierRegistrySnapshot struct {
 	OK                         bool                  `json:"ok"`
@@ -32,6 +40,21 @@ type publicDossierRegistrySnapshot struct {
 	Count                      int                   `json:"count"`
 	PublicationPolicy          map[string]any        `json:"publication_policy"`
 	Cases                      []publicDossierCaseV2 `json:"cases"`
+}
+
+// PublicDossierRegistryPublishReceipt is safe operational metadata for one
+// registry snapshot publication. It contains no database URL, Drive credential,
+// customer secret or private evidence bytes.
+type PublicDossierRegistryPublishReceipt struct {
+	ObjectID                string    `json:"object_id"`
+	ObjectName              string    `json:"object_name"`
+	ObjectSHA256            string    `json:"object_sha256"`
+	GeneratedAt             time.Time `json:"generated_at"`
+	TotalPublications       int       `json:"total_publications"`
+	PublishedCases          int       `json:"published_cases"`
+	RegistryStatus          string    `json:"registry_status"`
+	PublicationLedgerStatus string    `json:"publication_ledger_status"`
+	ReadbackVerified        bool      `json:"readback_verified"`
 }
 
 // PublicDossierCasesPortable serves one explicitly selected publication registry
@@ -133,6 +156,95 @@ func publicDossierRegistrySnapshotFromLoad(loaded publicDossierCasesV2Load, gene
 		},
 		Cases: loaded.Cases,
 	}
+}
+
+// PublishPublicDossierRegistrySnapshot creates a portable discovery snapshot only
+// from the primary, integrity-verifying publication loader. It refuses truncated or
+// invalid source state, writes one immutable Drive object, then reads the newest
+// object back through the checksum-verifying reader and requires exact byte parity.
+// This function never changes KOSCHEI_PUBLIC_REGISTRY_BACKEND.
+func (h *Handler) PublishPublicDossierRegistrySnapshot(ctx context.Context) (PublicDossierRegistryPublishReceipt, error) {
+	var receipt PublicDossierRegistryPublishReceipt
+	if h == nil || h.DB == nil {
+		return receipt, errors.New("public registry publisher requires the primary publication database")
+	}
+	maxRows, err := publicDossierRegistrySnapshotMaxRows()
+	if err != nil {
+		return receipt, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/public/cases", nil)
+	if err != nil {
+		return receipt, fmt.Errorf("build registry snapshot request: %w", err)
+	}
+	loaded, err := h.loadPublicDossierCasesV2(req, maxRows)
+	if err != nil {
+		return receipt, fmt.Errorf("load verified public registry: %w", err)
+	}
+	if loaded.UninspectedPublications != 0 {
+		return receipt, fmt.Errorf("public registry snapshot refused: %d publications exceed the inspected snapshot cap of %d", loaded.UninspectedPublications, maxRows)
+	}
+	if loaded.InvalidPublications != 0 || loaded.InvalidLedgerPublications != 0 {
+		return receipt, fmt.Errorf("public registry snapshot refused: invalid_publications=%d invalid_ledger_publications=%d", loaded.InvalidPublications, loaded.InvalidLedgerPublications)
+	}
+
+	snapshot := publicDossierRegistrySnapshotFromLoad(loaded, time.Now().UTC())
+	if !snapshot.RegistryComplete {
+		return receipt, errors.New("public registry snapshot refused: registry is not complete")
+	}
+	payload, err := json.Marshal(snapshot)
+	if err != nil {
+		return receipt, fmt.Errorf("encode public registry snapshot: %w", err)
+	}
+	if _, err := parsePublicDossierRegistrySnapshot(payload, maxRows); err != nil {
+		return receipt, fmt.Errorf("self-validate public registry snapshot: %w", err)
+	}
+
+	drive, err := archive.NewGoogleDriveFromEnv()
+	if err != nil {
+		return receipt, fmt.Errorf("open public registry Drive archive: %w", err)
+	}
+	object, err := drive.PutJSON(ctx, publicCaseRegistryDriveObjectName, payload)
+	if err != nil {
+		return receipt, fmt.Errorf("write public registry Drive snapshot: %w", err)
+	}
+	readObject, readback, err := drive.GetLatestJSONByName(ctx, publicCaseRegistryDriveObjectName)
+	if err != nil {
+		return receipt, fmt.Errorf("read back public registry Drive snapshot: %w", err)
+	}
+	if !strings.EqualFold(strings.TrimSpace(object.Hash), strings.TrimSpace(readObject.Hash)) || !bytes.Equal(payload, readback) {
+		return receipt, errors.New("public registry Drive readback did not match the published snapshot")
+	}
+	parsed, err := parsePublicDossierRegistrySnapshot(readback, maxRows)
+	if err != nil {
+		return receipt, fmt.Errorf("validate public registry Drive readback: %w", err)
+	}
+	if !parsed.GeneratedAt.Equal(snapshot.GeneratedAt) || parsed.Count != snapshot.Count || parsed.TotalPublications != snapshot.TotalPublications {
+		return receipt, errors.New("public registry Drive readback metadata mismatch")
+	}
+
+	return PublicDossierRegistryPublishReceipt{
+		ObjectID:                readObject.ID,
+		ObjectName:              readObject.Name,
+		ObjectSHA256:            strings.ToLower(strings.TrimSpace(readObject.Hash)),
+		GeneratedAt:             parsed.GeneratedAt,
+		TotalPublications:       parsed.TotalPublications,
+		PublishedCases:          parsed.Count,
+		RegistryStatus:          parsed.RegistryStatus,
+		PublicationLedgerStatus: parsed.PublicationLedgerStatus,
+		ReadbackVerified:        true,
+	}, nil
+}
+
+func publicDossierRegistrySnapshotMaxRows() (int, error) {
+	raw := strings.TrimSpace(os.Getenv("KOSCHEI_PUBLIC_REGISTRY_SNAPSHOT_MAX_ROWS"))
+	if raw == "" {
+		return defaultPublicCaseRegistrySnapshotMaxRows, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 1 || value > hardPublicCaseRegistrySnapshotMaxRows {
+		return 0, fmt.Errorf("KOSCHEI_PUBLIC_REGISTRY_SNAPSHOT_MAX_ROWS must be between 1 and %d", hardPublicCaseRegistrySnapshotMaxRows)
+	}
+	return value, nil
 }
 
 func loadPublicDossierRegistrySnapshotFromDrive(r *http.Request, limit int) (publicDossierRegistrySnapshot, archive.DriveObject, error) {
