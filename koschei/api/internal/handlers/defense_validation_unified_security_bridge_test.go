@@ -15,6 +15,9 @@ func TestDefenseValidationUnifiedSecurityProjectsAuthenticatedCasesWithoutRegrad
 		t.Fatal(err)
 	}
 	unified := response.UnifiedSecurityContract
+	if unified.BindingStatus != "consistent" || len(unified.BindingIssues) != 0 {
+		t.Fatalf("projection bindings=%#v", unified.BindingIssues)
+	}
 	if unified.ContractVersion != services.UnifiedSecurityContractVersion {
 		t.Fatalf("contract version=%q", unified.ContractVersion)
 	}
@@ -78,6 +81,9 @@ func TestDefenseValidationUnifiedSecurityEmitsVerifiedLateDetectionGap(t *testin
 		t.Fatalf("late detection should fail defense validation, got %q", response.Report.Verdict)
 	}
 	unified := response.UnifiedSecurityContract
+	if unified.BindingStatus != "consistent" || len(unified.BindingIssues) != 0 {
+		t.Fatalf("projection bindings=%#v", unified.BindingIssues)
+	}
 	if len(unified.AttackPaths) != 1 {
 		t.Fatalf("expected one verified defense-gap path, got %d: %#v", len(unified.AttackPaths), unified.AttackPaths)
 	}
@@ -110,6 +116,9 @@ func TestDefenseValidationUnifiedSecurityMissingObservationStaysEvidenceEmpty(t 
 		t.Fatal(err)
 	}
 	unified := response.UnifiedSecurityContract
+	if unified.BindingStatus != "consistent" || len(unified.BindingIssues) != 0 {
+		t.Fatalf("projection bindings=%#v", unified.BindingIssues)
+	}
 	if len(unified.Base.Subjects) != 0 || len(unified.Base.Evidence) != 0 || len(unified.Actions) != 0 || len(unified.AttackPaths) != 0 {
 		t.Fatalf("missing independent observations produced unified claims: %#v", unified)
 	}

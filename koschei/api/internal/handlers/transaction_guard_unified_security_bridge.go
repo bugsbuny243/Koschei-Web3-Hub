@@ -31,7 +31,7 @@ func buildTransactionGuardUnifiedSecurityProjection(
 	unified := services.BuildUnifiedSecurityInvestigation(base, now)
 
 	if network != "solana-mainnet" {
-		return unified
+		return services.FinalizeUnifiedSecurityInvestigation(unified)
 	}
 
 	for _, event := range authority.Events {
@@ -143,9 +143,6 @@ func buildTransactionGuardUnifiedSecurityProjection(
 		steps := make([]services.UnifiedSecurityAttackPathStep, 0, len(path.Steps))
 		pathEvidenceRefs := make([]string, 0, len(path.Steps))
 		entrySubjectID := ""
-		if walletOK {
-			entrySubjectID = walletSubject.ID
-		}
 
 		for _, step := range path.Steps {
 			subject, subjectOK := transactionGuardUnifiedSubject(step.Subject, network)
@@ -235,7 +232,7 @@ func buildTransactionGuardUnifiedSecurityProjection(
 	}
 
 	unified.Base = base
-	return unified
+	return services.FinalizeUnifiedSecurityInvestigation(unified)
 }
 
 func transactionGuardUnifiedSubject(raw, network string) (services.IntelligenceSubject, bool) {

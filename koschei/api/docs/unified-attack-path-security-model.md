@@ -48,6 +48,33 @@ The unified contract is evidence-first and fail-closed:
 7. Solana and other case-sensitive native identifiers remain byte/text exact; the model must not lowercase native subject IDs.
 8. The existing ARVIS intelligence decision remains authoritative. The unified envelope must not re-grade the base decision.
 
+## Completed projection binding checks
+
+Adapters call `FinalizeUnifiedSecurityInvestigation` after assembling the complete
+envelope. Builders start with `binding_status=unchecked`; a consistent projection
+reports `binding_status=consistent`. This checks graph consistency, not producer
+authentication, current permission to act, or a safe customer verdict.
+
+Every referenced subject, capability, action, transition and evidence row must
+resolve without ambiguous IDs. Evidence must belong to a participating subject or
+the explicitly referenced resource. Raw resource addresses must also match a
+participant's chain/network context, so the same address on another network cannot
+supply evidence accidentally. Declared transaction hashes must have matching
+evidence, and conflicting transaction hashes are rejected. Claims cannot be stronger
+than their supporting evidence or referenced capabilities/actions/transitions.
+Attack-path entries, step order and linked actors/targets must agree.
+
+A broken binding sets `binding_status=unverified` and returns machine-readable
+`binding_issues` with the affected object ID and reason code. All additive
+capabilities, actions, transitions, paths and consequences become `unverified`
+with zero confidence. The original base evidence, decision and caller-owned
+claims are preserved. Consistent observed/inferred/unavailable evidence is never
+upgraded, and a verified revoked or prospective capability retains that lifecycle.
+
+Transaction Guard and Defense Validation finalize their projections before
+returning the additive envelope. Domain adapters still own semantic interpretation
+and producer authentication; a consistent graph alone does not prove causation.
+
 ## Authenticated signed evidence ingress
 
 The unified model can consume the repository's existing `securityevidence.Event` format through an authenticated ingress adapter. This is a trust boundary, not a generic claim importer.

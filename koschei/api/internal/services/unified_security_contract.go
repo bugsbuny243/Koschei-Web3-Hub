@@ -143,6 +143,8 @@ type UnifiedSecurityAttackPath struct {
 // authoritative ARVIS projection; this envelope adds capability/action/boundary
 // semantics without re-grading the existing decision.
 type UnifiedSecurityInvestigation struct {
+	BindingStatus       string                                `json:"binding_status"`
+	BindingIssues       []UnifiedSecurityBindingIssue         `json:"binding_issues,omitempty"`
 	ContractVersion     string                                `json:"contract_version"`
 	Base                IntelligenceInvestigation             `json:"base"`
 	Capabilities        []IntelligenceCapability              `json:"capabilities,omitempty"`
@@ -289,6 +291,7 @@ func BuildUnifiedSecurityInvestigation(base IntelligenceInvestigation, now time.
 		now = time.Now().UTC()
 	}
 	return UnifiedSecurityInvestigation{
+		BindingStatus:   "unchecked",
 		ContractVersion: UnifiedSecurityContractVersion,
 		Base:            base,
 		GeneratedAt:     now.UTC(),
