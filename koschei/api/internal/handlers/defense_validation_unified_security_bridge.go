@@ -172,7 +172,7 @@ func buildDefenseValidationUnifiedSecurityProjection(input defenseValidationAPIR
 	}
 
 	unified.Base = base
-	return unified, nil
+	return services.FinalizeUnifiedSecurityInvestigation(unified), nil
 }
 
 func defenseValidationUnifiedCaseResults(report defense.DefenseValidationReportV02) map[string]defense.DefenseValidationCaseResultV02 {

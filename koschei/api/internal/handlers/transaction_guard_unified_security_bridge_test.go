@@ -69,6 +69,9 @@ func TestTransactionGuardUnifiedSecurityProjectsVerifiedDelegateAsProspectiveCap
 		now,
 	)
 
+	if projection.BindingStatus != "consistent" || len(projection.BindingIssues) != 0 {
+		t.Fatalf("projection bindings=%#v", projection.BindingIssues)
+	}
 	if projection.Base.Decision.Status != services.IntelligenceEvidenceUnverified || projection.Base.Decision.Action != "investigate" {
 		t.Fatalf("base decision was regraded: %#v", projection.Base.Decision)
 	}
@@ -91,6 +94,9 @@ func TestTransactionGuardUnifiedSecurityProjectsVerifiedDelegateAsProspectiveCap
 	}
 	if len(projection.AttackPaths) != 1 || projection.AttackPaths[0].Status != services.IntelligenceEvidenceInferred {
 		t.Fatalf("pre-signing path must remain inferred: %#v", projection.AttackPaths)
+	}
+	if projection.AttackPaths[0].EntrySubjectID != projection.AttackPaths[0].Steps[0].SubjectID {
+		t.Fatal("path entry does not identify the first projected actor")
 	}
 	if len(projection.Base.Evidence) != 2 {
 		t.Fatalf("expected authority and attack-path evidence, got %#v", projection.Base.Evidence)
@@ -188,5 +194,47 @@ func TestTransactionGuardUnifiedSecurityCanProjectObservedPermanentDelegateWitho
 	}
 	if len(projection.Actions) != 0 {
 		t.Fatalf("missing current authority must not be replaced with an invented actor: %#v", projection.Actions)
+	}
+}
+
+func TestTransactionGuardUnifiedSecurityRejectsAmbiguousAuthorityEvidence(t *testing.T) {
+	active := true
+	event := transactionGuardAuthorityEvent{
+		InstructionSource:     "outer",
+		InstructionIndex:      1,
+		Kind:                  "approve",
+		Account:               guardV3TestAddress(132),
+		CurrentAuthority:      guardV3TestAddress(131),
+		Delegate:              guardV3TestAddress(133),
+		Scope:                 "single_token_account_allowance",
+		Persistent:            true,
+		PostStateAvailable:    true,
+		ActiveAfterSimulation: &active,
+		EvidenceStatus:        "verified_final_simulated_token_account_state",
+	}
+	projection := buildTransactionGuardUnifiedSecurityProjection(
+		transactionGuardV2Request{Network: "solana-mainnet", Wallet: event.CurrentAuthority},
+		"fixture-request", "fixture-fingerprint",
+		transactionGuardAuthoritySurfaceAnalysis{Events: []transactionGuardAuthorityEvent{event, event}},
+		transactionGuardAttackPathAnalysis{}, time.Now(),
+	)
+	if projection.BindingStatus != "unverified" || len(projection.BindingIssues) == 0 {
+		t.Fatalf("ambiguous authority evidence accepted: %#v", projection)
+	}
+	if len(projection.Capabilities) != 2 || len(projection.Actions) != 2 {
+		t.Fatal("fixture did not exercise both capability and action claims")
+	}
+	for _, capability := range projection.Capabilities {
+		if capability.Status != services.IntelligenceEvidenceUnverified || capability.Confidence != 0 {
+			t.Fatalf("ambiguous capability retained a verified claim: %#v", capability)
+		}
+	}
+	for _, action := range projection.Actions {
+		if action.Status != services.IntelligenceEvidenceUnverified || action.Confidence != 0 {
+			t.Fatalf("ambiguous action retained a verified claim: %#v", action)
+		}
+	}
+	if len(projection.Base.Evidence) != 2 || projection.Base.Evidence[0].Status != services.IntelligenceEvidenceVerified || projection.Base.Decision.Status != services.IntelligenceEvidenceUnverified {
+		t.Fatal("binding rejection altered the original evidence or decision")
 	}
 }

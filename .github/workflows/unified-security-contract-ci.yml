@@ -5,6 +5,8 @@ on:
     paths:
       - "koschei/api/internal/services/unified_security_contract.go"
       - "koschei/api/internal/services/unified_security_contract_test.go"
+      - "koschei/api/internal/services/unified_security_bindings.go"
+      - "koschei/api/internal/services/unified_security_bindings_test.go"
       - "koschei/api/internal/services/unified_security_preflight.go"
       - "koschei/api/internal/services/unified_security_preflight_test.go"
       - "koschei/api/internal/services/unified_security_signed_evidence.go"
@@ -22,6 +24,8 @@ on:
     paths:
       - "koschei/api/internal/services/unified_security_contract.go"
       - "koschei/api/internal/services/unified_security_contract_test.go"
+      - "koschei/api/internal/services/unified_security_bindings.go"
+      - "koschei/api/internal/services/unified_security_bindings_test.go"
       - "koschei/api/internal/services/unified_security_preflight.go"
       - "koschei/api/internal/services/unified_security_preflight_test.go"
       - "koschei/api/internal/services/unified_security_signed_evidence.go"
@@ -66,6 +70,8 @@ jobs:
           files=(
             internal/services/unified_security_contract.go
             internal/services/unified_security_contract_test.go
+            internal/services/unified_security_bindings.go
+            internal/services/unified_security_bindings_test.go
             internal/services/unified_security_preflight.go
             internal/services/unified_security_preflight_test.go
             internal/services/unified_security_signed_evidence.go
@@ -85,7 +91,7 @@ jobs:
           fi
 
       - name: Run unified security contract tests
-        run: go test ./internal/services -run '^TestUnified|^TestTrustBoundaryTransition|^TestProspective' -count=1
+        run: go test -race ./internal/services -run '^TestUnified|^TestTrustBoundaryTransition|^TestProspective' -count=1
 
       - name: Run transaction guard unified projection tests
         run: go test ./internal/handlers -run '^TestTransactionGuardUnifiedSecurity' -count=1
