@@ -39,6 +39,7 @@ var databaseOptionalAPIPaths = func() map[string]struct{} {
 		"/api/owner/web3/execution-assurance/safe/verify",
 		"/api/public/impact",
 		"/api/public/metrics",
+		"/api/public/cases",
 		"/api/public/token/status",
 		"/api/public/token/readiness",
 		"/api/web3/health",
