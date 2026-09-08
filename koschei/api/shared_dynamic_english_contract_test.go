@@ -9,8 +9,8 @@ import (
 func TestSharedDynamicProductCopyIsEnglish(t *testing.T) {
 	files := map[string][]string{
 		"public/js/koschei-product-v2.js": {
-			"ARVIS production pipeline ready",
-			"DEGRADED · production pipeline could not be verified",
+			"ARVIS evidence pipeline operational",
+			"DEGRADED · evidence pipeline could not be verified",
 			"DEGRADED · evidence service unavailable",
 			"Health check did not respond within",
 		},

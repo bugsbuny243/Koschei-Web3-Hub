@@ -1,0 +1,48 @@
+name: Evidence Health Truth
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/internal/handlers/health*"
+      - "koschei/api/public/js/koschei-dashboard.js"
+      - "koschei/api/public/js/koschei-product-v2.js"
+      - "koschei/api/public/js/__tests__/evidence-health.test.cjs"
+      - "koschei/api/public/*.html"
+      - ".github/workflows/evidence-health-truth.yml"
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/handlers/health*"
+      - "koschei/api/public/js/koschei-dashboard.js"
+      - "koschei/api/public/js/koschei-product-v2.js"
+      - "koschei/api/public/js/__tests__/evidence-health.test.cjs"
+      - "koschei/api/public/*.html"
+      - ".github/workflows/evidence-health-truth.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  health-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exercise customer health indicators
+        run: node --test public/js/__tests__/evidence-health.test.cjs
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Check public liveness and evidence freshness
+        run: go test -race ./internal/handlers -run '^(TestCachedArvisHealthSnapshot.*|TestEvidenceHealth.*|TestArvisPipelineStatusUsesFreshness|TestPublicHealthStaysReadyInStatelessRuntimeWithoutLeakingDBError)$' -count=1
+      - name: Check health Go formatting
+        run: |
+          gofmt -d internal/handlers/health.go internal/handlers/health_public_test.go
+          test -z "$(gofmt -l internal/handlers/health.go internal/handlers/health_public_test.go)"

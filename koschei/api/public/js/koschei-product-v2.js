@@ -33,7 +33,34 @@
   }
 
   function installReveal(){const nodes=[...document.querySelectorAll('[data-reveal]')];if(!nodes.length)return;if(!('IntersectionObserver'in window)){nodes.forEach(node=>node.classList.add('is-visible'));return;}const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(!entry.isIntersecting)return;entry.target.classList.add('is-visible');observer.unobserve(entry.target);}),{rootMargin:'0px 0px -8% 0px',threshold:.08});nodes.forEach(node=>observer.observe(node));}
-  async function hydrateHealth(){const indicators=[...document.querySelectorAll('[data-koschei-live]')];if(!indicators.length)return;const controller=new AbortController();const timer=window.setTimeout(()=>controller.abort('koschei_health_timeout'),HEALTH_TIMEOUT_MS);try{const response=await fetch('/health',{cache:'no-store',credentials:'same-origin',signal:controller.signal});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.details||data.error||`HTTP ${response.status}`);const arvis=data.arvis||{},status=String(arvis.pipeline_status||arvis.status||data.status||'ready').toLowerCase();const isLive=['ready','healthy','live','connected','ok','manual'].some(value=>status.includes(value));indicators.forEach(node=>{node.classList.toggle('is-live',isLive);node.dataset.koscheiDependencyState=isLive?'ready':'degraded';node.textContent=isLive?'ARVIS production pipeline ready':'DEGRADED · production pipeline could not be verified';});}catch(error){indicators.forEach(node=>{node.textContent='DEGRADED · evidence service unavailable';node.title=error?.name==='AbortError'?`Health check did not respond within ${HEALTH_TIMEOUT_MS/1000} seconds`:String(error?.message||'dependency error');node.dataset.koscheiDependencyState='degraded';node.classList.remove('is-live');});}finally{window.clearTimeout(timer);}}
+  async function hydrateHealth(){
+    const indicators=[...document.querySelectorAll('[data-koschei-live]')];
+    if(!indicators.length)return;
+    const showPipeline=isLive=>indicators.forEach(node=>{
+      node.classList.toggle('is-live',isLive);
+      node.dataset.koscheiDependencyState=isLive?'ready':'degraded';
+      node.textContent=isLive?'ARVIS evidence pipeline operational':'DEGRADED · evidence pipeline could not be verified';
+    });
+    const controller=new AbortController();
+    const timer=window.setTimeout(()=>controller.abort('koschei_health_timeout'),HEALTH_TIMEOUT_MS);
+    try{
+      const response=await fetch('/health?evidence=refresh',{cache:'no-store',credentials:'same-origin',signal:controller.signal});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.details||data.error||`HTTP ${response.status}`);
+      const arvis=data.arvis||{};
+      const expiresAt=typeof arvis.cache_expires_at==='string'?Date.parse(arvis.cache_expires_at):NaN;
+      const isLive=['healthy','operational'].includes(arvis.pipeline_status)&&arvis.cached===true&&expiresAt>Date.now();
+      showPipeline(isLive);
+      if(isLive)window.setTimeout(()=>showPipeline(false),Math.min(Math.max(0,expiresAt-Date.now()),2147483647));
+    }catch(error){
+      indicators.forEach(node=>{
+        node.textContent='DEGRADED · evidence service unavailable';
+        node.title=error?.name==='AbortError'?`Health check did not respond within ${HEALTH_TIMEOUT_MS/1000} seconds`:String(error?.message||'dependency error');
+        node.dataset.koscheiDependencyState='degraded';
+        node.classList.remove('is-live');
+      });
+    }finally{window.clearTimeout(timer);window.setTimeout(hydrateHealth,15000);}
+  }
   function installFormState(){document.querySelectorAll('form').forEach(form=>form.addEventListener('submit',()=>{document.body.classList.add('is-processing');window.setTimeout(()=>document.body.classList.remove('is-processing'),6000);}));}
   function installExternalSafety(){document.querySelectorAll('a[target="_blank"]').forEach(link=>{const rel=new Set(String(link.rel||'').split(/\s+/).filter(Boolean));rel.add('noopener');rel.add('noreferrer');link.rel=[...rel].join(' ');});}
   function installHomepageScan(){const form=document.querySelector('[data-koschei-home-scan]');if(!form)return;form.addEventListener('submit',event=>{const input=form.querySelector('input[name="target"]');if(!input||!input.value.trim()){event.preventDefault();input?.focus();return;}input.value=input.value.trim();});}
