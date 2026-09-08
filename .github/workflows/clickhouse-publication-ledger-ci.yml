@@ -1,0 +1,145 @@
+name: ClickHouse Publication Ledger CI
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/clickhouse/migrations/002_dossier_publication_ledger.sql"
+      - "koschei/api/clickhouse/migrations/002_dossier_publication_ledger.sql.sha256"
+      - "koschei/api/internal/clickhouse/publication_*"
+      - "koschei/api/cmd/clickhouse-publication-schema/**"
+      - ".github/workflows/clickhouse-publication-ledger-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/clickhouse/migrations/002_dossier_publication_ledger.sql"
+      - "koschei/api/clickhouse/migrations/002_dossier_publication_ledger.sql.sha256"
+      - "koschei/api/internal/clickhouse/publication_*"
+      - "koschei/api/cmd/clickhouse-publication-schema/**"
+      - ".github/workflows/clickhouse-publication-ledger-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate append-only publication/evidence ledger
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:26.2
+        env:
+          CLICKHOUSE_DB: koschei_web3
+        ports:
+          - 8123:8123
+        options: >-
+          --health-cmd="clickhouse-client --query 'SELECT 1'"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Require gofmt-clean publication paths
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l internal/clickhouse/publication_*.go cmd/clickhouse-publication-schema)"
+          if [ -n "${unformatted}" ]; then
+            printf '%s\n' "${unformatted}"
+            exit 1
+          fi
+
+      - name: Verify reviewed migration checksum
+        run: |
+          set -euo pipefail
+          cd clickhouse/migrations
+          sha256sum -c 002_dossier_publication_ledger.sql.sha256
+
+      - name: Validate migration on ClickHouse 26.2
+        run: |
+          set -euo pipefail
+          container_id="$(docker ps --filter 'ancestor=clickhouse/clickhouse-server:26.2' --format '{{.ID}}' | head -n1)"
+          test -n "${container_id}"
+          docker exec -i "${container_id}" clickhouse-client --multiquery < clickhouse/migrations/002_dossier_publication_ledger.sql
+
+          manifest_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,'|',sorting_key) FROM system.tables WHERE database='koschei_web3' AND name='dossier_bundle_manifests' FORMAT TSVRaw")"
+          transition_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,'|',sorting_key) FROM system.tables WHERE database='koschei_web3' AND name='dossier_publication_transitions' FORMAT TSVRaw")"
+          manifest_hash_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='dossier_bundle_manifests' AND name='manifest_sha256' FORMAT TSVRaw")"
+          previous_hash_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='dossier_publication_transitions' AND name='previous_transition_sha256' FORMAT TSVRaw")"
+          exposure_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='dossier_publication_transitions' AND name='exposure_started_at' FORMAT TSVRaw")"
+
+          printf 'manifest_meta=%s\ntransition_meta=%s\nmanifest_hash_type=%s\nprevious_hash_type=%s\nexposure_type=%s\n' \
+            "${manifest_meta}" "${transition_meta}" "${manifest_hash_type}" "${previous_hash_type}" "${exposure_type}"
+
+          test "${manifest_meta}" = 'MergeTree|case_ref, manifest_id, bundle_sha256'
+          test "${transition_meta}" = 'MergeTree|case_ref, sequence, transition_id'
+          test "${manifest_hash_type}" = 'FixedString(64)'
+          test "${previous_hash_type}" = 'FixedString(64)'
+          test "${exposure_type}" = "Nullable(DateTime64(3, 'UTC'))"
+
+      - name: Validate append-only and fail-closed storage invariants
+        run: |
+          set -euo pipefail
+          container_id="$(docker ps --filter 'ancestor=clickhouse/clickhouse-server:26.2' --format '{{.ID}}' | head -n1)"
+          test -n "${container_id}"
+
+          docker exec -i "${container_id}" clickhouse-client --multiquery <<'SQL'
+          INSERT INTO koschei_web3.dossier_bundle_manifests
+          (manifest_id,case_ref,bundle_sha256,artifact_uri,artifact_sha256,dossier_version,network,target_kind,target_id,produced_at,manifest_sha256,schema_version)
+          VALUES
+          (toUUID('11111111-1111-5111-8111-111111111111'),'KD1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',repeat('a',64),'gdrive://file/canonical-dossier',repeat('b',64),'koschei-dossier-v1','solana-mainnet','wallet','AbCdEf123',toDateTime64('2026-09-08 12:00:00',3,'UTC'),repeat('c',64),1),
+          (toUUID('11111111-1111-5111-8111-111111111111'),'KD1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',repeat('a',64),'gdrive://file/canonical-dossier',repeat('b',64),'koschei-dossier-v1','solana-mainnet','wallet','AbCdEf123',toDateTime64('2026-09-08 12:00:00',3,'UTC'),repeat('d',64),1);
+
+          INSERT INTO koschei_web3.dossier_publication_transitions
+          (transition_id,case_ref,sequence,action,status,actor,published_by,public_title,public_summary,featured,redaction_profile,manifest_id,bundle_sha256,previous_transition_id,previous_transition_sha256,transition_sha256,occurred_at,exposure_started_at,schema_version)
+          VALUES
+          (toUUID('22222222-2222-5222-8222-222222222222'),'KD1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',1,'publish','public','owner','owner','Evidence case','Bounded summary',0,'public-onchain-v1',toUUID('11111111-1111-5111-8111-111111111111'),repeat('a',64),toUUID('00000000-0000-0000-0000-000000000000'),repeat('0',64),repeat('e',64),toDateTime64('2026-09-08 12:10:00',3,'UTC'),toDateTime64('2026-09-08 12:10:00',3,'UTC'),1),
+          (toUUID('33333333-3333-5333-8333-333333333333'),'KD1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',2,'hide','hidden','owner','owner','Evidence case','Bounded summary',0,'public-onchain-v1',toUUID('11111111-1111-5111-8111-111111111111'),repeat('a',64),toUUID('22222222-2222-5222-8222-222222222222'),repeat('e',64),repeat('f',64),toDateTime64('2026-09-08 12:20:00',3,'UTC'),toDateTime64('2026-09-08 12:10:00',3,'UTC'),1),
+          (toUUID('44444444-4444-5444-8444-444444444444'),'KD1-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',2,'draft','draft','owner','owner','Evidence case','Bounded summary',0,'public-onchain-v1',toUUID('11111111-1111-5111-8111-111111111111'),repeat('a',64),toUUID('22222222-2222-5222-8222-222222222222'),repeat('e',64),repeat('a',64),toDateTime64('2026-09-08 12:21:00',3,'UTC'),toDateTime64('2026-09-08 12:10:00',3,'UTC'),1);
+          SQL
+
+          manifest_conflicts="$(docker exec "${container_id}" clickhouse-client --query "SELECT count() FROM (SELECT manifest_id FROM koschei_web3.dossier_bundle_manifests GROUP BY manifest_id HAVING uniqExact(manifest_sha256)>1)")"
+          transition_forks="$(docker exec "${container_id}" clickhouse-client --query "SELECT count() FROM (SELECT case_ref,sequence FROM koschei_web3.dossier_publication_transitions GROUP BY case_ref,sequence HAVING uniqExact(transition_sha256)>1)")"
+          test "${manifest_conflicts}" = "1"
+          test "${transition_forks}" = "1"
+
+          if docker exec "${container_id}" clickhouse-client --query "INSERT INTO koschei_web3.dossier_bundle_manifests (manifest_id,case_ref,bundle_sha256,artifact_uri,artifact_sha256,dossier_version,network,target_kind,target_id,produced_at,manifest_sha256,schema_version) VALUES (toUUID('55555555-5555-5555-8555-555555555555'),'KD1-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',repeat('z',64),'gdrive://file/bad',repeat('b',64),'koschei-dossier-v1','solana-mainnet','wallet','Target',now64(3),repeat('c',64),1)"; then
+            echo 'invalid non-hex bundle hash unexpectedly accepted' >&2
+            exit 1
+          fi
+
+          if docker exec "${container_id}" clickhouse-client --query "INSERT INTO koschei_web3.dossier_publication_transitions (transition_id,case_ref,sequence,action,status,actor,published_by,featured,redaction_profile,manifest_id,bundle_sha256,previous_transition_id,previous_transition_sha256,transition_sha256,occurred_at,schema_version) VALUES (toUUID('66666666-6666-5666-8666-666666666666'),'KD1-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,'hide','hidden','owner','owner',1,'public-onchain-v1',toUUID('55555555-5555-5555-8555-555555555555'),repeat('a',64),toUUID('00000000-0000-0000-0000-000000000000'),repeat('0',64),repeat('c',64),now64(3),1)"; then
+            echo 'featured hidden transition unexpectedly accepted' >&2
+            exit 1
+          fi
+
+          if docker exec "${container_id}" clickhouse-client --query "INSERT INTO koschei_web3.dossier_publication_transitions (transition_id,case_ref,sequence,action,status,actor,published_by,featured,redaction_profile,manifest_id,bundle_sha256,previous_transition_id,previous_transition_sha256,transition_sha256,occurred_at,schema_version) VALUES (toUUID('77777777-7777-5777-8777-777777777777'),'KD1-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1,'draft','draft','owner','owner',0,'public-onchain-v1',toUUID('55555555-5555-5555-8555-555555555555'),repeat('a',64),toUUID('88888888-8888-5888-8888-888888888888'),repeat('d',64),repeat('c',64),now64(3),1)"; then
+            echo 'genesis transition with predecessor unexpectedly accepted' >&2
+            exit 1
+          fi
+
+      - name: Test publication ledger model and schema guard
+        run: go test ./internal/clickhouse -count=1
+
+      - name: Compile publication schema command
+        run: go test ./cmd/clickhouse-publication-schema -count=1
+
+      - name: Vet publication paths
+        run: go vet ./internal/clickhouse ./cmd/clickhouse-publication-schema
+
+      - name: Build publication schema command
+        run: CGO_ENABLED=0 GOOS=linux go build ./cmd/clickhouse-publication-schema
