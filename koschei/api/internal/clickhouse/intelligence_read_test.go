@@ -144,7 +144,7 @@ func TestNormalizeARVISMemoryReadRequestIsBounded(t *testing.T) {
 		{Network: "solana-mainnet", Since: now.Add(-time.Hour), Until: now, Limit: 1},
 		{Target: "x", Since: now.Add(-time.Hour), Until: now, Limit: 1},
 		{Target: "x", Network: "solana-mainnet", Since: now, Until: now, Limit: 1},
-		{Target: "x", Network: "solana-mainnet", Since: now.Add(-MaxARVISMemoryReadWindow-time.Second), Until: now, Limit: 1},
+		{Target: "x", Network: "solana-mainnet", Since: now.Add(-MaxARVISMemoryReadWindow - time.Second), Until: now, Limit: 1},
 		{Target: "x", Network: "solana-mainnet", Since: now.Add(-time.Hour), Until: now, Limit: MaxARVISMemoryReadRows + 1},
 	}
 	for i, request := range cases {
