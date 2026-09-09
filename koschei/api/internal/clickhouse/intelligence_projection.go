@@ -1,7 +1,6 @@
 package clickhouse
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
