@@ -59,7 +59,9 @@ func currentFabricSnapshot() fabricSnapshot {
 }
 
 func registerFabricRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/v2/fabric/capabilities", method(http.MethodGet, fabricCapabilities))
+	// Fabric is still experimental. Keep its capability contract outside /api/*
+	// until it is deliberately promoted into the production OpenAPI contract.
+	mux.HandleFunc("/fabric/capabilities", method(http.MethodGet, fabricCapabilities))
 	mux.HandleFunc("/fabric", method(http.MethodGet, fabricOperatorSurface))
 }
 
@@ -76,7 +78,7 @@ func MountFabric(base http.Handler) http.Handler {
 	fabric := securityHeaders(fabricMux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/fabric", "/api/v2/fabric/capabilities":
+		case "/fabric", "/fabric/capabilities":
 			fabric.ServeHTTP(w, r)
 		default:
 			base.ServeHTTP(w, r)
