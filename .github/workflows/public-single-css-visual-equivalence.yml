@@ -13,13 +13,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout single-CSS branch
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: refactor/public-single-css-v1
           path: candidate
 
       - name: Checkout main baseline
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: main
           path: baseline

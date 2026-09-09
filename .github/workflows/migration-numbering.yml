@@ -29,7 +29,7 @@ jobs:
       run:
         working-directory: koschei/api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Reject new duplicate prefixes, gaps, and history rewrites
         run: python3 scripts/check_migration_numbering.py
       - name: Prove duplicate and gap failures

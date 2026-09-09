@@ -42,7 +42,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Verify static ledger contract
         run: node scripts/verify-publication-ledger-linkage-v1.js

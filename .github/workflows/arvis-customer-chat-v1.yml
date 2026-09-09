@@ -17,7 +17,7 @@ jobs:
   arvis-customer-chat:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check customer chat JavaScript syntax
         run: node --check koschei/api/public/js/customer-arvis-chat-v1.js
       - name: Verify evidence-grounded customer chat contract

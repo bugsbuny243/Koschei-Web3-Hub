@@ -17,6 +17,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify public casefile presentation contract
         run: node koschei/api/scripts/verify-public-casefile-ui-v2.js
