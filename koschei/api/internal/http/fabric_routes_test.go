@@ -45,7 +45,7 @@ func TestFabricCapabilityAPI(t *testing.T) {
 	registerFabricRoutes(mux)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/api/v2/fabric/capabilities", nil)
+	request := httptest.NewRequest(http.MethodGet, "/fabric/capabilities", nil)
 	mux.ServeHTTP(recorder, request)
 
 	if recorder.Code != http.StatusOK {
@@ -87,12 +87,38 @@ func TestFabricRoutesRejectMutationMethods(t *testing.T) {
 	mux := http.NewServeMux()
 	registerFabricRoutes(mux)
 
-	for _, path := range []string{"/api/v2/fabric/capabilities", "/fabric"} {
+	for _, path := range []string{"/fabric/capabilities", "/fabric"} {
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(http.MethodPost, path, nil)
 		mux.ServeHTTP(recorder, request)
 		if recorder.Code != http.StatusMethodNotAllowed {
 			t.Fatalf("POST %s status = %d, want %d", path, recorder.Code, http.StatusMethodNotAllowed)
 		}
+	}
+}
+
+func TestMountFabricPreservesExistingRouteAndSecuresFabric(t *testing.T) {
+	base := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Legacy-Handler", "preserved")
+		_, _ = w.Write([]byte("legacy:" + r.URL.Path))
+	})
+	mounted := MountFabric(base)
+
+	legacy := httptest.NewRecorder()
+	mounted.ServeHTTP(legacy, httptest.NewRequest(http.MethodGet, "/health", nil))
+	if legacy.Header().Get("X-Legacy-Handler") != "preserved" || legacy.Body.String() != "legacy:/health" {
+		t.Fatalf("legacy route was not delegated unchanged: headers=%v body=%q", legacy.Header(), legacy.Body.String())
+	}
+
+	fabric := httptest.NewRecorder()
+	mounted.ServeHTTP(fabric, httptest.NewRequest(http.MethodGet, "/fabric/capabilities", nil))
+	if fabric.Code != http.StatusOK {
+		t.Fatalf("Fabric status = %d, want %d", fabric.Code, http.StatusOK)
+	}
+	if fabric.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatal("Fabric response did not pass through security headers")
+	}
+	if fabric.Header().Get("Content-Security-Policy") == "" {
+		t.Fatal("Fabric response is missing Content-Security-Policy")
 	}
 }
