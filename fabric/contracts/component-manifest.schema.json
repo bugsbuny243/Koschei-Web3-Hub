@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://koschei.dev/schemas/fabric/component-manifest-v1.json",
+  "title": "Koschei Fabric Component Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "component", "repository", "role", "preserveExisting", "capabilities"],
+  "properties": {
+    "schemaVersion": {"const": "1.0"},
+    "component": {"type": "string", "minLength": 1},
+    "repository": {"type": "string", "minLength": 1},
+    "role": {"type": "string", "minLength": 1},
+    "preserveExisting": {"const": true},
+    "defaultMode": {"enum": ["observe", "shadow", "active"]},
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "breakingChangesAllowed": {"const": false},
+        "crossProjectAccess": {"const": "contract-only"},
+        "legacyInterfaces": {"enum": ["preserve", "adapter"]}
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "domain", "status", "backend", "frontend", "telemetry"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "domain": {"enum": ["core", "web3", "web4", "web5", "web6"]},
+          "status": {"enum": ["stable", "experimental", "planned"]},
+          "backend": {"enum": ["existing", "adapter", "planned", "none"]},
+          "frontend": {"enum": ["existing", "planned", "not-applicable"]},
+          "telemetry": {"enum": ["existing", "planned", "not-applicable"]},
+          "notes": {"type": "string"}
+        }
+      }
+    }
+  }
+}
