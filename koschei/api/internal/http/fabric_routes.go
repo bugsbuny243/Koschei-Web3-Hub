@@ -44,7 +44,7 @@ func currentFabricSnapshot() fabricSnapshot {
 		Components: []fabricComponent{
 			{Name: "koschei-web3", Repository: "bugsbuny243/Koschei-Web3-Hub", Role: "security-validation-risk-intelligence", Mode: "active", Capabilities: []fabricCapability{
 				{ID: "web3-security-core", Domain: "web3", Status: "stable", Backend: "existing", Frontend: "existing", Telemetry: "existing"},
-				{ID: "fabric-capability-registry", Domain: "core", Status: "experimental", Backend: "adapter", Frontend: "experimental", Telemetry: "experimental"},
+				{ID: "fabric-capability-registry", Domain: "core", Status: "experimental", Backend: "existing", Frontend: "existing", Telemetry: "planned"},
 			}},
 			{Name: "koschei-lang", Repository: "bugsbuny243/koschei-lang", Role: "programmable-policy-agent-language", Mode: "observe", Capabilities: []fabricCapability{
 				{ID: "language-toolchain", Domain: "core", Status: "stable", Backend: "existing", Frontend: "existing", Telemetry: "existing"},
@@ -61,6 +61,27 @@ func currentFabricSnapshot() fabricSnapshot {
 func registerFabricRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v2/fabric/capabilities", method(http.MethodGet, fabricCapabilities))
 	mux.HandleFunc("/fabric", method(http.MethodGet, fabricOperatorSurface))
+}
+
+// MountFabric adds the new federated control-plane routes without modifying the
+// existing NewServer route graph. All non-Fabric requests are delegated to base
+// unchanged. Fabric responses still pass through the repository's existing
+// security-header and CSP transformation machinery.
+func MountFabric(base http.Handler) http.Handler {
+	if base == nil {
+		base = http.NotFoundHandler()
+	}
+	fabricMux := http.NewServeMux()
+	registerFabricRoutes(fabricMux)
+	fabric := securityHeaders(fabricMux)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/fabric", "/api/v2/fabric/capabilities":
+			fabric.ServeHTTP(w, r)
+		default:
+			base.ServeHTTP(w, r)
+		}
+	})
 }
 
 func fabricCapabilities(w http.ResponseWriter, _ *http.Request) {
