@@ -74,6 +74,7 @@ func currentFabricSnapshot() fabricSnapshot {
 		Components: []fabricComponent{
 			{Name: "koschei-web3", Repository: "bugsbuny243/Koschei-Web3-Hub", Role: "security-validation-risk-intelligence", Mode: "active", Capabilities: []fabricCapability{
 				{ID: "web3-security-core", Domain: "web3", Status: "stable", EvidenceState: "blocked", WorkPackages: []string{"CORE-01", "CORE-02", "CORE-03", "CORE-04", "SIGN-01"}, Backend: "existing", Frontend: "existing", Telemetry: "existing"},
+				{ID: "entitlement-ledger-split-plane", Domain: "core", Status: "experimental", EvidenceState: "partial", WorkPackages: []string{"CORE-01", "CORE-03"}, Backend: "existing", Frontend: "existing", Telemetry: "planned"},
 				{ID: "fabric-capability-registry", Domain: "core", Status: "experimental", EvidenceState: "partial", WorkPackages: []string{"CORE-04", "OPS-01"}, Backend: "existing", Frontend: "existing", Telemetry: "planned"},
 			}},
 			{Name: "koschei-lang", Repository: "bugsbuny243/koschei-lang", Role: "programmable-policy-agent-language", Mode: "observe", Capabilities: []fabricCapability{
