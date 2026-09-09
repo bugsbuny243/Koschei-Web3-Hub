@@ -5,14 +5,14 @@ on:
     paths:
       - "koschei/api/internal/services/intelligence_history_binding.go"
       - "koschei/api/internal/services/intelligence_history_binding_test.go"
-      - "koschei/api/docs/clickhouse-arvis-intelligence-memory-v1.md"
+      - "koschei/api/docs/intelligence-historical-evidence-binding-v1.md"
       - ".github/workflows/intelligence-history-binding-ci.yml"
   push:
     branches: [main]
     paths:
       - "koschei/api/internal/services/intelligence_history_binding.go"
       - "koschei/api/internal/services/intelligence_history_binding_test.go"
-      - "koschei/api/docs/clickhouse-arvis-intelligence-memory-v1.md"
+      - "koschei/api/docs/intelligence-historical-evidence-binding-v1.md"
       - ".github/workflows/intelligence-history-binding-ci.yml"
   workflow_dispatch:
 
