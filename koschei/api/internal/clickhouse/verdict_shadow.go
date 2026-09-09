@@ -17,8 +17,6 @@ import (
 
 const VerdictSnapshotSchemaVersion = uint16(1)
 
-const zeroUUID = "00000000-0000-0000-0000-000000000000"
-
 type VerdictSnapshot struct {
 	VerdictID       string
 	EventID         string
@@ -276,7 +274,7 @@ func (c *Client) VerdictSnapshotsFingerprint(ctx context.Context, since, until t
     recommendation,
     evidence,
     toString(evidence_sha256) AS evidence_sha256,
-    toJSONString(signals) AS signals,
+    signals,
     toString(signals_sha256) AS signals_sha256,
     rule_version,
     signed,
@@ -291,7 +289,7 @@ func (c *Client) VerdictSnapshotsFingerprint(ctx context.Context, since, until t
 FROM arvis_verdict_snapshots FINAL
 WHERE source_updated_at >= {since:DateTime64(6)}
   AND source_updated_at < {until:DateTime64(6)}
-ORDER BY module_id ASC, toString(verdict_id) ASC
+ORDER BY toString(verdict_id) ASC
 LIMIT {limit:UInt64}
 FORMAT JSONEachRow`)
 	params.Set("param_since", parityTimeMicrosParam(since))
@@ -362,7 +360,7 @@ func normalizeVerdictSnapshot(snapshot VerdictSnapshot) (verdictSnapshotRow, err
 	}
 	eventID := strings.TrimSpace(snapshot.EventID)
 	if eventID == "" {
-		eventID = zeroUUID
+		eventID = "00000000-0000-0000-0000-000000000000"
 	}
 	updatedAt := snapshot.SourceUpdatedAt.UTC().Truncate(time.Microsecond)
 	createdAt := snapshot.CreatedAt.UTC().Truncate(time.Microsecond)
