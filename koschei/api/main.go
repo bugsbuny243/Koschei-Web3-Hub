@@ -68,7 +68,7 @@ func main() {
 	}
 	staticDir := resolveStaticDir(os.Getenv("STATIC_DIR"))
 	log.Printf("static public path: %s", staticDir)
-	handler := englishPublicHTML(apihttp.NewServer(
+	handler := englishPublicHTML(apihttp.MountFabric(apihttp.NewServer(
 		nil,
 		dbInitError,
 		os.Getenv("ADMIN_PASSWORD"),
@@ -79,7 +79,7 @@ func main() {
 		apihttp.WithSolanaRPC(solanaRPC),
 		apihttp.WithJobStore(jobStore),
 		apihttp.WithJobQueue(jobQueue),
-	))
+	)))
 	server := newHTTPServer(port, handler)
 
 	serverErrors := make(chan error, 1)
