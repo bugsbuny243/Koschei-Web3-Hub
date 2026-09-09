@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "1.0",
+  "title": "Koschei Web3-Web6 Security Work Package",
+  "sourceDate": "2026-09-08",
+  "sourceDocument": "Koschei-Web3-Web6-Guvenlik-Calisma-Paketi-2026-09-08.md",
+  "classification": "research-and-design-not-production-proof",
+  "preserveExisting": true,
+  "principles": {
+    "web3": "chain-program-wallet-signature-bridge-oracle-economic-invariant-and-infrastructure-security",
+    "web4": "agents-tools-delegation-multi-service-xr-iot-digital-physical-security",
+    "web5": "portable-identity-verifiable-credentials-user-controlled-data-revocation-and-privacy",
+    "web6": "autonomous-harm-bounds-device-reality-evidence-crypto-agility-and-post-quantum-transition-research",
+    "web5AndWeb6AreWorkingLabelsNotUniversalStandards": true,
+    "verifiedIdentityDoesNotImplyUnlimitedAuthority": true,
+    "missingEvidenceMustRemainUnknown": true
+  },
+  "projectAuthorities": {
+    "koschei-web3": "chain-and-product-integration-intent-transaction-validation-evidence-customer-flow-and-deterministic-decision",
+    "koschei-sentinel": "threat-relations-research-data-training-evaluation-and-evidence-bound-model-interpretation",
+    "koschei-lang": "language-semantics-capability-authority-canonical-ir-runtime-resource-and-side-effect-bounds"
+  },
+  "authorityConstraints": [
+    "sentinel-cannot-mint-lang-authority",
+    "sentinel-cannot-sign-web3-decisions",
+    "sentinel-cannot-create-new-tool-permissions",
+    "external-formats-cannot-define-lang-semantics",
+    "cross-project-integration-is-versioned-contract-only"
+  ],
+  "p0Blockers": [
+    "CORE-01",
+    "CORE-02",
+    "CORE-04",
+    "SIGN-01",
+    "MODEL-04",
+    "LANG-01",
+    "LANG-02",
+    "SUPPLY-02"
+  ],
+  "workPackageGroups": {
+    "core": ["CORE-01", "CORE-02", "CORE-03", "CORE-04"],
+    "chain": ["CHAIN-01", "CHAIN-02", "CHAIN-03", "CHAIN-04"],
+    "sign": ["SIGN-01", "SIGN-02", "SIGN-03", "SIGN-04"],
+    "agent": ["AGENT-01", "AGENT-02", "AGENT-03", "AGENT-04"],
+    "model": ["MODEL-01", "MODEL-02", "MODEL-03", "MODEL-04"],
+    "identity": ["ID-01", "ID-02", "ID-03", "ID-04"],
+    "data": ["DATA-01", "DATA-02", "DATA-03", "DATA-04"],
+    "lang": ["LANG-01", "LANG-02", "LANG-03", "LANG-04"],
+    "supply": ["SUPPLY-01", "SUPPLY-02", "SUPPLY-03", "SUPPLY-04"],
+    "device": ["DEVICE-01", "DEVICE-02", "DEVICE-03", "DEVICE-04"],
+    "pq": ["PQ-01", "PQ-02", "PQ-03", "PQ-04"],
+    "ops": ["OPS-01", "OPS-02", "OPS-03", "OPS-04"]
+  },
+  "implementationSequence": [
+    {
+      "id": "A",
+      "name": "status-record-correction",
+      "workPackages": ["CORE-02"],
+      "extra": "remove-stale-cancelled-or-frozen-project-records"
+    },
+    {
+      "id": "B",
+      "name": "working-web3-foundation",
+      "workPackages": ["CORE-01", "CORE-02", "CORE-03"]
+    },
+    {
+      "id": "C",
+      "name": "shared-data-boundary",
+      "workPackages": ["CORE-04", "MODEL-01", "DATA-01"]
+    },
+    {
+      "id": "D",
+      "name": "lang-execution-proof",
+      "workPackages": ["LANG-01", "LANG-02", "SUPPLY-02"]
+    },
+    {
+      "id": "E",
+      "name": "model-evaluation-foundation",
+      "workPackages": ["MODEL-02", "MODEL-03", "MODEL-04"]
+    },
+    {
+      "id": "F",
+      "name": "first-common-security-experiment",
+      "workPackages": ["SIGN-01", "AGENT-02", "AGENT-04", "LANG-04", "OPS-01"]
+    },
+    {
+      "id": "G",
+      "name": "identity-and-data-expansion",
+      "workPackages": ["ID-01", "ID-02", "ID-03", "ID-04", "DATA-02", "DATA-03", "DATA-04", "AGENT-01", "AGENT-03"]
+    },
+    {
+      "id": "H",
+      "name": "device-and-post-quantum-research",
+      "workPackages": ["DEVICE-01", "DEVICE-02", "DEVICE-03", "DEVICE-04", "PQ-01", "PQ-02", "PQ-03", "PQ-04"]
+    }
+  ],
+  "firstAcceptanceScenario": {
+    "id": "read-only-agent-forced-toward-transaction-authority",
+    "mainnetSigning": false,
+    "realCustomerSecrets": false,
+    "expectedAuthorityFlow": [
+      "web3-fixes-request-target-network-evidence-and-case-identity",
+      "lang-validates-narrow-authority-from-trusted-authority-session",
+      "runtime-broker-enforces-real-tool-file-network-and-signer-access",
+      "sentinel-interprets-only-sanitized-event-and-evidence-view",
+      "web3-reports-deterministic-decision-model-interpretation-authority-result-and-real-effect-separately"
+    ],
+    "forbiddenEdges": [
+      "sentinel-to-runtime-authority"
+    ]
+  },
+  "acceptanceCases": [
+    {"id": "T01", "workPackages": ["CORE-03", "AGENT-02"]},
+    {"id": "T02", "workPackages": ["MODEL-02", "LANG-02"]},
+    {"id": "T03", "workPackages": ["AGENT-02", "LANG-04"]},
+    {"id": "T04", "workPackages": ["SIGN-01", "AGENT-04"]},
+    {"id": "T05", "workPackages": ["ID-02", "LANG-04"]},
+    {"id": "T06", "workPackages": ["CORE-03", "AGENT-03"]},
+    {"id": "T07", "workPackages": ["CORE-04", "SIGN-01"]},
+    {"id": "T08", "workPackages": ["CHAIN-02", "LANG-04"]},
+    {"id": "T09", "workPackages": ["MODEL-03", "OPS-03"]},
+    {"id": "T10", "workPackages": ["LANG-02", "OPS-03"]},
+    {"id": "T11", "workPackages": ["LANG-02", "LANG-03"]},
+    {"id": "T12", "workPackages": ["AGENT-04", "LANG-03"]},
+    {"id": "T13", "workPackages": ["CORE-04", "OPS-04"]},
+    {"id": "T14", "workPackages": ["DATA-02", "SUPPLY-02"]}
+  ],
+  "completionRule": "A work package becomes complete only when the candidate commit, executed acceptance result and remaining boundaries are recorded together. A file, schema or test definition alone is not completion proof."
+}

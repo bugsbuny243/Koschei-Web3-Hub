@@ -25,6 +25,10 @@ func entitlementEmailFromSubject(authSubject string) string {
 // Legacy package counters remain readable for historical owner data, but they
 // no longer grant customer access or control product usage.
 func (h *Handler) userCreditsAndRole(authSubject string, emails ...string) (bool, int, error) {
+	store := h.entitlementStore()
+	if store == nil {
+		return false, 0, errors.New("entitlement store unavailable")
+	}
 	authSubject = strings.TrimSpace(authSubject)
 	email := ""
 	if len(emails) > 0 {
@@ -35,7 +39,7 @@ func (h *Handler) userCreditsAndRole(authSubject string, emails ...string) (bool
 	}
 
 	var available int
-	err := h.DB.QueryRow(`
+	err := store.QueryRow(`
 		WITH identity AS (
 			SELECT lower(p.email) AS email
 			FROM app_user_profiles p
@@ -129,8 +133,8 @@ func (h *Handler) consumePremiumOutput(authSubject, email, reason string) error 
 }
 
 func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) {
-	if h == nil || h.DB == nil {
-		return false, errors.New("database unavailable")
+	if h == nil || h.entitlementStore() == nil {
+		return false, errors.New("entitlement store unavailable")
 	}
 	evaluation, err := h.evaluatePlanAccess(context.Background(), authSubject, email)
 	if err != nil {
@@ -143,8 +147,8 @@ func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) 
 // to the route-level SaaS gate. Keep that compatibility check entitlement-backed
 // so it can never reintroduce KOSCH holder authorization.
 func (h *Handler) requirePremiumOutput(authSubject string, emails ...string) (int, error) {
-	if h == nil || h.DB == nil {
-		return 0, errors.New("database unavailable")
+	if h == nil || h.entitlementStore() == nil {
+		return 0, errors.New("entitlement store unavailable")
 	}
 	email := ""
 	if len(emails) > 0 {

@@ -21,6 +21,7 @@ import (
 type Handler struct {
 	DB            *sql.DB
 	DBRead        *sql.DB
+	EntitlementDB *sql.DB
 	AdminPassword string
 	Limiter       *rateLimiter
 	DBInitError   string
@@ -29,6 +30,19 @@ type Handler struct {
 	JobStore      *jobs.Store
 	JobQueue      jobs.Queue
 	CourtClient   CourtNarrativeClient
+}
+
+// entitlementStore keeps commercial authorization separate from application
+// persistence. Existing stateful deployments continue to use DB as a fallback,
+// while stateless Web3 deployments may provide only EntitlementDB.
+func (h *Handler) entitlementStore() *sql.DB {
+	if h == nil {
+		return nil
+	}
+	if h.EntitlementDB != nil {
+		return h.EntitlementDB
+	}
+	return h.DB
 }
 
 func (h *Handler) dbAvailable(ctx context.Context) error {

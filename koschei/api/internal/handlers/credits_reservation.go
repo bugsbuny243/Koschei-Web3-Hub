@@ -14,8 +14,9 @@ type premiumOutputReservation struct {
 }
 
 func (h *Handler) reservePremiumOutput(ctx context.Context, authSubject, email, reason string) (premiumOutputReservation, error) {
-	if h == nil || h.DB == nil {
-		return premiumOutputReservation{}, errors.New("database unavailable")
+	store := h.entitlementStore()
+	if store == nil {
+		return premiumOutputReservation{}, errors.New("entitlement store unavailable")
 	}
 	authSubject = strings.TrimSpace(authSubject)
 	email = strings.ToLower(strings.TrimSpace(email))
@@ -27,13 +28,13 @@ func (h *Handler) reservePremiumOutput(ctx context.Context, authSubject, email, 
 		email = entitlementEmailFromSubject(authSubject)
 	}
 	if email == "" && authSubject != "" {
-		_ = h.DB.QueryRowContext(ctx, `SELECT lower(email) FROM app_user_profiles WHERE auth_subject=$1`, authSubject).Scan(&email)
+		_ = store.QueryRowContext(ctx, `SELECT lower(email) FROM app_user_profiles WHERE auth_subject=$1`, authSubject).Scan(&email)
 	}
 	if email == "" {
 		return premiumOutputReservation{}, errors.New("entitlement email unavailable")
 	}
 
-	tx, err := h.DB.BeginTx(ctx, nil)
+	tx, err := store.BeginTx(ctx, nil)
 	if err != nil {
 		return premiumOutputReservation{}, err
 	}
@@ -75,7 +76,8 @@ func (h *Handler) reservePremiumOutput(ctx context.Context, authSubject, email, 
 }
 
 func (h *Handler) refundPremiumOutputReservation(ctx context.Context, reservation premiumOutputReservation, refundReason string) error {
-	if h == nil || h.DB == nil {
+	store := h.entitlementStore()
+	if store == nil {
 		return nil
 	}
 	if strings.TrimSpace(reservation.EntitlementID) == "" {
@@ -85,7 +87,7 @@ func (h *Handler) refundPremiumOutputReservation(ctx context.Context, reservatio
 	if refundReason == "" {
 		refundReason = reservation.Reason + "_refund"
 	}
-	tx, err := h.DB.BeginTx(ctx, nil)
+	tx, err := store.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}

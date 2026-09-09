@@ -13,7 +13,7 @@ function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`$
 // scoped product surface rather than the retired command-universe shell.
 requireText(html,'/css/koschei-dashboard.css?v=1','dashboard scoped style');
 requireText(html,'/js/customer-workspace-v2.js?v=2','dashboard account-data controller');
-requireText(html,'/js/koschei-dashboard.js?v=1','dashboard presentation controller');
+requireText(html,'/js/koschei-dashboard.js?v=3','dashboard presentation controller');
 requireText(html,'id="workspaceLatestReport"','latest investigation mount');
 requireText(html,'id="workspaceAlerts"','alerts mount');
 requireText(html,'id="workspaceLiveState"','live account-state mount');
