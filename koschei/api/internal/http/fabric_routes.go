@@ -49,10 +49,12 @@ func currentFabricSnapshot() fabricSnapshot {
 			{Name: "koschei-lang", Repository: "bugsbuny243/koschei-lang", Role: "programmable-policy-agent-language", Mode: "observe", Capabilities: []fabricCapability{
 				{ID: "language-toolchain", Domain: "core", Status: "stable", Backend: "existing", Frontend: "existing", Telemetry: "existing"},
 				{ID: "web4-web6-policy-and-agent-profile", Domain: "web4", Status: "experimental", Backend: "adapter", Frontend: "planned", Telemetry: "planned"},
+				{ID: "web5-identity-data-profile", Domain: "web5", Status: "planned", Backend: "planned", Frontend: "planned", Telemetry: "planned"},
 			}},
 			{Name: "koschei-sentinel", Repository: "bugsbuny243/koschei-sentinel", Role: "observation-detection-response-and-model-intelligence", Mode: "observe", Capabilities: []fabricCapability{
 				{ID: "sentinel-evaluation-and-provenance", Domain: "core", Status: "stable", Backend: "existing", Frontend: "planned", Telemetry: "existing"},
 				{ID: "fabric-observation-plane", Domain: "web4", Status: "experimental", Backend: "adapter", Frontend: "planned", Telemetry: "planned"},
+				{ID: "pq-network-intelligence", Domain: "web6", Status: "experimental", Backend: "existing", Frontend: "planned", Telemetry: "existing"},
 			}},
 		},
 	}
