@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://koschei.dev/schemas/fabric/security-case-envelope.v1.json",
+  "title": "Koschei Fabric Security Case Evidence Envelope v1",
+  "description": "Cross-project binding envelope. It does not replace native ARVIS, Koschei Lang, or Sentinel schemas and does not create a shared decision authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "case",
+    "request",
+    "evidence",
+    "authority",
+    "runtime",
+    "sentinel",
+    "effect",
+    "nativeBindings"
+  ],
+  "properties": {
+    "schemaVersion": {"const": "fabric.security-case-envelope.v1"},
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "createdAt", "coordinator"],
+      "properties": {
+        "caseId": {"type": "string", "minLength": 1, "maxLength": 160},
+        "createdAt": {"type": "string", "format": "date-time"},
+        "coordinator": {"const": "koschei-web3"},
+        "traceId": {"type": ["string", "null"], "maxLength": 160}
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestDigestSha256", "network", "target", "requestedOperation"],
+      "properties": {
+        "requestDigestSha256": {"$ref": "#/$defs/sha256"},
+        "network": {"type": "string", "minLength": 1, "maxLength": 160},
+        "target": {"type": "string", "minLength": 1, "maxLength": 512},
+        "requestedOperation": {"type": "string", "minLength": 1, "maxLength": 256},
+        "nonce": {"type": ["string", "null"], "maxLength": 256}
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidenceId", "owner", "sourceRef", "contentDigestSha256", "capturedAt", "freshnessState"],
+        "properties": {
+          "evidenceId": {"type": "string", "minLength": 1, "maxLength": 160},
+          "owner": {"enum": ["koschei-web3", "koschei-lang", "koschei-sentinel", "external"]},
+          "sourceRef": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "sourceRevision": {"type": ["string", "null"], "maxLength": 256},
+          "snapshotRef": {"type": ["string", "null"], "maxLength": 1024},
+          "contentDigestSha256": {"$ref": "#/$defs/sha256"},
+          "capturedAt": {"type": "string", "format": "date-time"},
+          "freshnessState": {"enum": ["FRESH", "STALE", "UNKNOWN"]},
+          "verificationState": {"enum": ["VERIFIED", "PARTIAL", "UNVERIFIED", "UNKNOWN"]}
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorityOwner", "principal", "caller", "scope", "authorityState"],
+      "properties": {
+        "authorityOwner": {"const": "koschei-lang"},
+        "principal": {"type": "string", "minLength": 1, "maxLength": 256},
+        "caller": {"type": "string", "minLength": 1, "maxLength": 256},
+        "delegate": {"type": ["string", "null"], "maxLength": 256},
+        "scope": {"type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512}},
+        "notBefore": {"type": ["string", "null"], "format": "date-time"},
+        "expiresAt": {"type": ["string", "null"], "format": "date-time"},
+        "authorityState": {"enum": ["AUTHORIZED", "DENIED", "REVOKED", "UNVERIFIED", "UNKNOWN"]},
+        "grantDigestSha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtimeOwner", "policyVersion", "runtimeVersion", "revocationEpoch", "budget", "isolationState"],
+      "properties": {
+        "runtimeOwner": {"const": "koschei-lang"},
+        "policyVersion": {"type": "string", "minLength": 1, "maxLength": 256},
+        "runtimeVersion": {"type": "string", "minLength": 1, "maxLength": 256},
+        "revocationEpoch": {"type": "integer", "minimum": 0},
+        "isolationState": {"enum": ["VERIFIED", "PARTIAL", "UNVERIFIED", "UNAVAILABLE"]},
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxCalls", "maxDurationMs", "maxDataBytes"],
+          "properties": {
+            "maxCalls": {"type": "integer", "minimum": 0},
+            "maxDurationMs": {"type": "integer", "minimum": 0},
+            "maxDataBytes": {"type": "integer", "minimum": 0},
+            "maxSpendMinorUnits": {"type": ["integer", "null"], "minimum": 0}
+          }
+        }
+      }
+    },
+    "sentinel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "interpretationState", "supportingEvidenceIds", "uncertainty"],
+      "properties": {
+        "role": {"const": "evidence-interpretation-only"},
+        "modelRef": {"type": ["string", "null"], "maxLength": 512},
+        "checkpointDigestSha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "interpretationState": {"enum": ["AVAILABLE", "UNAVAILABLE", "INVALID", "TIMEOUT", "NOT_REQUESTED"]},
+        "supportingEvidenceIds": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 160}},
+        "uncertainty": {"type": "array", "maxItems": 128, "items": {"type": "string", "minLength": 1, "maxLength": 2000}}
+      }
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestedEffect", "actualEffectState", "independentObservationState"],
+      "properties": {
+        "requestedEffect": {"type": "string", "minLength": 1, "maxLength": 1000},
+        "actualEffectState": {"enum": ["NONE", "SUCCEEDED", "BLOCKED", "FAILED", "UNKNOWN"]},
+        "actualEffectDigestSha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "independentObservationState": {"enum": ["VERIFIED", "PARTIAL", "UNVERIFIED", "UNAVAILABLE"]},
+        "receiptRef": {"type": ["string", "null"], "maxLength": 1024},
+        "receiptDigestSha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "nativeBindings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["owner", "nativeSchema", "nativeRef", "nativeDigestSha256", "adapterVersion"],
+        "properties": {
+          "owner": {"enum": ["koschei-web3", "koschei-lang", "koschei-sentinel"]},
+          "nativeSchema": {"type": "string", "minLength": 1, "maxLength": 256},
+          "nativeRef": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "nativeDigestSha256": {"$ref": "#/$defs/sha256"},
+          "adapterVersion": {"type": "string", "minLength": 1, "maxLength": 128},
+          "mappingState": {"enum": ["VERIFIED", "PARTIAL", "UNVERIFIED"]}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
