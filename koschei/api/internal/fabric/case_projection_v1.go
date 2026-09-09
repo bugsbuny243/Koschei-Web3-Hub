@@ -37,12 +37,12 @@ type RequestV1 struct {
 }
 
 type EffectV1 struct {
-	RequestedEffect              string  `json:"requestedEffect"`
-	ActualEffectState            string  `json:"actualEffectState"`
-	ActualEffectDigestSHA256     *string `json:"actualEffectDigestSha256"`
+	RequestedEffect             string  `json:"requestedEffect"`
+	ActualEffectState           string  `json:"actualEffectState"`
+	ActualEffectDigestSHA256    *string `json:"actualEffectDigestSha256"`
 	IndependentObservationState string  `json:"independentObservationState"`
-	ReceiptRef                   *string `json:"receiptRef"`
-	ReceiptDigestSHA256          *string `json:"receiptDigestSha256"`
+	ReceiptRef                  *string `json:"receiptRef"`
+	ReceiptDigestSHA256         *string `json:"receiptDigestSha256"`
 }
 
 type Web3ProjectionV1 struct {
@@ -54,24 +54,24 @@ type Web3ProjectionV1 struct {
 }
 
 type Web3ProjectionInputV1 struct {
-	CaseID                       string
-	CreatedAt                    time.Time
-	TraceID                      *string
-	RequestDigestSHA256          string
-	Network                      string
-	Target                       string
-	RequestedOperation           string
-	Nonce                        *string
-	RequestedEffect              string
-	ActualEffectState            string
-	ActualEffectDigestSHA256     *string
+	CaseID                      string
+	CreatedAt                   time.Time
+	TraceID                     *string
+	RequestDigestSHA256         string
+	Network                     string
+	Target                      string
+	RequestedOperation          string
+	Nonce                       *string
+	RequestedEffect             string
+	ActualEffectState           string
+	ActualEffectDigestSHA256    *string
 	IndependentObservationState string
-	ReceiptRef                   *string
-	ReceiptDigestSHA256          *string
-	NativeSchema                 string
-	NativeRef                    string
-	NativeDigestSHA256           string
-	MappingState                 string
+	ReceiptRef                  *string
+	ReceiptDigestSHA256         *string
+	NativeSchema                string
+	NativeRef                   string
+	NativeDigestSHA256          string
+	MappingState                string
 }
 
 var (
@@ -143,12 +143,12 @@ func BuildWeb3ProjectionV1(input Web3ProjectionInputV1) (Web3ProjectionV1, error
 			Nonce:               input.Nonce,
 		},
 		Effect: EffectV1{
-			RequestedEffect:              input.RequestedEffect,
-			ActualEffectState:            input.ActualEffectState,
-			ActualEffectDigestSHA256:     input.ActualEffectDigestSHA256,
+			RequestedEffect:             input.RequestedEffect,
+			ActualEffectState:           input.ActualEffectState,
+			ActualEffectDigestSHA256:    input.ActualEffectDigestSHA256,
 			IndependentObservationState: input.IndependentObservationState,
-			ReceiptRef:                   input.ReceiptRef,
-			ReceiptDigestSHA256:          input.ReceiptDigestSHA256,
+			ReceiptRef:                  input.ReceiptRef,
+			ReceiptDigestSHA256:         input.ReceiptDigestSHA256,
 		},
 		NativeBinding: NativeBindingV1{
 			Owner:              "koschei-web3",
