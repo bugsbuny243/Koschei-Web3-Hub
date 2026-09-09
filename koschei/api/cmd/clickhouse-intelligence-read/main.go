@@ -33,12 +33,17 @@ func run() error {
 			limitDefault = parsed
 		}
 	}
+	outputDefault := strings.ToLower(strings.TrimSpace(os.Getenv("KOSCHEI_CLICKHOUSE_INTELLIGENCE_OUTPUT")))
+	if outputDefault == "" {
+		outputDefault = "memory"
+	}
 
 	target := flag.String("target", targetDefault, "exact case-sensitive chain target")
 	network := flag.String("network", networkDefault, "exact network label")
 	sinceRaw := flag.String("since", strings.TrimSpace(os.Getenv("KOSCHEI_CLICKHOUSE_INTELLIGENCE_SINCE")), "RFC3339 lower bound; defaults to 24h before until")
 	untilRaw := flag.String("until", strings.TrimSpace(os.Getenv("KOSCHEI_CLICKHOUSE_INTELLIGENCE_UNTIL")), "RFC3339 upper bound; defaults to now")
 	limit := flag.Uint64("limit", limitDefault, "maximum rows per ClickHouse memory source")
+	output := flag.String("output", outputDefault, "output contract: memory or investigation")
 	flag.Parse()
 
 	until := now
@@ -69,10 +74,24 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	var payload any = snapshot
+	switch strings.ToLower(strings.TrimSpace(*output)) {
+	case "memory":
+	case "investigation":
+		investigation, err := clickhouse.ProjectARVISMemory(snapshot, now)
+		if err != nil {
+			return fmt.Errorf("project intelligence investigation: %w", err)
+		}
+		payload = investigation
+	default:
+		return fmt.Errorf("unsupported output contract %q; expected memory or investigation", strings.TrimSpace(*output))
+	}
+
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(snapshot); err != nil {
-		return fmt.Errorf("encode intelligence memory snapshot: %w", err)
+	if err := encoder.Encode(payload); err != nil {
+		return fmt.Errorf("encode intelligence output: %w", err)
 	}
 	return nil
 }
