@@ -19,6 +19,15 @@ func TestFabricSnapshotPreservesExistingProducts(t *testing.T) {
 	if !snapshot.BackendFrontendParity {
 		t.Fatal("Fabric must require backend/frontend parity")
 	}
+	if snapshot.NativeSchemaMutation {
+		t.Fatal("Fabric must not mutate existing native v1 schemas")
+	}
+	if snapshot.SharedEnvelopeSchema != "fabric.security-case-envelope.v1" {
+		t.Fatalf("shared envelope = %q, want fabric.security-case-envelope.v1", snapshot.SharedEnvelopeSchema)
+	}
+	if len(snapshot.P0Blockers) != 8 {
+		t.Fatalf("P0 blockers = %d, want 8", len(snapshot.P0Blockers))
+	}
 	if len(snapshot.Components) != 3 {
 		t.Fatalf("components = %d, want 3", len(snapshot.Components))
 	}
@@ -37,6 +46,22 @@ func TestFabricSnapshotPreservesExistingProducts(t *testing.T) {
 		if !found {
 			t.Fatalf("missing Fabric component %q", component)
 		}
+	}
+}
+
+func TestFabricPackageSequenceStartsWithABAndCTracking(t *testing.T) {
+	snapshot := currentFabricSnapshot()
+	if len(snapshot.PackageStates) != 8 {
+		t.Fatalf("package states = %d, want 8", len(snapshot.PackageStates))
+	}
+	if snapshot.PackageStates[0].ID != "A" || snapshot.PackageStates[0].State != "in-progress" {
+		t.Fatalf("package A = %#v, want in-progress", snapshot.PackageStates[0])
+	}
+	if snapshot.PackageStates[1].ID != "B" || snapshot.PackageStates[1].State != "blocked" {
+		t.Fatalf("package B = %#v, want blocked", snapshot.PackageStates[1])
+	}
+	if snapshot.PackageStates[2].ID != "C" || snapshot.PackageStates[2].State != "in-progress" {
+		t.Fatalf("package C = %#v, want in-progress", snapshot.PackageStates[2])
 	}
 }
 
@@ -62,6 +87,9 @@ func TestFabricCapabilityAPI(t *testing.T) {
 	if snapshot.Workspace != "koschei-unified" {
 		t.Fatalf("workspace = %q, want koschei-unified", snapshot.Workspace)
 	}
+	if snapshot.AcceptanceCaseCount != 14 {
+		t.Fatalf("acceptanceCaseCount = %d, want 14", snapshot.AcceptanceCaseCount)
+	}
 }
 
 func TestFabricOperatorSurface(t *testing.T) {
@@ -76,7 +104,16 @@ func TestFabricOperatorSurface(t *testing.T) {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
 	}
 	body := recorder.Body.String()
-	for _, needle := range []string{"Koschei Fabric", "koschei-web3", "koschei-lang", "koschei-sentinel"} {
+	for _, needle := range []string{
+		"Koschei Fabric",
+		"koschei-web3",
+		"koschei-lang",
+		"koschei-sentinel",
+		"fabric.security-case-envelope.v1",
+		"Security work sequence",
+		"CORE-01",
+		"SUPPLY-02",
+	} {
 		if !strings.Contains(body, needle) {
 			t.Fatalf("operator surface missing %q", needle)
 		}
