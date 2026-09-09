@@ -14,6 +14,15 @@ var entitlementOnlyAPIPaths = map[string]struct{}{
 	"/api/polar/webhook":  {},
 }
 
+func init() {
+	// These paths are optional only with respect to the application database.
+	// Their route-local RequireEntitlementStore gate still fails closed when the
+	// commercial authorization ledger is unavailable.
+	for path := range entitlementOnlyAPIPaths {
+		databaseOptionalAPIPaths[path] = struct{}{}
+	}
+}
+
 func requiresEntitlementStore(h *handlers.Handler, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if h == nil || !h.RequireEntitlementStore(w) {
@@ -25,7 +34,8 @@ func requiresEntitlementStore(h *handlers.Handler, next http.HandlerFunc) http.H
 
 // apiReadinessWithEntitlement preserves the legacy application-persistence
 // readiness contract while allowing narrowly scoped commercial authorization
-// surfaces to depend on a separate entitlement ledger.
+// surfaces to depend on a separate entitlement ledger. It is available for the
+// later migration of legacy paid routes without weakening the existing wrapper.
 func apiReadinessWithEntitlement(db *sql.DB, entitlementDB *sql.DB, next http.Handler) http.Handler {
 	setSecurityAuditDB(db)
 	protected := bodyLimit(sensitiveRateLimit(db, next))
