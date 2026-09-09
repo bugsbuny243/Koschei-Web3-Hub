@@ -176,9 +176,13 @@ func cloneIntelligenceInvestigation(in IntelligenceInvestigation) IntelligenceIn
 	out := in
 	out.Subjects = append([]IntelligenceSubject(nil), in.Subjects...)
 	out.Entities = append([]IntelligenceEntity(nil), in.Entities...)
-	out.Evidence = make([]IntelligenceEvidence, 0, len(in.Evidence))
-	for _, evidence := range in.Evidence {
-		out.Evidence = append(out.Evidence, cloneIntelligenceEvidence(evidence))
+	if in.Evidence != nil {
+		out.Evidence = make([]IntelligenceEvidence, 0, len(in.Evidence))
+		for _, evidence := range in.Evidence {
+			out.Evidence = append(out.Evidence, cloneIntelligenceEvidence(evidence))
+		}
+	} else {
+		out.Evidence = nil
 	}
 	out.Relationships = append([]IntelligenceRelationship(nil), in.Relationships...)
 	out.Behaviors = append([]IntelligenceBehaviorFinding(nil), in.Behaviors...)
