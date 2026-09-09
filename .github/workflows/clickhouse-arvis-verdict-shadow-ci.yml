@@ -82,7 +82,8 @@ jobs:
           grep -Fq '`verdict_id` UUID' "${RUNNER_TEMP}/verdict-shadow-create.txt"
           grep -Fq '`evidence` Array(String)' "${RUNNER_TEMP}/verdict-shadow-create.txt"
           grep -Fq '`signals` JSON' "${RUNNER_TEMP}/verdict-shadow-create.txt"
-          grep -Fq '`source_updated_at` DateTime64(6, '\''UTC'\'')' "${RUNNER_TEMP}/verdict-shadow-create.txt"
+          source_updated_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='arvis_verdict_snapshots' AND name='source_updated_at' FORMAT TSVRaw")"
+          test "${source_updated_type}" = "DateTime64(6, 'UTC')"
 
       - name: Validate replacement, case and hash invariants
         run: |
