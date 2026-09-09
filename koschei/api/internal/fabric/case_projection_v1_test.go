@@ -8,19 +8,19 @@ import (
 
 func baseProjectionInput() Web3ProjectionInputV1 {
 	return Web3ProjectionInputV1{
-		CaseID:                       "case:fixture:1",
-		CreatedAt:                    time.Date(2026, 9, 9, 4, 0, 0, 0, time.UTC),
-		RequestDigestSHA256:          strings.Repeat("a", 64),
-		Network:                      "solana-mainnet",
-		Target:                       "fixture-target",
-		RequestedOperation:           "report:read",
-		RequestedEffect:              "read security report",
-		ActualEffectState:            "NONE",
+		CaseID:                      "case:fixture:1",
+		CreatedAt:                   time.Date(2026, 9, 9, 4, 0, 0, 0, time.UTC),
+		RequestDigestSHA256:         strings.Repeat("a", 64),
+		Network:                     "solana-mainnet",
+		Target:                      "fixture-target",
+		RequestedOperation:          "report:read",
+		RequestedEffect:             "read security report",
+		ActualEffectState:           "NONE",
 		IndependentObservationState: "UNVERIFIED",
-		NativeSchema:                 "arvis.export.v1",
-		NativeRef:                    "fixture://arvis/export/1",
-		NativeDigestSHA256:           strings.Repeat("b", 64),
-		MappingState:                 "PARTIAL",
+		NativeSchema:                "arvis.export.v1",
+		NativeRef:                   "fixture://arvis/export/1",
+		NativeDigestSHA256:          strings.Repeat("b", 64),
+		MappingState:                "PARTIAL",
 	}
 }
 
