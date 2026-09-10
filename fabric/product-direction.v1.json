@@ -1,0 +1,34 @@
+{
+  "schema_version": "koschei.product-direction.v1",
+  "as_of": "2026-09-10",
+  "product": "koschei-web3",
+  "role": "multi-network-security-validation-risk-intelligence",
+  "scope_target": "all-blockchain-networks-and-all-address-types",
+  "analysis_targets": [
+    "accounts",
+    "wallets",
+    "tokens",
+    "contracts",
+    "programs",
+    "pools",
+    "protocols",
+    "transactions",
+    "cross-network-flows"
+  ],
+  "scan_modes_target": [
+    "on-demand-address-investigation",
+    "continuous-network-observation"
+  ],
+  "arvis_role": "shared-evidence-relationship-and-deterministic-decision-engine",
+  "existing_solana_and_pump_features": "preserve",
+  "network_support_requires": [
+    "network-specific-adapter",
+    "canonical-evidence",
+    "frontend-coverage",
+    "telemetry",
+    "executed-acceptance"
+  ],
+  "implemented_in_this_slice": "offline-network-scoped-address-resolution-and-coverage-surface",
+  "new_live_collectors_in_this_slice": [],
+  "all_network_coverage_status": "target-not-completed"
+}

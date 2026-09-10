@@ -1,5 +1,11 @@
 # Koschei Web3 Project State
 
+## 2026-09-10 product-direction implementation candidate
+
+An additive candidate records the owner-corrected independent Lang, independent Sentinel, joint Lang + Sentinel commercial packaging, and all-network/all-address Web3 scope. It adds offline network-scoped address resolution with a coverage UI and address-free process telemetry. No new live chain collector, paid-customer acceptance or model/runtime production completion is claimed. Existing Solana/Pump, ARVIS, native contracts and gates are preserved. See [the implementation slice and remaining work](docs/PRODUCT_DIRECTION_2026-09-10.md).
+
+The checkpoint below remains historical evidence; its open acceptance items are not closed by this candidate.
+
 **Checkpoint date:** 2026-09-09  
 **Branch:** `integration/unified-fabric-2026-09-09`  
 **Status:** active integration work; not a production-completion claim.

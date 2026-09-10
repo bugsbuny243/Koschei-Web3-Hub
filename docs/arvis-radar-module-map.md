@@ -13,7 +13,7 @@ Customer-facing pages must not present separate technical modules as separate pr
 
 ## Arvıs principle
 
-Arvıs is an octopus-style Solana radar. Every radar arm has its own job, but the customer sees one unified radar surface:
+Arvıs is a multi-network security and evidence radar. The product target covers all blockchain networks and address types. The existing Solana/Pump.fun collectors remain intact; every additional network requires its own verified evidence adapter. The arms below describe the existing Solana lane, not the maximum product scope. Every radar arm has its own job, but the customer sees one unified radar surface:
 
 ```text
 KOSCHEİ WEB3
