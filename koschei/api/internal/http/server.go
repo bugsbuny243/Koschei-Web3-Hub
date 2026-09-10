@@ -17,11 +17,12 @@ import (
 )
 
 type serverConfig struct {
-	dbRead    *sql.DB
-	cache     cache.Cache
-	solanaRPC *web3.SolanaRPC
-	jobStore  *jobs.Store
-	jobQueue  jobs.Queue
+	dbRead        *sql.DB
+	entitlementDB *sql.DB
+	cache         cache.Cache
+	solanaRPC     *web3.SolanaRPC
+	jobStore      *jobs.Store
+	jobQueue      jobs.Queue
 }
 
 type Option func(*serverConfig)
@@ -30,6 +31,9 @@ type routeGate func(http.HandlerFunc) http.HandlerFunc
 type tierRouteGate func(string, http.HandlerFunc) http.HandlerFunc
 
 func WithReadDB(db *sql.DB) Option { return func(c *serverConfig) { c.dbRead = db } }
+func WithEntitlementDB(db *sql.DB) Option {
+	return func(c *serverConfig) { c.entitlementDB = db }
+}
 func WithCache(value cache.Cache) Option {
 	return func(c *serverConfig) {
 		if value != nil {
@@ -56,10 +60,13 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	if config.dbRead == nil {
 		config.dbRead = db
 	}
+	if config.entitlementDB == nil {
+		config.entitlementDB = db
+	}
 	if config.solanaRPC == nil {
 		config.solanaRPC = web3.NewSolanaRPC(config.cache)
 	}
-	h := &handlers.Handler{DB: db, DBRead: config.dbRead, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue, CourtClient: handlers.NewCourtNarrativeClientFromEnv()}
+	h := &handlers.Handler{DB: db, DBRead: config.dbRead, EntitlementDB: config.entitlementDB, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue, CourtClient: handlers.NewCourtNarrativeClientFromEnv()}
 	mux := http.NewServeMux()
 
 	planTierAccess := func(plan string, next http.HandlerFunc) http.HandlerFunc {
@@ -88,7 +95,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	registerBillingRoutes(mux, h)
 	registerWatchlistRoutes(mux, h, func(next http.HandlerFunc) http.HandlerFunc { return planTier("professional", next) }, func(next http.HandlerFunc) http.HandlerFunc { return planTierAccess("professional", next) })
 	registerStatic(mux, staticDir)
-	return securityHeaders(cors(apiReadiness(db, mux), corsOrigin))
+	return securityHeaders(cors(apiReadinessWithEntitlement(db, config.entitlementDB, mux), corsOrigin))
 }
 
 func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler, planAccess routeGate) {

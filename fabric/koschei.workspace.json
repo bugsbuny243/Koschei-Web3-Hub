@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0",
+  "workspace": "koschei-unified",
+  "integrationMode": "federated",
+  "preserveExisting": true,
+  "breakingChangesAllowed": false,
+  "defaultNewCapabilityMode": "observe",
+  "components": [
+    {
+      "name": "koschei-web3",
+      "repository": "bugsbuny243/Koschei-Web3-Hub",
+      "role": "security-validation-risk-intelligence",
+      "integrationBranch": "integration/unified-fabric-2026-09-09"
+    },
+    {
+      "name": "koschei-lang",
+      "repository": "bugsbuny243/koschei-lang",
+      "role": "programmable-policy-agent-language",
+      "integrationBranch": "integration/unified-fabric-2026-09-09"
+    },
+    {
+      "name": "koschei-sentinel",
+      "repository": "bugsbuny243/koschei-sentinel",
+      "role": "observation-detection-response-and-model-intelligence",
+      "integrationBranch": "integration/unified-fabric-2026-09-09"
+    }
+  ],
+  "sharedDomains": [
+    "identity",
+    "trust",
+    "policy",
+    "agents",
+    "events",
+    "evidence",
+    "storage",
+    "compute",
+    "crypto",
+    "telemetry",
+    "compat"
+  ],
+  "webEvolution": {
+    "web3": "existing-production-foundation",
+    "web4": "agentic-semantic-federated-layer",
+    "web5": "user-controlled-identity-and-data-layer",
+    "web6": "verifiable-autonomous-compute-and-crypto-agility-profile"
+  },
+  "compatibilityRules": {
+    "existingApisRemainAvailable": true,
+    "existingEvidenceSemanticsRemainIntact": true,
+    "unknownEvidenceMustRemainUnknown": true,
+    "crossProjectAccessRequiresExplicitContracts": true,
+    "newBackendCapabilitiesRequireFrontendSurface": true,
+    "newBackendCapabilitiesRequireTelemetry": true
+  }
+}

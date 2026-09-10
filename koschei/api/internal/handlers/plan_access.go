@@ -71,8 +71,9 @@ func planAccessRequestFromContext(ctx context.Context) (planAccessRequestContext
 }
 
 func (h *Handler) evaluatePlanAccess(ctx context.Context, authSubject, claimEmail string) (planAccessEvaluation, error) {
-	if h == nil || h.DB == nil {
-		return planAccessEvaluation{}, errors.New("database unavailable")
+	store := h.entitlementStore()
+	if store == nil {
+		return planAccessEvaluation{}, errors.New("entitlement store unavailable")
 	}
 	authSubject = strings.TrimSpace(authSubject)
 	email := strings.ToLower(strings.TrimSpace(claimEmail))
@@ -80,7 +81,7 @@ func (h *Handler) evaluatePlanAccess(ctx context.Context, authSubject, claimEmai
 		email = entitlementEmailFromSubject(authSubject)
 	}
 	if email == "" && authSubject != "" {
-		_ = h.DB.QueryRowContext(ctx, `
+		_ = store.QueryRowContext(ctx, `
 			SELECT lower(email)
 			FROM app_user_profiles
 			WHERE auth_subject=$1 AND status='active'
@@ -94,7 +95,7 @@ func (h *Handler) evaluatePlanAccess(ctx context.Context, authSubject, claimEmai
 	var plan string
 	var total, remaining int
 	var startsAt, expiresAt sql.NullTime
-	err := h.DB.QueryRowContext(ctx, `
+	err := store.QueryRowContext(ctx, `
 		SELECT COALESCE(plan_id,''), COALESCE(outputs_total,0), COALESCE(outputs_remaining,0), starts_at, expires_at
 		FROM entitlements
 		WHERE lower(email)=lower($1)

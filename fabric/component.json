@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0",
+  "component": "koschei-web3",
+  "repository": "bugsbuny243/Koschei-Web3-Hub",
+  "role": "security-validation-risk-intelligence",
+  "preserveExisting": true,
+  "defaultMode": "observe",
+  "compatibility": {
+    "breakingChangesAllowed": false,
+    "crossProjectAccess": "contract-only",
+    "legacyInterfaces": "preserve"
+  },
+  "capabilities": [
+    {
+      "id": "web3-security-core",
+      "domain": "web3",
+      "status": "stable",
+      "evidenceState": "blocked",
+      "workPackages": ["CORE-01", "CORE-02", "CORE-03", "CORE-04", "SIGN-01"],
+      "backend": "existing",
+      "frontend": "existing",
+      "telemetry": "existing",
+      "notes": "Existing Koschei Web3 and ARVIS behavior remains isolated and unchanged. The Web3-Web6 work package still records P0 customer-analysis/readiness blockers, so deployed code is not treated as completed security acceptance."
+    },
+    {
+      "id": "entitlement-ledger-split-plane",
+      "domain": "core",
+      "status": "experimental",
+      "evidenceState": "partial",
+      "workPackages": ["CORE-01", "CORE-03"],
+      "backend": "existing",
+      "frontend": "existing",
+      "telemetry": "planned",
+      "notes": "Dedicated commercial authorization/quota ledger is separated from application investigation persistence. Exact-head CI, configured-ledger lifecycle acceptance and telemetry are still required."
+    },
+    {
+      "id": "fabric-capability-registry",
+      "domain": "core",
+      "status": "experimental",
+      "evidenceState": "partial",
+      "workPackages": ["CORE-04", "OPS-01"],
+      "backend": "adapter",
+      "frontend": "existing",
+      "telemetry": "planned",
+      "notes": "Read-only federated registry for Koschei Web3, Koschei Lang and Sentinel. It is integration plumbing, not a new shared decision authority."
+    }
+  ]
+}
