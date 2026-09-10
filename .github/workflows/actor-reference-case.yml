@@ -40,8 +40,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
       - name: Validate scripts
@@ -62,8 +62,8 @@ jobs:
       KOSCHEI_OWNER_SECRET: ${{ secrets.KOSCHEI_OWNER_SECRET }}
       REFERENCE_WALLET: yHCxHBEaJW5tbndqC8JciSThr7U1cqLpdcsvHcx6PRe
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
 

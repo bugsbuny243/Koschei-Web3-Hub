@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check API-key controller JavaScript syntax
         run: node --check koschei/api/public/js/customer-api-keys-v1.js
       - name: Verify Enterprise credential lifecycle contract

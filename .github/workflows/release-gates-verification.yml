@@ -32,7 +32,7 @@ jobs:
         working-directory: koschei/api
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Set up Go 1.26.7
