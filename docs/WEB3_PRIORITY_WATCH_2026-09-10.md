@@ -37,6 +37,22 @@ collection and ARVIS decision paths remain part of the product. See
   not a claim that the entire service is down. The production registry remains
   an acceptance blocker until a new deployed check proves recovery.
 
+The subsequent read-only deployment inspection confirmed Railway deployment
+`15c765c7-f13e-4a1c-8956-9be2f8399d86` runs the inspected main commit and has
+deployment status SUCCESS. Its September 10, 02:19 UTC startup records confirm:
+
+- Application PostgreSQL persistence is disabled. In
+  [`main.go`](../koschei/api/main.go) the application handles are nil; the V2
+  public-case loader requires the primary application DB and returns an error
+  when it is nil. This explains the registry's unavailable state on this runtime.
+  The new ClickHouse historical-memory projection does not supply this handle.
+- `ENTITLEMENT_DATABASE_URL` is not set, and paid customer operations remain
+  fail-closed. Existing `DATABASE_URL` is deliberately not a fallback. This is a
+  separate commercial-access blocker, not a missing blockchain collector.
+
+No variable values were retrieved or changed. Successful deployment therefore
+does not establish that paid analysis or public-case discovery is operational.
+
 ## Verified external developments and product implications
 
 The source statements and Koschei engineering inferences are separated below.
@@ -51,29 +67,36 @@ Publication dates are not assumed to be incident or activation dates.
 
 ## Ordered work and acceptance
 
-1. **P0 — Recover verifiable public case access.** Inspect the deployed registry's
-   actual missing dependency/configuration. Preserve entitlement and evidence
+1. **P0 — Restore paid customer access.** Provision/connect the dedicated
+   entitlement ledger through the existing split-plane contract. Acceptance:
+   real plan lookup, atomic quota reservation/refund and paid-request lifecycle
+   succeed against the configured ledger. Do not substitute the application
+   database or a fabricated plan. Configuration and real-ledger acceptance remain
+   outstanding; this change does not configure a service or initiate billing.
+2. **P0 — Recover verifiable public case access.** Implement the separate
+   publication-persistence path required by the stateless boundary. Preserve
+   primary-store revocation visibility, entitlement and evidence
    checks. Acceptance: the deployed registry is operational with verifiable cases
    or a truthfully complete, healthy empty result; the existing smoke gate passes.
    Returning fabricated cases or treating a 503 as healthy is not a fix.
-2. **P0 — Bind security advisories to evidence.** Add a versioned advisory input
+3. **P0 — Bind security advisories to evidence.** Add a versioned advisory input
    behind ARVIS's chain-independent boundary, including original URL, publisher,
    publication and observation times, affected scope, and review state. Acceptance:
    customers see source and freshness; unrelated addresses are not accused;
    retracted/stale advisories are visible; missing evidence stays UNKNOWN.
    This input and its frontend are not implemented by this document.
-3. **P1 — Add real cross-network evidence.** Extend the network resolver with an
+4. **P1 — Add real cross-network evidence.** Extend the network resolver with an
    EVM evidence adapter and subsequently other network families. Acceptance:
    verify configured versus observed chain identity, block/finality context,
    source and age; the same address on different networks remains distinct;
    collection failures and unsupported networks are visible in the UI.
-4. **P1 — Protect Solana interpretation across upgrades.** Exercise authorized
+5. **P1 — Protect Solana interpretation across upgrades.** Exercise authorized
    excess-rent withdrawal, wrong authority/destination, token-balance changes,
    legacy/v0 transactions, and unsupported/malformed versions. Acceptance:
    supported cases retain existing behavior; unsupported data cannot create a
    clean security result; transaction-size constants are version-specific only
    when the relevant format is actually implemented and verified.
-5. **P1 — Test EVM fork compatibility.** Use the announced test environment for
+6. **P1 — Test EVM fork compatibility.** Use the announced test environment for
    changed gas semantics. Keep testnet evidence separate from mainnet evidence.
    Recheck the upstream activation status before implementation or release.
 
