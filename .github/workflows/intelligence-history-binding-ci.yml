@@ -1,0 +1,59 @@
+name: Intelligence History Binding CI
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/internal/services/intelligence_history_binding.go"
+      - "koschei/api/internal/services/intelligence_history_binding_test.go"
+      - "koschei/api/docs/intelligence-historical-evidence-binding-v1.md"
+      - ".github/workflows/intelligence-history-binding-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/services/intelligence_history_binding.go"
+      - "koschei/api/internal/services/intelligence_history_binding_test.go"
+      - "koschei/api/docs/intelligence-historical-evidence-binding-v1.md"
+      - ".github/workflows/intelligence-history-binding-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate historical evidence binding
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Require gofmt-clean binding paths
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l internal/services/intelligence_history_binding.go internal/services/intelligence_history_binding_test.go)"
+          test -z "${unformatted}" || { printf 'unformatted files:\n%s\n' "${unformatted}" >&2; exit 1; }
+
+      - name: Test atomic historical evidence binding
+        run: go test ./internal/services -run 'TestBindClickHouseHistoricalEvidence' -count=1
+
+      - name: Test full services package
+        run: go test ./internal/services -count=1
+
+      - name: Vet services package
+        run: go vet ./internal/services
+
+      - name: Build services package
+        run: go test ./internal/services -run '^$' -count=1
