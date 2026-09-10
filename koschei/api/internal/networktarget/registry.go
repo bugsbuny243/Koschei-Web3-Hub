@@ -21,16 +21,16 @@ type Network struct {
 }
 
 type Resolution struct {
-	SchemaVersion    string  `json:"schema_version"`
-	Network          Network `json:"network"`
-	Address          string  `json:"address"`
-	CanonicalRef     string  `json:"canonical_ref"`
-	SubjectID        string  `json:"subject_id"`
-	Classification   string  `json:"classification"`
-	SyntaxValid      bool    `json:"syntax_valid"`
-	AnalysisPerformed bool   `json:"analysis_performed"`
-	EvidenceStatus   string  `json:"evidence_status"`
-	LiveAvailability string  `json:"live_availability"`
+	SchemaVersion     string  `json:"schema_version"`
+	Network           Network `json:"network"`
+	Address           string  `json:"address"`
+	CanonicalRef      string  `json:"canonical_ref"`
+	SubjectID         string  `json:"subject_id"`
+	Classification    string  `json:"classification"`
+	SyntaxValid       bool    `json:"syntax_valid"`
+	AnalysisPerformed bool    `json:"analysis_performed"`
+	EvidenceStatus    string  `json:"evidence_status"`
+	LiveAvailability  string  `json:"live_availability"`
 }
 
 // Catalog describes collector implementation, not deployment health. A new
@@ -106,9 +106,15 @@ func Resolve(networkID, address string) (Resolution, error) {
 	canonical := selected.ID + ":" + canonicalAddress
 	digest := sha256.Sum256([]byte(canonical))
 	return Resolution{
-		SchemaVersion: SchemaVersion, Network: *selected, Address: address,
-		CanonicalRef: canonical, SubjectID: fmt.Sprintf("network-subject:%x", digest),
-		Classification: classification, SyntaxValid: true,
-		AnalysisPerformed: false, EvidenceStatus: "unknown", LiveAvailability: "not_checked",
+		SchemaVersion:     SchemaVersion,
+		Network:           *selected,
+		Address:           address,
+		CanonicalRef:      canonical,
+		SubjectID:         fmt.Sprintf("network-subject:%x", digest),
+		Classification:    classification,
+		SyntaxValid:       true,
+		AnalysisPerformed: false,
+		EvidenceStatus:    "unknown",
+		LiveAvailability:  "not_checked",
 	}, nil
 }

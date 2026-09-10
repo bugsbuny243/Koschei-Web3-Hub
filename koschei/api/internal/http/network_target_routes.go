@@ -66,15 +66,15 @@ func networkCoverageCatalog(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"schema_version": networktarget.SchemaVersion,
-		"scope_target": "all-blockchain-networks-and-address-types",
-		"networks": networktarget.Catalog(),
+		"schema_version":    networktarget.SchemaVersion,
+		"scope_target":      "all-blockchain-networks-and-address-types",
+		"networks":          networktarget.Catalog(),
 		"live_availability": "not_checked",
-		"telemetry": map[string]any{
-			"scope": "process_local",
+		"telemetry":         map[string]any{
+			"scope":               "process_local",
 			"resolution_requests": networkTargetRequests.Load(),
-			"rejected_requests": networkTargetRejected.Load(),
-			"addresses_recorded": false,
+			"rejected_requests":   networkTargetRejected.Load(),
+			"addresses_recorded":  false,
 		},
 	})
 }
