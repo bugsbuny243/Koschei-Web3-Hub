@@ -5,6 +5,8 @@ on:
     paths:
       - "koschei/api/internal/clickhouse/intelligence_read.go"
       - "koschei/api/internal/clickhouse/intelligence_read_test.go"
+      - "koschei/api/internal/clickhouse/intelligence_projection.go"
+      - "koschei/api/internal/clickhouse/intelligence_projection_test.go"
       - "koschei/api/cmd/clickhouse-intelligence-read/**"
       - "koschei/api/docs/clickhouse-arvis-intelligence-memory-v1.md"
       - ".github/workflows/clickhouse-arvis-intelligence-read-ci.yml"
@@ -13,7 +15,10 @@ on:
     paths:
       - "koschei/api/internal/clickhouse/intelligence_read.go"
       - "koschei/api/internal/clickhouse/intelligence_read_test.go"
+      - "koschei/api/internal/clickhouse/intelligence_projection.go"
+      - "koschei/api/internal/clickhouse/intelligence_projection_test.go"
       - "koschei/api/cmd/clickhouse-intelligence-read/**"
+      - "koschei/api/docs/clickhouse-arvis-intelligence-memory-v1.md"
       - ".github/workflows/clickhouse-arvis-intelligence-read-ci.yml"
   workflow_dispatch:
 
@@ -22,7 +27,7 @@ permissions:
 
 jobs:
   validate:
-    name: Validate bounded ARVIS intelligence read
+    name: Validate bounded ARVIS intelligence read and projection
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -56,7 +61,7 @@ jobs:
       - name: Require gofmt-clean intelligence read paths
         run: |
           set -euo pipefail
-          unformatted="$(gofmt -l internal/clickhouse/intelligence_read.go internal/clickhouse/intelligence_read_test.go cmd/clickhouse-intelligence-read)"
+          unformatted="$(gofmt -l internal/clickhouse/intelligence_read.go internal/clickhouse/intelligence_read_test.go internal/clickhouse/intelligence_projection.go internal/clickhouse/intelligence_projection_test.go cmd/clickhouse-intelligence-read)"
           test -z "${unformatted}" || { printf 'unformatted files:\n%s\n' "${unformatted}" >&2; exit 1; }
 
       - name: Validate existing shadow schemas on ClickHouse 26.2
@@ -90,6 +95,9 @@ jobs:
           test "${exact_count}" = "1"
           test "${case_distinct}" = "2"
           test "${linked_count}" = "1"
+
+      - name: Test intelligence memory projection fail-closed semantics
+        run: go test ./internal/clickhouse -run 'TestProjectARVISMemory|TestValidateARVISMemorySnapshotForProjection' -count=1
 
       - name: Test intelligence read client
         run: go test ./internal/clickhouse -count=1

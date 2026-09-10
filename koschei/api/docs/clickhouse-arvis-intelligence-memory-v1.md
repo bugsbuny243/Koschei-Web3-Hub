@@ -23,7 +23,7 @@ ARVIS remains authoritative for scanning, verdicts, evidence production, queue/l
 - PostgreSQL state
 - production ClickHouse schema or data
 
-The command is read-only.
+The operator command is read-only.
 
 ## Exact subject identity
 
@@ -61,7 +61,25 @@ The reader requires:
 
 Every ClickHouse query also sets bounded server-side execution/result/scan limits. If a source exceeds the requested row bound, the read fails instead of returning an apparently complete truncated view.
 
+## IntelligenceInvestigation projection
+
+`ProjectARVISMemory` converts a validated `ARVISMemorySnapshot` into the already-existing `koschei-intelligence-contract-v1` contract. It does not introduce a second intelligence schema.
+
+The projection is deliberately conservative:
+
+- the exact target is classified through the existing `IntelligenceSubject` model;
+- stream rows become `IntelligenceEvidence` with source `clickhouse_arvis_stream_memory`;
+- verdict rows become `IntelligenceEvidence` with source `clickhouse_arvis_verdict_memory`;
+- both are `observed`, not `verified`, because historical storage integrity is not proof that current chain state is unchanged;
+- a stored `signed=true` flag is preserved only as metadata and is explicitly marked `signature_verification=not_performed_by_memory_projection`;
+- the historical grade, risk index and verdict are retained as evidence attributes, not promoted into a new customer decision;
+- no `Relationship`, `Behavior`, `Hypothesis`, `AttackPath`, entity attribution, or current risk decision is created from historical memory alone.
+
+Before projection, the adapter re-checks the snapshot fingerprint, exact subject boundary, verdict content hashes, stream digest metadata, timestamp window, duplicate evidence identities and the event-id correlation metadata. A caller-constructed or tampered snapshot therefore fails closed instead of bypassing the reader's safety boundary.
+
 ## Operator command
+
+Memory output remains the default:
 
 ```bash
 cd koschei/api
@@ -74,11 +92,24 @@ go run ./cmd/clickhouse-intelligence-read \
   --network solana-mainnet \
   --since 2026-09-08T00:00:00Z \
   --until 2026-09-09T00:00:00Z \
-  --limit 200
+  --limit 200 \
+  --output memory
 ```
 
-Credentials must remain server-side and must not be committed, printed, placed in frontend code, or embedded in `CLICKHOUSE_HTTP_URL`.
+To emit the existing intelligence contract instead of the raw memory snapshot:
+
+```bash
+go run ./cmd/clickhouse-intelligence-read \
+  --target '<exact-chain-target>' \
+  --network solana-mainnet \
+  --since 2026-09-08T00:00:00Z \
+  --until 2026-09-09T00:00:00Z \
+  --limit 200 \
+  --output investigation
+```
+
+`KOSCHEI_CLICKHOUSE_INTELLIGENCE_OUTPUT=investigation` provides the same operator-only switch through environment configuration. Credentials must remain server-side and must not be committed, printed, placed in frontend code, or embedded in `CLICKHOUSE_HTTP_URL`.
 
 ## What this unlocks next
 
-Once real shadow data exists and bounded reads are measured, this evidence-memory surface can feed the already-existing `IntelligenceInvestigation` contract. The next projection must preserve the same rule: relationships and behavior findings require concrete evidence references; absence or incomplete evidence remains unknown/unverified.
+The ClickHouse memory layer can now feed the existing intelligence contract without changing ARVIS authority. The next production step is to connect this historical evidence to fresh investigation assembly only through explicit evidence bindings. Relationships, behavior findings and attack paths must still require concrete evidence references; absence or incomplete evidence remains unknown/unverified.
