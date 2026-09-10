@@ -9,19 +9,19 @@
     {
       "name": "koschei-web3",
       "repository": "bugsbuny243/Koschei-Web3-Hub",
-      "role": "security-validation-risk-intelligence",
+      "role": "multi-network-security-validation-risk-intelligence",
       "integrationBranch": "integration/unified-fabric-2026-09-09"
     },
     {
       "name": "koschei-lang",
       "repository": "bugsbuny243/koschei-lang",
-      "role": "programmable-policy-agent-language",
+      "role": "independent-security-programming-language",
       "integrationBranch": "integration/unified-fabric-2026-09-09"
     },
     {
       "name": "koschei-sentinel",
       "repository": "bugsbuny243/koschei-sentinel",
-      "role": "observation-detection-response-and-model-intelligence",
+      "role": "independent-cybersecurity-model",
       "integrationBranch": "integration/unified-fabric-2026-09-09"
     }
   ],

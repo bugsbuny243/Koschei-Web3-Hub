@@ -2,7 +2,7 @@
   "schemaVersion": "1.0",
   "component": "koschei-web3",
   "repository": "bugsbuny243/Koschei-Web3-Hub",
-  "role": "security-validation-risk-intelligence",
+  "role": "multi-network-security-validation-risk-intelligence",
   "preserveExisting": true,
   "defaultMode": "observe",
   "compatibility": {
