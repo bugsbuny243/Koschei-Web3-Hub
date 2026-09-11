@@ -390,6 +390,7 @@ func matchesAudience(v any, target string) bool {
 				return true
 			}
 		}
+	}
 	return false
 }
 
