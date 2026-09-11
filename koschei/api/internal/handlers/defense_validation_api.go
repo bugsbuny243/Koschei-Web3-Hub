@@ -60,18 +60,19 @@ type defenseValidationAPICase struct {
 }
 
 type defenseValidationAPIResponse struct {
-	OK                        bool                                  `json:"ok"`
-	Product                   string                                `json:"product"`
-	EvidenceModel             string                                `json:"evidence_model"`
-	ScenarioContractHash      string                                `json:"scenario_contract_hash"`
-	VerifiedExecutions        int                                   `json:"verified_executions"`
-	VerifiedObservations      int                                   `json:"verified_observations"`
-	Report                    defense.DefenseValidationReportV02    `json:"report"`
-	UnifiedSecurityContract   services.UnifiedSecurityInvestigation `json:"unified_security_contract"`
-	MainnetTransactionSent    bool                                  `json:"mainnet_transaction_sent"`
-	ExecutionAuthority        bool                                  `json:"execution_authority"`
-	ProductionControlMutation bool                                  `json:"production_control_mutation"`
-	Limitations               []string                              `json:"limitations"`
+	OK                        bool                                   `json:"ok"`
+	Product                   string                                 `json:"product"`
+	EvidenceModel             string                                 `json:"evidence_model"`
+	ScenarioContractHash      string                                 `json:"scenario_contract_hash"`
+	VerifiedExecutions        int                                    `json:"verified_executions"`
+	VerifiedObservations      int                                    `json:"verified_observations"`
+	Report                    defense.DefenseValidationReportV02     `json:"report"`
+	UnifiedSecurityContract   services.UnifiedSecurityInvestigation  `json:"unified_security_contract"`
+	AgentExecutionEvidence    []services.AgentExecutionEvidenceTrace `json:"agent_execution_evidence_v1"`
+	MainnetTransactionSent    bool                                   `json:"mainnet_transaction_sent"`
+	ExecutionAuthority        bool                                   `json:"execution_authority"`
+	ProductionControlMutation bool                                   `json:"production_control_mutation"`
+	Limitations               []string                               `json:"limitations"`
 }
 
 // DefenseValidationV1 validates an already-collected, isolated defense test run.
@@ -292,6 +293,10 @@ func evaluateDefenseValidationAPIRequest(input defenseValidationAPIRequest) (def
 	if err != nil {
 		return defenseValidationAPIResponse{}, fmt.Errorf("unified defense validation projection rejected: %w", err)
 	}
+	agentExecutionEvidence, err := buildDefenseValidationAgentExecutionTraces(input, report)
+	if err != nil {
+		return defenseValidationAPIResponse{}, fmt.Errorf("agent execution evidence projection rejected: %w", err)
+	}
 
 	return defenseValidationAPIResponse{
 		OK:                        true,
@@ -302,12 +307,14 @@ func evaluateDefenseValidationAPIRequest(input defenseValidationAPIRequest) (def
 		VerifiedObservations:      len(observations),
 		Report:                    report,
 		UnifiedSecurityContract:   unifiedSecurity,
+		AgentExecutionEvidence:    agentExecutionEvidence,
 		MainnetTransactionSent:    false,
 		ExecutionAuthority:        false,
 		ProductionControlMutation: false,
 		Limitations: []string{
 			"This endpoint evaluates evidence from isolated fork/sandbox runs; it does not execute arbitrary payloads or submit mainnet transactions.",
 			"A validated report applies only to the exact scenario contract, control configuration, execution receipts and independently signed observations in this run.",
+			"agent_execution_evidence_v1 is an evidence-only projection: missing agent identity or delegation remains UNVERIFIED and cannot create authority.",
 		},
 	}, nil
 }
