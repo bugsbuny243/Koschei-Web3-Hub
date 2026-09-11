@@ -1,6 +1,10 @@
 package services
 
-import "testing"
+import (
+	"testing"
+
+	"koschei/api/internal/securityevidence"
+)
 
 func TestUnifiedSignedEvidenceChainFamilyRecognizesBitcoinUTXO(t *testing.T) {
 	tests := map[string]string{
