@@ -9,9 +9,9 @@ import (
 func TestUnifiedSignedEvidenceChainFamilyRecognizesBitcoinUTXO(t *testing.T) {
 	tests := map[string]string{
 		"bitcoin": IntelligenceChainFamilyUTXO,
-		"utxo": IntelligenceChainFamilyUTXO,
+		"utxo":    IntelligenceChainFamilyUTXO,
 		"bip122:000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f": IntelligenceChainFamilyUTXO,
-		"solana": IntelligenceChainFamilySolana,
+		"solana":   IntelligenceChainFamilySolana,
 		"eip155:1": IntelligenceChainFamilyEVM,
 	}
 	for chain, want := range tests {
