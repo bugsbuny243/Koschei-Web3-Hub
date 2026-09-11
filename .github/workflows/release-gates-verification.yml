@@ -3,10 +3,19 @@ name: Release Gates Verification
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/**"
+      - ".github/workflows/release-gates-verification.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: release-gates-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   full-verification:
@@ -88,3 +97,58 @@ jobs:
         run: go vet ./...
       - name: Build all packages
         run: CGO_ENABLED=0 GOOS=linux go build ./...
+
+  production-acceptance:
+    name: Deployed public product acceptance
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: full-verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE_URL: https://tradepigloball.co
+    steps:
+      - name: Checkout acceptance verifier
+        uses: actions/checkout@v7
+
+      - name: Wait for deployed product and verify customer-visible surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+
+          wait_contract() {
+            local name="$1" path="$2" marker="$3" attempts="${4:-36}" code=""
+            for attempt in $(seq 1 "${attempts}"); do
+              code="$(curl --location --silent --show-error --max-time 20 \
+                --output "diagnostics/${name}.body" \
+                --write-out '%{http_code}' \
+                "${BASE_URL}${path}" || true)"
+              if [ "${code}" = "200" ] && grep -Fq "${marker}" "diagnostics/${name}.body"; then
+                echo "PASS ${path} attempt=${attempt}"
+                return 0
+              fi
+              case "${code}" in
+                000|502|503|504|200)
+                  echo "WAIT ${path} attempt=${attempt}/${attempts} code=${code}" >&2
+                  ;;
+                *)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: ${path} returned HTTP ${code}." >&2
+                  exit 31
+                  ;;
+              esac
+              sleep 10
+            done
+            echo "RELEASE_ACCEPTANCE_TIMEOUT: ${path} never exposed ${marker}." >&2
+            exit 32
+          }
+
+          wait_contract health /health '"status":"ok"'
+          wait_contract login /login 'KOSCHEI ARVIS'
+          wait_contract scan /scan 'public-solana-scan.js'
+          wait_contract cases '/api/public/cases?limit=100' '"ok":true'
+          wait_contract soc /api/public/soc/feed '"ok":true'
+
+          node koschei/api/scripts/verify-public-registry-smoke-response.js \
+            diagnostics/cases.body > diagnostics/public-registry-smoke.json
+
+          echo 'RELEASE_ACCEPTANCE_PASS: deployed public product and registry are operational.'
