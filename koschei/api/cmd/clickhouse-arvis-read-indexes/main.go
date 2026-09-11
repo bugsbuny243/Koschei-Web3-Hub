@@ -48,7 +48,7 @@ func run(parent context.Context) error {
 
 	ctx, cancel := context.WithTimeout(parent, 60*time.Second)
 	defer cancel()
-	if err := client.ApplyTrustedVerdictShadowMigration(ctx, string(migrationSQL)); err != nil {
+	if err := client.ApplyTrustedARVISReadIndexMigration(ctx, string(migrationSQL)); err != nil {
 		return fmt.Errorf("apply ClickHouse ARVIS read indexes: %w", err)
 	}
 	log.Printf("ClickHouse ARVIS read-index migration applied path=%s checksum_verified=true", readIndexMigrationPath)
