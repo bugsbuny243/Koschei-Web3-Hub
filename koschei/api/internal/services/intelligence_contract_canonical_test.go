@@ -26,3 +26,44 @@ func TestClassifyIntelligenceSubjectPreservesSolanaCase(t *testing.T) {
 		t.Fatal("Solana canonical ref is empty")
 	}
 }
+
+func TestClassifyIntelligenceSubjectRecognizesBitcoinBeforeGenericBase58(t *testing.T) {
+	address := "1BoatSLRHtKNngkdXEeobR76b53LETtpyT"
+	subject := ClassifyIntelligenceSubject(address, "bitcoin-mainnet")
+	if subject.ChainFamily != IntelligenceChainFamilyUTXO || subject.Chain != "bitcoin" {
+		t.Fatalf("Bitcoin subject misclassified: %+v", subject)
+	}
+	if subject.Kind != IntelligenceSubjectAddress {
+		t.Fatalf("Bitcoin subject kind=%q", subject.Kind)
+	}
+	if subject.ClassificationBasis != "bitcoin_mainnet_address_syntax" {
+		t.Fatalf("Bitcoin classification basis=%q", subject.ClassificationBasis)
+	}
+	if subject.CanonicalRef != "utxo:bitcoin:bitcoin-mainnet:"+address {
+		t.Fatalf("Bitcoin canonical ref=%q", subject.CanonicalRef)
+	}
+}
+
+func TestClassifyIntelligenceSubjectCanonicalizesBitcoinBech32Case(t *testing.T) {
+	lower := "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+	upper := "BC1QXY2KGDYGJRSQTZQ2N0YRF2493P83KKFJHX0WLH"
+	lowerSubject := ClassifyIntelligenceSubject(lower, "bitcoin-mainnet")
+	upperSubject := ClassifyIntelligenceSubject(upper, "bitcoin-mainnet")
+	if lowerSubject.ChainFamily != IntelligenceChainFamilyUTXO || upperSubject.ChainFamily != IntelligenceChainFamilyUTXO {
+		t.Fatalf("Bech32 Bitcoin subject not classified as UTXO: lower=%+v upper=%+v", lowerSubject, upperSubject)
+	}
+	if lowerSubject.ID != upperSubject.ID || lowerSubject.CanonicalRef != upperSubject.CanonicalRef {
+		t.Fatalf("Bech32 case changed Bitcoin identity: lower=%+v upper=%+v", lowerSubject, upperSubject)
+	}
+	if upperSubject.Raw != upper {
+		t.Fatalf("raw Bitcoin address casing was not preserved: %q", upperSubject.Raw)
+	}
+}
+
+func TestClassifyIntelligenceSubjectDoesNotTreatBitcoinAddressAsBitcoinOnSolanaNetwork(t *testing.T) {
+	address := "1BoatSLRHtKNngkdXEeobR76b53LETtpyT"
+	subject := ClassifyIntelligenceSubject(address, "solana-mainnet")
+	if subject.ChainFamily == IntelligenceChainFamilyUTXO {
+		t.Fatalf("Bitcoin classification ignored explicit network: %+v", subject)
+	}
+}

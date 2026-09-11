@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"koschei/api/internal/networktarget"
 )
 
 const (
@@ -13,6 +15,7 @@ const (
 
 	IntelligenceChainFamilyEVM     = "evm"
 	IntelligenceChainFamilySolana  = "solana"
+	IntelligenceChainFamilyUTXO    = "utxo"
 	IntelligenceChainFamilyUnknown = "unknown"
 
 	IntelligenceSubjectAddress = "address"
@@ -189,6 +192,11 @@ func VerifiedIntelligenceRelationship(sourceID, targetID, relation string, evide
 }
 
 func classifyIntelligenceTarget(target, network string) (family, chain, basis string) {
+	if network == "bitcoin-mainnet" {
+		if _, err := networktarget.Resolve(network, target); err == nil {
+			return IntelligenceChainFamilyUTXO, "bitcoin", "bitcoin_mainnet_address_syntax"
+		}
+	}
 	if evmAddressPattern.MatchString(target) {
 		return IntelligenceChainFamilyEVM, evmChainFromNetwork(network), "evm_address_syntax"
 	}
@@ -237,6 +245,11 @@ func intelligenceCanonicalRef(family, chain, network, target string) string {
 	canonicalTarget := strings.TrimSpace(target)
 	if family == IntelligenceChainFamilyEVM {
 		canonicalTarget = strings.ToLower(canonicalTarget)
+	}
+	if family == IntelligenceChainFamilyUTXO && strings.ToLower(strings.TrimSpace(network)) == "bitcoin-mainnet" {
+		if resolution, err := networktarget.Resolve("bitcoin-mainnet", canonicalTarget); err == nil {
+			canonicalTarget = strings.TrimPrefix(resolution.CanonicalRef, "bitcoin-mainnet:")
+		}
 	}
 	return strings.Join([]string{
 		family,
