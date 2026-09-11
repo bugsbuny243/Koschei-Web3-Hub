@@ -42,7 +42,7 @@ func Catalog() []Network {
 		{ID: "base-mainnet", Name: "Base", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "not_connected"},
 		{ID: "arbitrum-mainnet", Name: "Arbitrum", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "not_connected"},
 		{ID: "optimism-mainnet", Name: "Optimism", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "not_connected"},
-		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", AddressFormat: "not_implemented", CollectorStatus: "not_connected"},
+		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", AddressFormat: "bitcoin-mainnet", CollectorStatus: "parser_ready_collector_not_connected"},
 	}
 }
 
@@ -98,6 +98,12 @@ func Resolve(networkID, address string) (Resolution, error) {
 		classification = "evm_hex_syntax_only_checksum_not_verified"
 	case "base58-32":
 		if !solanaAddress(address) {
+			return Resolution{}, fmt.Errorf("address_network_format_mismatch")
+		}
+	case "bitcoin-mainnet":
+		var ok bool
+		canonicalAddress, classification, ok = bitcoinMainnetAddress(address)
+		if !ok {
 			return Resolution{}, fmt.Errorf("address_network_format_mismatch")
 		}
 	default:
