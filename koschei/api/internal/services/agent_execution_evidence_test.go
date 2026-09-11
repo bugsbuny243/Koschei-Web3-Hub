@@ -69,6 +69,19 @@ func TestAgentExecutionTracePolicyAndEffectDigestsAffectStableID(t *testing.T) {
 	}
 }
 
+func TestAgentExecutionTraceStageOutcomeAffectsStableID(t *testing.T) {
+	stagesA := verifiedAgentExecutionStages()
+	stagesB := verifiedAgentExecutionStages()
+	stagesA[2].Outcome = "allow"
+	stagesB[2].Outcome = "block"
+	receipt := strings.Repeat("f", 64)
+	traceA := BuildAgentExecutionEvidenceTrace("agent-1", "intent-1", AgentIndependentObservationVerified, "receipt://1", receipt, stagesA, time.Time{})
+	traceB := BuildAgentExecutionEvidenceTrace("agent-1", "intent-1", AgentIndependentObservationVerified, "receipt://1", receipt, stagesB, time.Time{})
+	if traceA.ID == traceB.ID {
+		t.Fatal("trace identity did not bind authorization outcome")
+	}
+}
+
 func verifiedAgentExecutionStages() []AgentExecutionStageEvidence {
 	stages := make([]AgentExecutionStageEvidence, 0, 6)
 	for _, stage := range requiredAgentExecutionStages {
