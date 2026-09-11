@@ -138,10 +138,10 @@ func sensitiveRuleForPath(path string) (sensitiveLimitRule, bool) {
 
 func consumeSharedSensitiveLimit(ctx context.Context, db *sql.DB, keyHash, route string, rule sensitiveLimitRule) (sensitiveLimitDecision, error) {
 	if db == nil {
-		if services.NeonAuthOnlyMode() {
-			return consumeMemorySensitiveLimit(keyHash, route, rule, time.Now().UTC())
-		}
-		return sensitiveLimitDecision{}, errors.New("rate limit database unavailable")
+		// Stateless runtime is an explicit supported mode. Rate limiting therefore
+		// falls back to the bounded in-process store whenever no shared PostgreSQL
+		// store is configured; it must not depend on the legacy auth-only flag.
+		return consumeMemorySensitiveLimit(keyHash, route, rule, time.Now().UTC())
 	}
 	keyHash = strings.TrimSpace(keyHash)
 	route = strings.TrimSpace(route)
@@ -207,10 +207,7 @@ func sensitiveRateLimitStorageName(db *sql.DB) string {
 	if db != nil {
 		return "postgresql"
 	}
-	if services.NeonAuthOnlyMode() {
-		return "bounded_memory"
-	}
-	return "unavailable"
+	return "bounded_memory"
 }
 
 func sensitiveBucketKeyHash(clientIP, route string) string {
