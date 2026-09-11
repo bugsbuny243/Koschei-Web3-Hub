@@ -18,8 +18,8 @@ func TestProbeBitcoinVerifiesMainnetBeforeAddressLookup(t *testing.T) {
 			_, _ = w.Write([]byte(bitcoinMainnetGenesisHash))
 		case "/address/1BoatSLRHtKNngkdXEeobR76b53LETtpyT":
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"address": "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
-				"chain_stats": map[string]any{"funded_txo_count": 2, "funded_txo_sum": 1500, "spent_txo_count": 1, "spent_txo_sum": 500, "tx_count": 2},
+				"address":       "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
+				"chain_stats":   map[string]any{"funded_txo_count": 2, "funded_txo_sum": 1500, "spent_txo_count": 1, "spent_txo_sum": 500, "tx_count": 2},
 				"mempool_stats": map[string]any{"funded_txo_count": 0, "funded_txo_sum": 0, "spent_txo_count": 0, "spent_txo_sum": 0, "tx_count": 0},
 			})
 		default:
@@ -72,8 +72,8 @@ func TestProbeBitcoinDoesNotTreatNoActivityAsSafeOrNonexistent(t *testing.T) {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"address": "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
-			"chain_stats": map[string]any{"funded_txo_count": 0, "funded_txo_sum": 0, "spent_txo_count": 0, "spent_txo_sum": 0, "tx_count": 0},
+			"address":       "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
+			"chain_stats":   map[string]any{"funded_txo_count": 0, "funded_txo_sum": 0, "spent_txo_count": 0, "spent_txo_sum": 0, "tx_count": 0},
 			"mempool_stats": map[string]any{"funded_txo_count": 0, "funded_txo_sum": 0, "spent_txo_count": 0, "spent_txo_sum": 0, "tx_count": 0},
 		})
 	}))
