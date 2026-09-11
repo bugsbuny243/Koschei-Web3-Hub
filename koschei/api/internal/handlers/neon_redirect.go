@@ -126,7 +126,7 @@ func (h *Handler) neonAuthStateSecret() string {
 
 func sanitizeFrontendRedirect(value string) string {
 	value = strings.TrimSpace(value)
-	if value == "" || !strings.HasPrefix(value, "/") || strings.HasPrefix(value, "//") || strings.ContainsAny(value, "\r\n") {
+	if value == "" || !strings.HasPrefix(value, "/") || strings.HasPrefix(value, "//") || strings.ContainsAny(value, "\\\r\n") {
 		return ""
 	}
 	return value
