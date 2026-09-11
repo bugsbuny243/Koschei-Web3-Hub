@@ -26,6 +26,9 @@ and decisions remain unchanged.
 
 ## Next acceptance sequence
 
+Current operational blockers and primary-source security/protocol updates are
+recorded in [the September 10 Web3 priority watch](WEB3_PRIORITY_WATCH_2026-09-10.md).
+
 1. Add real network-specific evidence adapters behind the common intelligence contract.
 2. Bind each adapter's configured network identity, source, block and observation time.
 3. Expose collection, freshness, failure and unsupported states in the same UI.

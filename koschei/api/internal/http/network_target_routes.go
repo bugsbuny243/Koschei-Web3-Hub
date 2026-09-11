@@ -70,7 +70,7 @@ func networkCoverageCatalog(w http.ResponseWriter, _ *http.Request) {
 		"scope_target":      "all-blockchain-networks-and-address-types",
 		"networks":          networktarget.Catalog(),
 		"live_availability": "not_checked",
-		"telemetry":         map[string]any{
+		"telemetry": map[string]any{
 			"scope":               "process_local",
 			"resolution_requests": networkTargetRequests.Load(),
 			"rejected_requests":   networkTargetRejected.Load(),
