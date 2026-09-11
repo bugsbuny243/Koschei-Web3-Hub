@@ -121,7 +121,11 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 		request.Address = r.PostForm.Get("address")
 	} else {
 		if mediaType != "application/json" {
-			reject(http.StatusUnsupportedMediaType, "json_required", "not_checked")
+			message := "json_or_form_required"
+			if withIntelligence {
+				message = "json_required"
+			}
+			reject(http.StatusUnsupportedMediaType, message, "not_checked")
 			return
 		}
 		var err error
