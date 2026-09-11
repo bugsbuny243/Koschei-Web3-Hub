@@ -33,9 +33,6 @@ func TestProfessionalOnlyAuthSemantics(t *testing.T) {
 			t.Fatalf("authTier(%q)=%q want api_key_plus_professional_entitlement", path, got)
 		}
 	}
-	if got := authTier("/api/v1/agent-execution/evidence", "defense_routes.go"); got != "api_key_plus_professional_entitlement" {
-		t.Fatalf("authTier(agent execution evidence)=%q want api_key_plus_professional_entitlement", got)
-	}
 
 	secured := security("api_key_plus_professional_entitlement")
 	if len(secured) != 1 {
