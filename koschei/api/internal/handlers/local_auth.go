@@ -184,7 +184,8 @@ func tryLocalJWT(token string) (neonJWTClaims, bool, error) {
 	if json.Unmarshal(headerRaw, &header) != nil {
 		return claims, false, nil
 	}
-	if strings.TrimSpace(header["kid"].(string)) != "koschei-local" {
+	kid, ok := header["kid"].(string)
+	if !ok || strings.TrimSpace(kid) != "koschei-local" {
 		return claims, false, nil
 	}
 	secret := localJWTSecret()
