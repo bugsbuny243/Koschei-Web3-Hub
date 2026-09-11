@@ -29,8 +29,8 @@ func TestResolveBitcoinLegacyMainnetAddresses(t *testing.T) {
 
 func TestResolveBitcoinRejectsWrongNetworkAndChecksum(t *testing.T) {
 	invalid := []string{
-		"mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn", // testnet P2PKH
-		"1BoatSLRHtKNngkdXEeobR76b53LETtpyU", // bad checksum
+		"mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn",         // testnet P2PKH
+		"1BoatSLRHtKNngkdXEeobR76b53LETtpyU",         // bad checksum
 		"bc1Qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq", // mixed case
 	}
 	for _, address := range invalid {
