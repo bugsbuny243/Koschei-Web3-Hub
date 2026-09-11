@@ -54,8 +54,8 @@ func networkDeploymentCatalog() []networkDeploymentState {
 				state.CollectorRuntime = "rpc_configured"
 			}
 		case "utxo":
-			state.CollectorRuntime = "parser_not_implemented"
-			state.LiveAvailability = "not_available"
+			state.CollectorRuntime = network.CollectorStatus
+			state.LiveAvailability = "collector_not_connected"
 		}
 		states = append(states, state)
 	}
