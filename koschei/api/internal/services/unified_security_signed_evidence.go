@@ -141,6 +141,8 @@ func unifiedSignedEvidenceChainFamily(chain string) string {
 		chain == "ethereum", chain == "base", chain == "arbitrum", chain == "optimism",
 		chain == "polygon", chain == "bnb-chain", chain == "bsc", chain == "avalanche":
 		return IntelligenceChainFamilyEVM
+	case chain == "bitcoin", chain == "utxo", strings.HasPrefix(chain, "bip122:"):
+		return IntelligenceChainFamilyUTXO
 	default:
 		return IntelligenceChainFamilyUnknown
 	}
