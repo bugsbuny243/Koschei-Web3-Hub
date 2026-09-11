@@ -58,6 +58,9 @@ const (
 	neonJWTFailureMissingEmailClaim neonJWTFailureCategory = "missing_email_claim"
 	neonJWTFailureInvalidSignature  neonJWTFailureCategory = "invalid_signature"
 	neonJWTFailureUnknown           neonJWTFailureCategory = "unknown"
+
+	jwksCacheTTL    = 5 * time.Minute
+	jwksNegativeTTL = 30 * time.Second
 )
 
 type neonJWTVerificationError struct {
@@ -75,8 +78,11 @@ func (e neonJWTVerificationError) Error() string {
 func (e neonJWTVerificationError) Unwrap() error { return e.Cause }
 
 var (
-	jwksCache map[string]neonJWK
-	jwksMu    sync.RWMutex
+	jwksCache            map[string]neonJWK
+	jwksCacheExpiresAt   time.Time
+	jwksNegativeCache    = map[string]time.Time{}
+	jwksMu               sync.RWMutex
+	jwksRefreshMu        sync.Mutex
 )
 
 func extractAuthToken(resp *http.Response, body []byte) (string, bool) {
@@ -254,12 +260,43 @@ func neonClaimsFromToken(token string) (neonJWTClaims, error) {
 }
 
 func loadJWKSKey(kid string) (neonJWK, error) {
+	kid = strings.TrimSpace(kid)
+	if kid == "" {
+		return neonJWK{}, errors.New("unknown key")
+	}
+	now := time.Now()
 	jwksMu.RLock()
-	if k, ok := jwksCache[kid]; ok {
-		jwksMu.RUnlock()
-		return k, nil
+	if now.Before(jwksCacheExpiresAt) {
+		if k, ok := jwksCache[kid]; ok {
+			jwksMu.RUnlock()
+			return k, nil
+		}
+		if until, ok := jwksNegativeCache[kid]; ok && now.Before(until) {
+			jwksMu.RUnlock()
+			return neonJWK{}, errors.New("unknown key")
+		}
 	}
 	jwksMu.RUnlock()
+
+	// Serialize refreshes so a burst of unknown/stale kids cannot fan out into
+	// concurrent requests to the identity provider.
+	jwksRefreshMu.Lock()
+	defer jwksRefreshMu.Unlock()
+
+	now = time.Now()
+	jwksMu.RLock()
+	if now.Before(jwksCacheExpiresAt) {
+		if k, ok := jwksCache[kid]; ok {
+			jwksMu.RUnlock()
+			return k, nil
+		}
+		if until, ok := jwksNegativeCache[kid]; ok && now.Before(until) {
+			jwksMu.RUnlock()
+			return neonJWK{}, errors.New("unknown key")
+		}
+	}
+	jwksMu.RUnlock()
+
 	jwksURL := strings.TrimSpace(configuredNeonAuthJWKSURL())
 	if jwksURL == "" && !isProduction() {
 		baseURL := strings.TrimSpace(configuredNeonAuthBaseURL())
@@ -287,14 +324,25 @@ func loadJWKSKey(kid string) (neonJWK, error) {
 	}
 	cache := map[string]neonJWK{}
 	for _, key := range doc.Keys {
-		if key.Kid == "" {
+		if strings.TrimSpace(key.Kid) == "" {
 			continue
 		}
 		cache[key.Kid] = key
 	}
+
+	refreshedAt := time.Now()
 	jwksMu.Lock()
 	jwksCache = cache
+	jwksCacheExpiresAt = refreshedAt.Add(jwksCacheTTL)
+	for missedKid, until := range jwksNegativeCache {
+		if !refreshedAt.Before(until) {
+			delete(jwksNegativeCache, missedKid)
+		}
+	}
 	k := jwksCache[kid]
+	if k.Kid == "" {
+		jwksNegativeCache[kid] = refreshedAt.Add(jwksNegativeTTL)
+	}
 	jwksMu.Unlock()
 	if k.Kid == "" {
 		return neonJWK{}, errors.New("unknown key")
@@ -341,7 +389,6 @@ func matchesAudience(v any, target string) bool {
 			if s, ok := it.(string); ok && s == target {
 				return true
 			}
-		}
 	}
 	return false
 }
