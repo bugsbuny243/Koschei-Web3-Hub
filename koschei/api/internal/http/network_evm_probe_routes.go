@@ -79,10 +79,10 @@ func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(status)
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"error": message,
+			"error":              message,
 			"analysis_performed": false,
-			"evidence_status": "unknown",
-			"live_availability": availability,
+			"evidence_status":    "unknown",
+			"live_availability":  availability,
 		})
 	}
 
