@@ -2,7 +2,6 @@ package services
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -40,12 +39,12 @@ func AdaptEVMProbeEvidence(result networktarget.EVMProbeResult, observedAt time.
 		return NetworkProbeIntelligenceProjection{}, errors.New("EVM subject classification mismatch")
 	}
 	attributes := map[string]any{
-		"chain_id":             strings.ToLower(strings.TrimSpace(result.ChainID)),
-		"expected_chain_id":    expectedChainID,
-		"contract_code_state":  result.ContractCodeState,
-		"evidence_scope":       "read_only_network_probe",
-		"analysis_performed":   true,
-		"live_availability":    "checked",
+		"chain_id":            strings.ToLower(strings.TrimSpace(result.ChainID)),
+		"expected_chain_id":   expectedChainID,
+		"contract_code_state": result.ContractCodeState,
+		"evidence_scope":      "read_only_network_probe",
+		"analysis_performed":  true,
+		"live_availability":   "checked",
 	}
 	if hash := strings.ToLower(strings.TrimSpace(result.ContractCodeHash)); hash != "" {
 		attributes["contract_code_sha256"] = hash
@@ -81,15 +80,15 @@ func AdaptBitcoinProbeEvidence(result networktarget.BitcoinProbeResult, observed
 		return NetworkProbeIntelligenceProjection{}, errors.New("Bitcoin subject classification mismatch")
 	}
 	attributes := map[string]any{
-		"genesis_hash":          expectedGenesis,
-		"activity_state":        result.ActivityState,
-		"confirmed_tx_count":    result.ConfirmedTXCount,
-		"mempool_tx_count":      result.MempoolTXCount,
-		"funded_sats":           result.FundedSats,
-		"spent_sats":            result.SpentSats,
-		"evidence_scope":        "read_only_network_probe",
-		"analysis_performed":    true,
-		"live_availability":     "checked",
+		"genesis_hash":       expectedGenesis,
+		"activity_state":     result.ActivityState,
+		"confirmed_tx_count": result.ConfirmedTXCount,
+		"mempool_tx_count":   result.MempoolTXCount,
+		"funded_sats":        result.FundedSats,
+		"spent_sats":         result.SpentSats,
+		"evidence_scope":     "read_only_network_probe",
+		"analysis_performed": true,
+		"live_availability":  "checked",
 	}
 	evidence := buildNetworkProbeEvidence(subject, "bitcoin_esplora_probe", "address_activity", result.ActivityState, observedAt, attributes)
 	return NetworkProbeIntelligenceProjection{Subject: subject, Evidence: evidence}, nil
@@ -120,8 +119,4 @@ func buildNetworkProbeEvidence(subject IntelligenceSubject, source, method, stat
 		Confidence:  0.8,
 		Attributes:  attributes,
 	}
-}
-
-func networkProbeProjectionSummary(projection NetworkProbeIntelligenceProjection) string {
-	return fmt.Sprintf("%s:%s:%s", projection.Subject.ChainFamily, projection.Evidence.Source, projection.Evidence.Status)
 }
