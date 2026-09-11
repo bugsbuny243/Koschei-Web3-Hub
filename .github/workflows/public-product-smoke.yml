@@ -206,8 +206,18 @@ jobs:
               echo "PR_PRODUCT_FAILURE: /api/public/cases returned HTTP ${cases_code} or an invalid success contract." >&2
               exit 45
             fi
-            expect_200 feed_api /api/public/soc/feed '"ok":true'
-            echo 'PR_PRODUCT_HEALTHY: production transport/pages/SOC API are reachable; registry readiness is observed on PRs and enforced strictly post-deploy.'
+
+            feed_code="$(probe feed_api '/api/public/soc/feed')"
+            echo "feed_api_code=${feed_code}" | tee -a diagnostics/result.txt
+            if [ "${feed_code}" = "200" ] && grep -Fq '"ok":true' diagnostics/feed_api.body; then
+              echo 'PR_PRODUCTION_SOC_OBSERVED: production SOC feed transport and contract are healthy.' | tee -a diagnostics/result.txt
+            elif [ "${feed_code}" = "503" ]; then
+              echo 'PR_PRODUCTION_SOC_BLOCKED: production SOC feed returned HTTP 503; DB-backed readiness remains enforced after deployment.' | tee -a diagnostics/result.txt
+            else
+              echo "PR_PRODUCT_FAILURE: /api/public/soc/feed returned HTTP ${feed_code} or an invalid success contract." >&2
+              exit 46
+            fi
+            echo 'PR_PRODUCT_HEALTHY: production pages are reachable; DB-backed registry/SOC readiness is observed on PRs and enforced strictly post-deploy.'
           else
             wait_expect_200 cases_api '/api/public/cases?limit=100' '"ok":true' 12
             wait_expect_200 feed_api /api/public/soc/feed '"ok":true' 12
