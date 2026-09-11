@@ -118,10 +118,18 @@ func AdaptSignedAgentIdentityDelegationEvidenceV1(event securityevidence.Event, 
 	}, nil
 }
 
-// BindAgentIdentityDelegationEvidenceV1 fills only the identity/delegation
-// stages of an existing evidence trace. It cannot manufacture authorization,
-// enforcement, execution or effect evidence, and it rejects intent mismatch.
-func BindAgentIdentityDelegationEvidenceV1(trace AgentExecutionEvidenceTrace, projection AgentIdentityDelegationEvidenceProjectionV1) (AgentExecutionEvidenceTrace, error) {
+// BindSignedAgentIdentityDelegationEvidenceV1 authenticates the signed event at
+// the binding boundary and then fills only identity/delegation stages. A caller
+// cannot pass a hand-built projection to upgrade trace completeness.
+func BindSignedAgentIdentityDelegationEvidenceV1(trace AgentExecutionEvidenceTrace, event securityevidence.Event, binding AgentIdentityDelegationEvidenceBindingV1) (AgentExecutionEvidenceTrace, error) {
+	projection, err := AdaptSignedAgentIdentityDelegationEvidenceV1(event, binding)
+	if err != nil {
+		return AgentExecutionEvidenceTrace{}, err
+	}
+	return bindAgentIdentityDelegationProjectionV1(trace, projection)
+}
+
+func bindAgentIdentityDelegationProjectionV1(trace AgentExecutionEvidenceTrace, projection AgentIdentityDelegationEvidenceProjectionV1) (AgentExecutionEvidenceTrace, error) {
 	if trace.ContractVersion != "" && trace.ContractVersion != AgentExecutionEvidenceContractVersion {
 		return AgentExecutionEvidenceTrace{}, errors.New("unsupported agent execution evidence contract version")
 	}
@@ -130,8 +138,14 @@ func BindAgentIdentityDelegationEvidenceV1(trace AgentExecutionEvidenceTrace, pr
 	if actorSubjectID == "" || intentRef == "" {
 		return AgentExecutionEvidenceTrace{}, errors.New("authenticated actor subject and intent binding are required")
 	}
-	if existingIntent := normalizeAgentSHA256(trace.IntentRef); existingIntent != "" && existingIntent != intentRef {
-		return AgentExecutionEvidenceTrace{}, errors.New("agent identity/delegation intent does not match execution trace intent")
+	if strings.TrimSpace(trace.IntentRef) != "" {
+		existingIntent := normalizeAgentSHA256(trace.IntentRef)
+		if existingIntent == "" {
+			return AgentExecutionEvidenceTrace{}, errors.New("execution trace intent is not a valid sha256 binding")
+		}
+		if existingIntent != intentRef {
+			return AgentExecutionEvidenceTrace{}, errors.New("agent identity/delegation intent does not match execution trace intent")
+		}
 	}
 
 	stages := append([]AgentExecutionStageEvidence(nil), trace.Stages...)
