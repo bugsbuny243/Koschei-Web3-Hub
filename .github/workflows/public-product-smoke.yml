@@ -184,11 +184,11 @@ jobs:
             done
           fi
 
-          wait_expect_200 cases_api '/api/public/cases?limit=100' '"ok":true' 12
-          wait_expect_200 feed_api /api/public/soc/feed '"ok":true' 12
-
           if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            node - <<'NODE' | tee -a diagnostics/result.txt
+            cases_code="$(probe cases_api '/api/public/cases?limit=100')"
+            echo "cases_api_code=${cases_code}" | tee -a diagnostics/result.txt
+            if [ "${cases_code}" = "200" ] && grep -Fq '"ok":true' diagnostics/cases_api.body; then
+              node - <<'NODE' | tee -a diagnostics/result.txt
           const fs = require('fs');
           const payload = JSON.parse(fs.readFileSync('diagnostics/cases_api.body', 'utf8'));
           const summary = {
@@ -200,8 +200,28 @@ jobs:
           };
           process.stdout.write(`PR_PRODUCTION_REGISTRY_OBSERVED=${JSON.stringify(summary)}\n`);
           NODE
-            echo 'PR_PRODUCT_HEALTHY: production transport/pages/APIs are reachable; branch registry semantics passed local decision tests and are enforced post-deploy.'
+            elif [ "${cases_code}" = "503" ]; then
+              echo 'PR_PRODUCTION_REGISTRY_BLOCKED: production registry returned HTTP 503; branch registry decision tests passed and strict readiness remains enforced after deployment.' | tee -a diagnostics/result.txt
+            else
+              echo "PR_PRODUCT_FAILURE: /api/public/cases returned HTTP ${cases_code} or an invalid success contract." >&2
+              exit 45
+            fi
+
+            feed_code="$(probe feed_api '/api/public/soc/feed')"
+            echo "feed_api_code=${feed_code}" | tee -a diagnostics/result.txt
+            if [ "${feed_code}" = "200" ] && grep -Fq '"ok":true' diagnostics/feed_api.body; then
+              echo 'PR_PRODUCTION_SOC_OBSERVED: production SOC feed transport and contract are healthy.' | tee -a diagnostics/result.txt
+            elif [ "${feed_code}" = "503" ]; then
+              echo 'PR_PRODUCTION_SOC_BLOCKED: production SOC feed returned HTTP 503; DB-backed readiness remains enforced after deployment.' | tee -a diagnostics/result.txt
+            else
+              echo "PR_PRODUCT_FAILURE: /api/public/soc/feed returned HTTP ${feed_code} or an invalid success contract." >&2
+              exit 46
+            fi
+            echo 'PR_PRODUCT_HEALTHY: production pages are reachable; DB-backed registry/SOC readiness is observed on PRs and enforced strictly post-deploy.'
           else
+            wait_expect_200 cases_api '/api/public/cases?limit=100' '"ok":true' 12
+            wait_expect_200 feed_api /api/public/soc/feed '"ok":true' 12
+
             if ! node koschei/api/scripts/verify-public-registry-smoke-response.js \
               diagnostics/cases_api.body > diagnostics/public-registry-smoke.json; then
               echo 'PUBLIC_CASE_REGISTRY_FAILURE: deployed registry is not complete, operational and verifiable.' >&2

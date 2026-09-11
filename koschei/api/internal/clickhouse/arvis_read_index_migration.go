@@ -49,7 +49,7 @@ func validateTrustedARVISReadIndexMigration(migrationSQL string) error {
 		return fmt.Errorf("ClickHouse ARVIS read-index migration exceeds %d byte safety limit", maxTrustedMigrationBytes)
 	}
 	allowedTables := map[string]bool{
-		"koschei_web3.arvis_verdict_snapshots":       true,
+		"koschei_web3.arvis_verdict_snapshots":      true,
 		"koschei_web3.security_radar_stream_events": true,
 	}
 	seen := 0

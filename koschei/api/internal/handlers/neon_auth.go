@@ -78,11 +78,11 @@ func (e neonJWTVerificationError) Error() string {
 func (e neonJWTVerificationError) Unwrap() error { return e.Cause }
 
 var (
-	jwksCache            map[string]neonJWK
-	jwksCacheExpiresAt   time.Time
-	jwksNegativeCache    = map[string]time.Time{}
-	jwksMu               sync.RWMutex
-	jwksRefreshMu        sync.Mutex
+	jwksCache          map[string]neonJWK
+	jwksCacheExpiresAt time.Time
+	jwksNegativeCache  = map[string]time.Time{}
+	jwksMu             sync.RWMutex
+	jwksRefreshMu      sync.Mutex
 )
 
 func extractAuthToken(resp *http.Response, body []byte) (string, bool) {
