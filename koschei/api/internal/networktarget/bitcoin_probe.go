@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	bitcoinProbeResponseLimit   = 256 * 1024
-	bitcoinMainnetGenesisHash   = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+	bitcoinProbeResponseLimit = 256 * 1024
+	bitcoinMainnetGenesisHash = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
 )
 
 type bitcoinAddressStats struct {
@@ -53,6 +53,15 @@ func ProbeBitcoin(ctx context.Context, client *http.Client, endpoint string, res
 	if resolution.Network.ID != "bitcoin-mainnet" || resolution.Network.Family != "utxo" || !resolution.SyntaxValid {
 		return BitcoinProbeResult{}, fmt.Errorf("bitcoin_probe_unsupported_target")
 	}
+	canonicalPrefix := resolution.Network.ID + ":"
+	if !strings.HasPrefix(resolution.CanonicalRef, canonicalPrefix) {
+		return BitcoinProbeResult{}, fmt.Errorf("bitcoin_probe_canonical_ref_invalid")
+	}
+	canonicalAddress := strings.TrimPrefix(resolution.CanonicalRef, canonicalPrefix)
+	if canonicalAddress == "" {
+		return BitcoinProbeResult{}, fmt.Errorf("bitcoin_probe_canonical_ref_invalid")
+	}
+
 	baseURL, err := validateBitcoinEsploraEndpoint(endpoint)
 	if err != nil {
 		return BitcoinProbeResult{}, err
@@ -71,10 +80,10 @@ func ProbeBitcoin(ctx context.Context, client *http.Client, endpoint string, res
 	}
 
 	var address bitcoinAddressResponse
-	if err := bitcoinEsploraJSON(ctx, client, baseURL+"/address/"+url.PathEscape(resolution.Address), &address); err != nil {
+	if err := bitcoinEsploraJSON(ctx, client, baseURL+"/address/"+url.PathEscape(canonicalAddress), &address); err != nil {
 		return BitcoinProbeResult{}, fmt.Errorf("bitcoin_address_activity_unavailable: %w", err)
 	}
-	if strings.TrimSpace(address.Address) != "" && address.Address != resolution.Address {
+	if strings.TrimSpace(address.Address) != "" && address.Address != canonicalAddress {
 		return BitcoinProbeResult{}, fmt.Errorf("bitcoin_address_response_mismatch")
 	}
 	if !validBitcoinStats(address.ChainStats) || !validBitcoinStats(address.MempoolStats) {
