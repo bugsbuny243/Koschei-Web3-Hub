@@ -56,12 +56,8 @@ func TestAdaptSignedAgentIdentityDelegationEvidenceV1RejectsUnsignedEvent(t *tes
 	}
 }
 
-func TestBindAgentIdentityDelegationEvidenceV1DoesNotCreateLaterStageEvidence(t *testing.T) {
+func TestBindSignedAgentIdentityDelegationEvidenceV1DoesNotCreateLaterStageEvidence(t *testing.T) {
 	event, binding := signedAgentIdentityDelegationFixture(t)
-	projection, err := AdaptSignedAgentIdentityDelegationEvidenceV1(event, binding)
-	if err != nil {
-		t.Fatal(err)
-	}
 	trace := BuildAgentExecutionEvidenceTrace(
 		"",
 		binding.IntentSHA256,
@@ -78,7 +74,7 @@ func TestBindAgentIdentityDelegationEvidenceV1DoesNotCreateLaterStageEvidence(t 
 		}},
 		time.Unix(1_789_000_000, 0).UTC(),
 	)
-	bound, err := BindAgentIdentityDelegationEvidenceV1(trace, projection)
+	bound, err := BindSignedAgentIdentityDelegationEvidenceV1(trace, event, binding)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,15 +94,29 @@ func TestBindAgentIdentityDelegationEvidenceV1DoesNotCreateLaterStageEvidence(t 
 	}
 }
 
-func TestBindAgentIdentityDelegationEvidenceV1RejectsIntentMismatch(t *testing.T) {
+func TestBindSignedAgentIdentityDelegationEvidenceV1RejectsIntentMismatch(t *testing.T) {
 	event, binding := signedAgentIdentityDelegationFixture(t)
-	projection, err := AdaptSignedAgentIdentityDelegationEvidenceV1(event, binding)
-	if err != nil {
-		t.Fatal(err)
-	}
 	trace := BuildAgentExecutionEvidenceTrace("", strings.Repeat("e", 64), AgentIndependentObservationUnavailable, "", "", nil, time.Now().UTC())
-	if _, err := BindAgentIdentityDelegationEvidenceV1(trace, projection); err == nil {
+	if _, err := BindSignedAgentIdentityDelegationEvidenceV1(trace, event, binding); err == nil {
 		t.Fatal("identity/delegation evidence bound to a different execution intent")
+	}
+}
+
+func TestBindSignedAgentIdentityDelegationEvidenceV1RejectsInvalidExistingIntent(t *testing.T) {
+	event, binding := signedAgentIdentityDelegationFixture(t)
+	trace := BuildAgentExecutionEvidenceTrace("", "", AgentIndependentObservationUnavailable, "", "", nil, time.Now().UTC())
+	trace.IntentRef = "not-a-sha256"
+	if _, err := BindSignedAgentIdentityDelegationEvidenceV1(trace, event, binding); err == nil {
+		t.Fatal("agent evidence replaced an invalid existing trace intent")
+	}
+}
+
+func TestBindSignedAgentIdentityDelegationEvidenceV1RejectsTamperedEvent(t *testing.T) {
+	event, binding := signedAgentIdentityDelegationFixture(t)
+	event.Subject.ID = "agent-b"
+	trace := BuildAgentExecutionEvidenceTrace("", binding.IntentSHA256, AgentIndependentObservationUnavailable, "", "", nil, time.Now().UTC())
+	if _, err := BindSignedAgentIdentityDelegationEvidenceV1(trace, event, binding); err == nil {
+		t.Fatal("tampered signed event was accepted at bind boundary")
 	}
 }
 
