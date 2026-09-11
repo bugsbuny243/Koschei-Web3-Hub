@@ -9,6 +9,13 @@ import (
 )
 
 func registerDefenseOSRoutes(mux *http.ServeMux, h *handlers.Handler) {
+	// Agent execution evidence is a runtime product surface, not an optional
+	// Defense OS laboratory feature. Keep it behind the same developer API key,
+	// Professional entitlement, rate-limit and DB readiness gates as the other
+	// paid developer APIs.
+	agentEvidence := h.APIKeyAuth(h.RequireAPIKeyPlanTier("professional", h.APIRateLimit(method("POST", h.DefenseValidationAgentExecutionEvidenceV1))))
+	mux.HandleFunc("/api/v1/agent-execution/evidence", requiresDB(h, agentEvidence))
+
 	// Live-system integrity, persistent actor memory and provider witness memory
 	// are owner control-plane surfaces, not optional Defense OS laboratory features.
 	mux.HandleFunc("/api/owner/radar/continuity", requiresDB(h, ownerOnly(h, method("GET", h.OwnerRadarContinuity))))
