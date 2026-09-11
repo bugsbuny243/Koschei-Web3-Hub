@@ -10,12 +10,21 @@ import (
 	"time"
 
 	"koschei/api/internal/networktarget"
+	"koschei/api/internal/services"
 )
+
+const networkProbeIntelligenceSchemaVersion = "koschei-network-probe-intelligence-v1"
 
 type networkDeploymentState struct {
 	NetworkID        string `json:"network_id"`
 	CollectorRuntime string `json:"collector_runtime"`
 	LiveAvailability string `json:"live_availability"`
+}
+
+type networkProbeIntelligenceEnvelope struct {
+	SchemaVersion string                                      `json:"schema_version"`
+	Probe         any                                         `json:"probe"`
+	Intelligence  services.NetworkProbeIntelligenceProjection `json:"intelligence"`
 }
 
 func evmRPCEnvName(networkID string) (string, bool) {
@@ -74,11 +83,16 @@ func networkDeploymentCatalog() []networkDeploymentState {
 }
 
 func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
+	networkTargetProbeWithClient(w, r, nil)
+}
+
+func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client *http.Client) {
 	networkTargetRequests.Add(1)
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 	defer r.Body.Close()
 	mediaType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
-	isForm := mediaType == "application/x-www-form-urlencoded"
+	withIntelligence := r.URL.Path == "/fabric/networks/probe/intelligence"
+	isForm := mediaType == "application/x-www-form-urlencoded" && !withIntelligence
 
 	reject := func(status int, message, availability string) {
 		networkTargetRejected.Add(1)
@@ -107,7 +121,7 @@ func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
 		request.Address = r.PostForm.Get("address")
 	} else {
 		if mediaType != "application/json" {
-			reject(http.StatusUnsupportedMediaType, "json_or_form_required", "not_checked")
+			reject(http.StatusUnsupportedMediaType, "json_required", "not_checked")
 			return
 		}
 		var err error
@@ -127,6 +141,16 @@ func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
+	writeIntelligence := func(probe any, projection services.NetworkProbeIntelligenceProjection) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(networkProbeIntelligenceEnvelope{
+			SchemaVersion: networkProbeIntelligenceSchemaVersion,
+			Probe:         probe,
+			Intelligence:  projection,
+		})
+	}
+
 	switch resolution.Network.Family {
 	case "evm":
 		endpoint := configuredEVMRPCEndpoint(resolution.Network.ID)
@@ -134,9 +158,18 @@ func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
 			reject(http.StatusServiceUnavailable, "evm_rpc_configuration_required", "configuration_required")
 			return
 		}
-		result, err := networktarget.ProbeEVM(ctx, nil, endpoint, resolution)
+		result, err := networktarget.ProbeEVM(ctx, client, endpoint, resolution)
 		if err != nil {
 			reject(http.StatusBadGateway, err.Error(), "unavailable")
+			return
+		}
+		if withIntelligence {
+			projection, projectionErr := services.AdaptEVMProbeEvidence(result, time.Now().UTC())
+			if projectionErr != nil {
+				reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
+				return
+			}
+			writeIntelligence(result, projection)
 			return
 		}
 		if isForm {
@@ -160,9 +193,18 @@ func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
 			reject(http.StatusServiceUnavailable, "bitcoin_esplora_configuration_required", "configuration_required")
 			return
 		}
-		result, err := networktarget.ProbeBitcoin(ctx, nil, endpoint, resolution)
+		result, err := networktarget.ProbeBitcoin(ctx, client, endpoint, resolution)
 		if err != nil {
 			reject(http.StatusBadGateway, err.Error(), "unavailable")
+			return
+		}
+		if withIntelligence {
+			projection, projectionErr := services.AdaptBitcoinProbeEvidence(result, time.Now().UTC())
+			if projectionErr != nil {
+				reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
+				return
+			}
+			writeIntelligence(result, projection)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
