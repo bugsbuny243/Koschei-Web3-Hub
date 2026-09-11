@@ -207,23 +207,37 @@ func TestSensitiveRateLimitMiddlewareSharesLimitAndHeaders(t *testing.T) {
 	}
 }
 
-func TestSensitiveRateLimitFailsClosedWithoutDatabase(t *testing.T) {
+func TestSensitiveRateLimitUsesBoundedMemoryWithoutDatabase(t *testing.T) {
 	setSecurityAuditDB(nil)
-	called := false
+	resetSensitiveMemoryLimitTestState()
+	called := 0
 	handler := sensitiveRateLimit(nil, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
+		called++
 		w.WriteHeader(http.StatusNoContent)
 	}))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "https://tradepigloball.co/api/auth/login", nil))
-	if recorder.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want fail-closed %d", recorder.Code, http.StatusServiceUnavailable)
+
+	for index := 1; index <= 11; index++ {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "https://tradepigloball.co/api/auth/login", nil)
+		request.RemoteAddr = "203.0.113.42:43123"
+		handler.ServeHTTP(recorder, request)
+		if recorder.Header().Get("RateLimit-Limit") != "10" || recorder.Header().Get("RateLimit-Reset") == "" {
+			t.Fatalf("request %d missing bounded-memory rate limit headers: %#v", index, recorder.Header())
+		}
+		if index <= 10 && recorder.Code != http.StatusNoContent {
+			t.Fatalf("request %d status=%d want %d", index, recorder.Code, http.StatusNoContent)
+		}
+		if index == 11 {
+			if recorder.Code != http.StatusTooManyRequests {
+				t.Fatalf("eleventh request status=%d want %d", recorder.Code, http.StatusTooManyRequests)
+			}
+			if recorder.Header().Get("Retry-After") == "" || recorder.Header().Get("RateLimit-Remaining") != "0" {
+				t.Fatalf("bounded-memory denial missing retry headers: %#v", recorder.Header())
+			}
+		}
 	}
-	if called {
-		t.Fatal("sensitive downstream handler ran without the shared rate limit database")
-	}
-	if recorder.Header().Get("Retry-After") != "1" {
-		t.Fatalf("Retry-After = %q, want 1", recorder.Header().Get("Retry-After"))
+	if called != 10 {
+		t.Fatalf("bounded-memory downstream calls=%d want 10", called)
 	}
 }
 
