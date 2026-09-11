@@ -389,6 +389,7 @@ func matchesAudience(v any, target string) bool {
 			if s, ok := it.(string); ok && s == target {
 				return true
 			}
+		}
 	}
 	return false
 }
