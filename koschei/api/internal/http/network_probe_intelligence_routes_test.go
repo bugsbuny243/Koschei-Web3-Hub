@@ -112,3 +112,27 @@ func TestExistingNetworkProbeResponseContractStaysFlat(t *testing.T) {
 		t.Fatalf("legacy probe evidence changed: %#v", payload)
 	}
 }
+
+func TestNetworkProbeIntelligenceRouteIsMountedAndFailsClosedWithoutRPC(t *testing.T) {
+	t.Setenv("ETHEREUM_RPC_URL", "")
+	request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe/intelligence", strings.NewReader(`{"network":"ethereum-mainnet","address":"0x1111111111111111111111111111111111111111"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	MountFabric(http.NotFoundHandler()).ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("route not mounted or did not fail closed: status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"error":"evm_rpc_configuration_required"`) {
+		t.Fatalf("unexpected response: %s", response.Body.String())
+	}
+}
+
+func TestLegacyProbeKeepsJsonOrFormMediaTypeError(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe", strings.NewReader("network=ethereum-mainnet"))
+	request.Header.Set("Content-Type", "text/plain")
+	response := httptest.NewRecorder()
+	networkTargetProbe(response, request)
+	if response.Code != http.StatusUnsupportedMediaType || !strings.Contains(response.Body.String(), `"error":"json_or_form_required"`) {
+		t.Fatalf("legacy media-type contract changed: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
