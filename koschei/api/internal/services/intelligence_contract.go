@@ -233,11 +233,16 @@ func isSyntacticSolanaAddress(value string) bool {
 }
 
 func intelligenceCanonicalRef(family, chain, network, target string) string {
+	family = strings.ToLower(strings.TrimSpace(family))
+	canonicalTarget := strings.TrimSpace(target)
+	if family == IntelligenceChainFamilyEVM {
+		canonicalTarget = strings.ToLower(canonicalTarget)
+	}
 	return strings.Join([]string{
-		strings.ToLower(strings.TrimSpace(family)),
+		family,
 		strings.ToLower(strings.TrimSpace(chain)),
 		strings.ToLower(strings.TrimSpace(network)),
-		strings.TrimSpace(target),
+		canonicalTarget,
 	}, ":")
 }
 
