@@ -137,7 +137,8 @@ func unifiedSignedEvidenceChainFamily(chain string) string {
 	switch {
 	case chain == "solana", strings.HasPrefix(chain, "solana:"):
 		return IntelligenceChainFamilySolana
-	case chain == "bitcoin", chain == "btc", strings.HasPrefix(chain, "bitcoin:"):
+	case chain == "bitcoin", chain == "btc", chain == "utxo",
+		strings.HasPrefix(chain, "bitcoin:"), strings.HasPrefix(chain, "bip122:"):
 		return IntelligenceChainFamilyUTXO
 	case chain == "evm", strings.HasPrefix(chain, "eip155:"),
 		chain == "ethereum", chain == "base", chain == "arbitrum", chain == "optimism",
