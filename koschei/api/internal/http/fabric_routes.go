@@ -93,6 +93,9 @@ func currentFabricSnapshot() fabricSnapshot {
 
 func registerFabricRoutes(mux *http.ServeMux) {
 	registerNetworkTargetRoutes(mux)
+	mux.HandleFunc("/fabric/networks/live", method(http.MethodGet, networkProbePage))
+	mux.HandleFunc("/fabric/networks/deployment", method(http.MethodGet, networkDeploymentCatalogHandler))
+	mux.HandleFunc("/fabric/networks/probe", method(http.MethodPost, networkTargetProbe))
 	// Fabric is still experimental. Keep its capability contract outside /api/*
 	// until it is deliberately promoted into the production OpenAPI contract.
 	mux.HandleFunc("/fabric/capabilities", method(http.MethodGet, fabricCapabilities))
@@ -112,7 +115,7 @@ func MountFabric(base http.Handler) http.Handler {
 	fabric := securityHeaders(fabricMux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/fabric", "/fabric/capabilities", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/resolve":
+		case "/fabric", "/fabric/capabilities", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe":
 			fabric.ServeHTTP(w, r)
 		default:
 			base.ServeHTTP(w, r)
@@ -131,7 +134,7 @@ var fabricPage = template.Must(template.New("fabric").Parse(`<!doctype html>
 <title>Koschei Fabric</title><style>
 body{font-family:system-ui,sans-serif;background:#080b12;color:#eef2ff;margin:0;padding:32px;max-width:1180px;margin-inline:auto}h1{font-size:3rem;margin:.2em 0}.muted{color:#a5afc8}.rules{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}.pill,.card{border:1px solid #2a3554;background:#101725}.pill{border-radius:999px;padding:7px 11px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}.card{border-radius:18px;padding:18px}.cap{border-top:1px solid #2a3554;margin-top:12px;padding-top:12px}.cap strong{display:block}.evidence{font-weight:700}.work{display:block;margin-top:5px;font-size:.8rem}.section{margin-top:30px}.package{padding:12px 0;border-top:1px solid #2a3554}.package:first-child{border-top:0}.package b{margin-right:8px}
 </style></head><body>
-<nav><a href="/fabric/networks">Network coverage</a></nav>
+<nav><a href="/fabric/networks">Network coverage</a> · <a href="/fabric/networks/live">Live EVM evidence</a></nav>
 <p class="muted">KOSCHEI UNIFIED CONTROL PLANE · EXPERIMENTAL</p><h1>Koschei Fabric</h1>
 <p class="muted">Koschei Web3, Koschei Lang and Koschei Sentinel are joined through explicit contracts. Existing production behavior stays intact; evidence maturity is shown separately so research or partial work is never presented as completed security acceptance.</p>
 <div class="rules"><span class="pill">workspace: {{.Workspace}}</span><span class="pill">mode: {{.IntegrationMode}}</span><span class="pill">preserve existing: {{.PreserveExisting}}</span><span class="pill">acceptance cases: {{.AcceptanceCaseCount}}</span><span class="pill">envelope: {{.SharedEnvelopeSchema}}</span></div>
