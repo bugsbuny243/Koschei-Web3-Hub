@@ -65,7 +65,7 @@ func currentFabricSnapshot() fabricSnapshot {
 			{ID: "A", Name: "status-record-correction", State: "in-progress", WorkPackages: []string{"CORE-02"}},
 			{ID: "B", Name: "working-web3-foundation", State: "blocked", WorkPackages: []string{"CORE-01", "CORE-02", "CORE-03"}},
 			{ID: "C", Name: "shared-data-boundary", State: "in-progress", WorkPackages: []string{"CORE-04", "MODEL-01", "DATA-01"}},
-			{ID: "D", Name: "lang-execution-proof", State: "planned", WorkPackages: []string{"LANG-01", "LANG-02", "SUPPLY-02"}},
+			{ID: "D", Name: "lang-execution-proof", State: "planned", WorkPackages: []string{"LANG-01", "LANG-02", "LANG-03", "LANG-04", "SUPPLY-02"}},
 			{ID: "E", Name: "model-evaluation-foundation", State: "planned", WorkPackages: []string{"MODEL-02", "MODEL-03", "MODEL-04"}},
 			{ID: "F", Name: "first-common-security-experiment", State: "planned", WorkPackages: []string{"SIGN-01", "AGENT-02", "AGENT-04", "LANG-04", "OPS-01"}},
 			{ID: "G", Name: "identity-and-data-expansion", State: "planned", WorkPackages: []string{"ID-01", "ID-02", "ID-03", "ID-04", "DATA-02", "DATA-03", "DATA-04", "AGENT-01", "AGENT-03"}},
@@ -96,6 +96,7 @@ func registerFabricRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/fabric/networks/live", method(http.MethodGet, networkProbePage))
 	mux.HandleFunc("/fabric/networks/deployment", method(http.MethodGet, networkDeploymentCatalogHandler))
 	mux.HandleFunc("/fabric/networks/probe", method(http.MethodPost, networkTargetProbe))
+	mux.HandleFunc("/fabric/networks/probe/intelligence", method(http.MethodPost, networkTargetProbe))
 	// Fabric is still experimental. Keep its capability contract outside /api/*
 	// until it is deliberately promoted into the production OpenAPI contract.
 	mux.HandleFunc("/fabric/capabilities", method(http.MethodGet, fabricCapabilities))
@@ -115,7 +116,7 @@ func MountFabric(base http.Handler) http.Handler {
 	fabric := securityHeaders(fabricMux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/fabric", "/fabric/capabilities", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe":
+		case "/fabric", "/fabric/capabilities", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe", "/fabric/networks/probe/intelligence":
 			fabric.ServeHTTP(w, r)
 		default:
 			base.ServeHTTP(w, r)
