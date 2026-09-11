@@ -39,13 +39,23 @@ func main() {
 	appCtx, stopApp := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopApp()
 
-	// Architecture boundary: Koschei Web3 remains stateless with respect to
-	// blockchain/radar/evidence application data. This process never reads the
-	// legacy DATABASE_URL and never starts database-backed radar, telemetry, job,
-	// alert or webhook workers. A separate entitlement ledger may be connected
-	// only for server-side paid-access and output-quota enforcement.
-	const dbInitError = "application persistence disabled by architecture"
-	log.Printf("stateless Web3 runtime enabled: application PostgreSQL persistence is not part of this process")
+	// The Web3 runtime remains stateless by default. Durable application
+	// persistence is opt-in through APP_DATABASE_URL so deployments that need
+	// account history, watchlists, jobs, webhooks and owner DB-backed operations
+	// can restore those capabilities without silently reusing legacy DATABASE_URL.
+	appDB, appReadDB, dbInitError, err := buildApplicationStores()
+	if err != nil {
+		log.Fatalf("CRITICAL: configured application persistence is unavailable: %v", err)
+	}
+	if appDB != nil {
+		defer appDB.Close()
+		if appReadDB != nil && appReadDB != appDB {
+			defer appReadDB.Close()
+		}
+		log.Printf("application persistence connected: DB-backed customer and owner capabilities available")
+	} else {
+		log.Printf("stateless Web3 runtime enabled: APP_DATABASE_URL is not set")
+	}
 
 	entitlementDB, err := buildEntitlementStore()
 	if err != nil {
@@ -66,7 +76,7 @@ func main() {
 		web3.RPCProviderHost(web3.SolanaRPCFallbackURL("solana-mainnet")),
 	)
 
-	jobStore := jobs.NewStore(nil)
+	jobStore := jobs.NewStore(appDB)
 	jobQueue := jobs.Queue(jobs.NoopQueue{})
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
 		jobQueue = jobs.NewNATSQueue(natsURL, os.Getenv("NATS_SUBJECT_PREFIX"))
@@ -83,12 +93,12 @@ func main() {
 	staticDir := resolveStaticDir(os.Getenv("STATIC_DIR"))
 	log.Printf("static public path: %s", staticDir)
 	handler := englishPublicHTML(apihttp.MountFabric(apihttp.NewServer(
-		nil,
+		appDB,
 		dbInitError,
 		os.Getenv("ADMIN_PASSWORD"),
 		firstEnv("CORS_ORIGIN", "CORS_ALLOWED_ORIGIN"),
 		staticDir,
-		apihttp.WithReadDB(nil),
+		apihttp.WithReadDB(appReadDB),
 		apihttp.WithEntitlementDB(entitlementDB),
 		apihttp.WithCache(appCache),
 		apihttp.WithSolanaRPC(solanaRPC),
@@ -125,6 +135,29 @@ func main() {
 			log.Printf("http server shutdown deadline reached")
 		}
 	}
+}
+
+func buildApplicationStores() (*sql.DB, *sql.DB, string, error) {
+	writeURL := strings.TrimSpace(os.Getenv("APP_DATABASE_URL"))
+	if writeURL == "" {
+		return nil, nil, "application persistence disabled: APP_DATABASE_URL is not configured", nil
+	}
+
+	writeDB, err := appdb.Connect(writeURL)
+	if err != nil {
+		return nil, nil, "application persistence unavailable", err
+	}
+
+	readURL := strings.TrimSpace(os.Getenv("APP_DATABASE_READ_URL"))
+	if readURL == "" || readURL == writeURL {
+		return writeDB, writeDB, "", nil
+	}
+	readDB, err := appdb.ConnectReplica(readURL)
+	if err != nil {
+		_ = writeDB.Close()
+		return nil, nil, "application read persistence unavailable", err
+	}
+	return writeDB, readDB, "", nil
 }
 
 func buildEntitlementStore() (*sql.DB, error) {
