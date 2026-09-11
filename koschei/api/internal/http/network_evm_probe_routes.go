@@ -10,12 +10,23 @@ import (
 	"time"
 
 	"koschei/api/internal/networktarget"
+	"koschei/api/internal/services"
 )
 
 type networkDeploymentState struct {
 	NetworkID        string `json:"network_id"`
 	CollectorRuntime string `json:"collector_runtime"`
 	LiveAvailability string `json:"live_availability"`
+}
+
+type evmNetworkProbeResponse struct {
+	networktarget.EVMProbeResult
+	Intelligence services.NetworkProbeIntelligenceProjection `json:"intelligence"`
+}
+
+type bitcoinNetworkProbeResponse struct {
+	networktarget.BitcoinProbeResult
+	Intelligence services.NetworkProbeIntelligenceProjection `json:"intelligence"`
 }
 
 func evmRPCEnvName(networkID string) (string, bool) {
@@ -96,6 +107,19 @@ func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
 			"live_availability":  availability,
 		})
 	}
+	rejectProjection := func() {
+		networkTargetRejected.Add(1)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"error":               "intelligence_projection_failed",
+			"analysis_performed":  true,
+			"evidence_status":     "observed",
+			"live_availability":   "checked",
+			"intelligence_status": "unavailable",
+		})
+	}
 
 	var request networkTargetRequest
 	if isForm {
@@ -143,9 +167,14 @@ func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
 			renderNetworkProbeResult(w, http.StatusOK, &result, "")
 			return
 		}
+		projection, err := services.AdaptEVMProbeEvidence(result, time.Now().UTC())
+		if err != nil {
+			rejectProjection()
+			return
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(result)
+		_ = json.NewEncoder(w).Encode(evmNetworkProbeResponse{EVMProbeResult: result, Intelligence: projection})
 	case "utxo":
 		if resolution.Network.ID != "bitcoin-mainnet" {
 			reject(http.StatusUnprocessableEntity, "live_probe_not_supported_for_network", "not_available")
@@ -165,9 +194,14 @@ func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
 			reject(http.StatusBadGateway, err.Error(), "unavailable")
 			return
 		}
+		projection, err := services.AdaptBitcoinProbeEvidence(result, time.Now().UTC())
+		if err != nil {
+			rejectProjection()
+			return
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(result)
+		_ = json.NewEncoder(w).Encode(bitcoinNetworkProbeResponse{BitcoinProbeResult: result, Intelligence: projection})
 	default:
 		reject(http.StatusUnprocessableEntity, "live_probe_not_supported_for_network", "not_available")
 	}
