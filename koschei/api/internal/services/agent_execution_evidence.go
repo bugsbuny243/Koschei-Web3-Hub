@@ -33,8 +33,9 @@ var requiredAgentExecutionStages = []string{
 }
 
 // AgentExecutionStageEvidence keeps each step in the agent security chain
-// independently evidence-bound. A verified authorization stage therefore does
-// not imply that enforcement, execution, or the requested effect occurred.
+// independently evidence-bound. Status describes evidence quality; Outcome is
+// the observed/verified result of that stage. A VERIFIED authorization stage
+// can therefore record either allow or block without implying later execution.
 type AgentExecutionStageEvidence struct {
 	Stage                string     `json:"stage"`
 	SubjectID            string     `json:"subject_id,omitempty"`
@@ -43,6 +44,7 @@ type AgentExecutionStageEvidence struct {
 	PolicyDigestSHA256   string     `json:"policy_digest_sha256,omitempty"`
 	ArtifactRef          string     `json:"artifact_ref,omitempty"`
 	ArtifactDigestSHA256 string     `json:"artifact_digest_sha256,omitempty"`
+	Outcome              string     `json:"outcome,omitempty"`
 	Status               string     `json:"status"`
 	ObservedAt           *time.Time `json:"observed_at,omitempty"`
 	EvidenceRefs         []string   `json:"evidence_refs,omitempty"`
@@ -52,7 +54,8 @@ type AgentExecutionStageEvidence struct {
 // AgentExecutionEvidenceTrace is an additive evidence contract for agent-origin
 // actions that may cross tools, services, and Web3 state. It is not an
 // authorization or safety decision. TraceStatus only reports evidence
-// completeness across the required stages.
+// completeness across the required stages; it does not mean the stage outcomes
+// were positive or that the requested effect succeeded.
 type AgentExecutionEvidenceTrace struct {
 	ContractVersion             string                        `json:"contract_version"`
 	ID                          string                        `json:"id"`
@@ -92,6 +95,7 @@ func BuildAgentExecutionEvidenceTrace(actorSubjectID, intentRef, independentObse
 			stage.PolicyDigestSHA256,
 			stage.ArtifactRef,
 			stage.ArtifactDigestSHA256,
+			stage.Outcome,
 			stage.Status,
 		)
 	}
@@ -124,6 +128,7 @@ func normalizeAgentExecutionStages(stages []AgentExecutionStageEvidence) []Agent
 		stage.PolicyDigestSHA256 = normalizeAgentSHA256(stage.PolicyDigestSHA256)
 		stage.ArtifactRef = strings.TrimSpace(stage.ArtifactRef)
 		stage.ArtifactDigestSHA256 = normalizeAgentSHA256(stage.ArtifactDigestSHA256)
+		stage.Outcome = strings.ToLower(strings.TrimSpace(stage.Outcome))
 		stage.EvidenceRefs = nonEmptyIntelligenceRefs(stage.EvidenceRefs)
 		stage.Status = normalizeAgentStageStatus(stage.Status, len(stage.EvidenceRefs) > 0)
 		stage.Confidence = clampIntelligenceConfidence(stage.Confidence)
