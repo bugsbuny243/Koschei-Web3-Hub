@@ -41,6 +41,10 @@ func configuredEVMRPCEndpoint(networkID string) string {
 	return strings.TrimSpace(os.Getenv(name))
 }
 
+func configuredBitcoinEsploraEndpoint() string {
+	return strings.TrimSpace(os.Getenv("BITCOIN_ESPLORA_URL"))
+}
+
 func networkDeploymentCatalog() []networkDeploymentState {
 	states := make([]networkDeploymentState, 0, len(networktarget.Catalog()))
 	for _, network := range networktarget.Catalog() {
@@ -54,8 +58,15 @@ func networkDeploymentCatalog() []networkDeploymentState {
 				state.CollectorRuntime = "rpc_configured"
 			}
 		case "utxo":
-			state.CollectorRuntime = network.CollectorStatus
-			state.LiveAvailability = "collector_not_connected"
+			if network.ID == "bitcoin-mainnet" {
+				if configuredBitcoinEsploraEndpoint() == "" {
+					state.CollectorRuntime = "configuration_required"
+					state.LiveAvailability = "configuration_required"
+				} else {
+					state.CollectorRuntime = "esplora_configured"
+					state.LiveAvailability = "not_checked"
+				}
+			}
 		}
 		states = append(states, state)
 	}
@@ -112,28 +123,52 @@ func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
 		reject(http.StatusUnprocessableEntity, err.Error(), "not_checked")
 		return
 	}
-	if resolution.Network.Family != "evm" {
-		reject(http.StatusUnprocessableEntity, "live_probe_not_supported_for_network", "not_available")
-		return
-	}
-	endpoint := configuredEVMRPCEndpoint(resolution.Network.ID)
-	if endpoint == "" {
-		reject(http.StatusServiceUnavailable, "evm_rpc_configuration_required", "configuration_required")
-		return
-	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	result, err := networktarget.ProbeEVM(ctx, nil, endpoint, resolution)
-	if err != nil {
-		reject(http.StatusBadGateway, err.Error(), "unavailable")
-		return
+
+	switch resolution.Network.Family {
+	case "evm":
+		endpoint := configuredEVMRPCEndpoint(resolution.Network.ID)
+		if endpoint == "" {
+			reject(http.StatusServiceUnavailable, "evm_rpc_configuration_required", "configuration_required")
+			return
+		}
+		result, err := networktarget.ProbeEVM(ctx, nil, endpoint, resolution)
+		if err != nil {
+			reject(http.StatusBadGateway, err.Error(), "unavailable")
+			return
+		}
+		if isForm {
+			renderNetworkProbeResult(w, http.StatusOK, &result, "")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(result)
+	case "utxo":
+		if resolution.Network.ID != "bitcoin-mainnet" {
+			reject(http.StatusUnprocessableEntity, "live_probe_not_supported_for_network", "not_available")
+			return
+		}
+		if isForm {
+			reject(http.StatusUnprocessableEntity, "bitcoin_live_probe_requires_json", "not_available")
+			return
+		}
+		endpoint := configuredBitcoinEsploraEndpoint()
+		if endpoint == "" {
+			reject(http.StatusServiceUnavailable, "bitcoin_esplora_configuration_required", "configuration_required")
+			return
+		}
+		result, err := networktarget.ProbeBitcoin(ctx, nil, endpoint, resolution)
+		if err != nil {
+			reject(http.StatusBadGateway, err.Error(), "unavailable")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(result)
+	default:
+		reject(http.StatusUnprocessableEntity, "live_probe_not_supported_for_network", "not_available")
 	}
-	if isForm {
-		renderNetworkProbeResult(w, http.StatusOK, &result, "")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_ = json.NewEncoder(w).Encode(result)
 }
