@@ -8,10 +8,9 @@ import (
 // registerStaticAliases keeps removed legacy product/demo URLs on the real
 // production surfaces instead of serving stale standalone pages.
 func registerStaticAliases(mux *http.ServeMux, staticDir string) {
-	// Register the customer scan API and the evidence/network fabric on the same
-	// production mux as the public scanner. These routes were previously only
-	// reachable when tests registered the fabric router directly.
-	registerCustomerScanRoutes(mux)
+	// Keep the evidence/network fabric on the same production mux as the public
+	// scanner. The customer scan API is registered by NewServer so it can receive
+	// the configured Solana RPC dependency instead of depending on static wiring.
 	registerFabricRoutes(mux)
 
 	// TradePI AI Agents shares the existing deployment but owns an isolated
