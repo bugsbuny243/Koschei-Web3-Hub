@@ -67,7 +67,7 @@ func TestCustomerScanResultRejectsMismatchedProbeSubject(t *testing.T) {
 	}
 	subject := ClassifyIntelligenceSubject("0x2222222222222222222222222222222222222222", target.NetworkHint)
 	projection := NetworkProbeIntelligenceProjection{
-		Subject: subject,
+		Subject:  subject,
 		Evidence: IntelligenceEvidence{ID: "ev-2", SubjectID: subject.ID, Status: IntelligenceEvidenceObserved},
 	}
 	if _, err := CustomerScanResultFromNetworkProbe(target, projection); err == nil {
