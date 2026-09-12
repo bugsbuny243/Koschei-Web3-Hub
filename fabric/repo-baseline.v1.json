@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1.0",
+  "title": "Koschei Web3 Repository Baseline",
+  "sourceDate": "2026-09-12",
+  "sourceCommit": "19c7dcfa4308ec8711434c811790695ea9c939b0",
+  "classification": "repository-evidence-baseline-not-production-deployment-proof",
+  "rules": {
+    "codePresenceIsNotDeploymentProof": true,
+    "probeReadyIsNotFullCollectorCoverage": true,
+    "missingIntegrationMustRemainMissing": true,
+    "researchDocumentsDoNotOverrideRepositoryEvidence": true,
+    "completionRequiresExecutedAcceptanceEvidence": true
+  },
+  "networkCapabilities": [
+    {"network":"solana-mainnet","family":"solana","repositoryState":"existing"},
+    {"network":"ethereum-mainnet","family":"evm","repositoryState":"probe_ready"},
+    {"network":"base-mainnet","family":"evm","repositoryState":"probe_ready"},
+    {"network":"arbitrum-mainnet","family":"evm","repositoryState":"probe_ready"},
+    {"network":"optimism-mainnet","family":"evm","repositoryState":"probe_ready"},
+    {"network":"bitcoin-mainnet","family":"utxo","repositoryState":"probe_ready"}
+  ],
+  "persistence": {
+    "applicationDatabase": {
+      "configuration": "APP_DATABASE_URL",
+      "readReplicaConfiguration": "APP_DATABASE_READ_URL",
+      "repositorySupport": true,
+      "deploymentConfigured": "unknown"
+    },
+    "entitlementLedger": {
+      "configuration": "ENTITLEMENT_DATABASE_URL",
+      "repositorySupport": true,
+      "missingBehavior": "fail-closed",
+      "deploymentConfigured": "unknown"
+    }
+  },
+  "agentEvidence": {
+    "identityDelegationEvidence": true,
+    "executionEvidence": true,
+    "materialActionBinding": true,
+    "executionTrace": true,
+    "externalProtocolIntegrations": {
+      "mcp": false,
+      "a2a": false,
+      "webmcp": false,
+      "ap2": false
+    }
+  },
+  "payments": {
+    "x402FoundationPresent": true,
+    "x402DefaultEnabled": false,
+    "x402RealPaymentIntegrationProven": false
+  },
+  "notProvenInRepository": [
+    "c2pa-provenance-integration",
+    "ml-kem-provider",
+    "ml-dsa-provider",
+    "verifiable-credentials-or-did-production-integration",
+    "physical-device-authority-runtime",
+    "neural-biometric-data-runtime",
+    "full-autonomous-revocation-proof"
+  ],
+  "auditDelta": {
+    "previousAuditCommit": "b972ffe5276890e604af069c2bc9575be39a6e45",
+    "commitsAhead": 87,
+    "knownChanges": [
+      "auth-redirect-backslash-hardening",
+      "jwks-hardening-tests-added",
+      "application-persistence-support-added",
+      "bitcoin-address-and-probe-support-added",
+      "evm-probe-support-added",
+      "agent-material-action-binding-added",
+      "legacy-neon-auth-cleanup-helper-removed",
+      "clickhouse-arvis-read-index-migration-added"
+    ]
+  }
+}
