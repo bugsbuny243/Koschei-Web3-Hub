@@ -3,6 +3,8 @@ package services
 import (
 	"errors"
 	"strings"
+
+	"koschei/api/internal/networktarget"
 )
 
 const (
@@ -68,7 +70,8 @@ func BuildCustomerScanResult(target CustomerScanTarget, trust Web3TrustVector, e
 // CustomerScanResultFromNetworkProbe converts an already-adapted read-only
 // network probe into a customer result. A network probe contributes observed
 // evidence only; it does not manufacture authorization, verification, finality
-// or a safety verdict.
+// or a safety verdict. EIP-7702 delegation state, when present in the evidence,
+// is surfaced as an observation reason only.
 func CustomerScanResultFromNetworkProbe(target CustomerScanTarget, projection NetworkProbeIntelligenceProjection) (CustomerScanResult, error) {
 	if target.Route != CustomerScanRouteEVMProbe && target.Route != CustomerScanRouteBitcoinProbe {
 		return CustomerScanResult{}, errors.New("network probe result requires EVM or Bitcoin scan route")
@@ -86,9 +89,13 @@ func CustomerScanResultFromNetworkProbe(target CustomerScanTarget, projection Ne
 		return CustomerScanResult{}, errors.New("network probe evidence is not bound to the projected subject")
 	}
 
+	reasons := []string{"READ_ONLY_NETWORK_OBSERVATION"}
+	if state, ok := projection.Evidence.Attributes["delegation_state"].(string); ok && strings.TrimSpace(state) == networktarget.EVMDelegationStateObserved {
+		reasons = append(reasons, "EIP7702_DELEGATION_OBSERVED")
+	}
 	trust := Web3TrustVector{
 		Observed: true,
-		Reasons:  []string{"READ_ONLY_NETWORK_OBSERVATION"},
+		Reasons:  reasons,
 	}
 	return BuildCustomerScanResult(target, trust, []string{projection.Evidence.ID})
 }
