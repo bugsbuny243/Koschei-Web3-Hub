@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strings"
 	"testing"
 
 	"koschei/api/internal/defense"
@@ -62,6 +63,44 @@ func TestDefenseValidationAgentTraceSeparatesAuthorizationOutcomeFromEvidenceSta
 	}
 	if !outcomes["allow"] || !outcomes["block"] {
 		t.Fatalf("expected independently represented allow and block outcomes, got %#v", outcomes)
+	}
+}
+
+func TestDefenseValidationAgentTraceBindsStagesToOneMaterialAction(t *testing.T) {
+	request := defenseValidationAPITestRequest(t)
+	response, err := evaluateDefenseValidationAPIRequest(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	traces, err := buildDefenseValidationAgentExecutionTraces(request, response.Report)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, trace := range traces {
+		bindingRef := ""
+		for _, stageName := range []string{
+			services.AgentExecutionStageAuthorization,
+			services.AgentExecutionStageEnforcement,
+			services.AgentExecutionStageExecution,
+			services.AgentExecutionStageEffect,
+		} {
+			stage := agentTraceStage(t, trace, stageName)
+			found := ""
+			for _, ref := range stage.EvidenceRefs {
+				if strings.HasPrefix(ref, "agent-material-action-binding:kamb_") {
+					found = ref
+					break
+				}
+			}
+			if found == "" {
+				t.Fatalf("stage %q missing material-action binding: %#v", stageName, stage)
+			}
+			if bindingRef == "" {
+				bindingRef = found
+			} else if bindingRef != found {
+				t.Fatalf("trace stages reference different material actions: first=%q stage=%q ref=%q", bindingRef, stageName, found)
+			}
+		}
 	}
 }
 
