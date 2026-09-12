@@ -179,6 +179,24 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 			writeCustomerScanError(w, http.StatusBadGateway, "customer_scan_result_unavailable")
 			return
 		}
+
+		proxyProbe, proxyErr := networktarget.ProbeEVMProxyAuthority(ctx, nil, endpoint, resolution)
+		if proxyErr != nil {
+			result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "EVM_AUTHORITY_PROBE_UNAVAILABLE"))
+			result.Trust.Reasons = append([]string(nil), result.Reasons...)
+			writeCustomerScanResult(w, http.StatusOK, result)
+			return
+		}
+		authority, authorityErr := services.BuildEVMSpenderAuthoritySnapshot(probe, proxyProbe)
+		if authorityErr != nil {
+			writeCustomerScanError(w, http.StatusBadGateway, "evm_authority_projection_unavailable")
+			return
+		}
+		result, resultErr = services.CustomerScanResultFromEVMAuthority(target, projection, authority)
+		if resultErr != nil {
+			writeCustomerScanError(w, http.StatusBadGateway, "evm_authority_result_unavailable")
+			return
+		}
 		writeCustomerScanResult(w, http.StatusOK, result)
 	case services.CustomerScanRouteBitcoinProbe:
 		endpoint := configuredBitcoinEsploraEndpoint()
