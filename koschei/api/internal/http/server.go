@@ -94,6 +94,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	registerDossierRoutes(mux, h)
 	registerBillingRoutes(mux, h)
 	registerWatchlistRoutes(mux, h, func(next http.HandlerFunc) http.HandlerFunc { return planTier("professional", next) }, func(next http.HandlerFunc) http.HandlerFunc { return planTierAccess("professional", next) })
+	registerCustomerScanRoutes(mux, config.solanaRPC)
 	registerStatic(mux, staticDir)
 	return securityHeaders(cors(apiReadinessWithEntitlement(db, config.entitlementDB, mux), corsOrigin))
 }
