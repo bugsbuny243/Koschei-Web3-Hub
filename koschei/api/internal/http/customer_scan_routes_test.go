@@ -53,14 +53,14 @@ func TestCustomerScanEndpointRejectsUnknownJSONFields(t *testing.T) {
 	}
 }
 
-func TestCustomerScanEndpointDoesNotClaimSolanaLiveEvidence(t *testing.T) {
+func TestCustomerScanEndpointDoesNotClaimSolanaLiveEvidenceWithoutRPC(t *testing.T) {
 	mux := http.NewServeMux()
 	registerCustomerScanRoutes(mux)
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/api/scan", strings.NewReader(`{"target":"11111111111111111111111111111111","network":"solana-mainnet"}`))
 	request.Header.Set("Content-Type", "application/json")
 	mux.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusNotImplemented {
+	if recorder.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 	var envelope customerScanEnvelope
@@ -68,7 +68,7 @@ func TestCustomerScanEndpointDoesNotClaimSolanaLiveEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	if envelope.Result.Trust.Observed || envelope.Result.Trust.Verified || envelope.Result.Trust.Finalized {
-		t.Fatalf("Solana syntax-only classification manufactured live evidence: %+v", envelope.Result)
+		t.Fatalf("missing RPC manufactured live evidence: %+v", envelope.Result)
 	}
 	found := false
 	for _, reason := range envelope.Result.Reasons {
