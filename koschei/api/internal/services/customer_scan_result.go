@@ -18,13 +18,14 @@ const (
 )
 
 type CustomerScanResult struct {
-	Target         CustomerScanTarget  `json:"target"`
-	Status         string              `json:"status"`
-	Verdict        string              `json:"verdict"`
-	EvidenceStatus string              `json:"evidence_status"`
-	Trust          Web3TrustVector     `json:"trust"`
-	Reasons        []string            `json:"reasons,omitempty"`
-	EvidenceRefs   []string            `json:"evidence_refs,omitempty"`
+	Target         CustomerScanTarget             `json:"target"`
+	Status         string                         `json:"status"`
+	Verdict        string                         `json:"verdict"`
+	EvidenceStatus string                         `json:"evidence_status"`
+	Trust          Web3TrustVector                `json:"trust"`
+	Reasons        []string                       `json:"reasons,omitempty"`
+	EvidenceRefs   []string                       `json:"evidence_refs,omitempty"`
+	EVMAuthority   *EVMSpenderAuthoritySnapshot   `json:"evm_authority,omitempty"`
 }
 
 // BuildCustomerScanResult builds the customer-facing evidence envelope. It is
@@ -98,4 +99,31 @@ func CustomerScanResultFromNetworkProbe(target CustomerScanTarget, projection Ne
 		Reasons:  reasons,
 	}
 	return BuildCustomerScanResult(target, trust, []string{projection.Evidence.ID})
+}
+
+// CustomerScanResultFromEVMAuthority attaches a current EVM authority snapshot
+// to an observed EVM customer scan. The authority snapshot adds evidence and
+// reason codes only; it never promotes authorization, verification, finality,
+// or a safety verdict.
+func CustomerScanResultFromEVMAuthority(target CustomerScanTarget, projection NetworkProbeIntelligenceProjection, authority EVMSpenderAuthoritySnapshot) (CustomerScanResult, error) {
+	if target.Route != CustomerScanRouteEVMProbe {
+		return CustomerScanResult{}, errors.New("EVM authority requires EVM scan route")
+	}
+	result, err := CustomerScanResultFromNetworkProbe(target, projection)
+	if err != nil {
+		return CustomerScanResult{}, err
+	}
+	if strings.TrimSpace(authority.Network) != strings.TrimSpace(target.NetworkHint) {
+		return CustomerScanResult{}, errors.New("EVM authority network does not match customer target")
+	}
+	if strings.ToLower(strings.TrimSpace(authority.Spender)) != strings.ToLower(strings.TrimSpace(target.Raw)) {
+		return CustomerScanResult{}, errors.New("EVM authority subject does not match customer target")
+	}
+	if err := ValidateWeb3TrustVector(authority.Trust); err != nil || !authority.Trust.Observed {
+		return CustomerScanResult{}, errors.New("observed EVM authority evidence is required")
+	}
+	result.Reasons = NormalizeWeb3TrustReasons(append(result.Reasons, authority.Reasons...))
+	result.Trust.Reasons = append([]string(nil), result.Reasons...)
+	result.EVMAuthority = &authority
+	return result, nil
 }
