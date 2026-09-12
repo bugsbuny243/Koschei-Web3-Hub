@@ -15,20 +15,20 @@ const AgentMaterialActionBindingContractVersionV1 = "koschei-agent-material-acti
 // composition only: a valid binding does not grant authority, imply safety, or
 // prove that an intended business result occurred.
 type AgentMaterialActionBindingV1 struct {
-	ContractVersion          string `json:"contract_version"`
-	ID                       string `json:"id"`
-	ChainID                  uint64 `json:"chain_id"`
-	Target                   string `json:"target"`
-	IntentSHA256             string `json:"intent_sha256"`
-	ApprovedPayloadSHA256    string `json:"approved_payload_sha256"`
-	CandidatePayloadSHA256   string `json:"candidate_payload_sha256"`
-	ActionSHA256             string `json:"action_sha256"`
-	InvariantSetSHA256       string `json:"invariant_set_sha256"`
+	ContractVersion           string `json:"contract_version"`
+	ID                        string `json:"id"`
+	ChainID                   uint64 `json:"chain_id"`
+	Target                    string `json:"target"`
+	IntentSHA256              string `json:"intent_sha256"`
+	ApprovedPayloadSHA256     string `json:"approved_payload_sha256"`
+	CandidatePayloadSHA256    string `json:"candidate_payload_sha256"`
+	ActionSHA256              string `json:"action_sha256"`
+	InvariantSetSHA256        string `json:"invariant_set_sha256"`
 	AuthorizationPolicySHA256 string `json:"authorization_policy_sha256"`
-	RuntimePolicySHA256      string `json:"runtime_policy_sha256"`
-	AuthorizationRef         string `json:"authorization_ref"`
-	ExecutionProofSHA256     string `json:"execution_proof_sha256"`
-	ContainmentReceiptSHA256 string `json:"containment_receipt_sha256"`
+	RuntimePolicySHA256       string `json:"runtime_policy_sha256"`
+	AuthorizationRef          string `json:"authorization_ref"`
+	ExecutionProofSHA256      string `json:"execution_proof_sha256"`
+	ContainmentReceiptSHA256  string `json:"containment_receipt_sha256"`
 }
 
 // BuildAgentMaterialActionBindingV1 re-verifies both native artifacts and then
