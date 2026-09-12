@@ -44,18 +44,23 @@ func buildDefenseValidationAgentExecutionTrace(raw defenseValidationAPICase, res
 	if !defenseValidationAgentProofMatches(raw.ExecutionProof) {
 		return services.AgentExecutionEvidenceTrace{}, errors.New("execution proof verification failed")
 	}
+	materialBinding, err := services.BuildAgentMaterialActionBindingV1(raw.ExecutionProof, raw.ContainmentReceipt)
+	if err != nil {
+		return services.AgentExecutionEvidenceTrace{}, fmt.Errorf("material action binding failed: %w", err)
+	}
 
-	proofDigest := strings.ToLower(strings.TrimSpace(raw.ExecutionProof.EnvelopeSHA256))
-	receiptDigest := strings.ToLower(strings.TrimSpace(raw.ContainmentReceipt.ReceiptSHA256))
+	proofDigest := materialBinding.ExecutionProofSHA256
+	receiptDigest := materialBinding.ContainmentReceiptSHA256
 	proofRef := "execution-proof:" + proofDigest
 	receiptRef := "execution-containment:" + receiptDigest
-	actionID := strings.ToLower(strings.TrimSpace(raw.ContainmentReceipt.Input.ActionSHA256))
+	bindingRef := "agent-material-action-binding:" + materialBinding.ID
+	actionID := materialBinding.ActionSHA256
 
 	var observedAt *time.Time
 	independentState := services.AgentIndependentObservationUnavailable
 	effectStatus := services.IntelligenceEvidenceObserved
 	effectConfidence := 0.8
-	effectRefs := []string{receiptRef}
+	effectRefs := []string{receiptRef, bindingRef}
 	if raw.ObservationEvent != nil && result.ObservationEvidenceState == defense.DefenseValidationEvidenceVerifiedV02 &&
 		defenseValidationAgentEventBindsDigests(raw.ObservationEvent.SourceDigests, receiptDigest, proofDigest) {
 		when := time.UnixMilli(raw.ObservationEvent.Window.ToUnixMS).UTC()
@@ -73,21 +78,21 @@ func buildDefenseValidationAgentExecutionTrace(raw defenseValidationAPICase, res
 			Stage:              services.AgentExecutionStageAuthorization,
 			ActionID:           actionID,
 			PolicyRef:          "executionproof.authorization.signing_policy",
-			PolicyDigestSHA256: raw.ExecutionProof.Envelope.Authorization.SigningPolicySHA256,
-			ArtifactRef:        strings.TrimSpace(raw.ExecutionProof.Envelope.Authorization.ApprovedSigningRequestID),
+			PolicyDigestSHA256: materialBinding.AuthorizationPolicySHA256,
+			ArtifactRef:        materialBinding.AuthorizationRef,
 			Outcome:            strings.ToLower(string(raw.ExecutionProof.Evaluation.Decision)),
 			Status:             services.IntelligenceEvidenceVerified,
-			EvidenceRefs:       []string{proofRef},
+			EvidenceRefs:       []string{proofRef, bindingRef},
 			Confidence:         1,
 		},
 		{
 			Stage:              services.AgentExecutionStageEnforcement,
 			ActionID:           actionID,
 			PolicyRef:          "executionproof.runtime.policy",
-			PolicyDigestSHA256: raw.ExecutionProof.Envelope.Runtime.PolicySHA256,
+			PolicyDigestSHA256: materialBinding.RuntimePolicySHA256,
 			Outcome:            "policy_evidence_observed",
 			Status:             services.IntelligenceEvidenceObserved,
-			EvidenceRefs:       []string{proofRef},
+			EvidenceRefs:       []string{proofRef, bindingRef},
 			Confidence:         0.8,
 		},
 		{
@@ -97,7 +102,7 @@ func buildDefenseValidationAgentExecutionTrace(raw defenseValidationAPICase, res
 			ArtifactDigestSHA256: actionID,
 			Outcome:              strings.ToLower(string(raw.ContainmentReceipt.Decision)),
 			Status:               services.IntelligenceEvidenceVerified,
-			EvidenceRefs:         []string{proofRef, receiptRef},
+			EvidenceRefs:         []string{proofRef, receiptRef, bindingRef},
 			Confidence:           1,
 		},
 		{
@@ -115,7 +120,7 @@ func buildDefenseValidationAgentExecutionTrace(raw defenseValidationAPICase, res
 
 	return services.BuildAgentExecutionEvidenceTrace(
 		"", // This validation corpus proves no agent identity.
-		strings.ToLower(strings.TrimSpace(raw.ContainmentReceipt.Input.ApprovedIntentSHA256)),
+		materialBinding.IntentSHA256,
 		independentState,
 		receiptRef,
 		receiptDigest,
