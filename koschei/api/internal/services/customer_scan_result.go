@@ -18,14 +18,14 @@ const (
 )
 
 type CustomerScanResult struct {
-	Target         CustomerScanTarget             `json:"target"`
-	Status         string                         `json:"status"`
-	Verdict        string                         `json:"verdict"`
-	EvidenceStatus string                         `json:"evidence_status"`
-	Trust          Web3TrustVector                `json:"trust"`
-	Reasons        []string                       `json:"reasons,omitempty"`
-	EvidenceRefs   []string                       `json:"evidence_refs,omitempty"`
-	EVMAuthority   *EVMSpenderAuthoritySnapshot   `json:"evm_authority,omitempty"`
+	Target         CustomerScanTarget           `json:"target"`
+	Status         string                       `json:"status"`
+	Verdict        string                       `json:"verdict"`
+	EvidenceStatus string                       `json:"evidence_status"`
+	Trust          Web3TrustVector              `json:"trust"`
+	Reasons        []string                     `json:"reasons,omitempty"`
+	EvidenceRefs   []string                     `json:"evidence_refs,omitempty"`
+	EVMAuthority   *EVMSpenderAuthoritySnapshot `json:"evm_authority,omitempty"`
 }
 
 // BuildCustomerScanResult builds the customer-facing evidence envelope. It is
