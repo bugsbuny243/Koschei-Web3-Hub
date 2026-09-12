@@ -89,15 +89,15 @@ func TestBuildEVMApprovalIntelligenceFlagsUnlimitedAndUpgradeableSpenderAsObserv
 
 func TestBuildEVMApprovalIntelligenceRejectsMixedPermitAndTemporaryFields(t *testing.T) {
 	_, err := BuildEVMApprovalIntelligence(EVMApprovalObservation{
-		Network:            "optimism-mainnet",
-		Token:              "0x1111111111111111111111111111111111111111",
-		Owner:              "0x2222222222222222222222222222222222222222",
-		Spender:            "0x3333333333333333333333333333333333333333",
-		Mechanism:          EVMApprovalMechanismTemporary,
-		Amount:             "1",
-		PermitNonce:        "1",
-		TransactionHash:    "0x" + strings.Repeat("d", 64),
-		ObservedAt:         time.Unix(5_000, 0).UTC(),
+		Network:         "optimism-mainnet",
+		Token:           "0x1111111111111111111111111111111111111111",
+		Owner:           "0x2222222222222222222222222222222222222222",
+		Spender:         "0x3333333333333333333333333333333333333333",
+		Mechanism:       EVMApprovalMechanismTemporary,
+		Amount:          "1",
+		PermitNonce:     "1",
+		TransactionHash: "0x" + strings.Repeat("d", 64),
+		ObservedAt:      time.Unix(5_000, 0).UTC(),
 	})
 	if err == nil {
 		t.Fatal("expected mixed temporary/permit observation to fail closed")
