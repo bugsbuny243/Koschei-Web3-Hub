@@ -25,8 +25,40 @@ func TestAddressIdentityIsNetworkScoped(t *testing.T) {
 	if ethereum.AnalysisPerformed || ethereum.EvidenceStatus != "unknown" || ethereum.LiveAvailability != "not_checked" {
 		t.Fatal("syntax resolution claimed analysis or live evidence")
 	}
-	if ethereum.Network.CollectorStatus != "not_connected" {
-		t.Fatal("EVM collector was falsely promoted")
+	if ethereum.Network.CollectorStatus != "probe_ready" {
+		t.Fatalf("EVM implementation status=%q want probe_ready", ethereum.Network.CollectorStatus)
+	}
+}
+
+func TestCatalogReportsImplementedProbesWithoutClaimingLiveAvailability(t *testing.T) {
+	probeReady := map[string]bool{
+		"ethereum-mainnet": false,
+		"base-mainnet":     false,
+		"arbitrum-mainnet": false,
+		"optimism-mainnet": false,
+		"bitcoin-mainnet":  false,
+	}
+	for _, network := range Catalog() {
+		if _, ok := probeReady[network.ID]; !ok {
+			continue
+		}
+		if network.CollectorStatus != "probe_ready" {
+			t.Fatalf("%s collector status=%q want probe_ready", network.ID, network.CollectorStatus)
+		}
+		probeReady[network.ID] = true
+	}
+	for networkID, seen := range probeReady {
+		if !seen {
+			t.Fatalf("probe-ready network %s missing from catalog", networkID)
+		}
+	}
+
+	bitcoin, err := Resolve("bitcoin-mainnet", "1BoatSLRHtKNngkdXEeobR76b53LETtpyT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bitcoin.AnalysisPerformed || bitcoin.EvidenceStatus != "unknown" || bitcoin.LiveAvailability != "not_checked" {
+		t.Fatalf("offline Bitcoin resolution claimed deployment/live evidence: %#v", bitcoin)
 	}
 }
 

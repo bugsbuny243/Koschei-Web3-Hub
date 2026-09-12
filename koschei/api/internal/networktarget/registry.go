@@ -35,14 +35,16 @@ type Resolution struct {
 
 // Catalog describes collector implementation, not deployment health. A new
 // adapter must provide its own evidence before it can produce an ARVIS verdict.
+// Runtime configuration/availability is reported separately by the deployment
+// catalog and live probe endpoints.
 func Catalog() []Network {
 	return []Network{
 		{ID: "solana-mainnet", Name: "Solana", Family: "solana", AddressFormat: "base58-32", CollectorStatus: "existing"},
-		{ID: "ethereum-mainnet", Name: "Ethereum", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "not_connected"},
-		{ID: "base-mainnet", Name: "Base", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "not_connected"},
-		{ID: "arbitrum-mainnet", Name: "Arbitrum", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "not_connected"},
-		{ID: "optimism-mainnet", Name: "Optimism", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "not_connected"},
-		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", AddressFormat: "bitcoin-mainnet", CollectorStatus: "parser_ready_collector_not_connected"},
+		{ID: "ethereum-mainnet", Name: "Ethereum", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
+		{ID: "base-mainnet", Name: "Base", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
+		{ID: "arbitrum-mainnet", Name: "Arbitrum", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
+		{ID: "optimism-mainnet", Name: "Optimism", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
+		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", AddressFormat: "bitcoin-mainnet", CollectorStatus: "probe_ready"},
 	}
 }
 

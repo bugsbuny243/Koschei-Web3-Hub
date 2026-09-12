@@ -28,8 +28,11 @@ func TestNetworkTargetResolutionDoesNotRunAnalysis(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
-	if result.AnalysisPerformed || result.EvidenceStatus != "unknown" || result.Network.CollectorStatus != "not_connected" {
+	if result.AnalysisPerformed || result.EvidenceStatus != "unknown" || result.LiveAvailability != "not_checked" {
 		t.Fatal("resolution fabricated live analysis")
+	}
+	if result.Network.CollectorStatus != "probe_ready" {
+		t.Fatalf("implementation status=%q want probe_ready", result.Network.CollectorStatus)
 	}
 	if response.Header().Get("Cache-Control") != "no-store" || response.Header().Get("X-Content-Type-Options") != "nosniff" {
 		t.Fatal("network target responses must preserve transport protections")
@@ -53,10 +56,13 @@ func TestNetworkCoverageFormAndCatalogAreVisible(t *testing.T) {
 	mounted := MountFabric(http.NotFoundHandler())
 	page := httptest.NewRecorder()
 	mounted.ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/fabric/networks", nil))
-	for _, text := range []string{"Network coverage", "Select a network", "Ethereum", "Bitcoin", "Not connected"} {
+	for _, text := range []string{"Network coverage", "Select a network", "Ethereum", "Bitcoin", "Probe implemented; deployment and live health not checked"} {
 		if !strings.Contains(page.Body.String(), text) {
 			t.Fatalf("coverage page missing %q", text)
 		}
+	}
+	if strings.Contains(page.Body.String(), "Bitcoin address parsing and evidence collection remain pending") {
+		t.Fatal("coverage page still claims implemented Bitcoin parsing/probe is pending")
 	}
 	values := url.Values{"network": {"solana-mainnet"}, "address": {strings.Repeat("1", 32)}}
 	response := targetRequest(values.Encode(), "application/x-www-form-urlencoded")
