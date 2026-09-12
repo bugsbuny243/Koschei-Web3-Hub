@@ -53,7 +53,7 @@ func TestBuildAgentMaterialActionBindingV1RejectsPayloadSubstitution(t *testing.
 
 func TestBuildAgentMaterialActionBindingV1RejectsTamperedProof(t *testing.T) {
 	proof, receipt := agentMaterialActionFixture(t)
-	proof.Envelope.Authorization.SigningPolicySHA256 = strings.Repeat("7", 64)
+	proof.Envelope.Authorization.SigningPolicySHA256 = strings.Repeat("8", 64)
 	if _, err := BuildAgentMaterialActionBindingV1(proof, receipt); err == nil {
 		t.Fatal("tampered execution proof was accepted")
 	}
