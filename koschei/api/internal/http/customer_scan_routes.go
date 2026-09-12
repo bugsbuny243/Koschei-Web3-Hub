@@ -12,6 +12,7 @@ import (
 
 	"koschei/api/internal/networktarget"
 	"koschei/api/internal/services"
+	"koschei/api/internal/web3"
 )
 
 const customerScanSchemaVersion = "koschei-customer-scan-v1"
@@ -26,8 +27,26 @@ type customerScanEnvelope struct {
 	Result        services.CustomerScanResult `json:"result"`
 }
 
-func registerCustomerScanRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/scan", method(http.MethodPost, customerScan))
+type customerSolanaAccountInfo struct {
+	Context struct {
+		Slot uint64 `json:"slot"`
+	} `json:"context"`
+	Value *struct {
+		Executable bool   `json:"executable"`
+		Lamports   uint64 `json:"lamports"`
+		Owner      string `json:"owner"`
+		Space      uint64 `json:"space"`
+	} `json:"value"`
+}
+
+func registerCustomerScanRoutes(mux *http.ServeMux, rpc ...*web3.SolanaRPC) {
+	var solanaRPC *web3.SolanaRPC
+	if len(rpc) > 0 {
+		solanaRPC = rpc[0]
+	}
+	mux.HandleFunc("/api/scan", method(http.MethodPost, func(w http.ResponseWriter, r *http.Request) {
+		customerScanWithSolanaRPC(w, r, solanaRPC)
+	}))
 }
 
 func decodeCustomerScanRequest(r io.Reader) (customerScanRequest, error) {
@@ -46,10 +65,17 @@ func decodeCustomerScanRequest(r io.Reader) (customerScanRequest, error) {
 	if request.Target == "" {
 		return request, errors.New("scan_target_required")
 	}
+	if len(request.Target) > 256 || len(request.Network) > 64 {
+		return request, errors.New("invalid_scan_request")
+	}
 	return request, nil
 }
 
 func customerScan(w http.ResponseWriter, r *http.Request) {
+	customerScanWithSolanaRPC(w, r, nil)
+}
+
+func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC *web3.SolanaRPC) {
 	r.Body = http.MaxBytesReader(w, r.Body, 2048)
 	defer r.Body.Close()
 	mediaType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -78,17 +104,50 @@ func customerScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Solana target classification is currently syntax-only here. The endpoint
-	// must not manufacture live evidence until the existing Solana intelligence
-	// collector is explicitly adapted to the CustomerScanResult contract.
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	observedAt := time.Now().UTC()
+
 	if target.Route == services.CustomerScanRouteSolanaIntel {
-		target.Reasons = append(target.Reasons, "SOLANA_CUSTOMER_SCAN_NOT_CONNECTED")
-		result, buildErr := services.BuildCustomerScanResult(target, services.Web3TrustVector{}, nil)
-		if buildErr != nil {
-			writeCustomerScanError(w, http.StatusUnprocessableEntity, "scan_result_unavailable")
+		if request.Network != "solana-mainnet" {
+			writeCustomerScanError(w, http.StatusUnprocessableEntity, "solana_mainnet_required")
 			return
 		}
-		writeCustomerScanResult(w, http.StatusNotImplemented, result)
+		if solanaRPC == nil {
+			target.Reasons = append(target.Reasons, "SOLANA_CUSTOMER_SCAN_NOT_CONNECTED")
+			result, buildErr := services.BuildCustomerScanResult(target, services.Web3TrustVector{}, nil)
+			if buildErr != nil {
+				writeCustomerScanError(w, http.StatusUnprocessableEntity, "scan_result_unavailable")
+				return
+			}
+			writeCustomerScanResult(w, http.StatusServiceUnavailable, result)
+			return
+		}
+		var account customerSolanaAccountInfo
+		params := []any{request.Target, map[string]any{"encoding": "base64", "commitment": "confirmed", "dataSlice": map[string]any{"offset": 0, "length": 0}}}
+		if err := solanaRPC.Call(ctx, request.Network, "getAccountInfo", params, &account, 0); err != nil {
+			writeCustomerScanError(w, http.StatusBadGateway, "solana_account_probe_unavailable")
+			return
+		}
+		observation := services.SolanaAccountObservation{
+			Address: request.Target,
+			Network: request.Network,
+			Slot:    account.Context.Slot,
+			Present: account.Value != nil,
+		}
+		if account.Value != nil {
+			observation.Executable = account.Value.Executable
+			observation.Lamports = account.Value.Lamports
+			observation.Owner = strings.TrimSpace(account.Value.Owner)
+			observation.Space = account.Value.Space
+		}
+		result, resultErr := services.CustomerScanResultFromSolanaObservation(target, observation)
+		if resultErr != nil {
+			writeCustomerScanError(w, http.StatusBadGateway, "solana_evidence_projection_unavailable")
+			return
+		}
+		_ = observedAt // observation slot is the primary evidence anchor; wall clock is not promoted to finality.
+		writeCustomerScanResult(w, http.StatusOK, result)
 		return
 	}
 
@@ -97,9 +156,6 @@ func customerScan(w http.ResponseWriter, r *http.Request) {
 		writeCustomerScanError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-	observedAt := time.Now().UTC()
 
 	switch target.Route {
 	case services.CustomerScanRouteEVMProbe:
@@ -168,9 +224,9 @@ func writeCustomerScanError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"schema_version": customerScanSchemaVersion,
-		"error":          strings.TrimSpace(message),
+		"schema_version":     customerScanSchemaVersion,
+		"error":              strings.TrimSpace(message),
 		"analysis_performed": false,
-		"evidence_status": services.Web3TrustEvidenceUnverified,
+		"evidence_status":    services.Web3TrustEvidenceUnverified,
 	})
 }
