@@ -7,28 +7,28 @@ import (
 )
 
 const (
-	CustomerScanTargetEVMAddress   = "evm_address"
-	CustomerScanTargetSolana       = "solana_address"
-	CustomerScanTargetBitcoin      = "bitcoin_address"
-	CustomerScanTargetTxHash       = "transaction_hash"
-	CustomerScanTargetUnknown      = "unknown"
-	CustomerScanRouteEVMProbe      = "evm_probe"
-	CustomerScanRouteSolanaIntel   = "solana_intelligence"
-	CustomerScanRouteBitcoinProbe  = "bitcoin_probe"
-	CustomerScanRouteTxLookup      = "transaction_lookup"
-	CustomerScanRouteUnresolved    = "unresolved"
+	CustomerScanTargetEVMAddress  = "evm_address"
+	CustomerScanTargetSolana      = "solana_address"
+	CustomerScanTargetBitcoin     = "bitcoin_address"
+	CustomerScanTargetTxHash      = "transaction_hash"
+	CustomerScanTargetUnknown     = "unknown"
+	CustomerScanRouteEVMProbe     = "evm_probe"
+	CustomerScanRouteSolanaIntel  = "solana_intelligence"
+	CustomerScanRouteBitcoinProbe = "bitcoin_probe"
+	CustomerScanRouteTxLookup     = "transaction_lookup"
+	CustomerScanRouteUnresolved   = "unresolved"
 )
 
 var evmTxHashPattern = regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
 
 type CustomerScanTarget struct {
-	Raw              string   `json:"raw"`
-	NetworkHint      string   `json:"network_hint,omitempty"`
-	Kind             string   `json:"kind"`
-	Route            string   `json:"route"`
-	Classification   string   `json:"classification"`
-	RequiresNetwork  bool     `json:"requires_network"`
-	Reasons          []string `json:"reasons,omitempty"`
+	Raw             string   `json:"raw"`
+	NetworkHint     string   `json:"network_hint,omitempty"`
+	Kind            string   `json:"kind"`
+	Route           string   `json:"route"`
+	Classification  string   `json:"classification"`
+	RequiresNetwork bool     `json:"requires_network"`
+	Reasons         []string `json:"reasons,omitempty"`
 }
 
 // ClassifyCustomerScanTarget decides only which existing analysis family may
