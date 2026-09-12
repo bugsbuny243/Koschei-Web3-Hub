@@ -16,8 +16,9 @@ type NetworkProbeIntelligenceProjection struct {
 }
 
 // AdaptEVMProbeEvidence projects a completed read-only EVM probe into the
-// chain-neutral intelligence model. Observed bytecode state is evidence only;
-// this adapter does not create a safety, ownership or authorization decision.
+// chain-neutral intelligence model. Observed bytecode and EIP-7702 delegation
+// state are evidence only; this adapter does not create a safety, ownership or
+// authorization decision.
 func AdaptEVMProbeEvidence(result networktarget.EVMProbeResult, observedAt time.Time) (NetworkProbeIntelligenceProjection, error) {
 	if observedAt.IsZero() {
 		return NetworkProbeIntelligenceProjection{}, errors.New("observed time is required")
@@ -33,6 +34,23 @@ func AdaptEVMProbeEvidence(result networktarget.EVMProbeResult, observedAt time.
 	if result.ContractCodeState != "contract_code_observed" && result.ContractCodeState != "no_contract_code_observed" {
 		return NetworkProbeIntelligenceProjection{}, errors.New("unsupported EVM observation state")
 	}
+	delegationState := strings.TrimSpace(result.DelegationState)
+	if delegationState == "" {
+		// Backward-compatible projection for previously captured probe fixtures.
+		// Live probes always populate an explicit delegation state.
+		delegationState = networktarget.EVMDelegationStateNotObserved
+	}
+	if delegationState != networktarget.EVMDelegationStateNotObserved && delegationState != networktarget.EVMDelegationStateObserved {
+		return NetworkProbeIntelligenceProjection{}, errors.New("unsupported EVM delegation state")
+	}
+	delegationTarget := strings.ToLower(strings.TrimSpace(result.DelegationTarget))
+	if delegationState == networktarget.EVMDelegationStateObserved {
+		if len(delegationTarget) != 42 || !strings.HasPrefix(delegationTarget, "0x") {
+			return NetworkProbeIntelligenceProjection{}, errors.New("observed EIP-7702 delegation target is invalid")
+		}
+	} else if delegationTarget != "" {
+		return NetworkProbeIntelligenceProjection{}, errors.New("delegation target requires observed EIP-7702 state")
+	}
 
 	subject := ClassifyIntelligenceSubject(resolution.Address, resolution.Network.ID)
 	if subject.ChainFamily != IntelligenceChainFamilyEVM {
@@ -42,12 +60,16 @@ func AdaptEVMProbeEvidence(result networktarget.EVMProbeResult, observedAt time.
 		"chain_id":            strings.ToLower(strings.TrimSpace(result.ChainID)),
 		"expected_chain_id":   expectedChainID,
 		"contract_code_state": result.ContractCodeState,
+		"delegation_state":    delegationState,
 		"evidence_scope":      "read_only_network_probe",
 		"analysis_performed":  true,
 		"live_availability":   "checked",
 	}
 	if hash := strings.ToLower(strings.TrimSpace(result.ContractCodeHash)); hash != "" {
 		attributes["contract_code_sha256"] = hash
+	}
+	if delegationTarget != "" {
+		attributes["delegation_target"] = delegationTarget
 	}
 	evidence := buildNetworkProbeEvidence(subject, "evm_rpc_probe", "eth_getCode", result.ContractCodeState, observedAt, attributes)
 	return NetworkProbeIntelligenceProjection{Subject: subject, Evidence: evidence}, nil
