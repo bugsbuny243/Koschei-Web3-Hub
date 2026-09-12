@@ -16,6 +16,13 @@ import (
 
 const evmProbeResponseLimit = 256 * 1024
 
+const (
+	EVMDelegationStateNotObserved = "no_eip7702_delegation_observed"
+	EVMDelegationStateObserved    = "eip7702_delegation_observed"
+)
+
+var eip7702DelegationPrefix = []byte{0xef, 0x01, 0x00}
+
 type EVMProbeResult struct {
 	SchemaVersion     string     `json:"schema_version"`
 	Resolution        Resolution `json:"resolution"`
@@ -23,6 +30,8 @@ type EVMProbeResult struct {
 	ExpectedChainID   string     `json:"expected_chain_id"`
 	ContractCodeState string     `json:"contract_code_state"`
 	ContractCodeHash  string     `json:"contract_code_sha256,omitempty"`
+	DelegationState   string     `json:"delegation_state"`
+	DelegationTarget  string     `json:"delegation_target,omitempty"`
 	AnalysisPerformed bool       `json:"analysis_performed"`
 	EvidenceStatus    string     `json:"evidence_status"`
 	LiveAvailability  string     `json:"live_availability"`
@@ -63,7 +72,9 @@ func ExpectedEVMChainID(networkID string) (string, bool) {
 // ProbeEVM performs a narrow read-only network check. It verifies that the
 // configured RPC endpoint belongs to the requested chain before asking whether
 // bytecode is currently observable at the address. Absence of bytecode is not
-// treated as proof that an account exists or is safe.
+// treated as proof that an account exists or is safe. A 23-byte EIP-7702
+// delegation indicator (0xef0100 || address) is reported as observed state only;
+// it does not prove who authorized the delegation or that the delegate is safe.
 func ProbeEVM(ctx context.Context, client *http.Client, endpoint string, resolution Resolution) (EVMProbeResult, error) {
 	expectedChainID, ok := ExpectedEVMChainID(resolution.Network.ID)
 	if !ok || resolution.Network.Family != "evm" || !resolution.SyntaxValid {
@@ -97,6 +108,8 @@ func ProbeEVM(ctx context.Context, client *http.Client, endpoint string, resolut
 	}
 	state := "no_contract_code_observed"
 	codeHash := ""
+	delegationState := EVMDelegationStateNotObserved
+	delegationTarget := ""
 	if code != "0x" && code != "0x0" {
 		encoded := strings.TrimPrefix(code, "0x")
 		if len(encoded)%2 != 0 {
@@ -109,6 +122,10 @@ func ProbeEVM(ctx context.Context, client *http.Client, endpoint string, resolut
 		sum := sha256.Sum256(raw)
 		codeHash = hex.EncodeToString(sum[:])
 		state = "contract_code_observed"
+		if len(raw) == len(eip7702DelegationPrefix)+20 && bytes.Equal(raw[:len(eip7702DelegationPrefix)], eip7702DelegationPrefix) {
+			delegationState = EVMDelegationStateObserved
+			delegationTarget = "0x" + hex.EncodeToString(raw[len(eip7702DelegationPrefix):])
+		}
 	}
 
 	resolution.AnalysisPerformed = true
@@ -121,6 +138,8 @@ func ProbeEVM(ctx context.Context, client *http.Client, endpoint string, resolut
 		ExpectedChainID:   expectedChainID,
 		ContractCodeState: state,
 		ContractCodeHash:  codeHash,
+		DelegationState:   delegationState,
+		DelegationTarget:  delegationTarget,
 		AnalysisPerformed: true,
 		EvidenceStatus:    "observed",
 		LiveAvailability:  "checked",
