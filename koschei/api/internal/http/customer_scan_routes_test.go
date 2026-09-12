@@ -13,27 +13,21 @@ import (
 )
 
 func TestCustomerScanEndpointRequiresNetworkForEVMAddress(t *testing.T) {
-	staticDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("index"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(staticDir, "scan.html"), []byte("scan"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	srv := httptest.NewServer(NewServer(nil, "", "", "", staticDir))
-	defer srv.Close()
+	// Exercise the route contract directly. NewServer intentionally wraps /api
+	// routes in deployment-readiness middleware, and a nil database in this unit
+	// test must not be used to weaken that production gate.
+	mux := http.NewServeMux()
+	registerCustomerScanRoutes(mux)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/scan", strings.NewReader(`{"target":"0x1111111111111111111111111111111111111111"}`))
+	request.Header.Set("Content-Type", "application/json")
+	mux.ServeHTTP(recorder, request)
 
-	requestBody := `{"target":"0x1111111111111111111111111111111111111111"}`
-	resp, err := http.Post(srv.URL+"/api/scan", "application/json", strings.NewReader(requestBody))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusUnprocessableEntity {
-		t.Fatalf("status=%d", resp.StatusCode)
+	if recorder.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 	var envelope customerScanEnvelope
-	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+	if err := json.NewDecoder(recorder.Body).Decode(&envelope); err != nil {
 		t.Fatal(err)
 	}
 	if envelope.SchemaVersion != customerScanSchemaVersion {
