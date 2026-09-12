@@ -8,6 +8,12 @@ import (
 // registerStaticAliases keeps removed legacy product/demo URLs on the real
 // production surfaces instead of serving stale standalone pages.
 func registerStaticAliases(mux *http.ServeMux, staticDir string) {
+	// Register the customer scan API and the evidence/network fabric on the same
+	// production mux as the public scanner. These routes were previously only
+	// reachable when tests registered the fabric router directly.
+	registerCustomerScanRoutes(mux)
+	registerFabricRoutes(mux)
+
 	// TradePI AI Agents shares the existing deployment but owns an isolated
 	// namespace and does not alter Koschei Web3 security behavior.
 	registerTradePIAgentRoutes(mux)
