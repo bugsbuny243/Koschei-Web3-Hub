@@ -13,8 +13,8 @@ import (
 
 const (
 	AgentDelegationEvidenceChainContractVersionV1 = "koschei-agent-delegation-evidence-chain-v1"
-	AgentDelegationChainAuthorityNotEvaluatedV1    = "not_evaluated"
-	maxAgentDelegationEvidenceHopsV1               = 32
+	AgentDelegationChainAuthorityNotEvaluatedV1   = "not_evaluated"
+	maxAgentDelegationEvidenceHopsV1              = 32
 )
 
 type AgentDelegationHopBindingV1 struct {
