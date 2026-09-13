@@ -47,6 +47,7 @@ func registerCustomerScanRoutes(mux *http.ServeMux, rpc ...*web3.SolanaRPC) {
 	mux.HandleFunc("/api/scan", method(http.MethodPost, func(w http.ResponseWriter, r *http.Request) {
 		customerScanWithSolanaRPC(w, r, solanaRPC)
 	}))
+	mux.HandleFunc("/api/scan/approval", method(http.MethodPost, customerApprovalScan))
 }
 
 func decodeCustomerScanRequest(r io.Reader) (customerScanRequest, error) {
