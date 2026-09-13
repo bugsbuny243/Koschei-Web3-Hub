@@ -68,7 +68,13 @@
 
   function loadPageEnhancements(){
     const current=cleanPath(location.pathname);
-    if(current==='/scan'||current.startsWith('/scan/')){loadStyle('/css/koschei.css?v=1','customer-result-guidance-v3');loadEnhancement('/js/customer-scan-flow-v3.js?v=1','scan-v3');loadEnhancement('/js/customer-result-guidance-v3.js?v=1','result-guidance-v3');}
+    if(current==='/scan'||current.startsWith('/scan/')){
+      loadStyle('/css/koschei.css?v=1','customer-result-guidance-v3');
+      loadStyle('/css/customer-universal-address-scan-v1.css?v=1','universal-address-scan-v1');
+      loadEnhancement('/js/customer-universal-address-scan-v1.js?v=1','universal-address-scan-v1');
+      loadEnhancement('/js/customer-scan-flow-v3.js?v=1','scan-v3');
+      loadEnhancement('/js/customer-result-guidance-v3.js?v=1','result-guidance-v3');
+    }
     if(current==='/dashboard'){loadStyle('/css/koschei.css?v=1','workspace-plans-v3');loadEnhancement('/js/customer-workspace-plans-v3.js?v=1','workspace-plans-v3');}
   }
 
