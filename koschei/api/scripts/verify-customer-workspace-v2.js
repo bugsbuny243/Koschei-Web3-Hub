@@ -11,9 +11,9 @@ function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`$
 
 // Current customer workspace surface. The dashboard is intentionally a clean,
 // scoped product surface rather than the retired command-universe shell.
-requireText(html,'/css/koschei-dashboard.css?v=1','dashboard scoped style');
-requireText(html,'/js/customer-workspace-v2.js?v=2','dashboard account-data controller');
-requireText(html,'/js/koschei-dashboard.js?v=3','dashboard presentation controller');
+requireText(html,'/css/koschei-dashboard.css?v=2','dashboard scoped style');
+requireText(html,'/js/customer-workspace-v2.js?v=3','dashboard account-data controller');
+requireText(html,'/js/koschei-dashboard.js?v=4','dashboard presentation controller');
 requireText(html,'id="workspaceLatestReport"','latest investigation mount');
 requireText(html,'id="workspaceAlerts"','alerts mount');
 requireText(html,'id="workspaceLiveState"','live account-state mount');
@@ -27,15 +27,18 @@ requireText(html,'Live operational truth','operational truth surface');
 requireText(html,'No fake telemetry','no synthetic telemetry boundary');
 requireText(html,'Missing evidence remains unknown.','evidence-gap boundary');
 requireText(html,'Solana is the live chain core.','live-chain boundary');
-requireText(html,'Other chains <em>architecture direction</em></span><b>NOT LIVE</b>','future-chain boundary');
+requireText(html,'Other chains <em>implemented probe paths</em></span><b>PROBE READY</b>','future-chain boundary');
 requireText(html,'Status: building. No live capability is fabricated in the customer interface.','defense-validation capability boundary');
-requireText(html,'Status: expansion architecture. Networks beyond the current live core are not presented as active coverage.','cross-chain capability boundary');
+requireText(html,'Status: probe-ready evidence paths exist for supported EVM and Bitcoin targets; production availability remains evidence-bound.','cross-chain capability boundary');
 forbid(html,/PROFESSIONAL · ARVIS COMMAND UNIVERSE|customer-command-universe-v2\.js|customer-command-center-v1\.js|id="workspaceMissionControl"/,'retired command-universe contract');
 forbid(html,/ARVIS early access|Preview monitored targets|STARTER\+|ENTERPRISE\+/i,'retired commercial or preview copy');
 forbid(html,/holder access|Checking holder access/i,'legacy holder access copy');
 
 // Account state remains sourced from authenticated server APIs. Missing sources
 // stay unavailable instead of being filled with synthetic metrics.
+requireText(html,'id="dashboardUniversalScanForm"','static address entry');
+requireText(html,'id="dashboardScanNetwork"','explicit network selection');
+requireText(html,'id="workspaceRefresh"','account recovery action');
 requireText(js,"read('/api/auth/premium-access')",'Professional access source');
 requireText(js,"read('/api/v1/radar/jobs/')",'canonical history source');
 requireText(js,"read('/api/watchlist')",'watchlist source');

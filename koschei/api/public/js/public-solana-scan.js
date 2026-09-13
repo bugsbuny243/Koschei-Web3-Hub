@@ -180,5 +180,6 @@ const initialKind=params.get('kind')||'token';
 applyMode(initialMode,{updateURL:false,reset:false});
 if(['token','wallet','site','transaction'].includes(initialKind)&&activeMode!=='token')kind.value=initialKind;
 const initial=pathMint||params.get('mint')||params.get('target')||'';
-if(initial&&activeMode!=='transaction'){target.value=initial;runScan()}
+const addressEntry=params.get('mode')==='address'||(!params.has('mode')&&!pathMint&&!params.has('mint'));
+if(initial&&activeMode!=='transaction'&&!addressEntry){target.value=initial;runScan()}
 })();

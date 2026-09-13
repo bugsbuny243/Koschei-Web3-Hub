@@ -133,7 +133,7 @@ test('all customer pages use new cache keys for both health scripts', () => {
     const html = readFileSync(path.join(publicDir, filename), 'utf8');
     for (const match of html.matchAll(/\/js\/(koschei-(?:dashboard|product-v2)\.js)([^"'\s>]*)/g)) {
       assets.add(match[1]);
-      assert.equal(match[2], '?v=3', `${filename} still serves an old health script cache key`);
+      assert.ok(/^\?v=\d+$/.test(match[2]) && Number(match[2].slice(3)) >= 3, `${filename} still serves an old health script cache key`);
     }
   }
   assert.deepEqual([...assets].sort(), ['koschei-dashboard.js', 'koschei-product-v2.js']);

@@ -17,13 +17,15 @@ const strictWhen=value=>{if(!hasValue(value))return'UNAVAILABLE';const parsed=ne
 const historyStates=new Set(['queued','running','completed','failed']);
 
 async function read(path){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),12000);
   try{
-    const response=await KoscheiAuth.apiCall(path,{method:'GET'});
+    const response=await KoscheiAuth.apiCall(path,{method:'GET',signal:controller.signal,cache:'no-store'});
     const data=await response.json().catch(()=>({}));
     return {ok:response.ok,status:response.status,data};
   }catch(error){
     return {ok:false,status:0,data:{},error};
-  }
+  }finally{clearTimeout(timer);}
 }
 
 function setKPI(id,value,detail,tone=''){
@@ -76,7 +78,7 @@ function renderLatestInvestigation(items){
   const meta=domNode('div','workspace-report-meta');
   for(const [label,value] of [['Verdict',verdict],['Grade',grade],['Evidence',evidence]]){const wrap=domNode('div');wrap.append(domNode('label','',label),domNode('strong','',value));meta.append(wrap);}
   const actions=domNode('div','workspace-report-actions');
-  if(target){const reinvestigate=domNode('a','primary','Re-investigate target');reinvestigate.href=`/scan?mode=deep&target=${encodeURIComponent(target)}`;actions.append(reinvestigate);}
+  if(target){const reinvestigate=domNode('a','primary','Re-investigate target');reinvestigate.href=network==='solana-mainnet'?`/arvis-chat?target=${encodeURIComponent(target)}`:`/scan?mode=address&target=${encodeURIComponent(target)}&network=${encodeURIComponent(network)}`;actions.append(reinvestigate);}
   const historyLink=domNode('a','','Open investigation history');historyLink.href='/reports';actions.append(historyLink);
   card.append(top,meta,actions);host.append(card);
 }
@@ -99,11 +101,20 @@ function renderSignedOut(){
   const signIn=$('workspaceSignIn');if(signIn)signIn.hidden=false;
 }
 
+function renderUnavailable(){
+  const state=$('workspaceLiveState');if(state){state.dataset.state='partial';state.textContent='ACCOUNT SERVICE UNAVAILABLE';}
+  for(const id of ['workspaceAccessKpi','workspaceReportsKpi','workspaceWatchKpi','workspaceAlertsKpi'])setKPI(id,'—','Account data could not be loaded. Use Refresh account to retry.','warn');
+  renderLatestInvestigation(null);
+  const alerts=$('workspaceAlerts');if(alerts)alerts.textContent='Alerts are unavailable. This does not mean there are no alerts.';
+}
 async function load(){
-  if(!window.KoscheiAuth)return;
-  try{await KoscheiAuth.init();}catch{}
+  if(!window.KoscheiAuth){renderUnavailable();return;}
+  let timer;
+  try{await Promise.race([KoscheiAuth.init(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('auth_timeout')),15000);})]);}
+  catch{renderUnavailable();return;}finally{clearTimeout(timer);}
   const link=$('sessionLink');
   if(!KoscheiAuth.isLoggedIn()){
+    if(link){link.href='/login?next=/dashboard';link.textContent='Sign in';}
     renderSignedOut();return;
   }
   if(link){link.href='/account';link.textContent='Account';}
@@ -118,10 +129,13 @@ async function load(){
     read('/api/watchlist/alerts')
   ]);
 
+  accessResult.ok=accessResult.ok&&isObject(accessResult.data?.access);
+  watchResult.ok=watchResult.ok&&Array.isArray(watchResult.data?.targets);
+  alertsResult.ok=alertsResult.ok&&Array.isArray(alertsResult.data?.alerts);
   const access=obj(accessResult.data?.access),active=accessResult.ok&&access.active===true;
   const plan=text(access.plan||'none').toUpperCase();
   const remaining=access.outputs_remaining,total=access.outputs_total;
-  setKPI('workspaceAccessKpi',active?plan:'INACTIVE',active?`${displayNumber(remaining)} of ${displayNumber(total)} premium outputs remaining`:(accessResult.ok?'No active paid SaaS entitlement.':'Access service unavailable.'),active?'good':accessResult.ok?'warn':'bad');
+  setKPI('workspaceAccessKpi',active?plan:accessResult.ok?'INACTIVE':'—',active?`${displayNumber(remaining)} of ${displayNumber(total)} premium outputs remaining`:(accessResult.ok?'No active paid SaaS entitlement.':'Access service unavailable.'),active?'good':accessResult.ok?'warn':'bad');
 
   const investigationHistory=historyFrom(historyResultResponse),historyAvailable=Array.isArray(investigationHistory);
   setKPI('workspaceReportsKpi',historyAvailable?String(investigationHistory.length):'—',historyAvailable?(investigationHistory.length?'Durable canonical jobs returned by account history.':'No canonical investigation job retained yet.'):'Investigation history unavailable.',historyAvailable?'good':'bad');
@@ -135,7 +149,8 @@ async function load(){
   setKPI('workspaceAlertsKpi',alertsResult.ok?String(unread):'—',alertsResult.ok?(alerts.length?`${alerts.length} recent alert record(s) returned.`:'No alert record returned.'):(alertsResult.status===402||alertsResult.status===403?'Professional plan required.':'Alert service unavailable.'),alertsResult.ok&&unread===0?'good':alertsResult.ok?'warn':alertsResult.status===402||alertsResult.status===403?'warn':'bad');
 
   renderLatestInvestigation(investigationHistory);
-  renderAlerts(alerts);
+  if(alertsResult.ok&&Array.isArray(alertsResult.data?.alerts))renderAlerts(alerts);
+  else {const host=$('workspaceAlerts');if(host)host.textContent=alertsResult.status===402||alertsResult.status===403?'Professional access is required to load alerts.':'Alerts are unavailable. This does not mean there are no alerts.';}
   const availableSources=[accessResult.ok,historyAvailable,watchResult.ok,alertsResult.ok].filter(Boolean).length;
   if(state){
     state.dataset.state=availableSources===4?'live':'partial';
@@ -143,5 +158,13 @@ async function load(){
   }
 }
 
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load);else load();
+let loading=false;
+async function refresh(){
+  if(loading)return;loading=true;
+  const button=$('workspaceRefresh');if(button)button.disabled=true;
+  try{await load();}catch{renderUnavailable();}
+  finally{loading=false;if(button)button.disabled=false;}
+}
+function mount(){ $('workspaceRefresh')?.addEventListener('click',refresh);refresh(); }
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount);else mount();
 })();

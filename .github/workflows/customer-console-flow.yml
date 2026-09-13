@@ -1,0 +1,33 @@
+name: Customer Console Flow
+on:
+  pull_request:
+    paths:
+      - 'koschei/api/public/**'
+      - 'koschei/api/scripts/verify-customer-console-connections.cjs'
+      - '.github/workflows/customer-console-flow.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'koschei/api/public/**'
+      - 'koschei/api/scripts/verify-customer-console-connections.cjs'
+      - '.github/workflows/customer-console-flow.yml'
+permissions:
+  contents: read
+jobs:
+  customer-console:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify customer behavior and evidence boundaries
+        run: node --test koschei/api/public/js/__tests__/*.mjs koschei/api/public/js/__tests__/*.cjs
+      - name: Verify script, style and form connections
+        run: node koschei/api/scripts/verify-customer-console-connections.cjs
+      - name: Check browser script syntax
+        run: |
+          for script in koschei/api/public/js/*.js; do
+            node --check "$script"
+          done

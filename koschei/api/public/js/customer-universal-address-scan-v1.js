@@ -3,33 +3,10 @@
 if(window.__koscheiUniversalAddressScanV1)return;
 window.__koscheiUniversalAddressScanV1=true;
 
-const EVM_NETWORKS=[
-  ['ethereum-mainnet','Ethereum'],
-  ['base-mainnet','Base'],
-  ['arbitrum-mainnet','Arbitrum'],
-  ['optimism-mainnet','Optimism']
-];
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-const yesNo=value=>value===true?'YES':value===false?'NO':'—';
-const short=value=>{const s=String(value??'');return s.length>34?`${s.slice(0,15)}…${s.slice(-11)}`:s||'—'};
-
-function classify(value){
-  const v=value.trim();
-  if(/^0x[0-9a-fA-F]{40}$/.test(v))return{family:'evm',label:'EVM address',networks:EVM_NETWORKS};
-  if(/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{20,90}$/i.test(v))return{family:'bitcoin',label:'Bitcoin address',networks:[['bitcoin-mainnet','Bitcoin']]};
-  if(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v))return{family:'solana',label:'Solana address',networks:[['solana-mainnet','Solana']]};
-  return{family:'unknown',label:'Unknown address',networks:[]};
-}
-
-async function scanNetwork(target,network,label){
-  try{
-    const response=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({target,network}),cache:'no-store',credentials:'same-origin'});
-    const data=await response.json().catch(()=>({}));
-    return{network,label,http:response.status,ok:response.ok,data};
-  }catch(error){
-    return{network,label,http:0,ok:false,data:{error:error?.message||'network_error'}};
-  }
-}
+const yesNo=value=>value===true?'YES':value===false?'NO':'UNKNOWN';
+const short=value=>String(value??'')||'—';
+const errorCopy={401:'Sign in to continue this analysis.',402:'Professional access is required for this request.',403:'Your account cannot access this request.',429:'Too many requests. Wait a moment, then try again.',503:'This evidence source is currently unavailable. Try again later.'};
 
 function authorityRows(authority){
   if(!authority)return'<div class="cus-empty">No authority snapshot was attached for this network.</div>';
@@ -93,7 +70,7 @@ function verdictSummary(classification,entries){
 function resultCard(entry){
   const result=entry.data?.result;
   if(!entry.ok||!result){
-    const message=entry.data?.error||`HTTP ${entry.http||'unavailable'}`;
+    const message=errorCopy[entry.http]||entry.data?.error||'The evidence request could not be completed. Try again.';
     return `<article class="cus-network-card is-unavailable"><div class="cus-card-head"><div><span>${esc(entry.label)}</span><b>Evidence unavailable</b></div><em>${esc(String(entry.http||'OFFLINE'))}</em></div><p>${esc(message)}</p></article>`;
   }
   const authority=result.evm_authority;
@@ -104,7 +81,9 @@ function resultCard(entry){
     <details class="cus-details"><summary>Technical evidence</summary>
       ${renderTrust(result.trust||{})}
       ${authority?`<div class="cus-authority"><div class="cus-subhead"><span>Authority surface</span><b>Observed evidence</b></div>${authorityRows(authority)}</div>`:''}
-      <div class="cus-reasons"><div class="cus-subhead"><span>Reason codes</span><b>${reasons.length}</b></div>${reasons.length?reasons.slice(0,12).map(reason=>`<code>${esc(reason)}</code>`).join(''):'<span class="cus-empty">No reason code attached.</span>'}</div>
+      <div class="cus-reasons"><div class="cus-subhead"><span>Reason codes</span><b>${reasons.length}</b></div>${reasons.length?reasons.map(reason=>`<code>${esc(reason)}</code>`).join(''):'<span class="cus-empty">No reason code attached.</span>'}</div>
+      <div class="cus-reasons"><div class="cus-subhead">Evidence references</div>${(result.evidence_refs||[]).map(ref=>`<code>${esc(ref)}</code>`).join('')||'<span class="cus-empty">No reference was attached.</span>'}</div>
+      <details class="cus-details"><summary>Complete response</summary><pre class="cus-raw">${esc(JSON.stringify(entry.data,null,2))}</pre></details>
     </details>
   </article>`;
 }
@@ -128,83 +107,82 @@ function summaryBlock(classification,entries){
 }
 
 function install(){
-  if(!location.pathname.startsWith('/scan'))return;
-  const anchor=document.querySelector('.universe-gateway');
-  if(!anchor||document.getElementById('customerUniversalScan'))return;
-  const legacyHero=document.querySelector('.hero');
-  const legacyEVM=document.querySelector('.evm-desk');
-  if(legacyHero)legacyHero.hidden=true;
-  if(legacyEVM)legacyEVM.hidden=true;
+  const section=document.getElementById('customerUniversalScan'),routing=window.KoscheiScanEntry;
+  if(!section||!routing)return;
+  const $=id=>document.getElementById(id);
+  const form=$('customerUniversalScanForm'),input=$('customerUniversalTarget'),network=$('customerUniversalNetwork');
+  const submit=$('customerUniversalSubmit'),cancel=$('customerUniversalCancel'),status=$('customerUniversalStatus');
+  const wrap=$('customerUniversalResultsWrap'),overview=$('customerUniversalOverview'),results=$('customerUniversalResults');
+  const recovery=$('customerUniversalRecovery'),advanced=$('advancedTools');
+  let pending=null,generation=0;
 
-  const section=document.createElement('section');
-  section.id='customerUniversalScan';
-  section.className='customer-universal-scan';
-  section.innerHTML=`
-    <div class="cus-copy">
-      <span class="eyebrow">ADDRESS SCAN</span>
-      <h2>Paste an address.<br>Koschei handles the rest.</h2>
-      <p>Paste a wallet or contract address. Koschei identifies the address family and checks the supported evidence sources automatically.</p>
-    </div>
-    <form class="cus-form" id="customerUniversalScanForm">
-      <label for="customerUniversalTarget">Wallet or contract address</label>
-      <div class="cus-input-wrap"><input id="customerUniversalTarget" autocomplete="off" spellcheck="false" placeholder="Paste an address"><button type="submit" class="primary" id="customerUniversalSubmit">Scan address</button></div>
-      <div class="cus-hint"><span>EVM</span><span>Solana</span><span>Bitcoin</span></div>
-    </form>
-    <div class="cus-status" id="customerUniversalStatus">Ready for an address.</div>
-    <div class="cus-results-wrap" id="customerUniversalResultsWrap" hidden><div id="customerUniversalOverview"></div><div class="cus-results" id="customerUniversalResults"></div></div>
-    <button class="cus-advanced" id="customerAdvancedToggle" type="button" aria-expanded="false">Advanced tools</button>`;
-  anchor.insertAdjacentElement('afterend',section);
-
-  const form=section.querySelector('#customerUniversalScanForm');
-  const input=section.querySelector('#customerUniversalTarget');
-  const submit=section.querySelector('#customerUniversalSubmit');
-  const status=section.querySelector('#customerUniversalStatus');
-  const wrap=section.querySelector('#customerUniversalResultsWrap');
-  const overview=section.querySelector('#customerUniversalOverview');
-  const results=section.querySelector('#customerUniversalResults');
-  const advanced=section.querySelector('#customerAdvancedToggle');
-
-  advanced.addEventListener('click',()=>{
-    const open=advanced.getAttribute('aria-expanded')!=='true';
-    advanced.setAttribute('aria-expanded',String(open));
-    advanced.textContent=open?'Hide advanced tools':'Advanced tools';
-    if(legacyHero)legacyHero.hidden=!open;
-    if(legacyEVM)legacyEVM.hidden=!open;
-  });
+  function stop(){
+    generation++;
+    pending?.abort();pending=null;
+    form.removeAttribute('aria-busy');submit.disabled=false;submit.textContent='Analyze address';cancel.hidden=true;
+  }
+  function invalidate(){
+    stop();wrap.hidden=true;recovery.hidden=true;
+    status.textContent='Ready to analyze the current address and network.';
+    input.removeAttribute('aria-invalid');
+  }
+  input.addEventListener('input',invalidate);network.addEventListener('change',invalidate);
+  cancel.addEventListener('click',()=>{stop();wrap.hidden=true;status.textContent='Analysis canceled. You can start another request.';});
+  window.addEventListener('pagehide',stop);
 
   async function runScan(){
-    const target=input.value.trim();
-    const classification=classify(target);
-    if(!target){status.textContent='Paste an address first.';input.focus();return;}
-    if(classification.family==='unknown'){
-      status.textContent='Address format was not recognized. Check the address and try again.';
-      wrap.hidden=true;
-      return;
+    stop();wrap.hidden=true;recovery.hidden=true;
+    const request=routing.resolve(input.value,network.value);
+    if(request.error){
+      status.textContent=request.error;input.setAttribute('aria-invalid','true');
+      (request.needsNetwork?network:input).focus();return;
     }
-    submit.disabled=true;
-    submit.textContent='Scanning…';
-    wrap.hidden=true;
-    overview.innerHTML='';
-    results.innerHTML='';
-    status.textContent=classification.family==='evm'?'EVM address detected. Checking supported EVM networks…':`${classification.label} detected. Collecting read-only evidence…`;
+    input.removeAttribute('aria-invalid');network.value=request.network;
+    const current=++generation,controller=new AbortController();pending=controller;
+    const timer=setTimeout(()=>controller.abort(),15000);
+    submit.disabled=true;submit.textContent='Analyzing…';cancel.hidden=false;form.setAttribute('aria-busy','true');
+    status.textContent=`Collecting read-only evidence on ${request.label}…`;
+    history.replaceState({},'',routing.url(request.target,request.network).url);
     try{
-      const entries=await Promise.all(classification.networks.map(([network,label])=>scanNetwork(target,network,label)));
-      overview.innerHTML=summaryBlock(classification,entries);
-      results.innerHTML=entries.map(resultCard).join('');
-      wrap.hidden=false;
-      const live=entries.filter(x=>x.ok&&x.data?.result).length;
-      status.textContent=live?`Scan complete. ${live} evidence source${live===1?'':'s'} returned a result.`:'No configured evidence source returned a result. Koschei did not convert missing evidence into a safety claim.';
+      const response=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({target:request.target,network:request.network}),cache:'no-store',credentials:'same-origin',signal:controller.signal});
+      const data=await response.json();
+      if(current!==generation)return;
+      if(response.ok&&!routing.matchesResult(data,request))throw new Error('The returned evidence does not match this address and network. The result was withheld.');
+      const entry={network:request.network,label:request.label,http:response.status,ok:response.ok,data};
+      overview.innerHTML=summaryBlock({family:request.family,label:request.label+' address'},[entry]);
+      results.innerHTML=resultCard(entry);wrap.hidden=false;
+      status.textContent=response.ok?'Analysis complete. Review the findings, limits and technical evidence below.':(errorCopy[response.status]||'Analysis could not complete. Review the source error below and try again.');
+      if([401,402,403].includes(response.status)){
+        const link=document.createElement('a');
+        link.href=response.status===401?'/login?next='+encodeURIComponent(routing.url(request.target,request.network).url):'/account';
+        link.textContent=response.status===401?'Sign in to continue':'Review account access';
+        recovery.replaceChildren(link);recovery.hidden=false;
+      }
+      if(response.ok&&request.family==='solana'){
+        const link=document.createElement('a');link.href='/arvis-chat?'+new URLSearchParams({target:request.target,network:request.network});
+        link.textContent='Continue with ARVIS investigation';recovery.replaceChildren(link);recovery.hidden=false;
+      }
+    }catch(error){
+      if(current!==generation)return;
+      status.textContent=controller.signal.aborted?'The evidence service did not respond within 15 seconds. Try again.':(error instanceof SyntaxError?'The service returned an unreadable response. Try again.':error.message||'Connection failed. Try again.');
+      wrap.hidden=true;
     }finally{
-      submit.disabled=false;
-      submit.textContent='Scan address';
+      clearTimeout(timer);
+      if(current===generation){pending=null;submit.disabled=false;submit.textContent='Analyze address';cancel.hidden=true;form.removeAttribute('aria-busy');}
     }
   }
-
   form.addEventListener('submit',event=>{event.preventDefault();runScan();});
-
-  const params=new URLSearchParams(location.search);
+  const params=new URLSearchParams(location.search),addressView=routing.isAddressView();
+  if(advanced){
+    advanced.open=!addressView;
+    document.querySelectorAll('[data-scan-mode]').forEach(button=>button.addEventListener('click',()=>{stop();advanced.open=true;}));
+  }
   const initial=params.get('target');
-  if(initial){input.value=initial;queueMicrotask(runScan);}
+  if(addressView&&initial){
+    input.value=initial;network.value=params.get('network')||'';
+    if(params.get('network')&&!routing.networks.some(item=>item[0]===params.get('network'))){status.textContent='The link contains an unsupported network. Select a network to continue.';return;}
+    runScan();
+  }
 }
 
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',install,{once:true}):install();
