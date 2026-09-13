@@ -9,7 +9,7 @@ const EVM_NETWORKS=[
   ['arbitrum-mainnet','Arbitrum'],
   ['optimism-mainnet','Optimism']
 ];
-const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]));
 const yesNo=value=>value===true?'YES':value===false?'NO':'—';
 const short=value=>{const s=String(value??'');return s.length>34?`${s.slice(0,15)}…${s.slice(-11)}`:s||'—'};
 
@@ -64,6 +64,32 @@ function customerSummary(result){
   return String(result.status||'Evidence returned').replaceAll('_',' ');
 }
 
+function verdictSummary(classification,entries){
+  const live=entries.filter(x=>x.ok&&x.data?.result);
+  if(!live.length){
+    return{tone:'limited',label:'LIMITED EVIDENCE',title:'No live evidence source returned a result.',copy:'Koschei could not complete a live observation for this address. Missing evidence is not treated as a safety signal.'};
+  }
+  const results=live.map(x=>x.data.result);
+  const authorities=results.map(x=>x.evm_authority).filter(Boolean);
+  const delegated=authorities.some(a=>a.delegation_state==='delegation_observed');
+  const upgradeable=authorities.some(a=>a.proxy_state==='erc1967_authority_observed');
+  const conflicting=authorities.some(a=>a.conflicting_slots===true);
+  if(conflicting){
+    return{tone:'review',label:'REVIEW AUTHORITY',title:'Conflicting proxy authority slots were observed.',copy:'The address has a control surface that deserves review. This observation does not prove malicious intent.'};
+  }
+  if(delegated){
+    return{tone:'review',label:'REVIEW AUTHORITY',title:'EIP-7702 delegation was observed.',copy:'The address delegates execution authority. Review the delegate target and attached evidence before relying on the address.'};
+  }
+  if(upgradeable){
+    return{tone:'review',label:'REVIEW AUTHORITY',title:'Upgradeable authority was observed.',copy:'ERC-1967 authority is present on at least one observed network. Upgradeability is a control surface, not an automatic malicious verdict.'};
+  }
+  const observed=results.some(x=>x.trust?.observed===true);
+  if(observed){
+    return{tone:'observed',label:'OBSERVED',title:'Live on-chain state was observed.',copy:classification.family==='evm'?'No supported authority signal was attached to the returned observations. This is not proof that the address is immutable or safe.':'Koschei returned live read-only evidence. Review the evidence details before making a security decision.'};
+  }
+  return{tone:'limited',label:'LIMITED EVIDENCE',title:'Evidence returned without a completed observation.',copy:'Koschei did not promote incomplete evidence into a safety claim.'};
+}
+
 function resultCard(entry){
   const result=entry.data?.result;
   if(!entry.ok||!result){
@@ -88,13 +114,17 @@ function summaryBlock(classification,entries){
   const unavailable=entries.length-live.length;
   const authorityCount=live.filter(x=>Boolean(x.data?.result?.evm_authority)).length;
   const observed=live.filter(x=>x.data?.result?.trust?.observed===true).length;
-  return `<section class="cus-overview">
-    <div><span>Detected</span><b>${esc(classification.label)}</b></div>
-    <div><span>Evidence returned</span><b>${live.length}</b></div>
-    <div><span>Observed networks</span><b>${observed}</b></div>
-    <div><span>Unavailable</span><b>${unavailable}</b></div>
-    ${classification.family==='evm'?`<div><span>Authority snapshots</span><b>${authorityCount}</b></div>`:''}
-  </section>`;
+  const verdict=verdictSummary(classification,entries);
+  return `<section class="cus-customer-verdict" data-tone="${esc(verdict.tone)}">
+      <span>${esc(verdict.label)}</span><h3>${esc(verdict.title)}</h3><p>${esc(verdict.copy)}</p>
+    </section>
+    <section class="cus-overview">
+      <div><span>Detected</span><b>${esc(classification.label)}</b></div>
+      <div><span>Evidence returned</span><b>${live.length}</b></div>
+      <div><span>Observed networks</span><b>${observed}</b></div>
+      <div><span>Unavailable</span><b>${unavailable}</b></div>
+      ${classification.family==='evm'?`<div><span>Authority snapshots</span><b>${authorityCount}</b></div>`:''}
+    </section>`;
 }
 
 function install(){
