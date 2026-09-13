@@ -9,7 +9,7 @@ const EVM_NETWORKS=[
   ['arbitrum-mainnet','Arbitrum'],
   ['optimism-mainnet','Optimism']
 ];
-const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]));
+const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const yesNo=value=>value===true?'YES':value===false?'NO':'—';
 const short=value=>{const s=String(value??'');return s.length>34?`${s.slice(0,15)}…${s.slice(-11)}`:s||'—'};
 
