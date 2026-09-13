@@ -15,10 +15,10 @@ const short=value=>{const s=String(value??'');return s.length>34?`${s.slice(0,15
 
 function classify(value){
   const v=value.trim();
-  if(/^0x[0-9a-fA-F]{40}$/.test(v))return{family:'evm',networks:EVM_NETWORKS};
-  if(/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{20,90}$/i.test(v))return{family:'bitcoin',networks:[['bitcoin-mainnet','Bitcoin']]};
-  if(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v))return{family:'solana',networks:[['solana-mainnet','Solana']]};
-  return{family:'unknown',networks:[]};
+  if(/^0x[0-9a-fA-F]{40}$/.test(v))return{family:'evm',label:'EVM address',networks:EVM_NETWORKS};
+  if(/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{20,90}$/i.test(v))return{family:'bitcoin',label:'Bitcoin address',networks:[['bitcoin-mainnet','Bitcoin']]};
+  if(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(v))return{family:'solana',label:'Solana address',networks:[['solana-mainnet','Solana']]};
+  return{family:'unknown',label:'Unknown address',networks:[]};
 }
 
 async function scanNetwork(target,network,label){
@@ -52,6 +52,18 @@ function renderTrust(trust={}){
   return `<div class="cus-trust">${axes.map(([name,value])=>`<div data-on="${value===true?'1':'0'}"><span>${esc(name)}</span><b>${yesNo(value)}</b></div>`).join('')}</div>`;
 }
 
+function customerSummary(result){
+  if(!result)return'Evidence unavailable';
+  if(result.evm_authority){
+    const a=result.evm_authority;
+    if(a.delegation_state==='delegation_observed')return'EIP-7702 delegation observed';
+    if(a.proxy_state==='erc1967_authority_observed')return'Upgradeable authority observed';
+    if(a.contract_code_state==='contract_code_observed')return'Contract code observed';
+  }
+  if(result.trust?.observed===true)return'On-chain state observed';
+  return String(result.status||'Evidence returned').replaceAll('_',' ');
+}
+
 function resultCard(entry){
   const result=entry.data?.result;
   if(!entry.ok||!result){
@@ -61,12 +73,28 @@ function resultCard(entry){
   const authority=result.evm_authority;
   const reasons=Array.isArray(result.reasons)?result.reasons:[];
   return `<article class="cus-network-card">
-    <div class="cus-card-head"><div><span>${esc(entry.label)}</span><b>${esc(String(result.status||'observed').replaceAll('_',' '))}</b></div><em>${esc(String(result.evidence_status||'unknown').toUpperCase())}</em></div>
+    <div class="cus-card-head"><div><span>${esc(entry.label)}</span><b>${esc(customerSummary(result))}</b></div><em>${esc(String(result.evidence_status||'unknown').toUpperCase())}</em></div>
     <div class="cus-target">${esc(result.target?.raw||'')}</div>
-    ${renderTrust(result.trust||{})}
-    ${authority?`<div class="cus-authority"><div class="cus-subhead"><span>Authority surface</span><b>Observed evidence</b></div>${authorityRows(authority)}</div>`:''}
-    <div class="cus-reasons"><div class="cus-subhead"><span>Reason codes</span><b>${reasons.length}</b></div>${reasons.length?reasons.slice(0,12).map(reason=>`<code>${esc(reason)}</code>`).join(''):'<span class="cus-empty">No reason code attached.</span>'}</div>
+    <details class="cus-details"><summary>Technical evidence</summary>
+      ${renderTrust(result.trust||{})}
+      ${authority?`<div class="cus-authority"><div class="cus-subhead"><span>Authority surface</span><b>Observed evidence</b></div>${authorityRows(authority)}</div>`:''}
+      <div class="cus-reasons"><div class="cus-subhead"><span>Reason codes</span><b>${reasons.length}</b></div>${reasons.length?reasons.slice(0,12).map(reason=>`<code>${esc(reason)}</code>`).join(''):'<span class="cus-empty">No reason code attached.</span>'}</div>
+    </details>
   </article>`;
+}
+
+function summaryBlock(classification,entries){
+  const live=entries.filter(x=>x.ok&&x.data?.result);
+  const unavailable=entries.length-live.length;
+  const authorityCount=live.filter(x=>Boolean(x.data?.result?.evm_authority)).length;
+  const observed=live.filter(x=>x.data?.result?.trust?.observed===true).length;
+  return `<section class="cus-overview">
+    <div><span>Detected</span><b>${esc(classification.label)}</b></div>
+    <div><span>Evidence returned</span><b>${live.length}</b></div>
+    <div><span>Observed networks</span><b>${observed}</b></div>
+    <div><span>Unavailable</span><b>${unavailable}</b></div>
+    ${classification.family==='evm'?`<div><span>Authority snapshots</span><b>${authorityCount}</b></div>`:''}
+  </section>`;
 }
 
 function install(){
@@ -83,65 +111,70 @@ function install(){
   section.className='customer-universal-scan';
   section.innerHTML=`
     <div class="cus-copy">
-      <span class="eyebrow">UNIVERSAL ADDRESS SCAN</span>
+      <span class="eyebrow">ADDRESS SCAN</span>
       <h2>Paste an address.<br>Koschei handles the rest.</h2>
-      <p>No chain selector. No token/owner/spender form. Paste a wallet or contract address and Koschei routes it to the supported evidence probes.</p>
+      <p>Paste a wallet or contract address. Koschei identifies the address family and checks the supported evidence sources automatically.</p>
     </div>
     <form class="cus-form" id="customerUniversalScanForm">
       <label for="customerUniversalTarget">Wallet or contract address</label>
-      <div class="cus-input-wrap"><input id="customerUniversalTarget" autocomplete="off" spellcheck="false" placeholder="0x… / Solana address / Bitcoin address"><button type="submit" class="primary" id="customerUniversalSubmit">Scan address</button></div>
-      <div class="cus-hint"><span>Ethereum · Base · Arbitrum · Optimism</span><span>Solana</span><span>Bitcoin</span></div>
+      <div class="cus-input-wrap"><input id="customerUniversalTarget" autocomplete="off" spellcheck="false" placeholder="Paste an address"><button type="submit" class="primary" id="customerUniversalSubmit">Scan address</button></div>
+      <div class="cus-hint"><span>EVM</span><span>Solana</span><span>Bitcoin</span></div>
     </form>
     <div class="cus-status" id="customerUniversalStatus">Ready for an address.</div>
-    <div class="cus-results" id="customerUniversalResults" hidden></div>
-    <button class="cus-advanced" id="customerAdvancedToggle" type="button" aria-expanded="false">Advanced investigation tools</button>`;
+    <div class="cus-results-wrap" id="customerUniversalResultsWrap" hidden><div id="customerUniversalOverview"></div><div class="cus-results" id="customerUniversalResults"></div></div>
+    <button class="cus-advanced" id="customerAdvancedToggle" type="button" aria-expanded="false">Advanced tools</button>`;
   anchor.insertAdjacentElement('afterend',section);
 
   const form=section.querySelector('#customerUniversalScanForm');
   const input=section.querySelector('#customerUniversalTarget');
   const submit=section.querySelector('#customerUniversalSubmit');
   const status=section.querySelector('#customerUniversalStatus');
+  const wrap=section.querySelector('#customerUniversalResultsWrap');
+  const overview=section.querySelector('#customerUniversalOverview');
   const results=section.querySelector('#customerUniversalResults');
   const advanced=section.querySelector('#customerAdvancedToggle');
 
   advanced.addEventListener('click',()=>{
     const open=advanced.getAttribute('aria-expanded')!=='true';
     advanced.setAttribute('aria-expanded',String(open));
-    advanced.textContent=open?'Hide advanced investigation tools':'Advanced investigation tools';
+    advanced.textContent=open?'Hide advanced tools':'Advanced tools';
     if(legacyHero)legacyHero.hidden=!open;
     if(legacyEVM)legacyEVM.hidden=!open;
   });
 
-  form.addEventListener('submit',async event=>{
-    event.preventDefault();
+  async function runScan(){
     const target=input.value.trim();
     const classification=classify(target);
     if(!target){status.textContent='Paste an address first.';input.focus();return;}
     if(classification.family==='unknown'){
       status.textContent='Address format was not recognized. Check the address and try again.';
-      results.hidden=true;
+      wrap.hidden=true;
       return;
     }
     submit.disabled=true;
     submit.textContent='Scanning…';
-    results.hidden=true;
+    wrap.hidden=true;
+    overview.innerHTML='';
     results.innerHTML='';
-    status.textContent=classification.family==='evm'?'EVM address detected. Checking supported EVM networks…':`${classification.networks[0][1]} address detected. Collecting read-only evidence…`;
+    status.textContent=classification.family==='evm'?'EVM address detected. Checking supported EVM networks…':`${classification.label} detected. Collecting read-only evidence…`;
     try{
       const entries=await Promise.all(classification.networks.map(([network,label])=>scanNetwork(target,network,label)));
+      overview.innerHTML=summaryBlock(classification,entries);
       results.innerHTML=entries.map(resultCard).join('');
-      results.hidden=false;
-      const live=entries.filter(x=>x.ok).length;
-      status.textContent=live?`Scan complete · ${live} network result${live===1?'':'s'} returned evidence.`:'No configured evidence probe returned a result. The address was not marked safe.';
+      wrap.hidden=false;
+      const live=entries.filter(x=>x.ok&&x.data?.result).length;
+      status.textContent=live?`Scan complete. ${live} evidence source${live===1?'':'s'} returned a result.`:'No configured evidence source returned a result. Koschei did not convert missing evidence into a safety claim.';
     }finally{
       submit.disabled=false;
       submit.textContent='Scan address';
     }
-  });
+  }
+
+  form.addEventListener('submit',event=>{event.preventDefault();runScan();});
 
   const params=new URLSearchParams(location.search);
   const initial=params.get('target');
-  if(initial){input.value=initial;}
+  if(initial){input.value=initial;queueMicrotask(runScan);}
 }
 
 document.readyState==='loading'?document.addEventListener('DOMContentLoaded',install,{once:true}):install();
