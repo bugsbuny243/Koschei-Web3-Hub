@@ -7,6 +7,8 @@ const STATE_ORDER=['verified','observed','window_open','arm_pending','not_applic
 const STATE_LABEL={verified:'Verified',observed:'Observed',window_open:'Monitoring',arm_pending:'Missing',not_applicable:'N/A'};
 const stateOf=node=>STATE_ORDER.find(state=>node.classList.contains(state))||'observed';
 const authorityMatch=label=>/authority|mint|freeze|owner control|delegate|admin|upgrade/i.test(label);
+let lastSignature='';
+let scheduled=false;
 
 function readSignals(){
   return [...result.querySelectorAll('.public-signal')].map(node=>{
@@ -17,9 +19,13 @@ function readSignals(){
   }).filter(row=>row.label);
 }
 function render(){
+  scheduled=false;
+  const rows=readSignals();
+  const signature=JSON.stringify(rows);
+  if(signature===lastSignature)return;
+  lastSignature=signature;
   const existing=result.querySelector('[data-premium-evidence-matrix]');
   if(existing)existing.remove();
-  const rows=readSignals();
   if(!rows.length)return;
   const counts=Object.fromEntries(STATE_ORDER.map(state=>[state,rows.filter(row=>row.state===state).length]));
   const authority=rows.filter(row=>authorityMatch(row.label));
@@ -46,7 +52,11 @@ function render(){
   const card=result.querySelector('.public-investigation-card')||result.firstElementChild;
   if(card)card.insertAdjacentElement('afterend',matrix);else result.prepend(matrix);
 }
-const observer=new MutationObserver(()=>queueMicrotask(render));
-observer.observe(result,{childList:true,subtree:true});
+function schedule(){if(scheduled)return;scheduled=true;queueMicrotask(render)}
+const observer=new MutationObserver(mutations=>{
+  if(mutations.every(m=>m.target.closest?.('[data-premium-evidence-matrix]')))return;
+  schedule();
+});
+observer.observe(result,{childList:true,subtree:true,characterData:true});
 render();
 })();
