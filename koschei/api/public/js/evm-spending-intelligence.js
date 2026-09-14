@@ -35,6 +35,7 @@ function authorityHTML(authority){
   return rows.map(([label,value],index)=>`<div class="esi-authority-row"><span>${String(index+1).padStart(2,'0')}</span><div><b>${esc(label)}</b><small title="${esc(value)}">${esc(short(value))}</small></div></div>`).join('');
 }
 function validateObservedAllowance(payload,expected){
+  if(payload?.schema_version!=='koschei-approval-scan-v1')throw new Error('approval evidence schema mismatch');
   const data=payload?.result;
   if(!data||typeof data!=='object')throw new Error('approval evidence missing');
   if(norm(data.network)!==norm(expected.network))throw new Error('approval evidence network mismatch');
