@@ -8,6 +8,7 @@ const source=fs.readFileSync(path.join(__dirname,'..','evm-spending-intelligence
 const token='0x1111111111111111111111111111111111111111';
 const owner='0x2222222222222222222222222222222222222222';
 const spender='0x3333333333333333333333333333333333333333';
+const maxUint256='115792089237316195423570985008687907853269984665640564039457584007913129639935';
 const observedTrust={claimed:false,observed:true,authorized:false,available:false,verified:false,finalized:false};
 
 class Node {
@@ -51,11 +52,15 @@ test('observed zero allowance renders only when tuple and evidence binding are c
   assert.match(h.nodes.evmSpendingStatus.textContent,/Current allowance observed/);assert.equal(h.nodes.evmSpendingSubmit.disabled,false);
 });
 
-test('bound spender authority evidence renders with the allowance observation',async()=>{
-  const h=harness(async()=>response(200,envelope({spender_authority:authority()})));
+test('exact max uint256 is the only unlimited allowance representation',async()=>{
+  const h=harness(async()=>response(200,envelope({amount:maxUint256,unlimited:true})));
   h.submit();await settle();
-  assert.equal(h.nodes.evmSpendingResult.hidden,false);
-  assert.match(h.nodes.evmSpendingResult.innerHTML,/contract_code_observed/);
+  assert.equal(h.nodes.evmSpendingResult.hidden,false);assert.match(h.nodes.evmSpendingResult.innerHTML,/Unlimited<\/span><strong>YES/);
+});
+
+test('bound spender authority evidence renders with the allowance observation',async()=>{
+  const h=harness(async()=>response(200,envelope({spender_authority:authority()})));h.submit();await settle();
+  assert.equal(h.nodes.evmSpendingResult.hidden,false);assert.match(h.nodes.evmSpendingResult.innerHTML,/contract_code_observed/);
 });
 
 test('malformed HTTP 200 is withheld instead of becoming zero allowance',async()=>{
@@ -64,8 +69,7 @@ test('malformed HTTP 200 is withheld instead of becoming zero allowance',async()
 });
 
 test('stale or foreign approval schema is withheld even when result shape looks valid',async()=>{
-  const stale=envelope();stale.schema_version='koschei-approval-scan-v0';
-  const h=harness(async()=>response(200,stale));h.submit();await settle();
+  const stale=envelope();stale.schema_version='koschei-approval-scan-v0';const h=harness(async()=>response(200,stale));h.submit();await settle();
   assert.equal(h.nodes.evmSpendingResult.hidden,true);assert.match(h.nodes.evmSpendingStatus.textContent,/approval evidence schema mismatch/);
 });
 
@@ -77,33 +81,35 @@ test('wrong chain or subject tuple is withheld',async()=>{
 });
 
 test('foreign or over-promoted nested spender authority is withheld',async()=>{
-  for(const badAuthority of [
-    authority({network:'base-mainnet'}),
-    authority({spender:'0x7777777777777777777777777777777777777777'}),
-    authority({trust:{observed:false,verified:false,authorized:false,finalized:false}}),
-    authority({trust:{observed:true,verified:true,authorized:false,finalized:false}})
-  ]){
+  for(const badAuthority of [authority({network:'base-mainnet'}),authority({spender:'0x7777777777777777777777777777777777777777'}),authority({trust:{observed:false,verified:false,authorized:false,finalized:false}}),authority({trust:{observed:true,verified:true,authorized:false,finalized:false}})]){
     const h=harness(async()=>response(200,envelope({spender_authority:badAuthority})));h.submit();await settle();
     assert.equal(h.nodes.evmSpendingResult.hidden,true);assert.equal(h.nodes.evmSpendingStatus.dataset.state,'error');
   }
 });
 
-test('incomplete or over-promoted allowance evidence is withheld',async()=>{
+test('non-canonical, overflowing, or contradictory amount semantics are withheld',async()=>{
+  const overflow='115792089237316195423570985008687907853269984665640564039457584007913129639936';
   for(const bad of [
-    {evidence_status:'unverified'},{live_availability:'partial'},{amount:undefined},
-    {trust:{observed:false,verified:false,authorized:false,finalized:false}},
-    {trust:{observed:true,verified:true,authorized:false,finalized:false}},
-    {trust:{observed:true,verified:false,authorized:true,finalized:false}},
-    {trust:{observed:true,verified:false,authorized:false,finalized:true}}
+    {amount:'000',unlimited:false},
+    {amount:overflow,unlimited:false},
+    {amount:'0',unlimited:true},
+    {amount:maxUint256,unlimited:false},
+    {amount:'1',unlimited:'false'}
   ]){
     const h=harness(async()=>response(200,envelope(bad)));h.submit();await settle();
     assert.equal(h.nodes.evmSpendingResult.hidden,true);assert.equal(h.nodes.evmSpendingStatus.dataset.state,'error');
   }
 });
 
+test('incomplete or over-promoted allowance evidence is withheld',async()=>{
+  for(const bad of [{evidence_status:'unverified'},{live_availability:'partial'},{amount:undefined},{trust:{observed:false,verified:false,authorized:false,finalized:false}},{trust:{observed:true,verified:true,authorized:false,finalized:false}},{trust:{observed:true,verified:false,authorized:true,finalized:false}},{trust:{observed:true,verified:false,authorized:false,finalized:true}}]){
+    const h=harness(async()=>response(200,envelope(bad)));h.submit();await settle();
+    assert.equal(h.nodes.evmSpendingResult.hidden,true);assert.equal(h.nodes.evmSpendingStatus.dataset.state,'error');
+  }
+});
+
 test('provider error never renders stale allowance',async()=>{
-  const h=harness(async()=>response(502,{error:'evm_allowance_probe_unavailable'}));
-  h.nodes.evmSpendingResult.hidden=false;h.nodes.evmSpendingResult.innerHTML='<b>stale</b>';h.submit();await settle();
+  const h=harness(async()=>response(502,{error:'evm_allowance_probe_unavailable'}));h.nodes.evmSpendingResult.hidden=false;h.nodes.evmSpendingResult.innerHTML='<b>stale</b>';h.submit();await settle();
   assert.equal(h.nodes.evmSpendingResult.hidden,true);assert.match(h.nodes.evmSpendingStatus.textContent,/evm_allowance_probe_unavailable/);assert.equal(h.nodes.evmSpendingSubmit.disabled,false);
 });
 
