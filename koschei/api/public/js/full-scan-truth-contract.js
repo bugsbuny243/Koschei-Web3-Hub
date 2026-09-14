@@ -1,3 +1,4 @@
+// ORPHAN: no HTML page loads this file as of 2026-09-14.
 (function(root,factory){
   const api=factory();
   if(typeof module==='object'&&module.exports)module.exports=api;

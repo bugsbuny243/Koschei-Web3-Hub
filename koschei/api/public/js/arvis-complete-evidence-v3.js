@@ -1,3 +1,4 @@
+// ORPHAN: no HTML page loads this file as of 2026-09-14.
 (()=>{
 'use strict';
 // Compatibility-only asset. Complete Evidence v3 previously re-projected the

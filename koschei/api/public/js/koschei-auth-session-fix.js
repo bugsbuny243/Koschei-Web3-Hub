@@ -1,3 +1,4 @@
+// ORPHAN: no HTML page loads this file as of 2026-09-14.
 (function () {
   const auth = window.KoscheiAuth;
   if (!auth || window.__koscheiAuthSessionFixInstalled) return;
