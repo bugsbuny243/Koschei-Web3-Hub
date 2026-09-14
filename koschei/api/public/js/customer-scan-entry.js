@@ -9,8 +9,6 @@ const networks=Object.freeze([
 function classify(value){
   const target=String(value||'').trim();
   if(/^0x[0-9a-fA-F]{40}$/.test(target))return 'evm';
-  // Legacy Bitcoin addresses overlap Solana's alphabet. Never infer a chain
-  // from their prefix alone; an explicit network disambiguates them.
   if(/^(?:bc1|BC1)[a-zA-Z0-9]{20,87}$/.test(target))return 'bitcoin';
   if(/^[13][1-9A-HJ-NP-Za-km-z]{25,34}$/.test(target))return 'ambiguous';
   if(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(target))return 'solana';
@@ -58,6 +56,14 @@ function authorityMatchesRequest(authority,request){
   if(trust.authorized||trust.verified||trust.finalized)return false;
   return true;
 }
+function partialEvidenceMatches(result,request){
+  const reasons=Array.isArray(result?.reasons)?result.reasons:[];
+  const authorityUnavailable=reasons.includes('EVM_AUTHORITY_PROBE_UNAVAILABLE');
+  const partialMarker=reasons.includes('PARTIAL_EVIDENCE_EVM_AUTHORITY_UNAVAILABLE');
+  if(request.family!=='evm')return !authorityUnavailable&&!partialMarker;
+  if(result.evm_authority===undefined||result.evm_authority===null)return authorityUnavailable&&partialMarker;
+  return !authorityUnavailable&&!partialMarker;
+}
 function matchesResult(data,request){
   const result=data?.result,target=result?.target,trust=result?.trust;
   if(data?.schema_version!=='koschei-customer-scan-v1'||target?.raw!==request.target||target?.network_hint!==request.network)return false;
@@ -72,6 +78,7 @@ function matchesResult(data,request){
   if(result.status==='evidence_ready'&&(!trust.verified||!trust.observed||result.verdict!=='review'))return false;
   if((result.status==='needs_context'||result.status==='insufficient_evidence')&&(trust.observed||result.verdict!=='unknown'))return false;
   if(!authorityMatchesRequest(result.evm_authority,request))return false;
+  if(!partialEvidenceMatches(result,request))return false;
   return true;
 }
 window.KoscheiScanEntry=Object.freeze({networks,classify,resolve,url,isAddressView,matchesResult});
