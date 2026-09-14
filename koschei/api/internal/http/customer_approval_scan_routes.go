@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math/big"
 	"mime"
 	"net/http"
 	"strings"
@@ -92,8 +93,14 @@ func validateCustomerApprovalObservation(request customerApprovalScanRequest, al
 	if strings.ToLower(strings.TrimSpace(allowance.EvidenceStatus)) != "observed" || strings.ToLower(strings.TrimSpace(allowance.LiveAvailability)) != "checked" {
 		return errors.New("approval_observation_incomplete")
 	}
-	if strings.TrimSpace(allowance.Amount) == "" {
-		return errors.New("approval_observation_amount_missing")
+	amountText := strings.TrimSpace(allowance.Amount)
+	amount, ok := new(big.Int).SetString(amountText, 10)
+	if !ok || amount.Sign() < 0 || amount.BitLen() > 256 || amount.String() != amountText {
+		return errors.New("approval_observation_amount_invalid")
+	}
+	maxUint256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+	if allowance.Unlimited != (amount.Cmp(maxUint256) == 0) {
+		return errors.New("approval_observation_unlimited_mismatch")
 	}
 	return nil
 }
