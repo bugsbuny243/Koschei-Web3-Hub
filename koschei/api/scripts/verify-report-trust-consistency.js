@@ -34,27 +34,27 @@ need('public/scan.html', '/css/koschei.css?v=1');
 reject('public/scan.html', 'data-scan-mode="quick"');
 reject('public/scan.html', 'Professional+');
 
-// Homepage trust contract follows the current clean homepage introduced by the
-// 2026-09-07 surface refactor. The verifier protects product truth and security
-// boundaries rather than pinning retired Universe Gateway copy/assets.
-need('public/index.html', 'See the blind spot.');
-need('public/index.html', 'Before it becomes the attack.');
-need('public/index.html', 'Solana live production core');
-need('public/index.html', 'missing evidence stays unknown');
-need('public/index.html', 'No custody · no private keys');
-need('public/index.html', 'One reasoning path.');
-need('public/index.html', 'Every claim accountable.');
-need('public/index.html', 'ARVIS is not a generic risk-score machine.');
-need('public/index.html', 'Attack Path');
-need('public/index.html', 'Evidence provenance');
-need('public/index.html', 'Protocol Defense Validation');
-need('public/index.html', '<span class="state building">Building</span>');
-need('public/index.html', 'Cross-chain Intelligence');
-need('public/index.html', '<span class="state building">Expansion</span>');
-need('public/index.html', 'Solana is the live core; additional chain adapters remain expansion work until their evidence paths are production-ready.');
-need('public/index.html', 'STRUCTURE ONLY · NOT LIVE TELEMETRY');
-need('public/index.html', '/css/koschei-home.css?v=1');
-need('public/index.html', 'Enter Customer Panel');
+// Homepage trust contract follows the current Security Intelligence surface.
+// Protect evidence boundaries and no-custody truth instead of retired visual copy.
+need('public/index.html', 'Security decisions,');
+need('public/index.html', 'with proof attached.');
+need('public/index.html', 'What is observed stays observed. What is unknown stays unknown.');
+need('public/index.html', '<strong>Read-only</strong>');
+need('public/index.html', '<strong>Fail-closed</strong>');
+need('public/index.html', '<strong>No custody</strong><span>no private keys</span>');
+need('public/index.html', 'Illustrative structure · not live telemetry');
+need('public/index.html', 'UNKNOWN ≠ SAFE');
+need('public/index.html', 'Evidence contract');
+need('public/index.html', 'Every conclusion keeps its boundary.');
+need('public/index.html', 'Observed is not verified');
+need('public/index.html', 'Permission is not safety');
+need('public/index.html', 'Absence is not proof');
+need('public/index.html', 'Coverage without theatre');
+need('public/index.html', 'Production core');
+need('public/index.html', 'LIVE CORE');
+need('public/index.html', 'PROBE READY');
+need('public/index.html', '/css/koschei-home.css?v=2');
+need('public/index.html', 'Enter Intelligence Console');
 need('public/index.html', 'Evidence first · Unknown stays unknown');
 
 // Retired homepage implementations and unsupported production claims stay out.
