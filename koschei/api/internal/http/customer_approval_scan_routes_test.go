@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"koschei/api/internal/networktarget"
 )
 
 func TestCustomerApprovalScanRejectsMissingContext(t *testing.T) {
@@ -62,5 +64,79 @@ func TestCustomerApprovalScanRejectsGET(t *testing.T) {
 	mux.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestValidateCustomerApprovalObservationAcceptsBoundObservedTuple(t *testing.T) {
+	request := customerApprovalScanRequest{
+		Network: "ethereum-mainnet",
+		Token:   "0x0000000000000000000000000000000000000001",
+		Owner:   "0x0000000000000000000000000000000000000002",
+		Spender: "0x0000000000000000000000000000000000000003",
+	}
+	allowance := networktarget.EVMAllowanceProbeResult{
+		Network:          request.Network,
+		ChainID:          "0x1",
+		ExpectedChainID:  "0x1",
+		Token:            request.Token,
+		Owner:            request.Owner,
+		Spender:          request.Spender,
+		Amount:           "0",
+		EvidenceStatus:   "observed",
+		LiveAvailability: "checked",
+	}
+	if err := validateCustomerApprovalObservation(request, allowance); err != nil {
+		t.Fatalf("valid bound observation rejected: %v", err)
+	}
+}
+
+func TestValidateCustomerApprovalObservationRejectsCrossNetworkSubstitution(t *testing.T) {
+	request := customerApprovalScanRequest{
+		Network: "ethereum-mainnet",
+		Token:   "0x0000000000000000000000000000000000000001",
+		Owner:   "0x0000000000000000000000000000000000000002",
+		Spender: "0x0000000000000000000000000000000000000003",
+	}
+	allowance := networktarget.EVMAllowanceProbeResult{
+		Network:          "base-mainnet",
+		ChainID:          "0x2105",
+		ExpectedChainID:  "0x2105",
+		Token:            request.Token,
+		Owner:            request.Owner,
+		Spender:          request.Spender,
+		Amount:           "1",
+		EvidenceStatus:   "observed",
+		LiveAvailability: "checked",
+	}
+	if err := validateCustomerApprovalObservation(request, allowance); err == nil {
+		t.Fatal("expected cross-network allowance evidence to be rejected")
+	}
+}
+
+func TestValidateCustomerApprovalObservationRejectsSpenderSubstitutionAndIncompleteEvidence(t *testing.T) {
+	request := customerApprovalScanRequest{
+		Network: "ethereum-mainnet",
+		Token:   "0x0000000000000000000000000000000000000001",
+		Owner:   "0x0000000000000000000000000000000000000002",
+		Spender: "0x0000000000000000000000000000000000000003",
+	}
+	base := networktarget.EVMAllowanceProbeResult{
+		Network:          request.Network,
+		ChainID:          "0x1",
+		ExpectedChainID:  "0x1",
+		Token:            request.Token,
+		Owner:            request.Owner,
+		Spender:          "0x0000000000000000000000000000000000000004",
+		Amount:           "1",
+		EvidenceStatus:   "observed",
+		LiveAvailability: "checked",
+	}
+	if err := validateCustomerApprovalObservation(request, base); err == nil {
+		t.Fatal("expected substituted spender to be rejected")
+	}
+	base.Spender = request.Spender
+	base.EvidenceStatus = "unverified"
+	if err := validateCustomerApprovalObservation(request, base); err == nil {
+		t.Fatal("expected incomplete approval evidence to be rejected")
 	}
 }
