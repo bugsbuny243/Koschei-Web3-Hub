@@ -8,7 +8,9 @@
     var nativeFetch=window.fetch.bind(window);
     function timeoutFor(path){
       if(path==='/health')return 10000;
-      if(path.indexOf('/api/token/scan')===0||path.indexOf('/api/v1/radar/')===0||path.indexOf('/api/owner/')===0||path.indexOf('/api/jobs/')===0)return 45000;
+      // Match the full-evidence collector budget used by public-solana-scan.
+      if(path.indexOf('/api/token/scan')===0)return 210000;
+      if(path.indexOf('/api/v1/radar/')===0||path.indexOf('/api/owner/')===0||path.indexOf('/api/jobs/')===0)return 45000;
       return 15000;
     }
     window.fetch=function(input,init){

@@ -5,6 +5,7 @@ window.__koscheiCustomerCommandCenterV1=true;
 
 const routes=[
   {label:'Command Center',href:'/dashboard',access:'PROFESSIONAL'},
+  {label:'Address analysis',href:'/scan',access:'READ-ONLY'},
   {label:'ARVIS Investigation',href:'/arvis-chat',mode:'primary',access:'PROFESSIONAL'},
   {label:'Deep Investigation',href:'/scan?mode=deep',access:'PROFESSIONAL'},
   {label:'Transaction Preflight',href:'/scan?mode=transaction',access:'PROFESSIONAL'},
@@ -17,24 +18,27 @@ const routes=[
 
 function ensureUniverse(){
   document.body.classList.add('koschei-universe');
-  if(!document.querySelector('link[data-koschei-universe]')){
+  if(!document.querySelector('link[data-koschei-universe],link[rel="stylesheet"][href="/css/koschei.css?v=1"]')){
     const link=document.createElement('link');
     link.rel='stylesheet';link.href='/css/koschei.css?v=1';link.dataset.koscheiUniverse='true';document.head.appendChild(link);
   }
 }
 
 function activeFor(href){
-  const current=location.pathname;
-  if(href==='/dashboard')return current==='/dashboard';
-  const path=href.split('?')[0];
-  return path!=='/'&&current.startsWith(path);
+  const url=new URL(href,location.origin),current=location.pathname.replace(/\.html$/,'');
+  if(current!==url.pathname)return false;
+  if(current==='/scan'){
+    const mode=new URLSearchParams(location.search).get('mode')||'address';
+    return (url.searchParams.get('mode')||'address')===mode;
+  }
+  return true;
 }
 
 function link(item){
   const a=document.createElement('a');a.href=item.href;
   const label=document.createElement('span');label.textContent=item.label;a.appendChild(label);
   if(item.access){const badge=document.createElement('small');badge.className='customer-capability-access';badge.textContent=item.access;a.appendChild(badge);}
-  if(activeFor(item.href))a.dataset.active='true';
+  if(activeFor(item.href)){a.dataset.active='true';a.setAttribute('aria-current','page');}
   if(item.mode==='primary')a.dataset.primary='true';
   return a;
 }
@@ -89,7 +93,7 @@ function mount(){
   const shell=document.createElement('div');shell.className='customer-app-shell';
   const content=document.createElement('div');content.className='customer-main';
   const parent=main.parentNode;parent.insertBefore(shell,main);shell.append(buildSidebar(),content);content.appendChild(main);enhanceHeader(content);
-  document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openPalette();return;}if(event.key==='Escape')closePalette();});
+  document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openPalette();return;}if(event.key==='Escape'){closePalette();document.body.classList.remove('customer-nav-open');content.querySelector('.customer-mobile-trigger')?.setAttribute('aria-expanded','false');}});
   document.addEventListener('click',event=>{
     if(event.target.closest('.customer-sidebar__nav a')){document.body.classList.remove('customer-nav-open');content.querySelector('.customer-mobile-trigger')?.setAttribute('aria-expanded','false');}
     if(!document.body.classList.contains('customer-nav-open'))return;

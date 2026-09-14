@@ -26,29 +26,15 @@ function installNavigation(){
 }
 
 function installUniversalScanEntry(){
-  const overview=$('overview');
-  if(!overview||$('dashboardUniversalScan'))return;
-  const style=document.createElement('style');
-  style.textContent=`
-    .dashboard-scan-entry{margin:18px 0 0;padding:18px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:linear-gradient(180deg,rgba(13,17,23,.96),rgba(8,11,15,.98))}
-    .dashboard-scan-entry>div:first-child{display:flex;justify-content:space-between;gap:24px;align-items:end}.dashboard-scan-entry h2{margin:5px 0 0;font-size:22px}.dashboard-scan-entry p{margin:0;max-width:560px;color:#7f8b96;font-size:12px;line-height:1.55}
-    .dashboard-scan-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:14px}.dashboard-scan-form input{min-height:48px;padding:0 14px;border:1px solid rgba(255,255,255,.1);border-radius:9px;background:#070a0e;color:#f2f5f7;font:700 12px "SFMono-Regular",Consolas,monospace;outline:none}.dashboard-scan-form input:focus{border-color:rgba(101,223,255,.42);box-shadow:0 0 0 3px rgba(101,223,255,.05)}.dashboard-scan-form button{min-width:140px;border:1px solid rgba(101,223,255,.55);border-radius:9px;background:linear-gradient(135deg,#82e6ff,#5ad1f5);color:#061014;font-weight:900}.dashboard-scan-note{margin-top:8px!important;color:#64717c!important;font:700 9px "SFMono-Regular",Consolas,monospace!important;text-transform:uppercase;letter-spacing:.05em}
-    @media(max-width:760px){.dashboard-scan-entry>div:first-child{display:block}.dashboard-scan-entry p{margin-top:8px}.dashboard-scan-form{grid-template-columns:1fr}.dashboard-scan-form button{min-height:46px}}
-  `;
-  document.head.appendChild(style);
-  const section=document.createElement('section');
-  section.id='dashboardUniversalScan';
-  section.className='dashboard-scan-entry';
-  section.innerHTML=`<div><div><span class="side-label">Start here</span><h2>Scan any supported address</h2></div><p>Paste a wallet or contract address. Koschei detects the address family and routes it to the supported evidence probes.</p></div><form class="dashboard-scan-form" id="dashboardUniversalScanForm"><input id="dashboardUniversalTarget" autocomplete="off" spellcheck="false" placeholder="0x… / Solana address / Bitcoin address" aria-label="Wallet or contract address"><button type="submit">Scan address</button></form><p class="dashboard-scan-note">One input · read-only · no private keys · unknown stays unknown</p>`;
-  const head=overview.querySelector('.page-head');
-  if(head)head.insertAdjacentElement('afterend',section);else overview.prepend(section);
-  const form=$('dashboardUniversalScanForm');
-  const input=$('dashboardUniversalTarget');
-  form?.addEventListener('submit',event=>{
+  const form=$('dashboardUniversalScanForm'),input=$('dashboardUniversalTarget');
+  const network=$('dashboardScanNetwork'),status=$('dashboardScanStatus');
+  if(!form||!input||!network)return;
+  form.addEventListener('submit',event=>{
+    const route=window.KoscheiScanEntry?.url(input.value,network.value);
+    if(!route)return; // The static GET form remains usable if the helper fails.
     event.preventDefault();
-    const target=text(input?.value);
-    if(!target){input?.focus();return;}
-    location.href=`/scan?target=${encodeURIComponent(target)}`;
+    if(route.error){status.textContent=route.error;(route.needsNetwork?network:input).focus();return;}
+    location.assign(route.url);
   });
 }
 

@@ -6,7 +6,7 @@
   const HEALTH_TIMEOUT_MS=10000;
 
   function loadStyle(href,key){
-    if(document.querySelector(`link[data-koschei-style="${key}"]`))return;
+    if(document.querySelector(`link[data-koschei-style="${key}"],link[rel="stylesheet"][href="${href}"]`))return;
     const link=document.createElement('link');link.rel='stylesheet';link.href=href;link.dataset.koscheiStyle=key;document.head.appendChild(link);
   }
 
@@ -70,9 +70,11 @@
     const current=cleanPath(location.pathname);
     if(current==='/scan'||current.startsWith('/scan/')){
       loadStyle('/css/koschei.css?v=1','customer-result-guidance-v3');
-      loadStyle('/css/customer-universal-address-scan-v1.css?v=1','universal-address-scan-v1');
-      loadEnhancement('/js/customer-universal-address-scan-v1.js?v=1','universal-address-scan-v1');
-      loadEnhancement('/js/customer-scan-flow-v3.js?v=1','scan-v3');
+      loadStyle('/css/customer-universal-address-scan-v1.css?v=2','universal-address-scan-v1');
+      loadEnhancement('/js/customer-universal-address-scan-v1.js?v=2','universal-address-scan-v1');
+      // The static address desk owns input and mode state. Retain the legacy
+      // enhancer only for older pages that do not include the new desk.
+      if(!document.getElementById('customerUniversalScan'))loadEnhancement('/js/customer-scan-flow-v3.js?v=1','scan-v3');
       loadEnhancement('/js/customer-result-guidance-v3.js?v=1','result-guidance-v3');
     }
     if(current==='/dashboard'){loadStyle('/css/koschei.css?v=1','workspace-plans-v3');loadEnhancement('/js/customer-workspace-plans-v3.js?v=1','workspace-plans-v3');}
