@@ -1,3 +1,4 @@
+// SUPERSEDED BY public_dossier_registry_drive.go (PublicDossierCasesPortable). Not routed. Kept for reference.
 package handlers
 
 import (

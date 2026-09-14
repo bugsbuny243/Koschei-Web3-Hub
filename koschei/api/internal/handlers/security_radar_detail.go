@@ -1,3 +1,4 @@
+// SUPERSEDED BY security_radar_detail_v3.go. Not routed. Kept for reference.
 package handlers
 
 import (

@@ -1,3 +1,4 @@
+// OUT OF SCOPE. Not routed.
 package handlers
 
 import "net/http"
