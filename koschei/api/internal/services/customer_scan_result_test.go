@@ -16,6 +16,7 @@ func TestCustomerScanResultFromNetworkProbeStaysObserved(t *testing.T) {
 		Evidence: IntelligenceEvidence{
 			ID:        "ev-1",
 			SubjectID: subject.ID,
+			Network:   subject.Network,
 			Status:    IntelligenceEvidenceObserved,
 		},
 	}
@@ -68,9 +69,45 @@ func TestCustomerScanResultRejectsMismatchedProbeSubject(t *testing.T) {
 	subject := ClassifyIntelligenceSubject("0x2222222222222222222222222222222222222222", target.NetworkHint)
 	projection := NetworkProbeIntelligenceProjection{
 		Subject:  subject,
-		Evidence: IntelligenceEvidence{ID: "ev-2", SubjectID: subject.ID, Status: IntelligenceEvidenceObserved},
+		Evidence: IntelligenceEvidence{ID: "ev-2", SubjectID: subject.ID, Network: subject.Network, Status: IntelligenceEvidenceObserved},
 	}
 	if _, err := CustomerScanResultFromNetworkProbe(target, projection); err == nil {
 		t.Fatal("expected mismatched probe subject to fail")
+	}
+}
+
+func TestCustomerScanResultRejectsMismatchedProbeNetwork(t *testing.T) {
+	target := CustomerScanTarget{
+		Raw:            "0x1111111111111111111111111111111111111111",
+		NetworkHint:    "ethereum-mainnet",
+		Kind:           CustomerScanTargetEVMAddress,
+		Route:          CustomerScanRouteEVMProbe,
+		Classification: "syntax_only",
+	}
+	subject := ClassifyIntelligenceSubject(target.Raw, "base-mainnet")
+	projection := NetworkProbeIntelligenceProjection{
+		Subject:  subject,
+		Evidence: IntelligenceEvidence{ID: "ev-base", SubjectID: subject.ID, Network: subject.Network, Status: IntelligenceEvidenceObserved},
+	}
+	if _, err := CustomerScanResultFromNetworkProbe(target, projection); err == nil {
+		t.Fatal("expected cross-network probe evidence to fail")
+	}
+}
+
+func TestCustomerScanResultRejectsEvidenceNetworkMismatch(t *testing.T) {
+	target := CustomerScanTarget{
+		Raw:            "0x1111111111111111111111111111111111111111",
+		NetworkHint:    "ethereum-mainnet",
+		Kind:           CustomerScanTargetEVMAddress,
+		Route:          CustomerScanRouteEVMProbe,
+		Classification: "syntax_only",
+	}
+	subject := ClassifyIntelligenceSubject(target.Raw, target.NetworkHint)
+	projection := NetworkProbeIntelligenceProjection{
+		Subject:  subject,
+		Evidence: IntelligenceEvidence{ID: "ev-wrong-network", SubjectID: subject.ID, Network: "base-mainnet", Status: IntelligenceEvidenceObserved},
+	}
+	if _, err := CustomerScanResultFromNetworkProbe(target, projection); err == nil {
+		t.Fatal("expected evidence network mismatch to fail")
 	}
 }
