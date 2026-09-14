@@ -86,14 +86,8 @@ func CustomerScanResultFromNetworkProbe(target CustomerScanTarget, projection Ne
 	if strings.TrimSpace(projection.Subject.Network) != strings.TrimSpace(target.NetworkHint) {
 		return CustomerScanResult{}, errors.New("network probe network does not match customer target")
 	}
-	if projection.Evidence.Status != IntelligenceEvidenceObserved {
-		return CustomerScanResult{}, errors.New("observed network probe evidence is required")
-	}
-	if projection.Evidence.SubjectID == "" || projection.Evidence.SubjectID != projection.Subject.ID {
-		return CustomerScanResult{}, errors.New("network probe evidence is not bound to the projected subject")
-	}
-	if strings.TrimSpace(projection.Evidence.Network) != strings.TrimSpace(projection.Subject.Network) {
-		return CustomerScanResult{}, errors.New("network probe evidence is not bound to the projected network")
+	if err := validateCustomerNetworkProbeEvidence(target, projection); err != nil {
+		return CustomerScanResult{}, err
 	}
 
 	reasons := []string{"READ_ONLY_NETWORK_OBSERVATION"}
@@ -105,6 +99,41 @@ func CustomerScanResultFromNetworkProbe(target CustomerScanTarget, projection Ne
 		Reasons:  reasons,
 	}
 	return BuildCustomerScanResult(target, trust, []string{projection.Evidence.ID})
+}
+
+func validateCustomerNetworkProbeEvidence(target CustomerScanTarget, projection NetworkProbeIntelligenceProjection) error {
+	evidence := projection.Evidence
+	if evidence.Status != IntelligenceEvidenceObserved {
+		return errors.New("observed network probe evidence is required")
+	}
+	if strings.TrimSpace(evidence.ID) == "" {
+		return errors.New("network probe evidence id is required")
+	}
+	if evidence.SubjectID == "" || evidence.SubjectID != projection.Subject.ID {
+		return errors.New("network probe evidence is not bound to the projected subject")
+	}
+	if strings.TrimSpace(evidence.Network) != strings.TrimSpace(projection.Subject.Network) {
+		return errors.New("network probe evidence is not bound to the projected network")
+	}
+	if strings.TrimSpace(evidence.Address) != strings.TrimSpace(target.Raw) {
+		return errors.New("network probe evidence address does not match customer target")
+	}
+	if evidence.ObservedAt.IsZero() {
+		return errors.New("network probe evidence observation time is required")
+	}
+	if strings.TrimSpace(evidence.Provenance) != networkProbeEvidenceProvenance {
+		return errors.New("network probe evidence provenance mismatch")
+	}
+	if target.Route == CustomerScanRouteEVMProbe {
+		if strings.TrimSpace(evidence.Source) != "evm_rpc_probe" || strings.TrimSpace(evidence.Method) != "eth_getCode" {
+			return errors.New("EVM customer evidence source mismatch")
+		}
+	} else if target.Route == CustomerScanRouteBitcoinProbe {
+		if strings.TrimSpace(evidence.Source) != "bitcoin_esplora_probe" || strings.TrimSpace(evidence.Method) != "address_activity" {
+			return errors.New("Bitcoin customer evidence source mismatch")
+		}
+	}
+	return nil
 }
 
 // CustomerScanResultFromEVMAuthority attaches a current EVM authority snapshot
