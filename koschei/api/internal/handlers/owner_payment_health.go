@@ -1,5 +1,7 @@
 package handlers
 
+// OUT OF SCOPE. Not routed.
+
 import (
 	"encoding/json"
 	"net/http"
