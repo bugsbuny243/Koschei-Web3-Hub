@@ -1,12 +1,14 @@
 package http
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"koschei/api/internal/networktarget"
+	"koschei/api/internal/services"
 )
 
 func TestCustomerApprovalScanRejectsMissingContext(t *testing.T) {
@@ -138,5 +140,60 @@ func TestValidateCustomerApprovalObservationRejectsSpenderSubstitutionAndIncompl
 	base.EvidenceStatus = "unverified"
 	if err := validateCustomerApprovalObservation(request, base); err == nil {
 		t.Fatal("expected incomplete approval evidence to be rejected")
+	}
+}
+
+func TestCustomerApprovalResultWriterPinsNoStoreSchemaAndObservedTrust(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	writeCustomerApprovalScanResult(recorder, http.StatusOK, customerApprovalScanResult{
+		Network:          "ethereum-mainnet",
+		Token:            "0x0000000000000000000000000000000000000001",
+		Owner:            "0x0000000000000000000000000000000000000002",
+		Spender:          "0x0000000000000000000000000000000000000003",
+		Amount:           "0",
+		EvidenceStatus:   services.Web3TrustEvidenceObserved,
+		LiveAvailability: "checked",
+		Trust:            services.Web3TrustVector{Observed: true},
+		Reasons:          []string{"CURRENT_ALLOWANCE_OBSERVED"},
+	})
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control=%q", got)
+	}
+	if got := recorder.Header().Get("Content-Type"); !strings.HasPrefix(got, "application/json") {
+		t.Fatalf("Content-Type=%q", got)
+	}
+	var envelope customerApprovalScanEnvelope
+	if err := json.NewDecoder(recorder.Body).Decode(&envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.SchemaVersion != customerApprovalScanSchemaVersion {
+		t.Fatalf("schema=%q", envelope.SchemaVersion)
+	}
+	if envelope.Result.Amount != "0" || !envelope.Result.Trust.Observed || envelope.Result.EvidenceStatus != services.Web3TrustEvidenceObserved {
+		t.Fatalf("unexpected observed envelope: %+v", envelope.Result)
+	}
+}
+
+func TestCustomerApprovalErrorWriterCannotManufactureEvidence(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	writeCustomerApprovalScanError(recorder, http.StatusBadGateway, "evm_allowance_probe_unavailable")
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control=%q", got)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body["schema_version"] != customerApprovalScanSchemaVersion || body["analysis_performed"] != false || body["evidence_status"] != services.Web3TrustEvidenceUnverified {
+		t.Fatalf("unexpected error envelope: %#v", body)
+	}
+	if body["error"] != "evm_allowance_probe_unavailable" {
+		t.Fatalf("error=%v", body["error"])
 	}
 }
