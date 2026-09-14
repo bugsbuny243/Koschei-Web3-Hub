@@ -44,7 +44,6 @@
           <p>Start an address analysis, open an investigation, or review your account evidence.</p>
         </div>
 
-
         <section id="dashboardUniversalScan" class="dashboard-scan-entry" aria-labelledby="dashboardScanTitle">
           <h2 id="dashboardScanTitle">What do you want to investigate?</h2>
           <p>Paste a public wallet or contract address and select its network.</p>
@@ -57,6 +56,9 @@
           <p id="dashboardScanStatus" role="status">Read-only analysis. No wallet connection or private keys.</p>
           <nav class="scan-shortcuts" aria-label="More investigation options"><a href="/scan?mode=token">Investigate a Solana token</a><a href="/scan?mode=transaction">Check before signing</a><a href="/arvis-chat">Ask ARVIS</a></nav>
         </section>
+
+        <div id="workspacePlanStrip"></div>
+        <div id="workspaceMissionControl"></div>
 
         <div class="kpis" aria-label="Live customer account state">
           <article class="workspace-kpi" id="workspaceAccessKpi"><span>Professional access</span><strong>—</strong><small>Checking paid entitlement.</small></article>
@@ -129,6 +131,7 @@
 <script src="/js/customer-scan-entry.js?v=1"></script>
 <script src="/js/koschei-auth.js?v=33"></script>
 <script src="/js/customer-workspace-v2.js?v=3"></script>
+<script src="/js/customer-workspace-plans-v3.js?v=1"></script>
 <script src="/js/koschei-dashboard.js?v=4"></script>
 </body>
 </html>

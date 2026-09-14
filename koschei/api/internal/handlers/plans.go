@@ -1,5 +1,7 @@
 package handlers
 
+// OUT OF SCOPE. Not routed.
+
 import "net/http"
 
 func (h *Handler) Plans(w http.ResponseWriter, _ *http.Request) {

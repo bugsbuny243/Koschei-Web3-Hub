@@ -78,6 +78,7 @@ function resultCard(entry){
   return `<article class="cus-network-card">
     <div class="cus-card-head"><div><span>${esc(entry.label)}</span><b>${esc(customerSummary(result))}</b></div><em>${esc(String(result.evidence_status||'unknown').toUpperCase())}</em></div>
     <div class="cus-target">${esc(result.target?.raw||'')}</div>
+    <div class="actions"><button type="button" class="btn" data-cus-share-x>Share result on X</button></div>
     <details class="cus-details"><summary>Technical evidence</summary>
       ${renderTrust(result.trust||{})}
       ${authority?`<div class="cus-authority"><div class="cus-subhead"><span>Authority surface</span><b>Observed evidence</b></div>${authorityRows(authority)}</div>`:''}
@@ -106,6 +107,21 @@ function summaryBlock(classification,entries){
     </section>`;
 }
 
+function sharePayload(request,result){
+  const share=window.KoscheiInvestigationShare;
+  return{
+    target:request.target,
+    kind:'address',
+    network:request.network,
+    networkLabel:request.label,
+    evidence_status:result.evidence_status,
+    status:result.status,
+    verdict:result.verdict,
+    reasons:Array.isArray(result.reasons)?result.reasons.slice():[],
+    url:share?.publicResultURL?share.publicResultURL(request.target,'address',request.network):undefined
+  };
+}
+
 function install(){
   const section=document.getElementById('customerUniversalScan'),routing=window.KoscheiScanEntry;
   if(!section||!routing)return;
@@ -114,7 +130,7 @@ function install(){
   const submit=$('customerUniversalSubmit'),cancel=$('customerUniversalCancel'),status=$('customerUniversalStatus');
   const wrap=$('customerUniversalResultsWrap'),overview=$('customerUniversalOverview'),results=$('customerUniversalResults');
   const recovery=$('customerUniversalRecovery'),advanced=$('advancedTools');
-  let pending=null,generation=0;
+  let pending=null,generation=0,lastSharePayload=null;
 
   function stop(){
     generation++;
@@ -122,16 +138,21 @@ function install(){
     form.removeAttribute('aria-busy');submit.disabled=false;submit.textContent='Analyze address';cancel.hidden=true;
   }
   function invalidate(){
-    stop();wrap.hidden=true;recovery.hidden=true;
+    stop();lastSharePayload=null;wrap.hidden=true;recovery.hidden=true;
     status.textContent='Ready to analyze the current address and network.';
     input.removeAttribute('aria-invalid');
   }
   input.addEventListener('input',invalidate);network.addEventListener('change',invalidate);
-  cancel.addEventListener('click',()=>{stop();wrap.hidden=true;status.textContent='Analysis canceled. You can start another request.';});
+  cancel.addEventListener('click',()=>{stop();lastSharePayload=null;wrap.hidden=true;status.textContent='Analysis canceled. You can start another request.';});
+  results.addEventListener('click',event=>{
+    const button=event.target?.closest?.('[data-cus-share-x]');
+    if(!button||!lastSharePayload)return;
+    window.KoscheiInvestigationShare?.open?.(lastSharePayload);
+  });
   window.addEventListener('pagehide',stop);
 
   async function runScan(){
-    stop();wrap.hidden=true;recovery.hidden=true;
+    stop();lastSharePayload=null;wrap.hidden=true;recovery.hidden=true;
     const request=routing.resolve(input.value,network.value);
     if(request.error){
       status.textContent=request.error;input.setAttribute('aria-invalid','true');
@@ -151,6 +172,7 @@ function install(){
       const entry={network:request.network,label:request.label,http:response.status,ok:response.ok,data};
       overview.innerHTML=summaryBlock({family:request.family,label:request.label+' address'},[entry]);
       results.innerHTML=resultCard(entry);wrap.hidden=false;
+      if(response.ok&&data?.result)lastSharePayload=sharePayload(request,data.result);
       status.textContent=response.ok?'Analysis complete. Review the findings, limits and technical evidence below.':(errorCopy[response.status]||'Analysis could not complete. Review the source error below and try again.');
       if([401,402,403].includes(response.status)){
         const link=document.createElement('a');
@@ -164,6 +186,7 @@ function install(){
       }
     }catch(error){
       if(current!==generation)return;
+      lastSharePayload=null;
       status.textContent=controller.signal.aborted?'The evidence service did not respond within 15 seconds. Try again.':(error instanceof SyntaxError?'The service returned an unreadable response. Try again.':error.message||'Connection failed. Try again.');
       wrap.hidden=true;
     }finally{
@@ -175,7 +198,7 @@ function install(){
   const params=new URLSearchParams(location.search),addressView=routing.isAddressView();
   if(advanced){
     advanced.open=!addressView;
-    document.querySelectorAll('[data-scan-mode]').forEach(button=>button.addEventListener('click',()=>{stop();advanced.open=true;}));
+    document.querySelectorAll('[data-scan-mode]').forEach(button=>button.addEventListener('click',()=>{stop();lastSharePayload=null;advanced.open=true;}));
   }
   const initial=params.get('target');
   if(addressView&&initial){

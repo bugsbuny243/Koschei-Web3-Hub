@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math/big"
 	"mime"
 	"net/http"
 	"strings"
@@ -66,7 +67,47 @@ func decodeCustomerApprovalScanRequest(r io.Reader) (customerApprovalScanRequest
 	if _, ok := networktarget.ExpectedEVMChainID(request.Network); !ok {
 		return request, errors.New("evm_allowance_unsupported_network")
 	}
+	for _, address := range []string{request.Token, request.Owner, request.Spender} {
+		if _, err := networktarget.Resolve(request.Network, address); err != nil {
+			return request, errors.New("invalid_approval_scan_request")
+		}
+	}
 	return request, nil
+}
+
+func validateCustomerApprovalObservation(request customerApprovalScanRequest, allowance networktarget.EVMAllowanceProbeResult) error {
+	expectedChainID, ok := networktarget.ExpectedEVMChainID(request.Network)
+	if !ok {
+		return errors.New("approval_observation_network_unsupported")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.Network)) != request.Network {
+		return errors.New("approval_observation_network_mismatch")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.ChainID)) != expectedChainID || strings.ToLower(strings.TrimSpace(allowance.ExpectedChainID)) != expectedChainID {
+		return errors.New("approval_observation_chain_mismatch")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.Token)) != request.Token {
+		return errors.New("approval_observation_token_mismatch")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.Owner)) != request.Owner {
+		return errors.New("approval_observation_owner_mismatch")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.Spender)) != request.Spender {
+		return errors.New("approval_observation_spender_mismatch")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.EvidenceStatus)) != "observed" || strings.ToLower(strings.TrimSpace(allowance.LiveAvailability)) != "checked" {
+		return errors.New("approval_observation_incomplete")
+	}
+	amountText := strings.TrimSpace(allowance.Amount)
+	amount, ok := new(big.Int).SetString(amountText, 10)
+	if !ok || amount.Sign() < 0 || amount.BitLen() > 256 || amount.String() != amountText {
+		return errors.New("approval_observation_amount_invalid")
+	}
+	maxUint256 := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+	if allowance.Unlimited != (amount.Cmp(maxUint256) == 0) {
+		return errors.New("approval_observation_unlimited_mismatch")
+	}
+	return nil
 }
 
 func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +134,10 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 	allowance, err := networktarget.ProbeEVMAllowance(ctx, nil, endpoint, request.Network, request.Token, request.Owner, request.Spender)
 	if err != nil {
 		writeCustomerApprovalScanError(w, http.StatusBadGateway, "evm_allowance_probe_unavailable")
+		return
+	}
+	if err := validateCustomerApprovalObservation(request, allowance); err != nil {
+		writeCustomerApprovalScanError(w, http.StatusBadGateway, "evm_allowance_evidence_binding_invalid")
 		return
 	}
 

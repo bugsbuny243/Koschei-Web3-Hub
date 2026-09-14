@@ -79,10 +79,9 @@ function simplifyCopy(){
   const hero=document.querySelector('section.surface.panel');
   const heading=hero?.querySelector('h1');if(heading)heading.textContent='Paste it. Check it before you trust it.';
   const sub=hero?.querySelector('p.sub');if(sub)sub.textContent='Start with one target. Koschei runs the fast evidence boundary first unless you explicitly choose a deeper investigation or transaction simulation.';
-  const form=$('scanForm');if(form&&!form.querySelector('.customer-scan-helper')){
-    const helper=document.createElement('p');helper.className='customer-scan-helper';helper.innerHTML='<strong>One customer flow:</strong> paste a token, wallet, site or serialized transaction. Ambiguous Solana addresses stay explicit instead of being silently reclassified.';
-    form.parentNode.insertBefore(helper,form);
-  }
+  const form=$('scanForm');let helper=document.querySelector('.customer-scan-helper');
+  if(form&&!helper){helper=document.createElement('p');helper.className='customer-scan-helper';form.parentNode.insertBefore(helper,form);}
+  if(helper&&!helper.textContent.trim())helper.innerHTML='<strong>One customer flow:</strong> paste a token, wallet, site or serialized transaction. Ambiguous Solana addresses stay explicit instead of being silently reclassified.';
   const target=$('target');if(target)target.placeholder='Paste token mint, wallet address, site URL, or transaction';
   const targetLabel=target?.closest('label');if(targetLabel?.firstChild)targetLabel.firstChild.textContent='What do you want to check?';
   const note=$('note');if(note)note.placeholder='Optional: what are you about to do? Example: buy this token, connect to this site, sign this transaction';

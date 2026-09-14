@@ -33,6 +33,9 @@ func CustomerScanResultFromSolanaObservation(target CustomerScanTarget, observat
 	if strings.ToLower(strings.TrimSpace(observation.Network)) != "solana-mainnet" {
 		return CustomerScanResult{}, errors.New("unsupported Solana observation network")
 	}
+	if strings.ToLower(strings.TrimSpace(target.NetworkHint)) != "solana-mainnet" {
+		return CustomerScanResult{}, errors.New("Solana observation network does not match customer target")
+	}
 	if observation.Slot == 0 {
 		return CustomerScanResult{}, errors.New("Solana observation slot is required")
 	}

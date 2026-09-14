@@ -18,9 +18,14 @@ func TestPublicSiteUsesApprovedSurfaceScopedCSSFiles(t *testing.T) {
 	}
 	sort.Strings(files)
 	want := []string{
+		filepath.FromSlash("public/css/customer-universal-address-scan-v1.css"),
+		filepath.FromSlash("public/css/evm-authority-desk.css"),
+		filepath.FromSlash("public/css/koschei-dashboard-premium.css"),
 		filepath.FromSlash("public/css/koschei-dashboard.css"),
 		filepath.FromSlash("public/css/koschei-home.css"),
+		filepath.FromSlash("public/css/koschei-scan-premium.css"),
 		filepath.FromSlash("public/css/koschei.css"),
+		filepath.FromSlash("public/css/premium-evidence-matrix.css"),
 	}
 	if len(files) != len(want) {
 		t.Fatalf("public CSS contract drifted: got %v, want %v", files, want)
@@ -39,6 +44,27 @@ func TestPublicSiteUsesApprovedSurfaceScopedCSSFiles(t *testing.T) {
 		t.Fatal("canonical CSS is missing the consolidation provenance header")
 	}
 
+	approved := map[string]struct{}{}
+	for _, path := range want {
+		approved["/css/"+filepath.Base(path)] = struct{}{}
+	}
+	requiredByPage := map[string][]string{
+		"public/index.html": {
+			"/css/koschei-home.css?v=2",
+		},
+		"public/dashboard.html": {
+			"/css/koschei-dashboard.css?v=2",
+			"/css/koschei-dashboard-premium.css?v=2",
+		},
+		"public/scan.html": {
+			"/css/koschei.css?v=1",
+			"/css/koschei-scan-premium.css?v=2",
+			"/css/premium-evidence-matrix.css?v=1",
+			"/css/evm-authority-desk.css?v=1",
+			"/css/customer-universal-address-scan-v1.css?v=2",
+		},
+	}
+
 	err = filepath.WalkDir("public", func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -51,23 +77,22 @@ func TestPublicSiteUsesApprovedSurfaceScopedCSSFiles(t *testing.T) {
 			return readErr
 		}
 		refs := internalPublicStylesheetRE.FindAllStringSubmatch(string(body), -1)
-		if len(refs) > 1 {
-			t.Errorf("%s loads %d internal CSS files; want at most one", path, len(refs))
-			return nil
+		seen := map[string]struct{}{}
+		for _, ref := range refs {
+			href := ref[1]
+			cssPath := strings.SplitN(href, "?", 2)[0]
+			if _, ok := approved[cssPath]; !ok {
+				t.Errorf("%s loads unapproved internal CSS %q", path, href)
+			}
+			if _, duplicate := seen[href]; duplicate {
+				t.Errorf("%s loads duplicate stylesheet %q", path, href)
+			}
+			seen[href] = struct{}{}
 		}
-		if len(refs) == 0 {
-			return nil
-		}
-
-		expected := "/css/koschei.css?v=1"
-		switch filepath.ToSlash(path) {
-		case "public/index.html":
-			expected = "/css/koschei-home.css?v=1"
-		case "public/dashboard.html":
-			expected = "/css/koschei-dashboard.css?v=1"
-		}
-		if refs[0][1] != expected {
-			t.Errorf("%s loads %q; want %q", path, refs[0][1], expected)
+		for _, required := range requiredByPage[filepath.ToSlash(path)] {
+			if _, ok := seen[required]; !ok {
+				t.Errorf("%s missing required scoped stylesheet %q", path, required)
+			}
 		}
 		return nil
 	})

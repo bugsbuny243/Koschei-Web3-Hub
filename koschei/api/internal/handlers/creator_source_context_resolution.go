@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -40,11 +43,12 @@ func (h *Handler) resolveCanonicalCreatorSourceContext(ctx context.Context, targ
 		return out
 	}
 
-	metadata := services.FetchHeliusTokenMetadata(ctx, strings.TrimSpace(creatorIntelRPCURL()), target)
+	metadata := services.FetchHeliusTokenMetadata(ctx, creatorMetadataRPCURL(), target)
 	out["creator_resolution"] = metadata
 	out["creator_resolution_provider"] = metadata.Provider
 	out["creator_resolution_status"] = metadata.Status
 	if !metadata.Available {
+		out["limitations"] = appendCreatorResolutionLimitation(out["limitations"], metadata.Status, metadata.Limitations)
 		return out
 	}
 	out["available"] = true
@@ -85,6 +89,58 @@ func (h *Handler) resolveCanonicalCreatorSourceContext(ctx context.Context, targ
 
 	verification := h.verifyCanonicalCreatorRelation(ctx, target, network, metadata.Creator, firstNonEmptyString(metadata.CreateTransaction, metadata.FirstMintTransaction))
 	return applyCanonicalCreatorVerification(out, verification)
+}
+
+// creatorMetadataRPCURL deliberately prefers an RPC URL that can resolve a
+// Helius enhanced API key without changing creatorIntelRPCURL, which remains
+// the canonical RPC preference for the rest of creator intelligence.
+func creatorMetadataRPCURL() string {
+	if heliusRPC := strings.TrimSpace(os.Getenv("HELIUS_SOLANA_RPC_URL")); heliusRPC != "" {
+		return heliusRPC
+	}
+	for _, envName := range []string{"SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL"} {
+		candidate := strings.TrimSpace(os.Getenv(envName))
+		if candidate != "" && creatorMetadataHeliusHostname(candidate) {
+			return candidate
+		}
+	}
+	return strings.TrimSpace(creatorIntelRPCURL())
+}
+
+func creatorMetadataHeliusHostname(rawURL string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(parsed.Hostname()), "helius")
+}
+
+func appendCreatorResolutionLimitation(raw any, status string, metadataLimitations []string) []string {
+	limitations := make([]string, 0, len(metadataLimitations)+2)
+	switch values := raw.(type) {
+	case []string:
+		limitations = append(limitations, values...)
+	case []any:
+		for _, value := range values {
+			if text := strings.TrimSpace(creatorIntelCleanString(value)); text != "" {
+				limitations = append(limitations, text)
+			}
+		}
+	case string:
+		if text := strings.TrimSpace(values); text != "" {
+			limitations = append(limitations, text)
+		}
+	}
+
+	status = firstNonEmptyString(strings.TrimSpace(status), "unknown")
+	message := fmt.Sprintf("Creator resolution failed: %s.", status)
+	if status == "not_configured" {
+		message += " Helius API key could not be resolved from the configured RPC URL."
+	} else if len(metadataLimitations) > 0 {
+		message += " " + strings.TrimSpace(metadataLimitations[0])
+	}
+	limitations = append(limitations, message)
+	return limitations
 }
 
 func cloneCreatorSourceContext(source map[string]any) map[string]any {

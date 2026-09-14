@@ -9,13 +9,14 @@ import (
 func TestCoreCustomerSurfacesAreSourceEnglishWave2(t *testing.T) {
 	files := map[string][]string{
 		"public/index.html": {
-			"Koschei Web3 | Security Validation & Risk Intelligence",
-			"See the blind spot.",
-			"Solana live production core",
-			"Material conclusions stay traceable to evidence; missing evidence stays unknown.",
-			"ARVIS is not a generic risk-score machine.",
-			"Attack Path",
-			"STRUCTURE ONLY · NOT LIVE TELEMETRY",
+			"Koschei Web3 | Security Intelligence",
+			"Evidence-led Web3 security intelligence",
+			"Security decisions,",
+			"What is observed stays observed. What is unknown stays unknown.",
+			"UNKNOWN ≠ SAFE",
+			"Observed is not verified",
+			"Permission is not safety",
+			"Production where proven.",
 		},
 		"public/account.html": {
 			"Professional Access",

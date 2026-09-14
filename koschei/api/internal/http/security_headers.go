@@ -17,6 +17,12 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
 		w.Header().Set("X-Permitted-Cross-Domain-Policies", "none")
 		w.Header().Set("Content-Security-Policy", koscheiBaseCSP())
+		if mutablePublicJavaScriptPath(r.URL.Path) {
+			// Public browser controllers are mutable security policy surfaces. Allow
+			// caching, but require revalidation so a stale query-string cache key
+			// cannot pin an older fail-closed contract after deployment.
+			w.Header().Set("Cache-Control", "no-cache")
+		}
 		if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
 		}
@@ -29,6 +35,11 @@ func securityHeaders(next http.Handler) http.Handler {
 		next.ServeHTTP(secured, r)
 		secured.finish()
 	})
+}
+
+func mutablePublicJavaScriptPath(rawPath string) bool {
+	path := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(rawPath, "\\", "/")))
+	return strings.HasPrefix(path, "/js/") && strings.HasSuffix(path, ".js")
 }
 
 // sensitiveStaticProbePath rejects common repository, environment, credential and

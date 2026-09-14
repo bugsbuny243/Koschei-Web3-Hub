@@ -1,5 +1,7 @@
 package handlers
 
+// SUPERSEDED BY public_case_operational_v2.go route surface. Not routed. Kept for reference.
+
 import (
 	"database/sql"
 	"fmt"

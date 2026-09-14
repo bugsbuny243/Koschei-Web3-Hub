@@ -188,6 +188,7 @@ jobs:
           node scripts/verify-customer-investigation-ui.js
           node scripts/verify-scan-runtime-recovery.js
           node scripts/verify-report-trust-consistency.js
+          node scripts/verify-evm-spending-intelligence.js
           node scripts/verify-dossier-contract.mjs
       - name: Check public language and investigation contracts
         run: |

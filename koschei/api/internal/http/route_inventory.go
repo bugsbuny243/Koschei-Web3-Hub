@@ -23,7 +23,7 @@ func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 		"rules": []string{
 			"A handler is live only when registered in the server boot chain.",
 			"The production route inventory is contract-tested against literal API registrations.",
-			"Operational customer analysis requires an active Professional entitlement; public proof, health and documentation surfaces do not execute customer investigations.",
+			"Bounded public /api/scan surfaces may collect stateless read-only chain evidence; retained, metered or privileged customer investigations remain behind the Professional entitlement boundary.",
 			"Legacy /api/arvis/preflight and /api/token/scan paths are compatibility routes and are wrapped by the Professional entitlement and output ledger at the HTTP readiness boundary.",
 			"Public SOC discovery exposes only explicitly published immutable dossiers; a stored dossier is private by default.",
 			"A customer session identifies the account; paid product authorization is derived only from an active Professional entitlement.",
@@ -44,7 +44,7 @@ func productionRouteInventory() []routeInventoryGroup {
 	return []routeInventoryGroup{
 		{Name: "public_and_system", Auth: "public_or_mixed", Routes: []string{
 			"GET /health", "GET /api/config", "GET /api/version", "GET /api/web3/health", "GET /api/web3/health/logs",
-			"POST /api/analytics/event", "GET /api/v1/risk/badge",
+			"POST /api/analytics/event", "GET /api/v1/risk/badge", "POST /api/scan", "POST /api/scan/approval",
 			"GET /api/public/impact", "GET /api/public/metrics", "GET /api/public/cases", "GET /api/public/soc/feed",
 			"GET /api/public/token/status", "GET /api/public/token/readiness", "GET /api/public/scan-history", "POST /api/public/transaction-simulate",
 			"GET /api/agent/health", "POST /api/agent/wallet-score", "POST /api/agent/risk-summary", "POST /api/agent/metadata-template", "POST /api/agent/chain-health",
@@ -72,7 +72,7 @@ func productionRouteInventory() []routeInventoryGroup {
 			"POST /api/owner/dossier/publications", "POST /api/owner/arvis/acceptance",
 		}},
 		{Name: "professional_customer_operations", Auth: "customer_session_plus_professional_entitlement", Routes: []string{
-			"POST /api/arvis/preflight", "POST /api/token/scan",
+			"POST /api/arvis/preflight", "POST /api/token/scan", "POST /api/metadata/generate",
 			"POST /api/v1/token/extensions", "POST /api/v1/address-poisoning/check", "POST /api/customer/web3/transaction-preflight", "POST /api/customer/web3/transaction-state-recheck",
 			"POST /api/v1/radar/check", "POST /api/v1/radar/jobs", "GET /api/v1/radar/jobs/", "GET /api/v1/radar/detail", "GET /api/v1/radar/feed",
 			"GET /api/v1/radar/creator-intelligence", "GET /api/v1/radar/actor-intelligence", "GET /api/v1/radar/graph", "GET /api/v1/radar/exposure", "POST /api/v1/radar/court",

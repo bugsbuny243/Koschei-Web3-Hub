@@ -40,7 +40,7 @@ test('legacy token, deep and preflight links keep their selected tool',()=>{
  assert.equal(router.isAddressView('?mint='+sol,'/scan'),false);
 });
 function envelope(target=evm,network='base-mainnet'){
- return {schema_version:'koschei-customer-scan-v1',result:{target:{raw:target,network_hint:network},status:'observed',evidence_status:'unverified',trust:{observed:true,verified:false,finalized:false},reasons:['TEST_FIXTURE'],evidence_refs:['fixture:test']}};
+ return {schema_version:'koschei-customer-scan-v1',result:{target:{raw:target,network_hint:network},status:'observed',verdict:'review',evidence_status:'observed',trust:{claimed:false,observed:true,authorized:false,available:false,verified:false,finalized:false},reasons:['TEST_FIXTURE'],evidence_refs:['fixture:test']}};
 }
 test('result identity binds schema, exact address and chain',()=>{
  const request=router.resolve(evm,'base-mainnet');
@@ -49,6 +49,20 @@ test('result identity binds schema, exact address and chain',()=>{
  assert.equal(router.matchesResult(envelope(evm,'ethereum-mainnet'),request),false);
  assert.equal(router.matchesResult({...envelope(),schema_version:'unknown'},request),false);
  assert.equal(router.matchesResult({result:null},request),false);
+});
+test('result maturity binds status, verdict, evidence status and trust vector',()=>{
+ const request=router.resolve(evm,'base-mainnet');
+ const mutate=fn=>{const value=structuredClone(envelope());fn(value.result);return value;};
+ assert.equal(router.matchesResult(mutate(r=>{r.evidence_status='unverified';}),request),false);
+ assert.equal(router.matchesResult(mutate(r=>{r.trust.observed=false;}),request),false);
+ assert.equal(router.matchesResult(mutate(r=>{r.trust.verified=true;r.trust.observed=false;r.evidence_status='verified';r.status='evidence_ready';}),request),false);
+ assert.equal(router.matchesResult(mutate(r=>{r.trust.finalized=true;r.trust.verified=false;r.evidence_status='finalized';r.status='evidence_ready';}),request),false);
+ assert.equal(router.matchesResult(mutate(r=>{r.verdict='unknown';}),request),false);
+ assert.equal(router.matchesResult(mutate(r=>{r.evidence_refs=[];}),request),false);
+ const verified=mutate(r=>{r.status='evidence_ready';r.evidence_status='verified';r.trust.verified=true;});
+ assert.equal(router.matchesResult(verified,request),true);
+ const limited=mutate(r=>{r.status='insufficient_evidence';r.verdict='unknown';r.evidence_status='unverified';r.trust.observed=false;r.evidence_refs=undefined;});
+ assert.equal(router.matchesResult(limited,request),true);
 });
 
 // Minimal DOM hosts exercise the real controller with asynchronous transports.
@@ -75,13 +89,13 @@ function harness(fetch,search=''){
 }
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 const response=(status,data)=>({status,ok:status>=200&&status<300,json:async()=>data});
-test('one submit sends one chain-bound request and displays unverified evidence honestly',async()=>{
+test('one submit sends one chain-bound request and displays observed evidence honestly',async()=>{
  const calls=[];const h=harness(async(url,options)=>{calls.push({url,options});return response(200,envelope());});
  h.submit();await settle();
  assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/scan');
  assert.deepEqual(JSON.parse(calls[0].options.body),{target:evm,network:'base-mainnet'});
  assert.equal(h.nodes.customerUniversalResultsWrap.hidden,false);
- assert.match(h.nodes.customerUniversalResults.innerHTML,/UNVERIFIED/);
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/OBSERVED/);
  assert.match(h.nodes.customerUniversalResults.innerHTML,/fixture:test/);
  assert.doesNotMatch(h.nodes.customerUniversalOverview.innerHTML,/SAFE/);
  assert.equal(h.nodes.customerUniversalSubmit.disabled,false);
@@ -103,6 +117,12 @@ test('a stale response cannot overwrite an edited target',async()=>{
 });
 test('mismatched response is withheld rather than rendered',async()=>{
  const h=harness(async()=>response(200,envelope(sol)));h.submit();await settle();
+ assert.equal(h.nodes.customerUniversalResultsWrap.hidden,true);
+ assert.match(h.nodes.customerUniversalStatus.textContent,/does not match/);
+});
+test('impossible trust maturity is withheld rather than rendered',async()=>{
+ const bad=envelope();bad.result.trust.observed=false;bad.result.trust.verified=true;bad.result.evidence_status='verified';bad.result.status='evidence_ready';
+ const h=harness(async()=>response(200,bad));h.submit();await settle();
  assert.equal(h.nodes.customerUniversalResultsWrap.hidden,true);
  assert.match(h.nodes.customerUniversalStatus.textContent,/does not match/);
 });
