@@ -44,7 +44,7 @@ func productionRouteInventory() []routeInventoryGroup {
 	return []routeInventoryGroup{
 		{Name: "public_and_system", Auth: "public_or_mixed", Routes: []string{
 			"GET /health", "GET /api/config", "GET /api/version", "GET /api/web3/health", "GET /api/web3/health/logs",
-			"POST /api/analytics/event", "GET /api/v1/risk/badge",
+			"POST /api/analytics/event", "GET /api/v1/risk/badge", "POST /api/scan", "POST /api/scan/approval",
 			"GET /api/public/impact", "GET /api/public/metrics", "GET /api/public/cases", "GET /api/public/soc/feed",
 			"GET /api/public/token/status", "GET /api/public/token/readiness", "GET /api/public/scan-history", "POST /api/public/transaction-simulate",
 			"GET /api/agent/health", "POST /api/agent/wallet-score", "POST /api/agent/risk-summary", "POST /api/agent/metadata-template", "POST /api/agent/chain-health",
