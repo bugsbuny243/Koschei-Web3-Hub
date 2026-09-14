@@ -14,15 +14,21 @@ function forbid(pattern,label){
 }
 
 requireText('function validateObservedAllowance(payload,expected)','approval response binding gate');
+requireText('function validateSpenderAuthority(authority,expected)','nested authority binding gate');
 requireText("payload?.schema_version!=='koschei-approval-scan-v1'",'approval schema binding');
 requireText("norm(data.network)!==norm(expected.network)",'network binding');
 requireText("norm(data.token)!==norm(expected.token)",'token binding');
 requireText("norm(data.owner)!==norm(expected.owner)",'owner binding');
 requireText("norm(data.spender)!==norm(expected.spender)",'spender binding');
+requireText("norm(authority.network)!==norm(expected.network)",'authority network binding');
+requireText("norm(authority.spender)!==norm(expected.spender)",'authority spender binding');
+requireText("authority.trust?.observed!==true",'authority observed trust gate');
+requireText("authority.trust?.verified===true||authority.trust?.authorized===true||authority.trust?.finalized===true",'authority trust promotion rejection');
 requireText("norm(data.evidence_status)!=='observed'||norm(data.live_availability)!=='checked'",'observed evidence gate');
 requireText("typeof data.amount!=='string'||!/^\\d+$/.test(data.amount)",'amount evidence gate');
 requireText("data.trust?.observed!==true",'observed trust gate');
 requireText("data.trust?.verified===true||data.trust?.authorized===true||data.trust?.finalized===true",'trust promotion rejection');
+requireText('validateSpenderAuthority(data.spender_authority,expected);','nested authority pre-render validation');
 requireText('validateObservedAllowance(data,values);','pre-render validation');
 requireText('const controller=new AbortController();','bounded approval transport');
 requireText('setTimeout(()=>controller.abort(),15000)','15 second approval timeout');
