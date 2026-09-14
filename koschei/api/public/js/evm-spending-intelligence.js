@@ -13,6 +13,7 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt
 const short=value=>{const text=String(value||'');return text.length>26?`${text.slice(0,12)}…${text.slice(-10)}`:text};
 const validAddress=value=>/^0x[0-9a-fA-F]{40}$/.test(String(value||'').trim());
 const yesNo=value=>value?'YES':'NO';
+const norm=value=>String(value||'').trim().toLowerCase();
 
 function trustCells(trust={}){
   const axes=[['Claimed','claimed'],['Observed','observed'],['Authorized','authorized'],['Available','available'],['Verified','verified'],['Finalized','finalized']];
@@ -33,22 +34,35 @@ function authorityHTML(authority){
   ].filter(([,value])=>value!==undefined&&value!==null&&value!=='');
   return rows.map(([label,value],index)=>`<div class="esi-authority-row"><span>${String(index+1).padStart(2,'0')}</span><div><b>${esc(label)}</b><small title="${esc(value)}">${esc(short(value))}</small></div></div>`).join('');
 }
+function validateObservedAllowance(payload,expected){
+  const data=payload?.result;
+  if(!data||typeof data!=='object')throw new Error('approval evidence missing');
+  if(norm(data.network)!==norm(expected.network))throw new Error('approval evidence network mismatch');
+  if(norm(data.token)!==norm(expected.token))throw new Error('approval evidence token mismatch');
+  if(norm(data.owner)!==norm(expected.owner))throw new Error('approval evidence owner mismatch');
+  if(norm(data.spender)!==norm(expected.spender))throw new Error('approval evidence spender mismatch');
+  if(norm(data.evidence_status)!=='observed'||norm(data.live_availability)!=='checked')throw new Error('approval evidence incomplete');
+  if(typeof data.amount!=='string'||!/^\d+$/.test(data.amount))throw new Error('approval amount unavailable');
+  if(data.trust?.observed!==true)throw new Error('approval observation trust missing');
+  if(data.trust?.verified===true||data.trust?.authorized===true||data.trust?.finalized===true)throw new Error('approval evidence over-promoted');
+  return data;
+}
 function render(payload){
-  const data=payload?.result||{};
+  const data=payload.result;
   const trust=data.trust||{};
   const reasons=Array.isArray(data.reasons)?data.reasons:[];
   const authority=data.spender_authority||null;
   result.hidden=false;
   result.innerHTML=`
     <div class="esi-summary">
-      <div><span>Current allowance</span><strong>${esc(data.amount||'0')}</strong><small>raw ERC-20 uint256 amount</small></div>
+      <div><span>Current allowance</span><strong>${esc(data.amount)}</strong><small>raw ERC-20 uint256 amount</small></div>
       <div data-alert="${data.unlimited?'true':'false'}"><span>Unlimited</span><strong>${data.unlimited?'YES':'NO'}</strong><small>exact max uint256 detection</small></div>
-      <div><span>Evidence</span><strong>${esc(String(data.evidence_status||'unknown').toUpperCase())}</strong><small>${esc(data.live_availability||'not checked')}</small></div>
+      <div><span>Evidence</span><strong>${esc(String(data.evidence_status).toUpperCase())}</strong><small>${esc(data.live_availability)}</small></div>
     </div>
     <div class="esi-identity">
-      <div><span>Token</span><code>${esc(data.token||'—')}</code></div>
-      <div><span>Owner</span><code>${esc(data.owner||'—')}</code></div>
-      <div><span>Spender</span><code>${esc(data.spender||'—')}</code></div>
+      <div><span>Token</span><code>${esc(data.token)}</code></div>
+      <div><span>Owner</span><code>${esc(data.owner)}</code></div>
+      <div><span>Spender</span><code>${esc(data.spender)}</code></div>
     </div>
     <div class="esi-grid">
       <section><div class="esi-subhead"><span>Trust vector</span><b>Allowance observation only</b></div><div class="esi-trust">${trustCells(trust)}</div></section>
@@ -76,10 +90,12 @@ form.addEventListener('submit',async event=>{
     const response=await fetch('/api/scan/approval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);
+    validateObservedAllowance(data,values);
     render(data);
     status.textContent='Current allowance observed. Creation mechanism and owner intent were not inferred.';
     status.dataset.state='ready';
   }catch(error){
+    result.hidden=true;
     status.textContent=`Spending intelligence unavailable: ${error?.message||'unknown error'}`;
     status.dataset.state='error';
   }finally{
