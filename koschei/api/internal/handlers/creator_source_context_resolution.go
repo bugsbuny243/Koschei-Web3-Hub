@@ -125,6 +125,7 @@ func appendCreatorResolutionLimitation(raw any, status string, metadataLimitatio
 			if text := strings.TrimSpace(creatorIntelCleanString(value)); text != "" {
 				limitations = append(limitations, text)
 			}
+		}
 	case string:
 		if text := strings.TrimSpace(values); text != "" {
 			limitations = append(limitations, text)
