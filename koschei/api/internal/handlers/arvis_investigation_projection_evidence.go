@@ -197,8 +197,8 @@ func enrichMoneyFlowInvestigationResult(result *arvisInvestigationResult, creato
 		result.EvidenceRefs = appendUniqueProjectionStrings(result.EvidenceRefs, signature)
 		result.Entities = appendUniqueProjectionStrings(result.Entities,
 			projectionString(item["from_entity"]), projectionString(item["to_entity"]),
-			projectionStrings(item["program_ids"])...,
 		)
+		result.Entities = appendUniqueProjectionStrings(result.Entities, projectionStrings(item["program_ids"])...)
 		if source != "" || destination != "" {
 			line := source + " -> " + destination
 			if amount > 0 {
@@ -242,8 +242,8 @@ func enrichInfrastructureInvestigationResult(result *arvisInvestigationResult, f
 		result.Entities = appendUniqueProjectionStrings(result.Entities,
 			projectionString(item["from_entity"]), projectionString(item["to_entity"]),
 			projectionString(item["from_entity_category"]), projectionString(item["to_entity_category"]),
-			projectionStrings(item["program_ids"])...,
 		)
+		result.Entities = appendUniqueProjectionStrings(result.Entities, projectionStrings(item["program_ids"])...)
 		result.Transactions = appendUniqueProjectionStrings(result.Transactions, projectionString(item["signature"]))
 		result.EvidenceRefs = appendUniqueProjectionStrings(result.EvidenceRefs,
 			projectionString(item["signature"]), projectionString(item["risk_flag_address"]), projectionString(item["risk_flag_endpoint"]),
