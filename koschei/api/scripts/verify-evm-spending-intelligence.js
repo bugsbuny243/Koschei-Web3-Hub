@@ -23,6 +23,11 @@ requireText("typeof data.amount!=='string'||!/^\\d+$/.test(data.amount)",'amount
 requireText("data.trust?.observed!==true",'observed trust gate');
 requireText("data.trust?.verified===true||data.trust?.authorized===true||data.trust?.finalized===true",'trust promotion rejection');
 requireText('validateObservedAllowance(data,values);','pre-render validation');
+requireText('const controller=new AbortController();','bounded approval transport');
+requireText('setTimeout(()=>controller.abort(),15000)','15 second approval timeout');
+requireText("cache:'no-store',credentials:'same-origin',signal:controller.signal",'approval fetch transport policy');
+requireText("controller.signal.aborted?'approval evidence timed out after 15 seconds'",'timeout failure copy');
+requireText('clearTimeout(timer);','approval timeout cleanup');
 requireText('result.hidden=true;','error hides stale result');
 requireText('CURRENT ALLOWANCE ≠ APPROVAL PROVENANCE','provenance boundary copy');
 requireText('APPROVAL ≠ SAFE SPENDER','safety boundary copy');
