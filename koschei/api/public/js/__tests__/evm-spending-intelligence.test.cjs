@@ -65,8 +65,16 @@ test('malformed HTTP 200 is withheld instead of becoming zero allowance',async()
   const h=harness(async()=>response(200,{}));
   h.submit();await settle();
   assert.equal(h.nodes.evmSpendingResult.hidden,true);
-  assert.match(h.nodes.evmSpendingStatus.textContent,/approval evidence missing/);
+  assert.match(h.nodes.evmSpendingStatus.textContent,/approval evidence schema mismatch/);
   assert.equal(h.nodes.evmSpendingSubmit.disabled,false);
+});
+
+test('stale or foreign approval schema is withheld even when result shape looks valid',async()=>{
+  const stale=envelope();stale.schema_version='koschei-approval-scan-v0';
+  const h=harness(async()=>response(200,stale));
+  h.submit();await settle();
+  assert.equal(h.nodes.evmSpendingResult.hidden,true);
+  assert.match(h.nodes.evmSpendingStatus.textContent,/approval evidence schema mismatch/);
 });
 
 test('wrong chain or subject tuple is withheld',async()=>{
