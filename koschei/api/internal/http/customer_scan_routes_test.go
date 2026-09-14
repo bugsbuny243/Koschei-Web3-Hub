@@ -13,9 +13,6 @@ import (
 )
 
 func TestCustomerScanEndpointRequiresNetworkForEVMAddress(t *testing.T) {
-	// Exercise the route contract directly. NewServer intentionally wraps /api
-	// routes in deployment-readiness middleware, and a nil database in this unit
-	// test must not be used to weaken that production gate.
 	mux := http.NewServeMux()
 	registerCustomerScanRoutes(mux)
 	recorder := httptest.NewRecorder()
@@ -63,11 +60,14 @@ func TestCustomerScanEndpointDoesNotClaimSolanaLiveEvidenceWithoutRPC(t *testing
 	if recorder.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
+	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control=%q", got)
+	}
 	var envelope customerScanEnvelope
 	if err := json.NewDecoder(recorder.Body).Decode(&envelope); err != nil {
 		t.Fatal(err)
 	}
-	if envelope.Result.Trust.Observed || envelope.Result.Trust.Verified || envelope.Result.Trust.Finalized {
+	if envelope.Result.EvidenceStatus != services.Web3TrustEvidenceUnverified || envelope.Result.Trust.Observed || envelope.Result.Trust.Verified || envelope.Result.Trust.Finalized {
 		t.Fatalf("missing RPC manufactured live evidence: %+v", envelope.Result)
 	}
 	found := false
@@ -79,6 +79,31 @@ func TestCustomerScanEndpointDoesNotClaimSolanaLiveEvidenceWithoutRPC(t *testing
 	}
 	if !found {
 		t.Fatalf("missing explicit Solana connection boundary: %+v", envelope.Result.Reasons)
+	}
+}
+
+func TestCustomerScanErrorWriterCannotManufactureProviderEvidence(t *testing.T) {
+	for _, message := range []string{"evm_probe_unavailable", "bitcoin_probe_unavailable", "solana_account_probe_unavailable"} {
+		t.Run(message, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			writeCustomerScanError(recorder, http.StatusBadGateway, message)
+			if recorder.Code != http.StatusBadGateway {
+				t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+			}
+			if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+				t.Fatalf("Cache-Control=%q", got)
+			}
+			var body map[string]any
+			if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+				t.Fatal(err)
+			}
+			if body["schema_version"] != customerScanSchemaVersion || body["analysis_performed"] != false || body["evidence_status"] != services.Web3TrustEvidenceUnverified {
+				t.Fatalf("provider failure manufactured evidence: %#v", body)
+			}
+			if body["error"] != message {
+				t.Fatalf("error=%v", body["error"])
+			}
+		})
 	}
 }
 
