@@ -12592,11 +12592,11 @@
         "security": [],
         "summary": "POST /api/scan",
         "tags": [
-          "scan"
+          "public_and_system"
         ],
         "x-koschei-auth-tier": "public",
-        "x-koschei-inventory-auth": "",
-        "x-koschei-route-source": "boot_chain_fallback"
+        "x-koschei-inventory-auth": "public_or_mixed",
+        "x-koschei-route-source": "route_inventory.go"
       }
     },
     "/api/scan/approval": {
@@ -12669,11 +12669,11 @@
         "security": [],
         "summary": "POST /api/scan/approval",
         "tags": [
-          "scan"
+          "public_and_system"
         ],
         "x-koschei-auth-tier": "public",
-        "x-koschei-inventory-auth": "",
-        "x-koschei-route-source": "boot_chain_fallback"
+        "x-koschei-inventory-auth": "public_or_mixed",
+        "x-koschei-route-source": "route_inventory.go"
       }
     },
     "/api/token/scan": {
