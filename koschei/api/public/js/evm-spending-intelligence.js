@@ -9,6 +9,7 @@ const spender=document.getElementById('evmSpendingSpender');
 const submit=document.getElementById('evmSpendingSubmit');
 const status=document.getElementById('evmSpendingStatus');
 const result=document.getElementById('evmSpendingResult');
+const maxUint256='115792089237316195423570985008687907853269984665640564039457584007913129639935';
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const short=value=>{const text=String(value||'');return text.length>26?`${text.slice(0,12)}…${text.slice(-10)}`:text};
 const validAddress=value=>/^0x[0-9a-fA-F]{40}$/.test(String(value||'').trim());
@@ -51,7 +52,9 @@ function validateObservedAllowance(payload,expected){
   if(norm(data.owner)!==norm(expected.owner))throw new Error('approval evidence owner mismatch');
   if(norm(data.spender)!==norm(expected.spender))throw new Error('approval evidence spender mismatch');
   if(norm(data.evidence_status)!=='observed'||norm(data.live_availability)!=='checked')throw new Error('approval evidence incomplete');
-  if(typeof data.amount!=='string'||!/^\d+$/.test(data.amount))throw new Error('approval amount unavailable');
+  if(typeof data.amount!=='string'||!/^(0|[1-9]\d*)$/.test(data.amount))throw new Error('approval amount unavailable');
+  if(data.amount.length>maxUint256.length||(data.amount.length===maxUint256.length&&data.amount>maxUint256))throw new Error('approval amount outside uint256');
+  if(typeof data.unlimited!=='boolean'||data.unlimited!==(data.amount===maxUint256))throw new Error('approval unlimited flag mismatch');
   if(data.trust?.observed!==true)throw new Error('approval observation trust missing');
   if(data.trust?.verified===true||data.trust?.authorized===true||data.trust?.finalized===true)throw new Error('approval evidence over-promoted');
   validateSpenderAuthority(data.spender_authority,expected);
