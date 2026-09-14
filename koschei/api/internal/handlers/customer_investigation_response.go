@@ -74,6 +74,11 @@ func attachCustomerAnalysisSummary(assembly *unifiedInvestigationAssembly) map[s
 	// into a safety approval.
 	attachArvisIntelligenceDecision(assembly)
 
+	// Expose the fourteen concrete ARVIS investigation answers as an additive
+	// projection over evidence that has already been collected into this report.
+	// The projection cannot mutate rules, grade, signature, or verdict authority.
+	assembly.Report["arvis_investigations"] = buildArvisInvestigationProjection(assembly.Report)
+
 	hasLiveEvidence := services.SecurityRadarHasLiveEvidence(assembly.Core.Bundle)
 	analysisSummary := buildCustomerAnalysisSummaryV3(*assembly, hasLiveEvidence)
 	assembly.Report["analysis_summary"] = analysisSummary
