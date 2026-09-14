@@ -39,91 +39,179 @@ func TestCustomerApprovalScanRejectsMissingContext(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/api/scan/approval", strings.NewReader(`{"network":"ethereum-mainnet","token":"0x0000000000000000000000000000000000000001"}`))
 	request.Header.Set("Content-Type", "application/json")
 	mux.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusBadRequest { t.Fatalf("expected 400, got %d: %s", recorder.Code, recorder.Body.String()) }
-	if !strings.Contains(recorder.Body.String(), "approval_scan_context_required") { t.Fatalf("expected missing context error, got %s", recorder.Body.String()) }
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), "approval_scan_context_required") {
+		t.Fatalf("expected missing context error, got %s", recorder.Body.String())
+	}
 }
 
 func TestCustomerApprovalScanRejectsUnsupportedNetwork(t *testing.T) {
-	mux := http.NewServeMux(); registerCustomerScanRoutes(mux)
+	mux := http.NewServeMux()
+	registerCustomerScanRoutes(mux)
 	body := `{"network":"not-a-chain","token":"0x0000000000000000000000000000000000000001","owner":"0x0000000000000000000000000000000000000002","spender":"0x0000000000000000000000000000000000000003"}`
-	recorder := httptest.NewRecorder(); request := httptest.NewRequest(http.MethodPost, "/api/scan/approval", strings.NewReader(body)); request.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/scan/approval", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
 	mux.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusBadRequest { t.Fatalf("expected 400, got %d: %s", recorder.Code, recorder.Body.String()) }
-	if !strings.Contains(recorder.Body.String(), "evm_allowance_unsupported_network") { t.Fatalf("expected unsupported network error, got %s", recorder.Body.String()) }
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), "evm_allowance_unsupported_network") {
+		t.Fatalf("expected unsupported network error, got %s", recorder.Body.String())
+	}
+}
+
+func TestCustomerApprovalScanRejectsInvalidAddressBeforeRPCConfiguration(t *testing.T) {
+	mux := http.NewServeMux()
+	registerCustomerScanRoutes(mux)
+	body := `{"network":"ethereum-mainnet","token":"0x1234","owner":"0x0000000000000000000000000000000000000002","spender":"0x0000000000000000000000000000000000000003"}`
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/scan/approval", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected invalid address to fail as 400 before provider lookup, got %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), "invalid_approval_scan_request") {
+		t.Fatalf("expected invalid approval request error, got %s", recorder.Body.String())
+	}
 }
 
 func TestCustomerApprovalScanRequiresJSON(t *testing.T) {
-	mux := http.NewServeMux(); registerCustomerScanRoutes(mux)
-	recorder := httptest.NewRecorder(); request := httptest.NewRequest(http.MethodPost, "/api/scan/approval", strings.NewReader("network=ethereum-mainnet")); request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	mux := http.NewServeMux()
+	registerCustomerScanRoutes(mux)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/scan/approval", strings.NewReader("network=ethereum-mainnet"))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	mux.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusUnsupportedMediaType { t.Fatalf("expected 415, got %d: %s", recorder.Code, recorder.Body.String()) }
+	if recorder.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("expected 415, got %d: %s", recorder.Code, recorder.Body.String())
+	}
 }
 
 func TestCustomerApprovalScanRejectsGET(t *testing.T) {
-	mux := http.NewServeMux(); registerCustomerScanRoutes(mux)
-	recorder := httptest.NewRecorder(); request := httptest.NewRequest(http.MethodGet, "/api/scan/approval", nil); mux.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusMethodNotAllowed { t.Fatalf("expected 405, got %d: %s", recorder.Code, recorder.Body.String()) }
+	mux := http.NewServeMux()
+	registerCustomerScanRoutes(mux)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/scan/approval", nil)
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d: %s", recorder.Code, recorder.Body.String())
+	}
 }
 
 func TestValidateCustomerApprovalObservationAcceptsBoundObservedTuple(t *testing.T) {
 	request, allowance := approvalObservationFixture()
-	if err := validateCustomerApprovalObservation(request, allowance); err != nil { t.Fatalf("valid bound observation rejected: %v", err) }
+	if err := validateCustomerApprovalObservation(request, allowance); err != nil {
+		t.Fatalf("valid bound observation rejected: %v", err)
+	}
 }
 
 func TestValidateCustomerApprovalObservationAcceptsExactUnlimitedMaxUint256(t *testing.T) {
 	request, allowance := approvalObservationFixture()
 	allowance.Amount = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
 	allowance.Unlimited = true
-	if err := validateCustomerApprovalObservation(request, allowance); err != nil { t.Fatalf("valid unlimited observation rejected: %v", err) }
+	if err := validateCustomerApprovalObservation(request, allowance); err != nil {
+		t.Fatalf("valid unlimited observation rejected: %v", err)
+	}
 }
 
 func TestValidateCustomerApprovalObservationRejectsNonCanonicalOrContradictoryAmount(t *testing.T) {
 	request, base := approvalObservationFixture()
-	cases := []networktarget.EVMAllowanceProbeResult{}
-	leadingZero := base; leadingZero.Amount = "000"
-	overflow := base; overflow.Amount = "115792089237316195423570985008687907853269984665640564039457584007913129639936"
-	falseUnlimited := base; falseUnlimited.Unlimited = true
-	missingUnlimited := base; missingUnlimited.Amount = "115792089237316195423570985008687907853269984665640564039457584007913129639935"; missingUnlimited.Unlimited = false
-	cases = append(cases, leadingZero, overflow, falseUnlimited, missingUnlimited)
-	for i, allowance := range cases {
-		if err := validateCustomerApprovalObservation(request, allowance); err == nil { t.Fatalf("case %d should be rejected: %+v", i, allowance) }
+	leadingZero := base
+	leadingZero.Amount = "000"
+	overflow := base
+	overflow.Amount = "115792089237316195423570985008687907853269984665640564039457584007913129639936"
+	falseUnlimited := base
+	falseUnlimited.Unlimited = true
+	missingUnlimited := base
+	missingUnlimited.Amount = "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+	missingUnlimited.Unlimited = false
+	for i, allowance := range []networktarget.EVMAllowanceProbeResult{leadingZero, overflow, falseUnlimited, missingUnlimited} {
+		if err := validateCustomerApprovalObservation(request, allowance); err == nil {
+			t.Fatalf("case %d should be rejected: %+v", i, allowance)
+		}
 	}
 }
 
 func TestValidateCustomerApprovalObservationRejectsCrossNetworkSubstitution(t *testing.T) {
 	request, allowance := approvalObservationFixture()
-	allowance.Network = "base-mainnet"; allowance.ChainID = "0x2105"; allowance.ExpectedChainID = "0x2105"; allowance.Amount = "1"
-	if err := validateCustomerApprovalObservation(request, allowance); err == nil { t.Fatal("expected cross-network allowance evidence to be rejected") }
+	allowance.Network = "base-mainnet"
+	allowance.ChainID = "0x2105"
+	allowance.ExpectedChainID = "0x2105"
+	allowance.Amount = "1"
+	if err := validateCustomerApprovalObservation(request, allowance); err == nil {
+		t.Fatal("expected cross-network allowance evidence to be rejected")
+	}
 }
 
 func TestValidateCustomerApprovalObservationRejectsSpenderSubstitutionAndIncompleteEvidence(t *testing.T) {
-	request, base := approvalObservationFixture(); base.Amount = "1"; base.Spender = "0x0000000000000000000000000000000000000004"
-	if err := validateCustomerApprovalObservation(request, base); err == nil { t.Fatal("expected substituted spender to be rejected") }
-	base.Spender = request.Spender; base.EvidenceStatus = "unverified"
-	if err := validateCustomerApprovalObservation(request, base); err == nil { t.Fatal("expected incomplete approval evidence to be rejected") }
+	request, base := approvalObservationFixture()
+	base.Amount = "1"
+	base.Spender = "0x0000000000000000000000000000000000000004"
+	if err := validateCustomerApprovalObservation(request, base); err == nil {
+		t.Fatal("expected substituted spender to be rejected")
+	}
+	base.Spender = request.Spender
+	base.EvidenceStatus = "unverified"
+	if err := validateCustomerApprovalObservation(request, base); err == nil {
+		t.Fatal("expected incomplete approval evidence to be rejected")
+	}
 }
 
 func TestCustomerApprovalResultWriterPinsNoStoreSchemaAndObservedTrust(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	writeCustomerApprovalScanResult(recorder, http.StatusOK, customerApprovalScanResult{
-		Network: "ethereum-mainnet", Token: "0x0000000000000000000000000000000000000001", Owner: "0x0000000000000000000000000000000000000002", Spender: "0x0000000000000000000000000000000000000003",
-		Amount: "0", EvidenceStatus: services.Web3TrustEvidenceObserved, LiveAvailability: "checked", Trust: services.Web3TrustVector{Observed: true}, Reasons: []string{"CURRENT_ALLOWANCE_OBSERVED"},
+		Network:          "ethereum-mainnet",
+		Token:            "0x0000000000000000000000000000000000000001",
+		Owner:            "0x0000000000000000000000000000000000000002",
+		Spender:          "0x0000000000000000000000000000000000000003",
+		Amount:           "0",
+		EvidenceStatus:   services.Web3TrustEvidenceObserved,
+		LiveAvailability: "checked",
+		Trust:            services.Web3TrustVector{Observed: true},
+		Reasons:          []string{"CURRENT_ALLOWANCE_OBSERVED"},
 	})
-	if recorder.Code != http.StatusOK { t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String()) }
-	if got := recorder.Header().Get("Cache-Control"); got != "no-store" { t.Fatalf("Cache-Control=%q", got) }
-	if got := recorder.Header().Get("Content-Type"); !strings.HasPrefix(got, "application/json") { t.Fatalf("Content-Type=%q", got) }
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control=%q", got)
+	}
+	if got := recorder.Header().Get("Content-Type"); !strings.HasPrefix(got, "application/json") {
+		t.Fatalf("Content-Type=%q", got)
+	}
 	var envelope customerApprovalScanEnvelope
-	if err := json.NewDecoder(recorder.Body).Decode(&envelope); err != nil { t.Fatal(err) }
-	if envelope.SchemaVersion != customerApprovalScanSchemaVersion { t.Fatalf("schema=%q", envelope.SchemaVersion) }
-	if envelope.Result.Amount != "0" || !envelope.Result.Trust.Observed || envelope.Result.EvidenceStatus != services.Web3TrustEvidenceObserved { t.Fatalf("unexpected observed envelope: %+v", envelope.Result) }
+	if err := json.NewDecoder(recorder.Body).Decode(&envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.SchemaVersion != customerApprovalScanSchemaVersion {
+		t.Fatalf("schema=%q", envelope.SchemaVersion)
+	}
+	if envelope.Result.Amount != "0" || !envelope.Result.Trust.Observed || envelope.Result.EvidenceStatus != services.Web3TrustEvidenceObserved {
+		t.Fatalf("unexpected observed envelope: %+v", envelope.Result)
+	}
 }
 
 func TestCustomerApprovalErrorWriterCannotManufactureEvidence(t *testing.T) {
-	recorder := httptest.NewRecorder(); writeCustomerApprovalScanError(recorder, http.StatusBadGateway, "evm_allowance_probe_unavailable")
-	if recorder.Code != http.StatusBadGateway { t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String()) }
-	if got := recorder.Header().Get("Cache-Control"); got != "no-store" { t.Fatalf("Cache-Control=%q", got) }
+	recorder := httptest.NewRecorder()
+	writeCustomerApprovalScanError(recorder, http.StatusBadGateway, "evm_allowance_probe_unavailable")
+	if recorder.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if got := recorder.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control=%q", got)
+	}
 	var body map[string]any
-	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil { t.Fatal(err) }
-	if body["schema_version"] != customerApprovalScanSchemaVersion || body["analysis_performed"] != false || body["evidence_status"] != services.Web3TrustEvidenceUnverified { t.Fatalf("unexpected error envelope: %#v", body) }
-	if body["error"] != "evm_allowance_probe_unavailable" { t.Fatalf("error=%v", body["error"]) }
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body["schema_version"] != customerApprovalScanSchemaVersion || body["analysis_performed"] != false || body["evidence_status"] != services.Web3TrustEvidenceUnverified {
+		t.Fatalf("unexpected error envelope: %#v", body)
+	}
+	if body["error"] != "evm_allowance_probe_unavailable" {
+		t.Fatalf("error=%v", body["error"])
+	}
 }
