@@ -23,7 +23,7 @@ func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 		"rules": []string{
 			"A handler is live only when registered in the server boot chain.",
 			"The production route inventory is contract-tested against literal API registrations.",
-			"Operational customer analysis requires an active Professional entitlement; public proof, health and documentation surfaces do not execute customer investigations.",
+			"Bounded public /api/scan surfaces may collect stateless read-only chain evidence; retained, metered or privileged customer investigations remain behind the Professional entitlement boundary.",
 			"Legacy /api/arvis/preflight and /api/token/scan paths are compatibility routes and are wrapped by the Professional entitlement and output ledger at the HTTP readiness boundary.",
 			"Public SOC discovery exposes only explicitly published immutable dossiers; a stored dossier is private by default.",
 			"A customer session identifies the account; paid product authorization is derived only from an active Professional entitlement.",
