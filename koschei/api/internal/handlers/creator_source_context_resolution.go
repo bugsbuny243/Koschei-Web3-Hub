@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -40,11 +43,16 @@ func (h *Handler) resolveCanonicalCreatorSourceContext(ctx context.Context, targ
 		return out
 	}
 
-	metadata := services.FetchHeliusTokenMetadata(ctx, strings.TrimSpace(creatorIntelRPCURL()), target)
+	metadata := services.FetchHeliusTokenMetadata(ctx, creatorMetadataRPCURL(), target)
 	out["creator_resolution"] = metadata
 	out["creator_resolution_provider"] = metadata.Provider
 	out["creator_resolution_status"] = metadata.Status
 	if !metadata.Available {
+		status := strings.TrimSpace(metadata.Status)
+		if status == "" {
+			status = "unavailable"
+		}
+		appendCreatorResolutionLimitation(out, fmt.Sprintf("Creator resolution failed: %s. Helius API key could not be resolved from the configured RPC URL or Helius metadata was unavailable.", status))
 		return out
 	}
 	out["available"] = true
@@ -85,6 +93,53 @@ func (h *Handler) resolveCanonicalCreatorSourceContext(ctx context.Context, targ
 
 	verification := h.verifyCanonicalCreatorRelation(ctx, target, network, metadata.Creator, firstNonEmptyString(metadata.CreateTransaction, metadata.FirstMintTransaction))
 	return applyCanonicalCreatorVerification(out, verification)
+}
+
+func creatorMetadataRPCURL() string {
+	if rpcURL := strings.TrimSpace(os.Getenv("HELIUS_SOLANA_RPC_URL")); rpcURL != "" {
+		return rpcURL
+	}
+
+	for _, envName := range []string{"SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL"} {
+		rpcURL := strings.TrimSpace(os.Getenv(envName))
+		if rpcURL == "" {
+			continue
+		}
+		parsed, err := url.Parse(rpcURL)
+		if err != nil {
+			continue
+		}
+		if strings.Contains(strings.ToLower(parsed.Hostname()), "helius") {
+			return rpcURL
+		}
+	}
+
+	return strings.TrimSpace(creatorIntelRPCURL())
+}
+
+func appendCreatorResolutionLimitation(out map[string]any, message string) {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return
+	}
+
+	switch existing := out["limitations"].(type) {
+	case []string:
+		out["limitations"] = append(existing, message)
+	case []any:
+		out["limitations"] = append(existing, message)
+	case string:
+		existing = strings.TrimSpace(existing)
+		if existing == "" {
+			out["limitations"] = []string{message}
+			return
+		}
+		out["limitations"] = []string{existing, message}
+	case nil:
+		out["limitations"] = []string{message}
+	default:
+		out["limitations"] = []string{message}
+	}
 }
 
 func cloneCreatorSourceContext(source map[string]any) map[string]any {
