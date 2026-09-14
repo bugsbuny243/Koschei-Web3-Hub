@@ -158,7 +158,7 @@ func TestCustomerScanResultAcceptsBoundBitcoinProbeProvenance(t *testing.T) {
 	target := CustomerScanTarget{
 		Raw:            "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
 		NetworkHint:    "bitcoin-mainnet",
-		Kind:           CustomerScanTargetBitcoinAddress,
+		Kind:           CustomerScanTargetBitcoin,
 		Route:          CustomerScanRouteBitcoinProbe,
 		Classification: "syntax_only",
 	}
