@@ -46,9 +46,9 @@ func TestCanonicalInvestigationSurfaceMountsProfessionalModesAndEvidenceControll
 	}
 	text := string(body)
 	for _, required := range []string{
-		"PROFESSIONAL · CLASSIC INVESTIGATION CONSOLE",
-		"Descend into the evidence.",
-		"Free Quick Check execution has been removed",
+		"Koschei Web3 | Intelligence Desk",
+		"Investigate an address.",
+		"Choose a network, collect the evidence, and inspect what controls the asset.",
 		"data-scan-mode=\"token\"",
 		"data-scan-mode=\"transaction\"",
 		"data-scan-mode=\"deep\"",
@@ -56,7 +56,10 @@ func TestCanonicalInvestigationSurfaceMountsProfessionalModesAndEvidenceControll
 		"customer-arvis-premium-suite.js",
 		"data-customer-arvis-result",
 		"public-solana-scan.js?v=13",
-		"Missing evidence is shown as a limitation, not converted into a safety claim.",
+		"Every material state keeps its source boundary",
+		"Unknown stays unknown",
+		"Presentation never outranks evidence maturity.",
+		"No wallet connection, signing or private keys.",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("canonical investigation page missing %q", required)
@@ -76,15 +79,18 @@ func TestDashboardIsCurrentCustomerSecurityWorkspace(t *testing.T) {
 	}
 	text := string(body)
 	for _, required := range []string{
-		"Koschei Web3 | Customer Panel",
+		"Koschei Web3 | Intelligence Console",
 		"Customer security workspace",
 		"Security Overview",
+		"What do you want to investigate?",
 		"ARVIS intelligence map",
 		"Live operational truth",
+		"No fake telemetry",
 		"Live account state",
 		"Security Capabilities",
 		"Missing evidence remains unknown.",
 		"Solana is the live chain core.",
+		"Read-only analysis. No wallet connection or private keys.",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("dashboard missing workspace contract %q", required)
