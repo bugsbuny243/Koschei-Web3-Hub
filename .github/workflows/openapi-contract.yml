@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -30,6 +30,113 @@ jobs:
         working-directory: koschei/api
     steps:
       - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Mark orphan frontend files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          public = Path('public')
+          html_files = sorted(public.glob('*.html'))
+          all_html = sorted(public.rglob('*.html'))
+          js_files = sorted((public / 'js').glob('*.js'))
+          date = '2026-09-14'
+          protected_js = {
+              'cipher.js',
+              'unified-scan-navigation.js',
+              'owner-command-center-v2.js',
+              'owner-unified-radar.js',
+              'arvis-canonical-projection-v1.js',
+          }
+          protected_html = {'index.html'}
+
+          html_text = {p: p.read_text(encoding='utf-8') for p in all_html}
+          corpus = '\n'.join(html_text.values())
+
+          orphan_js = []
+          for path in js_files:
+              if path.name in protected_js:
+                  continue
+              patterns = [
+                  f'/js/{path.name}',
+                  f'js/{path.name}',
+                  path.name,
+              ]
+              if not any(token in corpus for token in patterns):
+                  orphan_js.append(path)
+
+          orphan_html = []
+          for path in html_files:
+              if path.name in protected_html:
+                  continue
+              stem = path.stem
+              found = False
+              for other, text in html_text.items():
+                  if other == path:
+                      continue
+                  targets = [
+                      f'href="/{stem}"', f"href='/{stem}'",
+                      f'href="/{path.name}"', f"href='/{path.name}'",
+                      f'href="{path.name}"', f"href='{path.name}'",
+                      f'href="./{path.name}"', f"href='./{path.name}'",
+                  ]
+                  if any(token in text for token in targets):
+                      found = True
+                      break
+              if not found:
+                  orphan_html.append(path)
+
+          js_marker = f'// ORPHAN: no HTML page loads this file as of {date}.'
+          html_marker = f'<!-- ORPHAN: no inbound link as of {date}. -->'
+          changed = []
+
+          for path in orphan_js:
+              text = path.read_text(encoding='utf-8')
+              if text.startswith('// ORPHAN:'):
+                  continue
+              path.write_text(js_marker + '\n' + text, encoding='utf-8')
+              changed.append(path)
+
+          for path in orphan_html:
+              text = path.read_text(encoding='utf-8')
+              if html_marker in text or '<!-- ORPHAN: no inbound link as of ' in text:
+                  continue
+              match = re.search(r'<head(?:\s[^>]*)?>', text, flags=re.I)
+              if not match:
+                  print(f'SKIP_NO_HEAD={path.as_posix()}')
+                  continue
+              text = text[:match.end()] + '\n' + html_marker + text[match.end():]
+              path.write_text(text, encoding='utf-8')
+              changed.append(path)
+
+          print('ORPHAN_JS_COUNT=' + str(len(orphan_js)))
+          for path in orphan_js:
+              print('ORPHAN_JS=' + path.as_posix())
+          print('ORPHAN_HTML_COUNT=' + str(len(orphan_html)))
+          for path in orphan_html:
+              print('ORPHAN_HTML=' + path.as_posix())
+          print('CHANGED_COUNT=' + str(len(changed)))
+
+          Path('/tmp/orphan-report.txt').write_text(
+              'ORPHAN_JS_COUNT=' + str(len(orphan_js)) + '\n' +
+              ''.join('ORPHAN_JS=' + p.as_posix() + '\n' for p in orphan_js) +
+              'ORPHAN_HTML_COUNT=' + str(len(orphan_html)) + '\n' +
+              ''.join('ORPHAN_HTML=' + p.as_posix() + '\n' for p in orphan_html),
+              encoding='utf-8'
+          )
+          PY
+          cat /tmp/orphan-report.txt
+          if git diff --quiet; then
+            echo "No orphan marker changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/js/*.js public/*.html
+          git commit -m "chore: mark orphan frontend files"
+          git push origin HEAD:main
       - uses: actions/setup-go@v7
         with:
           go-version-file: koschei/api/go.mod
