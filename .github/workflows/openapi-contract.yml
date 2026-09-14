@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -30,46 +30,6 @@ jobs:
         working-directory: koschei/api
     steps:
       - uses: actions/checkout@v7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Mark unrouted legacy handlers
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          comments = {
-              "internal/handlers/security_radar_detail.go": "// SUPERSEDED BY security_radar_detail_v3.go. Not routed. Kept for reference.",
-              "internal/handlers/public_case_operational.go": "// SUPERSEDED BY public_case_operational_v2.go. Not routed. Kept for reference.",
-              "internal/handlers/public_case_page.go": "// SUPERSEDED BY public_case_operational_v2.go (PublicCaseOperationalPageV2). Not routed. Kept for reference.",
-              "internal/handlers/transaction_guard_v2.go": "// SUPERSEDED BY transaction_guard_v3.go. Not routed. Kept for reference.",
-              "internal/handlers/public_dossier_cases_v2.go": "// SUPERSEDED BY public_dossier_registry_drive.go (PublicDossierCasesPortable). Not routed. Kept for reference.",
-              "internal/handlers/web3.go": "// OUT OF SCOPE. Not routed.",
-              "internal/handlers/jobs.go": "// OUT OF SCOPE. Not routed.",
-              "internal/handlers/package_status.go": "// OUT OF SCOPE. Not routed.",
-              "internal/handlers/local_auth.go": "// OUT OF SCOPE. Not routed.",
-              "internal/handlers/owner_payment_health.go": "// OUT OF SCOPE. Not routed.",
-              "internal/handlers/mev_shield.go": "// OUT OF SCOPE. Not routed.",
-              "internal/handlers/plans.go": "// OUT OF SCOPE. Not routed.",
-          }
-          changed = []
-          for rel, comment in comments.items():
-              path = Path(rel)
-              text = path.read_text()
-              if text.startswith(comment + "\n"):
-                  continue
-              path.write_text(comment + "\n" + text)
-              changed.append(rel)
-          print("marked", len(changed), "handlers")
-          PY
-          if git diff --quiet; then
-            echo "No handler classification changes needed"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add internal/handlers/security_radar_detail.go internal/handlers/public_case_operational.go internal/handlers/public_case_page.go internal/handlers/transaction_guard_v2.go internal/handlers/public_dossier_cases_v2.go internal/handlers/web3.go internal/handlers/jobs.go internal/handlers/package_status.go internal/handlers/local_auth.go internal/handlers/owner_payment_health.go internal/handlers/mev_shield.go internal/handlers/plans.go
-          git commit -m "chore: classify unrouted legacy handlers"
-          git push origin HEAD:main
       - uses: actions/setup-go@v7
         with:
           go-version-file: koschei/api/go.mod
