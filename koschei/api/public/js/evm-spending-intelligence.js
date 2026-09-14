@@ -9,7 +9,7 @@ const spender=document.getElementById('evmSpendingSpender');
 const submit=document.getElementById('evmSpendingSubmit');
 const status=document.getElementById('evmSpendingStatus');
 const result=document.getElementById('evmSpendingResult');
-const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]));
+const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const short=value=>{const text=String(value||'');return text.length>26?`${text.slice(0,12)}…${text.slice(-10)}`:text};
 const validAddress=value=>/^0x[0-9a-fA-F]{40}$/.test(String(value||'').trim());
 const yesNo=value=>value?'YES':'NO';
