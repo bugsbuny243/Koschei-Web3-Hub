@@ -14,6 +14,7 @@ function forbid(pattern,label){
 }
 
 requireText('function validateObservedAllowance(payload,expected)','approval response binding gate');
+requireText("payload?.schema_version!=='koschei-approval-scan-v1'",'approval schema binding');
 requireText("norm(data.network)!==norm(expected.network)",'network binding');
 requireText("norm(data.token)!==norm(expected.token)",'token binding');
 requireText("norm(data.owner)!==norm(expected.owner)",'owner binding');
