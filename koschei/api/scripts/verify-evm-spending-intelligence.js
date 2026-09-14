@@ -25,7 +25,9 @@ requireText("norm(authority.spender)!==norm(expected.spender)",'authority spende
 requireText("authority.trust?.observed!==true",'authority observed trust gate');
 requireText("authority.trust?.verified===true||authority.trust?.authorized===true||authority.trust?.finalized===true",'authority trust promotion rejection');
 requireText("norm(data.evidence_status)!=='observed'||norm(data.live_availability)!=='checked'",'observed evidence gate');
-requireText("typeof data.amount!=='string'||!/^\\d+$/.test(data.amount)",'amount evidence gate');
+requireText("typeof data.amount!=='string'||!/^(0|[1-9]\\d*)$/.test(data.amount)",'canonical amount evidence gate');
+requireText('data.amount.length>maxUint256.length','uint256 range gate');
+requireText("typeof data.unlimited!=='boolean'||data.unlimited!==(data.amount===maxUint256)",'unlimited consistency gate');
 requireText("data.trust?.observed!==true",'observed trust gate');
 requireText("data.trust?.verified===true||data.trust?.authorized===true||data.trust?.finalized===true",'trust promotion rejection');
 requireText('validateSpenderAuthority(data.spender_authority,expected);','nested authority pre-render validation');
