@@ -34,6 +34,14 @@ function authorityHTML(authority){
   ].filter(([,value])=>value!==undefined&&value!==null&&value!=='');
   return rows.map(([label,value],index)=>`<div class="esi-authority-row"><span>${String(index+1).padStart(2,'0')}</span><div><b>${esc(label)}</b><small title="${esc(value)}">${esc(short(value))}</small></div></div>`).join('');
 }
+function validateSpenderAuthority(authority,expected){
+  if(authority===undefined||authority===null)return;
+  if(typeof authority!=='object')throw new Error('spender authority evidence malformed');
+  if(norm(authority.network)!==norm(expected.network))throw new Error('spender authority network mismatch');
+  if(norm(authority.spender)!==norm(expected.spender))throw new Error('spender authority subject mismatch');
+  if(authority.trust?.observed!==true)throw new Error('spender authority observation trust missing');
+  if(authority.trust?.verified===true||authority.trust?.authorized===true||authority.trust?.finalized===true)throw new Error('spender authority evidence over-promoted');
+}
 function validateObservedAllowance(payload,expected){
   if(payload?.schema_version!=='koschei-approval-scan-v1')throw new Error('approval evidence schema mismatch');
   const data=payload?.result;
@@ -46,6 +54,7 @@ function validateObservedAllowance(payload,expected){
   if(typeof data.amount!=='string'||!/^\d+$/.test(data.amount))throw new Error('approval amount unavailable');
   if(data.trust?.observed!==true)throw new Error('approval observation trust missing');
   if(data.trust?.verified===true||data.trust?.authorized===true||data.trust?.finalized===true)throw new Error('approval evidence over-promoted');
+  validateSpenderAuthority(data.spender_authority,expected);
   return data;
 }
 function render(payload){
