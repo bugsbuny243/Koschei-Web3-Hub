@@ -1,5 +1,13 @@
 # Koschei Web3 Project State
 
+## 2026-09-14 current-main repository/runtime alignment candidate
+
+The current cleanup/integration candidate is based on `main` commit `5dd0d378fac67db1ef4967b47a9d368173004c35` (PR #1123 included), not on the older 2026-09-09 integration branch. Work is isolated on `chore/web3-repo-refresh-main-2026-09-14` / PR #1125 until exact-head gates complete; this record does not claim merge or production readiness.
+
+The candidate restores the root repository/security contract, records the current Web4/Web5 standards intake, and closes boot-chain inventory gaps discovered after the chain-aware customer console landed. `POST /api/metadata/generate`, `POST /api/scan`, and `POST /api/scan/approval` are now represented by the owner-visible production route contract and generated OpenAPI surface. The two public customer scan/probe routes also use the existing fail-closed sensitive-rate-limit middleware with the stateless bounded-memory fallback when no shared application database is configured. These routes remain bounded read-only evidence probes; retained, metered, privileged, or durable customer operations remain governed by their existing Professional/persistence boundaries.
+
+No MCP, A2A, Verifiable Credential, x402, Lang, or Sentinel authority is enabled by this candidate. The 2026-09-09 checkpoint below remains historical evidence and its open acceptance items are not closed by the cleanup.
+
 ## 2026-09-10 product-direction implementation candidate
 
 An additive candidate records the owner-corrected independent Lang, independent Sentinel, joint Lang + Sentinel commercial packaging, and all-network/all-address Web3 scope. It adds offline network-scoped address resolution with a coverage UI and address-free process telemetry. No new live chain collector, paid-customer acceptance or model/runtime production completion is claimed. Existing Solana/Pump, ARVIS, native contracts and gates are preserved. See [the implementation slice and remaining work](docs/PRODUCT_DIRECTION_2026-09-10.md).
@@ -8,9 +16,9 @@ The checkpoint below remains historical evidence; its open acceptance items are 
 
 **Checkpoint date:** 2026-09-09  
 **Branch:** `integration/unified-fabric-2026-09-09`  
-**Status:** active integration work; not a production-completion claim.
+**Status:** historical integration checkpoint; not a production-completion claim.
 
-This file supersedes the older uploaded-snapshot checkpoint for the current integration branch. Historical fixes remain valid where the code still contains them, but old statements that Koschei Sentinel is cancelled/frozen are no longer current project policy.
+This checkpoint superseded an older uploaded-snapshot checkpoint for that integration branch. Historical fixes remain valid where the current code still contains them, but old statements that Koschei Sentinel is cancelled/frozen are no longer current project policy.
 
 ## CURRENT PROJECT BOUNDARIES
 
@@ -32,11 +40,11 @@ This file supersedes the older uploaded-snapshot checkpoint for the current inte
 
 The prior stateless architecture had a concrete contradiction: customer routes such as `/api/v1/radar/check` were allowed to execute without the application database, but the Professional entitlement/output gate still queried `Handler.DB`. With application `DB=nil`, authenticated paid requests therefore failed at `plan_access_unavailable` before analysis.
 
-The integration branch now separates commercial authorization from application persistence:
+The integration work separates commercial authorization from application persistence:
 
 - `Handler.EntitlementDB` is a dedicated commercial authorization ledger handle.
 - `Handler.DB` remains the application persistence handle and may stay nil.
-- `ENTITLEMENT_DATABASE_URL` is the only new runtime configuration used by the stateless process for paid-access enforcement; there is no implicit fallback to `DATABASE_URL` in `main.go`.
+- `ENTITLEMENT_DATABASE_URL` is the runtime configuration used by the stateless process for paid-access enforcement; there is no implicit fallback to `DATABASE_URL` in `main.go`.
 - `ConnectEntitlementStore` opens an existing ledger without running application migrations and verifies the required `entitlements`, `app_user_profiles`, and `credit_events` shape.
 - plan evaluation, atomic output reservation and refund use the entitlement ledger.
 - existing stateful deployments retain backward compatibility because entitlement access falls back to `Handler.DB` when no dedicated handle is supplied.
@@ -47,7 +55,7 @@ This is an implementation slice, not CORE-01 completion evidence. A real configu
 
 ## KOSCHEI FABRIC SECURITY WORK
 
-The integration branch contains a machine-readable security work index derived from `Koschei-Web3-Web6-Guvenlik-Calisma-Paketi-2026-09-08.md`:
+The integration work contains a machine-readable security work index derived from `Koschei-Web3-Web6-Guvenlik-Calisma-Paketi-2026-09-08.md`:
 
 - 12 security domains / 48 work packages;
 - P0 blockers: `CORE-01`, `CORE-02`, `CORE-04`, `SIGN-01`, `MODEL-04`, `LANG-01`, `LANG-02`, `SUPPLY-02`;
@@ -55,10 +63,10 @@ The integration branch contains a machine-readable security work index derived f
 - first common acceptance cases T01 through T14;
 - lifecycle state and evidence maturity are tracked separately.
 
-Current package state on this branch:
+Historical package state from the 2026-09-09 checkpoint:
 
 - A — status record correction: **in progress**;
-- B — working Web3 foundation: **blocked pending acceptance**, with CORE-01 implementation now in progress;
+- B — working Web3 foundation: **blocked pending acceptance**, with CORE-01 implementation in progress;
 - C — shared data boundary: **in progress**;
 - D–H: planned/gated by their prerequisites.
 
@@ -76,11 +84,9 @@ The adapters and schema are implementation artifacts only. T01–T14 have not ye
 
 ## VERIFIED SO FAR
 
-Before the latest CORE-01 split-plane commits, the Fabric branch had already passed the repository's OpenAPI, Auth Freeze, Supply Chain, CodeQL, API Required CI, Operator Exit Corpus, Release Gates and Security CI checks. A prior Public Product Smoke failure was isolated to the deployed public case registry returning HTTP 503 while the other probed product pages/assets returned 200.
+Historical green runs validate only the commits against which they executed. They do not validate the 2026-09-14 cleanup candidate or any later commit. Exact-head CI and relevant acceptance gates must pass again before promotion.
 
-The latest CORE-01 commits have started a new CI cycle. Do not treat the earlier green run as validation of these newer commits; exact-head CI must pass again.
-
-Koschei Sentinel PR #94 currently passes its general CI plus PQ evidence-review and PQ reviewed-catalog admission checks with the new Fabric case adapter included.
+Koschei Sentinel PR #94 was previously recorded as passing its general CI plus PQ evidence-review and PQ reviewed-catalog admission checks with the Fabric case adapter included; that statement is historical and does not imply current Sentinel production readiness.
 
 ## STILL OPEN / BLOCKED
 
@@ -95,7 +101,7 @@ Koschei Sentinel PR #94 currently passes its general CI plus PQ evidence-review 
 ## WORK-IN-PROGRESS POLICY
 
 1. Do not disable or remove existing working product behavior to add Fabric capabilities.
-2. Keep `main` untouched until the integration candidate passes its required gates and review.
+2. Keep candidate work isolated from `main` until its required gates and review pass.
 3. Do not fabricate database state, jobs, evidence, entitlement, model readiness or security acceptance.
 4. Preserve ARVIS evidence semantics and UNKNOWN on missing evidence.
 5. Keep Lang, Sentinel and Web3 ownership boundaries explicit; integrations use versioned contracts/adapters only.
