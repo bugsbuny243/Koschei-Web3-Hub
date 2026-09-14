@@ -1,3 +1,4 @@
+# Step 3 verification trigger; no CI behavior change.
 name: API Required CI
 
 on:
