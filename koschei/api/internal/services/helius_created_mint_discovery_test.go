@@ -173,7 +173,7 @@ func TestFetchHeliusCreatedMintDiscoveryArchivalIgnoresDefaultArchivalGate(t *te
 	t.Setenv("HELIUS_API_KEY", "test-key")
 	t.Setenv("HELIUS_CREATED_MINT_ARCHIVAL_ENABLED", "false")
 	t.Setenv("HELIUS_CREATED_MINT_PAGE_DELAY_MS", "0")
-	out := FetchHeliusCreatedMintDiscoveryArchival(t.Context(), "Actor111")
+	out := FetchHeliusCreatedMintDiscoveryArchival(t.Context(), "", "Actor111")
 	if !out.Available || out.Status != "complete" || out.PagesFetched != 2 {
 		t.Fatalf("unexpected archival discovery coverage: %#v", out)
 	}
