@@ -83,11 +83,17 @@ func CustomerScanResultFromNetworkProbe(target CustomerScanTarget, projection Ne
 	if strings.TrimSpace(projection.Subject.Raw) != strings.TrimSpace(target.Raw) {
 		return CustomerScanResult{}, errors.New("network probe subject does not match customer target")
 	}
+	if strings.TrimSpace(projection.Subject.Network) != strings.TrimSpace(target.NetworkHint) {
+		return CustomerScanResult{}, errors.New("network probe network does not match customer target")
+	}
 	if projection.Evidence.Status != IntelligenceEvidenceObserved {
 		return CustomerScanResult{}, errors.New("observed network probe evidence is required")
 	}
 	if projection.Evidence.SubjectID == "" || projection.Evidence.SubjectID != projection.Subject.ID {
 		return CustomerScanResult{}, errors.New("network probe evidence is not bound to the projected subject")
+	}
+	if strings.TrimSpace(projection.Evidence.Network) != strings.TrimSpace(projection.Subject.Network) {
+		return CustomerScanResult{}, errors.New("network probe evidence is not bound to the projected network")
 	}
 
 	reasons := []string{"READ_ONLY_NETWORK_OBSERVATION"}
