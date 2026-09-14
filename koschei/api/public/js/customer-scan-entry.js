@@ -37,12 +37,31 @@ function isAddressView(search=location.search,pathname=location.pathname){
   if(params.get('mode')==='address')return true;
   return !params.has('mode')&&!params.has('mint')&&!pathname.startsWith('/scan/');
 }
+function evidenceStatusForTrust(trust){
+  if(!trust||typeof trust!=='object')return null;
+  for(const key of ['claimed','observed','authorized','available','verified','finalized'])if(typeof trust[key]!=='boolean')return null;
+  if(trust.verified&&!trust.observed)return null;
+  if(trust.finalized&&!trust.verified)return null;
+  if(trust.finalized&&trust.verified&&trust.observed)return 'finalized';
+  if(trust.verified&&trust.observed)return 'verified';
+  if(trust.observed)return 'observed';
+  if(trust.claimed)return 'claimed';
+  return 'unverified';
+}
 function matchesResult(data,request){
-  const result=data?.result,target=result?.target;
-  return data?.schema_version==='koschei-customer-scan-v1'&&
-    target?.raw===request.target&&target?.network_hint===request.network&&
-    typeof result.trust==='object'&&result.trust!==null&&
-    typeof result.status==='string'&&Array.isArray(result.evidence_refs||[]);
+  const result=data?.result,target=result?.target,trust=result?.trust;
+  if(data?.schema_version!=='koschei-customer-scan-v1'||target?.raw!==request.target||target?.network_hint!==request.network)return false;
+  const evidenceStatus=evidenceStatusForTrust(trust);
+  if(!evidenceStatus||result?.evidence_status!==evidenceStatus)return false;
+  if(!['needs_context','insufficient_evidence','observed','evidence_ready'].includes(result?.status))return false;
+  if(!['unknown','review'].includes(result?.verdict))return false;
+  const refs=result?.evidence_refs;
+  if(refs!==undefined&&!Array.isArray(refs))return false;
+  if((result.status==='observed'||result.status==='evidence_ready')&&(!Array.isArray(refs)||refs.length===0))return false;
+  if(result.status==='observed'&&(!trust.observed||trust.verified||result.verdict!=='review'))return false;
+  if(result.status==='evidence_ready'&&(!trust.verified||!trust.observed||result.verdict!=='review'))return false;
+  if((result.status==='needs_context'||result.status==='insufficient_evidence')&&(trust.observed||result.verdict!=='unknown'))return false;
+  return true;
 }
 window.KoscheiScanEntry=Object.freeze({networks,classify,resolve,url,isAddressView,matchesResult});
 })();
