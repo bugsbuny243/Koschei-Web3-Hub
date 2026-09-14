@@ -147,7 +147,7 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 			writeCustomerScanError(w, http.StatusBadGateway, "solana_evidence_projection_unavailable")
 			return
 		}
-		_ = observedAt // observation slot is the primary evidence anchor; wall clock is not promoted to finality.
+		_ = observedAt
 		writeCustomerScanResult(w, http.StatusOK, result)
 		return
 	}
@@ -183,7 +183,7 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 
 		proxyProbe, proxyErr := networktarget.ProbeEVMProxyAuthority(ctx, nil, endpoint, resolution)
 		if proxyErr != nil {
-			result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "EVM_AUTHORITY_PROBE_UNAVAILABLE"))
+			result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "EVM_AUTHORITY_PROBE_UNAVAILABLE", "PARTIAL_EVIDENCE_EVM_AUTHORITY_UNAVAILABLE"))
 			result.Trust.Reasons = append([]string(nil), result.Reasons...)
 			writeCustomerScanResult(w, http.StatusOK, result)
 			return
