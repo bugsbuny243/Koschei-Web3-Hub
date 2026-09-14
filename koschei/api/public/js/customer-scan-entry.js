@@ -60,9 +60,9 @@ function partialEvidenceMatches(result,request){
   const reasons=Array.isArray(result?.reasons)?result.reasons:[];
   const authorityUnavailable=reasons.includes('EVM_AUTHORITY_PROBE_UNAVAILABLE');
   const partialMarker=reasons.includes('PARTIAL_EVIDENCE_EVM_AUTHORITY_UNAVAILABLE');
-  if(request.family!=='evm')return !authorityUnavailable&&!partialMarker;
-  if(result.evm_authority===undefined||result.evm_authority===null)return authorityUnavailable&&partialMarker;
-  return !authorityUnavailable&&!partialMarker;
+  if(!authorityUnavailable&&!partialMarker)return true;
+  if(request.family!=='evm'||result.evm_authority!==undefined&&result.evm_authority!==null)return false;
+  return authorityUnavailable&&partialMarker;
 }
 function matchesResult(data,request){
   const result=data?.result,target=result?.target,trust=result?.trust;
