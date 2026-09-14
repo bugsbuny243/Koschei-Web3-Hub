@@ -13,7 +13,11 @@ func TestInvestigationShareUsesUserReviewedXIntent(t *testing.T) {
 		"window.open",
 		"publicResultURL",
 		"evidence_pending",
-		"Eksik kanıt güvenli sayılmaz",
+		"Missing evidence is not proof of safety.",
+		"#Web3Security",
+		"base-mainnet",
+		"ethereum-mainnet",
+		"solana-mainnet",
 		"installRadarShare",
 	} {
 		if !strings.Contains(share, required) {
@@ -42,6 +46,13 @@ func TestCustomerScanAndRadarExposeInvestigationShare(t *testing.T) {
 	for _, required := range []string{"KoscheiInvestigationShare", "lastSharePayload", "evidence_pending", "publicResultURL"} {
 		if !strings.Contains(publicScan, required) {
 			t.Fatalf("public scan share integration is missing %q", required)
+		}
+	}
+
+	universalScan := mustReadShareFixture(t, "../../public/js/customer-universal-address-scan-v1.js")
+	for _, required := range []string{"KoscheiInvestigationShare", "lastSharePayload", "data-cus-share-x", "Share result on X", "kind:'address'", "publicResultURL(request.target,'address',request.network)"} {
+		if !strings.Contains(universalScan, required) {
+			t.Fatalf("universal scan X share integration is missing %q", required)
 		}
 	}
 
