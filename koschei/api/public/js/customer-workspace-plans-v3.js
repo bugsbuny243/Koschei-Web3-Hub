@@ -59,9 +59,10 @@ function annotateWorkspace(plan){
 }
 
 function render(state){
-  const host=document.getElementById('workspaceMissionControl');if(!host||document.getElementById('workspacePlanStrip'))return;
+  const host=document.getElementById('workspaceMissionControl');if(!host||host.dataset.workspacePlansMounted==='1')return;
+  host.dataset.workspacePlansMounted='1';
   const plan=state.active?state.plan:'none';
-  const section=document.createElement('section');section.className='workspace-plan-strip';section.id='workspacePlanStrip';
+  const section=document.getElementById('workspacePlanStrip')||document.createElement('section');section.className='workspace-plan-strip';section.id='workspacePlanStrip';section.replaceChildren();
   const copy=document.createElement('div');
   const eyebrow=document.createElement('span');eyebrow.className='eyebrow';eyebrow.textContent='Your workspace';
   const h3=document.createElement('h3');h3.textContent=state.signedOut?'Sign in to load your plan':state.unavailable?'Plan service unavailable':`${planLabel(plan)} workspace`;
@@ -77,7 +78,7 @@ function render(state){
     capability('Advanced intelligence','Professional and above: advanced radar/watchlist eligibility. These surfaces remain preview until production validation completes.',available(plan,'professional')?'preview':'locked'),
     capability('Developer operations','Enterprise: API credential and integration eligibility. Registered developer routes remain readiness-gated.',available(plan,'enterprise')?'preview':'locked')
   );
-  const wrap=document.createElement('div');wrap.append(section,grid);host.insertAdjacentElement('beforebegin',wrap);
+  const wrap=document.createElement('div');wrap.append(section,grid);host.replaceChildren(wrap);
   annotateWorkspace(plan);
 }
 
