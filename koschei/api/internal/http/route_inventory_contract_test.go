@@ -25,6 +25,7 @@ func registeredAPIRoutesFromSource(t *testing.T) map[string]struct{} {
 		"watchlist_routes.go",
 		"dossier_routes.go",
 		"metadata_routes.go",
+		"customer_scan_routes.go",
 		"defense_routes.go",
 	}
 	out := map[string]struct{}{}
