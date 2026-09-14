@@ -69,6 +69,35 @@ func decodeCustomerApprovalScanRequest(r io.Reader) (customerApprovalScanRequest
 	return request, nil
 }
 
+func validateCustomerApprovalObservation(request customerApprovalScanRequest, allowance networktarget.EVMAllowanceProbeResult) error {
+	expectedChainID, ok := networktarget.ExpectedEVMChainID(request.Network)
+	if !ok {
+		return errors.New("approval_observation_network_unsupported")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.Network)) != request.Network {
+		return errors.New("approval_observation_network_mismatch")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.ChainID)) != expectedChainID || strings.ToLower(strings.TrimSpace(allowance.ExpectedChainID)) != expectedChainID {
+		return errors.New("approval_observation_chain_mismatch")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.Token)) != request.Token {
+		return errors.New("approval_observation_token_mismatch")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.Owner)) != request.Owner {
+		return errors.New("approval_observation_owner_mismatch")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.Spender)) != request.Spender {
+		return errors.New("approval_observation_spender_mismatch")
+	}
+	if strings.ToLower(strings.TrimSpace(allowance.EvidenceStatus)) != "observed" || strings.ToLower(strings.TrimSpace(allowance.LiveAvailability)) != "checked" {
+		return errors.New("approval_observation_incomplete")
+	}
+	if strings.TrimSpace(allowance.Amount) == "" {
+		return errors.New("approval_observation_amount_missing")
+	}
+	return nil
+}
+
 func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	defer r.Body.Close()
@@ -93,6 +122,10 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 	allowance, err := networktarget.ProbeEVMAllowance(ctx, nil, endpoint, request.Network, request.Token, request.Owner, request.Spender)
 	if err != nil {
 		writeCustomerApprovalScanError(w, http.StatusBadGateway, "evm_allowance_probe_unavailable")
+		return
+	}
+	if err := validateCustomerApprovalObservation(request, allowance); err != nil {
+		writeCustomerApprovalScanError(w, http.StatusBadGateway, "evm_allowance_evidence_binding_invalid")
 		return
 	}
 
