@@ -13,7 +13,10 @@ function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`$
 // scoped product surface rather than the retired command-universe shell.
 requireText(html,'/css/koschei-dashboard.css?v=2','dashboard scoped style');
 requireText(html,'/js/customer-workspace-v2.js?v=3','dashboard account-data controller');
+requireText(html,'/js/customer-workspace-plans-v3.js?v=1','dashboard plan controller');
 requireText(html,'/js/koschei-dashboard.js?v=4','dashboard presentation controller');
+requireText(html,'id="workspacePlanStrip"','plan strip mount');
+requireText(html,'id="workspaceMissionControl"','plan capability mount');
 requireText(html,'id="workspaceLatestReport"','latest investigation mount');
 requireText(html,'id="workspaceAlerts"','alerts mount');
 requireText(html,'id="workspaceLiveState"','live account-state mount');
@@ -30,7 +33,7 @@ requireText(html,'Solana is the live chain core.','live-chain boundary');
 requireText(html,'Other chains <em>implemented probe paths</em></span><b>PROBE READY</b>','future-chain boundary');
 requireText(html,'Status: building. No live capability is fabricated in the customer interface.','defense-validation capability boundary');
 requireText(html,'Status: probe-ready evidence paths exist for supported EVM and Bitcoin targets; production availability remains evidence-bound.','cross-chain capability boundary');
-forbid(html,/PROFESSIONAL · ARVIS COMMAND UNIVERSE|customer-command-universe-v2\.js|customer-command-center-v1\.js|id="workspaceMissionControl"/,'retired command-universe contract');
+forbid(html,/PROFESSIONAL · ARVIS COMMAND UNIVERSE|customer-command-universe-v2\.js|customer-command-center-v1\.js/,'retired command-universe contract');
 forbid(html,/ARVIS early access|Preview monitored targets|STARTER\+|ENTERPRISE\+/i,'retired commercial or preview copy');
 forbid(html,/holder access|Checking holder access/i,'legacy holder access copy');
 
