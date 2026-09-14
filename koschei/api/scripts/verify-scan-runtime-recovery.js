@@ -69,7 +69,7 @@ async function ownerScenario(status,payload){
   assert(Number(timeout[1])>=180000,'public token scan aborts before the server investigation budget');
   assert(publicSource.includes("url.includes('/api/token/scan')?TOKEN_SCAN_TIMEOUT_MS"),'public token request does not use the extended timeout');
   assert(ownerHTML.includes('/js/owner-court-ui.js?v=4'),'owner scan recovery cache key is stale');
-  assert(scanHTML.includes('/js/public-solana-scan.js?v=12'),'public scan recovery cache key is stale');
+  assert(scanHTML.includes('/js/public-solana-scan.js?v=13'),'public scan recovery cache key is stale');
 
   console.log('stateless owner token/wallet fallback and public scan timeout contracts: ok');
 })().catch(error=>{
