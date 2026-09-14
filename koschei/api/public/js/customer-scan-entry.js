@@ -48,6 +48,16 @@ function evidenceStatusForTrust(trust){
   if(trust.claimed)return 'claimed';
   return 'unverified';
 }
+function authorityMatchesRequest(authority,request){
+  if(authority===undefined||authority===null)return true;
+  if(request.family!=='evm'||typeof authority!=='object')return false;
+  if(String(authority.network||'').trim()!==request.network)return false;
+  if(String(authority.spender||'').trim().toLowerCase()!==request.target.toLowerCase())return false;
+  const trust=authority.trust;
+  if(evidenceStatusForTrust(trust)!=='observed')return false;
+  if(trust.authorized||trust.verified||trust.finalized)return false;
+  return true;
+}
 function matchesResult(data,request){
   const result=data?.result,target=result?.target,trust=result?.trust;
   if(data?.schema_version!=='koschei-customer-scan-v1'||target?.raw!==request.target||target?.network_hint!==request.network)return false;
@@ -61,6 +71,7 @@ function matchesResult(data,request){
   if(result.status==='observed'&&(!trust.observed||trust.verified||result.verdict!=='review'))return false;
   if(result.status==='evidence_ready'&&(!trust.verified||!trust.observed||result.verdict!=='review'))return false;
   if((result.status==='needs_context'||result.status==='insufficient_evidence')&&(trust.observed||result.verdict!=='unknown'))return false;
+  if(!authorityMatchesRequest(result.evm_authority,request))return false;
   return true;
 }
 window.KoscheiScanEntry=Object.freeze({networks,classify,resolve,url,isAddressView,matchesResult});
