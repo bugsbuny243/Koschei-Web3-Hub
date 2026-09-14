@@ -16,15 +16,20 @@ function reject(file, text) {
 
 // Investigation/report evidence contract. The internal controller may retain
 // compatibility parsing for old quick-preflight responses, but the customer UI
-// no longer exposes free Quick Check execution.
+// no longer exposes free Quick Check execution. Pin the current Intelligence
+// Desk evidence and read-only boundaries instead of retired visual copy.
 need('public/js/public-solana-scan.js', 'Pending evidence arms and monitoring windows');
 need('public/js/public-solana-scan.js', 'Missing evidence = no safety decision');
 need('public/js/public-solana-scan.js', '/api/public/transaction-simulate');
 need('public/js/lp-control-evidence-card.js', 'Havuz hareket geçmişi bu taramada doğrulanamadı');
-need('public/scan.html', 'PROFESSIONAL · CLASSIC INVESTIGATION CONSOLE');
-need('public/scan.html', 'Missing evidence is shown as a limitation, not converted into a safety claim.');
+need('public/scan.html', 'INTELLIGENCE DESK');
+need('public/scan.html', 'Evidence provenance');
+need('public/scan.html', 'Unavailable or incomplete evidence cannot silently improve a risk outcome.');
 need('public/scan.html', 'Transaction simulation never signs or broadcasts.');
-need('public/scan.html', 'Free Quick Check execution has been removed');
+need('public/scan.html', 'data-scan-mode="token"');
+need('public/scan.html', 'data-scan-mode="transaction"');
+need('public/scan.html', 'data-scan-mode="deep"');
+need('public/scan.html', 'data-customer-arvis-result');
 need('public/scan.html', '/css/koschei.css?v=1');
 reject('public/scan.html', 'data-scan-mode="quick"');
 reject('public/scan.html', 'Professional+');
@@ -62,4 +67,4 @@ reject('public/index.html', 'STATIC HTML + VANILLA JS');
 reject('public/index.html', 'Ethereum</b><small>LIVE');
 reject('public/index.html', 'TRON</b><small>LIVE');
 
-console.log('Professional investigation, report and current homepage trust consistency contract verified');
+console.log('Intelligence Desk investigation, report and current homepage trust consistency contract verified');

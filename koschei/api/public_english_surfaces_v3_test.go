@@ -46,17 +46,18 @@ func TestCanonicalInvestigationSurfaceMountsProfessionalModesAndEvidenceControll
 	}
 	text := string(body)
 	for _, required := range []string{
-		"PROFESSIONAL · CLASSIC INVESTIGATION CONSOLE",
-		"Descend into the evidence.",
-		"Free Quick Check execution has been removed",
+		"INTELLIGENCE DESK",
+		"Investigate an address.",
+		"Every material state keeps its source boundary",
 		"data-scan-mode=\"token\"",
 		"data-scan-mode=\"transaction\"",
 		"data-scan-mode=\"deep\"",
 		"arvis-premium-contract.js",
 		"customer-arvis-premium-suite.js",
 		"data-customer-arvis-result",
-		"public-solana-scan.js?v=12",
-		"Missing evidence is shown as a limitation, not converted into a safety claim.",
+		"public-solana-scan.js?v=13",
+		"Unavailable or incomplete evidence cannot silently improve a risk outcome.",
+		"Transaction simulation never signs or broadcasts.",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("canonical investigation page missing %q", required)
