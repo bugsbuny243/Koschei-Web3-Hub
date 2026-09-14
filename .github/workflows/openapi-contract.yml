@@ -15,6 +15,7 @@ on:
       - "koschei/api/openapi.yaml"
       - "koschei/api/cmd/openapi-gen/**"
       - "koschei/api/internal/openapi/**"
+      - "koschei/api/internal/http/**"
       - ".github/workflows/openapi-contract.yml"
   workflow_dispatch:
 
