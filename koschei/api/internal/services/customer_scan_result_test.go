@@ -137,7 +137,9 @@ func TestCustomerScanResultRejectsForeignOrIncompleteProbeProvenance(t *testing.
 		mutate func(*NetworkProbeIntelligenceProjection)
 	}{
 		{"missing_id", func(p *NetworkProbeIntelligenceProjection) { p.Evidence.ID = "" }},
-		{"wrong_address", func(p *NetworkProbeIntelligenceProjection) { p.Evidence.Address = "0x2222222222222222222222222222222222222222" }},
+		{"wrong_address", func(p *NetworkProbeIntelligenceProjection) {
+			p.Evidence.Address = "0x2222222222222222222222222222222222222222"
+		}},
 		{"missing_time", func(p *NetworkProbeIntelligenceProjection) { p.Evidence.ObservedAt = time.Time{} }},
 		{"wrong_provenance", func(p *NetworkProbeIntelligenceProjection) { p.Evidence.Provenance = "foreign_adapter" }},
 		{"wrong_source", func(p *NetworkProbeIntelligenceProjection) { p.Evidence.Source = "bitcoin_esplora_probe" }},
