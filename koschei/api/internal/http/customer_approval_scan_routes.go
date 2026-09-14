@@ -67,6 +67,11 @@ func decodeCustomerApprovalScanRequest(r io.Reader) (customerApprovalScanRequest
 	if _, ok := networktarget.ExpectedEVMChainID(request.Network); !ok {
 		return request, errors.New("evm_allowance_unsupported_network")
 	}
+	for _, address := range []string{request.Token, request.Owner, request.Spender} {
+		if _, err := networktarget.Resolve(request.Network, address); err != nil {
+			return request, errors.New("invalid_approval_scan_request")
+		}
+	}
 	return request, nil
 }
 
