@@ -5508,6 +5508,26 @@
             },
             "description": "Invalid request."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Identity credential missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authenticated identity lacks the required access tier."
+          },
           "405": {
             "content": {
               "application/json": {
@@ -5539,14 +5559,18 @@
             "description": "Internal failure; no unsupported verdict is emitted."
           }
         },
-        "security": [],
+        "security": [
+          {
+            "sessionBearer": []
+          }
+        ],
         "summary": "POST /api/metadata/generate",
         "tags": [
-          "metadata"
+          "professional_customer_operations"
         ],
-        "x-koschei-auth-tier": "public",
-        "x-koschei-inventory-auth": "",
-        "x-koschei-route-source": "boot_chain_fallback"
+        "x-koschei-auth-tier": "customer_session_plus_professional_entitlement",
+        "x-koschei-inventory-auth": "customer_session_plus_professional_entitlement",
+        "x-koschei-route-source": "route_inventory.go"
       }
     },
     "/api/owner/actor-intelligence": {
@@ -12567,6 +12591,83 @@
         },
         "security": [],
         "summary": "POST /api/scan",
+        "tags": [
+          "scan"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "",
+        "x-koschei-route-source": "boot_chain_fallback"
+      }
+    },
+    "/api/scan/approval": {
+      "post": {
+        "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
+        "operationId": "post__api_scan_approval",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenericRequest"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceResponse"
+                }
+              }
+            },
+            "description": "Evidence-backed result, including valid WITHHOLD outcomes."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          }
+        },
+        "security": [],
+        "summary": "POST /api/scan/approval",
         "tags": [
           "scan"
         ],
