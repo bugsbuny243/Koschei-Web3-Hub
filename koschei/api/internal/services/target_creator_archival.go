@@ -11,16 +11,16 @@ import (
 // the referenced transaction from canonical RPC and verify signer, mint
 // reference and launch semantics before using it as verified evidence.
 type TargetCreatorArchivalObservation struct {
-	Configured bool      `json:"configured"`
-	Available  bool      `json:"available"`
-	Status     string    `json:"status"`
-	Provider   string    `json:"provider"`
-	Mint       string    `json:"mint"`
-	Creator    string    `json:"creator,omitempty"`
-	Signature  string    `json:"signature,omitempty"`
-	Slot       int64     `json:"slot,omitempty"`
-	ObservedAt time.Time `json:"observed_at,omitempty"`
-	Limitations []string `json:"limitations"`
+	Configured  bool      `json:"configured"`
+	Available   bool      `json:"available"`
+	Status      string    `json:"status"`
+	Provider    string    `json:"provider"`
+	Mint        string    `json:"mint"`
+	Creator     string    `json:"creator,omitempty"`
+	Signature   string    `json:"signature,omitempty"`
+	Slot        int64     `json:"slot,omitempty"`
+	ObservedAt  time.Time `json:"observed_at,omitempty"`
+	Limitations []string  `json:"limitations"`
 }
 
 // FetchHeliusTargetCreatorArchival performs a single-target archival creator
