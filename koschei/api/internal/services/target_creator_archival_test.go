@@ -40,7 +40,7 @@ func TestFetchHeliusTargetCreatorArchivalFindsPumpCreateWithoutGlobalArchivalFla
 			"result": map[string]any{
 				"paginationToken": "",
 				"data": []any{map[string]any{
-					"slot": float64(435759952),
+					"slot":      float64(435759952),
 					"blockTime": float64(1753650000),
 					"transaction": map[string]any{
 						"signatures": []any{signature},
