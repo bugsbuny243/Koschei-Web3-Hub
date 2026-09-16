@@ -27,10 +27,10 @@ func TestUnifiedInvestigationAssemblerCollectsActorEvidenceWithoutDatabase(t *te
 		window = window[:next]
 	}
 	for label, needle := range map[string]string{
-		"request-scope funding": fundingCall,
-		"request-scope live evidence": liveCall,
+		"request-scope funding":           fundingCall,
+		"request-scope live evidence":     liveCall,
 		"request-scope dossier hydration": hydrateCall,
-		"truthful verdict persistence": persistenceMarker,
+		"truthful verdict persistence":    persistenceMarker,
 	} {
 		if !strings.Contains(window, needle) {
 			t.Fatalf("nil-store branch missing %s wiring: %s", label, needle)
