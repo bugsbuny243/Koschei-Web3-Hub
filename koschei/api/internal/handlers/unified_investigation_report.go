@@ -200,6 +200,8 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 		}
 	}
 
+	actorLifecycle = applyRequestScopeActorLifecycleRecurrence(&core, actorLifecycle, externalDiscovery, creator, network, target)
+
 	actorExit := services.ActorExitRecurrence{
 		Status: "not_investigated", EvidenceStatus: "not_investigated", ActorWallet: creator, Network: network, CurrentTarget: target,
 		OtherTargets: []string{}, Signatures: []string{}, Slots: []int64{}, EventKinds: []string{}, Events: []services.ActorExitEventReference{}, Limitations: []string{},
@@ -295,198 +297,63 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			Limitations: []string{"Campaign genome pattern index could not be read; no cross-wallet genome claim was emitted."},
 		}
 	}
-
-	operationalMemory := services.ActorOperationalMemoryReport{
-		Wallet: creator, Network: network, Available: false, Status: "not_investigated",
-		Matches: []services.ActorOperationalMatch{}, GeneratedAt: now,
-		Policy: map[string]any{
-			"real_world_identity_claim": false,
-			"same_operator_claim":       false,
-			"verdict_authority":         false,
-		},
-	}
-	if store != nil && creator != "" {
-		if loaded, err := store.LoadOperationalMemoryMatches(ctx, creator, network, 25); err == nil {
-			operationalMemory = loaded
-		} else {
-			operationalMemory.Status = "unavailable"
-		}
-	}
-	fundingOutcomeMemory := services.LoadFundingClusterOutcomeMemory(ctx, db, core.FundingRecurrence)
-	incidentCorpus, incidentCorpusErr := services.LoadSecurityIncidentCorpus(ctx, db, network, target, "", 50)
-	if incidentCorpusErr != nil {
-		incidentCorpus = services.SecurityIncidentCorpusView{
-			Network: network, Target: target, Complete: false, Status: "unavailable", Records: []services.SecurityIncidentCorpusRecord{},
-			VerdictAuthority: false, RealWorldIdentityClaim: false, WrongdoingClaim: false,
-			Limitations: []string{"Verified incident corpus could not be read; no incident-memory claim was emitted."},
-		}
-	}
-	actorIncidentHistory := services.SecurityIncidentCorpusView{
-		Network: network, ActorWallet: creator, Complete: true, Status: "actor_unavailable",
-		Records: []services.SecurityIncidentCorpusRecord{}, VerdictAuthority: false, RealWorldIdentityClaim: false, WrongdoingClaim: false,
-		Limitations: []string{},
-	}
-	if creator != "" {
-		loaded, err := services.LoadSecurityIncidentCorpus(ctx, db, network, "", creator, 100)
-		if err != nil {
-			actorIncidentHistory.Complete = false
-			actorIncidentHistory.Status = "unavailable"
-			actorIncidentHistory.Limitations = append(actorIncidentHistory.Limitations, "Cross-token verified incident history could not be read for the current creator.")
-		} else {
-			actorIncidentHistory = loaded
-		}
-	}
-	fundingTrajectory := services.LoadPersistentFundingTrajectoryGraphForBehavior(ctx, db, creator, network)
-	campaignTempo := services.BuildCampaignTempoFingerprint(fundingTrajectory)
-	behavioralSignatures := services.BuildBehavioralSignatureReportWithTempo(
-		target, actorIncidentHistory, fundingOutcomeMemory, campaignGenome, operationalMemory, campaignGenomeMatches,
-		fundingTrajectory, campaignTempo,
-	)
-
-	unifiedVerdict := services.EvaluateUnifiedRadarVerdictV140(target, actorVerdict, behavior)
-	if h.DB != nil {
-		_ = services.CaptureHolderConcentrationObservation(ctx, h.DB, network, target, core.Intelligence, now)
-	}
-	holderConcentrationContext := services.LoadHolderConcentrationContext(ctx, db, core.Intelligence)
-	modules := radarDetailModules(core.Arms)
-	coverage := services.BuildArvisInvestigationCoverage(core.Arms)
-	structural := h.radarDetailStructuralContext(ctx, target, network)
-	graph := h.radarDetailGraph(ctx, target)
-	evidenceReferences := buildUnifiedEvidenceReferences(core, creator, transactionEvidence, behavior, unifiedVerdict)
-	evidenceReferences = applyUnifiedLiveEvidenceReferences(evidenceReferences, liveEvidence)
-	evidenceReferences = applyLPControlEvidenceReferences(evidenceReferences, core.LPControl)
-	evidenceReferences = applyMarketProgramEvidenceReferences(evidenceReferences, core)
-
+	operationalMemory, _ := services.LoadActorOperationalMemory(ctx, db, creator, network, 100)
+	fundingOutcomeMemory, _ := services.LoadFundingClusterOutcomeMemory(ctx, db, actorRun.FundingOrigin, network, 50)
+	incidentCorpus, _ := services.LoadSecurityIncidentCorpus(ctx, db, target, creator, network, 50)
+	actorIncidentHistory, _ := services.LoadActorIncidentHistory(ctx, db, creator, network, 50)
+	behavioralSignatures, _ := services.LoadBehavioralSignatureReport(ctx, db, target, creator, network, 100)
+	modules := unifiedInvestigationModules(core, actorDossier, actorVerdict, campaignGenome, campaignGenomeMatches, operationalMemory, fundingOutcomeMemory, incidentCorpus, actorIncidentHistory, behavioralSignatures, behavior, threat, actorLifecycle, actorExit, creatorRelation, distributionRun, externalDiscovery)
+	structural := unifiedStructuralReport(core, actorDossier, actorVerdict, campaignGenome, campaignGenomeMatches, operationalMemory, fundingOutcomeMemory, incidentCorpus, actorIncidentHistory, behavioralSignatures, behavior, threat, actorLifecycle, actorExit, creatorRelation, distributionRun, externalDiscovery)
+	graph := unifiedInvestigationGraph(core, actorDossier, actorVerdict, campaignGenome, campaignGenomeMatches, operationalMemory, fundingOutcomeMemory, incidentCorpus, actorIncidentHistory, behavioralSignatures, behavior, threat, actorLifecycle, actorExit, creatorRelation, distributionRun, externalDiscovery)
+	unifiedVerdict := services.BuildUnifiedRadarVerdict(services.UnifiedRadarVerdictInput{
+		Target: target, Network: network, Market: core.Market, Holder: core.Intelligence, Cluster: core.Cluster,
+		Arms: core.Arms, Behavior: behavior, ActorVerdict: actorVerdict, Threat: threat,
+	})
 	report := map[string]any{
-		"ok": true, "schema_version": unifiedInvestigationSchemaVersion,
-		"target": target, "network": network, "generated_at": now.Format(time.RFC3339),
-		"analysis_scope": "token_plus_actor_plus_market_behavior",
-		"final_verdict":  unifiedVerdict, "threat_anticipation": threat,
-		"investigation_coverage": coverage, "holder_distribution": core.Distribution,
-		"holder_intelligence": core.Intelligence, "holder_cluster": core.Cluster,
-		"holder_concentration_context": holderConcentrationContext,
-		"funding_cluster_history":      fundingOutcomeMemory,
-		"verified_incident_corpus":     incidentCorpus,
-		"campaign_genome_matches":      campaignGenomeMatches,
-		"campaign_tempo_fingerprint":   campaignTempo,
-		"behavioral_signatures":        behavioralSignatures,
-		"launch_forensics":             core.LaunchForensics, "market": core.Market,
-		"lp_control": core.LPControl, "jupiter_market_context": core.JupiterContext,
-		"exit_liquidity": core.ExitLiquidity, "program_security": unifiedProgramSecuritySurface(core.SourceContext),
-		"source_context": core.SourceContext, "structural_memory": structural,
-		"modules": modules, "evidence_arms": modules, "evidence": radarDetailEvidence(core.Arms),
-		"behavior_signals": behavior, "trade_ledger_aggregates": tradeLedger,
-		"transaction_evidence": transactionEvidence, "evidence_references": evidenceReferences,
-		"full_scan_live_evidence": liveEvidence,
-		"actor_investigation": map[string]any{
-			"wallet": creator, "dossier": actorDossier, "rule_verdict": actorVerdict,
-			"store_status": actorStoreStatus, "integration_run": actorRun,
-			"current_creator_relation":    creatorRelation,
-			"external_discovery":          externalDiscovery,
-			"funding_origin":              actorRun.FundingOrigin,
-			"funding_origin_persistence":  actorRun.FundingOriginPersistence,
-			"actor_live_evidence":         actorRun.LiveEvidence,
-			"current_token_distribution":  distributionRun,
-			"token_lifecycle_recurrence":  actorLifecycle,
-			"exit_event_recurrence":       actorExit,
-			"campaign_genome":             campaignGenome,
-			"campaign_genome_snapshot":    campaignGenomeSnapshot,
-			"campaign_genome_persistence": campaignGenomePersistence,
-			"campaign_genome_matches":     campaignGenomeMatches,
-			"campaign_tempo_fingerprint":  campaignTempo,
-			"operational_memory":          operationalMemory,
-			"funding_outcome_memory":      fundingOutcomeMemory,
-			"incident_corpus":             incidentCorpus,
-			"actor_incident_history":      actorIncidentHistory,
-			"behavioral_signatures":       behavioralSignatures,
-			// Backward-compatible token live-wallet coverage retained for existing UI clients.
-			"live_wallet_evidence":     liveEvidence.WalletCoverage,
-			"rule_verdict_persistence": actorRun.RuleVerdictPersistence,
-		},
-		"graph":                       graph,
-		"investigation_output_policy": services.SharedInvestigationOutputPolicy(),
-		"evidence_policy": map[string]any{
-			"numeric_final_score_disabled": true, "numeric_rug_probability_disabled": true,
-			"threat_capacity_is_not_intent": true, "no_evidence_no_claim": true,
-			"identity_scope": "onchain_wallet_only", "caller_type_changes_evidence": false,
-			"external_attribution_is_observed_only": true,
-			"recipient_full_wallet_history":         false,
-			"recipient_investigation_scope":         "mint_specific_token_accounts",
-			"jupiter_context_can_change_verdict":    false, "lp_control_arm_can_change_grade": false,
-			"exit_liquidity_quote_only": true, "program_authority_is_capability_not_intent": true,
-			"corpus_percentile_can_change_verdict":       false,
-			"live_transaction_rows_can_change_grade":     false,
-			"verified_actor_evidence_can_change_verdict": true,
-			"funding_recurrence_can_change_grade":        false,
-			"exit_event_recurrence_can_change_grade":     false,
-			"campaign_genome_can_change_verdict":         false,
-			"campaign_genome_matches_can_change_grade":   false,
-			"operational_memory_can_change_grade":        false,
-			"funding_outcome_memory_can_change_grade":    false,
-			"incident_corpus_can_change_grade":           false,
-			"campaign_tempo_can_change_grade":            false,
-			"behavioral_signatures_can_change_grade":     false,
-		},
+		"schema_version": unifiedInvestigationSchemaVersion,
+		"target": target,
+		"network": network,
+		"mode": mode,
+		"generated_at": now,
+		"creator": creator,
+		"creator_relation": creatorRelation,
+		"actor_investigation": actorRun,
+		"actor_store_status": actorStoreStatus,
+		"actor_lifecycle": actorLifecycle,
+		"actor_exit": actorExit,
+		"actor_dossier": actorDossier,
+		"actor_track": actorTrack,
+		"actor_verdict": actorVerdict,
+		"campaign_genome": campaignGenome,
+		"campaign_genome_snapshot": campaignGenomeSnapshot,
+		"campaign_genome_persistence": campaignGenomePersistence,
+		"campaign_genome_matches": campaignGenomeMatches,
+		"operational_memory": operationalMemory,
+		"funding_outcome_memory": fundingOutcomeMemory,
+		"incident_corpus": incidentCorpus,
+		"actor_incident_history": actorIncidentHistory,
+		"behavioral_signatures": behavioralSignatures,
+		"behavior": behavior,
+		"threat": threat,
+		"combined_evidence": combinedEvidence,
+		"modules": modules,
+		"structural": structural,
+		"graph": graph,
+		"trade_ledger": tradeLedger,
+		"transaction_evidence": transactionEvidence,
+		"live_evidence": liveEvidence,
+		"unified_verdict": unifiedVerdict,
+		"core": core,
 	}
-	_ = h.persistDossierSourceSnapshot(ctx, report)
 	return unifiedInvestigationAssembly{
 		Report: report, Core: core, DB: db, Store: store, Creator: creator,
 		ActorDossier: actorDossier, ActorTrack: actorTrack, ActorVerdict: actorVerdict,
 		CampaignGenome: campaignGenome, CampaignGenomeSnapshot: campaignGenomeSnapshot,
 		CampaignGenomePersistence: campaignGenomePersistence, CampaignGenomeMatches: campaignGenomeMatches,
 		OperationalMemory: operationalMemory, FundingOutcomeMemory: fundingOutcomeMemory,
-		IncidentCorpus: incidentCorpus, ActorIncidentHistory: actorIncidentHistory, BehavioralSignatures: behavioralSignatures,
-		Behavior: behavior, UnifiedVerdict: unifiedVerdict, Threat: threat,
-		CombinedEvidence: combinedEvidence, Modules: modules, Structural: structural,
+		IncidentCorpus: incidentCorpus, ActorIncidentHistory: actorIncidentHistory,
+		BehavioralSignatures: behavioralSignatures, Behavior: behavior, UnifiedVerdict: unifiedVerdict,
+		Threat: threat, CombinedEvidence: combinedEvidence, Modules: modules, Structural: structural,
 		Graph: graph, TradeLedger: tradeLedger, ActorStoreStatus: actorStoreStatus,
 	}
-}
-
-func (h *Handler) unifiedTradeLedgerAggregates(ctx context.Context, mint string) map[string]any {
-	out := map[string]any{
-		"available": false, "status": "monitoring_window_active", "trade_count": int64(0),
-		"buy_count": int64(0), "sell_count": int64(0), "unique_trader_count": int64(0),
-		"round_trip_wallet_count": int64(0), "wash_classification": "not_proven",
-	}
-	db := h.DBRead
-	if db == nil {
-		db = h.DB
-	}
-	if db == nil || strings.TrimSpace(mint) == "" {
-		out["status"] = "trade_ledger_unavailable"
-		return out
-	}
-	var tradeCount, buyCount, sellCount, uniqueTraders, roundTrip int64
-	var firstSeen, lastSeen sql.NullTime
-	err := db.QueryRowContext(ctx, `
-		WITH per_trader AS (
-			SELECT trader, bool_or(side='buy') AS bought, bool_or(side='sell') AS sold
-			FROM token_trade_events WHERE mint=$1 GROUP BY trader
-		)
-		SELECT
-			(SELECT count(*) FROM token_trade_events WHERE mint=$1),
-			(SELECT count(*) FROM token_trade_events WHERE mint=$1 AND side='buy'),
-			(SELECT count(*) FROM token_trade_events WHERE mint=$1 AND side='sell'),
-			(SELECT count(*) FROM per_trader),
-			(SELECT count(*) FROM per_trader WHERE bought AND sold),
-			(SELECT min(COALESCE(block_time,created_at)) FROM token_trade_events WHERE mint=$1),
-			(SELECT max(COALESCE(block_time,created_at)) FROM token_trade_events WHERE mint=$1)`, mint).Scan(
-		&tradeCount, &buyCount, &sellCount, &uniqueTraders, &roundTrip, &firstSeen, &lastSeen,
-	)
-	if err != nil {
-		out["status"] = "trade_ledger_query_failed"
-		return out
-	}
-	out["available"], out["status"] = tradeCount > 0, "observed_trade_ledger_aggregates"
-	out["trade_count"], out["buy_count"], out["sell_count"] = tradeCount, buyCount, sellCount
-	out["unique_trader_count"], out["round_trip_wallet_count"] = uniqueTraders, roundTrip
-	out["wash_classification"] = "not_proven"
-	out["interpretation"] = "Round-trip wallets are an investigation context signal; they are not, by themselves, proof of wash trading."
-	if firstSeen.Valid {
-		out["first_observed_at"] = firstSeen.Time.UTC().Format(time.RFC3339)
-	}
-	if lastSeen.Valid {
-		out["last_observed_at"] = lastSeen.Time.UTC().Format(time.RFC3339)
-	}
-	return out
 }
