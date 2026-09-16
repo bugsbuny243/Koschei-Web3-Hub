@@ -21,8 +21,8 @@ func TestEnrichArvisInvestigationProjectionDeepEvidence(t *testing.T) {
 		"actor_investigation": map[string]any{
 			"wallet": "CreatorWallet",
 			"funding_origin": map[string]any{
-				"source_wallet":      "FundingWallet",
-				"destination_wallet": "CreatorWallet",
+				"source_wallet":       "FundingWallet",
+				"destination_wallet":  "CreatorWallet",
 				"amount_sol":          1.25,
 				"signature":           "FundingSig",
 				"slot":                12345,

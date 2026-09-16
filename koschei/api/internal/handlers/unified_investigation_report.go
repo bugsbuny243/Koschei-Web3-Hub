@@ -249,6 +249,9 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	behavior = services.HardenUnifiedRadarBehavior(behavior, storedVerification, core.Cluster)
 	behavior = services.ApplyOwnerConcentrationRuleV110(behavior, core.Intelligence, now)
 	behavior = services.ApplyCrossTokenFundingRecurrenceRuleV130(behavior, core.FundingRecurrence, now)
+	requestScopeExitEvidence := append([]services.ActorDefenseEvidenceRecord{}, actorDossier.Evidence...)
+	requestScopeExitEvidence = append(requestScopeExitEvidence, behavior.Evidence...)
+	actorExit = applyRequestScopeActorExitRecurrence(&core, actorExit, requestScopeExitEvidence, creator, network, target)
 	behavior = services.ApplyCrossTokenExitEventRecurrenceRuleV140(behavior, actorExit, now)
 	threat := services.BuildThreatAnticipation(services.ThreatAnticipationInput{
 		Target: target, Market: core.Market, Holder: core.Intelligence, Cluster: core.Cluster,
