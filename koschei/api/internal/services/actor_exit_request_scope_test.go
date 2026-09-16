@@ -46,7 +46,7 @@ func TestBuildRequestScopeActorExitRecurrenceWithholdsObservedFromVerified(t *te
 			VerificationStatus: "observed", Signature: "sig-a", Slot: 303, ObservedAt: now,
 			Metadata: map[string]any{
 				"unified_rule_id": UnifiedRuleDominantHolderFirstExit,
-				"metrics": map[string]any{"holder_wallet": actor},
+				"metrics":         map[string]any{"holder_wallet": actor},
 			},
 		},
 		{
@@ -54,7 +54,7 @@ func TestBuildRequestScopeActorExitRecurrenceWithholdsObservedFromVerified(t *te
 			VerificationStatus: "observed", Signature: "sig-b", Slot: 404, ObservedAt: now.Add(time.Minute),
 			Metadata: map[string]any{
 				"unified_rule_id": UnifiedRuleDominantHolderFirstExit,
-				"metrics": map[string]any{"holder_wallet": actor},
+				"metrics":         map[string]any{"holder_wallet": actor},
 			},
 		},
 	}
