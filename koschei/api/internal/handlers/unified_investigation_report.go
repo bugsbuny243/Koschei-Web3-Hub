@@ -199,6 +199,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			actorLifecycle.Limitations = append(actorLifecycle.Limitations, "Actor lifecycle corpus query failed.")
 		}
 	}
+	actorLifecycle = applyRequestScopeActorLifecycleRecurrence(&core, actorLifecycle, externalDiscovery, creator, network, target)
 
 	actorExit := services.ActorExitRecurrence{
 		Status: "not_investigated", EvidenceStatus: "not_investigated", ActorWallet: creator, Network: network, CurrentTarget: target,

@@ -21,6 +21,7 @@ func applyRequestScopeActorLifecycleRecurrence(core *holderIntelligenceCoreResul
 		return current
 	}
 	core.Analysis = services.ApplyActorTokenLifecycleRecurrenceToAnalysis(core.Analysis, requestScope)
+	markRequestScopeActorLifecycleProvenance(&core.Analysis)
 	core.Bundle = services.EvidenceBackedSecurityRadarBundle(core.Analysis.Bundle)
 	core.Arms = services.ArvisArmsFromBundle(core.Bundle)
 	if len(core.Arms) == 0 {
@@ -28,6 +29,36 @@ func applyRequestScopeActorLifecycleRecurrence(core *holderIntelligenceCoreResul
 	}
 	core.Final = services.ArvisFinalFromBundle(core.Bundle)
 	return requestScope
+}
+
+// markRequestScopeActorLifecycleProvenance prevents live, request-scoped
+// recurrence from masquerading as evidence loaded from the persistent actor
+// lifecycle index. The recurrence evidence and VERIFIED state are unchanged;
+// only its provenance markers are corrected.
+func markRequestScopeActorLifecycleProvenance(analysis *services.ArvisAnalysis) {
+	if analysis == nil {
+		return
+	}
+	arms := services.ArvisArmsFromBundle(analysis.Bundle)
+	if len(arms) == 0 {
+		arms = append([]services.SecurityRadarVerdict{}, analysis.Arms...)
+	}
+	for index := range arms {
+		if arms[index].ModuleID != services.ModuleRepeatActorScan {
+			continue
+		}
+		if arms[index].Signals == nil {
+			arms[index].Signals = map[string]any{}
+		}
+		arms[index].Signals["persistent_actor_lifecycle_index"] = false
+		arms[index].Signals["request_scope_actor_lifecycle"] = true
+		break
+	}
+	analysis.Arms = arms
+	if analysis.Bundle.Metadata == nil {
+		analysis.Bundle.Metadata = map[string]any{}
+	}
+	analysis.Bundle.Metadata["arvis_arms"] = arms
 }
 
 func preferRequestScopeActorLifecycle(current, requestScope services.ActorTokenLifecycleRecurrence) bool {
