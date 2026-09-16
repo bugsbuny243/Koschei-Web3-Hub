@@ -1,3 +1,4 @@
+// SUPERSEDED BY public_dossier_registry_drive.go (PublicDossierCasesPortable). Not routed. Kept for reference.
 package handlers
 
 // SUPERSEDED BY public_case_operational_v2.go route surface. Not routed. Kept for reference.

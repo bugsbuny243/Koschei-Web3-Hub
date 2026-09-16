@@ -57,8 +57,43 @@ func (h *Handler) resolveCanonicalCreatorSourceContext(ctx context.Context, targ
 	out["token_symbol"] = firstNonEmptyString(creatorIntelCleanString(out["token_symbol"]), metadata.Symbol)
 	out["token_2022_extensions"] = metadata.OnchainExtensions
 	if strings.TrimSpace(metadata.Creator) == "" {
-		out["creator_resolution_status"] = "metadata_without_creator"
-		return out
+		// DAS and the bounded mint-history path can legitimately miss an older
+		// creation transaction. Restore the historical target-mint Helius lookup
+		// as a narrow fallback without enabling broad actor portfolio crawling.
+		archival := services.FetchHeliusTargetCreatorArchival(ctx, rpcURL, target)
+		out["creator_archival_resolution"] = archival
+		if strings.TrimSpace(archival.Creator) == "" || strings.TrimSpace(archival.Signature) == "" {
+			out["creator_resolution_status"] = "metadata_without_creator"
+			for _, limitation := range archival.Limitations {
+				appendCreatorResolutionLimitation(out, limitation)
+			}
+			return out
+		}
+
+		observedAt := archival.ObservedAt
+		if observedAt.IsZero() {
+			observedAt = time.Now().UTC()
+		}
+		out["source"] = "helius_target_mint_archival"
+		out["source_address"] = strings.TrimSpace(archival.Creator)
+		out["creator_wallet"] = strings.TrimSpace(archival.Creator)
+		out["creator_label"] = "Helius target-mint archival creator discovery"
+		out["creator_relation_verified"] = false
+		out["creator_relation_observed"] = true
+		out["creator_resolution_provider"] = archival.Provider
+		out["creator_resolution_status"] = "observed_external_attribution"
+		out["creator_scope"] = "Target-mint archival Helius discovery only; canonical RPC create-transaction signer, mint-reference and launch-semantics verification is required before VERIFIED status."
+		out["signature"] = strings.TrimSpace(archival.Signature)
+		out["creation_signature"] = strings.TrimSpace(archival.Signature)
+		out["launch_signature"] = strings.TrimSpace(archival.Signature)
+		out["first_mint_signature"] = strings.TrimSpace(archival.Signature)
+		out["observed_at"] = observedAt.UTC().Format(time.RFC3339)
+		for _, limitation := range archival.Limitations {
+			appendCreatorResolutionLimitation(out, limitation)
+		}
+
+		verification := h.verifyCanonicalCreatorRelation(ctx, target, network, archival.Creator, archival.Signature)
+		return applyCanonicalCreatorVerification(out, verification)
 	}
 
 	observedAt := metadata.ObservedAt

@@ -29,5 +29,6 @@ func (h *Handler) SecurityRadarDetailV3(w http.ResponseWriter, r *http.Request) 
 	}
 	assembly := h.buildUnifiedInvestigationReport(r.Context(), target, network, "manual_detail")
 	assembly.Report["target_classification"] = classification
+	attachCanonicalArvisInvestigations(&assembly)
 	writeJSON(w, http.StatusOK, assembly.Report)
 }

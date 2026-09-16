@@ -58,10 +58,10 @@ func (h *Handler) collectActorCreatedMintPortfolio(ctx context.Context, store *s
 		return out
 	}
 
-	// Default discovery is bounded standard Solana RPC. Helius archival history
-	// is an explicit operator opt-in. Every candidate remains OBSERVED until
-	// canonical Solana RPC verification succeeds below.
-	out.Discovery = services.FetchHeliusCreatedMintDiscovery(ctx, strings.TrimSpace(creatorIntelRPCURL()), wallet)
+	// Actor investigation is the explicit opt-in boundary for historical creator
+	// portfolio collection. The archival Helius walk is still bounded, and every
+	// candidate remains OBSERVED until canonical Solana RPC verification below.
+	out.Discovery = services.FetchHeliusCreatedMintDiscoveryArchival(ctx, strings.TrimSpace(creatorIntelRPCURL()), wallet)
 	out.Status = out.Discovery.Status
 	out.Limitations = append(out.Limitations, out.Discovery.Limitations...)
 	// Observation-store launches are merged before any provider/RPC early return.

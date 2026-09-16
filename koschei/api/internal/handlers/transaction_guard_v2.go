@@ -1,3 +1,4 @@
+// SUPERSEDED BY transaction_guard_v3.go. Not routed. Kept for reference.
 package handlers
 
 import (

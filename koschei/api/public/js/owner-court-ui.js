@@ -66,12 +66,18 @@
     root.innerHTML=`<div class="card loading"><b>Kalıcı Koschei soruşturması: ${esc(label)}</b><br><span>İlerleme: ${esc(progress)}% · Deneme: ${esc(job.attempts||0)}</span><br><span>Bu iş tarayıcı bağlantısından bağımsız çalışır. Mint → creator → oluşturulan tokenlar → funding → recipient → holder → LP kanıt zinciri tamamlanıyor.</span></div>`;
   }
 
-  async function pollCanonicalJob(pollUrl,root){
+  async function pollCanonicalJob(pollUrl,root,target){
     for(;;){
       const response=await fetch(pollUrl,{method:'GET',credentials:'same-origin',cache:'no-store'});
       let data={};
       try{data=await response.json()}catch{}
-      if(!response.ok||data.ok===false)throw new Error(data.message||data.detail||data.error||`Job sorgusu başarısız (${response.status})`);
+      if(!response.ok||data.ok===false){
+        if(directScan&&[404,405,501,503].includes(response.status)){
+          root.innerHTML='<div class="card loading">Kalıcı iş kaydı erişilemez oldu; canlı ARVIS taraması kesintisiz devam ediyor…</div>';
+          return await directScan(target,root);
+        }
+        throw new Error(data.message||data.detail||data.error||`Job sorgusu başarısız (${response.status})`);
+      }
       const job=obj(data.job);
       renderJobProgress(root,job);
       const status=String(job.status||'').toLowerCase();
@@ -110,7 +116,7 @@
       }
       if(!pollUrl)throw new Error('Canonical job poll adresi üretilmedi.');
       renderJobProgress(root,obj(data.job));
-      return await pollCanonicalJob(pollUrl,root);
+      return await pollCanonicalJob(pollUrl,root,target);
     }catch(error){
       const message=error?.message||'Kalıcı soruşturma başlatılamadı.';
       root.innerHTML=`<div class="card error-state"><div><b>Geniş araştırma raporu tamamlanamadı.</b><span>${esc(message)}</span></div></div>`;

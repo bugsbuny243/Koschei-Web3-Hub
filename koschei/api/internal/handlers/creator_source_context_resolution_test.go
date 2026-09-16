@@ -54,3 +54,42 @@ func TestCloneCreatorSourceContextPreservesSafetyDefaults(t *testing.T) {
 		t.Fatalf("unexpected identity default: %#v", out["identity_claimed"])
 	}
 }
+
+func TestCreatorMetadataRPCURLPrefersExplicitHeliusRPC(t *testing.T) {
+	t.Setenv("HELIUS_SOLANA_RPC_URL", "https://mainnet.helius-rpc.com/?api-key=explicit")
+	t.Setenv("SOLANA_RPC_URL", "https://solana-mainnet.g.alchemy.com/v2/primary")
+	t.Setenv("ALCHEMY_SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
+	t.Setenv("QUICKNODE_SOLANA_RPC_URL", "https://example.quiknode.pro/token")
+
+	got := creatorMetadataRPCURL()
+	want := "https://mainnet.helius-rpc.com/?api-key=explicit"
+	if got != want {
+		t.Fatalf("creatorMetadataRPCURL() = %q, want explicit Helius RPC %q", got, want)
+	}
+}
+
+func TestCreatorMetadataRPCURLSelectsFirstHeliusHostnameCandidate(t *testing.T) {
+	t.Setenv("HELIUS_SOLANA_RPC_URL", "")
+	t.Setenv("SOLANA_RPC_URL", "https://solana-mainnet.g.alchemy.com/v2/primary")
+	t.Setenv("ALCHEMY_SOLANA_RPC_URL", "https://rpc.helius.example/v1/alchemy-slot")
+	t.Setenv("QUICKNODE_SOLANA_RPC_URL", "https://backup.helius.example/v1/quicknode-slot")
+
+	got := creatorMetadataRPCURL()
+	want := "https://rpc.helius.example/v1/alchemy-slot"
+	if got != want {
+		t.Fatalf("creatorMetadataRPCURL() = %q, want first Helius-hosted configured RPC %q", got, want)
+	}
+}
+
+func TestCreatorMetadataRPCURLFallsBackToCreatorIntelRPCURL(t *testing.T) {
+	t.Setenv("HELIUS_SOLANA_RPC_URL", "")
+	t.Setenv("SOLANA_RPC_URL", "https://solana-mainnet.g.alchemy.com/v2/fallback")
+	t.Setenv("ALCHEMY_SOLANA_RPC_URL", "")
+	t.Setenv("QUICKNODE_SOLANA_RPC_URL", "")
+
+	got := creatorMetadataRPCURL()
+	want := creatorIntelRPCURL()
+	if got != want {
+		t.Fatalf("creatorMetadataRPCURL() = %q, want creatorIntelRPCURL() fallback %q", got, want)
+	}
+}
