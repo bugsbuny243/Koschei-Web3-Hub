@@ -10,7 +10,7 @@ import (
 func TestRequestScopeCanonicalCreatorRelationPreservesVerifiedEvidence(t *testing.T) {
 	observed := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
 	core := holderIntelligenceCoreResult{
-		Request: holderIntelligenceCoreRequest{Target: "Mint111", Network: "solana-mainnet"},
+		Request: services.SecurityRadarRequest{Target: "Mint111", Network: "solana-mainnet"},
 		SourceContext: map[string]any{
 			"creator_wallet":            "Creator111",
 			"creator_relation_verified": true,
@@ -44,7 +44,7 @@ func TestRequestScopeCanonicalCreatorRelationPreservesVerifiedEvidence(t *testin
 
 func TestRequestScopeCanonicalCreatorRelationNeverUpgradesIncompleteSource(t *testing.T) {
 	core := holderIntelligenceCoreResult{
-		Request: holderIntelligenceCoreRequest{Target: "Mint222", Network: "solana-mainnet"},
+		Request: services.SecurityRadarRequest{Target: "Mint222", Network: "solana-mainnet"},
 		SourceContext: map[string]any{
 			"creator_wallet":            "Creator222",
 			"creator_relation_verified": true,
@@ -63,7 +63,7 @@ func TestRequestScopeCanonicalCreatorRelationNeverUpgradesIncompleteSource(t *te
 
 func TestRequestScopeCanonicalCreatorRelationExternalObservationStaysObserved(t *testing.T) {
 	core := holderIntelligenceCoreResult{
-		Request: holderIntelligenceCoreRequest{Target: "Mint333", Network: "solana-mainnet"},
+		Request: services.SecurityRadarRequest{Target: "Mint333", Network: "solana-mainnet"},
 		SourceContext: map[string]any{
 			"creator_wallet":            "Creator333",
 			"creator_relation_verified": false,
