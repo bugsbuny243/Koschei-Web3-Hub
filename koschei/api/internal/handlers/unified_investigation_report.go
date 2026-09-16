@@ -135,8 +135,29 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			actorRun.Status = "creator_unavailable"
 			actorRun.Limitations = append(actorRun.Limitations, "Token taramasında doğrulanmış creator/deployer cüzdanı çözümlenemedi; actor investigation başlatılmadı.")
 		case store == nil:
-			actorRun.Status = "database_unavailable"
-			actorRun.Limitations = append(actorRun.Limitations, "Actor evidence store kullanılamadığı için creator soruşturması kalıcı olarak çalıştırılamadı.")
+			actorStoreStatus = "request_scope_live"
+			actorRun.FundingOrigin, actorRun.FundingOriginPersistence = h.collectActorFundingOrigin(ctx, nil, creator, network)
+			actorDossier, actorTrack = hydrateRequestScopeActorDossier(
+				actorDossier, actorTrack, externalDiscovery, actorRun.FundingOrigin,
+				actorRun.FundingOriginPersistence, actorRun.LiveEvidence, network,
+			)
+			actorRun.LiveEvidence = h.collectActorDefenseLiveEvidence(ctx, nil, actorDossier)
+			actorDossier, actorTrack = hydrateRequestScopeActorDossier(
+				actorDossier, actorTrack, externalDiscovery, actorRun.FundingOrigin,
+				actorRun.FundingOriginPersistence, actorRun.LiveEvidence, network,
+			)
+			actorRun.RuleVerdictPersistence = "database_unavailable"
+			actorRun.Limitations = append(actorRun.Limitations, "Actor evidence store kullanılamıyor; canlı actor kanıtı request-scope olarak tutuldu ve kalıcı actor index'e yazılmadı.")
+			distributionRun.Status = "persistence_unavailable"
+			distributionRun.Limitations = append(distributionRun.Limitations, "Current-token distribution investigator kalıcı creator→mint ilişkisi gerektirdiği için stateless runtime'da çalıştırılmadı.")
+			switch actorRun.LiveEvidence.Status {
+			case "complete":
+				actorRun.Status = "complete"
+			case "not_requested", "stored_evidence_only":
+				actorRun.Status = actorRun.LiveEvidence.Status
+			default:
+				actorRun.Status = "partial"
+			}
 		default:
 			actorRun.Status = "collecting"
 			actorRun.FundingOrigin, actorRun.FundingOriginPersistence = h.collectActorFundingOrigin(ctx, store, creator, network)
