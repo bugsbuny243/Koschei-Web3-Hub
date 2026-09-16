@@ -64,7 +64,7 @@ func buildRequestScopeCanonicalCreatorMintRelation(core holderIntelligenceCoreRe
 		CounterpartKind: "token", CounterpartID: mint,
 		Relation: "created_token", VerificationStatus: verificationStatus,
 		EvidenceKey: "canonical_creator_relation:" + mint,
-		Source: evidenceSource, Signature: signature, Slot: slot, ObservedAt: observedAt,
+		Source:      evidenceSource, Signature: signature, Slot: slot, ObservedAt: observedAt,
 		TokenMint: mint, OccurrenceCount: 1,
 		Metadata: map[string]any{
 			"actor_role":                     "creator_deployer",
