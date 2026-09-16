@@ -51,9 +51,36 @@ func TestCrossTokenExitEventRecurrenceIsEvidenceOnly(t *testing.T) {
 	if !signal.Triggered || signal.EvidenceStatus != "verified" || signal.GradeEffect != "evidence_only" {
 		t.Fatalf("unexpected signal: %#v", signal)
 	}
+	if signal.Scope != "persisted_transaction_referenced_cross_token_event_memory" {
+		t.Fatalf("persistent recurrence scope = %q", signal.Scope)
+	}
 	verdict := EvaluateUnifiedRadarVerdictV140("fixture-target-b", ActorDefenseRuleVerdict{Grade: "-", Verdict: "no_grade_trigger", TriggeredRules: []ActorDefenseRuleHit{}, WatchFlags: []ActorDefenseRuleHit{}}, behavior)
 	if verdict.Grade != "-" || verdict.Signed || verdict.Signature != "" {
 		t.Fatalf("C008 alone changed verdict: %#v", verdict)
+	}
+}
+
+func TestCrossTokenExitEventRecurrenceMarksRequestScopeProvenance(t *testing.T) {
+	recurrence := ActorExitRecurrence{
+		Available: true, Status: "verified_request_scope_exit_recurrence", EvidenceStatus: "verified",
+		ActorWallet: "fixture-wallet", CurrentTarget: "fixture-target-b",
+		DistinctTargetsWithEvents: 2, OtherTargets: []string{"fixture-target-a"},
+		Signatures: []string{"fixture-signature-a"}, Slots: []int64{101},
+		EventKinds: []string{ActorExitEventLiquidityRemoval}, ReferencesComplete: true,
+	}
+	behavior := ApplyCrossTokenExitEventRecurrenceRuleV140(UnifiedRadarBehaviorReport{Signals: []UnifiedRadarSignal{}}, recurrence, time.Now().UTC())
+	signal, ok := unifiedRadarSignalByRule(behavior, UnifiedRuleCrossTokenExitEventRecurrence)
+	if !ok {
+		t.Fatal("URD-C008 signal missing")
+	}
+	if !signal.Triggered || signal.EvidenceStatus != "verified" {
+		t.Fatalf("request-scope recurrence did not produce verified C008 evidence: %#v", signal)
+	}
+	if signal.Scope != "request_scope_transaction_referenced_cross_token_event_memory" {
+		t.Fatalf("request-scope recurrence scope = %q", signal.Scope)
+	}
+	if strings.Contains(signal.Scope, "persisted") {
+		t.Fatalf("request-scope recurrence masqueraded as persisted evidence: %q", signal.Scope)
 	}
 }
 
