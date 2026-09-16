@@ -21,8 +21,8 @@ func TestUnifiedInvestigationWiresCanonicalCreatorIntoStatelessDossier(t *testin
 		window = window[:next]
 	}
 	for label, needle := range map[string]string{
-		"canonical relation build": "buildRequestScopeCanonicalCreatorMintRelation(core, creator, network)",
-		"canonical dossier projection": "applyRequestScopeCanonicalCreatorRelation(actorDossier, creatorRelation)",
+		"canonical relation build":      "buildRequestScopeCanonicalCreatorMintRelation(core, creator, network)",
+		"canonical dossier projection":  "applyRequestScopeCanonicalCreatorRelation(actorDossier, creatorRelation)",
 		"non-persistent verdict marker": "actorRun.RuleVerdictPersistence = \"database_unavailable\"",
 	} {
 		if !strings.Contains(window, needle) {
