@@ -1,0 +1,106 @@
+name: Orphan Audit Scratch
+
+on:
+  pull_request:
+    paths:
+      - 'koschei/api/public/**'
+      - '.github/workflows/orphan-audit-scratch.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Audit orphan frontend files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, re, urllib.parse
+
+          public = Path('koschei/api/public')
+          htmls = sorted(public.rglob('*.html'))
+          js_files = sorted((public / 'js').glob('*.js'))
+
+          protected_js = {
+              'cipher.js',
+              'unified-scan-navigation.js',
+              'owner-command-center-v2.js',
+              'owner-unified-radar.js',
+              'arvis-canonical-projection-v1.js',
+          }
+
+          html_text = {p: p.read_text(encoding='utf-8', errors='replace') for p in htmls}
+          loaded_js = set()
+          script_re = re.compile(r'<script\b[^>]*\bsrc=["\']([^"\']+)["\']', re.I)
+          href_re = re.compile(r'<a\b[^>]*\bhref=["\']([^"\']+)["\']', re.I)
+
+          for page, text in html_text.items():
+              for src in script_re.findall(text):
+                  raw = urllib.parse.urlsplit(src).path
+                  if raw.startswith('/js/'):
+                      loaded_js.add(Path(raw).name)
+                  elif not raw.startswith('/'):
+                      resolved = (page.parent / raw).resolve()
+                      try:
+                          rel = resolved.relative_to(public.resolve())
+                      except ValueError:
+                          continue
+                      if len(rel.parts) >= 2 and rel.parts[0] == 'js':
+                          loaded_js.add(rel.name)
+
+          orphan_js = [p.name for p in js_files if p.name not in loaded_js and p.name not in protected_js and p.name != 'koschei-auth.js']
+
+          inbound = {p: [] for p in htmls}
+          route_map = {}
+          for p in htmls:
+              rel = p.relative_to(public).as_posix()
+              noext = rel[:-5] if rel.endswith('.html') else rel
+              keys = {f'/{rel}', f'/{noext}', rel, noext}
+              if p.name == 'index.html':
+                  keys.update({'/', 'index.html', '/index.html'})
+              for key in keys:
+                  route_map.setdefault(key, set()).add(p)
+
+          for source, text in html_text.items():
+              for href in href_re.findall(text):
+                  parsed = urllib.parse.urlsplit(href)
+                  if parsed.scheme or href.startswith('#') or href.startswith('//'):
+                      continue
+                  path = parsed.path
+                  candidates = set()
+                  if path.startswith('/'):
+                      candidates |= route_map.get(path, set())
+                      candidates |= route_map.get(path.lstrip('/'), set())
+                  else:
+                      rel_source = source.relative_to(public)
+                      joined = (rel_source.parent / path).as_posix()
+                      candidates |= route_map.get(joined, set())
+                      candidates |= route_map.get('/' + joined, set())
+                      candidates |= route_map.get(path, set())
+                  for target in candidates:
+                      if target != source:
+                          inbound[target].append({'source': source.relative_to(public).as_posix(), 'href': href})
+
+          orphan_html = [p.relative_to(public).as_posix() for p in htmls if p.name != 'index.html' and not inbound[p]]
+          result = {
+              'date': '2026-09-14',
+              'html_count': len(htmls),
+              'js_count': len(js_files),
+              'loaded_js_count': len(loaded_js),
+              'orphan_js_count': len(orphan_js),
+              'orphan_js': orphan_js,
+              'orphan_html_count': len(orphan_html),
+              'orphan_html': orphan_html,
+              'protected_js_not_marked': sorted(protected_js),
+          }
+          Path('orphan-audit.json').write_text(json.dumps(result, indent=2) + '\n')
+          print(json.dumps(result, indent=2))
+          PY
+      - uses: actions/upload-artifact@v7
+        with:
+          name: orphan-audit
+          path: orphan-audit.json
+          retention-days: 1
