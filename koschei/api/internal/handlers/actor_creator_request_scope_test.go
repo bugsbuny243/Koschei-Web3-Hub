@@ -12,12 +12,12 @@ func TestRequestScopeCanonicalCreatorRelationPreservesVerifiedEvidence(t *testin
 	core := holderIntelligenceCoreResult{
 		Request: holderIntelligenceCoreRequest{Target: "Mint111", Network: "solana-mainnet"},
 		SourceContext: map[string]any{
-			"creator_wallet":             "Creator111",
+			"creator_wallet":            "Creator111",
 			"creator_relation_verified": true,
-			"creation_signature":         "Sig111",
-			"slot":                       int64(444),
-			"observed_at":                observed.Format(time.RFC3339),
-			"source":                     "solana_rpc_create_transaction",
+			"creation_signature":        "Sig111",
+			"slot":                      int64(444),
+			"observed_at":               observed.Format(time.RFC3339),
+			"source":                    "solana_rpc_create_transaction",
 		},
 	}
 	relation := buildRequestScopeCanonicalCreatorMintRelation(core, "Creator111", "solana-mainnet")
@@ -46,10 +46,10 @@ func TestRequestScopeCanonicalCreatorRelationNeverUpgradesIncompleteSource(t *te
 	core := holderIntelligenceCoreResult{
 		Request: holderIntelligenceCoreRequest{Target: "Mint222", Network: "solana-mainnet"},
 		SourceContext: map[string]any{
-			"creator_wallet":             "Creator222",
+			"creator_wallet":            "Creator222",
 			"creator_relation_verified": true,
-			"creation_signature":         "Sig222",
-			"slot":                       int64(0),
+			"creation_signature":        "Sig222",
+			"slot":                      int64(0),
 		},
 	}
 	relation := buildRequestScopeCanonicalCreatorMintRelation(core, "Creator222", "solana-mainnet")
@@ -65,11 +65,11 @@ func TestRequestScopeCanonicalCreatorRelationExternalObservationStaysObserved(t 
 	core := holderIntelligenceCoreResult{
 		Request: holderIntelligenceCoreRequest{Target: "Mint333", Network: "solana-mainnet"},
 		SourceContext: map[string]any{
-			"creator_wallet":             "Creator333",
+			"creator_wallet":            "Creator333",
 			"creator_relation_verified": false,
-			"creation_signature":         "ExternalSig333",
-			"slot":                       int64(333),
-			"source":                     "helius_target_mint_archival",
+			"creation_signature":        "ExternalSig333",
+			"slot":                      int64(333),
+			"source":                    "helius_target_mint_archival",
 		},
 	}
 	relation := buildRequestScopeCanonicalCreatorMintRelation(core, "Creator333", "solana-mainnet")
