@@ -13,8 +13,9 @@ const (
 )
 
 // ApplyCrossTokenExitEventRecurrenceRuleV140 appends an evidence-only rule from
-// the persisted transaction-referenced event corpus. The observation cannot
-// alter a grade and is withheld when wallet/target/signature refs are incomplete.
+// transaction-referenced recurrence evidence selected by the runtime. The
+// observation cannot alter a grade and is withheld when wallet/target/signature
+// refs are incomplete.
 func ApplyCrossTokenExitEventRecurrenceRuleV140(report UnifiedRadarBehaviorReport, recurrence ActorExitRecurrence, now time.Time) UnifiedRadarBehaviorReport {
 	if now.IsZero() {
 		now = time.Now().UTC()
@@ -31,7 +32,7 @@ func ApplyCrossTokenExitEventRecurrenceRuleV140(report UnifiedRadarBehaviorRepor
 		EvidenceStatus: "unverified",
 		Triggered:      false,
 		GradeEffect:    "evidence_only",
-		Scope:          "persisted_transaction_referenced_cross_token_event_memory",
+		Scope:          crossTokenExitEventRecurrenceScope(recurrence),
 		Metrics: map[string]any{
 			"actor_wallet":                 actor,
 			"distinct_targets_with_events": recurrence.DistinctTargetsWithEvents,
@@ -83,6 +84,13 @@ func ApplyCrossTokenExitEventRecurrenceRuleV140(report UnifiedRadarBehaviorRepor
 		report.TriggeredRuleCount++
 	}
 	return report
+}
+
+func crossTokenExitEventRecurrenceScope(recurrence ActorExitRecurrence) string {
+	if strings.Contains(strings.ToLower(strings.TrimSpace(recurrence.Status)), "request_scope") {
+		return "request_scope_transaction_referenced_cross_token_event_memory"
+	}
+	return "persisted_transaction_referenced_cross_token_event_memory"
 }
 
 // EvaluateUnifiedRadarVerdictV140 preserves v1.3 grading exactly and attaches
