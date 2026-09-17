@@ -27,7 +27,7 @@ func TestVerifyCreatorSellTransactionsRequiresSignerBalanceDecreaseSellMarkerAnd
 		}
 		result := map[string]any{
 			"meta": map[string]any{
-				"err": nil,
+				"err":          nil,
 				"preBalances":  []any{float64(2_000_000_000)},
 				"postBalances": []any{float64(3_250_000_000)},
 				"preTokenBalances": []any{map[string]any{
