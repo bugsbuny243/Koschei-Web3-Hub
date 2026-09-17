@@ -136,6 +136,9 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			actorRun.Limitations = append(actorRun.Limitations, "Token taramasında doğrulanmış creator/deployer cüzdanı çözümlenemedi; actor investigation başlatılmadı.")
 		case store == nil:
 			actorStoreStatus = "request_scope_live"
+			creatorRelation = buildRequestScopeCanonicalCreatorMintRelation(core, creator, network)
+			actorDossier = applyRequestScopeCanonicalCreatorRelation(actorDossier, creatorRelation)
+			actorRun.Limitations = append(actorRun.Limitations, creatorRelation.Limitations...)
 			actorRun.FundingOrigin, actorRun.FundingOriginPersistence = h.collectActorFundingOrigin(ctx, nil, creator, network)
 			actorDossier, actorTrack = hydrateRequestScopeActorDossier(
 				actorDossier, actorTrack, externalDiscovery, actorRun.FundingOrigin,
