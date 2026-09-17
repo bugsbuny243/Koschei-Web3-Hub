@@ -420,7 +420,7 @@ func parseUnifiedLiveTransaction(mint string, target unifiedLiveWalletTarget, si
 		Wallet: strings.TrimSpace(target.Wallet), Role: target.Role, Direction: direction,
 		TokenDelta: creatorIntelRound(delta, 8), NetNativeSOLDelta: nativeSOLDelta,
 		NetNativeSOLAvailable: nativeSOLAvailable, NetNativeSOLStatus: nativeSOLStatus, NetNativeSOLSource: nativeSOLSource,
-		SwapRelated: swapRelated,
+		SwapRelated:    swapRelated,
 		Counterparties: counterparties, InstructionTypes: instructionTypes, TokenMints: instructionMints,
 		Source: "solana_jsonparsed_manual_full_scan",
 	}
