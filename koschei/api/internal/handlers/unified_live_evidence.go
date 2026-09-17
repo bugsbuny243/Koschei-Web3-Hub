@@ -48,19 +48,23 @@ type unifiedLaunchSignerObservation struct {
 }
 
 type unifiedLiveTransactionRow struct {
-	Signature        string   `json:"signature"`
-	Slot             int64    `json:"slot,omitempty"`
-	BlockTime        string   `json:"block_time,omitempty"`
-	Wallet           string   `json:"wallet"`
-	Role             string   `json:"role"`
-	Direction        string   `json:"direction"`
-	TokenDelta       float64  `json:"token_delta"`
-	SwapRelated      bool     `json:"swap_related"`
-	Counterparties   []string `json:"counterparties"`
-	InstructionTypes []string `json:"instruction_types"`
-	TokenMints       []string `json:"token_mints"`
-	EvidenceKey      string   `json:"evidence_key"`
-	Source           string   `json:"source"`
+	Signature               string   `json:"signature"`
+	Slot                    int64    `json:"slot,omitempty"`
+	BlockTime               string   `json:"block_time,omitempty"`
+	Wallet                  string   `json:"wallet"`
+	Role                    string   `json:"role"`
+	Direction               string   `json:"direction"`
+	TokenDelta              float64  `json:"token_delta"`
+	NetNativeSOLDelta       float64  `json:"net_native_sol_delta"`
+	NetNativeSOLAvailable   bool     `json:"net_native_sol_delta_available"`
+	NetNativeSOLStatus      string   `json:"net_native_sol_delta_status"`
+	NetNativeSOLSource      string   `json:"net_native_sol_delta_source,omitempty"`
+	SwapRelated             bool     `json:"swap_related"`
+	Counterparties          []string `json:"counterparties"`
+	InstructionTypes        []string `json:"instruction_types"`
+	TokenMints              []string `json:"token_mints"`
+	EvidenceKey             string   `json:"evidence_key"`
+	Source                  string   `json:"source"`
 }
 
 type unifiedLiveInvestigationReport struct {
@@ -158,6 +162,7 @@ func (h *Handler) collectUnifiedTokenLiveEvidence(ctx context.Context, core hold
 	out.Limitations = append(out.Limitations,
 		"Live transaction inspection is bounded to recent wallet signatures and successful JSON-parsed transactions.",
 		"A missing row means no relevant mint delta was observed in the bounded window; it is not proof that no older activity exists.",
+		"Native SOL delta, when available, is the transaction-backed net wallet balance change; fees, rent and wrapped SOL can make it differ from swap proceeds.",
 	)
 	return out
 }
@@ -376,6 +381,13 @@ func parseUnifiedLiveTransaction(mint string, target unifiedLiveWalletTarget, si
 	if math.Abs(delta) < 0.000000001 {
 		return unifiedLiveTransactionRow{}, false
 	}
+	nativeSOLDelta, nativeSOLAvailable := unifiedWalletNativeSOLDelta(message, meta, target.Wallet)
+	nativeSOLStatus := "unavailable"
+	nativeSOLSource := ""
+	if nativeSOLAvailable {
+		nativeSOLStatus = "transaction_backed_net_wallet_balance_change"
+		nativeSOLSource = "solana_jsonparsed_pre_post_balances"
+	}
 	swapRelated := creatorIntelSwapRelated(logs, instructionTypes)
 	direction := "transfer_in"
 	if delta < 0 {
@@ -406,7 +418,9 @@ func parseUnifiedLiveTransaction(mint string, target unifiedLiveWalletTarget, si
 	row := unifiedLiveTransactionRow{
 		Signature: strings.TrimSpace(signature.Signature), Slot: signature.Slot, BlockTime: blockTime,
 		Wallet: strings.TrimSpace(target.Wallet), Role: target.Role, Direction: direction,
-		TokenDelta: creatorIntelRound(delta, 8), SwapRelated: swapRelated,
+		TokenDelta: creatorIntelRound(delta, 8), NetNativeSOLDelta: nativeSOLDelta,
+		NetNativeSOLAvailable: nativeSOLAvailable, NetNativeSOLStatus: nativeSOLStatus, NetNativeSOLSource: nativeSOLSource,
+		SwapRelated: swapRelated,
 		Counterparties: counterparties, InstructionTypes: instructionTypes, TokenMints: instructionMints,
 		Source: "solana_jsonparsed_manual_full_scan",
 	}
