@@ -3,7 +3,7 @@
   const kit=window.OwnerRadarKit;
   if(!kit||window.__ownerCourtUIInstalled)return;
   window.__ownerCourtUIInstalled=true;
-  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[char]));
+  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const arr=value=>Array.isArray(value)?value:[];
   const obj=value=>value&&typeof value==='object'&&!Array.isArray(value)?value:{};
   const short=(value,length=56)=>{const text=String(value||'');return text.length>length?`${text.slice(0,length-12)}…${text.slice(-9)}`:text||'—'};
