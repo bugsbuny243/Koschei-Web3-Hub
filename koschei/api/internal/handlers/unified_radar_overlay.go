@@ -36,7 +36,9 @@ func (h *Handler) buildOwnerUnifiedRadarOverlay(ctx context.Context, target, net
 	}
 
 	sales := services.LoadCreatorSellAcceleration(ctx, db, target, creator, now)
+	verification := services.VerifyCreatorSellTransactions(ctx, creatorIntelRPCURL(), sales)
 	behavior := services.EvaluateUnifiedRadarBehavior(target, creator, core.Market, core.Intelligence, core.Cluster, sales, now)
+	behavior = services.HardenUnifiedRadarBehavior(behavior, verification, core.Cluster)
 	track := services.ActorDefenseTrack{Network: network, TargetKind: "token", TargetID: target, Dossier: map[string]any{}}
 	actorEvidence := []services.ActorDefenseEvidenceRecord{}
 	actorDossier := any(map[string]any{

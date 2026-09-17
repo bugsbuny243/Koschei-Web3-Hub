@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestHardenUnifiedCreatorSellRemainsObserved(t *testing.T) {
+func TestHardenUnifiedCreatorSellRemainsObservedWhenRouteThresholdsAreSupported(t *testing.T) {
 	now := time.Unix(1700000000, 0).UTC()
 	report := UnifiedRadarBehaviorReport{
 		Mint: "MintOne",
@@ -13,27 +13,63 @@ func TestHardenUnifiedCreatorSellRemainsObserved(t *testing.T) {
 			RuleID: UnifiedRuleCreatorSellAcceleration, Title: "Creator sell acceleration",
 			EvidenceStatus: "verified", Triggered: true, GradeEffect: "compounding_input",
 			Summary: "Creator produced 3 verified sells.", Metrics: map[string]any{},
-			Signatures: []string{"ledger-signature"}, ObservedAt: now,
+			Signatures: []string{"ledger-signature-one", "ledger-signature-two"}, ObservedAt: now,
 		}},
 	}
 	verification := CreatorSellVerification{
-		CandidateSignatures: []string{"ledger-signature"},
-		VerifiedSignatures:  []string{"ledger-signature"},
-		TransactionsParsed:  1,
+		CandidateSignatures:      []string{"ledger-signature-one", "ledger-signature-two"},
+		VerifiedSignatures:       []string{"ledger-signature-one", "ledger-signature-two"},
+		RouteAttributedSellCount: 2,
+		RouteAttributedSellSOL:   1.5,
+		TransactionsParsed:       2,
 	}
 	got := HardenUnifiedRadarBehavior(report, verification, HolderClusterAnalysis{})
 	if len(got.Signals) != 1 {
 		t.Fatalf("signals=%d", len(got.Signals))
 	}
 	signal := got.Signals[0]
-	if signal.EvidenceStatus != "observed" {
-		t.Fatalf("creator sell status=%q", signal.EvidenceStatus)
+	if signal.EvidenceStatus != "observed" || !signal.Triggered || signal.GradeEffect != "compounding_input" {
+		t.Fatalf("creator sell hardening=%#v", signal)
 	}
-	if len(signal.Signatures) != 1 || signal.Signatures[0] != "ledger-signature" {
-		t.Fatalf("verified support signatures=%v", signal.Signatures)
+	if len(signal.Signatures) != 2 || len(signal.EvidenceKeys) != 2 {
+		t.Fatalf("verified support refs=%#v", signal)
+	}
+	if signal.Metrics["route_attributed_sell_count"] != 2 || signal.Metrics["route_attributed_sell_sol"] != 1.5 {
+		t.Fatalf("route metrics=%#v", signal.Metrics)
 	}
 	if len(got.Evidence) != 0 {
 		t.Fatalf("ledger-derived acceleration must not create actor evidence rows: %#v", got.Evidence)
+	}
+}
+
+func TestHardenUnifiedCreatorSellWithdrawsWithoutRouteThresholdSupport(t *testing.T) {
+	now := time.Unix(1700000000, 0).UTC()
+	report := UnifiedRadarBehaviorReport{
+		Mint: "MintOne",
+		Signals: []UnifiedRadarSignal{{
+			RuleID: UnifiedRuleCreatorSellAcceleration, Title: "Creator sell acceleration",
+			EvidenceStatus: "observed", Triggered: true, GradeEffect: "compounding_input",
+			Summary: "Creator one-hour sell flow accelerated.", Metrics: map[string]any{},
+			Signatures: []string{"ledger-one", "ledger-two"}, ObservedAt: now,
+		}},
+	}
+	verification := CreatorSellVerification{
+		CandidateSignatures:      []string{"ledger-one", "ledger-two"},
+		VerifiedSignatures:       []string{"ledger-one"},
+		RouteAttributedSellCount: 1,
+		RouteAttributedSellSOL:   0.8,
+		TransactionsParsed:       2,
+	}
+	got := HardenUnifiedRadarBehavior(report, verification, HolderClusterAnalysis{})
+	signal := got.Signals[0]
+	if signal.Triggered || signal.GradeEffect != "none" {
+		t.Fatalf("unsupported C003 remained grade-changing: %#v", signal)
+	}
+	if got.TriggeredRuleCount != 0 {
+		t.Fatalf("triggered rule count=%d", got.TriggeredRuleCount)
+	}
+	if len(signal.Signatures) != 1 || signal.Signatures[0] != "ledger-one" {
+		t.Fatalf("verified signatures=%v", signal.Signatures)
 	}
 }
 

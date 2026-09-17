@@ -14,14 +14,30 @@ func HardenUnifiedRadarBehavior(report UnifiedRadarBehaviorReport, verification 
 				signal.EvidenceStatus = "observed"
 			}
 			signal.Signatures = append([]string{}, verification.VerifiedSignatures...)
+			signal.EvidenceKeys = []string{}
+			for _, signature := range verification.VerifiedSignatures {
+				if signature = strings.TrimSpace(signature); signature != "" {
+					signal.EvidenceKeys = append(signal.EvidenceKeys, "creator-sell:"+signature)
+				}
+			}
 			if signal.Metrics == nil {
 				signal.Metrics = map[string]any{}
 			}
 			signal.Metrics["ledger_candidate_signature_count"] = len(verification.CandidateSignatures)
 			signal.Metrics["verified_sell_signature_count"] = len(verification.VerifiedSignatures)
+			signal.Metrics["route_attributed_sell_count"] = verification.RouteAttributedSellCount
+			signal.Metrics["route_attributed_sell_sol"] = verification.RouteAttributedSellSOL
 			signal.Metrics["transactions_parsed"] = verification.TransactionsParsed
 			signal.Limitations = append(signal.Limitations, verification.Limitations...)
 			signal.Summary = strings.ReplaceAll(signal.Summary, "verified sells", "ledger-observed sells")
+			if signal.Triggered && (verification.RouteAttributedSellCount < UnifiedCreatorSellMinimumCount || verification.RouteAttributedSellSOL < UnifiedCreatorSellMinimumSOL) {
+				signal.Triggered = false
+				signal.GradeEffect = "none"
+				signal.Summary = "Stored trade-ledger windows met the C003 acceleration threshold, but transaction-backed route attribution did not confirm the required recent sell count and positive native-SOL flow; C003 was withheld."
+				signal.Limitations = append(signal.Limitations, "URD-C003 requires at least two recent creator-signed target-token outflow transactions with sell/swap markers and at least 1 SOL of positive transaction-backed native wallet delta before it can contribute to a grade.")
+			} else if signal.Triggered {
+				signal.Summary = "Stored trade-ledger acceleration thresholds were met and the recent creator-sell candidates were supported by transaction-backed token-out, sell/swap markers and positive native-SOL wallet deltas. Baseline timing remains ledger-derived, so C003 stays OBSERVED."
+			}
 		case UnifiedRuleDominantHolderFirstExit:
 			hardenUnifiedDominantHolderExit(signal, cluster)
 		}
