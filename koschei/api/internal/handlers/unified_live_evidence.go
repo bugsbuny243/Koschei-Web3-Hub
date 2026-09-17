@@ -48,23 +48,23 @@ type unifiedLaunchSignerObservation struct {
 }
 
 type unifiedLiveTransactionRow struct {
-	Signature               string   `json:"signature"`
-	Slot                    int64    `json:"slot,omitempty"`
-	BlockTime               string   `json:"block_time,omitempty"`
-	Wallet                  string   `json:"wallet"`
-	Role                    string   `json:"role"`
-	Direction               string   `json:"direction"`
-	TokenDelta              float64  `json:"token_delta"`
-	NetNativeSOLDelta       float64  `json:"net_native_sol_delta"`
-	NetNativeSOLAvailable   bool     `json:"net_native_sol_delta_available"`
-	NetNativeSOLStatus      string   `json:"net_native_sol_delta_status"`
-	NetNativeSOLSource      string   `json:"net_native_sol_delta_source,omitempty"`
-	SwapRelated             bool     `json:"swap_related"`
-	Counterparties          []string `json:"counterparties"`
-	InstructionTypes        []string `json:"instruction_types"`
-	TokenMints              []string `json:"token_mints"`
-	EvidenceKey             string   `json:"evidence_key"`
-	Source                  string   `json:"source"`
+	Signature             string   `json:"signature"`
+	Slot                  int64    `json:"slot,omitempty"`
+	BlockTime             string   `json:"block_time,omitempty"`
+	Wallet                string   `json:"wallet"`
+	Role                  string   `json:"role"`
+	Direction             string   `json:"direction"`
+	TokenDelta            float64  `json:"token_delta"`
+	NetNativeSOLDelta     float64  `json:"net_native_sol_delta"`
+	NetNativeSOLAvailable bool     `json:"net_native_sol_delta_available"`
+	NetNativeSOLStatus    string   `json:"net_native_sol_delta_status"`
+	NetNativeSOLSource    string   `json:"net_native_sol_delta_source,omitempty"`
+	SwapRelated           bool     `json:"swap_related"`
+	Counterparties        []string `json:"counterparties"`
+	InstructionTypes      []string `json:"instruction_types"`
+	TokenMints            []string `json:"token_mints"`
+	EvidenceKey           string   `json:"evidence_key"`
+	Source                string   `json:"source"`
 }
 
 type unifiedLiveInvestigationReport struct {
