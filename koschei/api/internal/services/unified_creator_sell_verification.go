@@ -7,17 +7,21 @@ import (
 )
 
 type CreatorSellVerification struct {
-	CandidateSignatures []string `json:"candidate_signatures"`
-	VerifiedSignatures  []string `json:"verified_signatures"`
-	TransactionsParsed  int      `json:"transactions_parsed"`
-	RPCFailures         int      `json:"rpc_failures"`
-	Limitations         []string `json:"limitations"`
+	CandidateSignatures      []string `json:"candidate_signatures"`
+	VerifiedSignatures       []string `json:"verified_signatures"`
+	RouteAttributedSellCount int      `json:"route_attributed_sell_count"`
+	RouteAttributedSellSOL   float64  `json:"route_attributed_sell_sol"`
+	TransactionsParsed       int      `json:"transactions_parsed"`
+	RPCFailures              int      `json:"rpc_failures"`
+	Limitations              []string `json:"limitations"`
 }
 
 // VerifyCreatorSellTransactions parses only the recent signatures already
-// selected by the manual trade ledger. The acceleration rule remains OBSERVED:
-// verified signatures support the narrative, while window rates and totals are
-// still ledger-derived.
+// selected by the manual trade ledger. A signature is accepted only when the
+// creator signed the transaction, the target-mint balance decreased, a sell or
+// swap marker exists, and the same transaction shows a positive native-SOL
+// balance delta for the creator. The acceleration windows remain ledger-derived,
+// so even route-attributed support remains OBSERVED rather than VERIFIED.
 func VerifyCreatorSellTransactions(ctx context.Context, rpcURL string, sales CreatorSellAcceleration) CreatorSellVerification {
 	out := CreatorSellVerification{
 		CandidateSignatures: append([]string{}, sales.Signatures...),
@@ -62,10 +66,51 @@ func VerifyCreatorSellTransactions(ctx context.Context, rpcURL string, sales Cre
 		if !unifiedTransactionHasSellMarker(message, meta) {
 			continue
 		}
+		nativeDelta, available := unifiedCreatorNativeSOLDelta(message, meta, creator)
+		if !available || nativeDelta <= 0 {
+			continue
+		}
 		out.VerifiedSignatures = append(out.VerifiedSignatures, signature)
+		out.RouteAttributedSellCount++
+		out.RouteAttributedSellSOL += nativeDelta
 	}
-	out.Limitations = append(out.Limitations, "Creator satış ivmesi OBSERVED kalır; doğrulanan imzalar yalnız transaction-backed destek sağlar.")
+	out.RouteAttributedSellSOL = roundUnifiedRadar(out.RouteAttributedSellSOL)
+	out.Limitations = append(out.Limitations,
+		"Creator satış ivmesinin recent ve baseline zaman pencereleri stored trade ledger'dan gelir; transaction-backed doğrulama yalnız recent sell imzalarının token-out + sell/swap marker + pozitif native SOL delta birlikteliğini doğrular.",
+		"Native SOL delta net cüzdan bakiyesi değişimidir; ücret, rent ve wrapped SOL etkileri nedeniyle brüt swap proceeds olarak yorumlanmaz.",
+	)
 	return out
+}
+
+func unifiedCreatorNativeSOLDelta(message, meta map[string]any, creator string) (float64, bool) {
+	creator = strings.TrimSpace(creator)
+	if creator == "" {
+		return 0, false
+	}
+	keys, _ := message["accountKeys"].([]any)
+	pre, preOK := meta["preBalances"].([]any)
+	post, postOK := meta["postBalances"].([]any)
+	if !preOK || !postOK || len(keys) == 0 {
+		return 0, false
+	}
+	for index, raw := range keys {
+		key := strings.TrimSpace(actorFundingString(raw))
+		if row := actorFundingMap(raw); len(row) > 0 {
+			if value := strings.TrimSpace(actorFundingString(row["pubkey"])); value != "" {
+				key = value
+			}
+		}
+		if key != creator {
+			continue
+		}
+		if index >= len(pre) || index >= len(post) {
+			return 0, false
+		}
+		preLamports := actorFundingInt64(pre[index])
+		postLamports := actorFundingInt64(post[index])
+		return roundUnifiedRadar(float64(postLamports-preLamports) / 1e9), true
+	}
+	return 0, false
 }
 
 func unifiedCreatorMintBalanceDecreased(meta map[string]any, creator, mint string) bool {
