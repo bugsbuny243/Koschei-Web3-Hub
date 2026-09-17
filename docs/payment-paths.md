@@ -2,7 +2,7 @@
 
 ## Supported billing boundary
 
-Koschei Web3 keeps billing and product authorization separate. **Starter**, **Professional**, and **Enterprise** access is granted only through an active server-side entitlement.
+Koschei Web3 has one paid customer plan: **Professional**. Paid customer access is granted only through an active server-side Professional entitlement.
 
 The repository does not expose a browser-controlled price or a client-side entitlement activation path. Payment-provider data is treated as external evidence for an entitlement decision, not as authority supplied by the frontend.
 
@@ -14,14 +14,14 @@ Any provider identifier outside the explicit allowlist is rejected. Retired Padd
 
 ## Polar authorization flow
 
-1. An authenticated customer requests checkout for a canonical Koschei plan.
-2. The backend maps that plan to a server-configured Polar product ID and creates a hosted Polar checkout. The browser receives only the hosted checkout ID/URL.
+1. An authenticated customer requests checkout for the canonical `professional` plan.
+2. The backend maps `professional` to the server-configured Polar product ID and creates a hosted Polar checkout. The browser receives only the hosted checkout ID/URL.
 3. Checkout creation or redirect success **does not grant product access**.
 4. Polar sends a signed webhook to `/api/polar/webhook`.
 5. The backend verifies the raw webhook body and signed delivery headers before parsing or trusting event data.
-6. For `subscription.active`, the backend verifies the product-to-plan mapping and the authenticated-subject/email metadata binding, records an idempotent evidence digest, and activates the server-side entitlement.
+6. For `subscription.active`, the backend verifies the product-to-plan mapping and the authenticated-subject/email metadata binding, records an idempotent evidence digest, and activates the server-side Professional entitlement.
 7. `subscription.canceled` and `subscription.past_due` are recorded but do not immediately revoke Koschei access; Polar can keep paid-period/grace-period access alive in those states.
-8. A verified `order.paid` with `billing_reason=subscription_cycle` and an active, correctly bound subscription refreshes that exact Polar entitlement period and restores the plan output capacity. Pending `order.created`, unpaid orders, purchases and proration orders do not refresh quota.
+8. A verified `order.paid` with `billing_reason=subscription_cycle` and an active, correctly bound subscription refreshes that exact Polar entitlement period and restores Professional output capacity. Pending `order.created`, unpaid orders, purchases and proration orders do not refresh quota.
 9. For `subscription.revoked`, only the entitlement carrying the exact `polar` provider plus subscription ID evidence is revoked. Other manual/provider grants are not touched, and the customer profile is recomputed from any remaining active entitlement.
 10. Duplicate events are idempotent, and an older `subscription.active` event cannot re-enable access after a newer/equal recorded revocation.
 
@@ -33,26 +33,22 @@ The deployment supplies these values as secrets/configuration, not source code:
 
 - `POLAR_ACCESS_TOKEN`
 - `POLAR_WEBHOOK_SECRET`
-- `POLAR_PRODUCT_STARTER_ID`
 - `POLAR_PRODUCT_PROFESSIONAL_ID`
-- `POLAR_PRODUCT_ENTERPRISE_ID`
 - `POLAR_ENVIRONMENT` (`production` or `sandbox`)
 - optional HTTPS-only `POLAR_SUCCESS_URL`
 - optional HTTPS-only `POLAR_RETURN_URL`
 
 Required Polar webhook events: `subscription.active`, `subscription.revoked`, and `order.paid`. Other signed subscription events may be retained as audit evidence but do not independently grant paid access.
 
-No Polar public-config endpoint exists. A missing token, webhook secret, product mapping, unsupported environment, invalid redirect URL, unknown provider or mismatched customer/product evidence fails closed.
+No Polar public-config endpoint exists. A missing token, webhook secret, Professional product mapping, unsupported environment, invalid redirect URL, unknown provider or mismatched customer/product evidence fails closed.
 
-## Canonical paid plans
+## Canonical paid plan
 
 | Plan | Canonical ID | Current output capacity |
 | --- | --- | ---: |
-| Starter | `starter` | 25 |
 | Professional | `professional` | 100 |
-| Enterprise | `enterprise` | 300 |
 
-These capacities describe the current entitlement implementation. Product pages must not describe unfinished security modules as production-ready merely because a plan exists.
+The capacity describes the current entitlement implementation. Product pages must not describe unfinished security modules as production-ready merely because the plan exists.
 
 ## Evidence and retention
 

@@ -8,8 +8,9 @@
     var nativeFetch=window.fetch.bind(window);
     function timeoutFor(path){
       if(path==='/health')return 10000;
-      // Match the full-evidence collector budget used by public-solana-scan.
+      // Full evidence collectors can legitimately spend multiple bounded RPC windows.
       if(path.indexOf('/api/token/scan')===0)return 210000;
+      if(path.indexOf('/api/v1/radar/detail')===0)return 210000;
       if(path.indexOf('/api/v1/radar/')===0||path.indexOf('/api/owner/')===0||path.indexOf('/api/jobs/')===0)return 45000;
       return 15000;
     }
@@ -95,6 +96,16 @@
     document.head.appendChild(script);
   }
 
+  function loadProfessionalDeepScanRoute(current){
+    var mode=new URLSearchParams(location.search||'').get('mode');
+    if(current!=='/scan'||mode!=='deep'||window.__koscheiProfessionalDeepScanRoute||document.querySelector('script[data-koschei-professional-deep-route]'))return;
+    var script=document.createElement('script');
+    script.src='/js/professional-deep-scan-route.js?v=1';
+    script.async=false;
+    script.dataset.koscheiProfessionalDeepRoute='true';
+    document.head.appendChild(script);
+  }
+
   function isActiveNavItem(href,current){
     var mode=new URLSearchParams(location.search||'').get('mode');
     if(href==='/scan?mode=deep')return current==='/scan'&&mode==='deep';
@@ -103,7 +114,7 @@
   }
 
   ready(function(){
-    var links=[['/live','Live SOC'],['/cases','Cases'],['/scan','Token Scan'],['/transaction-shield','Transaction Shield'],['/safe-check','Safe Check'],['/scan?mode=deep','Deep Scan'],['/dashboard','Workspace'],['/pricing','Plans']];
+    var links=[['/live','Live SOC'],['/cases','Cases'],['/scan','Token Scan'],['/transaction-shield','Transaction Shield'],['/safe-check','Safe Check'],['/scan?mode=deep','Deep Scan'],['/dashboard','Workspace'],['/pricing','Professional']];
     var current=(location.pathname||'/').replace(/\.html$/,'').replace(/\/$/,'')||'/';
     var existing=document.querySelector('.top .nav, header.top nav.nav, nav.top .nav');
     var nav=existing||document.createElement('nav');
@@ -112,13 +123,15 @@
     while(nav.firstChild)nav.removeChild(nav.firstChild);
     links.forEach(function(item){var anchor=document.createElement('a');anchor.href=item[0];anchor.textContent=item[1];if(isActiveNavItem(item[0],current))anchor.setAttribute('aria-current','page');nav.appendChild(anchor);});
     if(!existing){var top=document.querySelector('header.top,.top');if(top){nav.className+=' detached';top.parentNode.insertBefore(nav,top.nextSibling);}}
-    if(current==='/dashboard'&&!document.querySelector('.koschei-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip';strip.innerHTML='<div><b>Ask Koschei before buying or signing.</b><span>ARVIS investigation and transaction evidence stay inside the Koschei Web3 security workflow.</span></div><span><a href="/scan">ARVIS Investigation</a> <a href="/transaction-shield">Transaction Shield</a></span>';var stripAnchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(stripAnchor&&stripAnchor.parentNode){stripAnchor.parentNode.insertBefore(strip,stripAnchor.nextSibling);}}
+    if(['/scan','/dashboard','/account'].includes(current)&&!document.querySelector('.koschei-professional-strip')){var professional=document.createElement('section');professional.className='koschei-safety-strip koschei-professional-strip';professional.innerHTML='<div><b>Professional</b><span>Paid customer investigations and capacity are authorized by the active Professional entitlement. Checkout is hosted securely by Polar.</span></div><span><a href="/pricing">View Professional</a></span>';var professionalAnchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(professionalAnchor&&professionalAnchor.parentNode){professionalAnchor.parentNode.insertBefore(professional,professionalAnchor.nextSibling);}}
+    if(current==='/dashboard'&&!document.querySelector('.koschei-dashboard-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip koschei-dashboard-safety-strip';strip.innerHTML='<div><b>Ask Koschei before buying or signing.</b><span>ARVIS investigation and transaction evidence stay inside the Koschei Web3 security workflow.</span></div><span><a href="/scan">ARVIS Investigation</a> <a href="/transaction-shield">Transaction Shield</a></span>';var stripAnchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(stripAnchor&&stripAnchor.parentNode){stripAnchor.parentNode.insertBefore(strip,stripAnchor.nextSibling);}}
     var bottom=document.querySelector('nav.bottom');if(bottom)bottom.remove();
-    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei Web3 · ARVIS Intelligence</span><span><a href="/live">Live SOC</a> · <a href="/cases">Cases</a> · <a href="/scan">ARVIS Investigation</a> · <a href="/transaction-shield">Transaction Shield</a> · <a href="/safe-check">Safe Check</a> · <a href="/pricing">Plans</a></span>';document.body.appendChild(footer);}
+    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei Web3 · ARVIS Intelligence</span><span><a href="/live">Live SOC</a> · <a href="/cases">Cases</a> · <a href="/scan">ARVIS Investigation</a> · <a href="/transaction-shield">Transaction Shield</a> · <a href="/safe-check">Safe Check</a> · <a href="/pricing">Professional</a></span>';document.body.appendChild(footer);}
     if(current==='/safe-check')document.title='Safe Check — Koschei Web3 / ARVIS';
     if(current==='/security-radar')document.title='ARVIS Security Radar — Koschei Web3';
     translate(document.body);
     loadInvestigationShare(current);
+    loadProfessionalDeepScanRoute(current);
     var observer=new MutationObserver(function(records){records.forEach(function(record){record.addedNodes.forEach(function(node){if(node.nodeType===1)translate(node);else if(node.nodeType===3&&node.parentElement){var next=translateString(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;}});});});
     observer.observe(document.body,{childList:true,subtree:true,characterData:false});
   });
