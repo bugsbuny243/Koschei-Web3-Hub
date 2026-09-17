@@ -704,7 +704,7 @@ func creatorIntelCompactError(err error) string {
 	if err == nil {
 		return ""
 	}
-	value := strings.Join(strings.Fields(err.Error()), " ")
+	value := redactSensitiveErrorText(strings.Join(strings.Fields(err.Error()), " "))
 	if len(value) > 240 {
 		value = value[:240]
 	}
