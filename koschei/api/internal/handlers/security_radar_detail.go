@@ -65,7 +65,7 @@ func (h *Handler) SecurityRadarDetail(w http.ResponseWriter, r *http.Request) {
 	warning := radarDetailWarning(final, distribution, structural, modules, sourceContext)
 	graph := h.radarDetailGraph(r.Context(), target)
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	writeProviderSafeJSON(w, http.StatusOK, map[string]any{
 		"ok":                  true,
 		"schema_version":      "koschei-radar-detail-v2",
 		"target":              target,
@@ -491,7 +491,7 @@ func compactRadarDetailError(err error) string {
 	if err == nil {
 		return ""
 	}
-	message := strings.TrimSpace(err.Error())
+	message := strings.TrimSpace(services.SafeProviderError(err))
 	if len(message) > 180 {
 		message = message[:180]
 	}
