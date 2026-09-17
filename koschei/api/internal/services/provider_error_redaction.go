@@ -7,7 +7,17 @@ import (
 
 var providerCredentialPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)((?:https?|wss?)://[^\s"]+/v2/)[^\s"]+`),
-	regexp.MustCompile(`(?i)([?&](?:api[_-]?key|apikey|key|token)=)[^&\s"]+`),
+	regexp.MustCompile(`(?i)([?&](?:api[_-]?key|apikey|access[_-]?token|token|secret|client[_-]?secret|key)=)[^&\s"'<>]+`),
+	regexp.MustCompile(`(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+`),
+	regexp.MustCompile(`(?i)((?:HELIUS|ALCHEMY|QUICKNODE|SOLANA)?_?(?:API[_-]?KEY|ACCESS[_-]?TOKEN|TOKEN|SECRET)\s*=\s*)[^\s,;]+`),
+}
+
+func SafeProviderError(err error) string {
+	return safeProviderError(err)
+}
+
+func RedactProviderCredentials(message string) string {
+	return redactProviderCredentials(message)
 }
 
 func safeProviderError(err error) string {

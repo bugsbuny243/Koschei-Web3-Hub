@@ -168,7 +168,7 @@ func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request,
 			report["independent_review"] = appendix
 		}
 	}
-	writeJSON(w, http.StatusOK, report)
+	writeProviderSafeJSON(w, http.StatusOK, report)
 }
 
 func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request, requestedTarget, wallet, network string, classification radarTargetClassification, liveEvidence, courtRequested, extendedCourt bool) {
@@ -243,7 +243,7 @@ func (h *Handler) ownerUnifiedWalletRadar(w http.ResponseWriter, r *http.Request
 			"identity_scope":                        "onchain_wallet_only", "caller_type_changes_evidence": false,
 		},
 	}
-	writeJSON(w, http.StatusOK, response)
+	writeProviderSafeJSON(w, http.StatusOK, response)
 }
 
 func (h *Handler) ownerUnifiedWalletRadarStateless(w http.ResponseWriter, r *http.Request, requestedTarget, wallet, network string, classification radarTargetClassification, liveEvidence bool) {
@@ -353,7 +353,7 @@ func (h *Handler) ownerUnifiedWalletRadarStateless(w http.ResponseWriter, r *htt
 		},
 		"limitations": []string{"Raw actor evidence remains request-scoped in stateless runtime; only a bounded TTL verdict fingerprint index may be retained by the configured cache."},
 	}
-	writeJSON(w, http.StatusOK, response)
+	writeProviderSafeJSON(w, http.StatusOK, response)
 }
 
 func ownerCourtUnavailableReport(status string) *CourtReport {
