@@ -27,6 +27,72 @@ type canonicalCreatorRelationVerification struct {
 // creator is a signer, the requested mint is structurally referenced, and the
 // parsed transaction carries launch/create semantics. Discovery providers can
 // suggest the signature, but cannot set Verified themselves.
+func canonicalCreatorSignatureCandidates(source map[string]any) []string {
+	keys := []string{"creation_signature", "launch_signature", "first_mint_signature", "signature"}
+	seen := map[string]bool{}
+	out := []string{}
+	for _, key := range keys {
+		candidate := strings.TrimSpace(creatorIntelCleanString(source[key]))
+		if candidate == "" || seen[candidate] {
+			continue
+		}
+		seen[candidate] = true
+		out = append(out, candidate)
+	}
+	return out
+}
+
+func canonicalCreatorVerificationRank(status string) int {
+	switch strings.TrimSpace(status) {
+	case "verified_canonical_create_transaction":
+		return 100
+	case "slot_unavailable", "creator_not_signer", "mint_not_referenced", "launch_semantics_not_verified":
+		return 80
+	case "canonical_transaction_missing":
+		return 40
+	case "canonical_transaction_unavailable":
+		return 20
+	case "verification_inputs_incomplete":
+		return 10
+	default:
+		return 0
+	}
+}
+
+func (h *Handler) verifyCanonicalCreatorRelationCandidates(ctx context.Context, target, network, creator string, candidates []string) canonicalCreatorRelationVerification {
+	clean := []string{}
+	seen := map[string]bool{}
+	for _, candidate := range candidates {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" || seen[candidate] {
+			continue
+		}
+		seen[candidate] = true
+		clean = append(clean, candidate)
+	}
+	if len(clean) == 0 {
+		return h.verifyCanonicalCreatorRelation(ctx, target, network, creator, "")
+	}
+
+	best := canonicalCreatorRelationVerification{Status: "not_verified", InstructionTypes: []string{}, Limitations: []string{}}
+	bestRank := -1
+	for _, candidate := range clean {
+		verification := h.verifyCanonicalCreatorRelation(ctx, target, network, creator, candidate)
+		if verification.Verified {
+			return verification
+		}
+		rank := canonicalCreatorVerificationRank(verification.Status)
+		if rank > bestRank {
+			best = verification
+			bestRank = rank
+		}
+	}
+	if len(clean) > 1 {
+		best.Limitations = append(best.Limitations, fmt.Sprintf("Canonical creator verification tried %d distinct candidate signatures; none satisfied signer + mint-reference + launch-semantics requirements.", len(clean)))
+	}
+	return best
+}
+
 func (h *Handler) verifyCanonicalCreatorRelation(ctx context.Context, target, network, creator, signature string) canonicalCreatorRelationVerification {
 	out := canonicalCreatorRelationVerification{
 		Status: "not_verified", Signature: strings.TrimSpace(signature),
