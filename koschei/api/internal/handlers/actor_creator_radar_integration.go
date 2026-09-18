@@ -218,6 +218,11 @@ func (h *Handler) collectCanonicalActorDistribution(ctx context.Context, store *
 		return out
 	}
 	out.Target = target
+	if !strings.EqualFold(strings.TrimSpace(target.VerificationStatus), "verified") || strings.TrimSpace(target.CreationSignature) == "" {
+		out.Status = "creator_mint_relation_observed_only"
+		out.Limitations = append(out.Limitations, "Creator → mint ilişkisi VERIFIED creation transaction kanıtı taşımadığı için derived recipient evidence üretilmedi.")
+		return out
+	}
 	out.Report = h.investigateActorInitialRecipients(
 		distributionCtx,
 		target.CreatorWallet,
