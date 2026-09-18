@@ -85,7 +85,6 @@ func TestHolderClusterScanCandidatesConcurrentPreservesOrderAndUsesBoundedWorker
 	}
 }
 
-
 func TestHolderClusterParallelScanAllowedRequiresDeterministicBudget(t *testing.T) {
 	t.Setenv("KOSCHEI_HELIUS_ENHANCED_HISTORY_ENABLED", "false")
 	plans := []holderScanPlan{
