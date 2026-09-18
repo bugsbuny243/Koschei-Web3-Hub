@@ -61,6 +61,12 @@ func canonicalCreatorVerificationRank(status string) int {
 }
 
 func (h *Handler) verifyCanonicalCreatorRelationCandidates(ctx context.Context, target, network, creator string, candidates []string) canonicalCreatorRelationVerification {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	candidateCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	clean := []string{}
 	seen := map[string]bool{}
 	for _, candidate := range candidates {
@@ -78,7 +84,10 @@ func (h *Handler) verifyCanonicalCreatorRelationCandidates(ctx context.Context, 
 	best := canonicalCreatorRelationVerification{Status: "not_verified", InstructionTypes: []string{}, Limitations: []string{}}
 	bestRank := -1
 	for _, candidate := range clean {
-		verification := h.verifyCanonicalCreatorRelation(ctx, target, network, creator, candidate)
+		if candidateCtx.Err() != nil {
+			break
+		}
+		verification := h.verifyCanonicalCreatorRelation(candidateCtx, target, network, creator, candidate)
 		if verification.Verified {
 			return verification
 		}
