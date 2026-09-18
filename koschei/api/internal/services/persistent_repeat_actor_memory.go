@@ -39,10 +39,10 @@ func (s *SecurityRadarStore) PersistentRepeatDominantHolders(ctx context.Context
 		if currentPercentage <= 0 {
 			currentPercentage = row.RawPercentage
 		}
-		if currentPercentage < 20 {
-			continue
-		}
 
+		// Current concentration may fall below the historical dominance threshold.
+		// A top-5 risk-bearing wallet must still be checked against retained actor
+		// memory so past >=20% dominance does not disappear from the investigation.
 		matches, err := s.persistentRepeatDominantHolderMatches(ctx, owner, network)
 		if err != nil {
 			return nil, err
