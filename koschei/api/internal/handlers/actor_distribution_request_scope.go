@@ -32,12 +32,12 @@ func (h *Handler) collectRequestScopeCanonicalActorDistribution(ctx context.Cont
 	timeout := time.Duration(actorDefenseEnvInt("ACTOR_RECIPIENT_TIMEOUT_SECONDS", 150, 30, 240)) * time.Second
 	distributionCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	out.Report = services.InvestigateActorInitialRecipients(
+	out.Report = h.investigateActorInitialRecipients(
 		distributionCtx,
-		creatorIntelRPCURL(),
 		relation.Target.CreatorWallet,
 		relation.Target.Mint,
 		relation.Target.CreationSignature,
+		network,
 		services.ActorInitialRecipientOptions{
 			MaxRecipients:        actorDefenseEnvInt("ACTOR_RECIPIENT_LIMIT", 20, 1, 20),
 			SignaturePageSize:    actorDefenseEnvInt("ACTOR_RECIPIENT_SIGNATURE_PAGE_SIZE", 250, 50, 1000),

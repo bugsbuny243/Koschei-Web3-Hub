@@ -12,6 +12,14 @@ on:
       - "koschei/api/internal/handlers/creator_relation_canonical_verification.go"
       - "koschei/api/internal/handlers/creator_relation_canonical_verification_test.go"
       - "koschei/api/internal/handlers/creator_source_context_resolution.go"
+      - "koschei/api/internal/services/actor_distribution_target.go"
+      - "koschei/api/internal/handlers/actor_recipient_transport.go"
+      - "koschei/api/internal/handlers/actor_recipient_transport_test.go"
+      - "koschei/api/internal/handlers/actor_creator_radar_integration.go"
+      - "koschei/api/internal/handlers/actor_creator_request_scope.go"
+      - "koschei/api/internal/handlers/actor_creator_request_scope_test.go"
+      - "koschei/api/internal/handlers/actor_distribution_request_scope.go"
+      - "koschei/api/internal/handlers/actor_distribution_investigation.go"
       - ".github/workflows/holder-launch-evidence-acceptance.yml"
   pull_request:
     paths:
@@ -23,6 +31,14 @@ on:
       - "koschei/api/internal/handlers/creator_relation_canonical_verification.go"
       - "koschei/api/internal/handlers/creator_relation_canonical_verification_test.go"
       - "koschei/api/internal/handlers/creator_source_context_resolution.go"
+      - "koschei/api/internal/services/actor_distribution_target.go"
+      - "koschei/api/internal/handlers/actor_recipient_transport.go"
+      - "koschei/api/internal/handlers/actor_recipient_transport_test.go"
+      - "koschei/api/internal/handlers/actor_creator_radar_integration.go"
+      - "koschei/api/internal/handlers/actor_creator_request_scope.go"
+      - "koschei/api/internal/handlers/actor_creator_request_scope_test.go"
+      - "koschei/api/internal/handlers/actor_distribution_request_scope.go"
+      - "koschei/api/internal/handlers/actor_distribution_investigation.go"
       - ".github/workflows/holder-launch-evidence-acceptance.yml"
   workflow_dispatch:
 
@@ -55,5 +71,5 @@ jobs:
         run: |
           set -euo pipefail
           go test -v ./internal/handlers \
-            -run '^(TestHolderDistributionTransportUsesOnlySolanaRPCProof|TestVerifyCanonicalCreatorRelationRequiresSignerMintAndLaunchSemantics|TestVerifyCanonicalCreatorRelationRejectsNonSigner|TestVerifyCanonicalCreatorRelationRejectsWrongMint)$' \
+            -run '^(TestHolderDistributionTransportUsesOnlySolanaRPCProof|TestVerifyCanonicalCreatorRelationRequiresSignerMintAndLaunchSemantics|TestVerifyCanonicalCreatorRelationRejectsNonSigner|TestVerifyCanonicalCreatorRelationRejectsWrongMint|TestVerifyCanonicalCreatorRelationCandidatesRecoversFromRejectedFirstSignature|TestCanonicalCreatorSignatureCandidatesPrioritizeCreationAndDeduplicate|TestInvestigateActorInitialRecipientsUsesRPCManagerFailover|TestRequestScopeCanonicalCreatorRelationPreservesVerifiedEvidence|TestRequestScopeCanonicalCreatorRelationNeverUpgradesIncompleteSource|TestRequestScopeCanonicalCreatorRelationExternalObservationStaysObserved)$' \
             -count=1

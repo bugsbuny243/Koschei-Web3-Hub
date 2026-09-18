@@ -28,6 +28,17 @@ func (h *Handler) actorRecipientTransport(network string) services.ActorInitialR
 	}
 }
 
+func (h *Handler) investigateActorInitialRecipients(ctx context.Context, creator, mint, creationSignature, network string, options services.ActorInitialRecipientOptions) services.ActorInitialRecipientReport {
+	return services.InvestigateActorInitialRecipientsWithTransport(
+		ctx,
+		h.actorRecipientTransport(network),
+		creator,
+		mint,
+		creationSignature,
+		options,
+	)
+}
+
 func (t *koscheiActorRecipientTransport) Transaction(ctx context.Context, signature string) (map[string]any, error) {
 	var out map[string]any
 	err := t.h.callSolanaRPC(ctx, t.client, t.rpcURL, t.network, "getTransaction", []any{

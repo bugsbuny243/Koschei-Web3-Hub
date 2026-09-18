@@ -77,9 +77,10 @@ func (h *Handler) persistCanonicalCreatorMintRelation(ctx context.Context, store
 
 	source := core.SourceContext
 	signature := strings.TrimSpace(firstNonEmptyString(
-		creatorIntelCleanString(source["signature"]),
 		creatorIntelCleanString(source["creation_signature"]),
 		creatorIntelCleanString(source["launch_signature"]),
+		creatorIntelCleanString(source["first_mint_signature"]),
+		creatorIntelCleanString(source["signature"]),
 	))
 	slot := creatorIntelInt64(source["slot"])
 	observedAt := time.Now().UTC()
@@ -159,8 +160,12 @@ func (h *Handler) persistCanonicalCreatorMintRelation(ctx context.Context, store
 		},
 	}
 	out.Evidence = item
+	creationSignature := ""
+	if verificationStatus == "verified" {
+		creationSignature = signature
+	}
 	out.Target = services.ActorDistributionTarget{
-		CreatorWallet: creator, Mint: mint, CreationSignature: signature,
+		CreatorWallet: creator, Mint: mint, CreationSignature: creationSignature,
 		VerificationStatus: verificationStatus, FirstObservedAt: observedAt, LastObservedAt: observedAt,
 	}
 	out.Persistence = "persisted"
@@ -213,12 +218,17 @@ func (h *Handler) collectCanonicalActorDistribution(ctx context.Context, store *
 		return out
 	}
 	out.Target = target
-	out.Report = services.InvestigateActorInitialRecipients(
+	if !strings.EqualFold(strings.TrimSpace(target.VerificationStatus), "verified") || strings.TrimSpace(target.CreationSignature) == "" {
+		out.Status = "creator_mint_relation_observed_only"
+		out.Limitations = append(out.Limitations, "Creator → mint ilişkisi VERIFIED creation transaction kanıtı taşımadığı için derived recipient evidence üretilmedi.")
+		return out
+	}
+	out.Report = h.investigateActorInitialRecipients(
 		distributionCtx,
-		creatorIntelRPCURL(),
 		target.CreatorWallet,
 		target.Mint,
 		target.CreationSignature,
+		network,
 		services.ActorInitialRecipientOptions{
 			MaxRecipients:        actorDefenseEnvInt("ACTOR_RECIPIENT_LIMIT", 20, 1, 20),
 			SignaturePageSize:    actorDefenseEnvInt("ACTOR_RECIPIENT_SIGNATURE_PAGE_SIZE", 250, 50, 1000),
