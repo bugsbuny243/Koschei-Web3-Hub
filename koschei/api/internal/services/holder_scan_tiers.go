@@ -355,6 +355,37 @@ func holderClusterWorkerCount(candidateCount int) int {
 	return workers
 }
 
+func holderClusterParallelScanAllowed(plans []holderScanPlan, rpcBudget int) bool {
+	if len(plans) <= 1 || rpcBudget <= 0 || heliusEnhancedHistoryEnabled() {
+		return false
+	}
+	required := 0
+	for _, plan := range plans {
+		if plan.BudgetDegraded {
+			return false
+		}
+		required += 1 + plan.TransactionLimit
+		if required > rpcBudget {
+			return false
+		}
+	}
+	return true
+}
+
+func holderClusterScanCandidatesSequential(ctx context.Context, candidates []HolderRoleAccount, plans []holderScanPlan, scan holderClusterWalletScanFunc) ([]HolderClusterWallet, bool) {
+	if len(candidates) == 0 || len(plans) != len(candidates) || scan == nil {
+		return []HolderClusterWallet{}, false
+	}
+	out := make([]HolderClusterWallet, 0, len(candidates))
+	for index, account := range candidates {
+		if ctx.Err() != nil {
+			return out, true
+		}
+		out = append(out, scan(ctx, account, plans[index]))
+	}
+	return out, false
+}
+
 // holderClusterScanCandidatesConcurrent keeps holder evidence collection bounded
 // while allowing independent wallets to use the request window in parallel.
 // Results are materialized in candidate order so downstream scoring remains
