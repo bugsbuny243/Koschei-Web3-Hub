@@ -339,5 +339,65 @@ func holderClusterTransactionIndexesForLimit(signatures []SolanaSignatureInfo, l
 	return indexes
 }
 
+type holderClusterWalletScanFunc func(context.Context, HolderRoleAccount, holderScanPlan) HolderClusterWallet
+
+// holderClusterScanCandidatesConcurrent keeps holder evidence collection bounded
+// while allowing independent wallets to use the request window in parallel.
+// Results are materialized in candidate order so downstream scoring remains
+// deterministic. The shared provider budget is already mutex-protected.
+func holderClusterScanCandidatesConcurrent(ctx context.Context, candidates []HolderRoleAccount, plans []holderScanPlan, scan holderClusterWalletScanFunc) ([]HolderClusterWallet, bool) {
+	if len(candidates) == 0 || len(plans) != len(candidates) || scan == nil {
+		return []HolderClusterWallet{}, false
+	}
+	workerCount := holderDeepConcurrencyMax
+	if workerCount > len(candidates) {
+		workerCount = len(candidates)
+	}
+	if workerCount < 1 {
+		workerCount = 1
+	}
+
+	rows := make([]HolderClusterWallet, len(candidates))
+	completed := make([]bool, len(candidates))
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	for worker := 0; worker < workerCount; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for index := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
+				rows[index] = scan(ctx, candidates[index], plans[index])
+				completed[index] = true
+			}
+		}()
+	}
+
+	stopped := false
+sendLoop:
+	for index := range candidates {
+		select {
+		case <-ctx.Done():
+			stopped = true
+			break sendLoop
+		case jobs <- index:
+		}
+	}
+	close(jobs)
+	wg.Wait()
+
+	out := make([]HolderClusterWallet, 0, len(candidates))
+	for index := range rows {
+		if completed[index] {
+			out = append(out, rows[index])
+		}
+	}
+	if len(out) < len(candidates) && ctx.Err() != nil {
+		stopped = true
+	}
+	return out, stopped
+}
+
 var _ = time.RFC3339
-var _ = holderDeepConcurrencyMax
