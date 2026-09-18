@@ -80,7 +80,6 @@ func TestVerifyCanonicalCreatorRelationRejectsWrongMint(t *testing.T) {
 	}
 }
 
-
 func TestVerifyCanonicalCreatorRelationCandidatesRecoversFromRejectedFirstSignature(t *testing.T) {
 	const mint = "MintCandidate111"
 	const creator = "CreatorCandidate111"
