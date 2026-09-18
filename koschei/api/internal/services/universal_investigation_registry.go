@@ -66,7 +66,7 @@ func UniversalInvestigationAdapterProfiles() []UniversalInvestigationAdapterProf
 		{
 			ID: "evm-account-model", Domain: "web3", ChainFamily: IntelligenceChainFamilyEVM,
 			Status: UniversalAdapterProbe, NetworkScope: "eip155_family",
-			Networks: []string{"ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet"},
+			Networks: []string{"ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet"},
 			TargetKinds: []string{
 				IntelligenceSubjectAddress, IntelligenceSubjectToken, IntelligenceSubjectContract,
 				IntelligenceSubjectTransaction, IntelligenceSubjectBlock, IntelligenceSubjectBridge,
