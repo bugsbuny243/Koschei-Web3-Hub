@@ -33,6 +33,47 @@ func launchATAFairShareBudgets(total, owners int) []int {
 	return out
 }
 
+func runLaunchATARankedWorkerPool(ctx context.Context, total, workers int, work func(index int)) {
+	if total <= 0 || work == nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > total {
+		workers = total
+	}
+
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for index := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
+				work(index)
+			}
+		}()
+	}
+
+sendLoop:
+	for index := 0; index < total; index++ {
+		select {
+		case <-ctx.Done():
+			break sendLoop
+		case jobs <- index:
+		}
+	}
+	close(jobs)
+	wg.Wait()
+}
+
 func analyzeLaunchForensicsATA(ctx context.Context, rpcURL, mint string, candidates []launchOwnerCandidate, launchTime time.Time, launchSlot int64, cfg launchForensicsConfig, budget *holderScanRPCBudget) []LaunchActorProfile {
 	if len(candidates) == 0 {
 		return nil
@@ -43,53 +84,27 @@ func analyzeLaunchForensicsATA(ctx context.Context, rpcURL, mint string, candida
 	}
 	ownerBudgets := launchATAFairShareBudgets(totalBudget, len(candidates))
 	profiles := make([]LaunchActorProfile, len(candidates))
-	analyzeRange := func(start, end int) {
-		sem := make(chan struct{}, launchATAConcurrency)
-		var wg sync.WaitGroup
-		for i := start; i < end; i++ {
-			if ctx.Err() != nil {
-				break
+	runLaunchATARankedWorkerPool(ctx, len(candidates), launchATAConcurrency, func(index int) {
+		quota := ownerBudgets[index]
+		if quota <= 0 {
+			profiles[index] = LaunchActorProfile{
+				OwnerWallet: candidates[index].OwnerWallet, TokenAccounts: append([]string{}, candidates[index].TokenAccounts...),
+				Label: "HISTORY_NOT_CAPTURED", FundingStatus: "not_checked", Source: "ata_history",
+				Evidence: []string{"Launch ATA fair-share RPC budget did not allocate a call to this owner; missing history is not treated as safe evidence."},
 			}
-			wg.Add(1)
-			go func(index int) {
-				defer wg.Done()
-				select {
-				case sem <- struct{}{}:
-					defer func() { <-sem }()
-				case <-ctx.Done():
-					return
-				}
-				quota := ownerBudgets[index]
-				if quota <= 0 {
-					profiles[index] = LaunchActorProfile{
-						OwnerWallet: candidates[index].OwnerWallet, TokenAccounts: append([]string{}, candidates[index].TokenAccounts...),
-						Label: "HISTORY_NOT_CAPTURED", FundingStatus: "not_checked", Source: "ata_history",
-						Evidence: []string{"Launch ATA fair-share RPC budget did not allocate a call to this owner; missing history is not treated as safe evidence."},
-					}
-					return
-				}
-				localBudget := newHolderScanRPCBudget(quota)
-				profile := analyzeLaunchOwnerATA(ctx, rpcURL, mint, candidates[index], launchTime, launchSlot, cfg, localBudget)
-				used := localBudget.Used()
-				if budget != nil && used > 0 {
-					if !budget.Reserve(used) {
-						profile.Evidence = append(profile.Evidence, "Launch ATA fair-share accounting rejected local RPC usage; evidence was preserved but the scan remains bounded.")
-					}
-				}
-				profile.Evidence = append(profile.Evidence, fmt.Sprintf("Launch ATA fair-share quota: %d RPC calls allocated; %d used.", quota, used))
-				profiles[index] = profile
-			}(i)
+			return
 		}
-		wg.Wait()
-	}
-	priorityEnd := len(candidates)
-	if priorityEnd > 10 {
-		priorityEnd = 10
-	}
-	analyzeRange(0, priorityEnd)
-	if priorityEnd < len(candidates) && ctx.Err() == nil {
-		analyzeRange(priorityEnd, len(candidates))
-	}
+		localBudget := newHolderScanRPCBudget(quota)
+		profile := analyzeLaunchOwnerATA(ctx, rpcURL, mint, candidates[index], launchTime, launchSlot, cfg, localBudget)
+		used := localBudget.Used()
+		if budget != nil && used > 0 {
+			if !budget.Reserve(used) {
+				profile.Evidence = append(profile.Evidence, "Launch ATA fair-share accounting rejected local RPC usage; evidence was preserved but the scan remains bounded.")
+			}
+		}
+		profile.Evidence = append(profile.Evidence, fmt.Sprintf("Launch ATA fair-share quota: %d RPC calls allocated; %d used.", quota, used))
+		profiles[index] = profile
+	})
 	out := make([]LaunchActorProfile, 0, len(profiles))
 	for i, profile := range profiles {
 		if strings.TrimSpace(profile.OwnerWallet) == "" {
