@@ -32,8 +32,8 @@ func TestWriteProviderSafeJSONPreservesLargeValidJSON(t *testing.T) {
 	const value = "testvalue123"
 	recorder := httptest.NewRecorder()
 	writeProviderSafeJSON(recorder, http.StatusOK, map[string]any{
-		"ok":    true,
-		"large": strings.Repeat("evidence-", 80),
+		"ok":     true,
+		"large":  strings.Repeat("evidence-", 80),
 		"nested": map[string]any{
 			"error": `Post "https://mainnet.helius-rpc.com/?api-key=` + value + `": provider cooling down`,
 		},
