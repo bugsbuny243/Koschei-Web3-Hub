@@ -68,6 +68,7 @@ type HolderClusterAnalysis struct {
 	Verdict                   string                    `json:"verdict"`
 	WalletsRequested          int                       `json:"wallets_requested"`
 	WalletsAnalyzed           int                       `json:"wallets_analyzed"`
+	ConcurrentWorkers         int                       `json:"concurrent_workers"`
 	DeepOwnersScanned         int                       `json:"deep_owners_scanned"`
 	ShallowOwnersScanned      int                       `json:"shallow_owners_scanned"`
 	DeepSignatureLimit        int                       `json:"deep_signature_limit"`
@@ -121,6 +122,7 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 	out.ShallowTransactionLimit = cfg.ShallowTransactionLimit
 	out.RPCBudget = cfg.RPCBudget
 	out.WalletsRequested = len(candidates)
+	out.ConcurrentWorkers = holderClusterWorkerCount(len(candidates))
 	candidateWallets := map[string]bool{}
 	for _, candidate := range candidates {
 		candidateWallets[candidate.OwnerWallet] = true
