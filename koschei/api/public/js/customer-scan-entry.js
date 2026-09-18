@@ -4,7 +4,9 @@
 const networks=Object.freeze([
   ['solana-mainnet','Solana','solana'],['ethereum-mainnet','Ethereum','evm'],
   ['base-mainnet','Base','evm'],['arbitrum-mainnet','Arbitrum','evm'],
-  ['optimism-mainnet','Optimism','evm'],['bitcoin-mainnet','Bitcoin','bitcoin']
+  ['optimism-mainnet','Optimism','evm'],['polygon-mainnet','Polygon','evm'],
+  ['bnb-mainnet','BNB Smart Chain','evm'],['avalanche-mainnet','Avalanche C-Chain','evm'],
+  ['bitcoin-mainnet','Bitcoin','bitcoin']
 ]);
 function classify(value){
   const target=String(value||'').trim();
