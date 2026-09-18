@@ -32,7 +32,7 @@ func TestWriteProviderSafeJSONDoesNotTruncateLargePayload(t *testing.T) {
 	const value = "testvalue123"
 	recorder := httptest.NewRecorder()
 	writeProviderSafeJSON(recorder, http.StatusOK, map[string]any{
-		"summary": strings.Repeat("x", 600),
+		"summary":        strings.Repeat("x", 600),
 		"provider_error": "https://rpc.example.test/?api_key=" + value + "&network=mainnet",
 	})
 
