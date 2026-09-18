@@ -41,22 +41,22 @@ type ActorInitialRecipient struct {
 }
 
 type ActorInitialRecipientReport struct {
-	Mint                    string                  `json:"mint"`
-	CreatorWallet           string                  `json:"creator_wallet"`
-	CreationSignature       string                  `json:"creation_signature,omitempty"`
-	Status                  string                  `json:"status"`
-	DistributionScope       string                  `json:"distribution_scope"`
-	HistoryComplete         bool                    `json:"history_complete"`
+	Mint                       string                  `json:"mint"`
+	CreatorWallet              string                  `json:"creator_wallet"`
+	CreationSignature          string                  `json:"creation_signature,omitempty"`
+	Status                     string                  `json:"status"`
+	DistributionScope          string                  `json:"distribution_scope"`
+	HistoryComplete            bool                    `json:"history_complete"`
 	SourceTokenAccounts        []string                `json:"source_token_accounts"`
 	DerivedSourceTokenAccounts []string                `json:"derived_source_token_accounts,omitempty"`
 	SourceTokenAccountBasis    string                  `json:"source_token_account_basis,omitempty"`
 	Recipients                 []ActorInitialRecipient `json:"recipients"`
-	SignaturesScanned       int                     `json:"signatures_scanned"`
-	TransactionsParsed      int                     `json:"transactions_parsed"`
-	RecipientBalanceQueries int                     `json:"recipient_balance_queries"`
-	TopHolderStatus         string                  `json:"top_holder_status"`
-	Limitations             []string                `json:"limitations"`
-	GeneratedAt             time.Time               `json:"generated_at"`
+	SignaturesScanned          int                     `json:"signatures_scanned"`
+	TransactionsParsed         int                     `json:"transactions_parsed"`
+	RecipientBalanceQueries    int                     `json:"recipient_balance_queries"`
+	TopHolderStatus            string                  `json:"top_holder_status"`
+	Limitations                []string                `json:"limitations"`
+	GeneratedAt                time.Time               `json:"generated_at"`
 }
 
 type actorRecipientTransfer struct {
