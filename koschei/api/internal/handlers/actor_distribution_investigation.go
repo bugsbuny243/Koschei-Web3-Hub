@@ -54,7 +54,7 @@ func (h *Handler) OwnerActorDistributionInvestigation(w http.ResponseWriter, r *
 		return
 	}
 
-	report := services.InvestigateActorInitialRecipients(ctx, creatorIntelRPCURL(), target.CreatorWallet, target.Mint, target.CreationSignature, services.ActorInitialRecipientOptions{
+	report := h.investigateActorInitialRecipients(ctx, target.CreatorWallet, target.Mint, target.CreationSignature, network, services.ActorInitialRecipientOptions{
 		MaxRecipients:        actorDefenseEnvInt("ACTOR_RECIPIENT_LIMIT", 20, 1, 20),
 		SignaturePageSize:    actorDefenseEnvInt("ACTOR_RECIPIENT_SIGNATURE_PAGE_SIZE", 250, 50, 1000),
 		MaxPagesPerTokenATA:  actorDefenseEnvInt("ACTOR_RECIPIENT_MAX_PAGES_PER_ATA", 8, 1, 20),
