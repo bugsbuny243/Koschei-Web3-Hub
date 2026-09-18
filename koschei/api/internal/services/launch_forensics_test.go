@@ -183,3 +183,93 @@ func TestLaunchATARankedWorkerPoolStartsRankTenBeforeRankNineCompletes(t *testin
 		t.Fatal("ranked worker pool did not finish")
 	}
 }
+
+func TestCollectLaunchATASignaturesRoundRobinAlternatesAccountsByPage(t *testing.T) {
+	budget := newHolderScanRPCBudget(6)
+	calls := []string{}
+	pageByAccount := map[string]int{}
+
+	signatures, exhausted, limitations := collectLaunchATASignaturesRoundRobin(
+		context.Background(),
+		[]string{"ata-1", "ata-2"},
+		2,
+		1,
+		budget,
+		func(_ context.Context, address string, _ int, before string) ([]SolanaSignatureInfo, error) {
+			calls = append(calls, address)
+			pageByAccount[address]++
+			return []SolanaSignatureInfo{{
+				Signature: address + "-sig-" + before + string(rune('0'+pageByAccount[address])),
+				Slot:      int64(pageByAccount[address]),
+			}}, nil
+		},
+	)
+
+	want := []string{"ata-1", "ata-2", "ata-1", "ata-2"}
+	if len(calls) != len(want) {
+		t.Fatalf("call order=%v want=%v", calls, want)
+	}
+	for index := range want {
+		if calls[index] != want[index] {
+			t.Fatalf("call[%d]=%q want=%q all=%v", index, calls[index], want[index], calls)
+		}
+	}
+	if exhausted {
+		t.Fatal("hitting max pages with full pages must remain bounded, not claim exhausted history")
+	}
+	if len(signatures) != 4 {
+		t.Fatalf("signatures=%d want=4", len(signatures))
+	}
+	if budget.Remaining() != launchATAMinTransactionReserve {
+		t.Fatalf("remaining budget=%d want=%d", budget.Remaining(), launchATAMinTransactionReserve)
+	}
+	if len(limitations) != 0 {
+		t.Fatalf("unexpected limitations: %v", limitations)
+	}
+}
+
+func TestCollectLaunchATASignaturesRoundRobinCoversBothFirstPagesBeforeParseReserve(t *testing.T) {
+	budget := newHolderScanRPCBudget(4)
+	calls := []string{}
+
+	signatures, exhausted, limitations := collectLaunchATASignaturesRoundRobin(
+		context.Background(),
+		[]string{"ata-1", "ata-2"},
+		3,
+		1,
+		budget,
+		func(_ context.Context, address string, _ int, _ string) ([]SolanaSignatureInfo, error) {
+			calls = append(calls, address)
+			return []SolanaSignatureInfo{{Signature: address + "-sig", Slot: 1}}, nil
+		},
+	)
+
+	want := []string{"ata-1", "ata-2"}
+	if len(calls) != len(want) {
+		t.Fatalf("first-page coverage order=%v want=%v", calls, want)
+	}
+	for index := range want {
+		if calls[index] != want[index] {
+			t.Fatalf("call[%d]=%q want=%q all=%v", index, calls[index], want[index], calls)
+		}
+	}
+	if exhausted {
+		t.Fatal("budget-bounded round robin must not claim exhausted history")
+	}
+	if len(signatures) != 2 {
+		t.Fatalf("signatures=%d want=2", len(signatures))
+	}
+	if budget.Remaining() != launchATAMinTransactionReserve {
+		t.Fatalf("remaining budget=%d want=%d", budget.Remaining(), launchATAMinTransactionReserve)
+	}
+	foundReserve := false
+	for _, limitation := range limitations {
+		if strings.Contains(limitation, "parsed transaction verification") {
+			foundReserve = true
+			break
+		}
+	}
+	if !foundReserve {
+		t.Fatalf("missing parse-reserve limitation: %v", limitations)
+	}
+}
