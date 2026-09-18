@@ -64,6 +64,12 @@ func ExpectedEVMChainID(networkID string) (string, bool) {
 		return "0xa4b1", true
 	case "optimism-mainnet":
 		return "0xa", true
+	case "polygon-mainnet":
+		return "0x89", true
+	case "bnb-mainnet":
+		return "0x38", true
+	case "avalanche-mainnet":
+		return "0xa86a", true
 	default:
 		return "", false
 	}
