@@ -33,7 +33,7 @@ func InvestigateActorInitialRecipientsWithTransport(ctx context.Context, transpo
 	result := ActorInitialRecipientReport{
 		Mint: mint, CreatorWallet: creator, CreationSignature: creationSignature,
 		Status: "not_investigated", DistributionScope: "not_investigated",
-		SourceTokenAccounts: []string{}, Recipients: []ActorInitialRecipient{},
+		SourceTokenAccounts: []string{}, DerivedSourceTokenAccounts: []string{}, SourceTokenAccountBasis: "observed_creation_or_current_owner", Recipients: []ActorInitialRecipient{},
 		TopHolderStatus: "not_investigated", Limitations: []string{}, GeneratedAt: time.Now().UTC(),
 	}
 	if transport == nil {
@@ -67,6 +67,34 @@ func InvestigateActorInitialRecipientsWithTransport(ctx context.Context, transpo
 	} else {
 		result.Limitations = append(result.Limitations, "Creator mint-specific token accounts could not be read: "+compactActorFundingError(err))
 	}
+
+	derivedOnly := len(sourceAccounts) == 0
+	if derivedOnly {
+		mintProgram, mintProgramVerified := actorRecipientMintTokenProgram(ctx, transport, mint)
+		candidates, err := SolanaAssociatedTokenAddressCandidates(creator, mint, mintProgram)
+		if err != nil {
+			result.Limitations = append(result.Limitations, "Deterministic creator ATA derivation failed: "+compactActorFundingError(err))
+		} else {
+			for _, candidate := range candidates {
+				address := strings.TrimSpace(candidate.Address)
+				if address == "" {
+					continue
+				}
+				sourceAccounts[address] = true
+				result.DerivedSourceTokenAccounts = append(result.DerivedSourceTokenAccounts, address)
+			}
+			sort.Strings(result.DerivedSourceTokenAccounts)
+			if len(result.DerivedSourceTokenAccounts) > 0 {
+				result.SourceTokenAccountBasis = "deterministic_ata_fallback"
+				if mintProgramVerified {
+					result.Limitations = append(result.Limitations, "No creator token account was observed in the creation/current-account reads; canonical ATA history was derived from the verified mint token program and scanned instead.")
+				} else {
+					result.Limitations = append(result.Limitations, "No creator token account was observed in the creation/current-account reads; canonical ATA candidates for SPL Token and Token-2022 were scanned. Non-ATA creator token accounts remain outside this fallback.")
+				}
+			}
+		}
+	}
+
 	for address := range sourceAccounts {
 		result.SourceTokenAccounts = append(result.SourceTokenAccounts, address)
 	}
@@ -74,7 +102,7 @@ func InvestigateActorInitialRecipientsWithTransport(ctx context.Context, transpo
 	if len(result.SourceTokenAccounts) == 0 {
 		result.Status = "creator_token_accounts_not_observed"
 		result.DistributionScope = "not_investigated"
-		result.Limitations = append(result.Limitations, "No creator-owned mint-specific token account was observed in the creation transaction or current owner query.")
+		result.Limitations = append(result.Limitations, "No creator-owned mint-specific token account was observed and no deterministic ATA candidate could be derived.")
 		return result
 	}
 
@@ -109,10 +137,14 @@ func InvestigateActorInitialRecipientsWithTransport(ctx context.Context, transpo
 			complete = false
 		}
 	}
-	result.HistoryComplete = complete
-	if complete {
+	result.HistoryComplete = complete && !derivedOnly
+	switch {
+	case derivedOnly:
+		result.DistributionScope = "bounded_deterministic_creator_ata_history"
+		result.Limitations = append(result.Limitations, "Deterministic ATA fallback does not prove that the creator never used another mint-specific non-ATA token account; discovered transfers remain recipient-in-window evidence.")
+	case complete:
 		result.DistributionScope = "complete_creator_token_account_history"
-	} else {
+	default:
 		result.DistributionScope = "bounded_creator_token_account_history"
 		result.Limitations = append(result.Limitations, "ATA history did not reach its end; discovered transfers are recipient-in-window evidence, not asserted initial recipients.")
 	}
@@ -213,12 +245,28 @@ func InvestigateActorInitialRecipientsWithTransport(ctx context.Context, transpo
 	switch {
 	case len(result.Recipients) == 0:
 		result.Status = "no_creator_distribution_observed"
-	case complete:
+	case result.HistoryComplete:
 		result.Status = "initial_recipients_resolved"
 	default:
 		result.Status = "recipient_window_resolved"
 	}
 	return result
+}
+
+func actorRecipientMintTokenProgram(ctx context.Context, transport ActorInitialRecipientTransport, mint string) (string, bool) {
+	if transport == nil || strings.TrimSpace(mint) == "" {
+		return "", false
+	}
+	accounts, err := transport.MultipleAccounts(ctx, []string{strings.TrimSpace(mint)})
+	if err != nil || len(accounts.Value) == 0 || accounts.Value[0] == nil {
+		return "", false
+	}
+	switch owner := strings.TrimSpace(accounts.Value[0].Owner); owner {
+	case SolanaSPLTokenProgramID, SolanaToken2022ProgramID:
+		return owner, true
+	default:
+		return "", false
+	}
 }
 
 func actorRecipientTopHoldersWithTransport(ctx context.Context, transport ActorInitialRecipientTransport, mint string) (map[string]actorRecipientTopHolder, string) {
