@@ -213,12 +213,12 @@ func (h *Handler) collectCanonicalActorDistribution(ctx context.Context, store *
 		return out
 	}
 	out.Target = target
-	out.Report = services.InvestigateActorInitialRecipients(
+	out.Report = h.investigateActorInitialRecipients(
 		distributionCtx,
-		creatorIntelRPCURL(),
 		target.CreatorWallet,
 		target.Mint,
 		target.CreationSignature,
+		network,
 		services.ActorInitialRecipientOptions{
 			MaxRecipients:        actorDefenseEnvInt("ACTOR_RECIPIENT_LIMIT", 20, 1, 20),
 			SignaturePageSize:    actorDefenseEnvInt("ACTOR_RECIPIENT_SIGNATURE_PAGE_SIZE", 250, 50, 1000),
