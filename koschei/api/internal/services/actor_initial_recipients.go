@@ -41,20 +41,22 @@ type ActorInitialRecipient struct {
 }
 
 type ActorInitialRecipientReport struct {
-	Mint                    string                  `json:"mint"`
-	CreatorWallet           string                  `json:"creator_wallet"`
-	CreationSignature       string                  `json:"creation_signature,omitempty"`
-	Status                  string                  `json:"status"`
-	DistributionScope       string                  `json:"distribution_scope"`
-	HistoryComplete         bool                    `json:"history_complete"`
-	SourceTokenAccounts     []string                `json:"source_token_accounts"`
-	Recipients              []ActorInitialRecipient `json:"recipients"`
-	SignaturesScanned       int                     `json:"signatures_scanned"`
-	TransactionsParsed      int                     `json:"transactions_parsed"`
-	RecipientBalanceQueries int                     `json:"recipient_balance_queries"`
-	TopHolderStatus         string                  `json:"top_holder_status"`
-	Limitations             []string                `json:"limitations"`
-	GeneratedAt             time.Time               `json:"generated_at"`
+	Mint                       string                  `json:"mint"`
+	CreatorWallet              string                  `json:"creator_wallet"`
+	CreationSignature          string                  `json:"creation_signature,omitempty"`
+	Status                     string                  `json:"status"`
+	DistributionScope          string                  `json:"distribution_scope"`
+	HistoryComplete            bool                    `json:"history_complete"`
+	SourceTokenAccounts        []string                `json:"source_token_accounts"`
+	DerivedSourceTokenAccounts []string                `json:"derived_source_token_accounts,omitempty"`
+	SourceTokenAccountBasis    string                  `json:"source_token_account_basis,omitempty"`
+	Recipients                 []ActorInitialRecipient `json:"recipients"`
+	SignaturesScanned          int                     `json:"signatures_scanned"`
+	TransactionsParsed         int                     `json:"transactions_parsed"`
+	RecipientBalanceQueries    int                     `json:"recipient_balance_queries"`
+	TopHolderStatus            string                  `json:"top_holder_status"`
+	Limitations                []string                `json:"limitations"`
+	GeneratedAt                time.Time               `json:"generated_at"`
 }
 
 type actorRecipientTransfer struct {
@@ -84,7 +86,7 @@ func InvestigateActorInitialRecipients(ctx context.Context, rpcURL, creator, min
 	result := ActorInitialRecipientReport{
 		Mint: mint, CreatorWallet: creator, CreationSignature: creationSignature,
 		Status: "not_investigated", DistributionScope: "not_investigated",
-		SourceTokenAccounts: []string{}, Recipients: []ActorInitialRecipient{},
+		SourceTokenAccounts: []string{}, DerivedSourceTokenAccounts: []string{}, SourceTokenAccountBasis: "observed_creation_or_current_owner", Recipients: []ActorInitialRecipient{},
 		TopHolderStatus: "not_investigated", Limitations: []string{}, GeneratedAt: time.Now().UTC(),
 	}
 	if strings.TrimSpace(rpcURL) == "" {
@@ -118,6 +120,42 @@ func InvestigateActorInitialRecipients(ctx context.Context, rpcURL, creator, min
 	} else {
 		result.Limitations = append(result.Limitations, "Creator'ın mevcut mint-spesifik token hesapları alınamadı: "+compactActorFundingError(err))
 	}
+
+	derivedOnly := len(sourceAccounts) == 0
+	if derivedOnly {
+		mintProgram := ""
+		mintProgramVerified := false
+		if accounts, err := SolanaGetMultipleAccountsJSONParsed(ctx, rpcURL, []string{mint}); err == nil && len(accounts.Value) > 0 && accounts.Value[0] != nil {
+			switch owner := strings.TrimSpace(accounts.Value[0].Owner); owner {
+			case SolanaSPLTokenProgramID, SolanaToken2022ProgramID:
+				mintProgram = owner
+				mintProgramVerified = true
+			}
+		}
+		candidates, err := SolanaAssociatedTokenAddressCandidates(creator, mint, mintProgram)
+		if err != nil {
+			result.Limitations = append(result.Limitations, "Deterministic creator ATA derivation failed: "+compactActorFundingError(err))
+		} else {
+			for _, candidate := range candidates {
+				address := strings.TrimSpace(candidate.Address)
+				if address == "" {
+					continue
+				}
+				sourceAccounts[address] = true
+				result.DerivedSourceTokenAccounts = append(result.DerivedSourceTokenAccounts, address)
+			}
+			sort.Strings(result.DerivedSourceTokenAccounts)
+			if len(result.DerivedSourceTokenAccounts) > 0 {
+				result.SourceTokenAccountBasis = "deterministic_ata_fallback"
+				if mintProgramVerified {
+					result.Limitations = append(result.Limitations, "Creation/current-account reads did not expose a creator token account; the canonical ATA for the verified mint token program was scanned instead.")
+				} else {
+					result.Limitations = append(result.Limitations, "Creation/current-account reads did not expose a creator token account; SPL Token and Token-2022 canonical ATA candidates were scanned. Non-ATA creator token accounts remain outside this fallback.")
+				}
+			}
+		}
+	}
+
 	for address := range sourceAccounts {
 		result.SourceTokenAccounts = append(result.SourceTokenAccounts, address)
 	}
@@ -125,7 +163,7 @@ func InvestigateActorInitialRecipients(ctx context.Context, rpcURL, creator, min
 	if len(result.SourceTokenAccounts) == 0 {
 		result.Status = "creator_token_accounts_not_observed"
 		result.DistributionScope = "not_investigated"
-		result.Limitations = append(result.Limitations, "Creation transaction veya mevcut owner query içinde creator'a ait mint-spesifik token hesabı gözlemlenmedi.")
+		result.Limitations = append(result.Limitations, "Creator-owned mint-specific token account was not observed and no deterministic ATA candidate could be derived.")
 		return result
 	}
 
@@ -160,10 +198,14 @@ func InvestigateActorInitialRecipients(ctx context.Context, rpcURL, creator, min
 			complete = false
 		}
 	}
-	result.HistoryComplete = complete
-	if complete {
+	result.HistoryComplete = complete && !derivedOnly
+	switch {
+	case derivedOnly:
+		result.DistributionScope = "bounded_deterministic_creator_ata_history"
+		result.Limitations = append(result.Limitations, "Deterministic ATA fallback does not prove that the creator never used another mint-specific non-ATA token account; discovered transfers remain recipient-in-window evidence.")
+	case complete:
 		result.DistributionScope = "complete_creator_token_account_history"
-	} else {
+	default:
 		result.DistributionScope = "bounded_creator_token_account_history"
 		result.Limitations = append(result.Limitations, "ATA geçmişi sona ulaşmadığı için bulunan transferler 'initial' olarak değil, taranan penceredeki creator recipient'ları olarak adlandırılır.")
 	}
@@ -273,7 +315,7 @@ func InvestigateActorInitialRecipients(ctx context.Context, rpcURL, creator, min
 	switch {
 	case len(result.Recipients) == 0:
 		result.Status = "no_creator_distribution_observed"
-	case complete:
+	case result.HistoryComplete:
 		result.Status = "initial_recipients_resolved"
 	default:
 		result.Status = "recipient_window_resolved"

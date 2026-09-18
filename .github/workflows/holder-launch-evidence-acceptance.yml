@@ -13,6 +13,10 @@ on:
       - "koschei/api/internal/handlers/creator_relation_canonical_verification_test.go"
       - "koschei/api/internal/handlers/creator_source_context_resolution.go"
       - "koschei/api/internal/services/actor_distribution_target.go"
+      - "koschei/api/internal/services/actor_initial_recipients.go"
+      - "koschei/api/internal/services/actor_initial_recipient_transport.go"
+      - "koschei/api/internal/services/actor_initial_recipient_ata_fallback_test.go"
+      - "koschei/api/internal/services/solana_associated_token_address.go"
       - "koschei/api/internal/handlers/actor_recipient_transport.go"
       - "koschei/api/internal/handlers/actor_recipient_transport_test.go"
       - "koschei/api/internal/handlers/actor_creator_radar_integration.go"
@@ -32,6 +36,10 @@ on:
       - "koschei/api/internal/handlers/creator_relation_canonical_verification_test.go"
       - "koschei/api/internal/handlers/creator_source_context_resolution.go"
       - "koschei/api/internal/services/actor_distribution_target.go"
+      - "koschei/api/internal/services/actor_initial_recipients.go"
+      - "koschei/api/internal/services/actor_initial_recipient_transport.go"
+      - "koschei/api/internal/services/actor_initial_recipient_ata_fallback_test.go"
+      - "koschei/api/internal/services/solana_associated_token_address.go"
       - "koschei/api/internal/handlers/actor_recipient_transport.go"
       - "koschei/api/internal/handlers/actor_recipient_transport_test.go"
       - "koschei/api/internal/handlers/actor_creator_radar_integration.go"
@@ -61,11 +69,11 @@ jobs:
           cache-dependency-path: koschei/api/go.sum
       - name: Download modules
         run: go mod download
-      - name: Run holder snapshot contract tests
+      - name: Run holder and ATA service contract tests
         run: |
           set -euo pipefail
           go test -v ./internal/services \
-            -run '^(TestAnalyzeSolanaHolderRolesSnapshotIsProviderNeutral|TestSolanaHolderOwnerAddressesPreservesExactCaseAndOrder|TestAnalyzeSolanaHolderRolesSnapshotFailsClosedWhenDominantOwnerMetadataMissing)$' \
+            -run '^(TestAnalyzeSolanaHolderRolesSnapshotIsProviderNeutral|TestSolanaHolderOwnerAddressesPreservesExactCaseAndOrder|TestAnalyzeSolanaHolderRolesSnapshotFailsClosedWhenDominantOwnerMetadataMissing|TestDeriveSolanaAssociatedTokenAddressIsDeterministicAndOffCurve|TestSolanaAssociatedTokenAddressCandidatesUseMintProgramWhenKnown|TestActorRecipientDerivedATAFallbackFindsHistoryWithoutPromotingInitialRecipient)$' \
             -count=1
       - name: Run RPC-managed holder and creator verification tests
         run: |
