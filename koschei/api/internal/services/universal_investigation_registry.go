@@ -47,132 +47,136 @@ type UniversalInvestigationAdapterProfile struct {
 	VerdictPolicy        string   `json:"verdict_policy"`
 }
 
+func universalInvestigationProfile(
+	id, domain, chainFamily, status, networkScope string,
+	networks, targetKinds, evidenceSources, trustAnchors []string,
+	verdictPolicy string,
+) UniversalInvestigationAdapterProfile {
+	return UniversalInvestigationAdapterProfile{
+		ID: id, Domain: domain, ChainFamily: chainFamily, Status: status, NetworkScope: networkScope,
+		Networks: networks, TargetKinds: targetKinds, EvidenceSources: evidenceSources,
+		RequiredTrustAnchors: trustAnchors, VerdictPolicy: verdictPolicy,
+	}
+}
+
 func UniversalInvestigationAdapterProfiles() []UniversalInvestigationAdapterProfile {
 	return []UniversalInvestigationAdapterProfile{
-		{
-			ID: "solana-account-model", Domain: "web3", ChainFamily: IntelligenceChainFamilySolana,
-			Status: UniversalAdapterLive, NetworkScope: "registered_networks",
-			Networks: []string{"solana-mainnet"},
-			TargetKinds: []string{
+		universalInvestigationProfile(
+			"solana-account-model", "web3", IntelligenceChainFamilySolana, UniversalAdapterLive, "registered_networks",
+			[]string{"solana-mainnet"},
+			[]string{
 				IntelligenceSubjectAddress, IntelligenceSubjectToken, IntelligenceSubjectProgram,
 				IntelligenceSubjectTransaction, IntelligenceSubjectBlock, IntelligenceSubjectValidator,
 				IntelligenceSubjectBridge, IntelligenceSubjectGovernance,
 			},
-			EvidenceSources: []string{"solana_jsonrpc", "parsed_transactions", "program_state", "actor_memory"},
-			RequiredTrustAnchors: []string{"genesis_or_network_identity", "slot", "signature", "program_id"},
-			VerdictPolicy: "Existing deterministic ARVIS rules may affect a signed verdict only when their required Solana evidence is VERIFIED.",
-		},
-		{
-			ID: "evm-account-model", Domain: "web3", ChainFamily: IntelligenceChainFamilyEVM,
-			Status: UniversalAdapterProbe, NetworkScope: "eip155_family",
-			Networks: []string{"ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet"},
-			TargetKinds: []string{
+			[]string{"solana_jsonrpc", "parsed_transactions", "program_state", "actor_memory"},
+			[]string{"genesis_or_network_identity", "slot", "signature", "program_id"},
+			"Existing deterministic ARVIS rules may affect a signed verdict only when their required Solana evidence is VERIFIED.",
+		),
+		universalInvestigationProfile(
+			"evm-account-model", "web3", IntelligenceChainFamilyEVM, UniversalAdapterProbe, "eip155_family",
+			[]string{"ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet"},
+			[]string{
 				IntelligenceSubjectAddress, IntelligenceSubjectToken, IntelligenceSubjectContract,
 				IntelligenceSubjectTransaction, IntelligenceSubjectBlock, IntelligenceSubjectBridge,
 				IntelligenceSubjectGovernance,
 			},
-			EvidenceSources: []string{"ethereum_jsonrpc", "contract_code", "storage", "logs", "receipts", "eip7702", "erc1967"},
-			RequiredTrustAnchors: []string{"eth_chainId", "block_hash_or_number", "transaction_hash", "contract_address"},
-			VerdictPolicy: "Current EVM probes remain evidence-only until chain-specific deterministic verdict rules are promoted.",
-		},
-		{
-			ID: "bitcoin-utxo-model", Domain: "web3", ChainFamily: IntelligenceChainFamilyUTXO,
-			Status: UniversalAdapterProbe, NetworkScope: "bitcoin_family",
-			Networks: []string{"bitcoin-mainnet"},
-			TargetKinds: []string{IntelligenceSubjectAddress, IntelligenceSubjectTransaction, IntelligenceSubjectBlock},
-			EvidenceSources: []string{"bitcoin_core_rpc_or_esplora", "utxo_set", "transaction_graph", "block_headers"},
-			RequiredTrustAnchors: []string{"genesis_hash", "block_hash", "transaction_id", "script_pubkey"},
-			VerdictPolicy: "UTXO observations remain evidence-only until deterministic UTXO behavior rules are promoted.",
-		},
-		{
-			ID: "move-object-model", Domain: "web3", ChainFamily: IntelligenceChainFamilyMove,
-			Status: UniversalAdapterPlanned, NetworkScope: "move_family",
-			Networks: []string{"sui-mainnet", "aptos-mainnet"},
-			TargetKinds: []string{
+			[]string{"ethereum_jsonrpc", "contract_code", "storage", "logs", "receipts", "eip7702", "erc1967"},
+			[]string{"eth_chainId", "block_hash_or_number", "transaction_hash", "contract_address"},
+			"Current EVM probes remain evidence-only until chain-specific deterministic verdict rules are promoted.",
+		),
+		universalInvestigationProfile(
+			"bitcoin-utxo-model", "web3", IntelligenceChainFamilyUTXO, UniversalAdapterProbe, "bitcoin_family",
+			[]string{"bitcoin-mainnet"},
+			[]string{IntelligenceSubjectAddress, IntelligenceSubjectTransaction, IntelligenceSubjectBlock},
+			[]string{"bitcoin_core_rpc_or_esplora", "utxo_set", "transaction_graph", "block_headers"},
+			[]string{"genesis_hash", "block_hash", "transaction_id", "script_pubkey"},
+			"UTXO observations remain evidence-only until deterministic UTXO behavior rules are promoted.",
+		),
+		universalInvestigationProfile(
+			"move-object-model", "web3", IntelligenceChainFamilyMove, UniversalAdapterPlanned, "move_family",
+			[]string{"sui-mainnet", "aptos-mainnet"},
+			[]string{
 				IntelligenceSubjectAddress, IntelligenceSubjectToken, IntelligenceSubjectContract,
 				IntelligenceSubjectTransaction, IntelligenceSubjectBlock, IntelligenceSubjectValidator,
 				IntelligenceSubjectGovernance,
 			},
-			EvidenceSources: []string{"sui_graphql_or_rpc", "aptos_rest", "objects_resources_modules", "events", "transactions"},
-			RequiredTrustAnchors: []string{"chain_identity", "checkpoint_or_ledger_version", "transaction_digest_or_hash", "object_or_resource_id"},
-			VerdictPolicy: "No Move-family claim may affect a verdict before a network adapter proves chain identity and canonical state/transaction evidence.",
-		},
-		{
-			ID: "cosmos-cometbft-model", Domain: "web3", ChainFamily: IntelligenceChainFamilyCosmos,
-			Status: UniversalAdapterPlanned, NetworkScope: "cosmos_sdk_cometbft_family",
-			Networks: []string{"cosmoshub-mainnet", "osmosis-mainnet"},
-			TargetKinds: []string{
+			[]string{"sui_graphql_or_rpc", "aptos_rest", "objects_resources_modules", "events", "transactions"},
+			[]string{"chain_identity", "checkpoint_or_ledger_version", "transaction_digest_or_hash", "object_or_resource_id"},
+			"No Move-family claim may affect a verdict before a network adapter proves chain identity and canonical state/transaction evidence.",
+		),
+		universalInvestigationProfile(
+			"cosmos-cometbft-model", "web3", IntelligenceChainFamilyCosmos, UniversalAdapterPlanned, "cosmos_sdk_cometbft_family",
+			[]string{"cosmoshub-mainnet", "osmosis-mainnet"},
+			[]string{
 				IntelligenceSubjectAddress, IntelligenceSubjectToken, IntelligenceSubjectContract,
 				IntelligenceSubjectTransaction, IntelligenceSubjectBlock, IntelligenceSubjectValidator,
 				IntelligenceSubjectBridge, IntelligenceSubjectGovernance,
 			},
-			EvidenceSources: []string{"cometbft_rpc", "cosmos_sdk_query", "abci_state", "events", "ibc"},
-			RequiredTrustAnchors: []string{"chain_id", "block_height_hash", "transaction_hash", "module_or_contract_id"},
-			VerdictPolicy: "IBC or cross-zone linkage must remain OBSERVED/UNVERIFIED until both source and destination evidence are independently anchored.",
-		},
-		{
-			ID: "substrate-runtime-model", Domain: "web3", ChainFamily: IntelligenceChainFamilySubstrate,
-			Status: UniversalAdapterPlanned, NetworkScope: "substrate_family",
-			Networks: []string{"polkadot-mainnet"},
-			TargetKinds: []string{
+			[]string{"cometbft_rpc", "cosmos_sdk_query", "abci_state", "events", "ibc"},
+			[]string{"chain_id", "block_height_hash", "transaction_hash", "module_or_contract_id"},
+			"IBC or cross-zone linkage must remain OBSERVED/UNVERIFIED until both source and destination evidence are independently anchored.",
+		),
+		universalInvestigationProfile(
+			"substrate-runtime-model", "web3", IntelligenceChainFamilySubstrate, UniversalAdapterPlanned, "substrate_family",
+			[]string{"polkadot-mainnet"},
+			[]string{
 				IntelligenceSubjectAddress, IntelligenceSubjectContract, IntelligenceSubjectTransaction,
 				IntelligenceSubjectBlock, IntelligenceSubjectValidator, IntelligenceSubjectBridge,
 				IntelligenceSubjectGovernance,
 			},
-			EvidenceSources: []string{"polkadot_jsonrpc", "runtime_metadata", "storage", "events", "extrinsics"},
-			RequiredTrustAnchors: []string{"chain_spec_or_genesis", "block_hash", "runtime_version", "extrinsic_or_event_reference"},
-			VerdictPolicy: "Runtime upgrades must be version-bound; metadata from one runtime must not be applied to another without compatibility proof.",
-		},
-		{
-			ID: "ton-account-message-model", Domain: "web3", ChainFamily: IntelligenceChainFamilyTON,
-			Status: UniversalAdapterPlanned, NetworkScope: "ton_family",
-			Networks: []string{"ton-mainnet"},
-			TargetKinds: []string{
+			[]string{"polkadot_jsonrpc", "runtime_metadata", "storage", "events", "extrinsics"},
+			[]string{"chain_spec_or_genesis", "block_hash", "runtime_version", "extrinsic_or_event_reference"},
+			"Runtime upgrades must be version-bound; metadata from one runtime must not be applied to another without compatibility proof.",
+		),
+		universalInvestigationProfile(
+			"ton-account-message-model", "web3", IntelligenceChainFamilyTON, UniversalAdapterPlanned, "ton_family",
+			[]string{"ton-mainnet"},
+			[]string{
 				IntelligenceSubjectAddress, IntelligenceSubjectToken, IntelligenceSubjectContract,
 				IntelligenceSubjectTransaction, IntelligenceSubjectBlock, IntelligenceSubjectValidator,
 				IntelligenceSubjectBridge,
 			},
-			EvidenceSources: []string{"ton_api", "account_state", "messages", "transactions", "shard_blocks"},
-			RequiredTrustAnchors: []string{"workchain", "account_id", "block_or_transaction_anchor", "message_hash"},
-			VerdictPolicy: "Message intent and transaction effect remain separate; a message alone is not proof that the requested state transition completed.",
-		},
-		{
-			ID: "near-account-wasm-model", Domain: "web3", ChainFamily: IntelligenceChainFamilyNEAR,
-			Status: UniversalAdapterPlanned, NetworkScope: "near_family",
-			Networks: []string{"near-mainnet"},
-			TargetKinds: []string{
+			[]string{"ton_api", "account_state", "messages", "transactions", "shard_blocks"},
+			[]string{"workchain", "account_id", "block_or_transaction_anchor", "message_hash"},
+			"Message intent and transaction effect remain separate; a message alone is not proof that the requested state transition completed.",
+		),
+		universalInvestigationProfile(
+			"near-account-wasm-model", "web3", IntelligenceChainFamilyNEAR, UniversalAdapterPlanned, "near_family",
+			[]string{"near-mainnet"},
+			[]string{
 				IntelligenceSubjectAddress, IntelligenceSubjectToken, IntelligenceSubjectContract,
 				IntelligenceSubjectTransaction, IntelligenceSubjectBlock, IntelligenceSubjectValidator,
 				IntelligenceSubjectBridge, IntelligenceSubjectGovernance,
 			},
-			EvidenceSources: []string{"near_jsonrpc", "account_state", "wasm_code", "receipts", "transactions"},
-			RequiredTrustAnchors: []string{"chain_id", "block_hash_or_height", "transaction_or_receipt_id", "account_id"},
-			VerdictPolicy: "Receipt execution and final outcome must be verified separately from transaction submission.",
-		},
-		{
-			ID: "web5-identity-evidence", Domain: "web5", ChainFamily: IntelligenceChainFamilyOffchain,
-			Status: UniversalAdapterResearch, NetworkScope: "standards_family",
-			TargetKinds: []string{IntelligenceSubjectIdentity, IntelligenceSubjectCredential},
-			EvidenceSources: []string{"w3c_did", "did_resolution", "w3c_verifiable_credentials", "data_integrity"},
-			RequiredTrustAnchors: []string{"did_method", "verification_method", "proof_or_signature", "status_or_revocation_state"},
-			VerdictPolicy: "Verified identity proves only the credential/controller statement it actually covers; it never grants unlimited authority or a safety verdict.",
-		},
-		{
-			ID: "web4-agent-evidence", Domain: "web4", ChainFamily: IntelligenceChainFamilyOffchain,
-			Status: UniversalAdapterResearch, NetworkScope: "agent_protocol_family",
-			TargetKinds: []string{IntelligenceSubjectAgent, IntelligenceSubjectProtocol, IntelligenceSubjectArtifact},
-			EvidenceSources: []string{"mcp", "a2a", "oauth_authorization", "signed_provenance", "tool_and_task_telemetry"},
-			RequiredTrustAnchors: []string{"agent_or_server_identity", "capability_declaration", "authorization_context", "request_response_provenance"},
-			VerdictPolicy: "Agent capability, authorization, execution and effect are separate evidence axes; tool availability must never imply authorization.",
-		},
-		{
-			ID: "web6-crypto-agility-evidence", Domain: "web6", ChainFamily: IntelligenceChainFamilyOffchain,
-			Status: UniversalAdapterResearch, NetworkScope: "crypto_agility_profile",
-			TargetKinds: []string{IntelligenceSubjectProtocol, IntelligenceSubjectArtifact, IntelligenceSubjectProject},
-			EvidenceSources: []string{"algorithm_inventory", "signature_provenance", "key_lifecycle", "pq_transition_evidence"},
-			RequiredTrustAnchors: []string{"algorithm_identifier", "key_or_certificate_reference", "signed_artifact_hash", "migration_state"},
-			VerdictPolicy: "Post-quantum readiness is an evidence-backed migration state, not a binary safety label.",
-		},
+			[]string{"near_jsonrpc", "account_state", "wasm_code", "receipts", "transactions"},
+			[]string{"chain_id", "block_hash_or_height", "transaction_or_receipt_id", "account_id"},
+			"Receipt execution and final outcome must be verified separately from transaction submission.",
+		),
+		universalInvestigationProfile(
+			"web5-identity-evidence", "web5", IntelligenceChainFamilyOffchain, UniversalAdapterResearch, "standards_family",
+			nil,
+			[]string{IntelligenceSubjectIdentity, IntelligenceSubjectCredential},
+			[]string{"w3c_did", "did_resolution", "w3c_verifiable_credentials", "data_integrity"},
+			[]string{"did_method", "verification_method", "proof_or_signature", "status_or_revocation_state"},
+			"Verified identity proves only the credential/controller statement it actually covers; it never grants unlimited authority or a safety verdict.",
+		),
+		universalInvestigationProfile(
+			"web4-agent-evidence", "web4", IntelligenceChainFamilyOffchain, UniversalAdapterResearch, "agent_protocol_family",
+			nil,
+			[]string{IntelligenceSubjectAgent, IntelligenceSubjectProtocol, IntelligenceSubjectArtifact},
+			[]string{"mcp", "a2a", "oauth_authorization", "signed_provenance", "tool_and_task_telemetry"},
+			[]string{"agent_or_server_identity", "capability_declaration", "authorization_context", "request_response_provenance"},
+			"Agent capability, authorization, execution and effect are separate evidence axes; tool availability must never imply authorization.",
+		),
+		universalInvestigationProfile(
+			"web6-crypto-agility-evidence", "web6", IntelligenceChainFamilyOffchain, UniversalAdapterResearch, "crypto_agility_profile",
+			nil,
+			[]string{IntelligenceSubjectProtocol, IntelligenceSubjectArtifact, IntelligenceSubjectProject},
+			[]string{"algorithm_inventory", "signature_provenance", "key_lifecycle", "pq_transition_evidence"},
+			[]string{"algorithm_identifier", "key_or_certificate_reference", "signed_artifact_hash", "migration_state"},
+			"Post-quantum readiness is an evidence-backed migration state, not a binary safety label.",
+		),
 	}
 }
 
