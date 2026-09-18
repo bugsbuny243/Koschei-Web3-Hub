@@ -22,6 +22,7 @@ type RepeatDominantHolderEvidence struct {
 	TokenCount        int     `json:"token_count"`
 	ObservationDays   int     `json:"observation_days"`
 	ObservationWindow string  `json:"observation_window"`
+	HistoricalOnly    bool    `json:"historical_only,omitempty"`
 	// Deprecated compatibility diagnostic. It is not consumed by an ARVIS arm
 	// or the unified final verdict.
 	RiskWeight   int                         `json:"risk_weight,omitempty"`
@@ -72,7 +73,9 @@ func ApplyRepeatDominantHolderEvidenceToHolderIntelligence(in HolderIntelligence
 	}
 	byOwner := map[string]RepeatDominantHolderEvidence{}
 	for _, item := range evidence {
-		byOwner[strings.TrimSpace(item.OwnerWallet)] = item
+		if !item.HistoricalOnly {
+			byOwner[strings.TrimSpace(item.OwnerWallet)] = item
+		}
 		if strings.TrimSpace(item.EvidenceLine) != "" {
 			in.Findings = appendUniqueHolderEvidence(in.Findings, item.EvidenceLine)
 		}
