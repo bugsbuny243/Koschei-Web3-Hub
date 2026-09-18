@@ -68,6 +68,7 @@ type HolderClusterAnalysis struct {
 	Verdict                   string                    `json:"verdict"`
 	WalletsRequested          int                       `json:"wallets_requested"`
 	WalletsAnalyzed           int                       `json:"wallets_analyzed"`
+	ConcurrentWorkers         int                       `json:"concurrent_workers"`
 	DeepOwnersScanned         int                       `json:"deep_owners_scanned"`
 	ShallowOwnersScanned      int                       `json:"shallow_owners_scanned"`
 	DeepSignatureLimit        int                       `json:"deep_signature_limit"`
@@ -130,23 +131,32 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 		return out
 	}
 
-	for i, account := range candidates {
-		if ctx.Err() != nil {
-			out.Limitations = append(out.Limitations, "Cluster analysis stopped at the request deadline; partial observations are preserved.")
-			break
-		}
-		plan := plans[i]
-		row, enhancedOK := analyzeHolderClusterWalletEnhanced(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
+	scanWallet := func(scanCtx context.Context, account HolderRoleAccount, plan holderScanPlan) HolderClusterWallet {
+		row, enhancedOK := analyzeHolderClusterWalletEnhanced(scanCtx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
 		collector := "helius_enhanced"
 		if !enhancedOK {
-			row = analyzeHolderClusterWalletTiered(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
+			row = analyzeHolderClusterWalletTiered(scanCtx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
 			collector = "solana_rpc"
 		}
 		// Tier describes investigation depth. Collector describes the transport.
-		// Never overwrite deep/shallow with a provider name.
+		// Preserve the planned tier even when a provider path degrades.
 		row.Tier = plan.Tier
 		row.Collector = collector
-		if plan.Tier == "deep" {
+		return row
+	}
+	var rows []HolderClusterWallet
+	var deadlineStopped bool
+	if holderClusterParallelScanAllowed(plans, cfg.RPCBudget) {
+		out.ConcurrentWorkers = holderClusterWorkerCount(len(candidates))
+		rows, deadlineStopped = holderClusterScanCandidatesConcurrent(ctx, candidates, plans, scanWallet)
+	} else {
+		if len(candidates) > 0 {
+			out.ConcurrentWorkers = 1
+		}
+		rows, deadlineStopped = holderClusterScanCandidatesSequential(ctx, candidates, plans, scanWallet)
+	}
+	for _, row := range rows {
+		if row.Tier == "deep" {
 			out.DeepOwnersScanned++
 		} else {
 			out.ShallowOwnersScanned++
@@ -155,6 +165,9 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 			out.BudgetDegradedOwners++
 		}
 		out.Wallets = append(out.Wallets, row)
+	}
+	if deadlineStopped {
+		out.Limitations = append(out.Limitations, "Cluster analysis stopped at the request deadline; partial observations are preserved.")
 	}
 	out.RPCCallsUsed = budget.Used()
 	return summarizeHolderCluster(out)

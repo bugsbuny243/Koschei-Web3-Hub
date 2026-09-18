@@ -339,5 +339,104 @@ func holderClusterTransactionIndexesForLimit(signatures []SolanaSignatureInfo, l
 	return indexes
 }
 
+type holderClusterWalletScanFunc func(context.Context, HolderRoleAccount, holderScanPlan) HolderClusterWallet
+
+func holderClusterWorkerCount(candidateCount int) int {
+	if candidateCount <= 0 {
+		return 0
+	}
+	workers := holderDeepConcurrencyMax
+	if workers > candidateCount {
+		workers = candidateCount
+	}
+	if workers < 1 {
+		workers = 1
+	}
+	return workers
+}
+
+func holderClusterParallelScanAllowed(plans []holderScanPlan, rpcBudget int) bool {
+	if len(plans) <= 1 || rpcBudget <= 0 || heliusEnhancedHistoryEnabled() {
+		return false
+	}
+	required := 0
+	for _, plan := range plans {
+		if plan.BudgetDegraded {
+			return false
+		}
+		required += 1 + plan.TransactionLimit
+		if required > rpcBudget {
+			return false
+		}
+	}
+	return true
+}
+
+func holderClusterScanCandidatesSequential(ctx context.Context, candidates []HolderRoleAccount, plans []holderScanPlan, scan holderClusterWalletScanFunc) ([]HolderClusterWallet, bool) {
+	if len(candidates) == 0 || len(plans) != len(candidates) || scan == nil {
+		return []HolderClusterWallet{}, false
+	}
+	out := make([]HolderClusterWallet, 0, len(candidates))
+	for index, account := range candidates {
+		if ctx.Err() != nil {
+			return out, true
+		}
+		out = append(out, scan(ctx, account, plans[index]))
+	}
+	return out, false
+}
+
+// holderClusterScanCandidatesConcurrent keeps holder evidence collection bounded
+// while allowing independent wallets to use the request window in parallel.
+// Results are materialized in candidate order so downstream scoring remains
+// deterministic. The shared provider budget is already mutex-protected.
+func holderClusterScanCandidatesConcurrent(ctx context.Context, candidates []HolderRoleAccount, plans []holderScanPlan, scan holderClusterWalletScanFunc) ([]HolderClusterWallet, bool) {
+	if len(candidates) == 0 || len(plans) != len(candidates) || scan == nil {
+		return []HolderClusterWallet{}, false
+	}
+	workerCount := holderClusterWorkerCount(len(candidates))
+
+	rows := make([]HolderClusterWallet, len(candidates))
+	completed := make([]bool, len(candidates))
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	for worker := 0; worker < workerCount; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for index := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
+				rows[index] = scan(ctx, candidates[index], plans[index])
+				completed[index] = true
+			}
+		}()
+	}
+
+	stopped := false
+sendLoop:
+	for index := range candidates {
+		select {
+		case <-ctx.Done():
+			stopped = true
+			break sendLoop
+		case jobs <- index:
+		}
+	}
+	close(jobs)
+	wg.Wait()
+
+	out := make([]HolderClusterWallet, 0, len(candidates))
+	for index := range rows {
+		if completed[index] {
+			out = append(out, rows[index])
+		}
+	}
+	if len(out) < len(candidates) && ctx.Err() != nil {
+		stopped = true
+	}
+	return out, stopped
+}
+
 var _ = time.RFC3339
-var _ = holderDeepConcurrencyMax
