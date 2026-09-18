@@ -122,7 +122,6 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 	out.ShallowTransactionLimit = cfg.ShallowTransactionLimit
 	out.RPCBudget = cfg.RPCBudget
 	out.WalletsRequested = len(candidates)
-	out.ConcurrentWorkers = holderClusterWorkerCount(len(candidates))
 	candidateWallets := map[string]bool{}
 	for _, candidate := range candidates {
 		candidateWallets[candidate.OwnerWallet] = true
@@ -132,7 +131,7 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 		return out
 	}
 
-	rows, deadlineStopped := holderClusterScanCandidatesConcurrent(ctx, candidates, plans, func(scanCtx context.Context, account HolderRoleAccount, plan holderScanPlan) HolderClusterWallet {
+	scanWallet := func(scanCtx context.Context, account HolderRoleAccount, plan holderScanPlan) HolderClusterWallet {
 		row, enhancedOK := analyzeHolderClusterWalletEnhanced(scanCtx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
 		collector := "helius_enhanced"
 		if !enhancedOK {
@@ -144,7 +143,18 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 		row.Tier = plan.Tier
 		row.Collector = collector
 		return row
-	})
+	}
+	var rows []HolderClusterWallet
+	var deadlineStopped bool
+	if holderClusterParallelScanAllowed(plans, cfg.RPCBudget) {
+		out.ConcurrentWorkers = holderClusterWorkerCount(len(candidates))
+		rows, deadlineStopped = holderClusterScanCandidatesConcurrent(ctx, candidates, plans, scanWallet)
+	} else {
+		if len(candidates) > 0 {
+			out.ConcurrentWorkers = 1
+		}
+		rows, deadlineStopped = holderClusterScanCandidatesSequential(ctx, candidates, plans, scanWallet)
+	}
 	for _, row := range rows {
 		if row.Tier == "deep" {
 			out.DeepOwnersScanned++
