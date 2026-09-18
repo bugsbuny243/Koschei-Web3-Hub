@@ -22,12 +22,8 @@ type canonicalCreatorRelationVerification struct {
 	Limitations      []string
 }
 
-// verifyCanonicalCreatorRelation upgrades an externally discovered creator
-// relation only when the exact create-transaction can be re-read through
-// Koschei's canonical Solana transport and proves three independent facts:
-// creator is a signer, the requested mint is structurally referenced, and the
-// parsed transaction carries launch/create semantics. Discovery providers can
-// suggest the signature, but cannot set Verified themselves.
+// canonicalCreatorSignatureCandidates orders bounded source candidates from
+// strongest creation-specific provenance to the generic source signature.
 func canonicalCreatorSignatureCandidates(source map[string]any) []string {
 	keys := []string{"creation_signature", "launch_signature", "first_mint_signature", "signature"}
 	seen := map[string]bool{}
@@ -103,6 +99,12 @@ func (h *Handler) verifyCanonicalCreatorRelationCandidates(ctx context.Context, 
 	return best
 }
 
+// verifyCanonicalCreatorRelation upgrades an externally discovered creator
+// relation only when the exact create-transaction can be re-read through
+// Koschei's canonical Solana transport and proves three independent facts:
+// creator is a signer, the requested mint is structurally referenced, and the
+// parsed transaction carries launch/create semantics. Discovery providers can
+// suggest the signature, but cannot set Verified themselves.
 func (h *Handler) verifyCanonicalCreatorRelation(ctx context.Context, target, network, creator, signature string) canonicalCreatorRelationVerification {
 	out := canonicalCreatorRelationVerification{
 		Status: "not_verified", Signature: strings.TrimSpace(signature),
