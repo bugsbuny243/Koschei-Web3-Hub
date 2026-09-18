@@ -341,6 +341,20 @@ func holderClusterTransactionIndexesForLimit(signatures []SolanaSignatureInfo, l
 
 type holderClusterWalletScanFunc func(context.Context, HolderRoleAccount, holderScanPlan) HolderClusterWallet
 
+func holderClusterWorkerCount(candidateCount int) int {
+	if candidateCount <= 0 {
+		return 0
+	}
+	workers := holderDeepConcurrencyMax
+	if workers > candidateCount {
+		workers = candidateCount
+	}
+	if workers < 1 {
+		workers = 1
+	}
+	return workers
+}
+
 // holderClusterScanCandidatesConcurrent keeps holder evidence collection bounded
 // while allowing independent wallets to use the request window in parallel.
 // Results are materialized in candidate order so downstream scoring remains
@@ -349,13 +363,7 @@ func holderClusterScanCandidatesConcurrent(ctx context.Context, candidates []Hol
 	if len(candidates) == 0 || len(plans) != len(candidates) || scan == nil {
 		return []HolderClusterWallet{}, false
 	}
-	workerCount := holderDeepConcurrencyMax
-	if workerCount > len(candidates) {
-		workerCount = len(candidates)
-	}
-	if workerCount < 1 {
-		workerCount = 1
-	}
+	workerCount := holderClusterWorkerCount(len(candidates))
 
 	rows := make([]HolderClusterWallet, len(candidates))
 	completed := make([]bool, len(candidates))
