@@ -36,16 +36,16 @@ const (
 )
 
 type UniversalInvestigationAdapterProfile struct {
-	ID                   string
-	Domain               string
-	ChainFamily          string
-	Status               string
-	NetworkScope         string
-	Networks             []string
-	TargetKinds          []string
-	EvidenceSources      []string
-	RequiredTrustAnchors []string
-	VerdictPolicy        string
+	ID                   string   `json:"id"`
+	Domain               string   `json:"domain"`
+	ChainFamily          string   `json:"chain_family"`
+	Status               string   `json:"status"`
+	NetworkScope         string   `json:"network_scope"`
+	Networks             []string `json:"networks,omitempty"`
+	TargetKinds          []string `json:"target_kinds"`
+	EvidenceSources      []string `json:"evidence_sources"`
+	RequiredTrustAnchors []string `json:"required_trust_anchors"`
+	VerdictPolicy        string   `json:"verdict_policy"`
 }
 
 func UniversalInvestigationAdapterProfiles() []UniversalInvestigationAdapterProfile {
