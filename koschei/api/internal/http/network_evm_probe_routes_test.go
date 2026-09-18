@@ -9,7 +9,7 @@ import (
 )
 
 func TestEVMProbeFailsClosedWhenRPCIsNotConfigured(t *testing.T) {
-	for _, key := range []string{"ETHEREUM_RPC_URL", "BASE_RPC_URL", "ARBITRUM_RPC_URL", "OPTIMISM_RPC_URL"} {
+	for _, key := range []string{"ETHEREUM_RPC_URL", "BASE_RPC_URL", "ARBITRUM_RPC_URL", "OPTIMISM_RPC_URL", "POLYGON_RPC_URL", "BNB_RPC_URL", "AVALANCHE_RPC_URL"} {
 		t.Setenv(key, "")
 	}
 	request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe", strings.NewReader(`{"network":"ethereum-mainnet","address":"0x1111111111111111111111111111111111111111"}`))
