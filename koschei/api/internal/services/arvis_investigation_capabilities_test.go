@@ -78,7 +78,6 @@ func TestArvisBundleIncludesInvestigationCapabilityMap(t *testing.T) {
 	}
 }
 
-
 func TestArvisBundleExposesUniversalAdapterRegistry(t *testing.T) {
 	analysis := AnalyzeArvisRadars(SecurityRadarRequest{
 		Target:  "11111111111111111111111111111111",
