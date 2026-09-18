@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -11,11 +12,36 @@ import (
 
 const launchATAConcurrency = 4
 const launchTransactionBatchSize = 40
+const launchATAMinTransactionReserve = 2
+
+func launchATAFairShareBudgets(total, owners int) []int {
+	if owners <= 0 {
+		return nil
+	}
+	out := make([]int, owners)
+	if total <= 0 {
+		return out
+	}
+	base := total / owners
+	remainder := total % owners
+	for index := range out {
+		out[index] = base
+		if index < remainder {
+			out[index]++
+		}
+	}
+	return out
+}
 
 func analyzeLaunchForensicsATA(ctx context.Context, rpcURL, mint string, candidates []launchOwnerCandidate, launchTime time.Time, launchSlot int64, cfg launchForensicsConfig, budget *holderScanRPCBudget) []LaunchActorProfile {
 	if len(candidates) == 0 {
 		return nil
 	}
+	totalBudget := cfg.RPCBudget
+	if budget != nil {
+		totalBudget = budget.Remaining()
+	}
+	ownerBudgets := launchATAFairShareBudgets(totalBudget, len(candidates))
 	profiles := make([]LaunchActorProfile, len(candidates))
 	analyzeRange := func(start, end int) {
 		sem := make(chan struct{}, launchATAConcurrency)
@@ -33,7 +59,25 @@ func analyzeLaunchForensicsATA(ctx context.Context, rpcURL, mint string, candida
 				case <-ctx.Done():
 					return
 				}
-				profiles[index] = analyzeLaunchOwnerATA(ctx, rpcURL, mint, candidates[index], launchTime, launchSlot, cfg, budget)
+				quota := ownerBudgets[index]
+				if quota <= 0 {
+					profiles[index] = LaunchActorProfile{
+						OwnerWallet: candidates[index].OwnerWallet, TokenAccounts: append([]string{}, candidates[index].TokenAccounts...),
+						Label: "HISTORY_NOT_CAPTURED", FundingStatus: "not_checked", Source: "ata_history",
+						Evidence: []string{"Launch ATA fair-share RPC budget did not allocate a call to this owner; missing history is not treated as safe evidence."},
+					}
+					return
+				}
+				localBudget := newHolderScanRPCBudget(quota)
+				profile := analyzeLaunchOwnerATA(ctx, rpcURL, mint, candidates[index], launchTime, launchSlot, cfg, localBudget)
+				used := localBudget.Used()
+				if budget != nil && used > 0 {
+					if !budget.Reserve(used) {
+						profile.Evidence = append(profile.Evidence, "Launch ATA fair-share accounting rejected local RPC usage; evidence was preserved but the scan remains bounded.")
+					}
+				}
+				profile.Evidence = append(profile.Evidence, fmt.Sprintf("Launch ATA fair-share quota: %d RPC calls allocated; %d used.", quota, used))
+				profiles[index] = profile
 			}(i)
 		}
 		wg.Wait()
@@ -75,6 +119,11 @@ func analyzeLaunchOwnerATA(ctx context.Context, rpcURL, mint string, candidate l
 		before := ""
 		exhausted := false
 		for page := 0; page < cfg.ATAMaxPages; page++ {
+			if len(bySignature) > 0 && budget != nil && budget.Remaining() <= launchATAMinTransactionReserve {
+				base.Evidence = append(base.Evidence, "ATA fair-share bütçesi parsed transaction doğrulaması için kalan çağrıları ayırdı; imza sayfalaması bounded bırakıldı.")
+				allExhausted = false
+				break
+			}
 			if ctx.Err() != nil || !budget.Reserve(1) {
 				base.Evidence = append(base.Evidence, "ATA imza taraması RPC bütçesi veya istek süresi nedeniyle kısmi kaldı.")
 				allExhausted = false

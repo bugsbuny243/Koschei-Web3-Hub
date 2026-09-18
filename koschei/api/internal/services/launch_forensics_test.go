@@ -64,3 +64,81 @@ func TestTraceLaunchFundingMarksDirectCreatorWithoutRPC(t *testing.T) {
 		t.Fatalf("direct link should not spend RPC budget: %d", budget.Used())
 	}
 }
+
+func TestLaunchATAFairShareBudgetsDistributeWithoutStarvation(t *testing.T) {
+	got := launchATAFairShareBudgets(100, 18)
+	if len(got) != 18 {
+		t.Fatalf("owners=%d want=18", len(got))
+	}
+	total := 0
+	minimum, maximum := got[0], got[0]
+	for index, quota := range got {
+		if quota <= 0 {
+			t.Fatalf("owner %d received no quota: %v", index, got)
+		}
+		total += quota
+		if quota < minimum {
+			minimum = quota
+		}
+		if quota > maximum {
+			maximum = quota
+		}
+	}
+	if total != 100 {
+		t.Fatalf("allocated=%d want=100 quotas=%v", total, got)
+	}
+	if minimum != 5 || maximum != 6 || maximum-minimum > 1 {
+		t.Fatalf("unexpected fair-share spread min=%d max=%d quotas=%v", minimum, maximum, got)
+	}
+	for index, quota := range got {
+		want := 5
+		if index < 10 {
+			want = 6
+		}
+		if quota != want {
+			t.Fatalf("quota[%d]=%d want=%d all=%v", index, quota, want, got)
+		}
+	}
+}
+
+func TestLaunchATAFairShareBudgetsNeverExceedSmallBudget(t *testing.T) {
+	got := launchATAFairShareBudgets(5, 8)
+	total := 0
+	for _, quota := range got {
+		total += quota
+	}
+	if total != 5 {
+		t.Fatalf("allocated=%d want=5 quotas=%v", total, got)
+	}
+	for index, quota := range got {
+		want := 0
+		if index < 5 {
+			want = 1
+		}
+		if quota != want {
+			t.Fatalf("quota[%d]=%d want=%d all=%v", index, quota, want, got)
+		}
+	}
+}
+
+func TestLaunchATAFairShareBudgetLeavesParsedTransactionCapacity(t *testing.T) {
+	budget := newHolderScanRPCBudget(5)
+	if !budget.Reserve(1) {
+		t.Fatal("first signature page reservation failed")
+	}
+	if !budget.Reserve(1) {
+		t.Fatal("second signature page reservation failed")
+	}
+	if !budget.Reserve(1) {
+		t.Fatal("third signature page reservation failed")
+	}
+	if budget.Remaining() != launchATAMinTransactionReserve {
+		t.Fatalf("remaining=%d want=%d", budget.Remaining(), launchATAMinTransactionReserve)
+	}
+	if got := budget.ReserveUpTo(launchTransactionBatchSize); got != launchATAMinTransactionReserve {
+		t.Fatalf("parsed transaction grant=%d want=%d", got, launchATAMinTransactionReserve)
+	}
+	if budget.Used() != 5 {
+		t.Fatalf("used=%d want=5", budget.Used())
+	}
+}
