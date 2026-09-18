@@ -53,6 +53,17 @@ func (h *Handler) OwnerActorDistributionInvestigation(w http.ResponseWriter, r *
 		})
 		return
 	}
+	if !strings.EqualFold(strings.TrimSpace(target.VerificationStatus), "verified") || strings.TrimSpace(target.CreationSignature) == "" {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+			"ok":             false,
+			"error":          "creator_mint_relation_not_verified",
+			"message":        "Recipient araştırması yalnız VERIFIED creator → mint creation transaction kanıtından türetilir.",
+			"creator_wallet": creator,
+			"mint":           mint,
+			"verification":   target.VerificationStatus,
+		})
+		return
+	}
 
 	report := h.investigateActorInitialRecipients(ctx, target.CreatorWallet, target.Mint, target.CreationSignature, network, services.ActorInitialRecipientOptions{
 		MaxRecipients:        actorDefenseEnvInt("ACTOR_RECIPIENT_LIMIT", 20, 1, 20),
