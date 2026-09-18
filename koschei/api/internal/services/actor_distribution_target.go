@@ -19,7 +19,9 @@ type ActorDistributionTarget struct {
 
 // ResolvePersistentCreatorMint prevents the recipient investigator from
 // becoming a general-purpose history crawler. The creator→mint relation must
-// already exist in Koschei's persistent actor index. CreationSignature is\n// exposed only from VERIFIED creator→mint evidence; observed candidates remain\n// evidence but are never promoted into derived transaction scans.
+// already exist in Koschei's persistent actor index. CreationSignature is
+// exposed only from VERIFIED creator→mint evidence; observed candidates remain
+// evidence but are never promoted into derived transaction scans.
 func (s *ActorDefenseStore) ResolvePersistentCreatorMint(ctx context.Context, creator, mint, network string) (ActorDistributionTarget, error) {
 	creator = strings.TrimSpace(creator)
 	mint = strings.TrimSpace(mint)
