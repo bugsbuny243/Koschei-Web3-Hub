@@ -57,7 +57,6 @@ func TestApplyRequestScopeActorLifecycleRecurrenceEnrichesRepeatActorArm(t *test
 	}
 }
 
-
 func TestApplyRequestScopeActorLifecycleUsesVerifiedGraphCurrentMint(t *testing.T) {
 	now := time.Now().UTC()
 	core := holderIntelligenceCoreResult{}
