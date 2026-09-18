@@ -47,8 +47,10 @@ type ActorInitialRecipientReport struct {
 	Status                  string                  `json:"status"`
 	DistributionScope       string                  `json:"distribution_scope"`
 	HistoryComplete         bool                    `json:"history_complete"`
-	SourceTokenAccounts     []string                `json:"source_token_accounts"`
-	Recipients              []ActorInitialRecipient `json:"recipients"`
+	SourceTokenAccounts        []string                `json:"source_token_accounts"`
+	DerivedSourceTokenAccounts []string                `json:"derived_source_token_accounts,omitempty"`
+	SourceTokenAccountBasis    string                  `json:"source_token_account_basis,omitempty"`
+	Recipients                 []ActorInitialRecipient `json:"recipients"`
 	SignaturesScanned       int                     `json:"signatures_scanned"`
 	TransactionsParsed      int                     `json:"transactions_parsed"`
 	RecipientBalanceQueries int                     `json:"recipient_balance_queries"`
