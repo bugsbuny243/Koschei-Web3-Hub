@@ -28,7 +28,6 @@ func TestWriteProviderSafeJSONRedactsNestedProviderURL(t *testing.T) {
 	}
 }
 
-
 func TestWriteProviderSafeJSONDoesNotTruncateLargePayload(t *testing.T) {
 	const value = "testvalue123"
 	recorder := httptest.NewRecorder()
