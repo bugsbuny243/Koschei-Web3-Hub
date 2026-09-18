@@ -75,19 +75,11 @@ jobs:
           cache-dependency-path: koschei/api/go.sum
       - name: Download modules
         run: go mod download
-      - name: Run holder, creator ATA and ranked launch scheduler contract tests
+      - name: Run holder, creator ATA and launch pagination contract tests
         run: |
           set -euo pipefail
           go test -v ./internal/services \
-            -run '^(TestAnalyzeSolanaHolderRolesSnapshotIsProviderNeutral|TestSolanaHolderOwnerAddressesPreservesExactCaseAndOrder|TestAnalyzeSolanaHolderRolesSnapshotFailsClosedWhenDominantOwnerMetadataMissing|TestDeriveSolanaAssociatedTokenAddressIsDeterministicAndOffCurve|TestSolanaAssociatedTokenAddressCandidatesUseMintProgramWhenKnown|TestActorRecipientDerivedATAFallbackFindsHistoryWithoutPromotingInitialRecipient|TestLaunchATAFairShareBudgetsDistributeWithoutStarvation|TestLaunchATAFairShareBudgetsNeverExceedSmallBudget|TestLaunchATAFairShareBudgetLeavesParsedTransactionCapacity|TestLaunchATARankedWorkerPoolStartsRankTenBeforeRankNineCompletes|TestCollectLaunchATASignaturesRoundRobinAlternatesAccountsByPage|TestCollectLaunchATASignaturesRoundRobinCoversBothFirstPagesBeforeParseReserve) \
-            -count=1
-      - name: Run RPC-managed holder and creator verification tests
-        run: |
-          set -euo pipefail
-          go test -v ./internal/handlers \
-            -run '^(TestHolderDistributionTransportUsesOnlySolanaRPCProof|TestVerifyCanonicalCreatorRelationRequiresSignerMintAndLaunchSemantics|TestVerifyCanonicalCreatorRelationRejectsNonSigner|TestVerifyCanonicalCreatorRelationRejectsWrongMint|TestVerifyCanonicalCreatorRelationCandidatesRecoversFromRejectedFirstSignature|TestCanonicalCreatorSignatureCandidatesPrioritizeCreationAndDeduplicate|TestInvestigateActorInitialRecipientsUsesRPCManagerFailover|TestRequestScopeCanonicalCreatorRelationPreservesVerifiedEvidence|TestRequestScopeCanonicalCreatorRelationNeverUpgradesIncompleteSource|TestRequestScopeCanonicalCreatorRelationExternalObservationStaysObserved)$' \
-            -count=1
- \
+            -run '^(TestAnalyzeSolanaHolderRolesSnapshotIsProviderNeutral|TestSolanaHolderOwnerAddressesPreservesExactCaseAndOrder|TestAnalyzeSolanaHolderRolesSnapshotFailsClosedWhenDominantOwnerMetadataMissing|TestDeriveSolanaAssociatedTokenAddressIsDeterministicAndOffCurve|TestSolanaAssociatedTokenAddressCandidatesUseMintProgramWhenKnown|TestActorRecipientDerivedATAFallbackFindsHistoryWithoutPromotingInitialRecipient|TestLaunchATAFairShareBudgetsDistributeWithoutStarvation|TestLaunchATAFairShareBudgetsNeverExceedSmallBudget|TestLaunchATAFairShareBudgetLeavesParsedTransactionCapacity|TestLaunchATARankedWorkerPoolStartsRankTenBeforeRankNineCompletes|TestCollectLaunchATASignaturesRoundRobinAlternatesAccountsByPage|TestCollectLaunchATASignaturesRoundRobinCoversBothFirstPagesBeforeParseReserve)$' \
             -count=1
       - name: Run RPC-managed holder and creator verification tests
         run: |
