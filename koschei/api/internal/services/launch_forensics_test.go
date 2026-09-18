@@ -144,7 +144,6 @@ func TestLaunchATAFairShareBudgetLeavesParsedTransactionCapacity(t *testing.T) {
 	}
 }
 
-
 func TestLaunchATARankedWorkerPoolStartsRankTenBeforeRankNineCompletes(t *testing.T) {
 	startedNine := make(chan struct{})
 	startedTen := make(chan struct{})
