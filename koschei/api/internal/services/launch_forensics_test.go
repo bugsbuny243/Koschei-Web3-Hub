@@ -65,7 +65,6 @@ func TestTraceLaunchFundingMarksDirectCreatorWithoutRPC(t *testing.T) {
 	}
 }
 
-
 func TestLaunchATAFairShareBudgetsDistributeWithoutStarvation(t *testing.T) {
 	got := launchATAFairShareBudgets(100, 18)
 	if len(got) != 18 {
