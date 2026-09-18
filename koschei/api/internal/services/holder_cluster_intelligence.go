@@ -130,23 +130,21 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 		return out
 	}
 
-	for i, account := range candidates {
-		if ctx.Err() != nil {
-			out.Limitations = append(out.Limitations, "Cluster analysis stopped at the request deadline; partial observations are preserved.")
-			break
-		}
-		plan := plans[i]
-		row, enhancedOK := analyzeHolderClusterWalletEnhanced(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
+	rows, deadlineStopped := holderClusterScanCandidatesConcurrent(ctx, candidates, plans, func(scanCtx context.Context, account HolderRoleAccount, plan holderScanPlan) HolderClusterWallet {
+		row, enhancedOK := analyzeHolderClusterWalletEnhanced(scanCtx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
 		collector := "helius_enhanced"
 		if !enhancedOK {
-			row = analyzeHolderClusterWalletTiered(ctx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
+			row = analyzeHolderClusterWalletTiered(scanCtx, rpcURL, mint, account, launchBlockTime, candidateWallets, plan, budget)
 			collector = "solana_rpc"
 		}
 		// Tier describes investigation depth. Collector describes the transport.
-		// Never overwrite deep/shallow with a provider name.
+		// Preserve the planned tier even when a provider path degrades.
 		row.Tier = plan.Tier
 		row.Collector = collector
-		if plan.Tier == "deep" {
+		return row
+	})
+	for _, row := range rows {
+		if row.Tier == "deep" {
 			out.DeepOwnersScanned++
 		} else {
 			out.ShallowOwnersScanned++
@@ -155,6 +153,9 @@ func AnalyzeSolanaHolderCluster(ctx context.Context, rpcURL, mint string, roles 
 			out.BudgetDegradedOwners++
 		}
 		out.Wallets = append(out.Wallets, row)
+	}
+	if deadlineStopped {
+		out.Limitations = append(out.Limitations, "Cluster analysis stopped at the request deadline; partial observations are preserved.")
 	}
 	out.RPCCallsUsed = budget.Used()
 	return summarizeHolderCluster(out)
