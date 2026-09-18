@@ -119,6 +119,118 @@ func analyzeLaunchForensicsATA(ctx context.Context, rpcURL, mint string, candida
 	return out
 }
 
+type launchATASignaturePageFetcher func(context.Context, string, int, string) ([]SolanaSignatureInfo, error)
+
+type launchATAPageState struct {
+	address   string
+	before    string
+	pages     int
+	exhausted bool
+	failed    bool
+}
+
+func collectLaunchATASignaturesRoundRobin(
+	ctx context.Context,
+	tokenAccounts []string,
+	maxPages int,
+	signatureLimit int,
+	budget *holderScanRPCBudget,
+	fetch launchATASignaturePageFetcher,
+) (map[string]SolanaSignatureInfo, bool, []string) {
+	bySignature := map[string]SolanaSignatureInfo{}
+	limitations := []string{}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if maxPages <= 0 || signatureLimit <= 0 || fetch == nil {
+		return bySignature, false, []string{"ATA signature pagination configuration is incomplete; history was not treated as exhausted."}
+	}
+
+	states := make([]launchATAPageState, 0, len(tokenAccounts))
+	seenAccounts := map[string]bool{}
+	for _, tokenAccount := range tokenAccounts {
+		tokenAccount = strings.TrimSpace(tokenAccount)
+		if tokenAccount == "" || seenAccounts[tokenAccount] {
+			continue
+		}
+		seenAccounts[tokenAccount] = true
+		states = append(states, launchATAPageState{address: tokenAccount})
+	}
+	if len(states) == 0 {
+		return bySignature, false, []string{"No non-empty mint-specific token account was available for ATA history pagination."}
+	}
+
+	stoppedEarly := false
+pagination:
+	for page := 0; page < maxPages; page++ {
+		activeThisRound := false
+		for index := range states {
+			state := &states[index]
+			if state.exhausted || state.failed || state.pages >= maxPages {
+				continue
+			}
+			activeThisRound = true
+
+			// Give every still-eligible ATA its turn for the current page before
+			// advancing any account to the next page. Once signatures exist,
+			// preserve transaction-parse capacity after first-page coverage.
+			firstPagesPending := 0
+			for check := range states {
+				if !states[check].exhausted && !states[check].failed && states[check].pages == 0 {
+					firstPagesPending++
+				}
+			}
+			if len(bySignature) > 0 && budget != nil && state.pages > 0 && budget.Remaining() <= launchATAMinTransactionReserve {
+				limitations = append(limitations, "ATA round-robin pagination preserved remaining RPC calls for parsed transaction verification.")
+				stoppedEarly = true
+				break pagination
+			}
+			if len(bySignature) > 0 && budget != nil && state.pages == 0 && firstPagesPending > 0 &&
+				budget.Remaining() <= launchATAMinTransactionReserve+firstPagesPending-1 {
+				limitations = append(limitations, "ATA round-robin pagination could not cover every first page while preserving parsed transaction capacity.")
+				stoppedEarly = true
+				break pagination
+			}
+			if ctx.Err() != nil || !budget.Reserve(1) {
+				limitations = append(limitations, "ATA signature pagination stopped at the request or RPC budget boundary.")
+				stoppedEarly = true
+				break pagination
+			}
+
+			signatures, err := fetch(ctx, state.address, signatureLimit, state.before)
+			state.pages++
+			if err != nil {
+				state.failed = true
+				limitations = append(limitations, "ATA signature history could not be read: "+compactClusterError(err))
+				continue
+			}
+			for _, signature := range signatures {
+				if signature.Signature != "" {
+					bySignature[signature.Signature] = signature
+				}
+			}
+			if len(signatures) < signatureLimit || len(signatures) == 0 ||
+				strings.TrimSpace(signatures[len(signatures)-1].Signature) == "" {
+				state.exhausted = true
+				continue
+			}
+			state.before = signatures[len(signatures)-1].Signature
+		}
+		if !activeThisRound {
+			break
+		}
+	}
+
+	allExhausted := !stoppedEarly
+	for _, state := range states {
+		if !state.exhausted {
+			allExhausted = false
+			break
+		}
+	}
+	return bySignature, allExhausted, limitations
+}
+
 func analyzeLaunchOwnerATA(ctx context.Context, rpcURL, mint string, candidate launchOwnerCandidate, launchTime time.Time, launchSlot int64, cfg launchForensicsConfig, budget *holderScanRPCBudget) LaunchActorProfile {
 	base := LaunchActorProfile{
 		OwnerWallet: candidate.OwnerWallet, TokenAccounts: append([]string{}, candidate.TokenAccounts...),
@@ -128,47 +240,17 @@ func analyzeLaunchOwnerATA(ctx context.Context, rpcURL, mint string, candidate l
 		base.Evidence = append(base.Evidence, "Owner için çözümlenmiş token account/ATA bulunamadı.")
 		return base
 	}
-	bySignature := map[string]SolanaSignatureInfo{}
-	allExhausted := true
-	for _, tokenAccount := range candidate.TokenAccounts {
-		before := ""
-		exhausted := false
-		for page := 0; page < cfg.ATAMaxPages; page++ {
-			if len(bySignature) > 0 && budget != nil && budget.Remaining() <= launchATAMinTransactionReserve {
-				base.Evidence = append(base.Evidence, "ATA fair-share bütçesi parsed transaction doğrulaması için kalan çağrıları ayırdı; imza sayfalaması bounded bırakıldı.")
-				allExhausted = false
-				break
-			}
-			if ctx.Err() != nil || !budget.Reserve(1) {
-				base.Evidence = append(base.Evidence, "ATA imza taraması RPC bütçesi veya istek süresi nedeniyle kısmi kaldı.")
-				allExhausted = false
-				break
-			}
-			signatures, err := SolanaGetSignaturesForAddressBefore(ctx, rpcURL, tokenAccount, cfg.ATASignatureLimit, before)
-			if err != nil {
-				base.Evidence = append(base.Evidence, "ATA imza geçmişi alınamadı: "+compactClusterError(err))
-				allExhausted = false
-				break
-			}
-			for _, signature := range signatures {
-				if signature.Signature != "" {
-					bySignature[signature.Signature] = signature
-				}
-			}
-			if len(signatures) < cfg.ATASignatureLimit {
-				exhausted = true
-				break
-			}
-			if len(signatures) == 0 || strings.TrimSpace(signatures[len(signatures)-1].Signature) == "" {
-				exhausted = true
-				break
-			}
-			before = signatures[len(signatures)-1].Signature
-		}
-		if !exhausted {
-			allExhausted = false
-		}
-	}
+	bySignature, allExhausted, paginationLimitations := collectLaunchATASignaturesRoundRobin(
+		ctx,
+		candidate.TokenAccounts,
+		cfg.ATAMaxPages,
+		cfg.ATASignatureLimit,
+		budget,
+		func(fetchCtx context.Context, tokenAccount string, limit int, before string) ([]SolanaSignatureInfo, error) {
+			return SolanaGetSignaturesForAddressBefore(fetchCtx, rpcURL, tokenAccount, limit, before)
+		},
+	)
+	base.Evidence = append(base.Evidence, paginationLimitations...)
 	base.SignaturesFetched = len(bySignature)
 	base.WindowExhausted = allExhausted
 	if len(bySignature) == 0 {
