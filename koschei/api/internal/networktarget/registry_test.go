@@ -35,8 +35,11 @@ func TestCatalogReportsImplementedProbesWithoutClaimingLiveAvailability(t *testi
 		"ethereum-mainnet": false,
 		"base-mainnet":     false,
 		"arbitrum-mainnet": false,
-		"optimism-mainnet": false,
-		"bitcoin-mainnet":  false,
+		"optimism-mainnet":  false,
+		"polygon-mainnet":   false,
+		"bnb-mainnet":       false,
+		"avalanche-mainnet": false,
+		"bitcoin-mainnet":   false,
 	}
 	for _, network := range Catalog() {
 		if _, ok := probeReady[network.ID]; !ok {
