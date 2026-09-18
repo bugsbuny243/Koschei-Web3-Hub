@@ -380,7 +380,6 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	unifiedVerdict := services.EvaluateUnifiedRadarVerdictV140(target, actorVerdict, behavior)
 	if h.DB != nil {
 		_ = services.CaptureHolderConcentrationObservation(ctx, h.DB, network, target, core.Intelligence, now)
-		_, _ = services.CapturePersistentDominantHolderMemory(ctx, h.DB, network, target, core.Intelligence, now)
 	}
 	holderConcentrationContext := services.LoadHolderConcentrationContext(ctx, db, core.Intelligence)
 	modules := radarDetailModules(core.Arms)
