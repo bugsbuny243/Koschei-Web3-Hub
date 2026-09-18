@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLaunchOwnerCandidatesExcludeProtocolAndMergeTokenAccounts(t *testing.T) {
@@ -140,5 +141,46 @@ func TestLaunchATAFairShareBudgetLeavesParsedTransactionCapacity(t *testing.T) {
 	}
 	if budget.Used() != 5 {
 		t.Fatalf("used=%d want=5", budget.Used())
+	}
+}
+
+
+func TestLaunchATARankedWorkerPoolStartsRankTenBeforeRankNineCompletes(t *testing.T) {
+	startedNine := make(chan struct{})
+	startedTen := make(chan struct{})
+	releaseNine := make(chan struct{})
+	done := make(chan struct{})
+
+	go func() {
+		runLaunchATARankedWorkerPool(context.Background(), 12, launchATAConcurrency, func(index int) {
+			switch index {
+			case 9:
+				close(startedNine)
+				<-releaseNine
+			case 10:
+				close(startedTen)
+			}
+		})
+		close(done)
+	}()
+
+	select {
+	case <-startedNine:
+	case <-time.After(time.Second):
+		t.Fatal("rank 9 never started")
+	}
+	select {
+	case <-startedTen:
+		// Rank 10 can begin while rank 9 is still blocked: no top-10 phase barrier.
+	case <-time.After(time.Second):
+		close(releaseNine)
+		t.Fatal("rank 10 was blocked behind completion of the top-10 phase")
+	}
+	close(releaseNine)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("ranked worker pool did not finish")
 	}
 }
