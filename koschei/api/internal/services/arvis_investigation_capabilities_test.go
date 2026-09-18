@@ -77,3 +77,26 @@ func TestArvisBundleIncludesInvestigationCapabilityMap(t *testing.T) {
 		}
 	}
 }
+
+
+func TestArvisBundleExposesUniversalAdapterRegistry(t *testing.T) {
+	analysis := AnalyzeArvisRadars(SecurityRadarRequest{
+		Target:  "11111111111111111111111111111111",
+		Network: "solana-mainnet",
+		Mode:    SecurityRadarWatchMode,
+	})
+	if analysis.Bundle.Metadata == nil {
+		t.Fatal("expected ARVIS metadata")
+	}
+	profiles, ok := analysis.Bundle.Metadata["universal_adapter_profiles"].([]UniversalInvestigationAdapterProfile)
+	if !ok || len(profiles) == 0 {
+		t.Fatalf("universal adapter profiles missing: %#v", analysis.Bundle.Metadata["universal_adapter_profiles"])
+	}
+	kinds, ok := analysis.Bundle.Metadata["universal_target_kinds"].([]string)
+	if !ok || len(kinds) < 10 {
+		t.Fatalf("universal target kinds missing: %#v", analysis.Bundle.Metadata["universal_target_kinds"])
+	}
+	if analysis.Bundle.Metadata["universal_adapter_policy"] == "" {
+		t.Fatal("universal adapter policy missing")
+	}
+}
