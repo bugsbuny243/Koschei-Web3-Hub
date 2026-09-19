@@ -31,7 +31,7 @@ func TestUniversalDispatcherRoutesLiveAndProbeTargetsWithoutOverclaiming(t *test
 	}
 
 	bitcoin, err := BuildUniversalInvestigationPlan(
-		"bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080",
+		"bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
 		"bitcoin-mainnet",
 		IntelligenceSubjectAddress,
 	)
