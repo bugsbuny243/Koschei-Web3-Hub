@@ -14,6 +14,11 @@ import (
 
 var networkTargetRequests atomic.Uint64
 var networkTargetRejected atomic.Uint64
+var evmTransactionProbeRequests atomic.Uint64
+var evmTransactionProbeSuccess atomic.Uint64
+var evmTransactionProbeNotFound atomic.Uint64
+var evmTransactionProbeRejected atomic.Uint64
+var evmTransactionProbeLatencyMillis atomic.Uint64
 var networkEVMTransactionProbeRequests atomic.Uint64
 var networkEVMTransactionProbeSuccess atomic.Uint64
 var networkEVMTransactionProbeNotFound atomic.Uint64
