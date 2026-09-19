@@ -133,13 +133,13 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 		probe, probeErr := networktarget.ProbeEVMTransaction(ctx, nil, endpoint, request.Network, request.Target)
 		if probeErr != nil {
 			recordLatency()
-			if errors.Is(probeErr, networktarget.ErrEVMTransactionNotFound) {
+			status, message, notFound := customerEVMTransactionProbeError(probeErr)
+			if notFound {
 				networkEVMTransactionProbeNotFound.Add(1)
-				writeCustomerScanError(w, http.StatusNotFound, "evm_transaction_not_found")
-				return
+			} else {
+				networkEVMTransactionProbeFailed.Add(1)
 			}
-			networkEVMTransactionProbeFailed.Add(1)
-			writeCustomerScanError(w, http.StatusBadGateway, "evm_transaction_probe_unavailable")
+			writeCustomerScanError(w, status, message)
 			return
 		}
 		projection, projectionErr := services.AdaptEVMTransactionEvidence(probe, observedAt)
@@ -307,4 +307,12 @@ func writeCustomerScanError(w http.ResponseWriter, status int, message string) {
 		"analysis_performed": false,
 		"evidence_status":    services.Web3TrustEvidenceUnverified,
 	})
+}
+
+
+func customerEVMTransactionProbeError(err error) (status int, message string, notFound bool) {
+	if errors.Is(err, networktarget.ErrEVMTransactionNotFound) {
+		return http.StatusNotFound, "evm_transaction_not_found", true
+	}
+	return http.StatusBadGateway, "evm_transaction_probe_unavailable", false
 }
