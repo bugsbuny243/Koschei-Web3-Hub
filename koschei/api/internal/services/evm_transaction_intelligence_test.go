@@ -25,8 +25,8 @@ func TestAdaptEVMTransactionEvidenceRemainsObservedOnly(t *testing.T) {
 		ExecutionState:  networktarget.EVMTransactionExecutionSuccess,
 		ReceiptStatus:   "0x1",
 		Logs: []networktarget.EVMTransactionLogSummary{{
-			Address:  "0x3333333333333333333333333333333333333333",
-			Topics:   []string{"0x" + strings.Repeat("b", 64)},
+			Address:    "0x3333333333333333333333333333333333333333",
+			Topics:     []string{"0x" + strings.Repeat("b", 64)},
 			LogIndex:   "0x0",
 			Removed:    true,
 			DataSHA256: strings.Repeat("e", 64),
