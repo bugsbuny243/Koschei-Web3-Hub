@@ -157,7 +157,7 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 		From: strings.ToLower(tx.From), To: to, Value: tx.Value, Nonce: tx.Nonce,
 		Gas: tx.Gas, GasPrice: tx.GasPrice, TransactionType: tx.Type,
 		InputSHA256: inputHash, InputBytes: inputBytes,
-		ExecutionState: EVMTransactionExecutionPending,
+		ExecutionState:    EVMTransactionExecutionPending,
 		AnalysisPerformed: true, EvidenceStatus: "observed", LiveAvailability: "checked",
 	}
 	if (tx.BlockHash == nil) != (tx.BlockNumber == nil) {
