@@ -80,6 +80,22 @@ func BuildUniversalInvestigationPlan(target, network, kindHint string) (Universa
 	}
 }
 
+func UniversalInvestigationPlanForCustomerScanTarget(target CustomerScanTarget) (UniversalInvestigationPlan, error) {
+	if target.RequiresNetwork {
+		return UniversalInvestigationPlan{}, errors.New("customer target requires network context before universal dispatch")
+	}
+	kind := ""
+	switch target.Kind {
+	case CustomerScanTargetEVMAddress, CustomerScanTargetSolana, CustomerScanTargetBitcoin:
+		kind = IntelligenceSubjectAddress
+	case CustomerScanTargetTxHash:
+		kind = IntelligenceSubjectTransaction
+	default:
+		return UniversalInvestigationPlan{}, errors.New("customer target kind has no universal dispatch mapping")
+	}
+	return BuildUniversalInvestigationPlan(target.Raw, target.NetworkHint, kind)
+}
+
 func universalInvestigationProfileForSubject(subject IntelligenceSubject) (UniversalInvestigationAdapterProfile, bool) {
 	if subject.ChainFamily != IntelligenceChainFamilyOffchain {
 		return UniversalInvestigationProfileForNetwork(subject.Network)
