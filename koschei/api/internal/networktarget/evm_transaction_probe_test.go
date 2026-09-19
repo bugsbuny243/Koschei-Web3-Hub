@@ -1,4 +1,3 @@
-
 package networktarget
 
 import (
@@ -99,7 +98,6 @@ func TestProbeEVMTransactionRejectsBadHashBeforeRPC(t *testing.T) {
 		t.Fatal("invalid transaction hash was accepted")
 	}
 }
-
 
 func TestProbeEVMTransactionMissingReceiptAfterMinedTransactionIsUnknown(t *testing.T) {
 	txHash := "0x" + strings.Repeat("e", 64)
