@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"koschei/api/internal/networktarget"
 	"koschei/api/internal/services"
 )
 
@@ -102,7 +104,6 @@ func TestProductionMuxExposesFabricNetworkCatalog(t *testing.T) {
 	}
 }
 
-
 func TestCustomerScanEndpointRequiresNetworkForTransactionHash(t *testing.T) {
 	mux := http.NewServeMux()
 	registerCustomerScanRoutes(mux)
@@ -135,5 +136,52 @@ func TestCustomerScanEndpointRejectsUnconnectedTransactionNetwork(t *testing.T) 
 	mux.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusNotImplemented {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
+
+func TestCustomerEVMTransactionProbeErrorSeparatesNotFoundFromInfrastructure(t *testing.T) {
+	status, message, notFound := customerEVMTransactionProbeError(networktarget.ErrEVMTransactionNotFound)
+	if status != http.StatusNotFound || message != "evm_transaction_not_found" || !notFound {
+		t.Fatalf("not-found mapping=%d %q %v", status, message, notFound)
+	}
+	status, message, notFound = customerEVMTransactionProbeError(errors.New("rpc down"))
+	if status != http.StatusBadGateway || message != "evm_transaction_probe_unavailable" || notFound {
+		t.Fatalf("infrastructure mapping=%d %q %v", status, message, notFound)
+	}
+}
+
+func TestCustomerEVMTransactionProbeTelemetryCountsConfigurationFailure(t *testing.T) {
+	networkEVMTransactionProbeRequests.Store(0)
+	networkEVMTransactionProbeSuccess.Store(0)
+	networkEVMTransactionProbeNotFound.Store(0)
+	networkEVMTransactionProbeFailed.Store(0)
+	networkEVMTransactionProbePending.Store(0)
+	networkEVMTransactionProbeUnknown.Store(0)
+	networkEVMTransactionProbeLatencyMillis.Store(0)
+	t.Cleanup(func() {
+		networkEVMTransactionProbeRequests.Store(0)
+		networkEVMTransactionProbeSuccess.Store(0)
+		networkEVMTransactionProbeNotFound.Store(0)
+		networkEVMTransactionProbeFailed.Store(0)
+		networkEVMTransactionProbePending.Store(0)
+		networkEVMTransactionProbeUnknown.Store(0)
+		networkEVMTransactionProbeLatencyMillis.Store(0)
+	})
+	t.Setenv("ETHEREUM_RPC_URL", "")
+
+	mux := http.NewServeMux()
+	registerCustomerScanRoutes(mux)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/scan", strings.NewReader(
+		`{"target":"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","network":"ethereum-mainnet"}`,
+	))
+	request.Header.Set("Content-Type", "application/json")
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if networkEVMTransactionProbeRequests.Load() != 1 || networkEVMTransactionProbeFailed.Load() != 1 {
+		t.Fatalf("telemetry requests=%d failed=%d", networkEVMTransactionProbeRequests.Load(), networkEVMTransactionProbeFailed.Load())
 	}
 }
