@@ -160,11 +160,15 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 		ExecutionState: EVMTransactionExecutionPending,
 		AnalysisPerformed: true, EvidenceStatus: "observed", LiveAvailability: "checked",
 	}
-	if tx.BlockHash != nil {
-		result.BlockHash = strings.ToLower(strings.TrimSpace(*tx.BlockHash))
+	if (tx.BlockHash == nil) != (tx.BlockNumber == nil) {
+		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_block_anchor_incomplete")
 	}
-	if tx.BlockNumber != nil {
+	if tx.BlockHash != nil && tx.BlockNumber != nil {
+		result.BlockHash = strings.ToLower(strings.TrimSpace(*tx.BlockHash))
 		result.BlockNumber = strings.ToLower(strings.TrimSpace(*tx.BlockNumber))
+		if !validEVMTransactionHash(result.BlockHash) || !validEVMHexQuantity(result.BlockNumber) {
+			return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_block_anchor_invalid")
+		}
 	}
 
 	rawReceipt, receiptNull, err := evmRPCRaw(ctx, client, endpoint, 3, "eth_getTransactionReceipt", []any{transactionHash})
