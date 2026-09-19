@@ -219,12 +219,29 @@ func ClassifyUniversalInvestigationSubject(target, network, kindHint string) (In
 		return IntelligenceSubject{}, errors.New("universal target is required")
 	}
 
-	if kindHint == "" || kindHint == IntelligenceSubjectAddress {
+	if kindHint == "" {
 		subject := ClassifyIntelligenceSubject(target, network)
 		if subject.Kind == IntelligenceSubjectUnknown {
 			return IntelligenceSubject{}, errors.New("network and target kind are required for non-address subjects")
 		}
 		return subject, nil
+	}
+	if kindHint == IntelligenceSubjectAddress {
+		subject := ClassifyIntelligenceSubject(target, network)
+		if subject.Kind != IntelligenceSubjectUnknown {
+			return subject, nil
+		}
+		profile, ok := UniversalInvestigationProfileForNetwork(network)
+		if !ok || profile.Status != UniversalAdapterPlanned || !universalProfileSupportsKind(profile, kindHint) {
+			return IntelligenceSubject{}, errors.New("address syntax is not recognized by a live/probe adapter")
+		}
+		chain := universalChainName(network, profile.ChainFamily)
+		canonical := intelligenceCanonicalRef(profile.ChainFamily, chain, network, target)
+		return IntelligenceSubject{
+			ID: intelligenceStableID(canonical), Raw: target, CanonicalRef: canonical,
+			ChainFamily: profile.ChainFamily, Chain: chain, Network: network,
+			Kind: kindHint, ClassificationBasis: "explicit_planned_target_kind_unvalidated",
+		}, nil
 	}
 	if !universalInvestigationKindAllowed(kindHint) {
 		return IntelligenceSubject{}, errors.New("unsupported universal target kind")
