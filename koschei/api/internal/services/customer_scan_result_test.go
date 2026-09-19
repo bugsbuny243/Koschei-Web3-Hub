@@ -75,7 +75,6 @@ func TestCustomerScanResultRejectsMismatchedProbeSubject(t *testing.T) {
 	}
 }
 
-
 func TestCustomerScanResultExposesUniversalDispatchPlan(t *testing.T) {
 	target := CustomerScanTarget{
 		Raw:            "0x1111111111111111111111111111111111111111",
