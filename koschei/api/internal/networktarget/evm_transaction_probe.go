@@ -1,9 +1,9 @@
-
 package networktarget
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -24,7 +24,7 @@ const (
 	evmTransactionResponseLimit = 8 * 1024 * 1024
 )
 
-var ErrEVMTransactionNotFound = fmt.Errorf("evm_transaction_not_found")
+var ErrEVMTransactionNotFound = errors.New("evm_transaction_not_found")
 
 type EVMTransactionLogSummary struct {
 	Address  string   `json:"address"`
