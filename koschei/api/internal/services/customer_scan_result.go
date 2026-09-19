@@ -148,6 +148,11 @@ func CustomerScanResultFromEVMTransaction(target CustomerScanTarget, projection 
 		return CustomerScanResult{}, errors.New("EVM transaction projection is required")
 	}
 	if !strings.EqualFold(strings.TrimSpace(projection.Subject.Raw), strings.TrimSpace(target.Raw)) ||
+		!strings.EqualFold(strings.TrimSpace(projection.Subject.Network), strings.TrimSpace(target.NetworkHint)) ||
+		projection.Evidence.SubjectID != projection.Subject.ID ||
+		projection.Evidence.ChainFamily != projection.Subject.ChainFamily ||
+		!strings.EqualFold(strings.TrimSpace(projection.Evidence.Chain), strings.TrimSpace(projection.Subject.Chain)) ||
+		!strings.EqualFold(strings.TrimSpace(projection.Evidence.Network), strings.TrimSpace(projection.Subject.Network)) ||
 		projection.Evidence.Status != IntelligenceEvidenceObserved ||
 		!strings.EqualFold(strings.TrimSpace(projection.Evidence.TransactionHash), strings.TrimSpace(target.Raw)) {
 		return CustomerScanResult{}, errors.New("EVM transaction evidence is not bound to the customer target")
