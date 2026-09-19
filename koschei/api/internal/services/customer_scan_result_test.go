@@ -111,3 +111,39 @@ func TestCustomerScanResultDoesNotInventPlanBeforeNetworkResolution(t *testing.T
 		t.Fatalf("networkless target unexpectedly received plan: %#v", result.InvestigationPlan)
 	}
 }
+
+
+func TestCustomerScanResultFromEVMTransactionBindsObservedEvidence(t *testing.T) {
+	target, err := ClassifyCustomerScanTarget(
+		"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"ethereum-mainnet",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject, err := ClassifyUniversalInvestigationSubject(target.Raw, target.NetworkHint, IntelligenceSubjectTransaction)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection := NetworkProbeIntelligenceProjection{
+		Subject: subject,
+		Evidence: IntelligenceEvidence{
+			ID:              "evm-tx-1",
+			SubjectID:       subject.ID,
+			ChainFamily:     IntelligenceChainFamilyEVM,
+			Network:         target.NetworkHint,
+			Status:          IntelligenceEvidenceObserved,
+			TransactionHash: target.Raw,
+		},
+	}
+	result, err := CustomerScanResultFromEVMTransaction(target, projection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != CustomerScanStatusObserved || result.TransactionEvidence == nil {
+		t.Fatalf("unexpected transaction result: %#v", result)
+	}
+	if result.InvestigationPlan == nil || result.InvestigationPlan.Route != UniversalDispatchEVMTransaction {
+		t.Fatalf("missing EVM transaction dispatch plan: %#v", result.InvestigationPlan)
+	}
+}
