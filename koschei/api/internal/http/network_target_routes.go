@@ -14,6 +14,13 @@ import (
 
 var networkTargetRequests atomic.Uint64
 var networkTargetRejected atomic.Uint64
+var networkEVMTransactionProbeRequests atomic.Uint64
+var networkEVMTransactionProbeSuccess atomic.Uint64
+var networkEVMTransactionProbeNotFound atomic.Uint64
+var networkEVMTransactionProbeFailed atomic.Uint64
+var networkEVMTransactionProbePending atomic.Uint64
+var networkEVMTransactionProbeUnknown atomic.Uint64
+var networkEVMTransactionProbeLatencyMillis atomic.Uint64
 
 type networkTargetRequest struct {
 	Network string `json:"network"`
@@ -74,7 +81,14 @@ func networkCoverageCatalog(w http.ResponseWriter, _ *http.Request) {
 			"scope":               "process_local",
 			"resolution_requests": networkTargetRequests.Load(),
 			"rejected_requests":   networkTargetRejected.Load(),
-			"addresses_recorded":  false,
+			"addresses_recorded":                    false,
+			"evm_transaction_probe_requests":        networkEVMTransactionProbeRequests.Load(),
+			"evm_transaction_probe_success":         networkEVMTransactionProbeSuccess.Load(),
+			"evm_transaction_probe_not_found":       networkEVMTransactionProbeNotFound.Load(),
+			"evm_transaction_probe_failed":          networkEVMTransactionProbeFailed.Load(),
+			"evm_transaction_probe_pending":         networkEVMTransactionProbePending.Load(),
+			"evm_transaction_probe_unknown":         networkEVMTransactionProbeUnknown.Load(),
+			"evm_transaction_probe_latency_ms_total": networkEVMTransactionProbeLatencyMillis.Load(),
 		},
 	})
 }
