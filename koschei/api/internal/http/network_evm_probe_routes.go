@@ -37,6 +37,12 @@ func evmRPCEnvName(networkID string) (string, bool) {
 		return "ARBITRUM_RPC_URL", true
 	case "optimism-mainnet":
 		return "OPTIMISM_RPC_URL", true
+	case "polygon-mainnet":
+		return "POLYGON_RPC_URL", true
+	case "bnb-mainnet":
+		return "BNB_RPC_URL", true
+	case "avalanche-mainnet":
+		return "AVALANCHE_RPC_URL", true
 	default:
 		return "", false
 	}

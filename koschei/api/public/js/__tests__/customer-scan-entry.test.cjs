@@ -13,7 +13,7 @@ const router=scope.window.KoscheiScanEntry;
 
 test('EVM addresses require an explicit network and do not fan out',()=>{
  assert.equal(router.resolve(evm).needsNetwork,true);
- for(const network of ['ethereum-mainnet','base-mainnet','arbitrum-mainnet','optimism-mainnet']){
+ for(const network of ['ethereum-mainnet','base-mainnet','arbitrum-mainnet','optimism-mainnet','polygon-mainnet','bnb-mainnet','avalanche-mainnet']){
   const url=new URL(router.url(evm,network).url,'https://example.test');
   assert.equal(url.searchParams.get('network'),network);
   assert.equal(url.searchParams.get('target'),evm);

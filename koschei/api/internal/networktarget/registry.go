@@ -44,6 +44,9 @@ func Catalog() []Network {
 		{ID: "base-mainnet", Name: "Base", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
 		{ID: "arbitrum-mainnet", Name: "Arbitrum", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
 		{ID: "optimism-mainnet", Name: "Optimism", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
+		{ID: "polygon-mainnet", Name: "Polygon", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
+		{ID: "bnb-mainnet", Name: "BNB Smart Chain", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
+		{ID: "avalanche-mainnet", Name: "Avalanche C-Chain", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
 		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", AddressFormat: "bitcoin-mainnet", CollectorStatus: "probe_ready"},
 	}
 }

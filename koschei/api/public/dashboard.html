@@ -44,7 +44,6 @@
           <p>Start an address analysis, open an investigation, or review your account evidence.</p>
         </div>
         <div id="workspacePlanStrip"></div>
-        <div id="workspaceMissionControl"></div>
 
         <section id="dashboardUniversalScan" class="dashboard-scan-entry" aria-labelledby="dashboardScanTitle">
           <h2 id="dashboardScanTitle">What do you want to investigate?</h2>
@@ -52,7 +51,7 @@
           <form class="dashboard-scan-form" id="dashboardUniversalScanForm" action="/scan" method="get">
             <input type="hidden" name="mode" value="address">
             <label for="dashboardUniversalTarget">Wallet or contract address<input id="dashboardUniversalTarget" name="target" required maxlength="256" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Paste the complete public address" aria-describedby="dashboardScanStatus"></label>
-            <label for="dashboardScanNetwork">Network<select id="dashboardScanNetwork" name="network" required><option value="">Select network</option><option value="solana-mainnet">Solana</option><option value="ethereum-mainnet">Ethereum</option><option value="base-mainnet">Base</option><option value="arbitrum-mainnet">Arbitrum</option><option value="optimism-mainnet">Optimism</option><option value="bitcoin-mainnet">Bitcoin</option></select></label>
+            <label for="dashboardScanNetwork">Network<select id="dashboardScanNetwork" name="network" required><option value="">Select network</option><option value="solana-mainnet">Solana</option><option value="ethereum-mainnet">Ethereum</option><option value="base-mainnet">Base</option><option value="arbitrum-mainnet">Arbitrum</option><option value="optimism-mainnet">Optimism</option><option value="polygon-mainnet">Polygon</option><option value="bnb-mainnet">BNB Smart Chain</option><option value="avalanche-mainnet">Avalanche C-Chain</option><option value="bitcoin-mainnet">Bitcoin</option></select></label>
             <button type="submit">Analyze address</button>
           </form>
           <p id="dashboardScanStatus" role="status">Read-only analysis. No wallet connection or private keys.</p>

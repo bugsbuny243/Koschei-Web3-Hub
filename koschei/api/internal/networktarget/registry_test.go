@@ -32,11 +32,14 @@ func TestAddressIdentityIsNetworkScoped(t *testing.T) {
 
 func TestCatalogReportsImplementedProbesWithoutClaimingLiveAvailability(t *testing.T) {
 	probeReady := map[string]bool{
-		"ethereum-mainnet": false,
-		"base-mainnet":     false,
-		"arbitrum-mainnet": false,
-		"optimism-mainnet": false,
-		"bitcoin-mainnet":  false,
+		"ethereum-mainnet":  false,
+		"base-mainnet":      false,
+		"arbitrum-mainnet":  false,
+		"optimism-mainnet":  false,
+		"polygon-mainnet":   false,
+		"bnb-mainnet":       false,
+		"avalanche-mainnet": false,
+		"bitcoin-mainnet":   false,
 	}
 	for _, network := range Catalog() {
 		if _, ok := probeReady[network.ID]; !ok {
