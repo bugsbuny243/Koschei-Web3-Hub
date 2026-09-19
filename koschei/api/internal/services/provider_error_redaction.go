@@ -13,7 +13,14 @@ var providerCredentialPatterns = []*regexp.Regexp{
 }
 
 func SafeProviderError(err error) string {
-	return safeProviderError(err)
+	if err == nil {
+		return ""
+	}
+	message := redactProviderCredentials(err.Error())
+	if len(message) > 240 {
+		message = message[:240]
+	}
+	return message
 }
 
 func RedactProviderCredentials(message string) string {
@@ -21,14 +28,7 @@ func RedactProviderCredentials(message string) string {
 }
 
 func safeProviderError(err error) string {
-	if err == nil {
-		return ""
-	}
-	message := redactProviderCredentials(strings.TrimSpace(err.Error()))
-	if len(message) > 240 {
-		message = message[:240]
-	}
-	return message
+	return SafeProviderError(err)
 }
 
 func redactProviderCredentials(message string) string {

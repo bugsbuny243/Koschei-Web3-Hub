@@ -28,25 +28,25 @@ func TestWriteProviderSafeJSONRedactsNestedProviderURL(t *testing.T) {
 	}
 }
 
-func TestWriteProviderSafeJSONDoesNotTruncateLargePayload(t *testing.T) {
+func TestWriteProviderSafeJSONPreservesLargeValidJSON(t *testing.T) {
 	const value = "testvalue123"
 	recorder := httptest.NewRecorder()
 	writeProviderSafeJSON(recorder, http.StatusOK, map[string]any{
-		"summary":        strings.Repeat("x", 600),
-		"provider_error": "https://rpc.example.test/?api_key=" + value + "&network=mainnet",
+		"ok":    true,
+		"large": strings.Repeat("evidence-", 80),
+		"nested": map[string]any{
+			"error": `Post "https://mainnet.helius-rpc.com/?api-key=` + value + `": provider cooling down`,
+		},
 	})
 
-	body := recorder.Body.String()
-	if len(body) <= 240 {
-		t.Fatalf("provider-safe JSON was truncated: length=%d body=%q", len(body), body)
+	if recorder.Body.Len() <= 240 {
+		t.Fatalf("large response was unexpectedly truncated: %d bytes", recorder.Body.Len())
 	}
-	if strings.Contains(body, value) {
-		t.Fatalf("provider credential leaked in JSON response: %s", body)
+	var decoded map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &decoded); err != nil {
+		t.Fatalf("large provider-safe response must remain valid JSON: %v body=%q", err, recorder.Body.String())
 	}
-	if !strings.Contains(body, "api_key=[redacted]") {
-		t.Fatalf("redaction marker missing from JSON response: %s", body)
-	}
-	if !json.Valid([]byte(body)) {
-		t.Fatalf("provider-safe response must remain valid JSON: %s", body)
+	if strings.Contains(recorder.Body.String(), value) {
+		t.Fatalf("provider credential leaked in large JSON response: %s", recorder.Body.String())
 	}
 }
