@@ -52,8 +52,9 @@ func TestUniversalDispatcherKeepsDeclaredButUnconnectedKindsNonExecutable(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if evmTx.Executable || evmTx.Route != UniversalDispatchDeclaredOnly || evmTx.VerdictAuthority != UniversalVerdictNone {
-		t.Fatalf("EVM transaction was overclaimed: %#v", evmTx)
+	if !evmTx.Executable || evmTx.Route != UniversalDispatchEVMTransaction || !evmTx.EvidenceOnly ||
+		evmTx.VerdictAuthority != UniversalVerdictEvidenceOnly {
+		t.Fatalf("unexpected EVM transaction plan: %#v", evmTx)
 	}
 
 	btcTx, err := BuildUniversalInvestigationPlan(
