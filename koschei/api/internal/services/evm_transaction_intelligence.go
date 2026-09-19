@@ -25,7 +25,8 @@ func AdaptEVMTransactionEvidence(result networktarget.EVMTransactionEvidenceResu
 	if err != nil || subject.ChainFamily != IntelligenceChainFamilyEVM {
 		return NetworkProbeIntelligenceProjection{}, errors.New("EVM transaction subject classification mismatch")
 	}
-	if result.ExecutionState != networktarget.EVMTransactionExecutionPending &&
+	if result.ExecutionState != networktarget.EVMTransactionExecutionUnknown &&
+		result.ExecutionState != networktarget.EVMTransactionExecutionPending &&
 		result.ExecutionState != networktarget.EVMTransactionExecutionSuccess &&
 		result.ExecutionState != networktarget.EVMTransactionExecutionReverted {
 		return NetworkProbeIntelligenceProjection{}, errors.New("unsupported EVM transaction execution state")
@@ -47,6 +48,7 @@ func AdaptEVMTransactionEvidence(result networktarget.EVMTransactionEvidenceResu
 		"block_number": result.BlockNumber,
 		"execution_state": result.ExecutionState,
 		"receipt_status": result.ReceiptStatus,
+		"receipt_root": result.ReceiptRoot,
 		"gas_used": result.GasUsed,
 		"cumulative_gas_used": result.CumulativeGasUsed,
 		"effective_gas_price": result.EffectiveGasPrice,
@@ -56,12 +58,17 @@ func AdaptEVMTransactionEvidence(result networktarget.EVMTransactionEvidenceResu
 		"analysis_performed": true,
 		"live_availability": "checked",
 	}
-	logAddresses := make([]string, 0, len(result.Logs))
-	for _, item := range result.Logs {
-		logAddresses = append(logAddresses, item.Address)
-	}
-	if len(logAddresses) > 0 {
-		attrs["log_addresses"] = logAddresses
+	if len(result.Logs) > 0 {
+		logs := make([]map[string]any, 0, len(result.Logs))
+		for _, item := range result.Logs {
+			logs = append(logs, map[string]any{
+				"address":   item.Address,
+				"topics":    append([]string(nil), item.Topics...),
+				"log_index": item.LogIndex,
+				"removed":   item.Removed,
+			})
+		}
+		attrs["logs"] = logs
 	}
 
 	var block int64
