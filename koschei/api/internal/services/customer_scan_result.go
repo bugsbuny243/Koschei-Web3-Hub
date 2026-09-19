@@ -18,14 +18,15 @@ const (
 )
 
 type CustomerScanResult struct {
-	Target         CustomerScanTarget           `json:"target"`
-	Status         string                       `json:"status"`
-	Verdict        string                       `json:"verdict"`
-	EvidenceStatus string                       `json:"evidence_status"`
-	Trust          Web3TrustVector              `json:"trust"`
-	Reasons        []string                     `json:"reasons,omitempty"`
-	EvidenceRefs   []string                     `json:"evidence_refs,omitempty"`
-	EVMAuthority   *EVMSpenderAuthoritySnapshot `json:"evm_authority,omitempty"`
+	Target            CustomerScanTarget            `json:"target"`
+	Status            string                        `json:"status"`
+	Verdict           string                        `json:"verdict"`
+	EvidenceStatus    string                        `json:"evidence_status"`
+	Trust             Web3TrustVector               `json:"trust"`
+	Reasons           []string                      `json:"reasons,omitempty"`
+	EvidenceRefs      []string                      `json:"evidence_refs,omitempty"`
+	EVMAuthority      *EVMSpenderAuthoritySnapshot  `json:"evm_authority,omitempty"`
+	InvestigationPlan *UniversalInvestigationPlan   `json:"investigation_plan,omitempty"`
 }
 
 // BuildCustomerScanResult builds the customer-facing evidence envelope. It is
@@ -49,6 +50,13 @@ func BuildCustomerScanResult(target CustomerScanTarget, trust Web3TrustVector, e
 		Trust:          trust,
 		Reasons:        NormalizeWeb3TrustReasons(reasons),
 		EvidenceRefs:   nonEmptyIntelligenceRefs(evidenceRefs),
+	}
+	if target.Route != CustomerScanRouteUnresolved && !target.RequiresNetwork {
+		plan, planErr := UniversalInvestigationPlanForCustomerScanTarget(target)
+		if planErr != nil {
+			return CustomerScanResult{}, planErr
+		}
+		result.InvestigationPlan = &plan
 	}
 
 	switch {
