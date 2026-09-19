@@ -60,19 +60,19 @@ func TestAdaptEVMTransactionEvidenceRemainsObservedOnly(t *testing.T) {
 func TestAdaptEVMTransactionEvidenceAcceptsUnknownExecutionWithoutPromotingIt(t *testing.T) {
 	txHash := "0x" + strings.Repeat("9", 64)
 	result := networktarget.EVMTransactionEvidenceResult{
-		SchemaVersion: networktarget.SchemaVersion,
-		Network: "ethereum-mainnet",
-		ChainID: "0x1",
+		SchemaVersion:     networktarget.SchemaVersion,
+		Network:           "ethereum-mainnet",
+		ChainID:           "0x1",
 		ExpectedChainID:   "0x1",
-		TransactionHash: txHash,
-		From: "0x1111111111111111111111111111111111111111",
-		BlockHash: "0x" + strings.Repeat("c", 64),
-		BlockNumber: "0x10",
+		TransactionHash:   txHash,
+		From:              "0x1111111111111111111111111111111111111111",
+		BlockHash:         "0x" + strings.Repeat("c", 64),
+		BlockNumber:       "0x10",
 		ExecutionState:    networktarget.EVMTransactionExecutionUnknown,
 		ReceiptRoot:       "0x" + strings.Repeat("d", 64),
 		AnalysisPerformed: true,
-		EvidenceStatus: IntelligenceEvidenceObserved,
-		LiveAvailability: "checked",
+		EvidenceStatus:    IntelligenceEvidenceObserved,
+		LiveAvailability:  "checked",
 	}
 	projection, err := AdaptEVMTransactionEvidence(result, time.Unix(2, 0).UTC())
 	if err != nil {
