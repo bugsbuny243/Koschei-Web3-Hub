@@ -109,6 +109,35 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 	defer cancel()
 	observedAt := time.Now().UTC()
 
+	if target.Route == services.CustomerScanRouteTxLookup {
+		if _, ok := networktarget.ExpectedEVMChainID(request.Network); !ok {
+			writeCustomerScanError(w, http.StatusNotImplemented, "transaction_network_not_connected")
+			return
+		}
+		endpoint := configuredEVMRPCEndpoint(request.Network)
+		if endpoint == "" {
+			writeCustomerScanError(w, http.StatusServiceUnavailable, "evm_rpc_configuration_required")
+			return
+		}
+		probe, probeErr := networktarget.ProbeEVMTransaction(ctx, nil, endpoint, request.Network, request.Target)
+		if probeErr != nil {
+			writeCustomerScanError(w, http.StatusBadGateway, "evm_transaction_probe_unavailable")
+			return
+		}
+		projection, projectionErr := services.AdaptEVMTransactionEvidence(probe, observedAt)
+		if projectionErr != nil {
+			writeCustomerScanError(w, http.StatusBadGateway, "evm_transaction_projection_unavailable")
+			return
+		}
+		result, resultErr := services.CustomerScanResultFromEVMTransaction(target, projection)
+		if resultErr != nil {
+			writeCustomerScanError(w, http.StatusBadGateway, "customer_scan_result_unavailable")
+			return
+		}
+		writeCustomerScanResult(w, http.StatusOK, result)
+		return
+	}
+
 	if target.Route == services.CustomerScanRouteSolanaIntel {
 		if request.Network != "solana-mainnet" {
 			writeCustomerScanError(w, http.StatusUnprocessableEntity, "solana_mainnet_required")
