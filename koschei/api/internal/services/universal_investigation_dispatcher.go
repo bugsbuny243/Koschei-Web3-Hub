@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/hex"
 	"errors"
 	"strings"
 )
@@ -149,7 +150,12 @@ func buildEVMUniversalDispatchPlan(plan UniversalInvestigationPlan) (UniversalIn
 		plan.VerdictAuthority = UniversalVerdictEvidenceOnly
 		plan.Limitations = append(plan.Limitations, "Current EVM dispatcher collects chain-identity, bytecode/delegation and authority evidence only; no deterministic EVM grade is authorized.")
 	case IntelligenceSubjectTransaction:
-		if len(strings.TrimSpace(plan.Subject.Raw)) != 66 || !strings.HasPrefix(strings.ToLower(strings.TrimSpace(plan.Subject.Raw)), "0x") {
+		raw := strings.ToLower(strings.TrimSpace(plan.Subject.Raw))
+		if len(raw) != 66 || !strings.HasPrefix(raw, "0x") {
+			return UniversalInvestigationPlan{}, errors.New("EVM executable transaction target must be a canonical 32-byte hash")
+		}
+		decoded, err := hex.DecodeString(raw[2:])
+		if err != nil || len(decoded) != 32 {
 			return UniversalInvestigationPlan{}, errors.New("EVM executable transaction target must be a canonical 32-byte hash")
 		}
 		plan.Route = UniversalDispatchEVMTransaction
