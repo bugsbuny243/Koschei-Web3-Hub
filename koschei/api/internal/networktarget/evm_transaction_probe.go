@@ -16,10 +16,15 @@ import (
 )
 
 const (
+	EVMTransactionExecutionUnknown  = "unknown"
 	EVMTransactionExecutionPending  = "pending"
 	EVMTransactionExecutionSuccess  = "success"
 	EVMTransactionExecutionReverted = "reverted"
+
+	evmTransactionResponseLimit = 8 * 1024 * 1024
 )
+
+var ErrEVMTransactionNotFound = fmt.Errorf("evm_transaction_not_found")
 
 type EVMTransactionLogSummary struct {
 	Address  string   `json:"address"`
@@ -47,6 +52,7 @@ type EVMTransactionEvidenceResult struct {
 	BlockNumber       string                     `json:"block_number,omitempty"`
 	ExecutionState    string                     `json:"execution_state"`
 	ReceiptStatus     string                     `json:"receipt_status,omitempty"`
+	ReceiptRoot       string                     `json:"receipt_root,omitempty"`
 	GasUsed           string                     `json:"gas_used,omitempty"`
 	CumulativeGasUsed string                     `json:"cumulative_gas_used,omitempty"`
 	EffectiveGasPrice string                     `json:"effective_gas_price,omitempty"`
@@ -76,6 +82,7 @@ type evmReceiptRPC struct {
 	BlockHash         string  `json:"blockHash"`
 	BlockNumber       string  `json:"blockNumber"`
 	Status            string  `json:"status"`
+	Root              string  `json:"root"`
 	GasUsed           string  `json:"gasUsed"`
 	CumulativeGasUsed string  `json:"cumulativeGasUsed"`
 	EffectiveGasPrice string  `json:"effectiveGasPrice"`
@@ -123,7 +130,7 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_unavailable: %w", err)
 	}
 	if isNull {
-		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_not_found")
+		return EVMTransactionEvidenceResult{}, ErrEVMTransactionNotFound
 	}
 	var tx evmTransactionRPC
 	if err := json.Unmarshal(rawTx, &tx); err != nil {
@@ -165,6 +172,9 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_receipt_unavailable: %w", err)
 	}
 	if receiptNull {
+		if result.BlockHash != "" || result.BlockNumber != "" {
+			result.ExecutionState = EVMTransactionExecutionUnknown
+		}
 		return result, nil
 	}
 
@@ -177,19 +187,27 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 	}
 	receipt.BlockHash = strings.ToLower(strings.TrimSpace(receipt.BlockHash))
 	receipt.BlockNumber = strings.ToLower(strings.TrimSpace(receipt.BlockNumber))
+	if !validEVMTransactionHash(receipt.BlockHash) || !validEVMHexQuantity(receipt.BlockNumber) {
+		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_receipt_block_anchor_invalid")
+	}
 	if result.BlockHash != "" && receipt.BlockHash != result.BlockHash {
 		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_block_hash_mismatch")
 	}
 	if result.BlockNumber != "" && receipt.BlockNumber != result.BlockNumber {
 		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_block_number_mismatch")
 	}
-	if receipt.Status != "0x0" && receipt.Status != "0x1" {
+	receipt.Root = strings.ToLower(strings.TrimSpace(receipt.Root))
+	if receipt.Status != "" && receipt.Status != "0x0" && receipt.Status != "0x1" {
 		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_receipt_status_invalid")
+	}
+	if receipt.Status == "" && !validEVMTransactionHash(receipt.Root) {
+		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_receipt_status_unknown_without_root")
 	}
 
 	result.BlockHash = receipt.BlockHash
 	result.BlockNumber = receipt.BlockNumber
 	result.ReceiptStatus = receipt.Status
+	result.ReceiptRoot = receipt.Root
 	result.GasUsed = receipt.GasUsed
 	result.CumulativeGasUsed = receipt.CumulativeGasUsed
 	result.EffectiveGasPrice = receipt.EffectiveGasPrice
@@ -199,10 +217,13 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 			return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_contract_address_invalid")
 		}
 	}
-	if receipt.Status == "0x1" {
+	switch receipt.Status {
+	case "0x1":
 		result.ExecutionState = EVMTransactionExecutionSuccess
-	} else {
+	case "0x0":
 		result.ExecutionState = EVMTransactionExecutionReverted
+	default:
+		result.ExecutionState = EVMTransactionExecutionUnknown
 	}
 	result.Logs = make([]EVMTransactionLogSummary, 0, len(receipt.Logs))
 	for _, item := range receipt.Logs {
@@ -243,6 +264,24 @@ func validEVMAddress(value string) bool {
 	return err == nil
 }
 
+func validEVMHexQuantity(value string) bool {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if len(value) < 3 || !strings.HasPrefix(value, "0x") {
+		return false
+	}
+	raw := value[2:]
+	if raw == "" || (len(raw) > 1 && raw[0] == '0') {
+		return false
+	}
+	_, err := hex.DecodeString(func() string {
+		if len(raw)%2 != 0 {
+			return "0" + raw
+		}
+		return raw
+	}())
+	return err == nil
+}
+
 func hashEVMHexData(value string) (string, int, error) {
 	value = strings.TrimSpace(value)
 	if !strings.HasPrefix(value, "0x") {
@@ -278,7 +317,7 @@ func evmRPCRaw(ctx context.Context, client *http.Client, endpoint string, id int
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return nil, false, fmt.Errorf("rpc_status_%d", resp.StatusCode)
 	}
-	limited := &io.LimitedReader{R: resp.Body, N: evmProbeResponseLimit + 1}
+	limited := &io.LimitedReader{R: resp.Body, N: evmTransactionResponseLimit + 1}
 	var decoded evmRPCResponse
 	if err := json.NewDecoder(limited).Decode(&decoded); err != nil {
 		return nil, false, err
