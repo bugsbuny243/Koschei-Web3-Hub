@@ -126,7 +126,6 @@ func TestUniversalDispatcherRejectsExecutableAddressKindWithInvalidSyntax(t *tes
 	}
 }
 
-
 func TestUniversalDispatcherRejectsNonHexEVMTransactionHash(t *testing.T) {
 	_, err := BuildUniversalInvestigationPlan(
 		"0xzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
