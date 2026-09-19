@@ -52,8 +52,9 @@ func TestUniversalDispatcherKeepsDeclaredButUnconnectedKindsNonExecutable(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if evmTx.Executable || evmTx.Route != UniversalDispatchDeclaredOnly || evmTx.VerdictAuthority != UniversalVerdictNone {
-		t.Fatalf("EVM transaction was overclaimed: %#v", evmTx)
+	if !evmTx.Executable || evmTx.Route != UniversalDispatchEVMTransaction || !evmTx.EvidenceOnly ||
+		evmTx.VerdictAuthority != UniversalVerdictEvidenceOnly {
+		t.Fatalf("unexpected EVM transaction plan: %#v", evmTx)
 	}
 
 	btcTx, err := BuildUniversalInvestigationPlan(
@@ -122,5 +123,16 @@ func TestUniversalDispatcherRejectsExecutableAddressKindWithInvalidSyntax(t *tes
 	}
 	if _, err := BuildUniversalInvestigationPlan("not-bitcoin", "bitcoin-mainnet", IntelligenceSubjectAddress); err == nil {
 		t.Fatal("invalid Bitcoin address target was accepted")
+	}
+}
+
+func TestUniversalDispatcherRejectsNonHexEVMTransactionHash(t *testing.T) {
+	_, err := BuildUniversalInvestigationPlan(
+		"0xzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+		"ethereum-mainnet",
+		IntelligenceSubjectTransaction,
+	)
+	if err == nil {
+		t.Fatal("non-hex EVM transaction hash was declared executable")
 	}
 }

@@ -18,15 +18,16 @@ const (
 )
 
 type CustomerScanResult struct {
-	Target            CustomerScanTarget           `json:"target"`
-	Status            string                       `json:"status"`
-	Verdict           string                       `json:"verdict"`
-	EvidenceStatus    string                       `json:"evidence_status"`
-	Trust             Web3TrustVector              `json:"trust"`
-	Reasons           []string                     `json:"reasons,omitempty"`
-	EvidenceRefs      []string                     `json:"evidence_refs,omitempty"`
-	EVMAuthority      *EVMSpenderAuthoritySnapshot `json:"evm_authority,omitempty"`
-	InvestigationPlan *UniversalInvestigationPlan  `json:"investigation_plan,omitempty"`
+	Target              CustomerScanTarget           `json:"target"`
+	Status              string                       `json:"status"`
+	Verdict             string                       `json:"verdict"`
+	EvidenceStatus      string                       `json:"evidence_status"`
+	Trust               Web3TrustVector              `json:"trust"`
+	Reasons             []string                     `json:"reasons,omitempty"`
+	EvidenceRefs        []string                     `json:"evidence_refs,omitempty"`
+	EVMAuthority        *EVMSpenderAuthoritySnapshot `json:"evm_authority,omitempty"`
+	InvestigationPlan   *UniversalInvestigationPlan  `json:"investigation_plan,omitempty"`
+	TransactionEvidence *IntelligenceEvidence        `json:"transaction_evidence,omitempty"`
 }
 
 // BuildCustomerScanResult builds the customer-facing evidence envelope. It is
@@ -133,5 +134,37 @@ func CustomerScanResultFromEVMAuthority(target CustomerScanTarget, projection Ne
 	result.Reasons = NormalizeWeb3TrustReasons(append(result.Reasons, authority.Reasons...))
 	result.Trust.Reasons = append([]string(nil), result.Reasons...)
 	result.EVMAuthority = &authority
+	return result, nil
+}
+
+func CustomerScanResultFromEVMTransaction(target CustomerScanTarget, projection NetworkProbeIntelligenceProjection) (CustomerScanResult, error) {
+	if target.Route != CustomerScanRouteTxLookup || target.Kind != CustomerScanTargetTxHash {
+		return CustomerScanResult{}, errors.New("EVM transaction result requires transaction lookup route")
+	}
+	if target.RequiresNetwork {
+		return CustomerScanResult{}, errors.New("network context is required before EVM transaction projection")
+	}
+	if projection.Subject.Kind != IntelligenceSubjectTransaction || projection.Subject.ChainFamily != IntelligenceChainFamilyEVM {
+		return CustomerScanResult{}, errors.New("EVM transaction projection is required")
+	}
+	if !strings.EqualFold(strings.TrimSpace(projection.Subject.Raw), strings.TrimSpace(target.Raw)) ||
+		!strings.EqualFold(strings.TrimSpace(projection.Subject.Network), strings.TrimSpace(target.NetworkHint)) ||
+		projection.Evidence.SubjectID != projection.Subject.ID ||
+		projection.Evidence.ChainFamily != projection.Subject.ChainFamily ||
+		!strings.EqualFold(strings.TrimSpace(projection.Evidence.Chain), strings.TrimSpace(projection.Subject.Chain)) ||
+		!strings.EqualFold(strings.TrimSpace(projection.Evidence.Network), strings.TrimSpace(projection.Subject.Network)) ||
+		projection.Evidence.Status != IntelligenceEvidenceObserved ||
+		!strings.EqualFold(strings.TrimSpace(projection.Evidence.TransactionHash), strings.TrimSpace(target.Raw)) {
+		return CustomerScanResult{}, errors.New("EVM transaction evidence is not bound to the customer target")
+	}
+	result, err := BuildCustomerScanResult(target, Web3TrustVector{
+		Observed: true,
+		Reasons:  []string{"READ_ONLY_EVM_TRANSACTION_OBSERVATION"},
+	}, []string{projection.Evidence.ID})
+	if err != nil {
+		return CustomerScanResult{}, err
+	}
+	evidence := projection.Evidence
+	result.TransactionEvidence = &evidence
 	return result, nil
 }

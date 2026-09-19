@@ -14,6 +14,13 @@ import (
 
 var networkTargetRequests atomic.Uint64
 var networkTargetRejected atomic.Uint64
+var networkEVMTransactionProbeRequests atomic.Uint64
+var networkEVMTransactionProbeSuccess atomic.Uint64
+var networkEVMTransactionProbeNotFound atomic.Uint64
+var networkEVMTransactionProbeFailed atomic.Uint64
+var networkEVMTransactionProbePending atomic.Uint64
+var networkEVMTransactionProbeUnknown atomic.Uint64
+var networkEVMTransactionProbeLatencyMillis atomic.Uint64
 
 type networkTargetRequest struct {
 	Network string `json:"network"`
@@ -65,17 +72,24 @@ func registerNetworkTargetRoutes(mux *http.ServeMux) {
 func networkCoverageCatalog(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	telemetry := map[string]any{}
+	telemetry["scope"] = "process_local"
+	telemetry["resolution_requests"] = networkTargetRequests.Load()
+	telemetry["rejected_requests"] = networkTargetRejected.Load()
+	telemetry["addresses_recorded"] = false
+	telemetry["evm_transaction_probe_requests"] = networkEVMTransactionProbeRequests.Load()
+	telemetry["evm_transaction_probe_success"] = networkEVMTransactionProbeSuccess.Load()
+	telemetry["evm_transaction_probe_not_found"] = networkEVMTransactionProbeNotFound.Load()
+	telemetry["evm_transaction_probe_failed"] = networkEVMTransactionProbeFailed.Load()
+	telemetry["evm_transaction_probe_pending"] = networkEVMTransactionProbePending.Load()
+	telemetry["evm_transaction_probe_unknown"] = networkEVMTransactionProbeUnknown.Load()
+	telemetry["evm_transaction_probe_latency_ms_total"] = networkEVMTransactionProbeLatencyMillis.Load()
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"schema_version":    networktarget.SchemaVersion,
 		"scope_target":      "all-blockchain-networks-and-address-types",
 		"networks":          networktarget.Catalog(),
 		"live_availability": "not_checked",
-		"telemetry": map[string]any{
-			"scope":               "process_local",
-			"resolution_requests": networkTargetRequests.Load(),
-			"rejected_requests":   networkTargetRejected.Load(),
-			"addresses_recorded":  false,
-		},
+		"telemetry":         telemetry,
 	})
 }
 

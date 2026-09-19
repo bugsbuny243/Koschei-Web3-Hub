@@ -31,6 +31,10 @@ function renderTrust(trust={}){
 
 function customerSummary(result){
   if(!result)return'Evidence unavailable';
+  if(result.transaction_evidence){
+    const state=String(result.transaction_evidence.state_change||result.transaction_evidence.attributes?.execution_state||'unknown').replaceAll('_',' ');
+    return 'Transaction '+state;
+  }
   if(result.evm_authority){
     const a=result.evm_authority;
     if(a.delegation_state==='delegation_observed')return'EIP-7702 delegation observed';
@@ -67,6 +71,21 @@ function verdictSummary(classification,entries){
   return{tone:'limited',label:'LIMITED EVIDENCE',title:'Evidence returned without a completed observation.',copy:'Koschei did not promote incomplete evidence into a safety claim.'};
 }
 
+function transactionRows(evidence){
+  if(!evidence)return '';
+  const a=evidence.attributes||{};
+  const rows=[
+    ['Execution',evidence.state_change||a.execution_state],
+    ['Block',evidence.block_or_slot||a.block_number],
+    ['From',evidence.address||a.from],
+    ['To',evidence.contract||a.to],
+    ['Receipt status',a.receipt_status],
+    ['Logs',a.log_count]
+  ];
+  return '<div class="cus-authority"><div class="cus-subhead"><span>Transaction evidence</span><b>Observed only</b></div>'+
+    rows.filter(([,value])=>value!==undefined&&value!==null&&value!=='').map(([key,value])=>'<div class="cus-row"><span>'+esc(key)+'</span><b title="'+esc(value)+'">'+esc(short(value))+'</b></div>').join('')+'</div>';
+}
+
 function resultCard(entry){
   const result=entry.data?.result;
   if(!entry.ok||!result){
@@ -81,6 +100,7 @@ function resultCard(entry){
     <details class="cus-details"><summary>Technical evidence</summary>
       ${renderTrust(result.trust||{})}
       ${authority?`<div class="cus-authority"><div class="cus-subhead"><span>Authority surface</span><b>Observed evidence</b></div>${authorityRows(authority)}</div>`:''}
+      ${transactionRows(result.transaction_evidence)}
       <div class="cus-reasons"><div class="cus-subhead"><span>Reason codes</span><b>${reasons.length}</b></div>${reasons.length?reasons.map(reason=>`<code>${esc(reason)}</code>`).join(''):'<span class="cus-empty">No reason code attached.</span>'}</div>
       <div class="cus-reasons"><div class="cus-subhead">Evidence references</div>${(result.evidence_refs||[]).map(ref=>`<code>${esc(ref)}</code>`).join('')||'<span class="cus-empty">No reference was attached.</span>'}</div>
       <details class="cus-details"><summary>Complete response</summary><pre class="cus-raw">${esc(JSON.stringify(entry.data,null,2))}</pre></details>
@@ -119,11 +139,11 @@ function install(){
   function stop(){
     generation++;
     pending?.abort();pending=null;
-    form.removeAttribute('aria-busy');submit.disabled=false;submit.textContent='Analyze address';cancel.hidden=true;
+    form.removeAttribute('aria-busy');submit.disabled=false;submit.textContent='Analyze target';cancel.hidden=true;
   }
   function invalidate(){
     stop();wrap.hidden=true;recovery.hidden=true;
-    status.textContent='Ready to analyze the current address and network.';
+    status.textContent='Ready to analyze the current target and network.';
     input.removeAttribute('aria-invalid');
   }
   input.addEventListener('input',invalidate);network.addEventListener('change',invalidate);
@@ -141,15 +161,15 @@ function install(){
     const current=++generation,controller=new AbortController();pending=controller;
     const timer=setTimeout(()=>controller.abort(),15000);
     submit.disabled=true;submit.textContent='Analyzing…';cancel.hidden=false;form.setAttribute('aria-busy','true');
-    status.textContent=`Collecting read-only evidence on ${request.label}…`;
+    status.textContent=`Collecting read-only ${request.kind==='transaction'?'transaction':'address'} evidence on ${request.label}…`;
     history.replaceState({},'',routing.url(request.target,request.network).url);
     try{
       const response=await fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({target:request.target,network:request.network}),cache:'no-store',credentials:'same-origin',signal:controller.signal});
       const data=await response.json();
       if(current!==generation)return;
-      if(response.ok&&!routing.matchesResult(data,request))throw new Error('The returned evidence does not match this address and network. The result was withheld.');
+      if(response.ok&&!routing.matchesResult(data,request))throw new Error('The returned evidence does not match this target and network. The result was withheld.');
       const entry={network:request.network,label:request.label,http:response.status,ok:response.ok,data};
-      overview.innerHTML=summaryBlock({family:request.family,label:request.label+' address'},[entry]);
+      overview.innerHTML=summaryBlock({family:request.family,label:request.label+' '+(request.kind==='transaction'?'transaction':'address')},[entry]);
       results.innerHTML=resultCard(entry);wrap.hidden=false;
       status.textContent=response.ok?'Analysis complete. Review the findings, limits and technical evidence below.':(errorCopy[response.status]||'Analysis could not complete. Review the source error below and try again.');
       if([401,402,403].includes(response.status)){
@@ -168,7 +188,7 @@ function install(){
       wrap.hidden=true;
     }finally{
       clearTimeout(timer);
-      if(current===generation){pending=null;submit.disabled=false;submit.textContent='Analyze address';cancel.hidden=true;form.removeAttribute('aria-busy');}
+      if(current===generation){pending=null;submit.disabled=false;submit.textContent='Analyze target';cancel.hidden=true;form.removeAttribute('aria-busy');}
     }
   }
   form.addEventListener('submit',event=>{event.preventDefault();runScan();});

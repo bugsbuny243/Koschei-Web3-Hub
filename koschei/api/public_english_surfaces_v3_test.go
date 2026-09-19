@@ -47,7 +47,7 @@ func TestCanonicalInvestigationSurfaceMountsProfessionalModesAndEvidenceControll
 	text := string(body)
 	for _, required := range []string{
 		"INTELLIGENCE DESK",
-		"Investigate an address.",
+		"Investigate an address or EVM transaction.",
 		"Every material state keeps its source boundary",
 		"data-scan-mode=\"token\"",
 		"data-scan-mode=\"transaction\"",

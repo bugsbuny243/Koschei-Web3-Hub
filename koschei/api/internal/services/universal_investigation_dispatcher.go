@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/hex"
 	"errors"
 	"strings"
 )
@@ -9,6 +10,7 @@ const (
 	UniversalDispatchSolanaCore       = "solana_live_core"
 	UniversalDispatchSolanaTx         = "solana_transaction_intelligence"
 	UniversalDispatchEVMProbe         = "evm_read_only_probe"
+	UniversalDispatchEVMTransaction   = "evm_transaction_receipt_probe"
 	UniversalDispatchBitcoinProbe     = "bitcoin_read_only_probe"
 	UniversalDispatchDeclaredOnly     = "declared_not_executable"
 	UniversalDispatchPlannedAdapter   = "planned_adapter"
@@ -147,6 +149,20 @@ func buildEVMUniversalDispatchPlan(plan UniversalInvestigationPlan) (UniversalIn
 		plan.EvidenceOnly = true
 		plan.VerdictAuthority = UniversalVerdictEvidenceOnly
 		plan.Limitations = append(plan.Limitations, "Current EVM dispatcher collects chain-identity, bytecode/delegation and authority evidence only; no deterministic EVM grade is authorized.")
+	case IntelligenceSubjectTransaction:
+		raw := strings.ToLower(strings.TrimSpace(plan.Subject.Raw))
+		if len(raw) != 66 || !strings.HasPrefix(raw, "0x") {
+			return UniversalInvestigationPlan{}, errors.New("EVM executable transaction target must be a canonical 32-byte hash")
+		}
+		decoded, err := hex.DecodeString(raw[2:])
+		if err != nil || len(decoded) != 32 {
+			return UniversalInvestigationPlan{}, errors.New("EVM executable transaction target must be a canonical 32-byte hash")
+		}
+		plan.Route = UniversalDispatchEVMTransaction
+		plan.Executable = true
+		plan.EvidenceOnly = true
+		plan.VerdictAuthority = UniversalVerdictEvidenceOnly
+		plan.Limitations = append(plan.Limitations, "EVM transaction and receipt evidence is observational only; execution success or revert does not imply safety or authorization.")
 	default:
 		plan.Route = UniversalDispatchDeclaredOnly
 		plan.Limitations = append(plan.Limitations, "EVM target kind is declared in the universal model but no production transaction/block/bridge/governance collector is connected yet.")
