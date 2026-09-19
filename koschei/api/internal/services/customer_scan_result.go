@@ -27,6 +27,7 @@ type CustomerScanResult struct {
 	EvidenceRefs      []string                     `json:"evidence_refs,omitempty"`
 	EVMAuthority      *EVMSpenderAuthoritySnapshot `json:"evm_authority,omitempty"`
 	InvestigationPlan *UniversalInvestigationPlan  `json:"investigation_plan,omitempty"`
+	TransactionEvidence *IntelligenceEvidence        `json:"transaction_evidence,omitempty"`
 }
 
 // BuildCustomerScanResult builds the customer-facing evidence envelope. It is
@@ -133,5 +134,33 @@ func CustomerScanResultFromEVMAuthority(target CustomerScanTarget, projection Ne
 	result.Reasons = NormalizeWeb3TrustReasons(append(result.Reasons, authority.Reasons...))
 	result.Trust.Reasons = append([]string(nil), result.Reasons...)
 	result.EVMAuthority = &authority
+	return result, nil
+}
+
+
+func CustomerScanResultFromEVMTransaction(target CustomerScanTarget, projection NetworkProbeIntelligenceProjection) (CustomerScanResult, error) {
+	if target.Route != CustomerScanRouteTxLookup || target.Kind != CustomerScanTargetTxHash {
+		return CustomerScanResult{}, errors.New("EVM transaction result requires transaction lookup route")
+	}
+	if target.RequiresNetwork {
+		return CustomerScanResult{}, errors.New("network context is required before EVM transaction projection")
+	}
+	if projection.Subject.Kind != IntelligenceSubjectTransaction || projection.Subject.ChainFamily != IntelligenceChainFamilyEVM {
+		return CustomerScanResult{}, errors.New("EVM transaction projection is required")
+	}
+	if !strings.EqualFold(strings.TrimSpace(projection.Subject.Raw), strings.TrimSpace(target.Raw)) ||
+		projection.Evidence.Status != IntelligenceEvidenceObserved ||
+		!strings.EqualFold(strings.TrimSpace(projection.Evidence.TransactionHash), strings.TrimSpace(target.Raw)) {
+		return CustomerScanResult{}, errors.New("EVM transaction evidence is not bound to the customer target")
+	}
+	result, err := BuildCustomerScanResult(target, Web3TrustVector{
+		Observed: true,
+		Reasons:  []string{"READ_ONLY_EVM_TRANSACTION_OBSERVATION"},
+	}, []string{projection.Evidence.ID})
+	if err != nil {
+		return CustomerScanResult{}, err
+	}
+	evidence := projection.Evidence
+	result.TransactionEvidence = &evidence
 	return result, nil
 }
