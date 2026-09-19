@@ -147,7 +147,6 @@ func TestCustomerScanResultFromEVMTransactionBindsObservedEvidence(t *testing.T)
 	}
 }
 
-
 func TestCustomerScanResultFromEVMTransactionRejectsCrossNetworkEvidence(t *testing.T) {
 	target, err := ClassifyCustomerScanTarget(
 		"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
