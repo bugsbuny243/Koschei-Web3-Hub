@@ -87,6 +87,7 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 		if historyDB != nil {
 			store := services.NewSecurityRadarStore(historyDB)
 			_ = store.CaptureHolderSnapshots(parent, target, network, intelligence)
+			_, _ = services.CapturePersistentDominantHolderMemory(parent, historyDB, network, target, intelligence, time.Now().UTC())
 
 			// ACTOR_INVESTIGATION_ENGINE.md sections 1, 2 and 6; actor-v1.0,
 			// unified-radar-v1.0. Prefer the retention-independent actor index.

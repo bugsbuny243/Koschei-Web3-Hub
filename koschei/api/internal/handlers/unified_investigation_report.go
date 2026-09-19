@@ -69,6 +69,22 @@ func (h *Handler) assembleUnifiedInvestigationReport(ctx context.Context, core h
 	return h.assembleUnifiedInvestigationReportMode(ctx, core, mode)
 }
 
+func (h *Handler) unifiedInvestigationDB(liveRequested bool) *sql.DB {
+	if h == nil {
+		return nil
+	}
+	// Full/live investigation mutates the persistent actor index and immediately
+	// rereads that evidence. Prefer the primary database so writes never target a
+	// read replica and read-after-write actor evidence is visible in the same run.
+	if liveRequested && h.DB != nil {
+		return h.DB
+	}
+	if h.DBRead != nil {
+		return h.DBRead
+	}
+	return h.DB
+}
+
 func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, core holderIntelligenceCoreResult, mode string) unifiedInvestigationAssembly {
 	target := strings.TrimSpace(core.Request.Target)
 	network := strings.TrimSpace(core.Request.Network)
@@ -79,10 +95,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	creator := strings.TrimSpace(creatorIntelCleanString(core.SourceContext["creator_wallet"]))
 	liveRequested := unifiedLiveEvidenceAllowed(mode)
 
-	db := h.DBRead
-	if db == nil {
-		db = h.DB
-	}
+	db := h.unifiedInvestigationDB(liveRequested)
 	actorDossier := services.ActorDefenseDossier{
 		Wallet: creator, Network: network,
 		Tokens: []services.ActorDefenseTokenObservation{}, RelatedActors: []services.ActorDefenseRelatedActor{},
@@ -229,7 +242,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			actorLifecycle.Limitations = append(actorLifecycle.Limitations, "Actor lifecycle corpus query failed.")
 		}
 	}
-	actorLifecycle = applyRequestScopeActorLifecycleRecurrence(&core, actorLifecycle, externalDiscovery, creator, network, target)
+	actorLifecycle = applyRequestScopeActorLifecycleRecurrence(&core, actorLifecycle, externalDiscovery, actorDossier, creator, network, target)
 
 	actorExit := services.ActorExitRecurrence{
 		Status: "not_investigated", EvidenceStatus: "not_investigated", ActorWallet: creator, Network: network, CurrentTarget: target,

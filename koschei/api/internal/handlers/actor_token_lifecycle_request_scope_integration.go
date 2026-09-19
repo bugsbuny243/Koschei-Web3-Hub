@@ -6,16 +6,16 @@ import (
 	"koschei/api/internal/services"
 )
 
-// applyRequestScopeActorLifecycleRecurrence restores Repeat Actor Scan from
-// canonically verified creator-mint lifecycle observations collected in the
-// current live request when persistent lifecycle memory is unavailable or less
-// complete. Persistent VERIFIED evidence remains preferred when it is at least
-// as strong. This helper never changes deterministic verdict rules.
-func applyRequestScopeActorLifecycleRecurrence(core *holderIntelligenceCoreResult, current services.ActorTokenLifecycleRecurrence, external actorExternalDiscoveryRun, creator, network, target string) services.ActorTokenLifecycleRecurrence {
+// applyRequestScopeActorLifecycleRecurrence restores lifecycle visibility from
+// canonically verified creator-mint observations already present in the current
+// investigation. External discovery and the actor evidence graph are both read;
+// no additional RPC call or persistent-memory claim is created here.
+func applyRequestScopeActorLifecycleRecurrence(core *holderIntelligenceCoreResult, current services.ActorTokenLifecycleRecurrence, external actorExternalDiscoveryRun, dossier services.ActorDefenseDossier, creator, network, target string) services.ActorTokenLifecycleRecurrence {
 	if core == nil || strings.TrimSpace(creator) == "" {
 		return current
 	}
 	observations := append([]services.ActorTokenLifecycleObservation{}, external.CreatedMintPortfolio.LifecycleObservations...)
+	observations = append(observations, verifiedLifecycleObservationsFromActorGraph(dossier, creator)...)
 	requestScope := services.BuildRequestScopeTokenLifecycleRecurrence(creator, network, target, observations)
 	if !preferRequestScopeActorLifecycle(current, requestScope) {
 		return current
@@ -29,6 +29,41 @@ func applyRequestScopeActorLifecycleRecurrence(core *holderIntelligenceCoreResul
 	}
 	core.Final = services.ArvisFinalFromBundle(core.Bundle)
 	return requestScope
+}
+
+// verifiedLifecycleObservationsFromActorGraph exposes only canonical creator→mint
+// graph edges to lifecycle. OBSERVED/INFERRED edges, edges without transaction
+// references, and non-creator relations are deliberately excluded.
+func verifiedLifecycleObservationsFromActorGraph(dossier services.ActorDefenseDossier, creator string) []services.ActorTokenLifecycleObservation {
+	creator = strings.TrimSpace(creator)
+	if creator == "" {
+		return []services.ActorTokenLifecycleObservation{}
+	}
+	graph := services.BuildActorEvidenceGraph(dossier)
+	out := []services.ActorTokenLifecycleObservation{}
+	for _, edge := range graph.Edges {
+		if edge.VerificationStatus != "verified" || !strings.EqualFold(strings.TrimSpace(edge.Relation), "created_token") {
+			continue
+		}
+		if strings.TrimSpace(edge.Source) != creator || strings.TrimSpace(edge.Target) == "" {
+			continue
+		}
+		if strings.TrimSpace(edge.Signature) == "" || edge.Slot <= 0 || edge.ObservedAt.IsZero() {
+			continue
+		}
+		out = append(out, services.ActorTokenLifecycleObservation{
+			Network:           dossier.Network,
+			ActorWallet:       creator,
+			Mint:              strings.TrimSpace(edge.Target),
+			CreationSignature: strings.TrimSpace(edge.Signature),
+			CreationSlot:      edge.Slot,
+			FirstObservedAt:   edge.ObservedAt.UTC(),
+			LastObservedAt:    edge.ObservedAt.UTC(),
+			ObservationCount:  1,
+			LifecycleStatus:   "creator_relation_observed",
+		})
+	}
+	return out
 }
 
 // markRequestScopeActorLifecycleProvenance prevents live, request-scoped
@@ -62,6 +97,14 @@ func markRequestScopeActorLifecycleProvenance(analysis *services.ArvisAnalysis) 
 }
 
 func preferRequestScopeActorLifecycle(current, requestScope services.ActorTokenLifecycleRecurrence) bool {
+	if requestScope.TotalTokens == 0 {
+		return false
+	}
+	// A verified current creator→mint relation must at least surface as a
+	// single-token lifecycle observation instead of 0/not_investigated.
+	if current.TotalTokens == 0 || current.Status == "not_investigated" || current.Status == "unavailable" {
+		return true
+	}
 	if requestScope.TotalTokens < 2 || len(requestScope.OtherMints) == 0 {
 		return false
 	}

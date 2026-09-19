@@ -28,13 +28,13 @@ func (h *Handler) resolveCanonicalCreatorSourceContext(ctx context.Context, targ
 	// creator and create signature. Do not return early: canonical RPC must get a
 	// chance to upgrade that relation from OBSERVED to VERIFIED.
 	if creator := strings.TrimSpace(creatorIntelCleanString(out["creator_wallet"])); creator != "" {
-		signature := strings.TrimSpace(firstNonEmptyString(
-			creatorIntelCleanString(out["creation_signature"]),
-			creatorIntelCleanString(out["launch_signature"]),
-			creatorIntelCleanString(out["first_mint_signature"]),
-			creatorIntelCleanString(out["signature"]),
-		))
-		verification := h.verifyCanonicalCreatorRelation(ctx, target, network, creator, signature)
+		verification := h.verifyCanonicalCreatorRelationCandidates(
+			ctx,
+			target,
+			network,
+			creator,
+			canonicalCreatorSignatureCandidates(out),
+		)
 		out = applyCanonicalCreatorVerification(out, verification)
 		if verification.Verified {
 			return out
@@ -97,7 +97,7 @@ func (h *Handler) resolveCanonicalCreatorSourceContext(ctx context.Context, targ
 			appendCreatorResolutionLimitation(out, limitation)
 		}
 
-		verification := h.verifyCanonicalCreatorRelation(ctx, target, network, archival.Creator, archival.Signature)
+		verification := h.verifyCanonicalCreatorRelationCandidates(ctx, target, network, archival.Creator, canonicalCreatorSignatureCandidates(out))
 		return applyCanonicalCreatorVerification(out, verification)
 	}
 
@@ -127,7 +127,7 @@ func (h *Handler) resolveCanonicalCreatorSourceContext(ctx context.Context, targ
 		out["first_mint_signature"] = strings.TrimSpace(metadata.FirstMintTransaction)
 	}
 
-	verification := h.verifyCanonicalCreatorRelation(ctx, target, network, metadata.Creator, firstNonEmptyString(metadata.CreateTransaction, metadata.FirstMintTransaction))
+	verification := h.verifyCanonicalCreatorRelationCandidates(ctx, target, network, metadata.Creator, canonicalCreatorSignatureCandidates(out))
 	return applyCanonicalCreatorVerification(out, verification)
 }
 
