@@ -50,6 +50,13 @@ func TestSensitiveRuleKeepsLegacyRiskBadgeAlias(t *testing.T) {
 	}
 }
 
+func TestSensitiveRuleCoversUniversalCustomerScan(t *testing.T) {
+	rule, ok := sensitiveRuleForPath("/api/scan")
+	if !ok || rule.Limit != 10 || rule.Window != time.Minute {
+		t.Fatalf("universal customer scan rate limit = %+v ok=%v", rule, ok)
+	}
+}
+
 func TestSensitiveRuleCoversTransactionGuard(t *testing.T) {
 	rule, ok := sensitiveRuleForPath("/api/v1/shield/transaction")
 	if !ok || rule.Limit != 30 || rule.Window != time.Minute {
