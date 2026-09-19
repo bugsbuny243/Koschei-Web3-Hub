@@ -27,8 +27,10 @@ func TestAdaptEVMTransactionEvidenceRemainsObservedOnly(t *testing.T) {
 		Logs: []networktarget.EVMTransactionLogSummary{{
 			Address:  "0x3333333333333333333333333333333333333333",
 			Topics:   []string{"0x" + strings.Repeat("b", 64)},
-			LogIndex: "0x0",
-			Removed:  true,
+			LogIndex:   "0x0",
+			Removed:    true,
+			DataSHA256: strings.Repeat("e", 64),
+			DataBytes:  32,
 		}},
 		AnalysisPerformed: true,
 		EvidenceStatus:    IntelligenceEvidenceObserved,
@@ -50,6 +52,9 @@ func TestAdaptEVMTransactionEvidenceRemainsObservedOnly(t *testing.T) {
 	}
 	if logs[0]["removed"] != true || logs[0]["log_index"] != "0x0" {
 		t.Fatalf("log reorg/index metadata lost: %#v", logs[0])
+	}
+	if logs[0]["data_sha256"] != strings.Repeat("e", 64) || logs[0]["data_bytes"] != 32 {
+		t.Fatalf("log data evidence lost: %#v", logs[0])
 	}
 	topics, ok := logs[0]["topics"].([]string)
 	if !ok || len(topics) != 1 || topics[0] != "0x"+strings.Repeat("b", 64) {
