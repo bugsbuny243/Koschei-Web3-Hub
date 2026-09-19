@@ -125,3 +125,15 @@ func TestUniversalDispatcherRejectsExecutableAddressKindWithInvalidSyntax(t *tes
 		t.Fatal("invalid Bitcoin address target was accepted")
 	}
 }
+
+
+func TestUniversalDispatcherRejectsNonHexEVMTransactionHash(t *testing.T) {
+	_, err := BuildUniversalInvestigationPlan(
+		"0xzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+		"ethereum-mainnet",
+		IntelligenceSubjectTransaction,
+	)
+	if err == nil {
+		t.Fatal("non-hex EVM transaction hash was declared executable")
+	}
+}
