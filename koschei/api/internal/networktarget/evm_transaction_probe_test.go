@@ -112,7 +112,7 @@ func TestProbeEVMTransactionMissingReceiptAfterMinedTransactionIsUnknown(t *test
 		case "eth_getTransactionByHash":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": map[string]any{
 				"hash": txHash, "from": "0x1111111111111111111111111111111111111111",
-				"to": "0x2222222222222222222222222222222222222222",
+				"to":    "0x2222222222222222222222222222222222222222",
 				"value": "0x0", "nonce": "0x1", "gas": "0x5208", "gasPrice": "0x1", "type": "0x2",
 				"input": "0x", "blockHash": blockHash, "blockNumber": "0x10",
 			}})
@@ -148,7 +148,7 @@ func TestProbeEVMTransactionPreservesPreByzantiumRootAsUnknown(t *testing.T) {
 		case "eth_getTransactionByHash":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": map[string]any{
 				"hash": txHash, "from": "0x1111111111111111111111111111111111111111",
-				"to": "0x2222222222222222222222222222222222222222",
+				"to":    "0x2222222222222222222222222222222222222222",
 				"value": "0x0", "nonce": "0x1", "gas": "0x5208", "gasPrice": "0x1", "type": "0x0",
 				"input": "0x", "blockHash": blockHash, "blockNumber": "0x10",
 			}})
