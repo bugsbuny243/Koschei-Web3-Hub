@@ -114,26 +114,56 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 			writeCustomerScanError(w, http.StatusNotImplemented, "transaction_network_not_connected")
 			return
 		}
+		started := time.Now()
+		networkEVMTransactionProbeRequests.Add(1)
+		recordLatency := func() {
+			elapsed := time.Since(started).Milliseconds()
+			if elapsed < 0 {
+				elapsed = 0
+			}
+			networkEVMTransactionProbeLatencyMillis.Add(uint64(elapsed))
+		}
 		endpoint := configuredEVMRPCEndpoint(request.Network)
 		if endpoint == "" {
+			networkEVMTransactionProbeFailed.Add(1)
+			recordLatency()
 			writeCustomerScanError(w, http.StatusServiceUnavailable, "evm_rpc_configuration_required")
 			return
 		}
 		probe, probeErr := networktarget.ProbeEVMTransaction(ctx, nil, endpoint, request.Network, request.Target)
 		if probeErr != nil {
+			recordLatency()
+			if errors.Is(probeErr, networktarget.ErrEVMTransactionNotFound) {
+				networkEVMTransactionProbeNotFound.Add(1)
+				writeCustomerScanError(w, http.StatusNotFound, "evm_transaction_not_found")
+				return
+			}
+			networkEVMTransactionProbeFailed.Add(1)
 			writeCustomerScanError(w, http.StatusBadGateway, "evm_transaction_probe_unavailable")
 			return
 		}
 		projection, projectionErr := services.AdaptEVMTransactionEvidence(probe, observedAt)
 		if projectionErr != nil {
+			networkEVMTransactionProbeFailed.Add(1)
+			recordLatency()
 			writeCustomerScanError(w, http.StatusBadGateway, "evm_transaction_projection_unavailable")
 			return
 		}
 		result, resultErr := services.CustomerScanResultFromEVMTransaction(target, projection)
 		if resultErr != nil {
+			networkEVMTransactionProbeFailed.Add(1)
+			recordLatency()
 			writeCustomerScanError(w, http.StatusBadGateway, "customer_scan_result_unavailable")
 			return
 		}
+		networkEVMTransactionProbeSuccess.Add(1)
+		switch probe.ExecutionState {
+		case networktarget.EVMTransactionExecutionPending:
+			networkEVMTransactionProbePending.Add(1)
+		case networktarget.EVMTransactionExecutionUnknown:
+			networkEVMTransactionProbeUnknown.Add(1)
+		}
+		recordLatency()
 		writeCustomerScanResult(w, http.StatusOK, result)
 		return
 	}
