@@ -196,7 +196,6 @@ func TestProbeEVMTransactionNotFoundUsesSentinel(t *testing.T) {
 	}
 }
 
-
 func TestEVMTransactionResponseLimitAllowsLargeConsensusPayloads(t *testing.T) {
 	if evmTransactionResponseLimit < 128*1024*1024 {
 		t.Fatalf("transaction response limit=%d want at least 128 MiB", evmTransactionResponseLimit)
@@ -215,7 +214,7 @@ func TestProbeEVMTransactionRejectsMalformedTransactionQuantity(t *testing.T) {
 		case "eth_getTransactionByHash":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": map[string]any{
 				"hash": txHash, "from": "0x1111111111111111111111111111111111111111",
-				"to": "0x2222222222222222222222222222222222222222",
+				"to":    "0x2222222222222222222222222222222222222222",
 				"value": "not-a-quantity", "nonce": "0x1", "gas": "0x5208", "gasPrice": "0x1",
 				"type": "0x2", "input": "0x", "blockHash": nil, "blockNumber": nil,
 			}})
@@ -252,7 +251,7 @@ func TestProbeEVMTransactionRejectsMalformedReceiptQuantityAndLogIndex(t *testin
 				case "eth_getTransactionByHash":
 					_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": map[string]any{
 						"hash": txHash, "from": "0x1111111111111111111111111111111111111111",
-						"to": "0x2222222222222222222222222222222222222222",
+						"to":    "0x2222222222222222222222222222222222222222",
 						"value": "0x0", "nonce": "0x1", "gas": "0x5208", "gasPrice": "0x1",
 						"type": "0x2", "input": "0x", "blockHash": blockHash, "blockNumber": "0x10",
 					}})
