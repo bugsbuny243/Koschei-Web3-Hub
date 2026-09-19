@@ -61,8 +61,8 @@ func AdaptEVMTransactionEvidence(result networktarget.EVMTransactionEvidenceResu
 		logs := make([]map[string]any, 0, len(result.Logs))
 		for _, item := range result.Logs {
 			logs = append(logs, map[string]any{
-				"address":   item.Address,
-				"topics":    append([]string(nil), item.Topics...),
+				"address":     item.Address,
+				"topics":      append([]string(nil), item.Topics...),
 				"log_index":   item.LogIndex,
 				"removed":     item.Removed,
 				"data_sha256": item.DataSHA256,
