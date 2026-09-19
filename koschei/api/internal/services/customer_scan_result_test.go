@@ -130,6 +130,7 @@ func TestCustomerScanResultFromEVMTransactionBindsObservedEvidence(t *testing.T)
 			ID:              "evm-tx-1",
 			SubjectID:       subject.ID,
 			ChainFamily:     IntelligenceChainFamilyEVM,
+			Chain:           subject.Chain,
 			Network:         target.NetworkHint,
 			Status:          IntelligenceEvidenceObserved,
 			TransactionHash: target.Raw,
