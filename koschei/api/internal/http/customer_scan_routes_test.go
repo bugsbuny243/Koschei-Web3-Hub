@@ -139,7 +139,6 @@ func TestCustomerScanEndpointRejectsUnconnectedTransactionNetwork(t *testing.T) 
 	}
 }
 
-
 func TestCustomerEVMTransactionProbeErrorSeparatesNotFoundFromInfrastructure(t *testing.T) {
 	status, message, notFound := customerEVMTransactionProbeError(networktarget.ErrEVMTransactionNotFound)
 	if status != http.StatusNotFound || message != "evm_transaction_not_found" || !notFound {
