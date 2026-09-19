@@ -101,3 +101,39 @@ func TestProductionMuxExposesFabricNetworkCatalog(t *testing.T) {
 		t.Fatalf("status=%d", resp.StatusCode)
 	}
 }
+
+
+func TestCustomerScanEndpointRequiresNetworkForTransactionHash(t *testing.T) {
+	mux := http.NewServeMux()
+	registerCustomerScanRoutes(mux)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/scan", strings.NewReader(
+		`{"target":"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+	))
+	request.Header.Set("Content-Type", "application/json")
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var envelope customerScanEnvelope
+	if err := json.NewDecoder(recorder.Body).Decode(&envelope); err != nil {
+		t.Fatal(err)
+	}
+	if !envelope.Result.Target.RequiresNetwork || envelope.Result.InvestigationPlan != nil {
+		t.Fatalf("networkless transaction target was overclaimed: %+v", envelope.Result)
+	}
+}
+
+func TestCustomerScanEndpointRejectsUnconnectedTransactionNetwork(t *testing.T) {
+	mux := http.NewServeMux()
+	registerCustomerScanRoutes(mux)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/scan", strings.NewReader(
+		`{"target":"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","network":"solana-mainnet"}`,
+	))
+	request.Header.Set("Content-Type", "application/json")
+	mux.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNotImplemented {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+}
