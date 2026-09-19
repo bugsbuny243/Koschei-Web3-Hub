@@ -309,7 +309,6 @@ func writeCustomerScanError(w http.ResponseWriter, status int, message string) {
 	})
 }
 
-
 func customerEVMTransactionProbeError(err error) (status int, message string, notFound bool) {
 	if errors.Is(err, networktarget.ErrEVMTransactionNotFound) {
 		return http.StatusNotFound, "evm_transaction_not_found", true
