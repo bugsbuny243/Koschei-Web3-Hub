@@ -21,16 +21,21 @@ const (
 	EVMTransactionExecutionSuccess  = "success"
 	EVMTransactionExecutionReverted = "reverted"
 
-	evmTransactionResponseLimit = 8 * 1024 * 1024
+	// JSON-RPC hex payloads are roughly twice the raw calldata/log-data size.
+	// Keep a hard bound, but allow consensus-valid high-gas EVM transactions
+	// on supported networks without rejecting them solely due to JSON expansion.
+	evmTransactionResponseLimit = 128 * 1024 * 1024
 )
 
 var ErrEVMTransactionNotFound = errors.New("evm_transaction_not_found")
 
 type EVMTransactionLogSummary struct {
-	Address  string   `json:"address"`
-	Topics   []string `json:"topics,omitempty"`
-	LogIndex string   `json:"log_index,omitempty"`
-	Removed  bool     `json:"removed"`
+	Address    string   `json:"address"`
+	Topics     []string `json:"topics,omitempty"`
+	LogIndex   string   `json:"log_index,omitempty"`
+	Removed    bool     `json:"removed"`
+	DataSHA256 string   `json:"data_sha256,omitempty"`
+	DataBytes  int      `json:"data_bytes"`
 }
 
 type EVMTransactionEvidenceResult struct {
@@ -92,6 +97,7 @@ type evmReceiptRPC struct {
 		Topics   []string `json:"topics"`
 		LogIndex string   `json:"logIndex"`
 		Removed  bool     `json:"removed"`
+		Data     string   `json:"data"`
 	} `json:"logs"`
 }
 
@@ -145,6 +151,16 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 		if to != "" && !validEVMAddress(to) {
 			return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_to_invalid")
 		}
+	}
+	tx.Value = strings.ToLower(strings.TrimSpace(tx.Value))
+	tx.Nonce = strings.ToLower(strings.TrimSpace(tx.Nonce))
+	tx.Gas = strings.ToLower(strings.TrimSpace(tx.Gas))
+	tx.GasPrice = strings.ToLower(strings.TrimSpace(tx.GasPrice))
+	tx.Type = strings.ToLower(strings.TrimSpace(tx.Type))
+	if !validEVMHexQuantity(tx.Value) || !validEVMHexQuantity(tx.Nonce) ||
+		!validEVMHexQuantity(tx.Gas) || !validEVMHexQuantity(tx.GasPrice) ||
+		!validEVMHexQuantity(tx.Type) {
+		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_quantity_invalid")
 	}
 	inputHash, inputBytes, err := hashEVMHexData(tx.Input)
 	if err != nil {
@@ -200,7 +216,17 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 	if result.BlockNumber != "" && receipt.BlockNumber != result.BlockNumber {
 		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_block_number_mismatch")
 	}
+	receipt.Status = strings.ToLower(strings.TrimSpace(receipt.Status))
 	receipt.Root = strings.ToLower(strings.TrimSpace(receipt.Root))
+	receipt.GasUsed = strings.ToLower(strings.TrimSpace(receipt.GasUsed))
+	receipt.CumulativeGasUsed = strings.ToLower(strings.TrimSpace(receipt.CumulativeGasUsed))
+	receipt.EffectiveGasPrice = strings.ToLower(strings.TrimSpace(receipt.EffectiveGasPrice))
+	if !validEVMHexQuantity(receipt.GasUsed) || !validEVMHexQuantity(receipt.CumulativeGasUsed) {
+		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_receipt_quantity_invalid")
+	}
+	if receipt.EffectiveGasPrice != "" && !validEVMHexQuantity(receipt.EffectiveGasPrice) {
+		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_receipt_effective_gas_price_invalid")
+	}
 	if receipt.Status != "" && receipt.Status != "0x0" && receipt.Status != "0x1" {
 		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_receipt_status_invalid")
 	}
@@ -243,8 +269,17 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 			}
 			topics = append(topics, topic)
 		}
+		logIndex := strings.ToLower(strings.TrimSpace(item.LogIndex))
+		if !validEVMHexQuantity(logIndex) {
+			return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_log_index_invalid")
+		}
+		dataHash, dataBytes, dataErr := hashEVMHexData(item.Data)
+		if dataErr != nil {
+			return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_log_data_invalid")
+		}
 		result.Logs = append(result.Logs, EVMTransactionLogSummary{
-			Address: address, Topics: topics, LogIndex: item.LogIndex, Removed: item.Removed,
+			Address: address, Topics: topics, LogIndex: logIndex, Removed: item.Removed,
+			DataSHA256: dataHash, DataBytes: dataBytes,
 		})
 	}
 	return result, nil
