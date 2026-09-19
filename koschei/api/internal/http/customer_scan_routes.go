@@ -142,7 +142,8 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 			writeCustomerScanError(w, status, message)
 			return
 		}
-		projection, projectionErr := services.AdaptEVMTransactionEvidence(probe, observedAt)
+		transactionObservedAt := time.Now().UTC()
+		projection, projectionErr := services.AdaptEVMTransactionEvidence(probe, transactionObservedAt)
 		if projectionErr != nil {
 			networkEVMTransactionProbeFailed.Add(1)
 			recordLatency()
