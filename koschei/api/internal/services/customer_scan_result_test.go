@@ -112,7 +112,6 @@ func TestCustomerScanResultDoesNotInventPlanBeforeNetworkResolution(t *testing.T
 	}
 }
 
-
 func TestCustomerScanResultFromEVMTransactionBindsObservedEvidence(t *testing.T) {
 	target, err := ClassifyCustomerScanTarget(
 		"0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
