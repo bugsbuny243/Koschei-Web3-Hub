@@ -1,9 +1,6 @@
 package services
 
-import (
-	"regexp"
-	"strings"
-)
+import "regexp"
 
 var providerCredentialPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)((?:https?|wss?)://[^\s"]+/v2/)[^\s"]+`),

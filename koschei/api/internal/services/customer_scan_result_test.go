@@ -74,3 +74,40 @@ func TestCustomerScanResultRejectsMismatchedProbeSubject(t *testing.T) {
 		t.Fatal("expected mismatched probe subject to fail")
 	}
 }
+
+func TestCustomerScanResultExposesUniversalDispatchPlan(t *testing.T) {
+	target := CustomerScanTarget{
+		Raw:            "0x1111111111111111111111111111111111111111",
+		NetworkHint:    "polygon-mainnet",
+		Kind:           CustomerScanTargetEVMAddress,
+		Route:          CustomerScanRouteEVMProbe,
+		Classification: "syntax_only",
+	}
+	result, err := BuildCustomerScanResult(target, Web3TrustVector{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.InvestigationPlan == nil {
+		t.Fatal("expected universal investigation plan")
+	}
+	if !result.InvestigationPlan.Executable || result.InvestigationPlan.Route != UniversalDispatchEVMProbe {
+		t.Fatalf("unexpected plan: %#v", result.InvestigationPlan)
+	}
+	if result.InvestigationPlan.VerdictAuthority != UniversalVerdictEvidenceOnly {
+		t.Fatalf("unexpected verdict authority: %#v", result.InvestigationPlan)
+	}
+}
+
+func TestCustomerScanResultDoesNotInventPlanBeforeNetworkResolution(t *testing.T) {
+	target, err := ClassifyCustomerScanTarget("0x1111111111111111111111111111111111111111", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := BuildCustomerScanResult(target, Web3TrustVector{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.InvestigationPlan != nil {
+		t.Fatalf("networkless target unexpectedly received plan: %#v", result.InvestigationPlan)
+	}
+}
