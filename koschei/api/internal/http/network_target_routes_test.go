@@ -79,8 +79,22 @@ func TestNetworkCoverageFormAndCatalogAreVisible(t *testing.T) {
 	if err := json.Unmarshal(catalog.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := payload["telemetry"]; !ok || payload["live_availability"] != "not_checked" {
+	telemetry, ok := payload["telemetry"].(map[string]any)
+	if !ok || payload["live_availability"] != "not_checked" {
 		t.Fatal("coverage telemetry or availability boundary missing")
+	}
+	for _, key := range []string{
+		"evm_transaction_probe_requests",
+		"evm_transaction_probe_success",
+		"evm_transaction_probe_not_found",
+		"evm_transaction_probe_failed",
+		"evm_transaction_probe_pending",
+		"evm_transaction_probe_unknown",
+		"evm_transaction_probe_latency_ms_total",
+	} {
+		if _, exists := telemetry[key]; !exists {
+			t.Fatalf("operator telemetry missing %q: %#v", key, telemetry)
+		}
 	}
 }
 

@@ -18,15 +18,15 @@
 <body class="koschei-v2 koschei-enterprise koschei-universe">
 <main class="page">
 <nav class="top"><a class="brand" href="/"><span class="mark">K</span><span><strong>Koschei Web3</strong><br><small>Intelligence Desk</small></span></a><div class="nav"><a class="btn primary" href="/arvis-chat">ARVIS</a><a class="btn" href="/fabric/networks">Networks</a><a class="btn" href="/reports">Evidence</a><a class="btn" href="/dashboard">Console</a><a class="btn" href="/account">Account</a></div></nav>
-<header class="universe-gateway scan-intro"><span class="eyebrow">INTELLIGENCE DESK</span><h1>Investigate an address.</h1><p class="sub">Choose a network, collect the evidence, and inspect what controls the asset.</p></header>
-<section id="customerUniversalScan" class="customer-universal-scan" aria-label="Address analysis">
+<header class="universe-gateway scan-intro"><span class="eyebrow">INTELLIGENCE DESK</span><h1>Investigate an address or EVM transaction.</h1><p class="sub">Choose a network, collect read-only evidence, and inspect the target without signing or broadcasting.</p></header>
+<section id="customerUniversalScan" class="customer-universal-scan" aria-label="Address or EVM transaction analysis">
   <form class="cus-form" id="customerUniversalScanForm">
-    <label for="customerUniversalTarget">Wallet or contract address</label>
-    <input id="customerUniversalTarget" required maxlength="256" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Paste the complete public address" aria-describedby="customerUniversalStatus">
-    <div class="cus-input-wrap"><label for="customerUniversalNetwork">Network<select id="customerUniversalNetwork"><option value="">Select network</option><option value="solana-mainnet">Solana</option><option value="ethereum-mainnet">Ethereum</option><option value="base-mainnet">Base</option><option value="arbitrum-mainnet">Arbitrum</option><option value="optimism-mainnet">Optimism</option><option value="bitcoin-mainnet">Bitcoin</option></select></label><button type="submit" class="primary" id="customerUniversalSubmit">Analyze address</button><button type="button" id="customerUniversalCancel" hidden>Cancel</button></div>
-    <p class="cus-hint">Use a public address. No wallet connection, signing or private keys.</p>
+    <label for="customerUniversalTarget">Wallet, contract address, or EVM transaction hash</label>
+    <input id="customerUniversalTarget" required maxlength="256" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Paste a public address or 0x transaction hash" aria-describedby="customerUniversalStatus">
+    <div class="cus-input-wrap"><label for="customerUniversalNetwork">Network<select id="customerUniversalNetwork"><option value="">Select network</option><option value="solana-mainnet">Solana</option><option value="ethereum-mainnet">Ethereum</option><option value="base-mainnet">Base</option><option value="arbitrum-mainnet">Arbitrum</option><option value="optimism-mainnet">Optimism</option><option value="polygon-mainnet">Polygon</option><option value="bnb-mainnet">BNB Smart Chain</option><option value="avalanche-mainnet">Avalanche C-Chain</option><option value="bitcoin-mainnet">Bitcoin</option></select></label><button type="submit" class="primary" id="customerUniversalSubmit">Analyze target</button><button type="button" id="customerUniversalCancel" hidden>Cancel</button></div>
+    <p class="cus-hint">Use a public address or EVM transaction hash. No wallet connection, signing, broadcast, or private keys.</p>
   </form>
-  <p class="cus-status" id="customerUniversalStatus" role="status" aria-live="polite">Ready. Select the network where you want to inspect this address.</p>
+  <p class="cus-status" id="customerUniversalStatus" role="status" aria-live="polite">Ready. Select the network where you want to inspect this target.</p>
   <div id="customerUniversalRecovery" class="scan-shortcuts" hidden></div>
   <div class="cus-results-wrap" id="customerUniversalResultsWrap" hidden><div id="customerUniversalOverview"></div><div class="cus-results" id="customerUniversalResults"></div></div>
   <noscript>Enable JavaScript to request live evidence.</noscript>

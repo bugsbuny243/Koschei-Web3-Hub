@@ -5,6 +5,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const source=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
 const evm='0x1111111111111111111111111111111111111111';
+const evmTx='0x'+'a'.repeat(64);
 const sol='So11111111111111111111111111111111111111112';
 const bitcoin='1BoatSLRHtKNngkdXEeobR76b53LETtpyT';
 const scope=vm.createContext({window:{},URLSearchParams,location:{search:'',pathname:'/scan'}});
@@ -29,18 +30,32 @@ test('ambiguous base58 requires chain context; Solana and Bitcoin are never sile
  assert.ok(router.resolve(sol,'base-mainnet').error);
  assert.ok(router.resolve(evm,'unsupported-chain').error);
 });
-test('invalid addresses, transaction hashes and secret-shaped input are not submitted as addresses',()=>{
- for(const value of ['', '0x123', 'https://example.test', '0x'+'a'.repeat(64), 'word '.repeat(24), '<img src=x onerror=alert(1)>'])assert.ok(router.resolve(value,'ethereum-mainnet').error);
+test('invalid addresses and secret-shaped input are not submitted as targets',()=>{
+ for(const value of ['', '0x123', 'https://example.test', 'word '.repeat(24), '<img src=x onerror=alert(1)>'])assert.ok(router.resolve(value,'ethereum-mainnet').error);
+});
+test('EVM transaction hashes require explicit EVM network context and use lookup mode',()=>{
+ assert.equal(router.resolve(evmTx).needsNetwork,true);
+ const request=router.resolve(evmTx,'base-mainnet');
+ assert.equal(request.kind,'transaction');assert.equal(request.family,'evm');
+ assert.ok(router.resolve(evmTx,'solana-mainnet').error);
+ const targetURL=new URL(router.url(evmTx,'base-mainnet').url,'https://example.test');
+ assert.equal(targetURL.searchParams.get('mode'),'lookup');
+ assert.equal(targetURL.searchParams.get('target'),evmTx);
+ assert.equal(targetURL.searchParams.get('network'),'base-mainnet');
 });
 test('legacy token, deep and preflight links keep their selected tool',()=>{
  assert.equal(router.isAddressView('?target='+evm,'/scan'),true);
  assert.equal(router.isAddressView('?mode=address&target='+evm,'/scan'),true);
+ assert.equal(router.isAddressView('?mode=lookup&target='+evmTx,'/scan'),true);
  for(const mode of ['token','deep','transaction'])assert.equal(router.isAddressView('?mode='+mode,'/scan'),false);
  assert.equal(router.isAddressView('','/scan/'+sol),false);
  assert.equal(router.isAddressView('?mint='+sol,'/scan'),false);
 });
 function envelope(target=evm,network='base-mainnet'){
  return {schema_version:'koschei-customer-scan-v1',result:{target:{raw:target,network_hint:network},status:'observed',evidence_status:'unverified',trust:{observed:true,verified:false,finalized:false},reasons:['TEST_FIXTURE'],evidence_refs:['fixture:test']}};
+}
+function transactionEnvelope(network='base-mainnet'){
+ return {schema_version:'koschei-customer-scan-v1',result:{target:{raw:evmTx,network_hint:network},status:'observed',evidence_status:'observed',trust:{observed:true,verified:false,finalized:false},reasons:['READ_ONLY_EVM_TRANSACTION_OBSERVATION'],evidence_refs:['fixture:tx'],transaction_evidence:{transaction_hash:evmTx,block_or_slot:16,address:'0x1111111111111111111111111111111111111111',contract:'0x2222222222222222222222222222222222222222',state_change:'success',attributes:{execution_state:'success',receipt_status:'0x1',log_count:1}}}};
 }
 test('result identity binds schema, exact address and chain',()=>{
  const request=router.resolve(evm,'base-mainnet');
@@ -85,6 +100,15 @@ test('one submit sends one chain-bound request and displays unverified evidence 
  assert.match(h.nodes.customerUniversalResults.innerHTML,/fixture:test/);
  assert.doesNotMatch(h.nodes.customerUniversalOverview.innerHTML,/SAFE/);
  assert.equal(h.nodes.customerUniversalSubmit.disabled,false);
+});
+test('EVM transaction lookup is shipped through the universal scan form and renders execution evidence',async()=>{
+ const calls=[];const h=harness(async(url,options)=>{calls.push({url,options});return response(200,transactionEnvelope());});
+ h.submit(evmTx,'base-mainnet');await settle();
+ assert.equal(calls.length,1);assert.deepEqual(JSON.parse(calls[0].options.body),{target:evmTx,network:'base-mainnet'});
+ assert.match(h.nodes.customerUniversalOverview.innerHTML,/transaction/i);
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/Transaction success/);
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/Execution/);
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/0x1/);
 });
 test('ambiguous EVM deep link waits for network without starting a request',async()=>{
  let calls=0;const h=harness(async()=>{calls++;return response(200,envelope());},'?target='+evm);
