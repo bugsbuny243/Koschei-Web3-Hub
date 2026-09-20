@@ -493,12 +493,11 @@ func (w *PumpHighVolumeRadarWorker) scanAndStore(ctx context.Context, eventID st
 			fmt.Sprintf("PumpPortal-discovered mint crossed the automatic 24-hour USD volume gate: $%.2f >= $%.2f.", market.Volume24hUSD, w.ThresholdUSD),
 			"Market volume was obtained from DexScreener pair data; volume alone is not a safety or fraud verdict.",
 		)
-		signature := arvisStreamScopedVerdictSignature(arm.Signature, arm.ModuleID, eventID)
 		_, err := w.Store.InsertVerdict(ctx, SecurityRadarVerdictRecord{
 			EventID: eventID, ModuleID: arm.ModuleID, Target: arm.Target, TargetType: "token", Network: arm.Network,
 			Grade: arm.Grade, RiskIndex: arm.RiskIndex, RiskLevel: arm.RiskLevel, Verdict: arm.Verdict,
 			Recommendation: arm.Recommendation, Evidence: arm.Evidence, Signals: arm.Signals,
-			RuleVersion: arm.RuleVersion, Signed: arm.Signed, Signature: signature,
+			RuleVersion: arm.RuleVersion, EvidenceVerified: arm.EvidenceVerified,
 			Source: pumpHighVolumeSource, EventType: pumpHighVolumeEventType, Provider: "alchemy+pumpportal+dexscreener",
 		})
 		if err != nil && firstErr == nil {
