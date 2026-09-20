@@ -40,9 +40,10 @@ type SecurityRadarVerdict struct {
 	Signals        map[string]any `json:"signals"`
 	Evidence       []string       `json:"evidence"`
 	GeneratedAt    string         `json:"generated_at"`
-	RuleVersion    string         `json:"rule_version"`
-	Signed         bool           `json:"signed"`
-	Signature      string         `json:"signature"`
+	RuleVersion      string         `json:"rule_version"`
+	EvidenceVerified bool           `json:"evidence_verified,omitempty"`
+	Signed           bool           `json:"signed"`
+	Signature        string         `json:"signature"`
 }
 
 type SecurityRadarBundle struct {
@@ -403,9 +404,10 @@ func newRadarVerdict(module, moduleID string, req SecurityRadarRequest, risk int
 		Recommendation: recommendation,
 		Signals:        signals,
 		Evidence:       evidence,
-		GeneratedAt:    generatedAt,
-		RuleVersion:    SecurityRadarRuleVersion,
-		Signed:         true,
+		GeneratedAt:      generatedAt,
+		RuleVersion:      SecurityRadarRuleVersion,
+		EvidenceVerified: securityRadarSignalsHaveVerifiedEvidence(signals),
+		Signed:           true,
 	}
 	v.Signature = signSecurityRadarVerdict(v.ModuleID, v.Target, v.Network, v.RiskIndex)
 	return v
