@@ -20,6 +20,22 @@ func TestSecurityRadarVerifiedEvidenceIsIndependentFromAuthentication(t *testing
 		t.Fatal("legacy evidence signals must remain readable during authentication migration")
 	}
 
+	verifiedStatus := SecurityRadarVerdict{
+		Signals: map[string]any{"evidence_status": "verified_parsed_transaction"},
+		Signed:  false,
+	}
+	if !SecurityRadarVerdictHasVerifiedEvidence(verifiedStatus) {
+		t.Fatal("verified evidence status family must survive authentication migration")
+	}
+
+	observedStatus := SecurityRadarVerdict{
+		Signals: map[string]any{"evidence_status": "observed_market_snapshot"},
+		Signed:  true,
+	}
+	if SecurityRadarVerdictHasVerifiedEvidence(observedStatus) {
+		t.Fatal("observed evidence must not become verified because it is authenticated")
+	}
+
 	authOnly := SecurityRadarVerdict{
 		Signed:    true,
 		Signature: "not-evidence",
