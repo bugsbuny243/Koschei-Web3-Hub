@@ -63,16 +63,7 @@ ALTER TABLE IF EXISTS security_unified_radar_verdicts
         (
             signed = true AND
             signature IS NOT NULL AND
-            btrim(signature) ~ '^[A-Za-z0-9_-]{86}
-            key_id IS NOT NULL AND btrim(key_id) <> '' AND
-            payload_hash ~ '^sha256:[0-9a-f]{64}$'
-        )
-    );
-
-CREATE INDEX IF NOT EXISTS idx_security_unified_radar_key_time
-    ON security_unified_radar_verdicts (key_id,last_seen_at DESC)
-    WHERE signed = true;
- AND
+            btrim(signature) ~ '^[A-Za-z0-9_-]{86}$' AND
             signature_algorithm = 'ed25519' AND
             key_id IS NOT NULL AND btrim(key_id) <> '' AND
             payload_hash ~ '^sha256:[0-9a-f]{64}$'
