@@ -9,9 +9,9 @@ ALTER TABLE IF EXISTS security_radar_verdicts
 -- identity as digest material, but do not claim cryptographic authentication.
 UPDATE security_radar_verdicts
 SET evidence_verified =
-        COALESCE((signals->>'verified_evidence')::boolean, false)
-        OR COALESCE((signals->>'real_onchain_evidence')::boolean, false)
-        OR COALESCE((signals->>'real_offchain_evidence')::boolean, false),
+        lower(COALESCE(signals->>'verified_evidence', 'false')) = 'true'
+        OR lower(COALESCE(signals->>'real_onchain_evidence', 'false')) = 'true'
+        OR lower(COALESCE(signals->>'real_offchain_evidence', 'false')) = 'true',
     digest = COALESCE(NULLIF(btrim(digest), ''), NULLIF(btrim(signature), '')),
     signed = false,
     signature = NULL,
@@ -28,7 +28,13 @@ WHERE
     );
 
 UPDATE security_radar_verdicts
-SET signature = NULL,
+SET evidence_verified =
+        evidence_verified
+        OR lower(COALESCE(signals->>'verified_evidence', 'false')) = 'true'
+        OR lower(COALESCE(signals->>'real_onchain_evidence', 'false')) = 'true'
+        OR lower(COALESCE(signals->>'real_offchain_evidence', 'false')) = 'true',
+    digest = COALESCE(NULLIF(btrim(digest), ''), NULLIF(btrim(signature), '')),
+    signature = NULL,
     signature_algorithm = NULL,
     key_id = NULL,
     payload_hash = NULL
