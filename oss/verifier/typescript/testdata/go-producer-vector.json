@@ -1,0 +1,56 @@
+{
+  "seed_base64url": "U1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1M",
+  "trusted_public_key": "-AzM3OSuHAeuIIoq35mjEK5CB-Awb6AjYRCwaCe7uNA",
+  "verdict": {
+    "target": "Mint<Interop>&111",
+    "network": "solana-mainnet",
+    "grade": "B",
+    "verdict": "compounding_rule",
+    "evidence": [
+      "Creator <reuse> [ARD-C001, VERIFIED]: Verified & linked summary",
+      "Market > liquidity [URD-C001, OBSERVED]: Observed <gap> & pressure"
+    ],
+    "rule_version": "koschei-unified-radar-rules-v1.4.0",
+    "triggered_rules": [
+      {
+        "rule_id": "ARD-C001",
+        "title": "Creator <reuse>",
+        "tier": "compounding",
+        "evidence_status": "verified",
+        "grade_effect": "compounding_input",
+        "grade_cap": "",
+        "count": 1,
+        "summary": "Verified & linked summary",
+        "evidence_keys": ["creator:<Mint>"],
+        "signatures": ["solana&sig"]
+      },
+      {
+        "rule_id": "URD-C001",
+        "title": "Market > liquidity",
+        "tier": "compounding",
+        "evidence_status": "observed",
+        "grade_effect": "",
+        "grade_cap": "",
+        "count": 2,
+        "summary": "Observed <gap> & pressure",
+        "evidence_keys": ["market:&"],
+        "signatures": []
+      }
+    ],
+    "watch_flags": [],
+    "decision_path": [
+      "Unified verdict contract: koschei-unified-radar-decision-v1.0.2.",
+      "Only distinct VERIFIED/OBSERVED compounding rule IDs may lower the baseline.",
+      "Multiple evidence groups for one rule remain separately auditable but count once in the grade decision.",
+      "VERIFIED hard-cap grade effects are evaluated before compounding rules.",
+      "INFERRED is watch-only and UNVERIFIED cannot change the grade.",
+      "2 distinct evidence-backed compounding rule IDs lowered the baseline by one grade to B."
+    ],
+    "signed": true,
+    "signature": "4RpDmUjbMDYteMNrQU70vVdw7g5q2lWzZMbR-4IXf6qen_yBkpmTolVor26A3lhKVM5Xc_dc006VU-uYOU1TBQ",
+    "signature_algorithm": "ed25519",
+    "key_id": "interop-key-v1",
+    "payload_hash": "sha256:e4915aed85cc8771e0a6448a3cae924ce4aa9592712fb8f0a83979143d32c201",
+    "created_at": "2026-09-20T04:00:00Z"
+  }
+}

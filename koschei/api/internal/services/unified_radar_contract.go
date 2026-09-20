@@ -15,9 +15,18 @@ import (
 const UnifiedRadarDecisionContractVersion = "koschei-unified-radar-decision-v1.0.2"
 
 // FinalizeUnifiedRadarVerdictContract binds the deterministic verdict state to
-// its target before persistence. A withheld grade ("-") is still a signed
-// deterministic decision: it means no grade-changing rule fired, never A/LOW.
+// its target before persistence. Cryptographic signing is independent from the
+// deterministic digest: signed=true is emitted only when an Ed25519 signer is
+// configured and successfully authenticates the canonical payload.
 func FinalizeUnifiedRadarVerdictContract(target string, verdict UnifiedRadarVerdict) UnifiedRadarVerdict {
+	network := strings.TrimSpace(verdict.Network)
+	if network == "" {
+		network = "solana-mainnet"
+	}
+	return FinalizeUnifiedRadarVerdictContractForNetwork(target, network, verdict)
+}
+
+func FinalizeUnifiedRadarVerdictContractForNetwork(target, network string, verdict UnifiedRadarVerdict) UnifiedRadarVerdict {
 	verdict = normalizeUnifiedRadarVerdictDecision(verdict)
 	if strings.TrimSpace(verdict.RulesetVersion) == "" {
 		verdict.RulesetVersion = UnifiedRadarRulesetVersion
@@ -27,14 +36,27 @@ func FinalizeUnifiedRadarVerdictContract(target string, verdict UnifiedRadarVerd
 	} else {
 		verdict.GeneratedAt = verdict.GeneratedAt.UTC()
 	}
+	verdict.Target = strings.TrimSpace(target)
+	verdict.Network = strings.TrimSpace(network)
+	if verdict.Network == "" {
+		verdict.Network = "solana-mainnet"
+	}
 	verdict.TriggeredRules = nonNilActorRuleHits(verdict.TriggeredRules)
 	verdict.WatchFlags = nonNilActorRuleHits(verdict.WatchFlags)
 	verdict.DecisionPath = nonNilStrings(verdict.DecisionPath)
-	verdict.Signed = true
-	// Always recompute after normalization. A previously signed verdict may have
-	// counted multiple evidence groups for one rule ID and therefore bound the
-	// wrong grade/verdict state.
-	verdict.Signature = signUnifiedRadarVerdict(strings.TrimSpace(target), verdict)
+	verdict.Digest = digestUnifiedRadarVerdict(verdict.Target, verdict)
+	verdict.Signed = false
+	verdict.Signature = ""
+	verdict.SignatureAlgorithm = ""
+	verdict.KeyID = ""
+	verdict.PayloadHash = ""
+	if authentication, configured, err := authenticateUnifiedRadarVerdictV1(verdict); err == nil && configured {
+		verdict.Signed = true
+		verdict.Signature = authentication.Signature
+		verdict.SignatureAlgorithm = authentication.Algorithm
+		verdict.KeyID = authentication.KeyID
+		verdict.PayloadHash = authentication.PayloadHash
+	}
 	return verdict
 }
 
@@ -95,7 +117,11 @@ func normalizeUnifiedRadarVerdictDecision(verdict UnifiedRadarVerdict) UnifiedRa
 		decision = append(decision, "No evidence-backed grade-changing rule was satisfied; absence of evidence is not an A grade.")
 	}
 	verdict.DecisionPath = decision
+	verdict.Signed = false
 	verdict.Signature = ""
+	verdict.SignatureAlgorithm = ""
+	verdict.KeyID = ""
+	verdict.PayloadHash = ""
 	return applyRuntimeVerdictMode(verdict)
 }
 
@@ -199,11 +225,7 @@ func unifiedRadarContractWorstGrade(grades []string) string {
 // rule_version, evidence, triggered_rules and decision_path. Numeric risk fields
 // are deliberately absent.
 func (verdict UnifiedRadarVerdict) MarshalJSON() ([]byte, error) {
-	originalGrade := strings.TrimSpace(verdict.Grade)
-	originalVerdict := strings.TrimSpace(verdict.Verdict)
-	originalSignature := strings.TrimSpace(verdict.Signature)
 	contract := normalizeUnifiedRadarVerdictDecision(verdict)
-	decisionChanged := originalGrade != strings.TrimSpace(contract.Grade) || originalVerdict != strings.TrimSpace(contract.Verdict)
 	contract.RulesetVersion = strings.TrimSpace(contract.RulesetVersion)
 	if contract.RulesetVersion == "" {
 		contract.RulesetVersion = UnifiedRadarRulesetVersion
@@ -213,54 +235,69 @@ func (verdict UnifiedRadarVerdict) MarshalJSON() ([]byte, error) {
 	} else {
 		contract.GeneratedAt = contract.GeneratedAt.UTC()
 	}
+	contract.Target = strings.TrimSpace(verdict.Target)
+	contract.Network = strings.TrimSpace(verdict.Network)
+	if contract.Network == "" {
+		contract.Network = "solana-mainnet"
+	}
 	contract.TriggeredRules = nonNilActorRuleHits(contract.TriggeredRules)
 	contract.WatchFlags = nonNilActorRuleHits(contract.WatchFlags)
 	contract.DecisionPath = nonNilStrings(contract.DecisionPath)
 	evidence := unifiedVerdictContractEvidence(contract)
 
-	// Preserve a target-bound signature previously produced by Finalize... when
-	// normalization leaves the deterministic decision unchanged. The normalizer
-	// deliberately clears Signature so stale signatures cannot survive a changed
-	// grade/verdict; callers that were never finalized receive the target-agnostic
-	// contract-state fallback below.
-	signature := originalSignature
-	if decisionChanged {
-		signature = ""
-	}
-	if signature == "" {
-		signature = signUnifiedVerdictContractState(contract, evidence)
+	if contract.Target != "" {
+		contract = FinalizeUnifiedRadarVerdictContractForNetwork(contract.Target, contract.Network, contract)
+	} else {
+		contract.Digest = digestUnifiedVerdictContractState(contract, evidence)
+		contract.Signed = false
+		contract.Signature = ""
+		contract.SignatureAlgorithm = ""
+		contract.KeyID = ""
+		contract.PayloadHash = ""
 	}
 
 	payload := struct {
-		Grade           string                `json:"grade"`
-		Verdict         string                `json:"verdict"`
-		Evidence        []string              `json:"evidence"`
-		RuleVersion     string                `json:"rule_version"`
-		RulesetVersion  string                `json:"ruleset_version,omitempty"`
-		ActorRuleset    string                `json:"actor_ruleset_version,omitempty"`
-		TriggeredRules  []ActorDefenseRuleHit `json:"triggered_rules"`
-		WatchFlags      []ActorDefenseRuleHit `json:"watch_flags,omitempty"`
-		DecisionPath    []string              `json:"decision_path"`
-		NarrativeSource string                `json:"narrative_source,omitempty"`
-		Signed          bool                  `json:"signed"`
-		Signature       string                `json:"signature,omitempty"`
-		CreatedAt       time.Time             `json:"created_at"`
-		GeneratedAt     time.Time             `json:"generated_at,omitempty"`
+		Target             string                `json:"target"`
+		Network            string                `json:"network"`
+		Grade              string                `json:"grade"`
+		Verdict            string                `json:"verdict"`
+		Evidence           []string              `json:"evidence"`
+		RuleVersion        string                `json:"rule_version"`
+		RulesetVersion     string                `json:"ruleset_version,omitempty"`
+		ActorRuleset       string                `json:"actor_ruleset_version,omitempty"`
+		TriggeredRules     []ActorDefenseRuleHit `json:"triggered_rules"`
+		WatchFlags         []ActorDefenseRuleHit `json:"watch_flags,omitempty"`
+		DecisionPath       []string              `json:"decision_path"`
+		NarrativeSource    string                `json:"narrative_source,omitempty"`
+		Digest             string                `json:"digest,omitempty"`
+		Signed             bool                  `json:"signed"`
+		Signature          string                `json:"signature,omitempty"`
+		SignatureAlgorithm string                `json:"signature_algorithm,omitempty"`
+		KeyID              string                `json:"key_id,omitempty"`
+		PayloadHash        string                `json:"payload_hash,omitempty"`
+		CreatedAt          string                `json:"created_at"`
+		GeneratedAt        time.Time             `json:"generated_at,omitempty"`
 	}{
-		Grade:           normalizeUnifiedContractGrade(contract.Grade),
-		Verdict:         strings.TrimSpace(contract.Verdict),
-		Evidence:        evidence,
-		RuleVersion:     contract.RulesetVersion,
-		RulesetVersion:  contract.RulesetVersion,
-		ActorRuleset:    strings.TrimSpace(contract.ActorRuleset),
-		TriggeredRules:  contract.TriggeredRules,
-		WatchFlags:      contract.WatchFlags,
-		DecisionPath:    contract.DecisionPath,
-		NarrativeSource: strings.TrimSpace(contract.NarrativeSource),
-		Signed:          true,
-		Signature:       signature,
-		CreatedAt:       contract.GeneratedAt,
-		GeneratedAt:     contract.GeneratedAt,
+		Target:             contract.Target,
+		Network:            contract.Network,
+		Grade:              normalizeUnifiedContractGrade(contract.Grade),
+		Verdict:            strings.TrimSpace(contract.Verdict),
+		Evidence:           evidence,
+		RuleVersion:        contract.RulesetVersion,
+		RulesetVersion:     contract.RulesetVersion,
+		ActorRuleset:       strings.TrimSpace(contract.ActorRuleset),
+		TriggeredRules:     contract.TriggeredRules,
+		WatchFlags:         contract.WatchFlags,
+		DecisionPath:       contract.DecisionPath,
+		NarrativeSource:    strings.TrimSpace(contract.NarrativeSource),
+		Digest:             contract.Digest,
+		Signed:             contract.Signed,
+		Signature:          contract.Signature,
+		SignatureAlgorithm: contract.SignatureAlgorithm,
+		KeyID:              contract.KeyID,
+		PayloadHash:        contract.PayloadHash,
+		CreatedAt:          contract.GeneratedAt.UTC().Format(time.RFC3339Nano),
+		GeneratedAt:        contract.GeneratedAt,
 	}
 	return json.Marshal(payload)
 }
@@ -288,7 +325,7 @@ func unifiedVerdictContractEvidence(verdict UnifiedRadarVerdict) []string {
 	return uniqueUnifiedContractStrings(values)
 }
 
-func signUnifiedVerdictContractState(verdict UnifiedRadarVerdict, evidence []string) string {
+func digestUnifiedVerdictContractState(verdict UnifiedRadarVerdict, evidence []string) string {
 	rules := make([]string, 0, len(verdict.TriggeredRules))
 	for _, hit := range verdict.TriggeredRules {
 		rules = append(rules, strings.TrimSpace(hit.RuleID)+":"+strings.TrimSpace(hit.EvidenceStatus))

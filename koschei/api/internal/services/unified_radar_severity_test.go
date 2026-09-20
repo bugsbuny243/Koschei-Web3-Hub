@@ -28,7 +28,7 @@ func TestUnifiedVerdictCapsSevereHolderLiquidityExitAtC(t *testing.T) {
 	}}
 
 	verdict := EvaluateUnifiedRadarVerdict("MintOne", ActorDefenseRuleVerdict{}, behavior)
-	if verdict.Grade != "C" || verdict.Verdict != "severe_compounding_rule" || !verdict.Signed {
+	if verdict.Grade != "C" || verdict.Verdict != "severe_compounding_rule" || verdict.Signed || verdict.Digest == "" {
 		t.Fatalf("severity-aware verdict=%#v", verdict)
 	}
 	decision := strings.Join(verdict.DecisionPath, " ")

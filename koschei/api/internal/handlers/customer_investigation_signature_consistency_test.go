@@ -9,6 +9,7 @@ import (
 )
 
 func TestCustomerInvestigationEnvelopeSerializesOneCanonicalVerdictSignature(t *testing.T) {
+	configureHandlerVerdictTestSigner(t)
 	final := services.FinalizeUnifiedRadarVerdictContract("MintSignature111", services.UnifiedRadarVerdict{
 		RulesetVersion: services.UnifiedRadarRulesetVersion,
 		ActorRuleset:   services.ActorDefenseRulesetVersion,

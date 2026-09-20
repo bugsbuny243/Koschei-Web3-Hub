@@ -190,10 +190,16 @@ func EvaluateUnifiedRadarVerdictV110(target string, actor ActorDefenseRuleVerdic
 		out.DecisionPath = append(out.DecisionPath, "URD-C005 fixed the maximum grade at "+capGrade+" from VERIFIED owner-resolved, infrastructure-excluded concentration.")
 	}
 
-	out.Signed = out.Grade != "-" && len(out.TriggeredRules) > 0
-	if out.Signed {
-		out.Signature = signUnifiedRadarVerdict(strings.TrimSpace(target), out)
+	out.Target = strings.TrimSpace(target)
+	if strings.TrimSpace(out.Network) == "" {
+		out.Network = "solana-mainnet"
 	}
+	out.Digest = digestUnifiedRadarVerdict(out.Target, out)
+	out.Signed = false
+	out.Signature = ""
+	out.SignatureAlgorithm = ""
+	out.KeyID = ""
+	out.PayloadHash = ""
 	return out
 }
 

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,7 +37,8 @@ func TestPersistentFundingTrajectoryGraphPostgres17(t *testing.T) {
 	mint := fmt.Sprintf("TrajectoryToken%d", nonce)
 	fundingSignature := fmt.Sprintf("trajectory-funding-%d", nonce)
 	creationSignature := fmt.Sprintf("trajectory-creation-%d", nonce)
-	verdictSignature := fmt.Sprintf("trajectory-verdict-%d", nonce)
+	verdictSignature := strings.Repeat("A", 86)
+	verdictPayloadHash := "sha256:" + strings.Repeat("a", 64)
 	verdictFingerprint := fmt.Sprintf("trajectory-fingerprint-%d", nonce)
 	exitSignature := fmt.Sprintf("trajectory-exit-%d", nonce)
 	baseTime := time.Now().UTC().Add(-72 * time.Hour)
@@ -92,10 +94,12 @@ func TestPersistentFundingTrajectoryGraphPostgres17(t *testing.T) {
 
 	_, err = db.ExecContext(ctx, `
 		INSERT INTO security_unified_radar_verdicts
-		(network,target_kind,target_id,grade,verdict,ruleset_version,actor_ruleset_version,signed,signature,fingerprint,first_seen_at,last_seen_at)
+		(network,target_kind,target_id,grade,verdict,ruleset_version,actor_ruleset_version,
+		 signed,signature,signature_algorithm,key_id,payload_hash,fingerprint,first_seen_at,last_seen_at)
 		VALUES
-		($1,'token',$2,'C','compounding_rule','rules-v1','actor-rules-v1',true,$3,$4,$5,$5)`,
-		network, mint, verdictSignature, verdictFingerprint, baseTime.Add(40*time.Hour))
+		($1,'token',$2,'C','compounding_rule','rules-v1','actor-rules-v1',
+		 true,$3,'ed25519','trajectory-test-key',$4,$5,$6,$6)`,
+		network, mint, verdictSignature, verdictPayloadHash, verdictFingerprint, baseTime.Add(40*time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}

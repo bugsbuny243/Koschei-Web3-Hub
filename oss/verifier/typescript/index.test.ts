@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -84,4 +85,25 @@ test("rejects a forged payload hash", () => {
   const result = verifySignedVerdict(verdict, trustedKeys);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some(error => error.includes("payload_hash")));
+});
+
+
+test("verifies the shared Go producer interoperability vector", () => {
+  const fixture = JSON.parse(
+    readFileSync(new URL("./testdata/go-producer-vector.json", import.meta.url), "utf8"),
+  ) as {
+    trusted_public_key: string;
+    verdict: Record<string, unknown>;
+  };
+
+  const result = verifySignedVerdict(fixture.verdict, {
+    "interop-key-v1": fixture.trusted_public_key,
+  });
+  assert.deepEqual(result, { valid: true, errors: [] });
+
+  const payload = canonicalVerdictPayloadBytes(fixture.verdict);
+  const payloadHash = "sha256:" + createHash("sha256").update(payload).digest("hex");
+  assert.equal(payloadHash, fixture.verdict.payload_hash);
+  assert.match(payload.toString("utf8"), /\\u003cInterop\\u003e\\u0026/);
+  assert.match(payload.toString("utf8"), /\\u2029/);
 });
