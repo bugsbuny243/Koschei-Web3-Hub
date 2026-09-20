@@ -117,11 +117,15 @@ func EvaluateUnifiedRadarVerdictV140(target string, actor ActorDefenseRuleVerdic
 		out.DecisionPath = append(out.DecisionPath, fmt.Sprintf("Rule %s [%s] is evidence-only and cannot alter the letter grade: %s", signal.RuleID, signal.EvidenceStatus, signal.Summary))
 	}
 	actorRuleSortHits(out.TriggeredRules)
-	out.Signed = out.Grade != "-" && len(out.TriggeredRules) > 0
-	if out.Signed {
-		out.Signature = signUnifiedRadarVerdict(strings.TrimSpace(target), out)
-	} else {
-		out.Signature = ""
+	out.Target = strings.TrimSpace(target)
+	if strings.TrimSpace(out.Network) == "" {
+		out.Network = "solana-mainnet"
 	}
+	out.Digest = digestUnifiedRadarVerdict(out.Target, out)
+	out.Signed = false
+	out.Signature = ""
+	out.SignatureAlgorithm = ""
+	out.KeyID = ""
+	out.PayloadHash = ""
 	return out
 }
