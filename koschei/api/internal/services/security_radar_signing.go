@@ -12,7 +12,7 @@ import (
 
 const (
 	SecurityRadarVerdictSignatureDomainV1 = "koschei.arvis-arm-verdict/v1"
-	securityRadarVerdictDigestPrefix       = "koschei-radar:"
+	securityRadarVerdictDigestPrefix      = "koschei-radar:"
 )
 
 type securityRadarVerdictSigningPayloadV1 struct {
