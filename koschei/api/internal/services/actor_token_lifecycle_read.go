@@ -162,12 +162,11 @@ func ApplyActorTokenLifecycleRecurrenceToAnalysis(analysis ArvisAnalysis, recurr
 				arms[index].Signals["real_onchain_evidence"] = true
 				arms[index].Signals["arm_evidence_available"] = true
 				arms[index].EvidenceVerified = true
-				arms[index].Signed = true
-				arms[index].Signature = signSecurityRadarVerdict(arms[index].ModuleID, arms[index].Target, arms[index].Network, arms[index].RiskIndex)
 			}
 			arms[index].Evidence = append(arms[index].Evidence, fmt.Sprintf("Creator lifecycle memory: %s appears on %d token(s); %d are currently inactive/dead observations. Other target mints: %s.", recurrence.ActorWallet, recurrence.TotalTokens, recurrence.InactiveOrDeadTokens, strings.Join(recurrence.OtherMints, ", ")))
 			arms[index].Verdict = "Persistent creator lifecycle memory shows the same on-chain creator across multiple token mints."
 			arms[index].Recommendation = "Review the referenced creator-linked token lifecycle rows; inactive/dead is not automatically a rug classification."
+			arms[index] = finalizeSecurityRadarVerdictAuthentication(arms[index])
 		} else if recurrence.Available {
 			arms[index].Evidence = append(arms[index].Evidence, "Creator lifecycle memory was queried; a single observed token does not constitute repeat-actor recurrence.")
 		}
