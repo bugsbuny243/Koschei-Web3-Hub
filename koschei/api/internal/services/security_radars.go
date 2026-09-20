@@ -649,4 +649,3 @@ func verdictFromRiskLevel(moduleID, level string, signals map[string]any) string
 		return "Internal pre-connect evidence only"
 	}
 }
-
