@@ -28,18 +28,18 @@ type SecurityRadarRequest struct {
 }
 
 type SecurityRadarVerdict struct {
-	Module         string         `json:"module"`
-	ModuleID       string         `json:"module_id"`
-	Target         string         `json:"target"`
-	Network        string         `json:"network"`
-	Grade          string         `json:"grade"`
-	RiskIndex      int            `json:"risk_index"`
-	RiskLevel      string         `json:"risk_level"`
-	Verdict        string         `json:"verdict"`
-	Recommendation string         `json:"recommendation"`
-	Signals        map[string]any `json:"signals"`
-	Evidence       []string       `json:"evidence"`
-	GeneratedAt    string         `json:"generated_at"`
+	Module           string         `json:"module"`
+	ModuleID         string         `json:"module_id"`
+	Target           string         `json:"target"`
+	Network          string         `json:"network"`
+	Grade            string         `json:"grade"`
+	RiskIndex        int            `json:"risk_index"`
+	RiskLevel        string         `json:"risk_level"`
+	Verdict          string         `json:"verdict"`
+	Recommendation   string         `json:"recommendation"`
+	Signals          map[string]any `json:"signals"`
+	Evidence         []string       `json:"evidence"`
+	GeneratedAt      string         `json:"generated_at"`
 	RuleVersion      string         `json:"rule_version"`
 	EvidenceVerified bool           `json:"evidence_verified,omitempty"`
 	Signed           bool           `json:"signed"`
@@ -393,17 +393,17 @@ func newRadarVerdict(module, moduleID string, req SecurityRadarRequest, risk int
 	verdict := verdictFromRiskLevel(moduleID, level, signals)
 	recommendation := recommendationFromRiskLevel(level)
 	v := SecurityRadarVerdict{
-		Module:         module,
-		ModuleID:       moduleID,
-		Target:         req.Target,
-		Network:        req.Network,
-		Grade:          gradeFromRiskLevel(level),
-		RiskIndex:      risk,
-		RiskLevel:      level,
-		Verdict:        verdict,
-		Recommendation: recommendation,
-		Signals:        signals,
-		Evidence:       evidence,
+		Module:           module,
+		ModuleID:         moduleID,
+		Target:           req.Target,
+		Network:          req.Network,
+		Grade:            gradeFromRiskLevel(level),
+		RiskIndex:        risk,
+		RiskLevel:        level,
+		Verdict:          verdict,
+		Recommendation:   recommendation,
+		Signals:          signals,
+		Evidence:         evidence,
 		GeneratedAt:      generatedAt,
 		RuleVersion:      SecurityRadarRuleVersion,
 		EvidenceVerified: securityRadarSignalsHaveVerifiedEvidence(signals),
