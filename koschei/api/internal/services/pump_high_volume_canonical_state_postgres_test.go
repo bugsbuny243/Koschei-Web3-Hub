@@ -52,14 +52,14 @@ func TestPumpHighVolumeCanonicalReportStatePostgres17(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A legacy signed final row must not prove that the canonical Pump report ran.
+	// A migrated legacy final row is unsigned and must not prove that the canonical Pump report ran.
 	_, err = db.ExecContext(ctx, `
 		INSERT INTO security_radar_verdicts (
 			module_id,target,target_type,network,grade,risk_index,risk_level,verdict,
 			recommendation,evidence,signals,rule_version,signed,source
 		) VALUES (
 			'final_verdict_engine',$1,'token','solana-mainnet','F',99,'critical','legacy_final',
-			'legacy only','[]'::jsonb,'{}'::jsonb,'legacy-v1',true,$2
+			'legacy only','[]'::jsonb,'{}'::jsonb,'legacy-v1',false,$2
 		)`, mint, PumpHighVolumeCanonicalSource)
 	if err != nil {
 		t.Fatal(err)
