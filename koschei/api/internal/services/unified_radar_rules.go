@@ -81,6 +81,8 @@ type UnifiedRadarBehaviorReport struct {
 }
 
 type UnifiedRadarVerdict struct {
+	Target          string                `json:"-"`
+	Network         string                `json:"-"`
 	Grade           string                `json:"grade"`
 	Verdict         string                `json:"verdict"`
 	RulesetVersion  string                `json:"ruleset_version"`
@@ -89,8 +91,12 @@ type UnifiedRadarVerdict struct {
 	WatchFlags      []ActorDefenseRuleHit `json:"watch_flags"`
 	DecisionPath    []string              `json:"decision_path"`
 	NarrativeSource string                `json:"narrative_source"`
+	Digest          string                `json:"-"`
 	Signed          bool                  `json:"signed"`
 	Signature       string                `json:"signature,omitempty"`
+	SignatureAlgorithm string             `json:"-"`
+	KeyID           string                `json:"-"`
+	PayloadHash     string                `json:"-"`
 	GeneratedAt     time.Time             `json:"generated_at"`
 }
 
@@ -252,15 +258,13 @@ func EvaluateUnifiedRadarVerdict(target string, actor ActorDefenseRuleVerdict, b
 		}
 	}
 	out := UnifiedRadarVerdict{
+		Target: strings.TrimSpace(target), Network: "solana-mainnet",
 		Grade: grade, Verdict: verdict, RulesetVersion: UnifiedRadarRulesetVersion,
 		ActorRuleset: ActorDefenseRulesetVersion, TriggeredRules: triggered, WatchFlags: watch,
 		DecisionPath: decision, NarrativeSource: "deterministic_rules_only_ai_explains_but_never_grades",
 		GeneratedAt: time.Now().UTC(),
 	}
-	if out.Grade != "-" && len(out.TriggeredRules) > 0 {
-		out.Signed = true
-		out.Signature = signUnifiedRadarVerdict(strings.TrimSpace(target), out)
-	}
+	out.Digest = digestUnifiedRadarVerdict(strings.TrimSpace(target), out)
 	return out
 }
 
@@ -539,7 +543,7 @@ func unifiedSignalRuleHit(signal UnifiedRadarSignal) ActorDefenseRuleHit {
 	}
 }
 
-func signUnifiedRadarVerdict(target string, verdict UnifiedRadarVerdict) string {
+func digestUnifiedRadarVerdict(target string, verdict UnifiedRadarVerdict) string {
 	ruleIDs := []string{}
 	evidenceKeys := []string{}
 	signatures := []string{}
