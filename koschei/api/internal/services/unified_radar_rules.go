@@ -81,23 +81,23 @@ type UnifiedRadarBehaviorReport struct {
 }
 
 type UnifiedRadarVerdict struct {
-	Target          string                `json:"-"`
-	Network         string                `json:"-"`
-	Grade           string                `json:"grade"`
-	Verdict         string                `json:"verdict"`
-	RulesetVersion  string                `json:"ruleset_version"`
-	ActorRuleset    string                `json:"actor_ruleset_version"`
-	TriggeredRules  []ActorDefenseRuleHit `json:"triggered_rules"`
-	WatchFlags      []ActorDefenseRuleHit `json:"watch_flags"`
-	DecisionPath    []string              `json:"decision_path"`
-	NarrativeSource string                `json:"narrative_source"`
-	Digest          string                `json:"-"`
-	Signed          bool                  `json:"signed"`
-	Signature       string                `json:"signature,omitempty"`
-	SignatureAlgorithm string             `json:"-"`
-	KeyID           string                `json:"-"`
-	PayloadHash     string                `json:"-"`
-	GeneratedAt     time.Time             `json:"generated_at"`
+	Target             string                `json:"-"`
+	Network            string                `json:"-"`
+	Grade              string                `json:"grade"`
+	Verdict            string                `json:"verdict"`
+	RulesetVersion     string                `json:"ruleset_version"`
+	ActorRuleset       string                `json:"actor_ruleset_version"`
+	TriggeredRules     []ActorDefenseRuleHit `json:"triggered_rules"`
+	WatchFlags         []ActorDefenseRuleHit `json:"watch_flags"`
+	DecisionPath       []string              `json:"decision_path"`
+	NarrativeSource    string                `json:"narrative_source"`
+	Digest             string                `json:"-"`
+	Signed             bool                  `json:"signed"`
+	Signature          string                `json:"signature,omitempty"`
+	SignatureAlgorithm string                `json:"-"`
+	KeyID              string                `json:"-"`
+	PayloadHash        string                `json:"-"`
+	GeneratedAt        time.Time             `json:"generated_at"`
 }
 
 func LoadCreatorSellAcceleration(ctx context.Context, db *sql.DB, mint, creator string, now time.Time) CreatorSellAcceleration {
