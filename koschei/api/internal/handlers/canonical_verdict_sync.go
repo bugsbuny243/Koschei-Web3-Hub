@@ -89,6 +89,19 @@ func decodeCanonicalVerdictValue(raw any, target any) bool {
 	if raw == nil || target == nil {
 		return false
 	}
+	if destination, ok := target.(*services.UnifiedRadarVerdict); ok {
+		switch value := raw.(type) {
+		case services.UnifiedRadarVerdict:
+			*destination = value
+			return true
+		case *services.UnifiedRadarVerdict:
+			if value == nil {
+				return false
+			}
+			*destination = *value
+			return true
+		}
+	}
 	encoded, err := json.Marshal(raw)
 	if err != nil || len(encoded) == 0 || string(encoded) == "null" {
 		return false
