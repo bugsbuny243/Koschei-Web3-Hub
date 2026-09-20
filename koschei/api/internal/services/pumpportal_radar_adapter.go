@@ -138,15 +138,7 @@ func pumpPortalSignals(ev PumpPortalEvent, mint, signature, eventType string) ma
 }
 
 func pumpPortalArmVerified(arm SecurityRadarVerdict) bool {
-	if !arm.Signed || arm.Signals == nil {
-		return false
-	}
-	for _, key := range []string{"verified_evidence", "real_onchain_evidence", "real_offchain_evidence"} {
-		if value, _ := arm.Signals[key].(bool); value {
-			return true
-		}
-	}
-	return false
+	return SecurityRadarVerdictHasVerifiedEvidence(arm)
 }
 
 func pumpPortalWarningLabel(risk int) string {

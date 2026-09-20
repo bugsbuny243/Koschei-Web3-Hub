@@ -477,7 +477,7 @@ func threatArmEvidenceStatus(arm SecurityRadarVerdict) string {
 			return status
 		}
 	}
-	if arm.Signed {
+	if SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		return "verified"
 	}
 	return "observed"

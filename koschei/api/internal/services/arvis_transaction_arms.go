@@ -610,7 +610,7 @@ func replaceArvisArm(arms []SecurityRadarVerdict, replacement SecurityRadarVerdi
 func verifiedArvisArmCount(arms []SecurityRadarVerdict) int {
 	count := 0
 	for _, arm := range arms {
-		if arm.ModuleID == ModuleFinalVerdictEngine || !arm.Signed || arm.Signals == nil {
+		if arm.ModuleID == ModuleFinalVerdictEngine || arm.Signals == nil || !SecurityRadarVerdictHasVerifiedEvidence(arm) {
 			continue
 		}
 		if ok, _ := arm.Signals["real_onchain_evidence"].(bool); ok {

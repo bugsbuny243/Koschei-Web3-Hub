@@ -477,7 +477,7 @@ func (w *PumpHighVolumeRadarWorker) scanAndStore(ctx context.Context, eventID st
 	inserted := 0
 	var firstErr error
 	for _, arm := range arms {
-		if !arm.Signed || !pumpPortalArmVerified(arm) {
+		if !pumpPortalArmVerified(arm) {
 			continue
 		}
 		arm.Signals = mergePumpPortalSignals(arm.Signals, volumeSignals)
