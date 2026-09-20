@@ -67,9 +67,7 @@ func EvidenceBackedFinalSecurityRadarVerdict(bundle SecurityRadarBundle) Securit
 			}
 		}
 	}
-	final := FinalSecurityRadarVerdict(bundle)
-	final.Signed = true
-	return final
+	return FinalSecurityRadarVerdict(bundle)
 }
 
 func insufficientEvidenceVerdict(verdict SecurityRadarVerdict) SecurityRadarVerdict {
@@ -81,8 +79,8 @@ func insufficientEvidenceVerdict(verdict SecurityRadarVerdict) SecurityRadarVerd
 	verdict.RiskLevel = "unknown"
 	verdict.Verdict = SecurityRadarInsufficientEvidenceMessage
 	verdict.Recommendation = "insufficient_evidence"
-	verdict.Signed = false
-	verdict.Signature = ""
+	verdict.Digest = ""
+	clearSecurityRadarVerdictAuthentication(&verdict)
 	verdict.Signals["score_source"] = "none"
 	verdict.Signals["verified_evidence"] = false
 	verdict.Signals["real_onchain_evidence"] = false

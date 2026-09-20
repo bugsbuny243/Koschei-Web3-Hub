@@ -51,7 +51,7 @@ func TestPersistentRepeatActorNoMatchCompletesAllTimeQueryWithoutSafetyClaim(t *
 		if arm.ModuleID != ModuleRepeatActorScan {
 			continue
 		}
-		if !arm.Signed || arvisSignalString(arm.Signals, "execution_status") != ArvisExecutionCompleted {
+		if !SecurityRadarVerdictHasVerifiedEvidence(arm) || arvisSignalString(arm.Signals, "execution_status") != ArvisExecutionCompleted {
 			t.Fatalf("repeat arm=%#v", arm)
 		}
 		if got := arvisSignalString(arm.Signals, "memory_scope"); got != "persistent_actor_index_all_time" {
