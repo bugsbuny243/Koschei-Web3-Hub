@@ -8,13 +8,19 @@ import (
 	"testing"
 )
 
-func TestSecurityRadarVerdictAuthenticationUsesEd25519(t *testing.T) {
+func setSecurityRadarTestSigner(t *testing.T) ed25519.PrivateKey {
+	t.Helper()
 	seed := make([]byte, ed25519.SeedSize)
 	for i := range seed {
 		seed[i] = byte(i + 1)
 	}
 	t.Setenv(unifiedVerdictSigningKeyIDEnv, "arm-test-key")
 	t.Setenv(unifiedVerdictSigningPrivateKeyEnv, base64.RawURLEncoding.EncodeToString(seed))
+	return ed25519.NewKeyFromSeed(seed)
+}
+
+func TestSecurityRadarVerdictAuthenticationUsesEd25519(t *testing.T) {
+	privateKey := setSecurityRadarTestSigner(t)
 
 	verdict := finalizeSecurityRadarVerdictAuthentication(SecurityRadarVerdict{
 		ModuleID:         ModuleHolderConcentration,
@@ -43,7 +49,6 @@ func TestSecurityRadarVerdictAuthenticationUsesEd25519(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	privateKey := ed25519.NewKeyFromSeed(seed)
 	if !ed25519.Verify(privateKey.Public().(ed25519.PublicKey), payload, rawSignature) {
 		t.Fatal("arm verdict signature did not verify")
 	}
