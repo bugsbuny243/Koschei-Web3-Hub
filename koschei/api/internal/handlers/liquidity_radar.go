@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -122,7 +123,7 @@ func dispatchEmergencyLiquidityAlert(ctx context.Context, req liquidityRadarRequ
 		if chatID := strings.TrimSpace(os.Getenv("TELEGRAM_CHAT_ID")); chatID != "" {
 			telegramPayload["chat_id"] = chatID
 		}
-		if err := postWebhook(ctx, telegramURL, telegramPayload); err != nil {
+		if err := postWebhook(ctx, telegramURL, telegramPayload, "telegram"); err != nil {
 			result.Errors = append(result.Errors, "telegram: "+err.Error())
 		} else {
 			result.TelegramSent = true
@@ -130,7 +131,7 @@ func dispatchEmergencyLiquidityAlert(ctx context.Context, req liquidityRadarRequ
 	}
 	discordURL := firstNonEmpty(req.DiscordWebhook, os.Getenv("DISCORD_WEBHOOK_URL"))
 	if discordURL != "" {
-		if err := postWebhook(ctx, discordURL, map[string]any{"content": message}); err != nil {
+		if err := postWebhook(ctx, discordURL, map[string]any{"content": message}, "discord"); err != nil {
 			result.Errors = append(result.Errors, "discord: "+err.Error())
 		} else {
 			result.DiscordSent = true
@@ -157,14 +158,23 @@ func whitehatAddresses(input []string) []string {
 	return out
 }
 
-func postWebhook(ctx context.Context, url string, payload map[string]any) error {
+func postWebhook(ctx context.Context, rawURL string, payload map[string]any, provider string) error {
+	endpoint, err := trustedWebhookURL(rawURL, provider)
+	if err != nil {
+		return err
+	}
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{Timeout: 6 * time.Second}
+	client := &http.Client{
+		Timeout: 6 * time.Second,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	res, err := client.Do(req)
 	if err != nil {
 		return err
@@ -174,4 +184,33 @@ func postWebhook(ctx context.Context, url string, payload map[string]any) error 
 		return fmt.Errorf("webhook returned %s", res.Status)
 	}
 	return nil
+}
+
+func trustedWebhookURL(rawURL, provider string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !parsed.IsAbs() {
+		return "", fmt.Errorf("invalid %s webhook URL", provider)
+	}
+	if !strings.EqualFold(parsed.Scheme, "https") || parsed.User != nil || parsed.Fragment != "" {
+		return "", fmt.Errorf("untrusted %s webhook URL", provider)
+	}
+	if port := parsed.Port(); port != "" && port != "443" {
+		return "", fmt.Errorf("untrusted %s webhook port", provider)
+	}
+	host := strings.ToLower(parsed.Hostname())
+	path := parsed.EscapedPath()
+	switch provider {
+	case "telegram":
+		if host != "api.telegram.org" || !strings.HasPrefix(path, "/bot") {
+			return "", fmt.Errorf("untrusted telegram webhook URL")
+		}
+	case "discord":
+		allowedHost := host == "discord.com" || host == "canary.discord.com" || host == "ptb.discord.com"
+		if !allowedHost || !strings.HasPrefix(path, "/api/webhooks/") {
+			return "", fmt.Errorf("untrusted discord webhook URL")
+		}
+	default:
+		return "", fmt.Errorf("unsupported webhook provider")
+	}
+	return parsed.String(), nil
 }
