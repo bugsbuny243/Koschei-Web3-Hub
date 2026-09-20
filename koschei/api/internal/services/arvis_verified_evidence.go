@@ -1,5 +1,7 @@
 package services
 
+import "strings"
+
 func SecurityRadarVerdictHasVerifiedEvidence(verdict SecurityRadarVerdict) bool {
 	if verdict.EvidenceVerified {
 		return true
@@ -20,7 +22,8 @@ func securityRadarSignalsHaveVerifiedEvidence(signals map[string]any) bool {
 	if value, _ := signals["real_offchain_evidence"].(bool); value {
 		return true
 	}
-	return false
+	status := strings.ToLower(strings.TrimSpace(arvisSignalString(signals, "evidence_status")))
+	return status == "verified" || strings.HasPrefix(status, "verified_")
 }
 
 func verifiedArvisEvidenceCount(arms []SecurityRadarVerdict) int {
