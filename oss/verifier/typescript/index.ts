@@ -222,7 +222,7 @@ function isRuleHit(value: unknown): boolean {
   for (const key of ["evidence_keys", "signatures"]) {
     if (rule[key] !== undefined && !isStringArray(rule[key])) return false;
   }
-  if (rule.count !== undefined && (!Number.isInteger(rule.count) || Number(rule.count) < 0)) return false;
+  if (rule.count !== undefined && (typeof rule.count !== "number" || !Number.isInteger(rule.count) || rule.count < 0)) return false;
   return true;
 }
 
@@ -237,7 +237,7 @@ function canonicalRuleBindings(value: unknown): CanonicalRuleBinding[] {
       tier: stringValue(rule.tier),
       grade_effect: stringValue(rule.grade_effect),
       grade_cap: stringValue(rule.grade_cap),
-      count: Number.isInteger(rule.count) ? Number(rule.count) : 0,
+      count: typeof rule.count === "number" && Number.isInteger(rule.count) ? rule.count : 0,
       summary: stringValue(rule.summary),
       evidence_keys: stringArray(rule.evidence_keys),
       signatures: stringArray(rule.signatures),
