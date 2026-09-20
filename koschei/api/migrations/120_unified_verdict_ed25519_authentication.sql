@@ -25,6 +25,27 @@ WHERE signed = true
       payload_hash IS NULL OR btrim(payload_hash) = ''
   );
 
+-- Old writers could also leave a deterministic fingerprint in signature while
+-- signed=false. Preserve any useful identity as digest, then clear every
+-- authentication-only field before the new invariant is installed.
+UPDATE security_unified_radar_verdicts
+SET digest = COALESCE(
+        NULLIF(btrim(digest), ''),
+        NULLIF(btrim(signature), ''),
+        NULLIF(btrim(fingerprint), '')
+    ),
+    signature = NULL,
+    signature_algorithm = NULL,
+    key_id = NULL,
+    payload_hash = NULL
+WHERE signed = false
+  AND (
+      signature IS NOT NULL OR
+      signature_algorithm IS NOT NULL OR
+      key_id IS NOT NULL OR
+      payload_hash IS NOT NULL
+  );
+
 ALTER TABLE IF EXISTS security_unified_radar_verdicts
     DROP CONSTRAINT IF EXISTS security_unified_radar_authentication_check;
 
@@ -41,7 +62,17 @@ ALTER TABLE IF EXISTS security_unified_radar_verdicts
         OR
         (
             signed = true AND
-            signature IS NOT NULL AND btrim(signature) <> '' AND
+            signature IS NOT NULL AND
+            btrim(signature) ~ '^[A-Za-z0-9_-]{86}
+            key_id IS NOT NULL AND btrim(key_id) <> '' AND
+            payload_hash ~ '^sha256:[0-9a-f]{64}$'
+        )
+    );
+
+CREATE INDEX IF NOT EXISTS idx_security_unified_radar_key_time
+    ON security_unified_radar_verdicts (key_id,last_seen_at DESC)
+    WHERE signed = true;
+ AND
             signature_algorithm = 'ed25519' AND
             key_id IS NOT NULL AND btrim(key_id) <> '' AND
             payload_hash ~ '^sha256:[0-9a-f]{64}$'
