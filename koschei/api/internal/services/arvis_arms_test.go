@@ -22,6 +22,7 @@ func TestUnavailableArvisArmIsNeverSigned(t *testing.T) {
 func TestEvidenceArmSignsEvidenceWithoutIssuingGrade(t *testing.T) {
 	req := SecurityRadarRequest{Target: "target", Network: "solana-mainnet"}
 	signals := map[string]any{"real_onchain_evidence": true, "arm_evidence_available": true}
+	setSecurityRadarTestSigner(t)
 	arm := evidenceArm("Token Authority Scanner", ModuleTokenAuthorityScanner, req, 81, signals, []string{"parsed mint evidence"}, time.Now().UTC().Format(time.RFC3339))
 	if !arm.Signed || arm.Signature == "" {
 		t.Fatalf("evidence arm should be signed: %#v", arm)
@@ -74,7 +75,7 @@ func TestArvisPumpAndRaydiumApplicabilityUsesEvidenceNotMode(t *testing.T) {
 	profile := radarEvidenceProfile{LiveRPC: true, AccountExists: true, AccountOwner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", RecentSignatureCount: 12, DataQuality: "live_rpc_evidence", EvidenceStatus: "verified_rpc_observation"}
 	pump := buildPumpProgramApplicabilityArm(req, profile, "2026-07-18T00:00:00Z")
 	raydium := buildRaydiumProgramApplicabilityArm(req, profile, "2026-07-18T00:00:00Z")
-	if !pump.Signed {
+	if !SecurityRadarVerdictHasVerifiedEvidence(pump) {
 		t.Fatalf("pump arm did not build from evidence in manual mode: %#v", pump)
 	}
 	if status := arvisSignalString(raydium.Signals, "execution_status"); status != ArvisExecutionNotApplicable {
@@ -90,7 +91,7 @@ func TestArvisPumpAndRaydiumCanBothBuildForMigratedPoolEvidence(t *testing.T) {
 	profile := radarEvidenceProfile{LiveRPC: true, AccountExists: true, AccountOwner: defaultRaydiumProgramID, RecentSignatureCount: 8, DataQuality: "live_rpc_evidence", EvidenceStatus: "verified_rpc_observation"}
 	pump := buildPumpProgramApplicabilityArm(req, profile, "2026-07-18T00:00:00Z")
 	raydium := buildRaydiumProgramApplicabilityArm(req, profile, "2026-07-18T00:00:00Z")
-	if !pump.Signed || !raydium.Signed {
+	if !SecurityRadarVerdictHasVerifiedEvidence(pump) || !SecurityRadarVerdictHasVerifiedEvidence(raydium) {
 		t.Fatalf("expected both arms to build: pump=%#v raydium=%#v", pump, raydium)
 	}
 }
@@ -117,7 +118,7 @@ func TestSecurityModuleAllowlistWithholdsDisabledArmEvidence(t *testing.T) {
 		evidenceArm("Funding Cluster Detector", ModuleFundingClusterDetector, req, 1, map[string]any{"real_onchain_evidence": true}, []string{"funding evidence"}, generatedAt),
 	}
 	got := applyRuntimeSecurityModulePolicy(req, generatedAt, arms)
-	if len(got) != 2 || !got[0].Signed || got[1].Signed {
+	if len(got) != 2 || !SecurityRadarVerdictHasVerifiedEvidence(got[0]) || SecurityRadarVerdictHasVerifiedEvidence(got[1]) {
 		t.Fatalf("module allowlist did not preserve/withhold correctly: %#v", got)
 	}
 	if status := arvisSignalString(got[1].Signals, "execution_status"); status != ArvisExecutionSourceUnavailable {
