@@ -127,3 +127,9 @@ func TestUnifiedVerdictSignatureBindsTargetAndNetwork(t *testing.T) {
 func unifiedVerdictTestPrivateKey(fill byte) ed25519.PrivateKey {
 	return ed25519.NewKeyFromSeed(bytes.Repeat([]byte{fill}, ed25519.SeedSize))
 }
+
+func configureUnifiedVerdictTestSigner(t *testing.T) {
+	t.Helper()
+	t.Setenv(unifiedVerdictSigningKeyIDEnv, "test-suite-verdict-key-v1")
+	t.Setenv(unifiedVerdictSigningPrivateKeyEnv, "U1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1M")
+}
