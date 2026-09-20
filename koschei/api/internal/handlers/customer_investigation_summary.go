@@ -79,8 +79,9 @@ func customerEvidenceCoverage(arms []services.SecurityRadarVerdict) map[string]a
 			"module_id":      arm.ModuleID,
 			"module":         arm.Module,
 			"state":          state,
-			"signed":         arm.Signed,
-			"recommendation": arm.Recommendation,
+			"signed":            arm.Signed,
+			"evidence_verified": services.SecurityRadarVerdictHasVerifiedEvidence(arm),
+			"recommendation":    arm.Recommendation,
 			"evidence_count": len(arm.Evidence),
 			"evidence":       append([]string{}, arm.Evidence...),
 			"generated_at":   arm.GeneratedAt,
@@ -142,7 +143,7 @@ func customerArmEvidenceState(arm services.SecurityRadarVerdict) string {
 	case "evidence_pending", "source_unavailable", "insufficient_evidence", "not_requested":
 		return "pending"
 	}
-	if arm.Signed && (strings.TrimSpace(arm.Signature) != "" || len(arm.Evidence) > 0) {
+	if services.SecurityRadarVerdictHasVerifiedEvidence(arm) && len(arm.Evidence) > 0 {
 		return "observed"
 	}
 	return "pending"
