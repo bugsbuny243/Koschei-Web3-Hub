@@ -472,10 +472,9 @@ func evidenceArm(module, moduleID string, req SecurityRadarRequest, risk int, si
 		Grade: "-", RiskIndex: 0, RiskLevel: "evidence_only",
 		Verdict:        "Evidence collected; final grade is produced only by EvaluateUnifiedRadarVerdict.",
 		Recommendation: "evaluate_unified_rules", Signals: signals, Evidence: evidence,
-		GeneratedAt: generatedAt, RuleVersion: SecurityRadarRuleVersion, EvidenceVerified: true, Signed: true,
+		GeneratedAt: generatedAt, RuleVersion: SecurityRadarRuleVersion, EvidenceVerified: true,
 	}
-	v.Signature = signSecurityRadarVerdict(v.ModuleID, v.Target, v.Network, 0)
-	return v
+	return finalizeSecurityRadarVerdictAuthentication(v)
 }
 
 func unavailableArm(module, moduleID string, req SecurityRadarRequest, generatedAt, reason string) SecurityRadarVerdict {
