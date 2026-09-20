@@ -11,16 +11,16 @@ const (
 )
 
 type ArvisArmCoverage struct {
-	ModuleID        string `json:"module_id"`
-	Module          string `json:"module"`
-	ExecutionStatus string `json:"execution_status"`
-	EvidenceStatus  string `json:"evidence_status"`
-	Applicable      bool   `json:"applicable"`
-	Attempted       bool   `json:"attempted"`
+	ModuleID         string `json:"module_id"`
+	Module           string `json:"module"`
+	ExecutionStatus  string `json:"execution_status"`
+	EvidenceStatus   string `json:"evidence_status"`
+	Applicable       bool   `json:"applicable"`
+	Attempted        bool   `json:"attempted"`
 	Signed           bool   `json:"signed"`
 	EvidenceVerified bool   `json:"evidence_verified"`
 	EvidenceCount    int    `json:"evidence_count"`
-	Reason          string `json:"reason,omitempty"`
+	Reason           string `json:"reason,omitempty"`
 }
 
 type ArvisInvestigationCoverage struct {
