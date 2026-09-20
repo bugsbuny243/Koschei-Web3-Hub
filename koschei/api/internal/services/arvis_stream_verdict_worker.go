@@ -339,7 +339,7 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 		}
 		eventID, err := w.store.InsertEvent(ctx, SecurityRadarEventRecord{
 			ModuleID: arm.ModuleID, Target: arm.Target, TargetType: "token", Network: arm.Network,
-			Signature: arm.Signature, SourceAddress: target.ProgramID, EventType: "arvis_stream_verdict",
+			Signature: target.Signature, SourceAddress: target.ProgramID, EventType: "arvis_stream_verdict",
 			Slot: target.Slot, Signals: signals,
 			RawSummary: map[string]any{
 				"source_module":           target.ModuleID,
@@ -361,7 +361,7 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 			EventID: eventID, ModuleID: arm.ModuleID, Target: arm.Target, TargetType: "token", Network: arm.Network,
 			Grade: arm.Grade, RiskIndex: arm.RiskIndex, RiskLevel: arm.RiskLevel, Verdict: arm.Verdict,
 			Recommendation: arm.Recommendation, Evidence: arm.Evidence, Signals: signals,
-			RuleVersion: arm.RuleVersion, Signed: arm.Signed, Signature: arm.Signature,
+			RuleVersion: arm.RuleVersion, EvidenceVerified: arm.EvidenceVerified,
 			Source: "arvis_stream", EventType: "arvis_stream_verdict", Provider: provider,
 		}); err != nil {
 			if isArvisUniqueViolation(err) {
