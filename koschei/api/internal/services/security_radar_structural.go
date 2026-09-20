@@ -181,8 +181,9 @@ func (s *SecurityRadarStore) applyStructuralFloor(ctx context.Context, verdict *
 	verdict.Recommendation = recommendationFromRiskLevel(verdict.RiskLevel)
 	verdict.Signals = nonNilMap(verdict.Signals)
 	verdict.Verdict = verdictFromRiskLevel(verdict.ModuleID, verdict.RiskLevel, verdict.Signals)
-	if strings.TrimSpace(verdict.Signature) != "" {
-		verdict.Signature = signSecurityRadarVerdict(verdict.ModuleID, verdict.Target, verdict.Network, verdict.RiskIndex)
+	if strings.TrimSpace(verdict.Signature) != "" || verdict.Signed {
+		verdict.Signed = false
+		verdict.Signature = ""
 	}
 
 	verdict.Signals["structural_floor_applied"] = true
