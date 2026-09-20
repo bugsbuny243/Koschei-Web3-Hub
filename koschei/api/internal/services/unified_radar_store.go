@@ -54,7 +54,7 @@ func (s *UnifiedRadarVerdictStore) Persist(ctx context.Context, network, targetK
 	if targetKind == "" || targetID == "" {
 		return UnifiedRadarVerdictHistoryRecord{}, fmt.Errorf("unified radar target is required")
 	}
-	verdict = FinalizeUnifiedRadarVerdictContract(targetID, verdict)
+	verdict = FinalizeUnifiedRadarVerdictContractForNetwork(targetID, network, verdict)
 	fingerprint, err := UnifiedRadarVerdictFingerprint(network, targetKind, targetID, verdict, behavior)
 	if err != nil {
 		return UnifiedRadarVerdictHistoryRecord{}, err
