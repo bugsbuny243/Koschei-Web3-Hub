@@ -5,6 +5,9 @@ ALTER TABLE IF EXISTS security_radar_verdicts
     ADD COLUMN IF NOT EXISTS key_id text,
     ADD COLUMN IF NOT EXISTS payload_hash text;
 
+ALTER TABLE IF EXISTS security_radar_verdicts
+    ALTER COLUMN signed SET DEFAULT false;
+
 -- Legacy arm rows used deterministic hashes as signatures. Preserve their
 -- identity as digest material, but do not claim cryptographic authentication.
 UPDATE security_radar_verdicts
