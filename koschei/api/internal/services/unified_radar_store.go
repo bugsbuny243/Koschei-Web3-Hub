@@ -20,8 +20,12 @@ type UnifiedRadarVerdictHistoryRecord struct {
 	Verdict             string                `json:"verdict"`
 	RulesetVersion      string                `json:"ruleset_version"`
 	ActorRulesetVersion string                `json:"actor_ruleset_version"`
+	Digest              string                `json:"digest,omitempty"`
 	Signed              bool                  `json:"signed"`
 	Signature           string                `json:"signature,omitempty"`
+	SignatureAlgorithm  string                `json:"signature_algorithm,omitempty"`
+	KeyID               string                `json:"key_id,omitempty"`
+	PayloadHash         string                `json:"payload_hash,omitempty"`
 	Fingerprint         string                `json:"fingerprint"`
 	TriggeredRules      []ActorDefenseRuleHit `json:"triggered_rules"`
 	WatchFlags          []ActorDefenseRuleHit `json:"watch_flags"`
@@ -80,34 +84,45 @@ func (s *UnifiedRadarVerdictStore) Persist(ctx context.Context, network, targetK
 	err = s.DB.QueryRowContext(ctx, `
 		INSERT INTO security_unified_radar_verdicts (
 			network,target_kind,target_id,grade,verdict,ruleset_version,actor_ruleset_version,
-			signed,signature,fingerprint,triggered_rules,watch_flags,decision_path,behavior_signals,
+			digest,signed,signature,signature_algorithm,key_id,payload_hash,fingerprint,
+			triggered_rules,watch_flags,decision_path,behavior_signals,
 			first_seen_at,last_seen_at,scan_count,created_at,updated_at
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULLIF($9,''),$10,$11::jsonb,$12::jsonb,$13::jsonb,$14::jsonb,$15,$15,1,now(),now())
+		VALUES (
+			$1,$2,$3,$4,$5,$6,$7,NULLIF($8,''),$9,NULLIF($10,''),NULLIF($11,''),NULLIF($12,''),NULLIF($13,''),$14,
+			$15::jsonb,$16::jsonb,$17::jsonb,$18::jsonb,$19,$19,1,now(),now()
+		)
 		ON CONFLICT (fingerprint)
 		DO UPDATE SET
 			last_seen_at=GREATEST(security_unified_radar_verdicts.last_seen_at,EXCLUDED.last_seen_at),
 			scan_count=security_unified_radar_verdicts.scan_count+1,
-			signed=security_unified_radar_verdicts.signed OR EXCLUDED.signed,
-			signature=COALESCE(EXCLUDED.signature,security_unified_radar_verdicts.signature),
+			digest=COALESCE(EXCLUDED.digest,security_unified_radar_verdicts.digest),
+			signed=EXCLUDED.signed,
+			signature=EXCLUDED.signature,
+			signature_algorithm=EXCLUDED.signature_algorithm,
+			key_id=EXCLUDED.key_id,
+			payload_hash=EXCLUDED.payload_hash,
 			triggered_rules=EXCLUDED.triggered_rules,
 			watch_flags=EXCLUDED.watch_flags,
 			decision_path=EXCLUDED.decision_path,
 			behavior_signals=EXCLUDED.behavior_signals,
 			updated_at=now()
 		RETURNING id::text,network,target_kind,target_id,grade,verdict,ruleset_version,
-		          actor_ruleset_version,signed,COALESCE(signature,''),fingerprint,
+		          actor_ruleset_version,COALESCE(digest,''),signed,COALESCE(signature,''),
+		          COALESCE(signature_algorithm,''),COALESCE(key_id,''),COALESCE(payload_hash,''),fingerprint,
 		          triggered_rules,watch_flags,decision_path,behavior_signals,
 		          first_seen_at,last_seen_at,scan_count`,
 		network, targetKind, targetID, normalizeUnifiedGrade(verdict.Grade), strings.TrimSpace(verdict.Verdict),
-		strings.TrimSpace(verdict.RulesetVersion), strings.TrimSpace(verdict.ActorRuleset), verdict.Signed,
-		strings.TrimSpace(verdict.Signature), fingerprint, string(triggered), string(watch), string(decision),
-		string(signals), generatedAt,
+		strings.TrimSpace(verdict.RulesetVersion), strings.TrimSpace(verdict.ActorRuleset), strings.TrimSpace(verdict.Digest),
+		verdict.Signed, strings.TrimSpace(verdict.Signature), strings.TrimSpace(verdict.SignatureAlgorithm),
+		strings.TrimSpace(verdict.KeyID), strings.TrimSpace(verdict.PayloadHash), fingerprint,
+		string(triggered), string(watch), string(decision), string(signals), generatedAt,
 	).Scan(
 		&record.ID, &record.Network, &record.TargetKind, &record.TargetID, &record.Grade,
-		&record.Verdict, &record.RulesetVersion, &record.ActorRulesetVersion, &record.Signed,
-		&record.Signature, &record.Fingerprint, &triggeredRaw, &watchRaw, &decisionRaw,
-		&signalsRaw, &record.FirstSeenAt, &record.LastSeenAt, &record.ScanCount,
+		&record.Verdict, &record.RulesetVersion, &record.ActorRulesetVersion, &record.Digest,
+		&record.Signed, &record.Signature, &record.SignatureAlgorithm, &record.KeyID, &record.PayloadHash,
+		&record.Fingerprint, &triggeredRaw, &watchRaw, &decisionRaw, &signalsRaw,
+		&record.FirstSeenAt, &record.LastSeenAt, &record.ScanCount,
 	)
 	if err != nil {
 		return UnifiedRadarVerdictHistoryRecord{}, err
@@ -132,7 +147,8 @@ func (s *UnifiedRadarVerdictStore) History(ctx context.Context, network, targetK
 	}
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id::text,network,target_kind,target_id,grade,verdict,ruleset_version,
-		       actor_ruleset_version,signed,COALESCE(signature,''),fingerprint,
+		       actor_ruleset_version,COALESCE(digest,''),signed,COALESCE(signature,''),
+		       COALESCE(signature_algorithm,''),COALESCE(key_id,''),COALESCE(payload_hash,''),fingerprint,
 		       triggered_rules,watch_flags,decision_path,behavior_signals,
 		       first_seen_at,last_seen_at,scan_count
 		FROM security_unified_radar_verdicts
@@ -149,9 +165,10 @@ func (s *UnifiedRadarVerdictStore) History(ctx context.Context, network, targetK
 		var triggeredRaw, watchRaw, decisionRaw, signalsRaw []byte
 		if err := rows.Scan(
 			&record.ID, &record.Network, &record.TargetKind, &record.TargetID, &record.Grade,
-			&record.Verdict, &record.RulesetVersion, &record.ActorRulesetVersion, &record.Signed,
-			&record.Signature, &record.Fingerprint, &triggeredRaw, &watchRaw, &decisionRaw,
-			&signalsRaw, &record.FirstSeenAt, &record.LastSeenAt, &record.ScanCount,
+			&record.Verdict, &record.RulesetVersion, &record.ActorRulesetVersion, &record.Digest,
+			&record.Signed, &record.Signature, &record.SignatureAlgorithm, &record.KeyID, &record.PayloadHash,
+			&record.Fingerprint, &triggeredRaw, &watchRaw, &decisionRaw, &signalsRaw,
+			&record.FirstSeenAt, &record.LastSeenAt, &record.ScanCount,
 		); err != nil {
 			return nil, err
 		}
