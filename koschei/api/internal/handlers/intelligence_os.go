@@ -205,9 +205,14 @@ type fundingAssistantInput struct {
 	Notes            string `json:"notes"`
 }
 
+const maxFundingAssistantMilestones = 20
+
 func fundingAssistantDraft(q fundingAssistantInput) map[string]any {
 	if q.MilestoneCount < 1 {
 		q.MilestoneCount = 3
+	}
+	if q.MilestoneCount > maxFundingAssistantMilestones {
+		q.MilestoneCount = maxFundingAssistantMilestones
 	}
 	if q.Ecosystem == "" {
 		q.Ecosystem = "Custom"
@@ -249,6 +254,10 @@ func (h *Handler) FundingAssistant(w http.ResponseWriter, r *http.Request) {
 	var q fundingAssistantInput
 	if decodeJSON(r, &q) != nil || strings.TrimSpace(q.ProjectName) == "" || strings.TrimSpace(q.ShortDescription) == "" {
 		writeJSON(w, 400, map[string]string{"error": "project_name_and_short_description_required"})
+		return
+	}
+	if q.MilestoneCount > maxFundingAssistantMilestones {
+		writeJSON(w, 400, map[string]any{"error": "milestone_count_too_large", "max": maxFundingAssistantMilestones})
 		return
 	}
 	draft := fundingAssistantDraft(q)
