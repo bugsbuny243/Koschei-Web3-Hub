@@ -43,8 +43,8 @@ func TestSuspiciousClaimSurfacePreservesStructuralFactsWithoutScore(t *testing.T
 	shield := buildWalletlessClaimArm(req, evidence, time.Now().UTC().Format(time.RFC3339))
 	surface := buildClaimSurfaceArm(req, evidence, time.Now().UTC().Format(time.RFC3339))
 	for _, arm := range []SecurityRadarVerdict{shield, surface} {
-		if !arm.Signed {
-			t.Fatalf("parsed suspicious surface must produce signed evidence: %#v", arm)
+		if !SecurityRadarVerdictHasVerifiedEvidence(arm) {
+			t.Fatalf("parsed suspicious surface must produce verified evidence: %#v", arm)
 		}
 		if arm.RiskIndex != 0 || arm.Grade != "-" {
 			t.Fatalf("claim arm issued score or grade: %#v", arm)

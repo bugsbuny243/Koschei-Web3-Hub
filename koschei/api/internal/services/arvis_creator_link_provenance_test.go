@@ -11,8 +11,8 @@ func TestCreatorLinkEvidenceStaysObservedWithoutCanonicalCreateAnchor(t *testing
 	}
 	arm := creatorLinkEvidenceArm(req, "CreatorObserved111111111111111111111111111", launch, "2026-08-31T00:00:00Z")
 
-	if !arm.Signed {
-		t.Fatal("observed creator evidence should remain a signed evidence arm")
+	if !SecurityRadarVerdictHasVerifiedEvidence(arm) {
+		t.Fatal("observed creator evidence should remain available evidence")
 	}
 	if got, _ := arm.Signals["real_onchain_evidence"].(bool); got {
 		t.Fatal("source attribution was incorrectly upgraded to real_onchain_evidence")
@@ -40,8 +40,8 @@ func TestCreatorLinkEvidenceUpgradesWithCanonicalCreateAnchor(t *testing.T) {
 	}
 	arm := creatorLinkEvidenceArm(req, "CreatorVerified11111111111111111111111111", launch, "2026-08-31T00:00:00Z")
 
-	if !arm.Signed {
-		t.Fatal("verified creator evidence should be signed")
+	if !SecurityRadarVerdictHasVerifiedEvidence(arm) {
+		t.Fatal("verified creator evidence should remain verified")
 	}
 	if got, _ := arm.Signals["real_onchain_evidence"].(bool); !got {
 		t.Fatal("canonical creator evidence should be real_onchain_evidence")

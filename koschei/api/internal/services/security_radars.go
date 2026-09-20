@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"os"
@@ -28,22 +26,26 @@ type SecurityRadarRequest struct {
 }
 
 type SecurityRadarVerdict struct {
-	Module           string         `json:"module"`
-	ModuleID         string         `json:"module_id"`
-	Target           string         `json:"target"`
-	Network          string         `json:"network"`
-	Grade            string         `json:"grade"`
-	RiskIndex        int            `json:"risk_index"`
-	RiskLevel        string         `json:"risk_level"`
-	Verdict          string         `json:"verdict"`
-	Recommendation   string         `json:"recommendation"`
-	Signals          map[string]any `json:"signals"`
-	Evidence         []string       `json:"evidence"`
-	GeneratedAt      string         `json:"generated_at"`
-	RuleVersion      string         `json:"rule_version"`
-	EvidenceVerified bool           `json:"evidence_verified,omitempty"`
-	Signed           bool           `json:"signed"`
-	Signature        string         `json:"signature"`
+	Module             string         `json:"module"`
+	ModuleID           string         `json:"module_id"`
+	Target             string         `json:"target"`
+	Network            string         `json:"network"`
+	Grade              string         `json:"grade"`
+	RiskIndex          int            `json:"risk_index"`
+	RiskLevel          string         `json:"risk_level"`
+	Verdict            string         `json:"verdict"`
+	Recommendation     string         `json:"recommendation"`
+	Signals            map[string]any `json:"signals"`
+	Evidence           []string       `json:"evidence"`
+	GeneratedAt        string         `json:"generated_at"`
+	RuleVersion        string         `json:"rule_version"`
+	EvidenceVerified   bool           `json:"evidence_verified,omitempty"`
+	Digest             string         `json:"digest,omitempty"`
+	Signed             bool           `json:"signed"`
+	Signature          string         `json:"signature"`
+	SignatureAlgorithm string         `json:"signature_algorithm,omitempty"`
+	KeyID              string         `json:"key_id,omitempty"`
+	PayloadHash        string         `json:"payload_hash,omitempty"`
 }
 
 type SecurityRadarBundle struct {
@@ -60,14 +62,18 @@ type SecurityRadarBundle struct {
 }
 
 type SecurityRadarFinalVerdict struct {
-	Grade          string `json:"grade"`
-	RiskIndex      int    `json:"risk_index"`
-	RiskLevel      string `json:"risk_level"`
-	Verdict        string `json:"verdict,omitempty"`
-	Recommendation string `json:"recommendation"`
-	RuleVersion    string `json:"rule_version"`
-	Signed         bool   `json:"signed"`
-	Signature      string `json:"signature,omitempty"`
+	Grade              string `json:"grade"`
+	RiskIndex          int    `json:"risk_index"`
+	RiskLevel          string `json:"risk_level"`
+	Verdict            string `json:"verdict,omitempty"`
+	Recommendation     string `json:"recommendation"`
+	RuleVersion        string `json:"rule_version"`
+	Digest             string `json:"digest,omitempty"`
+	Signed             bool   `json:"signed"`
+	Signature          string `json:"signature,omitempty"`
+	SignatureAlgorithm string `json:"signature_algorithm,omitempty"`
+	KeyID              string `json:"key_id,omitempty"`
+	PayloadHash        string `json:"payload_hash,omitempty"`
 }
 
 type radarEvidenceProfile struct {
@@ -168,14 +174,18 @@ func FinalSecurityRadarVerdict(bundle SecurityRadarBundle) SecurityRadarFinalVer
 		}
 	}
 	return SecurityRadarFinalVerdict{
-		Grade:          winner.Grade,
-		RiskIndex:      winner.RiskIndex,
-		RiskLevel:      winner.RiskLevel,
-		Verdict:        winner.Verdict,
-		Recommendation: winner.Recommendation,
-		RuleVersion:    SecurityRadarRuleVersion,
-		Signed:         true,
-		Signature:      winner.Signature,
+		Grade:              winner.Grade,
+		RiskIndex:          winner.RiskIndex,
+		RiskLevel:          winner.RiskLevel,
+		Verdict:            winner.Verdict,
+		Recommendation:     winner.Recommendation,
+		RuleVersion:        SecurityRadarRuleVersion,
+		Digest:             winner.Digest,
+		Signed:             winner.Signed,
+		Signature:          winner.Signature,
+		SignatureAlgorithm: winner.SignatureAlgorithm,
+		KeyID:              winner.KeyID,
+		PayloadHash:        winner.PayloadHash,
 	}
 }
 
@@ -407,10 +417,8 @@ func newRadarVerdict(module, moduleID string, req SecurityRadarRequest, risk int
 		GeneratedAt:      generatedAt,
 		RuleVersion:      SecurityRadarRuleVersion,
 		EvidenceVerified: securityRadarSignalsHaveVerifiedEvidence(signals),
-		Signed:           true,
 	}
-	v.Signature = signSecurityRadarVerdict(v.ModuleID, v.Target, v.Network, v.RiskIndex)
-	return v
+	return finalizeSecurityRadarVerdictAuthentication(v)
 }
 
 func baseEvidenceSignals(profile radarEvidenceProfile) map[string]any {
@@ -640,10 +648,4 @@ func verdictFromRiskLevel(moduleID, level string, signals map[string]any) string
 	default:
 		return "Internal pre-connect evidence only"
 	}
-}
-
-func signSecurityRadarVerdict(moduleID, target, network string, riskIndex int) string {
-	payload := fmt.Sprintf("%s|%s|%s|%d|%s", moduleID, strings.TrimSpace(target), strings.TrimSpace(network), riskIndex, SecurityRadarRuleVersion)
-	h := sha256.Sum256([]byte(payload))
-	return hex.EncodeToString(h[:])
 }

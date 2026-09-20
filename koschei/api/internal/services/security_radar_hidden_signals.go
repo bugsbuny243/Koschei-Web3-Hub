@@ -132,7 +132,8 @@ func applyHiddenRiskAdjustment(verdict *SecurityRadarVerdictRecord, adjustment i
 	verdict.Grade = gradeFromRiskLevel(verdict.RiskLevel)
 	verdict.Recommendation = recommendationFromRiskLevel(verdict.RiskLevel)
 	verdict.Verdict = verdictFromRiskLevel(verdict.ModuleID, verdict.RiskLevel, nonNilMap(verdict.Signals))
-	if verdict.Signature != "" {
-		verdict.Signature = signSecurityRadarVerdict(verdict.ModuleID, verdict.Target, verdict.Network, verdict.RiskIndex)
+	if verdict.Signature != "" || verdict.Signed {
+		verdict.Signed = false
+		verdict.Signature = ""
 	}
 }

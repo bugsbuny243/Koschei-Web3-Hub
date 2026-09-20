@@ -145,6 +145,7 @@ func ApplyRepeatDominantHolderEvidenceToAnalysis(analysis ArvisAnalysis, req Sec
 		repeatArm.Verdict = "Persistent actor-memory query completed; no repeat-dominant holder match was observed in the bounded evidence window."
 		repeatArm.Recommendation = "Continue persistent observation; absence inside the bounded window is not proof of absence outside it."
 	}
+	repeatArm = finalizeSecurityRadarVerdictAuthentication(repeatArm)
 
 	arms := ArvisArmsFromBundle(analysis.Bundle)
 	if len(arms) == 0 {
