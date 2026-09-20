@@ -36,6 +36,7 @@ func finalizeSecurityRadarVerdictAuthentication(verdict SecurityRadarVerdict) Se
 	verdict.Network = normalizeRadarNetwork(verdict.Network)
 	verdict.RuleVersion = strings.TrimSpace(verdict.RuleVersion)
 	verdict.EvidenceVerified = verdict.EvidenceVerified || securityRadarSignalsHaveVerifiedEvidence(verdict.Signals)
+	verdict.Digest = ""
 
 	clearSecurityRadarVerdictAuthentication(&verdict)
 
