@@ -332,17 +332,12 @@ func radarDetailFinalMap(fresh services.SecurityRadarFinalVerdict, persisted *se
 func radarDetailModules(arms []services.SecurityRadarVerdict) []map[string]any {
 	out := make([]map[string]any, 0, len(arms))
 	for _, arm := range arms {
-		verified := false
-		for _, key := range []string{"verified_evidence", "real_onchain_evidence", "real_offchain_evidence"} {
-			if value, _ := arm.Signals[key].(bool); value {
-				verified = true
-			}
-		}
+		verified := services.SecurityRadarVerdictHasVerifiedEvidence(arm)
 		out = append(out, map[string]any{
 			"module": arm.Module, "module_id": arm.ModuleID, "grade": arm.Grade,
 			"risk_index": arm.RiskIndex, "risk_level": arm.RiskLevel,
 			"verdict": arm.Verdict, "recommendation": arm.Recommendation,
-			"verified": verified && arm.Signed, "signed": arm.Signed,
+			"verified": verified, "evidence_verified": verified, "signed": arm.Signed,
 			"signals": arm.Signals, "evidence": arm.Evidence,
 			"generated_at": arm.GeneratedAt, "signature": arm.Signature,
 		})
@@ -359,7 +354,7 @@ func radarDetailEvidence(arms []services.SecurityRadarVerdict) []map[string]any 
 			}
 			out = append(out, map[string]any{
 				"module": arm.Module, "module_id": arm.ModuleID,
-				"verified": arm.Signed && radarDetailArmVerified(arm), "text": evidence,
+				"verified": radarDetailArmVerified(arm), "text": evidence,
 			})
 		}
 	}
@@ -446,12 +441,7 @@ func radarDetailAuthority(modules []map[string]any, structural map[string]any, k
 }
 
 func radarDetailArmVerified(arm services.SecurityRadarVerdict) bool {
-	for _, key := range []string{"verified_evidence", "real_onchain_evidence", "real_offchain_evidence"} {
-		if value, _ := arm.Signals[key].(bool); value {
-			return true
-		}
-	}
-	return false
+	return services.SecurityRadarVerdictHasVerifiedEvidence(arm)
 }
 
 func radarDetailString(values map[string]any, keys ...string) string {

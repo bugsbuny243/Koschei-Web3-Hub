@@ -58,6 +58,12 @@ The verifier constructs this exact JSON object in this field order and signs/ver
 }
 ```
 
+### Canonical byte encoding
+
+The canonical object is encoded as compact UTF-8 JSON with no insignificant whitespace. Field order is the order shown above. ARVIS v1 deliberately matches Go `encoding/json` string escaping so producer and verifier compute the same bytes: `<`, `>`, and `&` are escaped as `\\u003c`, `\\u003e`, and `\\u0026`; U+2028 and U+2029 are escaped as `\\u2028` and `\\u2029`. Canonical rule strings and string-array items are trimmed before authentication.
+
+Rule-array order is the deterministic order emitted by the producer and is preserved by the verifier. Consumers implementing their own verifier should test against `oss/verifier/typescript/testdata/go-producer-vector.json` to catch byte-level drift.
+
 Free-form diagnostic `facts` are intentionally not signing authority in v1. They may be displayed as diagnostics, but changing them does not change the authenticated decision. If a fact must affect a customer decision, it must first be projected into an authenticated rule/evidence field.
 
 `payload_hash` is SHA-256 of those canonical bytes. The Ed25519 signature is over the same canonical bytes, not over caller-provided `payload_hash` text.

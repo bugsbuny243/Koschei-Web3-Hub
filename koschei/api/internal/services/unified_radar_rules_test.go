@@ -81,12 +81,17 @@ func TestUnifiedVerdictJoinsActorAndMarketRulesWithoutNumber(t *testing.T) {
 		RuleID: UnifiedRuleVolumeLiquidityGap, Title: "gap", EvidenceStatus: "observed",
 		Triggered: true, GradeEffect: "compounding_input", Summary: "gap observed",
 	}}}
-	verdict := EvaluateUnifiedRadarVerdict("MintOne", actor, behavior)
-	if verdict.Grade != "B" || verdict.Verdict != "compounding_rule" || !verdict.Signed {
-		t.Fatalf("unified verdict=%#v", verdict)
+	evaluated := EvaluateUnifiedRadarVerdict("MintOne", actor, behavior)
+	if evaluated.Grade != "B" || evaluated.Verdict != "compounding_rule" || evaluated.Signed || evaluated.Signature != "" {
+		t.Fatalf("evaluator must return an unsigned deterministic decision: %#v", evaluated)
 	}
-	if verdict.Signature == "" || strings.Contains(verdict.Signature, "/100") {
-		t.Fatalf("invalid signature=%q", verdict.Signature)
+	if !strings.HasPrefix(evaluated.Digest, "koschei-unified:") {
+		t.Fatalf("evaluator digest=%q", evaluated.Digest)
+	}
+	configureUnifiedVerdictTestSigner(t)
+	verdict := FinalizeUnifiedRadarVerdictContract("MintOne", evaluated)
+	if !verdict.Signed || verdict.Signature == "" || strings.HasPrefix(verdict.Signature, "koschei-unified:") {
+		t.Fatalf("finalized verdict did not receive Ed25519 authentication: %#v", verdict)
 	}
 }
 

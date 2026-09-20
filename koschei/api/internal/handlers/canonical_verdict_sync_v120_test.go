@@ -8,6 +8,7 @@ import (
 )
 
 func TestCanonicalVerdictSynchronizationPreservesSignedV120HardCap(t *testing.T) {
+	configureHandlerVerdictTestSigner(t)
 	current := services.UnifiedRadarVerdict{
 		Grade:          "D",
 		Verdict:        "hard_trigger",
@@ -42,8 +43,8 @@ func TestCanonicalVerdictSynchronizationPreservesSignedV120HardCap(t *testing.T)
 	if final.RulesetVersion != services.UnifiedRadarRulesetVersionV120 {
 		t.Fatalf("v1.2 ruleset downgraded: %q", final.RulesetVersion)
 	}
-	if !final.Signed || !strings.HasPrefix(final.Signature, "koschei-unified:") {
-		t.Fatalf("v1.2 verdict was not normalized and target-bound: %#v", final)
+	if !final.Signed || final.Signature == "koschei-unified:existing-v120" || final.SignatureAlgorithm != "ed25519" || !strings.HasPrefix(final.PayloadHash, "sha256:") {
+		t.Fatalf("v1.2 verdict was not cryptographically normalized and target-bound: %#v", final)
 	}
 }
 

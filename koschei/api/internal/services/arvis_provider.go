@@ -46,10 +46,10 @@ func applyResolvedArvisProvider(bundle SecurityRadarBundle) SecurityRadarBundle 
 		if arm.Signals == nil {
 			continue
 		}
-		if value, _ := arm.Signals["real_onchain_evidence"].(bool); value && arm.Signed {
+		if value, _ := arm.Signals["real_onchain_evidence"].(bool); value {
 			hasOnchain = true
 		}
-		if value, _ := arm.Signals["real_offchain_evidence"].(bool); value && arm.Signed {
+		if value, _ := arm.Signals["real_offchain_evidence"].(bool); value {
 			hasOffchain = true
 		}
 	}

@@ -1,19 +1,29 @@
 package services
 
+import "strings"
+
 func SecurityRadarVerdictHasVerifiedEvidence(verdict SecurityRadarVerdict) bool {
-	if !verdict.Signed || verdict.Signals == nil {
+	if verdict.EvidenceVerified {
+		return true
+	}
+	return securityRadarSignalsHaveVerifiedEvidence(verdict.Signals)
+}
+
+func securityRadarSignalsHaveVerifiedEvidence(signals map[string]any) bool {
+	if signals == nil {
 		return false
 	}
-	if value, _ := verdict.Signals["verified_evidence"].(bool); value {
+	if value, _ := signals["verified_evidence"].(bool); value {
 		return true
 	}
-	if value, _ := verdict.Signals["real_onchain_evidence"].(bool); value {
+	if value, _ := signals["real_onchain_evidence"].(bool); value {
 		return true
 	}
-	if value, _ := verdict.Signals["real_offchain_evidence"].(bool); value {
+	if value, _ := signals["real_offchain_evidence"].(bool); value {
 		return true
 	}
-	return false
+	status := strings.ToLower(strings.TrimSpace(arvisSignalString(signals, "evidence_status")))
+	return status == "verified" || strings.HasPrefix(status, "verified_")
 }
 
 func verifiedArvisEvidenceCount(arms []SecurityRadarVerdict) int {

@@ -7,7 +7,10 @@ import (
 )
 
 func TestUnifiedContractPreservesVerifiedHardCapGradeEffect(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	raw := UnifiedRadarVerdict{
+		Target:         "MintHardCap",
+		Network:        "solana-mainnet",
 		Grade:          "B",
 		Verdict:        "compounding_rule",
 		RulesetVersion: UnifiedRadarRulesetVersionV110,
@@ -53,8 +56,14 @@ func TestUnifiedContractPreservesVerifiedHardCapGradeEffect(t *testing.T) {
 	if contract["grade"] != "F" || contract["verdict"] != "hard_trigger" {
 		t.Fatalf("hard cap was rewritten during serialization: %s", encoded)
 	}
-	if signature, _ := contract["signature"].(string); !strings.HasPrefix(signature, "koschei-unified-contract:") {
-		t.Fatalf("changed hard-cap decision retained stale signature: %q", signature)
+	if contract["signed"] != true || contract["signature_algorithm"] != "ed25519" || contract["key_id"] != "test-suite-verdict-key-v1" {
+		t.Fatalf("hard-cap verdict was not authenticated with Ed25519: %s", encoded)
+	}
+	if signature, _ := contract["signature"].(string); signature == "koschei-unified:stale-b" || strings.HasPrefix(signature, "koschei-unified-contract:") {
+		t.Fatalf("changed hard-cap decision retained legacy digest semantics: %q", signature)
+	}
+	if payloadHash, _ := contract["payload_hash"].(string); !strings.HasPrefix(payloadHash, "sha256:") {
+		t.Fatalf("hard-cap payload hash missing: %q", payloadHash)
 	}
 	decision, _ := contract["decision_path"].([]any)
 	foundHardCap := false
@@ -70,6 +79,7 @@ func TestUnifiedContractPreservesVerifiedHardCapGradeEffect(t *testing.T) {
 }
 
 func TestFinalizeUnifiedContractPreservesV120HardCapAndRuleset(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	raw := UnifiedRadarVerdict{
 		Grade:          "D",
 		Verdict:        "hard_trigger",
@@ -95,7 +105,7 @@ func TestFinalizeUnifiedContractPreservesV120HardCapAndRuleset(t *testing.T) {
 	if finalized.RulesetVersion != UnifiedRadarRulesetVersionV120 {
 		t.Fatalf("v1.2 ruleset downgraded: %q", finalized.RulesetVersion)
 	}
-	if !finalized.Signed || !strings.HasPrefix(finalized.Signature, "koschei-unified:") {
-		t.Fatalf("v1.2 verdict was not target-bound: %#v", finalized)
+	if !finalized.Signed || finalized.SignatureAlgorithm != "ed25519" || finalized.KeyID != "test-suite-verdict-key-v1" || !strings.HasPrefix(finalized.PayloadHash, "sha256:") {
+		t.Fatalf("v1.2 verdict was not cryptographically target-bound: %#v", finalized)
 	}
 }
