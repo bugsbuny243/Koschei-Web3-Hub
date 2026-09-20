@@ -133,7 +133,7 @@ func buildWalletlessClaimArm(req SecurityRadarRequest, e arvisClaimSurfaceEviden
 	}
 	arm := verifiedEvidenceArm("Walletless Claim Shield", ModuleWalletlessClaimShield, req, 0, signals, evidence, generatedAt)
 	arm.Verdict = "Claim instruction and wallet-request indicators were recorded; this arm does not issue a grade."
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }
 
 func buildClaimSurfaceArm(req SecurityRadarRequest, e arvisClaimSurfaceEvidence, generatedAt string) SecurityRadarVerdict {
@@ -155,7 +155,7 @@ func buildClaimSurfaceArm(req SecurityRadarRequest, e arvisClaimSurfaceEvidence,
 	}
 	arm := verifiedEvidenceArm("Claim Surface Risk", ModuleClaimSurfaceRisk, req, 0, signals, evidence, generatedAt)
 	arm.Verdict = "Off-chain claim-surface indicators were recorded; this arm does not issue a grade."
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }
 
 func claimEvidenceSignals(e arvisClaimSurfaceEvidence, moduleID string) map[string]any {
