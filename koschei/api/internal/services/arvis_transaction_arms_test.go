@@ -70,22 +70,22 @@ func TestTransactionArmsRequireParsedEvidence(t *testing.T) {
 	req := SecurityRadarRequest{Target: "target", Network: "solana-mainnet"}
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
 	missing := arvisTransactionEvidence{}
-	if arm := buildPumpTransactionArm(req, missing, generatedAt); arm.Signed {
+	if arm := buildPumpTransactionArm(req, missing, generatedAt); SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		t.Fatal("Pump arm must remain unsigned without parsed program evidence")
 	}
-	if arm := buildRaydiumTransactionArm(req, missing, generatedAt); arm.Signed {
+	if arm := buildRaydiumTransactionArm(req, missing, generatedAt); SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		t.Fatal("Raydium arm must remain unsigned without parsed program evidence")
 	}
-	if arm := buildLiquidityMovementTransactionArm(req, missing, generatedAt); arm.Signed {
+	if arm := buildLiquidityMovementTransactionArm(req, missing, generatedAt); SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		t.Fatal("liquidity arm must remain unsigned without parsed transaction evidence")
 	}
-	if arm := buildCreatorLinkTransactionArm(req, missing, generatedAt); arm.Signed {
+	if arm := buildCreatorLinkTransactionArm(req, missing, generatedAt); SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		t.Fatal("creator arm must remain unsigned without parsed transaction evidence")
 	}
-	if arm := buildFundingClusterTransactionArm(req, missing, generatedAt); arm.Signed {
+	if arm := buildFundingClusterTransactionArm(req, missing, generatedAt); SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		t.Fatal("funding arm must remain unsigned without parsed transaction evidence")
 	}
-	if arm := buildTransactionIntentProgramArm(req, missing, generatedAt); arm.Signed {
+	if arm := buildTransactionIntentProgramArm(req, missing, generatedAt); SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		t.Fatal("transaction intent must remain unsigned without parsed transaction evidence")
 	}
 }
@@ -104,8 +104,8 @@ func TestTransactionIntentProgramArmClassifiesParsedIntent(t *testing.T) {
 		WritableCount:       4, InnerInstructionCount: 2, RaydiumRelated: true, ComputeBudgetRelated: true,
 	}
 	arm := buildTransactionIntentProgramArm(req, tx, generatedAt)
-	if !arm.Signed {
-		t.Fatalf("expected signed transaction intent arm: %#v", arm)
+	if !SecurityRadarVerdictHasVerifiedEvidence(arm) {
+		t.Fatalf("expected verified transaction intent evidence: %#v", arm)
 	}
 	if arm.ModuleID != ModuleProgramRelationScan {
 		t.Fatalf("intent must strengthen Program Relation without adding a 15th arm: %s", arm.ModuleID)
