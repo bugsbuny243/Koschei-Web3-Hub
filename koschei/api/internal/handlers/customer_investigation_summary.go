@@ -76,16 +76,16 @@ func customerEvidenceCoverage(arms []services.SecurityRadarVerdict) map[string]a
 		state := customerArmEvidenceState(arm)
 		counts[state]++
 		modules = append(modules, map[string]any{
-			"module_id":      arm.ModuleID,
-			"module":         arm.Module,
-			"state":          state,
+			"module_id":         arm.ModuleID,
+			"module":            arm.Module,
+			"state":             state,
 			"signed":            arm.Signed,
 			"evidence_verified": services.SecurityRadarVerdictHasVerifiedEvidence(arm),
 			"recommendation":    arm.Recommendation,
-			"evidence_count": len(arm.Evidence),
-			"evidence":       append([]string{}, arm.Evidence...),
-			"generated_at":   arm.GeneratedAt,
-			"rule_version":   arm.RuleVersion,
+			"evidence_count":    len(arm.Evidence),
+			"evidence":          append([]string{}, arm.Evidence...),
+			"generated_at":      arm.GeneratedAt,
+			"rule_version":      arm.RuleVersion,
 		})
 	}
 	if len(arms) < architectureArms {
