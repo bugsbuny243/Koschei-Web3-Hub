@@ -31,19 +31,19 @@ type SecurityRadarEventRecord struct {
 }
 
 type SecurityRadarVerdictRecord struct {
-	ID             string         `json:"id,omitempty"`
-	EventID        string         `json:"event_id,omitempty"`
-	ModuleID       string         `json:"module_id"`
-	Target         string         `json:"target"`
-	TargetType     string         `json:"target_type"`
-	Network        string         `json:"network"`
-	Grade          string         `json:"grade"`
-	RiskIndex      int            `json:"risk_index"`
-	RiskLevel      string         `json:"risk_level"`
-	Verdict        string         `json:"verdict"`
-	Recommendation string         `json:"recommendation"`
-	Evidence       []string       `json:"evidence"`
-	Signals        map[string]any `json:"signals"`
+	ID                 string         `json:"id,omitempty"`
+	EventID            string         `json:"event_id,omitempty"`
+	ModuleID           string         `json:"module_id"`
+	Target             string         `json:"target"`
+	TargetType         string         `json:"target_type"`
+	Network            string         `json:"network"`
+	Grade              string         `json:"grade"`
+	RiskIndex          int            `json:"risk_index"`
+	RiskLevel          string         `json:"risk_level"`
+	Verdict            string         `json:"verdict"`
+	Recommendation     string         `json:"recommendation"`
+	Evidence           []string       `json:"evidence"`
+	Signals            map[string]any `json:"signals"`
 	RuleVersion        string         `json:"rule_version"`
 	EvidenceVerified   bool           `json:"evidence_verified,omitempty"`
 	Digest             string         `json:"digest,omitempty"`
@@ -53,9 +53,9 @@ type SecurityRadarVerdictRecord struct {
 	KeyID              string         `json:"key_id,omitempty"`
 	PayloadHash        string         `json:"payload_hash,omitempty"`
 	Source             string         `json:"source,omitempty"`
-	EventType      string         `json:"event_type,omitempty"`
-	Provider       string         `json:"provider,omitempty"`
-	CreatedAt      time.Time      `json:"created_at"`
+	EventType          string         `json:"event_type,omitempty"`
+	Provider           string         `json:"provider,omitempty"`
+	CreatedAt          time.Time      `json:"created_at"`
 }
 
 func NewSecurityRadarStore(db *sql.DB) *SecurityRadarStore {
