@@ -9,6 +9,7 @@ import (
 )
 
 func TestCanonicalVerdictSynchronizationRunsBeforeSnapshotDiagnostics(t *testing.T) {
+	configureHandlerVerdictTestSigner(t)
 	actor := services.ActorDefenseRuleVerdict{
 		RulesetVersion: services.ActorDefenseRulesetVersion,
 		TriggeredRules: repeatedTransferGroupsV111(4),
