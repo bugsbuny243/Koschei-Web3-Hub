@@ -2,17 +2,23 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://tradepigloball.co/schemas/signed-verdict.schema.json",
   "title": "Koschei ARVIS Signed Verdict",
-  "description": "Evidence-backed, deterministic and numberless final verdict contract for Solana developer integrations.",
+  "description": "Evidence-backed final verdict contract. signed=true means the canonical authenticated payload is verified with Ed25519 against an out-of-band trusted key registry.",
   "type": "object",
   "required": [
+    "target",
+    "network",
     "grade",
+    "verdict",
     "evidence",
     "rule_version",
+    "triggered_rules",
+    "decision_path",
     "signed",
     "signature",
     "signature_algorithm",
     "key_id",
-    "payload_hash"
+    "payload_hash",
+    "created_at"
   ],
   "properties": {
     "target": {
@@ -21,7 +27,8 @@
     },
     "network": {
       "type": "string",
-      "default": "solana-mainnet"
+      "default": "solana-mainnet",
+      "minLength": 1
     },
     "grade": {
       "type": "string",
@@ -29,7 +36,8 @@
       "description": "Letter grade from A to F. '-' means no grade-changing rule was triggered; absence of evidence is not an A grade."
     },
     "verdict": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "recommendation": {
       "type": "string"
@@ -124,8 +132,8 @@
     },
     "signature": {
       "type": "string",
-      "minLength": 64,
-      "description": "Ed25519 signature over the canonical verdict payload, encoded as base64/base64url or hex."
+      "pattern": "^[A-Za-z0-9_-]{86}$",
+      "description": "Canonical unpadded base64url encoding of a 64-byte Ed25519 signature over the canonical authenticated verdict payload."
     },
     "created_at": {
       "type": "string",
@@ -136,11 +144,77 @@
     },
     "key_id": {
       "type": "string",
-      "minLength": 1
+      "minLength": 1,
+      "description": "Identifier resolved by the consumer against an out-of-band trusted Ed25519 public-key registry. A key supplied by the verdict itself is never trusted."
     },
     "payload_hash": {
       "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$"
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 of the canonical authenticated verdict payload, recomputed by the verifier before signature verification."
+    },
+    "watch_flags": {
+      "type": "array",
+      "description": "Watch-only rule bindings included in the authenticated payload. They do not gain grade-changing authority by being signed.",
+      "items": {
+        "type": "object",
+        "required": [
+          "rule_id",
+          "evidence_status"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "string"
+          },
+          "evidence_status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "observed",
+              "inferred",
+              "unverified"
+            ]
+          },
+          "grade_effect": {
+            "type": "string"
+          },
+          "grade_cap": {
+            "type": "string",
+            "pattern": "^[A-F-]$"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "summary": {
+            "type": "string"
+          },
+          "evidence_keys": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "signatures": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "facts": {
+            "type": "object"
+          }
+        },
+        "additionalProperties": true
+      }
     }
   },
   "additionalProperties": true
