@@ -51,7 +51,7 @@ func TestUnifiedRadarV111CountsDistinctCompoundingRuleIDs(t *testing.T) {
 	}
 
 	verdict := EvaluateUnifiedRadarVerdictV110("Mint111", actor, behavior)
-	if verdict.Grade != "F" || verdict.Verdict != "hard_trigger" || !verdict.Signed {
+	if verdict.Grade != "F" || verdict.Verdict != "hard_trigger" || verdict.Signed || verdict.Digest == "" {
 		t.Fatalf("unexpected corrected verdict: %#v", verdict)
 	}
 	if verdict.RulesetVersion != "koschei-unified-radar-rules-v1.1.1" {
@@ -80,7 +80,7 @@ func TestUnifiedRadarV111TwoDistinctRulesMayCompound(t *testing.T) {
 	}
 	behavior := UnifiedRadarBehaviorReport{Signals: []UnifiedRadarSignal{}, GeneratedAt: time.Now().UTC()}
 	verdict := EvaluateUnifiedRadarVerdictV110("Mint222", actor, behavior)
-	if verdict.Grade != "B" || verdict.Verdict != "compounding_rule" || !verdict.Signed {
+	if verdict.Grade != "B" || verdict.Verdict != "compounding_rule" || verdict.Signed || verdict.Digest == "" {
 		t.Fatalf("two distinct compounding rules did not produce B: %#v", verdict)
 	}
 }

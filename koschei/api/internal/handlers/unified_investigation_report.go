@@ -391,6 +391,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	)
 
 	unifiedVerdict := services.EvaluateUnifiedRadarVerdictV140(target, actorVerdict, behavior)
+	unifiedVerdict = services.FinalizeUnifiedRadarVerdictContractForNetwork(target, network, unifiedVerdict)
 	if h.DB != nil {
 		_ = services.CaptureHolderConcentrationObservation(ctx, h.DB, network, target, core.Intelligence, now)
 	}

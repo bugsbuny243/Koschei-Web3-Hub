@@ -123,7 +123,30 @@ export function canonicalVerdictPayloadBytes(value: VerdictLike): Buffer {
       : [],
     created_at: String(value.created_at),
   };
-  return Buffer.from(JSON.stringify(payload), "utf8");
+  return Buffer.from(goCompatibleJSONStringify(payload), "utf8");
+}
+
+function goCompatibleJSONStringify(value: unknown): string {
+  const encoded = JSON.stringify(value);
+  if (encoded === undefined) {
+    throw new Error("canonical verdict payload could not be encoded");
+  }
+  return encoded.replace(/[<>&\u2028\u2029]/g, character => {
+    switch (character) {
+      case "<":
+        return "\\u003c";
+      case ">":
+        return "\\u003e";
+      case "&":
+        return "\\u0026";
+      case "\u2028":
+        return "\\u2028";
+      case "\u2029":
+        return "\\u2029";
+      default:
+        return character;
+    }
+  });
 }
 
 function validateVerdictShape(value: unknown): string[] {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,6 +39,8 @@ func TestPersistentFundingClusterOutcomesPostgres17(t *testing.T) {
 	tokenB := fmt.Sprintf("OutcomeTokenB%d", nonce)
 	tokenC := fmt.Sprintf("OutcomeTokenC%d", nonce)
 	baseTime := time.Now().UTC().Add(-48 * time.Hour)
+	signedVerdictSignature := strings.Repeat("B", 86)
+	signedVerdictPayloadHash := "sha256:" + strings.Repeat("b", 64)
 
 	defer func() {
 		_, _ = db.ExecContext(context.Background(), `DELETE FROM security_actor_exit_events WHERE network=$1 AND actor_wallet IN ($2,$3)`, network, creatorA, creatorB)
@@ -104,11 +107,14 @@ func TestPersistentFundingClusterOutcomesPostgres17(t *testing.T) {
 
 	_, err = db.ExecContext(ctx, `
 		INSERT INTO security_unified_radar_verdicts
-		(network,target_kind,target_id,grade,verdict,ruleset_version,actor_ruleset_version,signed,signature,fingerprint,first_seen_at,last_seen_at)
+		(network,target_kind,target_id,grade,verdict,ruleset_version,actor_ruleset_version,
+		 signed,signature,signature_algorithm,key_id,payload_hash,fingerprint,first_seen_at,last_seen_at)
 		VALUES
-		($1,'token',$2,'B','compounding_rule','rules-v1','actor-rules-v1',true,$3,$4,$5,$5),
-		($1,'token',$6,'-','watch_only','rules-v1','actor-rules-v1',false,NULL,$7,$5,$5)`,
-		network, tokenB, fmt.Sprintf("signed-verdict-%d", nonce), fmt.Sprintf("fingerprint-signed-%d", nonce), baseTime.Add(32*time.Hour), tokenC, fmt.Sprintf("fingerprint-unsigned-%d", nonce))
+		($1,'token',$2,'B','compounding_rule','rules-v1','actor-rules-v1',
+		 true,$3,'ed25519','funding-outcome-test-key',$4,$5,$6,$6),
+		($1,'token',$7,'-','watch_only','rules-v1','actor-rules-v1',
+		 false,NULL,NULL,NULL,NULL,$8,$6,$6)`,
+		network, tokenB, signedVerdictSignature, signedVerdictPayloadHash, fmt.Sprintf("fingerprint-signed-%d", nonce), baseTime.Add(32*time.Hour), tokenC, fmt.Sprintf("fingerprint-unsigned-%d", nonce))
 	if err != nil {
 		t.Fatal(err)
 	}

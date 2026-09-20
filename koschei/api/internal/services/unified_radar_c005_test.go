@@ -46,8 +46,8 @@ func TestC005OwnerResolvedFThreshold(t *testing.T) {
 	}
 
 	verdict := EvaluateUnifiedRadarVerdictV110("MintF", ActorDefenseRuleVerdict{}, behavior)
-	if verdict.Grade != "F" || verdict.Verdict != "hard_trigger" || !verdict.Signed || verdict.Signature == "" {
-		t.Fatalf("verdict=%#v", verdict)
+	if verdict.Grade != "F" || verdict.Verdict != "hard_trigger" || verdict.Signed || verdict.Signature != "" || verdict.Digest == "" {
+		t.Fatalf("evaluator verdict=%#v", verdict)
 	}
 }
 
@@ -57,7 +57,7 @@ func TestC005OwnerResolvedDThreshold(t *testing.T) {
 	behavior = ApplyOwnerConcentrationRuleV110(behavior, c005Holder(50), now)
 	verdict := EvaluateUnifiedRadarVerdictV110("MintD", ActorDefenseRuleVerdict{}, behavior)
 
-	if behavior.Signals[0].GradeEffect != "hard_cap_D" || verdict.Grade != "D" || !verdict.Signed {
+	if behavior.Signals[0].GradeEffect != "hard_cap_D" || verdict.Grade != "D" || verdict.Signed || verdict.Digest == "" {
 		t.Fatalf("behavior=%#v verdict=%#v", behavior, verdict)
 	}
 }

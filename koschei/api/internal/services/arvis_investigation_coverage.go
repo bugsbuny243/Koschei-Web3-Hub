@@ -11,15 +11,16 @@ const (
 )
 
 type ArvisArmCoverage struct {
-	ModuleID        string `json:"module_id"`
-	Module          string `json:"module"`
-	ExecutionStatus string `json:"execution_status"`
-	EvidenceStatus  string `json:"evidence_status"`
-	Applicable      bool   `json:"applicable"`
-	Attempted       bool   `json:"attempted"`
-	Signed          bool   `json:"signed"`
-	EvidenceCount   int    `json:"evidence_count"`
-	Reason          string `json:"reason,omitempty"`
+	ModuleID         string `json:"module_id"`
+	Module           string `json:"module"`
+	ExecutionStatus  string `json:"execution_status"`
+	EvidenceStatus   string `json:"evidence_status"`
+	Applicable       bool   `json:"applicable"`
+	Attempted        bool   `json:"attempted"`
+	Signed           bool   `json:"signed"`
+	EvidenceVerified bool   `json:"evidence_verified"`
+	EvidenceCount    int    `json:"evidence_count"`
+	Reason           string `json:"reason,omitempty"`
 }
 
 type ArvisInvestigationCoverage struct {
@@ -67,7 +68,7 @@ func BuildArvisInvestigationCoverage(arms []SecurityRadarVerdict) ArvisInvestiga
 		entry := ArvisArmCoverage{
 			ModuleID: arm.ModuleID, Module: arm.Module, ExecutionStatus: status,
 			EvidenceStatus: evidenceStatus, Applicable: applicable, Attempted: attempted,
-			Signed: arm.Signed, EvidenceCount: len(arm.Evidence), Reason: arvisFirstEvidence(arm.Evidence),
+			Signed: arm.Signed, EvidenceVerified: SecurityRadarVerdictHasVerifiedEvidence(arm), EvidenceCount: len(arm.Evidence), Reason: arvisFirstEvidence(arm.Evidence),
 		}
 		coverage.Arms = append(coverage.Arms, entry)
 		if attempted {
@@ -77,7 +78,7 @@ func BuildArvisInvestigationCoverage(arms []SecurityRadarVerdict) ArvisInvestiga
 		case ArvisExecutionCompleted:
 			coverage.Completed++
 			completedModules[arm.ModuleID] = true
-			if arm.Signed && len(arm.Evidence) > 0 {
+			if SecurityRadarVerdictHasVerifiedEvidence(arm) && len(arm.Evidence) > 0 {
 				coverage.EvidenceProducing++
 			}
 			if !arvisSignalBool(arm.Signals, "finding_observed") && arvisSignalPresent(arm.Signals, "finding_observed") {
@@ -163,7 +164,7 @@ func arvisArmExecutionStatus(arm SecurityRadarVerdict) string {
 			return explicit
 		}
 	}
-	if arm.Signed {
+	if SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		return ArvisExecutionCompleted
 	}
 	// These transaction-specific collectors are intentionally not applicable to

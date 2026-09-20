@@ -120,11 +120,16 @@ func EvaluateUnifiedRadarVerdictV120(target string, actor ActorDefenseRuleVerdic
 		out.Verdict = "hard_trigger"
 		out.DecisionPath = append(out.DecisionPath, "URD-C006 fixed the maximum grade at "+capGrade+" from a VERIFIED parsed creator transfer joined to owner-resolved cross-token dominant-holder memory.")
 	}
-	out.Signed = out.Grade != "-" && len(out.TriggeredRules) > 0
-	out.Signature = ""
-	if out.Signed {
-		out.Signature = signUnifiedRadarVerdict(strings.TrimSpace(target), out)
+	out.Target = strings.TrimSpace(target)
+	if strings.TrimSpace(out.Network) == "" {
+		out.Network = "solana-mainnet"
 	}
+	out.Digest = digestUnifiedRadarVerdict(out.Target, out)
+	out.Signed = false
+	out.Signature = ""
+	out.SignatureAlgorithm = ""
+	out.KeyID = ""
+	out.PayloadHash = ""
 	return out
 }
 

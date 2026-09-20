@@ -161,6 +161,7 @@ func ApplyActorTokenLifecycleRecurrenceToAnalysis(analysis ArvisAnalysis, recurr
 				arms[index].Signals["verified_evidence"] = true
 				arms[index].Signals["real_onchain_evidence"] = true
 				arms[index].Signals["arm_evidence_available"] = true
+				arms[index].EvidenceVerified = true
 				arms[index].Signed = true
 				arms[index].Signature = signSecurityRadarVerdict(arms[index].ModuleID, arms[index].Target, arms[index].Network, arms[index].RiskIndex)
 			}

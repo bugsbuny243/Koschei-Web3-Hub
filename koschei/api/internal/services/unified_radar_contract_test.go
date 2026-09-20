@@ -7,6 +7,7 @@ import (
 )
 
 func TestUnifiedRuntimeContractAcceptsNoGradeVerdict(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	rawVerdict := EvaluateUnifiedRadarVerdict("MintOne", ActorDefenseRuleVerdict{}, UnifiedRadarBehaviorReport{})
 	if rawVerdict.Grade != "-" {
 		t.Fatalf("expected withheld grade, got %q", rawVerdict.Grade)
@@ -46,12 +47,16 @@ func TestUnifiedRuntimeContractAcceptsNoGradeVerdict(t *testing.T) {
 	if !ok || len(decision) == 0 {
 		t.Fatalf("decision_path=%#v", contract["decision_path"])
 	}
-	if signature, _ := contract["signature"].(string); !strings.HasPrefix(signature, "koschei-unified-contract:") {
-		t.Fatalf("fallback contract signature=%q", signature)
+	if signature, _ := contract["signature"].(string); signature == "" || strings.HasPrefix(signature, "koschei-unified-contract:") {
+		t.Fatalf("cryptographic contract signature=%q", signature)
+	}
+	if digest, _ := contract["digest"].(string); digest == "" {
+		t.Fatalf("contract digest=%q", digest)
 	}
 }
 
 func TestFinalizeUnifiedRuntimeContractBindsTarget(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	verdict := EvaluateUnifiedRadarVerdict("MintOne", ActorDefenseRuleVerdict{}, UnifiedRadarBehaviorReport{})
 	finalized := FinalizeUnifiedRadarVerdictContract("MintOne", verdict)
 	if !finalized.Signed || finalized.Signature == "" {
@@ -64,6 +69,7 @@ func TestFinalizeUnifiedRuntimeContractBindsTarget(t *testing.T) {
 }
 
 func TestUnifiedRuntimeContractCarriesTriggeredRules(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	actor := ActorDefenseRuleVerdict{TriggeredRules: []ActorDefenseRuleHit{
 		{RuleID: ActorRuleCompoundCreatorReuse, Title: "Creator reuse", Tier: "compounding", EvidenceStatus: "verified", GradeEffect: "compounding_input", Summary: "creator reused"},
 		{RuleID: ActorRuleCompoundHolderReuse, Title: "Holder reuse", Tier: "compounding", EvidenceStatus: "observed", GradeEffect: "compounding_input", Summary: "holder reused"},
@@ -91,6 +97,7 @@ func TestUnifiedRuntimeContractCarriesTriggeredRules(t *testing.T) {
 }
 
 func TestUnifiedContractCountsMultipleC004GroupsAsOneRuleID(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	groups := []ActorDefenseRuleHit{
 		{RuleID: ActorRuleCompoundRepeatedTransfer, Title: "Repeated transfer A", Tier: "compounding", EvidenceStatus: "verified", GradeEffect: "compounding_input", Count: 7, EvidenceKeys: []string{"a:1"}, Signatures: []string{"sig-a"}, Facts: map[string]any{"relation": "direct_sol_transfer_in", "counterpart_id": "WalletA"}},
 		{RuleID: ActorRuleCompoundRepeatedTransfer, Title: "Repeated transfer B", Tier: "compounding", EvidenceStatus: "verified", GradeEffect: "compounding_input", Count: 8, EvidenceKeys: []string{"b:1"}, Signatures: []string{"sig-b"}, Facts: map[string]any{"relation": "direct_sol_transfer_in", "counterpart_id": "WalletB"}},
@@ -108,8 +115,11 @@ func TestUnifiedContractCountsMultipleC004GroupsAsOneRuleID(t *testing.T) {
 	if len(finalized.TriggeredRules) != 3 {
 		t.Fatalf("audit groups were removed: %#v", finalized.TriggeredRules)
 	}
-	if finalized.Signature == raw.Signature || !strings.HasPrefix(finalized.Signature, "koschei-unified:") {
-		t.Fatalf("stale B signature survived normalization: %q", finalized.Signature)
+	if finalized.Signature == raw.Signature || finalized.Signature == "" || strings.HasPrefix(finalized.Signature, "koschei-unified:") {
+		t.Fatalf("stale B signature survived normalization or digest leaked as signature: %q", finalized.Signature)
+	}
+	if !strings.HasPrefix(finalized.Digest, "koschei-unified:") {
+		t.Fatalf("deterministic digest missing after normalization: %q", finalized.Digest)
 	}
 	if !unifiedDecisionContains(finalized.DecisionPath, "one distinct evidence-backed compounding rule id") {
 		t.Fatalf("decision path does not explain distinct rule-ID counting: %#v", finalized.DecisionPath)
@@ -117,6 +127,7 @@ func TestUnifiedContractCountsMultipleC004GroupsAsOneRuleID(t *testing.T) {
 }
 
 func TestUnifiedMarshalNormalizesRawDuplicateRuleGrade(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	raw := UnifiedRadarVerdict{
 		Grade: "B", Verdict: "compounding_rule", RulesetVersion: UnifiedRadarRulesetVersion,
 		TriggeredRules: []ActorDefenseRuleHit{
@@ -136,12 +147,19 @@ func TestUnifiedMarshalNormalizesRawDuplicateRuleGrade(t *testing.T) {
 	if contract["grade"] != "-" || contract["verdict"] != "single_observation" {
 		t.Fatalf("raw duplicate-rule grade leaked through serialization: %s", encoded)
 	}
-	if signature, _ := contract["signature"].(string); !strings.HasPrefix(signature, "koschei-unified-contract:") {
-		t.Fatalf("changed serialized decision retained stale signature: %q", signature)
+	if contract["signed"] != false {
+		t.Fatalf("targetless normalized verdict claimed cryptographic signature: %#v", contract)
+	}
+	if signature, _ := contract["signature"].(string); signature != "" {
+		t.Fatalf("targetless normalized verdict retained signature: %q", signature)
+	}
+	if digest, _ := contract["digest"].(string); !strings.HasPrefix(digest, "koschei-unified-contract:") {
+		t.Fatalf("targetless normalized verdict digest=%q", digest)
 	}
 }
 
 func TestUnifiedContractAllowsC004PlusDistinctRuleIDToProduceB(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	verdict := FinalizeUnifiedRadarVerdictContract("ActorWallet", UnifiedRadarVerdict{
 		RulesetVersion: UnifiedRadarRulesetVersion,
 		TriggeredRules: []ActorDefenseRuleHit{
@@ -166,6 +184,7 @@ func unifiedDecisionContains(items []string, fragment string) bool {
 }
 
 func TestStrictVerdictModeRequiresVerifiedCompoundingRules(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	t.Setenv("KOSCHEI_VERDICT_MODE", "strict")
 	verdict := FinalizeUnifiedRadarVerdictContract("StrictMint", UnifiedRadarVerdict{
 		RulesetVersion: UnifiedRadarRulesetVersion,
@@ -180,6 +199,7 @@ func TestStrictVerdictModeRequiresVerifiedCompoundingRules(t *testing.T) {
 }
 
 func TestEvidenceOnlyVerdictModePreservesSignedEvidenceAndWithholdsGrade(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	t.Setenv("KOSCHEI_VERDICT_MODE", "evidence_only")
 	verdict := FinalizeUnifiedRadarVerdictContract("EvidenceMint", UnifiedRadarVerdict{
 		RulesetVersion: UnifiedRadarRulesetVersion,

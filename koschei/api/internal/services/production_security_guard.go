@@ -14,7 +14,7 @@ func MissingProductionSecurityEnv() []string {
 	if !strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
 		return nil
 	}
-	required := []string{"API_KEY_PEPPER", "USER_SESSION_SECRET", "OWNER_SECRET", "NEON_AUTH_JWKS_URL"}
+	required := []string{"API_KEY_PEPPER", "USER_SESSION_SECRET", "OWNER_SECRET", "NEON_AUTH_JWKS_URL", unifiedVerdictSigningKeyIDEnv, unifiedVerdictSigningPrivateKeyEnv}
 	if !NeonAuthOnlyMode() {
 		required = append(required, "DATABASE_URL")
 	}
