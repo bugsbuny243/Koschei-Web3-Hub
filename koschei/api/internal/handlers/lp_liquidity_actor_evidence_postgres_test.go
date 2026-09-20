@@ -14,6 +14,8 @@ import (
 )
 
 func TestLiquidityMovementActorEvidencePostgres17(t *testing.T) {
+	t.Setenv("KOSCHEI_VERDICT_SIGNING_KEY_ID", "ci-liquidity-arm-key-v1")
+	t.Setenv("KOSCHEI_VERDICT_SIGNING_PRIVATE_KEY", "U1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1M")
 	databaseURL := os.Getenv("KOSCHEI_TEST_DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("KOSCHEI_TEST_DATABASE_URL is not set")
@@ -56,10 +58,9 @@ func TestLiquidityMovementActorEvidencePostgres17(t *testing.T) {
 			"verified_evidence":     true,
 			"real_onchain_evidence": true,
 		},
-		RuleVersion: "ci-liquidity-incident-v1",
-		Signed:      true,
-		Signature:   "ci-verdict-signature-" + suffix,
-		Source:      "solana_rpc",
+		RuleVersion:      "ci-liquidity-incident-v1",
+		EvidenceVerified: true,
+		Source:           "solana_rpc",
 	})
 	if err != nil {
 		t.Fatal(err)
