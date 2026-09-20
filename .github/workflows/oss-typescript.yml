@@ -27,8 +27,8 @@ jobs:
       fail-fast: false
       matrix:
         package:
-          - sdk/typescript
           - oss/event-normalizer
+          - oss/verifier/typescript
     defaults:
       run:
         working-directory: ${{ matrix.package }}
