@@ -21,12 +21,16 @@ func synchronizeCanonicalUnifiedVerdict(report map[string]any) (services.Unified
 	if target == "" {
 		return services.UnifiedRadarVerdict{}, false
 	}
+	network := strings.TrimSpace(dossierString(report["network"]))
+	if network == "" {
+		network = "solana-mainnet"
+	}
 
 	current := services.UnifiedRadarVerdict{}
 	if decodeCanonicalVerdictValue(report["final_verdict"], &current) &&
 		strings.TrimSpace(current.Signature) != "" && current.Signed &&
 		canonicalUnifiedRulesetAtLeast(current.RulesetVersion, 1, 1, 1) {
-		normalized := services.FinalizeUnifiedRadarVerdictContract(target, current)
+		normalized := services.FinalizeUnifiedRadarVerdictContractForNetwork(target, network, current)
 		report["final_verdict"] = normalized
 		return normalized, true
 	}
@@ -49,7 +53,7 @@ func synchronizeCanonicalUnifiedVerdict(report map[string]any) (services.Unified
 	} else {
 		final = services.EvaluateUnifiedRadarVerdictV110(target, actor, behavior)
 	}
-	final = services.FinalizeUnifiedRadarVerdictContract(target, final)
+	final = services.FinalizeUnifiedRadarVerdictContractForNetwork(target, network, final)
 	report["final_verdict"] = final
 	return final, true
 }
