@@ -144,7 +144,7 @@ func TestUnifiedVerdictGoProducerMatchesSharedTypeScriptVector(t *testing.T) {
 	var fixture struct {
 		SeedBase64URL    string `json:"seed_base64url"`
 		TrustedPublicKey string `json:"trusted_public_key"`
-		Verdict struct {
+		Verdict          struct {
 			Target             string                `json:"target"`
 			Network            string                `json:"network"`
 			RuleVersion        string                `json:"rule_version"`
