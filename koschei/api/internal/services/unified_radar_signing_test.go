@@ -136,7 +136,6 @@ func configureUnifiedVerdictTestSigner(t *testing.T) {
 	t.Setenv(unifiedVerdictSigningPrivateKeyEnv, "U1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1M")
 }
 
-
 func TestUnifiedVerdictGoProducerMatchesSharedTypeScriptVector(t *testing.T) {
 	raw, err := os.ReadFile("../../../../oss/verifier/typescript/testdata/go-producer-vector.json")
 	if err != nil {
