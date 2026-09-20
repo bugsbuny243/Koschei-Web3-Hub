@@ -83,6 +83,19 @@ func main() {
 	}
 	defer jobQueue.Close()
 
+	role, err := parseRuntimeRole(os.Getenv("KOSCHEI_RUNTIME_ROLE"))
+	if err != nil {
+		log.Fatalf("CRITICAL: invalid KOSCHEI_RUNTIME_ROLE: %v", err)
+	}
+	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore)
+	defer stopBackgroundRuntime()
+	log.Printf("runtime role=%s http=%t background_workers=%t", role, role.servesHTTP(), role.runsBackgroundWorkers())
+	if !role.servesHTTP() {
+		<-appCtx.Done()
+		log.Printf("shutdown signal received")
+		return
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
