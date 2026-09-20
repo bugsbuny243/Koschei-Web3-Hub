@@ -7,8 +7,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFinalizeUnifiedVerdictUsesRealEd25519WhenConfigured(t *testing.T) {
@@ -132,4 +134,68 @@ func configureUnifiedVerdictTestSigner(t *testing.T) {
 	t.Helper()
 	t.Setenv(unifiedVerdictSigningKeyIDEnv, "test-suite-verdict-key-v1")
 	t.Setenv(unifiedVerdictSigningPrivateKeyEnv, "U1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1M")
+}
+
+
+func TestUnifiedVerdictGoProducerMatchesSharedTypeScriptVector(t *testing.T) {
+	raw, err := os.ReadFile("../../../../oss/verifier/typescript/testdata/go-producer-vector.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		SeedBase64URL    string `json:"seed_base64url"`
+		TrustedPublicKey string `json:"trusted_public_key"`
+		Verdict struct {
+			Target             string                `json:"target"`
+			Network            string                `json:"network"`
+			RuleVersion        string                `json:"rule_version"`
+			TriggeredRules     []ActorDefenseRuleHit `json:"triggered_rules"`
+			WatchFlags         []ActorDefenseRuleHit `json:"watch_flags"`
+			Signature          string                `json:"signature"`
+			SignatureAlgorithm string                `json:"signature_algorithm"`
+			KeyID              string                `json:"key_id"`
+			PayloadHash        string                `json:"payload_hash"`
+			CreatedAt          string                `json:"created_at"`
+		} `json:"verdict"`
+	}
+	if err := json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	createdAt, err := time.Parse(time.RFC3339Nano, fixture.Verdict.CreatedAt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv(unifiedVerdictSigningKeyIDEnv, fixture.Verdict.KeyID)
+	t.Setenv(unifiedVerdictSigningPrivateKeyEnv, fixture.SeedBase64URL)
+	final := FinalizeUnifiedRadarVerdictContractForNetwork(
+		fixture.Verdict.Target,
+		fixture.Verdict.Network,
+		UnifiedRadarVerdict{
+			RulesetVersion: fixture.Verdict.RuleVersion,
+			ActorRuleset:   ActorDefenseRulesetVersion,
+			TriggeredRules: fixture.Verdict.TriggeredRules,
+			WatchFlags:     fixture.Verdict.WatchFlags,
+			GeneratedAt:    createdAt,
+		},
+	)
+
+	if !final.Signed || final.SignatureAlgorithm != fixture.Verdict.SignatureAlgorithm || final.KeyID != fixture.Verdict.KeyID {
+		t.Fatalf("shared vector was not authenticated: %#v", final)
+	}
+	if final.PayloadHash != fixture.Verdict.PayloadHash {
+		t.Fatalf("payload hash drift: got %q want %q", final.PayloadHash, fixture.Verdict.PayloadHash)
+	}
+	if final.Signature != fixture.Verdict.Signature {
+		t.Fatalf("signature drift: got %q want %q", final.Signature, fixture.Verdict.Signature)
+	}
+
+	privateKey, err := parseUnifiedVerdictPrivateKey(fixture.SeedBase64URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicKey := privateKey.Public().(ed25519.PublicKey)
+	if got := base64.RawURLEncoding.EncodeToString(publicKey); got != fixture.TrustedPublicKey {
+		t.Fatalf("public key drift: got %q want %q", got, fixture.TrustedPublicKey)
+	}
 }
