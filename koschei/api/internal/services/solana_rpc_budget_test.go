@@ -70,3 +70,26 @@ func TestInteractiveSolanaRPCBudgetBypassesBackgroundWindow(t *testing.T) {
 		t.Fatal("interactive reserve must not reset or consume the background budget")
 	}
 }
+
+func TestSolanaRPCBudgetExceededCarriesResetWindow(t *testing.T) {
+	resetSolanaRPCCachesForTest()
+	t.Setenv("SOLANA_RPC_BUDGET_ENABLED", "true")
+	t.Setenv("SOLANA_RPC_BUDGET_WINDOW_SECONDS", "60")
+	t.Setenv("SOLANA_RPC_BUDGET_MAX_REQUESTS", "1")
+
+	if err := reserveSolanaRPCBudget(context.Background(), "first"); err != nil {
+		t.Fatalf("first reserve failed: %v", err)
+	}
+	err := reserveSolanaRPCBudget(context.Background(), "second")
+	resetAt, ok := solanaRPCBudgetResetAt(err)
+	if !ok {
+		t.Fatalf("expected typed budget exhaustion, got %v", err)
+	}
+	if !resetAt.After(time.Now()) {
+		t.Fatalf("resetAt=%s must be in the future", resetAt)
+	}
+	wait := solanaRPCBudgetWaitDuration()
+	if wait <= 0 || wait > 61*time.Second {
+		t.Fatalf("budget wait=%s want (0,61s]", wait)
+	}
+}
