@@ -292,7 +292,9 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 	maxRetries := solanaRPCMax429Retries()
 	for attempt := 0; ; attempt++ {
 		if err := reserveSolanaRPCBudget(ctx, method); err != nil {
-			web3.LogRPCFailure(method, rpcURL, 0, err)
+			if _, expectedBudgetPause := solanaRPCBudgetResetAt(err); !expectedBudgetPause {
+				web3.LogRPCFailure(method, rpcURL, 0, err)
+			}
 			return zero, err
 		}
 		if err := waitForSolanaRPCSlot(ctx); err != nil {
