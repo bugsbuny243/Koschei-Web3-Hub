@@ -231,6 +231,19 @@ func (s *SecurityRadarStore) LatestVerdicts(ctx context.Context, limit int) ([]S
 	return s.latestVerdictsWindow(ctx, limit, false)
 }
 
+// RecentVerdicts never falls back to the full historical corpus. Public live
+// consumers have a fixed 24-hour window and must not scan older rows only to
+// discard them after reading.
+func (s *SecurityRadarStore) RecentVerdicts(ctx context.Context, limit int) ([]SecurityRadarVerdictRecord, error) {
+	if s == nil || s.DB == nil {
+		return []SecurityRadarVerdictRecord{}, nil
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	return s.latestVerdictsWindow(ctx, limit, true)
+}
+
 func (s *SecurityRadarStore) latestVerdictsWindow(ctx context.Context, limit int, recentOnly bool) ([]SecurityRadarVerdictRecord, error) {
 	windowFilter := ""
 	if recentOnly {
