@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -17,6 +18,46 @@ var solanaRPCBudget = struct {
 }{}
 
 type interactiveSolanaRPCBudgetKey struct{}
+
+type solanaRPCBudgetExceededError struct {
+	Method  string
+	ResetAt time.Time
+}
+
+func (e *solanaRPCBudgetExceededError) Error() string {
+	return fmt.Sprintf("solana rpc budget exceeded for %s; next window at %s", strings.TrimSpace(e.Method), e.ResetAt.UTC().Format(time.RFC3339))
+}
+
+func solanaRPCBudgetResetAt(err error) (time.Time, bool) {
+	var budgetErr *solanaRPCBudgetExceededError
+	if !errors.As(err, &budgetErr) || budgetErr == nil || budgetErr.ResetAt.IsZero() {
+		return time.Time{}, false
+	}
+	return budgetErr.ResetAt, true
+}
+
+func solanaRPCBudgetWaitDuration() time.Duration {
+	if !solanaRPCBudgetEnabled() {
+		return 0
+	}
+	maxRequests := solanaRPCBudgetMaxRequests()
+	if maxRequests <= 0 {
+		return 0
+	}
+	window := solanaRPCBudgetWindow()
+	now := time.Now()
+	solanaRPCBudget.Lock()
+	defer solanaRPCBudget.Unlock()
+	if solanaRPCBudget.WindowStart.IsZero() || now.Sub(solanaRPCBudget.WindowStart) >= window || solanaRPCBudget.Count < maxRequests {
+		return 0
+	}
+	wait := time.Until(solanaRPCBudget.WindowStart.Add(window))
+	if wait < 0 {
+		return 0
+	}
+	return wait
+}
+
 
 // WithInteractiveSolanaRPCBudget marks a foreground, user-triggered ARVIS
 // investigation. Foreground scans keep their own per-scan RPC budgets and
@@ -67,7 +108,7 @@ func reserveSolanaRPCBudget(ctx context.Context, method string) error {
 		return ctx.Err()
 	default:
 	}
-	return fmt.Errorf("solana rpc budget exceeded for %s; next window at %s", strings.TrimSpace(method), resetAt.UTC().Format(time.RFC3339))
+	return &solanaRPCBudgetExceededError{Method: method, ResetAt: resetAt}
 }
 
 func resetSolanaRPCBudgetForTest() {
