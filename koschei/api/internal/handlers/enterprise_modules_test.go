@@ -87,10 +87,10 @@ func TestEmergencyLiquidityAlertIgnoresRequestWebhookOverride(t *testing.T) {
 	t.Setenv("DISCORD_WEBHOOK_URL", "")
 
 	result := dispatchEmergencyLiquidityAlert(context.Background(), liquidityRadarRequest{
-		PoolAddress:     "pool",
+		PoolAddress:      "pool",
 		RemovedLiquidity: 100_000,
-		TelegramWebhook: server.URL,
-		DiscordWebhook:  server.URL,
+		TelegramWebhook:  server.URL,
+		DiscordWebhook:   server.URL,
 	}, 100, "KRİTİK", 100_000)
 	if !result.EmergencyMode {
 		t.Fatal("expected emergency mode")
