@@ -32,8 +32,8 @@ func TestOwnerUnifiedRadarRouteCoversVerifiedTargetKinds(t *testing.T) {
 func TestOwnerUnifiedProgramArtifactRadarReturnsEvidenceGap(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	classification := radarTargetClassification{
-		Type: radarTargetProgramData,
-		Status: "verified_rpc_observation",
+		Type:     radarTargetProgramData,
+		Status:   "verified_rpc_observation",
 		Evidence: "program data account",
 	}
 	(&Handler{}).ownerUnifiedProgramArtifactRadar(recorder, "ProgramDataTarget", "solana-mainnet", classification)
