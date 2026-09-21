@@ -170,7 +170,7 @@ func lpControlPoolArm(req SecurityRadarRequest, lp LPControlEvidence, generatedA
 	arm := evidenceArm(moduleName, ModuleRaydiumPoolGuardian, req, 0, signals, evidence, generatedAt)
 	arm.Verdict = "Pool reserves and protocol-specific control surfaces were collected directly from Solana accounts; the status describes observed capability, not intent."
 	arm.Recommendation = "none"
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }
 
 func lpControlLiquidityArm(req SecurityRadarRequest, lp LPControlEvidence, generatedAt string) SecurityRadarVerdict {
@@ -204,7 +204,7 @@ func lpControlLiquidityArm(req SecurityRadarRequest, lp LPControlEvidence, gener
 	}()
 	arm.Signals["reserve_snapshot_verified"] = lp.ReadSlot > 0 && lp.TokenVault != "" && lp.QuoteVault != ""
 	arm.Verdict = "Pool reserve balances were read at the reported slot. Add/remove liquidity is reported only when an explicit liquidity instruction trace carries compatible vault deltas."
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }
 
 func lpMovementReferences(values []LiquidityMovementEvidence) ([]string, []int64, []string, []string) {

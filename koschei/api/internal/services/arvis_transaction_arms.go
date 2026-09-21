@@ -488,7 +488,7 @@ func buildTransactionIntentProgramArm(req SecurityRadarRequest, tx arvisTransact
 	arm := evidenceArm("Program Relation Scan", ModuleProgramRelationScan, req, 0, s, e, generatedAt)
 	arm.Verdict = "Parsed transaction intent evidence attached to Program Relation Scan; final grade remains owned by EvaluateUnifiedRadarVerdict."
 	arm.Recommendation = "Review signer, writable account, program and balance-delta evidence before making any transaction-intent claim."
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }
 
 func classifyTransactionIntent(tx arvisTransactionEvidence) (string, []string) {

@@ -50,11 +50,11 @@ func TestPumpAndRaydiumTransactionArmsStaySourceSpecific(t *testing.T) {
 		LamportDeltas:       map[string]int64{},
 	}
 	pumpArm := buildPumpTransactionArm(pumpReq, pumpEvidence, generatedAt)
-	if !pumpArm.Signed || !SecurityRadarVerdictHasVerifiedEvidence(pumpArm) {
+	if !SecurityRadarVerdictHasVerifiedEvidence(pumpArm) {
 		t.Fatalf("Pump evidence did not produce verified Pump arm: %#v", pumpArm)
 	}
-	if raydiumArm := buildRaydiumTransactionArm(pumpReq, pumpEvidence, generatedAt); raydiumArm.Signed {
-		t.Fatalf("Pump evidence incorrectly signed Raydium arm: %#v", raydiumArm)
+	if raydiumArm := buildRaydiumTransactionArm(pumpReq, pumpEvidence, generatedAt); SecurityRadarVerdictHasVerifiedEvidence(raydiumArm) {
+		t.Fatalf("Pump evidence incorrectly verified Raydium arm: %#v", raydiumArm)
 	}
 
 	raydiumEvidence := arvisTransactionEvidence{
@@ -66,10 +66,10 @@ func TestPumpAndRaydiumTransactionArmsStaySourceSpecific(t *testing.T) {
 		LamportDeltas:       map[string]int64{},
 	}
 	raydiumArm := buildRaydiumTransactionArm(raydiumReq, raydiumEvidence, generatedAt)
-	if !raydiumArm.Signed || !SecurityRadarVerdictHasVerifiedEvidence(raydiumArm) {
+	if !SecurityRadarVerdictHasVerifiedEvidence(raydiumArm) {
 		t.Fatalf("Raydium evidence did not produce verified Raydium arm: %#v", raydiumArm)
 	}
-	if pumpArm := buildPumpTransactionArm(raydiumReq, raydiumEvidence, generatedAt); pumpArm.Signed {
-		t.Fatalf("Raydium evidence incorrectly signed Pump arm: %#v", pumpArm)
+	if pumpArm := buildPumpTransactionArm(raydiumReq, raydiumEvidence, generatedAt); SecurityRadarVerdictHasVerifiedEvidence(pumpArm) {
+		t.Fatalf("Raydium evidence incorrectly verified Pump arm: %#v", pumpArm)
 	}
 }

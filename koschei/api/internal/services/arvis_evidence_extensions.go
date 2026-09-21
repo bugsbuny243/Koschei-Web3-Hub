@@ -104,7 +104,7 @@ func creatorLinkEvidenceArm(req SecurityRadarRequest, creator string, launch Lau
 		arm.Verdict = "Creator/deployer attribution is OBSERVED but not canonically verified on-chain; cross-token reuse is owned by Repeat Actor Scan and final interpretation belongs to the unified rules engine."
 	}
 	arm.Recommendation = "Inspect the canonical create transaction, persistent created-token history and direct creator-to-holder transaction evidence."
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }
 
 func creatorRelationCanonicalVerified(launch LaunchForensicsAnalysis) bool {
@@ -158,7 +158,7 @@ func liquidityMovementEvidenceArm(req SecurityRadarRequest, market TokenMarketSn
 	arm := evidenceArm("Liquidity Movement", ModuleLiquidityMovement, req, 0, signals, evidence, generatedAt)
 	arm.Verdict = "Liquidity depth was observed. LP actor attribution remains unverified until transaction-backed add/remove evidence exists."
 	arm.Recommendation = "Use liquidity depth as input to URD-C001/URD-C002 and parsed LP transactions for creator-removal hard triggers."
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }
 
 func raydiumMarketEvidenceArm(req SecurityRadarRequest, market TokenMarketSnapshot, generatedAt string) SecurityRadarVerdict {
@@ -207,5 +207,5 @@ func raydiumMarketEvidenceArm(req SecurityRadarRequest, market TokenMarketSnapsh
 	arm := evidenceArm("Raydium Pool Guardian", ModuleRaydiumPoolGuardian, req, 0, signals, evidence, generatedAt)
 	arm.Verdict = "A Raydium primary market pair and its reported depth were observed; LP control remains an explicit evidence gap."
 	arm.Recommendation = "Resolve pool reserves, LP mint ownership, burn/locker proof and parsed add/remove signatures."
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }

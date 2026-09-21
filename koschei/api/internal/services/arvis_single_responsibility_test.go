@@ -70,9 +70,9 @@ func TestCreatorAndLiquidityReplaceUnavailablePlaceholders(t *testing.T) {
 	for _, arm := range analysis.Arms {
 		switch arm.ModuleID {
 		case ModuleCreatorLinkAnalysis:
-			creatorFound = arm.Signed && arm.Signals["creator_wallet"] != nil
+			creatorFound = SecurityRadarVerdictHasVerifiedEvidence(arm) && arm.Signals["creator_wallet"] != nil
 		case ModuleLiquidityMovement:
-			liquidityFound = arm.Signed && arm.Signals["liquidity_usd"] != nil
+			liquidityFound = SecurityRadarVerdictHasVerifiedEvidence(arm) && arm.Signals["liquidity_usd"] != nil
 		}
 		if arm.RiskIndex != 0 || arm.Grade != "-" {
 			t.Fatalf("extension arm issued score/grade: %s %#v", arm.ModuleID, arm)

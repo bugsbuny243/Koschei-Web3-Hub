@@ -379,6 +379,7 @@ func ApplyActorExitRecurrenceToAnalysis(analysis ArvisAnalysis, recurrence Actor
 			arms[index].Evidence = append(arms[index].Evidence, fmt.Sprintf("Persistent event memory references %s across %d token target(s); cited transaction signatures and slots are attached.", recurrence.ActorWallet, recurrence.DistinctTargetsWithEvents))
 			arms[index].Verdict = "Persistent on-chain event memory shows transaction-referenced recurrence across multiple token targets."
 			arms[index].Recommendation = "Review the cited target mints, transaction signatures and slots as technical on-chain observations."
+			arms[index] = finalizeSecurityRadarVerdictAuthentication(arms[index])
 		} else if recurrence.Available {
 			arms[index].Evidence = append(arms[index].Evidence, "Persistent event memory was queried; fewer than two referenced token targets do not constitute cross-token recurrence.")
 		}

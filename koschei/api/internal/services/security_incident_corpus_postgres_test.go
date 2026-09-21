@@ -12,6 +12,7 @@ import (
 )
 
 func TestSecurityIncidentCorpusPostgres17(t *testing.T) {
+	configureUnifiedVerdictTestSigner(t)
 	databaseURL := os.Getenv("KOSCHEI_TEST_DATABASE_URL")
 	if databaseURL == "" {
 		t.Skip("KOSCHEI_TEST_DATABASE_URL is not set")
@@ -35,15 +36,13 @@ func TestSecurityIncidentCorpusPostgres17(t *testing.T) {
 	defer func() { _ = tx.Rollback() }()
 
 	const (
-		network  = "solana-mainnet"
-		targetA  = "IncidentCorpusTargetA1111111111111111111111111111"
-		actorA   = "IncidentCorpusActorA11111111111111111111111111111"
-		eventA   = "incident-corpus-event-signature-a"
-		verdictA = "incident-corpus-verdict-signature-a"
-		targetB  = "IncidentCorpusTargetB1111111111111111111111111111"
-		actorB   = "IncidentCorpusActorB11111111111111111111111111111"
-		eventB   = "incident-corpus-event-signature-b"
-		verdictB = "incident-corpus-verdict-signature-b"
+		network = "solana-mainnet"
+		targetA = "IncidentCorpusTargetA1111111111111111111111111111"
+		actorA  = "IncidentCorpusActorA11111111111111111111111111111"
+		eventA  = "incident-corpus-event-signature-a"
+		targetB = "IncidentCorpusTargetB1111111111111111111111111111"
+		actorB  = "IncidentCorpusActorB11111111111111111111111111111"
+		eventB  = "incident-corpus-event-signature-b"
 	)
 
 	insertExit := func(target, actor, signature string, slot int64) {
@@ -57,20 +56,42 @@ func TestSecurityIncidentCorpusPostgres17(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	insertVerdict := func(target, signature string, risk int) {
+	incidentVerdict := func(target, verdictText string, risk int) SecurityRadarVerdict {
 		t.Helper()
+		return finalizeSecurityRadarVerdictAuthentication(SecurityRadarVerdict{
+			ModuleID:         ModuleFinalVerdictEngine,
+			Target:           target,
+			Network:          network,
+			Grade:            "F",
+			RiskIndex:        risk,
+			RiskLevel:        "critical",
+			Verdict:          verdictText,
+			Recommendation:   "review ci evidence",
+			Signals:          map[string]any{"verified_evidence": true, "real_onchain_evidence": true},
+			Evidence:         []string{"verified ci evidence"},
+			RuleVersion:      "ci-final-v1",
+			EvidenceVerified: true,
+		})
+	}
+	insertVerdict := func(target string, risk int) SecurityRadarVerdict {
+		t.Helper()
+		auth := incidentVerdict(target, "ci material verdict", risk)
+		if !auth.Signed {
+			t.Fatalf("incident test verdict was not authenticated: %#v", auth)
+		}
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO security_radar_verdicts
 			(event_id,module_id,target,target_type,network,grade,risk_index,risk_level,verdict,recommendation,
-			 evidence,signals,rule_version,signed,signature,source,created_at,updated_at)
+			 evidence,signals,rule_version,evidence_verified,digest,signed,signature,signature_algorithm,key_id,payload_hash,source,created_at,updated_at)
 			VALUES
 			(NULL,'final_verdict_engine',$1,'token',$2,'F',$4,'critical','ci material verdict','review ci evidence',
 			 '["verified ci evidence"]'::jsonb,'{"verified_evidence":true,"real_onchain_evidence":true}'::jsonb,
-			 'ci-final-v1',true,$3,'ci',now(),now())
-		`, target, network, signature, risk)
+			 'ci-final-v1',true,$3,true,$5,$6,$7,$8,'ci',now(),now())
+		`, target, network, auth.Digest, risk, auth.Signature, auth.SignatureAlgorithm, auth.KeyID, auth.PayloadHash)
 		if err != nil {
 			t.Fatal(err)
 		}
+		return auth
 	}
 	countForTarget := func(target string) int {
 		t.Helper()
@@ -86,13 +107,13 @@ func TestSecurityIncidentCorpusPostgres17(t *testing.T) {
 	if got := countForTarget(targetA); got != 0 {
 		t.Fatalf("event-only corpus count=%d want=0", got)
 	}
-	insertVerdict(targetA, verdictA, 91)
+	verdictA := insertVerdict(targetA, 91)
 	if got := countForTarget(targetA); got != 1 {
 		t.Fatalf("event-then-verdict corpus count=%d want=1", got)
 	}
 
 	// Verdict first: the later VERIFIED exit event must converge to the same corpus.
-	insertVerdict(targetB, verdictB, 88)
+	_ = insertVerdict(targetB, 88)
 	if got := countForTarget(targetB); got != 0 {
 		t.Fatalf("verdict-only corpus count=%d want=0", got)
 	}
@@ -133,11 +154,19 @@ func TestSecurityIncidentCorpusPostgres17(t *testing.T) {
 
 	// A later revision of the same signed verdict is a new immutable version and
 	// points back to the previous row instead of rewriting it.
+	revised := incidentVerdict(targetA, "ci revised material verdict", 96)
 	_, err = tx.ExecContext(ctx, `
 		UPDATE security_radar_verdicts
-		SET risk_index=96,verdict='ci revised material verdict',updated_at=updated_at+interval '1 second'
+		SET risk_index=96,
+		    verdict='ci revised material verdict',
+		    digest=$2,
+		    signature=$3,
+		    signature_algorithm=$4,
+		    key_id=$5,
+		    payload_hash=$6,
+		    updated_at=updated_at+interval '1 second'
 		WHERE module_id='final_verdict_engine' AND signature=$1
-	`, verdictA)
+	`, verdictA.Signature, revised.Digest, revised.Signature, revised.SignatureAlgorithm, revised.KeyID, revised.PayloadHash)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -15,8 +15,8 @@ func TestLPControlUnsupportedPoolDoesNotCompleteCollectors(t *testing.T) {
 	pool := lpControlPoolArm(request, lp, "2026-07-17T20:00:00Z")
 	movement := lpControlLiquidityArm(request, lp, "2026-07-17T20:00:00Z")
 	for _, arm := range []SecurityRadarVerdict{pool, movement} {
-		if arm.Signed {
-			t.Fatalf("unsupported pool produced signed completed arm: %#v", arm)
+		if SecurityRadarVerdictHasVerifiedEvidence(arm) {
+			t.Fatalf("unsupported pool produced verified completed arm: %#v", arm)
 		}
 		if got := arvisSignalString(arm.Signals, "execution_status"); got != ArvisExecutionInsufficient {
 			t.Fatalf("module=%s status=%q arm=%#v", arm.ModuleID, got, arm)
@@ -37,7 +37,7 @@ func TestLPControlDecodedPositionPoolCompletesWithoutInventingLPToken(t *testing
 		EvidenceKeys: []string{"pool:DLMM111@500"},
 	}
 	arm := lpControlPoolArm(request, lp, "2026-07-17T20:00:00Z")
-	if !arm.Signed || arvisSignalString(arm.Signals, "execution_status") != ArvisExecutionCompleted {
+	if !SecurityRadarVerdictHasVerifiedEvidence(arm) || arvisSignalString(arm.Signals, "execution_status") != ArvisExecutionCompleted {
 		t.Fatalf("decoded pool did not complete: %#v", arm)
 	}
 	if value, _ := arm.Signals["lp_mint"].(string); value != "" {

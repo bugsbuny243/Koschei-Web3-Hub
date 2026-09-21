@@ -35,7 +35,7 @@ func TestFundingClusterTransactionFillsUnavailableBase(t *testing.T) {
 	}, []string{"initialization delta"}, time.Now().UTC().Format(time.RFC3339))
 	arms := []SecurityRadarVerdict{base}
 	replaceFundingClusterArmPreservingHolderEvidence(arms, replacement)
-	if !arms[0].Signed || arms[0].Signals["transaction_signature"] != "sig" {
+	if !SecurityRadarVerdictHasVerifiedEvidence(arms[0]) || arms[0].Signals["transaction_signature"] != "sig" {
 		t.Fatalf("verified transaction evidence did not fill unavailable base: %#v", arms[0])
 	}
 	if arms[0].RiskIndex != 0 || arms[0].Grade != "-" {
@@ -48,7 +48,7 @@ func TestSniperTimingRejectsTruncatedLatestHundred(t *testing.T) {
 		LiveRPC: true, RecentSignatureCount: 100, SignatureWindowSeconds: 1,
 		TargetSignatureHistoryExhausted: false, TargetSignatureTimingObserved: true,
 	}, time.Now().UTC().Format(time.RFC3339))
-	if arm.Signed || arm.RiskLevel != "unknown" {
+	if SecurityRadarVerdictHasVerifiedEvidence(arm) || arm.RiskLevel != "unknown" {
 		t.Fatalf("truncated recent window must not become sniper timing: %#v", arm)
 	}
 	if !strings.Contains(strings.Join(arm.Evidence, " "), "truncated") {
@@ -61,7 +61,7 @@ func TestSniperTimingAcceptsCompleteMintHistoryAsEvidenceOnly(t *testing.T) {
 		LiveRPC: true, RecentSignatureCount: 40, SignatureWindowSeconds: 8,
 		TargetSignatureHistoryExhausted: true, TargetSignatureTimingObserved: true,
 	}, time.Now().UTC().Format(time.RFC3339))
-	if !arm.Signed {
+	if !SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		t.Fatalf("complete observed history should be usable: %#v", arm)
 	}
 	if arm.RiskIndex != 0 || arm.Grade != "-" {
@@ -75,8 +75,8 @@ func TestMajorityEOAHolderProducesHolderEvidenceNotGrade(t *testing.T) {
 		LargestHolderPct: 59, Top10HolderPct: 64,
 		HolderRoles: HolderRoleAnalysis{Available: true},
 	}, time.Now().UTC().Format(time.RFC3339))
-	if !arm.Signed {
-		t.Fatalf("majority holder evidence should be signed: %#v", arm)
+	if !SecurityRadarVerdictHasVerifiedEvidence(arm) {
+		t.Fatalf("majority holder evidence should be verified: %#v", arm)
 	}
 	if arm.RiskIndex != 0 || arm.Grade != "-" || arm.RiskLevel != "evidence_only" {
 		t.Fatalf("holder arm issued score/grade: %#v", arm)

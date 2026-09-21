@@ -97,7 +97,7 @@ func launchDistributionArm(req SecurityRadarRequest, forensics LaunchForensicsAn
 	arm := evidenceArm("Launch Distribution", ModuleLaunchDistribution, req, 0, signals, evidence, generatedAt)
 	arm.Verdict = fmt.Sprintf("Launch Distribution observed mint-specific history for %d owner wallets; this arm reports evidence and does not issue a grade.", forensics.OwnersWithTradeHistory)
 	arm.Recommendation = "Compare initial recipients with current top holders and persistent repeat-actor evidence."
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }
 
 func pumpLaunchBehaviorArm(req SecurityRadarRequest, forensics LaunchForensicsAnalysis, generatedAt string) SecurityRadarVerdict {
@@ -150,7 +150,7 @@ func pumpLaunchBehaviorArm(req SecurityRadarRequest, forensics LaunchForensicsAn
 		arm.Verdict = "Launch-wallet behavior analysis completed; no sniper, rhythm-bot or creator-linked profile was observed in the bounded evidence window."
 	}
 	arm.Recommendation = "Correlate observed launch wallets with funding, holder and persistent actor evidence; this arm does not claim common ownership."
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }
 
 func launchSniperTimingArm(req SecurityRadarRequest, forensics LaunchForensicsAnalysis, generatedAt string) SecurityRadarVerdict {
@@ -192,5 +192,5 @@ func launchSniperTimingArm(req SecurityRadarRequest, forensics LaunchForensicsAn
 		arm.Verdict = "Launch timing analysis completed; no sniper or rhythm-bot classified wallet was observed in the captured evidence window."
 	}
 	arm.Recommendation = "Review the launch timeline together with funding and creator-linked evidence."
-	return arm
+	return finalizeSecurityRadarVerdictAuthentication(arm)
 }

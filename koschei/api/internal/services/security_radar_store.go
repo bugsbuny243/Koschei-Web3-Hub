@@ -31,26 +31,31 @@ type SecurityRadarEventRecord struct {
 }
 
 type SecurityRadarVerdictRecord struct {
-	ID             string         `json:"id,omitempty"`
-	EventID        string         `json:"event_id,omitempty"`
-	ModuleID       string         `json:"module_id"`
-	Target         string         `json:"target"`
-	TargetType     string         `json:"target_type"`
-	Network        string         `json:"network"`
-	Grade          string         `json:"grade"`
-	RiskIndex      int            `json:"risk_index"`
-	RiskLevel      string         `json:"risk_level"`
-	Verdict        string         `json:"verdict"`
-	Recommendation string         `json:"recommendation"`
-	Evidence       []string       `json:"evidence"`
-	Signals        map[string]any `json:"signals"`
-	RuleVersion    string         `json:"rule_version"`
-	Signed         bool           `json:"signed"`
-	Signature      string         `json:"signature"`
-	Source         string         `json:"source,omitempty"`
-	EventType      string         `json:"event_type,omitempty"`
-	Provider       string         `json:"provider,omitempty"`
-	CreatedAt      time.Time      `json:"created_at"`
+	ID                 string         `json:"id,omitempty"`
+	EventID            string         `json:"event_id,omitempty"`
+	ModuleID           string         `json:"module_id"`
+	Target             string         `json:"target"`
+	TargetType         string         `json:"target_type"`
+	Network            string         `json:"network"`
+	Grade              string         `json:"grade"`
+	RiskIndex          int            `json:"risk_index"`
+	RiskLevel          string         `json:"risk_level"`
+	Verdict            string         `json:"verdict"`
+	Recommendation     string         `json:"recommendation"`
+	Evidence           []string       `json:"evidence"`
+	Signals            map[string]any `json:"signals"`
+	RuleVersion        string         `json:"rule_version"`
+	EvidenceVerified   bool           `json:"evidence_verified,omitempty"`
+	Digest             string         `json:"digest,omitempty"`
+	Signed             bool           `json:"signed"`
+	Signature          string         `json:"signature"`
+	SignatureAlgorithm string         `json:"signature_algorithm,omitempty"`
+	KeyID              string         `json:"key_id,omitempty"`
+	PayloadHash        string         `json:"payload_hash,omitempty"`
+	Source             string         `json:"source,omitempty"`
+	EventType          string         `json:"event_type,omitempty"`
+	Provider           string         `json:"provider,omitempty"`
+	CreatedAt          time.Time      `json:"created_at"`
 }
 
 func NewSecurityRadarStore(db *sql.DB) *SecurityRadarStore {
@@ -147,12 +152,6 @@ func (s *SecurityRadarStore) InsertVerdict(ctx context.Context, verdict Security
 	s.applyStructuralFloor(ctx, &verdict)
 
 	signals := nonNilMap(verdict.Signals)
-	if verdict.Source == "arvis_stream" {
-		if streamEventID, _ := signals["source_stream_event_id"].(string); strings.TrimSpace(streamEventID) != "" {
-			verdict.Signature = arvisStreamScopedVerdictSignature(verdict.Signature, verdict.ModuleID, streamEventID)
-			signals["stream_scoped_signature"] = true
-		}
-	}
 	if shouldApplySBX1HiddenSignals(verdict) {
 		hidden := buildSBX1HiddenSignalPack(ctx, verdict)
 		applyHiddenRiskAdjustment(&verdict, hidden.RiskAdjustment)
@@ -160,6 +159,8 @@ func (s *SecurityRadarStore) InsertVerdict(ctx context.Context, verdict Security
 		signals["sbx1_hidden_risk_adjustment"] = hidden.RiskAdjustment
 		signals["sbx1_hidden_customer_surface"] = false
 	}
+	verdict.Signals = signals
+	verdict = finalizeSecurityRadarVerdictRecordAuthentication(verdict)
 	evidence, err := marshalSecurityRadarJSON(nonNilEvidence(verdict.Evidence))
 	if err != nil {
 		return "", fmt.Errorf("encode verdict evidence: %w", err)
@@ -176,25 +177,35 @@ func (s *SecurityRadarStore) InsertVerdict(ctx context.Context, verdict Security
 	}
 	var id string
 	err = s.DB.QueryRowContext(ctx, `
-		INSERT INTO security_radar_verdicts (event_id,module_id,target,target_type,network,grade,risk_index,risk_level,verdict,recommendation,evidence,signals,rule_version,signed,signature,source,created_at,updated_at)
-		VALUES (NULLIF($1,'')::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13,$14,NULLIF($15,''),$16,now(),now())
-		ON CONFLICT (signature,module_id) WHERE signature IS NOT NULL DO UPDATE SET
-			event_id=COALESCE(EXCLUDED.event_id, security_radar_verdicts.event_id),
-			target=EXCLUDED.target,
-			target_type=EXCLUDED.target_type,
-			network=EXCLUDED.network,
-			grade=EXCLUDED.grade,
-			risk_index=EXCLUDED.risk_index,
-			risk_level=EXCLUDED.risk_level,
-			verdict=EXCLUDED.verdict,
-			recommendation=EXCLUDED.recommendation,
-			evidence=EXCLUDED.evidence,
-			signals=EXCLUDED.signals,
-			rule_version=EXCLUDED.rule_version,
-			signed=EXCLUDED.signed,
-			source=EXCLUDED.source,
-			updated_at=now()
-		RETURNING id::text`, verdict.EventID, verdict.ModuleID, verdict.Target, verdict.TargetType, verdict.Network, verdict.Grade, verdict.RiskIndex, verdict.RiskLevel, verdict.Verdict, verdict.Recommendation, string(evidence), string(signalsRaw), verdict.RuleVersion, verdict.Signed, verdict.Signature, verdict.Source).Scan(&id)
+		INSERT INTO security_radar_verdicts (
+			event_id,module_id,target,target_type,network,grade,risk_index,risk_level,verdict,recommendation,
+			evidence,signals,rule_version,evidence_verified,digest,signed,signature,signature_algorithm,key_id,payload_hash,source,created_at,updated_at
+		)
+		VALUES (
+			NULLIF($1,'')::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+			$11::jsonb,$12::jsonb,$13,$14,NULLIF($15,''),$16,NULLIF($17,''),NULLIF($18,''),NULLIF($19,''),NULLIF($20,''),$21,now(),now()
+		)
+		ON CONFLICT DO NOTHING
+		RETURNING id::text`,
+		verdict.EventID, verdict.ModuleID, verdict.Target, verdict.TargetType, verdict.Network, verdict.Grade, verdict.RiskIndex,
+		verdict.RiskLevel, verdict.Verdict, verdict.Recommendation, string(evidence), string(signalsRaw), verdict.RuleVersion,
+		verdict.EvidenceVerified, verdict.Digest, verdict.Signed, verdict.Signature, verdict.SignatureAlgorithm, verdict.KeyID,
+		verdict.PayloadHash, verdict.Source).Scan(&id)
+	if err == sql.ErrNoRows {
+		if verdict.Source == "arvis_stream" {
+			if streamEventID, _ := signals["source_stream_event_id"].(string); strings.TrimSpace(streamEventID) != "" {
+				err = s.DB.QueryRowContext(ctx, `
+					SELECT id::text FROM security_radar_verdicts
+					WHERE source='arvis_stream' AND module_id=$1 AND signals->>'source_stream_event_id'=$2
+					ORDER BY created_at ASC LIMIT 1`, verdict.ModuleID, strings.TrimSpace(streamEventID)).Scan(&id)
+			}
+		} else if strings.TrimSpace(verdict.Digest) != "" {
+			err = s.DB.QueryRowContext(ctx, `
+				SELECT id::text FROM security_radar_verdicts
+				WHERE module_id=$1 AND digest=$2 AND source IS DISTINCT FROM 'arvis_stream'
+				ORDER BY created_at ASC LIMIT 1`, verdict.ModuleID, strings.TrimSpace(verdict.Digest)).Scan(&id)
+		}
+	}
 	if err != nil && strings.TrimSpace(verdict.EventID) != "" {
 		_, _ = s.DB.ExecContext(ctx, `
 			DELETE FROM security_radar_events e
@@ -243,8 +254,13 @@ func (s *SecurityRadarStore) latestVerdictsWindow(ctx context.Context, limit int
 				v.evidence,
 				v.signals,
 				v.rule_version,
+				COALESCE(v.evidence_verified,false) AS evidence_verified,
+				COALESCE(v.digest,'') AS digest,
 				v.signed,
 				COALESCE(v.signature,'') AS signature,
+				COALESCE(v.signature_algorithm,'') AS signature_algorithm,
+				COALESCE(v.key_id,'') AS key_id,
+				COALESCE(v.payload_hash,'') AS payload_hash,
 				COALESCE(v.source,'') AS source,
 				COALESCE(e.event_type,'') AS event_type,
 				v.created_at
@@ -264,7 +280,7 @@ func (s *SecurityRadarStore) latestVerdictsWindow(ctx context.Context, limit int
 			  ` + windowFilter + `
 			ORDER BY v.target, v.risk_index DESC, v.created_at DESC, v.id DESC
 		)
-		SELECT id, event_id, module_id, target, target_type, network, grade, risk_index, risk_level, verdict, recommendation, evidence, signals, rule_version, signed, signature, source, event_type, created_at
+		SELECT id, event_id, module_id, target, target_type, network, grade, risk_index, risk_level, verdict, recommendation, evidence, signals, rule_version, evidence_verified, digest, signed, signature, signature_algorithm, key_id, payload_hash, source, event_type, created_at
 		FROM representatives
 		ORDER BY risk_index DESC, created_at DESC
 		LIMIT $1`
@@ -279,7 +295,7 @@ func (s *SecurityRadarStore) latestVerdictsWindow(ctx context.Context, limit int
 	for rows.Next() {
 		var item SecurityRadarVerdictRecord
 		var evidenceRaw, signalsRaw []byte
-		if err := rows.Scan(&item.ID, &item.EventID, &item.ModuleID, &item.Target, &item.TargetType, &item.Network, &item.Grade, &item.RiskIndex, &item.RiskLevel, &item.Verdict, &item.Recommendation, &evidenceRaw, &signalsRaw, &item.RuleVersion, &item.Signed, &item.Signature, &item.Source, &item.EventType, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.EventID, &item.ModuleID, &item.Target, &item.TargetType, &item.Network, &item.Grade, &item.RiskIndex, &item.RiskLevel, &item.Verdict, &item.Recommendation, &evidenceRaw, &signalsRaw, &item.RuleVersion, &item.EvidenceVerified, &item.Digest, &item.Signed, &item.Signature, &item.SignatureAlgorithm, &item.KeyID, &item.PayloadHash, &item.Source, &item.EventType, &item.CreatedAt); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal(evidenceRaw, &item.Evidence)
@@ -500,4 +516,30 @@ func (s *SecurityRadarStore) RepeatDominantHolderMatchesExceptMint(ctx context.C
 		out = append(out, item)
 	}
 	return out, rows.Err()
+}
+
+func finalizeSecurityRadarVerdictRecordAuthentication(record SecurityRadarVerdictRecord) SecurityRadarVerdictRecord {
+	authenticated := finalizeSecurityRadarVerdictAuthentication(SecurityRadarVerdict{
+		ModuleID:         record.ModuleID,
+		Target:           record.Target,
+		Network:          record.Network,
+		Grade:            record.Grade,
+		RiskIndex:        record.RiskIndex,
+		RiskLevel:        record.RiskLevel,
+		Verdict:          record.Verdict,
+		Recommendation:   record.Recommendation,
+		Signals:          record.Signals,
+		Evidence:         record.Evidence,
+		RuleVersion:      record.RuleVersion,
+		EvidenceVerified: record.EvidenceVerified,
+	})
+	record.Network = authenticated.Network
+	record.EvidenceVerified = authenticated.EvidenceVerified
+	record.Digest = authenticated.Digest
+	record.Signed = authenticated.Signed
+	record.Signature = authenticated.Signature
+	record.SignatureAlgorithm = authenticated.SignatureAlgorithm
+	record.KeyID = authenticated.KeyID
+	record.PayloadHash = authenticated.PayloadHash
+	return record
 }

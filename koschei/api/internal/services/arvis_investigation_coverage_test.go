@@ -38,7 +38,7 @@ func TestLaunchForensicsCompletesLaunchCollectors(t *testing.T) {
 	}
 	for _, moduleID := range []string{ModulePumpSybilRadar, ModuleLaunchDistribution, ModuleSniperTimingDetector} {
 		arm, ok := seen[moduleID]
-		if !ok || !arm.Signed || arvisSignalString(arm.Signals, "execution_status") != ArvisExecutionCompleted {
+		if !ok || !SecurityRadarVerdictHasVerifiedEvidence(arm) || arvisSignalString(arm.Signals, "execution_status") != ArvisExecutionCompleted {
 			t.Fatalf("collector %s=%#v", moduleID, arm)
 		}
 	}
@@ -75,7 +75,7 @@ func TestRepeatActorQueryWithoutMatchIsCompleted(t *testing.T) {
 		if arm.ModuleID != ModuleRepeatActorScan {
 			continue
 		}
-		if !arm.Signed || arvisSignalString(arm.Signals, "execution_status") != ArvisExecutionCompleted {
+		if !SecurityRadarVerdictHasVerifiedEvidence(arm) || arvisSignalString(arm.Signals, "execution_status") != ArvisExecutionCompleted {
 			t.Fatalf("repeat arm=%#v", arm)
 		}
 		if arvisSignalBool(arm.Signals, "finding_observed") {
