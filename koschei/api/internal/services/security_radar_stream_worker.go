@@ -94,20 +94,39 @@ func resolveSecurityRadarWSSURL() string {
 
 func resolveSecurityRadarRPCURL() string {
 	if v := firstSecurityRadarEnv("SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL"); v != "" {
-		return v
+		return securityRadarRPCURLWithProviderKey(v)
 	}
 	if wss := strings.TrimSpace(os.Getenv("SOLANA_WSS_URL")); wss != "" {
 		if strings.HasPrefix(wss, "wss://") {
-			return "https://" + strings.TrimPrefix(wss, "wss://")
+			return securityRadarRPCURLWithProviderKey("https://" + strings.TrimPrefix(wss, "wss://"))
 		}
 		if strings.HasPrefix(wss, "ws://") {
-			return "http://" + strings.TrimPrefix(wss, "ws://")
+			return securityRadarRPCURLWithProviderKey("http://" + strings.TrimPrefix(wss, "ws://"))
 		}
 	}
 	if key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")); key != "" {
 		return "https://solana-mainnet.g.alchemy.com/v2/" + key
 	}
 	return ""
+}
+
+func securityRadarRPCURLWithProviderKey(rawURL string) string {
+	trimmed := strings.TrimSpace(rawURL)
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed == nil || !strings.Contains(strings.ToLower(parsed.Hostname()), "helius") {
+		return trimmed
+	}
+	query := parsed.Query()
+	if strings.TrimSpace(query.Get("api-key")) != "" {
+		return trimmed
+	}
+	key := heliusProviderAPIKey(trimmed)
+	if key == "" {
+		return trimmed
+	}
+	query.Set("api-key", key)
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
 }
 
 func envBool(key string) bool {
