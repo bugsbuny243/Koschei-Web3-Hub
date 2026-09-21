@@ -81,7 +81,7 @@
       return data;
     }catch(error){
       const message=error?.message||'Canlı ARVIS soruşturması başlatılamadı.';
-      root.innerHTML=`<div class="card error-state"><div><b>Geniş araştırma raporu tamamlanamadı.</b><span>${esc(message)}</span></div></div>`;
+      root.innerHTML=`<div class="card error-state"><div><b>ARVIS araştırması tamamlanamadı.</b><span>${esc(message)}</span></div></div>`;
       throw error;
     }
   }
