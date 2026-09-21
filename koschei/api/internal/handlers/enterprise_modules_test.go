@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -53,20 +54,10 @@ func TestLiquidityDrainScoreCritical(t *testing.T) {
 	}
 }
 
-func TestEmergencyLiquidityAlertPostsWebhook(t *testing.T) {
+func TestEmergencyLiquidityAlertRejectsUntrustedWebhook(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
-		if r.Method != http.MethodPost {
-			t.Fatalf("method = %s, want POST", r.Method)
-		}
-		var payload map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode payload: %v", err)
-		}
-		if payload["content"] == "" && payload["text"] == "" {
-			t.Fatalf("payload missing content/text: %+v", payload)
-		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
@@ -74,8 +65,11 @@ func TestEmergencyLiquidityAlertPostsWebhook(t *testing.T) {
 	t.Setenv("WHITEHAT_ALERT_ADDRESSES", "whitehat1,whitehat2")
 
 	result := dispatchEmergencyLiquidityAlert(context.Background(), liquidityRadarRequest{PoolAddress: "pool", RemovedLiquidity: 100_000}, 100, "KRİTİK", 100_000)
-	if !result.EmergencyMode || !result.DiscordSent || calls != 1 {
+	if !result.EmergencyMode || result.DiscordSent || calls != 0 {
 		t.Fatalf("unexpected emergency result: %+v calls=%d", result, calls)
+	}
+	if len(result.Errors) != 1 || !strings.Contains(result.Errors[0], "untrusted discord webhook URL") {
+		t.Fatalf("expected trusted-host rejection, got %+v", result.Errors)
 	}
 	if len(result.WhitehatAddresses) != 2 {
 		t.Fatalf("whitehat addresses = %+v, want 2", result.WhitehatAddresses)
