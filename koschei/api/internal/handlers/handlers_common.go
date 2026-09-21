@@ -30,6 +30,8 @@ type Handler struct {
 	JobStore      *jobs.Store
 	JobQueue      jobs.Queue
 	CourtClient   CourtNarrativeClient
+
+	publicRadarTelemetry *publicRadarTelemetryCache
 }
 
 // entitlementStore keeps commercial authorization separate from application

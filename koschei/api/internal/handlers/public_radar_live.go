@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strings"
@@ -36,6 +37,10 @@ type publicRadarLiveEvent struct {
 // it projects only recent customer-visible A-F verdicts backed by verified
 // evidence and strips raw targets and internal worker details.
 func (h *Handler) PublicRadarLiveFeed(w http.ResponseWriter, r *http.Request) {
+	// The verdict read is mandatory; telemetry has a separate, smaller budget.
+	// A public poll must never wait for the lifetime stream inventory to be counted.
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
 	db := h.DBRead
 	if db == nil {
 		db = h.DB
@@ -47,7 +52,7 @@ func (h *Handler) PublicRadarLiveFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := services.NewSecurityRadarStore(db).LatestVerdicts(r.Context(), 100)
+	items, err := services.NewSecurityRadarStore(db).RecentVerdicts(ctx, 100)
 	if err != nil {
 		status := http.StatusServiceUnavailable
 		code := "radar_live_unavailable"
@@ -77,7 +82,7 @@ func (h *Handler) PublicRadarLiveFeed(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	stream := h.securityRadarStreamStats(r.Context())
+	stream := h.publicRadarLiveTelemetry(ctx, db)
 	pipelineStatus := metricString(stream, "pipeline_status")
 	if pipelineStatus == "" {
 		pipelineStatus = "unknown"
@@ -99,19 +104,24 @@ func (h *Handler) PublicRadarLiveFeed(w http.ResponseWriter, r *http.Request) {
 			"last_result_at":  lastResultAt,
 		},
 		"pipeline": map[string]any{
-			"status":               pipelineStatus,
-			"raw_stream_events":    stream["raw_stream_events"],
-			"recognized_events":    stream["recognized_events"],
-			"visible_verdicts":     stream["visible_verdicts"],
-			"processing_active":    stream["processing_active"],
-			"processing_completed": stream["processing_completed"],
-			"processing_failed":    stream["processing_failed"],
-			"last_stream_event_at": stream["last_stream_event_at"],
-			"last_processed_at":    stream["last_processed_at"],
-			"source_health":        h.arvisSourceHealth(r.Context()),
+			"status":                     pipelineStatus,
+			"telemetry_status":           stream["telemetry_status"],
+			"observed_at":                stream["observed_at"],
+			"raw_stream_events_estimate": stream["raw_stream_events_estimate"],
+			"estimate_source":            "postgres_statistics",
+			"raw_stream_events":          stream["raw_stream_events"],
+			"recognized_events":          stream["recognized_events"],
+			"visible_verdicts":           stream["visible_verdicts"],
+			"processing_active":          stream["processing_active"],
+			"processing_completed":       stream["processing_completed"],
+			"processing_failed":          stream["processing_failed"],
+			"last_stream_event_at":       stream["last_stream_event_at"],
+			"last_processed_at":          stream["last_processed_at"],
+			"source_health":              stream["source_health"],
 		},
 		"events": events,
 		"boundaries": []string{
+			"Lifetime inventory counts are not recomputed by public polls; unavailable counts are null and planner estimates are explicitly separate from exact counts.",
 			"Yalnız son 24 saatte üretilmiş, imzalı ve doğrulanmış kanıta bağlı A/B/C/D/F sonuçları gösterilir.",
 			"Bu akış owner tarafından ayrıca yayınlanmış dossier listesi değildir; canlı ARVIS radar kararlarının güvenli public izdüşümüdür.",
 			"Ham hedef adresi, özel müşteri taraması, owner secret ve iç worker ayrıntısı public yanıta girmez.",
