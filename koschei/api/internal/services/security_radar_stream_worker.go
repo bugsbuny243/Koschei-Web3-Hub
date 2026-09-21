@@ -75,6 +75,9 @@ func resolveSecurityRadarWSSURL() string {
 	if v := firstSecurityRadarEnv("SOLANA_WSS_URL", "ALCHEMY_SOLANA_WSS_URL", "HELIUS_SOLANA_WSS_URL", "QUICKNODE_SOLANA_WSS_URL"); v != "" {
 		return v
 	}
+	if key := strings.TrimSpace(os.Getenv("HELIUS_API_KEY")); key != "" {
+		return "wss://mainnet.helius-rpc.com/?api-key=" + url.QueryEscape(key)
+	}
 	if rpc := strings.TrimSpace(os.Getenv("SOLANA_RPC_URL")); rpc != "" {
 		if strings.HasPrefix(rpc, "https://") {
 			return "wss://" + strings.TrimPrefix(rpc, "https://")
