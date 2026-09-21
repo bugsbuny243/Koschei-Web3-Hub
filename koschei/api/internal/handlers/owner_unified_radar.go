@@ -105,25 +105,25 @@ func ownerUnifiedRadarRoute(classification radarTargetClassification) string {
 
 func (h *Handler) ownerUnifiedProgramArtifactRadar(w http.ResponseWriter, target, network string, classification radarTargetClassification) {
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true,
-		"status": "evidence_gap",
-		"investigation_kind": "program_deployment_artifact",
-		"schema_version": "koschei-unified-investigation-v1",
-		"target": target,
-		"network": network,
+		"ok":                    true,
+		"status":                "evidence_gap",
+		"investigation_kind":    "program_deployment_artifact",
+		"schema_version":        "koschei-unified-investigation-v1",
+		"target":                target,
+		"network":               network,
 		"target_classification": classification,
 		"final_verdict": map[string]any{
-			"grade": "-",
+			"grade":      "-",
 			"risk_level": "unknown",
-			"signed": false,
-			"withheld": true,
-			"verdict": radarTargetRejectionMessage(classification),
+			"signed":     false,
+			"withheld":   true,
+			"verdict":    radarTargetRejectionMessage(classification),
 		},
 		"evidence_policy": map[string]any{
-			"no_evidence_no_claim": true,
-			"missing_semantics_is_not_safe": true,
+			"no_evidence_no_claim":                    true,
+			"missing_semantics_is_not_safe":           true,
 			"loader_artifact_is_not_program_behavior": true,
-			"numeric_final_score_disabled": true,
+			"numeric_final_score_disabled":            true,
 		},
 	})
 }
