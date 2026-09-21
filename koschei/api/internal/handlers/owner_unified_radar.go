@@ -39,6 +39,13 @@ func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) 
 	if network == "" {
 		network = "solana-mainnet"
 	}
+
+	// Manual owner investigations are foreground work. They keep their bounded
+	// per-scan collector budgets, but do not share the background-worker RPC
+	// window; otherwise a busy live radar can make an explicit owner scan fail
+	// before target classification even starts.
+	r = r.WithContext(services.WithInteractiveSolanaRPCBudget(r.Context()))
+
 	budgets := services.LoadArvisScanBudgets()
 	log.Printf("arvis scan budgets: wallet=%ds launch=%ds creator=%ds rpc=%d funding=%d", budgets.WalletTimeoutSeconds, budgets.LaunchTimeoutSeconds, budgets.CreatorTimeoutSeconds, budgets.RPCBudget, budgets.FundingRPCBudget)
 	courtRequested := envBool("KOSCHEI_OWNER_COURT_AUTO_ENABLED", false)

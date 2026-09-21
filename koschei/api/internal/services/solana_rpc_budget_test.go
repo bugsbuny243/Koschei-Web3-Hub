@@ -47,3 +47,26 @@ func TestSolanaRPC429CooldownHasFloorAndCeiling(t *testing.T) {
 		t.Fatalf("cooldown ceiling = %s, want 1h", got)
 	}
 }
+
+func TestInteractiveSolanaRPCBudgetBypassesBackgroundWindow(t *testing.T) {
+	resetSolanaRPCCachesForTest()
+	t.Setenv("SOLANA_RPC_BUDGET_ENABLED", "true")
+	t.Setenv("SOLANA_RPC_BUDGET_WINDOW_SECONDS", "60")
+	t.Setenv("SOLANA_RPC_BUDGET_MAX_REQUESTS", "1")
+
+	if err := reserveSolanaRPCBudget(context.Background(), "background-first"); err != nil {
+		t.Fatalf("background reserve failed: %v", err)
+	}
+	if err := reserveSolanaRPCBudget(context.Background(), "background-second"); err == nil {
+		t.Fatal("expected shared background budget to be exhausted")
+	}
+
+	interactive := WithInteractiveSolanaRPCBudget(context.Background())
+	if err := reserveSolanaRPCBudget(interactive, "owner-manual-scan"); err != nil {
+		t.Fatalf("interactive owner scan must not be blocked by background budget: %v", err)
+	}
+
+	if err := reserveSolanaRPCBudget(context.Background(), "background-still-exhausted"); err == nil {
+		t.Fatal("interactive reserve must not reset or consume the background budget")
+	}
+}
