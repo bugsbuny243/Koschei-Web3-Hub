@@ -16,7 +16,31 @@ var solanaRPCBudget = struct {
 	Count       int
 }{}
 
+type interactiveSolanaRPCBudgetKey struct{}
+
+// WithInteractiveSolanaRPCBudget marks a foreground, user-triggered ARVIS
+// investigation. Foreground scans keep their own per-scan RPC budgets and
+// upstream provider throttling, but must not be blocked by the shared
+// background-worker budget window.
+func WithInteractiveSolanaRPCBudget(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, interactiveSolanaRPCBudgetKey{}, true)
+}
+
+func interactiveSolanaRPCBudget(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	enabled, _ := ctx.Value(interactiveSolanaRPCBudgetKey{}).(bool)
+	return enabled
+}
+
 func reserveSolanaRPCBudget(ctx context.Context, method string) error {
+	if interactiveSolanaRPCBudget(ctx) {
+		return nil
+	}
 	if !solanaRPCBudgetEnabled() {
 		return nil
 	}
