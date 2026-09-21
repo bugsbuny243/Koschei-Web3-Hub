@@ -76,6 +76,33 @@ func TestEmergencyLiquidityAlertRejectsUntrustedWebhook(t *testing.T) {
 	}
 }
 
+func TestEmergencyLiquidityAlertIgnoresRequestWebhookOverride(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	t.Setenv("TELEGRAM_WEBHOOK_URL", "")
+	t.Setenv("DISCORD_WEBHOOK_URL", "")
+
+	result := dispatchEmergencyLiquidityAlert(context.Background(), liquidityRadarRequest{
+		PoolAddress:     "pool",
+		RemovedLiquidity: 100_000,
+		TelegramWebhook: server.URL,
+		DiscordWebhook:  server.URL,
+	}, 100, "KRİTİK", 100_000)
+	if !result.EmergencyMode {
+		t.Fatal("expected emergency mode")
+	}
+	if result.TelegramSent || result.DiscordSent || calls != 0 {
+		t.Fatalf("request-controlled webhook target was used: result=%+v calls=%d", result, calls)
+	}
+	if len(result.Errors) != 0 {
+		t.Fatalf("ignored request webhook target should not generate transport errors: %+v", result.Errors)
+	}
+}
+
 func TestWhitehatAddressesDeduplicateRequestAndEnv(t *testing.T) {
 	t.Setenv("WHITEHAT_ALERT_ADDRESSES", "Alpha, Beta")
 	got := whitehatAddresses([]string{"alpha", "Gamma"})
