@@ -336,11 +336,11 @@ func (w *securityRadarJournalStreamWorker) enrichOne(ctx context.Context, target
 	encodedMints, _ := json.Marshal(mints)
 	_, err = w.Store.DB.ExecContext(ctx, `
         UPDATE security_radar_stream_events
-        SET target=$2,
+        SET target=$2::text,
             target_type='token',
             evidence_quality='transaction_enriched_mint',
             decoded=decoded || jsonb_build_object(
-                'enriched_mint',$2,
+                'enriched_mint',$2::text,
                 'enriched_mints',$3::jsonb,
                 'sovereign_enrichment_status','completed',
                 'sovereign_enrichment_completed_at',now()::text
@@ -367,8 +367,8 @@ func (w *securityRadarJournalStreamWorker) markEnrichmentFailure(ctx context.Con
 	_, err := w.Store.DB.ExecContext(ctx, `
         UPDATE security_radar_stream_events
         SET decoded=decoded || jsonb_build_object(
-                'sovereign_enrichment_status',$2,
-                'sovereign_enrichment_error',$3,
+                'sovereign_enrichment_status',$2::text,
+                'sovereign_enrichment_error',$3::text,
                 'sovereign_enrichment_failed_at',now()::text
             ),
             updated_at=now()
