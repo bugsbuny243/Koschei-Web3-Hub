@@ -20,8 +20,10 @@ type ownerUnifiedRadarRequest struct {
 	ExtendedCourt *bool  `json:"extended_court,omitempty"`
 }
 
-// OwnerUnifiedRadarScan is the owner-facing manual entry point. Token targets
-// use the same technical investigation report as public and API callers.
+// OwnerUnifiedRadarScan is the owner-facing target-first ARVIS entry point.
+// Verified target kinds are routed into their existing evidence collectors;
+// unsupported or unresolved evidence is reported explicitly instead of being
+// coerced into a token-only scan.
 func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) {
 	var input ownerUnifiedRadarRequest
 	if err := decodeJSON(r, &input); err != nil {
@@ -48,10 +50,10 @@ func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) 
 		extendedCourt = *input.ExtendedCourt
 	}
 	classification := classifyRadarTarget(r.Context(), target)
-	switch classification.Type {
-	case radarTargetTokenMint:
+	switch ownerUnifiedRadarRoute(classification) {
+	case "token":
 		h.ownerUnifiedTokenRadar(w, r, target, network, classification, courtRequested, extendedCourt)
-	case radarTargetWallet, radarTargetTokenAccount:
+	case "wallet":
 		wallet := target
 		if classification.Type == radarTargetTokenAccount {
 			wallet = strings.TrimSpace(classification.TokenOwnerWallet)
@@ -60,7 +62,7 @@ func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) 
 			writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
 				"ok": false, "error": "token_account_owner_unresolved",
 				"target": target, "target_classification": classification,
-				"message": "Token hesabının owner cüzdanı çözümlenemedi; birleşik Radar başlatılmadı.",
+				"message": "Token hesabının owner cüzdanı çözümlenemedi; ARVIS actor investigation başlatılmadı.",
 			})
 			return
 		}
@@ -69,17 +71,61 @@ func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) 
 			liveEvidence = *input.LiveEvidence
 		}
 		h.ownerUnifiedWalletRadar(w, r, target, wallet, network, classification, liveEvidence, courtRequested, extendedCourt)
+	case "program":
+		h.ownerUnifiedProgramRadar(w, r, target, network, classification)
+	case "transaction":
+		h.ownerUnifiedTransactionRadar(w, r, target, network, classification)
+	case "program_artifact":
+		h.ownerUnifiedProgramArtifactRadar(w, target, network, classification)
 	default:
-		status := http.StatusUnprocessableEntity
-		if classification.Type == radarTargetUnknown {
-			status = http.StatusServiceUnavailable
-		}
-		writeJSON(w, status, map[string]any{
-			"ok": false, "error": "unsupported_radar_target", "target": target,
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"ok": false, "error": "target_classification_unavailable", "target": target,
 			"network": network, "target_classification": classification,
-			"message": "Tek Radar şu anda doğrulanmış token mint, wallet veya token-account hedefini kabul eder.",
+			"message": firstNonEmptyString(classification.Evidence, "ARVIS hedef türünü doğrulayamadı; kanıt sınıflandırması tamamlanmadan verdict üretilmedi."),
 		})
 	}
+}
+
+func ownerUnifiedRadarRoute(classification radarTargetClassification) string {
+	switch classification.Type {
+	case radarTargetTokenMint:
+		return "token"
+	case radarTargetWallet, radarTargetTokenAccount:
+		return "wallet"
+	case radarTargetProgram:
+		return "program"
+	case radarTargetTransactionSignature:
+		return "transaction"
+	case radarTargetProgramData, radarTargetProgramBuffer, radarTargetProgramLoaderAccount:
+		return "program_artifact"
+	default:
+		return "classification_gap"
+	}
+}
+
+func (h *Handler) ownerUnifiedProgramArtifactRadar(w http.ResponseWriter, target, network string, classification radarTargetClassification) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": true,
+		"status": "evidence_gap",
+		"investigation_kind": "program_deployment_artifact",
+		"schema_version": "koschei-unified-investigation-v1",
+		"target": target,
+		"network": network,
+		"target_classification": classification,
+		"final_verdict": map[string]any{
+			"grade": "-",
+			"risk_level": "unknown",
+			"signed": false,
+			"withheld": true,
+			"verdict": radarTargetRejectionMessage(classification),
+		},
+		"evidence_policy": map[string]any{
+			"no_evidence_no_claim": true,
+			"missing_semantics_is_not_safe": true,
+			"loader_artifact_is_not_program_behavior": true,
+			"numeric_final_score_disabled": true,
+		},
+	})
 }
 
 func (h *Handler) ownerUnifiedTokenRadar(w http.ResponseWriter, r *http.Request, target, network string, classification radarTargetClassification, courtRequested, extendedCourt bool) {
