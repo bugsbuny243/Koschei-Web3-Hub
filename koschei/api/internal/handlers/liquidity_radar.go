@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -75,7 +76,7 @@ func (h *Handler) LiquidityDrainAnalyze(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(r.Context(), `INSERT INTO liquidity_drain_alerts (pool_address, token_mint, severity, risk_score, removed_liquidity_usd, loss_prevented_usd, telegram_queued, sms_queued, alert_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.PoolAddress, req.TokenMint, severity, score, req.RemovedLiquidity, lossPrevented, emergency.TelegramSent || req.TelegramWebhook != "", req.TwilioPhoneNumber != "", string(alertPayload)); err != nil {
+	if _, err := tx.ExecContext(r.Context(), `INSERT INTO liquidity_drain_alerts (pool_address, token_mint, severity, risk_score, removed_liquidity_usd, loss_prevented_usd, telegram_queued, sms_queued, alert_payload, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())`, req.PoolAddress, req.TokenMint, severity, score, req.RemovedLiquidity, lossPrevented, emergency.TelegramSent, req.TwilioPhoneNumber != "", string(alertPayload)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
@@ -87,7 +88,7 @@ func (h *Handler) LiquidityDrainAnalyze(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "db_failed"})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "risk_score": score, "severity": severity, "liquidity_loss_prevented_usd": lossPrevented, "telegram_queued": emergency.TelegramSent || req.TelegramWebhook != "", "discord_queued": emergency.DiscordSent || req.DiscordWebhook != "", "sms_queued": req.TwilioPhoneNumber != "", "emergency": emergency, "message": "Likidite boşaltma radarı alarmı üretildi."})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "risk_score": score, "severity": severity, "liquidity_loss_prevented_usd": lossPrevented, "telegram_queued": emergency.TelegramSent, "discord_queued": emergency.DiscordSent, "sms_queued": req.TwilioPhoneNumber != "", "emergency": emergency, "message": "Likidite boşaltma radarı alarmı üretildi."})
 }
 
 func liquidityDrainScore(req liquidityRadarRequest) int {
@@ -116,21 +117,21 @@ func dispatchEmergencyLiquidityAlert(ctx context.Context, req liquidityRadarRequ
 		return result
 	}
 	message := fmt.Sprintf("🚨 Koschei Emergency Mode: liquidity drain risk %d%% (%s). Pool: %s Token: %s Removed: $%.2f Protected estimate: $%.2f Whitehats: %s", score, severity, firstNonEmpty(req.PoolAddress, "unknown"), firstNonEmpty(req.TokenMint, "unknown"), req.RemovedLiquidity, lossPrevented, strings.Join(result.WhitehatAddresses, ", "))
-	telegramURL := firstNonEmpty(req.TelegramWebhook, os.Getenv("TELEGRAM_WEBHOOK_URL"))
+	telegramURL := strings.TrimSpace(os.Getenv("TELEGRAM_WEBHOOK_URL"))
 	if telegramURL != "" {
 		telegramPayload := map[string]any{"text": message}
 		if chatID := strings.TrimSpace(os.Getenv("TELEGRAM_CHAT_ID")); chatID != "" {
 			telegramPayload["chat_id"] = chatID
 		}
-		if err := postWebhook(ctx, telegramURL, telegramPayload); err != nil {
+		if err := postWebhook(ctx, telegramURL, telegramPayload, "telegram"); err != nil {
 			result.Errors = append(result.Errors, "telegram: "+err.Error())
 		} else {
 			result.TelegramSent = true
 		}
 	}
-	discordURL := firstNonEmpty(req.DiscordWebhook, os.Getenv("DISCORD_WEBHOOK_URL"))
+	discordURL := strings.TrimSpace(os.Getenv("DISCORD_WEBHOOK_URL"))
 	if discordURL != "" {
-		if err := postWebhook(ctx, discordURL, map[string]any{"content": message}); err != nil {
+		if err := postWebhook(ctx, discordURL, map[string]any{"content": message}, "discord"); err != nil {
 			result.Errors = append(result.Errors, "discord: "+err.Error())
 		} else {
 			result.DiscordSent = true
@@ -157,14 +158,23 @@ func whitehatAddresses(input []string) []string {
 	return out
 }
 
-func postWebhook(ctx context.Context, url string, payload map[string]any) error {
+func postWebhook(ctx context.Context, rawURL string, payload map[string]any, provider string) error {
+	endpoint, err := trustedWebhookURL(rawURL, provider)
+	if err != nil {
+		return err
+	}
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{Timeout: 6 * time.Second}
+	client := &http.Client{
+		Timeout: 6 * time.Second,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 	res, err := client.Do(req)
 	if err != nil {
 		return err
@@ -174,4 +184,33 @@ func postWebhook(ctx context.Context, url string, payload map[string]any) error 
 		return fmt.Errorf("webhook returned %s", res.Status)
 	}
 	return nil
+}
+
+func trustedWebhookURL(rawURL, provider string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || !parsed.IsAbs() {
+		return "", fmt.Errorf("invalid %s webhook URL", provider)
+	}
+	if !strings.EqualFold(parsed.Scheme, "https") || parsed.User != nil || parsed.Fragment != "" {
+		return "", fmt.Errorf("untrusted %s webhook URL", provider)
+	}
+	if port := parsed.Port(); port != "" && port != "443" {
+		return "", fmt.Errorf("untrusted %s webhook port", provider)
+	}
+	host := strings.ToLower(parsed.Hostname())
+	path := parsed.EscapedPath()
+	switch provider {
+	case "telegram":
+		if host != "api.telegram.org" || !strings.HasPrefix(path, "/bot") {
+			return "", fmt.Errorf("untrusted telegram webhook URL")
+		}
+	case "discord":
+		allowedHost := host == "discord.com" || host == "canary.discord.com" || host == "ptb.discord.com"
+		if !allowedHost || !strings.HasPrefix(path, "/api/webhooks/") {
+			return "", fmt.Errorf("untrusted discord webhook URL")
+		}
+	default:
+		return "", fmt.Errorf("unsupported webhook provider")
+	}
+	return parsed.String(), nil
 }

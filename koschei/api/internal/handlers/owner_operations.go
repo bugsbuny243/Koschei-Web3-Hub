@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -80,7 +81,7 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 		radar["pipeline_status"] = radarStatus
 	}
 	servicesMap := map[string]any{
-		"database":        map[string]any{"status": serviceStatus(db != nil, "connected", "unavailable")},
+		"database":        ownerDatabaseServiceStatus(ctx, db),
 		"neon_auth":       map[string]any{"status": serviceStatus(envSet("NEON_AUTH_JWKS_URL"), "configured", "missing")},
 		"solana_rpc":      map[string]any{"status": serviceStatus(envSet("SOLANA_RPC_URL") || envSet("ALCHEMY_SOLANA_RPC_URL") || envSet("HELIUS_SOLANA_RPC_URL") || envSet("QUICKNODE_SOLANA_RPC_URL") || envSet("ALCHEMY_API_KEY"), "configured", "missing")},
 		"security_radar":  map[string]any{"status": radarStatus},
@@ -97,6 +98,48 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 			"payment_providers": []string{},
 		},
 	})
+}
+
+func ownerDatabaseServiceStatus(ctx context.Context, db *sql.DB) map[string]any {
+	out := map[string]any{
+		"status":              serviceStatus(db != nil, "connected", "unavailable"),
+		"query_observability": "unavailable",
+	}
+	if db == nil {
+		return out
+	}
+
+	stats := db.Stats()
+	out["pool"] = map[string]any{
+		"max_open_connections": stats.MaxOpenConnections,
+		"open_connections":     stats.OpenConnections,
+		"in_use":               stats.InUse,
+		"idle":                 stats.Idle,
+		"wait_count":           stats.WaitCount,
+		"wait_duration_ms":     stats.WaitDuration.Milliseconds(),
+		"max_idle_closed":      stats.MaxIdleClosed,
+		"max_idle_time_closed": stats.MaxIdleTimeClosed,
+		"max_lifetime_closed":  stats.MaxLifetimeClosed,
+	}
+
+	var enabled, available bool
+	if err := db.QueryRowContext(ctx, `
+		SELECT
+			EXISTS (SELECT 1 FROM pg_extension WHERE extname='pg_stat_statements'),
+			EXISTS (SELECT 1 FROM pg_available_extensions WHERE name='pg_stat_statements')
+	`).Scan(&enabled, &available); err != nil {
+		out["query_observability"] = "probe_failed"
+		return out
+	}
+	switch {
+	case enabled:
+		out["query_observability"] = "enabled"
+	case available:
+		out["query_observability"] = "available_disabled"
+	default:
+		out["query_observability"] = "extension_unavailable"
+	}
+	return out
 }
 
 // OwnerRadarOverview powers the owner ARVIS workspace without requiring a
