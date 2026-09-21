@@ -236,15 +236,24 @@ func (w *securityRadarJournalStreamWorker) persistJournalEvent(ctx context.Conte
 }
 
 func (w *securityRadarJournalStreamWorker) enrichmentLoop(ctx context.Context) {
-	w.enrichBatch(ctx)
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
 	for {
+		if wait := solanaRPCBudgetWaitDuration(); wait > 0 {
+			timer := time.NewTimer(wait)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+			continue
+		}
+		w.enrichBatch(ctx)
+		timer := time.NewTimer(2 * time.Second)
 		select {
 		case <-ctx.Done():
+			timer.Stop()
 			return
-		case <-ticker.C:
-			w.enrichBatch(ctx)
+		case <-timer.C:
 		}
 	}
 }
@@ -325,6 +334,10 @@ func (w *securityRadarJournalStreamWorker) enrichOne(ctx context.Context, target
 	defer cancel()
 	tx, err := SolanaGetTransactionJSONParsed(attemptCtx, w.RPCURL, target.Signature)
 	if err != nil {
+		if resetAt, budgetPause := solanaRPCBudgetResetAt(err); budgetPause {
+			w.markEnrichmentBudgetDeferred(ctx, target, resetAt)
+			return
+		}
 		w.markEnrichmentFailure(ctx, target, compactRadarError("getTransaction", err))
 		return
 	}
@@ -350,6 +363,29 @@ func (w *securityRadarJournalStreamWorker) enrichOne(ctx context.Context, target
     `, target.ID, mints[0], string(encodedMints))
 	if err != nil && ctx.Err() == nil {
 		log.Printf("security radar sovereign enrichment update failed event=%s: %v", target.ID, err)
+	}
+}
+
+func (w *securityRadarJournalStreamWorker) markEnrichmentBudgetDeferred(ctx context.Context, target securityRadarEnrichmentTarget, resetAt time.Time) {
+	if w == nil || w.Store == nil || w.Store.DB == nil {
+		return
+	}
+	_, err := w.Store.DB.ExecContext(ctx, `
+        UPDATE security_radar_stream_events
+        SET decoded=jsonb_set(
+                decoded || jsonb_build_object(
+                    'sovereign_enrichment_status','budget_deferred',
+                    'sovereign_enrichment_retry_after',$2::text
+                ),
+                '{sovereign_enrichment_attempts}',
+                to_jsonb(GREATEST(COALESCE((decoded->>'sovereign_enrichment_attempts')::integer,1)-1,0)),
+                true
+            ),
+            updated_at=now()
+        WHERE id=$1::uuid
+    `, target.ID, resetAt.UTC().Format(time.RFC3339Nano))
+	if err != nil && ctx.Err() == nil {
+		log.Printf("security radar sovereign budget defer state update failed event=%s: %v", target.ID, err)
 	}
 }
 
