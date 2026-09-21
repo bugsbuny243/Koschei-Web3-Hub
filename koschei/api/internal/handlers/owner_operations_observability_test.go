@@ -49,7 +49,7 @@ func TestOwnerDatabaseServiceStatusPostgres17(t *testing.T) {
 			t.Fatalf("pool key %q missing: %#v", key, pool)
 		}
 	}
-	if status, _ := got["query_observability"].(string); status == "" {
-		t.Fatalf("query observability probe returned empty status: %#v", got)
+	if status, _ := got["query_observability"].(string); status != "enabled" {
+		t.Fatalf("query observability status=%q want enabled: %#v", status, got)
 	}
 }
