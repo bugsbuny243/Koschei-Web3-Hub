@@ -58,7 +58,6 @@ func solanaRPCBudgetWaitDuration() time.Duration {
 	return wait
 }
 
-
 // WithInteractiveSolanaRPCBudget marks a foreground, user-triggered ARVIS
 // investigation. Foreground scans keep their own per-scan RPC budgets and
 // upstream provider throttling, but must not be blocked by the shared
