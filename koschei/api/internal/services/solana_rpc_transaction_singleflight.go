@@ -14,6 +14,8 @@ import (
 
 var solanaTransactionFetchGroup singleflight.Group
 
+const solanaMaxSupportedTransactionVersion = 1
+
 // solanaGetTransactionJSONParsedSingleflight suppresses identical in-flight
 // transaction fetches before they consume the services RPC budget, local pacing
 // slot, process-wide provider slot or upstream request. Completed responses are
@@ -35,7 +37,7 @@ func solanaGetTransactionJSONParsedSingleflight(ctx context.Context, rpcURL, sig
 		result, callErr := solanaRPCDo[SolanaTransactionResult](workCtx, rpcURL, "getTransaction", []any{signature, map[string]any{
 			"encoding":                       "jsonParsed",
 			"commitment":                     "confirmed",
-			"maxSupportedTransactionVersion": 0,
+			"maxSupportedTransactionVersion": solanaMaxSupportedTransactionVersion,
 		}})
 		if callErr != nil {
 			return nil, callErr
@@ -73,7 +75,7 @@ func solanaTransactionSharedFetchTimeout() time.Duration {
 func solanaTransactionFetchKey(rpcURL, signature string) string {
 	// The endpoint may contain a provider credential. Hash it with the exact
 	// request identity so the singleflight map never retains or logs raw keys.
-	material := strings.TrimSpace(rpcURL) + "\ngetTransaction\n" + strings.TrimSpace(signature) + "\njsonParsed\nconfirmed\n0"
+	material := strings.TrimSpace(rpcURL) + "\ngetTransaction\n" + strings.TrimSpace(signature) + fmt.Sprintf("\njsonParsed\nconfirmed\n%d", solanaMaxSupportedTransactionVersion)
 	digest := sha256.Sum256([]byte(material))
 	return hex.EncodeToString(digest[:])
 }
