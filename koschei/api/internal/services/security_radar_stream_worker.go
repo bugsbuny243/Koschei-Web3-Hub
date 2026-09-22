@@ -283,7 +283,19 @@ func (w *SecurityRadarStreamWorker) decodeLogsPayload(payload []byte) (SecurityR
 	}
 	signature := anyString(value["signature"])
 	target := signature
-	return SecurityRadarStreamEventRecord{Provider: SecurityRadarStreamProvider, StreamMode: SecurityRadarStreamModeLogs, Network: w.Network, ModuleID: moduleID, EventType: eventType, Target: target, TargetType: targetTypeForRadarModule(moduleID), Signature: signature, Slot: radarInt64(contextValue["slot"]), ProgramID: programID, EvidenceQuality: evidenceQualityForRadarModule(moduleID), Decoded: map[string]any{"logs": logs, "err": value["err"], "subscription_method": "logsSubscribe"}, RawEvent: raw}, signature != "" || moduleID != "unknown"
+	decoded := map[string]any{
+		"logs":                logs,
+		"err":                 value["err"],
+		"subscription_method": "logsSubscribe",
+	}
+	if radarStreamTransactionFailed(decoded) {
+		// A failed transaction is still durable evidence, but it cannot produce
+		// a successful mint/pool transition. Keep it in the journal without
+		// spending scarce getTransaction budget on enrichment.
+		decoded["sovereign_enrichment_status"] = "skipped_failed_transaction"
+		decoded["sovereign_enrichment_skip_reason"] = "wss_transaction_failed"
+	}
+	return SecurityRadarStreamEventRecord{Provider: SecurityRadarStreamProvider, StreamMode: SecurityRadarStreamModeLogs, Network: w.Network, ModuleID: moduleID, EventType: eventType, Target: target, TargetType: targetTypeForRadarModule(moduleID), Signature: signature, Slot: radarInt64(contextValue["slot"]), ProgramID: programID, EvidenceQuality: evidenceQualityForRadarModule(moduleID), Decoded: decoded, RawEvent: raw}, signature != "" || moduleID != "unknown"
 }
 
 func (w *SecurityRadarStreamWorker) persistEvent(ctx context.Context, event SecurityRadarStreamEventRecord) {
@@ -338,6 +350,9 @@ func shouldPublishSBX1CustomerVerdict(event SecurityRadarStreamEventRecord, verd
 
 func (w *SecurityRadarStreamWorker) enrichEventTarget(ctx context.Context, event SecurityRadarStreamEventRecord) SecurityRadarStreamEventRecord {
 	if strings.TrimSpace(w.RPCURL) == "" || strings.TrimSpace(event.Signature) == "" {
+		return event
+	}
+	if radarStreamTransactionFailed(event.Decoded) {
 		return event
 	}
 	needsEnrichment := strings.TrimSpace(event.Target) == "" || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature))
@@ -441,6 +456,14 @@ func extractMintsFromTransactionMap(tx map[string]any) []string {
 	}
 	walk(tx)
 	return out
+}
+
+func radarStreamTransactionFailed(decoded map[string]any) bool {
+	if decoded == nil {
+		return false
+	}
+	errValue, exists := decoded["err"]
+	return exists && errValue != nil
 }
 
 func targetTypeForRadarModule(moduleID string) string {

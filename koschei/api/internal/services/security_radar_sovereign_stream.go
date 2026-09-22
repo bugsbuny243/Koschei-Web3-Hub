@@ -288,6 +288,10 @@ func (w *securityRadarJournalStreamWorker) claimEnrichmentBatch(ctx context.Cont
             WHERE signature IS NOT NULL
               AND btrim(signature)<>''
               AND module_id IN ($1,$2)
+              -- logsSubscribe already tells us whether the transaction failed.
+              -- Failed transactions remain durable journal evidence but must not
+              -- consume getTransaction enrichment budget.
+              AND (decoded->'err' IS NULL OR decoded->'err' = 'null'::jsonb)
               AND (target IS NULL OR btrim(target)='' OR target=signature OR target_type<>'token')
               AND COALESCE((decoded->>'sovereign_enrichment_attempts')::integer,0) < 5
               AND (
