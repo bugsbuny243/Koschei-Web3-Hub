@@ -24,10 +24,10 @@ import (
 )
 
 const (
-	SecurityRadarStreamProvider   = "solana_wss"
-	SecurityRadarStreamModeLogs   = "logs_subscribe"
-	minimalWSKeepaliveInterval    = 15 * time.Second
-	minimalWSWriteTimeout         = 10 * time.Second
+	SecurityRadarStreamProvider = "solana_wss"
+	SecurityRadarStreamModeLogs = "logs_subscribe"
+	minimalWSKeepaliveInterval  = 15 * time.Second
+	minimalWSWriteTimeout       = 10 * time.Second
 )
 
 type SecurityRadarStreamEventRecord struct {
