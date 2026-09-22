@@ -19,12 +19,15 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 const (
 	SecurityRadarStreamProvider = "solana_wss"
 	SecurityRadarStreamModeLogs = "logs_subscribe"
+	minimalWSKeepaliveInterval  = 15 * time.Second
+	minimalWSWriteTimeout       = 10 * time.Second
 )
 
 type SecurityRadarStreamEventRecord struct {
@@ -238,17 +241,14 @@ func (w *SecurityRadarStreamWorker) runOnce(ctx context.Context) error {
 			return err
 		}
 	}
-	ping := time.NewTicker(25 * time.Second)
-	defer ping.Stop()
+	connCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go conn.startKeepalive(connCtx, minimalWSKeepaliveInterval)
 	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ping.C:
-			_ = conn.Ping()
-		default:
+		if err := connCtx.Err(); err != nil {
+			return err
 		}
-		payload, err := conn.ReadText(ctx)
+		payload, err := conn.ReadText(connCtx)
 		if err != nil {
 			return err
 		}
@@ -545,8 +545,9 @@ func isLikelyRadarSolanaAddress(value string) bool {
 }
 
 type minimalWSConn struct {
-	conn net.Conn
-	r    *bufio.Reader
+	conn    net.Conn
+	r       *bufio.Reader
+	writeMu sync.Mutex
 }
 
 func dialMinimalWebSocket(ctx context.Context, rawURL string) (*minimalWSConn, error) {
@@ -647,7 +648,38 @@ func (c *minimalWSConn) WriteJSON(v any) error {
 }
 func (c *minimalWSConn) Ping() error               { return c.writeFrame(0x9, []byte("koschei")) }
 func (c *minimalWSConn) pong(payload []byte) error { return c.writeFrame(0xA, payload) }
+
+func (c *minimalWSConn) startKeepalive(ctx context.Context, interval time.Duration) {
+	if c == nil || c.conn == nil {
+		return
+	}
+	if interval <= 0 {
+		interval = minimalWSKeepaliveInterval
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			_ = c.Close()
+			return
+		case <-ticker.C:
+			if err := c.Ping(); err != nil {
+				_ = c.Close()
+				return
+			}
+		}
+	}
+}
+
 func (c *minimalWSConn) writeFrame(opcode byte, payload []byte) error {
+	if c == nil || c.conn == nil {
+		return io.ErrClosedPipe
+	}
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	_ = c.conn.SetWriteDeadline(time.Now().Add(minimalWSWriteTimeout))
+	defer c.conn.SetWriteDeadline(time.Time{})
 	var b bytes.Buffer
 	b.WriteByte(0x80 | opcode)
 	maskKey := make([]byte, 4)

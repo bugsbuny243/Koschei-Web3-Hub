@@ -162,17 +162,14 @@ func (w *securityRadarJournalStreamWorker) runOnce(ctx context.Context) error {
 			return err
 		}
 	}
-	ping := time.NewTicker(25 * time.Second)
-	defer ping.Stop()
+	connCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go conn.startKeepalive(connCtx, minimalWSKeepaliveInterval)
 	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ping.C:
-			_ = conn.Ping()
-		default:
+		if err := connCtx.Err(); err != nil {
+			return err
 		}
-		payload, err := conn.ReadText(ctx)
+		payload, err := conn.ReadText(connCtx)
 		if err != nil {
 			return err
 		}
