@@ -3,6 +3,7 @@ package services
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"net"
 	"strings"
@@ -80,5 +81,27 @@ func TestMinimalWebSocketKeepaliveCancellationUnblocksRead(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("websocket read stayed blocked after keepalive context cancellation")
+	}
+}
+
+func TestMinimalWebSocketCloseFrameReturnsCodeAndReason(t *testing.T) {
+	client, server := net.Pipe()
+	defer server.Close()
+	ws := &minimalWSConn{conn: client, r: bufio.NewReader(client)}
+	defer ws.Close()
+
+	go func() {
+		payload := append([]byte{0x03, 0xE9}, []byte("provider restart")...)
+		frame := append([]byte{0x88, byte(len(payload))}, payload...)
+		_, _ = server.Write(frame)
+	}()
+
+	_, err := ws.ReadText(context.Background())
+	var closeErr *websocketCloseError
+	if !errors.As(err, &closeErr) {
+		t.Fatalf("expected websocketCloseError, got %T %v", err, err)
+	}
+	if closeErr.Code != 1001 || closeErr.Reason != "provider restart" {
+		t.Fatalf("unexpected close metadata code=%d reason=%q", closeErr.Code, closeErr.Reason)
 	}
 }
