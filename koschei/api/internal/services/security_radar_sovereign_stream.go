@@ -164,7 +164,7 @@ func (w *securityRadarJournalStreamWorker) runOnce(ctx context.Context) error {
 	}
 	connCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	go conn.startKeepalive(connCtx, 15*time.Second)
+	go conn.startKeepalive(connCtx, minimalWSKeepaliveInterval)
 	for {
 		if err := connCtx.Err(); err != nil {
 			return err
