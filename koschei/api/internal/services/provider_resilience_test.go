@@ -64,8 +64,8 @@ func TestDecodeLogsPayloadMarksFailedTransactionAsTerminalJournalEvidence(t *tes
 					"context": map[string]any{"slot": 123.0},
 					"value": map[string]any{
 						"signature": "ci-failed-wss-signature",
-						"logs": []any{"Program " + defaultPumpProgramID + " invoke [1]"},
-						"err": errValue,
+						"logs":      []any{"Program " + defaultPumpProgramID + " invoke [1]"},
+						"err":       errValue,
 					},
 				},
 			},
