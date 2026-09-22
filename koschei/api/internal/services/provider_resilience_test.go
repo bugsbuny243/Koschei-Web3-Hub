@@ -53,7 +53,6 @@ func TestClassifyRadarStreamTextByProgramID(t *testing.T) {
 	}
 }
 
-
 func TestDecodeLogsPayloadMarksFailedTransactionAsTerminalJournalEvidence(t *testing.T) {
 	worker := &SecurityRadarStreamWorker{Network: "solana-mainnet"}
 	makePayload := func(errValue any) []byte {
