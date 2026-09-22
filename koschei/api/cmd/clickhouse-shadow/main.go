@@ -78,7 +78,7 @@ func run(parent context.Context) error {
 	}
 	if expected > cfg.maxRows {
 		return fmt.Errorf(
-			"shadow window contains %d rows, above safety cap %d; narrow KOSCHEI_CLICKHOUSE_SHADOW_SINCE or deliberately raise KOSCHEI_CLICKHOUSE_SHADOW_MAX_ROWS (hard cap %d)",
+			"shadow window contains %d rows, above safety cap %d; narrow the explicit [since,until) window or deliberately raise KOSCHEI_CLICKHOUSE_SHADOW_MAX_ROWS (hard cap %d)",
 			expected,
 			cfg.maxRows,
 			maxAllowedRows,
@@ -218,24 +218,41 @@ func run(parent context.Context) error {
 	}
 
 	log.Printf(
-		"ClickHouse shadow parity ok postgres=%d clickhouse_distinct=%d copied_this_run=%d content_sha256=%s window=[%s,%s)",
+		"ClickHouse shadow parity ok postgres=%d clickhouse_distinct=%d copied_this_run=%d content_sha256=%s window=[%s,%s) next_since=%s",
 		expected,
 		clickhouseCount,
 		copied,
 		clickhouseFingerprint,
 		cfg.since.Format(time.RFC3339),
 		cfg.until.Format(time.RFC3339),
+		cfg.until.Format(time.RFC3339),
 	)
 	return nil
 }
 
 func loadConfig() (config, error) {
+	return loadConfigAt(time.Now().UTC())
+}
+
+func loadConfigAt(now time.Time) (config, error) {
 	postgresURL := firstNonEmpty(strings.TrimSpace(os.Getenv("DATABASE_READ_URL")), strings.TrimSpace(os.Getenv("DATABASE_URL")))
 	if postgresURL == "" {
 		return config{}, fmt.Errorf("DATABASE_READ_URL or DATABASE_URL is required")
 	}
 
-	until := time.Now().UTC()
+	now = now.UTC()
+	until := now
+	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_CLICKHOUSE_SHADOW_UNTIL")); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			return config{}, fmt.Errorf("parse KOSCHEI_CLICKHOUSE_SHADOW_UNTIL as RFC3339: %w", err)
+		}
+		until = parsed.UTC()
+		if until.After(now) {
+			return config{}, fmt.Errorf("KOSCHEI_CLICKHOUSE_SHADOW_UNTIL must not be in the future")
+		}
+	}
+
 	since := until.Add(-24 * time.Hour)
 	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_CLICKHOUSE_SHADOW_SINCE")); raw != "" {
 		parsed, err := time.Parse(time.RFC3339, raw)
@@ -245,7 +262,7 @@ func loadConfig() (config, error) {
 		since = parsed.UTC()
 	}
 	if !since.Before(until) {
-		return config{}, fmt.Errorf("KOSCHEI_CLICKHOUSE_SHADOW_SINCE must be before now")
+		return config{}, fmt.Errorf("KOSCHEI_CLICKHOUSE_SHADOW_SINCE must be before KOSCHEI_CLICKHOUSE_SHADOW_UNTIL")
 	}
 
 	batchSize := boundedEnvInt("KOSCHEI_CLICKHOUSE_SHADOW_BATCH_SIZE", defaultBatchSize, 1000, 100000)
