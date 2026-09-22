@@ -40,7 +40,7 @@ type arvisTransactionEvidence struct {
 
 func AnalyzeArvisRadarsWithTransactions(req SecurityRadarRequest) ArvisAnalysis {
 	analysis := AnalyzeArvisRadars(req)
-	txEvidence := collectArvisTransactionEvidence(req, analysis.Arms)
+	txEvidence := collectArvisTransactionEvidenceContext(context.Background(), req, analysis.Arms)
 	if !txEvidence.Available {
 		analysis.Bundle.Metadata["transaction_evidence_available"] = false
 		analysis.Bundle.Metadata["transaction_evidence_errors"] = txEvidence.Errors
@@ -87,6 +87,13 @@ func AnalyzeArvisRadarsWithTransactions(req SecurityRadarRequest) ArvisAnalysis 
 }
 
 func collectArvisTransactionEvidence(req SecurityRadarRequest, arms []SecurityRadarVerdict) arvisTransactionEvidence {
+	return collectArvisTransactionEvidenceContext(context.Background(), req, arms)
+}
+
+func collectArvisTransactionEvidenceContext(parent context.Context, req SecurityRadarRequest, arms []SecurityRadarVerdict) arvisTransactionEvidence {
+	if parent == nil {
+		parent = context.Background()
+	}
 	out := arvisTransactionEvidence{TokenBalanceChanges: map[string]float64{}, LamportDeltas: map[string]int64{}}
 	rpcURL := strings.TrimSpace(os.Getenv("SOLANA_RPC_URL"))
 	if rpcURL == "" {
@@ -110,7 +117,7 @@ func collectArvisTransactionEvidence(req SecurityRadarRequest, arms []SecurityRa
 		}
 	}
 	if signature == "" && isLikelyRadarSolanaAddress(strings.TrimSpace(req.Target)) {
-		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+		ctx, cancel := context.WithTimeout(parent, 4*time.Second)
 		signatures, err := SolanaGetSignaturesForAddress(ctx, rpcURL, req.Target, 1)
 		cancel()
 		if err == nil && len(signatures) > 0 {
@@ -124,7 +131,7 @@ func collectArvisTransactionEvidence(req SecurityRadarRequest, arms []SecurityRa
 		return out
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 7*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 7*time.Second)
 	tx, err := SolanaGetTransactionJSONParsed(ctx, rpcURL, signature)
 	cancel()
 	if err != nil {
