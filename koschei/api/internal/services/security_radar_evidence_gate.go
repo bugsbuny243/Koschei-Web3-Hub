@@ -1,5 +1,7 @@
 package services
 
+import "context"
+
 const SecurityRadarInsufficientEvidenceMessage = "Real data unavailable. Analysis could not be completed."
 
 func SecurityRadarHasLiveEvidence(bundle SecurityRadarBundle) bool {
@@ -22,7 +24,14 @@ func SecurityRadarHasLiveEvidence(bundle SecurityRadarBundle) bool {
 }
 
 func EvidenceBackedSecurityRadarBundle(bundle SecurityRadarBundle) SecurityRadarBundle {
-	bundle = EnrichArvisBundleWithTransactions(bundle)
+	return EvidenceBackedSecurityRadarBundleContext(context.Background(), bundle)
+}
+
+func EvidenceBackedSecurityRadarBundleContext(ctx context.Context, bundle SecurityRadarBundle) SecurityRadarBundle {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	bundle = EnrichArvisBundleWithTransactionsContext(ctx, bundle)
 	bundle = EnrichArvisBundleWithClaimSurface(bundle)
 	bundle = applyResolvedArvisProvider(bundle)
 	if SecurityRadarHasLiveEvidence(bundle) {
