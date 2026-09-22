@@ -111,8 +111,10 @@ CLICKHOUSE_PASSWORD=...
 Optional safety controls:
 
 ```text
-# RFC3339; defaults to the last 24 hours.
+# RFC3339. With no explicit window, the copier defaults to the last 24 hours.
+# For deterministic/resumable backfill, set both values. The window is [since, until).
 KOSCHEI_CLICKHOUSE_SHADOW_SINCE=2026-09-07T00:00:00Z
+KOSCHEI_CLICKHOUSE_SHADOW_UNTIL=2026-09-07T01:00:00Z
 
 # ClickHouse best-practice insert batch. Default 10,000; range 1,000..100,000.
 KOSCHEI_CLICKHOUSE_SHADOW_BATCH_SIZE=10000
@@ -149,6 +151,13 @@ The content parity check is stronger than row-count parity: a changed target,
 signature, slot, program ID, timestamp, decoded evidence payload, or raw evidence
 payload changes the resulting fingerprint even when the number of rows stays the
 same.
+
+For backfill, successful output includes `next_since=<until>`. Reuse that exact
+RFC3339 value as the next chunk's `KOSCHEI_CLICKHOUSE_SHADOW_SINCE`, choose a
+new explicit `KOSCHEI_CLICKHOUSE_SHADOW_UNTIL`, and rerun. Because every chunk
+is half-open `[since, until)`, retries are deterministic and adjacent chunks do
+not overlap or leave a timestamp boundary gap. No PostgreSQL source row is
+deleted by this command.
 
 Passwords and connection URLs are never printed by the command.
 
