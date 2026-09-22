@@ -56,7 +56,7 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 		}
 	}
 	analysis := services.AnalyzeArvisRadarsContext(analysisCtx, req)
-	bundle := services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
+	bundle := services.EvidenceBackedSecurityRadarBundleContext(analysisCtx, analysis.Bundle)
 	roles := services.ArvisHolderRolesFromBundle(bundle)
 	distribution := radarDetailHolderDistributionFromRoles(roles)
 	if !roles.Available {
@@ -71,7 +71,7 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 	market := radarDetailMarketSnapshot(parent, target)
 	creator := strings.TrimSpace(creatorIntelCleanString(source["creator_wallet"]))
 	analysis = services.ApplyCreatorAndLiquidityEvidenceToAnalysis(analysis, req, creator, market, launch)
-	bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
+	bundle = services.EvidenceBackedSecurityRadarBundleContext(analysisCtx, analysis.Bundle)
 	arms := services.ArvisArmsFromBundle(bundle)
 	if len(arms) == 0 {
 		arms = analysis.Arms
@@ -109,7 +109,7 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 				} else {
 					analysis = services.ApplyRepeatDominantHolderEvidenceToAnalysis(analysis, req, found)
 				}
-				bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
+				bundle = services.EvidenceBackedSecurityRadarBundleContext(analysisCtx, analysis.Bundle)
 				arms = services.ArvisArmsFromBundle(bundle)
 				if len(arms) == 0 {
 					arms = analysis.Arms
@@ -134,7 +134,7 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 	if phase2MarketContextAllowed(mode) && h != nil {
 		lpControl = h.collectCompleteLPControlEvidence(parent, network, target, creator, market, source)
 		analysis = services.ApplyLPControlEvidenceToAnalysis(analysis, req, lpControl)
-		bundle = services.EvidenceBackedSecurityRadarBundle(analysis.Bundle)
+		bundle = services.EvidenceBackedSecurityRadarBundleContext(analysisCtx, analysis.Bundle)
 		arms = services.ArvisArmsFromBundle(bundle)
 		if len(arms) == 0 {
 			arms = analysis.Arms
