@@ -24,8 +24,10 @@ import (
 )
 
 const (
-	SecurityRadarStreamProvider = "solana_wss"
-	SecurityRadarStreamModeLogs = "logs_subscribe"
+	SecurityRadarStreamProvider   = "solana_wss"
+	SecurityRadarStreamModeLogs   = "logs_subscribe"
+	minimalWSKeepaliveInterval    = 15 * time.Second
+	minimalWSWriteTimeout         = 10 * time.Second
 )
 
 type SecurityRadarStreamEventRecord struct {
@@ -241,7 +243,7 @@ func (w *SecurityRadarStreamWorker) runOnce(ctx context.Context) error {
 	}
 	connCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	go conn.startKeepalive(connCtx, 15*time.Second)
+	go conn.startKeepalive(connCtx, minimalWSKeepaliveInterval)
 	for {
 		if err := connCtx.Err(); err != nil {
 			return err
@@ -652,7 +654,7 @@ func (c *minimalWSConn) startKeepalive(ctx context.Context, interval time.Durati
 		return
 	}
 	if interval <= 0 {
-		interval = 15 * time.Second
+		interval = minimalWSKeepaliveInterval
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -676,7 +678,7 @@ func (c *minimalWSConn) writeFrame(opcode byte, payload []byte) error {
 	}
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
-	_ = c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	_ = c.conn.SetWriteDeadline(time.Now().Add(minimalWSWriteTimeout))
 	defer c.conn.SetWriteDeadline(time.Time{})
 	var b bytes.Buffer
 	b.WriteByte(0x80 | opcode)
