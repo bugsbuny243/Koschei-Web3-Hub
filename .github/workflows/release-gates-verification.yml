@@ -90,7 +90,295 @@ jobs:
       - name: Verify archive, resume and checksum fail-closed on PostgreSQL 17
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_release_gate?sslmode=disable
-        run: go test -v ./internal/services -run '^TestRetentionArchiveDeletePostgres17$' -count=1
+        run: go test -v ./internal/services -run '^TestRetentionArchiveDeletePostgres17
+        run: go test ./...
+      - name: Race-test July consolidation packages
+        run: go test -race ./internal/handlers ./internal/services ./internal/defense
+      - name: Vet all packages
+        run: go vet ./...
+      - name: Build all packages
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+
+  production-acceptance:
+    name: Deployed public product acceptance
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: full-verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE_URL: https://tradepigloball.co
+    steps:
+      - name: Checkout acceptance verifier
+        uses: actions/checkout@v7
+
+      - name: Wait for deployed product and verify customer-visible surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+
+          wait_contract() {
+            local name="$1" path="$2" marker="$3" attempts="${4:-36}" code=""
+            for attempt in $(seq 1 "${attempts}"); do
+              code="$(curl --location --silent --show-error --max-time 20 \
+                --output "diagnostics/${name}.body" \
+                --write-out '%{http_code}' \
+                "${BASE_URL}${path}" || true)"
+              if [ "${code}" = "200" ] && grep -Fq "${marker}" "diagnostics/${name}.body"; then
+                echo "PASS ${path} attempt=${attempt}"
+                return 0
+              fi
+              case "${code}" in
+                000|502|503|504|200)
+                  echo "WAIT ${path} attempt=${attempt}/${attempts} code=${code}" >&2
+                  ;;
+                *)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: ${path} returned HTTP ${code}." >&2
+                  exit 31
+                  ;;
+              esac
+              sleep 10
+            done
+            echo "RELEASE_ACCEPTANCE_TIMEOUT: ${path} never exposed ${marker}." >&2
+            exit 32
+          }
+
+          probe_customer_protected_route() {
+            local name="$1" method="$2" path="$3" attempts="${4:-36}" code=""
+            for attempt in $(seq 1 "${attempts}"); do
+              code="$(curl --silent --show-error --max-time 20 \
+                --output "diagnostics/${name}.body" \
+                --write-out '%{http_code}' \
+                --request "${method}" \
+                --header 'accept: application/json' \
+                "${BASE_URL}${path}" || true)"
+              case "${code}" in
+                400|401|403|422)
+                  echo "PASS customer protected route ${method} ${path} attempt=${attempt} code=${code}"
+                  return 0
+                  ;;
+                000|502|503|504)
+                  echo "WAIT customer protected route ${method} ${path} attempt=${attempt}/${attempts} code=${code}" >&2
+                  ;;
+                404)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: customer protected route ${method} ${path} is missing (HTTP 404)." >&2
+                  exit 33
+                  ;;
+                405)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: customer protected route ${path} rejected canonical method ${method} (HTTP 405)." >&2
+                  exit 34
+                  ;;
+                200|201|202|204)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: customer protected route ${method} ${path} accepted an unauthenticated invalid probe (HTTP ${code})." >&2
+                  exit 35
+                  ;;
+                *)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: customer protected route ${method} ${path} returned unexpected HTTP ${code}." >&2
+                  exit 36
+                  ;;
+              esac
+              sleep 10
+            done
+            echo "RELEASE_ACCEPTANCE_TIMEOUT: customer protected route ${method} ${path} never reached auth or validation." >&2
+            exit 37
+          }
+
+          probe_owner_hidden_boundary() {
+            local name="$1" path="$2" body="$3" attempts="${4:-36}" code=""
+            for attempt in $(seq 1 "${attempts}"); do
+              code="$(curl --silent --show-error --max-time 20 \
+                --output "diagnostics/${name}.body" \
+                --write-out '%{http_code}' \
+                --request POST \
+                --header 'accept: application/json' \
+                --header 'content-type: application/json' \
+                --data "${body}" \
+                "${BASE_URL}${path}" || true)"
+              case "${code}" in
+                404)
+                  echo "PASS owner hidden boundary POST ${path} attempt=${attempt} code=404 (intentional unauthenticated concealment; canonical route registration is verified in full-verification)"
+                  return 0
+                  ;;
+                000|502|503|504)
+                  echo "WAIT owner hidden boundary POST ${path} attempt=${attempt}/${attempts} code=${code}" >&2
+                  ;;
+                200|201|202|204)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: owner route POST ${path} accepted an unauthenticated probe (HTTP ${code})." >&2
+                  exit 38
+                  ;;
+                *)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: owner hidden boundary POST ${path} returned HTTP ${code}; expected deliberate 404 concealment." >&2
+                  exit 39
+                  ;;
+              esac
+              sleep 10
+            done
+            echo "RELEASE_ACCEPTANCE_TIMEOUT: owner hidden boundary POST ${path} did not stabilize." >&2
+            exit 40
+          }
+
+          wait_contract health /health '"status":"ok"'
+          wait_contract login /login 'KOSCHEI ARVIS'
+          wait_contract scan /scan 'public-solana-scan.js'
+          wait_contract cases '/api/public/cases?limit=100' '"ok":true'
+          wait_contract soc /api/public/soc/feed '"ok":true'
+
+          probe_customer_protected_route professional-radar-detail GET \
+            '/api/v1/radar/detail?target=release-route-probe&network=solana-mainnet&mode=deep'
+          probe_owner_hidden_boundary owner-radar-unified '/api/owner/radar/unified' \
+            '{"target":"release-route-probe","network":"solana-mainnet","mode":"deep"}'
+
+          node koschei/api/scripts/verify-public-registry-smoke-response.js \
+            diagnostics/cases.body > diagnostics/public-registry-smoke.json
+
+          echo 'RELEASE_ACCEPTANCE_PASS: deployed public product, customer Deep Scan auth boundary, owner concealment boundary and registry are operational.'
+ -count=1
+      - name: Verify live sovereign enrichment prioritizes newest journal work
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_release_gate?sslmode=disable
+        run: go test -v ./internal/services -run '^TestSovereignEnrichmentClaimPrioritizesNewestJournalEventPostgres17
+        run: go test ./...
+      - name: Race-test July consolidation packages
+        run: go test -race ./internal/handlers ./internal/services ./internal/defense
+      - name: Vet all packages
+        run: go vet ./...
+      - name: Build all packages
+        run: CGO_ENABLED=0 GOOS=linux go build ./...
+
+  production-acceptance:
+    name: Deployed public product acceptance
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: full-verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE_URL: https://tradepigloball.co
+    steps:
+      - name: Checkout acceptance verifier
+        uses: actions/checkout@v7
+
+      - name: Wait for deployed product and verify customer-visible surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p diagnostics
+
+          wait_contract() {
+            local name="$1" path="$2" marker="$3" attempts="${4:-36}" code=""
+            for attempt in $(seq 1 "${attempts}"); do
+              code="$(curl --location --silent --show-error --max-time 20 \
+                --output "diagnostics/${name}.body" \
+                --write-out '%{http_code}' \
+                "${BASE_URL}${path}" || true)"
+              if [ "${code}" = "200" ] && grep -Fq "${marker}" "diagnostics/${name}.body"; then
+                echo "PASS ${path} attempt=${attempt}"
+                return 0
+              fi
+              case "${code}" in
+                000|502|503|504|200)
+                  echo "WAIT ${path} attempt=${attempt}/${attempts} code=${code}" >&2
+                  ;;
+                *)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: ${path} returned HTTP ${code}." >&2
+                  exit 31
+                  ;;
+              esac
+              sleep 10
+            done
+            echo "RELEASE_ACCEPTANCE_TIMEOUT: ${path} never exposed ${marker}." >&2
+            exit 32
+          }
+
+          probe_customer_protected_route() {
+            local name="$1" method="$2" path="$3" attempts="${4:-36}" code=""
+            for attempt in $(seq 1 "${attempts}"); do
+              code="$(curl --silent --show-error --max-time 20 \
+                --output "diagnostics/${name}.body" \
+                --write-out '%{http_code}' \
+                --request "${method}" \
+                --header 'accept: application/json' \
+                "${BASE_URL}${path}" || true)"
+              case "${code}" in
+                400|401|403|422)
+                  echo "PASS customer protected route ${method} ${path} attempt=${attempt} code=${code}"
+                  return 0
+                  ;;
+                000|502|503|504)
+                  echo "WAIT customer protected route ${method} ${path} attempt=${attempt}/${attempts} code=${code}" >&2
+                  ;;
+                404)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: customer protected route ${method} ${path} is missing (HTTP 404)." >&2
+                  exit 33
+                  ;;
+                405)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: customer protected route ${path} rejected canonical method ${method} (HTTP 405)." >&2
+                  exit 34
+                  ;;
+                200|201|202|204)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: customer protected route ${method} ${path} accepted an unauthenticated invalid probe (HTTP ${code})." >&2
+                  exit 35
+                  ;;
+                *)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: customer protected route ${method} ${path} returned unexpected HTTP ${code}." >&2
+                  exit 36
+                  ;;
+              esac
+              sleep 10
+            done
+            echo "RELEASE_ACCEPTANCE_TIMEOUT: customer protected route ${method} ${path} never reached auth or validation." >&2
+            exit 37
+          }
+
+          probe_owner_hidden_boundary() {
+            local name="$1" path="$2" body="$3" attempts="${4:-36}" code=""
+            for attempt in $(seq 1 "${attempts}"); do
+              code="$(curl --silent --show-error --max-time 20 \
+                --output "diagnostics/${name}.body" \
+                --write-out '%{http_code}' \
+                --request POST \
+                --header 'accept: application/json' \
+                --header 'content-type: application/json' \
+                --data "${body}" \
+                "${BASE_URL}${path}" || true)"
+              case "${code}" in
+                404)
+                  echo "PASS owner hidden boundary POST ${path} attempt=${attempt} code=404 (intentional unauthenticated concealment; canonical route registration is verified in full-verification)"
+                  return 0
+                  ;;
+                000|502|503|504)
+                  echo "WAIT owner hidden boundary POST ${path} attempt=${attempt}/${attempts} code=${code}" >&2
+                  ;;
+                200|201|202|204)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: owner route POST ${path} accepted an unauthenticated probe (HTTP ${code})." >&2
+                  exit 38
+                  ;;
+                *)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: owner hidden boundary POST ${path} returned HTTP ${code}; expected deliberate 404 concealment." >&2
+                  exit 39
+                  ;;
+              esac
+              sleep 10
+            done
+            echo "RELEASE_ACCEPTANCE_TIMEOUT: owner hidden boundary POST ${path} did not stabilize." >&2
+            exit 40
+          }
+
+          wait_contract health /health '"status":"ok"'
+          wait_contract login /login 'KOSCHEI ARVIS'
+          wait_contract scan /scan 'public-solana-scan.js'
+          wait_contract cases '/api/public/cases?limit=100' '"ok":true'
+          wait_contract soc /api/public/soc/feed '"ok":true'
+
+          probe_customer_protected_route professional-radar-detail GET \
+            '/api/v1/radar/detail?target=release-route-probe&network=solana-mainnet&mode=deep'
+          probe_owner_hidden_boundary owner-radar-unified '/api/owner/radar/unified' \
+            '{"target":"release-route-probe","network":"solana-mainnet","mode":"deep"}'
+
+          node koschei/api/scripts/verify-public-registry-smoke-response.js \
+            diagnostics/cases.body > diagnostics/public-registry-smoke.json
+
+          echo 'RELEASE_ACCEPTANCE_PASS: deployed public product, customer Deep Scan auth boundary, owner concealment boundary and registry are operational.'
+ -count=1
       - name: Test all packages
         run: go test ./...
       - name: Race-test July consolidation packages
