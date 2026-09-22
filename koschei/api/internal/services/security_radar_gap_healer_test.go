@@ -1,7 +1,11 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 )
 
@@ -81,5 +85,37 @@ func TestReplaySignatureFailedDistinguishesNullFromFailure(t *testing.T) {
 	}
 	if !replaySignatureFailed(json.RawMessage(`{"InstructionError":[1,"Custom"]}`)) {
 		t.Fatal("non-null transaction error must be treated as failed")
+	}
+}
+
+func TestGapHealerFetchSignaturePageHonorsBackgroundRPCBudget(t *testing.T) {
+	t.Setenv("SOLANA_RPC_BUDGET_ENABLED", "true")
+	t.Setenv("SOLANA_RPC_BUDGET_MAX_REQUESTS", "1")
+	t.Setenv("SOLANA_RPC_BUDGET_WINDOW_SECONDS", "3600")
+	resetSolanaRPCBudgetForTest()
+	t.Cleanup(resetSolanaRPCBudgetForTest)
+
+	if err := reserveSolanaRPCBudget(context.Background(), "exhaust-budget"); err != nil {
+		t.Fatal(err)
+	}
+
+	var hits atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","result":[],"id":1}`))
+	}))
+	defer server.Close()
+
+	healer := &securityRadarGapHealer{RPCURL: server.URL, HTTPClient: server.Client()}
+	_, err := healer.fetchSignaturePage(context.Background(), "11111111111111111111111111111111", "", 1)
+	if err == nil {
+		t.Fatal("expected background RPC budget exhaustion")
+	}
+	if _, ok := solanaRPCBudgetResetAt(err); !ok {
+		t.Fatalf("expected typed RPC budget error, got %v", err)
+	}
+	if got := hits.Load(); got != 0 {
+		t.Fatalf("gap healer must not hit upstream after budget exhaustion, hits=%d", got)
 	}
 }
