@@ -39,14 +39,20 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 		log.Printf("security radar automatic workers disabled by KOSCHEI_AUTOMATIC_SCANNING_ENABLED")
 		return stopDatabaseWorkers
 	}
+	// The slot gap healer has its own shared background RPC budget. Start it
+	// before the broad-worker saver gate so journal ingest can retain
+	// deterministic replay coverage without re-enabling quota-heavy scanners.
+	stopGapHealer := StartSecurityRadarGapHealerIfEnabled(ctx, db)
 	if SolanaRPCLimitSaverEnabled() && !ForceBackgroundRadarEnabled() {
-		log.Printf("broad security radar RPC workers paused: SOLANA_RPC_LIMIT_SAVER_ENABLED=true; manual scans remain available")
-		return stopDatabaseWorkers
+		log.Printf("broad security radar RPC workers paused: SOLANA_RPC_LIMIT_SAVER_ENABLED=true; budgeted slot gap healer remains independently gated; manual scans remain available")
+		return func() {
+			stopGapHealer()
+			stopDatabaseWorkers()
+		}
 	}
 	stopHeartbeat := StartArvisRadarHeartbeat(ctx, db)
 	stopStreamVerdicts := StartArvisStreamVerdictWorker(ctx, db)
 	stopStreamRecovery := StartArvisStreamRecovery(ctx, db)
-	stopGapHealer := StartSecurityRadarGapHealerIfEnabled(ctx, db)
 	stopAll := func() {
 		stopGapHealer()
 		stopStreamRecovery()
