@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -49,5 +50,58 @@ func TestClassifyRadarStreamTextByProgramID(t *testing.T) {
 	module, eventType, programID = classifyRadarStreamText("Program " + strings.ToLower(defaultRaydiumProgramID) + " invoke [1]")
 	if module != ModuleRaydiumPoolGuardian || eventType != "raydium_pool_or_liquidity" || programID != defaultRaydiumProgramID {
 		t.Fatalf("raydium program was not classified correctly: %s %s %s", module, eventType, programID)
+	}
+}
+
+
+func TestDecodeLogsPayloadMarksFailedTransactionAsTerminalJournalEvidence(t *testing.T) {
+	worker := &SecurityRadarStreamWorker{Network: "solana-mainnet"}
+	makePayload := func(errValue any) []byte {
+		t.Helper()
+		raw := map[string]any{
+			"method": "logsNotification",
+			"params": map[string]any{
+				"result": map[string]any{
+					"context": map[string]any{"slot": 123.0},
+					"value": map[string]any{
+						"signature": "ci-failed-wss-signature",
+						"logs": []any{"Program " + defaultPumpProgramID + " invoke [1]"},
+						"err": errValue,
+					},
+				},
+			},
+		}
+		payload, err := json.Marshal(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return payload
+	}
+
+	failed, ok := worker.decodeLogsPayload(makePayload(map[string]any{
+		"InstructionError": []any{0.0, "Custom"},
+	}))
+	if !ok {
+		t.Fatal("failed WSS transaction should still be retained as a journal event")
+	}
+	if got := anyString(failed.Decoded["sovereign_enrichment_status"]); got != "skipped_failed_transaction" {
+		t.Fatalf("failed status=%q want skipped_failed_transaction", got)
+	}
+	if got := anyString(failed.Decoded["sovereign_enrichment_skip_reason"]); got != "wss_transaction_failed" {
+		t.Fatalf("skip reason=%q want wss_transaction_failed", got)
+	}
+	if !radarStreamTransactionFailed(failed.Decoded) {
+		t.Fatal("failed WSS transaction was not recognized as failed")
+	}
+
+	successful, ok := worker.decodeLogsPayload(makePayload(nil))
+	if !ok {
+		t.Fatal("successful WSS transaction was not decoded")
+	}
+	if _, exists := successful.Decoded["sovereign_enrichment_status"]; exists {
+		t.Fatalf("successful transaction unexpectedly received terminal status: %v", successful.Decoded)
+	}
+	if radarStreamTransactionFailed(successful.Decoded) {
+		t.Fatal("successful WSS transaction was misclassified as failed")
 	}
 }
