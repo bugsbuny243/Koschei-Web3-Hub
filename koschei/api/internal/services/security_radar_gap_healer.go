@@ -110,6 +110,10 @@ func (h *securityRadarGapHealer) RunOnce(ctx context.Context) {
 				log.Printf("security radar slot gap healer paused: replay cursor migration is not applied")
 				return
 			}
+			if resetAt, budgetPause := solanaRPCBudgetResetAt(err); budgetPause {
+				log.Printf("security radar slot gap healer paused: background RPC budget exhausted until=%s", resetAt.UTC().Format(time.RFC3339))
+				return
+			}
 			log.Printf("security radar slot gap healer source=%s failed: %s", source.Label, safeProviderError(err))
 		}
 	}
@@ -220,6 +224,9 @@ func (h *securityRadarGapHealer) loadCursor(ctx context.Context, source arvisHea
 func (h *securityRadarGapHealer) fetchSignaturePage(ctx context.Context, programID, before string, limit int) ([]securityRadarReplaySignature, error) {
 	if h == nil || strings.TrimSpace(h.RPCURL) == "" {
 		return nil, errors.New("gap healer RPC URL unavailable")
+	}
+	if err := reserveSolanaRPCBudget(ctx, "gap_healer:getSignaturesForAddress"); err != nil {
+		return nil, err
 	}
 	if limit <= 0 || limit > 1000 {
 		limit = 500

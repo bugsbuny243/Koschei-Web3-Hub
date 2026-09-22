@@ -544,6 +544,21 @@ func isLikelyRadarSolanaAddress(value string) bool {
 	return true
 }
 
+type websocketCloseError struct {
+	Code   uint16
+	Reason string
+}
+
+func (e *websocketCloseError) Error() string {
+	if e == nil {
+		return "websocket closed"
+	}
+	if strings.TrimSpace(e.Reason) == "" {
+		return fmt.Sprintf("websocket closed code=%d", e.Code)
+	}
+	return fmt.Sprintf("websocket closed code=%d reason=%q", e.Code, strings.TrimSpace(e.Reason))
+}
+
 type minimalWSConn struct {
 	conn    net.Conn
 	r       *bufio.Reader
@@ -747,7 +762,13 @@ func (c *minimalWSConn) ReadText(ctx context.Context) ([]byte, error) {
 		case 0x1:
 			return payload, nil
 		case 0x8:
-			return nil, io.EOF
+			if len(payload) < 2 {
+				return nil, &websocketCloseError{Code: 1005}
+			}
+			return nil, &websocketCloseError{
+				Code:   binary.BigEndian.Uint16(payload[:2]),
+				Reason: string(payload[2:]),
+			}
 		case 0x9:
 			_ = c.pong(payload)
 		case 0xA:
