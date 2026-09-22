@@ -1,11 +1,19 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
 
 func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadarBundle {
+	return EnrichArvisBundleWithTransactionsContext(context.Background(), bundle)
+}
+
+func EnrichArvisBundleWithTransactionsContext(ctx context.Context, bundle SecurityRadarBundle) SecurityRadarBundle {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if bundle.Metadata == nil {
 		bundle.Metadata = map[string]any{}
 	}
@@ -18,7 +26,7 @@ func EnrichArvisBundleWithTransactions(bundle SecurityRadarBundle) SecurityRadar
 		return bundle
 	}
 	req := SecurityRadarRequest{Target: bundle.Target, Network: bundle.Network, Mode: bundle.WatchMode}
-	txEvidence := collectArvisTransactionEvidence(req, arms)
+	txEvidence := collectArvisTransactionEvidenceContext(ctx, req, arms)
 	if !txEvidence.Available {
 		bundle.Metadata["transaction_evidence_available"] = false
 		bundle.Metadata["transaction_evidence_errors"] = txEvidence.Errors

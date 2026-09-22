@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"koschei/api/internal/services"
 )
 
 type ownerInvestigationAcceptanceRequest struct {
@@ -32,7 +34,11 @@ func (h *Handler) OwnerInvestigationAcceptance(w http.ResponseWriter, r *http.Re
 	if network == "" {
 		network = "solana-mainnet"
 	}
-	classification := classifyRadarTarget(r.Context(), target)
+	// Acceptance is an explicit owner-triggered foreground scan. Preserve the
+	// interactive RPC-budget marker through target classification and the full
+	// investigation so live background enrichment cannot starve this request.
+	scanRoot := services.WithInteractiveSolanaRPCBudget(r.Context())
+	classification := classifyRadarTarget(scanRoot, target)
 	if classification.Type != radarTargetTokenMint {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
 			"ok": false, "error": "acceptance_requires_token_mint", "target": target,
@@ -41,7 +47,7 @@ func (h *Handler) OwnerInvestigationAcceptance(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
+	ctx, cancel := context.WithTimeout(scanRoot, 180*time.Second)
 	defer cancel()
 	assembly := h.buildUnifiedInvestigationReport(ctx, target, network, "owner_unified_manual_scan")
 	acceptance := evaluateInvestigationAcceptance(assembly.Report, target, input.Profile)
