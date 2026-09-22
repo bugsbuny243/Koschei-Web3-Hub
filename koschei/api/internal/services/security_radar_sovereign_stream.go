@@ -294,7 +294,11 @@ func (w *securityRadarJournalStreamWorker) claimEnrichmentBatch(ctx context.Cont
                     NOT (decoded ? 'sovereign_enrichment_status')
                     OR updated_at < now() - interval '30 seconds'
                   )
-            ORDER BY created_at ASC
+            -- The live worker is deliberately freshness-first. On a multi-million-row
+            -- journal, oldest-first makes every cycle walk historical backlog before it
+            -- can protect the current Solana head. Deterministic replay/backfill owns old
+            -- history; this loop keeps the live radar current.
+            ORDER BY created_at DESC
             FOR UPDATE SKIP LOCKED
             LIMIT $3
         )

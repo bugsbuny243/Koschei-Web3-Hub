@@ -43,10 +43,11 @@ Journal mode currently guarantees the following inside a live process:
 2. Intake applies backpressure until capacity returns or the process context is cancelled.
 3. Once a persistence worker dequeues an event, a transient database write error is retried with bounded exponential backoff until the insert succeeds or the process is shutting down.
 4. Heavy transaction enrichment is not performed by the WSS reader.
-5. Enrichment work is claimed from the persisted journal with PostgreSQL `FOR UPDATE SKIP LOCKED` semantics.
-6. Enrichment attempts are bounded and recorded in the event metadata.
-7. The existing database uniqueness contract remains the duplicate-event boundary.
-8. The existing ARVIS stream verdict worker remains responsible for evidence qualification and verdict persistence.
+5. Live enrichment work is claimed newest-first from the persisted journal with PostgreSQL `FOR UPDATE SKIP LOCKED` semantics, so historical backlog cannot block current Solana observations.
+6. Historical recovery is a separate deterministic replay/backfill responsibility; the live worker does not promise FIFO backlog draining.
+7. Enrichment attempts are bounded and recorded in the event metadata.
+8. The existing database uniqueness contract remains the duplicate-event boundary.
+9. The existing ARVIS stream verdict worker remains responsible for evidence qualification and verdict persistence.
 
 ## What this does NOT guarantee yet
 
