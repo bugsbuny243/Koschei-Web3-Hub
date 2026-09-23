@@ -98,16 +98,6 @@ func globalRadarNetworkEventWithClient(w http.ResponseWriter, r *http.Request, c
 		reject(http.StatusUnprocessableEntity, "network_not_registered", "not_checked")
 		return
 	}
-	if network.Family != "move" {
-		reject(http.StatusUnprocessableEntity, "live_network_event_not_supported_for_network", "not_available")
-		return
-	}
-	endpoint := configuredMoveIdentityEndpoint(network.ID)
-	if endpoint == "" {
-		reject(http.StatusServiceUnavailable, "move_identity_configuration_required", "configuration_required")
-		return
-	}
-
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	observedAt := time.Now().UTC()
@@ -121,6 +111,45 @@ func globalRadarNetworkEventWithClient(w http.ResponseWriter, r *http.Request, c
 			Probe:         probe,
 			RadarEvent:    event,
 		})
+	}
+
+	if network.Family == "evm" {
+		endpoint := configuredEVMRPCEndpoint(network.ID)
+		if endpoint == "" {
+			reject(http.StatusServiceUnavailable, "evm_rpc_configuration_required", "configuration_required")
+			return
+		}
+		result, probeErr := networktarget.ProbeEVMNodeTelemetry(ctx, client, endpoint, network.ID, observedAt)
+		if probeErr != nil {
+			reject(http.StatusBadGateway, probeErr.Error(), "unavailable")
+			return
+		}
+		sourceDigest, digestErr := normalizedProbeDigest(result)
+		if digestErr != nil {
+			reject(http.StatusInternalServerError, "radar_probe_digest_unavailable", "unavailable")
+			return
+		}
+		event, eventErr := radarevent.BuildEVMNodeTelemetryEvent(
+			"global-radar/evm-node-telemetry-v1:"+network.ID,
+			result,
+			sourceDigest,
+		)
+		if eventErr != nil {
+			reject(http.StatusBadGateway, "radar_event_projection_unavailable", "unavailable")
+			return
+		}
+		writeEvent(result, event)
+		return
+	}
+
+	if network.Family != "move" {
+		reject(http.StatusUnprocessableEntity, "live_network_event_not_supported_for_network", "not_available")
+		return
+	}
+	endpoint := configuredMoveIdentityEndpoint(network.ID)
+	if endpoint == "" {
+		reject(http.StatusServiceUnavailable, "move_identity_configuration_required", "configuration_required")
+		return
 	}
 
 	switch network.ID {
