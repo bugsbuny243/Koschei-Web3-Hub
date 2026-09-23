@@ -8,15 +8,15 @@ import (
 const GlobalRadarRelationSchemaVersion = "koschei.global-radar-relation.v1"
 
 type GlobalRadarRelationEdge struct {
-	SchemaVersion       string              `json:"schema_version"`
-	EdgeID              string              `json:"edge_id"`
-	Source              IntelligenceSubject `json:"source"`
-	Target              IntelligenceSubject `json:"target"`
-	Relation            string              `json:"relation"`
-	Status              string              `json:"status"`
-	CrossNetwork        bool                `json:"cross_network"`
-	EvidenceRefs        []string            `json:"evidence_refs,omitempty"`
-	VerificationPolicy  string              `json:"verification_policy"`
+	SchemaVersion      string              `json:"schema_version"`
+	EdgeID             string              `json:"edge_id"`
+	Source             IntelligenceSubject `json:"source"`
+	Target             IntelligenceSubject `json:"target"`
+	Relation           string              `json:"relation"`
+	Status             string              `json:"status"`
+	CrossNetwork       bool                `json:"cross_network"`
+	EvidenceRefs       []string            `json:"evidence_refs,omitempty"`
+	VerificationPolicy string              `json:"verification_policy"`
 }
 
 // BuildGlobalRadarRelationEdge creates a durable graph edge without inferring
