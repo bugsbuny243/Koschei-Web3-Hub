@@ -21,7 +21,7 @@ type globalRadarTruthBoundary struct {
 	InfrastructureGeographyOnly bool   `json:"infrastructure_geography_only"`
 	MissingEvidencePolicy       string `json:"missing_evidence_policy"`
 	CapabilityIsNotLiveEvidence bool   `json:"capability_is_not_live_evidence"`
-	HypothesisPromotionAllowed bool   `json:"hypothesis_promotion_allowed"`
+	HypothesisPromotionAllowed  bool   `json:"hypothesis_promotion_allowed"`
 }
 
 type globalRadarNetworkState struct {
@@ -39,16 +39,16 @@ type globalRadarSummary struct {
 }
 
 type globalRadarSnapshot struct {
-	SchemaVersion string                    `json:"schema_version"`
+	SchemaVersion          string                    `json:"schema_version"`
 	EventSchema            string                    `json:"event_schema"`
 	EntityGraphSchema      string                    `json:"entity_graph_schema"`
 	AttackPathSchema       string                    `json:"attack_path_schema"`
 	SecurityEvidenceSchema string                    `json:"security_evidence_schema"`
-	Scope         string                    `json:"scope"`
-	GeneratedAt   time.Time                 `json:"generated_at"`
-	TruthBoundary globalRadarTruthBoundary  `json:"truth_boundary"`
-	Summary       globalRadarSummary        `json:"summary"`
-	Networks      []globalRadarNetworkState `json:"networks"`
+	Scope                  string                    `json:"scope"`
+	GeneratedAt            time.Time                 `json:"generated_at"`
+	TruthBoundary          globalRadarTruthBoundary  `json:"truth_boundary"`
+	Summary                globalRadarSummary        `json:"summary"`
+	Networks               []globalRadarNetworkState `json:"networks"`
 }
 
 func currentGlobalRadarSnapshot(now time.Time) globalRadarSnapshot {
@@ -104,15 +104,15 @@ func currentGlobalRadarSnapshot(now time.Time) globalRadarSnapshot {
 		EntityGraphSchema:      radargraph.SchemaVersionV1,
 		AttackPathSchema:       radarpath.SchemaVersionV1,
 		SecurityEvidenceSchema: securityevidence.SchemaVersionV1,
-		Scope:         "multi-network-observation-control-plane",
-		GeneratedAt:   now.UTC(),
+		Scope:                  "multi-network-observation-control-plane",
+		GeneratedAt:            now.UTC(),
 		TruthBoundary: globalRadarTruthBoundary{
 			LiveChainMetricsIncluded:    false,
 			WalletGeolocationIncluded:   false,
 			InfrastructureGeographyOnly: true,
 			MissingEvidencePolicy:       "unknown",
 			CapabilityIsNotLiveEvidence: true,
-			HypothesisPromotionAllowed: false,
+			HypothesisPromotionAllowed:  false,
 		},
 		Summary: globalRadarSummary{
 			RegisteredNetworks:    len(catalog),
