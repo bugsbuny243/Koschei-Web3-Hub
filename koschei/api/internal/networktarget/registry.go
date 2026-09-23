@@ -23,6 +23,19 @@ type Network struct {
 	NodeTelemetryStatus string `json:"node_telemetry_status"`
 }
 
+type Resolution struct {
+	SchemaVersion     string  `json:"schema_version"`
+	Network           Network `json:"network"`
+	Address           string  `json:"address"`
+	CanonicalRef      string  `json:"canonical_ref"`
+	SubjectID         string  `json:"subject_id"`
+	Classification    string  `json:"classification"`
+	SyntaxValid       bool    `json:"syntax_valid"`
+	AnalysisPerformed bool    `json:"analysis_performed"`
+	EvidenceStatus    string  `json:"evidence_status"`
+	LiveAvailability  string  `json:"live_availability"`
+}
+
 // Catalog describes collector implementation, not deployment health. A new
 // adapter must provide its own evidence before it can produce an ARVIS verdict.
 // Runtime configuration/availability is reported separately by the deployment
