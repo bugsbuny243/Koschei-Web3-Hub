@@ -11,7 +11,7 @@ func TestBuildSolanaLiquidityRadarEventIsDescriptiveOnly(t *testing.T) {
 		Available: true, Status: "verified_market_snapshot", Provider: "dexscreener",
 		Mint: mint, LiquidityUSD: 100000, Volume24hUSD: 50000, PriceUSD: 1,
 		BestPairAddress: "Pair111", BestPairDEX: "raydium",
-		ObservedAt: time.Date(2026, 9, 23, 17, 0, 0, 0, time.UTC),
+		ObservedAt:     time.Date(2026, 9, 23, 17, 0, 0, 0, time.UTC),
 		ValuationScope: "most_liquid_solana_pair_reference_price",
 	}
 	current := previous
@@ -39,7 +39,7 @@ func TestBuildSolanaLiquidityRadarEventIsDescriptiveOnly(t *testing.T) {
 func TestBuildSolanaLiquidityRadarEventRejectsSingleOrMismatchedContext(t *testing.T) {
 	base := TokenMarketSnapshot{
 		Available: true, Status: "verified_market_snapshot", Provider: "dexscreener",
-		Mint: "So11111111111111111111111111111111111111112",
+		Mint:         "So11111111111111111111111111111111111111112",
 		LiquidityUSD: 100, ObservedAt: time.Date(2026, 9, 23, 17, 0, 0, 0, time.UTC),
 	}
 	current := base
