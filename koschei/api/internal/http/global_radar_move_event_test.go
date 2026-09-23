@@ -159,3 +159,83 @@ func TestMoveDeploymentCatalogReportsConfigurationTruthfully(t *testing.T) {
 		t.Fatalf("aptos state=%#v", byID["aptos-mainnet"])
 	}
 }
+
+
+func TestGlobalRadarEVMNetworkEventProducesNodeHealthEvent(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Method string `json:"method"`
+			ID     int    `json:"id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch request.Method {
+		case "eth_chainId":
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":101,"result":"0x1"}`))
+		case "web3_clientVersion":
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":102,"result":"Geth/v1.2.3"}`))
+		case "net_peerCount":
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":103,"result":"0x2a"}`))
+		case "eth_blockNumber":
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":104,"result":"0x17d7840"}`))
+		case "eth_syncing":
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":105,"result":false}`))
+		default:
+			t.Fatalf("unexpected rpc method %q", request.Method)
+		}
+	}))
+	defer server.Close()
+	t.Setenv("ETHEREUM_RPC_URL", server.URL)
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/fabric/radar/network-event",
+		strings.NewReader(`{"network":"ethereum-mainnet"}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	globalRadarNetworkEventWithClient(response, request, server.Client())
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	var envelope globalRadarProbeEnvelope
+	if err := json.Unmarshal(response.Body.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.RadarEvent.NetworkID != "ethereum-mainnet" ||
+		envelope.RadarEvent.Kind != radarevent.KindNetworkHealth ||
+		envelope.RadarEvent.State != securityevidence.StateObserved {
+		t.Fatalf("unexpected event: %#v", envelope.RadarEvent)
+	}
+	if err := envelope.RadarEvent.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	facts := map[string]radarevent.Fact{}
+	for _, fact := range envelope.RadarEvent.Facts {
+		facts[fact.Key] = fact
+	}
+	if facts["peer_count"].Value != "42" ||
+		facts["syncing"].Value != "false" ||
+		facts["endpoint_scope"].Value != "single_rpc_endpoint_only" {
+		t.Fatalf("unexpected node facts: %#v", facts)
+	}
+}
+
+func TestGlobalRadarNetworkEventRejectsUnsupportedUTXONetworkHealth(t *testing.T) {
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/fabric/radar/network-event",
+		strings.NewReader(`{"network":"bitcoin-mainnet"}`),
+	)
+	request.Header.Set("Content-Type", "application/json")
+	MountFabric(http.NotFoundHandler()).ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnprocessableEntity ||
+		!strings.Contains(response.Body.String(), "live_network_event_not_supported_for_network") {
+		t.Fatalf("unexpected response: %d %s", response.Code, response.Body.String())
+	}
+}
