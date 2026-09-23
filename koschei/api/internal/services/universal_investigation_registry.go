@@ -90,7 +90,7 @@ func UniversalInvestigationAdapterProfiles() []UniversalInvestigationAdapterProf
 			"UTXO observations remain evidence-only until deterministic UTXO behavior rules are promoted.",
 		),
 		universalInvestigationProfile(
-			"move-object-model", "web3", IntelligenceChainFamilyMove, UniversalAdapterPlanned, "move_family",
+			"move-object-model", "web3", IntelligenceChainFamilyMove, UniversalAdapterProbe, "move_family",
 			[]string{"sui-mainnet", "aptos-mainnet"},
 			[]string{
 				IntelligenceSubjectAddress, IntelligenceSubjectToken, IntelligenceSubjectContract,
@@ -99,7 +99,7 @@ func UniversalInvestigationAdapterProfiles() []UniversalInvestigationAdapterProf
 			},
 			[]string{"sui_graphql_or_rpc", "aptos_rest", "objects_resources_modules", "events", "transactions"},
 			[]string{"chain_identity", "checkpoint_or_ledger_version", "transaction_digest_or_hash", "object_or_resource_id"},
-			"Sui/Aptos identity probes exist in networktarget, but the universal Move investigation dispatcher remains planned; no Move-family claim may affect a deterministic verdict until executable chain-specific evidence collectors and rules are promoted.",
+			"Sui/Aptos address probes verify canonical target syntax and selected mainnet identity only. They remain evidence-only and cannot affect a deterministic grade until chain-specific address/object/resource/transaction rules are promoted.",
 		),
 		universalInvestigationProfile(
 			"cosmos-cometbft-model", "web3", IntelligenceChainFamilyCosmos, UniversalAdapterPlanned, "cosmos_sdk_cometbft_family",
