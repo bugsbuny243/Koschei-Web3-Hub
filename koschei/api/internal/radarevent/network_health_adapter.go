@@ -34,6 +34,7 @@ func BuildNetworkHealthEvent(producer string, observation networktarget.NetworkT
 		})
 	}
 
+	addFact("telemetry_source", observation.Source, "")
 	addFact("client_family", observation.ClientFamily, "")
 	if observation.StakeSharePct != nil {
 		addFact("stake_share_pct", strconv.FormatFloat(*observation.StakeSharePct, 'f', -1, 64), "percent")
