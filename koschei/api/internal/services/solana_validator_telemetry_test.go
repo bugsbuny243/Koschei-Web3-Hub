@@ -22,27 +22,27 @@ func TestProbeSolanaValidatorTelemetryNormalizesStakeShares(t *testing.T) {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"jsonrpc": "2.0",
-			"id": req.ID,
+			"id":      req.ID,
 			"result": map[string]any{
 				"current": []any{
 					map[string]any{
-						"votePubkey": "Vote111111111111111111111111111111111111111",
-						"nodePubkey": "Node111111111111111111111111111111111111111",
-						"activatedStake": 75,
-						"commission": 5,
-						"lastVote": 100,
-						"rootSlot": 90,
+						"votePubkey":       "Vote111111111111111111111111111111111111111",
+						"nodePubkey":       "Node111111111111111111111111111111111111111",
+						"activatedStake":   75,
+						"commission":       5,
+						"lastVote":         100,
+						"rootSlot":         90,
 						"epochVoteAccount": true,
 					},
 				},
 				"delinquent": []any{
 					map[string]any{
-						"votePubkey": "Vote222222222222222222222222222222222222222",
-						"nodePubkey": "Node222222222222222222222222222222222222222",
-						"activatedStake": 25,
-						"commission": 10,
-						"lastVote": 80,
-						"rootSlot": 70,
+						"votePubkey":       "Vote222222222222222222222222222222222222222",
+						"nodePubkey":       "Node222222222222222222222222222222222222222",
+						"activatedStake":   25,
+						"commission":       10,
+						"lastVote":         80,
+						"rootSlot":         70,
 						"epochVoteAccount": true,
 					},
 				},
