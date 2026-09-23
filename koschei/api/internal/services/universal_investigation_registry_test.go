@@ -117,7 +117,6 @@ func TestClassifyUniversalInvestigationSubjectFailsClosedForUndeclaredChainKind(
 	}
 }
 
-
 func TestMoveUniversalProfileIsProbeAndCanonicalAddressesClassify(t *testing.T) {
 	address := "0x" + strings.Repeat("11", 32)
 	var firstID string
