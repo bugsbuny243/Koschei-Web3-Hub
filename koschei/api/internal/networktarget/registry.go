@@ -55,6 +55,8 @@ func Catalog() []Network {
 		{ID: "bnb-mainnet", Name: "BNB Smart Chain", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_staked_authority", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
 		{ID: "avalanche-mainnet", Name: "Avalanche C-Chain", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
 		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", Environment: "mainnet", ConsensusFamily: "proof_of_work", AddressFormat: "bitcoin-mainnet", CollectorStatus: "probe_ready", NodeTelemetryStatus: "core_node_and_pow_network_probe_ready"},
+		{ID: "sui-mainnet", Name: "Sui", Family: "move", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "move-hex-32-strict", CollectorStatus: "probe_ready", NodeTelemetryStatus: "chain_identity_probe_ready"},
+		{ID: "aptos-mainnet", Name: "Aptos", Family: "move", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "move-hex-32-strict", CollectorStatus: "probe_ready", NodeTelemetryStatus: "ledger_identity_probe_ready"},
 	}
 }
 
@@ -69,6 +71,7 @@ func LookupNetwork(networkID string) (Network, bool) {
 }
 
 var evmAddress = regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
+var moveHex32Address = regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
 
 const base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
@@ -115,6 +118,12 @@ func Resolve(networkID, address string) (Resolution, error) {
 		if !solanaAddress(address) {
 			return Resolution{}, fmt.Errorf("address_network_format_mismatch")
 		}
+	case "move-hex-32-strict":
+		if !moveHex32Address.MatchString(address) {
+			return Resolution{}, fmt.Errorf("address_network_format_mismatch")
+		}
+		canonicalAddress = strings.ToLower(address)
+		classification = "move_hex_32_canonical_syntax_only"
 	case "bitcoin-mainnet":
 		var ok bool
 		canonicalAddress, classification, ok = bitcoinMainnetAddress(address)

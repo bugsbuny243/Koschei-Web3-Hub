@@ -40,6 +40,8 @@ func TestCatalogReportsImplementedProbesWithoutClaimingLiveAvailability(t *testi
 		"bnb-mainnet":       false,
 		"avalanche-mainnet": false,
 		"bitcoin-mainnet":   false,
+		"sui-mainnet":       false,
+		"aptos-mainnet":     false,
 	}
 	for _, network := range Catalog() {
 		if _, ok := probeReady[network.ID]; !ok {
