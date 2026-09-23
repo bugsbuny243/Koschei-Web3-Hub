@@ -86,7 +86,7 @@ func ProbeEVMNodeTelemetry(ctx context.Context, client *http.Client, endpoint, n
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_node_head_invalid")
 	}
 
-	syncRaw, err := evmRPCRaw(ctx, client, endpoint, 105, "eth_syncing", nil)
+	syncRaw, err := evmNodeTelemetryRPCRaw(ctx, client, endpoint, 105, "eth_syncing", nil)
 	if err != nil {
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_node_sync_state_unavailable: %w", err)
 	}
@@ -132,7 +132,7 @@ func validateEVMNodeTelemetryEndpoint(endpoint string) (*url.URL, error) {
 	return parsed, nil
 }
 
-func evmRPCRaw(ctx context.Context, client *http.Client, endpoint string, id int, method string, params []any) (json.RawMessage, error) {
+func evmNodeTelemetryRPCRaw(ctx context.Context, client *http.Client, endpoint string, id int, method string, params []any) (json.RawMessage, error) {
 	payload, err := json.Marshal(evmRPCRequest{JSONRPC: "2.0", ID: id, Method: method, Params: params})
 	if err != nil {
 		return nil, err
