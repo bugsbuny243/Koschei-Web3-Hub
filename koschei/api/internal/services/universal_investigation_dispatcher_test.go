@@ -41,6 +41,19 @@ func TestUniversalDispatcherRoutesLiveAndProbeTargetsWithoutOverclaiming(t *test
 		bitcoin.VerdictAuthority != UniversalVerdictEvidenceOnly {
 		t.Fatalf("unexpected Bitcoin plan: %#v", bitcoin)
 	}
+
+	move, err := BuildUniversalInvestigationPlan(
+		"0x1111111111111111111111111111111111111111111111111111111111111111",
+		"sui-mainnet",
+		IntelligenceSubjectAddress,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !move.Executable || move.Route != UniversalDispatchMoveIdentity || !move.EvidenceOnly ||
+		move.VerdictAuthority != UniversalVerdictEvidenceOnly {
+		t.Fatalf("unexpected Move plan: %#v", move)
+	}
 }
 
 func TestUniversalDispatcherKeepsDeclaredButUnconnectedKindsNonExecutable(t *testing.T) {
@@ -68,6 +81,18 @@ func TestUniversalDispatcherKeepsDeclaredButUnconnectedKindsNonExecutable(t *tes
 	if btcTx.Executable || btcTx.Route != UniversalDispatchDeclaredOnly || btcTx.VerdictAuthority != UniversalVerdictNone {
 		t.Fatalf("Bitcoin transaction was overclaimed: %#v", btcTx)
 	}
+
+	moveContract, err := BuildUniversalInvestigationPlan(
+		"0x1111111111111111111111111111111111111111111111111111111111111111",
+		"aptos-mainnet",
+		IntelligenceSubjectContract,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if moveContract.Executable || moveContract.Route != UniversalDispatchDeclaredOnly || moveContract.VerdictAuthority != UniversalVerdictNone {
+		t.Fatalf("Move contract target was overclaimed: %#v", moveContract)
+	}
 }
 
 func TestUniversalDispatcherKeepsPlannedFamiliesFailClosed(t *testing.T) {
@@ -76,8 +101,6 @@ func TestUniversalDispatcherKeepsPlannedFamiliesFailClosed(t *testing.T) {
 		network string
 		kind    string
 	}{
-		{"0x1", "sui-mainnet", IntelligenceSubjectContract},
-		{"0x1", "aptos-mainnet", IntelligenceSubjectContract},
 		{"cosmos1placeholder", "cosmoshub-mainnet", IntelligenceSubjectAddress},
 		{"1:placeholder", "ton-mainnet", IntelligenceSubjectContract},
 		{"example.near", "near-mainnet", IntelligenceSubjectContract},
@@ -123,6 +146,10 @@ func TestUniversalDispatcherRejectsExecutableAddressKindWithInvalidSyntax(t *tes
 	}
 	if _, err := BuildUniversalInvestigationPlan("not-bitcoin", "bitcoin-mainnet", IntelligenceSubjectAddress); err == nil {
 		t.Fatal("invalid Bitcoin address target was accepted")
+	}
+
+	if _, err := BuildUniversalInvestigationPlan("0x1", "sui-mainnet", IntelligenceSubjectAddress); err == nil {
+		t.Fatal("invalid Sui address target was accepted")
 	}
 }
 
