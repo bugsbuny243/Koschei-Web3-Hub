@@ -24,10 +24,10 @@ type GlobalRadarSnapshotCoverage struct {
 }
 
 type GlobalRadarSnapshot struct {
-	SchemaVersion string                      `json:"schema_version"`
-	GeneratedAt   time.Time                   `json:"generated_at"`
-	Observations  []GlobalRadarObservation    `json:"observations"`
-	Relations     []GlobalRadarRelationEdge   `json:"relations,omitempty"`
+	SchemaVersion string                        `json:"schema_version"`
+	GeneratedAt   time.Time                     `json:"generated_at"`
+	Observations  []GlobalRadarObservation      `json:"observations"`
+	Relations     []GlobalRadarRelationEdge     `json:"relations,omitempty"`
 	BridgeLinks   []GlobalRadarBridgeLink       `json:"bridge_links,omitempty"`
 	VerdictRefs   []GlobalRadarVerdictReference `json:"verdict_references,omitempty"`
 	Coverage      GlobalRadarSnapshotCoverage   `json:"coverage"`
