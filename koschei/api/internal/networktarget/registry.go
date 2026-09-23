@@ -13,11 +13,14 @@ import (
 const SchemaVersion = "koschei.network-target.v1"
 
 type Network struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	Family          string `json:"family"`
-	AddressFormat   string `json:"address_format"`
-	CollectorStatus string `json:"collector_status"`
+	ID                  string `json:"id"`
+	Name                string `json:"name"`
+	Family              string `json:"family"`
+	Environment         string `json:"environment"`
+	ConsensusFamily     string `json:"consensus_family"`
+	AddressFormat       string `json:"address_format"`
+	CollectorStatus     string `json:"collector_status"`
+	NodeTelemetryStatus string `json:"node_telemetry_status"`
 }
 
 type Resolution struct {
@@ -37,18 +40,32 @@ type Resolution struct {
 // adapter must provide its own evidence before it can produce an ARVIS verdict.
 // Runtime configuration/availability is reported separately by the deployment
 // catalog and live probe endpoints.
+//
+// ConsensusFamily is a coarse monitoring category used to select evidence
+// dimensions. It is not a claim that networks in the same category have
+// equivalent consensus or security properties.
 func Catalog() []Network {
 	return []Network{
-		{ID: "solana-mainnet", Name: "Solana", Family: "solana", AddressFormat: "base58-32", CollectorStatus: "existing"},
-		{ID: "ethereum-mainnet", Name: "Ethereum", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
-		{ID: "base-mainnet", Name: "Base", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
-		{ID: "arbitrum-mainnet", Name: "Arbitrum", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
-		{ID: "optimism-mainnet", Name: "Optimism", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
-		{ID: "polygon-mainnet", Name: "Polygon", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
-		{ID: "bnb-mainnet", Name: "BNB Smart Chain", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
-		{ID: "avalanche-mainnet", Name: "Avalanche C-Chain", Family: "evm", AddressFormat: "hex-20", CollectorStatus: "probe_ready"},
-		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", AddressFormat: "bitcoin-mainnet", CollectorStatus: "probe_ready"},
+		{ID: "solana-mainnet", Name: "Solana", Family: "solana", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "base58-32", CollectorStatus: "existing", NodeTelemetryStatus: "contract_only"},
+		{ID: "ethereum-mainnet", Name: "Ethereum", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
+		{ID: "base-mainnet", Name: "Base", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
+		{ID: "arbitrum-mainnet", Name: "Arbitrum", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
+		{ID: "optimism-mainnet", Name: "Optimism", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
+		{ID: "polygon-mainnet", Name: "Polygon", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
+		{ID: "bnb-mainnet", Name: "BNB Smart Chain", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_staked_authority", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
+		{ID: "avalanche-mainnet", Name: "Avalanche C-Chain", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
+		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", Environment: "mainnet", ConsensusFamily: "proof_of_work", AddressFormat: "bitcoin-mainnet", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
 	}
+}
+
+func LookupNetwork(networkID string) (Network, bool) {
+	networkID = strings.TrimSpace(networkID)
+	for _, network := range Catalog() {
+		if network.ID == networkID {
+			return network, true
+		}
+	}
+	return Network{}, false
 }
 
 var evmAddress = regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
@@ -77,15 +94,8 @@ func Resolve(networkID, address string) (Resolution, error) {
 	if networkID == "" {
 		return Resolution{}, fmt.Errorf("network_required")
 	}
-	var selected *Network
-	for _, network := range Catalog() {
-		if network.ID == networkID {
-			copy := network
-			selected = &copy
-			break
-		}
-	}
-	if selected == nil {
+	selected, ok := LookupNetwork(networkID)
+	if !ok {
 		return Resolution{}, fmt.Errorf("network_not_registered")
 	}
 	address = strings.TrimSpace(address)
@@ -118,7 +128,7 @@ func Resolve(networkID, address string) (Resolution, error) {
 	digest := sha256.Sum256([]byte(canonical))
 	return Resolution{
 		SchemaVersion:     SchemaVersion,
-		Network:           *selected,
+		Network:           selected,
 		Address:           address,
 		CanonicalRef:      canonical,
 		SubjectID:         fmt.Sprintf("network-subject:%x", digest),
