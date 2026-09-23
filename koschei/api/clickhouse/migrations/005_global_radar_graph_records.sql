@@ -53,5 +53,5 @@ CREATE TABLE IF NOT EXISTS koschei_web3.global_radar_graph_records
         CHECK match(toString(payload_sha256), '^[0-9a-f]{64}$')
 )
 ENGINE = ReplacingMergeTree(ingest_version)
-ORDER BY (record_type, network, record_date, subject_id, record_id)
+ORDER BY (record_type, network, record_date, subject_id, record_id, payload_sha256)
 SETTINGS index_granularity = 8192;
