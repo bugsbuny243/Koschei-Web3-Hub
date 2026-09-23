@@ -99,7 +99,7 @@ func UniversalInvestigationAdapterProfiles() []UniversalInvestigationAdapterProf
 			},
 			[]string{"sui_graphql_or_rpc", "aptos_rest", "objects_resources_modules", "events", "transactions"},
 			[]string{"chain_identity", "checkpoint_or_ledger_version", "transaction_digest_or_hash", "object_or_resource_id"},
-			"No Move-family claim may affect a verdict before a network adapter proves chain identity and canonical state/transaction evidence.",
+			"Sui/Aptos identity probes exist in networktarget, but the universal Move investigation dispatcher remains planned; no Move-family claim may affect a deterministic verdict until executable chain-specific evidence collectors and rules are promoted.",
 		),
 		universalInvestigationProfile(
 			"cosmos-cometbft-model", "web3", IntelligenceChainFamilyCosmos, UniversalAdapterPlanned, "cosmos_sdk_cometbft_family",

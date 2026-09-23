@@ -192,6 +192,11 @@ func VerifiedIntelligenceRelationship(sourceID, targetID, relation string, evide
 }
 
 func classifyIntelligenceTarget(target, network string) (family, chain, basis string) {
+	if network == "sui-mainnet" || network == "aptos-mainnet" {
+		if _, err := networktarget.Resolve(network, target); err == nil {
+			return IntelligenceChainFamilyMove, universalChainName(network, IntelligenceChainFamilyMove), "move_32byte_canonical_address_syntax"
+		}
+	}
 	if network == "bitcoin-mainnet" {
 		if _, err := networktarget.Resolve(network, target); err == nil {
 			return IntelligenceChainFamilyUTXO, "bitcoin", "bitcoin_mainnet_address_syntax"
@@ -243,7 +248,7 @@ func isSyntacticSolanaAddress(value string) bool {
 func intelligenceCanonicalRef(family, chain, network, target string) string {
 	family = strings.ToLower(strings.TrimSpace(family))
 	canonicalTarget := strings.TrimSpace(target)
-	if family == IntelligenceChainFamilyEVM {
+	if family == IntelligenceChainFamilyEVM || family == IntelligenceChainFamilyMove {
 		canonicalTarget = strings.ToLower(canonicalTarget)
 	}
 	if family == IntelligenceChainFamilyUTXO && strings.ToLower(strings.TrimSpace(network)) == "bitcoin-mainnet" {

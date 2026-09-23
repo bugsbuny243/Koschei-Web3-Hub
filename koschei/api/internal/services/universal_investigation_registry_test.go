@@ -1,6 +1,9 @@
 package services
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestUniversalInvestigationProfilesKeepPlannedFamiliesNonLive(t *testing.T) {
 	plannedFamilies := map[string]bool{
@@ -112,5 +115,46 @@ func TestClassifyUniversalInvestigationSubjectFailsClosedForUndeclaredChainKind(
 	}
 	if _, err := ClassifyUniversalInvestigationSubject("anything", "", "mystery"); err == nil {
 		t.Fatal("unsupported target kind was accepted")
+	}
+}
+
+func TestMoveCanonicalAddressesClassifyWhileUniversalDispatcherStaysPlanned(t *testing.T) {
+	address := "0x" + strings.Repeat("11", 32)
+	var firstID string
+
+	for _, network := range []string{"sui-mainnet", "aptos-mainnet"} {
+		profile, ok := UniversalInvestigationProfileForNetwork(network)
+		if !ok || profile.ChainFamily != IntelligenceChainFamilyMove || profile.Status != UniversalAdapterPlanned {
+			t.Fatalf("network %s profile=%#v ok=%v", network, profile, ok)
+		}
+
+		subject, err := ClassifyUniversalInvestigationSubject(address, network, IntelligenceSubjectAddress)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if subject.ChainFamily != IntelligenceChainFamilyMove || subject.Kind != IntelligenceSubjectAddress {
+			t.Fatalf("network %s subject=%#v", network, subject)
+		}
+		if subject.ClassificationBasis != "move_32byte_canonical_address_syntax" {
+			t.Fatalf("network %s basis=%q", network, subject.ClassificationBasis)
+		}
+		if firstID == "" {
+			firstID = subject.ID
+		} else if firstID == subject.ID {
+			t.Fatal("same canonical Move address was conflated across Sui and Aptos")
+		}
+
+		plan, err := BuildUniversalInvestigationPlan(address, network, IntelligenceSubjectAddress)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if plan.Executable || plan.Route != UniversalDispatchPlannedAdapter || plan.VerdictAuthority != UniversalVerdictNone {
+			t.Fatalf("network %s identity probe overclaimed universal dispatcher: %#v", network, plan)
+		}
+	}
+
+	invalid := ClassifyIntelligenceSubject("0x1", "sui-mainnet")
+	if invalid.Kind != IntelligenceSubjectUnknown {
+		t.Fatalf("non-canonical Sui address received canonical classification: %#v", invalid)
 	}
 }
