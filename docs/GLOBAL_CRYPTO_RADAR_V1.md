@@ -110,19 +110,46 @@ dimensions remain explicit `missing_evidence` and are never converted into risk.
 Solana validator telemetry can be projected as one Radar observation per validator.
 No synthetic decentralization score is produced.
 
+### Snapshot contract
+
+`koschei.global-radar-snapshot.v1` assembles observations, relation edges, verified
+bridge links and ARVIS verdict references into one self-consistent machine-readable
+snapshot. Verified relations and verdict references are rejected when their evidence
+references are outside the snapshot.
+
+Coverage reports counts for networks, subjects, observations, observed/verified
+evidence, relations, cross-network relations, bridge links, verdict references and
+missing-evidence items. `risk_score_produced` is always false.
+
+### Liquidity observations
+
+Provider-backed Solana market snapshots can be compared as descriptive liquidity
+events. The projection preserves liquidity/volume/price deltas and provider
+limitations, but explicitly sets `market_data_can_issue_verdict=false` and
+`rug_or_drain_claim=false`.
+
+### ARVIS verdict references
+
+`koschei.global-radar-verdict-reference.v1` preserves an existing evidence-linked,
+source-marked-signed ARVIS deterministic verdict as an authoritative graph reference.
+
+Global Radar does not re-grade or re-sign the verdict. It also does not claim
+independent Ed25519 verification until `key_id` is resolved through an out-of-band
+trusted public-key registry. The projection therefore reports
+`signature_verification=not_reverified_by_global_radar`.
+
 ## Next implementation slices
 
-1. Add a machine-readable Radar snapshot/coverage contract over observations, graph
-   edges and bridge links without producing a risk score.
-2. Add liquidity-event observations without letting market data issue security
-   verdicts.
-3. Project ARVIS signed deterministic verdicts into the global graph without creating
-   a second verdict engine.
-4. Add public/operator coverage views that distinguish implemented, configured,
+1. Add durable graph persistence/query paths for observations, relations, bridge links
+   and verdict references.
+2. Add operator-facing snapshot retrieval that distinguishes implemented, configured,
    observed and verified states.
-5. Add durable graph persistence/query paths for observations and relation edges.
-6. Connect bridge-specific live adapters only where both chain-side transfer identities
+3. Connect bridge-specific live adapters only where both chain-side transfer identities
    can be independently anchored.
+4. Add independent verdict signature verification once a trusted public-key registry
+   contract is available to the Radar verifier.
+5. Expand live node telemetry projections for EVM beacon/execution and Bitcoin Core/PoW
+   collectors without inventing missing geography or client identity.
 
 ## Product principle
 
