@@ -6,7 +6,6 @@ import (
 	"io"
 	"mime"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -16,17 +15,6 @@ import (
 
 type globalRadarNetworkRequest struct {
 	Network string `json:"network"`
-}
-
-func configuredMoveIdentityEndpoint(networkID string) string {
-	switch strings.TrimSpace(networkID) {
-	case "sui-mainnet":
-		return strings.TrimSpace(os.Getenv("SUI_GRAPHQL_URL"))
-	case "aptos-mainnet":
-		return strings.TrimSpace(os.Getenv("APTOS_REST_URL"))
-	default:
-		return ""
-	}
 }
 
 func decodeGlobalRadarNetworkRequest(reader io.Reader) (globalRadarNetworkRequest, error) {
