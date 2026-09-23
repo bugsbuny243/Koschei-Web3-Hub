@@ -13,7 +13,7 @@ func telemetryPercent(value float64) *float64 {
 func TestCatalogExposesTelemetryImplementationWithoutClaimingDeploymentHealth(t *testing.T) {
 	expected := map[string]string{
 		"solana-mainnet":    "validator_probe_ready",
-		"ethereum-mainnet":  "rpc_node_probe_ready",
+		"ethereum-mainnet":  "execution_and_beacon_probe_ready",
 		"base-mainnet":      "rpc_node_probe_ready",
 		"arbitrum-mainnet":  "rpc_node_probe_ready",
 		"optimism-mainnet":  "rpc_node_probe_ready",
