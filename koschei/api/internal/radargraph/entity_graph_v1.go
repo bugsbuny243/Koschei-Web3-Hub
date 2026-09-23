@@ -24,6 +24,8 @@ const (
 const (
 	RelationFunded             = "funded"
 	RelationTransferredTo      = "transferred_to"
+	RelationDrainedTo          = "drained_to"
+	RelationSwappedTo          = "swapped_to"
 	RelationCalled             = "called"
 	RelationCreated            = "created"
 	RelationDeployed           = "deployed"
@@ -337,7 +339,7 @@ func validNodeKind(kind string) bool {
 
 func validRelation(relation string) bool {
 	switch relation {
-	case RelationFunded, RelationTransferredTo, RelationCalled, RelationCreated, RelationDeployed, RelationBridgedTo, RelationLiquidityTo, RelationHolds, RelationInteractedWith, RelationCorrelatedWith, RelationSuspectedSameActor:
+	case RelationFunded, RelationTransferredTo, RelationDrainedTo, RelationSwappedTo, RelationCalled, RelationCreated, RelationDeployed, RelationBridgedTo, RelationLiquidityTo, RelationHolds, RelationInteractedWith, RelationCorrelatedWith, RelationSuspectedSameActor:
 		return true
 	default:
 		return false
