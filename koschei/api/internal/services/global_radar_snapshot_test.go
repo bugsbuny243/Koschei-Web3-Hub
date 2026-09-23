@@ -86,7 +86,6 @@ func TestBuildGlobalRadarSnapshotCountsMissingTelemetryEvidence(t *testing.T) {
 	}
 }
 
-
 func TestBuildGlobalRadarSnapshotBindsARVISVerdictReferenceToIncludedEvidence(t *testing.T) {
 	subject := ClassifyIntelligenceSubject("So11111111111111111111111111111111111111112", "solana-mainnet")
 	subject.Kind = IntelligenceSubjectToken
