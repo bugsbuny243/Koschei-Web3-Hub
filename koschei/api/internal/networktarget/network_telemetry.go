@@ -23,8 +23,9 @@ type NetworkTelemetryInput struct {
 	ObservedAt     time.Time
 	EvidenceStatus string
 	ClientFamily   string
-	StakeSharePct  *float64
-	HashSharePct   *float64
+	StakeSharePct       *float64
+	HashSharePct        *float64
+	VotingPowerSharePct *float64
 	ASN            string
 	CountryCode    string
 	LocationSource string
@@ -39,8 +40,9 @@ type NetworkTelemetryObservation struct {
 	ObservedAt      time.Time `json:"observed_at"`
 	EvidenceStatus  string    `json:"evidence_status"`
 	ClientFamily    string    `json:"client_family,omitempty"`
-	StakeSharePct   *float64  `json:"stake_share_pct,omitempty"`
-	HashSharePct    *float64  `json:"hash_share_pct,omitempty"`
+	StakeSharePct       *float64  `json:"stake_share_pct,omitempty"`
+	HashSharePct        *float64  `json:"hash_share_pct,omitempty"`
+	VotingPowerSharePct *float64  `json:"voting_power_share_pct,omitempty"`
 	ASN             string    `json:"asn,omitempty"`
 	CountryCode     string    `json:"country_code,omitempty"`
 	LocationSource  string    `json:"location_source,omitempty"`
@@ -48,8 +50,8 @@ type NetworkTelemetryObservation struct {
 }
 
 // NormalizeNetworkTelemetry converts a source observation into a bounded,
-// network-scoped evidence record. It never invents location, client, stake or
-// hash-rate data. Precise end-user/device coordinates are intentionally not
+// network-scoped evidence record. It never invents location, client, stake,
+// hash-rate or consensus voting-power data. Precise end-user/device coordinates are intentionally not
 // part of this contract.
 func NormalizeNetworkTelemetry(input NetworkTelemetryInput) (NetworkTelemetryObservation, error) {
 	network, ok := LookupNetwork(input.NetworkID)
@@ -95,6 +97,10 @@ func NormalizeNetworkTelemetry(input NetworkTelemetryInput) (NetworkTelemetryObs
 	if err != nil {
 		return NetworkTelemetryObservation{}, fmt.Errorf("network_telemetry_hash_share_invalid")
 	}
+	votingPowerShare, err := normalizeNetworkTelemetryPercent(input.VotingPowerSharePct)
+	if err != nil {
+		return NetworkTelemetryObservation{}, fmt.Errorf("network_telemetry_voting_power_share_invalid")
+	}
 
 	asn := strings.ToUpper(strings.TrimSpace(input.ASN))
 	if asn != "" && !networkTelemetryASN.MatchString(asn) {
@@ -117,7 +123,7 @@ func NormalizeNetworkTelemetry(input NetworkTelemetryInput) (NetworkTelemetryObs
 	if clientFamily == "" {
 		missing = append(missing, "client_family")
 	}
-	if stakeShare == nil && hashShare == nil {
+	if stakeShare == nil && hashShare == nil && votingPowerShare == nil {
 		missing = append(missing, "consensus_contribution")
 	}
 	if asn == "" {
@@ -136,8 +142,9 @@ func NormalizeNetworkTelemetry(input NetworkTelemetryInput) (NetworkTelemetryObs
 		ObservedAt:      input.ObservedAt.UTC(),
 		EvidenceStatus:  evidenceStatus,
 		ClientFamily:    clientFamily,
-		StakeSharePct:   stakeShare,
-		HashSharePct:    hashShare,
+		StakeSharePct:       stakeShare,
+		HashSharePct:        hashShare,
+		VotingPowerSharePct: votingPowerShare,
 		ASN:             asn,
 		CountryCode:     countryCode,
 		LocationSource:  locationSource,
