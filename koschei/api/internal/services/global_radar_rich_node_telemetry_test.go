@@ -51,16 +51,16 @@ func TestProjectEVMNodeTelemetryToGlobalRadarPreservesEndpointScope(t *testing.T
 
 func TestProjectEthereumBeaconTelemetryToGlobalRadarKeepsFinalityButNoPopulationClaim(t *testing.T) {
 	result := networktarget.EthereumBeaconTelemetryResult{
-		SchemaVersion:         networktarget.NetworkTelemetrySchemaVersion,
-		Observation:           radarTelemetryFixture(t, "ethereum-mainnet", "node", "ethereum-beacon-endpoint:test", "ethereum-beacon-api:test", "Lighthouse/v1"),
-		ClientVersion:         "Lighthouse/v1",
-		ConnectedPeers:        90,
-		HeadSlot:              123,
-		SyncDistance:          0,
-		Finalized:             networktarget.EthereumBeaconCheckpoint{Epoch: 44, Root: "0x" + string(make([]byte, 64))},
-		EndpointScope:         "single_beacon_endpoint_plus_chain_checkpoints",
-		AnalysisPerformed:     true,
-		LiveAvailability:      "checked",
+		SchemaVersion:     networktarget.NetworkTelemetrySchemaVersion,
+		Observation:       radarTelemetryFixture(t, "ethereum-mainnet", "node", "ethereum-beacon-endpoint:test", "ethereum-beacon-api:test", "Lighthouse/v1"),
+		ClientVersion:     "Lighthouse/v1",
+		ConnectedPeers:    90,
+		HeadSlot:          123,
+		SyncDistance:      0,
+		Finalized:         networktarget.EthereumBeaconCheckpoint{Epoch: 44, Root: "0x" + string(make([]byte, 64))},
+		EndpointScope:     "single_beacon_endpoint_plus_chain_checkpoints",
+		AnalysisPerformed: true,
+		LiveAvailability:  "checked",
 	}
 	result.Finalized.Root = "0x" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	got, err := ProjectEthereumBeaconTelemetryToGlobalRadar(result)
