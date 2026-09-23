@@ -39,7 +39,7 @@ func TestCatalogReportsImplementedProbesWithoutClaimingLiveAvailability(t *testi
 		"polygon-mainnet":   false,
 		"bnb-mainnet":       false,
 		"avalanche-mainnet": false,
-		"bitcoin-mainnet":   false,
+		"bitcoin-mainnet":   false,\n\t\t"sui-mainnet":       false,\n\t\t"aptos-mainnet":     false,
 	}
 	for _, network := range Catalog() {
 		if _, ok := probeReady[network.ID]; !ok {
@@ -102,5 +102,33 @@ func TestCatalogCannotBeMutatedByConsumer(t *testing.T) {
 	catalog[0].CollectorStatus = "promoted"
 	if Catalog()[0].CollectorStatus != "existing" {
 		t.Fatal("caller mutated shared registry")
+	}
+}
+
+
+func TestMoveCanonicalAddressResolutionIsNetworkScopedAndStrict(t *testing.T) {
+	address := "0x" + strings.Repeat("ab", 32)
+	sui, err := Resolve("sui-mainnet", address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	aptos, err := Resolve("aptos-mainnet", address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sui.SubjectID == aptos.SubjectID || sui.CanonicalRef == aptos.CanonicalRef {
+		t.Fatal("same Move address was conflated across Sui and Aptos")
+	}
+	if sui.Classification != "move_hex_32_canonical_syntax_only" || aptos.Classification != "move_hex_32_canonical_syntax_only" {
+		t.Fatalf("unexpected Move classification: sui=%#v aptos=%#v", sui, aptos)
+	}
+	upper, err := Resolve("sui-mainnet", "0x"+strings.Repeat("AB", 32))
+	if err != nil || upper.SubjectID != sui.SubjectID {
+		t.Fatal("Move hex case normalization changed Sui identity")
+	}
+	for _, bad := range []string{"0x1", "0x" + strings.Repeat("ab", 20), strings.Repeat("ab", 32)} {
+		if _, err := Resolve("sui-mainnet", bad); err == nil {
+			t.Fatalf("non-canonical Move address accepted: %q", bad)
+		}
 	}
 }
