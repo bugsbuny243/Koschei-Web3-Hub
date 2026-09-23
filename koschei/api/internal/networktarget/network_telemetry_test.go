@@ -21,6 +21,8 @@ func TestCatalogExposesTelemetryImplementationWithoutClaimingDeploymentHealth(t 
 		"bnb-mainnet":       "rpc_node_probe_ready",
 		"avalanche-mainnet": "rpc_node_probe_ready",
 		"bitcoin-mainnet":   "core_node_and_pow_network_probe_ready",
+		"sui-mainnet":       "chain_identity_probe_ready",
+		"aptos-mainnet":     "ledger_identity_probe_ready",
 	}
 	for _, network := range Catalog() {
 		if network.Environment == "" {
