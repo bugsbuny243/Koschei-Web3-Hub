@@ -20,6 +20,7 @@ const (
 type securityRadarJournalStreamWorker struct {
 	Store              *SecurityRadarStore
 	WSSURL             string
+	FallbackWSSURL     string
 	RPCURL             string
 	Network            string
 	Queue              chan SecurityRadarStreamEventRecord
@@ -71,9 +72,11 @@ func newSecurityRadarJournalStreamWorker(store *SecurityRadarStore, wssURL, rpcU
 	persistConcurrency := boundedSecurityRadarEnvInt("KOSCHEI_STREAM_JOURNAL_WRITERS", 4, 1, 32)
 	enrichmentBatch := boundedSecurityRadarEnvInt("KOSCHEI_STREAM_ENRICHMENT_BATCH", 25, 1, 100)
 	decoder := NewSecurityRadarStreamWorker(store, wssURL, rpcURL)
+	trimmedWSS := strings.TrimSpace(wssURL)
 	return &securityRadarJournalStreamWorker{
 		Store:              store,
-		WSSURL:             strings.TrimSpace(wssURL),
+		WSSURL:             trimmedWSS,
+		FallbackWSSURL:     resolveSecurityRadarWSSFallbackURL(trimmedWSS),
 		RPCURL:             strings.TrimSpace(rpcURL),
 		Network:            firstRadarValue(os.Getenv("RADAR_STREAM_NETWORK"), "solana-mainnet"),
 		Queue:              make(chan SecurityRadarStreamEventRecord, bufferSize),
@@ -99,7 +102,7 @@ func (w *securityRadarJournalStreamWorker) Start(ctx context.Context) {
 	if w == nil || w.Store == nil || w.Store.DB == nil || strings.TrimSpace(w.WSSURL) == "" {
 		return
 	}
-	log.Printf("security radar sovereign journal started provider=%s mode=%s network=%s writers=%d backpressure=block_not_drop", SecurityRadarStreamProvider, SecurityRadarStreamModeLogs, w.Network, w.PersistConcurrency)
+	log.Printf("security radar sovereign journal started provider=%s mode=%s network=%s writers=%d backpressure=block_not_drop wss_fallback=%t", SecurityRadarStreamProvider, SecurityRadarStreamModeLogs, w.Network, w.PersistConcurrency, strings.TrimSpace(w.FallbackWSSURL) != "")
 	for i := 0; i < w.PersistConcurrency; i++ {
 		go w.persistLoop(ctx)
 	}
@@ -147,7 +150,7 @@ func (w *securityRadarJournalStreamWorker) Start(ctx context.Context) {
 }
 
 func (w *securityRadarJournalStreamWorker) runOnce(ctx context.Context) error {
-	conn, err := dialMinimalWebSocket(ctx, w.WSSURL)
+	conn, err := dialSecurityRadarWebSocket(ctx, w.WSSURL, w.FallbackWSSURL)
 	if err != nil {
 		return err
 	}
