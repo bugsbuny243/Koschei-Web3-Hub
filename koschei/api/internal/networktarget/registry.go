@@ -57,6 +57,8 @@ func Catalog() []Network {
 		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", Environment: "mainnet", ConsensusFamily: "proof_of_work", AddressFormat: "bitcoin-mainnet", CollectorStatus: "probe_ready", NodeTelemetryStatus: "core_node_and_pow_network_probe_ready"},
 		{ID: "sui-mainnet", Name: "Sui", Family: "move", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "move-hex-32-strict", CollectorStatus: "probe_ready", NodeTelemetryStatus: "chain_identity_probe_ready"},
 		{ID: "aptos-mainnet", Name: "Aptos", Family: "move", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "move-hex-32-strict", CollectorStatus: "probe_ready", NodeTelemetryStatus: "ledger_identity_probe_ready"},
+		{ID: "cosmoshub-mainnet", Name: "Cosmos Hub", Family: "cosmos", Environment: "mainnet", ConsensusFamily: "cometbft", AddressFormat: "bech32-unimplemented", CollectorStatus: "network_probe_ready", NodeTelemetryStatus: "cometbft_validator_probe_ready"},
+		{ID: "osmosis-mainnet", Name: "Osmosis", Family: "cosmos", Environment: "mainnet", ConsensusFamily: "cometbft", AddressFormat: "bech32-unimplemented", CollectorStatus: "network_probe_ready", NodeTelemetryStatus: "cometbft_validator_probe_ready"},
 	}
 }
 
