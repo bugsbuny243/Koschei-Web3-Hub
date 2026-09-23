@@ -10,7 +10,18 @@ func telemetryPercent(value float64) *float64 {
 	return &value
 }
 
-func TestCatalogExposesTelemetryMetadataWithoutClaimingLiveCollector(t *testing.T) {
+func TestCatalogExposesTelemetryImplementationWithoutClaimingDeploymentHealth(t *testing.T) {
+	expected := map[string]string{
+		"solana-mainnet":    "validator_probe_ready",
+		"ethereum-mainnet":  "rpc_node_probe_ready",
+		"base-mainnet":      "rpc_node_probe_ready",
+		"arbitrum-mainnet":  "rpc_node_probe_ready",
+		"optimism-mainnet":  "rpc_node_probe_ready",
+		"polygon-mainnet":   "rpc_node_probe_ready",
+		"bnb-mainnet":       "rpc_node_probe_ready",
+		"avalanche-mainnet": "rpc_node_probe_ready",
+		"bitcoin-mainnet":   "core_node_probe_ready",
+	}
 	for _, network := range Catalog() {
 		if network.Environment == "" {
 			t.Fatalf("%s environment missing", network.ID)
@@ -18,8 +29,8 @@ func TestCatalogExposesTelemetryMetadataWithoutClaimingLiveCollector(t *testing.
 		if network.ConsensusFamily == "" {
 			t.Fatalf("%s consensus family missing", network.ID)
 		}
-		if network.NodeTelemetryStatus != "contract_only" {
-			t.Fatalf("%s node telemetry status=%q want contract_only", network.ID, network.NodeTelemetryStatus)
+		if got, ok := expected[network.ID]; !ok || network.NodeTelemetryStatus != got {
+			t.Fatalf("%s node telemetry status=%q want=%q", network.ID, network.NodeTelemetryStatus, got)
 		}
 	}
 }

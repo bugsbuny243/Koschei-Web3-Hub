@@ -46,15 +46,15 @@ type Resolution struct {
 // equivalent consensus or security properties.
 func Catalog() []Network {
 	return []Network{
-		{ID: "solana-mainnet", Name: "Solana", Family: "solana", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "base58-32", CollectorStatus: "existing", NodeTelemetryStatus: "contract_only"},
-		{ID: "ethereum-mainnet", Name: "Ethereum", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
-		{ID: "base-mainnet", Name: "Base", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
-		{ID: "arbitrum-mainnet", Name: "Arbitrum", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
-		{ID: "optimism-mainnet", Name: "Optimism", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
-		{ID: "polygon-mainnet", Name: "Polygon", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
-		{ID: "bnb-mainnet", Name: "BNB Smart Chain", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_staked_authority", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
-		{ID: "avalanche-mainnet", Name: "Avalanche C-Chain", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
-		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", Environment: "mainnet", ConsensusFamily: "proof_of_work", AddressFormat: "bitcoin-mainnet", CollectorStatus: "probe_ready", NodeTelemetryStatus: "contract_only"},
+		{ID: "solana-mainnet", Name: "Solana", Family: "solana", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "base58-32", CollectorStatus: "existing", NodeTelemetryStatus: "validator_probe_ready"},
+		{ID: "ethereum-mainnet", Name: "Ethereum", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
+		{ID: "base-mainnet", Name: "Base", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
+		{ID: "arbitrum-mainnet", Name: "Arbitrum", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
+		{ID: "optimism-mainnet", Name: "Optimism", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
+		{ID: "polygon-mainnet", Name: "Polygon", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
+		{ID: "bnb-mainnet", Name: "BNB Smart Chain", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_staked_authority", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
+		{ID: "avalanche-mainnet", Name: "Avalanche C-Chain", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
+		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", Environment: "mainnet", ConsensusFamily: "proof_of_work", AddressFormat: "bitcoin-mainnet", CollectorStatus: "probe_ready", NodeTelemetryStatus: "core_node_probe_ready"},
 	}
 }
 
