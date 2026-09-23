@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"koschei/api/internal/networktarget"
+	"koschei/api/internal/radarevent"
 )
 
 const globalRadarSchemaVersion = "koschei.global-radar.v1"
@@ -35,6 +36,7 @@ type globalRadarSummary struct {
 
 type globalRadarSnapshot struct {
 	SchemaVersion string                    `json:"schema_version"`
+	EventSchema   string                    `json:"event_schema"`
 	Scope         string                    `json:"scope"`
 	GeneratedAt   time.Time                 `json:"generated_at"`
 	TruthBoundary globalRadarTruthBoundary  `json:"truth_boundary"`
@@ -91,6 +93,7 @@ func currentGlobalRadarSnapshot(now time.Time) globalRadarSnapshot {
 
 	return globalRadarSnapshot{
 		SchemaVersion: globalRadarSchemaVersion,
+		EventSchema:   radarevent.SchemaVersionV1,
 		Scope:         "multi-network-observation-control-plane",
 		GeneratedAt:   now.UTC(),
 		TruthBoundary: globalRadarTruthBoundary{
