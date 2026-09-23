@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"koschei/api/internal/radarevent"
 	"koschei/api/internal/radargraph"
 	"koschei/api/internal/radarpath"
-	"koschei/api/internal/radarevent"
 	"koschei/api/internal/securityevidence"
 )
 
