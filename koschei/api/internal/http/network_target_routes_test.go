@@ -110,7 +110,6 @@ func TestNetworkResolutionHasNoImplicitNetworkAndNoGETMutation(t *testing.T) {
 	}
 }
 
-
 func TestGlobalRadarCapabilityCatalogIsExplicitAndFailClosed(t *testing.T) {
 	mounted := MountFabric(http.NotFoundHandler())
 	response := httptest.NewRecorder()
