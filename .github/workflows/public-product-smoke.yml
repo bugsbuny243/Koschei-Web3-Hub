@@ -86,6 +86,14 @@ jobs:
                 000|502|503|504)
                   echo "WAITING_FOR_DEPLOY: ${path} attempt=${attempt}/${attempts} code=${code}" >&2
                   ;;
+                429)
+                  if grep -Fqi 'server: railway-hikari' "diagnostics/${name}.headers"; then
+                    echo "WAITING_FOR_RAILWAY_EDGE_RATE_LIMIT: ${path} attempt=${attempt}/${attempts} code=429" >&2
+                  else
+                    echo "PUBLIC_PRODUCT_FAILURE: ${path} returned HTTP 429 outside the recognized Railway edge rate-limit contract." >&2
+                    exit 21
+                  fi
+                  ;;
                 200)
                   echo "WAITING_FOR_DEPLOY_MARKER: ${path} marker=${marker} attempt=${attempt}/${attempts}" >&2
                   ;;
@@ -103,7 +111,9 @@ jobs:
           checked_page() {
             local name="$1" path="$2" marker="$3"
             if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-              expect_200 "${name}" "${path}" "${marker}"
+              # PR smoke still requires a real 200 + contract marker. Retry only
+              # transient Railway Hikari edge throttling and deploy transport errors.
+              wait_expect_200 "${name}" "${path}" "${marker}" 6
             else
               wait_expect_200 "${name}" "${path}" "${marker}" 18
             fi
