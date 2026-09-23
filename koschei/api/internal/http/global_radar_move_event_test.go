@@ -125,7 +125,6 @@ func TestGlobalRadarNetworkEventRejectsUnknownFieldsAndGET(t *testing.T) {
 	}
 }
 
-
 func TestMoveDeploymentCatalogReportsConfigurationTruthfully(t *testing.T) {
 	t.Setenv("SUI_GRAPHQL_URL", "")
 	t.Setenv("APTOS_REST_URL", "")
