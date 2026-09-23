@@ -14,8 +14,9 @@ import (
 )
 
 const moveIdentityResponseLimit = 128 * 1024
-const suiMainnetChainIdentifierBase58 = "4btiuiMPvEENsttpZC7CZ53DruC3MAgfznDbASZ7DR6S"
-const aptosMainnetChainID = 1
+
+const SuiMainnetChainIdentifier = "4btiuiMPvEENsttpZC7CZ53DruC3MAgfznDbASZ7DR6S"
+const AptosMainnetChainID uint8 = 1
 
 type SuiMainnetIdentityProbeResult struct {
 	SchemaVersion     string                      `json:"schema_version"`
@@ -92,7 +93,7 @@ func ProbeSuiMainnetIdentity(ctx context.Context, client *http.Client, endpoint 
 		return SuiMainnetIdentityProbeResult{}, fmt.Errorf("sui_chain_identity_graphql_error")
 	}
 	chainIdentifier := strings.TrimSpace(response.Data.ChainIdentifier)
-	if chainIdentifier != suiMainnetChainIdentifierBase58 {
+	if chainIdentifier != SuiMainnetChainIdentifier {
 		return SuiMainnetIdentityProbeResult{}, fmt.Errorf("sui_mainnet_chain_identity_mismatch")
 	}
 
@@ -143,7 +144,7 @@ func ProbeAptosMainnetIdentity(ctx context.Context, client *http.Client, endpoin
 	if err := moveIdentityDoJSON(client, req, &response); err != nil {
 		return AptosMainnetIdentityProbeResult{}, fmt.Errorf("aptos_ledger_identity_unavailable: %w", err)
 	}
-	if response.ChainID != aptosMainnetChainID {
+	if response.ChainID != AptosMainnetChainID {
 		return AptosMainnetIdentityProbeResult{}, fmt.Errorf("aptos_mainnet_chain_identity_mismatch")
 	}
 
