@@ -19,17 +19,17 @@ func TestProbeBitcoinCoreNodeTelemetryIsEndpointScoped(t *testing.T) {
 		switch req.Method {
 		case "getnetworkinfo":
 			result = map[string]any{
-				"version": 280000,
-				"subversion": "/Satoshi:28.0.0/",
+				"version":         280000,
+				"subversion":      "/Satoshi:28.0.0/",
 				"protocolversion": 70016,
-				"connections": 11,
-				"networkactive": true,
+				"connections":     11,
+				"networkactive":   true,
 			}
 		case "getblockchaininfo":
 			result = map[string]any{
-				"chain": "main",
-				"blocks": 900000,
-				"headers": 900000,
+				"chain":                "main",
+				"blocks":               900000,
+				"headers":              900000,
 				"verificationprogress": 1.0,
 				"initialblockdownload": false,
 			}
@@ -63,17 +63,17 @@ func TestProbeBitcoinCoreNodeTelemetryRejectsNonMainnet(t *testing.T) {
 		var req bitcoinCoreRPCRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		result := any(map[string]any{
-			"version": 280000,
-			"subversion": "/Satoshi:28.0.0/",
+			"version":         280000,
+			"subversion":      "/Satoshi:28.0.0/",
 			"protocolversion": 70016,
-			"connections": 1,
-			"networkactive": true,
+			"connections":     1,
+			"networkactive":   true,
 		})
 		if req.Method == "getblockchaininfo" {
 			result = map[string]any{
-				"chain": "test",
-				"blocks": 1,
-				"headers": 1,
+				"chain":                "test",
+				"blocks":               1,
+				"headers":              1,
 				"verificationprogress": 1.0,
 				"initialblockdownload": false,
 			}
