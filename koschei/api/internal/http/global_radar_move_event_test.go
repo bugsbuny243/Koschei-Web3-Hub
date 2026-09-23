@@ -159,7 +159,6 @@ func TestMoveDeploymentCatalogReportsConfigurationTruthfully(t *testing.T) {
 	}
 }
 
-
 func TestGlobalRadarEVMNetworkEventProducesNodeHealthEvent(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request struct {
