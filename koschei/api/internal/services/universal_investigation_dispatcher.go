@@ -12,6 +12,7 @@ const (
 	UniversalDispatchEVMProbe         = "evm_read_only_probe"
 	UniversalDispatchEVMTransaction   = "evm_transaction_receipt_probe"
 	UniversalDispatchBitcoinProbe     = "bitcoin_read_only_probe"
+	UniversalDispatchMoveIdentity     = "move_identity_probe"
 	UniversalDispatchDeclaredOnly     = "declared_not_executable"
 	UniversalDispatchPlannedAdapter   = "planned_adapter"
 	UniversalDispatchResearchAdapter  = "research_adapter"
@@ -75,6 +76,8 @@ func BuildUniversalInvestigationPlan(target, network, kindHint string) (Universa
 		return buildEVMUniversalDispatchPlan(plan)
 	case IntelligenceChainFamilyUTXO:
 		return buildBitcoinUniversalDispatchPlan(plan)
+	case IntelligenceChainFamilyMove:
+		return buildMoveUniversalDispatchPlan(plan)
 	default:
 		plan.Limitations = append(plan.Limitations, "No executable production dispatcher exists for this chain family.")
 		return plan, nil
@@ -185,6 +188,33 @@ func buildBitcoinUniversalDispatchPlan(plan UniversalInvestigationPlan) (Univers
 	default:
 		plan.Route = UniversalDispatchDeclaredOnly
 		plan.Limitations = append(plan.Limitations, "Bitcoin transaction/block kinds are declared but do not yet have a connected production collector.")
+	}
+	return plan, nil
+}
+
+
+func buildMoveUniversalDispatchPlan(plan UniversalInvestigationPlan) (UniversalInvestigationPlan, error) {
+	switch plan.Subject.Kind {
+	case IntelligenceSubjectAddress:
+		classified := ClassifyIntelligenceSubject(plan.Subject.Raw, plan.Subject.Network)
+		if classified.ChainFamily != IntelligenceChainFamilyMove ||
+			(classified.Chain != "sui" && classified.Chain != "aptos") {
+			return UniversalInvestigationPlan{}, errors.New("Move executable target failed canonical address validation")
+		}
+		plan.Route = UniversalDispatchMoveIdentity
+		plan.Executable = true
+		plan.EvidenceOnly = true
+		plan.VerdictAuthority = UniversalVerdictEvidenceOnly
+		plan.Limitations = append(
+			plan.Limitations,
+			"Move identity probes verify canonical address syntax and selected mainnet identity only; address existence, ownership, balances, objects/resources and safety are not inferred.",
+		)
+	default:
+		plan.Route = UniversalDispatchDeclaredOnly
+		plan.Limitations = append(
+			plan.Limitations,
+			"Move target kind is declared in the universal model but only canonical address identity probes are connected.",
+		)
 	}
 	return plan, nil
 }
