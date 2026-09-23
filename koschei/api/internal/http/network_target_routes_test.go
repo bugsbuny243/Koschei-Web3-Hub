@@ -109,3 +109,39 @@ func TestNetworkResolutionHasNoImplicitNetworkAndNoGETMutation(t *testing.T) {
 		t.Fatal("resolver must keep target addresses out of GET URLs")
 	}
 }
+
+
+func TestGlobalRadarCapabilityCatalogIsExplicitAndFailClosed(t *testing.T) {
+	mounted := MountFabric(http.NotFoundHandler())
+	response := httptest.NewRecorder()
+	mounted.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/fabric/networks/radar", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("unexpected status %d: %s", response.Code, response.Body.String())
+	}
+	if response.Header().Get("Cache-Control") != "no-store" || response.Header().Get("X-Content-Type-Options") != "nosniff" {
+		t.Fatal("global radar capability response must preserve transport protections")
+	}
+
+	var payload struct {
+		SchemaVersion    string                          `json:"schema_version"`
+		Scope            string                          `json:"scope"`
+		LiveAvailability string                          `json:"live_availability"`
+		Networks         []networktarget.RadarCapability `json:"networks"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.SchemaVersion != networktarget.GlobalRadarCapabilitySchemaVersion ||
+		payload.Scope != "global-multi-chain-radar" ||
+		payload.LiveAvailability != "not_checked" {
+		t.Fatalf("unexpected radar capability boundary: %#v", payload)
+	}
+	if len(payload.Networks) != len(networktarget.Catalog()) {
+		t.Fatalf("radar capability count=%d catalog=%d", len(payload.Networks), len(networktarget.Catalog()))
+	}
+	for _, capability := range payload.Networks {
+		if capability.Family == "move" && capability.TransactionObservation != "not_connected" {
+			t.Fatalf("%s move transaction dispatcher was overclaimed: %#v", capability.NetworkID, capability)
+		}
+	}
+}
