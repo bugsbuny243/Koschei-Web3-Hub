@@ -151,10 +151,10 @@ func TestMoveDeploymentCatalogReportsConfigurationTruthfully(t *testing.T) {
 	for _, state := range states {
 		byID[state.NetworkID] = state
 	}
-	if byID["sui-mainnet"].CollectorRuntime != "graphql_configured" {
+	if byID["sui-mainnet"].CollectorRuntime != "identity_probe_configured" {
 		t.Fatalf("sui state=%#v", byID["sui-mainnet"])
 	}
-	if byID["aptos-mainnet"].CollectorRuntime != "rest_configured" {
+	if byID["aptos-mainnet"].CollectorRuntime != "identity_probe_configured" {
 		t.Fatalf("aptos state=%#v", byID["aptos-mainnet"])
 	}
 }
