@@ -140,7 +140,6 @@ func totalSolanaActivatedStake(groups ...[]solanaVoteAccountRPCItem) (uint64, er
 	return total, nil
 }
 
-
 // ProjectSolanaValidatorTelemetryToGlobalRadar converts each normalized
 // validator telemetry row into one evidence-only Global Radar observation.
 // It preserves missing evidence and does not derive a decentralization score.
