@@ -274,6 +274,9 @@ func canonicalEdge(edge Edge) (Edge, error) {
 	if !validRelation(edge.Relation) {
 		return Edge{}, fmt.Errorf("unsupported entity relation %q", edge.Relation)
 	}
+	if edge.Relation == RelationSuspectedSameActor && edge.Basis != BasisHypothesis {
+		return Edge{}, errors.New("suspected_same_actor must remain a hypothesis")
+	}
 	if edge.ObservedAtUnixMS <= 0 {
 		return Edge{}, errors.New("edge observation time is required")
 	}
