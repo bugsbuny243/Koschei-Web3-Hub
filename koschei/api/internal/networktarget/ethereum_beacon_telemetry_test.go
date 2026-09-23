@@ -21,27 +21,27 @@ func TestProbeEthereumBeaconTelemetryCollectsConsensusEvidence(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"version": "Lighthouse/v7.1.0"}})
 		case "/eth/v1/node/peer_count":
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{
-				"disconnected": "3",
-				"connecting": "1",
-				"connected": "64",
+				"disconnected":  "3",
+				"connecting":    "1",
+				"connected":     "64",
 				"disconnecting": "0",
 			}})
 		case "/eth/v1/node/syncing":
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{
-				"head_slot": "123456",
+				"head_slot":     "123456",
 				"sync_distance": "0",
-				"is_syncing": false,
+				"is_syncing":    false,
 				"is_optimistic": false,
-				"el_offline": false,
+				"el_offline":    false,
 			}})
 		case "/eth/v1/beacon/states/head/finality_checkpoints":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"execution_optimistic": false,
-				"finalized": false,
+				"finalized":            false,
 				"data": map[string]any{
 					"previous_justified": map[string]any{"epoch": "3800", "root": root1},
-					"current_justified": map[string]any{"epoch": "3801", "root": root2},
-					"finalized": map[string]any{"epoch": "3799", "root": root3},
+					"current_justified":  map[string]any{"epoch": "3801", "root": root2},
+					"finalized":          map[string]any{"epoch": "3799", "root": root3},
 				},
 			})
 		default:
@@ -83,11 +83,11 @@ func TestProbeEthereumBeaconTelemetryFailsClosedOnInvalidCheckpoint(t *testing.T
 		case "/eth/v1/beacon/states/head/finality_checkpoints":
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"execution_optimistic": false,
-				"finalized": true,
+				"finalized":            true,
 				"data": map[string]any{
 					"previous_justified": map[string]any{"epoch": "1", "root": "bad-root"},
-					"current_justified": map[string]any{"epoch": "1", "root": "bad-root"},
-					"finalized": map[string]any{"epoch": "1", "root": "bad-root"},
+					"current_justified":  map[string]any{"epoch": "1", "root": "bad-root"},
+					"finalized":          map[string]any{"epoch": "1", "root": "bad-root"},
 				},
 			})
 		default:
