@@ -22,9 +22,10 @@ type networkDeploymentState struct {
 }
 
 type networkProbeIntelligenceEnvelope struct {
-	SchemaVersion string                                      `json:"schema_version"`
-	Probe         any                                         `json:"probe"`
-	Intelligence  services.NetworkProbeIntelligenceProjection `json:"intelligence"`
+	SchemaVersion    string                                      `json:"schema_version"`
+	Probe            any                                         `json:"probe"`
+	Intelligence     services.NetworkProbeIntelligenceProjection `json:"intelligence"`
+	RadarObservation services.GlobalRadarObservation             `json:"radar_observation"`
 }
 
 func evmRPCEnvName(networkID string) (string, bool) {
@@ -151,14 +152,20 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	writeIntelligence := func(probe any, projection services.NetworkProbeIntelligenceProjection) {
+	writeIntelligence := func(probe any, projection services.NetworkProbeIntelligenceProjection, observationKind string) error {
+		observation, err := services.BuildGlobalRadarObservation(observationKind, projection.Subject, projection.Evidence)
+		if err != nil {
+			return err
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(networkProbeIntelligenceEnvelope{
-			SchemaVersion: networkProbeIntelligenceSchemaVersion,
-			Probe:         probe,
-			Intelligence:  projection,
+			SchemaVersion:    networkProbeIntelligenceSchemaVersion,
+			Probe:            probe,
+			Intelligence:     projection,
+			RadarObservation: observation,
 		})
+		return nil
 	}
 
 	switch resolution.Network.Family {
@@ -179,7 +186,10 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 				reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 				return
 			}
-			writeIntelligence(result, projection)
+			if writeIntelligence(result, projection, services.GlobalRadarObservationContractProgram) != nil {
+				reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+				return
+			}
 			return
 		}
 		if isForm {
@@ -214,7 +224,10 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 				reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 				return
 			}
-			writeIntelligence(result, projection)
+			if writeIntelligence(result, projection, services.GlobalRadarObservationTransaction) != nil {
+				reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+				return
+			}
 			return
 		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")

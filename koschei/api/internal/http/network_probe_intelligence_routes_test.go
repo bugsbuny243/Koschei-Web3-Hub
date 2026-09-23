@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"koschei/api/internal/services"
 )
 
 func TestNetworkProbeIntelligenceProjectsVerifiedEVMObservation(t *testing.T) {
@@ -57,6 +59,20 @@ func TestNetworkProbeIntelligenceProjectsVerifiedEVMObservation(t *testing.T) {
 				Confidence float64 `json:"confidence"`
 			} `json:"evidence"`
 		} `json:"intelligence"`
+		RadarObservation struct {
+			SchemaVersion   string `json:"schema_version"`
+			ObservationID   string `json:"observation_id"`
+			ObservationKind string `json:"observation_kind"`
+			DecisionState   string `json:"decision_state"`
+			Subject         struct {
+				ChainFamily string `json:"chain_family"`
+				Network     string `json:"network"`
+			} `json:"subject"`
+			Evidence struct {
+				Status string `json:"status"`
+				Source string `json:"source"`
+			} `json:"evidence"`
+		} `json:"radar_observation"`
 	}
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode intelligence response: %v", err)
@@ -72,6 +88,18 @@ func TestNetworkProbeIntelligenceProjectsVerifiedEVMObservation(t *testing.T) {
 	}
 	if payload.Intelligence.Evidence.Status != "observed" || payload.Intelligence.Evidence.Source != "evm_rpc_probe" || payload.Intelligence.Evidence.Confidence != 0.8 {
 		t.Fatalf("unexpected evidence: %#v", payload.Intelligence.Evidence)
+	}
+	if payload.RadarObservation.SchemaVersion != services.GlobalRadarObservationSchemaVersion ||
+		payload.RadarObservation.ObservationID == "" ||
+		payload.RadarObservation.ObservationKind != services.GlobalRadarObservationContractProgram ||
+		payload.RadarObservation.DecisionState != "evidence_only_no_verdict_created" {
+		t.Fatalf("unexpected radar observation: %#v", payload.RadarObservation)
+	}
+	if payload.RadarObservation.Subject.ChainFamily != "evm" ||
+		payload.RadarObservation.Subject.Network != "ethereum-mainnet" ||
+		payload.RadarObservation.Evidence.Status != "observed" ||
+		payload.RadarObservation.Evidence.Source != "evm_rpc_probe" {
+		t.Fatalf("radar observation changed evidence identity: %#v", payload.RadarObservation)
 	}
 }
 

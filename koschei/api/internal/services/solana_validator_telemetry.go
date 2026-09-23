@@ -139,3 +139,31 @@ func totalSolanaActivatedStake(groups ...[]solanaVoteAccountRPCItem) (uint64, er
 	}
 	return total, nil
 }
+
+// ProjectSolanaValidatorTelemetryToGlobalRadar converts each normalized
+// validator telemetry row into one evidence-only Global Radar observation.
+// It preserves missing evidence and does not derive a decentralization score.
+func ProjectSolanaValidatorTelemetryToGlobalRadar(report SolanaValidatorTelemetryReport) ([]GlobalRadarObservation, error) {
+	if report.SchemaVersion != networktarget.NetworkTelemetrySchemaVersion ||
+		report.Network != "solana-mainnet" ||
+		!report.AnalysisPerformed ||
+		report.LiveAvailability != "checked" {
+		return nil, fmt.Errorf("completed solana validator telemetry report is required")
+	}
+	out := make([]GlobalRadarObservation, 0, len(report.Validators))
+	for _, validator := range report.Validators {
+		observation, err := AdaptNetworkTelemetryToGlobalRadar(validator.Observation)
+		if err != nil {
+			return nil, err
+		}
+		observation.Evidence.Attributes["node_pubkey"] = validator.NodePubkey
+		observation.Evidence.Attributes["activated_stake"] = validator.ActivatedStake
+		observation.Evidence.Attributes["commission_percent"] = validator.Commission
+		observation.Evidence.Attributes["last_vote"] = validator.LastVote
+		observation.Evidence.Attributes["root_slot"] = validator.RootSlot
+		observation.Evidence.Attributes["delinquent"] = validator.Delinquent
+		observation.Evidence.Attributes["decentralization_score"] = nil
+		out = append(out, observation)
+	}
+	return out, nil
+}
