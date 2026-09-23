@@ -23,6 +23,8 @@ func TestCatalogExposesTelemetryImplementationWithoutClaimingDeploymentHealth(t 
 		"bitcoin-mainnet":   "core_node_and_pow_network_probe_ready",
 		"sui-mainnet":       "chain_identity_probe_ready",
 		"aptos-mainnet":     "ledger_identity_probe_ready",
+		"cosmoshub-mainnet": "cometbft_validator_probe_ready",
+		"osmosis-mainnet":   "cometbft_validator_probe_ready",
 	}
 	for _, network := range Catalog() {
 		if network.Environment == "" {
@@ -107,6 +109,7 @@ func TestNormalizeNetworkTelemetryRejectsUnboundedClaims(t *testing.T) {
 		{NetworkID: "solana-mainnet", SubjectKind: "node", SubjectID: "n", Source: "s", ObservedAt: now, EvidenceStatus: "inferred"},
 		{NetworkID: "solana-mainnet", SubjectKind: "validator", SubjectID: "n", Source: "s", ObservedAt: now, EvidenceStatus: "observed", StakeSharePct: telemetryPercent(100.01)},
 		{NetworkID: "bitcoin-mainnet", SubjectKind: "miner", SubjectID: "m", Source: "s", ObservedAt: now, EvidenceStatus: "observed", HashSharePct: telemetryPercent(-0.01)},
+		{NetworkID: "cosmoshub-mainnet", SubjectKind: "validator", SubjectID: "v", Source: "s", ObservedAt: now, EvidenceStatus: "observed", VotingPowerSharePct: telemetryPercent(100.01)},
 		{NetworkID: "solana-mainnet", SubjectKind: "node", SubjectID: "n", Source: "s", ObservedAt: now, EvidenceStatus: "observed", ASN: "not-an-asn"},
 		{NetworkID: "solana-mainnet", SubjectKind: "node", SubjectID: "n", Source: "s", ObservedAt: now, EvidenceStatus: "observed", CountryCode: "TR"},
 	}
