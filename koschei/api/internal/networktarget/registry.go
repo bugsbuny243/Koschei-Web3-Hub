@@ -54,7 +54,7 @@ func Catalog() []Network {
 		{ID: "polygon-mainnet", Name: "Polygon", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
 		{ID: "bnb-mainnet", Name: "BNB Smart Chain", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_staked_authority", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
 		{ID: "avalanche-mainnet", Name: "Avalanche C-Chain", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
-		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", Environment: "mainnet", ConsensusFamily: "proof_of_work", AddressFormat: "bitcoin-mainnet", CollectorStatus: "probe_ready", NodeTelemetryStatus: "core_node_probe_ready"},
+		{ID: "bitcoin-mainnet", Name: "Bitcoin", Family: "utxo", Environment: "mainnet", ConsensusFamily: "proof_of_work", AddressFormat: "bitcoin-mainnet", CollectorStatus: "probe_ready", NodeTelemetryStatus: "core_node_and_pow_network_probe_ready"},
 	}
 }
 
