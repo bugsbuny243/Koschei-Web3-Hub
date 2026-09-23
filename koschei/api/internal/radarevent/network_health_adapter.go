@@ -15,7 +15,7 @@ func BuildNetworkHealthEvent(producer string, observation networktarget.NetworkT
 		return Event{}, fmt.Errorf("unsupported network telemetry schema %q", observation.SchemaVersion)
 	}
 
-	state, err := networkTelemetryEvidenceState(observation.EvidenceStatus)
+	state, err := evidenceStateFromString(observation.EvidenceStatus)
 	if err != nil {
 		return Event{}, err
 	}
@@ -71,7 +71,7 @@ func BuildNetworkHealthEvent(producer string, observation networktarget.NetworkT
 	return event.Seal()
 }
 
-func networkTelemetryEvidenceState(value string) (securityevidence.EvidenceState, error) {
+func evidenceStateFromString(value string) (securityevidence.EvidenceState, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "observed":
 		return securityevidence.StateObserved, nil
