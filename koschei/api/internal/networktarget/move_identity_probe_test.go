@@ -50,7 +50,7 @@ func TestProbeSuiMainnetIdentity(t *testing.T) {
 			t.Fatalf("query=%q", body["query"])
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"data": map[string]any{"chainIdentifier": suiMainnetChainIdentifierBase58},
+			"data": map[string]any{"chainIdentifier": SuiMainnetChainIdentifier},
 		})
 	}))
 	defer server.Close()
@@ -59,7 +59,7 @@ func TestProbeSuiMainnetIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ChainIdentifier != suiMainnetChainIdentifierBase58 || got.Observation.Network.ID != "sui-mainnet" {
+	if got.ChainIdentifier != SuiMainnetChainIdentifier || got.Observation.Network.ID != "sui-mainnet" {
 		t.Fatalf("unexpected Sui identity: %#v", got)
 	}
 	if got.Observation.StakeSharePct != nil || got.EndpointScope != "sui_graphql_chain_identity_only" {
