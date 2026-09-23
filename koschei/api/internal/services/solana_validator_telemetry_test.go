@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"koschei/api/internal/networktarget"
 )
 
 func TestProbeSolanaValidatorTelemetryNormalizesStakeShares(t *testing.T) {
