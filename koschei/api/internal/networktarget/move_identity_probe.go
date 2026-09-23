@@ -18,27 +18,27 @@ const suiMainnetChainIdentifierBase58 = "4btiuiMPvEENsttpZC7CZ53DruC3MAgfznDbASZ
 const aptosMainnetChainID = 1
 
 type SuiMainnetIdentityProbeResult struct {
-	SchemaVersion      string                      `json:"schema_version"`
-	Observation        NetworkTelemetryObservation `json:"observation"`
-	ChainIdentifier    string                      `json:"chain_identifier"`
-	EndpointScope      string                      `json:"endpoint_scope"`
-	AnalysisPerformed  bool                        `json:"analysis_performed"`
-	LiveAvailability   string                      `json:"live_availability"`
+	SchemaVersion     string                      `json:"schema_version"`
+	Observation       NetworkTelemetryObservation `json:"observation"`
+	ChainIdentifier   string                      `json:"chain_identifier"`
+	EndpointScope     string                      `json:"endpoint_scope"`
+	AnalysisPerformed bool                        `json:"analysis_performed"`
+	LiveAvailability  string                      `json:"live_availability"`
 }
 
 type AptosMainnetIdentityProbeResult struct {
-	SchemaVersion      string                      `json:"schema_version"`
-	Observation        NetworkTelemetryObservation `json:"observation"`
-	ChainID            uint8                       `json:"chain_id"`
-	Epoch              uint64                      `json:"epoch"`
-	LedgerVersion      uint64                      `json:"ledger_version"`
-	LedgerTimestamp    uint64                      `json:"ledger_timestamp"`
-	BlockHeight        uint64                      `json:"block_height"`
-	NodeRole           string                      `json:"node_role"`
-	GitHash            string                      `json:"git_hash,omitempty"`
-	EndpointScope      string                      `json:"endpoint_scope"`
-	AnalysisPerformed  bool                        `json:"analysis_performed"`
-	LiveAvailability   string                      `json:"live_availability"`
+	SchemaVersion     string                      `json:"schema_version"`
+	Observation       NetworkTelemetryObservation `json:"observation"`
+	ChainID           uint8                       `json:"chain_id"`
+	Epoch             uint64                      `json:"epoch"`
+	LedgerVersion     uint64                      `json:"ledger_version"`
+	LedgerTimestamp   uint64                      `json:"ledger_timestamp"`
+	BlockHeight       uint64                      `json:"block_height"`
+	NodeRole          string                      `json:"node_role"`
+	GitHash           string                      `json:"git_hash,omitempty"`
+	EndpointScope     string                      `json:"endpoint_scope"`
+	AnalysisPerformed bool                        `json:"analysis_performed"`
+	LiveAvailability  string                      `json:"live_availability"`
 }
 
 type suiGraphQLIdentityResponse struct {
