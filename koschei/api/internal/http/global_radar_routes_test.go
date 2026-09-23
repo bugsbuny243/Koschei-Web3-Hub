@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"koschei/api/internal/networktarget"
+	"koschei/api/internal/radarevent"
 )
 
 func TestGlobalRadarSnapshotExposesTruthfulMultiNetworkControlPlane(t *testing.T) {
@@ -32,6 +33,9 @@ func TestGlobalRadarSnapshotExposesTruthfulMultiNetworkControlPlane(t *testing.T
 	}
 	if snapshot.SchemaVersion != globalRadarSchemaVersion {
 		t.Fatalf("schema=%q", snapshot.SchemaVersion)
+	}
+	if snapshot.EventSchema != radarevent.SchemaVersionV1 {
+		t.Fatalf("event schema=%q", snapshot.EventSchema)
 	}
 	if snapshot.Scope != "multi-network-observation-control-plane" {
 		t.Fatalf("scope=%q", snapshot.Scope)
