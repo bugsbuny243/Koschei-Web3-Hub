@@ -1,6 +1,6 @@
 package services
 
-import "testing"
+import (\n\t"strings"\n\t"testing"\n)
 
 func TestUniversalInvestigationProfilesKeepPlannedFamiliesNonLive(t *testing.T) {
 	plannedFamilies := map[string]bool{
@@ -112,5 +112,23 @@ func TestClassifyUniversalInvestigationSubjectFailsClosedForUndeclaredChainKind(
 	}
 	if _, err := ClassifyUniversalInvestigationSubject("anything", "", "mystery"); err == nil {
 		t.Fatal("unsupported target kind was accepted")
+	}
+}
+
+
+func TestMoveUniversalProfileIsProbeAndCanonicalAddressesClassify(t *testing.T) {
+	for _, network := range []string{"sui-mainnet", "aptos-mainnet"} {
+		profile, ok := UniversalInvestigationProfileForNetwork(network)
+		if !ok || profile.ChainFamily != IntelligenceChainFamilyMove || profile.Status != UniversalAdapterProbe {
+			t.Fatalf("network %s profile=%#v ok=%v", network, profile, ok)
+		}
+		address := "0x" + strings.Repeat("11", 32)
+		subject, err := ClassifyUniversalInvestigationSubject(address, network, IntelligenceSubjectAddress)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if subject.ChainFamily != IntelligenceChainFamilyMove || subject.Kind != IntelligenceSubjectAddress {
+			t.Fatalf("network %s subject=%#v", network, subject)
+		}
 	}
 }
