@@ -7,6 +7,7 @@ import (
 
 func TestUniversalInvestigationProfilesKeepPlannedFamiliesNonLive(t *testing.T) {
 	plannedFamilies := map[string]bool{
+		IntelligenceChainFamilyMove:      false,
 		IntelligenceChainFamilyCosmos:    false,
 		IntelligenceChainFamilySubstrate: false,
 		IntelligenceChainFamilyTON:       false,
@@ -117,13 +118,13 @@ func TestClassifyUniversalInvestigationSubjectFailsClosedForUndeclaredChainKind(
 	}
 }
 
-func TestMoveUniversalProfileIsProbeAndCanonicalAddressesClassify(t *testing.T) {
+func TestMoveCanonicalAddressesClassifyWhileUniversalDispatcherStaysPlanned(t *testing.T) {
 	address := "0x" + strings.Repeat("11", 32)
 	var firstID string
 
 	for _, network := range []string{"sui-mainnet", "aptos-mainnet"} {
 		profile, ok := UniversalInvestigationProfileForNetwork(network)
-		if !ok || profile.ChainFamily != IntelligenceChainFamilyMove || profile.Status != UniversalAdapterProbe {
+		if !ok || profile.ChainFamily != IntelligenceChainFamilyMove || profile.Status != UniversalAdapterPlanned {
 			t.Fatalf("network %s profile=%#v ok=%v", network, profile, ok)
 		}
 
@@ -142,9 +143,18 @@ func TestMoveUniversalProfileIsProbeAndCanonicalAddressesClassify(t *testing.T) 
 		} else if firstID == subject.ID {
 			t.Fatal("same canonical Move address was conflated across Sui and Aptos")
 		}
+
+		plan, err := BuildUniversalInvestigationPlan(address, network, IntelligenceSubjectAddress)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if plan.Executable || plan.Route != UniversalDispatchPlannedAdapter || plan.VerdictAuthority != UniversalVerdictNone {
+			t.Fatalf("network %s identity probe overclaimed universal dispatcher: %#v", network, plan)
+		}
 	}
 
-	if _, err := ClassifyUniversalInvestigationSubject("0x1", "sui-mainnet", IntelligenceSubjectAddress); err == nil {
-		t.Fatal("non-canonical Sui address was accepted by probe profile")
+	invalid := ClassifyIntelligenceSubject("0x1", "sui-mainnet")
+	if invalid.Kind != IntelligenceSubjectUnknown {
+		t.Fatalf("non-canonical Sui address received canonical classification: %#v", invalid)
 	}
 }
