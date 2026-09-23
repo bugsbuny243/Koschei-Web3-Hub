@@ -61,6 +61,25 @@ func configuredBitcoinEsploraEndpoint() string {
 	return strings.TrimSpace(os.Getenv("BITCOIN_ESPLORA_URL"))
 }
 
+func moveIdentityEnvName(networkID string) (string, bool) {
+	switch strings.TrimSpace(networkID) {
+	case "sui-mainnet":
+		return "SUI_GRAPHQL_URL", true
+	case "aptos-mainnet":
+		return "APTOS_REST_URL", true
+	default:
+		return "", false
+	}
+}
+
+func configuredMoveIdentityEndpoint(networkID string) string {
+	name, ok := moveIdentityEnvName(networkID)
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(os.Getenv(name))
+}
+
 func networkDeploymentCatalog() []networkDeploymentState {
 	states := make([]networkDeploymentState, 0, len(networktarget.Catalog()))
 	for _, network := range networktarget.Catalog() {
@@ -82,6 +101,14 @@ func networkDeploymentCatalog() []networkDeploymentState {
 					state.CollectorRuntime = "esplora_configured"
 					state.LiveAvailability = "not_checked"
 				}
+			}
+		case "move":
+			if configuredMoveIdentityEndpoint(network.ID) == "" {
+				state.CollectorRuntime = "configuration_required"
+				state.LiveAvailability = "configuration_required"
+			} else {
+				state.CollectorRuntime = "identity_probe_configured"
+				state.LiveAvailability = "not_checked"
 			}
 		}
 		states = append(states, state)
@@ -233,6 +260,63 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(result)
+	case "move":
+		if isForm {
+			reject(http.StatusUnprocessableEntity, "move_live_probe_requires_json", "not_available")
+			return
+		}
+		endpoint := configuredMoveIdentityEndpoint(resolution.Network.ID)
+		if endpoint == "" {
+			reject(http.StatusServiceUnavailable, "move_identity_configuration_required", "configuration_required")
+			return
+		}
+		observedAt := time.Now().UTC()
+		switch resolution.Network.ID {
+		case "sui-mainnet":
+			result, err := networktarget.ProbeSuiMainnetIdentity(ctx, client, endpoint, observedAt)
+			if err != nil {
+				reject(http.StatusBadGateway, err.Error(), "unavailable")
+				return
+			}
+			if withIntelligence {
+				projection, projectionErr := services.AdaptSuiIdentityProbeEvidence(resolution, result, observedAt)
+				if projectionErr != nil {
+					reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
+					return
+				}
+				if writeIntelligence(result, projection, services.GlobalRadarObservationIdentity) != nil {
+					reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+					return
+				}
+				return
+			}
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-store")
+			_ = json.NewEncoder(w).Encode(result)
+		case "aptos-mainnet":
+			result, err := networktarget.ProbeAptosMainnetIdentity(ctx, client, endpoint, observedAt)
+			if err != nil {
+				reject(http.StatusBadGateway, err.Error(), "unavailable")
+				return
+			}
+			if withIntelligence {
+				projection, projectionErr := services.AdaptAptosIdentityProbeEvidence(resolution, result, observedAt)
+				if projectionErr != nil {
+					reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
+					return
+				}
+				if writeIntelligence(result, projection, services.GlobalRadarObservationIdentity) != nil {
+					reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+					return
+				}
+				return
+			}
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-store")
+			_ = json.NewEncoder(w).Encode(result)
+		default:
+			reject(http.StatusUnprocessableEntity, "live_probe_not_supported_for_network", "not_available")
+		}
 	default:
 		reject(http.StatusUnprocessableEntity, "live_probe_not_supported_for_network", "not_available")
 	}
