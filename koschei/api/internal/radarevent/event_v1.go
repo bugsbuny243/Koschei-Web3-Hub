@@ -38,18 +38,18 @@ type Fact struct {
 }
 
 type Event struct {
-	SchemaVersion   string                         `json:"schema_version"`
-	Producer        string                         `json:"producer"`
-	Kind            string                         `json:"kind"`
-	NetworkID       string                         `json:"network_id"`
-	SubjectKind     string                         `json:"subject_kind"`
-	SubjectID       string                         `json:"subject_id"`
-	ObservedAtUnixMS int64                         `json:"observed_at_unix_ms"`
-	State           securityevidence.EvidenceState `json:"evidence_state"`
-	NativeRefs      []NativeReference              `json:"native_refs,omitempty"`
-	SourceDigests   []string                       `json:"source_digests_sha256,omitempty"`
-	Facts           []Fact                         `json:"facts,omitempty"`
-	EventSHA256     string                         `json:"event_sha256"`
+	SchemaVersion    string                         `json:"schema_version"`
+	Producer         string                         `json:"producer"`
+	Kind             string                         `json:"kind"`
+	NetworkID        string                         `json:"network_id"`
+	SubjectKind      string                         `json:"subject_kind"`
+	SubjectID        string                         `json:"subject_id"`
+	ObservedAtUnixMS int64                          `json:"observed_at_unix_ms"`
+	State            securityevidence.EvidenceState `json:"evidence_state"`
+	NativeRefs       []NativeReference              `json:"native_refs,omitempty"`
+	SourceDigests    []string                       `json:"source_digests_sha256,omitempty"`
+	Facts            []Fact                         `json:"facts,omitempty"`
+	EventSHA256      string                         `json:"event_sha256"`
 }
 
 func (e Event) Canonical() (Event, error) {
