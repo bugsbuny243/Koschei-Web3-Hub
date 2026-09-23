@@ -71,7 +71,6 @@ func TestProbeSolanaValidatorTelemetryNormalizesStakeShares(t *testing.T) {
 	}
 }
 
-
 func TestProjectSolanaValidatorTelemetryToGlobalRadarKeepsEvidenceOnlySemantics(t *testing.T) {
 	stakeShare := 60.0
 	observation, err := networktarget.NormalizeNetworkTelemetry(networktarget.NetworkTelemetryInput{
