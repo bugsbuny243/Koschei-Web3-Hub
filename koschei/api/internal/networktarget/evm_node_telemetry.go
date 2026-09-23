@@ -14,17 +14,17 @@ import (
 )
 
 type EVMNodeTelemetryResult struct {
-	SchemaVersion    string                      `json:"schema_version"`
-	Observation      NetworkTelemetryObservation `json:"observation"`
-	ChainID          string                      `json:"chain_id"`
-	ExpectedChainID  string                      `json:"expected_chain_id"`
-	ClientVersion    string                      `json:"client_version"`
-	PeerCount        uint64                      `json:"peer_count"`
-	HeadBlock        uint64                      `json:"head_block"`
-	Syncing          bool                        `json:"syncing"`
-	EndpointScope    string                      `json:"endpoint_scope"`
-	AnalysisPerformed bool                       `json:"analysis_performed"`
-	LiveAvailability string                      `json:"live_availability"`
+	SchemaVersion     string                      `json:"schema_version"`
+	Observation       NetworkTelemetryObservation `json:"observation"`
+	ChainID           string                      `json:"chain_id"`
+	ExpectedChainID   string                      `json:"expected_chain_id"`
+	ClientVersion     string                      `json:"client_version"`
+	PeerCount         uint64                      `json:"peer_count"`
+	HeadBlock         uint64                      `json:"head_block"`
+	Syncing           bool                        `json:"syncing"`
+	EndpointScope     string                      `json:"endpoint_scope"`
+	AnalysisPerformed bool                        `json:"analysis_performed"`
+	LiveAvailability  string                      `json:"live_availability"`
 }
 
 // ProbeEVMNodeTelemetry observes one configured execution RPC endpoint.
