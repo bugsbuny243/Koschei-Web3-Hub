@@ -66,6 +66,7 @@ func decodeNetworkTargetRequest(reader io.Reader) (networkTargetRequest, error) 
 func registerNetworkTargetRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/fabric/networks", method(http.MethodGet, networkCoveragePage))
 	mux.HandleFunc("/fabric/networks/catalog", method(http.MethodGet, networkCoverageCatalog))
+	mux.HandleFunc("/fabric/networks/radar", method(http.MethodGet, globalRadarCapabilityCatalog))
 	mux.HandleFunc("/fabric/networks/resolve", method(http.MethodPost, networkTargetResolve))
 }
 
@@ -90,6 +91,18 @@ func networkCoverageCatalog(w http.ResponseWriter, _ *http.Request) {
 		"networks":          networktarget.Catalog(),
 		"live_availability": "not_checked",
 		"telemetry":         telemetry,
+	})
+}
+
+func globalRadarCapabilityCatalog(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"schema_version":    networktarget.GlobalRadarCapabilitySchemaVersion,
+		"scope":             "global-multi-chain-radar",
+		"claim_policy":      "repository capability only; live availability and evidence must be verified independently",
+		"live_availability": "not_checked",
+		"networks":          networktarget.GlobalRadarCapabilities(),
 	})
 }
 
