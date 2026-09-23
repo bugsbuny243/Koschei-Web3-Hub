@@ -18,6 +18,7 @@ type GlobalRadarSnapshotCoverage struct {
 	VerifiedRelationCount     int  `json:"verified_relation_count"`
 	CrossNetworkRelationCount int  `json:"cross_network_relation_count"`
 	BridgeLinkCount           int  `json:"bridge_link_count"`
+	VerdictReferenceCount     int  `json:"verdict_reference_count"`
 	MissingEvidenceItemCount  int  `json:"missing_evidence_item_count"`
 	RiskScoreProduced         bool `json:"risk_score_produced"`
 }
@@ -27,8 +28,9 @@ type GlobalRadarSnapshot struct {
 	GeneratedAt   time.Time                   `json:"generated_at"`
 	Observations  []GlobalRadarObservation    `json:"observations"`
 	Relations     []GlobalRadarRelationEdge   `json:"relations,omitempty"`
-	BridgeLinks   []GlobalRadarBridgeLink     `json:"bridge_links,omitempty"`
-	Coverage      GlobalRadarSnapshotCoverage `json:"coverage"`
+	BridgeLinks   []GlobalRadarBridgeLink       `json:"bridge_links,omitempty"`
+	VerdictRefs   []GlobalRadarVerdictReference `json:"verdict_references,omitempty"`
+	Coverage      GlobalRadarSnapshotCoverage   `json:"coverage"`
 }
 
 // BuildGlobalRadarSnapshot assembles a self-consistent machine-readable radar
@@ -37,6 +39,7 @@ func BuildGlobalRadarSnapshot(
 	observations []GlobalRadarObservation,
 	relations []GlobalRadarRelationEdge,
 	bridgeLinks []GlobalRadarBridgeLink,
+	verdictRefs []GlobalRadarVerdictReference,
 	generatedAt time.Time,
 ) (GlobalRadarSnapshot, error) {
 	if generatedAt.IsZero() {
@@ -96,6 +99,33 @@ func BuildGlobalRadarSnapshot(
 		evidenceIDs[link.LinkEvidence.ID] = true
 	}
 
+	verdictReferenceIDs := map[string]bool{}
+	for _, reference := range verdictRefs {
+		if reference.SchemaVersion != GlobalRadarVerdictReferenceSchemaVersion ||
+			strings.TrimSpace(reference.ReferenceID) == "" ||
+			reference.AuthoritativeEngine != "arvis" ||
+			reference.SignatureVerification != "not_reverified_by_global_radar" ||
+			reference.ProjectionState != "authoritative_reference_only" {
+			return GlobalRadarSnapshot{}, errors.New("invalid global radar verdict reference")
+		}
+		if verdictReferenceIDs[reference.ReferenceID] {
+			return GlobalRadarSnapshot{}, errors.New("duplicate global radar verdict reference")
+		}
+		verdictReferenceIDs[reference.ReferenceID] = true
+		if !subjectIDs[reference.TargetSubjectID] {
+			return GlobalRadarSnapshot{}, errors.New("verdict target subject is missing from snapshot observations")
+		}
+		refs := nonEmptyIntelligenceRefs(reference.EvidenceRefs)
+		if len(refs) == 0 {
+			return GlobalRadarSnapshot{}, errors.New("verdict reference has no canonical evidence refs")
+		}
+		for _, ref := range refs {
+			if !evidenceIDs[ref] {
+				return GlobalRadarSnapshot{}, errors.New("verdict reference references evidence outside snapshot")
+			}
+		}
+	}
+
 	relationIDs := map[string]bool{}
 	for _, relation := range relations {
 		if relation.SchemaVersion != GlobalRadarRelationSchemaVersion ||
@@ -134,6 +164,7 @@ func BuildGlobalRadarSnapshot(
 	coverage.ObservationCount = len(observations)
 	coverage.RelationCount = len(relations)
 	coverage.BridgeLinkCount = len(bridgeLinks)
+	coverage.VerdictReferenceCount = len(verdictRefs)
 
 	return GlobalRadarSnapshot{
 		SchemaVersion: GlobalRadarSnapshotSchemaVersion,
@@ -141,6 +172,7 @@ func BuildGlobalRadarSnapshot(
 		Observations:  append([]GlobalRadarObservation(nil), observations...),
 		Relations:     append([]GlobalRadarRelationEdge(nil), relations...),
 		BridgeLinks:   append([]GlobalRadarBridgeLink(nil), bridgeLinks...),
+		VerdictRefs:   append([]GlobalRadarVerdictReference(nil), verdictRefs...),
 		Coverage:      coverage,
 	}, nil
 }
