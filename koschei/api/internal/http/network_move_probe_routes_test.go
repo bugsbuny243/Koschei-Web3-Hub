@@ -22,7 +22,7 @@ func TestMoveProbeRequiresConfiguredIdentityEndpoint(t *testing.T) {
 			request := httptest.NewRequest(
 				http.MethodPost,
 				"/fabric/networks/probe",
-				strings.NewReader(`{"network":"`+tc.network+`","address":"`+address+`"}`),
+				strings.NewReader(`{"network":"` + tc.network + `","address":"` + address + `"}`),
 			)
 			request.Header.Set("Content-Type", "application/json")
 			response := httptest.NewRecorder()
@@ -66,7 +66,7 @@ func TestSuiMoveProbeIntelligenceProjectsVerifiedNetworkIdentityOnly(t *testing.
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/fabric/networks/probe/intelligence",
-		strings.NewReader(`{"network":"sui-mainnet","address":"`+address+`"}`),
+		strings.NewReader(`{"network":"sui-mainnet","address":"` + address + `"}`),
 	)
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
@@ -138,7 +138,7 @@ func TestAptosMoveProbeIntelligenceProjectsLedgerIdentityOnly(t *testing.T) {
 	request := httptest.NewRequest(
 		http.MethodPost,
 		"/fabric/networks/probe/intelligence",
-		strings.NewReader(`{"network":"aptos-mainnet","address":"`+address+`"}`),
+		strings.NewReader(`{"network":"aptos-mainnet","address":"` + address + `"}`),
 	)
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
