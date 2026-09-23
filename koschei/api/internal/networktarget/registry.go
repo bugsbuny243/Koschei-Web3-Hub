@@ -47,7 +47,7 @@ type Resolution struct {
 func Catalog() []Network {
 	return []Network{
 		{ID: "solana-mainnet", Name: "Solana", Family: "solana", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "base58-32", CollectorStatus: "existing", NodeTelemetryStatus: "validator_probe_ready"},
-		{ID: "ethereum-mainnet", Name: "Ethereum", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
+		{ID: "ethereum-mainnet", Name: "Ethereum", Family: "evm", Environment: "mainnet", ConsensusFamily: "proof_of_stake", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "execution_and_beacon_probe_ready"},
 		{ID: "base-mainnet", Name: "Base", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
 		{ID: "arbitrum-mainnet", Name: "Arbitrum", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
 		{ID: "optimism-mainnet", Name: "Optimism", Family: "evm", Environment: "mainnet", ConsensusFamily: "rollup", AddressFormat: "hex-20", CollectorStatus: "probe_ready", NodeTelemetryStatus: "rpc_node_probe_ready"},
