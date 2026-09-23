@@ -23,22 +23,22 @@ const (
 )
 
 type globalRadarGraphRecordRow struct {
-	RecordType       string   `json:"record_type"`
-	RecordID         string   `json:"record_id"`
-	SchemaVersion    string   `json:"schema_version"`
-	SnapshotSHA256   string   `json:"snapshot_sha256"`
-	Network          string   `json:"network"`
-	SecondaryNetwork string   `json:"secondary_network"`
-	SubjectID        string   `json:"subject_id"`
-	TargetSubjectID  string   `json:"target_subject_id"`
-	RecordKind       string   `json:"record_kind"`
-	EvidenceStatus   string   `json:"evidence_status"`
-	EvidenceRefs     []string `json:"evidence_refs"`
-	ObservedAt       any      `json:"observed_at"`
+	RecordType       string    `json:"record_type"`
+	RecordID         string    `json:"record_id"`
+	SchemaVersion    string    `json:"schema_version"`
+	SnapshotSHA256   string    `json:"snapshot_sha256"`
+	Network          string    `json:"network"`
+	SecondaryNetwork string    `json:"secondary_network"`
+	SubjectID        string    `json:"subject_id"`
+	TargetSubjectID  string    `json:"target_subject_id"`
+	RecordKind       string    `json:"record_kind"`
+	EvidenceStatus   string    `json:"evidence_status"`
+	EvidenceRefs     []string  `json:"evidence_refs"`
+	ObservedAt       any       `json:"observed_at"`
 	RecordedAt       time.Time `json:"recorded_at"`
-	PayloadJSON      string   `json:"payload_json"`
-	PayloadSHA256    string   `json:"payload_sha256"`
-	IngestVersion    uint64   `json:"ingest_version"`
+	PayloadJSON      string    `json:"payload_json"`
+	PayloadSHA256    string    `json:"payload_sha256"`
+	IngestVersion    uint64    `json:"ingest_version"`
 }
 
 type globalRadarGraphReadRow struct {
