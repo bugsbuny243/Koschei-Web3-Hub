@@ -21,6 +21,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"koschei/api/internal/web3"
 )
 
 const (
@@ -47,12 +49,13 @@ type SecurityRadarStreamEventRecord struct {
 }
 
 type SecurityRadarStreamWorker struct {
-	Store      *SecurityRadarStore
-	WSSURL     string
-	RPCURL     string
-	Network    string
-	BufferSize int
-	Queue      chan SecurityRadarStreamEventRecord
+	Store          *SecurityRadarStore
+	WSSURL         string
+	FallbackWSSURL string
+	RPCURL         string
+	Network        string
+	BufferSize     int
+	Queue          chan SecurityRadarStreamEventRecord
 }
 
 func StartSecurityRadarStreamIfEnabled(ctx context.Context, db *sql.DB) func() {
@@ -93,6 +96,82 @@ func resolveSecurityRadarWSSURL() string {
 		return "wss://solana-mainnet.g.alchemy.com/v2/" + key
 	}
 	return ""
+}
+
+func resolveSecurityRadarWSSFallbackURL(primary string) string {
+	for _, candidate := range []string{
+		strings.TrimSpace(os.Getenv("ALCHEMY_SOLANA_WSS_URL")),
+		strings.TrimSpace(os.Getenv("HELIUS_SOLANA_WSS_URL")),
+		strings.TrimSpace(os.Getenv("QUICKNODE_SOLANA_WSS_URL")),
+	} {
+		if candidate == "" || sameSecurityRadarWSSProvider(primary, candidate) {
+			continue
+		}
+		return candidate
+	}
+	return securityRadarRPCToWSSFallback(primary, web3.SolanaRPCFallbackURL("solana-mainnet"))
+}
+
+func securityRadarRPCToWSSFallback(primary, rpcFallback string) string {
+	rpcFallback = strings.TrimSpace(rpcFallback)
+	if rpcFallback == "" {
+		return ""
+	}
+	candidate := ""
+	switch {
+	case strings.HasPrefix(rpcFallback, "https://"):
+		candidate = "wss://" + strings.TrimPrefix(rpcFallback, "https://")
+	case strings.HasPrefix(rpcFallback, "http://"):
+		candidate = "ws://" + strings.TrimPrefix(rpcFallback, "http://")
+	default:
+		return ""
+	}
+	if sameSecurityRadarWSSProvider(primary, candidate) {
+		return ""
+	}
+	return candidate
+}
+
+func sameSecurityRadarWSSProvider(a, b string) bool {
+	ua, errA := url.Parse(strings.TrimSpace(a))
+	ub, errB := url.Parse(strings.TrimSpace(b))
+	if errA != nil || errB != nil || ua == nil || ub == nil {
+		return strings.TrimSpace(a) == strings.TrimSpace(b)
+	}
+	return strings.EqualFold(strings.TrimSpace(ua.Hostname()), strings.TrimSpace(ub.Hostname()))
+}
+
+func securityRadarWSSHost(raw string) string {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u == nil {
+		return "unknown"
+	}
+	host := strings.TrimSpace(u.Hostname())
+	if host == "" {
+		return "unknown"
+	}
+	return host
+}
+
+func dialSecurityRadarWebSocket(ctx context.Context, primary, fallback string) (*minimalWSConn, error) {
+	conn, primaryErr := dialMinimalWebSocket(ctx, primary)
+	if primaryErr == nil {
+		return conn, nil
+	}
+	if ctx.Err() != nil || strings.TrimSpace(fallback) == "" || sameSecurityRadarWSSProvider(primary, fallback) {
+		return nil, primaryErr
+	}
+	fallbackConn, fallbackErr := dialMinimalWebSocket(ctx, fallback)
+	if fallbackErr != nil {
+		return nil, fmt.Errorf("primary websocket failed: %v; fallback websocket failed: %w", primaryErr, fallbackErr)
+	}
+	log.Printf(
+		"security radar WSS failover activated primary_host=%s fallback_host=%s primary_err=%s",
+		securityRadarWSSHost(primary),
+		securityRadarWSSHost(fallback),
+		safeProviderError(primaryErr),
+	)
+	return fallbackConn, nil
 }
 
 func resolveSecurityRadarRPCURL() string {
@@ -144,7 +223,16 @@ func NewSecurityRadarStreamWorker(store *SecurityRadarStore, wssURL string, rpcU
 			bufferSize = n
 		}
 	}
-	return &SecurityRadarStreamWorker{Store: store, WSSURL: strings.TrimSpace(wssURL), RPCURL: strings.TrimSpace(rpcURL), Network: firstRadarValue(os.Getenv("RADAR_STREAM_NETWORK"), "solana-mainnet"), BufferSize: bufferSize, Queue: make(chan SecurityRadarStreamEventRecord, bufferSize)}
+	trimmedWSS := strings.TrimSpace(wssURL)
+	return &SecurityRadarStreamWorker{
+		Store:          store,
+		WSSURL:         trimmedWSS,
+		FallbackWSSURL: resolveSecurityRadarWSSFallbackURL(trimmedWSS),
+		RPCURL:         strings.TrimSpace(rpcURL),
+		Network:        firstRadarValue(os.Getenv("RADAR_STREAM_NETWORK"), "solana-mainnet"),
+		BufferSize:     bufferSize,
+		Queue:          make(chan SecurityRadarStreamEventRecord, bufferSize),
+	}
 }
 
 func (w *SecurityRadarStreamWorker) Start(ctx context.Context) {
@@ -226,7 +314,7 @@ func (w *SecurityRadarStreamWorker) persistLoop(ctx context.Context) {
 }
 
 func (w *SecurityRadarStreamWorker) runOnce(ctx context.Context) error {
-	conn, err := dialMinimalWebSocket(ctx, w.WSSURL)
+	conn, err := dialSecurityRadarWebSocket(ctx, w.WSSURL, w.FallbackWSSURL)
 	if err != nil {
 		return err
 	}
