@@ -82,6 +82,15 @@ func networkDeploymentCatalog() []networkDeploymentState {
 					state.LiveAvailability = "not_checked"
 				}
 			}
+		case "move":
+			if configuredMoveIdentityEndpoint(network.ID) == "" {
+				state.CollectorRuntime = "configuration_required"
+				state.LiveAvailability = "configuration_required"
+			} else if network.ID == "sui-mainnet" {
+				state.CollectorRuntime = "graphql_configured"
+			} else if network.ID == "aptos-mainnet" {
+				state.CollectorRuntime = "rest_configured"
+			}
 		}
 		states = append(states, state)
 	}
