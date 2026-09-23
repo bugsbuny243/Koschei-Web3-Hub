@@ -344,17 +344,12 @@ WHERE record_date >= toDate({since:DateTime64(9)})
   AND recorded_at < {until:DateTime64(9)}
   AND (network = {network:String} OR secondary_network = {network:String})`
 	if request.SubjectID != "" {
-		queryText += "
-  AND (subject_id = {subject:String} OR target_subject_id = {subject:String})"
+		queryText += "\n  AND (subject_id = {subject:String} OR target_subject_id = {subject:String})"
 	}
 	if request.RecordType != "" {
-		queryText += "
-  AND record_type = {record_type:String}"
+		queryText += "\n  AND record_type = {record_type:String}"
 	}
-	queryText += "
-ORDER BY recorded_at ASC, record_type ASC, record_id ASC, payload_sha256 ASC
-LIMIT {limit:UInt64}
-FORMAT JSONEachRow"
+	queryText += "\nORDER BY recorded_at ASC, record_type ASC, record_id ASC, payload_sha256 ASC\nLIMIT {limit:UInt64}\nFORMAT JSONEachRow"
 	params.Set("query", queryText)
 	params.Set("param_since", globalRadarTimeParam(request.Since))
 	params.Set("param_until", globalRadarTimeParam(request.Until))
