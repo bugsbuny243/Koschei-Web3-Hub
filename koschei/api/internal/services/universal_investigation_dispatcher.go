@@ -192,7 +192,6 @@ func buildBitcoinUniversalDispatchPlan(plan UniversalInvestigationPlan) (Univers
 	return plan, nil
 }
 
-
 func buildMoveUniversalDispatchPlan(plan UniversalInvestigationPlan) (UniversalInvestigationPlan, error) {
 	switch plan.Subject.Kind {
 	case IntelligenceSubjectAddress:
