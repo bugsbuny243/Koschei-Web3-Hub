@@ -9,15 +9,15 @@ import (
 const GlobalRadarBridgeLinkSchemaVersion = "koschei.global-radar-bridge-link.v1"
 
 type GlobalRadarBridgeLink struct {
-	SchemaVersion          string                   `json:"schema_version"`
-	LinkID                 string                   `json:"link_id"`
-	BridgeProtocol         string                   `json:"bridge_protocol"`
-	BridgeTransferID       string                   `json:"bridge_transfer_id"`
-	SourceObservation      GlobalRadarObservation   `json:"source_observation"`
-	DestinationObservation GlobalRadarObservation   `json:"destination_observation"`
-	LinkEvidence           IntelligenceEvidence     `json:"link_evidence"`
-	Relation               GlobalRadarRelationEdge  `json:"relation"`
-	VerificationBoundary   string                   `json:"verification_boundary"`
+	SchemaVersion          string                  `json:"schema_version"`
+	LinkID                 string                  `json:"link_id"`
+	BridgeProtocol         string                  `json:"bridge_protocol"`
+	BridgeTransferID       string                  `json:"bridge_transfer_id"`
+	SourceObservation      GlobalRadarObservation  `json:"source_observation"`
+	DestinationObservation GlobalRadarObservation  `json:"destination_observation"`
+	LinkEvidence           IntelligenceEvidence    `json:"link_evidence"`
+	Relation               GlobalRadarRelationEdge `json:"relation"`
+	VerificationBoundary   string                  `json:"verification_boundary"`
 }
 
 // BuildGlobalRadarBridgeLink correlates two already-observed chain transactions.
