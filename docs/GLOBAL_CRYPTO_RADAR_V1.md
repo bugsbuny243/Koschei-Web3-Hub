@@ -62,22 +62,45 @@ Sui and Aptos identity classification exists, but transaction/state/program disp
 remains fail-closed. Identity readiness must never silently promote them to full radar
 coverage.
 
+## Implemented in this slice
+
+### Capability contract
+
+`koschei.global-radar-capability.v1` exposes radar capabilities independently per
+network. It is repository-state metadata, not deployment proof.
+
+### Observation envelope
+
+`koschei.global-radar-observation.v1` wraps already-normalized
+`IntelligenceEvidence` without creating a verdict. The builder rejects subject,
+chain-family, chain or network mismatches and accepts only OBSERVED or VERIFIED
+evidence with a concrete source and observation time.
+
+The existing EVM and Bitcoin read-only intelligence probe route now adds a
+`radar_observation` projection while keeping the legacy flat probe response
+unchanged.
+
+### Durable relation edge
+
+`koschei.global-radar-relation.v1` creates stable graph edge identifiers.
+
+A relation is VERIFIED only when one concrete evidence record explicitly binds both
+endpoint subject IDs. Cross-network relations additionally require that the binding
+record names the matching source and target networks. Independent observations on
+two chains are not treated as proof that those subjects are related.
+
 ## Next implementation slices
 
-1. Normalize live observations into one chain-neutral evidence envelope while
-   preserving chain-native semantics.
-2. Add durable entity and relation identifiers for wallet/account/contract/bridge
-   graph edges.
-3. Add cross-chain correlation records that point to concrete source evidence instead
-   of probabilistic attribution.
-4. Add live node/validator/miner telemetry snapshots and concentration dimensions.
-5. Add bridge transfer observation and source/destination transaction linkage.
-6. Add liquidity-event observations without letting market data issue security
+1. Add a concrete bridge-transfer linker that can emit the explicit cross-network
+   binding evidence required by the relation contract.
+2. Add live node/validator/miner telemetry snapshots and concentration dimensions.
+3. Add liquidity-event observations without letting market data issue security
    verdicts.
-7. Project ARVIS signed deterministic verdicts into the global graph without creating
+4. Project ARVIS signed deterministic verdicts into the global graph without creating
    a second verdict engine.
-8. Add public/operator coverage views that distinguish implemented, configured,
+5. Add public/operator coverage views that distinguish implemented, configured,
    observed and verified states.
+6. Add durable graph persistence/query paths for observations and relation edges.
 
 ## Product principle
 
