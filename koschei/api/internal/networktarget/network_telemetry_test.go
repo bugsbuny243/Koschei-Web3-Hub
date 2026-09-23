@@ -14,9 +14,9 @@ func TestCatalogExposesTelemetryImplementationWithoutClaimingDeploymentHealth(t 
 	expected := map[string]string{
 		"solana-mainnet":    "validator_probe_ready",
 		"ethereum-mainnet":  "execution_and_beacon_probe_ready",
-		"base-mainnet":      "rpc_node_probe_ready",
-		"arbitrum-mainnet":  "rpc_node_probe_ready",
-		"optimism-mainnet":  "rpc_node_probe_ready",
+		"base-mainnet":      "rpc_node_and_finality_probe_ready",
+		"arbitrum-mainnet":  "rpc_node_and_finality_probe_ready",
+		"optimism-mainnet":  "rpc_node_and_finality_probe_ready",
 		"polygon-mainnet":   "rpc_node_probe_ready",
 		"bnb-mainnet":       "rpc_node_probe_ready",
 		"avalanche-mainnet": "rpc_node_probe_ready",
