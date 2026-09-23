@@ -9,26 +9,26 @@ import (
 const GlobalRadarVerdictReferenceSchemaVersion = "koschei.global-radar-verdict-reference.v1"
 
 type GlobalRadarVerdictReference struct {
-	SchemaVersion          string   `json:"schema_version"`
-	ReferenceID            string   `json:"reference_id"`
-	AuthoritativeEngine    string   `json:"authoritative_engine"`
-	TargetSubjectID        string   `json:"target_subject_id"`
-	Network                string   `json:"network"`
-	Grade                  string   `json:"grade"`
-	Verdict                string   `json:"verdict"`
-	RulesetVersion         string   `json:"ruleset_version"`
-	ActorRulesetVersion    string   `json:"actor_ruleset_version,omitempty"`
+	SchemaVersion          string    `json:"schema_version"`
+	ReferenceID            string    `json:"reference_id"`
+	AuthoritativeEngine    string    `json:"authoritative_engine"`
+	TargetSubjectID        string    `json:"target_subject_id"`
+	Network                string    `json:"network"`
+	Grade                  string    `json:"grade"`
+	Verdict                string    `json:"verdict"`
+	RulesetVersion         string    `json:"ruleset_version"`
+	ActorRulesetVersion    string    `json:"actor_ruleset_version,omitempty"`
 	GeneratedAt            time.Time `json:"generated_at"`
-	SourceMarkedSigned     bool     `json:"source_marked_signed"`
-	SignatureAlgorithm     string   `json:"signature_algorithm"`
-	KeyID                  string   `json:"key_id"`
-	PayloadHash            string   `json:"payload_hash"`
-	Signature              string   `json:"signature"`
-	SignatureVerification  string   `json:"signature_verification"`
-	DecisionEvidenceStatus string   `json:"decision_evidence_status"`
-	EvidenceRefs           []string `json:"evidence_refs"`
-	ProjectionState        string   `json:"projection_state"`
-	TrustBoundary          string   `json:"trust_boundary"`
+	SourceMarkedSigned     bool      `json:"source_marked_signed"`
+	SignatureAlgorithm     string    `json:"signature_algorithm"`
+	KeyID                  string    `json:"key_id"`
+	PayloadHash            string    `json:"payload_hash"`
+	Signature              string    `json:"signature"`
+	SignatureVerification  string    `json:"signature_verification"`
+	DecisionEvidenceStatus string    `json:"decision_evidence_status"`
+	EvidenceRefs           []string  `json:"evidence_refs"`
+	ProjectionState        string    `json:"projection_state"`
+	TrustBoundary          string    `json:"trust_boundary"`
 }
 
 // ProjectARVISSignedVerdictToGlobalRadar preserves an existing authoritative ARVIS
