@@ -7,7 +7,6 @@ import (
 
 func TestUniversalInvestigationProfilesKeepPlannedFamiliesNonLive(t *testing.T) {
 	plannedFamilies := map[string]bool{
-		IntelligenceChainFamilyMove:      false,
 		IntelligenceChainFamilyCosmos:    false,
 		IntelligenceChainFamilySubstrate: false,
 		IntelligenceChainFamilyTON:       false,
@@ -118,13 +117,13 @@ func TestClassifyUniversalInvestigationSubjectFailsClosedForUndeclaredChainKind(
 	}
 }
 
-func TestMoveCanonicalAddressesClassifyWhileUniversalDispatcherStaysPlanned(t *testing.T) {
+func TestMoveCanonicalAddressesClassifyWithEvidenceOnlyProbe(t *testing.T) {
 	address := "0x" + strings.Repeat("11", 32)
 	var firstID string
 
 	for _, network := range []string{"sui-mainnet", "aptos-mainnet"} {
 		profile, ok := UniversalInvestigationProfileForNetwork(network)
-		if !ok || profile.ChainFamily != IntelligenceChainFamilyMove || profile.Status != UniversalAdapterPlanned {
+		if !ok || profile.ChainFamily != IntelligenceChainFamilyMove || profile.Status != UniversalAdapterProbe {
 			t.Fatalf("network %s profile=%#v ok=%v", network, profile, ok)
 		}
 
@@ -148,8 +147,8 @@ func TestMoveCanonicalAddressesClassifyWhileUniversalDispatcherStaysPlanned(t *t
 		if err != nil {
 			t.Fatal(err)
 		}
-		if plan.Executable || plan.Route != UniversalDispatchPlannedAdapter || plan.VerdictAuthority != UniversalVerdictNone {
-			t.Fatalf("network %s identity probe overclaimed universal dispatcher: %#v", network, plan)
+		if !plan.Executable || plan.Route != UniversalDispatchMoveIdentity || !plan.EvidenceOnly || plan.VerdictAuthority != UniversalVerdictEvidenceOnly {
+			t.Fatalf("network %s identity probe plan mismatch: %#v", network, plan)
 		}
 	}
 
