@@ -124,3 +124,38 @@ func TestGlobalRadarNetworkEventRejectsUnknownFieldsAndGET(t *testing.T) {
 		t.Fatalf("GET status=%d body=%s", get.Code, get.Body.String())
 	}
 }
+
+
+func TestMoveDeploymentCatalogReportsConfigurationTruthfully(t *testing.T) {
+	t.Setenv("SUI_GRAPHQL_URL", "")
+	t.Setenv("APTOS_REST_URL", "")
+	states := networkDeploymentCatalog()
+	byID := map[string]networkDeploymentState{}
+	for _, state := range states {
+		byID[state.NetworkID] = state
+	}
+	for _, networkID := range []string{"sui-mainnet", "aptos-mainnet"} {
+		state, ok := byID[networkID]
+		if !ok {
+			t.Fatalf("deployment catalog missing %s", networkID)
+		}
+		if state.CollectorRuntime != "configuration_required" ||
+			state.LiveAvailability != "configuration_required" {
+			t.Fatalf("%s state=%#v", networkID, state)
+		}
+	}
+
+	t.Setenv("SUI_GRAPHQL_URL", "https://sui.example/graphql")
+	t.Setenv("APTOS_REST_URL", "https://aptos.example/v1")
+	states = networkDeploymentCatalog()
+	byID = map[string]networkDeploymentState{}
+	for _, state := range states {
+		byID[state.NetworkID] = state
+	}
+	if byID["sui-mainnet"].CollectorRuntime != "graphql_configured" {
+		t.Fatalf("sui state=%#v", byID["sui-mainnet"])
+	}
+	if byID["aptos-mainnet"].CollectorRuntime != "rest_configured" {
+		t.Fatalf("aptos state=%#v", byID["aptos-mainnet"])
+	}
+}
