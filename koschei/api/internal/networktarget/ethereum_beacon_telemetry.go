@@ -23,22 +23,22 @@ type EthereumBeaconCheckpoint struct {
 }
 
 type EthereumBeaconTelemetryResult struct {
-	SchemaVersion       string                      `json:"schema_version"`
-	Observation         NetworkTelemetryObservation `json:"observation"`
-	ClientVersion       string                      `json:"client_version"`
-	ConnectedPeers      uint64                      `json:"connected_peers"`
-	HeadSlot            uint64                      `json:"head_slot"`
-	SyncDistance        uint64                      `json:"sync_distance"`
-	IsSyncing           bool                        `json:"is_syncing"`
-	IsOptimistic        bool                        `json:"is_optimistic"`
-	ExecutionLayerOffline bool                      `json:"execution_layer_offline"`
-	PreviousJustified   EthereumBeaconCheckpoint    `json:"previous_justified"`
-	CurrentJustified    EthereumBeaconCheckpoint    `json:"current_justified"`
-	Finalized           EthereumBeaconCheckpoint    `json:"finalized"`
-	CheckpointStateFinalized bool                   `json:"checkpoint_state_finalized"`
-	EndpointScope       string                      `json:"endpoint_scope"`
-	AnalysisPerformed   bool                        `json:"analysis_performed"`
-	LiveAvailability    string                      `json:"live_availability"`
+	SchemaVersion            string                      `json:"schema_version"`
+	Observation              NetworkTelemetryObservation `json:"observation"`
+	ClientVersion            string                      `json:"client_version"`
+	ConnectedPeers           uint64                      `json:"connected_peers"`
+	HeadSlot                 uint64                      `json:"head_slot"`
+	SyncDistance             uint64                      `json:"sync_distance"`
+	IsSyncing                bool                        `json:"is_syncing"`
+	IsOptimistic             bool                        `json:"is_optimistic"`
+	ExecutionLayerOffline    bool                        `json:"execution_layer_offline"`
+	PreviousJustified        EthereumBeaconCheckpoint    `json:"previous_justified"`
+	CurrentJustified         EthereumBeaconCheckpoint    `json:"current_justified"`
+	Finalized                EthereumBeaconCheckpoint    `json:"finalized"`
+	CheckpointStateFinalized bool                        `json:"checkpoint_state_finalized"`
+	EndpointScope            string                      `json:"endpoint_scope"`
+	AnalysisPerformed        bool                        `json:"analysis_performed"`
+	LiveAvailability         string                      `json:"live_availability"`
 }
 
 type ethereumBeaconVersionResponse struct {
@@ -49,9 +49,9 @@ type ethereumBeaconVersionResponse struct {
 
 type ethereumBeaconPeerCountResponse struct {
 	Data struct {
-		Disconnected string `json:"disconnected"`
-		Connecting   string `json:"connecting"`
-		Connected    string `json:"connected"`
+		Disconnected  string `json:"disconnected"`
+		Connecting    string `json:"connecting"`
+		Connected     string `json:"connected"`
 		Disconnecting string `json:"disconnecting"`
 	} `json:"data"`
 }
@@ -74,7 +74,7 @@ type ethereumBeaconCheckpointWire struct {
 type ethereumBeaconFinalityResponse struct {
 	ExecutionOptimistic bool `json:"execution_optimistic"`
 	Finalized           bool `json:"finalized"`
-	Data struct {
+	Data                struct {
 		PreviousJustified ethereumBeaconCheckpointWire `json:"previous_justified"`
 		CurrentJustified  ethereumBeaconCheckpointWire `json:"current_justified"`
 		Finalized         ethereumBeaconCheckpointWire `json:"finalized"`
