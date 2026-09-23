@@ -90,7 +90,7 @@ func UniversalInvestigationAdapterProfiles() []UniversalInvestigationAdapterProf
 			"UTXO observations remain evidence-only until deterministic UTXO behavior rules are promoted.",
 		),
 		universalInvestigationProfile(
-			"move-object-model", "web3", IntelligenceChainFamilyMove, UniversalAdapterPlanned, "move_family",
+			"move-object-model", "web3", IntelligenceChainFamilyMove, UniversalAdapterProbe, "move_family",
 			[]string{"sui-mainnet", "aptos-mainnet"},
 			[]string{
 				IntelligenceSubjectAddress, IntelligenceSubjectToken, IntelligenceSubjectContract,
