@@ -10,6 +10,7 @@ on:
       - "koschei/api/internal/services/global_radar_*.go"
       - "koschei/api/internal/services/solana_validator_telemetry.go"
       - "koschei/api/internal/services/solana_validator_telemetry_test.go"
+      - "koschei/api/cmd/clickhouse-global-radar-read/**"
       - ".github/workflows/clickhouse-global-radar-ci.yml"
   push:
     branches: [main]
@@ -19,6 +20,7 @@ on:
       - "koschei/api/internal/clickhouse/global_radar_store.go"
       - "koschei/api/internal/clickhouse/global_radar_store_test.go"
       - "koschei/api/internal/services/global_radar_*.go"
+      - "koschei/api/cmd/clickhouse-global-radar-read/**"
       - ".github/workflows/clickhouse-global-radar-ci.yml"
   workflow_dispatch:
 
@@ -115,5 +117,11 @@ jobs:
       - name: Test Global Radar ClickHouse writer and reader
         run: go test ./internal/clickhouse -count=1
 
+      - name: Compile Global Radar memory reader
+        run: go test ./cmd/clickhouse-global-radar-read -count=1
+
       - name: Vet Global Radar ClickHouse paths
-        run: go vet ./internal/clickhouse
+        run: go vet ./internal/clickhouse ./cmd/clickhouse-global-radar-read
+
+      - name: Build Global Radar memory reader
+        run: CGO_ENABLED=0 GOOS=linux go build ./cmd/clickhouse-global-radar-read
