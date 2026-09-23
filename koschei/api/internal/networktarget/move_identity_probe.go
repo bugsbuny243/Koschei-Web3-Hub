@@ -13,11 +13,9 @@ import (
 	"time"
 )
 
-const (
-	moveIdentityResponseLimit      = 128 * 1024
-	suiMainnetChainIdentifierBase58 = "4btiuiMPvEENsttpZC7CZ53DruC3MAgfznDbASZ7DR6S"
-	aptosMainnetChainID             = 1
-)
+const moveIdentityResponseLimit = 128 * 1024
+const suiMainnetChainIdentifierBase58 = "4btiuiMPvEENsttpZC7CZ53DruC3MAgfznDbASZ7DR6S"
+const aptosMainnetChainID = 1
 
 type SuiMainnetIdentityProbeResult struct {
 	SchemaVersion      string                      `json:"schema_version"`
