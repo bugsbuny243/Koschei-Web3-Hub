@@ -99,6 +99,7 @@ func registerFabricRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/fabric/networks/probe/intelligence", method(http.MethodPost, networkTargetProbe))
 	mux.HandleFunc("/fabric/radar/global", method(http.MethodGet, globalRadarSnapshotHandler))
 	mux.HandleFunc("/fabric/radar", method(http.MethodGet, globalRadarOperatorPage))
+	mux.HandleFunc("/fabric/radar/probe-event", method(http.MethodPost, globalRadarProbeEvent))
 	// Fabric is still experimental. Keep its capability contract outside /api/*
 	// until it is deliberately promoted into the production OpenAPI contract.
 	mux.HandleFunc("/fabric/capabilities", method(http.MethodGet, fabricCapabilities))
@@ -118,7 +119,7 @@ func MountFabric(base http.Handler) http.Handler {
 	fabric := securityHeaders(fabricMux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/fabric", "/fabric/capabilities", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe", "/fabric/networks/probe/intelligence", "/fabric/radar/global", "/fabric/radar":
+		case "/fabric", "/fabric/capabilities", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe", "/fabric/networks/probe/intelligence", "/fabric/radar/global", "/fabric/radar", "/fabric/radar/probe-event":
 			fabric.ServeHTTP(w, r)
 		default:
 			base.ServeHTTP(w, r)
