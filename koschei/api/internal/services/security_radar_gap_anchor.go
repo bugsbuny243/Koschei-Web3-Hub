@@ -103,13 +103,14 @@ func latestDurableReplayAnchor(ctx context.Context, db *sql.DB, network, program
 	var signature string
 	var slot int64
 	err := db.QueryRowContext(ctx, `
-		SELECT COALESCE(signature,''),COALESCE(slot,0)
+		SELECT signature,slot
 		FROM security_radar_stream_events
 		WHERE network=$1
 		  AND program_id=$2
 		  AND signature IS NOT NULL
 		  AND btrim(signature)<>''
-		ORDER BY COALESCE(slot,0) DESC,created_at DESC
+		  AND slot IS NOT NULL
+		ORDER BY slot DESC,created_at DESC
 		LIMIT 1
 	`, normalizeRadarNetwork(network), strings.TrimSpace(programID)).Scan(&signature, &slot)
 	if errors.Is(err, sql.ErrNoRows) {
