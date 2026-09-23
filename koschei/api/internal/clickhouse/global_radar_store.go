@@ -18,8 +18,8 @@ import (
 const (
 	MaxGlobalRadarGraphReadRows   = uint64(5000)
 	MaxGlobalRadarGraphReadWindow = 31 * 24 * time.Hour
-	globalRadarGraphScanRowCap     = uint64(10000000)
-	globalRadarGraphBodyLimit      = int64(64 << 20)
+	globalRadarGraphScanRowCap    = uint64(10000000)
+	globalRadarGraphBodyLimit     = int64(64 << 20)
 )
 
 type globalRadarGraphRecordRow struct {
