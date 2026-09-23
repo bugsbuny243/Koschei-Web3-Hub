@@ -12,25 +12,25 @@ import (
 const globalRadarSchemaVersion = "koschei.global-radar.v1"
 
 type globalRadarTruthBoundary struct {
-	LiveChainMetricsIncluded      bool   `json:"live_chain_metrics_included"`
-	WalletGeolocationIncluded     bool   `json:"wallet_geolocation_included"`
-	InfrastructureGeographyOnly   bool   `json:"infrastructure_geography_only"`
-	MissingEvidencePolicy         string `json:"missing_evidence_policy"`
-	CapabilityIsNotLiveEvidence   bool   `json:"capability_is_not_live_evidence"`
+	LiveChainMetricsIncluded    bool   `json:"live_chain_metrics_included"`
+	WalletGeolocationIncluded   bool   `json:"wallet_geolocation_included"`
+	InfrastructureGeographyOnly bool   `json:"infrastructure_geography_only"`
+	MissingEvidencePolicy       string `json:"missing_evidence_policy"`
+	CapabilityIsNotLiveEvidence bool   `json:"capability_is_not_live_evidence"`
 }
 
 type globalRadarNetworkState struct {
-	Network            networktarget.Network `json:"network"`
-	CollectorRuntime   string                `json:"collector_runtime"`
-	LiveAvailability   string                `json:"live_availability"`
+	Network          networktarget.Network `json:"network"`
+	CollectorRuntime string                `json:"collector_runtime"`
+	LiveAvailability string                `json:"live_availability"`
 }
 
 type globalRadarSummary struct {
-	RegisteredNetworks     int      `json:"registered_networks"`
-	NetworkFamilies        []string `json:"network_families"`
-	ImplementationReady    int      `json:"implementation_ready"`
-	ConfigurationRequired  int      `json:"configuration_required"`
-	LiveChecked            int      `json:"live_checked"`
+	RegisteredNetworks    int      `json:"registered_networks"`
+	NetworkFamilies       []string `json:"network_families"`
+	ImplementationReady   int      `json:"implementation_ready"`
+	ConfigurationRequired int      `json:"configuration_required"`
+	LiveChecked           int      `json:"live_checked"`
 }
 
 type globalRadarSnapshot struct {
