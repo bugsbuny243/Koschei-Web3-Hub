@@ -64,6 +64,14 @@ chain adapter
 
 A future adapter will promote correlated radar events into `koschei.security-evidence/v1` only when the evidence contract requirements are satisfied.
 
+## Durable event ledger
+
+ClickHouse migration `006_global_radar_events.sql` defines an append-first ledger keyed by the canonical `event_sha256`. Exact delivery replay converges through `ReplacingMergeTree(ingest_version)`, while distinct canonical event digests remain separate historical records.
+
+The writer re-verifies every event digest before any network write, canonicalizes the event again, stores the complete canonical event JSON, and binds those stored bytes with a separate payload SHA-256. The ledger does not create a risk grade or promote evidence state.
+
+This storage path is intentionally available before automatic producers are connected. A producer must already possess the real source digest required by the event contract; normalized probe output is not retroactively relabeled as raw source evidence.
+
 ## Next step
 
 Build source adapters that emit this envelope from:
