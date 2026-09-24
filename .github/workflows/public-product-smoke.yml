@@ -103,7 +103,13 @@ jobs:
           checked_page() {
             local name="$1" path="$2" marker="$3"
             if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-              wait_expect_200 "${name}" "${path}" "${marker}" 6
+              code="$(probe "${name}" "${path}")"
+              echo "${name}_code=${code}" | tee -a diagnostics/result.txt
+              case "${code}" in
+                200) grep -Fq "${marker}" "diagnostics/${name}.body" || { echo "PUBLIC_PRODUCT_CONTRACT_FAILURE: ${path} is missing marker ${marker}." >&2; exit 1; } ;;
+                429) echo "PR_PRODUCTION_RATE_LIMITED: ${path} returned HTTP 429; branch-local checks remain authoritative and strict production readiness stays post-deploy." | tee -a diagnostics/result.txt ;;
+                *) echo "PUBLIC_PRODUCT_FAILURE: ${path} returned HTTP ${code}." >&2; exit 1 ;;
+              esac
             else
               wait_expect_200 "${name}" "${path}" "${marker}" 18
             fi
