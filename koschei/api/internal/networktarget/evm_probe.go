@@ -140,8 +140,8 @@ func ProbeEVM(ctx context.Context, client *http.Client, endpoint string, resolut
 	resolution.EvidenceStatus = "observed"
 	resolution.LiveAvailability = "checked"
 	return EVMProbeResult{
-		SchemaVersion:     SchemaVersion,
-		Resolution:        resolution,
+		SchemaVersion:              SchemaVersion,
+		Resolution:                 resolution,
 		ChainID:                    chainID,
 		ExpectedChainID:            expectedChainID,
 		ChainIDResponseSHA256:      chainIDResponseSHA256,
