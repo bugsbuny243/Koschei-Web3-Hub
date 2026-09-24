@@ -132,6 +132,58 @@ func TestBuildBitcoinAddressProbeEventPreservesUTXOActivityWithoutSafetyClaim(t 
 	}
 }
 
+func TestBuildBitcoinAddressProbeEventFromResultBindsNativeResponseDigests(t *testing.T) {
+	resolution, err := networktarget.Resolve("bitcoin-mainnet", "1BoatSLRHtKNngkdXEeobR76b53LETtpyT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	genesisDigest := strings.Repeat("a", 64)
+	addressDigest := strings.Repeat("b", 64)
+	result := networktarget.BitcoinProbeResult{
+		SchemaVersion:         networktarget.SchemaVersion,
+		Resolution:            resolution,
+		GenesisHash:           strings.Repeat("0", 64),
+		ExpectedGenesisHash:   strings.Repeat("0", 64),
+		GenesisResponseSHA256: genesisDigest,
+		ActivityState:         "activity_observed",
+		ConfirmedTXCount:      12,
+		MempoolTXCount:        1,
+		FundedSats:            42000,
+		SpentSats:             21000,
+		AddressResponseSHA256: addressDigest,
+		AnalysisPerformed:     true,
+		EvidenceStatus:        "observed",
+		LiveAvailability:      "checked",
+	}
+	event, err := BuildBitcoinAddressProbeEventFromResult("bitcoin-esplora-adapter", result, time.UnixMilli(1780000000000))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := event.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if len(event.SourceDigests) != 2 || event.SourceDigests[0] != genesisDigest || event.SourceDigests[1] != addressDigest {
+		t.Fatalf("unexpected source digests: %#v", event.SourceDigests)
+	}
+	facts := map[string]Fact{}
+	for _, fact := range event.Facts {
+		facts[fact.Key] = fact
+	}
+	if facts["genesis_hash"].EvidenceSHA256 != genesisDigest || facts["expected_genesis_hash"].EvidenceSHA256 != genesisDigest {
+		t.Fatalf("genesis facts lost native response binding: %#v", facts)
+	}
+	if facts["activity_state"].EvidenceSHA256 != addressDigest ||
+		facts["confirmed_tx_count"].EvidenceSHA256 != addressDigest ||
+		facts["funded_sats"].EvidenceSHA256 != addressDigest {
+		t.Fatalf("activity facts lost native response binding: %#v", facts)
+	}
+
+	result.AddressResponseSHA256 = ""
+	if _, err := BuildBitcoinAddressProbeEventFromResult("bitcoin-esplora-adapter", result, time.UnixMilli(1780000000000)); err == nil {
+		t.Fatal("missing native address response digest was accepted")
+	}
+}
+
 func TestBuildMoveIdentityEventsPreserveVerifiedChainIdentity(t *testing.T) {
 	suiObservation, err := networktarget.NormalizeNetworkTelemetry(networktarget.NetworkTelemetryInput{
 		NetworkID:      "sui-mainnet",

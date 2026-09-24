@@ -99,6 +99,43 @@ func buildEVMAddressProbeEvent(
 }
 
 func BuildBitcoinAddressProbeEvent(producer string, result networktarget.BitcoinProbeResult, observedAt time.Time, sourceDigest string) (Event, error) {
+	return buildBitcoinAddressProbeEvent(
+		producer,
+		result,
+		observedAt,
+		[]string{sourceDigest},
+		sourceDigest,
+		sourceDigest,
+	)
+}
+
+// BuildBitcoinAddressProbeEventFromResult binds network identity facts to the
+// exact /block-height/0 response bytes and address activity facts to the exact
+// Esplora /address response bytes. Missing native digests fail closed.
+func BuildBitcoinAddressProbeEventFromResult(producer string, result networktarget.BitcoinProbeResult, observedAt time.Time) (Event, error) {
+	genesisDigest := strings.TrimSpace(result.GenesisResponseSHA256)
+	addressDigest := strings.TrimSpace(result.AddressResponseSHA256)
+	if genesisDigest == "" || addressDigest == "" {
+		return Event{}, errors.New("bitcoin probe native response digests are required")
+	}
+	return buildBitcoinAddressProbeEvent(
+		producer,
+		result,
+		observedAt,
+		[]string{genesisDigest, addressDigest},
+		genesisDigest,
+		addressDigest,
+	)
+}
+
+func buildBitcoinAddressProbeEvent(
+	producer string,
+	result networktarget.BitcoinProbeResult,
+	observedAt time.Time,
+	sourceDigests []string,
+	genesisDigest string,
+	addressDigest string,
+) (Event, error) {
 	if result.SchemaVersion != networktarget.SchemaVersion {
 		return Event{}, errors.New("unsupported bitcoin probe schema")
 	}
@@ -118,14 +155,14 @@ func BuildBitcoinAddressProbeEvent(producer string, result networktarget.Bitcoin
 	}
 
 	facts := compactFacts([]Fact{
-		boundFact("genesis_hash", result.GenesisHash, "", sourceDigest),
-		boundFact("expected_genesis_hash", result.ExpectedGenesisHash, "", sourceDigest),
-		boundFact("activity_state", result.ActivityState, "", sourceDigest),
-		boundFact("confirmed_tx_count", strconv.FormatInt(result.ConfirmedTXCount, 10), "transactions", sourceDigest),
-		boundFact("mempool_tx_count", strconv.FormatInt(result.MempoolTXCount, 10), "transactions", sourceDigest),
-		boundFact("funded_sats", strconv.FormatInt(result.FundedSats, 10), "sats", sourceDigest),
-		boundFact("spent_sats", strconv.FormatInt(result.SpentSats, 10), "sats", sourceDigest),
-		boundFact("live_availability", result.LiveAvailability, "", sourceDigest),
+		boundFact("genesis_hash", result.GenesisHash, "", genesisDigest),
+		boundFact("expected_genesis_hash", result.ExpectedGenesisHash, "", genesisDigest),
+		boundFact("activity_state", result.ActivityState, "", addressDigest),
+		boundFact("confirmed_tx_count", strconv.FormatInt(result.ConfirmedTXCount, 10), "transactions", addressDigest),
+		boundFact("mempool_tx_count", strconv.FormatInt(result.MempoolTXCount, 10), "transactions", addressDigest),
+		boundFact("funded_sats", strconv.FormatInt(result.FundedSats, 10), "sats", addressDigest),
+		boundFact("spent_sats", strconv.FormatInt(result.SpentSats, 10), "sats", addressDigest),
+		boundFact("live_availability", result.LiveAvailability, "", addressDigest),
 	})
 
 	event := Event{
@@ -141,7 +178,7 @@ func BuildBitcoinAddressProbeEvent(producer string, result networktarget.Bitcoin
 			{Kind: "canonical_ref", Value: subjectID},
 			{Kind: "address", Value: result.Resolution.Address},
 		},
-		SourceDigests: []string{sourceDigest},
+		SourceDigests: append([]string(nil), sourceDigests...),
 		Facts:         facts,
 	}
 	return event.Seal()

@@ -2,6 +2,8 @@ package networktarget
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -93,5 +95,39 @@ func TestProbeBitcoinRequiresHTTPSConfiguredEndpoint(t *testing.T) {
 	resolution, _ := Resolve("bitcoin-mainnet", "1BoatSLRHtKNngkdXEeobR76b53LETtpyT")
 	if _, err := ProbeBitcoin(context.Background(), http.DefaultClient, "http://127.0.0.1:3000", resolution); err == nil {
 		t.Fatal("non-HTTPS endpoint was accepted")
+	}
+}
+
+func TestProbeBitcoinCapturesExactEsploraResponseDigests(t *testing.T) {
+	genesisBody := []byte(bitcoinMainnetGenesisHash + "\n")
+	addressBody := []byte(`{"address":"1BoatSLRHtKNngkdXEeobR76b53LETtpyT","chain_stats":{"funded_txo_count":1,"funded_txo_sum":1000,"spent_txo_count":0,"spent_txo_sum":0,"tx_count":1},"mempool_stats":{"funded_txo_count":0,"funded_txo_sum":0,"spent_txo_count":0,"spent_txo_sum":0,"tx_count":0}}`)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/block-height/0":
+			_, _ = w.Write(genesisBody)
+		case "/address/1BoatSLRHtKNngkdXEeobR76b53LETtpyT":
+			_, _ = w.Write(addressBody)
+		default:
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	resolution, err := Resolve("bitcoin-mainnet", "1BoatSLRHtKNngkdXEeobR76b53LETtpyT")
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := ProbeBitcoin(context.Background(), server.Client(), server.URL, resolution)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	genesisDigest := sha256.Sum256(genesisBody)
+	addressDigest := sha256.Sum256(addressBody)
+	if result.GenesisResponseSHA256 != hex.EncodeToString(genesisDigest[:]) {
+		t.Fatalf("genesis response digest=%q", result.GenesisResponseSHA256)
+	}
+	if result.AddressResponseSHA256 != hex.EncodeToString(addressDigest[:]) {
+		t.Fatalf("address response digest=%q", result.AddressResponseSHA256)
 	}
 }
