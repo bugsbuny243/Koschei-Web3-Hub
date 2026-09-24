@@ -310,12 +310,18 @@ func networkTargetProbeWithStores(w http.ResponseWriter, r *http.Request, client
 			return
 		}
 		if withIntelligence {
-			projection, projectionErr := services.AdaptBitcoinProbeEvidence(result, time.Now().UTC())
+			observedAt := time.Now().UTC()
+			projection, projectionErr := services.AdaptBitcoinProbeEvidence(result, observedAt)
 			if projectionErr != nil {
 				reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 				return
 			}
-			if err := writeIntelligence(result, projection, services.GlobalRadarObservationTransaction, nil); err != nil {
+			radarEvent, eventErr := radarevent.BuildBitcoinAddressProbeEventFromResult("bitcoin-esplora-adapter", result, observedAt)
+			if eventErr != nil {
+				reject(http.StatusBadGateway, "radar_event_unavailable", "unavailable")
+				return
+			}
+			if err := writeIntelligence(result, projection, services.GlobalRadarObservationTransaction, &radarEvent); err != nil {
 				writeIntelligenceError(err)
 				return
 			}

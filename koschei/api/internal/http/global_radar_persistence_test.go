@@ -176,3 +176,54 @@ func TestNetworkProbeIntelligenceFailsClosedWhenEventSinkCannotPersist(t *testin
 		t.Fatalf("unexpected response: %s", response.Body.String())
 	}
 }
+
+func TestBitcoinNetworkProbeIntelligenceEmitsAndPersistsNativeDigestEvent(t *testing.T) {
+	const address = "1BoatSLRHtKNngkdXEeobR76b53LETtpyT"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/block-height/0":
+			_, _ = w.Write([]byte("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"))
+		case "/address/" + address:
+			_, _ = w.Write([]byte(`{"address":"1BoatSLRHtKNngkdXEeobR76b53LETtpyT","chain_stats":{"funded_txo_count":1,"funded_txo_sum":1000,"spent_txo_count":0,"spent_txo_sum":0,"tx_count":1},"mempool_stats":{"funded_txo_count":0,"funded_txo_sum":0,"spent_txo_count":0,"spent_txo_sum":0,"tx_count":0}}`))
+		default:
+			http.Error(w, "unexpected path", http.StatusBadRequest)
+		}
+	}))
+	defer server.Close()
+	t.Setenv("BITCOIN_ESPLORA_URL", server.URL)
+
+	snapshotSink := &recordingGlobalRadarSink{}
+	eventSink := &recordingGlobalRadarEventSink{}
+	request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe/intelligence", strings.NewReader(`{"network":"bitcoin-mainnet","address":"1BoatSLRHtKNngkdXEeobR76b53LETtpyT"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	networkTargetProbeWithStores(response, request, server.Client(), snapshotSink, eventSink)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if len(eventSink.events) != 1 {
+		t.Fatalf("persisted events=%d want 1", len(eventSink.events))
+	}
+	event := eventSink.events[0]
+	if err := event.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if event.NetworkID != "bitcoin-mainnet" || event.Kind != radarevent.KindAccount || len(event.SourceDigests) != 2 {
+		t.Fatalf("unexpected bitcoin radar event: %#v", event)
+	}
+
+	var payload struct {
+		RadarEvent            *radarevent.Event `json:"radar_event"`
+		RadarEventPersistence string            `json:"radar_event_persistence"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.RadarEvent == nil || payload.RadarEvent.EventSHA256 != event.EventSHA256 {
+		t.Fatalf("response event mismatch: %#v", payload.RadarEvent)
+	}
+	if payload.RadarEventPersistence != "clickhouse" {
+		t.Fatalf("radar_event_persistence=%q", payload.RadarEventPersistence)
+	}
+}
