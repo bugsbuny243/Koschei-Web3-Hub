@@ -42,13 +42,13 @@ type globalRadarOwnerRecordsTruthBoundary struct {
 }
 
 type globalRadarOwnerRecordsResponse struct {
-	SchemaVersion string                                       `json:"schema_version"`
-	Scope         string                                       `json:"scope"`
-	GeneratedAt   time.Time                                    `json:"generated_at"`
-	Query         globalRadarOwnerRecordsQuery                 `json:"query"`
-	Count         int                                          `json:"count"`
-	Records       []koscheiclickhouse.GlobalRadarStoredRecord  `json:"records"`
-	TruthBoundary globalRadarOwnerRecordsTruthBoundary         `json:"truth_boundary"`
+	SchemaVersion string                                      `json:"schema_version"`
+	Scope         string                                      `json:"scope"`
+	GeneratedAt   time.Time                                   `json:"generated_at"`
+	Query         globalRadarOwnerRecordsQuery                `json:"query"`
+	Count         int                                         `json:"count"`
+	Records       []koscheiclickhouse.GlobalRadarStoredRecord `json:"records"`
+	TruthBoundary globalRadarOwnerRecordsTruthBoundary        `json:"truth_boundary"`
 }
 
 func ownerGlobalRadarGraphRecords(reader GlobalRadarGraphReader) http.HandlerFunc {

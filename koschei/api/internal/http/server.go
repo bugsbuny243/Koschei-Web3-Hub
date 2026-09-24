@@ -44,7 +44,7 @@ func WithCache(value cache.Cache) Option {
 }
 func WithSolanaRPC(rpc *web3.SolanaRPC) Option { return func(c *serverConfig) { c.solanaRPC = rpc } }
 func WithJobStore(store *jobs.Store) Option { return func(c *serverConfig) { c.jobStore = store } }
-func WithJobQueue(queue jobs.Queue) Option { return func(c *serverConfig) { c.jobQueue = queue } }
+func WithJobQueue(queue jobs.Queue) Option  { return func(c *serverConfig) { c.jobQueue = queue } }
 func WithGlobalRadarGraphReader(reader GlobalRadarGraphReader) Option {
 	return func(c *serverConfig) { c.globalRadarGraphReader = reader }
 }
