@@ -29,7 +29,7 @@ type networkProbeIntelligenceEnvelope struct {
 	Intelligence          services.NetworkProbeIntelligenceProjection `json:"intelligence"`
 	RadarObservation      services.GlobalRadarObservation             `json:"radar_observation"`
 	RadarPersistence      string                                      `json:"radar_persistence,omitempty"`
-	RadarEvent            *radarevent.Event                            `json:"radar_event,omitempty"`
+	RadarEvent            *radarevent.Event                           `json:"radar_event,omitempty"`
 	RadarEventPersistence string                                      `json:"radar_event_persistence,omitempty"`
 }
 
