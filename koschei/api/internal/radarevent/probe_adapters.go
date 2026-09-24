@@ -10,6 +10,43 @@ import (
 )
 
 func BuildEVMAddressProbeEvent(producer string, result networktarget.EVMProbeResult, observedAt time.Time, sourceDigest string) (Event, error) {
+	return buildEVMAddressProbeEvent(
+		producer,
+		result,
+		observedAt,
+		[]string{sourceDigest},
+		sourceDigest,
+		sourceDigest,
+	)
+}
+
+// BuildEVMAddressProbeEventFromResult uses the exact response-byte SHA-256
+// captured by ProbeEVM. It refuses to manufacture provenance from normalized
+// fields when either native RPC response digest is missing.
+func BuildEVMAddressProbeEventFromResult(producer string, result networktarget.EVMProbeResult, observedAt time.Time) (Event, error) {
+	chainDigest := strings.TrimSpace(result.ChainIDResponseSHA256)
+	codeDigest := strings.TrimSpace(result.ContractCodeResponseSHA256)
+	if chainDigest == "" || codeDigest == "" {
+		return Event{}, errors.New("evm probe native response digests are required")
+	}
+	return buildEVMAddressProbeEvent(
+		producer,
+		result,
+		observedAt,
+		[]string{chainDigest, codeDigest},
+		chainDigest,
+		codeDigest,
+	)
+}
+
+func buildEVMAddressProbeEvent(
+	producer string,
+	result networktarget.EVMProbeResult,
+	observedAt time.Time,
+	sourceDigests []string,
+	chainDigest string,
+	codeDigest string,
+) (Event, error) {
 	if result.SchemaVersion != networktarget.SchemaVersion {
 		return Event{}, errors.New("unsupported evm probe schema")
 	}
@@ -29,17 +66,17 @@ func BuildEVMAddressProbeEvent(producer string, result networktarget.EVMProbeRes
 	}
 
 	facts := []Fact{
-		boundFact("chain_id", result.ChainID, "", sourceDigest),
-		boundFact("expected_chain_id", result.ExpectedChainID, "", sourceDigest),
-		boundFact("contract_code_state", result.ContractCodeState, "", sourceDigest),
-		boundFact("delegation_state", result.DelegationState, "", sourceDigest),
-		boundFact("live_availability", result.LiveAvailability, "", sourceDigest),
+		boundFact("chain_id", result.ChainID, "", chainDigest),
+		boundFact("expected_chain_id", result.ExpectedChainID, "", chainDigest),
+		boundFact("contract_code_state", result.ContractCodeState, "", codeDigest),
+		boundFact("delegation_state", result.DelegationState, "", codeDigest),
+		boundFact("live_availability", result.LiveAvailability, "", codeDigest),
 	}
 	if value := strings.TrimSpace(result.ContractCodeHash); value != "" {
-		facts = append(facts, boundFact("contract_code_sha256", value, "", sourceDigest))
+		facts = append(facts, boundFact("contract_code_sha256", value, "", codeDigest))
 	}
 	if value := strings.TrimSpace(result.DelegationTarget); value != "" {
-		facts = append(facts, boundFact("delegation_target", value, "", sourceDigest))
+		facts = append(facts, boundFact("delegation_target", value, "", codeDigest))
 	}
 
 	event := Event{
@@ -55,7 +92,7 @@ func BuildEVMAddressProbeEvent(producer string, result networktarget.EVMProbeRes
 			{Kind: "canonical_ref", Value: subjectID},
 			{Kind: "address", Value: result.Resolution.Address},
 		},
-		SourceDigests: []string{sourceDigest},
+		SourceDigests: append([]string(nil), sourceDigests...),
 		Facts:         compactFacts(facts),
 	}
 	return event.Seal()

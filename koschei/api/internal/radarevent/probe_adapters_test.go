@@ -45,6 +45,56 @@ func TestBuildEVMAddressProbeEventKeepsAccountEvidenceChainIndependent(t *testin
 	}
 }
 
+func TestBuildEVMAddressProbeEventFromResultBindsNativeResponseDigests(t *testing.T) {
+	resolution, err := networktarget.Resolve("ethereum-mainnet", "0x1111111111111111111111111111111111111111")
+	if err != nil {
+		t.Fatal(err)
+	}
+	chainDigest := strings.Repeat("a", 64)
+	codeDigest := strings.Repeat("b", 64)
+	result := networktarget.EVMProbeResult{
+		SchemaVersion:              networktarget.SchemaVersion,
+		Resolution:                 resolution,
+		ChainID:                    "0x1",
+		ExpectedChainID:            "0x1",
+		ChainIDResponseSHA256:      chainDigest,
+		ContractCodeState:          "contract_code_observed",
+		ContractCodeHash:           strings.Repeat("c", 64),
+		ContractCodeResponseSHA256: codeDigest,
+		DelegationState:            networktarget.EVMDelegationStateNotObserved,
+		AnalysisPerformed:          true,
+		EvidenceStatus:             "observed",
+		LiveAvailability:           "checked",
+	}
+	event, err := BuildEVMAddressProbeEventFromResult("evm-rpc-adapter", result, time.UnixMilli(1780000000000))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := event.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if len(event.SourceDigests) != 2 || event.SourceDigests[0] != chainDigest || event.SourceDigests[1] != codeDigest {
+		t.Fatalf("unexpected source digests: %#v", event.SourceDigests)
+	}
+	facts := map[string]Fact{}
+	for _, fact := range event.Facts {
+		facts[fact.Key] = fact
+	}
+	if facts["chain_id"].EvidenceSHA256 != chainDigest || facts["expected_chain_id"].EvidenceSHA256 != chainDigest {
+		t.Fatalf("chain facts lost chain response binding: %#v", facts)
+	}
+	if facts["contract_code_state"].EvidenceSHA256 != codeDigest ||
+		facts["contract_code_sha256"].EvidenceSHA256 != codeDigest ||
+		facts["delegation_state"].EvidenceSHA256 != codeDigest {
+		t.Fatalf("code facts lost code response binding: %#v", facts)
+	}
+
+	result.ContractCodeResponseSHA256 = ""
+	if _, err := BuildEVMAddressProbeEventFromResult("evm-rpc-adapter", result, time.UnixMilli(1780000000000)); err == nil {
+		t.Fatal("missing native response digest was accepted")
+	}
+}
+
 func TestBuildBitcoinAddressProbeEventPreservesUTXOActivityWithoutSafetyClaim(t *testing.T) {
 	resolution, err := networktarget.Resolve("bitcoin-mainnet", "1BoatSLRHtKNngkdXEeobR76b53LETtpyT")
 	if err != nil {

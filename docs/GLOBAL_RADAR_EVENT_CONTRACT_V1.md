@@ -77,7 +77,7 @@ This storage path is intentionally available before automatic producers are conn
 Build source adapters that emit this envelope from:
 
 - Solana live stream observations;
-- EVM transaction and contract probes;
+- EVM transaction and contract probes. The address/code probe now preserves exact `eth_chainId` and `eth_getCode` response-byte SHA-256 values and can build an event directly from those native digests;
 - Bitcoin address/network observations;
 - Sui and Aptos identity/network observations.
 
