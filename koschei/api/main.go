@@ -137,6 +137,7 @@ func main() {
 		apihttp.WithJobStore(jobStore),
 		apihttp.WithJobQueue(jobQueue),
 		apihttp.WithGlobalRadarGraphReader(globalRadarSink),
+		apihttp.WithGlobalRadarEventReader(globalRadarEventSink),
 	),
 		apihttp.WithGlobalRadarSnapshotSink(globalRadarSink),
 		apihttp.WithGlobalRadarEventSink(globalRadarEventSink),

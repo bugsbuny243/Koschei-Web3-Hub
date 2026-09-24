@@ -126,9 +126,9 @@ This is still telemetry collection rather than multi-chain transaction firehose 
 
 ### Owner-only persisted graph retrieval
 
-The existing ClickHouse graph reader is now exposed through `GET /api/owner/radar/global/records` behind the repository's existing owner authentication boundary. The route requires a registered `network`, defaults to a 24-hour half-open window, accepts optional `subject_id` and `record_type`, and clamps the HTTP surface to at most 1,000 rows even though the lower ClickHouse reader retains its stricter 31-day / 5,000-row hard contract and scan caps.
+The existing ClickHouse graph reader is now exposed through `GET /api/owner/radar/global/records` behind the repository's existing owner authentication boundary. The canonical event ledger is separately readable through `GET /api/owner/radar/global/events` under the same owner boundary. The route requires a registered `network`, defaults to a 24-hour half-open window, accepts optional `subject_id` and `record_type`, and clamps the HTTP surface to at most 1,000 rows even though the lower ClickHouse reader retains its stricter 31-day / 5,000-row hard contract and scan caps.
 
-Returned rows are historical persisted evidence, not a claim about current chain state. The ClickHouse reader rechecks requested network/subject/type/time boundaries, validates payload JSON and recomputes each stored payload SHA-256 before the owner route can return it. The Fabric capability surface marks operator UI visualization as pending rather than claiming a completed graph frontend.
+Returned rows are historical persisted evidence, not a claim about current chain state. The graph reader rechecks requested network/subject/type/time boundaries, validates payload JSON and recomputes each stored payload SHA-256 before the owner route can return it. The event reader also decodes every stored payload back into `koschei.global-radar-event.v1`, re-runs canonical event verification, and checks row identity, source digests, evidence state and observation time against the verified payload. The Fabric capability surface marks operator UI visualization as pending rather than claiming a completed graph frontend.
 
 ### Snapshot contract
 
@@ -160,7 +160,7 @@ An additive server-owned trusted-key registry contract can now independently rev
 ## Next implementation slices
 
 1. Extend durable persistence from explicit intelligence probes to continuous background multi-network ingest without changing existing ARVIS decision authority.
-2. Add an operator graph visualization over the owner-only persisted graph retrieval; the bounded authenticated JSON retrieval contract now exists.
+2. Add an operator graph/timeline visualization over the owner-only graph and canonical event retrieval APIs; both bounded authenticated JSON read contracts now exist.
 3. Connect bridge-specific live adapters only where both chain-side transfer identities can be independently anchored.
 4. Wire the trusted verdict-key registry into production verdict-reference creation; the verification contract now exists but the legacy unverified projection remains the default for callers that do not supply server-owned trust material.
 5. Expand live node telemetry persistence for EVM beacon/execution and Bitcoin Core/PoW collectors without inventing missing geography or client identity.

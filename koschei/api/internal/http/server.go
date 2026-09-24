@@ -24,6 +24,7 @@ type serverConfig struct {
 	jobStore               *jobs.Store
 	jobQueue               jobs.Queue
 	globalRadarGraphReader GlobalRadarGraphReader
+	globalRadarEventReader GlobalRadarEventReader
 }
 
 type Option func(*serverConfig)
@@ -47,6 +48,9 @@ func WithJobStore(store *jobs.Store) Option { return func(c *serverConfig) { c.j
 func WithJobQueue(queue jobs.Queue) Option  { return func(c *serverConfig) { c.jobQueue = queue } }
 func WithGlobalRadarGraphReader(reader GlobalRadarGraphReader) Option {
 	return func(c *serverConfig) { c.globalRadarGraphReader = reader }
+}
+func WithGlobalRadarEventReader(reader GlobalRadarEventReader) Option {
+	return func(c *serverConfig) { c.globalRadarEventReader = reader }
 }
 
 func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string, opts ...Option) http.Handler {
@@ -93,6 +97,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	registerAccountRoutes(mux, h, planTierAccess)
 	registerOwnerRoutes(mux, h, staticDir)
 	mux.HandleFunc("/api/owner/radar/global/records", ownerOnly(h, method("GET", ownerGlobalRadarGraphRecords(config.globalRadarGraphReader))))
+	mux.HandleFunc("/api/owner/radar/global/events", ownerOnly(h, method("GET", ownerGlobalRadarEvents(config.globalRadarEventReader))))
 	registerDefenseOSRoutes(mux, h)
 	registerProductRoutes(mux, h, planTier, planTierAccess)
 	registerDeveloperAPIRoutes(mux, h, apiKeyProfessional, apiKeyProfessionalMetered)

@@ -167,3 +167,167 @@ func TestVerifyGlobalRadarEventSchemaAcceptsCanonicalTable(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+
+func TestReadGlobalRadarEventsReverifiesStoredCanonicalEvent(t *testing.T) {
+	event := sampleGlobalRadarEvent(t)
+	payload, err := json.Marshal(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payloadSHA256 := jsonPayloadSHA256(payload)
+	observedAt := time.UnixMilli(event.ObservedAtUnixMS).UTC()
+	ingestedAt := observedAt.Add(time.Minute)
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("query")
+		if !strings.Contains(query, "FROM global_radar_events FINAL") ||
+			!strings.Contains(query, "network_id = {network:String}") {
+			t.Fatalf("unexpected query: %s", query)
+		}
+		if r.URL.Query().Get("param_network") != "ethereum-mainnet" ||
+			r.URL.Query().Get("param_limit") != "11" {
+			t.Fatalf("unexpected params: %s", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		_ = json.NewEncoder(w).Encode(globalRadarEventReadRow{
+			EventSHA256:      event.EventSHA256,
+			SchemaVersion:    event.SchemaVersion,
+			Producer:         event.Producer,
+			Kind:             event.Kind,
+			NetworkID:        event.NetworkID,
+			SubjectKind:      event.SubjectKind,
+			SubjectID:        event.SubjectID,
+			EvidenceState:    string(event.State),
+			SourceDigests:    append([]string(nil), event.SourceDigests...),
+			ObservedAtMillis: event.ObservedAtUnixMS,
+			IngestedAtMillis: ingestedAt.UnixMilli(),
+			PayloadJSON:      string(payload),
+			PayloadSHA256:    payloadSHA256,
+			IngestVersion:    42,
+		})
+	}))
+	defer server.Close()
+
+	client, err := New(Config{
+		HTTPURL:    server.URL,
+		Database:   "koschei_web3",
+		User:       "radar-user",
+		Password:   "radar-password",
+		HTTPClient: server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err := client.ReadGlobalRadarEvents(context.Background(), GlobalRadarEventReadRequest{
+		Network: "ethereum-mainnet",
+		Since:   observedAt.Add(-time.Minute),
+		Until:   observedAt.Add(time.Minute),
+		Limit:   10,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Event.EventSHA256 != event.EventSHA256 {
+		t.Fatalf("unexpected rows: %#v", rows)
+	}
+	if rows[0].PayloadSHA256 != payloadSHA256 || rows[0].IngestVersion != 42 {
+		t.Fatalf("stored metadata changed: %#v", rows[0])
+	}
+}
+
+func TestReadGlobalRadarEventsRejectsPayloadHashMismatch(t *testing.T) {
+	event := sampleGlobalRadarEvent(t)
+	payload, err := json.Marshal(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observedAt := time.UnixMilli(event.ObservedAtUnixMS).UTC()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(globalRadarEventReadRow{
+			EventSHA256:      event.EventSHA256,
+			SchemaVersion:    event.SchemaVersion,
+			Producer:         event.Producer,
+			Kind:             event.Kind,
+			NetworkID:        event.NetworkID,
+			SubjectKind:      event.SubjectKind,
+			SubjectID:        event.SubjectID,
+			EvidenceState:    string(event.State),
+			SourceDigests:    event.SourceDigests,
+			ObservedAtMillis: event.ObservedAtUnixMS,
+			IngestedAtMillis: observedAt.Add(time.Minute).UnixMilli(),
+			PayloadJSON:      string(payload),
+			PayloadSHA256:    strings.Repeat("f", 64),
+			IngestVersion:    1,
+		})
+	}))
+	defer server.Close()
+
+	client, err := New(Config{
+		HTTPURL:    server.URL,
+		Database:   "koschei_web3",
+		User:       "radar-user",
+		Password:   "radar-password",
+		HTTPClient: server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.ReadGlobalRadarEvents(context.Background(), GlobalRadarEventReadRequest{
+		Network: "ethereum-mainnet",
+		Since:   observedAt.Add(-time.Minute),
+		Until:   observedAt.Add(time.Minute),
+		Limit:   10,
+	})
+	if err == nil || !strings.Contains(err.Error(), "payload hash mismatch") {
+		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestReadGlobalRadarEventsRejectsRowPayloadIdentityMismatch(t *testing.T) {
+	event := sampleGlobalRadarEvent(t)
+	payload, err := json.Marshal(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observedAt := time.UnixMilli(event.ObservedAtUnixMS).UTC()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(globalRadarEventReadRow{
+			EventSHA256:      event.EventSHA256,
+			SchemaVersion:    event.SchemaVersion,
+			Producer:         event.Producer,
+			Kind:             event.Kind,
+			NetworkID:        "bitcoin-mainnet",
+			SubjectKind:      event.SubjectKind,
+			SubjectID:        event.SubjectID,
+			EvidenceState:    string(event.State),
+			SourceDigests:    event.SourceDigests,
+			ObservedAtMillis: event.ObservedAtUnixMS,
+			IngestedAtMillis: observedAt.Add(time.Minute).UnixMilli(),
+			PayloadJSON:      string(payload),
+			PayloadSHA256:    jsonPayloadSHA256(payload),
+			IngestVersion:    1,
+		})
+	}))
+	defer server.Close()
+
+	client, err := New(Config{
+		HTTPURL:    server.URL,
+		Database:   "koschei_web3",
+		User:       "radar-user",
+		Password:   "radar-password",
+		HTTPClient: server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.ReadGlobalRadarEvents(context.Background(), GlobalRadarEventReadRequest{
+		Network: "bitcoin-mainnet",
+		Since:   observedAt.Add(-time.Minute),
+		Until:   observedAt.Add(time.Minute),
+		Limit:   10,
+	})
+	if err == nil || !strings.Contains(err.Error(), "does not match canonical payload identity") {
+		t.Fatalf("err=%v", err)
+	}
+}

@@ -37,7 +37,12 @@ func buildGlobalRadarSnapshotSink(parent context.Context) (globalRadarGraphStore
 	return client, nil
 }
 
-func buildGlobalRadarEventSink(parent context.Context) (apihttp.GlobalRadarEventSink, error) {
+type globalRadarEventStore interface {
+	apihttp.GlobalRadarEventSink
+	apihttp.GlobalRadarEventReader
+}
+
+func buildGlobalRadarEventSink(parent context.Context) (globalRadarEventStore, error) {
 	if strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_EVENT_CLICKHOUSE_ENABLED")) != "1" {
 		return nil, nil
 	}
