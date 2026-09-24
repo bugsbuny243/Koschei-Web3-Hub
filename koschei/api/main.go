@@ -96,6 +96,14 @@ func main() {
 		return
 	}
 
+	globalRadarSink, err := buildGlobalRadarSnapshotSink(appCtx)
+	if err != nil {
+		log.Fatalf("CRITICAL: configured Global Radar ClickHouse persistence is unavailable: %v", err)
+	}
+	if globalRadarSink != nil {
+		log.Printf("global radar ClickHouse persistence enabled for Fabric intelligence probes")
+	}
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -117,7 +125,7 @@ func main() {
 		apihttp.WithSolanaRPC(solanaRPC),
 		apihttp.WithJobStore(jobStore),
 		apihttp.WithJobQueue(jobQueue),
-	)))
+	), apihttp.WithGlobalRadarSnapshotSink(globalRadarSink)))
 	server := newHTTPServer(port, handler)
 
 	serverErrors := make(chan error, 1)

@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"mime"
 	"net/http"
 	"os"
@@ -26,7 +27,10 @@ type networkProbeIntelligenceEnvelope struct {
 	Probe            any                                         `json:"probe"`
 	Intelligence     services.NetworkProbeIntelligenceProjection `json:"intelligence"`
 	RadarObservation services.GlobalRadarObservation             `json:"radar_observation"`
+	RadarPersistence string                                      `json:"radar_persistence,omitempty"`
 }
+
+var errGlobalRadarPersistenceUnavailable = errors.New("global radar persistence unavailable")
 
 func evmRPCEnvName(networkID string) (string, bool) {
 	switch strings.TrimSpace(networkID) {
@@ -117,10 +121,14 @@ func networkDeploymentCatalog() []networkDeploymentState {
 }
 
 func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
-	networkTargetProbeWithClient(w, r, nil)
+	networkTargetProbeWithDependencies(w, r, nil, nil)
 }
 
 func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client *http.Client) {
+	networkTargetProbeWithDependencies(w, r, client, nil)
+}
+
+func networkTargetProbeWithDependencies(w http.ResponseWriter, r *http.Request, client *http.Client, sink GlobalRadarSnapshotSink) {
 	networkTargetRequests.Add(1)
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 	defer r.Body.Close()
@@ -184,6 +192,23 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 		if err != nil {
 			return err
 		}
+		persistence := ""
+		if sink != nil {
+			snapshot, snapshotErr := services.BuildGlobalRadarSnapshot(
+				[]services.GlobalRadarObservation{observation},
+				nil,
+				nil,
+				nil,
+				time.Now().UTC(),
+			)
+			if snapshotErr != nil {
+				return snapshotErr
+			}
+			if persistErr := sink.InsertGlobalRadarSnapshot(ctx, snapshot); persistErr != nil {
+				return errors.Join(errGlobalRadarPersistenceUnavailable, persistErr)
+			}
+			persistence = "clickhouse"
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(networkProbeIntelligenceEnvelope{
@@ -191,8 +216,17 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 			Probe:            probe,
 			Intelligence:     projection,
 			RadarObservation: observation,
+			RadarPersistence: persistence,
 		})
 		return nil
+	}
+
+	writeIntelligenceError := func(err error) {
+		message := "radar_observation_unavailable"
+		if errors.Is(err, errGlobalRadarPersistenceUnavailable) {
+			message = "radar_persistence_unavailable"
+		}
+		reject(http.StatusBadGateway, message, "unavailable")
 	}
 
 	switch resolution.Network.Family {
@@ -213,8 +247,8 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 				reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 				return
 			}
-			if writeIntelligence(result, projection, services.GlobalRadarObservationContractProgram) != nil {
-				reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+			if err := writeIntelligence(result, projection, services.GlobalRadarObservationContractProgram); err != nil {
+				writeIntelligenceError(err)
 				return
 			}
 			return
@@ -251,8 +285,8 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 				reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 				return
 			}
-			if writeIntelligence(result, projection, services.GlobalRadarObservationTransaction) != nil {
-				reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+			if err := writeIntelligence(result, projection, services.GlobalRadarObservationTransaction); err != nil {
+				writeIntelligenceError(err)
 				return
 			}
 			return
@@ -284,8 +318,8 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 					reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 					return
 				}
-				if writeIntelligence(result, projection, services.GlobalRadarObservationIdentity) != nil {
-					reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+				if err := writeIntelligence(result, projection, services.GlobalRadarObservationIdentity); err != nil {
+					writeIntelligenceError(err)
 					return
 				}
 				return
@@ -305,8 +339,8 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 					reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 					return
 				}
-				if writeIntelligence(result, projection, services.GlobalRadarObservationIdentity) != nil {
-					reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+				if err := writeIntelligence(result, projection, services.GlobalRadarObservationIdentity); err != nil {
+					writeIntelligenceError(err)
 					return
 				}
 				return

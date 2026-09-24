@@ -110,6 +110,12 @@ dimensions remain explicit `missing_evidence` and are never converted into risk.
 Solana validator telemetry can be projected as one Radar observation per validator.
 No synthetic decentralization score is produced.
 
+### Durable probe persistence
+
+The existing `/fabric/networks/probe/intelligence` path can now persist its canonical one-observation Global Radar snapshot into ClickHouse when `KOSCHEI_GLOBAL_RADAR_CLICKHOUSE_ENABLED=1`. The feature is off by default, validates the ClickHouse graph schema at API startup, and fails closed on persistence failure instead of claiming a durable observation that was not stored. The legacy flat probe route is unchanged.
+
+This is deliberately not described as continuous collection. It only makes an explicitly requested intelligence probe durable. Background multi-network ingest remains a later slice.
+
 ### Snapshot contract
 
 `koschei.global-radar-snapshot.v1` assembles observations, relation edges, verified
@@ -140,16 +146,11 @@ trusted public-key registry. The projection therefore reports
 
 ## Next implementation slices
 
-1. Add durable graph persistence/query paths for observations, relations, bridge links
-   and verdict references.
-2. Add operator-facing snapshot retrieval that distinguishes implemented, configured,
-   observed and verified states.
-3. Connect bridge-specific live adapters only where both chain-side transfer identities
-   can be independently anchored.
-4. Add independent verdict signature verification once a trusted public-key registry
-   contract is available to the Radar verifier.
-5. Expand live node telemetry projections for EVM beacon/execution and Bitcoin Core/PoW
-   collectors without inventing missing geography or client identity.
+1. Extend durable persistence from explicit intelligence probes to continuous background multi-network ingest without changing existing ARVIS decision authority.
+2. Add operator-facing graph retrieval that distinguishes implemented, configured, observed, persisted and verified states.
+3. Connect bridge-specific live adapters only where both chain-side transfer identities can be independently anchored.
+4. Add independent verdict signature verification once a trusted public-key registry contract is available to the Radar verifier.
+5. Expand live node telemetry persistence for EVM beacon/execution and Bitcoin Core/PoW collectors without inventing missing geography or client identity.
 
 ## Product principle
 

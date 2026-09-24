@@ -1,10 +1,29 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"html/template"
 	"net/http"
+
+	"koschei/api/internal/services"
 )
+
+type GlobalRadarSnapshotSink interface {
+	InsertGlobalRadarSnapshot(context.Context, services.GlobalRadarSnapshot) error
+}
+
+type fabricConfig struct {
+	globalRadarSnapshotSink GlobalRadarSnapshotSink
+}
+
+type FabricOption func(*fabricConfig)
+
+func WithGlobalRadarSnapshotSink(sink GlobalRadarSnapshotSink) FabricOption {
+	return func(config *fabricConfig) {
+		config.globalRadarSnapshotSink = sink
+	}
+}
 
 type fabricCapability struct {
 	ID            string   `json:"id"`
@@ -91,12 +110,14 @@ func currentFabricSnapshot() fabricSnapshot {
 	}
 }
 
-func registerFabricRoutes(mux *http.ServeMux) {
+func registerFabricRoutes(mux *http.ServeMux, config fabricConfig) {
 	registerNetworkTargetRoutes(mux)
 	mux.HandleFunc("/fabric/networks/live", method(http.MethodGet, networkProbePage))
 	mux.HandleFunc("/fabric/networks/deployment", method(http.MethodGet, networkDeploymentCatalogHandler))
 	mux.HandleFunc("/fabric/networks/probe", method(http.MethodPost, networkTargetProbe))
-	mux.HandleFunc("/fabric/networks/probe/intelligence", method(http.MethodPost, networkTargetProbe))
+	mux.HandleFunc("/fabric/networks/probe/intelligence", method(http.MethodPost, func(w http.ResponseWriter, r *http.Request) {
+		networkTargetProbeWithDependencies(w, r, nil, config.globalRadarSnapshotSink)
+	}))
 	mux.HandleFunc("/fabric/radar/global", method(http.MethodGet, globalRadarSnapshotHandler))
 	// Fabric is still experimental. Keep its capability contract outside /api/*
 	// until it is deliberately promoted into the production OpenAPI contract.
@@ -108,12 +129,18 @@ func registerFabricRoutes(mux *http.ServeMux) {
 // existing NewServer route graph. All non-Fabric requests are delegated to base
 // unchanged. Fabric responses still pass through the repository's existing
 // security-header and CSP transformation machinery.
-func MountFabric(base http.Handler) http.Handler {
+func MountFabric(base http.Handler, opts ...FabricOption) http.Handler {
 	if base == nil {
 		base = http.NotFoundHandler()
 	}
+	config := fabricConfig{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&config)
+		}
+	}
 	fabricMux := http.NewServeMux()
-	registerFabricRoutes(fabricMux)
+	registerFabricRoutes(fabricMux, config)
 	fabric := securityHeaders(fabricMux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
