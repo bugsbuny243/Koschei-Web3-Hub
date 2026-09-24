@@ -227,3 +227,63 @@ func TestBitcoinNetworkProbeIntelligenceEmitsAndPersistsNativeDigestEvent(t *tes
 		t.Fatalf("radar_event_persistence=%q", payload.RadarEventPersistence)
 	}
 }
+
+func TestMoveNetworkProbeIntelligenceEmitsAndPersistsNativeDigestEvents(t *testing.T) {
+	t.Run("sui", func(t *testing.T) {
+		const address = "0x1111111111111111111111111111111111111111111111111111111111111111"
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"data":{"chainIdentifier":"4btiuiMPvEENsttpZC7CZ53DruC3MAgfznDbASZ7DR6S"}}`))
+		}))
+		defer server.Close()
+		t.Setenv("SUI_GRAPHQL_URL", server.URL)
+
+		eventSink := &recordingGlobalRadarEventSink{}
+		request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe/intelligence", strings.NewReader(`{"network":"sui-mainnet","address":"0x1111111111111111111111111111111111111111111111111111111111111111"}`))
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+
+		networkTargetProbeWithStores(response, request, server.Client(), nil, eventSink)
+		if response.Code != http.StatusOK {
+			t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+		}
+		if len(eventSink.events) != 1 {
+			t.Fatalf("persisted events=%d want 1", len(eventSink.events))
+		}
+		event := eventSink.events[0]
+		if err := event.Verify(); err != nil {
+			t.Fatal(err)
+		}
+		if event.NetworkID != "sui-mainnet" || event.Kind != radarevent.KindNetworkHealth || len(event.SourceDigests) != 1 {
+			t.Fatalf("unexpected sui event: %#v", event)
+		}
+	})
+
+	t.Run("aptos", func(t *testing.T) {
+		const address = "0x2222222222222222222222222222222222222222222222222222222222222222"
+		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"chain_id":1,"epoch":"123","ledger_version":"456789","ledger_timestamp":"1700000000000000","block_height":"98765","node_role":"full_node","git_hash":"abcdef"}`))
+		}))
+		defer server.Close()
+		t.Setenv("APTOS_REST_URL", server.URL)
+
+		eventSink := &recordingGlobalRadarEventSink{}
+		request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe/intelligence", strings.NewReader(`{"network":"aptos-mainnet","address":"0x2222222222222222222222222222222222222222222222222222222222222222"}`))
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+
+		networkTargetProbeWithStores(response, request, server.Client(), nil, eventSink)
+		if response.Code != http.StatusOK {
+			t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+		}
+		if len(eventSink.events) != 1 {
+			t.Fatalf("persisted events=%d want 1", len(eventSink.events))
+		}
+		event := eventSink.events[0]
+		if err := event.Verify(); err != nil {
+			t.Fatal(err)
+		}
+		if event.NetworkID != "aptos-mainnet" || event.Kind != radarevent.KindNetworkHealth || len(event.SourceDigests) != 1 {
+			t.Fatalf("unexpected aptos event: %#v", event)
+		}
+	})
+}

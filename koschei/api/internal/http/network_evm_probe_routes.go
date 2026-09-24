@@ -354,7 +354,12 @@ func networkTargetProbeWithStores(w http.ResponseWriter, r *http.Request, client
 					reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 					return
 				}
-				if err := writeIntelligence(result, projection, services.GlobalRadarObservationIdentity, nil); err != nil {
+				radarEvent, eventErr := radarevent.BuildSuiIdentityEventFromResult("sui-identity-adapter", result)
+				if eventErr != nil {
+					reject(http.StatusBadGateway, "radar_event_unavailable", "unavailable")
+					return
+				}
+				if err := writeIntelligence(result, projection, services.GlobalRadarObservationIdentity, &radarEvent); err != nil {
 					writeIntelligenceError(err)
 					return
 				}
@@ -375,7 +380,12 @@ func networkTargetProbeWithStores(w http.ResponseWriter, r *http.Request, client
 					reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 					return
 				}
-				if err := writeIntelligence(result, projection, services.GlobalRadarObservationIdentity, nil); err != nil {
+				radarEvent, eventErr := radarevent.BuildAptosIdentityEventFromResult("aptos-identity-adapter", result)
+				if eventErr != nil {
+					reject(http.StatusBadGateway, "radar_event_unavailable", "unavailable")
+					return
+				}
+				if err := writeIntelligence(result, projection, services.GlobalRadarObservationIdentity, &radarEvent); err != nil {
 					writeIntelligenceError(err)
 					return
 				}
