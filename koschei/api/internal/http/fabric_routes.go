@@ -110,7 +110,11 @@ func currentFabricSnapshot() fabricSnapshot {
 	}
 }
 
-func registerFabricRoutes(mux *http.ServeMux, config fabricConfig) {
+func registerFabricRoutes(mux *http.ServeMux, configs ...fabricConfig) {
+	config := fabricConfig{}
+	if len(configs) > 0 {
+		config = configs[0]
+	}
 	registerNetworkTargetRoutes(mux)
 	mux.HandleFunc("/fabric/networks/live", method(http.MethodGet, networkProbePage))
 	mux.HandleFunc("/fabric/networks/deployment", method(http.MethodGet, networkDeploymentCatalogHandler))
