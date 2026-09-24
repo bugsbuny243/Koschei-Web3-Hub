@@ -184,6 +184,14 @@ func buildBitcoinAddressProbeEvent(
 	return event.Seal()
 }
 
+func BuildSuiIdentityEventFromResult(producer string, result networktarget.SuiMainnetIdentityProbeResult) (Event, error) {
+	sourceDigest := strings.TrimSpace(result.ResponseSHA256)
+	if sourceDigest == "" {
+		return Event{}, errors.New("sui identity native response digest is required")
+	}
+	return BuildSuiIdentityEvent(producer, result, sourceDigest)
+}
+
 func BuildSuiIdentityEvent(producer string, result networktarget.SuiMainnetIdentityProbeResult, sourceDigest string) (Event, error) {
 	if result.SchemaVersion != networktarget.NetworkTelemetrySchemaVersion {
 		return Event{}, errors.New("unsupported sui identity probe schema")
@@ -206,6 +214,14 @@ func BuildSuiIdentityEvent(producer string, result networktarget.SuiMainnetIdent
 	)
 	event.Facts = compactFacts(event.Facts)
 	return event.Seal()
+}
+
+func BuildAptosIdentityEventFromResult(producer string, result networktarget.AptosMainnetIdentityProbeResult) (Event, error) {
+	sourceDigest := strings.TrimSpace(result.ResponseSHA256)
+	if sourceDigest == "" {
+		return Event{}, errors.New("aptos identity native response digest is required")
+	}
+	return BuildAptosIdentityEvent(producer, result, sourceDigest)
 }
 
 func BuildAptosIdentityEvent(producer string, result networktarget.AptosMainnetIdentityProbeResult, sourceDigest string) (Event, error) {

@@ -250,6 +250,80 @@ func TestBuildMoveIdentityEventsPreserveVerifiedChainIdentity(t *testing.T) {
 	}
 }
 
+func TestBuildMoveIdentityEventsFromResultRequireNativeResponseDigest(t *testing.T) {
+	suiObservation, err := networktarget.NormalizeNetworkTelemetry(networktarget.NetworkTelemetryInput{
+		NetworkID:      "sui-mainnet",
+		SubjectKind:    "network",
+		SubjectID:      "sui-mainnet",
+		Source:         "sui-graphql-chain-identity:node.example",
+		ObservedAt:     time.UnixMilli(1780000000000),
+		EvidenceStatus: "verified",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	suiDigest := strings.Repeat("d", 64)
+	suiResult := networktarget.SuiMainnetIdentityProbeResult{
+		SchemaVersion:     networktarget.NetworkTelemetrySchemaVersion,
+		Observation:       suiObservation,
+		ChainIdentifier:   networktarget.SuiMainnetChainIdentifier,
+		ResponseSHA256:    suiDigest,
+		EndpointScope:     "sui_graphql_chain_identity_only",
+		AnalysisPerformed: true,
+		LiveAvailability:  "checked",
+	}
+	suiEvent, err := BuildSuiIdentityEventFromResult("sui-identity-adapter", suiResult)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(suiEvent.SourceDigests) != 1 || suiEvent.SourceDigests[0] != suiDigest {
+		t.Fatalf("unexpected sui source digests: %#v", suiEvent.SourceDigests)
+	}
+	suiResult.ResponseSHA256 = ""
+	if _, err := BuildSuiIdentityEventFromResult("sui-identity-adapter", suiResult); err == nil {
+		t.Fatal("missing Sui native response digest was accepted")
+	}
+
+	aptosObservation, err := networktarget.NormalizeNetworkTelemetry(networktarget.NetworkTelemetryInput{
+		NetworkID:      "aptos-mainnet",
+		SubjectKind:    "network",
+		SubjectID:      "aptos-mainnet",
+		Source:         "aptos-rest-ledger-index:node.example",
+		ObservedAt:     time.UnixMilli(1780000000000),
+		EvidenceStatus: "verified",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	aptosDigest := strings.Repeat("e", 64)
+	aptosResult := networktarget.AptosMainnetIdentityProbeResult{
+		SchemaVersion:     networktarget.NetworkTelemetrySchemaVersion,
+		Observation:       aptosObservation,
+		ChainID:           1,
+		Epoch:             42,
+		LedgerVersion:     1234,
+		LedgerTimestamp:   1780000000000000,
+		BlockHeight:       1000,
+		NodeRole:          "full_node",
+		GitHash:           "abc123",
+		ResponseSHA256:    aptosDigest,
+		EndpointScope:     "aptos_rest_mainnet_ledger_identity",
+		AnalysisPerformed: true,
+		LiveAvailability:  "checked",
+	}
+	aptosEvent, err := BuildAptosIdentityEventFromResult("aptos-identity-adapter", aptosResult)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(aptosEvent.SourceDigests) != 1 || aptosEvent.SourceDigests[0] != aptosDigest {
+		t.Fatalf("unexpected aptos source digests: %#v", aptosEvent.SourceDigests)
+	}
+	aptosResult.ResponseSHA256 = ""
+	if _, err := BuildAptosIdentityEventFromResult("aptos-identity-adapter", aptosResult); err == nil {
+		t.Fatal("missing Aptos native response digest was accepted")
+	}
+}
+
 func TestProbeAdaptersRejectIncompleteLiveObservation(t *testing.T) {
 	resolution, err := networktarget.Resolve("ethereum-mainnet", "0x1111111111111111111111111111111111111111")
 	if err != nil {

@@ -3,6 +3,8 @@ package networktarget
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -22,6 +24,7 @@ type SuiMainnetIdentityProbeResult struct {
 	SchemaVersion     string                      `json:"schema_version"`
 	Observation       NetworkTelemetryObservation `json:"observation"`
 	ChainIdentifier   string                      `json:"chain_identifier"`
+	ResponseSHA256    string                      `json:"response_sha256,omitempty"`
 	EndpointScope     string                      `json:"endpoint_scope"`
 	AnalysisPerformed bool                        `json:"analysis_performed"`
 	LiveAvailability  string                      `json:"live_availability"`
@@ -37,6 +40,7 @@ type AptosMainnetIdentityProbeResult struct {
 	BlockHeight       uint64                      `json:"block_height"`
 	NodeRole          string                      `json:"node_role"`
 	GitHash           string                      `json:"git_hash,omitempty"`
+	ResponseSHA256    string                      `json:"response_sha256,omitempty"`
 	EndpointScope     string                      `json:"endpoint_scope"`
 	AnalysisPerformed bool                        `json:"analysis_performed"`
 	LiveAvailability  string                      `json:"live_availability"`
@@ -86,7 +90,8 @@ func ProbeSuiMainnetIdentity(ctx context.Context, client *http.Client, endpoint 
 	req.Header.Set("Accept", "application/json")
 
 	var response suiGraphQLIdentityResponse
-	if err := moveIdentityDoJSON(client, req, &response); err != nil {
+	responseSHA256, err := moveIdentityDoJSONWithDigest(client, req, &response)
+	if err != nil {
 		return SuiMainnetIdentityProbeResult{}, fmt.Errorf("sui_chain_identity_unavailable: %w", err)
 	}
 	if len(response.Errors) > 0 {
@@ -114,6 +119,7 @@ func ProbeSuiMainnetIdentity(ctx context.Context, client *http.Client, endpoint 
 		SchemaVersion:     NetworkTelemetrySchemaVersion,
 		Observation:       observation,
 		ChainIdentifier:   chainIdentifier,
+		ResponseSHA256:    responseSHA256,
 		EndpointScope:     "sui_graphql_chain_identity_only",
 		AnalysisPerformed: true,
 		LiveAvailability:  "checked",
@@ -141,7 +147,8 @@ func ProbeAptosMainnetIdentity(ctx context.Context, client *http.Client, endpoin
 	req.Header.Set("Accept", "application/json")
 
 	var response aptosLedgerIndexResponse
-	if err := moveIdentityDoJSON(client, req, &response); err != nil {
+	responseSHA256, err := moveIdentityDoJSONWithDigest(client, req, &response)
+	if err != nil {
 		return AptosMainnetIdentityProbeResult{}, fmt.Errorf("aptos_ledger_identity_unavailable: %w", err)
 	}
 	if response.ChainID != AptosMainnetChainID {
@@ -197,6 +204,7 @@ func ProbeAptosMainnetIdentity(ctx context.Context, client *http.Client, endpoin
 		BlockHeight:       blockHeight,
 		NodeRole:          nodeRole,
 		GitHash:           gitHash,
+		ResponseSHA256:    responseSHA256,
 		EndpointScope:     "aptos_rest_mainnet_ledger_identity",
 		AnalysisPerformed: true,
 		LiveAvailability:  "checked",
@@ -213,22 +221,32 @@ func validateMoveIdentityEndpoint(endpoint string) (*url.URL, error) {
 }
 
 func moveIdentityDoJSON(client *http.Client, req *http.Request, target any) error {
+	_, err := moveIdentityDoJSONWithDigest(client, req, target)
+	return err
+}
+
+func moveIdentityDoJSONWithDigest(client *http.Client, req *http.Request, target any) (string, error) {
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("http_status_%d", resp.StatusCode)
+		return "", fmt.Errorf("http_status_%d", resp.StatusCode)
 	}
 	limited := &io.LimitedReader{R: resp.Body, N: moveIdentityResponseLimit + 1}
-	if err := json.NewDecoder(limited).Decode(target); err != nil {
-		return err
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		return "", err
 	}
 	if limited.N <= 0 {
-		return fmt.Errorf("response_too_large")
+		return "", fmt.Errorf("response_too_large")
 	}
-	return nil
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(target); err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func parseMoveIdentityUint64(value string) (uint64, error) {

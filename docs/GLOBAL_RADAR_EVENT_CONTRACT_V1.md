@@ -83,6 +83,6 @@ Build source adapters that emit this envelope from:
 - Solana live stream observations;
 - EVM transaction and contract probes. The address/code probe now preserves exact `eth_chainId` and `eth_getCode` response-byte SHA-256 values and can build an event directly from those native digests;
 - Bitcoin address/network observations. The Esplora address probe now preserves separate exact response-byte SHA-256 values for mainnet genesis verification and address activity;
-- Sui and Aptos identity/network observations.
+- Sui and Aptos identity/network observations. Both probes now retain the exact bounded identity-response SHA-256 needed for native provenance.
 
 After that, the same event stream becomes the input to the cross-chain entity graph.
