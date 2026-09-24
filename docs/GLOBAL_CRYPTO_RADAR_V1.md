@@ -147,17 +147,16 @@ limitations, but explicitly sets `market_data_can_issue_verdict=false` and
 `koschei.global-radar-verdict-reference.v1` preserves an existing evidence-linked,
 source-marked-signed ARVIS deterministic verdict as an authoritative graph reference.
 
-Global Radar does not re-grade or re-sign the verdict. It also does not claim
-independent Ed25519 verification until `key_id` is resolved through an out-of-band
-trusted public-key registry. The projection therefore reports
-`signature_verification=not_reverified_by_global_radar`.
+Global Radar does not re-grade or re-sign the verdict. The legacy projection remains explicitly unverified and reports `signature_verification=not_reverified_by_global_radar`.
+
+An additive server-owned trusted-key registry contract can now independently reverify the same canonical ARVIS v1 payload with Ed25519. Registry entries are selected by `key_id`, require canonical unpadded base64url 32-byte public keys, and support bounded `valid_from`, `valid_until`, and `revoked_at` lifecycle controls evaluated against the verdict's authenticated `generated_at`. Only callers that explicitly supply this registry may receive `signature_verification=verified_ed25519_trusted_registry`; unknown, malformed, expired, revoked, tampered, or mismatched signatures fail closed.
 
 ## Next implementation slices
 
 1. Extend durable persistence from explicit intelligence probes to continuous background multi-network ingest without changing existing ARVIS decision authority.
 2. Add operator-facing graph retrieval that distinguishes implemented, configured, observed, persisted and verified states.
 3. Connect bridge-specific live adapters only where both chain-side transfer identities can be independently anchored.
-4. Add independent verdict signature verification once a trusted public-key registry contract is available to the Radar verifier.
+4. Wire the trusted verdict-key registry into production verdict-reference creation; the verification contract now exists but the legacy unverified projection remains the default for callers that do not supply server-owned trust material.
 5. Expand live node telemetry persistence for EVM beacon/execution and Bitcoin Core/PoW collectors without inventing missing geography or client identity.
 
 ## Product principle
