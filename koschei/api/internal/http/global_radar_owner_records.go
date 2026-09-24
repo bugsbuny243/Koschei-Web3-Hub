@@ -131,6 +131,9 @@ func parseGlobalRadarOwnerRecordsQuery(r *http.Request, now time.Time) (globalRa
 	if !since.Before(until) {
 		return globalRadarOwnerRecordsQuery{}, fmt.Errorf("invalid_time_window")
 	}
+	if until.Sub(since) > koscheiclickhouse.MaxGlobalRadarGraphReadWindow {
+		return globalRadarOwnerRecordsQuery{}, fmt.Errorf("time_window_too_large")
+	}
 
 	limit := globalRadarOwnerDefaultLimit
 	if raw := strings.TrimSpace(values.Get("limit")); raw != "" {
