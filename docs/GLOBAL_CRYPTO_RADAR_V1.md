@@ -124,6 +124,12 @@ The first background slice covers EVM execution-node telemetry, optional Ethereu
 
 This is still telemetry collection rather than multi-chain transaction firehose ingestion. ARVIS remains the only connected verdict authority.
 
+### Owner-only persisted graph retrieval
+
+The existing ClickHouse graph reader is now exposed through `GET /api/owner/radar/global/records` behind the repository's existing owner authentication boundary. The route requires a registered `network`, defaults to a 24-hour half-open window, accepts optional `subject_id` and `record_type`, and clamps the HTTP surface to at most 1,000 rows even though the lower ClickHouse reader retains its stricter 31-day / 5,000-row hard contract and scan caps.
+
+Returned rows are historical persisted evidence, not a claim about current chain state. The ClickHouse reader rechecks requested network/subject/type/time boundaries, validates payload JSON and recomputes each stored payload SHA-256 before the owner route can return it. The Fabric capability surface marks operator UI visualization as pending rather than claiming a completed graph frontend.
+
 ### Snapshot contract
 
 `koschei.global-radar-snapshot.v1` assembles observations, relation edges, verified
@@ -154,7 +160,7 @@ An additive server-owned trusted-key registry contract can now independently rev
 ## Next implementation slices
 
 1. Extend durable persistence from explicit intelligence probes to continuous background multi-network ingest without changing existing ARVIS decision authority.
-2. Add operator-facing graph retrieval that distinguishes implemented, configured, observed, persisted and verified states.
+2. Add an operator graph visualization over the owner-only persisted graph retrieval; the bounded authenticated JSON retrieval contract now exists.
 3. Connect bridge-specific live adapters only where both chain-side transfer identities can be independently anchored.
 4. Wire the trusted verdict-key registry into production verdict-reference creation; the verification contract now exists but the legacy unverified projection remains the default for callers that do not supply server-owned trust material.
 5. Expand live node telemetry persistence for EVM beacon/execution and Bitcoin Core/PoW collectors without inventing missing geography or client identity.

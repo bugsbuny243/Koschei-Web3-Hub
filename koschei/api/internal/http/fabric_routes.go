@@ -107,6 +107,7 @@ func currentFabricSnapshot() fabricSnapshot {
 				{ID: "web3-security-core", Domain: "web3", Status: "stable", EvidenceState: "blocked", WorkPackages: []string{"CORE-01", "CORE-02", "CORE-03", "CORE-04", "SIGN-01"}, Backend: "existing", Frontend: "existing", Telemetry: "existing"},
 				{ID: "entitlement-ledger-split-plane", Domain: "core", Status: "experimental", EvidenceState: "partial", WorkPackages: []string{"CORE-01", "CORE-03"}, Backend: "existing", Frontend: "existing", Telemetry: "planned"},
 				{ID: "fabric-capability-registry", Domain: "core", Status: "experimental", EvidenceState: "partial", WorkPackages: []string{"CORE-04", "OPS-01"}, Backend: "existing", Frontend: "existing", Telemetry: "planned"},
+				{ID: "global-radar-persisted-graph-read", Domain: "web3", Status: "experimental", EvidenceState: "observed", Backend: "owner-api", Frontend: "ui-pending", Telemetry: "clickhouse"},
 			}},
 			{Name: "koschei-lang", Repository: "bugsbuny243/koschei-lang", Role: "independent-security-programming-language", Mode: "observe", Capabilities: []fabricCapability{
 				{ID: "language-toolchain", Domain: "core", Status: "experimental", EvidenceState: "blocked", WorkPackages: []string{"LANG-01", "LANG-02", "LANG-03", "LANG-04", "SUPPLY-02"}, Backend: "existing", Frontend: "existing", Telemetry: "existing"},

@@ -14,7 +14,12 @@ import (
 
 const globalRadarClickHouseStartupTimeout = 10 * time.Second
 
-func buildGlobalRadarSnapshotSink(parent context.Context) (apihttp.GlobalRadarSnapshotSink, error) {
+type globalRadarGraphStore interface {
+	apihttp.GlobalRadarSnapshotSink
+	apihttp.GlobalRadarGraphReader
+}
+
+func buildGlobalRadarSnapshotSink(parent context.Context) (globalRadarGraphStore, error) {
 	if strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_CLICKHOUSE_ENABLED")) != "1" {
 		return nil, nil
 	}

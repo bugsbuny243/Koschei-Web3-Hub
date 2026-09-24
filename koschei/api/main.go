@@ -136,6 +136,7 @@ func main() {
 		apihttp.WithSolanaRPC(solanaRPC),
 		apihttp.WithJobStore(jobStore),
 		apihttp.WithJobQueue(jobQueue),
+		apihttp.WithGlobalRadarGraphReader(globalRadarSink),
 	),
 		apihttp.WithGlobalRadarSnapshotSink(globalRadarSink),
 		apihttp.WithGlobalRadarEventSink(globalRadarEventSink),
