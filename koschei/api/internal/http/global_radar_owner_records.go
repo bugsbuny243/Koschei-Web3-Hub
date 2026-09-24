@@ -42,13 +42,13 @@ type globalRadarOwnerRecordsTruthBoundary struct {
 }
 
 type globalRadarOwnerRecordsResponse struct {
-	SchemaVersion string                               `json:"schema_version"`
-	Scope         string                               `json:"scope"`
-	GeneratedAt   time.Time                            `json:"generated_at"`
-	Query         globalRadarOwnerRecordsQuery         `json:"query"`
-	Count         int                                  `json:"count"`
-	Records       []koscheiclickhouse.GlobalRadarStoredRecord `json:"records"`
-	TruthBoundary globalRadarOwnerRecordsTruthBoundary `json:"truth_boundary"`
+	SchemaVersion string                                       `json:"schema_version"`
+	Scope         string                                       `json:"scope"`
+	GeneratedAt   time.Time                                    `json:"generated_at"`
+	Query         globalRadarOwnerRecordsQuery                 `json:"query"`
+	Count         int                                          `json:"count"`
+	Records       []koscheiclickhouse.GlobalRadarStoredRecord  `json:"records"`
+	TruthBoundary globalRadarOwnerRecordsTruthBoundary         `json:"truth_boundary"`
 }
 
 func ownerGlobalRadarGraphRecords(reader GlobalRadarGraphReader) http.HandlerFunc {
@@ -166,7 +166,7 @@ func writeGlobalRadarOwnerError(w http.ResponseWriter, status int, code string) 
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"error":             code,
+		"error":               code,
 		"current_chain_state": false,
 	})
 }
