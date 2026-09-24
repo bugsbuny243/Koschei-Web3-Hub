@@ -53,7 +53,7 @@ func TestCollectGlobalRadarBackgroundTelemetryPersistsEVMObservation(t *testing.
 			Kind: GlobalRadarTelemetryEVMNode, NetworkID: "ethereum-mainnet", Endpoint: server.URL,
 		}},
 		HTTPClient: server.Client(),
-		Now: func() time.Time { return now },
+		Now:        func() time.Time { return now },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestCollectGlobalRadarBackgroundTelemetryPersistsSuccessfulTargetsAndReport
 			{Kind: "unsupported", NetworkID: "ethereum-mainnet", Endpoint: server.URL},
 		},
 		HTTPClient: server.Client(),
-		Now: func() time.Time { return time.Date(2026, 9, 24, 6, 0, 0, 0, time.UTC) },
+		Now:        func() time.Time { return time.Date(2026, 9, 24, 6, 0, 0, 0, time.UTC) },
 	})
 	if err == nil {
 		t.Fatal("expected partial-cycle error")
