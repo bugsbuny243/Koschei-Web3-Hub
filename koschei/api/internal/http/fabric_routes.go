@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 
+	"koschei/api/internal/radarevent"
 	"koschei/api/internal/services"
 )
 
@@ -13,8 +14,13 @@ type GlobalRadarSnapshotSink interface {
 	InsertGlobalRadarSnapshot(context.Context, services.GlobalRadarSnapshot) error
 }
 
+type GlobalRadarEventSink interface {
+	InsertGlobalRadarEvents(context.Context, []radarevent.Event) error
+}
+
 type fabricConfig struct {
 	globalRadarSnapshotSink GlobalRadarSnapshotSink
+	globalRadarEventSink    GlobalRadarEventSink
 }
 
 type FabricOption func(*fabricConfig)
@@ -22,6 +28,12 @@ type FabricOption func(*fabricConfig)
 func WithGlobalRadarSnapshotSink(sink GlobalRadarSnapshotSink) FabricOption {
 	return func(config *fabricConfig) {
 		config.globalRadarSnapshotSink = sink
+	}
+}
+
+func WithGlobalRadarEventSink(sink GlobalRadarEventSink) FabricOption {
+	return func(config *fabricConfig) {
+		config.globalRadarEventSink = sink
 	}
 }
 
@@ -120,7 +132,7 @@ func registerFabricRoutes(mux *http.ServeMux, configs ...fabricConfig) {
 	mux.HandleFunc("/fabric/networks/deployment", method(http.MethodGet, networkDeploymentCatalogHandler))
 	mux.HandleFunc("/fabric/networks/probe", method(http.MethodPost, networkTargetProbe))
 	mux.HandleFunc("/fabric/networks/probe/intelligence", method(http.MethodPost, func(w http.ResponseWriter, r *http.Request) {
-		networkTargetProbeWithDependencies(w, r, nil, config.globalRadarSnapshotSink)
+		networkTargetProbeWithStores(w, r, nil, config.globalRadarSnapshotSink, config.globalRadarEventSink)
 	}))
 	mux.HandleFunc("/fabric/radar/global", method(http.MethodGet, globalRadarSnapshotHandler))
 	// Fabric is still experimental. Keep its capability contract outside /api/*

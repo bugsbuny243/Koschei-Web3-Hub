@@ -91,6 +91,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar ClickHouse persistence is unavailable: %v", err)
 	}
+	globalRadarEventSink, err := buildGlobalRadarEventSink(appCtx)
+	if err != nil {
+		log.Fatalf("CRITICAL: configured Global Radar event ClickHouse persistence is unavailable: %v", err)
+	}
 	globalRadarBackground, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarSink)
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar background telemetry is invalid: %v", err)
@@ -106,6 +110,9 @@ func main() {
 
 	if globalRadarSink != nil {
 		log.Printf("global radar ClickHouse persistence enabled for Fabric intelligence probes")
+	}
+	if globalRadarEventSink != nil {
+		log.Printf("global radar event ClickHouse persistence enabled for native-digest Fabric events")
 	}
 
 	port := os.Getenv("PORT")
@@ -129,7 +136,10 @@ func main() {
 		apihttp.WithSolanaRPC(solanaRPC),
 		apihttp.WithJobStore(jobStore),
 		apihttp.WithJobQueue(jobQueue),
-	), apihttp.WithGlobalRadarSnapshotSink(globalRadarSink)))
+	),
+		apihttp.WithGlobalRadarSnapshotSink(globalRadarSink),
+		apihttp.WithGlobalRadarEventSink(globalRadarEventSink),
+	))
 	server := newHTTPServer(port, handler)
 
 	serverErrors := make(chan error, 1)

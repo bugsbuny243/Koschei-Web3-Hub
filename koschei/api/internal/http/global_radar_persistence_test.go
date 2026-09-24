@@ -9,12 +9,26 @@ import (
 	"strings"
 	"testing"
 
+	"koschei/api/internal/radarevent"
 	"koschei/api/internal/services"
 )
 
 type recordingGlobalRadarSink struct {
 	snapshots []services.GlobalRadarSnapshot
 	err       error
+}
+
+type recordingGlobalRadarEventSink struct {
+	events []radarevent.Event
+	err    error
+}
+
+func (s *recordingGlobalRadarEventSink) InsertGlobalRadarEvents(_ context.Context, events []radarevent.Event) error {
+	if s.err != nil {
+		return s.err
+	}
+	s.events = append(s.events, events...)
+	return nil
 }
 
 func (s *recordingGlobalRadarSink) InsertGlobalRadarSnapshot(_ context.Context, snapshot services.GlobalRadarSnapshot) error {
@@ -99,6 +113,66 @@ func TestNetworkProbeIntelligenceFailsClosedWhenConfiguredSinkCannotPersist(t *t
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 	if !strings.Contains(response.Body.String(), `"error":"radar_persistence_unavailable"`) {
+		t.Fatalf("unexpected response: %s", response.Body.String())
+	}
+}
+
+func TestNetworkProbeIntelligenceEmitsAndPersistsNativeDigestEVMEvent(t *testing.T) {
+	rpc := globalRadarPersistenceTestRPC(t)
+	defer rpc.Close()
+	t.Setenv("ETHEREUM_RPC_URL", rpc.URL)
+
+	snapshotSink := &recordingGlobalRadarSink{}
+	eventSink := &recordingGlobalRadarEventSink{}
+	request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe/intelligence", strings.NewReader(`{"network":"ethereum-mainnet","address":"0x1111111111111111111111111111111111111111"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	networkTargetProbeWithStores(response, request, rpc.Client(), snapshotSink, eventSink)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if len(eventSink.events) != 1 {
+		t.Fatalf("persisted events=%d want 1", len(eventSink.events))
+	}
+	event := eventSink.events[0]
+	if err := event.Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if len(event.SourceDigests) != 2 {
+		t.Fatalf("source digests=%#v", event.SourceDigests)
+	}
+
+	var payload struct {
+		RadarEvent            *radarevent.Event `json:"radar_event"`
+		RadarEventPersistence string            `json:"radar_event_persistence"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.RadarEvent == nil || payload.RadarEvent.EventSHA256 != event.EventSHA256 {
+		t.Fatalf("response event mismatch: %#v", payload.RadarEvent)
+	}
+	if payload.RadarEventPersistence != "clickhouse" {
+		t.Fatalf("radar_event_persistence=%q", payload.RadarEventPersistence)
+	}
+}
+
+func TestNetworkProbeIntelligenceFailsClosedWhenEventSinkCannotPersist(t *testing.T) {
+	rpc := globalRadarPersistenceTestRPC(t)
+	defer rpc.Close()
+	t.Setenv("ETHEREUM_RPC_URL", rpc.URL)
+
+	eventSink := &recordingGlobalRadarEventSink{err: errors.New("event clickhouse unavailable")}
+	request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe/intelligence", strings.NewReader(`{"network":"ethereum-mainnet","address":"0x1111111111111111111111111111111111111111"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	networkTargetProbeWithStores(response, request, rpc.Client(), nil, eventSink)
+	if response.Code != http.StatusBadGateway {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), `"error":"radar_event_persistence_unavailable"`) {
 		t.Fatalf("unexpected response: %s", response.Body.String())
 	}
 }

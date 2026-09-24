@@ -70,7 +70,11 @@ ClickHouse migration `006_global_radar_events.sql` defines an append-first ledge
 
 The writer re-verifies every event digest before any network write, canonicalizes the event again, stores the complete canonical event JSON, and binds those stored bytes with a separate payload SHA-256. The ledger does not create a risk grade or promote evidence state.
 
-This storage path is intentionally available before automatic producers are connected. A producer must already possess the real source digest required by the event contract; normalized probe output is not retroactively relabeled as raw source evidence.
+The EVM intelligence probe can now emit this envelope directly from the exact response-byte digests captured for `eth_chainId` and `eth_getCode`. Optional persistence is controlled independently by `KOSCHEI_GLOBAL_RADAR_EVENT_CLICKHOUSE_ENABLED=1`; startup verifies migration 006 before the sink is accepted.
+
+Graph snapshot persistence and event-ledger persistence are separate replay-convergent writes rather than a distributed transaction. If either configured sink fails, the request fails closed; retrying the same canonical evidence converges by stable snapshot/event identity.
+
+A producer must already possess the real source digest required by the event contract; normalized probe output is not retroactively relabeled as raw source evidence.
 
 ## Next step
 

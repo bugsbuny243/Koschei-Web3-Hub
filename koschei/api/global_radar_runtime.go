@@ -32,6 +32,24 @@ func buildGlobalRadarSnapshotSink(parent context.Context) (apihttp.GlobalRadarSn
 	return client, nil
 }
 
+func buildGlobalRadarEventSink(parent context.Context) (apihttp.GlobalRadarEventSink, error) {
+	if strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_EVENT_CLICKHOUSE_ENABLED")) != "1" {
+		return nil, nil
+	}
+
+	client, err := koscheiclickhouse.NewFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("create Global Radar event ClickHouse client: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(parent, globalRadarClickHouseStartupTimeout)
+	defer cancel()
+	if err := client.VerifyGlobalRadarEventSchema(ctx); err != nil {
+		return nil, fmt.Errorf("verify Global Radar ClickHouse event schema: %w", err)
+	}
+	return client, nil
+}
+
 func buildGlobalRadarBackgroundTelemetryConfig(sink services.GlobalRadarSnapshotSink) (*services.GlobalRadarBackgroundTelemetryConfig, error) {
 	if strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_BACKGROUND_ENABLED")) != "1" {
 		return nil, nil
