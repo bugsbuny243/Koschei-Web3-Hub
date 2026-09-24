@@ -30,7 +30,7 @@ func globalRadarPersistenceTestRPC(t *testing.T) *httptest.Server {
 	return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		var request struct {
-			Method string \`json:"method"\`
+			Method string `json:"method"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Fatalf("decode rpc request: %v", err)
@@ -38,9 +38,9 @@ func globalRadarPersistenceTestRPC(t *testing.T) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		switch request.Method {
 		case "eth_chainId":
-			_, _ = w.Write([]byte(\`{"jsonrpc":"2.0","id":1,"result":"0x1"}\`))
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":"0x1"}`))
 		case "eth_getCode":
-			_, _ = w.Write([]byte(\`{"jsonrpc":"2.0","id":2,"result":"0x60016000"}\`))
+			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":2,"result":"0x60016000"}`))
 		default:
 			http.Error(w, "unexpected method", http.StatusBadRequest)
 		}
@@ -53,7 +53,7 @@ func TestNetworkProbeIntelligencePersistsCanonicalSnapshotWhenSinkConfigured(t *
 	t.Setenv("ETHEREUM_RPC_URL", rpc.URL)
 
 	sink := &recordingGlobalRadarSink{}
-	request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe/intelligence", strings.NewReader(\`{"network":"ethereum-mainnet","address":"0x1111111111111111111111111111111111111111"}\`))
+	request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe/intelligence", strings.NewReader(`{"network":"ethereum-mainnet","address":"0x1111111111111111111111111111111111111111"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 

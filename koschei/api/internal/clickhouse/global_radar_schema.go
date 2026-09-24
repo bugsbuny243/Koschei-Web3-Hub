@@ -14,10 +14,10 @@ func (c *Client) VerifyGlobalRadarGraphSchema(ctx context.Context) error {
 
 	metadataURL := *c.endpoint
 	metadataParams := metadataURL.Query()
-	metadataParams.Set("query", \`SELECT engine, sorting_key
+	metadataParams.Set("query", `SELECT engine, sorting_key
 FROM system.tables
 WHERE database={db:String} AND name='global_radar_graph_records'
-FORMAT JSON\`)
+FORMAT JSON`)
 	metadataParams.Set("param_db", c.database)
 	metadataParams.Set("max_execution_time", "10")
 	metadataParams.Set("max_result_rows", "10")
@@ -39,7 +39,7 @@ FORMAT JSON\`)
 
 	columnsURL := *c.endpoint
 	columnParams := columnsURL.Query()
-	columnParams.Set("query", \`SELECT count() AS count
+	columnParams.Set("query", `SELECT count() AS count
 FROM system.columns
 WHERE database={db:String}
   AND table='global_radar_graph_records'
@@ -63,7 +63,7 @@ WHERE database={db:String}
     'ingested_at',
     'record_date'
   )
-FORMAT JSON\`)
+FORMAT JSON`)
 	columnParams.Set("param_db", c.database)
 	columnParams.Set("max_execution_time", "10")
 	columnParams.Set("max_result_rows", "10")
