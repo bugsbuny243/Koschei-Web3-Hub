@@ -2,6 +2,8 @@ package networktarget
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -113,4 +115,44 @@ func repeatBeaconHex(pair string) string {
 		out += pair
 	}
 	return out
+}
+
+func TestProbeEthereumBeaconTelemetryCapturesExactResponseDigests(t *testing.T) {
+	root := "0x" + repeatBeaconHex("44")
+	versionBody := []byte(`{"data":{"version":"Lighthouse/v7.1.0"}}`)
+	peerBody := []byte(`{"data":{"disconnected":"0","connecting":"0","connected":"64","disconnecting":"0"}}`)
+	syncBody := []byte(`{"data":{"head_slot":"123456","sync_distance":"0","is_syncing":false,"is_optimistic":false,"el_offline":false}}`)
+	finalityBody := []byte(`{"execution_optimistic":false,"finalized":true,"data":{"previous_justified":{"epoch":"3800","root":"` + root + `"},"current_justified":{"epoch":"3801","root":"` + root + `"},"finalized":{"epoch":"3799","root":"` + root + `"}}}`)
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/eth/v1/node/version":
+			_, _ = w.Write(versionBody)
+		case "/eth/v1/node/peer_count":
+			_, _ = w.Write(peerBody)
+		case "/eth/v1/node/syncing":
+			_, _ = w.Write(syncBody)
+		case "/eth/v1/beacon/states/head/finality_checkpoints":
+			_, _ = w.Write(finalityBody)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	got, err := ProbeEthereumBeaconTelemetry(context.Background(), server.Client(), server.URL, time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	versionDigest := sha256.Sum256(versionBody)
+	peerDigest := sha256.Sum256(peerBody)
+	syncDigest := sha256.Sum256(syncBody)
+	finalityDigest := sha256.Sum256(finalityBody)
+	if got.VersionResponseSHA256 != hex.EncodeToString(versionDigest[:]) ||
+		got.PeerCountResponseSHA256 != hex.EncodeToString(peerDigest[:]) ||
+		got.SyncingResponseSHA256 != hex.EncodeToString(syncDigest[:]) ||
+		got.FinalityResponseSHA256 != hex.EncodeToString(finalityDigest[:]) {
+		t.Fatalf("unexpected beacon response digests: %#v", got)
+	}
 }

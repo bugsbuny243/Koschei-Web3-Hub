@@ -114,3 +114,31 @@ func repeatBitcoinPoWHex(pair string) string {
 	}
 	return out
 }
+
+func TestProbeBitcoinPoWNetworkTelemetryCapturesNativeResponseDigests(t *testing.T) {
+	best := repeatBitcoinPoWHex("33")
+	work := repeatBitcoinPoWHex("44")
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req bitcoinCoreRPCRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatal(err)
+		}
+		switch req.Method {
+		case "getblockchaininfo":
+			_, _ = w.Write([]byte(`{"result":{"chain":"main","blocks":900001,"headers":900001,"bestblockhash":"` + best + `","difficulty":123456789.5,"chainwork":"` + work + `","initialblockdownload":false},"error":null,"id":401}`))
+		case "getnetworkhashps":
+			_, _ = w.Write([]byte(`{"result":8.75e20,"error":null,"id":402}`))
+		default:
+			t.Fatalf("unexpected method %q", req.Method)
+		}
+	}))
+	defer server.Close()
+
+	got, err := ProbeBitcoinPoWNetworkTelemetry(context.Background(), server.Client(), server.URL, time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.BlockchainInfoResponseSHA256 == "" || got.NetworkHashPSResponseSHA256 == "" {
+		t.Fatalf("missing native response digests: %#v", got)
+	}
+}

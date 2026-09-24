@@ -123,7 +123,14 @@ func collectGlobalRadarTelemetryTarget(ctx context.Context, client *http.Client,
 			return GlobalRadarObservation{}, nil, err
 		}
 		observation, err := ProjectEthereumBeaconTelemetryToGlobalRadar(result)
-		return observation, nil, err
+		if err != nil {
+			return GlobalRadarObservation{}, nil, err
+		}
+		event, err := radarevent.BuildEthereumBeaconTelemetryEventFromResult("ethereum-beacon-telemetry-adapter", result)
+		if err != nil {
+			return GlobalRadarObservation{}, nil, err
+		}
+		return observation, &event, nil
 	case GlobalRadarTelemetryBitcoinCore:
 		if networkID != "bitcoin-mainnet" {
 			return GlobalRadarObservation{}, nil, fmt.Errorf("bitcoin core telemetry requires bitcoin-mainnet")
@@ -150,7 +157,14 @@ func collectGlobalRadarTelemetryTarget(ctx context.Context, client *http.Client,
 			return GlobalRadarObservation{}, nil, err
 		}
 		observation, err := ProjectBitcoinPoWNetworkTelemetryToGlobalRadar(result)
-		return observation, nil, err
+		if err != nil {
+			return GlobalRadarObservation{}, nil, err
+		}
+		event, err := radarevent.BuildBitcoinPoWNetworkTelemetryEventFromResult("bitcoin-pow-telemetry-adapter", result)
+		if err != nil {
+			return GlobalRadarObservation{}, nil, err
+		}
+		return observation, &event, nil
 	default:
 		return GlobalRadarObservation{}, nil, fmt.Errorf("unsupported global radar telemetry kind %q", kind)
 	}

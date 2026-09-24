@@ -1,7 +1,10 @@
 package networktarget
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,22 +26,26 @@ type EthereumBeaconCheckpoint struct {
 }
 
 type EthereumBeaconTelemetryResult struct {
-	SchemaVersion            string                      `json:"schema_version"`
-	Observation              NetworkTelemetryObservation `json:"observation"`
-	ClientVersion            string                      `json:"client_version"`
-	ConnectedPeers           uint64                      `json:"connected_peers"`
-	HeadSlot                 uint64                      `json:"head_slot"`
-	SyncDistance             uint64                      `json:"sync_distance"`
-	IsSyncing                bool                        `json:"is_syncing"`
-	IsOptimistic             bool                        `json:"is_optimistic"`
-	ExecutionLayerOffline    bool                        `json:"execution_layer_offline"`
-	PreviousJustified        EthereumBeaconCheckpoint    `json:"previous_justified"`
-	CurrentJustified         EthereumBeaconCheckpoint    `json:"current_justified"`
-	Finalized                EthereumBeaconCheckpoint    `json:"finalized"`
-	CheckpointStateFinalized bool                        `json:"checkpoint_state_finalized"`
-	EndpointScope            string                      `json:"endpoint_scope"`
-	AnalysisPerformed        bool                        `json:"analysis_performed"`
-	LiveAvailability         string                      `json:"live_availability"`
+	SchemaVersion             string                      `json:"schema_version"`
+	Observation               NetworkTelemetryObservation `json:"observation"`
+	ClientVersion             string                      `json:"client_version"`
+	VersionResponseSHA256     string                      `json:"version_response_sha256,omitempty"`
+	ConnectedPeers            uint64                      `json:"connected_peers"`
+	PeerCountResponseSHA256   string                      `json:"peer_count_response_sha256,omitempty"`
+	HeadSlot                  uint64                      `json:"head_slot"`
+	SyncDistance              uint64                      `json:"sync_distance"`
+	IsSyncing                 bool                        `json:"is_syncing"`
+	IsOptimistic              bool                        `json:"is_optimistic"`
+	ExecutionLayerOffline     bool                        `json:"execution_layer_offline"`
+	SyncingResponseSHA256     string                      `json:"syncing_response_sha256,omitempty"`
+	PreviousJustified         EthereumBeaconCheckpoint    `json:"previous_justified"`
+	CurrentJustified          EthereumBeaconCheckpoint    `json:"current_justified"`
+	Finalized                 EthereumBeaconCheckpoint    `json:"finalized"`
+	CheckpointStateFinalized  bool                        `json:"checkpoint_state_finalized"`
+	FinalityResponseSHA256    string                      `json:"finality_response_sha256,omitempty"`
+	EndpointScope             string                      `json:"endpoint_scope"`
+	AnalysisPerformed         bool                        `json:"analysis_performed"`
+	LiveAvailability          string                      `json:"live_availability"`
 }
 
 type ethereumBeaconVersionResponse struct {
@@ -98,7 +105,8 @@ func ProbeEthereumBeaconTelemetry(ctx context.Context, client *http.Client, endp
 	}
 
 	var version ethereumBeaconVersionResponse
-	if err := ethereumBeaconGETJSON(ctx, client, baseURL+"/eth/v1/node/version", &version); err != nil {
+	versionResponseSHA256, err := ethereumBeaconGETJSONWithDigest(ctx, client, baseURL+"/eth/v1/node/version", &version)
+	if err != nil {
 		return EthereumBeaconTelemetryResult{}, fmt.Errorf("ethereum_beacon_version_unavailable: %w", err)
 	}
 	clientVersion := strings.TrimSpace(version.Data.Version)
@@ -107,7 +115,8 @@ func ProbeEthereumBeaconTelemetry(ctx context.Context, client *http.Client, endp
 	}
 
 	var peers ethereumBeaconPeerCountResponse
-	if err := ethereumBeaconGETJSON(ctx, client, baseURL+"/eth/v1/node/peer_count", &peers); err != nil {
+	peerCountResponseSHA256, err := ethereumBeaconGETJSONWithDigest(ctx, client, baseURL+"/eth/v1/node/peer_count", &peers)
+	if err != nil {
 		return EthereumBeaconTelemetryResult{}, fmt.Errorf("ethereum_beacon_peer_count_unavailable: %w", err)
 	}
 	connectedPeers, err := parseEthereumBeaconUint64(peers.Data.Connected)
@@ -121,7 +130,8 @@ func ProbeEthereumBeaconTelemetry(ctx context.Context, client *http.Client, endp
 	}
 
 	var syncing ethereumBeaconSyncingResponse
-	if err := ethereumBeaconGETJSON(ctx, client, baseURL+"/eth/v1/node/syncing", &syncing); err != nil {
+	syncingResponseSHA256, err := ethereumBeaconGETJSONWithDigest(ctx, client, baseURL+"/eth/v1/node/syncing", &syncing)
+	if err != nil {
 		return EthereumBeaconTelemetryResult{}, fmt.Errorf("ethereum_beacon_sync_unavailable: %w", err)
 	}
 	headSlot, err := parseEthereumBeaconUint64(syncing.Data.HeadSlot)
@@ -134,7 +144,8 @@ func ProbeEthereumBeaconTelemetry(ctx context.Context, client *http.Client, endp
 	}
 
 	var finality ethereumBeaconFinalityResponse
-	if err := ethereumBeaconGETJSON(ctx, client, baseURL+"/eth/v1/beacon/states/head/finality_checkpoints", &finality); err != nil {
+	finalityResponseSHA256, err := ethereumBeaconGETJSONWithDigest(ctx, client, baseURL+"/eth/v1/beacon/states/head/finality_checkpoints", &finality)
+	if err != nil {
 		return EthereumBeaconTelemetryResult{}, fmt.Errorf("ethereum_beacon_finality_unavailable: %w", err)
 	}
 	previousJustified, err := normalizeEthereumBeaconCheckpoint(finality.Data.PreviousJustified)
@@ -167,16 +178,20 @@ func ProbeEthereumBeaconTelemetry(ctx context.Context, client *http.Client, endp
 		SchemaVersion:            NetworkTelemetrySchemaVersion,
 		Observation:              observation,
 		ClientVersion:            clientVersion,
+		VersionResponseSHA256:    versionResponseSHA256,
 		ConnectedPeers:           connectedPeers,
+		PeerCountResponseSHA256:  peerCountResponseSHA256,
 		HeadSlot:                 headSlot,
 		SyncDistance:             syncDistance,
 		IsSyncing:                syncing.Data.IsSyncing,
 		IsOptimistic:             syncing.Data.IsOptimistic || finality.ExecutionOptimistic,
 		ExecutionLayerOffline:    syncing.Data.ELOffline,
+		SyncingResponseSHA256:    syncingResponseSHA256,
 		PreviousJustified:        previousJustified,
 		CurrentJustified:         currentJustified,
 		Finalized:                finalizedCheckpoint,
 		CheckpointStateFinalized: finality.Finalized,
+		FinalityResponseSHA256:   finalityResponseSHA256,
 		EndpointScope:            "single_beacon_endpoint_plus_chain_checkpoints",
 		AnalysisPerformed:        true,
 		LiveAvailability:         "checked",
@@ -193,27 +208,37 @@ func validateEthereumBeaconEndpoint(endpoint string) (string, string, error) {
 }
 
 func ethereumBeaconGETJSON(ctx context.Context, client *http.Client, endpoint string, target any) error {
+	_, err := ethereumBeaconGETJSONWithDigest(ctx, client, endpoint, target)
+	return err
+}
+
+func ethereumBeaconGETJSONWithDigest(ctx context.Context, client *http.Client, endpoint string, target any) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	req.Header.Set("Accept", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("beacon_status_%d", resp.StatusCode)
+		return "", fmt.Errorf("beacon_status_%d", resp.StatusCode)
 	}
 	limited := &io.LimitedReader{R: resp.Body, N: ethereumBeaconTelemetryResponseLimit + 1}
-	if err := json.NewDecoder(limited).Decode(target); err != nil {
-		return err
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		return "", err
 	}
 	if limited.N <= 0 {
-		return fmt.Errorf("beacon_response_too_large")
+		return "", fmt.Errorf("beacon_response_too_large")
 	}
-	return nil
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(target); err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func parseEthereumBeaconUint64(value string) (uint64, error) {

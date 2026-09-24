@@ -13,18 +13,20 @@ import (
 var bitcoinPoWHex256 = regexp.MustCompile(`^[0-9a-fA-F]{64}$`)
 
 type BitcoinPoWNetworkTelemetryResult struct {
-	SchemaVersion          string                      `json:"schema_version"`
-	Observation            NetworkTelemetryObservation `json:"observation"`
-	EstimatedNetworkHashPS float64                     `json:"estimated_network_hash_ps"`
-	Difficulty             float64                     `json:"difficulty"`
-	BestBlockHash          string                      `json:"best_block_hash"`
-	Chainwork              string                      `json:"chainwork"`
-	Blocks                 int64                       `json:"blocks"`
-	Headers                int64                       `json:"headers"`
-	InitialBlockDownload   bool                        `json:"initial_block_download"`
-	EstimatorScope         string                      `json:"estimator_scope"`
-	AnalysisPerformed      bool                        `json:"analysis_performed"`
-	LiveAvailability       string                      `json:"live_availability"`
+	SchemaVersion                string                      `json:"schema_version"`
+	Observation                  NetworkTelemetryObservation `json:"observation"`
+	EstimatedNetworkHashPS       float64                     `json:"estimated_network_hash_ps"`
+	NetworkHashPSResponseSHA256  string                      `json:"network_hash_ps_response_sha256,omitempty"`
+	Difficulty                   float64                     `json:"difficulty"`
+	BestBlockHash                string                      `json:"best_block_hash"`
+	Chainwork                    string                      `json:"chainwork"`
+	Blocks                       int64                       `json:"blocks"`
+	Headers                      int64                       `json:"headers"`
+	InitialBlockDownload         bool                        `json:"initial_block_download"`
+	BlockchainInfoResponseSHA256 string                      `json:"blockchain_info_response_sha256,omitempty"`
+	EstimatorScope               string                      `json:"estimator_scope"`
+	AnalysisPerformed            bool                        `json:"analysis_performed"`
+	LiveAvailability             string                      `json:"live_availability"`
 }
 
 type bitcoinPoWBlockchainInfo struct {
@@ -54,7 +56,8 @@ func ProbeBitcoinPoWNetworkTelemetry(ctx context.Context, client *http.Client, e
 	}
 
 	var blockchain bitcoinPoWBlockchainInfo
-	if err := bitcoinCoreRPC(ctx, client, endpoint, 401, "getblockchaininfo", &blockchain); err != nil {
+	blockchainInfoResponseSHA256, err := bitcoinCoreRPCWithDigest(ctx, client, endpoint, 401, "getblockchaininfo", &blockchain)
+	if err != nil {
 		return BitcoinPoWNetworkTelemetryResult{}, fmt.Errorf("bitcoin_pow_blockchain_info_unavailable: %w", err)
 	}
 	if err := validateBitcoinPoWBlockchainInfo(blockchain); err != nil {
@@ -62,7 +65,8 @@ func ProbeBitcoinPoWNetworkTelemetry(ctx context.Context, client *http.Client, e
 	}
 
 	var hashPS float64
-	if err := bitcoinCoreRPC(ctx, client, endpoint, 402, "getnetworkhashps", &hashPS); err != nil {
+	networkHashPSResponseSHA256, err := bitcoinCoreRPCWithDigest(ctx, client, endpoint, 402, "getnetworkhashps", &hashPS)
+	if err != nil {
 		return BitcoinPoWNetworkTelemetryResult{}, fmt.Errorf("bitcoin_pow_network_hashps_unavailable: %w", err)
 	}
 	if math.IsNaN(hashPS) || math.IsInf(hashPS, 0) || hashPS < 0 {
@@ -83,18 +87,20 @@ func ProbeBitcoinPoWNetworkTelemetry(ctx context.Context, client *http.Client, e
 	}
 
 	return BitcoinPoWNetworkTelemetryResult{
-		SchemaVersion:          NetworkTelemetrySchemaVersion,
-		Observation:            observation,
-		EstimatedNetworkHashPS: hashPS,
-		Difficulty:             blockchain.Difficulty,
-		BestBlockHash:          strings.ToLower(strings.TrimSpace(blockchain.BestBlockHash)),
-		Chainwork:              strings.ToLower(strings.TrimSpace(blockchain.Chainwork)),
-		Blocks:                 blockchain.Blocks,
-		Headers:                blockchain.Headers,
-		InitialBlockDownload:   blockchain.InitialBlockDownload,
-		EstimatorScope:         "bitcoin_core_network_estimate_from_single_mainnet_node",
-		AnalysisPerformed:      true,
-		LiveAvailability:       "checked",
+		SchemaVersion:                NetworkTelemetrySchemaVersion,
+		Observation:                  observation,
+		EstimatedNetworkHashPS:       hashPS,
+		NetworkHashPSResponseSHA256:  networkHashPSResponseSHA256,
+		Difficulty:                   blockchain.Difficulty,
+		BestBlockHash:                strings.ToLower(strings.TrimSpace(blockchain.BestBlockHash)),
+		Chainwork:                    strings.ToLower(strings.TrimSpace(blockchain.Chainwork)),
+		Blocks:                       blockchain.Blocks,
+		Headers:                      blockchain.Headers,
+		InitialBlockDownload:         blockchain.InitialBlockDownload,
+		BlockchainInfoResponseSHA256: blockchainInfoResponseSHA256,
+		EstimatorScope:               "bitcoin_core_network_estimate_from_single_mainnet_node",
+		AnalysisPerformed:            true,
+		LiveAvailability:             "checked",
 	}, nil
 }
 

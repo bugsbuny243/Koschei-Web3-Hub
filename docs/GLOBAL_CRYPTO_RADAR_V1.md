@@ -120,7 +120,7 @@ This path remains useful for explicit operator probes.
 
 An additional opt-in worker can continuously persist network-health evidence for explicitly selected networks. It is disabled by default, requires the ClickHouse Global Radar sink, requires an explicit network allowlist, and clamps collection cadence to 5–60 minutes.
 
-The first background slice covers EVM execution-node telemetry, optional Ethereum Beacon telemetry, and Bitcoin Core plus PoW network telemetry. Each collector verifies its native chain/network boundary before projection. EVM execution-node and Bitcoin Core collectors now also preserve native response-byte digests and can emit canonical Global Radar events into the optional event ledger. Beacon and PoW remain snapshot-only until equivalent raw-source provenance is retained. Failures on one target are reported as partial-cycle errors and never become safety conclusions or synthetic verdicts.
+The first background slice covers EVM execution-node telemetry, optional Ethereum Beacon telemetry, and Bitcoin Core plus PoW network telemetry. Each collector verifies its native chain/network boundary before projection. EVM execution-node, Ethereum Beacon, Bitcoin Core and Bitcoin PoW collectors now preserve native response-byte digests and can emit canonical Global Radar events into the optional event ledger. Derived Beacon state that combines multiple responses is not forced into a single-source fact; only directly source-bound facts enter the event contract. Failures on one target are reported as partial-cycle errors and never become safety conclusions or synthetic verdicts.
 
 This is still telemetry collection rather than multi-chain transaction firehose ingestion. ARVIS remains the only connected verdict authority.
 
