@@ -114,7 +114,15 @@ No synthetic decentralization score is produced.
 
 The existing `/fabric/networks/probe/intelligence` path can now persist its canonical one-observation Global Radar snapshot into ClickHouse when `KOSCHEI_GLOBAL_RADAR_CLICKHOUSE_ENABLED=1`. The feature is off by default, validates the ClickHouse graph schema at API startup, and fails closed on persistence failure instead of claiming a durable observation that was not stored. The legacy flat probe route is unchanged.
 
-This is deliberately not described as continuous collection. It only makes an explicitly requested intelligence probe durable. Background multi-network ingest remains a later slice.
+This path remains useful for explicit operator probes.
+
+### Bounded background network telemetry
+
+An additional opt-in worker can continuously persist network-health evidence for explicitly selected networks. It is disabled by default, requires the ClickHouse Global Radar sink, requires an explicit network allowlist, and clamps collection cadence to 5–60 minutes.
+
+The first background slice covers EVM execution-node telemetry, optional Ethereum Beacon telemetry, and Bitcoin Core plus PoW network telemetry. Each collector verifies its native chain/network boundary before projection. Failures on one target are reported as partial-cycle errors and never become safety conclusions or synthetic verdicts.
+
+This is still telemetry collection rather than multi-chain transaction firehose ingestion. ARVIS remains the only connected verdict authority.
 
 ### Snapshot contract
 

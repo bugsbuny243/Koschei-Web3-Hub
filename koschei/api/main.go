@@ -87,7 +87,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: invalid KOSCHEI_RUNTIME_ROLE: %v", err)
 	}
-	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore)
+	globalRadarSink, err := buildGlobalRadarSnapshotSink(appCtx)
+	if err != nil {
+		log.Fatalf("CRITICAL: configured Global Radar ClickHouse persistence is unavailable: %v", err)
+	}
+	globalRadarBackground, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarSink)
+	if err != nil {
+		log.Fatalf("CRITICAL: configured Global Radar background telemetry is invalid: %v", err)
+	}
+	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore, globalRadarBackground)
 	defer stopBackgroundRuntime()
 	log.Printf("runtime role=%s http=%t background_workers=%t", role, role.servesHTTP(), role.runsBackgroundWorkers())
 	if !role.servesHTTP() {
@@ -96,10 +104,6 @@ func main() {
 		return
 	}
 
-	globalRadarSink, err := buildGlobalRadarSnapshotSink(appCtx)
-	if err != nil {
-		log.Fatalf("CRITICAL: configured Global Radar ClickHouse persistence is unavailable: %v", err)
-	}
 	if globalRadarSink != nil {
 		log.Printf("global radar ClickHouse persistence enabled for Fabric intelligence probes")
 	}
