@@ -10,13 +10,19 @@ import (
 
 type globalRadarBackgroundTestSink struct{}
 
-func (globalRadarBackgroundTestSink) InsertGlobalRadarSnapshot(context.Context, services.GlobalRadarSnapshot) error { return nil }
+func (globalRadarBackgroundTestSink) InsertGlobalRadarSnapshot(context.Context, services.GlobalRadarSnapshot) error {
+	return nil
+}
 
 func TestBuildGlobalRadarBackgroundTelemetryConfigDisabledByDefault(t *testing.T) {
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_BACKGROUND_ENABLED", "")
 	config, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarBackgroundTestSink{})
-	if err != nil { t.Fatal(err) }
-	if config != nil { t.Fatal("background telemetry must remain disabled by default") }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config != nil {
+		t.Fatal("background telemetry must remain disabled by default")
+	}
 }
 
 func TestBuildGlobalRadarBackgroundTelemetryConfigRequiresDurableSink(t *testing.T) {
@@ -36,7 +42,9 @@ func TestBuildGlobalRadarBackgroundTelemetryConfigUsesExplicitNetworks(t *testin
 	t.Setenv("BITCOIN_CORE_RPC_URL", "https://bitcoin.example")
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_BACKGROUND_INTERVAL_SECONDS", "900")
 	config, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarBackgroundTestSink{})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(config.Targets) != 4 {
 		t.Fatalf("targets=%d want 4", len(config.Targets))
 	}

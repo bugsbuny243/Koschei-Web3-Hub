@@ -93,14 +93,22 @@ func buildGlobalRadarBackgroundTelemetryConfig(sink services.GlobalRadarSnapshot
 func globalRadarEVMEndpoint(networkID string) string {
 	var name string
 	switch networkID {
-	case "ethereum-mainnet": name = "ETHEREUM_RPC_URL"
-	case "base-mainnet": name = "BASE_RPC_URL"
-	case "arbitrum-mainnet": name = "ARBITRUM_RPC_URL"
-	case "optimism-mainnet": name = "OPTIMISM_RPC_URL"
-	case "polygon-mainnet": name = "POLYGON_RPC_URL"
-	case "bnb-mainnet": name = "BNB_RPC_URL"
-	case "avalanche-mainnet": name = "AVALANCHE_RPC_URL"
-	default: return ""
+	case "ethereum-mainnet":
+		name = "ETHEREUM_RPC_URL"
+	case "base-mainnet":
+		name = "BASE_RPC_URL"
+	case "arbitrum-mainnet":
+		name = "ARBITRUM_RPC_URL"
+	case "optimism-mainnet":
+		name = "OPTIMISM_RPC_URL"
+	case "polygon-mainnet":
+		name = "POLYGON_RPC_URL"
+	case "bnb-mainnet":
+		name = "BNB_RPC_URL"
+	case "avalanche-mainnet":
+		name = "AVALANCHE_RPC_URL"
+	default:
+		return ""
 	}
 	return strings.TrimSpace(os.Getenv(name))
 }

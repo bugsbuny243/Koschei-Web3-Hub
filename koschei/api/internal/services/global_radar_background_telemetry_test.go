@@ -69,8 +69,12 @@ func TestCollectGlobalRadarBackgroundTelemetryPersistsEVMObservation(t *testing.
 func TestCollectGlobalRadarBackgroundTelemetryPersistsSuccessfulTargetsAndReportsPartialFailure(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		var request struct { Method string `json:"method"` }
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil { t.Fatal(err) }
+		var request struct {
+			Method string `json:"method"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		responses := map[string]string{
 			"eth_chainId": "{\"jsonrpc\":\"2.0\",\"id\":101,\"result\":\"0x1\"}",
@@ -79,11 +83,14 @@ func TestCollectGlobalRadarBackgroundTelemetryPersistsSuccessfulTargetsAndReport
 			"eth_blockNumber": "{\"jsonrpc\":\"2.0\",\"id\":104,\"result\":\"0x10\"}",
 			"eth_syncing": "{\"jsonrpc\":\"2.0\",\"id\":105,\"result\":false}",
 		}
-		if payload, ok := responses[request.Method]; ok { _, _ = w.Write([]byte(payload)); return }
+		if payload, ok := responses[request.Method]; ok {
+			_, _ = w.Write([]byte(payload))
+			return
+		}
 		http.Error(w, "unexpected", http.StatusBadRequest)
 	}))
 	defer server.Close()
-	
+
 	sink := &globalRadarTelemetryRecordingSink{}
 	snapshot, err := CollectGlobalRadarBackgroundTelemetry(context.Background(), GlobalRadarBackgroundTelemetryConfig{
 		Sink: sink,

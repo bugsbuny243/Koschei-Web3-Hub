@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	GlobalRadarTelemetryEVMNode        = "evm_node"
-	GlobalRadarTelemetryEthereumBeacon = "ethereum_beacon"
-	GlobalRadarTelemetryBitcoinCore   = "bitcoin_core_node"
-	GlobalRadarTelemetryBitcoinPoW    = "bitcoin_pow_network"
+	GlobalRadarTelemetryEVMNode         = "evm_node"
+	GlobalRadarTelemetryEthereumBeacon  = "ethereum_beacon"
+	GlobalRadarTelemetryBitcoinCore     = "bitcoin_core_node"
+	GlobalRadarTelemetryBitcoinPoW      = "bitcoin_pow_network"
 )
 
 type GlobalRadarSnapshotSink interface {
