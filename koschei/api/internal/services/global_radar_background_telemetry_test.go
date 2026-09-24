@@ -77,11 +77,11 @@ func TestCollectGlobalRadarBackgroundTelemetryPersistsSuccessfulTargetsAndReport
 		}
 		w.Header().Set("Content-Type", "application/json")
 		responses := map[string]string{
-			"eth_chainId": "{\"jsonrpc\":\"2.0\",\"id\":101,\"result\":\"0x1\"}",
+			"eth_chainId":        "{\"jsonrpc\":\"2.0\",\"id\":101,\"result\":\"0x1\"}",
 			"web3_clientVersion": "{\"jsonrpc\":\"2.0\",\"id\":102,\"result\":\"Geth/v1.16\"}",
-			"net_peerCount": "{\"jsonrpc\":\"2.0\",\"id\":103,\"result\":\"0x1\"}",
-			"eth_blockNumber": "{\"jsonrpc\":\"2.0\",\"id\":104,\"result\":\"0x10\"}",
-			"eth_syncing": "{\"jsonrpc\":\"2.0\",\"id\":105,\"result\":false}",
+			"net_peerCount":      "{\"jsonrpc\":\"2.0\",\"id\":103,\"result\":\"0x1\"}",
+			"eth_blockNumber":    "{\"jsonrpc\":\"2.0\",\"id\":104,\"result\":\"0x10\"}",
+			"eth_syncing":        "{\"jsonrpc\":\"2.0\",\"id\":105,\"result\":false}",
 		}
 		if payload, ok := responses[request.Method]; ok {
 			_, _ = w.Write([]byte(payload))
