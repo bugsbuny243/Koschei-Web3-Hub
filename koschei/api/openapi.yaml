@@ -10053,7 +10053,7 @@
     "/api/owner/radar/global/records": {
       "get": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "get_api_owner_radar_global_records",
+        "operationId": "get__api_owner_radar_global_records",
         "parameters": [],
         "responses": {
           "200": {
