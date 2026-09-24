@@ -83,7 +83,7 @@ jobs:
                 return 0
               fi
               case "${code}" in
-                000|502|503|504)
+                000|429|502|503|504)
                   echo "WAITING_FOR_DEPLOY: ${path} attempt=${attempt}/${attempts} code=${code}" >&2
                   ;;
                 200)
@@ -103,7 +103,7 @@ jobs:
           checked_page() {
             local name="$1" path="$2" marker="$3"
             if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-              expect_200 "${name}" "${path}" "${marker}"
+              wait_expect_200 "${name}" "${path}" "${marker}" 6
             else
               wait_expect_200 "${name}" "${path}" "${marker}" 18
             fi
