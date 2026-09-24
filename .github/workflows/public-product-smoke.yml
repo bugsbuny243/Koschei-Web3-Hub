@@ -132,6 +132,10 @@ jobs:
           checked_page social_renderer_asset /js/arvis-social-render-v2-publish.js "socialRendererVersion='2.0.0'"
 
           for page in arvis_scan arvis_dashboard safe_check transaction_shield security_radar owner_production; do
+            if [ "${GITHUB_EVENT_NAME}" = "pull_request" ] && grep -Fq "PR_PRODUCTION_RATE_LIMITED" diagnostics/result.txt && ! grep -Fq '<html lang="en">' "diagnostics/${page}.body"; then
+              echo "PR rate-limit observation: skipping production body assertion for ${page}." | tee -a diagnostics/result.txt
+              continue
+            fi
             grep -Fq '<html lang="en">' "diagnostics/${page}.body" || {
               echo "ARVIS_LANGUAGE_FAILURE: ${page} is not response-English." >&2
               exit 33
