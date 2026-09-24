@@ -26,26 +26,26 @@ type EthereumBeaconCheckpoint struct {
 }
 
 type EthereumBeaconTelemetryResult struct {
-	SchemaVersion             string                      `json:"schema_version"`
-	Observation               NetworkTelemetryObservation `json:"observation"`
-	ClientVersion             string                      `json:"client_version"`
-	VersionResponseSHA256     string                      `json:"version_response_sha256,omitempty"`
-	ConnectedPeers            uint64                      `json:"connected_peers"`
-	PeerCountResponseSHA256   string                      `json:"peer_count_response_sha256,omitempty"`
-	HeadSlot                  uint64                      `json:"head_slot"`
-	SyncDistance              uint64                      `json:"sync_distance"`
-	IsSyncing                 bool                        `json:"is_syncing"`
-	IsOptimistic              bool                        `json:"is_optimistic"`
-	ExecutionLayerOffline     bool                        `json:"execution_layer_offline"`
-	SyncingResponseSHA256     string                      `json:"syncing_response_sha256,omitempty"`
-	PreviousJustified         EthereumBeaconCheckpoint    `json:"previous_justified"`
-	CurrentJustified          EthereumBeaconCheckpoint    `json:"current_justified"`
-	Finalized                 EthereumBeaconCheckpoint    `json:"finalized"`
-	CheckpointStateFinalized  bool                        `json:"checkpoint_state_finalized"`
-	FinalityResponseSHA256    string                      `json:"finality_response_sha256,omitempty"`
-	EndpointScope             string                      `json:"endpoint_scope"`
-	AnalysisPerformed         bool                        `json:"analysis_performed"`
-	LiveAvailability          string                      `json:"live_availability"`
+	SchemaVersion            string                      `json:"schema_version"`
+	Observation              NetworkTelemetryObservation `json:"observation"`
+	ClientVersion            string                      `json:"client_version"`
+	VersionResponseSHA256    string                      `json:"version_response_sha256,omitempty"`
+	ConnectedPeers           uint64                      `json:"connected_peers"`
+	PeerCountResponseSHA256  string                      `json:"peer_count_response_sha256,omitempty"`
+	HeadSlot                 uint64                      `json:"head_slot"`
+	SyncDistance             uint64                      `json:"sync_distance"`
+	IsSyncing                bool                        `json:"is_syncing"`
+	IsOptimistic             bool                        `json:"is_optimistic"`
+	ExecutionLayerOffline    bool                        `json:"execution_layer_offline"`
+	SyncingResponseSHA256    string                      `json:"syncing_response_sha256,omitempty"`
+	PreviousJustified        EthereumBeaconCheckpoint    `json:"previous_justified"`
+	CurrentJustified         EthereumBeaconCheckpoint    `json:"current_justified"`
+	Finalized                EthereumBeaconCheckpoint    `json:"finalized"`
+	CheckpointStateFinalized bool                        `json:"checkpoint_state_finalized"`
+	FinalityResponseSHA256   string                      `json:"finality_response_sha256,omitempty"`
+	EndpointScope            string                      `json:"endpoint_scope"`
+	AnalysisPerformed        bool                        `json:"analysis_performed"`
+	LiveAvailability         string                      `json:"live_availability"`
 }
 
 type ethereumBeaconVersionResponse struct {
