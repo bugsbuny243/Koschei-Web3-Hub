@@ -50,7 +50,7 @@ func buildGlobalRadarEventSink(parent context.Context) (apihttp.GlobalRadarEvent
 	return client, nil
 }
 
-func buildGlobalRadarBackgroundTelemetryConfig(sink services.GlobalRadarSnapshotSink) (*services.GlobalRadarBackgroundTelemetryConfig, error) {
+func buildGlobalRadarBackgroundTelemetryConfig(sink services.GlobalRadarSnapshotSink, eventSinks ...services.GlobalRadarTelemetryEventSink) (*services.GlobalRadarBackgroundTelemetryConfig, error) {
 	if strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_BACKGROUND_ENABLED")) != "1" {
 		return nil, nil
 	}
@@ -105,7 +105,11 @@ func buildGlobalRadarBackgroundTelemetryConfig(sink services.GlobalRadarSnapshot
 	if len(targets) == 0 {
 		return nil, fmt.Errorf("Global Radar background telemetry has no configured targets")
 	}
-	return &services.GlobalRadarBackgroundTelemetryConfig{Sink: sink, Targets: targets, Interval: interval}, nil
+	var eventSink services.GlobalRadarTelemetryEventSink
+	if len(eventSinks) > 0 {
+		eventSink = eventSinks[0]
+	}
+	return &services.GlobalRadarBackgroundTelemetryConfig{Sink: sink, EventSink: eventSink, Targets: targets, Interval: interval}, nil
 }
 
 func globalRadarEVMEndpoint(networkID string) string {

@@ -95,7 +95,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar event ClickHouse persistence is unavailable: %v", err)
 	}
-	globalRadarBackground, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarSink)
+	globalRadarBackground, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarSink, globalRadarEventSink)
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar background telemetry is invalid: %v", err)
 	}

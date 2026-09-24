@@ -7,14 +7,25 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"koschei/api/internal/radarevent"
 )
 
 type globalRadarTelemetryRecordingSink struct {
 	snapshots []GlobalRadarSnapshot
 }
 
+type globalRadarTelemetryRecordingEventSink struct {
+	events []radarevent.Event
+}
+
 func (s *globalRadarTelemetryRecordingSink) InsertGlobalRadarSnapshot(_ context.Context, snapshot GlobalRadarSnapshot) error {
 	s.snapshots = append(s.snapshots, snapshot)
+	return nil
+}
+
+func (s *globalRadarTelemetryRecordingEventSink) InsertGlobalRadarEvents(_ context.Context, events []radarevent.Event) error {
+	s.events = append(s.events, events...)
 	return nil
 }
 
@@ -46,9 +57,11 @@ func TestCollectGlobalRadarBackgroundTelemetryPersistsEVMObservation(t *testing.
 	defer server.Close()
 
 	sink := &globalRadarTelemetryRecordingSink{}
+	eventSink := &globalRadarTelemetryRecordingEventSink{}
 	now := time.Date(2026, 9, 24, 6, 0, 0, 0, time.UTC)
 	snapshot, err := CollectGlobalRadarBackgroundTelemetry(context.Background(), GlobalRadarBackgroundTelemetryConfig{
-		Sink: sink,
+		Sink:      sink,
+		EventSink: eventSink,
 		Targets: []GlobalRadarTelemetryTarget{{
 			Kind: GlobalRadarTelemetryEVMNode, NetworkID: "ethereum-mainnet", Endpoint: server.URL,
 		}},
@@ -60,6 +73,15 @@ func TestCollectGlobalRadarBackgroundTelemetryPersistsEVMObservation(t *testing.
 	}
 	if len(sink.snapshots) != 1 || len(snapshot.Observations) != 1 {
 		t.Fatalf("snapshots=%d observations=%d", len(sink.snapshots), len(snapshot.Observations))
+	}
+	if len(eventSink.events) != 1 {
+		t.Fatalf("events=%d want 1", len(eventSink.events))
+	}
+	if err := eventSink.events[0].Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if eventSink.events[0].NetworkID != "ethereum-mainnet" || eventSink.events[0].Kind != radarevent.KindNetworkHealth {
+		t.Fatalf("unexpected event: %#v", eventSink.events[0])
 	}
 	if snapshot.Observations[0].Subject.Network != "ethereum-mainnet" || snapshot.Coverage.RiskScoreProduced {
 		t.Fatalf("unexpected snapshot: %#v", snapshot)

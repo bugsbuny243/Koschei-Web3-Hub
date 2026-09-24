@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"koschei/api/internal/networktarget"
+	"koschei/api/internal/radarevent"
 )
 
 const (
@@ -23,6 +24,10 @@ type GlobalRadarSnapshotSink interface {
 	InsertGlobalRadarSnapshot(context.Context, GlobalRadarSnapshot) error
 }
 
+type GlobalRadarTelemetryEventSink interface {
+	InsertGlobalRadarEvents(context.Context, []radarevent.Event) error
+}
+
 type GlobalRadarTelemetryTarget struct {
 	Kind      string
 	NetworkID string
@@ -31,6 +36,7 @@ type GlobalRadarTelemetryTarget struct {
 
 type GlobalRadarBackgroundTelemetryConfig struct {
 	Sink       GlobalRadarSnapshotSink
+	EventSink  GlobalRadarTelemetryEventSink
 	Targets    []GlobalRadarTelemetryTarget
 	Interval   time.Duration
 	HTTPClient *http.Client
@@ -49,14 +55,18 @@ func CollectGlobalRadarBackgroundTelemetry(ctx context.Context, cfg GlobalRadarB
 		now = cfg.Now().UTC()
 	}
 	observations := make([]GlobalRadarObservation, 0, len(cfg.Targets))
+	events := make([]radarevent.Event, 0, len(cfg.Targets))
 	errs := make([]error, 0)
 	for _, target := range cfg.Targets {
-		observation, err := collectGlobalRadarTelemetryTarget(ctx, cfg.HTTPClient, target, now)
+		observation, event, err := collectGlobalRadarTelemetryTarget(ctx, cfg.HTTPClient, target, now)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s/%s: %w", strings.TrimSpace(target.NetworkID), strings.TrimSpace(target.Kind), err))
 			continue
 		}
 		observations = append(observations, observation)
+		if event != nil {
+			events = append(events, *event)
+		}
 	}
 	if len(observations) == 0 {
 		if len(errs) == 0 {
@@ -71,55 +81,78 @@ func CollectGlobalRadarBackgroundTelemetry(ctx context.Context, cfg GlobalRadarB
 	if err := cfg.Sink.InsertGlobalRadarSnapshot(ctx, snapshot); err != nil {
 		return GlobalRadarSnapshot{}, fmt.Errorf("persist global radar telemetry snapshot: %w", err)
 	}
+	if cfg.EventSink != nil && len(events) > 0 {
+		if err := cfg.EventSink.InsertGlobalRadarEvents(ctx, events); err != nil {
+			return snapshot, fmt.Errorf("persist global radar telemetry events: %w", err)
+		}
+	}
 	if len(errs) > 0 {
 		return snapshot, errors.Join(errs...)
 	}
 	return snapshot, nil
 }
 
-func collectGlobalRadarTelemetryTarget(ctx context.Context, client *http.Client, target GlobalRadarTelemetryTarget, observedAt time.Time) (GlobalRadarObservation, error) {
+func collectGlobalRadarTelemetryTarget(ctx context.Context, client *http.Client, target GlobalRadarTelemetryTarget, observedAt time.Time) (GlobalRadarObservation, *radarevent.Event, error) {
 	kind := strings.ToLower(strings.TrimSpace(target.Kind))
 	networkID := strings.ToLower(strings.TrimSpace(target.NetworkID))
 	endpoint := strings.TrimSpace(target.Endpoint)
 	if endpoint == "" {
-		return GlobalRadarObservation{}, fmt.Errorf("telemetry endpoint is required")
+		return GlobalRadarObservation{}, nil, fmt.Errorf("telemetry endpoint is required")
 	}
 	switch kind {
 	case GlobalRadarTelemetryEVMNode:
 		result, err := networktarget.ProbeEVMNodeTelemetry(ctx, client, endpoint, networkID, observedAt)
 		if err != nil {
-			return GlobalRadarObservation{}, err
+			return GlobalRadarObservation{}, nil, err
 		}
-		return ProjectEVMNodeTelemetryToGlobalRadar(result)
+		observation, err := ProjectEVMNodeTelemetryToGlobalRadar(result)
+		if err != nil {
+			return GlobalRadarObservation{}, nil, err
+		}
+		event, err := radarevent.BuildEVMNodeTelemetryEventFromResult("evm-node-telemetry-adapter", result)
+		if err != nil {
+			return GlobalRadarObservation{}, nil, err
+		}
+		return observation, &event, nil
 	case GlobalRadarTelemetryEthereumBeacon:
 		if networkID != "ethereum-mainnet" {
-			return GlobalRadarObservation{}, fmt.Errorf("ethereum beacon telemetry requires ethereum-mainnet")
+			return GlobalRadarObservation{}, nil, fmt.Errorf("ethereum beacon telemetry requires ethereum-mainnet")
 		}
 		result, err := networktarget.ProbeEthereumBeaconTelemetry(ctx, client, endpoint, observedAt)
 		if err != nil {
-			return GlobalRadarObservation{}, err
+			return GlobalRadarObservation{}, nil, err
 		}
-		return ProjectEthereumBeaconTelemetryToGlobalRadar(result)
+		observation, err := ProjectEthereumBeaconTelemetryToGlobalRadar(result)
+		return observation, nil, err
 	case GlobalRadarTelemetryBitcoinCore:
 		if networkID != "bitcoin-mainnet" {
-			return GlobalRadarObservation{}, fmt.Errorf("bitcoin core telemetry requires bitcoin-mainnet")
+			return GlobalRadarObservation{}, nil, fmt.Errorf("bitcoin core telemetry requires bitcoin-mainnet")
 		}
 		result, err := networktarget.ProbeBitcoinCoreNodeTelemetry(ctx, client, endpoint, observedAt)
 		if err != nil {
-			return GlobalRadarObservation{}, err
+			return GlobalRadarObservation{}, nil, err
 		}
-		return ProjectBitcoinCoreNodeTelemetryToGlobalRadar(result)
+		observation, err := ProjectBitcoinCoreNodeTelemetryToGlobalRadar(result)
+		if err != nil {
+			return GlobalRadarObservation{}, nil, err
+		}
+		event, err := radarevent.BuildBitcoinCoreNodeTelemetryEventFromResult("bitcoin-core-telemetry-adapter", result)
+		if err != nil {
+			return GlobalRadarObservation{}, nil, err
+		}
+		return observation, &event, nil
 	case GlobalRadarTelemetryBitcoinPoW:
 		if networkID != "bitcoin-mainnet" {
-			return GlobalRadarObservation{}, fmt.Errorf("bitcoin PoW telemetry requires bitcoin-mainnet")
+			return GlobalRadarObservation{}, nil, fmt.Errorf("bitcoin PoW telemetry requires bitcoin-mainnet")
 		}
 		result, err := networktarget.ProbeBitcoinPoWNetworkTelemetry(ctx, client, endpoint, observedAt)
 		if err != nil {
-			return GlobalRadarObservation{}, err
+			return GlobalRadarObservation{}, nil, err
 		}
-		return ProjectBitcoinPoWNetworkTelemetryToGlobalRadar(result)
+		observation, err := ProjectBitcoinPoWNetworkTelemetryToGlobalRadar(result)
+		return observation, nil, err
 	default:
-		return GlobalRadarObservation{}, fmt.Errorf("unsupported global radar telemetry kind %q", kind)
+		return GlobalRadarObservation{}, nil, fmt.Errorf("unsupported global radar telemetry kind %q", kind)
 	}
 }
 
