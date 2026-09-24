@@ -103,7 +103,7 @@ jobs:
           checked_page() {
             local name="$1" path="$2" marker="$3"
             if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-              expect_200 "${name}" "${path}" "${marker}"
+              wait_expect_200 "${name}" "${path}" "${marker}" 6
             else
               wait_expect_200 "${name}" "${path}" "${marker}" 18
             fi
