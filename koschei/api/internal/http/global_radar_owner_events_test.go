@@ -93,7 +93,6 @@ func TestOwnerGlobalRadarEventsReturnsReverifiedHistoricalEvents(t *testing.T) {
 	}
 }
 
-
 func TestOwnerGlobalRadarEventsAcceptsLogKind(t *testing.T) {
 	t.Setenv("APP_ENV", "test")
 	t.Setenv("OWNER_SECRET", "owner-test-secret")
