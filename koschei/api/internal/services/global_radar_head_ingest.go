@@ -348,6 +348,167 @@ func collectGlobalRadarHeadBundle(ctx context.Context, client *http.Client, targ
 	}
 }
 
+func GlobalRadarHeadIngestConfirmationHealthID(target GlobalRadarHeadIngestTarget) string {
+	return "global-radar.confirmation." + strings.ToLower(strings.TrimSpace(target.NetworkID)) + "." + strings.ToLower(strings.TrimSpace(target.Kind))
+}
+
+func confirmGlobalRadarHeadBundle(ctx context.Context, cfg GlobalRadarHeadIngestConfig, target GlobalRadarHeadIngestTarget, bundle globalRadarHeadBundle, observedAt time.Time) error {
+	endpoint := strings.TrimSpace(target.ConfirmationEndpoint)
+	healthID := GlobalRadarHeadIngestConfirmationHealthID(target)
+	if endpoint == "" {
+		if cfg.RequireConfirmation {
+			err := fmt.Errorf("independent confirmation endpoint is required for %s", target.NetworkID)
+			if cfg.Health != nil {
+				cfg.Health.Failure(healthID, err)
+			}
+			return err
+		}
+		return nil
+	}
+	if cfg.Health != nil {
+		cfg.Health.Register(healthID, "block_confirmation", target.NetworkID, true)
+	}
+	identity, err := probeGlobalRadarBlockIdentity(ctx, cfg.HTTPClient, target, endpoint, bundle.height, observedAt)
+	if err != nil {
+		if cfg.Health != nil {
+			cfg.Health.Failure(healthID, err)
+		}
+		return fmt.Errorf("independent block confirmation failed: %w", err)
+	}
+	if identity.Hash != bundle.blockHash || identity.ParentHash != bundle.parentHash {
+		err := fmt.Errorf("multi-provider block disagreement at height %d: primary=%s/%s confirmation=%s/%s", bundle.height, bundle.blockHash, bundle.parentHash, identity.Hash, identity.ParentHash)
+		if cfg.Health != nil {
+			cfg.Health.Failure(healthID, err)
+		}
+		return err
+	}
+	if cfg.Health != nil {
+		cfg.Health.Success(healthID, 1)
+	}
+	return nil
+}
+
+func probeGlobalRadarBlockIdentity(ctx context.Context, client *http.Client, target GlobalRadarHeadIngestTarget, endpoint string, height uint64, observedAt time.Time) (networktarget.BlockIdentity, error) {
+	kind := strings.ToLower(strings.TrimSpace(target.Kind))
+	networkID := strings.ToLower(strings.TrimSpace(target.NetworkID))
+	switch kind {
+	case GlobalRadarHeadIngestEVM:
+		return networktarget.ProbeEVMBlockIdentity(ctx, client, endpoint, networkID, height, observedAt)
+	case GlobalRadarHeadIngestBitcoin:
+		if networkID != "bitcoin-mainnet" {
+			return networktarget.BlockIdentity{}, fmt.Errorf("bitcoin block identity requires bitcoin-mainnet")
+		}
+		return networktarget.ProbeBitcoinBlockIdentity(ctx, client, endpoint, height, observedAt)
+	default:
+		return networktarget.BlockIdentity{}, fmt.Errorf("unsupported global radar block identity kind %q", kind)
+	}
+}
+
+func handleGlobalRadarReorg(ctx context.Context, cfg GlobalRadarHeadIngestConfig, target GlobalRadarHeadIngestTarget, checkpoint radarcursor.Checkpoint, observedAt time.Time, reason string) error {
+	if checkpoint.State != radarcursor.StateReorgObserved {
+		if err := freezeGlobalRadarHeadCheckpoint(ctx, cfg, checkpoint, observedAt); err != nil {
+			return fmt.Errorf("%s; freeze checkpoint failed: %w", reason, err)
+		}
+		checkpoint.State = radarcursor.StateReorgObserved
+		checkpoint.ObservedAt = observedAt.UTC()
+	}
+	if !cfg.AutoReorgRecovery {
+		return fmt.Errorf("%s", reason)
+	}
+	ancestor, err := recoverGlobalRadarReorg(ctx, cfg, target, checkpoint, observedAt)
+	if err != nil {
+		return fmt.Errorf("%s; automatic recovery failed: %w", reason, err)
+	}
+	return fmt.Errorf("%s; automatic recovery rewound durable cursor to height %d; next cycle will resume", reason, ancestor.Height)
+}
+
+func recoverGlobalRadarReorg(ctx context.Context, cfg GlobalRadarHeadIngestConfig, target GlobalRadarHeadIngestTarget, checkpoint radarcursor.Checkpoint, observedAt time.Time) (radarcursor.Checkpoint, error) {
+	healthID := "global-radar.reorg-recovery." + strings.ToLower(strings.TrimSpace(target.NetworkID))
+	if strings.TrimSpace(target.ConfirmationEndpoint) == "" {
+		err := fmt.Errorf("reorg recovery requires an independent confirmation endpoint")
+		if cfg.Health != nil {
+			cfg.Health.Failure(healthID, err)
+		}
+		return radarcursor.Checkpoint{}, err
+	}
+	if checkpoint.Height == 0 {
+		err := fmt.Errorf("reorg recovery cannot rewind below genesis")
+		if cfg.Health != nil {
+			cfg.Health.Failure(healthID, err)
+		}
+		return radarcursor.Checkpoint{}, err
+	}
+	maxRewind := cfg.MaxReorgRewind
+	if maxRewind == 0 {
+		maxRewind = defaultGlobalRadarHeadIngestMaxReorgRewind
+	}
+	if maxRewind > maxGlobalRadarHeadIngestMaxReorgRewind {
+		maxRewind = maxGlobalRadarHeadIngestMaxReorgRewind
+	}
+	floor := uint64(0)
+	if checkpoint.Height > maxRewind {
+		floor = checkpoint.Height - maxRewind
+	}
+	cursorKey := GlobalRadarHeadIngestCursorKey(target)
+
+	for height := checkpoint.Height - 1; ; height-- {
+		stored, found, err := cfg.CursorStore.LoadGlobalRadarCanonicalCheckpointAtHeight(ctx, cursorKey, height)
+		if err != nil {
+			if cfg.Health != nil {
+				cfg.Health.Failure(healthID, err)
+			}
+			return radarcursor.Checkpoint{}, fmt.Errorf("load canonical checkpoint at height %d: %w", height, err)
+		}
+		if found {
+			primary, err := probeGlobalRadarBlockIdentity(ctx, cfg.HTTPClient, target, target.Endpoint, height, observedAt)
+			if err != nil {
+				if cfg.Health != nil {
+					cfg.Health.Failure(healthID, err)
+				}
+				return radarcursor.Checkpoint{}, fmt.Errorf("primary recovery probe at height %d: %w", height, err)
+			}
+			confirmation, err := probeGlobalRadarBlockIdentity(ctx, cfg.HTTPClient, target, target.ConfirmationEndpoint, height, observedAt)
+			if err != nil {
+				if cfg.Health != nil {
+					cfg.Health.Failure(healthID, err)
+				}
+				return radarcursor.Checkpoint{}, fmt.Errorf("confirmation recovery probe at height %d: %w", height, err)
+			}
+			if primary.Hash != confirmation.Hash || primary.ParentHash != confirmation.ParentHash {
+				err := fmt.Errorf("recovery providers disagree at height %d", height)
+				if cfg.Health != nil {
+					cfg.Health.Failure(healthID, err)
+				}
+				return radarcursor.Checkpoint{}, err
+			}
+			if stored.BlockHash == primary.Hash && stored.ParentHash == primary.ParentHash {
+				rewind := stored
+				rewind.State = radarcursor.StateRewind
+				rewind.ObservedAt = observedAt.UTC()
+				if err := cfg.CursorStore.SaveGlobalRadarIngestCheckpoint(ctx, rewind); err != nil {
+					if cfg.Health != nil {
+						cfg.Health.Failure(healthID, err)
+					}
+					return radarcursor.Checkpoint{}, fmt.Errorf("persist rewind checkpoint: %w", err)
+				}
+				if cfg.Health != nil {
+					cfg.Health.Success(healthID, 1)
+				}
+				log.Printf("global radar reorg recovery rewound %s to height=%d hash=%s", target.NetworkID, rewind.Height, rewind.BlockHash)
+				return rewind, nil
+			}
+		}
+		if height == floor || height == 0 {
+			break
+		}
+	}
+	err := fmt.Errorf("no two-provider common ancestor found within rewind window=%d", maxRewind)
+	if cfg.Health != nil {
+		cfg.Health.Failure(healthID, err)
+	}
+	return radarcursor.Checkpoint{}, err
+}
+
 func StartGlobalRadarHeadIngest(ctx context.Context, cfg GlobalRadarHeadIngestConfig) func() {
 	if cfg.EventSink == nil || cfg.CursorStore == nil || len(cfg.Targets) == 0 {
 		return func() {}
@@ -365,6 +526,12 @@ func StartGlobalRadarHeadIngest(ctx context.Context, cfg GlobalRadarHeadIngestCo
 		cfg.Health.Register("global-radar.head.checkpoint-store", "storage", "", true)
 		for _, target := range cfg.Targets {
 			cfg.Health.Register(GlobalRadarHeadIngestTargetHealthID(target), "head_ingest", target.NetworkID, true)
+			if strings.TrimSpace(target.ConfirmationEndpoint) != "" || cfg.RequireConfirmation {
+				cfg.Health.Register(GlobalRadarHeadIngestConfirmationHealthID(target), "block_confirmation", target.NetworkID, strings.TrimSpace(target.ConfirmationEndpoint) != "")
+			}
+			if cfg.AutoReorgRecovery {
+				cfg.Health.Register("global-radar.reorg-recovery."+strings.ToLower(strings.TrimSpace(target.NetworkID)), "reorg_recovery", target.NetworkID, strings.TrimSpace(target.ConfirmationEndpoint) != "")
+			}
 		}
 	}
 
