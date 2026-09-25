@@ -5,6 +5,11 @@ on:
     paths:
       - "koschei/api/clickhouse/migrations/005_global_radar_graph_records.sql"
       - "koschei/api/clickhouse/migrations/005_global_radar_graph_records.sql.sha256"
+      - "koschei/api/clickhouse/migrations/006_global_radar_events.sql"
+      - "koschei/api/clickhouse/migrations/006_global_radar_events.sql.sha256"
+      - "koschei/api/internal/clickhouse/global_radar_event_store.go"
+      - "koschei/api/internal/clickhouse/global_radar_event_store_test.go"
+      - "koschei/api/internal/radarevent/**"
       - "koschei/api/internal/clickhouse/global_radar_store.go"
       - "koschei/api/internal/clickhouse/global_radar_store_test.go"
       - "koschei/api/internal/services/global_radar_*.go"
@@ -17,6 +22,11 @@ on:
     paths:
       - "koschei/api/clickhouse/migrations/005_global_radar_graph_records.sql"
       - "koschei/api/clickhouse/migrations/005_global_radar_graph_records.sql.sha256"
+      - "koschei/api/clickhouse/migrations/006_global_radar_events.sql"
+      - "koschei/api/clickhouse/migrations/006_global_radar_events.sql.sha256"
+      - "koschei/api/internal/clickhouse/global_radar_event_store.go"
+      - "koschei/api/internal/clickhouse/global_radar_event_store_test.go"
+      - "koschei/api/internal/radarevent/**"
       - "koschei/api/internal/clickhouse/global_radar_store.go"
       - "koschei/api/internal/clickhouse/global_radar_store_test.go"
       - "koschei/api/internal/services/global_radar_*.go"
@@ -63,7 +73,7 @@ jobs:
       - name: Require gofmt-clean Global Radar paths
         run: |
           set -euo pipefail
-          unformatted="$(gofmt -l internal/clickhouse/global_radar_store.go internal/clickhouse/global_radar_store_test.go internal/services/global_radar_*.go internal/services/solana_validator_telemetry.go internal/services/solana_validator_telemetry_test.go)"
+          unformatted="$(gofmt -l internal/clickhouse/global_radar_store.go internal/clickhouse/global_radar_store_test.go internal/clickhouse/global_radar_event_store.go internal/clickhouse/global_radar_event_store_test.go internal/radarevent/*.go internal/services/global_radar_*.go internal/services/solana_validator_telemetry.go internal/services/solana_validator_telemetry_test.go)"
           test -z "${unformatted}" || { printf 'unformatted files:\n%s\n' "${unformatted}" >&2; exit 1; }
 
       - name: Verify reviewed migration checksum
@@ -71,6 +81,7 @@ jobs:
           set -euo pipefail
           cd clickhouse/migrations
           sha256sum -c 005_global_radar_graph_records.sql.sha256
+          sha256sum -c 006_global_radar_events.sql.sha256
 
       - name: Validate migration on ClickHouse 26.2
         run: |
@@ -78,6 +89,7 @@ jobs:
           container_id="$(docker ps --filter 'ancestor=clickhouse/clickhouse-server:26.2' --format '{{.ID}}' | head -n1)"
           test -n "${container_id}"
           docker exec -i "${container_id}" clickhouse-client --multiquery < clickhouse/migrations/005_global_radar_graph_records.sql
+          docker exec -i "${container_id}" clickhouse-client --multiquery < clickhouse/migrations/006_global_radar_events.sql
 
           table_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,'|',sorting_key) FROM system.tables WHERE database='koschei_web3' AND name='global_radar_graph_records' FORMAT TSVRaw")"
           payload_hash_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='global_radar_graph_records' AND name='payload_sha256' FORMAT TSVRaw")"
@@ -86,6 +98,14 @@ jobs:
           test "${table_meta}" = "ReplacingMergeTree|record_type, network, record_date, subject_id, record_id, payload_sha256"
           test "${payload_hash_type}" = "FixedString(64)"
           test "${observed_type}" = "Nullable(DateTime64(9, 'UTC'))"
+
+          event_table_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,'|',sorting_key) FROM system.tables WHERE database='koschei_web3' AND name='global_radar_events' FORMAT TSVRaw")"
+          event_payload_hash_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='global_radar_events' AND name='payload_sha256' FORMAT TSVRaw")"
+          event_observed_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='global_radar_events' AND name='observed_at' FORMAT TSVRaw")"
+
+          test "${event_table_meta}" = "ReplacingMergeTree|network_id, event_date, kind, subject_id, event_sha256"
+          test "${event_payload_hash_type}" = "FixedString(64)"
+          test "${event_observed_type}" = "DateTime64(3, 'UTC')"
 
       - name: Validate replay convergence and state-history preservation
         run: |
@@ -111,6 +131,22 @@ jobs:
 
           if docker exec "${container_id}" clickhouse-client --query "INSERT INTO koschei_web3.global_radar_graph_records (record_type,record_id,schema_version,snapshot_sha256,network,subject_id,record_kind,evidence_status,evidence_refs,recorded_at,payload_json,payload_sha256,ingest_version) VALUES ('observation','bad-hash','v1',repeat('c',64),'solana-mainnet','subject','state','observed',[],now64(9),'{}',repeat('z',64),4)"; then
             echo "invalid Global Radar payload hash unexpectedly accepted" >&2
+            exit 1
+          fi
+
+          docker exec -i "${container_id}" clickhouse-client --multiquery <<'SQL'
+          INSERT INTO koschei_web3.global_radar_events
+          (event_sha256,schema_version,producer,kind,network_id,subject_kind,subject_id,evidence_state,source_digests,observed_at,payload_json,payload_sha256,ingest_version)
+          VALUES
+          (repeat('d',64),'koschei.global-radar-event.v1','test-adapter','network_health','ethereum-mainnet','node','node-1','observed',[repeat('e',64)],toDateTime64('2026-09-24 06:00:00.123',3,'UTC'),'{"event":"same"}',repeat('f',64),1),
+          (repeat('d',64),'koschei.global-radar-event.v1','test-adapter','network_health','ethereum-mainnet','node','node-1','observed',[repeat('e',64)],toDateTime64('2026-09-24 06:00:00.123',3,'UTC'),'{"event":"same"}',repeat('f',64),2);
+          SQL
+
+          event_versions="$(docker exec "${container_id}" clickhouse-client --query "SELECT count() FROM koschei_web3.global_radar_events FINAL WHERE event_sha256=repeat('d',64)")"
+          test "${event_versions}" = "1"
+
+          if docker exec "${container_id}" clickhouse-client --query "INSERT INTO koschei_web3.global_radar_events (event_sha256,schema_version,producer,kind,network_id,subject_kind,subject_id,evidence_state,source_digests,observed_at,payload_json,payload_sha256,ingest_version) VALUES (repeat('z',64),'koschei.global-radar-event.v1','test-adapter','network_health','ethereum-mainnet','node','node-2','unavailable',[],now64(3),'{}',repeat('f',64),3)"; then
+            echo "invalid Global Radar event digest unexpectedly accepted" >&2
             exit 1
           fi
 

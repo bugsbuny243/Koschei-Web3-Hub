@@ -10,6 +10,43 @@ import (
 )
 
 func BuildEVMAddressProbeEvent(producer string, result networktarget.EVMProbeResult, observedAt time.Time, sourceDigest string) (Event, error) {
+	return buildEVMAddressProbeEvent(
+		producer,
+		result,
+		observedAt,
+		[]string{sourceDigest},
+		sourceDigest,
+		sourceDigest,
+	)
+}
+
+// BuildEVMAddressProbeEventFromResult uses the exact response-byte SHA-256
+// captured by ProbeEVM. It refuses to manufacture provenance from normalized
+// fields when either native RPC response digest is missing.
+func BuildEVMAddressProbeEventFromResult(producer string, result networktarget.EVMProbeResult, observedAt time.Time) (Event, error) {
+	chainDigest := strings.TrimSpace(result.ChainIDResponseSHA256)
+	codeDigest := strings.TrimSpace(result.ContractCodeResponseSHA256)
+	if chainDigest == "" || codeDigest == "" {
+		return Event{}, errors.New("evm probe native response digests are required")
+	}
+	return buildEVMAddressProbeEvent(
+		producer,
+		result,
+		observedAt,
+		[]string{chainDigest, codeDigest},
+		chainDigest,
+		codeDigest,
+	)
+}
+
+func buildEVMAddressProbeEvent(
+	producer string,
+	result networktarget.EVMProbeResult,
+	observedAt time.Time,
+	sourceDigests []string,
+	chainDigest string,
+	codeDigest string,
+) (Event, error) {
 	if result.SchemaVersion != networktarget.SchemaVersion {
 		return Event{}, errors.New("unsupported evm probe schema")
 	}
@@ -29,17 +66,17 @@ func BuildEVMAddressProbeEvent(producer string, result networktarget.EVMProbeRes
 	}
 
 	facts := []Fact{
-		boundFact("chain_id", result.ChainID, "", sourceDigest),
-		boundFact("expected_chain_id", result.ExpectedChainID, "", sourceDigest),
-		boundFact("contract_code_state", result.ContractCodeState, "", sourceDigest),
-		boundFact("delegation_state", result.DelegationState, "", sourceDigest),
-		boundFact("live_availability", result.LiveAvailability, "", sourceDigest),
+		boundFact("chain_id", result.ChainID, "", chainDigest),
+		boundFact("expected_chain_id", result.ExpectedChainID, "", chainDigest),
+		boundFact("contract_code_state", result.ContractCodeState, "", codeDigest),
+		boundFact("delegation_state", result.DelegationState, "", codeDigest),
+		boundFact("live_availability", result.LiveAvailability, "", codeDigest),
 	}
 	if value := strings.TrimSpace(result.ContractCodeHash); value != "" {
-		facts = append(facts, boundFact("contract_code_sha256", value, "", sourceDigest))
+		facts = append(facts, boundFact("contract_code_sha256", value, "", codeDigest))
 	}
 	if value := strings.TrimSpace(result.DelegationTarget); value != "" {
-		facts = append(facts, boundFact("delegation_target", value, "", sourceDigest))
+		facts = append(facts, boundFact("delegation_target", value, "", codeDigest))
 	}
 
 	event := Event{
@@ -55,13 +92,50 @@ func BuildEVMAddressProbeEvent(producer string, result networktarget.EVMProbeRes
 			{Kind: "canonical_ref", Value: subjectID},
 			{Kind: "address", Value: result.Resolution.Address},
 		},
-		SourceDigests: []string{sourceDigest},
+		SourceDigests: append([]string(nil), sourceDigests...),
 		Facts:         compactFacts(facts),
 	}
 	return event.Seal()
 }
 
 func BuildBitcoinAddressProbeEvent(producer string, result networktarget.BitcoinProbeResult, observedAt time.Time, sourceDigest string) (Event, error) {
+	return buildBitcoinAddressProbeEvent(
+		producer,
+		result,
+		observedAt,
+		[]string{sourceDigest},
+		sourceDigest,
+		sourceDigest,
+	)
+}
+
+// BuildBitcoinAddressProbeEventFromResult binds network identity facts to the
+// exact /block-height/0 response bytes and address activity facts to the exact
+// Esplora /address response bytes. Missing native digests fail closed.
+func BuildBitcoinAddressProbeEventFromResult(producer string, result networktarget.BitcoinProbeResult, observedAt time.Time) (Event, error) {
+	genesisDigest := strings.TrimSpace(result.GenesisResponseSHA256)
+	addressDigest := strings.TrimSpace(result.AddressResponseSHA256)
+	if genesisDigest == "" || addressDigest == "" {
+		return Event{}, errors.New("bitcoin probe native response digests are required")
+	}
+	return buildBitcoinAddressProbeEvent(
+		producer,
+		result,
+		observedAt,
+		[]string{genesisDigest, addressDigest},
+		genesisDigest,
+		addressDigest,
+	)
+}
+
+func buildBitcoinAddressProbeEvent(
+	producer string,
+	result networktarget.BitcoinProbeResult,
+	observedAt time.Time,
+	sourceDigests []string,
+	genesisDigest string,
+	addressDigest string,
+) (Event, error) {
 	if result.SchemaVersion != networktarget.SchemaVersion {
 		return Event{}, errors.New("unsupported bitcoin probe schema")
 	}
@@ -81,14 +155,14 @@ func BuildBitcoinAddressProbeEvent(producer string, result networktarget.Bitcoin
 	}
 
 	facts := compactFacts([]Fact{
-		boundFact("genesis_hash", result.GenesisHash, "", sourceDigest),
-		boundFact("expected_genesis_hash", result.ExpectedGenesisHash, "", sourceDigest),
-		boundFact("activity_state", result.ActivityState, "", sourceDigest),
-		boundFact("confirmed_tx_count", strconv.FormatInt(result.ConfirmedTXCount, 10), "transactions", sourceDigest),
-		boundFact("mempool_tx_count", strconv.FormatInt(result.MempoolTXCount, 10), "transactions", sourceDigest),
-		boundFact("funded_sats", strconv.FormatInt(result.FundedSats, 10), "sats", sourceDigest),
-		boundFact("spent_sats", strconv.FormatInt(result.SpentSats, 10), "sats", sourceDigest),
-		boundFact("live_availability", result.LiveAvailability, "", sourceDigest),
+		boundFact("genesis_hash", result.GenesisHash, "", genesisDigest),
+		boundFact("expected_genesis_hash", result.ExpectedGenesisHash, "", genesisDigest),
+		boundFact("activity_state", result.ActivityState, "", addressDigest),
+		boundFact("confirmed_tx_count", strconv.FormatInt(result.ConfirmedTXCount, 10), "transactions", addressDigest),
+		boundFact("mempool_tx_count", strconv.FormatInt(result.MempoolTXCount, 10), "transactions", addressDigest),
+		boundFact("funded_sats", strconv.FormatInt(result.FundedSats, 10), "sats", addressDigest),
+		boundFact("spent_sats", strconv.FormatInt(result.SpentSats, 10), "sats", addressDigest),
+		boundFact("live_availability", result.LiveAvailability, "", addressDigest),
 	})
 
 	event := Event{
@@ -104,10 +178,18 @@ func BuildBitcoinAddressProbeEvent(producer string, result networktarget.Bitcoin
 			{Kind: "canonical_ref", Value: subjectID},
 			{Kind: "address", Value: result.Resolution.Address},
 		},
-		SourceDigests: []string{sourceDigest},
+		SourceDigests: append([]string(nil), sourceDigests...),
 		Facts:         facts,
 	}
 	return event.Seal()
+}
+
+func BuildSuiIdentityEventFromResult(producer string, result networktarget.SuiMainnetIdentityProbeResult) (Event, error) {
+	sourceDigest := strings.TrimSpace(result.ResponseSHA256)
+	if sourceDigest == "" {
+		return Event{}, errors.New("sui identity native response digest is required")
+	}
+	return BuildSuiIdentityEvent(producer, result, sourceDigest)
 }
 
 func BuildSuiIdentityEvent(producer string, result networktarget.SuiMainnetIdentityProbeResult, sourceDigest string) (Event, error) {
@@ -132,6 +214,14 @@ func BuildSuiIdentityEvent(producer string, result networktarget.SuiMainnetIdent
 	)
 	event.Facts = compactFacts(event.Facts)
 	return event.Seal()
+}
+
+func BuildAptosIdentityEventFromResult(producer string, result networktarget.AptosMainnetIdentityProbeResult) (Event, error) {
+	sourceDigest := strings.TrimSpace(result.ResponseSHA256)
+	if sourceDigest == "" {
+		return Event{}, errors.New("aptos identity native response digest is required")
+	}
+	return BuildAptosIdentityEvent(producer, result, sourceDigest)
 }
 
 func BuildAptosIdentityEvent(producer string, result networktarget.AptosMainnetIdentityProbeResult, sourceDigest string) (Event, error) {

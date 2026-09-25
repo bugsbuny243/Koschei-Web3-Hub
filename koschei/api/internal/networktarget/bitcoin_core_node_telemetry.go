@@ -3,6 +3,8 @@ package networktarget
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,19 +17,21 @@ import (
 const bitcoinCoreTelemetryResponseLimit = 256 * 1024
 
 type BitcoinCoreNodeTelemetryResult struct {
-	SchemaVersion        string                      `json:"schema_version"`
-	Observation          NetworkTelemetryObservation `json:"observation"`
-	ClientVersion        string                      `json:"client_version"`
-	ProtocolVersion      int                         `json:"protocol_version"`
-	Connections          int                         `json:"connections"`
-	NetworkActive        bool                        `json:"network_active"`
-	Blocks               int64                       `json:"blocks"`
-	Headers              int64                       `json:"headers"`
-	VerificationProgress float64                     `json:"verification_progress"`
-	InitialBlockDownload bool                        `json:"initial_block_download"`
-	EndpointScope        string                      `json:"endpoint_scope"`
-	AnalysisPerformed    bool                        `json:"analysis_performed"`
-	LiveAvailability     string                      `json:"live_availability"`
+	SchemaVersion                string                      `json:"schema_version"`
+	Observation                  NetworkTelemetryObservation `json:"observation"`
+	ClientVersion                string                      `json:"client_version"`
+	ProtocolVersion              int                         `json:"protocol_version"`
+	Connections                  int                         `json:"connections"`
+	NetworkActive                bool                        `json:"network_active"`
+	NetworkInfoResponseSHA256    string                      `json:"network_info_response_sha256,omitempty"`
+	Blocks                       int64                       `json:"blocks"`
+	Headers                      int64                       `json:"headers"`
+	VerificationProgress         float64                     `json:"verification_progress"`
+	InitialBlockDownload         bool                        `json:"initial_block_download"`
+	BlockchainInfoResponseSHA256 string                      `json:"blockchain_info_response_sha256,omitempty"`
+	EndpointScope                string                      `json:"endpoint_scope"`
+	AnalysisPerformed            bool                        `json:"analysis_performed"`
+	LiveAvailability             string                      `json:"live_availability"`
 }
 
 type bitcoinCoreRPCRequest struct {
@@ -75,11 +79,13 @@ func ProbeBitcoinCoreNodeTelemetry(ctx context.Context, client *http.Client, end
 	}
 
 	var networkInfo bitcoinCoreNetworkInfo
-	if err := bitcoinCoreRPC(ctx, client, endpoint, 201, "getnetworkinfo", &networkInfo); err != nil {
+	networkInfoResponseSHA256, err := bitcoinCoreRPCWithDigest(ctx, client, endpoint, 201, "getnetworkinfo", &networkInfo)
+	if err != nil {
 		return BitcoinCoreNodeTelemetryResult{}, fmt.Errorf("bitcoin_core_network_info_unavailable: %w", err)
 	}
 	var blockchainInfo bitcoinCoreBlockchainInfo
-	if err := bitcoinCoreRPC(ctx, client, endpoint, 202, "getblockchaininfo", &blockchainInfo); err != nil {
+	blockchainInfoResponseSHA256, err := bitcoinCoreRPCWithDigest(ctx, client, endpoint, 202, "getblockchaininfo", &blockchainInfo)
+	if err != nil {
 		return BitcoinCoreNodeTelemetryResult{}, fmt.Errorf("bitcoin_core_blockchain_info_unavailable: %w", err)
 	}
 
@@ -105,19 +111,21 @@ func ProbeBitcoinCoreNodeTelemetry(ctx context.Context, client *http.Client, end
 	}
 
 	return BitcoinCoreNodeTelemetryResult{
-		SchemaVersion:        NetworkTelemetrySchemaVersion,
-		Observation:          observation,
-		ClientVersion:        clientVersion,
-		ProtocolVersion:      networkInfo.ProtocolVersion,
-		Connections:          networkInfo.Connections,
-		NetworkActive:        networkInfo.NetworkActive,
-		Blocks:               blockchainInfo.Blocks,
-		Headers:              blockchainInfo.Headers,
-		VerificationProgress: blockchainInfo.VerificationProgress,
-		InitialBlockDownload: blockchainInfo.InitialBlockDownload,
-		EndpointScope:        "single_bitcoin_core_node_only",
-		AnalysisPerformed:    true,
-		LiveAvailability:     "checked",
+		SchemaVersion:                NetworkTelemetrySchemaVersion,
+		Observation:                  observation,
+		ClientVersion:                clientVersion,
+		ProtocolVersion:              networkInfo.ProtocolVersion,
+		Connections:                  networkInfo.Connections,
+		NetworkActive:                networkInfo.NetworkActive,
+		NetworkInfoResponseSHA256:    networkInfoResponseSHA256,
+		Blocks:                       blockchainInfo.Blocks,
+		Headers:                      blockchainInfo.Headers,
+		VerificationProgress:         blockchainInfo.VerificationProgress,
+		InitialBlockDownload:         blockchainInfo.InitialBlockDownload,
+		BlockchainInfoResponseSHA256: blockchainInfoResponseSHA256,
+		EndpointScope:                "single_bitcoin_core_node_only",
+		AnalysisPerformed:            true,
+		LiveAvailability:             "checked",
 	}, nil
 }
 
@@ -131,36 +139,47 @@ func validateBitcoinCoreTelemetryEndpoint(endpoint string) (*url.URL, error) {
 }
 
 func bitcoinCoreRPC(ctx context.Context, client *http.Client, endpoint string, id int, method string, target any) error {
+	_, err := bitcoinCoreRPCWithDigest(ctx, client, endpoint, id, method, target)
+	return err
+}
+
+func bitcoinCoreRPCWithDigest(ctx context.Context, client *http.Client, endpoint string, id int, method string, target any) (string, error) {
 	payload, err := json.Marshal(bitcoinCoreRPCRequest{JSONRPC: "1.0", ID: id, Method: method, Params: []any{}})
 	if err != nil {
-		return err
+		return "", err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return err
+		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("rpc_status_%d", resp.StatusCode)
+		return "", fmt.Errorf("rpc_status_%d", resp.StatusCode)
 	}
 	limited := &io.LimitedReader{R: resp.Body, N: bitcoinCoreTelemetryResponseLimit + 1}
-	var decoded bitcoinCoreRPCResponse
-	if err := json.NewDecoder(limited).Decode(&decoded); err != nil {
-		return err
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		return "", err
 	}
 	if limited.N <= 0 {
-		return fmt.Errorf("rpc_response_too_large")
+		return "", fmt.Errorf("rpc_response_too_large")
+	}
+	sum := sha256.Sum256(body)
+
+	var decoded bitcoinCoreRPCResponse
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&decoded); err != nil {
+		return "", err
 	}
 	if decoded.ID != id || decoded.Error != nil || len(decoded.Result) == 0 {
-		return fmt.Errorf("rpc_response_invalid")
+		return "", fmt.Errorf("rpc_response_invalid")
 	}
 	if err := json.Unmarshal(decoded.Result, target); err != nil {
-		return fmt.Errorf("rpc_result_invalid")
+		return "", fmt.Errorf("rpc_result_invalid")
 	}
-	return nil
+	return hex.EncodeToString(sum[:]), nil
 }

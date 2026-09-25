@@ -2,6 +2,8 @@ package networktarget
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -137,5 +139,37 @@ func TestMoveIdentityProbesRejectNonHTTPS(t *testing.T) {
 	}
 	if _, err := ProbeAptosMainnetIdentity(context.Background(), http.DefaultClient, "http://aptos.example/v1", now); err == nil {
 		t.Fatal("non-HTTPS Aptos endpoint accepted")
+	}
+}
+
+func TestMoveIdentityProbesCaptureExactResponseDigests(t *testing.T) {
+	suiBody := []byte(`{"data":{"chainIdentifier":"4btiuiMPvEENsttpZC7CZ53DruC3MAgfznDbASZ7DR6S"}}`)
+	suiServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(suiBody)
+	}))
+	defer suiServer.Close()
+
+	sui, err := ProbeSuiMainnetIdentity(context.Background(), suiServer.Client(), suiServer.URL, time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	suiDigest := sha256.Sum256(suiBody)
+	if sui.ResponseSHA256 != hex.EncodeToString(suiDigest[:]) {
+		t.Fatalf("sui response digest=%q", sui.ResponseSHA256)
+	}
+
+	aptosBody := []byte(`{"chain_id":1,"epoch":"123","ledger_version":"456789","ledger_timestamp":"1700000000000000","block_height":"98765","node_role":"full_node","git_hash":"abcdef"}`)
+	aptosServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(aptosBody)
+	}))
+	defer aptosServer.Close()
+
+	aptos, err := ProbeAptosMainnetIdentity(context.Background(), aptosServer.Client(), aptosServer.URL, time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	aptosDigest := sha256.Sum256(aptosBody)
+	if aptos.ResponseSHA256 != hex.EncodeToString(aptosDigest[:]) {
+		t.Fatalf("aptos response digest=%q", aptos.ResponseSHA256)
 	}
 }

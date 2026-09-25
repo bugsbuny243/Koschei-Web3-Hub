@@ -1,5 +1,6 @@
 (()=>{
 'use strict';
+if(window.__koscheiOwnerCanonicalV4)return;
 
 const state={users:[],query:'',status:'all',plan:'all',wallet:'all',loading:false,refreshTimer:null};
 const owner=()=>window.KoscheiOwner;

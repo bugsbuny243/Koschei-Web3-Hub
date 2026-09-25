@@ -48,20 +48,25 @@ func startBackgroundRuntime(
 	db, readDB *sql.DB,
 	solanaRPC *web3.SolanaRPC,
 	jobStore *jobs.Store,
+	globalRadarBackground *services.GlobalRadarBackgroundTelemetryConfig,
 ) func() {
 	if !role.runsBackgroundWorkers() {
 		return func() {}
 	}
-	if db == nil {
-		log.Printf("background runtime not started: APP_DATABASE_URL is not configured")
-		return func() {}
-	}
 
-	stops := []func(){
-		services.StartSecurityRadarWatcher(ctx, db, solanaRPC),
-		services.StartSecurityRadarSovereignStreamIfEnabled(ctx, db),
-		handlers.StartCanonicalInvestigationJobWorker(ctx, db, readDB, solanaRPC, jobStore),
-		handlers.StartCanonicalPumpJobScheduler(ctx, db, jobStore),
+	stops := make([]func(), 0, 5)
+	if globalRadarBackground != nil {
+		stops = append(stops, services.StartGlobalRadarBackgroundTelemetry(ctx, *globalRadarBackground))
+	}
+	if db == nil {
+		log.Printf("PostgreSQL-backed background runtime not started: APP_DATABASE_URL is not configured")
+	} else {
+		stops = append(stops,
+			services.StartSecurityRadarWatcher(ctx, db, solanaRPC),
+			services.StartSecurityRadarSovereignStreamIfEnabled(ctx, db),
+			handlers.StartCanonicalInvestigationJobWorker(ctx, db, readDB, solanaRPC, jobStore),
+			handlers.StartCanonicalPumpJobScheduler(ctx, db, jobStore),
+		)
 	}
 	return func() {
 		for i := len(stops) - 1; i >= 0; i-- {

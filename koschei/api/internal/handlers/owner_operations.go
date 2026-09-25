@@ -19,12 +19,18 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 	if db == nil {
 		db = h.DB
 	}
+	entitlementDB := h.entitlementStore()
 	ctx := r.Context()
+
 	summary := map[string]any{
-		"total_users": 0, "active_users": 0, "verified_wallets": 0,
-		"kosch_holders": 0, "kosch_basic": 0, "kosch_pro": 0, "kosch_enterprise": 0,
-		"radar_verdicts_24h": 0, "high_risk_24h": 0, "security_events_24h": 0,
-		"open_feedback": 0,
+		"total_users":               nil,
+		"active_users":              nil,
+		"verified_wallets":          nil,
+		"professional_entitlements": nil,
+		"radar_verdicts_24h":        nil,
+		"high_risk_24h":             nil,
+		"security_events_24h":       nil,
+		"open_feedback":             nil,
 	}
 	if db != nil {
 		if ownerTableExists(ctx, db, "app_user_profiles") {
@@ -33,18 +39,6 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 		}
 		if ownerTableExists(ctx, db, "verified_wallet_links") {
 			summary["verified_wallets"] = ownerCount(ctx, db, `SELECT count(DISTINCT auth_subject) FROM verified_wallet_links WHERE status='active'`)
-		}
-		if ownerTableExists(ctx, db, "token_access_snapshots") {
-			latest := `WITH latest AS (
-				SELECT DISTINCT ON (auth_subject) auth_subject, tier, amount_raw
-				FROM token_access_snapshots
-				WHERE expires_at > now()
-				ORDER BY auth_subject, checked_at DESC
-			)`
-			summary["kosch_holders"] = ownerCount(ctx, db, latest+` SELECT count(*) FROM latest WHERE tier IN ('basic','pro','enterprise')`)
-			summary["kosch_basic"] = ownerCount(ctx, db, latest+` SELECT count(*) FROM latest WHERE tier='basic'`)
-			summary["kosch_pro"] = ownerCount(ctx, db, latest+` SELECT count(*) FROM latest WHERE tier='pro'`)
-			summary["kosch_enterprise"] = ownerCount(ctx, db, latest+` SELECT count(*) FROM latest WHERE tier='enterprise'`)
 		}
 		if ownerTableExists(ctx, db, "security_radar_verdicts") {
 			summary["radar_verdicts_24h"] = ownerCount(ctx, db, `SELECT count(*) FROM security_radar_verdicts WHERE module_id='final_verdict_engine' AND signed=true AND created_at >= now()-interval '24 hours'`)
@@ -56,6 +50,14 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 		if ownerTableExists(ctx, db, "customer_feedback") {
 			summary["open_feedback"] = ownerCount(ctx, db, `SELECT count(*) FROM customer_feedback WHERE status IN ('new','reviewing','planned')`)
 		}
+	}
+	if entitlementDB != nil && ownerTableExists(ctx, entitlementDB, "entitlements") {
+		summary["professional_entitlements"] = ownerCount(ctx, entitlementDB, `
+			SELECT count(*)
+			FROM entitlements
+			WHERE status='active'
+			  AND lower(COALESCE(plan_id,'')) IN ('professional','starter','enterprise','builder','pro','studio','basic')
+			  AND (expires_at IS NULL OR expires_at > now())`)
 	}
 
 	radar := h.securityRadarStreamStats(ctx)
@@ -80,22 +82,88 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 		}
 		radar["pipeline_status"] = radarStatus
 	}
+
+	appDBStatus := ownerDatabaseServiceStatus(ctx, db)
+	entitlementStatus := ownerDatabaseServiceStatus(ctx, entitlementDB)
+	entitlementStatus["mode"] = "dedicated_or_stateful_compatibility"
+	cacheStatus := "memory_fallback"
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("CACHE_ENABLED")), "false") {
+		cacheStatus = "disabled"
+	} else if envSet("REDIS_URL") {
+		cacheStatus = "redis_configured"
+	}
+	jobQueueStatus := "local_noop"
+	if envSet("NATS_URL") {
+		jobQueueStatus = "nats_configured"
+	}
+	tokenTelemetryAvailable := db != nil && ownerTableExists(ctx, db, "token_access_snapshots")
+
 	servicesMap := map[string]any{
-		"database":        ownerDatabaseServiceStatus(ctx, db),
-		"neon_auth":       map[string]any{"status": serviceStatus(envSet("NEON_AUTH_JWKS_URL"), "configured", "missing")},
-		"solana_rpc":      map[string]any{"status": serviceStatus(envSet("SOLANA_RPC_URL") || envSet("ALCHEMY_SOLANA_RPC_URL") || envSet("HELIUS_SOLANA_RPC_URL") || envSet("QUICKNODE_SOLANA_RPC_URL") || envSet("ALCHEMY_API_KEY"), "configured", "missing")},
-		"security_radar":  map[string]any{"status": radarStatus},
-		"kosch_access":    map[string]any{"status": serviceStatus(configuredKoscheiTokenGateEnabled() && configuredKoscheiTokenMint() != "", "configured", "missing")},
+		"application_database": appDBStatus,
+		"entitlement_store":    entitlementStatus,
+		"neon_auth": map[string]any{
+			"status":       serviceStatus(envSet("NEON_AUTH_JWKS_URL"), "configured", "not_configured"),
+			"verification": "configuration_only",
+		},
+		"solana_rpc": map[string]any{
+			"status":       serviceStatus(envSet("SOLANA_RPC_URL") || envSet("ALCHEMY_SOLANA_RPC_URL") || envSet("HELIUS_SOLANA_RPC_URL") || envSet("QUICKNODE_SOLANA_RPC_URL") || envSet("ALCHEMY_API_KEY"), "configured", "not_configured"),
+			"verification": "configuration_only",
+		},
+		"security_radar": map[string]any{"status": radarStatus, "verification": "runtime_state"},
+		"global_radar_graph": map[string]any{
+			"status":       serviceStatus(strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_CLICKHOUSE_ENABLED")) == "1", "enabled", "disabled"),
+			"verification": "runtime_configuration",
+		},
+		"global_radar_events": map[string]any{
+			"status":       serviceStatus(strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_EVENT_CLICKHOUSE_ENABLED")) == "1", "enabled", "disabled"),
+			"verification": "runtime_configuration",
+		},
+		"clickhouse": map[string]any{
+			"status":       serviceStatus(envSet("CLICKHOUSE_HTTP_URL"), "configured", "not_configured"),
+			"verification": "configuration_only",
+		},
+		"cache":     map[string]any{"status": cacheStatus},
+		"job_queue": map[string]any{"status": jobQueueStatus},
+		"token_telemetry": map[string]any{
+			"status":    serviceStatus(tokenTelemetryAvailable, "available", "unavailable"),
+			"authority": "audit_only",
+		},
+		"polar_billing": map[string]any{
+			"status": serviceStatus(
+				envSet("POLAR_ACCESS_TOKEN") && envSet("POLAR_WEBHOOK_SECRET") && envSet("POLAR_PRODUCT_PROFESSIONAL_ID"),
+				"configured",
+				"incomplete",
+			),
+			"provider": "polar",
+		},
 		"visual_renderer": map[string]any{"status": "ready", "mode": "client_canvas_png"},
-		"owner_brain":     map[string]any{"status": serviceStatus(aiProviderConfigured(), "configured", "missing")},
+		"owner_assistant": map[string]any{
+			"status":       serviceStatus(ownerAIProviderConfigured(), "configured", "not_configured"),
+			"provider":     "together",
+			"storage":      serviceStatus(db != nil, "application_database", "unavailable"),
+			"verification": "configuration_plus_storage_boundary",
+		},
+	}
+
+	dataState := "available"
+	if db == nil {
+		dataState = "application_database_unavailable"
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true, "generated_at": time.Now().UTC(), "summary": summary,
-		"services": servicesMap, "radar": radar,
+		"ok":             true,
+		"schema_version": "koschei.owner-control-plane.v4",
+		"generated_at":   time.Now().UTC(),
+		"data_state":     dataState,
+		"summary":        summary,
+		"services":       servicesMap,
+		"radar":          radar,
 		"access_model": map[string]any{
-			"free_core":         []string{"safe_check", "basic_token_scan"},
-			"kosch_premium":     []string{"full_radar", "structural_memory", "graph", "exposure", "visual_reports", "automation"},
-			"payment_providers": []string{},
+			"public_proof":       true,
+			"paid_plan":          "professional",
+			"authorization":      "server_side_professional_entitlement",
+			"billing_provider":   "polar",
+			"token_telemetry":    "audit_only_no_authority",
+			"historical_aliases": "readable_but_normalized_to_professional",
 		},
 	})
 }
@@ -480,26 +548,43 @@ func ownerRadarPracticalConclusion(level string, distribution map[string]any) st
 	}
 }
 
-// OwnerKOSCHAccess exposes current wallet verification and the latest cached
-// KOSCH tier per account. Historical package/credit fields are intentionally
-// absent from this contract.
-func (h *Handler) OwnerKOSCHAccess(w http.ResponseWriter, r *http.Request) {
+// OwnerTokenTelemetry exposes historical KOSCH observations for owner audit only.
+// These snapshots never authorize SaaS access or influence verdict authority.
+func (h *Handler) OwnerTokenTelemetry(w http.ResponseWriter, r *http.Request) {
 	db := h.DBRead
 	if db == nil {
 		db = h.DB
 	}
-	if db == nil || !ownerTableExists(r.Context(), db, "app_user_profiles") {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "users": []any{}, "summary": map[string]any{}})
+	unavailable := func(reason string) {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"ok":             true,
+			"schema_version": "koschei.owner-token-telemetry.v1",
+			"available":      false,
+			"authority":      "audit_only",
+			"reason":         reason,
+			"users":          []any{},
+			"summary": map[string]any{
+				"total": nil, "verified": nil, "snapshots": nil,
+			},
+		})
+	}
+	if db == nil {
+		unavailable("application_database_unavailable")
 		return
 	}
+	if !ownerTableExists(r.Context(), db, "app_user_profiles") {
+		unavailable("profile_source_unavailable")
+		return
+	}
+	if !ownerTableExists(r.Context(), db, "token_access_snapshots") {
+		unavailable("historical_snapshot_source_unavailable")
+		return
+	}
+
 	q := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
 	walletJoin := `LEFT JOIN LATERAL (SELECT wallet_address, verified_at FROM verified_wallet_links v WHERE v.auth_subject=p.auth_subject AND v.status='active' ORDER BY verified_at DESC LIMIT 1) vw ON true`
 	if !ownerTableExists(r.Context(), db, "verified_wallet_links") {
 		walletJoin = `LEFT JOIN LATERAL (SELECT NULL::text wallet_address, NULL::timestamptz verified_at) vw ON true`
-	}
-	snapshotJoin := `LEFT JOIN LATERAL (SELECT tier, amount, amount_raw, checked_at, expires_at FROM token_access_snapshots s WHERE s.auth_subject=p.auth_subject ORDER BY checked_at DESC LIMIT 1) ts ON true`
-	if !ownerTableExists(r.Context(), db, "token_access_snapshots") {
-		snapshotJoin = `LEFT JOIN LATERAL (SELECT NULL::text tier, NULL::text amount, NULL::text amount_raw, NULL::timestamptz checked_at, NULL::timestamptz expires_at) ts ON true`
 	}
 	rows, err := db.QueryContext(r.Context(), `
 		SELECT p.id::text, COALESCE(p.auth_subject,''), lower(p.email),
@@ -509,32 +594,43 @@ func (h *Handler) OwnerKOSCHAccess(w http.ResponseWriter, r *http.Request) {
 		       ts.checked_at, ts.expires_at
 		FROM app_user_profiles p
 		`+walletJoin+`
-		`+snapshotJoin+`
+		LEFT JOIN LATERAL (
+			SELECT tier, amount, checked_at, expires_at
+			FROM token_access_snapshots s
+			WHERE s.auth_subject=p.auth_subject
+			ORDER BY checked_at DESC
+			LIMIT 1
+		) ts ON true
 		WHERE ($1='' OR lower(p.email) LIKE $2 OR lower(COALESCE(p.auth_subject,'')) LIKE $2 OR lower(COALESCE(vw.wallet_address,p.wallet_address,'')) LIKE $2)
 		ORDER BY p.created_at DESC LIMIT 500`, q, "%"+q+"%")
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "kosch_access_query_failed"})
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "token_telemetry_query_failed"})
 		return
 	}
 	defer rows.Close()
+
 	users := []map[string]any{}
-	counts := map[string]int64{"total": 0, "verified": 0, "holders": 0, "basic": 0, "pro": 0, "enterprise": 0}
+	counts := map[string]int64{"total": 0, "verified": 0, "snapshots": 0}
 	for rows.Next() {
-		var id, subject, email, wallet, status, tier, amount string
+		var id, subject, email, wallet, status, label, amount string
 		var created time.Time
 		var verifiedAt, checkedAt, expiresAt sql.NullTime
-		if err := rows.Scan(&id, &subject, &email, &wallet, &status, &created, &verifiedAt, &tier, &amount, &checkedAt, &expiresAt); err != nil {
+		if err := rows.Scan(&id, &subject, &email, &wallet, &status, &created, &verifiedAt, &label, &amount, &checkedAt, &expiresAt); err != nil {
 			continue
 		}
 		counts["total"]++
 		if verifiedAt.Valid {
 			counts["verified"]++
 		}
-		if tier == "basic" || tier == "pro" || tier == "enterprise" {
-			counts["holders"]++
-			counts[tier]++
+		if checkedAt.Valid {
+			counts["snapshots"]++
 		}
-		item := map[string]any{"id": id, "auth_subject": subject, "email": email, "wallet_address": wallet, "status": status, "created_at": created, "wallet_verified": verifiedAt.Valid, "tier": tier, "amount": amount}
+		item := map[string]any{
+			"id": id, "auth_subject": subject, "email": email, "wallet_address": wallet,
+			"status": status, "created_at": created, "wallet_verified": verifiedAt.Valid,
+			"historical_snapshot_label": label, "observed_amount": amount,
+			"snapshot_authority": "none_audit_only",
+		}
 		if verifiedAt.Valid {
 			item["verified_at"] = verifiedAt.Time
 		}
@@ -547,12 +643,17 @@ func (h *Handler) OwnerKOSCHAccess(w http.ResponseWriter, r *http.Request) {
 		users = append(users, item)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true, "users": users, "summary": counts,
-		"mint_address": configuredKoscheiTokenMint(),
-		"thresholds": map[string]string{
-			"basic":      tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_BASIC", "0.000001"),
-			"pro":        tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_PRO", "250000"),
-			"enterprise": tokenTierThresholdEnv("KOSCHEI_TOKEN_TIER_ENTERPRISE", "2000000"),
+		"ok":             true,
+		"schema_version": "koschei.owner-token-telemetry.v1",
+		"available":      true,
+		"authority":      "audit_only",
+		"users":          users,
+		"summary":        counts,
+		"mint_address":   configuredKoscheiTokenMint(),
+		"policy": map[string]any{
+			"commercial_authority": false,
+			"verdict_authority":    false,
+			"purpose":              "historical_observability",
 		},
 	})
 }

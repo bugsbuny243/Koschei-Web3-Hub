@@ -61,9 +61,9 @@ func productionRouteInventory() []routeInventoryGroup {
 			"POST /api/polar/checkout", "POST /api/polar/webhook",
 		}},
 		{Name: "owner", Auth: "owner_session", Routes: []string{
-			"POST /api/owner/login", "POST /api/owner/logout", "GET /api/owner/command-center", "GET /api/owner/operations",
+			"POST /api/owner/login", "POST /api/owner/logout", "GET /api/owner/command-center", "GET /api/owner/operations", "GET /api/owner/token-telemetry",
 			"GET /api/owner/arvis", "POST /api/owner/arvis/scan", "POST /api/owner/radar/unified", "POST /api/owner/radar/jobs", "GET /api/owner/radar/jobs/",
-			"POST /api/owner/radar/funding-corpus/warmup", "GET /api/owner/creator-intelligence", "GET /api/owner/wallet-linkage", "GET /api/owner/actor-intelligence",
+			"POST /api/owner/radar/funding-corpus/warmup", "GET /api/owner/radar/global/records", "GET /api/owner/radar/global/events", "GET /api/owner/creator-intelligence", "GET /api/owner/wallet-linkage", "GET /api/owner/actor-intelligence",
 			"GET /api/owner/actor-memory/matches", "GET /api/owner/radar/continuity", "GET /api/owner/radar/provider-memory",
 			"GET /api/owner/defense/tracks", "POST /api/owner/defense/investigate", "POST /api/owner/defense/actor-acceptance", "POST /api/owner/defense/distribution",
 			"POST /api/owner/web3/shield/preflight", "POST /api/owner/web3/transaction-guard", "POST /api/owner/web3/transaction-guard/state-recheck", "POST /api/owner/web3/address-poisoning/check", "POST /api/owner/web3/defense-validation", "POST /api/owner/web3/execution-assurance/safe/verify",

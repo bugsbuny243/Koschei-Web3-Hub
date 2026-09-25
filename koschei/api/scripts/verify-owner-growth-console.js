@@ -16,7 +16,7 @@ const server=read('internal/http/server.go');
 function requireText(source,needle,label){if(!source.includes(needle))throw new Error(`${label}: missing ${needle}`);}
 function forbidText(source,needle,label){if(source.includes(needle))throw new Error(`${label}: forbidden ${needle}`);}
 
-requireText(html,'/js/owner-customer-directory.js?v=1','owner html customer directory');
+requireText(html,'/js/owner-customer-directory.js?v=2','owner html customer directory');
 requireText(html,'/js/owner-social-studio.js?v=2','owner html social studio');
 requireText(html,'/js/owner-social-mobile-renderer.js?v=1','owner html mobile-safe renderer');
 requireText(html,'/js/owner-social-voice.js?v=2','owner html Together voice');

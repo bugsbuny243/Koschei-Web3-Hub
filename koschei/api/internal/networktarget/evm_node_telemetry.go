@@ -3,6 +3,8 @@ package networktarget
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,17 +16,22 @@ import (
 )
 
 type EVMNodeTelemetryResult struct {
-	SchemaVersion     string                      `json:"schema_version"`
-	Observation       NetworkTelemetryObservation `json:"observation"`
-	ChainID           string                      `json:"chain_id"`
-	ExpectedChainID   string                      `json:"expected_chain_id"`
-	ClientVersion     string                      `json:"client_version"`
-	PeerCount         uint64                      `json:"peer_count"`
-	HeadBlock         uint64                      `json:"head_block"`
-	Syncing           bool                        `json:"syncing"`
-	EndpointScope     string                      `json:"endpoint_scope"`
-	AnalysisPerformed bool                        `json:"analysis_performed"`
-	LiveAvailability  string                      `json:"live_availability"`
+	SchemaVersion               string                      `json:"schema_version"`
+	Observation                 NetworkTelemetryObservation `json:"observation"`
+	ChainID                     string                      `json:"chain_id"`
+	ExpectedChainID             string                      `json:"expected_chain_id"`
+	ChainIDResponseSHA256       string                      `json:"chain_id_response_sha256,omitempty"`
+	ClientVersion               string                      `json:"client_version"`
+	ClientVersionResponseSHA256 string                      `json:"client_version_response_sha256,omitempty"`
+	PeerCount                   uint64                      `json:"peer_count"`
+	PeerCountResponseSHA256     string                      `json:"peer_count_response_sha256,omitempty"`
+	HeadBlock                   uint64                      `json:"head_block"`
+	HeadBlockResponseSHA256     string                      `json:"head_block_response_sha256,omitempty"`
+	Syncing                     bool                        `json:"syncing"`
+	SyncingResponseSHA256       string                      `json:"syncing_response_sha256,omitempty"`
+	EndpointScope               string                      `json:"endpoint_scope"`
+	AnalysisPerformed           bool                        `json:"analysis_performed"`
+	LiveAvailability            string                      `json:"live_availability"`
 }
 
 // ProbeEVMNodeTelemetry observes one configured execution RPC endpoint.
@@ -50,7 +57,7 @@ func ProbeEVMNodeTelemetry(ctx context.Context, client *http.Client, endpoint, n
 		client = &http.Client{Timeout: 8 * time.Second}
 	}
 
-	chainID, err := evmRPCString(ctx, client, endpoint, 101, "eth_chainId", nil)
+	chainID, chainIDResponseSHA256, err := evmRPCStringWithDigest(ctx, client, endpoint, 101, "eth_chainId", nil)
 	if err != nil {
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_node_chain_id_unavailable: %w", err)
 	}
@@ -59,7 +66,7 @@ func ProbeEVMNodeTelemetry(ctx context.Context, client *http.Client, endpoint, n
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_rpc_network_mismatch")
 	}
 
-	clientVersion, err := evmRPCString(ctx, client, endpoint, 102, "web3_clientVersion", nil)
+	clientVersion, clientVersionResponseSHA256, err := evmRPCStringWithDigest(ctx, client, endpoint, 102, "web3_clientVersion", nil)
 	if err != nil {
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_node_client_version_unavailable: %w", err)
 	}
@@ -68,7 +75,7 @@ func ProbeEVMNodeTelemetry(ctx context.Context, client *http.Client, endpoint, n
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_node_client_version_invalid")
 	}
 
-	peerRaw, err := evmRPCString(ctx, client, endpoint, 103, "net_peerCount", nil)
+	peerRaw, peerCountResponseSHA256, err := evmRPCStringWithDigest(ctx, client, endpoint, 103, "net_peerCount", nil)
 	if err != nil {
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_node_peer_count_unavailable: %w", err)
 	}
@@ -77,7 +84,7 @@ func ProbeEVMNodeTelemetry(ctx context.Context, client *http.Client, endpoint, n
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_node_peer_count_invalid")
 	}
 
-	headRaw, err := evmRPCString(ctx, client, endpoint, 104, "eth_blockNumber", nil)
+	headRaw, headBlockResponseSHA256, err := evmRPCStringWithDigest(ctx, client, endpoint, 104, "eth_blockNumber", nil)
 	if err != nil {
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_node_head_unavailable: %w", err)
 	}
@@ -86,7 +93,7 @@ func ProbeEVMNodeTelemetry(ctx context.Context, client *http.Client, endpoint, n
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_node_head_invalid")
 	}
 
-	syncRaw, err := evmNodeTelemetryRPCRaw(ctx, client, endpoint, 105, "eth_syncing", nil)
+	syncRaw, syncingResponseSHA256, err := evmNodeTelemetryRPCRawWithDigest(ctx, client, endpoint, 105, "eth_syncing", nil)
 	if err != nil {
 		return EVMNodeTelemetryResult{}, fmt.Errorf("evm_node_sync_state_unavailable: %w", err)
 	}
@@ -109,17 +116,22 @@ func ProbeEVMNodeTelemetry(ctx context.Context, client *http.Client, endpoint, n
 	}
 
 	return EVMNodeTelemetryResult{
-		SchemaVersion:     NetworkTelemetrySchemaVersion,
-		Observation:       observation,
-		ChainID:           chainID,
-		ExpectedChainID:   expectedChainID,
-		ClientVersion:     clientVersion,
-		PeerCount:         peerCount,
-		HeadBlock:         headBlock,
-		Syncing:           syncing,
-		EndpointScope:     "single_rpc_endpoint_only",
-		AnalysisPerformed: true,
-		LiveAvailability:  "checked",
+		SchemaVersion:               NetworkTelemetrySchemaVersion,
+		Observation:                 observation,
+		ChainID:                     chainID,
+		ExpectedChainID:             expectedChainID,
+		ChainIDResponseSHA256:       chainIDResponseSHA256,
+		ClientVersion:               clientVersion,
+		ClientVersionResponseSHA256: clientVersionResponseSHA256,
+		PeerCount:                   peerCount,
+		PeerCountResponseSHA256:     peerCountResponseSHA256,
+		HeadBlock:                   headBlock,
+		HeadBlockResponseSHA256:     headBlockResponseSHA256,
+		Syncing:                     syncing,
+		SyncingResponseSHA256:       syncingResponseSHA256,
+		EndpointScope:               "single_rpc_endpoint_only",
+		AnalysisPerformed:           true,
+		LiveAvailability:            "checked",
 	}, nil
 }
 
@@ -133,35 +145,46 @@ func validateEVMNodeTelemetryEndpoint(endpoint string) (*url.URL, error) {
 }
 
 func evmNodeTelemetryRPCRaw(ctx context.Context, client *http.Client, endpoint string, id int, method string, params []any) (json.RawMessage, error) {
+	result, _, err := evmNodeTelemetryRPCRawWithDigest(ctx, client, endpoint, id, method, params)
+	return result, err
+}
+
+func evmNodeTelemetryRPCRawWithDigest(ctx context.Context, client *http.Client, endpoint string, id int, method string, params []any) (json.RawMessage, string, error) {
 	payload, err := json.Marshal(evmRPCRequest{JSONRPC: "2.0", ID: id, Method: method, Params: params})
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, fmt.Errorf("rpc_status_%d", resp.StatusCode)
+		return nil, "", fmt.Errorf("rpc_status_%d", resp.StatusCode)
 	}
 	limited := &io.LimitedReader{R: resp.Body, N: evmProbeResponseLimit + 1}
-	var decoded evmRPCResponse
-	if err := json.NewDecoder(limited).Decode(&decoded); err != nil {
-		return nil, err
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, "", err
 	}
 	if limited.N <= 0 {
-		return nil, fmt.Errorf("rpc_response_too_large")
+		return nil, "", fmt.Errorf("rpc_response_too_large")
+	}
+	sum := sha256.Sum256(body)
+
+	var decoded evmRPCResponse
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&decoded); err != nil {
+		return nil, "", err
 	}
 	if decoded.JSONRPC != "2.0" || decoded.ID != id || decoded.Error != nil || len(decoded.Result) == 0 {
-		return nil, fmt.Errorf("rpc_response_invalid")
+		return nil, "", fmt.Errorf("rpc_response_invalid")
 	}
-	return decoded.Result, nil
+	return decoded.Result, hex.EncodeToString(sum[:]), nil
 }
 
 func parseEVMQuantity(value string) (uint64, error) {

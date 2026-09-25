@@ -1,10 +1,41 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"html/template"
 	"net/http"
+
+	"koschei/api/internal/radarevent"
+	"koschei/api/internal/services"
 )
+
+type GlobalRadarSnapshotSink interface {
+	InsertGlobalRadarSnapshot(context.Context, services.GlobalRadarSnapshot) error
+}
+
+type GlobalRadarEventSink interface {
+	InsertGlobalRadarEvents(context.Context, []radarevent.Event) error
+}
+
+type fabricConfig struct {
+	globalRadarSnapshotSink GlobalRadarSnapshotSink
+	globalRadarEventSink    GlobalRadarEventSink
+}
+
+type FabricOption func(*fabricConfig)
+
+func WithGlobalRadarSnapshotSink(sink GlobalRadarSnapshotSink) FabricOption {
+	return func(config *fabricConfig) {
+		config.globalRadarSnapshotSink = sink
+	}
+}
+
+func WithGlobalRadarEventSink(sink GlobalRadarEventSink) FabricOption {
+	return func(config *fabricConfig) {
+		config.globalRadarEventSink = sink
+	}
+}
 
 type fabricCapability struct {
 	ID            string   `json:"id"`
@@ -76,6 +107,7 @@ func currentFabricSnapshot() fabricSnapshot {
 				{ID: "web3-security-core", Domain: "web3", Status: "stable", EvidenceState: "blocked", WorkPackages: []string{"CORE-01", "CORE-02", "CORE-03", "CORE-04", "SIGN-01"}, Backend: "existing", Frontend: "existing", Telemetry: "existing"},
 				{ID: "entitlement-ledger-split-plane", Domain: "core", Status: "experimental", EvidenceState: "partial", WorkPackages: []string{"CORE-01", "CORE-03"}, Backend: "existing", Frontend: "existing", Telemetry: "planned"},
 				{ID: "fabric-capability-registry", Domain: "core", Status: "experimental", EvidenceState: "partial", WorkPackages: []string{"CORE-04", "OPS-01"}, Backend: "existing", Frontend: "existing", Telemetry: "planned"},
+				{ID: "global-radar-persisted-graph-read", Domain: "web3", Status: "experimental", EvidenceState: "observed", Backend: "owner-api", Frontend: "ui-pending", Telemetry: "clickhouse"},
 			}},
 			{Name: "koschei-lang", Repository: "bugsbuny243/koschei-lang", Role: "independent-security-programming-language", Mode: "observe", Capabilities: []fabricCapability{
 				{ID: "language-toolchain", Domain: "core", Status: "experimental", EvidenceState: "blocked", WorkPackages: []string{"LANG-01", "LANG-02", "LANG-03", "LANG-04", "SUPPLY-02"}, Backend: "existing", Frontend: "existing", Telemetry: "existing"},
@@ -91,12 +123,18 @@ func currentFabricSnapshot() fabricSnapshot {
 	}
 }
 
-func registerFabricRoutes(mux *http.ServeMux) {
+func registerFabricRoutes(mux *http.ServeMux, configs ...fabricConfig) {
+	config := fabricConfig{}
+	if len(configs) > 0 {
+		config = configs[0]
+	}
 	registerNetworkTargetRoutes(mux)
 	mux.HandleFunc("/fabric/networks/live", method(http.MethodGet, networkProbePage))
 	mux.HandleFunc("/fabric/networks/deployment", method(http.MethodGet, networkDeploymentCatalogHandler))
 	mux.HandleFunc("/fabric/networks/probe", method(http.MethodPost, networkTargetProbe))
-	mux.HandleFunc("/fabric/networks/probe/intelligence", method(http.MethodPost, networkTargetProbe))
+	mux.HandleFunc("/fabric/networks/probe/intelligence", method(http.MethodPost, func(w http.ResponseWriter, r *http.Request) {
+		networkTargetProbeWithStores(w, r, nil, config.globalRadarSnapshotSink, config.globalRadarEventSink)
+	}))
 	mux.HandleFunc("/fabric/radar/global", method(http.MethodGet, globalRadarSnapshotHandler))
 	// Fabric is still experimental. Keep its capability contract outside /api/*
 	// until it is deliberately promoted into the production OpenAPI contract.
@@ -108,12 +146,18 @@ func registerFabricRoutes(mux *http.ServeMux) {
 // existing NewServer route graph. All non-Fabric requests are delegated to base
 // unchanged. Fabric responses still pass through the repository's existing
 // security-header and CSP transformation machinery.
-func MountFabric(base http.Handler) http.Handler {
+func MountFabric(base http.Handler, opts ...FabricOption) http.Handler {
 	if base == nil {
 		base = http.NotFoundHandler()
 	}
+	config := fabricConfig{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&config)
+		}
+	}
 	fabricMux := http.NewServeMux()
-	registerFabricRoutes(fabricMux)
+	registerFabricRoutes(fabricMux, config)
 	fabric := securityHeaders(fabricMux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

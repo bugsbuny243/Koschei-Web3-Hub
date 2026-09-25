@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"mime"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"koschei/api/internal/networktarget"
+	"koschei/api/internal/radarevent"
 	"koschei/api/internal/services"
 )
 
@@ -22,11 +24,19 @@ type networkDeploymentState struct {
 }
 
 type networkProbeIntelligenceEnvelope struct {
-	SchemaVersion    string                                      `json:"schema_version"`
-	Probe            any                                         `json:"probe"`
-	Intelligence     services.NetworkProbeIntelligenceProjection `json:"intelligence"`
-	RadarObservation services.GlobalRadarObservation             `json:"radar_observation"`
+	SchemaVersion         string                                      `json:"schema_version"`
+	Probe                 any                                         `json:"probe"`
+	Intelligence          services.NetworkProbeIntelligenceProjection `json:"intelligence"`
+	RadarObservation      services.GlobalRadarObservation             `json:"radar_observation"`
+	RadarPersistence      string                                      `json:"radar_persistence,omitempty"`
+	RadarEvent            *radarevent.Event                           `json:"radar_event,omitempty"`
+	RadarEventPersistence string                                      `json:"radar_event_persistence,omitempty"`
 }
+
+var (
+	errGlobalRadarPersistenceUnavailable      = errors.New("global radar persistence unavailable")
+	errGlobalRadarEventPersistenceUnavailable = errors.New("global radar event persistence unavailable")
+)
 
 func evmRPCEnvName(networkID string) (string, bool) {
 	switch strings.TrimSpace(networkID) {
@@ -117,10 +127,18 @@ func networkDeploymentCatalog() []networkDeploymentState {
 }
 
 func networkTargetProbe(w http.ResponseWriter, r *http.Request) {
-	networkTargetProbeWithClient(w, r, nil)
+	networkTargetProbeWithStores(w, r, nil, nil, nil)
 }
 
 func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client *http.Client) {
+	networkTargetProbeWithStores(w, r, client, nil, nil)
+}
+
+func networkTargetProbeWithDependencies(w http.ResponseWriter, r *http.Request, client *http.Client, sink GlobalRadarSnapshotSink) {
+	networkTargetProbeWithStores(w, r, client, sink, nil)
+}
+
+func networkTargetProbeWithStores(w http.ResponseWriter, r *http.Request, client *http.Client, sink GlobalRadarSnapshotSink, eventSink GlobalRadarEventSink) {
 	networkTargetRequests.Add(1)
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 	defer r.Body.Close()
@@ -179,20 +197,60 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	writeIntelligence := func(probe any, projection services.NetworkProbeIntelligenceProjection, observationKind string) error {
+	writeIntelligence := func(probe any, projection services.NetworkProbeIntelligenceProjection, observationKind string, radarEvent *radarevent.Event) error {
 		observation, err := services.BuildGlobalRadarObservation(observationKind, projection.Subject, projection.Evidence)
 		if err != nil {
 			return err
 		}
+		persistence := ""
+		if sink != nil {
+			snapshot, snapshotErr := services.BuildGlobalRadarSnapshot(
+				[]services.GlobalRadarObservation{observation},
+				nil,
+				nil,
+				nil,
+				time.Now().UTC(),
+			)
+			if snapshotErr != nil {
+				return snapshotErr
+			}
+			if persistErr := sink.InsertGlobalRadarSnapshot(ctx, snapshot); persistErr != nil {
+				return errors.Join(errGlobalRadarPersistenceUnavailable, persistErr)
+			}
+			persistence = "clickhouse"
+		}
+
+		eventPersistence := ""
+		if eventSink != nil && radarEvent != nil {
+			if persistErr := eventSink.InsertGlobalRadarEvents(ctx, []radarevent.Event{*radarEvent}); persistErr != nil {
+				return errors.Join(errGlobalRadarEventPersistenceUnavailable, persistErr)
+			}
+			eventPersistence = "clickhouse"
+		}
+
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(networkProbeIntelligenceEnvelope{
-			SchemaVersion:    networkProbeIntelligenceSchemaVersion,
-			Probe:            probe,
-			Intelligence:     projection,
-			RadarObservation: observation,
+			SchemaVersion:         networkProbeIntelligenceSchemaVersion,
+			Probe:                 probe,
+			Intelligence:          projection,
+			RadarObservation:      observation,
+			RadarPersistence:      persistence,
+			RadarEvent:            radarEvent,
+			RadarEventPersistence: eventPersistence,
 		})
 		return nil
+	}
+
+	writeIntelligenceError := func(err error) {
+		message := "radar_observation_unavailable"
+		switch {
+		case errors.Is(err, errGlobalRadarEventPersistenceUnavailable):
+			message = "radar_event_persistence_unavailable"
+		case errors.Is(err, errGlobalRadarPersistenceUnavailable):
+			message = "radar_persistence_unavailable"
+		}
+		reject(http.StatusBadGateway, message, "unavailable")
 	}
 
 	switch resolution.Network.Family {
@@ -208,13 +266,19 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 			return
 		}
 		if withIntelligence {
-			projection, projectionErr := services.AdaptEVMProbeEvidence(result, time.Now().UTC())
+			observedAt := time.Now().UTC()
+			projection, projectionErr := services.AdaptEVMProbeEvidence(result, observedAt)
 			if projectionErr != nil {
 				reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 				return
 			}
-			if writeIntelligence(result, projection, services.GlobalRadarObservationContractProgram) != nil {
-				reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+			radarEvent, eventErr := radarevent.BuildEVMAddressProbeEventFromResult("evm-rpc-adapter", result, observedAt)
+			if eventErr != nil {
+				reject(http.StatusBadGateway, "radar_event_unavailable", "unavailable")
+				return
+			}
+			if err := writeIntelligence(result, projection, services.GlobalRadarObservationContractProgram, &radarEvent); err != nil {
+				writeIntelligenceError(err)
 				return
 			}
 			return
@@ -246,13 +310,19 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 			return
 		}
 		if withIntelligence {
-			projection, projectionErr := services.AdaptBitcoinProbeEvidence(result, time.Now().UTC())
+			observedAt := time.Now().UTC()
+			projection, projectionErr := services.AdaptBitcoinProbeEvidence(result, observedAt)
 			if projectionErr != nil {
 				reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 				return
 			}
-			if writeIntelligence(result, projection, services.GlobalRadarObservationTransaction) != nil {
-				reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+			radarEvent, eventErr := radarevent.BuildBitcoinAddressProbeEventFromResult("bitcoin-esplora-adapter", result, observedAt)
+			if eventErr != nil {
+				reject(http.StatusBadGateway, "radar_event_unavailable", "unavailable")
+				return
+			}
+			if err := writeIntelligence(result, projection, services.GlobalRadarObservationTransaction, &radarEvent); err != nil {
+				writeIntelligenceError(err)
 				return
 			}
 			return
@@ -284,8 +354,13 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 					reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 					return
 				}
-				if writeIntelligence(result, projection, services.GlobalRadarObservationIdentity) != nil {
-					reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+				radarEvent, eventErr := radarevent.BuildSuiIdentityEventFromResult("sui-identity-adapter", result)
+				if eventErr != nil {
+					reject(http.StatusBadGateway, "radar_event_unavailable", "unavailable")
+					return
+				}
+				if err := writeIntelligence(result, projection, services.GlobalRadarObservationIdentity, &radarEvent); err != nil {
+					writeIntelligenceError(err)
 					return
 				}
 				return
@@ -305,8 +380,13 @@ func networkTargetProbeWithClient(w http.ResponseWriter, r *http.Request, client
 					reject(http.StatusBadGateway, "intelligence_projection_unavailable", "unavailable")
 					return
 				}
-				if writeIntelligence(result, projection, services.GlobalRadarObservationIdentity) != nil {
-					reject(http.StatusBadGateway, "radar_observation_unavailable", "unavailable")
+				radarEvent, eventErr := radarevent.BuildAptosIdentityEventFromResult("aptos-identity-adapter", result)
+				if eventErr != nil {
+					reject(http.StatusBadGateway, "radar_event_unavailable", "unavailable")
+					return
+				}
+				if err := writeIntelligence(result, projection, services.GlobalRadarObservationIdentity, &radarEvent); err != nil {
+					writeIntelligenceError(err)
 					return
 				}
 				return

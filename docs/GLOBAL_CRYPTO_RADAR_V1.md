@@ -110,6 +110,26 @@ dimensions remain explicit `missing_evidence` and are never converted into risk.
 Solana validator telemetry can be projected as one Radar observation per validator.
 No synthetic decentralization score is produced.
 
+### Durable probe persistence
+
+The existing `/fabric/networks/probe/intelligence` path can now persist its canonical one-observation Global Radar snapshot into ClickHouse when `KOSCHEI_GLOBAL_RADAR_CLICKHOUSE_ENABLED=1`. The feature is off by default, validates the ClickHouse graph schema at API startup, and fails closed on persistence failure instead of claiming a durable observation that was not stored. The legacy flat probe route is unchanged.
+
+This path remains useful for explicit operator probes.
+
+### Bounded background network telemetry
+
+An additional opt-in worker can continuously persist network-health evidence for explicitly selected networks. It is disabled by default, requires the ClickHouse Global Radar sink, requires an explicit network allowlist, and clamps collection cadence to 5–60 minutes.
+
+The first background slice covers EVM execution-node telemetry, optional Ethereum Beacon telemetry, and Bitcoin Core plus PoW network telemetry. Each collector verifies its native chain/network boundary before projection. EVM execution-node, Ethereum Beacon, Bitcoin Core and Bitcoin PoW collectors now preserve native response-byte digests and can emit canonical Global Radar events into the optional event ledger. Derived Beacon state that combines multiple responses is not forced into a single-source fact; only directly source-bound facts enter the event contract. Failures on one target are reported as partial-cycle errors and never become safety conclusions or synthetic verdicts.
+
+This is still telemetry collection rather than multi-chain transaction firehose ingestion. ARVIS remains the only connected verdict authority.
+
+### Owner-only persisted graph retrieval
+
+The existing ClickHouse graph reader is now exposed through `GET /api/owner/radar/global/records` behind the repository's existing owner authentication boundary. The canonical event ledger is separately readable through `GET /api/owner/radar/global/events` under the same owner boundary. The route requires a registered `network`, defaults to a 24-hour half-open window, accepts optional `subject_id` and `record_type`, and clamps the HTTP surface to at most 1,000 rows even though the lower ClickHouse reader retains its stricter 31-day / 5,000-row hard contract and scan caps.
+
+Returned rows are historical persisted evidence, not a claim about current chain state. The graph reader rechecks requested network/subject/type/time boundaries, validates payload JSON and recomputes each stored payload SHA-256 before the owner route can return it. The event reader also decodes every stored payload back into `koschei.global-radar-event.v1`, re-runs canonical event verification, and checks row identity, source digests, evidence state and observation time against the verified payload. The Fabric capability surface marks operator UI visualization as pending rather than claiming a completed graph frontend.
+
 ### Snapshot contract
 
 `koschei.global-radar-snapshot.v1` assembles observations, relation edges, verified
@@ -133,23 +153,17 @@ limitations, but explicitly sets `market_data_can_issue_verdict=false` and
 `koschei.global-radar-verdict-reference.v1` preserves an existing evidence-linked,
 source-marked-signed ARVIS deterministic verdict as an authoritative graph reference.
 
-Global Radar does not re-grade or re-sign the verdict. It also does not claim
-independent Ed25519 verification until `key_id` is resolved through an out-of-band
-trusted public-key registry. The projection therefore reports
-`signature_verification=not_reverified_by_global_radar`.
+Global Radar does not re-grade or re-sign the verdict. The legacy projection remains explicitly unverified and reports `signature_verification=not_reverified_by_global_radar`.
+
+An additive server-owned trusted-key registry contract can now independently reverify the same canonical ARVIS v1 payload with Ed25519. Registry entries are selected by `key_id`, require canonical unpadded base64url 32-byte public keys, and support bounded `valid_from`, `valid_until`, and `revoked_at` lifecycle controls evaluated against the verdict's authenticated `generated_at`. Only callers that explicitly supply this registry may receive `signature_verification=verified_ed25519_trusted_registry`; unknown, malformed, expired, revoked, tampered, or mismatched signatures fail closed.
 
 ## Next implementation slices
 
-1. Add durable graph persistence/query paths for observations, relations, bridge links
-   and verdict references.
-2. Add operator-facing snapshot retrieval that distinguishes implemented, configured,
-   observed and verified states.
-3. Connect bridge-specific live adapters only where both chain-side transfer identities
-   can be independently anchored.
-4. Add independent verdict signature verification once a trusted public-key registry
-   contract is available to the Radar verifier.
-5. Expand live node telemetry projections for EVM beacon/execution and Bitcoin Core/PoW
-   collectors without inventing missing geography or client identity.
+1. Extend durable persistence from explicit intelligence probes to continuous background multi-network ingest without changing existing ARVIS decision authority.
+2. Add an operator graph/timeline visualization over the owner-only graph and canonical event retrieval APIs; both bounded authenticated JSON read contracts now exist.
+3. Connect bridge-specific live adapters only where both chain-side transfer identities can be independently anchored.
+4. Wire the trusted verdict-key registry into production verdict-reference creation; the verification contract now exists but the legacy unverified projection remains the default for callers that do not supply server-owned trust material.
+5. Expand live node telemetry persistence for EVM beacon/execution and Bitcoin Core/PoW collectors without inventing missing geography or client identity.
 
 ## Product principle
 

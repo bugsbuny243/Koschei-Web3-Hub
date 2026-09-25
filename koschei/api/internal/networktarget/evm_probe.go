@@ -24,17 +24,19 @@ const (
 var eip7702DelegationPrefix = []byte{0xef, 0x01, 0x00}
 
 type EVMProbeResult struct {
-	SchemaVersion     string     `json:"schema_version"`
-	Resolution        Resolution `json:"resolution"`
-	ChainID           string     `json:"chain_id"`
-	ExpectedChainID   string     `json:"expected_chain_id"`
-	ContractCodeState string     `json:"contract_code_state"`
-	ContractCodeHash  string     `json:"contract_code_sha256,omitempty"`
-	DelegationState   string     `json:"delegation_state"`
-	DelegationTarget  string     `json:"delegation_target,omitempty"`
-	AnalysisPerformed bool       `json:"analysis_performed"`
-	EvidenceStatus    string     `json:"evidence_status"`
-	LiveAvailability  string     `json:"live_availability"`
+	SchemaVersion              string     `json:"schema_version"`
+	Resolution                 Resolution `json:"resolution"`
+	ChainID                    string     `json:"chain_id"`
+	ExpectedChainID            string     `json:"expected_chain_id"`
+	ChainIDResponseSHA256      string     `json:"chain_id_response_sha256,omitempty"`
+	ContractCodeState          string     `json:"contract_code_state"`
+	ContractCodeHash           string     `json:"contract_code_sha256,omitempty"`
+	ContractCodeResponseSHA256 string     `json:"contract_code_response_sha256,omitempty"`
+	DelegationState            string     `json:"delegation_state"`
+	DelegationTarget           string     `json:"delegation_target,omitempty"`
+	AnalysisPerformed          bool       `json:"analysis_performed"`
+	EvidenceStatus             string     `json:"evidence_status"`
+	LiveAvailability           string     `json:"live_availability"`
 }
 
 type evmRPCRequest struct {
@@ -95,7 +97,7 @@ func ProbeEVM(ctx context.Context, client *http.Client, endpoint string, resolut
 		client = &http.Client{Timeout: 8 * time.Second}
 	}
 
-	chainID, err := evmRPCString(ctx, client, endpoint, 1, "eth_chainId", nil)
+	chainID, chainIDResponseSHA256, err := evmRPCStringWithDigest(ctx, client, endpoint, 1, "eth_chainId", nil)
 	if err != nil {
 		return EVMProbeResult{}, fmt.Errorf("evm_chain_id_unavailable: %w", err)
 	}
@@ -104,7 +106,7 @@ func ProbeEVM(ctx context.Context, client *http.Client, endpoint string, resolut
 		return EVMProbeResult{}, fmt.Errorf("evm_rpc_network_mismatch")
 	}
 
-	code, err := evmRPCString(ctx, client, endpoint, 2, "eth_getCode", []any{strings.ToLower(resolution.Address), "latest"})
+	code, contractCodeResponseSHA256, err := evmRPCStringWithDigest(ctx, client, endpoint, 2, "eth_getCode", []any{strings.ToLower(resolution.Address), "latest"})
 	if err != nil {
 		return EVMProbeResult{}, fmt.Errorf("evm_contract_code_unavailable: %w", err)
 	}
@@ -138,52 +140,67 @@ func ProbeEVM(ctx context.Context, client *http.Client, endpoint string, resolut
 	resolution.EvidenceStatus = "observed"
 	resolution.LiveAvailability = "checked"
 	return EVMProbeResult{
-		SchemaVersion:     SchemaVersion,
-		Resolution:        resolution,
-		ChainID:           chainID,
-		ExpectedChainID:   expectedChainID,
-		ContractCodeState: state,
-		ContractCodeHash:  codeHash,
-		DelegationState:   delegationState,
-		DelegationTarget:  delegationTarget,
-		AnalysisPerformed: true,
-		EvidenceStatus:    "observed",
-		LiveAvailability:  "checked",
+		SchemaVersion:              SchemaVersion,
+		Resolution:                 resolution,
+		ChainID:                    chainID,
+		ExpectedChainID:            expectedChainID,
+		ChainIDResponseSHA256:      chainIDResponseSHA256,
+		ContractCodeState:          state,
+		ContractCodeHash:           codeHash,
+		ContractCodeResponseSHA256: contractCodeResponseSHA256,
+		DelegationState:            delegationState,
+		DelegationTarget:           delegationTarget,
+		AnalysisPerformed:          true,
+		EvidenceStatus:             "observed",
+		LiveAvailability:           "checked",
 	}, nil
 }
 
 func evmRPCString(ctx context.Context, client *http.Client, endpoint string, id int, method string, params []any) (string, error) {
+	result, _, err := evmRPCStringWithDigest(ctx, client, endpoint, id, method, params)
+	return result, err
+}
+
+func evmRPCStringWithDigest(ctx context.Context, client *http.Client, endpoint string, id int, method string, params []any) (string, string, error) {
 	payload, err := json.Marshal(evmRPCRequest{JSONRPC: "2.0", ID: id, Method: method, Params: params})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return "", fmt.Errorf("rpc_status_%d", resp.StatusCode)
+		return "", "", fmt.Errorf("rpc_status_%d", resp.StatusCode)
 	}
+
 	limited := &io.LimitedReader{R: resp.Body, N: evmProbeResponseLimit + 1}
-	var decoded evmRPCResponse
-	if err := json.NewDecoder(limited).Decode(&decoded); err != nil {
-		return "", err
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		return "", "", err
 	}
 	if limited.N <= 0 {
-		return "", fmt.Errorf("rpc_response_too_large")
+		return "", "", fmt.Errorf("rpc_response_too_large")
+	}
+	responseDigest := sha256.Sum256(body)
+	responseSHA256 := hex.EncodeToString(responseDigest[:])
+
+	var decoded evmRPCResponse
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(&decoded); err != nil {
+		return "", "", err
 	}
 	if decoded.JSONRPC != "2.0" || decoded.ID != id || decoded.Error != nil || len(decoded.Result) == 0 {
-		return "", fmt.Errorf("rpc_response_invalid")
+		return "", "", fmt.Errorf("rpc_response_invalid")
 	}
 	var result string
 	if err := json.Unmarshal(decoded.Result, &result); err != nil || strings.TrimSpace(result) == "" {
-		return "", fmt.Errorf("rpc_result_invalid")
+		return "", "", fmt.Errorf("rpc_result_invalid")
 	}
-	return result, nil
+	return result, responseSHA256, nil
 }

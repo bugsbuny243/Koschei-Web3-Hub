@@ -2,6 +2,8 @@ package networktarget
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -97,5 +99,44 @@ func TestProbeEVMRequiresHTTPSConfiguredEndpoint(t *testing.T) {
 	resolution, _ := Resolve("ethereum-mainnet", "0x4444444444444444444444444444444444444444")
 	if _, err := ProbeEVM(context.Background(), http.DefaultClient, "http://127.0.0.1:8545", resolution); err == nil {
 		t.Fatal("non-HTTPS endpoint was accepted")
+	}
+}
+
+func TestProbeEVMCapturesExactRPCResponseDigests(t *testing.T) {
+	chainBody := []byte(`{"jsonrpc":"2.0","id":1,"result":"0x1"}`)
+	codeBody := []byte(`{"jsonrpc":"2.0","id":2,"result":"0x60016000"}`)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req evmRPCRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode rpc request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch req.Method {
+		case "eth_chainId":
+			_, _ = w.Write(chainBody)
+		case "eth_getCode":
+			_, _ = w.Write(codeBody)
+		default:
+			t.Fatalf("unexpected rpc method %q", req.Method)
+		}
+	}))
+	defer server.Close()
+
+	resolution, err := Resolve("ethereum-mainnet", "0x5555555555555555555555555555555555555555")
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := ProbeEVM(context.Background(), server.Client(), server.URL, resolution)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	chainDigest := sha256.Sum256(chainBody)
+	codeDigest := sha256.Sum256(codeBody)
+	if result.ChainIDResponseSHA256 != hex.EncodeToString(chainDigest[:]) {
+		t.Fatalf("chain response digest=%q", result.ChainIDResponseSHA256)
+	}
+	if result.ContractCodeResponseSHA256 != hex.EncodeToString(codeDigest[:]) {
+		t.Fatalf("code response digest=%q", result.ContractCodeResponseSHA256)
 	}
 }

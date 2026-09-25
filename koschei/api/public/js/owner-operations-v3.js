@@ -1,5 +1,6 @@
 (()=>{
 'use strict';
+if(window.__koscheiOwnerCanonicalV4)return;
 if(window.__koscheiOwnerOperationsV3)return;
 window.__koscheiOwnerOperationsV3=true;
 const ready=fn=>document.readyState==='loading'?document.addEventListener('DOMContentLoaded',fn,{once:true}):fn();

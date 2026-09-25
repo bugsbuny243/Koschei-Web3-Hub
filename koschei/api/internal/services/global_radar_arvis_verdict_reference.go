@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -106,4 +107,23 @@ func ProjectARVISSignedVerdictToGlobalRadar(
 		ProjectionState:        "authoritative_reference_only",
 		TrustBoundary:          "signature_requires_out_of_band_trusted_key_registry_for_independent_verification",
 	}, nil
+}
+
+func ProjectVerifiedARVISSignedVerdictToGlobalRadar(
+	subject IntelligenceSubject,
+	verdict UnifiedRadarVerdict,
+	decision IntelligenceDecision,
+	registry GlobalRadarTrustedVerdictRegistry,
+) (GlobalRadarVerdictReference, error) {
+	reference, err := ProjectARVISSignedVerdictToGlobalRadar(subject, verdict, decision)
+	if err != nil {
+		return GlobalRadarVerdictReference{}, err
+	}
+	if err := VerifyUnifiedRadarVerdictWithTrustedRegistry(verdict, registry); err != nil {
+		return GlobalRadarVerdictReference{}, fmt.Errorf("verify ARVIS verdict signature: %w", err)
+	}
+	reference.SignatureVerification = GlobalRadarVerifiedSignatureState
+	reference.ProjectionState = "authoritative_reference_signature_verified"
+	reference.TrustBoundary = "signature_verified_against_server_owned_trusted_key_registry"
+	return reference, nil
 }

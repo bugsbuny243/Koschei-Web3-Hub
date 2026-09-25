@@ -1,7 +1,10 @@
 package networktarget
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,18 +34,20 @@ type bitcoinAddressResponse struct {
 }
 
 type BitcoinProbeResult struct {
-	SchemaVersion       string     `json:"schema_version"`
-	Resolution          Resolution `json:"resolution"`
-	GenesisHash         string     `json:"genesis_hash"`
-	ExpectedGenesisHash string     `json:"expected_genesis_hash"`
-	ActivityState       string     `json:"activity_state"`
-	ConfirmedTXCount    int64      `json:"confirmed_tx_count"`
-	MempoolTXCount      int64      `json:"mempool_tx_count"`
-	FundedSats          int64      `json:"funded_sats"`
-	SpentSats           int64      `json:"spent_sats"`
-	AnalysisPerformed   bool       `json:"analysis_performed"`
-	EvidenceStatus      string     `json:"evidence_status"`
-	LiveAvailability    string     `json:"live_availability"`
+	SchemaVersion         string     `json:"schema_version"`
+	Resolution            Resolution `json:"resolution"`
+	GenesisHash           string     `json:"genesis_hash"`
+	ExpectedGenesisHash   string     `json:"expected_genesis_hash"`
+	GenesisResponseSHA256 string     `json:"genesis_response_sha256,omitempty"`
+	ActivityState         string     `json:"activity_state"`
+	ConfirmedTXCount      int64      `json:"confirmed_tx_count"`
+	MempoolTXCount        int64      `json:"mempool_tx_count"`
+	FundedSats            int64      `json:"funded_sats"`
+	SpentSats             int64      `json:"spent_sats"`
+	AddressResponseSHA256 string     `json:"address_response_sha256,omitempty"`
+	AnalysisPerformed     bool       `json:"analysis_performed"`
+	EvidenceStatus        string     `json:"evidence_status"`
+	LiveAvailability      string     `json:"live_availability"`
 }
 
 // ProbeBitcoin performs a narrow read-only observation through an
@@ -70,7 +75,7 @@ func ProbeBitcoin(ctx context.Context, client *http.Client, endpoint string, res
 		client = &http.Client{Timeout: 8 * time.Second}
 	}
 
-	genesisHash, err := bitcoinEsploraText(ctx, client, baseURL+"/block-height/0")
+	genesisHash, genesisResponseSHA256, err := bitcoinEsploraTextWithDigest(ctx, client, baseURL+"/block-height/0")
 	if err != nil {
 		return BitcoinProbeResult{}, fmt.Errorf("bitcoin_genesis_unavailable: %w", err)
 	}
@@ -80,7 +85,8 @@ func ProbeBitcoin(ctx context.Context, client *http.Client, endpoint string, res
 	}
 
 	var address bitcoinAddressResponse
-	if err := bitcoinEsploraJSON(ctx, client, baseURL+"/address/"+url.PathEscape(canonicalAddress), &address); err != nil {
+	addressResponseSHA256, err := bitcoinEsploraJSONWithDigest(ctx, client, baseURL+"/address/"+url.PathEscape(canonicalAddress), &address)
+	if err != nil {
 		return BitcoinProbeResult{}, fmt.Errorf("bitcoin_address_activity_unavailable: %w", err)
 	}
 	if strings.TrimSpace(address.Address) != "" && address.Address != canonicalAddress {
@@ -99,18 +105,20 @@ func ProbeBitcoin(ctx context.Context, client *http.Client, endpoint string, res
 	resolution.EvidenceStatus = "observed"
 	resolution.LiveAvailability = "checked"
 	return BitcoinProbeResult{
-		SchemaVersion:       SchemaVersion,
-		Resolution:          resolution,
-		GenesisHash:         genesisHash,
-		ExpectedGenesisHash: bitcoinMainnetGenesisHash,
-		ActivityState:       activityState,
-		ConfirmedTXCount:    address.ChainStats.TXCount,
-		MempoolTXCount:      address.MempoolStats.TXCount,
-		FundedSats:          address.ChainStats.FundedTXOSum + address.MempoolStats.FundedTXOSum,
-		SpentSats:           address.ChainStats.SpentTXOSum + address.MempoolStats.SpentTXOSum,
-		AnalysisPerformed:   true,
-		EvidenceStatus:      "observed",
-		LiveAvailability:    "checked",
+		SchemaVersion:         SchemaVersion,
+		Resolution:            resolution,
+		GenesisHash:           genesisHash,
+		ExpectedGenesisHash:   bitcoinMainnetGenesisHash,
+		GenesisResponseSHA256: genesisResponseSHA256,
+		ActivityState:         activityState,
+		ConfirmedTXCount:      address.ChainStats.TXCount,
+		MempoolTXCount:        address.MempoolStats.TXCount,
+		FundedSats:            address.ChainStats.FundedTXOSum + address.MempoolStats.FundedTXOSum,
+		SpentSats:             address.ChainStats.SpentTXOSum + address.MempoolStats.SpentTXOSum,
+		AddressResponseSHA256: addressResponseSHA256,
+		AnalysisPerformed:     true,
+		EvidenceStatus:        "observed",
+		LiveAvailability:      "checked",
 	}, nil
 }
 
@@ -128,6 +136,45 @@ func validBitcoinStats(stats bitcoinAddressStats) bool {
 }
 
 func bitcoinEsploraText(ctx context.Context, client *http.Client, endpoint string) (string, error) {
+	value, _, err := bitcoinEsploraTextWithDigest(ctx, client, endpoint)
+	return value, err
+}
+
+func bitcoinEsploraTextWithDigest(ctx context.Context, client *http.Client, endpoint string) (string, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", "", err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return "", "", fmt.Errorf("esplora_status_%d", resp.StatusCode)
+	}
+	limited := &io.LimitedReader{R: resp.Body, N: 256 + 1}
+	body, err := io.ReadAll(limited)
+	if err != nil {
+		return "", "", err
+	}
+	if limited.N <= 0 {
+		return "", "", fmt.Errorf("esplora_response_too_large")
+	}
+	value := strings.TrimSpace(string(body))
+	if value == "" {
+		return "", "", fmt.Errorf("esplora_response_invalid")
+	}
+	sum := sha256.Sum256(body)
+	return value, hex.EncodeToString(sum[:]), nil
+}
+
+func bitcoinEsploraJSON(ctx context.Context, client *http.Client, endpoint string, target any) error {
+	_, err := bitcoinEsploraJSONWithDigest(ctx, client, endpoint, target)
+	return err
+}
+
+func bitcoinEsploraJSONWithDigest(ctx context.Context, client *http.Client, endpoint string, target any) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return "", err
@@ -140,7 +187,7 @@ func bitcoinEsploraText(ctx context.Context, client *http.Client, endpoint strin
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return "", fmt.Errorf("esplora_status_%d", resp.StatusCode)
 	}
-	limited := &io.LimitedReader{R: resp.Body, N: 256 + 1}
+	limited := &io.LimitedReader{R: resp.Body, N: bitcoinProbeResponseLimit + 1}
 	body, err := io.ReadAll(limited)
 	if err != nil {
 		return "", err
@@ -148,32 +195,9 @@ func bitcoinEsploraText(ctx context.Context, client *http.Client, endpoint strin
 	if limited.N <= 0 {
 		return "", fmt.Errorf("esplora_response_too_large")
 	}
-	value := strings.TrimSpace(string(body))
-	if value == "" {
-		return "", fmt.Errorf("esplora_response_invalid")
+	if err := json.NewDecoder(bytes.NewReader(body)).Decode(target); err != nil {
+		return "", err
 	}
-	return value, nil
-}
-
-func bitcoinEsploraJSON(ctx context.Context, client *http.Client, endpoint string, target any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("esplora_status_%d", resp.StatusCode)
-	}
-	limited := &io.LimitedReader{R: resp.Body, N: bitcoinProbeResponseLimit + 1}
-	if err := json.NewDecoder(limited).Decode(target); err != nil {
-		return err
-	}
-	if limited.N <= 0 {
-		return fmt.Errorf("esplora_response_too_large")
-	}
-	return nil
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:]), nil
 }

@@ -64,13 +64,25 @@ chain adapter
 
 A future adapter will promote correlated radar events into `koschei.security-evidence/v1` only when the evidence contract requirements are satisfied.
 
+## Durable event ledger
+
+ClickHouse migration `006_global_radar_events.sql` defines an append-first ledger keyed by the canonical `event_sha256`. Exact delivery replay converges through `ReplacingMergeTree(ingest_version)`, while distinct canonical event digests remain separate historical records.
+
+The writer re-verifies every event digest before any network write, canonicalizes the event again, stores the complete canonical event JSON, and binds those stored bytes with a separate payload SHA-256. The ledger does not create a risk grade or promote evidence state.
+
+The EVM, Bitcoin, Sui and Aptos intelligence probes can now emit this envelope directly from exact native response-byte digests. EVM binds `eth_chainId` and `eth_getCode` separately; Bitcoin binds mainnet genesis verification and address activity separately. Optional persistence is controlled independently by `KOSCHEI_GLOBAL_RADAR_EVENT_CLICKHOUSE_ENABLED=1`; startup verifies migration 006 before the sink is accepted.
+
+Graph snapshot persistence and event-ledger persistence are separate replay-convergent writes rather than a distributed transaction. If either configured sink fails, the request fails closed; retrying the same canonical evidence converges by stable snapshot/event identity.
+
+A producer must already possess the real source digest required by the event contract; normalized probe output is not retroactively relabeled as raw source evidence.
+
 ## Next step
 
 Build source adapters that emit this envelope from:
 
 - Solana live stream observations;
-- EVM transaction and contract probes;
-- Bitcoin address/network observations;
-- Sui and Aptos identity/network observations.
+- EVM transaction and contract probes. The address/code probe now preserves exact `eth_chainId` and `eth_getCode` response-byte SHA-256 values and can build an event directly from those native digests;
+- Bitcoin address/network observations. The Esplora address probe now preserves separate exact response-byte SHA-256 values for mainnet genesis verification and address activity;
+- Sui and Aptos identity/network observations. Both probes now retain the exact bounded identity-response SHA-256 needed for native provenance.
 
 After that, the same event stream becomes the input to the cross-chain entity graph.

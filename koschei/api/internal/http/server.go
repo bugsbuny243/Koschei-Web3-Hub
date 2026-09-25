@@ -17,12 +17,14 @@ import (
 )
 
 type serverConfig struct {
-	dbRead        *sql.DB
-	entitlementDB *sql.DB
-	cache         cache.Cache
-	solanaRPC     *web3.SolanaRPC
-	jobStore      *jobs.Store
-	jobQueue      jobs.Queue
+	dbRead                 *sql.DB
+	entitlementDB          *sql.DB
+	cache                  cache.Cache
+	solanaRPC              *web3.SolanaRPC
+	jobStore               *jobs.Store
+	jobQueue               jobs.Queue
+	globalRadarGraphReader GlobalRadarGraphReader
+	globalRadarEventReader GlobalRadarEventReader
 }
 
 type Option func(*serverConfig)
@@ -44,6 +46,12 @@ func WithCache(value cache.Cache) Option {
 func WithSolanaRPC(rpc *web3.SolanaRPC) Option { return func(c *serverConfig) { c.solanaRPC = rpc } }
 func WithJobStore(store *jobs.Store) Option    { return func(c *serverConfig) { c.jobStore = store } }
 func WithJobQueue(queue jobs.Queue) Option     { return func(c *serverConfig) { c.jobQueue = queue } }
+func WithGlobalRadarGraphReader(reader GlobalRadarGraphReader) Option {
+	return func(c *serverConfig) { c.globalRadarGraphReader = reader }
+}
+func WithGlobalRadarEventReader(reader GlobalRadarEventReader) Option {
+	return func(c *serverConfig) { c.globalRadarEventReader = reader }
+}
 
 func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin string, staticDir string, opts ...Option) http.Handler {
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
@@ -88,6 +96,8 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	registerCoreRoutes(mux, h, planAccess)
 	registerAccountRoutes(mux, h, planTierAccess)
 	registerOwnerRoutes(mux, h, staticDir)
+	mux.HandleFunc("/api/owner/radar/global/records", ownerOnly(h, method("GET", ownerGlobalRadarGraphRecords(config.globalRadarGraphReader))))
+	mux.HandleFunc("/api/owner/radar/global/events", ownerOnly(h, method("GET", ownerGlobalRadarEvents(config.globalRadarEventReader))))
 	registerDefenseOSRoutes(mux, h)
 	registerProductRoutes(mux, h, planTier, planTierAccess)
 	registerDeveloperAPIRoutes(mux, h, apiKeyProfessional, apiKeyProfessionalMetered)
@@ -144,6 +154,7 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/api/owner/logout", ownerOnly(h, method("POST", h.OwnerLogout)))
 	mux.HandleFunc("/api/owner/command-center", ownerOnly(h, method("GET", h.OwnerCommandCenterStatus)))
 	mux.HandleFunc("/api/owner/operations", ownerOnly(h, method("GET", h.OwnerOperationsStatus)))
+	mux.HandleFunc("/api/owner/token-telemetry", ownerOnly(h, method("GET", h.OwnerTokenTelemetry)))
 	mux.HandleFunc("/api/owner/arvis", requiresDB(h, ownerOnly(h, method("GET", h.OwnerRadarOverviewFast))))
 	mux.HandleFunc("/api/owner/arvis/scan", ownerOnly(h, method("POST", h.OwnerUnifiedRadarScan)))
 	mux.HandleFunc("/api/owner/radar/unified", ownerOnly(h, method("POST", h.OwnerUnifiedRadarScan)))
