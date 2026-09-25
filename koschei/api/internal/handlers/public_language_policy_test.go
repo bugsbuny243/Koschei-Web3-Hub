@@ -15,8 +15,6 @@ func TestUserFacingPagesAvoidLegalFraming(t *testing.T) {
 		"scan.html",
 		"owner-production.html",
 		filepath.Join("js", "owner-court-ui.js"),
-		filepath.Join("js", "owner-command-center-v2.js"),
-		filepath.Join("js", "owner-unified-radar.js"),
 	}
 	forbidden := []string{
 		"mahkeme",

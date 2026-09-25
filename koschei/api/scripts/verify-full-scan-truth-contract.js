@@ -1,6 +1,6 @@
 'use strict';
 
-const truth=require('../public/js/full-scan-truth-contract.js');
+const truth=require('./lib/full-scan-truth-contract.js');
 
 const emptyActor={actor_investigation:{wallet:'',dossier:{tokens:[],related_actors:[],evidence:[],track:{created_token_count:0,dominant_holder_token_count:0,traded_token_count:0,related_actor_count:0,verified_evidence_count:0,observed_evidence_count:0}}}};
 if(!truth.actorDossierEmpty(emptyActor))throw new Error('empty actor dossier was not classified as empty');
