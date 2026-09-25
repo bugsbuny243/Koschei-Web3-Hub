@@ -13,26 +13,26 @@ func TestBuildEVMBlockIngestEventsProducesCanonicalBlockTransactionAndLogEvents(
 	parentHash := "0x" + strings.Repeat("b", 64)
 	txHash := "0x" + strings.Repeat("c", 64)
 	result := networktarget.EVMBlockIngestResult{
-		NetworkID: "ethereum-mainnet",
-		ChainID: "0x1",
-		Height: 42,
-		Hash: blockHash,
-		ParentHash: parentHash,
-		BlockTimestamp: time.Unix(1700000000, 0).UTC(),
-		ObservedAt: time.Date(2026, 9, 25, 13, 0, 0, 0, time.UTC),
+		NetworkID:         "ethereum-mainnet",
+		ChainID:           "0x1",
+		Height:            42,
+		Hash:              blockHash,
+		ParentHash:        parentHash,
+		BlockTimestamp:    time.Unix(1700000000, 0).UTC(),
+		ObservedAt:        time.Date(2026, 9, 25, 13, 0, 0, 0, time.UTC),
 		TransactionHashes: []string{txHash},
 		Logs: []networktarget.EVMLogObservation{{
-			Address: "0x" + strings.Repeat("d", 40),
-			Topics: []string{"0x" + strings.Repeat("e", 64)},
-			DataSHA256: strings.Repeat("f", 64),
-			TxHash: txHash,
-			BlockHash: blockHash,
+			Address:     "0x" + strings.Repeat("d", 40),
+			Topics:      []string{"0x" + strings.Repeat("e", 64)},
+			DataSHA256:  strings.Repeat("f", 64),
+			TxHash:      txHash,
+			BlockHash:   blockHash,
 			BlockNumber: 42,
-			LogIndex: 0,
+			LogIndex:    0,
 		}},
 		ChainIDResponseSHA256: strings.Repeat("1", 64),
-		BlockResponseSHA256: strings.Repeat("2", 64),
-		LogsResponseSHA256: strings.Repeat("3", 64),
+		BlockResponseSHA256:   strings.Repeat("2", 64),
+		LogsResponseSHA256:    strings.Repeat("3", 64),
 	}
 
 	events, err := BuildEVMBlockIngestEvents("evm-block-ingest-adapter", result)
@@ -57,16 +57,16 @@ func TestBuildEVMBlockIngestEventsProducesCanonicalBlockTransactionAndLogEvents(
 
 func TestBuildBitcoinBlockIngestEventsProducesCanonicalBlockAndTransactionEvents(t *testing.T) {
 	result := networktarget.BitcoinBlockIngestResult{
-		NetworkID: "bitcoin-mainnet",
-		Height: 100,
-		Hash: strings.Repeat("a", 64),
-		PreviousHash: strings.Repeat("b", 64),
-		BlockTime: time.Unix(1700000000, 0).UTC(),
-		ObservedAt: time.Date(2026, 9, 25, 13, 0, 0, 0, time.UTC),
-		TransactionIDs: []string{strings.Repeat("c", 64)},
+		NetworkID:                    "bitcoin-mainnet",
+		Height:                       100,
+		Hash:                         strings.Repeat("a", 64),
+		PreviousHash:                 strings.Repeat("b", 64),
+		BlockTime:                    time.Unix(1700000000, 0).UTC(),
+		ObservedAt:                   time.Date(2026, 9, 25, 13, 0, 0, 0, time.UTC),
+		TransactionIDs:               []string{strings.Repeat("c", 64)},
 		BlockchainInfoResponseSHA256: strings.Repeat("1", 64),
-		BlockHashResponseSHA256: strings.Repeat("2", 64),
-		BlockResponseSHA256: strings.Repeat("3", 64),
+		BlockHashResponseSHA256:      strings.Repeat("2", 64),
+		BlockResponseSHA256:          strings.Repeat("3", 64),
 	}
 
 	events, err := BuildBitcoinBlockIngestEvents("bitcoin-block-ingest-adapter", result)
