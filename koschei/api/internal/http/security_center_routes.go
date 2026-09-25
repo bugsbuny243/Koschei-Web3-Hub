@@ -5,12 +5,26 @@ import (
 	"html/template"
 	"net/http"
 
+	"koschei/api/internal/runtimehealth"
 	"koschei/api/internal/securitycenter"
 )
 
-func registerSecurityCenterRoutes(mux *http.ServeMux) {
+func registerSecurityCenterRoutes(mux *http.ServeMux, registries ...*runtimehealth.Registry) {
+	var registry *runtimehealth.Registry
+	if len(registries) > 0 {
+		registry = registries[0]
+	}
 	mux.HandleFunc("/fabric/security-center/capabilities", method(http.MethodGet, securityCenterCapabilities))
+	mux.HandleFunc("/fabric/security-center/runtime-health", method(http.MethodGet, securityCenterRuntimeHealth(registry)))
 	mux.HandleFunc("/fabric/security-center", method(http.MethodGet, securityCenterSurface))
+}
+
+func securityCenterRuntimeHealth(registry *runtimehealth.Registry) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(registry.Snapshot())
+	}
 }
 
 func securityCenterCapabilities(w http.ResponseWriter, _ *http.Request) {
