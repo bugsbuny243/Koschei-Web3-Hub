@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -159,4 +158,3 @@ func validBitcoinIngestHash(value string) bool {
 	return err == nil
 }
 
-var _ = strconv.FormatUint
