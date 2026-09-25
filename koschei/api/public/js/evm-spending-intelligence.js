@@ -10,6 +10,7 @@ const spender=document.getElementById('evmSpendingSpender');
 const submit=document.getElementById('evmSpendingSubmit');
 const status=document.getElementById('evmSpendingStatus');
 const result=document.getElementById('evmSpendingResult');
+const empty=document.getElementById('evmSpendingEmpty');
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const short=value=>{const text=String(value||'');return text.length>26?`${text.slice(0,12)}…${text.slice(-10)}`:text};
 const validAddress=value=>/^0x[0-9a-fA-F]{40}$/.test(String(value||'').trim());
@@ -40,6 +41,7 @@ function render(payload){
   const reasons=Array.isArray(data.reasons)?data.reasons:[];
   const authority=data.spender_authority||null;
   result.hidden=false;
+  if(empty)empty.hidden=true;
   result.innerHTML=`
     <div class="esi-summary">
       <div><span>Current allowance</span><strong>${esc(data.amount||'0')}</strong><small>raw ERC-20 uint256 amount</small></div>
@@ -66,6 +68,7 @@ form.addEventListener('submit',async event=>{
     status.textContent='Token, owner and spender must each be a 20-byte EVM address.';
     status.dataset.state='error';
     result.hidden=true;
+    if(empty)empty.hidden=false;
     return;
   }
   submit.disabled=true;
@@ -73,6 +76,7 @@ form.addEventListener('submit',async event=>{
   status.textContent='Reading current allowance and spender authority with read-only RPC calls…';
   status.dataset.state='loading';
   result.hidden=true;
+  if(empty)empty.hidden=false;
   try{
     const response=await fetch('/api/scan/approval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});
     const data=await response.json().catch(()=>({}));
