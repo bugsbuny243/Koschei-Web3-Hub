@@ -100,7 +100,9 @@ func main() {
 		log.Fatalf("CRITICAL: configured Global Radar ClickHouse persistence is unavailable: %v", err)
 	}
 	runtimeHealth.Register("storage.global-radar-graph-clickhouse", "storage", "", globalRadarSink != nil)
-	if globalRadarSink != nil { runtimeHealth.Success("storage.global-radar-graph-clickhouse", 0) }
+	if globalRadarSink != nil {
+		runtimeHealth.Success("storage.global-radar-graph-clickhouse", 0)
+	}
 	globalRadarEventSink, err := buildGlobalRadarEventSink(appCtx)
 	if err != nil {
 		runtimeHealth.Register("storage.global-radar-event-clickhouse", "storage", "", true)
@@ -108,12 +110,18 @@ func main() {
 		log.Fatalf("CRITICAL: configured Global Radar event ClickHouse persistence is unavailable: %v", err)
 	}
 	runtimeHealth.Register("storage.global-radar-event-clickhouse", "storage", "", globalRadarEventSink != nil)
-	if globalRadarEventSink != nil { runtimeHealth.Success("storage.global-radar-event-clickhouse", 0) }
+	if globalRadarEventSink != nil {
+		runtimeHealth.Success("storage.global-radar-event-clickhouse", 0)
+	}
 	globalRadarBackground, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarSink, globalRadarEventSink)
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar background telemetry is invalid: %v", err)
 	}
-	if globalRadarBackground != nil { globalRadarBackground.Health = runtimeHealth } else { runtimeHealth.Register("worker.global-radar-background-telemetry", "worker", "", false) }
+	if globalRadarBackground != nil {
+		globalRadarBackground.Health = runtimeHealth
+	} else {
+		runtimeHealth.Register("worker.global-radar-background-telemetry", "worker", "", false)
+	}
 	globalRadarHeadIngest, err := buildGlobalRadarHeadIngestConfig(globalRadarEventSink, runtimeHealth)
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar head ingest is invalid: %v", err)
