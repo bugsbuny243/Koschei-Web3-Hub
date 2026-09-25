@@ -14,36 +14,36 @@ import (
 )
 
 const (
-	evmIngestResponseLimit      = 8 * 1024 * 1024
-	MaxEVMIngestTransactions    = 5000
-	MaxEVMIngestLogs            = 10000
-	MaxEVMIngestTopicsPerLog    = 16
+	evmIngestResponseLimit   = 8 * 1024 * 1024
+	MaxEVMIngestTransactions = 5000
+	MaxEVMIngestLogs         = 10000
+	MaxEVMIngestTopicsPerLog = 16
 )
 
 type EVMLogObservation struct {
-	Address    string   `json:"address"`
-	Topics     []string `json:"topics"`
-	DataSHA256 string   `json:"data_sha256"`
-	TxHash     string   `json:"transaction_hash"`
-	BlockHash  string   `json:"block_hash"`
-	BlockNumber uint64  `json:"block_number"`
-	LogIndex   uint64   `json:"log_index"`
-	Removed    bool     `json:"removed"`
+	Address     string   `json:"address"`
+	Topics      []string `json:"topics"`
+	DataSHA256  string   `json:"data_sha256"`
+	TxHash      string   `json:"transaction_hash"`
+	BlockHash   string   `json:"block_hash"`
+	BlockNumber uint64   `json:"block_number"`
+	LogIndex    uint64   `json:"log_index"`
+	Removed     bool     `json:"removed"`
 }
 
 type EVMBlockIngestResult struct {
-	NetworkID                 string              `json:"network_id"`
-	ChainID                   string              `json:"chain_id"`
-	Height                    uint64              `json:"height"`
-	Hash                      string              `json:"hash"`
-	ParentHash                string              `json:"parent_hash"`
-	BlockTimestamp            time.Time           `json:"block_timestamp"`
-	ObservedAt                time.Time           `json:"observed_at"`
-	TransactionHashes         []string            `json:"transaction_hashes"`
-	Logs                      []EVMLogObservation `json:"logs"`
-	ChainIDResponseSHA256     string              `json:"chain_id_response_sha256"`
-	BlockResponseSHA256       string              `json:"block_response_sha256"`
-	LogsResponseSHA256        string              `json:"logs_response_sha256"`
+	NetworkID             string              `json:"network_id"`
+	ChainID               string              `json:"chain_id"`
+	Height                uint64              `json:"height"`
+	Hash                  string              `json:"hash"`
+	ParentHash            string              `json:"parent_hash"`
+	BlockTimestamp        time.Time           `json:"block_timestamp"`
+	ObservedAt            time.Time           `json:"observed_at"`
+	TransactionHashes     []string            `json:"transaction_hashes"`
+	Logs                  []EVMLogObservation `json:"logs"`
+	ChainIDResponseSHA256 string              `json:"chain_id_response_sha256"`
+	BlockResponseSHA256   string              `json:"block_response_sha256"`
+	LogsResponseSHA256    string              `json:"logs_response_sha256"`
 }
 
 type evmBlockIngestWire struct {
