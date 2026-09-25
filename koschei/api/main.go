@@ -18,6 +18,7 @@ import (
 	"koschei/api/internal/handlers"
 	apihttp "koschei/api/internal/http"
 	"koschei/api/internal/jobs"
+	"koschei/api/internal/runtimehealth"
 	"koschei/api/internal/services"
 	"koschei/api/internal/web3"
 )
@@ -38,6 +39,7 @@ func main() {
 
 	appCtx, stopApp := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopApp()
+	runtimeHealth := runtimehealth.New()
 
 	// The Web3 runtime remains stateless by default. Durable application
 	// persistence is opt-in through APP_DATABASE_URL so deployments that need
@@ -47,11 +49,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: configured application persistence is unavailable: %v", err)
 	}
+	runtimeHealth.Register("storage.application-postgres", "storage", "", appDB != nil)
 	if appDB != nil {
 		defer appDB.Close()
 		if appReadDB != nil && appReadDB != appDB {
 			defer appReadDB.Close()
 		}
+		runtimeHealth.Success("storage.application-postgres", 0)
 		log.Printf("application persistence connected: DB-backed customer and owner capabilities available")
 	} else {
 		log.Printf("stateless Web3 runtime enabled: APP_DATABASE_URL is not set")
@@ -61,8 +65,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: configured entitlement ledger is unavailable: %v", err)
 	}
+	runtimeHealth.Register("storage.entitlement-postgres", "storage", "", entitlementDB != nil)
 	if entitlementDB != nil {
 		defer entitlementDB.Close()
+		runtimeHealth.Success("storage.entitlement-postgres", 0)
 		log.Printf("entitlement ledger connected: paid-access enforcement available")
 	} else {
 		log.Printf("ENTITLEMENT_DATABASE_URL is not set: paid customer operations remain fail-closed")
@@ -89,17 +95,30 @@ func main() {
 	}
 	globalRadarSink, err := buildGlobalRadarSnapshotSink(appCtx)
 	if err != nil {
+		runtimeHealth.Register("storage.global-radar-graph-clickhouse", "storage", "", true)
+		runtimeHealth.Failure("storage.global-radar-graph-clickhouse", err)
 		log.Fatalf("CRITICAL: configured Global Radar ClickHouse persistence is unavailable: %v", err)
 	}
+	runtimeHealth.Register("storage.global-radar-graph-clickhouse", "storage", "", globalRadarSink != nil)
+	if globalRadarSink != nil { runtimeHealth.Success("storage.global-radar-graph-clickhouse", 0) }
 	globalRadarEventSink, err := buildGlobalRadarEventSink(appCtx)
 	if err != nil {
+		runtimeHealth.Register("storage.global-radar-event-clickhouse", "storage", "", true)
+		runtimeHealth.Failure("storage.global-radar-event-clickhouse", err)
 		log.Fatalf("CRITICAL: configured Global Radar event ClickHouse persistence is unavailable: %v", err)
 	}
+	runtimeHealth.Register("storage.global-radar-event-clickhouse", "storage", "", globalRadarEventSink != nil)
+	if globalRadarEventSink != nil { runtimeHealth.Success("storage.global-radar-event-clickhouse", 0) }
 	globalRadarBackground, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarSink, globalRadarEventSink)
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar background telemetry is invalid: %v", err)
 	}
-	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore, globalRadarBackground)
+	if globalRadarBackground != nil { globalRadarBackground.Health = runtimeHealth } else { runtimeHealth.Register("worker.global-radar-background-telemetry", "worker", "", false) }
+	globalRadarHeadIngest, err := buildGlobalRadarHeadIngestConfig(globalRadarEventSink, runtimeHealth)
+	if err != nil {
+		log.Fatalf("CRITICAL: configured Global Radar head ingest is invalid: %v", err)
+	}
+	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore, globalRadarBackground, globalRadarHeadIngest)
 	defer stopBackgroundRuntime()
 	log.Printf("runtime role=%s http=%t background_workers=%t", role, role.servesHTTP(), role.runsBackgroundWorkers())
 	if !role.servesHTTP() {
@@ -141,6 +160,7 @@ func main() {
 	),
 		apihttp.WithGlobalRadarSnapshotSink(globalRadarSink),
 		apihttp.WithGlobalRadarEventSink(globalRadarEventSink),
+		apihttp.WithRuntimeHealthRegistry(runtimeHealth),
 	))
 	server := newHTTPServer(port, handler)
 
