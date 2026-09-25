@@ -129,6 +129,7 @@ func registerFabricRoutes(mux *http.ServeMux, configs ...fabricConfig) {
 		config = configs[0]
 	}
 	registerNetworkTargetRoutes(mux)
+	registerSecurityCenterRoutes(mux)
 	mux.HandleFunc("/fabric/networks/live", method(http.MethodGet, networkProbePage))
 	mux.HandleFunc("/fabric/networks/deployment", method(http.MethodGet, networkDeploymentCatalogHandler))
 	mux.HandleFunc("/fabric/networks/probe", method(http.MethodPost, networkTargetProbe))
@@ -161,7 +162,7 @@ func MountFabric(base http.Handler, opts ...FabricOption) http.Handler {
 	fabric := securityHeaders(fabricMux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/fabric", "/fabric/capabilities", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/radar", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe", "/fabric/networks/probe/intelligence", "/fabric/radar/global":
+		case "/fabric", "/fabric/capabilities", "/fabric/security-center", "/fabric/security-center/capabilities", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/radar", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe", "/fabric/networks/probe/intelligence", "/fabric/radar/global":
 			fabric.ServeHTTP(w, r)
 		default:
 			base.ServeHTTP(w, r)
