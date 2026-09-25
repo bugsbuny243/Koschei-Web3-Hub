@@ -207,7 +207,6 @@ func (c *Client) VerifyGlobalRadarIngestCheckpointSchema(ctx context.Context) er
 	return nil
 }
 
-
 func (c *Client) LoadGlobalRadarCanonicalCheckpointAtHeight(ctx context.Context, cursorKey string, height uint64) (radarcursor.Checkpoint, bool, error) {
 	if c == nil {
 		return radarcursor.Checkpoint{}, false, fmt.Errorf("ClickHouse client is unavailable")
