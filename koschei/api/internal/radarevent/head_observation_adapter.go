@@ -14,13 +14,13 @@ func BuildEVMHeadBlockEvent(producer string, result networktarget.EVMHeadObserva
 	}
 	height := strconv.FormatUint(result.HeadBlock, 10)
 	return (Event{
-		Producer: producer,
-		Kind: KindBlock,
-		NetworkID: result.NetworkID,
-		SubjectKind: "block",
-		SubjectID: result.NetworkID + ":height:" + height,
+		Producer:         producer,
+		Kind:             KindBlock,
+		NetworkID:        result.NetworkID,
+		SubjectKind:      "block",
+		SubjectID:        result.NetworkID + ":height:" + height,
 		ObservedAtUnixMS: result.ObservedAt.UnixMilli(),
-		State: securityevidence.StateObserved,
+		State:            securityevidence.StateObserved,
 		NativeRefs: []NativeReference{
 			{Kind: "block_height", Value: height},
 			{Kind: "chain_id", Value: result.ChainID},
@@ -39,15 +39,15 @@ func BuildBitcoinHeadBlockEvent(producer string, result networktarget.BitcoinHea
 	}
 	height := strconv.FormatUint(result.HeadBlock, 10)
 	return (Event{
-		Producer: producer,
-		Kind: KindBlock,
-		NetworkID: result.NetworkID,
-		SubjectKind: "block",
-		SubjectID: result.NetworkID + ":height:" + height,
+		Producer:         producer,
+		Kind:             KindBlock,
+		NetworkID:        result.NetworkID,
+		SubjectKind:      "block",
+		SubjectID:        result.NetworkID + ":height:" + height,
 		ObservedAtUnixMS: result.ObservedAt.UnixMilli(),
-		State: securityevidence.StateObserved,
-		NativeRefs: []NativeReference{{Kind: "block_height", Value: height}},
-		SourceDigests: []string{result.BlockchainInfoResponseSHA256},
+		State:            securityevidence.StateObserved,
+		NativeRefs:       []NativeReference{{Kind: "block_height", Value: height}},
+		SourceDigests:    []string{result.BlockchainInfoResponseSHA256},
 		Facts: []Fact{
 			{Key: "head_height", Value: height, Unit: "block", EvidenceSHA256: result.BlockchainInfoResponseSHA256},
 			{Key: "observation_scope", Value: "single_bitcoin_core_head"},
