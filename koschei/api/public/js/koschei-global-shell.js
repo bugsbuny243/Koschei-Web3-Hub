@@ -106,6 +106,16 @@
     document.head.appendChild(script);
   }
 
+  function loadFeedbackButton(current){
+    if(['/login','/register','/forgot-password','/reset-password','/owner','/owner-production'].includes(current))return;
+    if(document.getElementById('koscheiFeedbackButton')||document.querySelector('script[data-koschei-feedback-button]'))return;
+    var script=document.createElement('script');
+    script.src='/js/feedback-button.js?v=1';
+    script.async=true;
+    script.dataset.koscheiFeedbackButton='1';
+    document.head.appendChild(script);
+  }
+
   function isActiveNavItem(href,current){
     var mode=new URLSearchParams(location.search||'').get('mode');
     if(href==='/scan?mode=deep')return current==='/scan'&&mode==='deep';
@@ -132,6 +142,7 @@
     translate(document.body);
     loadInvestigationShare(current);
     loadProfessionalDeepScanRoute(current);
+    loadFeedbackButton(current);
     var observer=new MutationObserver(function(records){records.forEach(function(record){record.addedNodes.forEach(function(node){if(node.nodeType===1)translate(node);else if(node.nodeType===3&&node.parentElement){var next=translateString(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;}});});});
     observer.observe(document.body,{childList:true,subtree:true,characterData:false});
   });
