@@ -37,10 +37,10 @@ type Entry struct {
 }
 
 type Snapshot struct {
-	SchemaVersion string         `json:"schema_version"`
-	GeneratedAt   time.Time      `json:"generated_at"`
-	Entries       []Entry        `json:"entries"`
-	Counts        map[State]int  `json:"counts"`
+	SchemaVersion string        `json:"schema_version"`
+	GeneratedAt   time.Time     `json:"generated_at"`
+	Entries       []Entry       `json:"entries"`
+	Counts        map[State]int `json:"counts"`
 }
 
 type Registry struct {
