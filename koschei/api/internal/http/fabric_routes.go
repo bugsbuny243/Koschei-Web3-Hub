@@ -22,7 +22,7 @@ type GlobalRadarEventSink interface {
 type fabricConfig struct {
 	globalRadarSnapshotSink GlobalRadarSnapshotSink
 	globalRadarEventSink    GlobalRadarEventSink
-	runtimeHealth            *runtimehealth.Registry
+	runtimeHealth           *runtimehealth.Registry
 }
 
 type FabricOption func(*fabricConfig)
