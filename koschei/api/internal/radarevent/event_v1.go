@@ -18,6 +18,7 @@ const SchemaVersionV1 = "koschei.global-radar-event.v1"
 const (
 	KindBlock         = "block"
 	KindTransaction   = "transaction"
+	KindLog           = "log"
 	KindAccount       = "account"
 	KindAsset         = "asset"
 	KindContract      = "contract"
@@ -162,7 +163,7 @@ func (e Event) Verify() error {
 
 func validKind(kind string) bool {
 	switch kind {
-	case KindBlock, KindTransaction, KindAccount, KindAsset, KindContract, KindBridge, KindLiquidity, KindNetworkHealth:
+	case KindBlock, KindTransaction, KindLog, KindAccount, KindAsset, KindContract, KindBridge, KindLiquidity, KindNetworkHealth:
 		return true
 	default:
 		return false
@@ -171,7 +172,7 @@ func validKind(kind string) bool {
 
 func validSubjectKind(kind string) bool {
 	switch kind {
-	case "network", "block", "transaction", "address", "account", "wallet", "contract", "program", "asset", "token", "pool", "bridge", "validator", "node", "miner", "protocol":
+	case "network", "block", "transaction", "log", "address", "account", "wallet", "contract", "program", "asset", "token", "pool", "bridge", "validator", "node", "miner", "protocol":
 		return true
 	default:
 		return false
