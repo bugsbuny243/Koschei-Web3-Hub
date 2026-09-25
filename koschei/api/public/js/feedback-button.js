@@ -1,4 +1,4 @@
-// ORPHAN: no HTML page loads this file as of 2026-09-14.
+// REGISTERED: active on /fabric/security-center as of 2026-09-25.
 (()=>{
   if(document.getElementById('koscheiFeedbackButton')) return;
   const link=document.createElement('a');
