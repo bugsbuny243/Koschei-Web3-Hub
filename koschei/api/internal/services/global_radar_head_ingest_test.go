@@ -37,11 +37,11 @@ func TestRunGlobalRadarHeadIngestCyclePersistsOnlyNewEVMHead(t *testing.T) {
 	sink := &globalRadarTelemetryRecordingEventSink{}
 	health := runtimehealth.New()
 	cfg := GlobalRadarHeadIngestConfig{
-		EventSink: sink,
-		Targets: []GlobalRadarHeadIngestTarget{{Kind: GlobalRadarHeadIngestEVM, NetworkID: "ethereum-mainnet", Endpoint: server.URL}},
+		EventSink:  sink,
+		Targets:    []GlobalRadarHeadIngestTarget{{Kind: GlobalRadarHeadIngestEVM, NetworkID: "ethereum-mainnet", Endpoint: server.URL}},
 		HTTPClient: server.Client(),
-		Health: health,
-		Now: func() time.Time { return time.Date(2026, 9, 25, 9, 0, 0, 0, time.UTC) },
+		Health:     health,
+		Now:        func() time.Time { return time.Date(2026, 9, 25, 9, 0, 0, 0, time.UTC) },
 	}
 	lastSeen := map[string]uint64{}
 	count, err := RunGlobalRadarHeadIngestCycle(context.Background(), cfg, lastSeen)
@@ -97,8 +97,8 @@ func TestRunGlobalRadarHeadIngestCyclePersistsSuccessfulTargetAndReportsFailure(
 			{Kind: "unsupported", NetworkID: "base-mainnet", Endpoint: server.URL},
 		},
 		HTTPClient: server.Client(),
-		Health: health,
-		Now: func() time.Time { return time.Date(2026, 9, 25, 9, 0, 0, 0, time.UTC) },
+		Health:     health,
+		Now:        func() time.Time { return time.Date(2026, 9, 25, 9, 0, 0, 0, time.UTC) },
 	}
 	count, err := RunGlobalRadarHeadIngestCycle(context.Background(), cfg, map[string]uint64{})
 	if err == nil {
