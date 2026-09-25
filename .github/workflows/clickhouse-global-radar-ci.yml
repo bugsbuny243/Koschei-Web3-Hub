@@ -165,6 +165,20 @@ jobs:
           event_versions="$(docker exec "${container_id}" clickhouse-client --query "SELECT count() FROM koschei_web3.global_radar_events FINAL WHERE event_sha256=repeat('d',64)")"
           test "${event_versions}" = "1"
 
+          docker exec -i "${container_id}" clickhouse-client --multiquery <<'SQL'
+          INSERT INTO koschei_web3.global_radar_ingest_checkpoints
+          (cursor_key,schema_version,network_id,stream_kind,height,block_hash,parent_hash,source_event_sha256,state,observed_at,checkpoint_version)
+          VALUES
+          ('global-radar/head/ethereum-mainnet/evm_head','koschei.global-radar-ingest-checkpoint.v1','ethereum-mainnet','evm_head',100,concat('0x',repeat('a',64)),concat('0x',repeat('b',64)),repeat('d',64),'canonical',toDateTime64('2026-09-25 09:00:00.000',3,'UTC'),1),
+          ('global-radar/head/ethereum-mainnet/evm_head','koschei.global-radar-ingest-checkpoint.v1','ethereum-mainnet','evm_head',100,concat('0x',repeat('a',64)),concat('0x',repeat('b',64)),repeat('d',64),'canonical',toDateTime64('2026-09-25 09:00:00.000',3,'UTC'),2),
+          ('global-radar/head/ethereum-mainnet/evm_head','koschei.global-radar-ingest-checkpoint.v1','ethereum-mainnet','evm_head',100,concat('0x',repeat('a',64)),concat('0x',repeat('b',64)),repeat('d',64),'reorg_observed',toDateTime64('2026-09-25 09:01:00.000',3,'UTC'),3);
+          SQL
+
+          checkpoint_exact_replay="$(docker exec "${container_id}" clickhouse-client --query "SELECT count() FROM koschei_web3.global_radar_ingest_checkpoints FINAL WHERE cursor_key='global-radar/head/ethereum-mainnet/evm_head' AND state='canonical'")"
+          checkpoint_history="$(docker exec "${container_id}" clickhouse-client --query "SELECT count() FROM koschei_web3.global_radar_ingest_checkpoints FINAL WHERE cursor_key='global-radar/head/ethereum-mainnet/evm_head'")"
+          test "${checkpoint_exact_replay}" = "1"
+          test "${checkpoint_history}" = "2"
+
           if docker exec "${container_id}" clickhouse-client --query "INSERT INTO koschei_web3.global_radar_events (event_sha256,schema_version,producer,kind,network_id,subject_kind,subject_id,evidence_state,source_digests,observed_at,payload_json,payload_sha256,ingest_version) VALUES (repeat('z',64),'koschei.global-radar-event.v1','test-adapter','network_health','ethereum-mainnet','node','node-2','unavailable',[],now64(3),'{}',repeat('f',64),3)"; then
             echo "invalid Global Radar event digest unexpectedly accepted" >&2
             exit 1
