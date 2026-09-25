@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -235,6 +237,14 @@ type evmLineageFixture struct {
 	parentHash string
 }
 
+func trustedTLSServerClient(servers ...*httptest.Server) *http.Client {
+	pool := x509.NewCertPool()
+	for _, server := range servers {
+		pool.AddCert(server.Certificate())
+	}
+	return &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}}}
+}
+
 func evmLineageServer(t *testing.T, head uint64, blocks map[uint64]evmLineageFixture) *httptest.Server {
 	t.Helper()
 	return httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -303,7 +313,7 @@ func TestRunGlobalRadarHeadIngestCycleRejectsProviderDisagreement(t *testing.T) 
 	}
 	cfg := GlobalRadarHeadIngestConfig{
 		EventSink: sink, CursorStore: store, Targets: []GlobalRadarHeadIngestTarget{target},
-		HTTPClient: primary.Client(), RequireConfirmation: true,
+		HTTPClient: trustedTLSServerClient(primary, confirmation), RequireConfirmation: true,
 	}
 
 	count, err := RunGlobalRadarHeadIngestCycle(context.Background(), cfg)
@@ -356,7 +366,7 @@ func TestRunGlobalRadarHeadIngestCycleAutomaticallyRewindsToTwoProviderCommonAnc
 	sink := &headIngestEventSink{}
 	cfg := GlobalRadarHeadIngestConfig{
 		EventSink: sink, CursorStore: store, Targets: []GlobalRadarHeadIngestTarget{target},
-		HTTPClient: primary.Client(), RequireConfirmation: true, AutoReorgRecovery: true, MaxReorgRewind: 8,
+		HTTPClient: trustedTLSServerClient(primary, confirmation), RequireConfirmation: true, AutoReorgRecovery: true, MaxReorgRewind: 8,
 	}
 	count, err := RunGlobalRadarHeadIngestCycle(context.Background(), cfg)
 	if err == nil || !strings.Contains(err.Error(), "rewound durable cursor to height 99") {
