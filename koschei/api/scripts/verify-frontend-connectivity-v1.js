@@ -116,14 +116,18 @@ function backendRouteExists(raw) {
 }
 
 for (const item of allPublic) {
+  for (const match of item.source.matchAll(/\/(?:js|css|sdk)\/[A-Za-z0-9_.\/-]+\.(?:js|css)|\/(?:widget|agent-widget)\.js/g)) {
+    const raw = match[0];
+    const asset = assetPathFromURL(raw);
+    if (!asset) continue;
+    if (!publicFiles.has(asset)) missingAssets.push({from: item.rel, ref: raw, expected: asset});
+    else if (incoming.has(asset)) incoming.get(asset).push(item.rel);
+  }
+
   const strings = quotedStrings(item.source);
   for (const raw of strings) {
     const asset = assetPathFromURL(raw);
-    if (asset) {
-      if (!publicFiles.has(asset)) missingAssets.push({from: item.rel, ref: raw, expected: asset});
-      else if (incoming.has(asset)) incoming.get(asset).push(item.rel);
-      continue;
-    }
+    if (asset) continue;
 
     const clean = stripURL(raw);
     if (clean.startsWith('/api/') || clean.startsWith('/fabric/')) {
