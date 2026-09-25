@@ -1,4 +1,4 @@
-// REGISTERED: active on /dashboard as of 2026-09-25.
+// REGISTERED: preserved in Security Center inventory; customer workspace v2 explicitly retires this DOM contract.
 (()=>{
 'use strict';
 if(window.__koscheiCommandUniverseV2)return;
