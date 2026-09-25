@@ -63,7 +63,7 @@ func evmHeadIngestServer(t *testing.T, head uint64, blockHash, parentHash string
 		case "eth_chainId":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": "0x1"})
 		case "eth_blockNumber":
-			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": "0x" + strings.TrimLeft(strings.ToLower(strings.TrimPrefix(formatHex(head), "0x")), "0")})
+			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": formatHex(head)})
 		case "eth_getBlockByNumber":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": map[string]any{
 				"number": formatHex(head), "hash": blockHash, "parentHash": parentHash, "timestamp": "0x64", "transactions": txHashes,
