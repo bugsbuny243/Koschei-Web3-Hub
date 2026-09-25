@@ -119,13 +119,13 @@ jobs:
           test "${event_payload_hash_type}" = "FixedString(64)"
           test "${event_observed_type}" = "DateTime64(3, 'UTC')"
 
-          checkpoint_table_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,\'|\',sorting_key) FROM system.tables WHERE database=\'koschei_web3\' AND name=\'global_radar_ingest_checkpoints\' FORMAT TSVRaw")"
-          checkpoint_event_hash_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database=\'koschei_web3\' AND table=\'global_radar_ingest_checkpoints\' AND name=\'source_event_sha256\' FORMAT TSVRaw")"
-          checkpoint_observed_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database=\'koschei_web3\' AND table=\'global_radar_ingest_checkpoints\' AND name=\'observed_at\' FORMAT TSVRaw")"
+          checkpoint_table_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,'|',sorting_key) FROM system.tables WHERE database='koschei_web3' AND name='global_radar_ingest_checkpoints' FORMAT TSVRaw")"
+          checkpoint_event_hash_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='global_radar_ingest_checkpoints' AND name='source_event_sha256' FORMAT TSVRaw")"
+          checkpoint_observed_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='global_radar_ingest_checkpoints' AND name='observed_at' FORMAT TSVRaw")"
 
           test "${checkpoint_table_meta}" = "ReplacingMergeTree|cursor_key, height, block_hash, source_event_sha256, state"
           test "${checkpoint_event_hash_type}" = "FixedString(64)"
-          test "${checkpoint_observed_type}" = "DateTime64(3, \'UTC\')"
+          test "${checkpoint_observed_type}" = "DateTime64(3, 'UTC')"
 
       - name: Validate replay convergence and state-history preservation
         run: |
