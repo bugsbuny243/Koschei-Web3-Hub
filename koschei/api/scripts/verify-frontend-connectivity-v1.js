@@ -65,7 +65,7 @@ const js = allPublic.filter(x => x.rel.endsWith('.js'));
 const css = allPublic.filter(x => x.rel.endsWith('.css'));
 const runtimeAssets = [...js, ...css];
 
-const goFiles = walk(httpRoot).filter(file => file.endsWith('.go'));
+const goFiles = walk(httpRoot).filter(file => file.endsWith('.go') && !file.endsWith('_test.go'));
 const goSource = goFiles.map(file => fs.readFileSync(file, 'utf8')).join('\n');
 const registeredRoutes = new Set();
 for (const match of goSource.matchAll(/["'`]((?:\/api\/|\/fabric\/|\/owner(?:\/|$)|\/docs\/)[^"'`\s]*)["'`]/g)) {
@@ -77,10 +77,27 @@ for (const match of goSource.matchAll(/(?:HandleFunc|registerStaticFileAlias|reg
   if (value.startsWith('/')) registeredRoutes.add(value);
 }
 
+const staticAliases = fs.readFileSync(path.join(httpRoot, 'static_aliases.go'), 'utf8');
+for (const match of staticAliases.matchAll(/["'`]([^"'`]+)["'`]/g)) {
+  const value = stripURL(match[1]);
+  if (value.startsWith('/')) registeredRoutes.add(value);
+}
+
 const missingAssets = [];
 const missingPages = [];
 const apiRefsMissing = [];
 const incoming = new Map(runtimeAssets.map(x => [x.rel, []]));
+
+const runtimeGoFiles = walk(apiRoot).filter(file => file.endsWith('.go') && !file.endsWith('_test.go') && !file.startsWith(publicRoot));
+for (const file of runtimeGoFiles) {
+  const source = fs.readFileSync(file, 'utf8');
+  for (const raw of quotedStrings(source)) {
+    const asset = assetPathFromURL(raw);
+    if (!asset) continue;
+    if (!publicFiles.has(asset)) missingAssets.push({from: rel(file), ref: raw, expected: asset});
+    else if (incoming.has(asset)) incoming.get(asset).push('go:' + rel(file));
+  }
+}
 
 const backendRoutes = [...registeredRoutes].filter(x => x.startsWith('/api/') || x.startsWith('/fabric/'));
 function backendRouteExists(raw) {
