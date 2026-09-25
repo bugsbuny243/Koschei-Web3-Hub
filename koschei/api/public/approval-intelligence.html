@@ -22,7 +22,7 @@
 <div class="esi-field"><label for="evmSpendingOwner">Owner</label><input class="esi-input" id="evmSpendingOwner" autocomplete="off" placeholder="0x…" required></div>
 <div class="esi-field"><label for="evmSpendingSpender">Spender</label><input class="esi-input" id="evmSpendingSpender" autocomplete="off" placeholder="0x…" required></div>
 <button class="safety-btn primary" id="evmSpendingSubmit" type="submit">Read spending authority</button></form><p class="esi-status" id="evmSpendingStatus" data-state="idle">No RPC observation has been requested yet.</p><div class="safety-boundary"><b>Evidence boundary:</b> a non-zero or unlimited allowance describes current permission state. It does not establish how the approval was created, whether the owner intended it now, or whether the spender is safe.</div></article>
-<aside class="esi-panel"><span class="safety-kicker">OBSERVATION</span><div class="esi-result" id="evmSpendingResult" hidden></div><div class="esi-empty">Run a read-only observation to populate this panel. Missing authority evidence remains unavailable rather than being converted into “immutable” or “safe”.</div></aside>
+<aside class="esi-panel"><span class="safety-kicker">OBSERVATION</span><div class="esi-result" id="evmSpendingResult" hidden></div><div class="esi-empty" id="evmSpendingEmpty">Run a read-only observation to populate this panel. Missing authority evidence remains unavailable rather than being converted into “immutable” or “safe”.</div></aside>
 </section>
 </main>
 <script src="/js/koschei-global-shell.js?v=4"></script>
