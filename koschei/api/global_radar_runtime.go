@@ -146,7 +146,6 @@ func globalRadarEVMEndpoint(networkID string) string {
 	return strings.TrimSpace(os.Getenv(name))
 }
 
-
 func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEventSink, health *runtimehealth.Registry) (*services.GlobalRadarHeadIngestConfig, error) {
 	if strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED")) != "1" {
 		if health != nil {
