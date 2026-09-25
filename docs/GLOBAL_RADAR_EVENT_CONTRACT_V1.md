@@ -85,7 +85,7 @@ Cursor advancement is deliberately ordered after canonical event persistence. If
 
 The continuous EVM adapter now emits one `block` event plus transaction-identity and block-scoped `log` events from `eth_getBlockByNumber` and `eth_getLogs(blockHash=...)`. Bitcoin emits one `block` event plus transaction-identity events from `getblockhash` and `getblock`. Native response bytes remain bound by SHA-256; the adapters do not claim full transaction bodies, mempool completeness, finality, intent, or safety.
 
-When a next block's parent hash does not match the durable cursor, or the same height resolves to a different block hash, the worker writes a durable `reorg_observed` cursor state and stops advancing that stream. Automatic rewind is intentionally not performed in this slice.
+When a next block's parent hash does not match the durable cursor, or the same height resolves to a different block hash, the worker writes a durable `reorg_observed` cursor state. Optional two-provider recovery can then search backward through previously stored canonical checkpoints. A rewind is written only when the primary and independently configured confirmation provider report the same historical block hash and parent hash and that identity matches the stored canonical checkpoint. The search depth is bounded. Two-provider agreement is operational lineage confirmation, not consensus finality.
 
 
 ## Next step
