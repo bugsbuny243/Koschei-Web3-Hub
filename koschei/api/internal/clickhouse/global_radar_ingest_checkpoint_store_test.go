@@ -41,7 +41,7 @@ func TestSaveGlobalRadarIngestCheckpointUsesJSONEachRow(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client, err := New(Config{HTTPURL: server.URL, Database: "koschei_web3", HTTPClient: server.Client()})
+	client, err := New(Config{HTTPURL: server.URL, Database: "koschei_web3", User: "radar-user", Password: "radar-password", HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestLoadGlobalRadarIngestCheckpointReturnsLatestRow(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client, err := New(Config{HTTPURL: server.URL, Database: "koschei_web3", HTTPClient: server.Client()})
+	client, err := New(Config{HTTPURL: server.URL, Database: "koschei_web3", User: "radar-user", Password: "radar-password", HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestLoadGlobalRadarIngestCheckpointMissing(t *testing.T) {
 		_, _ = io.WriteString(w, "")
 	}))
 	defer server.Close()
-	client, err := New(Config{HTTPURL: server.URL, Database: "koschei_web3", HTTPClient: server.Client()})
+	client, err := New(Config{HTTPURL: server.URL, Database: "koschei_web3", User: "radar-user", Password: "radar-password", HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestVerifyGlobalRadarIngestCheckpointSchema(t *testing.T) {
 		}
 	}))
 	defer server.Close()
-	client, err := New(Config{HTTPURL: server.URL, Database: "koschei_web3", HTTPClient: server.Client()})
+	client, err := New(Config{HTTPURL: server.URL, Database: "koschei_web3", User: "radar-user", Password: "radar-password", HTTPClient: server.Client()})
 	if err != nil {
 		t.Fatal(err)
 	}
