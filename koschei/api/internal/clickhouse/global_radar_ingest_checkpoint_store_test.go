@@ -134,7 +134,6 @@ func TestVerifyGlobalRadarIngestCheckpointSchema(t *testing.T) {
 	}
 }
 
-
 func TestLoadGlobalRadarCanonicalCheckpointAtHeightFiltersCanonicalHistory(t *testing.T) {
 	want := sampleGlobalRadarCheckpoint()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
