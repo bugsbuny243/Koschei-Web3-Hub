@@ -9,6 +9,7 @@ import (
 
 	koscheiclickhouse "koschei/api/internal/clickhouse"
 	apihttp "koschei/api/internal/http"
+	"koschei/api/internal/runtimehealth"
 	"koschei/api/internal/services"
 )
 
@@ -143,4 +144,64 @@ func globalRadarEVMEndpoint(networkID string) string {
 		return ""
 	}
 	return strings.TrimSpace(os.Getenv(name))
+}
+
+func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEventSink, health *runtimehealth.Registry) (*services.GlobalRadarHeadIngestConfig, error) {
+	if strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED")) != "1" {
+		if health != nil {
+			health.Register("worker.global-radar-head-ingest", "worker", "", false)
+		}
+		return nil, nil
+	}
+	if eventSink == nil {
+		return nil, fmt.Errorf("Global Radar head ingest requires KOSCHEI_GLOBAL_RADAR_EVENT_CLICKHOUSE_ENABLED=1")
+	}
+	rawNetworks := strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_NETWORKS"))
+	if rawNetworks == "" {
+		return nil, fmt.Errorf("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_NETWORKS is required when head ingest is enabled")
+	}
+	interval := 15 * time.Second
+	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_INTERVAL_SECONDS")); raw != "" {
+		parsed, err := time.ParseDuration(raw + "s")
+		if err != nil || parsed < 5*time.Second || parsed > 5*time.Minute {
+			return nil, fmt.Errorf("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_INTERVAL_SECONDS must be between 5 and 300")
+		}
+		interval = parsed
+	}
+	seen := map[string]bool{}
+	targets := make([]services.GlobalRadarHeadIngestTarget, 0)
+	for _, raw := range strings.Split(rawNetworks, ",") {
+		networkID := strings.ToLower(strings.TrimSpace(raw))
+		if networkID == "" || seen[networkID] {
+			continue
+		}
+		seen[networkID] = true
+		switch networkID {
+		case "ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet":
+			endpoint := globalRadarEVMEndpoint(networkID)
+			if endpoint == "" {
+				return nil, fmt.Errorf("%s RPC endpoint is required for Global Radar head ingest", networkID)
+			}
+			targets = append(targets, services.GlobalRadarHeadIngestTarget{Kind: services.GlobalRadarHeadIngestEVM, NetworkID: networkID, Endpoint: endpoint})
+		case "bitcoin-mainnet":
+			endpoint := strings.TrimSpace(os.Getenv("BITCOIN_CORE_RPC_URL"))
+			if endpoint == "" {
+				return nil, fmt.Errorf("BITCOIN_CORE_RPC_URL is required for bitcoin-mainnet Global Radar head ingest")
+			}
+			targets = append(targets, services.GlobalRadarHeadIngestTarget{Kind: services.GlobalRadarHeadIngestBitcoin, NetworkID: networkID, Endpoint: endpoint})
+		default:
+			return nil, fmt.Errorf("Global Radar head ingest does not yet support %q", networkID)
+		}
+	}
+	if len(targets) == 0 {
+		return nil, fmt.Errorf("Global Radar head ingest has no configured targets")
+	}
+	if health != nil {
+		health.Register("worker.global-radar-head-ingest", "worker", "", true)
+		health.Register("global-radar.head.event-sink", "storage", "", true)
+		for _, target := range targets {
+			health.Register(services.GlobalRadarHeadIngestTargetHealthID(target), "head_ingest", target.NetworkID, true)
+		}
+	}
+	return &services.GlobalRadarHeadIngestConfig{EventSink: eventSink, Targets: targets, Interval: interval, Health: health}, nil
 }

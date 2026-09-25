@@ -115,3 +115,38 @@ The next implementation work should extend the same registry rather than creatin
 8. Sentinel model-evaluation telemetry in observe/shadow mode before any promotion gate.
 9. Lang policy/proof adapter conformance tests at the Fabric boundary.
 10. Operator incident workflow linking evidence, alerts, dossiers and response actions without giving AI explanation authority over deterministic verdicts.
+
+
+## Runtime health registry and continuous head ingest — 2026-09-25
+
+Runtime availability is now tracked separately from repository capability metadata.
+
+Schema:
+
+`koschei.runtime-health.v1`
+
+Surface:
+
+`GET /fabric/security-center/runtime-health`
+
+The registry records only operational status and bounded counters:
+
+- configured / disabled;
+- live / degraded / unavailable / stopped;
+- last success and failure timestamps;
+- consecutive failure count;
+- successful and failed cycle counts;
+- observation count;
+- network and component kind.
+
+It does not expose provider URLs, credentials, database DSNs, signing keys or other secret material. A healthy component is not a safety verdict, and a degraded component is not evidence that a chain or asset is unsafe.
+
+A separate continuous head-ingest worker is also available behind:
+
+- `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED=1`;
+- `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_NETWORKS`;
+- `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_INTERVAL_SECONDS`.
+
+It requires the canonical Global Radar event ClickHouse ledger. The first version supports Ethereum, Base, Arbitrum, Optimism, Polygon, BNB Smart Chain, Avalanche C-Chain and Bitcoin mainnet. Each target verifies its native network boundary, preserves source-response SHA-256 evidence, and emits a canonical `block` event only when the observed head height advances within the running process.
+
+This is deliberately not described as transaction-firehose ingestion. It observes chain heads. Transaction/log/mempool ingestion, durable cross-restart cursors and reorg-aware block-hash lineage remain separate follow-on work.

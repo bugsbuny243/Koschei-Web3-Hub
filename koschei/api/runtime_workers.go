@@ -49,14 +49,18 @@ func startBackgroundRuntime(
 	solanaRPC *web3.SolanaRPC,
 	jobStore *jobs.Store,
 	globalRadarBackground *services.GlobalRadarBackgroundTelemetryConfig,
+	globalRadarHeadIngest *services.GlobalRadarHeadIngestConfig,
 ) func() {
 	if !role.runsBackgroundWorkers() {
 		return func() {}
 	}
 
-	stops := make([]func(), 0, 5)
+	stops := make([]func(), 0, 6)
 	if globalRadarBackground != nil {
 		stops = append(stops, services.StartGlobalRadarBackgroundTelemetry(ctx, *globalRadarBackground))
+	}
+	if globalRadarHeadIngest != nil {
+		stops = append(stops, services.StartGlobalRadarHeadIngest(ctx, *globalRadarHeadIngest))
 	}
 	if db == nil {
 		log.Printf("PostgreSQL-backed background runtime not started: APP_DATABASE_URL is not configured")

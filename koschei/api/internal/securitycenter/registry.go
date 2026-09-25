@@ -75,6 +75,21 @@ func Current() Snapshot {
 				Notes:           []string{"chain adapters emit evidence without manufacturing a verdict", "canonical event persistence is optional and fail-closed when configured"},
 			},
 			{
+				ID: "runtime-health-registry", Layer: "control-plane", Domain: "runtime-observability", Mode: "implemented", EvidenceAuthority: "operational_status_only", Activation: "always available in HTTP runtime; entries reflect configured components",
+				BackendSurfaces: []string{"/fabric/security-center/runtime-health"},
+				Telemetry:       []string{"configured", "live", "degraded", "unavailable", "disabled", "stopped", "last success/failure", "cycle and observation counters"},
+				Notes:           []string{"runtime health is not chain risk", "endpoint identities and secrets are never exposed"},
+			},
+			{
+				ID: "continuous-multi-network-head-ingest", Layer: "ingest", Domain: "evm-utxo", Mode: "conditional", EvidenceAuthority: "observation_only", Activation: "KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED=1 plus event ClickHouse and explicit network allowlist",
+				NetworkIDs:       []string{"ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet", "bitcoin-mainnet"},
+				DependsOn:        []string{"global-radar-event-plane", "runtime-health-registry"},
+				BackendSurfaces:  []string{"/api/owner/radar/global/events", "/fabric/security-center/runtime-health"},
+				FrontendSurfaces: []string{"/owner-production", "/fabric/security-center"},
+				Telemetry:        []string{"canonical block-head events", "native RPC response SHA-256", "per-network worker health"},
+				Notes:            []string{"bounded polling emits only new observed head heights", "this is not transaction firehose ingestion and makes no finality or safety claim"},
+			},
+			{
 				ID: "solana-arvis-evidence-and-verdict", Layer: "decision", Domain: "solana", Mode: "active", EvidenceAuthority: "authoritative_arvis", Activation: "FEATURE_SOLANA and evidence sources",
 				NetworkIDs:       []string{"solana-mainnet"},
 				BackendSurfaces:  []string{"/api/scan", "/api/token/scan", "/api/owner/radar/unified", "/api/v1/scan/token"},

@@ -177,3 +177,16 @@ The objective is not to claim the largest number of supported chains.
 
 The objective is to build the strongest evidence graph across chains while every
 unsupported or unverified capability remains explicit and fail-closed.
+
+
+### Continuous multi-network head ingest
+
+An additional opt-in worker now observes advancing head heights for explicitly selected EVM networks and Bitcoin mainnet. It is separate from the slower network-health telemetry worker and is controlled by `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED`, an explicit network allowlist, and a bounded 5–300 second cadence.
+
+The worker requires the canonical Global Radar event ClickHouse sink, verifies each configured EVM chain ID or Bitcoin mainnet identity before acceptance, and binds emitted `block` events to native RPC response SHA-256 digests. Repeated observations of the same or lower height are suppressed within the running process.
+
+These events prove only that one configured endpoint reported that head height at the recorded observation time. They do not claim finality, block canonicality across multiple providers, transaction completeness, mempool visibility or chain safety. Cross-restart durable cursors and reorg-aware block-hash lineage remain future work.
+
+### Runtime health
+
+`GET /fabric/security-center/runtime-health` exposes `koschei.runtime-health.v1` for configured storage, telemetry and head-ingest components. Runtime health is operational metadata only and is kept separate from ARVIS risk/verdict authority.
