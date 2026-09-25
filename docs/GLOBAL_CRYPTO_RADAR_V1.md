@@ -165,7 +165,7 @@ The repository also preserves previously unmounted frontend runtimes through an 
 
 ## Next implementation slices
 
-1. Extend durable persistence from explicit intelligence probes to continuous background multi-network ingest without changing existing ARVIS decision authority.
+1. Extend the new durable multi-network block/transaction/log ingest with bounded automatic reorg recovery and multi-provider lineage confirmation without changing ARVIS decision authority.
 2. Add an operator graph/timeline visualization over the owner-only graph and canonical event retrieval APIs; both bounded authenticated JSON read contracts now exist.
 3. Connect bridge-specific live adapters only where both chain-side transfer identities can be independently anchored.
 4. Wire the trusted verdict-key registry into production verdict-reference creation; the verification contract now exists but the legacy unverified projection remains the default for callers that do not supply server-owned trust material.
@@ -179,13 +179,15 @@ The objective is to build the strongest evidence graph across chains while every
 unsupported or unverified capability remains explicit and fail-closed.
 
 
-### Continuous multi-network head ingest
+### Continuous durable multi-network block ingest
 
-An additional opt-in worker now observes advancing head heights for explicitly selected EVM networks and Bitcoin mainnet. It is separate from the slower network-health telemetry worker and is controlled by `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED`, an explicit network allowlist, and a bounded 5–300 second cadence.
+The opt-in worker now persists a cross-restart cursor in the migration-007 ClickHouse checkpoint ledger rather than relying on process memory. It is separate from the slower network-health telemetry worker and is controlled by `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED`, an explicit network allowlist, a bounded 5–300 second cadence, a bounded blocks-per-cycle catch-up limit, and a bounded events-per-block limit.
 
-The worker requires the canonical Global Radar event ClickHouse sink, verifies each configured EVM chain ID or Bitcoin mainnet identity before acceptance, and binds emitted `block` events to native RPC response SHA-256 digests. Repeated observations of the same or lower height are suppressed within the running process.
+For EVM targets the adapter verifies chain ID, fetches the exact block identity with `eth_getBlockByNumber`, binds transaction identities from that block, and fetches logs with `eth_getLogs(blockHash=...)`. It emits canonical `block`, `transaction`, and `log` events whose source-response bytes are SHA-256 bound. Bitcoin mainnet similarly binds `getblockhash` and `getblock` evidence and emits canonical block plus transaction-identity events.
 
-These events prove only that one configured endpoint reported that head height at the recorded observation time. They do not claim finality, block canonicality across multiple providers, transaction completeness, mempool visibility or chain safety. Cross-restart durable cursors and reorg-aware block-hash lineage remain future work.
+Cursor advancement happens only after the event batch is accepted. The next block's parent hash must match the stored block hash; the same height must continue resolving to the stored hash. A mismatch writes a durable `reorg_observed` state and freezes the stream instead of advancing on ambiguous lineage.
+
+These records remain observations from configured endpoints. They do not claim finality, multi-provider canonicality, full transaction bodies, mempool visibility, automatic reorg rewind, actor identity, intent or chain safety. ARVIS remains the only connected verdict authority.
 
 ### Runtime health
 

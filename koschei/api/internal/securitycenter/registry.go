@@ -81,13 +81,13 @@ func Current() Snapshot {
 				Notes:           []string{"runtime health is not chain risk", "endpoint identities and secrets are never exposed"},
 			},
 			{
-				ID: "continuous-multi-network-head-ingest", Layer: "ingest", Domain: "evm-utxo", Mode: "conditional", EvidenceAuthority: "observation_only", Activation: "KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED=1 plus event ClickHouse and explicit network allowlist",
+				ID: "continuous-multi-network-block-ingest", Layer: "ingest", Domain: "evm-utxo", Mode: "conditional", EvidenceAuthority: "observation_only", Activation: "KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED=1 plus event/checkpoint ClickHouse and explicit network allowlist",
 				NetworkIDs:       []string{"ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet", "bitcoin-mainnet"},
 				DependsOn:        []string{"global-radar-event-plane", "runtime-health-registry"},
 				BackendSurfaces:  []string{"/api/owner/radar/global/events", "/fabric/security-center/runtime-health"},
 				FrontendSurfaces: []string{"/owner-production", "/fabric/security-center"},
-				Telemetry:        []string{"canonical block-head events", "native RPC response SHA-256", "per-network worker health"},
-				Notes:            []string{"bounded polling emits only new observed head heights", "this is not transaction firehose ingestion and makes no finality or safety claim"},
+				Telemetry:        []string{"canonical block events", "transaction identity events", "EVM log events", "native RPC response SHA-256", "durable ingest checkpoints", "reorg freeze state", "per-network worker health"},
+				Notes:            []string{"cursor advances only after event persistence", "parent/hash discontinuity freezes the durable cursor instead of silently advancing", "no mempool or full transaction-body completeness claim", "ARVIS verdict authority is unchanged"},
 			},
 			{
 				ID: "solana-arvis-evidence-and-verdict", Layer: "decision", Domain: "solana", Mode: "active", EvidenceAuthority: "authoritative_arvis", Activation: "FEATURE_SOLANA and evidence sources",

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"koschei/api/internal/radarcursor"
 	"koschei/api/internal/radarevent"
 	"koschei/api/internal/runtimehealth"
 )
@@ -15,10 +16,20 @@ func (globalRadarHeadConfigEventSink) InsertGlobalRadarEvents(context.Context, [
 	return nil
 }
 
+type globalRadarHeadConfigCursorStore struct{}
+
+func (globalRadarHeadConfigCursorStore) LoadGlobalRadarIngestCheckpoint(context.Context, string) (radarcursor.Checkpoint, bool, error) {
+	return radarcursor.Checkpoint{}, false, nil
+}
+
+func (globalRadarHeadConfigCursorStore) SaveGlobalRadarIngestCheckpoint(context.Context, radarcursor.Checkpoint) error {
+	return nil
+}
+
 func TestBuildGlobalRadarHeadIngestConfigDisabledByDefault(t *testing.T) {
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED", "")
 	health := runtimehealth.New()
-	config, err := buildGlobalRadarHeadIngestConfig(globalRadarHeadConfigEventSink{}, health)
+	config, err := buildGlobalRadarHeadIngestConfig(globalRadarHeadConfigEventSink{}, globalRadarHeadConfigCursorStore{}, health)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,25 +42,27 @@ func TestBuildGlobalRadarHeadIngestConfigDisabledByDefault(t *testing.T) {
 	}
 }
 
-func TestBuildGlobalRadarHeadIngestConfigRequiresEventSink(t *testing.T) {
+func TestBuildGlobalRadarHeadIngestConfigRequiresDurableStore(t *testing.T) {
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED", "1")
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_NETWORKS", "ethereum-mainnet")
-	config, err := buildGlobalRadarHeadIngestConfig(nil, runtimehealth.New())
-	if err == nil || !strings.Contains(err.Error(), "EVENT_CLICKHOUSE") {
+	config, err := buildGlobalRadarHeadIngestConfig(nil, nil, runtimehealth.New())
+	if err == nil || !strings.Contains(err.Error(), "durable checkpoint") {
 		t.Fatalf("config=%v err=%v", config, err)
 	}
 }
 
-func TestBuildGlobalRadarHeadIngestConfigUsesExplicitNetworks(t *testing.T) {
+func TestBuildGlobalRadarHeadIngestConfigUsesExplicitNetworksAndBounds(t *testing.T) {
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED", "1")
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_NETWORKS", "ethereum-mainnet,base-mainnet,bitcoin-mainnet")
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_INTERVAL_SECONDS", "12")
+	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_BLOCKS_PER_CYCLE", "7")
+	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_EVENTS_PER_BLOCK", "9000")
 	t.Setenv("ETHEREUM_RPC_URL", "https://ethereum.example")
 	t.Setenv("BASE_RPC_URL", "https://base.example")
 	t.Setenv("BITCOIN_CORE_RPC_URL", "https://bitcoin.example")
 	health := runtimehealth.New()
 
-	config, err := buildGlobalRadarHeadIngestConfig(globalRadarHeadConfigEventSink{}, health)
+	config, err := buildGlobalRadarHeadIngestConfig(globalRadarHeadConfigEventSink{}, globalRadarHeadConfigCursorStore{}, health)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,6 +71,9 @@ func TestBuildGlobalRadarHeadIngestConfigUsesExplicitNetworks(t *testing.T) {
 	}
 	if config.Interval.String() != "12s" {
 		t.Fatalf("interval=%s", config.Interval)
+	}
+	if config.MaxBlocksPerCycle != 7 || config.MaxEventsPerBlock != 9000 {
+		t.Fatalf("bounds=%d/%d", config.MaxBlocksPerCycle, config.MaxEventsPerBlock)
 	}
 	if len(health.Snapshot().Entries) < 5 {
 		t.Fatalf("expected worker, sink and target health entries: %#v", health.Snapshot())
@@ -69,8 +85,19 @@ func TestBuildGlobalRadarHeadIngestConfigRejectsTooFastCadence(t *testing.T) {
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_NETWORKS", "ethereum-mainnet")
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_INTERVAL_SECONDS", "1")
 	t.Setenv("ETHEREUM_RPC_URL", "https://ethereum.example")
-	config, err := buildGlobalRadarHeadIngestConfig(globalRadarHeadConfigEventSink{}, runtimehealth.New())
+	config, err := buildGlobalRadarHeadIngestConfig(globalRadarHeadConfigEventSink{}, globalRadarHeadConfigCursorStore{}, runtimehealth.New())
 	if err == nil || !strings.Contains(err.Error(), "between 5 and 300") {
+		t.Fatalf("config=%v err=%v", config, err)
+	}
+}
+
+func TestBuildGlobalRadarHeadIngestConfigRejectsOversizedCycle(t *testing.T) {
+	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED", "1")
+	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_NETWORKS", "ethereum-mainnet")
+	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_BLOCKS_PER_CYCLE", "65")
+	t.Setenv("ETHEREUM_RPC_URL", "https://ethereum.example")
+	config, err := buildGlobalRadarHeadIngestConfig(globalRadarHeadConfigEventSink{}, globalRadarHeadConfigCursorStore{}, runtimehealth.New())
+	if err == nil || !strings.Contains(err.Error(), "between 1 and 64") {
 		t.Fatalf("config=%v err=%v", config, err)
 	}
 }

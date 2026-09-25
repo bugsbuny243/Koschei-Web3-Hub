@@ -93,6 +93,25 @@ func TestOwnerGlobalRadarEventsReturnsReverifiedHistoricalEvents(t *testing.T) {
 	}
 }
 
+func TestOwnerGlobalRadarEventsAcceptsLogKind(t *testing.T) {
+	t.Setenv("APP_ENV", "test")
+	t.Setenv("OWNER_SECRET", "owner-test-secret")
+	t.Setenv("OWNER_WALLET", "")
+	reader := &recordingGlobalRadarEventReader{}
+	server := NewServer(nil, "", "", "", t.TempDir(), WithGlobalRadarEventReader(reader))
+	request := httptest.NewRequest(http.MethodGet, "/api/owner/radar/global/events?network=ethereum-mainnet&kind=log&limit=5", nil)
+	request.Header.Set("x-koschei-secret", "owner-test-secret")
+	response := httptest.NewRecorder()
+	server.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if len(reader.requests) != 1 || reader.requests[0].Kind != radarevent.KindLog || reader.requests[0].Limit != 5 {
+		t.Fatalf("unexpected log read request: %#v", reader.requests)
+	}
+}
+
 func TestOwnerGlobalRadarEventsRejectsUnknownKindBeforeReader(t *testing.T) {
 	t.Setenv("APP_ENV", "test")
 	t.Setenv("OWNER_SECRET", "owner-test-secret")

@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	koscheiclickhouse "koschei/api/internal/clickhouse"
 	apihttp "koschei/api/internal/http"
+	"koschei/api/internal/radarcursor"
 	"koschei/api/internal/runtimehealth"
 	"koschei/api/internal/services"
 )
@@ -41,6 +43,8 @@ func buildGlobalRadarSnapshotSink(parent context.Context) (globalRadarGraphStore
 type globalRadarEventStore interface {
 	apihttp.GlobalRadarEventSink
 	apihttp.GlobalRadarEventReader
+	radarcursor.Store
+	VerifyGlobalRadarIngestCheckpointSchema(context.Context) error
 }
 
 func buildGlobalRadarEventSink(parent context.Context) (globalRadarEventStore, error) {
@@ -57,6 +61,9 @@ func buildGlobalRadarEventSink(parent context.Context) (globalRadarEventStore, e
 	defer cancel()
 	if err := client.VerifyGlobalRadarEventSchema(ctx); err != nil {
 		return nil, fmt.Errorf("verify Global Radar ClickHouse event schema: %w", err)
+	}
+	if err := client.VerifyGlobalRadarIngestCheckpointSchema(ctx); err != nil {
+		return nil, fmt.Errorf("verify Global Radar ClickHouse ingest checkpoint schema: %w", err)
 	}
 	return client, nil
 }
@@ -146,15 +153,15 @@ func globalRadarEVMEndpoint(networkID string) string {
 	return strings.TrimSpace(os.Getenv(name))
 }
 
-func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEventSink, health *runtimehealth.Registry) (*services.GlobalRadarHeadIngestConfig, error) {
+func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEventSink, cursorStore radarcursor.Store, health *runtimehealth.Registry) (*services.GlobalRadarHeadIngestConfig, error) {
 	if strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED")) != "1" {
 		if health != nil {
 			health.Register("worker.global-radar-head-ingest", "worker", "", false)
 		}
 		return nil, nil
 	}
-	if eventSink == nil {
-		return nil, fmt.Errorf("Global Radar head ingest requires KOSCHEI_GLOBAL_RADAR_EVENT_CLICKHOUSE_ENABLED=1")
+	if eventSink == nil || cursorStore == nil {
+		return nil, fmt.Errorf("Global Radar head ingest requires KOSCHEI_GLOBAL_RADAR_EVENT_CLICKHOUSE_ENABLED=1 with durable checkpoint storage")
 	}
 	rawNetworks := strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_NETWORKS"))
 	if rawNetworks == "" {
@@ -168,6 +175,23 @@ func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEve
 		}
 		interval = parsed
 	}
+	maxBlocksPerCycle := 4
+	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_BLOCKS_PER_CYCLE")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > 64 {
+			return nil, fmt.Errorf("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_BLOCKS_PER_CYCLE must be between 1 and 64")
+		}
+		maxBlocksPerCycle = parsed
+	}
+	maxEventsPerBlock := 6000
+	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_EVENTS_PER_BLOCK")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > 25000 {
+			return nil, fmt.Errorf("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_EVENTS_PER_BLOCK must be between 1 and 25000")
+		}
+		maxEventsPerBlock = parsed
+	}
+
 	seen := map[string]bool{}
 	targets := make([]services.GlobalRadarHeadIngestTarget, 0)
 	for _, raw := range strings.Split(rawNetworks, ",") {
@@ -203,5 +227,8 @@ func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEve
 			health.Register(services.GlobalRadarHeadIngestTargetHealthID(target), "head_ingest", target.NetworkID, true)
 		}
 	}
-	return &services.GlobalRadarHeadIngestConfig{EventSink: eventSink, Targets: targets, Interval: interval, Health: health}, nil
+	return &services.GlobalRadarHeadIngestConfig{
+		EventSink: eventSink, CursorStore: cursorStore, Targets: targets, Interval: interval, Health: health,
+		MaxBlocksPerCycle: maxBlocksPerCycle, MaxEventsPerBlock: maxEventsPerBlock,
+	}, nil
 }
