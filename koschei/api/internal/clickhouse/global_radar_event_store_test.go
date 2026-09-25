@@ -168,7 +168,6 @@ func TestVerifyGlobalRadarEventSchemaAcceptsCanonicalTable(t *testing.T) {
 	}
 }
 
-
 func TestReadGlobalRadarEventsReverifiesStoredCanonicalEvent(t *testing.T) {
 	event := sampleGlobalRadarEvent(t)
 	payload, err := json.Marshal(event)

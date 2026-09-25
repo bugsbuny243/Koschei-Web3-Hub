@@ -187,10 +187,9 @@ FORMAT JSON`)
 	return nil
 }
 
-
 const (
-	MaxGlobalRadarEventReadRows   = uint64(5000)
-	MaxGlobalRadarEventReadWindow = 31 * 24 * time.Hour
+	MaxGlobalRadarEventReadRows    = uint64(5000)
+	MaxGlobalRadarEventReadWindow  = 31 * 24 * time.Hour
 	globalRadarEventReadScanRowCap = uint64(10000000)
 	globalRadarEventReadBodyLimit  = int64(64 << 20)
 )
