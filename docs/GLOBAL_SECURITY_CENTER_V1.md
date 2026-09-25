@@ -105,7 +105,7 @@ The control plane must preserve these rules:
 
 The next implementation work should extend the same registry rather than creating parallel products:
 
-1. Extend durable non-Solana block/transaction/log ingest with bounded automatic reorg recovery and provider-diversity confirmation.
+1. Expand provider-diversity confirmation beyond two-provider block lineage into broader source diversity and operator recovery controls.
 2. Live bridge adapters where both sides can bind the same native transfer identity.
 3. Production trusted-key registry wiring for ARVIS verdict references.
 4. Per-capability runtime health records that distinguish configured, reachable, degraded and unavailable without converting health into risk.
@@ -150,4 +150,18 @@ A separate durable block-ingest worker is available behind:
 
 It requires both the canonical Global Radar event ledger and the migration-007 durable checkpoint ledger. Ethereum, Base, Arbitrum, Optimism, Polygon, BNB Smart Chain and Avalanche C-Chain emit canonical block, transaction-identity and block-scoped log events. Bitcoin emits canonical block and transaction-identity events. Each source adapter verifies its native network boundary and binds native RPC response bytes by SHA-256.
 
-The durable cursor advances only after the block event batch is accepted. Block hash and parent hash lineage are checked before progression. A hash discontinuity persists `reorg_observed` and freezes that stream rather than silently advancing. This slice still does not claim mempool visibility, full transaction-body completeness, multi-provider canonicality, finality, automatic reorg rewind or chain safety.
+The durable cursor advances only after the block event batch is accepted. Block hash and parent hash lineage are checked before progression. Optional independent confirmation can require a second configured provider to report the same height/hash/parent identity before persistence. Provider disagreement fails closed. When bounded automatic recovery is enabled, a discontinuity is first recorded as `reorg_observed`, then historical canonical checkpoints are searched backward for a stored ancestor that both providers independently match. A successful recovery writes a `rewind` checkpoint and the next cycle resumes from that ancestor. This still does not claim finality, mempool visibility, full transaction-body completeness, actor identity, intent or chain safety.
+
+
+## Multi-provider lineage confirmation and bounded recovery — 2026-09-25
+
+The durable block-ingest worker can now use a separately configured confirmation RPC for every supported EVM target and Bitcoin mainnet.
+
+Two independent controls remain off by default:
+
+- `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_REQUIRE_CONFIRMATION=1` requires block identity agreement before a block event batch can be persisted.
+- `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_AUTO_REORG_RECOVERY=1` enables bounded common-ancestor recovery after a recorded lineage discontinuity.
+
+Recovery never trusts a replacement branch merely because the primary endpoint changed. The worker loads previously stored canonical checkpoints, probes the same historical height through both primary and confirmation providers, requires matching block hash and parent hash, and only then writes a `rewind` checkpoint. The search is bounded by `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_REORG_REWIND` and cannot exceed 64 blocks.
+
+Provider agreement here is an operational lineage check, not a consensus-finality proof or ARVIS verdict.
