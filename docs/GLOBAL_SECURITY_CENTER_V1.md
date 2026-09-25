@@ -74,9 +74,9 @@ The new Global Radar owner panel reads the already-existing owner-only persisted
 
 The surface reads current ERC-20 allowance plus spender authority evidence (contract code, EIP-7702 and ERC-1967 evidence where available). It does not infer approval provenance, owner intent or safety.
 
-### Customer dashboard
+### Customer dashboard compatibility
 
-`customer-command-universe-v2.js` is now mounted on `/dashboard`, where its existing DOM contract already exists.
+`customer-command-universe-v2.js` is preserved and registered, but is not co-executed on `/dashboard`: the active Customer Workspace V2 acceptance contract explicitly retires that command-universe DOM contract. Keeping it in the inventory preserves the module without violating the current authoritative workspace runtime.
 
 ### Security-center visual/runtime inventory
 
