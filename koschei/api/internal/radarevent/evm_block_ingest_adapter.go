@@ -26,7 +26,7 @@ func BuildEVMBlockIngestEvents(producer string, result networktarget.EVMBlockIng
 		NetworkID:        result.NetworkID,
 		SubjectKind:      "block",
 		SubjectID:        result.Hash,
-		ObservedAtUnixMS: result.ObservedAt.UnixMilli(),
+		ObservedAtUnixMS: result.BlockTimestamp.UnixMilli(),
 		State:            securityevidence.StateObserved,
 		NativeRefs: []NativeReference{
 			{Kind: "block_hash", Value: result.Hash},
@@ -58,7 +58,7 @@ func BuildEVMBlockIngestEvents(producer string, result networktarget.EVMBlockIng
 			NetworkID:        result.NetworkID,
 			SubjectKind:      "transaction",
 			SubjectID:        txHash,
-			ObservedAtUnixMS: result.ObservedAt.UnixMilli(),
+			ObservedAtUnixMS: result.BlockTimestamp.UnixMilli(),
 			State:            securityevidence.StateObserved,
 			NativeRefs: []NativeReference{
 				{Kind: "transaction_hash", Value: txHash},
@@ -96,7 +96,7 @@ func BuildEVMBlockIngestEvents(producer string, result networktarget.EVMBlockIng
 			NetworkID:        result.NetworkID,
 			SubjectKind:      "log",
 			SubjectID:        subjectID,
-			ObservedAtUnixMS: result.ObservedAt.UnixMilli(),
+			ObservedAtUnixMS: result.BlockTimestamp.UnixMilli(),
 			State:            securityevidence.StateObserved,
 			NativeRefs:       nativeRefs,
 			SourceDigests:    []string{result.LogsResponseSHA256},
