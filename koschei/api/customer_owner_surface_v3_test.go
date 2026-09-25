@@ -118,7 +118,7 @@ func TestOwnerSurfaceV4UsesOneCanonicalRuntimeAndProfessionalAuthority(t *testin
 	v3 := readSurfaceV3(t, "public/js/owner-operations-v3.js")
 	customers := readSurfaceV3(t, "public/js/owner-customer-directory.js")
 	for path, body := range map[string]string{
-		"owner-operations-v3.js": v3,
+		"owner-operations-v3.js":      v3,
 		"owner-customer-directory.js": customers,
 	} {
 		if !strings.Contains(body, "if(window.__koscheiOwnerCanonicalV4)return;") {

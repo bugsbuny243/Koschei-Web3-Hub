@@ -42,10 +42,10 @@ func (h *Handler) buildOwnerChatSnapshot(ctx context.Context) ownerChatSnapshot 
 	snapshot := ownerChatSnapshot{
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 		Services: map[string]any{
-			"database":        ownerDatabaseStatus(ctx, h.DB),
-			"ai_provider":     ownerAIProviderStatus(),
-			"neon_auth":       configuredStatus("NEON_AUTH_JWKS_URL"),
-			"solana_rpc":      configuredStatusAny("SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL", "ALCHEMY_API_KEY"),
+			"database":    ownerDatabaseStatus(ctx, h.DB),
+			"ai_provider": ownerAIProviderStatus(),
+			"neon_auth":   configuredStatus("NEON_AUTH_JWKS_URL"),
+			"solana_rpc":  configuredStatusAny("SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL", "ALCHEMY_API_KEY"),
 			"polar_billing": serviceStatus(
 				strings.TrimSpace(os.Getenv("POLAR_ACCESS_TOKEN")) != "" &&
 					strings.TrimSpace(os.Getenv("POLAR_WEBHOOK_SECRET")) != "" &&

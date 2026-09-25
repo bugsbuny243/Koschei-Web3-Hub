@@ -548,9 +548,8 @@ func ownerRadarPracticalConclusion(level string, distribution map[string]any) st
 	}
 }
 
-// OwnerKOSCHAccess exposes current wallet verification and the latest cached
-// KOSCH tier per account. Historical package/credit fields are intentionally
-// absent from this contract.
+// OwnerTokenTelemetry exposes historical KOSCH observations for owner audit only.
+// These snapshots never authorize SaaS access or influence verdict authority.
 func (h *Handler) OwnerTokenTelemetry(w http.ResponseWriter, r *http.Request) {
 	db := h.DBRead
 	if db == nil {
