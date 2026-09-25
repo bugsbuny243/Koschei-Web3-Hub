@@ -26,21 +26,25 @@ const (
 )
 
 type GlobalRadarHeadIngestTarget struct {
-	Kind      string
-	NetworkID string
-	Endpoint  string
+	Kind                 string
+	NetworkID            string
+	Endpoint             string
+	ConfirmationEndpoint string
 }
 
 type GlobalRadarHeadIngestConfig struct {
-	EventSink         GlobalRadarTelemetryEventSink
-	CursorStore       radarcursor.Store
-	Targets           []GlobalRadarHeadIngestTarget
-	Interval          time.Duration
-	HTTPClient        *http.Client
-	Now               func() time.Time
-	Health            *runtimehealth.Registry
-	MaxBlocksPerCycle int
-	MaxEventsPerBlock int
+	EventSink           GlobalRadarTelemetryEventSink
+	CursorStore         radarcursor.RecoveryStore
+	Targets             []GlobalRadarHeadIngestTarget
+	Interval            time.Duration
+	HTTPClient          *http.Client
+	Now                 func() time.Time
+	Health              *runtimehealth.Registry
+	MaxBlocksPerCycle   int
+	MaxEventsPerBlock   int
+	RequireConfirmation bool
+	AutoReorgRecovery   bool
+	MaxReorgRewind      uint64
 }
 
 type globalRadarHeadBundle struct {
