@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"koschei/api/internal/radarevent"
+	"koschei/api/internal/runtimehealth"
 	"koschei/api/internal/services"
 )
 
@@ -21,6 +22,7 @@ type GlobalRadarEventSink interface {
 type fabricConfig struct {
 	globalRadarSnapshotSink GlobalRadarSnapshotSink
 	globalRadarEventSink    GlobalRadarEventSink
+	runtimeHealth            *runtimehealth.Registry
 }
 
 type FabricOption func(*fabricConfig)
@@ -34,6 +36,12 @@ func WithGlobalRadarSnapshotSink(sink GlobalRadarSnapshotSink) FabricOption {
 func WithGlobalRadarEventSink(sink GlobalRadarEventSink) FabricOption {
 	return func(config *fabricConfig) {
 		config.globalRadarEventSink = sink
+	}
+}
+
+func WithRuntimeHealthRegistry(registry *runtimehealth.Registry) FabricOption {
+	return func(config *fabricConfig) {
+		config.runtimeHealth = registry
 	}
 }
 
@@ -129,7 +137,7 @@ func registerFabricRoutes(mux *http.ServeMux, configs ...fabricConfig) {
 		config = configs[0]
 	}
 	registerNetworkTargetRoutes(mux)
-	registerSecurityCenterRoutes(mux)
+	registerSecurityCenterRoutes(mux, config.runtimeHealth)
 	mux.HandleFunc("/fabric/networks/live", method(http.MethodGet, networkProbePage))
 	mux.HandleFunc("/fabric/networks/deployment", method(http.MethodGet, networkDeploymentCatalogHandler))
 	mux.HandleFunc("/fabric/networks/probe", method(http.MethodPost, networkTargetProbe))
@@ -162,7 +170,7 @@ func MountFabric(base http.Handler, opts ...FabricOption) http.Handler {
 	fabric := securityHeaders(fabricMux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/fabric", "/fabric/capabilities", "/fabric/security-center", "/fabric/security-center/capabilities", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/radar", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe", "/fabric/networks/probe/intelligence", "/fabric/radar/global":
+		case "/fabric", "/fabric/capabilities", "/fabric/security-center", "/fabric/security-center/capabilities", "/fabric/security-center/runtime-health", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/radar", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe", "/fabric/networks/probe/intelligence", "/fabric/radar/global":
 			fabric.ServeHTTP(w, r)
 		default:
 			base.ServeHTTP(w, r)
