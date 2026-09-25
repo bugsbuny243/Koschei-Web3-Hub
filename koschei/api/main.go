@@ -122,7 +122,7 @@ func main() {
 	} else {
 		runtimeHealth.Register("worker.global-radar-background-telemetry", "worker", "", false)
 	}
-	globalRadarHeadIngest, err := buildGlobalRadarHeadIngestConfig(globalRadarEventSink, runtimeHealth)
+	globalRadarHeadIngest, err := buildGlobalRadarHeadIngestConfig(globalRadarEventSink, globalRadarEventSink, runtimeHealth)
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar head ingest is invalid: %v", err)
 	}
