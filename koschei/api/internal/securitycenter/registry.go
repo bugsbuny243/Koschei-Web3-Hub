@@ -160,7 +160,7 @@ func Current() Snapshot {
 func preservedAssetBindings() []AssetBinding {
 	return []AssetBinding{
 		{Asset: "/js/cipher.js", Kind: "visual-runtime", State: "active", Surface: "/fabric/security-center", Reason: "non-security presentation enhancement; now mounted on the security-center surface"},
-		{Asset: "/js/customer-command-universe-v2.js", Kind: "dashboard-runtime", State: "active", Surface: "/dashboard", Reason: "syncs existing dashboard evidence/account status fields"},
+		{Asset: "/js/customer-command-universe-v2.js", Kind: "dashboard-runtime", State: "preserved_registered", Surface: "customer workspace compatibility inventory", Reason: "customer workspace v2 explicitly retires this DOM contract; preserved without co-execution so the active workspace contract remains authoritative"},
 		{Asset: "/js/early-access-v1.js", Kind: "customer-intake", State: "preserved_registered", Surface: "dedicated intake surface pending", Reason: "requires its own form contract; not injected into unrelated security workflows"},
 		{Asset: "/js/evm-spending-intelligence.js", Kind: "security-runtime", State: "active", Surface: "/scan", Reason: "bound to the existing /api/scan/approval EVM allowance and spender-authority evidence route"},
 		{Asset: "/js/feedback-button.js", Kind: "operator-feedback", State: "active", Surface: "/fabric/security-center", Reason: "provides direct feedback entry without changing evidence behavior"},
