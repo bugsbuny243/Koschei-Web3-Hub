@@ -133,3 +133,43 @@ func TestVerifyGlobalRadarIngestCheckpointSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+
+func TestLoadGlobalRadarCanonicalCheckpointAtHeightFiltersCanonicalHistory(t *testing.T) {
+	want := sampleGlobalRadarCheckpoint()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("query")
+		if !strings.Contains(query, "height = {height:UInt64}") || !strings.Contains(query, "state = 'canonical'") {
+			t.Fatalf("unexpected query: %s", query)
+		}
+		if r.URL.Query().Get("param_cursor") != want.CursorKey || r.URL.Query().Get("param_height") != "42" {
+			t.Fatalf("unexpected params: %s", r.URL.RawQuery)
+		}
+		_ = json.NewEncoder(w).Encode(globalRadarIngestCheckpointReadRow{
+			CursorKey:         want.CursorKey,
+			SchemaVersion:     radarcursor.SchemaVersion,
+			NetworkID:         want.NetworkID,
+			StreamKind:        want.StreamKind,
+			Height:            want.Height,
+			BlockHash:         want.BlockHash,
+			ParentHash:        want.ParentHash,
+			SourceEventSHA256: want.SourceEventSHA256,
+			State:             radarcursor.StateCanonical,
+			ObservedAtMillis:  want.ObservedAt.UnixMilli(),
+			CheckpointVersion: 88,
+		})
+	}))
+	defer server.Close()
+
+	client, err := New(Config{HTTPURL: server.URL, Database: "koschei_web3", User: "radar-user", Password: "radar-password", HTTPClient: server.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok, err := client.LoadGlobalRadarCanonicalCheckpointAtHeight(context.Background(), want.CursorKey, want.Height)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || got.State != radarcursor.StateCanonical || got.Height != want.Height || got.BlockHash != want.BlockHash {
+		t.Fatalf("unexpected canonical history result: ok=%t %#v", ok, got)
+	}
+}
