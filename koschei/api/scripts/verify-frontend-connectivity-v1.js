@@ -121,7 +121,11 @@ for (const item of allPublic) {
   const strings = quotedStrings(item.source);
   for (const raw of strings) {
     const asset = assetPathFromURL(raw);
-    if (asset) continue;
+    if (asset) {
+      if (!publicFiles.has(asset)) missingAssets.push({from: item.rel, ref: raw, expected: asset});
+      else if (incoming.has(asset)) incoming.get(asset).push(item.rel);
+      continue;
+    }
 
     const clean = stripURL(raw);
     if (clean.startsWith('/api/') || clean.startsWith('/fabric/')) {
