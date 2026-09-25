@@ -132,7 +132,6 @@ func TestOwnerSurfaceV4UsesOneCanonicalRuntimeAndProfessionalAuthority(t *testin
 	}
 }
 
-
 func TestCustomerRouteVisibilityIsNotOwnedByOwnerDashboardCSS(t *testing.T) {
 	css := readSurfaceV3(t, "public/css/koschei.css")
 	if strings.Contains(css, ".page{display:none}.page.active{display:block}") {
