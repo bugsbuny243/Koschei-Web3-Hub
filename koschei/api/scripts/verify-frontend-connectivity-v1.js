@@ -91,7 +91,8 @@ const incoming = new Map(runtimeAssets.map(x => [x.rel, []]));
 const runtimeGoFiles = walk(apiRoot).filter(file => file.endsWith('.go') && !file.endsWith('_test.go') && !file.startsWith(publicRoot));
 for (const file of runtimeGoFiles) {
   const source = fs.readFileSync(file, 'utf8');
-  for (const raw of quotedStrings(source)) {
+  for (const match of source.matchAll(/\/(?:js|css|sdk)\/[A-Za-z0-9_.\/-]+\.(?:js|css)|\/(?:widget|agent-widget)\.js/g)) {
+    const raw = match[0];
     const asset = assetPathFromURL(raw);
     if (!asset) continue;
     if (!publicFiles.has(asset)) missingAssets.push({from: rel(file), ref: raw, expected: asset});
