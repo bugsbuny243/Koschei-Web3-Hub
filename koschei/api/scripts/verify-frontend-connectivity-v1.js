@@ -51,7 +51,9 @@ function pagePathFromRoute(raw, publicFiles, registeredRoutes) {
 
 function quotedStrings(source) {
   const out = [];
-  for (const match of source.matchAll(/(["'`])((?:\\.|(?!\1).)*)\1/gs)) out.push(match[2]);
+  for (const re of [/'([^'\\n]*)'/g, /"([^"\\n]*)"/g, /`([^`]*)`/gs]) {
+    for (const match of source.matchAll(re)) out.push(match[1]);
+  }
   return out;
 }
 
@@ -116,14 +118,6 @@ function backendRouteExists(raw) {
 }
 
 for (const item of allPublic) {
-  for (const match of item.source.matchAll(/\/(?:js|css|sdk)\/[A-Za-z0-9_.\/-]+\.(?:js|css)|\/(?:widget|agent-widget)\.js/g)) {
-    const raw = match[0];
-    const asset = assetPathFromURL(raw);
-    if (!asset) continue;
-    if (!publicFiles.has(asset)) missingAssets.push({from: item.rel, ref: raw, expected: asset});
-    else if (incoming.has(asset)) incoming.get(asset).push(item.rel);
-  }
-
   const strings = quotedStrings(item.source);
   for (const raw of strings) {
     const asset = assetPathFromURL(raw);
