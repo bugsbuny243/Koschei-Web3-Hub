@@ -83,8 +83,13 @@ jobs:
       - name: Require gofmt-clean Global Radar paths
         run: |
           set -euo pipefail
-          unformatted="$(gofmt -l internal/clickhouse/global_radar_store.go internal/clickhouse/global_radar_store_test.go internal/clickhouse/global_radar_event_store.go internal/clickhouse/global_radar_event_store_test.go internal/clickhouse/global_radar_ingest_checkpoint_store.go internal/clickhouse/global_radar_ingest_checkpoint_store_test.go internal/radarcursor/*.go internal/radarevent/*.go internal/networktarget/*_block_ingest.go internal/networktarget/*_block_ingest_test.go internal/services/global_radar_*.go internal/services/solana_validator_telemetry.go internal/services/solana_validator_telemetry_test.go)"
-          test -z "${unformatted}" || { printf 'unformatted files:\n%s\n' "${unformatted}" >&2; exit 1; }
+          files=(internal/clickhouse/global_radar_store.go internal/clickhouse/global_radar_store_test.go internal/clickhouse/global_radar_event_store.go internal/clickhouse/global_radar_event_store_test.go internal/clickhouse/global_radar_ingest_checkpoint_store.go internal/clickhouse/global_radar_ingest_checkpoint_store_test.go internal/radarcursor/*.go internal/radarevent/*.go internal/networktarget/*_block_ingest.go internal/networktarget/*_block_ingest_test.go internal/services/global_radar_*.go internal/services/solana_validator_telemetry.go internal/services/solana_validator_telemetry_test.go)
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [ -n "${unformatted}" ]; then
+            printf 'unformatted files:\n%s\n' "${unformatted}" >&2
+            gofmt -d "${files[@]}" >&2
+            exit 1
+          fi
 
       - name: Verify reviewed migration checksum
         run: |
