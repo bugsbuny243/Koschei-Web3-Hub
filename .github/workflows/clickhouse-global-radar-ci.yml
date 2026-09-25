@@ -15,6 +15,8 @@ on:
       - "koschei/api/internal/clickhouse/global_radar_ingest_checkpoint_store_test.go"
       - "koschei/api/internal/radarcursor/**"
       - "koschei/api/internal/radarevent/**"
+      - "koschei/api/internal/networktarget/block_identity.go"
+      - "koschei/api/internal/networktarget/block_identity_test.go"
       - "koschei/api/internal/clickhouse/global_radar_store.go"
       - "koschei/api/internal/clickhouse/global_radar_store_test.go"
       - "koschei/api/internal/services/global_radar_*.go"
@@ -37,6 +39,8 @@ on:
       - "koschei/api/internal/clickhouse/global_radar_ingest_checkpoint_store_test.go"
       - "koschei/api/internal/radarcursor/**"
       - "koschei/api/internal/radarevent/**"
+      - "koschei/api/internal/networktarget/block_identity.go"
+      - "koschei/api/internal/networktarget/block_identity_test.go"
       - "koschei/api/internal/clickhouse/global_radar_store.go"
       - "koschei/api/internal/clickhouse/global_radar_store_test.go"
       - "koschei/api/internal/services/global_radar_*.go"
@@ -83,7 +87,7 @@ jobs:
       - name: Require gofmt-clean Global Radar paths
         run: |
           set -euo pipefail
-          files=(internal/clickhouse/global_radar_store.go internal/clickhouse/global_radar_store_test.go internal/clickhouse/global_radar_event_store.go internal/clickhouse/global_radar_event_store_test.go internal/clickhouse/global_radar_ingest_checkpoint_store.go internal/clickhouse/global_radar_ingest_checkpoint_store_test.go internal/radarcursor/*.go internal/radarevent/*.go internal/networktarget/*_block_ingest.go internal/networktarget/*_block_ingest_test.go internal/services/global_radar_*.go internal/services/solana_validator_telemetry.go internal/services/solana_validator_telemetry_test.go)
+          files=(internal/clickhouse/global_radar_store.go internal/clickhouse/global_radar_store_test.go internal/clickhouse/global_radar_event_store.go internal/clickhouse/global_radar_event_store_test.go internal/clickhouse/global_radar_ingest_checkpoint_store.go internal/clickhouse/global_radar_ingest_checkpoint_store_test.go internal/radarcursor/*.go internal/radarevent/*.go internal/networktarget/*_block_ingest.go internal/networktarget/*_block_ingest_test.go internal/networktarget/block_identity.go internal/networktarget/block_identity_test.go internal/services/global_radar_*.go internal/services/solana_validator_telemetry.go internal/services/solana_validator_telemetry_test.go)
           unformatted="$(gofmt -l "${files[@]}")"
           if [ -n "${unformatted}" ]; then
             printf 'unformatted files:\n%s\n' "${unformatted}" >&2
