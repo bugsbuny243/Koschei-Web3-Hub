@@ -33,7 +33,7 @@ func BuildBitcoinBlockIngestEvents(producer string, result networktarget.Bitcoin
 		NetworkID:        result.NetworkID,
 		SubjectKind:      "block",
 		SubjectID:        result.Hash,
-		ObservedAtUnixMS: result.ObservedAt.UnixMilli(),
+		ObservedAtUnixMS: result.BlockTime.UnixMilli(),
 		State:            securityevidence.StateObserved,
 		NativeRefs:       nativeRefs,
 		SourceDigests:    []string{result.BlockchainInfoResponseSHA256, result.BlockHashResponseSHA256, result.BlockResponseSHA256},
@@ -57,7 +57,7 @@ func BuildBitcoinBlockIngestEvents(producer string, result networktarget.Bitcoin
 			NetworkID:        result.NetworkID,
 			SubjectKind:      "transaction",
 			SubjectID:        txid,
-			ObservedAtUnixMS: result.ObservedAt.UnixMilli(),
+			ObservedAtUnixMS: result.BlockTime.UnixMilli(),
 			State:            securityevidence.StateObserved,
 			NativeRefs: []NativeReference{
 				{Kind: "transaction_id", Value: txid},
