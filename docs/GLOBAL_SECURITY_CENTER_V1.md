@@ -105,7 +105,7 @@ The control plane must preserve these rules:
 
 The next implementation work should extend the same registry rather than creating parallel products:
 
-1. Continuous transaction/event ingest for explicitly configured non-Solana networks.
+1. Extend durable non-Solana block/transaction/log ingest with bounded automatic reorg recovery and provider-diversity confirmation.
 2. Live bridge adapters where both sides can bind the same native transfer identity.
 3. Production trusted-key registry wiring for ARVIS verdict references.
 4. Per-capability runtime health records that distinguish configured, reachable, degraded and unavailable without converting health into risk.
@@ -141,12 +141,13 @@ The registry records only operational status and bounded counters:
 
 It does not expose provider URLs, credentials, database DSNs, signing keys or other secret material. A healthy component is not a safety verdict, and a degraded component is not evidence that a chain or asset is unsafe.
 
-A separate continuous head-ingest worker is also available behind:
+A separate durable block-ingest worker is available behind:
 
 - `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED=1`;
 - `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_NETWORKS`;
-- `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_INTERVAL_SECONDS`.
+- `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_INTERVAL_SECONDS`;
+- bounded per-cycle block and per-block event limits.
 
-It requires the canonical Global Radar event ClickHouse ledger. The first version supports Ethereum, Base, Arbitrum, Optimism, Polygon, BNB Smart Chain, Avalanche C-Chain and Bitcoin mainnet. Each target verifies its native network boundary, preserves source-response SHA-256 evidence, and emits a canonical `block` event only when the observed head height advances within the running process.
+It requires both the canonical Global Radar event ledger and the migration-007 durable checkpoint ledger. Ethereum, Base, Arbitrum, Optimism, Polygon, BNB Smart Chain and Avalanche C-Chain emit canonical block, transaction-identity and block-scoped log events. Bitcoin emits canonical block and transaction-identity events. Each source adapter verifies its native network boundary and binds native RPC response bytes by SHA-256.
 
-This is deliberately not described as transaction-firehose ingestion. It observes chain heads. Transaction/log/mempool ingestion, durable cross-restart cursors and reorg-aware block-hash lineage remain separate follow-on work.
+The durable cursor advances only after the block event batch is accepted. Block hash and parent hash lineage are checked before progression. A hash discontinuity persists `reorg_observed` and freezes that stream rather than silently advancing. This slice still does not claim mempool visibility, full transaction-body completeness, multi-provider canonicality, finality, automatic reorg rewind or chain safety.
