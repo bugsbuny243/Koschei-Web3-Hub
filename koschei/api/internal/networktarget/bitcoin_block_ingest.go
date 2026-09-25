@@ -30,7 +30,6 @@ type BitcoinBlockIngestResult struct {
 	BlockHashResponseSHA256      string    `json:"block_hash_response_sha256"`
 	BlockResponseSHA256          string    `json:"block_response_sha256"`
 }
-
 type bitcoinBlockIngestWire struct {
 	Hash              string   `json:"hash"`
 	Height            int64    `json:"height"`
