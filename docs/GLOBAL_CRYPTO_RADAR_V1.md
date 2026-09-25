@@ -157,6 +157,12 @@ Global Radar does not re-grade or re-sign the verdict. The legacy projection rem
 
 An additive server-owned trusted-key registry contract can now independently reverify the same canonical ARVIS v1 payload with Ed25519. Registry entries are selected by `key_id`, require canonical unpadded base64url 32-byte public keys, and support bounded `valid_from`, `valid_until`, and `revoked_at` lifecycle controls evaluated against the verdict's authenticated `generated_at`. Only callers that explicitly supply this registry may receive `signature_verification=verified_ed25519_trusted_registry`; unknown, malformed, expired, revoked, tampered, or mismatched signatures fail closed.
 
+## Security-center integration update — 2026-09-25
+
+The Global Radar is now registered inside `koschei.security-center-capability.v1` and exposed through `GET /fabric/security-center` and `GET /fabric/security-center/capabilities`. The owner control center now has a persisted graph/event timeline reader over the existing owner-only ClickHouse APIs. This UI is explicitly historical evidence only and does not represent current chain state.
+
+The repository also preserves previously unmounted frontend runtimes through an explicit asset registry instead of deleting them or blindly co-executing incompatible versions.
+
 ## Next implementation slices
 
 1. Extend durable persistence from explicit intelligence probes to continuous background multi-network ingest without changing existing ARVIS decision authority.
