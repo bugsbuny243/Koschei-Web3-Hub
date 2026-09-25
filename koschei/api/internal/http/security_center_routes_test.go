@@ -45,7 +45,6 @@ func TestSecurityCenterSurfaceExplainsEvidenceBoundary(t *testing.T) {
 	}
 }
 
-
 func TestSecurityCenterRuntimeHealthRoute(t *testing.T) {
 	registry := runtimehealth.New()
 	registry.Register("worker.global-radar-head-ingest", "worker", "", true)
