@@ -1,14 +1,14 @@
-<!doctype html><html lang="tr"><head>
+<!doctype html><html lang="en"><head>
 <!-- ORPHAN: no inbound link as of 2026-09-14. --><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/css/koschei.css?v=1">
-<title>Developer API — Koschei ARVIS</title><style>pre{white-space:pre-wrap;color:#c7f9df}.stack{display:grid;gap:16px}.note{border:1px solid #18ffb245;background:#18ffb210;border-radius:16px;padding:15px}</style></head><body><nav class="nav"><a class="nav-logo" href="/docs">K Koschei Dokümanları</a><div class="nav-links"><a class="nav-link" href="/docs">Genel Bakış</a><a class="nav-link" href="/pricing">Planlar</a><a class="nav-link" href="/account">Hesap</a></div></nav><main class="page"><h1>Developer API Referansı</h1><p class="page-sub">API anahtarı yalnız sunucu tarafı kimlik bilgisidir; ürün erişimini atlamaz. Developer API erişimi aktif Enterprise SaaS entitlement ve geçerli API anahtarı gerektirir.</p><div class="note"><b>Akış:</b> Koschei hesabı → aktif Enterprise aboneliği → API anahtarı oluşturma → X-API-Key ile sunucu tarafı çağrı.</div><div class="stack"><section class="card"><h2>Token scan</h2><pre>curl -X POST https://tradepigloball.co/api/v1/scan/token \
+<title>Developer API — Koschei Web3</title><style>body{background:#0b0f13;color:#f2f5f7}.page{display:block!important}.nav{background:#0d1217;color:#f2f5f7}.nav-link,.nav-logo{color:#f2f5f7}pre{white-space:pre-wrap;color:#c7f9df}.stack{display:grid;gap:16px}.note{border:1px solid #18ffb245;background:#18ffb210;border-radius:16px;padding:15px}</style></head><body class="koschei-v2 koschei-enterprise"><nav class="nav"><a class="nav-logo" href="/docs">K Koschei Documentation</a><div class="nav-links"><a class="nav-link" href="/docs">Overview</a><a class="nav-link" href="/pricing">Professional</a><a class="nav-link" href="/account">Account</a></div></nav><main class="page"><h1>Developer API Reference</h1><p class="page-sub">An API key is a server-side credential only; it never bypasses product authorization. Developer API access requires an active Professional entitlement and a valid API key.</p><div class="note"><b>Flow:</b> Koschei account → active Professional entitlement → create API key → server-side X-API-Key request.</div><div class="stack"><section class="card"><h2>Token scan</h2><pre>curl -X POST https://tradepigloball.co/api/v1/scan/token \
   -H "X-API-Key: kos_live_..." \
   -H "Content-Type: application/json" \
   -d '{"mint":"SOLANA_MINT","network":"solana-mainnet"}'</pre></section><section class="card"><h2>Shield preflight</h2><pre>const response = await fetch('/api/v1/shield/preflight', {
   method: 'POST',
   headers: {'X-API-Key': apiKey, 'Content-Type': 'application/json'},
   body: JSON.stringify({target, intent: 'sign'})
-});</pre></section><section class="card"><h2>Kullanım geçmişi</h2><pre>import requests
+});</pre></section><section class="card"><h2>Usage</h2><pre>import requests
 usage = requests.get(
   'https://tradepigloball.co/api/v1/usage',
   headers={'X-API-Key': api_key}
-).json()</pre></section><section class="card"><h2>Erişim notu</h2><p>Developer API yetkisi aktif Enterprise SaaS entitlement ve geçerli sunucu tarafı API anahtarıyla belirlenir. Tarayıcıya veya istemci koduna ham API anahtarı gömmeyin.</p></section></div></main></body></html>
+).json()</pre></section><section class="card"><h2>Access boundary</h2><p>Developer API authorization is determined by the active Professional entitlement plus a valid server-side API key. Never embed a raw API key in browser or client-side code.</p></section></div></main></body></html>
