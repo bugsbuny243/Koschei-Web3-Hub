@@ -657,4 +657,3 @@ func (h *Handler) OwnerTokenTelemetry(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 }
-
