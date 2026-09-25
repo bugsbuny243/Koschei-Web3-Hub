@@ -157,4 +157,3 @@ func validBitcoinIngestHash(value string) bool {
 	_, err := hex.DecodeString(value)
 	return err == nil
 }
-
