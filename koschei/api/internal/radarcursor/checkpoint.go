@@ -34,6 +34,11 @@ type Store interface {
 	SaveGlobalRadarIngestCheckpoint(context.Context, Checkpoint) error
 }
 
+type RecoveryStore interface {
+	Store
+	LoadGlobalRadarCanonicalCheckpointAtHeight(context.Context, string, uint64) (Checkpoint, bool, error)
+}
+
 func (c Checkpoint) Canonical() (Checkpoint, error) {
 	out := c
 	out.CursorKey = strings.TrimSpace(out.CursorKey)
