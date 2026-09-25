@@ -231,7 +231,6 @@ func TestRunGlobalRadarHeadIngestCycleFreezesOnReorg(t *testing.T) {
 	}
 }
 
-
 type evmLineageFixture struct {
 	hash       string
 	parentHash string
