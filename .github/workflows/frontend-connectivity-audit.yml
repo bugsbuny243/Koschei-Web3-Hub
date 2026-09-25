@@ -1,0 +1,32 @@
+name: Frontend Connectivity Audit
+
+on:
+  push:
+    branches:
+      - fix/frontend-connectivity-v1
+    paths:
+      - 'koschei/api/public/**'
+      - 'koschei/api/internal/http/**'
+      - 'koschei/api/scripts/verify-frontend-connectivity-v1.js'
+      - '.github/workflows/frontend-connectivity-audit.yml'
+  pull_request:
+    paths:
+      - 'koschei/api/public/**'
+      - 'koschei/api/internal/http/**'
+      - 'koschei/api/scripts/verify-frontend-connectivity-v1.js'
+      - '.github/workflows/frontend-connectivity-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-connectivity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify frontend connectivity
+        run: node koschei/api/scripts/verify-frontend-connectivity-v1.js
