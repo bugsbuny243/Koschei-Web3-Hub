@@ -12,6 +12,7 @@ It sits **before** ARVIS decision logic. Chain adapters use it to move observed 
 
 - `block`
 - `transaction`
+- `log`
 - `asset`
 - `contract`
 - `bridge`
@@ -70,18 +71,29 @@ ClickHouse migration `006_global_radar_events.sql` defines an append-first ledge
 
 The writer re-verifies every event digest before any network write, canonicalizes the event again, stores the complete canonical event JSON, and binds those stored bytes with a separate payload SHA-256. The ledger does not create a risk grade or promote evidence state.
 
-The EVM, Bitcoin, Sui and Aptos intelligence probes can now emit this envelope directly from exact native response-byte digests. EVM binds `eth_chainId` and `eth_getCode` separately; Bitcoin binds mainnet genesis verification and address activity separately. Optional persistence is controlled independently by `KOSCHEI_GLOBAL_RADAR_EVENT_CLICKHOUSE_ENABLED=1`; startup verifies migration 006 before the sink is accepted.
+The EVM, Bitcoin, Sui and Aptos intelligence probes can now emit this envelope directly from exact native response-byte digests. EVM binds `eth_chainId` and `eth_getCode` separately; Bitcoin binds mainnet genesis verification and address activity separately. Optional persistence is controlled independently by `KOSCHEI_GLOBAL_RADAR_EVENT_CLICKHOUSE_ENABLED=1`; startup verifies migration 006 for the canonical event ledger and migration 007 for the durable ingest-checkpoint ledger before the sink is accepted.
 
 Graph snapshot persistence and event-ledger persistence are separate replay-convergent writes rather than a distributed transaction. If either configured sink fails, the request fails closed; retrying the same canonical evidence converges by stable snapshot/event identity.
 
 A producer must already possess the real source digest required by the event contract; normalized probe output is not retroactively relabeled as raw source evidence.
+
+## Durable block-ingest cursor and lineage
+
+`koschei.global-radar-ingest-checkpoint.v1` is an operational cursor contract stored in ClickHouse migration `007_global_radar_ingest_checkpoints.sql`. A cursor records the network/stream identity, height, block hash, parent hash, the canonical block-event digest that justified advancement, observation time, and one of `canonical`, `reorg_observed`, or `rewind`.
+
+Cursor advancement is deliberately ordered after canonical event persistence. If event persistence succeeds and checkpoint persistence fails, the next cycle may replay the same source evidence; the cursor is never allowed to claim a block that was not first written to the event ledger. Exact checkpoint replay converges while distinct lineage states remain queryable historical records.
+
+The continuous EVM adapter now emits one `block` event plus transaction-identity and block-scoped `log` events from `eth_getBlockByNumber` and `eth_getLogs(blockHash=...)`. Bitcoin emits one `block` event plus transaction-identity events from `getblockhash` and `getblock`. Native response bytes remain bound by SHA-256; the adapters do not claim full transaction bodies, mempool completeness, finality, intent, or safety.
+
+When a next block's parent hash does not match the durable cursor, or the same height resolves to a different block hash, the worker writes a durable `reorg_observed` cursor state and stops advancing that stream. Automatic rewind is intentionally not performed in this slice.
+
 
 ## Next step
 
 Build source adapters that emit this envelope from:
 
 - Solana live stream observations;
-- EVM transaction and contract probes. The address/code probe now preserves exact `eth_chainId` and `eth_getCode` response-byte SHA-256 values and can build an event directly from those native digests;
+- EVM block, transaction-identity, log and contract probes. The continuous block adapter preserves exact `eth_chainId`, block and block-scoped log response-byte SHA-256 values; the address/code probe separately preserves exact `eth_chainId` and `eth_getCode` response-byte SHA-256 values;
 - Bitcoin address/network observations. The Esplora address probe now preserves separate exact response-byte SHA-256 values for mainnet genesis verification and address activity;
 - Sui and Aptos identity/network observations. Both probes now retain the exact bounded identity-response SHA-256 needed for native provenance.
 
