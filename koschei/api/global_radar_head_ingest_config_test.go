@@ -106,7 +106,6 @@ func TestBuildGlobalRadarHeadIngestConfigRejectsOversizedCycle(t *testing.T) {
 	}
 }
 
-
 func TestBuildGlobalRadarHeadIngestConfigRequiresConfirmationEndpointWhenEnabled(t *testing.T) {
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED", "1")
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_NETWORKS", "ethereum-mainnet")
