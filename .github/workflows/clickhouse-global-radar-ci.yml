@@ -7,8 +7,13 @@ on:
       - "koschei/api/clickhouse/migrations/005_global_radar_graph_records.sql.sha256"
       - "koschei/api/clickhouse/migrations/006_global_radar_events.sql"
       - "koschei/api/clickhouse/migrations/006_global_radar_events.sql.sha256"
+      - "koschei/api/clickhouse/migrations/007_global_radar_ingest_checkpoints.sql"
+      - "koschei/api/clickhouse/migrations/007_global_radar_ingest_checkpoints.sql.sha256"
       - "koschei/api/internal/clickhouse/global_radar_event_store.go"
       - "koschei/api/internal/clickhouse/global_radar_event_store_test.go"
+      - "koschei/api/internal/clickhouse/global_radar_ingest_checkpoint_store.go"
+      - "koschei/api/internal/clickhouse/global_radar_ingest_checkpoint_store_test.go"
+      - "koschei/api/internal/radarcursor/**"
       - "koschei/api/internal/radarevent/**"
       - "koschei/api/internal/clickhouse/global_radar_store.go"
       - "koschei/api/internal/clickhouse/global_radar_store_test.go"
@@ -24,8 +29,13 @@ on:
       - "koschei/api/clickhouse/migrations/005_global_radar_graph_records.sql.sha256"
       - "koschei/api/clickhouse/migrations/006_global_radar_events.sql"
       - "koschei/api/clickhouse/migrations/006_global_radar_events.sql.sha256"
+      - "koschei/api/clickhouse/migrations/007_global_radar_ingest_checkpoints.sql"
+      - "koschei/api/clickhouse/migrations/007_global_radar_ingest_checkpoints.sql.sha256"
       - "koschei/api/internal/clickhouse/global_radar_event_store.go"
       - "koschei/api/internal/clickhouse/global_radar_event_store_test.go"
+      - "koschei/api/internal/clickhouse/global_radar_ingest_checkpoint_store.go"
+      - "koschei/api/internal/clickhouse/global_radar_ingest_checkpoint_store_test.go"
+      - "koschei/api/internal/radarcursor/**"
       - "koschei/api/internal/radarevent/**"
       - "koschei/api/internal/clickhouse/global_radar_store.go"
       - "koschei/api/internal/clickhouse/global_radar_store_test.go"
@@ -73,7 +83,7 @@ jobs:
       - name: Require gofmt-clean Global Radar paths
         run: |
           set -euo pipefail
-          unformatted="$(gofmt -l internal/clickhouse/global_radar_store.go internal/clickhouse/global_radar_store_test.go internal/clickhouse/global_radar_event_store.go internal/clickhouse/global_radar_event_store_test.go internal/radarevent/*.go internal/services/global_radar_*.go internal/services/solana_validator_telemetry.go internal/services/solana_validator_telemetry_test.go)"
+          unformatted="$(gofmt -l internal/clickhouse/global_radar_store.go internal/clickhouse/global_radar_store_test.go internal/clickhouse/global_radar_event_store.go internal/clickhouse/global_radar_event_store_test.go internal/clickhouse/global_radar_ingest_checkpoint_store.go internal/clickhouse/global_radar_ingest_checkpoint_store_test.go internal/radarcursor/*.go internal/radarevent/*.go internal/networktarget/*_block_ingest.go internal/networktarget/*_block_ingest_test.go internal/services/global_radar_*.go internal/services/solana_validator_telemetry.go internal/services/solana_validator_telemetry_test.go)"
           test -z "${unformatted}" || { printf 'unformatted files:\n%s\n' "${unformatted}" >&2; exit 1; }
 
       - name: Verify reviewed migration checksum
@@ -82,6 +92,7 @@ jobs:
           cd clickhouse/migrations
           sha256sum -c 005_global_radar_graph_records.sql.sha256
           sha256sum -c 006_global_radar_events.sql.sha256
+          sha256sum -c 007_global_radar_ingest_checkpoints.sql.sha256
 
       - name: Validate migration on ClickHouse 26.2
         run: |
@@ -90,6 +101,7 @@ jobs:
           test -n "${container_id}"
           docker exec -i "${container_id}" clickhouse-client --multiquery < clickhouse/migrations/005_global_radar_graph_records.sql
           docker exec -i "${container_id}" clickhouse-client --multiquery < clickhouse/migrations/006_global_radar_events.sql
+          docker exec -i "${container_id}" clickhouse-client --multiquery < clickhouse/migrations/007_global_radar_ingest_checkpoints.sql
 
           table_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,'|',sorting_key) FROM system.tables WHERE database='koschei_web3' AND name='global_radar_graph_records' FORMAT TSVRaw")"
           payload_hash_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='global_radar_graph_records' AND name='payload_sha256' FORMAT TSVRaw")"
@@ -106,6 +118,14 @@ jobs:
           test "${event_table_meta}" = "ReplacingMergeTree|network_id, event_date, kind, subject_id, event_sha256"
           test "${event_payload_hash_type}" = "FixedString(64)"
           test "${event_observed_type}" = "DateTime64(3, 'UTC')"
+
+          checkpoint_table_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,\'|\',sorting_key) FROM system.tables WHERE database=\'koschei_web3\' AND name=\'global_radar_ingest_checkpoints\' FORMAT TSVRaw")"
+          checkpoint_event_hash_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database=\'koschei_web3\' AND table=\'global_radar_ingest_checkpoints\' AND name=\'source_event_sha256\' FORMAT TSVRaw")"
+          checkpoint_observed_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database=\'koschei_web3\' AND table=\'global_radar_ingest_checkpoints\' AND name=\'observed_at\' FORMAT TSVRaw")"
+
+          test "${checkpoint_table_meta}" = "ReplacingMergeTree|cursor_key, height, block_hash, source_event_sha256, state"
+          test "${checkpoint_event_hash_type}" = "FixedString(64)"
+          test "${checkpoint_observed_type}" = "DateTime64(3, \'UTC\')"
 
       - name: Validate replay convergence and state-history preservation
         run: |
