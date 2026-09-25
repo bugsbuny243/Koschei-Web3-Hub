@@ -16,7 +16,7 @@ Rules:
 - Answer in Turkish unless the owner explicitly asks for another language.
 - Speak naturally, directly and conversationally. Be concise, but explain important risks.
 - Use the supplied operational snapshot and deterministic Radar result as the source of truth.
-- Koschei uses a free-core + SaaS entitlement model. Starter, Professional and Enterprise are the canonical commercial plans. Paddle is the canonical billing provider.
+- Koschei uses server-side SaaS entitlements. Professional is the single operational paid customer plan. Polar is the canonical billing provider.
 - KOSCH holdings, wallet balances, historical holder tiers and token-access snapshots are audit-only legacy data and MUST NOT grant product access, discounts, quotas, API permissions, evidence weight or verdict authority.
 - ARVIS is early access. A registered route is not proof that the surrounding feature is production-complete. Monitoring, advanced radar, developer and integration surfaces must be described as preview until their production validation is complete.
 - Clearly distinguish verified facts, estimates, previews and suggestions.
@@ -46,15 +46,21 @@ func (h *Handler) buildOwnerChatSnapshot(ctx context.Context) ownerChatSnapshot 
 			"ai_provider":     ownerAIProviderStatus(),
 			"neon_auth":       configuredStatus("NEON_AUTH_JWKS_URL"),
 			"solana_rpc":      configuredStatusAny("SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL", "ALCHEMY_API_KEY"),
-			"paddle_billing":  serviceStatus(strings.TrimSpace(os.Getenv("PADDLE_API_KEY")) != "" && strings.TrimSpace(os.Getenv("PADDLE_WEBHOOK_SECRET")) != "", "configured", "incomplete"),
+			"polar_billing": serviceStatus(
+				strings.TrimSpace(os.Getenv("POLAR_ACCESS_TOKEN")) != "" &&
+					strings.TrimSpace(os.Getenv("POLAR_WEBHOOK_SECRET")) != "" &&
+					strings.TrimSpace(os.Getenv("POLAR_PRODUCT_PROFESSIONAL_ID")) != "",
+				"configured",
+				"incomplete",
+			),
 			"visual_renderer": "client_canvas_png_ready",
 		},
 		Business: map[string]any{},
 		Access: map[string]any{
 			"model":             "free_core_saas_entitlements",
 			"free_core":         []string{"safe_check", "basic_token_scan"},
-			"plans":             []string{"starter", "professional", "enterprise"},
-			"payment_providers": []string{"paddle"},
+			"plans":             []string{"professional"},
+			"payment_providers": []string{"polar"},
 			"token_authority":   "retired_audit_only",
 			"arvis_readiness":   "early_access",
 		},
@@ -69,10 +75,13 @@ func (h *Handler) buildOwnerChatSnapshot(ctx context.Context) ownerChatSnapshot 
 		snapshot.Access["verified_wallets"] = ownerCount(ctx, h.DB, `SELECT count(DISTINCT auth_subject) FROM verified_wallet_links WHERE status='active'`)
 	}
 	if ownerTableExists(ctx, h.DB, "entitlements") {
-		snapshot.Access["active_paid_entitlements"] = ownerCount(ctx, h.DB, `SELECT count(*) FROM entitlements WHERE status='active' AND COALESCE(plan_id,'') NOT IN ('','free') AND (expires_at IS NULL OR expires_at>now())`)
-		snapshot.Access["starter_entitlements"] = ownerCount(ctx, h.DB, `SELECT count(*) FROM entitlements WHERE status='active' AND lower(COALESCE(plan_id,'')) IN ('starter','basic') AND (expires_at IS NULL OR expires_at>now())`)
-		snapshot.Access["professional_entitlements"] = ownerCount(ctx, h.DB, `SELECT count(*) FROM entitlements WHERE status='active' AND lower(COALESCE(plan_id,'')) IN ('professional','builder','pro') AND (expires_at IS NULL OR expires_at>now())`)
-		snapshot.Access["enterprise_entitlements"] = ownerCount(ctx, h.DB, `SELECT count(*) FROM entitlements WHERE status='active' AND lower(COALESCE(plan_id,'')) IN ('enterprise','studio') AND (expires_at IS NULL OR expires_at>now())`)
+		snapshot.Access["active_professional_entitlements"] = ownerCount(ctx, h.DB, `
+			SELECT count(*)
+			FROM entitlements
+			WHERE status='active'
+			  AND lower(COALESCE(plan_id,'')) IN ('professional','starter','enterprise','builder','pro','studio','basic')
+			  AND (expires_at IS NULL OR expires_at>now())`)
+		snapshot.Access["canonical_paid_plan"] = "professional"
 	}
 	if ownerTableExists(ctx, h.DB, "token_access_snapshots") {
 		snapshot.Access["historical_token_access_records"] = ownerCount(ctx, h.DB, `SELECT count(*) FROM token_access_snapshots`)

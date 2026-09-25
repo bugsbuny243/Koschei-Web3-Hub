@@ -154,6 +154,7 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/api/owner/logout", ownerOnly(h, method("POST", h.OwnerLogout)))
 	mux.HandleFunc("/api/owner/command-center", ownerOnly(h, method("GET", h.OwnerCommandCenterStatus)))
 	mux.HandleFunc("/api/owner/operations", ownerOnly(h, method("GET", h.OwnerOperationsStatus)))
+	mux.HandleFunc("/api/owner/token-telemetry", ownerOnly(h, method("GET", h.OwnerTokenTelemetry)))
 	mux.HandleFunc("/api/owner/arvis", requiresDB(h, ownerOnly(h, method("GET", h.OwnerRadarOverviewFast))))
 	mux.HandleFunc("/api/owner/arvis/scan", ownerOnly(h, method("POST", h.OwnerUnifiedRadarScan)))
 	mux.HandleFunc("/api/owner/radar/unified", ownerOnly(h, method("POST", h.OwnerUnifiedRadarScan)))
