@@ -206,3 +206,76 @@ func (c *Client) VerifyGlobalRadarIngestCheckpointSchema(ctx context.Context) er
 	}
 	return nil
 }
+
+func (c *Client) LoadGlobalRadarCanonicalCheckpointAtHeight(ctx context.Context, cursorKey string, height uint64) (radarcursor.Checkpoint, bool, error) {
+	if c == nil {
+		return radarcursor.Checkpoint{}, false, fmt.Errorf("ClickHouse client is unavailable")
+	}
+	cursorKey = strings.TrimSpace(cursorKey)
+	if cursorKey == "" || len(cursorKey) > 256 {
+		return radarcursor.Checkpoint{}, false, fmt.Errorf("Global Radar ingest cursor key is invalid")
+	}
+
+	queryURL := *c.endpoint
+	params := queryURL.Query()
+	queryText := "SELECT\n" +
+		"    cursor_key, schema_version, network_id, stream_kind, height, block_hash, parent_hash,\n" +
+		"    toString(source_event_sha256) AS source_event_sha256, state,\n" +
+		"    toUnixTimestamp64Milli(observed_at) AS observed_at_ms, checkpoint_version\n" +
+		"FROM global_radar_ingest_checkpoints\n" +
+		"WHERE cursor_key = {cursor:String} AND height = {height:UInt64} AND state = 'canonical'\n" +
+		"ORDER BY checkpoint_version DESC, recorded_at DESC\n" +
+		"LIMIT 1\nFORMAT JSONEachRow"
+	params.Set("query", queryText)
+	params.Set("param_cursor", cursorKey)
+	params.Set("param_height", fmt.Sprintf("%d", height))
+	params.Set("max_execution_time", "10")
+	params.Set("max_result_rows", "1")
+	params.Set("result_overflow_mode", "throw")
+	queryURL.RawQuery = params.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return radarcursor.Checkpoint{}, false, fmt.Errorf("build ClickHouse Global Radar canonical checkpoint read request: %w", err)
+	}
+	c.applyHeaders(req)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return radarcursor.Checkpoint{}, false, fmt.Errorf("ClickHouse Global Radar canonical checkpoint read failed: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		message, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return radarcursor.Checkpoint{}, false, fmt.Errorf("ClickHouse Global Radar canonical checkpoint read failed status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(message)))
+	}
+	limited := &io.LimitedReader{R: resp.Body, N: 64*1024 + 1}
+	decoder := json.NewDecoder(limited)
+	var row globalRadarIngestCheckpointReadRow
+	if err := decoder.Decode(&row); err != nil {
+		if err == io.EOF {
+			return radarcursor.Checkpoint{}, false, nil
+		}
+		return radarcursor.Checkpoint{}, false, fmt.Errorf("decode ClickHouse Global Radar canonical checkpoint: %w", err)
+	}
+	if limited.N <= 0 {
+		return radarcursor.Checkpoint{}, false, fmt.Errorf("ClickHouse Global Radar canonical checkpoint response too large")
+	}
+	var extra json.RawMessage
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return radarcursor.Checkpoint{}, false, fmt.Errorf("ClickHouse Global Radar canonical checkpoint returned multiple rows")
+	}
+	checkpoint, err := (radarcursor.Checkpoint{
+		CursorKey: row.CursorKey, SchemaVersion: row.SchemaVersion,
+		NetworkID: row.NetworkID, StreamKind: row.StreamKind, Height: row.Height,
+		BlockHash: row.BlockHash, ParentHash: row.ParentHash,
+		SourceEventSHA256: row.SourceEventSHA256, State: row.State,
+		ObservedAt: time.UnixMilli(row.ObservedAtMillis).UTC(),
+	}).Canonical()
+	if err != nil {
+		return radarcursor.Checkpoint{}, false, fmt.Errorf("validate stored Global Radar canonical checkpoint: %w", err)
+	}
+	if checkpoint.CursorKey != cursorKey || checkpoint.Height != height || checkpoint.State != radarcursor.StateCanonical || row.CheckpointVersion == 0 {
+		return radarcursor.Checkpoint{}, false, fmt.Errorf("stored Global Radar canonical checkpoint identity is invalid")
+	}
+	return checkpoint, true, nil
+}

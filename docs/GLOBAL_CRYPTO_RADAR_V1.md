@@ -165,7 +165,7 @@ The repository also preserves previously unmounted frontend runtimes through an 
 
 ## Next implementation slices
 
-1. Extend the new durable multi-network block/transaction/log ingest with bounded automatic reorg recovery and multi-provider lineage confirmation without changing ARVIS decision authority.
+1. Extend provider-diversity verification beyond two-provider block identity while preserving ARVIS decision authority.
 2. Add an operator graph/timeline visualization over the owner-only graph and canonical event retrieval APIs; both bounded authenticated JSON read contracts now exist.
 3. Connect bridge-specific live adapters only where both chain-side transfer identities can be independently anchored.
 4. Wire the trusted verdict-key registry into production verdict-reference creation; the verification contract now exists but the legacy unverified projection remains the default for callers that do not supply server-owned trust material.
@@ -185,9 +185,11 @@ The opt-in worker now persists a cross-restart cursor in the migration-007 Click
 
 For EVM targets the adapter verifies chain ID, fetches the exact block identity with `eth_getBlockByNumber`, binds transaction identities from that block, and fetches logs with `eth_getLogs(blockHash=...)`. It emits canonical `block`, `transaction`, and `log` events whose source-response bytes are SHA-256 bound. Bitcoin mainnet similarly binds `getblockhash` and `getblock` evidence and emits canonical block plus transaction-identity events.
 
-Cursor advancement happens only after the event batch is accepted. The next block's parent hash must match the stored block hash; the same height must continue resolving to the stored hash. A mismatch writes a durable `reorg_observed` state and freezes the stream instead of advancing on ambiguous lineage.
+Cursor advancement happens only after the event batch is accepted. The next block's parent hash must match the stored block hash; the same height must continue resolving to the stored hash. Optional confirmation RPCs can independently re-read block identity before persistence. A primary/confirmation disagreement fails closed without writing that block batch.
 
-These records remain observations from configured endpoints. They do not claim finality, multi-provider canonicality, full transaction bodies, mempool visibility, automatic reorg rewind, actor identity, intent or chain safety. ARVIS remains the only connected verdict authority.
+If automatic recovery is enabled, a mismatch is first persisted as `reorg_observed`. The worker then scans backward through already stored canonical checkpoints, requiring the primary and confirmation providers to agree on the same historical block hash and parent hash and requiring that identity to equal the stored checkpoint. A successful match writes a bounded `rewind` checkpoint and the following cycle resumes from that ancestor. No automatic replacement branch is accepted without that two-provider/stored-history intersection.
+
+These records remain observations from configured endpoints. Two-provider agreement is not finality or a chain-safety verdict. The system still does not claim full transaction bodies, mempool visibility, actor identity or intent. ARVIS remains the only connected verdict authority.
 
 ### Runtime health
 

@@ -43,7 +43,7 @@ func buildGlobalRadarSnapshotSink(parent context.Context) (globalRadarGraphStore
 type globalRadarEventStore interface {
 	apihttp.GlobalRadarEventSink
 	apihttp.GlobalRadarEventReader
-	radarcursor.Store
+	radarcursor.RecoveryStore
 	VerifyGlobalRadarIngestCheckpointSchema(context.Context) error
 }
 
@@ -153,7 +153,32 @@ func globalRadarEVMEndpoint(networkID string) string {
 	return strings.TrimSpace(os.Getenv(name))
 }
 
-func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEventSink, cursorStore radarcursor.Store, health *runtimehealth.Registry) (*services.GlobalRadarHeadIngestConfig, error) {
+func globalRadarConfirmationEndpoint(networkID string) string {
+	var name string
+	switch networkID {
+	case "ethereum-mainnet":
+		name = "KOSCHEI_GLOBAL_RADAR_CONFIRMATION_ETHEREUM_RPC_URL"
+	case "base-mainnet":
+		name = "KOSCHEI_GLOBAL_RADAR_CONFIRMATION_BASE_RPC_URL"
+	case "arbitrum-mainnet":
+		name = "KOSCHEI_GLOBAL_RADAR_CONFIRMATION_ARBITRUM_RPC_URL"
+	case "optimism-mainnet":
+		name = "KOSCHEI_GLOBAL_RADAR_CONFIRMATION_OPTIMISM_RPC_URL"
+	case "polygon-mainnet":
+		name = "KOSCHEI_GLOBAL_RADAR_CONFIRMATION_POLYGON_RPC_URL"
+	case "bnb-mainnet":
+		name = "KOSCHEI_GLOBAL_RADAR_CONFIRMATION_BNB_RPC_URL"
+	case "avalanche-mainnet":
+		name = "KOSCHEI_GLOBAL_RADAR_CONFIRMATION_AVALANCHE_RPC_URL"
+	case "bitcoin-mainnet":
+		name = "KOSCHEI_GLOBAL_RADAR_CONFIRMATION_BITCOIN_CORE_RPC_URL"
+	default:
+		return ""
+	}
+	return strings.TrimSpace(os.Getenv(name))
+}
+
+func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEventSink, cursorStore radarcursor.RecoveryStore, health *runtimehealth.Registry) (*services.GlobalRadarHeadIngestConfig, error) {
 	if strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED")) != "1" {
 		if health != nil {
 			health.Register("worker.global-radar-head-ingest", "worker", "", false)
@@ -191,6 +216,16 @@ func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEve
 		}
 		maxEventsPerBlock = parsed
 	}
+	requireConfirmation := strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_REQUIRE_CONFIRMATION")) == "1"
+	autoReorgRecovery := strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_AUTO_REORG_RECOVERY")) == "1"
+	maxReorgRewind := 12
+	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_REORG_REWIND")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > 64 {
+			return nil, fmt.Errorf("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_REORG_REWIND must be between 1 and 64")
+		}
+		maxReorgRewind = parsed
+	}
 
 	seen := map[string]bool{}
 	targets := make([]services.GlobalRadarHeadIngestTarget, 0)
@@ -206,13 +241,21 @@ func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEve
 			if endpoint == "" {
 				return nil, fmt.Errorf("%s RPC endpoint is required for Global Radar head ingest", networkID)
 			}
-			targets = append(targets, services.GlobalRadarHeadIngestTarget{Kind: services.GlobalRadarHeadIngestEVM, NetworkID: networkID, Endpoint: endpoint})
+			confirmation := globalRadarConfirmationEndpoint(networkID)
+			if (requireConfirmation || autoReorgRecovery) && confirmation == "" {
+				return nil, fmt.Errorf("%s confirmation RPC endpoint is required when confirmation or auto reorg recovery is enabled", networkID)
+			}
+			targets = append(targets, services.GlobalRadarHeadIngestTarget{Kind: services.GlobalRadarHeadIngestEVM, NetworkID: networkID, Endpoint: endpoint, ConfirmationEndpoint: confirmation})
 		case "bitcoin-mainnet":
 			endpoint := strings.TrimSpace(os.Getenv("BITCOIN_CORE_RPC_URL"))
 			if endpoint == "" {
 				return nil, fmt.Errorf("BITCOIN_CORE_RPC_URL is required for bitcoin-mainnet Global Radar head ingest")
 			}
-			targets = append(targets, services.GlobalRadarHeadIngestTarget{Kind: services.GlobalRadarHeadIngestBitcoin, NetworkID: networkID, Endpoint: endpoint})
+			confirmation := globalRadarConfirmationEndpoint(networkID)
+			if (requireConfirmation || autoReorgRecovery) && confirmation == "" {
+				return nil, fmt.Errorf("bitcoin-mainnet confirmation RPC endpoint is required when confirmation or auto reorg recovery is enabled")
+			}
+			targets = append(targets, services.GlobalRadarHeadIngestTarget{Kind: services.GlobalRadarHeadIngestBitcoin, NetworkID: networkID, Endpoint: endpoint, ConfirmationEndpoint: confirmation})
 		default:
 			return nil, fmt.Errorf("Global Radar head ingest does not yet support %q", networkID)
 		}
@@ -230,5 +273,6 @@ func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEve
 	return &services.GlobalRadarHeadIngestConfig{
 		EventSink: eventSink, CursorStore: cursorStore, Targets: targets, Interval: interval, Health: health,
 		MaxBlocksPerCycle: maxBlocksPerCycle, MaxEventsPerBlock: maxEventsPerBlock,
+		RequireConfirmation: requireConfirmation, AutoReorgRecovery: autoReorgRecovery, MaxReorgRewind: uint64(maxReorgRewind),
 	}, nil
 }
