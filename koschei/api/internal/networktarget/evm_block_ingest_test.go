@@ -20,8 +20,8 @@ func TestProbeEVMBlockIngestBindsBlockTransactionsAndLogs(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		var req struct {
-			ID     int             `json:"id"`
-			Method string          `json:"method"`
+			ID     int               `json:"id"`
+			Method string            `json:"method"`
 			Params []json.RawMessage `json:"params"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
