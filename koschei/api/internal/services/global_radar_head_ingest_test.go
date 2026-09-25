@@ -73,14 +73,14 @@ func evmHeadIngestServer(t *testing.T, head uint64, blockHash, parentHash string
 			if withLog {
 				txHash := txHashes[0]
 				logs = append(logs, map[string]any{
-					"address": "0x" + strings.Repeat("e", 40),
-					"topics": []string{"0x" + strings.Repeat("f", 64)},
-					"data": "0x1234",
+					"address":         "0x" + strings.Repeat("e", 40),
+					"topics":          []string{"0x" + strings.Repeat("f", 64)},
+					"data":            "0x1234",
 					"transactionHash": txHash,
-					"blockHash": blockHash,
-					"blockNumber": formatHex(head),
-					"logIndex": "0x0",
-					"removed": false,
+					"blockHash":       blockHash,
+					"blockNumber":     formatHex(head),
+					"logIndex":        "0x0",
+					"removed":         false,
 				})
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": logs})
