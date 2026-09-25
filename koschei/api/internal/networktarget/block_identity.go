@@ -10,12 +10,12 @@ import (
 )
 
 type BlockIdentity struct {
-	NetworkID  string    `json:"network_id"`
-	Height     uint64    `json:"height"`
-	Hash       string    `json:"hash"`
-	ParentHash string    `json:"parent_hash,omitempty"`
-	ObservedAt time.Time `json:"observed_at"`
-	SourceSHA256 string  `json:"source_sha256"`
+	NetworkID    string    `json:"network_id"`
+	Height       uint64    `json:"height"`
+	Hash         string    `json:"hash"`
+	ParentHash   string    `json:"parent_hash,omitempty"`
+	ObservedAt   time.Time `json:"observed_at"`
+	SourceSHA256 string    `json:"source_sha256"`
 }
 
 func ProbeEVMBlockIdentity(ctx context.Context, client *http.Client, endpoint, networkID string, height uint64, observedAt time.Time) (BlockIdentity, error) {
@@ -63,11 +63,11 @@ func ProbeEVMBlockIdentity(ctx context.Context, client *http.Client, endpoint, n
 		return BlockIdentity{}, fmt.Errorf("evm_block_identity_hash_invalid")
 	}
 	return BlockIdentity{
-		NetworkID: networkID,
-		Height: height,
-		Hash: hash,
-		ParentHash: parentHash,
-		ObservedAt: observedAt.UTC(),
+		NetworkID:    networkID,
+		Height:       height,
+		Hash:         hash,
+		ParentHash:   parentHash,
+		ObservedAt:   observedAt.UTC(),
 		SourceSHA256: digest,
 	}, nil
 }
@@ -119,11 +119,11 @@ func ProbeBitcoinBlockIdentity(ctx context.Context, client *http.Client, endpoin
 		return BlockIdentity{}, fmt.Errorf("bitcoin_block_identity_parent_invalid")
 	}
 	return BlockIdentity{
-		NetworkID: "bitcoin-mainnet",
-		Height: height,
-		Hash: blockHash,
-		ParentHash: parentHash,
-		ObservedAt: observedAt.UTC(),
+		NetworkID:    "bitcoin-mainnet",
+		Height:       height,
+		Hash:         blockHash,
+		ParentHash:   parentHash,
+		ObservedAt:   observedAt.UTC(),
 		SourceSHA256: digest,
 	}, nil
 }
