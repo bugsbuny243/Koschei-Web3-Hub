@@ -89,6 +89,7 @@ function mount(){
   ensureUniverse();
   const main=document.querySelector('main.wrap, main.page, main.ops-page');
   if(!main||main.closest('.customer-app-shell'))return;
+  main.classList.add('customer-route-visible');
   normalizeLegacyAccessCopy(main);
   const shell=document.createElement('div');shell.className='customer-app-shell';
   const content=document.createElement('div');content.className='customer-main';
