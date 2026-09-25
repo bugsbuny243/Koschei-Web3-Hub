@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Read current ERC-20 allowance and bounded spender authority evidence with Koschei Web3.">
+<meta name="theme-color" content="#02050a">
+<title>Approval Intelligence · Koschei Web3</title>
+<link rel="stylesheet" href="/css/koschei.css?v=1">
+<style>
+.esi-shell{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:16px}.esi-panel{border:1px solid rgba(255,255,255,.1);border-radius:18px;background:#071019;padding:18px}.esi-form{display:grid;gap:12px}.esi-field{display:grid;gap:6px}.esi-field label,.esi-subhead span{font:800 10px ui-monospace,monospace;letter-spacing:.09em;text-transform:uppercase;color:#85a3b2}.esi-input,.esi-select{width:100%;border:1px solid rgba(255,255,255,.14);border-radius:11px;background:#03090e;color:#eefcff;padding:11px 12px}.esi-status{margin-top:12px;color:#9eb4bf}.esi-status[data-state="error"]{color:#ff9fb5}.esi-status[data-state="ready"]{color:#7ff0c4}.esi-result{display:grid;gap:13px}.esi-summary,.esi-identity,.esi-grid,.esi-trust{display:grid;gap:8px}.esi-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.esi-summary>div,.esi-identity>div,.esi-trust>div,.esi-authority-row{border:1px solid rgba(255,255,255,.09);border-radius:11px;padding:11px;background:#09151f}.esi-summary span,.esi-identity span,.esi-trust span{display:block;color:#78909d;font-size:11px}.esi-summary strong,.esi-identity code,.esi-trust b{display:block;margin-top:5px;overflow-wrap:anywhere}.esi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.esi-subhead{display:flex;justify-content:space-between;gap:10px;margin-bottom:8px}.esi-authority{display:grid;gap:7px}.esi-authority-row{display:grid;grid-template-columns:auto 1fr;gap:10px}.esi-authority-row small{display:block;color:#91a7b3;overflow-wrap:anywhere}.esi-reasons code{display:inline-block;margin:4px 6px 0 0;padding:6px 8px;border-radius:8px;background:#0b1a24;color:#8fe6ff}.esi-foot,.esi-empty{color:#8ea4af;font-size:12px;line-height:1.5}.esi-empty{padding:14px;border:1px dashed rgba(255,255,255,.12);border-radius:12px}.esi-summary [data-alert="true"]{border-color:rgba(255,85,119,.45)}@media(max-width:850px){.esi-shell,.esi-grid{grid-template-columns:1fr}.esi-summary{grid-template-columns:1fr}}
+</style>
+</head>
+<body class="safety-page koschei-v2">
+<main class="safety-wrap">
+<nav class="safety-nav"><a class="safety-brand" href="/"><span class="safety-mark">K</span><span><strong>Koschei Web3</strong><small>Approval Intelligence</small></span></a><div class="safety-links"><a class="safety-btn" href="/transaction-firewall">Transaction Guard</a><a class="safety-btn" href="/developers">Developers</a><a class="safety-btn" href="/pricing">Professional</a></div></nav>
+<header class="safety-hero"><span class="safety-kicker">EVM · READ-ONLY ALLOWANCE OBSERVATION</span><h1>Inspect current spending authority without calling it safety.</h1><p>Provide an EVM network, ERC-20 token, owner and spender. Koschei performs bounded read-only RPC observations for the current allowance and, when available, the spender code / proxy authority surface. It does not infer approval provenance, owner intent, or maliciousness.</p><div class="safety-proofline"><span class="safety-chip">No wallet connect</span><span class="safety-chip">Read-only RPC</span><span class="safety-chip">Current allowance only</span><span class="safety-chip warn">Permission ≠ safety</span></div></header>
+<section class="esi-shell">
+<article class="esi-panel"><span class="safety-kicker">INPUT</span><h2>Read spending authority.</h2><form class="esi-form" id="evmSpendingForm">
+<div class="esi-field"><label for="evmSpendingNetwork">Network</label><select class="esi-select" id="evmSpendingNetwork"><option value="ethereum-mainnet">Ethereum Mainnet</option><option value="base-mainnet">Base Mainnet</option><option value="arbitrum-mainnet">Arbitrum Mainnet</option><option value="optimism-mainnet">Optimism Mainnet</option><option value="polygon-mainnet">Polygon Mainnet</option><option value="bnb-mainnet">BNB Mainnet</option><option value="avalanche-mainnet">Avalanche Mainnet</option></select></div>
+<div class="esi-field"><label for="evmSpendingToken">ERC-20 token</label><input class="esi-input" id="evmSpendingToken" autocomplete="off" placeholder="0x…" required></div>
+<div class="esi-field"><label for="evmSpendingOwner">Owner</label><input class="esi-input" id="evmSpendingOwner" autocomplete="off" placeholder="0x…" required></div>
+<div class="esi-field"><label for="evmSpendingSpender">Spender</label><input class="esi-input" id="evmSpendingSpender" autocomplete="off" placeholder="0x…" required></div>
+<button class="safety-btn primary" id="evmSpendingSubmit" type="submit">Read spending authority</button></form><p class="esi-status" id="evmSpendingStatus" data-state="idle">No RPC observation has been requested yet.</p><div class="safety-boundary"><b>Evidence boundary:</b> a non-zero or unlimited allowance describes current permission state. It does not establish how the approval was created, whether the owner intended it now, or whether the spender is safe.</div></article>
+<aside class="esi-panel"><span class="safety-kicker">OBSERVATION</span><div class="esi-result" id="evmSpendingResult" hidden></div><div class="esi-empty">Run a read-only observation to populate this panel. Missing authority evidence remains unavailable rather than being converted into “immutable” or “safe”.</div></aside>
+</section>
+</main>
+<script src="/js/koschei-global-shell.js?v=4"></script>
+<script src="/js/evm-spending-intelligence.js?v=1"></script>
+</body>
+</html>
