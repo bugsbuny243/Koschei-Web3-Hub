@@ -23,6 +23,8 @@ const (
 	maxGlobalRadarHeadIngestMaxBlocksPerCycle     = 64
 	defaultGlobalRadarHeadIngestMaxEventsPerBlock = 6000
 	maxGlobalRadarHeadIngestMaxEventsPerBlock     = 25000
+	defaultGlobalRadarHeadIngestMaxReorgRewind    = 12
+	maxGlobalRadarHeadIngestMaxReorgRewind        = 64
 )
 
 type GlobalRadarHeadIngestTarget struct {
@@ -125,7 +127,14 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 			return 0, fmt.Errorf("durable head checkpoint identity mismatch")
 		}
 		if checkpoint.State == radarcursor.StateReorgObserved {
-			return 0, fmt.Errorf("durable head checkpoint is frozen after reorg observation")
+			if !cfg.AutoReorgRecovery {
+				return 0, fmt.Errorf("durable head checkpoint is frozen after reorg observation")
+			}
+			ancestor, recoverErr := recoverGlobalRadarReorg(ctx, cfg, target, checkpoint, observedAt)
+			if recoverErr != nil {
+				return 0, fmt.Errorf("durable head checkpoint is frozen after reorg observation: %w", recoverErr)
+			}
+			return 0, fmt.Errorf("automatic reorg recovery rewound durable cursor to height %d; next cycle will resume", ancestor.Height)
 		}
 	}
 
@@ -157,6 +166,9 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 		if err != nil {
 			return 0, err
 		}
+		if err := confirmGlobalRadarHeadBundle(ctx, cfg, target, bundle, observedAt); err != nil {
+			return 0, err
+		}
 		return persistGlobalRadarHeadBundle(ctx, cfg, target, cursorKey, bundle, maxEvents)
 	}
 
@@ -165,11 +177,12 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 		if err != nil {
 			return 0, err
 		}
+		if err := confirmGlobalRadarHeadBundle(ctx, cfg, target, bundle, observedAt); err != nil {
+			return 0, err
+		}
 		if bundle.blockHash != checkpoint.BlockHash {
-			if err := freezeGlobalRadarHeadCheckpoint(ctx, cfg, checkpoint, observedAt); err != nil {
-				return 0, fmt.Errorf("reorg observed and freeze checkpoint failed: %w", err)
-			}
-			return 0, fmt.Errorf("reorg observed at height %d: stored=%s current=%s", checkpoint.Height, checkpoint.BlockHash, bundle.blockHash)
+			reason := fmt.Sprintf("reorg observed at height %d: stored=%s current=%s", checkpoint.Height, checkpoint.BlockHash, bundle.blockHash)
+			return 0, handleGlobalRadarReorg(ctx, cfg, target, checkpoint, observedAt, reason)
 		}
 		return 0, nil
 	}
@@ -185,11 +198,12 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 		if err != nil {
 			return persisted, err
 		}
+		if err := confirmGlobalRadarHeadBundle(ctx, cfg, target, bundle, observedAt); err != nil {
+			return persisted, err
+		}
 		if bundle.parentHash != current.BlockHash {
-			if err := freezeGlobalRadarHeadCheckpoint(ctx, cfg, current, observedAt); err != nil {
-				return persisted, fmt.Errorf("parent hash mismatch and freeze checkpoint failed: %w", err)
-			}
-			return persisted, fmt.Errorf("reorg observed before height %d: expected_parent=%s observed_parent=%s", height, current.BlockHash, bundle.parentHash)
+			reason := fmt.Sprintf("reorg observed before height %d: expected_parent=%s observed_parent=%s", height, current.BlockHash, bundle.parentHash)
+			return persisted, handleGlobalRadarReorg(ctx, cfg, target, current, observedAt, reason)
 		}
 		count, err := persistGlobalRadarHeadBundle(ctx, cfg, target, cursorKey, bundle, maxEvents)
 		persisted += count
