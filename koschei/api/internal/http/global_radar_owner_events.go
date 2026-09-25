@@ -153,6 +153,7 @@ func parseGlobalRadarOwnerEventsQuery(r *http.Request, now time.Time) (globalRad
 	case "",
 		radarevent.KindBlock,
 		radarevent.KindTransaction,
+		radarevent.KindLog,
 		radarevent.KindAccount,
 		radarevent.KindAsset,
 		radarevent.KindContract,
