@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,12 +9,29 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"koschei/api/internal/web3"
 )
 
 type solanaFailoverTransport struct {
 	base http.RoundTripper
+}
+
+type solanaRPCProviderCooldownError struct {
+	Until time.Time
+}
+
+func (e *solanaRPCProviderCooldownError) Error() string {
+	if e == nil || e.Until.IsZero() {
+		return "solana rpc provider cooling down"
+	}
+	return fmt.Sprintf("solana rpc provider cooling down until %s", e.Until.UTC().Format(time.RFC3339))
+}
+
+func isSolanaRPCProviderCooldownError(err error) bool {
+	var target *solanaRPCProviderCooldownError
+	return errors.As(err, &target)
 }
 
 func init() {
@@ -38,7 +56,7 @@ func (t *solanaFailoverTransport) RoundTrip(req *http.Request) (*http.Response, 
 				failureErr = fmt.Errorf("http status %d", status)
 			}
 		}
-		if !solanaAdaptiveBatchDegradationStatus(req, status) {
+		if !solanaAdaptiveBatchDegradationStatus(req, status) && !isSolanaRPCProviderCooldownError(failureErr) {
 			web3.LogRPCFailure(method, primary, status, failureErr)
 		}
 	}
@@ -79,7 +97,9 @@ func (t *solanaFailoverTransport) RoundTrip(req *http.Request) (*http.Response, 
 				failureErr = fmt.Errorf("http status %d", status)
 			}
 		}
-		web3.LogRPCFailure(method, fallbackRaw, status, failureErr)
+		if !isSolanaRPCProviderCooldownError(failureErr) {
+			web3.LogRPCFailure(method, fallbackRaw, status, failureErr)
+		}
 	}
 	return fallbackResp, fallbackErr
 }
@@ -90,7 +110,7 @@ func (t *solanaFailoverTransport) roundTripGoverned(req *http.Request) (*http.Re
 	}
 	endpoint := req.URL.String()
 	if until, cooling := web3.SolanaRPCProviderCooldown(endpoint); cooling {
-		return nil, fmt.Errorf("solana rpc provider cooling down until %s", until.UTC().Format("2006-01-02T15:04:05Z"))
+		return nil, &solanaRPCProviderCooldownError{Until: until}
 	}
 	if err := web3.WaitForSolanaRPCProviderSlot(req.Context(), endpoint); err != nil {
 		return nil, err
