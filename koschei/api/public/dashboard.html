@@ -9,6 +9,7 @@
 <title>Koschei Web3 | Intelligence Console</title>
 <link rel="stylesheet" href="/css/koschei-dashboard.css?v=3">
 <link rel="stylesheet" href="/css/koschei-dashboard-premium.css?v=3">
+<link rel="stylesheet" href="/css/koschei-command-vision.css?v=1">
 </head>
 <body>
 <a class="skip-link" href="#overview">Skip to workspace</a>
@@ -20,10 +21,10 @@
     </a>
     <div class="side-label">Command center</div>
     <nav class="side-nav" aria-label="Customer security workspace">
-      <a href="#overview" aria-current="page"><i>01</i><span>Overview</span></a>
-      <a href="#intelligence"><i>02</i><span>ARVIS Map</span></a>
-      <a href="#evidence"><i>03</i><span>Evidence Feed</span></a>
-      <a href="#capabilities"><i>04</i><span>Security Capabilities</span></a>
+      <a href="#overview" aria-current="page"><i>01</i><span>Command Center</span></a>
+      <a href="#intelligence"><i>02</i><span>ARVIS Radar</span></a>
+      <a href="#evidence"><i>03</i><span>Live Evidence</span></a>
+      <a href="#capabilities"><i>04</i><span>Command Modules</span></a>
     </nav>
     <div class="side-label secondary">Operations</div>
     <nav class="workspace-links" aria-label="Investigation tools">
@@ -50,9 +51,9 @@
       <section id="overview" aria-labelledby="overview-title" class="command-overview">
         <div class="command-hero">
           <div class="command-hero-copy">
-            <span class="command-eyebrow">Customer intelligence workspace · command center</span>
-            <h1 id="overview-title">Security Overview <em>Command Center</em></h1>
-            <p>Investigate a public address, contract, token or transaction; correlate ARVIS evidence; review account-scoped alerts and history; and move into preflight, watchlists or cross-chain evidence from one operational surface.</p>
+            <span class="command-eyebrow">KOSCHEI INTELLIGENCE PLATFORM · CUSTOMER COMMAND CENTER</span>
+            <h1 id="overview-title">Command Center <em>ARVIS security intelligence universe</em></h1>
+            <p>Investigate a public address, contract, token or transaction; correlate ARVIS evidence; review account-scoped alerts and history; and move into preflight, watchlists or cross-chain evidence from one mission-control surface.</p>
             <div class="command-principles" aria-label="Koschei operating boundaries">
               <span><b>READ-ONLY</b>No custody</span>
               <span><b>FAIL-CLOSED</b>Unknown stays unknown</span>
@@ -103,7 +104,7 @@
 
       <section class="grid-main command-grid-main" id="intelligence" aria-label="ARVIS intelligence and operational truth">
         <article class="panel">
-          <div class="panel-head command-panel-head"><span>ARVIS intelligence map</span><b>Evidence relationship model · conceptual until account evidence is loaded</b></div>
+          <div class="panel-head command-panel-head"><span>ARVIS Threat Radar</span><b>Evidence relationship model · conceptual until account evidence is loaded</b></div>
           <div class="intel-map" aria-label="Conceptual ARVIS reasoning map, not live graph telemetry">
             <div class="map-ring r1"></div><div class="map-ring r2"></div>
             <div class="map-line l1"></div><div class="map-line l2"></div><div class="map-line l3"></div><div class="map-line l4"></div><div class="map-line l5"></div>
@@ -130,7 +131,7 @@
 
       <section class="workspace-live" id="evidence" aria-labelledby="evidence-title">
         <div class="workspace-live-head">
-          <div><span class="side-label">Account evidence feed</span><h2 id="evidence-title">Live account state · investigations & alerts</h2><p>Investigation history and monitoring state below come from authenticated account services when available. Unavailable sources stay unavailable.</p></div>
+          <div><span class="side-label">LIVE EVIDENCE & THREAT FEED</span><h2 id="evidence-title">Investigations, monitoring & alerts</h2><p>Investigation history and monitoring state below come from authenticated account services when available. Unavailable sources stay unavailable.</p></div>
           <button type="button" class="workspace-refresh" id="workspaceRefresh">Refresh account</button><span class="workspace-live-state" id="workspaceLiveState" data-state="partial">CHECKING ACCOUNT DATA</span>
         </div>
         <div class="workspace-command-grid">
