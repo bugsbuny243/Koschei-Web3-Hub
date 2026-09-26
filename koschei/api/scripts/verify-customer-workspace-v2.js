@@ -11,9 +11,9 @@ function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`$
 
 // Current customer workspace surface. The dashboard is intentionally a clean,
 // scoped product surface rather than the retired command-universe shell.
-requireText(html,'/css/koschei-dashboard.css?v=2','dashboard scoped style');
+requireText(html,'/css/koschei-dashboard.css?v=3','dashboard scoped style');
 requireText(html,'/js/customer-workspace-v2.js?v=3','dashboard account-data controller');
-requireText(html,'/js/koschei-dashboard.js?v=4','dashboard presentation controller');
+requireText(html,'/js/koschei-dashboard.js?v=5','dashboard presentation controller');
 requireText(html,'id="workspaceLatestReport"','latest investigation mount');
 requireText(html,'id="workspaceAlerts"','alerts mount');
 requireText(html,'id="workspaceLiveState"','live account-state mount');
@@ -22,6 +22,10 @@ requireText(html,'Investigation jobs','history KPI copy');
 requireText(html,'Professional access','Professional access KPI');
 requireText(html,'Customer security workspace','customer workspace boundary');
 requireText(html,'Security Overview','current dashboard headline');
+requireText(html,'Customer security command center','command-center identity');
+requireText(html,'INVESTIGATE ANY ASSET','command-center investigation entry');
+requireText(html,'Monitoring & watchlists','monitoring capability surface');
+requireText(html,'API & professional access','professional integration surface');
 requireText(html,'ARVIS intelligence map','ARVIS intelligence surface');
 requireText(html,'Live operational truth','operational truth surface');
 requireText(html,'No fake telemetry','no synthetic telemetry boundary');
