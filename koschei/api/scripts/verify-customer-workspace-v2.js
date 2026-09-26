@@ -9,8 +9,8 @@ const css=fs.readFileSync(path.join(root,'public','css','koschei-dashboard.css')
 function requireText(source,needle,label){if(!source.includes(needle))throw new Error(`${label}: missing ${needle}`);}
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
 
-// Current customer workspace surface. The dashboard is intentionally a clean,
-// scoped product surface rather than the retired command-universe shell.
+// Current customer workspace surface. The dashboard is a bounded customer command center,
+// while preserving the evidence-first account and ARVIS authority contracts.
 requireText(html,'/css/koschei-dashboard.css?v=3','dashboard scoped style');
 requireText(html,'/js/customer-workspace-v2.js?v=3','dashboard account-data controller');
 requireText(html,'/js/koschei-dashboard.js?v=5','dashboard presentation controller');
@@ -22,7 +22,7 @@ requireText(html,'Investigation jobs','history KPI copy');
 requireText(html,'Professional access','Professional access KPI');
 requireText(html,'Customer security workspace','customer workspace boundary');
 requireText(html,'Security Overview','current dashboard headline');
-requireText(html,'Customer intelligence workspace · command center','command-center identity');
+requireText(html,'Customer security command center','command-center identity');
 requireText(html,'INVESTIGATE ANY ASSET','command-center investigation entry');
 requireText(html,'Monitoring & watchlists','monitoring capability surface');
 requireText(html,'API & professional access','professional integration surface');
