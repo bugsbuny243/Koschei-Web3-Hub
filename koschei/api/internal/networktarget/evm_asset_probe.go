@@ -18,39 +18,39 @@ import (
 )
 
 const (
-	evmERC20TotalSupplySelector = "18160ddd"
-	evmERC20BalanceOfSelector   = "70a08231"
-	evmERC20DecimalsSelector    = "313ce567"
-	evmERC20SymbolSelector      = "95d89b41"
-	evmERC20NameSelector        = "06fdde03"
+	evmERC20TotalSupplySelector	= "18160ddd"
+	evmERC20BalanceOfSelector	= "70a08231"
+	evmERC20DecimalsSelector	= "313ce567"
+	evmERC20SymbolSelector	= "95d89b41"
+	evmERC20NameSelector		= "06fdde03"
 )
 
 var ErrEVMERC20SurfaceNotObserved = errors.New("evm_erc20_surface_not_observed")
 
 type EVMAssetProbeResult struct {
-	SchemaVersion                  string `json:"schema_version"`
-	Network                        string `json:"network"`
-	ChainID                        string `json:"chain_id"`
-	ExpectedChainID                string `json:"expected_chain_id"`
-	Contract                       string `json:"contract"`
-	InterfaceState                 string `json:"interface_state"`
-	TotalSupply                    string `json:"total_supply"`
-	ContractBalance                string `json:"contract_balance"`
-	Decimals                       uint64 `json:"decimals,omitempty"`
-	DecimalsObserved               bool   `json:"decimals_observed"`
-	Symbol                         string `json:"symbol,omitempty"`
-	SymbolEncoding                 string `json:"symbol_encoding,omitempty"`
-	SymbolObserved                 bool   `json:"symbol_observed"`
-	Name                           string `json:"name,omitempty"`
-	NameEncoding                   string `json:"name_encoding,omitempty"`
-	NameObserved                   bool   `json:"name_observed"`
-	TotalSupplyResponseSHA256      string `json:"total_supply_response_sha256"`
-	ContractBalanceResponseSHA256  string `json:"contract_balance_response_sha256"`
-	DecimalsResponseSHA256         string `json:"decimals_response_sha256,omitempty"`
-	SymbolResponseSHA256           string `json:"symbol_response_sha256,omitempty"`
-	NameResponseSHA256             string `json:"name_response_sha256,omitempty"`
-	EvidenceStatus                 string `json:"evidence_status"`
-	LiveAvailability               string `json:"live_availability"`
+	SchemaVersion			string	`json:"schema_version"`
+	Network				string	`json:"network"`
+	ChainID				string	`json:"chain_id"`
+	ExpectedChainID			string	`json:"expected_chain_id"`
+	Contract			string	`json:"contract"`
+	InterfaceState			string	`json:"interface_state"`
+	TotalSupply			string	`json:"total_supply"`
+	ContractBalance			string	`json:"contract_balance"`
+	Decimals			uint64	`json:"decimals,omitempty"`
+	DecimalsObserved		bool	`json:"decimals_observed"`
+	Symbol				string	`json:"symbol,omitempty"`
+	SymbolEncoding			string	`json:"symbol_encoding,omitempty"`
+	SymbolObserved			bool	`json:"symbol_observed"`
+	Name				string	`json:"name,omitempty"`
+	NameEncoding			string	`json:"name_encoding,omitempty"`
+	NameObserved			bool	`json:"name_observed"`
+	TotalSupplyResponseSHA256	string	`json:"total_supply_response_sha256"`
+	ContractBalanceResponseSHA256	string	`json:"contract_balance_response_sha256"`
+	DecimalsResponseSHA256		string	`json:"decimals_response_sha256,omitempty"`
+	SymbolResponseSHA256		string	`json:"symbol_response_sha256,omitempty"`
+	NameResponseSHA256		string	`json:"name_response_sha256,omitempty"`
+	EvidenceStatus			string	`json:"evidence_status"`
+	LiveAvailability		string	`json:"live_availability"`
 }
 
 // ProbeEVMERC20Asset observes an ERC-20-like method surface only after a base EVM
@@ -107,18 +107,18 @@ func ProbeEVMERC20Asset(ctx context.Context, client *http.Client, endpoint strin
 	}
 
 	result := EVMAssetProbeResult{
-		SchemaVersion:                 SchemaVersion,
-		Network:                       resolution.Network.ID,
-		ChainID:                       expectedChainID,
-		ExpectedChainID:               expectedChainID,
-		Contract:                      contract,
-		InterfaceState:                "erc20_like_surface_observed",
-		TotalSupply:                   totalSupply.String(),
-		ContractBalance:               contractBalance.String(),
-		TotalSupplyResponseSHA256:     totalDigest,
-		ContractBalanceResponseSHA256: balanceDigest,
-		EvidenceStatus:                "observed",
-		LiveAvailability:              "checked",
+		SchemaVersion:			SchemaVersion,
+		Network:			resolution.Network.ID,
+		ChainID:			expectedChainID,
+		ExpectedChainID:		expectedChainID,
+		Contract:			contract,
+		InterfaceState:		"erc20_like_surface_observed",
+		TotalSupply:			totalSupply.String(),
+		ContractBalance:		contractBalance.String(),
+		TotalSupplyResponseSHA256:		totalDigest,
+		ContractBalanceResponseSHA256:	balanceDigest,
+		EvidenceStatus:			"observed",
+		LiveAvailability:		"checked",
 	}
 
 	if value, digest, ok, callErr := evmAssetCall(ctx, client, endpoint, 43, contract, "0x"+evmERC20DecimalsSelector); callErr == nil {

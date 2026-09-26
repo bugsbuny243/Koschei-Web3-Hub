@@ -1,9 +1,9 @@
 package networktarget
 
 import (
-	"errors"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,14 +16,14 @@ func TestProbeEVMERC20AssetObservesMethodSurfaceWithoutComplianceClaim(t *testin
 		t.Fatal(err)
 	}
 	base := EVMProbeResult{
-		SchemaVersion:     SchemaVersion,
-		Resolution:        resolution,
-		ChainID:           "0x1",
-		ExpectedChainID:   "0x1",
-		ContractCodeState: "contract_code_observed",
-		AnalysisPerformed: true,
-		EvidenceStatus:    "observed",
-		LiveAvailability:  "checked",
+		SchemaVersion:		SchemaVersion,
+		Resolution:		resolution,
+		ChainID:		"0x1",
+		ExpectedChainID:	"0x1",
+		ContractCodeState:	"contract_code_observed",
+		AnalysisPerformed:	true,
+		EvidenceStatus:		"observed",
+		LiveAvailability:	"checked",
 	}
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req evmRPCRequest
@@ -76,9 +76,13 @@ func TestProbeEVMERC20AssetRequiresTwoCoreMethods(t *testing.T) {
 		t.Fatal(err)
 	}
 	base := EVMProbeResult{
-		Resolution: resolution, ChainID: "0x1", ExpectedChainID: "0x1",
-		ContractCodeState: "contract_code_observed", AnalysisPerformed: true,
-		EvidenceStatus: "observed", LiveAvailability: "checked",
+		Resolution:		resolution,
+		ChainID:		"0x1",
+		ExpectedChainID:	"0x1",
+		ContractCodeState:	"contract_code_observed",
+		AnalysisPerformed:	true,
+		EvidenceStatus:		"observed",
+		LiveAvailability:	"checked",
 	}
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req evmRPCRequest
@@ -90,8 +94,9 @@ func TestProbeEVMERC20AssetRequiresTwoCoreMethods(t *testing.T) {
 			return
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"jsonrpc": "2.0", "id": req.ID,
-			"error": map[string]any{"code": -32000, "message": "execution reverted"},
+			"jsonrpc": "2.0",
+			"id":      req.ID,
+			"error":   map[string]any{"code": -32000, "message": "execution reverted"},
 		})
 	}))
 	defer server.Close()
