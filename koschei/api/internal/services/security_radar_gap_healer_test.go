@@ -7,6 +7,9 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"koschei/api/internal/web3"
 )
 
 func TestPlanSecurityRadarReplayPageStopsAtExactWatermark(t *testing.T) {
@@ -117,5 +120,42 @@ func TestGapHealerFetchSignaturePageHonorsBackgroundRPCBudget(t *testing.T) {
 	}
 	if got := hits.Load(); got != 0 {
 		t.Fatalf("gap healer must not hit upstream after budget exhaustion, hits=%d", got)
+	}
+}
+
+
+func TestGapHealerPublishes429CooldownToSharedProviderGovernor(t *testing.T) {
+	t.Setenv("SOLANA_RPC_GOVERNOR_ENABLED", "true")
+	t.Setenv("SOLANA_RPC_LIMIT_SAVER_ENABLED", "false")
+	t.Setenv("SOLANA_RPC_429_COOLDOWN_SECONDS", "30")
+	t.Setenv("SOLANA_RPC_BUDGET_ENABLED", "false")
+	web3.ResetSolanaRPCProviderGovernorForTest()
+	t.Cleanup(web3.ResetSolanaRPCProviderGovernorForTest)
+
+	var hits atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		http.Error(w, "rate limited", http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	healer := &securityRadarGapHealer{RPCURL: server.URL, HTTPClient: server.Client()}
+	_, err := healer.fetchSignaturePage(context.Background(), "11111111111111111111111111111111", "", 1)
+	if err == nil {
+		t.Fatal("expected 429 error")
+	}
+	until, cooling := web3.SolanaRPCProviderCooldown(server.URL)
+	if !cooling || time.Until(until) < 20*time.Second {
+		t.Fatalf("provider cooldown not published: cooling=%t until=%s", cooling, until)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
+	defer cancel()
+	_, err = healer.fetchSignaturePage(ctx, "11111111111111111111111111111111", "", 1)
+	if err == nil {
+		t.Fatal("expected second request to be blocked by shared cooldown")
+	}
+	if got := hits.Load(); got != 1 {
+		t.Fatalf("shared cooldown must block second upstream hit, hits=%d", got)
 	}
 }
