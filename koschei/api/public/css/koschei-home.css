@@ -95,3 +95,130 @@ h1{margin:28px 0 0;max-width:820px;font-size:clamp(56px,6vw,92px);line-height:.9
   .capability-card p{font-size:12px}
   .capability-principles{grid-template-columns:1fr}
 }
+
+
+/* Command Vision v1 — approved homepage visual translation */
+
+/*
+  Koschei Command Vision v1
+  Visual translation of the approved command-center concept.
+  Presentation only: no synthetic telemetry, scores or access state are introduced here.
+*/
+
+:root{
+  --vision-bg:#02070b;
+  --vision-panel:#071018;
+  --vision-panel-2:#0a151d;
+  --vision-line:rgba(104,234,205,.15);
+  --vision-green:#35f1b7;
+  --vision-green-soft:#8fffdc;
+  --vision-cyan:#5edcff;
+  --vision-red:#ff5f72;
+  --vision-amber:#ffcf67;
+}
+
+.home-page,
+.dashboard{
+  background:
+    radial-gradient(circle at 74% 7%,rgba(38,255,189,.07),transparent 26rem),
+    radial-gradient(circle at 18% 58%,rgba(50,147,197,.055),transparent 34rem),
+    linear-gradient(180deg,#020609 0%,#03080c 48%,#020609 100%)!important;
+}
+.home-page::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-1;
+  pointer-events:none;
+  opacity:.34;
+  background-image:
+    linear-gradient(rgba(95,234,209,.022) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(95,234,209,.022) 1px,transparent 1px);
+  background-size:42px 42px;
+  mask-image:linear-gradient(to bottom,black,transparent 86%);
+}
+.home-page .brand-mark,
+.dashboard .brand-mark{
+  border-color:rgba(53,241,183,.38)!important;
+  color:var(--vision-green-soft)!important;
+  background:linear-gradient(145deg,#092019,#061016)!important;
+  box-shadow:0 0 28px rgba(53,241,183,.09),inset 0 1px rgba(255,255,255,.05)!important;
+}
+.home-page .btn.primary,
+.dashboard .dashboard-scan-form button{
+  border-color:rgba(83,255,203,.85)!important;
+  background:linear-gradient(180deg,#65f6c8,#2ed8a6)!important;
+  color:#03110c!important;
+  box-shadow:0 12px 34px rgba(53,241,183,.13)!important;
+}
+.home-page .btn.primary:hover,
+.dashboard .dashboard-scan-form button:hover{
+  background:linear-gradient(180deg,#8affda,#43edba)!important;
+}
+
+
+
+@media(max-width:1320px){
+  .home-page .hero{grid-template-columns:1fr;gap:46px}
+  .vision-radar-card{max-width:980px}
+  .dashboard .command-grid-main{grid-template-columns:1fr!important}
+  .dashboard .command-grid-main>.panel:first-child,
+  .dashboard .command-grid-main>.panel:last-child{min-height:0!important}
+  .dashboard .intel-map{min-height:560px!important}
+}
+@media(max-width:1080px){
+  .home-page .vision-power-strip{grid-template-columns:repeat(2,1fr)}
+  .dashboard{grid-template-columns:248px minmax(0,1fr)!important}
+  .dashboard .command-hero{grid-template-columns:1fr!important}
+  .dashboard .command-hero-status{min-height:120px!important}
+}
+@media(max-width:820px){
+  .home-page .home-shell{width:min(100% - 24px,1540px)}
+  .home-page .hero{padding-top:54px}
+  .vision-radar-card{min-height:540px}
+  .vision-radar{min-height:410px}
+  .vr-ring-3{width:340px;height:340px}
+  .vr-sweep{width:330px;height:330px}
+  .vision-callout{width:42%}
+  .vision-radar-foot{grid-template-columns:1fr}
+  .dashboard{display:block!important}
+  .dashboard .command-hero{padding:22px!important}
+  .dashboard .command-hero h1{font-size:clamp(42px,10vw,58px)!important}
+  .dashboard .command-kpis{grid-template-columns:1fr 1fr!important}
+  .dashboard .workspace-command-grid{grid-template-columns:1fr!important}
+  .dashboard .intel-map{min-height:430px!important}
+}
+@media(max-width:560px){
+  .home-page .vision-power-strip{grid-template-columns:1fr}
+  .home-page h1{font-size:50px}
+  .home-page h1 span{font-size:.56em}
+  .vision-radar-card{padding:14px!important;min-height:520px}
+  .vision-radar-head{align-items:flex-start;flex-direction:column}
+  .vision-radar{min-height:390px}
+  .vr-ring-1{width:130px;height:130px}
+  .vr-ring-2{width:220px;height:220px}
+  .vr-ring-3{width:300px;height:300px}
+  .vr-sweep{width:280px;height:280px}
+  .vr-core{width:74px;height:74px}
+  .vr-core b{font-size:23px}
+  .vision-callout{width:44%;padding:8px}
+  .vision-callout span{font-size:8px}
+  .callout-a{right:7px;top:10px}
+  .callout-b{left:7px;bottom:10px}
+  .callout-c{left:7px;top:86px}
+  .callout-d{right:7px;bottom:76px}
+  .home-page .premium-cta{padding:48px 20px}
+  .dashboard .main{padding-inline:9px!important}
+  .dashboard .command-hero{padding:18px!important}
+  .dashboard .command-hero h1{font-size:40px!important}
+  .dashboard .command-principles{grid-template-columns:1fr 1fr!important}
+  .dashboard .command-kpis{grid-template-columns:1fr 1fr!important}
+  .dashboard .intel-map{min-height:360px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .vr-sweep,
+  .dashboard .intel-map::before{animation:none!important}
+}
+
+
+.home-page .hero-truth{margin:16px 0 0;color:#6d887f;font:700 10px var(--mono);letter-spacing:.04em}.home-page .hero-truth strong{color:#b8e8d9;font-weight:800}
