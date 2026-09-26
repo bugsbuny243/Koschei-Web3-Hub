@@ -5,12 +5,13 @@ const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'public','dashboard.html'),'utf8');
 const js=fs.readFileSync(path.join(root,'public','js','customer-workspace-v2.js'),'utf8');
 const css=fs.readFileSync(path.join(root,'public','css','koschei-dashboard.css'),'utf8');
+const premiumCss=fs.readFileSync(path.join(root,'public','css','koschei-dashboard-premium.css'),'utf8');
 
 function requireText(source,needle,label){if(!source.includes(needle))throw new Error(`${label}: missing ${needle}`);}
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
 
-// Current customer workspace surface. The dashboard is intentionally a clean,
-// scoped product surface rather than the retired command-universe shell.
+// Current customer workspace surface. The dashboard is a bounded customer command
+// center while preserving evidence-first account and ARVIS authority contracts.
 requireText(html,'/css/koschei-dashboard.css?v=3','dashboard scoped style');
 requireText(html,'/js/customer-workspace-v2.js?v=3','dashboard account-data controller');
 requireText(html,'/js/koschei-dashboard.js?v=5','dashboard presentation controller');
@@ -71,5 +72,9 @@ if(/\bfetch\s*\(/.test(js))throw new Error('workspace account data must use Kosc
 
 // Scoped dashboard bundle must retain the live-account and evidence card styles.
 for(const marker of ['.workspace-live','.workspace-alert','.workspace-report-card','.workspace-kpi','.intel-map','.status-row'])requireText(css,marker,`dashboard style ${marker}`);
+
+for(const marker of ['.command-hero','.command-actions','.command-grid-main','.command-capability-grid','.nav-open .sidebar'])requireText(premiumCss,marker,`command-center style ${marker}`);
+requireText(premiumCss,'transform:translateX(-104%)','mobile off-canvas sidebar boundary');
+requireText(premiumCss,'body.nav-open::after','mobile drawer overlay boundary');
 
 console.log('customer workspace current evidence-first contract: ok');
