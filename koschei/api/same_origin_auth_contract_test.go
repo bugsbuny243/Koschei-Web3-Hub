@@ -17,6 +17,9 @@ func TestAuthPresentationInstallsSameOriginEmailContract(t *testing.T) {
 		"/api/auth/register",
 		"credentials:'same-origin'",
 		"window.__koscheiSameOriginEmailAuthInstalled",
+		"installSecureAccessPresentation",
+		"Koschei Web3 · Customer Security Command Center",
+		"Open command center",
 	} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("same-origin auth runtime is missing %q", required)
@@ -28,7 +31,7 @@ func TestAuthPresentationInstallsSameOriginEmailContract(t *testing.T) {
 }
 
 func TestAuthPresentationCacheVersionIsBumped(t *testing.T) {
-	if !strings.Contains(authEnglishOverlayScript, "english-auth-presentation.js?v=2") {
+	if !strings.Contains(authEnglishOverlayScript, "english-auth-presentation.js?v=3") {
 		t.Fatalf("auth presentation script was not cache-busted: %s", authEnglishOverlayScript)
 	}
 }
