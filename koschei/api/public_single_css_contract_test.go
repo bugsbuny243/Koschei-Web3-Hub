@@ -76,14 +76,14 @@ func TestPublicSiteUsesApprovedSurfaceScopedCSSFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read homepage: %v", err)
 	}
-	if !strings.Contains(string(indexBody), `/css/koschei-home.css?v=2`) {
+	if !strings.Contains(string(indexBody), `/css/koschei-home.css?v=3`) {
 		t.Fatal("homepage is not pinned to the current home stylesheet")
 	}
 	dashboardBody, err := os.ReadFile("public/dashboard.html")
 	if err != nil {
 		t.Fatalf("read dashboard: %v", err)
 	}
-	for _, href := range []string{`/css/koschei-dashboard.css?v=2`, `/css/koschei-dashboard-premium.css?v=2`} {
+	for _, href := range []string{`/css/koschei-dashboard.css?v=3`, `/css/koschei-dashboard-premium.css?v=3`} {
 		if !strings.Contains(string(dashboardBody), href) {
 			t.Fatalf("dashboard missing current stylesheet %q", href)
 		}
