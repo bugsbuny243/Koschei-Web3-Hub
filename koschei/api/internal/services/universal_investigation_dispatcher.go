@@ -11,9 +11,8 @@ const (
 	UniversalDispatchSolanaTx         = "solana_transaction_intelligence"
 	UniversalDispatchEVMProbe         = "evm_read_only_probe"
 	UniversalDispatchEVMTransaction   = "evm_transaction_receipt_probe"
-	UniversalDispatchBitcoinProbe       = "bitcoin_read_only_probe"
-	UniversalDispatchBitcoinTransaction = "bitcoin_transaction_probe"
-	UniversalDispatchMoveIdentity       = "move_identity_probe"
+	UniversalDispatchBitcoinProbe     = "bitcoin_read_only_probe"
+	UniversalDispatchMoveIdentity     = "move_identity_probe"
 	UniversalDispatchDeclaredOnly     = "declared_not_executable"
 	UniversalDispatchPlannedAdapter   = "planned_adapter"
 	UniversalDispatchResearchAdapter  = "research_adapter"
@@ -22,6 +21,8 @@ const (
 	UniversalVerdictEvidenceOnly      = "evidence_only_no_grade_authority"
 	UniversalVerdictNone              = "no_verdict_authority"
 )
+
+const UniversalDispatchBitcoinTransaction = "bitcoin_transaction_probe"
 
 type UniversalInvestigationPlan struct {
 	Subject                 IntelligenceSubject                  `json:"subject"`
