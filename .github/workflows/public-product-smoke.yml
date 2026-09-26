@@ -121,7 +121,7 @@ jobs:
           checked_page safe_check /safe-check "arvis-premium-contract.js"
           checked_page transaction_shield /transaction-shield "arvis-premium-contract.js"
           checked_page security_radar /security-radar "arvis-premium-contract.js"
-          checked_page owner_production /owner-production.html "owner-control-center.js?v=12"
+          checked_page owner_production /owner-production.html "owner-control-center.js?v=13"
           checked_page complete_evidence_asset /js/arvis-complete-evidence-v3.js "completeEvidenceVersion='3.0.0'"
           checked_page social_renderer_asset /js/arvis-social-render-v2-publish.js "socialRendererVersion='2.0.0'"
 
