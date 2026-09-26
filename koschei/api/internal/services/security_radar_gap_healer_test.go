@@ -123,7 +123,6 @@ func TestGapHealerFetchSignaturePageHonorsBackgroundRPCBudget(t *testing.T) {
 	}
 }
 
-
 func TestGapHealerPublishes429CooldownToSharedProviderGovernor(t *testing.T) {
 	t.Setenv("SOLANA_RPC_GOVERNOR_ENABLED", "true")
 	t.Setenv("SOLANA_RPC_LIMIT_SAVER_ENABLED", "false")
