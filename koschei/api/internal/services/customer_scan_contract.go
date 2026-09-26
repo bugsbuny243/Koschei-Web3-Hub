@@ -19,49 +19,8 @@ const (
 	CustomerScanRouteUnresolved   = "unresolved"
 )
 
-var evmTxHashPattern = regexp.MustCompile(`^0x[0-9a-fA-F]{64}package services
-
-import (
-	"errors"
-	"regexp"
-	"strings"
-)
-
-const (
-	CustomerScanTargetEVMAddress  = "evm_address"
-	CustomerScanTargetSolana      = "solana_address"
-	CustomerScanTargetBitcoin     = "bitcoin_address"
-	CustomerScanTargetTxHash      = "transaction_hash"
-	CustomerScanTargetUnknown     = "unknown"
-	CustomerScanRouteEVMProbe     = "evm_probe"
-	CustomerScanRouteSolanaIntel  = "solana_intelligence"
-	CustomerScanRouteBitcoinProbe = "bitcoin_probe"
-	CustomerScanRouteTxLookup     = "transaction_lookup"
-	CustomerScanRouteUnresolved   = "unresolved"
-)
-
-)\nvar bitcoinTxIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{64}package services
-
-import (
-	"errors"
-	"regexp"
-	"strings"
-)
-
-const (
-	CustomerScanTargetEVMAddress  = "evm_address"
-	CustomerScanTargetSolana      = "solana_address"
-	CustomerScanTargetBitcoin     = "bitcoin_address"
-	CustomerScanTargetTxHash      = "transaction_hash"
-	CustomerScanTargetUnknown     = "unknown"
-	CustomerScanRouteEVMProbe     = "evm_probe"
-	CustomerScanRouteSolanaIntel  = "solana_intelligence"
-	CustomerScanRouteBitcoinProbe = "bitcoin_probe"
-	CustomerScanRouteTxLookup     = "transaction_lookup"
-	CustomerScanRouteUnresolved   = "unresolved"
-)
-
-)
+var evmTxHashPattern = regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
+var bitcoinTxIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{64}$`)
 
 type CustomerScanTarget struct {
 	Raw             string   `json:"raw"`

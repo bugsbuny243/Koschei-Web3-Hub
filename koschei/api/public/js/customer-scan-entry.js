@@ -22,7 +22,9 @@ function classify(value){
 function resolve(value,network=''){
   const target=String(value||'').trim(),family=classify(target);
   if(!target)return {error:'Paste a public wallet or contract address.'};
-  if(target.length>256)return {error:'Enter a complete wallet, contract address, or transaction hash.'};\n  if(network==='bitcoin-mainnet'&&/^[0-9a-fA-F]{64}$/.test(target))return {target:target.toLowerCase(),network,label:'Bitcoin',family:'bitcoin',kind:'transaction'};\n  if(family==='unknown')return {error:'Enter a complete wallet, contract address, or transaction hash.'};
+  if(target.length>256)return {error:'Enter a complete wallet, contract address, or transaction hash.'};
+  if(network==='bitcoin-mainnet'&&/^[0-9a-fA-F]{64}$/.test(target))return {target:target.toLowerCase(),network,label:'Bitcoin',family:'bitcoin',kind:'transaction'};
+  if(family==='unknown')return {error:'Enter a complete wallet, contract address, or transaction hash.'};
   const selected=networks.find(item=>item[0]===network);
   if(network&&!selected)return {error:'Select a supported network.'};
   if(!selected&&(family==='evm'||family==='evm_transaction'||family==='ambiguous'))return {error:'Select the network for this target. Its format alone does not identify the chain.',needsNetwork:true};
