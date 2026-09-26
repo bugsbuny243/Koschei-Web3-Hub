@@ -16,14 +16,14 @@ func TestProbeEVMERC20AssetObservesMethodSurfaceWithoutComplianceClaim(t *testin
 		t.Fatal(err)
 	}
 	base := EVMProbeResult{
-		SchemaVersion:		SchemaVersion,
-		Resolution:		resolution,
-		ChainID:		"0x1",
-		ExpectedChainID:	"0x1",
-		ContractCodeState:	"contract_code_observed",
-		AnalysisPerformed:	true,
-		EvidenceStatus:		"observed",
-		LiveAvailability:	"checked",
+		SchemaVersion:     SchemaVersion,
+		Resolution:        resolution,
+		ChainID:           "0x1",
+		ExpectedChainID:   "0x1",
+		ContractCodeState: "contract_code_observed",
+		AnalysisPerformed: true,
+		EvidenceStatus:    "observed",
+		LiveAvailability:  "checked",
 	}
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req evmRPCRequest
@@ -76,13 +76,13 @@ func TestProbeEVMERC20AssetRequiresTwoCoreMethods(t *testing.T) {
 		t.Fatal(err)
 	}
 	base := EVMProbeResult{
-		Resolution:		resolution,
-		ChainID:		"0x1",
-		ExpectedChainID:	"0x1",
-		ContractCodeState:	"contract_code_observed",
-		AnalysisPerformed:	true,
-		EvidenceStatus:		"observed",
-		LiveAvailability:	"checked",
+		Resolution:        resolution,
+		ChainID:           "0x1",
+		ExpectedChainID:   "0x1",
+		ContractCodeState: "contract_code_observed",
+		AnalysisPerformed: true,
+		EvidenceStatus:    "observed",
+		LiveAvailability:  "checked",
 	}
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req evmRPCRequest

@@ -29,15 +29,15 @@ func AdaptEVMAssetEvidence(result networktarget.EVMAssetProbeResult, observedAt 
 		return NetworkProbeIntelligenceProjection{}, errors.New("EVM asset core evidence is incomplete")
 	}
 	attributes := map[string]any{
-		"chain_id":				expectedChainID,
-		"interface_state":			result.InterfaceState,
-		"total_supply":				result.TotalSupply,
-		"contract_balance":			result.ContractBalance,
-		"total_supply_response_sha256":		strings.ToLower(result.TotalSupplyResponseSHA256),
-		"contract_balance_response_sha256":	strings.ToLower(result.ContractBalanceResponseSHA256),
-		"evidence_scope":			"read_only_erc20_like_surface_probe",
-		"standards_compliance_claimed":		false,
-		"safety_claimed":			false,
+		"chain_id":                         expectedChainID,
+		"interface_state":                  result.InterfaceState,
+		"total_supply":                     result.TotalSupply,
+		"contract_balance":                 result.ContractBalance,
+		"total_supply_response_sha256":     strings.ToLower(result.TotalSupplyResponseSHA256),
+		"contract_balance_response_sha256": strings.ToLower(result.ContractBalanceResponseSHA256),
+		"evidence_scope":                   "read_only_erc20_like_surface_probe",
+		"standards_compliance_claimed":     false,
+		"safety_claimed":                   false,
 	}
 	if result.DecimalsObserved {
 		attributes["decimals"] = result.Decimals

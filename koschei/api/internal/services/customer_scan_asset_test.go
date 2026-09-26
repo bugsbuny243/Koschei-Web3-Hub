@@ -4,11 +4,11 @@ import "testing"
 
 func TestCustomerScanResultWithEVMAssetEvidenceAttachesObservedAsset(t *testing.T) {
 	target := CustomerScanTarget{
-		Raw:			"0x1111111111111111111111111111111111111111",
-		NetworkHint:		"ethereum-mainnet",
-		Kind:			CustomerScanTargetEVMAddress,
-		Route:			CustomerScanRouteEVMProbe,
-		Classification:	"syntax_only",
+		Raw:            "0x1111111111111111111111111111111111111111",
+		NetworkHint:    "ethereum-mainnet",
+		Kind:           CustomerScanTargetEVMAddress,
+		Route:          CustomerScanRouteEVMProbe,
+		Classification: "syntax_only",
 	}
 	subject := ClassifyIntelligenceSubject(target.Raw, target.NetworkHint)
 	base, err := BuildCustomerScanResult(target, Web3TrustVector{Observed: true}, []string{"base-evidence"})
@@ -18,14 +18,14 @@ func TestCustomerScanResultWithEVMAssetEvidenceAttachesObservedAsset(t *testing.
 	projection := NetworkProbeIntelligenceProjection{
 		Subject: subject,
 		Evidence: IntelligenceEvidence{
-			ID:		"asset-evidence",
-			SubjectID:	subject.ID,
-			ChainFamily:	IntelligenceChainFamilyEVM,
-			Chain:		subject.Chain,
-			Network:		subject.Network,
-			Status:		IntelligenceEvidenceObserved,
-			Address:		target.Raw,
-			Attributes:	map[string]any{"interface_state": "erc20_like_surface_observed"},
+			ID:          "asset-evidence",
+			SubjectID:   subject.ID,
+			ChainFamily: IntelligenceChainFamilyEVM,
+			Chain:       subject.Chain,
+			Network:     subject.Network,
+			Status:      IntelligenceEvidenceObserved,
+			Address:     target.Raw,
+			Attributes:  map[string]any{"interface_state": "erc20_like_surface_observed"},
 		},
 	}
 	result, err := CustomerScanResultWithEVMAssetEvidence(base, target, projection)
