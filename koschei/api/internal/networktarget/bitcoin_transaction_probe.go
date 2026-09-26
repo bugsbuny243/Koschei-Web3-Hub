@@ -17,7 +17,7 @@ import (
 
 const (
 	bitcoinTransactionResponseLimit = 4 * 1024 * 1024
-	bitcoinMaxSatoshis               = int64(21_000_000 * 100_000_000)
+	bitcoinMaxSatoshis              = int64(21_000_000 * 100_000_000)
 )
 
 var ErrBitcoinTransactionNotFound = errors.New("bitcoin_transaction_not_found")
