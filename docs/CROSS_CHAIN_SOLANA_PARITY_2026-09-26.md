@@ -25,9 +25,10 @@ Parity means equivalent security outcomes, not identical collectors:
 ## Ordered parity work
 
 1. Transaction parity
-   - Bitcoin customer tx lookup with Esplora evidence (this slice).
-   - EVM calldata/log semantic decoding beyond raw hashes.
-   - Bitcoin input/output/script flow projection.
+   - Bitcoin customer tx lookup with Esplora evidence — delivered.
+   - EVM selector + standard Transfer/Approval layout evidence — delivered (hint-only selectors; no ABI-name overclaim).
+   - EVM calldata/log semantic decoding beyond standard layouts — next.
+   - Bitcoin input/output/script flow projection — next.
 
 2. Asset and control parity
    - EVM ERC-20/721/1155 metadata, holders/concentration, implementation/admin/delegation graph.

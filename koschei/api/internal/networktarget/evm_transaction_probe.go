@@ -25,17 +25,28 @@ const (
 	// Keep a hard bound, but allow consensus-valid high-gas EVM transactions
 	// on supported networks without rejecting them solely due to JSON expansion.
 	evmTransactionResponseLimit = 128 * 1024 * 1024
+
+	evmTransferEventTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+	evmApprovalEventTopic = "0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925"
 )
 
 var ErrEVMTransactionNotFound = errors.New("evm_transaction_not_found")
 
 type EVMTransactionLogSummary struct {
-	Address    string   `json:"address"`
-	Topics     []string `json:"topics,omitempty"`
-	LogIndex   string   `json:"log_index,omitempty"`
-	Removed    bool     `json:"removed"`
-	DataSHA256 string   `json:"data_sha256,omitempty"`
-	DataBytes  int      `json:"data_bytes"`
+	Address        string   `json:"address"`
+	Topics         []string `json:"topics,omitempty"`
+	LogIndex       string   `json:"log_index,omitempty"`
+	Removed        bool     `json:"removed"`
+	DataSHA256     string   `json:"data_sha256,omitempty"`
+	DataBytes      int      `json:"data_bytes"`
+	SemanticKind   string   `json:"semantic_kind,omitempty"`
+	SemanticLayout string   `json:"semantic_layout,omitempty"`
+	FromAddress    string   `json:"from_address,omitempty"`
+	ToAddress      string   `json:"to_address,omitempty"`
+	OwnerAddress   string   `json:"owner_address,omitempty"`
+	SpenderAddress string   `json:"spender_address,omitempty"`
+	ValueHex       string   `json:"value_hex,omitempty"`
+	TokenIDHex     string   `json:"token_id_hex,omitempty"`
 }
 
 type EVMTransactionEvidenceResult struct {
@@ -53,6 +64,11 @@ type EVMTransactionEvidenceResult struct {
 	TransactionType   string                     `json:"transaction_type,omitempty"`
 	InputSHA256       string                     `json:"input_sha256,omitempty"`
 	InputBytes        int                        `json:"input_bytes"`
+	InputSelector     string                     `json:"input_selector,omitempty"`
+	InputSelectorHint string                     `json:"input_selector_hint,omitempty"`
+	StandardEventCount int                       `json:"standard_event_count"`
+	TransferEventCount int                       `json:"transfer_event_count"`
+	ApprovalEventCount int                       `json:"approval_event_count"`
 	BlockHash         string                     `json:"block_hash,omitempty"`
 	BlockNumber       string                     `json:"block_number,omitempty"`
 	ExecutionState    string                     `json:"execution_state"`
@@ -166,13 +182,14 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 	if err != nil {
 		return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_input_invalid")
 	}
+	inputSelector, inputSelectorHint := evmTransactionInputSelector(tx.Input)
 
 	result := EVMTransactionEvidenceResult{
 		SchemaVersion: SchemaVersion, Network: strings.TrimSpace(networkID),
 		ChainID: chainID, ExpectedChainID: expectedChainID, TransactionHash: transactionHash,
 		From: strings.ToLower(tx.From), To: to, Value: tx.Value, Nonce: tx.Nonce,
 		Gas: tx.Gas, GasPrice: tx.GasPrice, TransactionType: tx.Type,
-		InputSHA256: inputHash, InputBytes: inputBytes,
+		InputSHA256: inputHash, InputBytes: inputBytes, InputSelector: inputSelector, InputSelectorHint: inputSelectorHint,
 		ExecutionState:    EVMTransactionExecutionPending,
 		AnalysisPerformed: true, EvidenceStatus: "observed", LiveAvailability: "checked",
 	}
@@ -277,12 +294,151 @@ func ProbeEVMTransaction(ctx context.Context, client *http.Client, endpoint, net
 		if dataErr != nil {
 			return EVMTransactionEvidenceResult{}, fmt.Errorf("evm_transaction_log_data_invalid")
 		}
-		result.Logs = append(result.Logs, EVMTransactionLogSummary{
+		summary := EVMTransactionLogSummary{
 			Address: address, Topics: topics, LogIndex: logIndex, Removed: item.Removed,
 			DataSHA256: dataHash, DataBytes: dataBytes,
-		})
+		}
+		classifyEVMStandardLog(&summary, item.Data)
+		switch summary.SemanticKind {
+		case "standard_transfer":
+			result.StandardEventCount++
+			result.TransferEventCount++
+		case "standard_approval":
+			result.StandardEventCount++
+			result.ApprovalEventCount++
+		}
+		result.Logs = append(result.Logs, summary)
 	}
 	return result, nil
+}
+
+func evmTransactionInputSelector(input string) (string, string) {
+	input = strings.ToLower(strings.TrimSpace(input))
+	if len(input) < 10 || !strings.HasPrefix(input, "0x") {
+		return "", ""
+	}
+	selector := input[:10]
+	if _, err := hex.DecodeString(selector[2:]); err != nil {
+		return "", ""
+	}
+	switch selector {
+	case "0xa9059cbb":
+		return selector, "transfer(address,uint256)"
+	case "0x095ea7b3":
+		return selector, "approve(address,uint256)"
+	case "0x23b872dd":
+		return selector, "transferFrom(address,address,uint256)"
+	case "0x42842e0e":
+		return selector, "safeTransferFrom(address,address,uint256)"
+	case "0xb88d4fde":
+		return selector, "safeTransferFrom(address,address,uint256,bytes)"
+	default:
+		return selector, ""
+	}
+}
+
+func classifyEVMStandardLog(summary *EVMTransactionLogSummary, data string) {
+	if summary == nil || len(summary.Topics) == 0 {
+		return
+	}
+	topic0 := strings.ToLower(strings.TrimSpace(summary.Topics[0]))
+	switch topic0 {
+	case evmTransferEventTopic:
+		if len(summary.Topics) == 3 && summary.DataBytes == 32 {
+			from, fromOK := evmABITopicAddress(summary.Topics[1])
+			to, toOK := evmABITopicAddress(summary.Topics[2])
+			value, valueOK := evmABIUint256Quantity(data)
+			if fromOK && toOK && valueOK {
+				summary.SemanticKind = "standard_transfer"
+				summary.SemanticLayout = "erc20_like"
+				summary.FromAddress = from
+				summary.ToAddress = to
+				summary.ValueHex = value
+			}
+			return
+		}
+		if len(summary.Topics) == 4 && summary.DataBytes == 0 {
+			from, fromOK := evmABITopicAddress(summary.Topics[1])
+			to, toOK := evmABITopicAddress(summary.Topics[2])
+			tokenID, tokenOK := evmABITopicUint256Quantity(summary.Topics[3])
+			if fromOK && toOK && tokenOK {
+				summary.SemanticKind = "standard_transfer"
+				summary.SemanticLayout = "erc721_like"
+				summary.FromAddress = from
+				summary.ToAddress = to
+				summary.TokenIDHex = tokenID
+			}
+		}
+	case evmApprovalEventTopic:
+		if len(summary.Topics) == 3 && summary.DataBytes == 32 {
+			owner, ownerOK := evmABITopicAddress(summary.Topics[1])
+			spender, spenderOK := evmABITopicAddress(summary.Topics[2])
+			value, valueOK := evmABIUint256Quantity(data)
+			if ownerOK && spenderOK && valueOK {
+				summary.SemanticKind = "standard_approval"
+				summary.SemanticLayout = "erc20_like"
+				summary.OwnerAddress = owner
+				summary.SpenderAddress = spender
+				summary.ValueHex = value
+			}
+			return
+		}
+		if len(summary.Topics) == 4 && summary.DataBytes == 0 {
+			owner, ownerOK := evmABITopicAddress(summary.Topics[1])
+			spender, spenderOK := evmABITopicAddress(summary.Topics[2])
+			tokenID, tokenOK := evmABITopicUint256Quantity(summary.Topics[3])
+			if ownerOK && spenderOK && tokenOK {
+				summary.SemanticKind = "standard_approval"
+				summary.SemanticLayout = "erc721_like"
+				summary.OwnerAddress = owner
+				summary.SpenderAddress = spender
+				summary.TokenIDHex = tokenID
+			}
+		}
+	}
+}
+
+func evmABITopicAddress(topic string) (string, bool) {
+	topic = strings.ToLower(strings.TrimSpace(topic))
+	if !validEVMTransactionHash(topic) {
+		return "", false
+	}
+	raw := topic[2:]
+	if raw[:24] != strings.Repeat("0", 24) {
+		return "", false
+	}
+	address := "0x" + raw[24:]
+	return address, validEVMAddress(address)
+}
+
+func evmABITopicUint256Quantity(topic string) (string, bool) {
+	topic = strings.ToLower(strings.TrimSpace(topic))
+	if !validEVMTransactionHash(topic) {
+		return "", false
+	}
+	return evmABIWordQuantity(topic[2:])
+}
+
+func evmABIUint256Quantity(data string) (string, bool) {
+	data = strings.ToLower(strings.TrimSpace(data))
+	if len(data) != 66 || !strings.HasPrefix(data, "0x") {
+		return "", false
+	}
+	return evmABIWordQuantity(data[2:])
+}
+
+func evmABIWordQuantity(raw string) (string, bool) {
+	if len(raw) != 64 {
+		return "", false
+	}
+	if _, err := hex.DecodeString(raw); err != nil {
+		return "", false
+	}
+	trimmed := strings.TrimLeft(raw, "0")
+	if trimmed == "" {
+		trimmed = "0"
+	}
+	return "0x" + trimmed, true
 }
 
 func validEVMTransactionHash(value string) bool {

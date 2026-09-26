@@ -47,7 +47,7 @@ func evmTransactionFixture(hash string, mined bool) map[string]any {
 		"gas":      "0x5208",
 		"gasPrice": "0x1",
 		"type":     "0x2",
-		"input":    "0x1234",
+		"input":    "0xa9059cbb" + strings.Repeat("00", 64),
 	}
 	if mined {
 		out["blockHash"] = "0x" + strings.Repeat("c", 64)
@@ -71,11 +71,15 @@ func evmReceiptFixture(hash string, status string) map[string]any {
 		"contractAddress":   nil,
 		"logs": []any{
 			map[string]any{
-				"address":  "0x3333333333333333333333333333333333333333",
-				"topics":   []string{"0x" + strings.Repeat("b", 64)},
+				"address": "0x3333333333333333333333333333333333333333",
+				"topics": []string{
+					evmTransferEventTopic,
+					"0x" + strings.Repeat("0", 24) + strings.Repeat("1", 40),
+					"0x" + strings.Repeat("0", 24) + strings.Repeat("2", 40),
+				},
 				"logIndex": "0x0",
 				"removed":  false,
-				"data":     "0x" + strings.Repeat("00", 32),
+				"data":     "0x" + strings.Repeat("0", 63) + "1",
 			},
 		},
 	}
@@ -93,11 +97,48 @@ func TestProbeEVMTransactionBindsReceiptAndExecutionState(t *testing.T) {
 	if result.ExecutionState != EVMTransactionExecutionSuccess || result.ReceiptStatus != "0x1" {
 		t.Fatalf("unexpected execution result: %+v", result)
 	}
-	if result.BlockNumber != "0x10" || result.InputBytes != 2 || result.InputSHA256 == "" {
+	if result.BlockNumber != "0x10" || result.InputBytes != 68 || result.InputSHA256 == "" || result.InputSelector != "0xa9059cbb" || result.InputSelectorHint != "transfer(address,uint256)" {
 		t.Fatalf("incomplete transaction evidence: %+v", result)
 	}
 	if len(result.Logs) != 1 || result.Logs[0].DataBytes != 32 || result.Logs[0].DataSHA256 == "" {
 		t.Fatalf("structured log evidence missing: %+v", result.Logs)
+	}
+	if result.StandardEventCount != 1 || result.TransferEventCount != 1 || result.ApprovalEventCount != 0 {
+		t.Fatalf("standard event counters missing: %+v", result)
+	}
+	log := result.Logs[0]
+	if log.SemanticKind != "standard_transfer" || log.SemanticLayout != "erc20_like" ||
+		log.FromAddress != "0x"+strings.Repeat("1", 40) || log.ToAddress != "0x"+strings.Repeat("2", 40) || log.ValueHex != "0x1" {
+		t.Fatalf("ERC-20-like transfer semantics missing: %+v", log)
+	}
+}
+
+func TestClassifyEVMStandardLogKeepsERC721ApprovalLayoutEvidenceOnly(t *testing.T) {
+	summary := EVMTransactionLogSummary{
+		Topics: []string{
+			evmApprovalEventTopic,
+			"0x" + strings.Repeat("0", 24) + strings.Repeat("1", 40),
+			"0x" + strings.Repeat("0", 24) + strings.Repeat("2", 40),
+			"0x" + strings.Repeat("0", 63) + "7",
+		},
+		DataBytes: 0,
+	}
+	classifyEVMStandardLog(&summary, "0x")
+	if summary.SemanticKind != "standard_approval" || summary.SemanticLayout != "erc721_like" ||
+		summary.OwnerAddress != "0x"+strings.Repeat("1", 40) || summary.SpenderAddress != "0x"+strings.Repeat("2", 40) ||
+		summary.TokenIDHex != "0x7" {
+		t.Fatalf("ERC-721-like approval semantics missing: %+v", summary)
+	}
+}
+
+func TestClassifyEVMStandardLogDoesNotOverclaimNonCanonicalLayout(t *testing.T) {
+	summary := EVMTransactionLogSummary{
+		Topics: []string{evmTransferEventTopic},
+		DataBytes: 32,
+	}
+	classifyEVMStandardLog(&summary, "0x"+strings.Repeat("0", 64))
+	if summary.SemanticKind != "" || summary.SemanticLayout != "" {
+		t.Fatalf("non-canonical event layout was overclaimed: %+v", summary)
 	}
 }
 

@@ -79,8 +79,13 @@ function transactionRows(evidence){
     ['Block',evidence.block_or_slot||a.block_number],
     ['From',evidence.address||a.from],
     ['To',evidence.contract||a.to],
+    ['Input selector',a.input_selector],
+    ['Selector hint',a.input_selector_hint],
     ['Receipt status',a.receipt_status],
-    ['Logs',a.log_count]
+    ['Logs',a.log_count],
+    ['Standard events',a.standard_event_count],
+    ['Transfer events',a.transfer_event_count],
+    ['Approval events',a.approval_event_count]
   ];
   return '<div class="cus-authority"><div class="cus-subhead"><span>Transaction evidence</span><b>Observed only</b></div>'+
     rows.filter(([,value])=>value!==undefined&&value!==null&&value!=='').map(([key,value])=>'<div class="cus-row"><span>'+esc(key)+'</span><b title="'+esc(value)+'">'+esc(short(value))+'</b></div>').join('')+'</div>';
