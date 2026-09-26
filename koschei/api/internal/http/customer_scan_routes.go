@@ -273,18 +273,20 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 		if proxyErr != nil {
 			result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "EVM_AUTHORITY_PROBE_UNAVAILABLE"))
 			result.Trust.Reasons = append([]string(nil), result.Reasons...)
-			writeCustomerScanResult(w, http.StatusOK, result)
-			return
-		}
-		authority, authorityErr := services.BuildEVMSpenderAuthoritySnapshot(probe, proxyProbe)
-		if authorityErr != nil {
-			writeCustomerScanError(w, http.StatusBadGateway, "evm_authority_projection_unavailable")
-			return
-		}
-		result, resultErr = services.CustomerScanResultFromEVMAuthority(target, projection, authority)
-		if resultErr != nil {
-			writeCustomerScanError(w, http.StatusBadGateway, "evm_authority_result_unavailable")
-			return
+		} else {
+			authority, authorityErr := services.BuildEVMSpenderAuthoritySnapshot(probe, proxyProbe)
+			if authorityErr != nil {
+				result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "EVM_AUTHORITY_PROJECTION_UNAVAILABLE"))
+				result.Trust.Reasons = append([]string(nil), result.Reasons...)
+			} else {
+				withAuthority, authorityResultErr := services.CustomerScanResultFromEVMAuthority(target, projection, authority)
+				if authorityResultErr != nil {
+					result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "EVM_AUTHORITY_RESULT_UNAVAILABLE"))
+					result.Trust.Reasons = append([]string(nil), result.Reasons...)
+				} else {
+					result = withAuthority
+				}
+			}
 		}
 
 		if probe.ContractCodeState == "contract_code_observed" {
