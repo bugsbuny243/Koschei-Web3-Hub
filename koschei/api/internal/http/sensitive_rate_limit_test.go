@@ -106,6 +106,13 @@ func TestConsumeSharedSensitiveLimitIsAtomicAcrossPools(t *testing.T) {
 	}
 
 	rule := sensitiveLimitRule{Limit: 5, Window: time.Minute}
+	// Seed an active bucket so this atomicity test cannot straddle a real clock
+	// fixed-window boundary and mistake a legitimate reset for a lost update.
+	if _, err := dbOne.Exec(`INSERT INTO security_rate_limit_buckets
+		(bucket_key_hash,route,window_started_at,window_seconds,request_count,expires_at)
+		VALUES($1,$2,statement_timestamp(),60,0,statement_timestamp()+interval '5 minutes')`, keyHash, route); err != nil {
+		t.Fatal(err)
+	}
 	const requests = 20
 	var allowed atomic.Int64
 	var maxCount atomic.Int64
