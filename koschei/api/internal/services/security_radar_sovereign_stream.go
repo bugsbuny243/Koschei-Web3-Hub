@@ -128,9 +128,7 @@ func (w *securityRadarJournalStreamWorker) Start(ctx context.Context) {
 		if time.Since(startedAt) >= 45*time.Second {
 			backoff = 3 * time.Second
 		}
-		if isRadarRateLimitError(err) && backoff < 30*time.Second {
-			backoff = 30 * time.Second
-		}
+		backoff = radarReconnectBase(backoff, err)
 		wait := radarReconnectWait(backoff)
 		if err != nil {
 			log.Printf("security radar sovereign reconnect scheduled retry_in=%s err=%s", wait.Round(time.Second), safeProviderError(err))
