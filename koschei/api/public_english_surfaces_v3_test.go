@@ -78,7 +78,7 @@ func TestDashboardIsCurrentCustomerSecurityWorkspace(t *testing.T) {
 	text := string(body)
 	for _, required := range []string{
 		"Koschei Web3 | Intelligence Console",
-		"Customer intelligence workspace",
+		"Customer security command center",
 		"Security Overview",
 		"ARVIS intelligence map",
 		"Live operational truth",
