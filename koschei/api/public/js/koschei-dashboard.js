@@ -41,9 +41,11 @@ function installUniversalScanEntry(){
 async function hydrateHealth(){
   const pipeline=$('commandPipelineState');
   const top=$('topStatus');
+  const hero=$('commandHeroState');
   const showPipeline=ready=>{
     if(pipeline){pipeline.textContent=ready?'ARVIS PIPELINE OPERATIONAL':'DEGRADED / UNVERIFIED';pipeline.closest('.status-row')?.setAttribute('data-tone',ready?'ready':'unknown');}
     if(top){top.dataset.state=ready?'live':'degraded';top.querySelector('span').textContent=ready?'Evidence pipeline operational':'Pipeline degraded / unverified';}
+    if(hero)hero.textContent=ready?'Evidence pipeline operational':'Evidence boundaries active';
   };
   const controller=new AbortController();
   const timer=window.setTimeout(()=>controller.abort('health_timeout'),10000);
@@ -59,6 +61,7 @@ async function hydrateHealth(){
   }catch(error){
     if(pipeline){pipeline.textContent='UNAVAILABLE';pipeline.closest('.status-row')?.setAttribute('data-tone','unknown');}
     if(top){top.dataset.state='degraded';top.querySelector('span').textContent='Evidence service unavailable';top.title=text(error?.message||error);}
+    if(hero)hero.textContent='Evidence service unavailable';
   }finally{window.clearTimeout(timer);window.setTimeout(hydrateHealth,15000);}
 }
 
