@@ -22,7 +22,7 @@ requireText(html,'Investigation jobs','history KPI copy');
 requireText(html,'Professional access','Professional access KPI');
 requireText(html,'Customer security workspace','customer workspace boundary');
 requireText(html,'Security Overview','current dashboard headline');
-requireText(html,'Customer security command center','command-center identity');
+requireText(html,'Customer intelligence workspace · command center','command-center identity');
 requireText(html,'INVESTIGATE ANY ASSET','command-center investigation entry');
 requireText(html,'Monitoring & watchlists','monitoring capability surface');
 requireText(html,'API & professional access','professional integration surface');
