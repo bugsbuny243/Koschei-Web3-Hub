@@ -85,7 +85,16 @@ function transactionRows(evidence){
     ['Logs',a.log_count],
     ['Standard events',a.standard_event_count],
     ['Transfer events',a.transfer_event_count],
-    ['Approval events',a.approval_event_count]
+    ['Approval events',a.approval_event_count],
+    ['BTC inputs',a.input_count],
+    ['BTC outputs',a.output_count],
+    ['Total input sats',a.total_input_sats],
+    ['Total output sats',a.total_output_sats],
+    ['Derived fee sats',a.derived_fee_sats],
+    ['Fee balance checked',a.fee_balance_checked===true?'YES':a.fee_balance_checked===false?'NO':undefined],
+    ['Fee consistent',a.fee_consistent===true?'YES':a.fee_consistent===false?'NO':undefined],
+    ['Input script types',a.input_script_types?JSON.stringify(a.input_script_types):undefined],
+    ['Output script types',a.output_script_types?JSON.stringify(a.output_script_types):undefined]
   ];
   return '<div class="cus-authority"><div class="cus-subhead"><span>Transaction evidence</span><b>Observed only</b></div>'+
     rows.filter(([,value])=>value!==undefined&&value!==null&&value!=='').map(([key,value])=>'<div class="cus-row"><span>'+esc(key)+'</span><b title="'+esc(value)+'">'+esc(short(value))+'</b></div>').join('')+'</div>';

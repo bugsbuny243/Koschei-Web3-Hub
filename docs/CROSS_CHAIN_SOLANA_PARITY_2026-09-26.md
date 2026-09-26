@@ -28,11 +28,11 @@ Parity means equivalent security outcomes, not identical collectors:
    - Bitcoin customer tx lookup with Esplora evidence — delivered.
    - EVM selector + standard Transfer/Approval layout evidence — delivered (hint-only selectors; no ABI-name overclaim).
    - EVM calldata/log semantic decoding beyond standard layouts — next.
-   - Bitcoin input/output/script flow projection — next.
+   - Bitcoin input/output/prevout/script/value flow projection — delivered.
 
 2. Asset and control parity
    - EVM ERC-20/721/1155 metadata, holders/concentration, implementation/admin/delegation graph.
-   - Bitcoin UTXO ownership-free flow graph, script type and spend-condition evidence.
+   - Bitcoin UTXO ownership-free flow graph now has transaction-local prevout/output evidence; cross-transaction spend graph and spend-condition semantics remain next.
 
 3. Liquidity / market structure
    - EVM DEX pool/vault/liquidity evidence with protocol-specific adapters.
