@@ -112,7 +112,7 @@ jobs:
           checked_page health /health '"status":"ok"'
           checked_page cases_page /cases "Yayınlanmış Güvenlik Vakaları"
           checked_page live_page /live "Canlı SOC"
-          checked_page login_page /login "Koschei Web3 · Secure Access"
+          checked_page login_page /login "KOSCHEI ARVIS"
           checked_page register_page /register "KOSCHEI ARVIS"
           checked_page account_page /account "Your identity opens the door. The entitlement opens the system."
           checked_page reports_page /reports "Investigation History"
