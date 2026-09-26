@@ -1,11 +1,14 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
 	"time"
+
+	"koschei/api/internal/web3"
 )
 
 func TestRedactProviderCredentials(t *testing.T) {
@@ -51,6 +54,31 @@ func TestRadarReconnectBaseUsesConfigured429Cooldown(t *testing.T) {
 	}
 	if got := radarReconnectBase(45*time.Second, errors.New("connection reset by peer")); got != 45*time.Second {
 		t.Fatalf("non-rate-limit reconnect base changed to %s", got)
+	}
+}
+
+func TestLegacyStreamEnrichmentDefersDuringProviderCooldown(t *testing.T) {
+	t.Setenv("SOLANA_RPC_GOVERNOR_ENABLED", "true")
+	web3.ResetSolanaRPCProviderGovernorForTest()
+	t.Cleanup(web3.ResetSolanaRPCProviderGovernorForTest)
+
+	rpcURL := "https://rpc.example.test"
+	web3.DeferSolanaRPCProvider(rpcURL, 30*time.Second)
+
+	worker := &SecurityRadarStreamWorker{RPCURL: rpcURL}
+	signature := "ci-cooldown-signature"
+	event := SecurityRadarStreamEventRecord{
+		Target: signature, Signature: signature, Decoded: map[string]any{},
+	}
+	got := worker.enrichEventTarget(context.Background(), event)
+	if status := anyString(got.Decoded["sovereign_enrichment_status"]); status != "provider_cooldown_deferred" {
+		t.Fatalf("status=%q want provider_cooldown_deferred", status)
+	}
+	if retryAfter := anyString(got.Decoded["sovereign_enrichment_retry_after"]); retryAfter == "" {
+		t.Fatal("provider cooldown defer must expose a retry-after timestamp")
+	}
+	if _, exists := got.Decoded["enrichment_error"]; exists {
+		t.Fatalf("cooldown defer must not be recorded as an enrichment failure: %#v", got.Decoded)
 	}
 }
 
