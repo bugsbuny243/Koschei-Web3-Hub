@@ -13,6 +13,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/web3"
 )
 
 type securityRadarGapHealer struct {
@@ -228,6 +230,9 @@ func (h *securityRadarGapHealer) fetchSignaturePage(ctx context.Context, program
 	if err := reserveSolanaRPCBudget(ctx, "gap_healer:getSignaturesForAddress"); err != nil {
 		return nil, err
 	}
+	if err := web3.WaitForSolanaRPCProviderSlot(ctx, h.RPCURL); err != nil {
+		return nil, err
+	}
 	if limit <= 0 || limit > 1000 {
 		limit = 500
 	}
@@ -259,6 +264,9 @@ func (h *securityRadarGapHealer) fetchSignaturePage(ctx context.Context, program
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			web3.DeferSolanaRPCProvider(h.RPCURL, solanaRPC429Cooldown())
+		}
 		return nil, fmt.Errorf("gap healer RPC status %d", resp.StatusCode)
 	}
 	var envelope struct {

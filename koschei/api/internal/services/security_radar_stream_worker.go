@@ -154,15 +154,40 @@ func securityRadarWSSHost(raw string) string {
 }
 
 func dialSecurityRadarWebSocket(ctx context.Context, primary, fallback string) (*minimalWSConn, error) {
-	conn, primaryErr := dialMinimalWebSocket(ctx, primary)
-	if primaryErr == nil {
-		return conn, nil
+	primary = strings.TrimSpace(primary)
+	fallback = strings.TrimSpace(fallback)
+
+	var primaryErr error
+	if until, cooling := web3.SolanaRPCProviderCooldown(primary); cooling && fallback != "" && !sameSecurityRadarWSSProvider(primary, fallback) {
+		primaryErr = fmt.Errorf("primary provider cooling down until %s", until.UTC().Format(time.RFC3339))
+	} else {
+		if err := web3.WaitForSolanaRPCProviderSlot(ctx, primary); err != nil {
+			return nil, err
+		}
+		conn, err := dialMinimalWebSocket(ctx, primary)
+		if err == nil {
+			return conn, nil
+		}
+		primaryErr = err
+		if isRadarRateLimitError(primaryErr) {
+			web3.DeferSolanaRPCProvider(primary, solanaRPC429Cooldown())
+		}
 	}
-	if ctx.Err() != nil || strings.TrimSpace(fallback) == "" || sameSecurityRadarWSSProvider(primary, fallback) {
+	if ctx.Err() != nil || fallback == "" || sameSecurityRadarWSSProvider(primary, fallback) {
 		return nil, primaryErr
+	}
+
+	if until, cooling := web3.SolanaRPCProviderCooldown(fallback); cooling {
+		return nil, fmt.Errorf("primary websocket failed: %v; fallback provider cooling down until %s", primaryErr, until.UTC().Format(time.RFC3339))
+	}
+	if err := web3.WaitForSolanaRPCProviderSlot(ctx, fallback); err != nil {
+		return nil, fmt.Errorf("primary websocket failed: %v; fallback wait failed: %w", primaryErr, err)
 	}
 	fallbackConn, fallbackErr := dialMinimalWebSocket(ctx, fallback)
 	if fallbackErr != nil {
+		if isRadarRateLimitError(fallbackErr) {
+			web3.DeferSolanaRPCProvider(fallback, solanaRPC429Cooldown())
+		}
 		return nil, fmt.Errorf("primary websocket failed: %v; fallback websocket failed: %w", primaryErr, fallbackErr)
 	}
 	log.Printf(
@@ -257,9 +282,7 @@ func (w *SecurityRadarStreamWorker) Start(ctx context.Context) {
 		if time.Since(startedAt) >= 45*time.Second {
 			backoff = 3 * time.Second
 		}
-		if isRadarRateLimitError(err) && backoff < 30*time.Second {
-			backoff = 30 * time.Second
-		}
+		backoff = radarReconnectBase(backoff, err)
 		wait := radarReconnectWait(backoff)
 		if err != nil {
 			log.Printf("security radar SBX-1 WSS reconnect scheduled retry_in=%s err=%s", wait.Round(time.Second), safeProviderError(err))
@@ -284,6 +307,16 @@ func isRadarRateLimitError(err error) bool {
 	}
 	message := strings.ToLower(err.Error())
 	return strings.Contains(message, "429") || strings.Contains(message, "too many requests") || strings.Contains(message, "rate limit")
+}
+
+func radarReconnectBase(backoff time.Duration, err error) time.Duration {
+	if backoff <= 0 {
+		backoff = 3 * time.Second
+	}
+	if isRadarRateLimitError(err) {
+		backoff = maxDuration(backoff, solanaRPC429Cooldown())
+	}
+	return backoff
 }
 
 func radarReconnectWait(base time.Duration) time.Duration {

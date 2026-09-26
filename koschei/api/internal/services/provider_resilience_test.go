@@ -41,6 +41,19 @@ func TestRadarReconnectWaitAndRateLimitDetection(t *testing.T) {
 	}
 }
 
+func TestRadarReconnectBaseUsesConfigured429Cooldown(t *testing.T) {
+	t.Setenv("SOLANA_RPC_LIMIT_SAVER_ENABLED", "false")
+	t.Setenv("SOLANA_RPC_429_COOLDOWN_SECONDS", "120")
+
+	got := radarReconnectBase(3*time.Second, errors.New("HTTP/1.1 429 Too Many Requests"))
+	if got != 120*time.Second {
+		t.Fatalf("rate-limit reconnect base=%s want 120s", got)
+	}
+	if got := radarReconnectBase(45*time.Second, errors.New("connection reset by peer")); got != 45*time.Second {
+		t.Fatalf("non-rate-limit reconnect base changed to %s", got)
+	}
+}
+
 func TestClassifyRadarStreamTextByProgramID(t *testing.T) {
 	module, eventType, programID := classifyRadarStreamText("Program " + strings.ToLower(defaultPumpProgramID) + " invoke [1]")
 	if module != ModulePumpSybilRadar || eventType != "pump_launch_or_trade" || programID != defaultPumpProgramID {
