@@ -480,10 +480,23 @@ func (w *SecurityRadarStreamWorker) enrichEventTarget(ctx context.Context, event
 	if !needsEnrichment {
 		return event
 	}
+	if event.Decoded == nil {
+		event.Decoded = map[string]any{}
+	}
+	if until, cooling := web3.SolanaRPCProviderCooldown(w.RPCURL); cooling {
+		event.Decoded["sovereign_enrichment_status"] = "provider_cooldown_deferred"
+		event.Decoded["sovereign_enrichment_retry_after"] = until.UTC().Format(time.RFC3339Nano)
+		return event
+	}
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Second)
 	defer cancel()
 	tx, err := SolanaGetTransactionJSONParsed(ctx, w.RPCURL, event.Signature)
 	if err != nil {
+		if until, cooling := web3.SolanaRPCProviderCooldown(w.RPCURL); cooling {
+			event.Decoded["sovereign_enrichment_status"] = "provider_cooldown_deferred"
+			event.Decoded["sovereign_enrichment_retry_after"] = until.UTC().Format(time.RFC3339Nano)
+			return event
+		}
 		event.Decoded["enrichment_error"] = compactRadarError("getTransaction", err)
 		return event
 	}
