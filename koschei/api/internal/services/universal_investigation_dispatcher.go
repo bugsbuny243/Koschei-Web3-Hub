@@ -13,7 +13,7 @@ const (
 	UniversalDispatchEVMTransaction   = "evm_transaction_receipt_probe"
 	UniversalDispatchBitcoinProbe       = "bitcoin_read_only_probe"
 	UniversalDispatchBitcoinTransaction = "bitcoin_transaction_probe"
-	UniversalDispatchMoveIdentity     = "move_identity_probe"
+	UniversalDispatchMoveIdentity       = "move_identity_probe"
 	UniversalDispatchDeclaredOnly     = "declared_not_executable"
 	UniversalDispatchPlannedAdapter   = "planned_adapter"
 	UniversalDispatchResearchAdapter  = "research_adapter"

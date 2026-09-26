@@ -41,17 +41,17 @@ func AdaptBitcoinTransactionEvidence(result networktarget.BitcoinTransactionEvid
 	}
 	observedAt = observedAt.UTC()
 	attributes := map[string]any{
-		"genesis_hash": expectedGenesis,
+		"genesis_hash":                expectedGenesis,
 		"transaction_response_sha256": strings.ToLower(strings.TrimSpace(result.TransactionSHA256)),
-		"version": result.Version,
-		"locktime": result.Locktime,
-		"input_count": result.InputCount,
-		"output_count": result.OutputCount,
-		"size_bytes": result.Size,
-		"weight": result.Weight,
-		"fee_sats": result.FeeSats,
-		"confirmed": result.Confirmed,
-		"evidence_scope": "read_only_bitcoin_transaction_probe",
+		"version":                     result.Version,
+		"locktime":                    result.Locktime,
+		"input_count":                 result.InputCount,
+		"output_count":                result.OutputCount,
+		"size_bytes":                  result.Size,
+		"weight":                      result.Weight,
+		"fee_sats":                    result.FeeSats,
+		"confirmed":                   result.Confirmed,
+		"evidence_scope":              "read_only_bitcoin_transaction_probe",
 	}
 	if result.Confirmed {
 		attributes["block_hash"] = strings.ToLower(strings.TrimSpace(result.BlockHash))
@@ -59,21 +59,21 @@ func AdaptBitcoinTransactionEvidence(result networktarget.BitcoinTransactionEvid
 	}
 	identity := strings.Join([]string{"bitcoin-transaction-probe", subject.ID, txid, state, observedAt.Format(time.RFC3339Nano)}, ":")
 	evidence := IntelligenceEvidence{
-		ID: intelligenceStableID(identity),
-		SubjectID: subject.ID,
-		ChainFamily: IntelligenceChainFamilyUTXO,
-		Chain: "bitcoin",
-		Network: result.Network,
-		Source: "bitcoin_esplora_probe",
-		Status: IntelligenceEvidenceObserved,
+		ID:              intelligenceStableID(identity),
+		SubjectID:       subject.ID,
+		ChainFamily:     IntelligenceChainFamilyUTXO,
+		Chain:           "bitcoin",
+		Network:         result.Network,
+		Source:          "bitcoin_esplora_probe",
+		Status:          IntelligenceEvidenceObserved,
 		TransactionHash: txid,
-		BlockOrSlot: result.BlockHeight,
-		ObservedAt: observedAt,
-		Method: "transaction_lookup",
-		StateChange: state,
-		Provenance: networkProbeEvidenceProvenance,
-		Confidence: 0.8,
-		Attributes: attributes,
+		BlockOrSlot:     result.BlockHeight,
+		ObservedAt:      observedAt,
+		Method:          "transaction_lookup",
+		StateChange:     state,
+		Provenance:      networkProbeEvidenceProvenance,
+		Confidence:      0.8,
+		Attributes:      attributes,
 	}
 	return NetworkProbeIntelligenceProjection{Subject: subject, Evidence: evidence}, nil
 }

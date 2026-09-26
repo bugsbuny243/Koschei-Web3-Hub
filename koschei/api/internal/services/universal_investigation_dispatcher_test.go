@@ -78,8 +78,9 @@ func TestUniversalDispatcherKeepsDeclaredButUnconnectedKindsNonExecutable(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	if btcTx.Executable || btcTx.Route != UniversalDispatchDeclaredOnly || btcTx.VerdictAuthority != UniversalVerdictNone {
-		t.Fatalf("Bitcoin transaction was overclaimed: %#v", btcTx)
+	if !btcTx.Executable || btcTx.Route != UniversalDispatchBitcoinTransaction || !btcTx.EvidenceOnly ||
+		btcTx.VerdictAuthority != UniversalVerdictEvidenceOnly {
+		t.Fatalf("unexpected Bitcoin transaction plan: %#v", btcTx)
 	}
 
 	moveContract, err := BuildUniversalInvestigationPlan(

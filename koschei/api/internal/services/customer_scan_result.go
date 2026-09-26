@@ -169,7 +169,6 @@ func CustomerScanResultFromEVMTransaction(target CustomerScanTarget, projection 
 	return result, nil
 }
 
-
 func CustomerScanResultFromBitcoinTransaction(target CustomerScanTarget, projection NetworkProbeIntelligenceProjection) (CustomerScanResult, error) {
 	if target.Route != CustomerScanRouteTxLookup || target.Kind != CustomerScanTargetTxHash {
 		return CustomerScanResult{}, errors.New("Bitcoin transaction result requires transaction lookup route")

@@ -18,7 +18,7 @@ func TestProbeBitcoinTransactionObserved(t *testing.T) {
 		case "/tx/" + txid:
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"txid": txid, "version": 2, "locktime": 0,
-				"vin": []any{map[string]any{"txid": strings.Repeat("c", 64)}},
+				"vin":  []any{map[string]any{"txid": strings.Repeat("c", 64)}},
 				"vout": []any{map[string]any{"value": 123}},
 				"size": 180, "weight": 720, "fee": 900,
 				"status": map[string]any{"confirmed": true, "block_height": 900000, "block_hash": blockHash, "block_time": 1700000000},
@@ -29,7 +29,7 @@ func TestProbeBitcoinTransactionObserved(t *testing.T) {
 	}))
 	defer server.Close()
 	got, err := ProbeBitcoinTransaction(t.Context(), server.Client(), server.URL, txid)
-	if err != nil { t.Fatal(err) }
+	if err != nil {\n\t\tt.Fatal(err)\n\t}
 	if got.TransactionID != txid || !got.Confirmed || got.BlockHeight != 900000 || got.InputCount != 1 || got.OutputCount != 1 || got.FeeSats != 900 {
 		t.Fatalf("unexpected result: %+v", got)
 	}
