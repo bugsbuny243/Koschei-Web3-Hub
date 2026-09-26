@@ -19,7 +19,49 @@ const (
 	CustomerScanRouteUnresolved   = "unresolved"
 )
 
-var evmTxHashPattern = regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
+var evmTxHashPattern = regexp.MustCompile(`^0x[0-9a-fA-F]{64}package services
+
+import (
+	"errors"
+	"regexp"
+	"strings"
+)
+
+const (
+	CustomerScanTargetEVMAddress  = "evm_address"
+	CustomerScanTargetSolana      = "solana_address"
+	CustomerScanTargetBitcoin     = "bitcoin_address"
+	CustomerScanTargetTxHash      = "transaction_hash"
+	CustomerScanTargetUnknown     = "unknown"
+	CustomerScanRouteEVMProbe     = "evm_probe"
+	CustomerScanRouteSolanaIntel  = "solana_intelligence"
+	CustomerScanRouteBitcoinProbe = "bitcoin_probe"
+	CustomerScanRouteTxLookup     = "transaction_lookup"
+	CustomerScanRouteUnresolved   = "unresolved"
+)
+
+)\nvar bitcoinTxIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{64}package services
+
+import (
+	"errors"
+	"regexp"
+	"strings"
+)
+
+const (
+	CustomerScanTargetEVMAddress  = "evm_address"
+	CustomerScanTargetSolana      = "solana_address"
+	CustomerScanTargetBitcoin     = "bitcoin_address"
+	CustomerScanTargetTxHash      = "transaction_hash"
+	CustomerScanTargetUnknown     = "unknown"
+	CustomerScanRouteEVMProbe     = "evm_probe"
+	CustomerScanRouteSolanaIntel  = "solana_intelligence"
+	CustomerScanRouteBitcoinProbe = "bitcoin_probe"
+	CustomerScanRouteTxLookup     = "transaction_lookup"
+	CustomerScanRouteUnresolved   = "unresolved"
+)
+
+)
 
 type CustomerScanTarget struct {
 	Raw             string   `json:"raw"`
@@ -66,6 +108,12 @@ func ClassifyCustomerScanTarget(raw, networkHint string) (CustomerScanTarget, er
 		if out.RequiresNetwork {
 			out.Reasons = []string{"NETWORK_REQUIRED_FOR_TRANSACTION_HASH"}
 		}
+		return out, nil
+	}
+
+	if networkHint == "bitcoin-mainnet" && bitcoinTxIDPattern.MatchString(raw) {
+		out.Kind = CustomerScanTargetTxHash
+		out.Route = CustomerScanRouteTxLookup
 		return out, nil
 	}
 

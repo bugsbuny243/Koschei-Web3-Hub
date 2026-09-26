@@ -168,3 +168,38 @@ func CustomerScanResultFromEVMTransaction(target CustomerScanTarget, projection 
 	result.TransactionEvidence = &evidence
 	return result, nil
 }
+
+
+func CustomerScanResultFromBitcoinTransaction(target CustomerScanTarget, projection NetworkProbeIntelligenceProjection) (CustomerScanResult, error) {
+	if target.Route != CustomerScanRouteTxLookup || target.Kind != CustomerScanTargetTxHash {
+		return CustomerScanResult{}, errors.New("Bitcoin transaction result requires transaction lookup route")
+	}
+	if target.RequiresNetwork || strings.TrimSpace(target.NetworkHint) != "bitcoin-mainnet" {
+		return CustomerScanResult{}, errors.New("bitcoin-mainnet context is required before Bitcoin transaction projection")
+	}
+	if projection.Subject.Kind != IntelligenceSubjectTransaction ||
+		projection.Subject.ChainFamily != IntelligenceChainFamilyUTXO ||
+		projection.Subject.Chain != "bitcoin" {
+		return CustomerScanResult{}, errors.New("Bitcoin transaction projection is required")
+	}
+	if !strings.EqualFold(strings.TrimSpace(projection.Subject.Raw), strings.TrimSpace(target.Raw)) ||
+		projection.Subject.Network != "bitcoin-mainnet" ||
+		projection.Evidence.SubjectID != projection.Subject.ID ||
+		projection.Evidence.ChainFamily != IntelligenceChainFamilyUTXO ||
+		projection.Evidence.Chain != "bitcoin" ||
+		projection.Evidence.Network != "bitcoin-mainnet" ||
+		projection.Evidence.Status != IntelligenceEvidenceObserved ||
+		!strings.EqualFold(strings.TrimSpace(projection.Evidence.TransactionHash), strings.TrimSpace(target.Raw)) {
+		return CustomerScanResult{}, errors.New("Bitcoin transaction evidence is not bound to the customer target")
+	}
+	result, err := BuildCustomerScanResult(target, Web3TrustVector{
+		Observed: true,
+		Reasons:  []string{"READ_ONLY_BITCOIN_TRANSACTION_OBSERVATION"},
+	}, []string{projection.Evidence.ID})
+	if err != nil {
+		return CustomerScanResult{}, err
+	}
+	evidence := projection.Evidence
+	result.TransactionEvidence = &evidence
+	return result, nil
+}

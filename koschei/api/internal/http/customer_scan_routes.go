@@ -110,6 +110,34 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 	observedAt := time.Now().UTC()
 
 	if target.Route == services.CustomerScanRouteTxLookup {
+		if request.Network == "bitcoin-mainnet" {
+			endpoint := configuredBitcoinEsploraEndpoint()
+			if endpoint == "" {
+				writeCustomerScanError(w, http.StatusServiceUnavailable, "bitcoin_esplora_configuration_required")
+				return
+			}
+			probe, probeErr := networktarget.ProbeBitcoinTransaction(ctx, nil, endpoint, request.Target)
+			if probeErr != nil {
+				if errors.Is(probeErr, networktarget.ErrBitcoinTransactionNotFound) {
+					writeCustomerScanError(w, http.StatusNotFound, "bitcoin_transaction_not_found")
+				} else {
+					writeCustomerScanError(w, http.StatusBadGateway, "bitcoin_transaction_probe_unavailable")
+				}
+				return
+			}
+			projection, projectionErr := services.AdaptBitcoinTransactionEvidence(probe, time.Now().UTC())
+			if projectionErr != nil {
+				writeCustomerScanError(w, http.StatusBadGateway, "bitcoin_transaction_projection_unavailable")
+				return
+			}
+			result, resultErr := services.CustomerScanResultFromBitcoinTransaction(target, projection)
+			if resultErr != nil {
+				writeCustomerScanError(w, http.StatusBadGateway, "customer_scan_result_unavailable")
+				return
+			}
+			writeCustomerScanResult(w, http.StatusOK, result)
+			return
+		}
 		if _, ok := networktarget.ExpectedEVMChainID(request.Network); !ok {
 			writeCustomerScanError(w, http.StatusNotImplemented, "transaction_network_not_connected")
 			return

@@ -11,7 +11,7 @@ const (
 	UniversalDispatchSolanaTx         = "solana_transaction_intelligence"
 	UniversalDispatchEVMProbe         = "evm_read_only_probe"
 	UniversalDispatchEVMTransaction   = "evm_transaction_receipt_probe"
-	UniversalDispatchBitcoinProbe     = "bitcoin_read_only_probe"
+	UniversalDispatchBitcoinProbe     = "bitcoin_read_only_probe"\n\tUniversalDispatchBitcoinTransaction = "bitcoin_transaction_probe"
 	UniversalDispatchMoveIdentity     = "move_identity_probe"
 	UniversalDispatchDeclaredOnly     = "declared_not_executable"
 	UniversalDispatchPlannedAdapter   = "planned_adapter"
@@ -185,9 +185,23 @@ func buildBitcoinUniversalDispatchPlan(plan UniversalInvestigationPlan) (Univers
 		plan.EvidenceOnly = true
 		plan.VerdictAuthority = UniversalVerdictEvidenceOnly
 		plan.Limitations = append(plan.Limitations, "Current Bitcoin dispatcher exposes address activity evidence only; ownership and safety are not inferred.")
+	case IntelligenceSubjectTransaction:
+		raw := strings.ToLower(strings.TrimSpace(plan.Subject.Raw))
+		if len(raw) != 64 {
+			return UniversalInvestigationPlan{}, errors.New("Bitcoin executable transaction target must be a canonical 32-byte txid")
+		}
+		decoded, err := hex.DecodeString(raw)
+		if err != nil || len(decoded) != 32 {
+			return UniversalInvestigationPlan{}, errors.New("Bitcoin executable transaction target must be a canonical 32-byte txid")
+		}
+		plan.Route = UniversalDispatchBitcoinTransaction
+		plan.Executable = true
+		plan.EvidenceOnly = true
+		plan.VerdictAuthority = UniversalVerdictEvidenceOnly
+		plan.Limitations = append(plan.Limitations, "Bitcoin transaction evidence is observational only; confirmation or fee state does not imply safety, ownership or intent.")
 	default:
 		plan.Route = UniversalDispatchDeclaredOnly
-		plan.Limitations = append(plan.Limitations, "Bitcoin transaction/block kinds are declared but do not yet have a connected production collector.")
+		plan.Limitations = append(plan.Limitations, "Bitcoin block kinds remain declared but do not yet have a standalone customer collector.")
 	}
 	return plan, nil
 }
