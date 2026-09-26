@@ -1,7 +1,9 @@
 package services
 
 import (
+	"bytes"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -60,6 +62,54 @@ func TestServiceFailoverPublishes429ToSharedProviderGovernor(t *testing.T) {
 	}
 	if _, cooling := web3.SolanaRPCProviderCooldown("https://backup.example/rpc"); cooling {
 		t.Fatal("primary cooldown leaked to backup provider")
+	}
+}
+
+func TestServiceFailoverDoesNotLogLocalCooldownAsRPCFailure(t *testing.T) {
+	t.Setenv("APP_ENV", "test")
+	t.Setenv("SOLANA_RPC_GOVERNOR_ENABLED", "true")
+	t.Setenv("SOLANA_RPC_MIN_INTERVAL_MS", "0")
+	t.Setenv("SOLANA_RPC_FAILOVER_ENABLED", "true")
+	t.Setenv("SOLANA_RPC_URL", "https://primary.example/rpc")
+	t.Setenv("SOLANA_RPC_FALLBACK_URL", "https://backup.example/rpc")
+	web3.ResetSolanaRPCProviderGovernorForTest()
+	defer web3.ResetSolanaRPCProviderGovernorForTest()
+	web3.DeferSolanaRPCProvider("https://primary.example/rpc", time.Minute)
+	web3.DeferSolanaRPCProvider("https://backup.example/rpc", time.Minute)
+
+	var upstreamCalls atomic.Int32
+	transport := &solanaFailoverTransport{base: governorRoundTripper(func(r *http.Request) (*http.Response, error) {
+		upstreamCalls.Add(1)
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader(`{"jsonrpc":"2.0","result":{}}`)),
+			Request:    r,
+		}, nil
+	})}
+
+	var logs bytes.Buffer
+	previous := log.Writer()
+	log.SetOutput(&logs)
+	defer log.SetOutput(previous)
+
+	req, err := http.NewRequest(http.MethodPost, "https://primary.example/rpc", strings.NewReader(`{"jsonrpc":"2.0"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-Koschei-RPC-Method", "getTransaction")
+	resp, err := transport.RoundTrip(req)
+	if resp != nil {
+		resp.Body.Close()
+	}
+	if err == nil || !isSolanaRPCProviderCooldownError(err) {
+		t.Fatalf("expected typed local cooldown error, got resp=%v err=%v", resp, err)
+	}
+	if got := upstreamCalls.Load(); got != 0 {
+		t.Fatalf("all-provider cooldown must avoid upstream calls, got %d", got)
+	}
+	if text := logs.String(); strings.Contains(text, "solana rpc failure") || strings.Contains(text, "provider cooling down") {
+		t.Fatalf("local cooldown was logged as RPC failure: %s", text)
 	}
 }
 
