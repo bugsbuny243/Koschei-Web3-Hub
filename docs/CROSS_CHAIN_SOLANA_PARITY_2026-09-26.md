@@ -31,7 +31,7 @@ Parity means equivalent security outcomes, not identical collectors:
    - Bitcoin input/output/prevout/script/value flow projection — delivered.
 
 2. Asset and control parity
-   - EVM ERC-20/721/1155 metadata, holders/concentration, implementation/admin/delegation graph.
+   - EVM ERC-20-like method surface + bounded metadata/total-supply evidence — delivered v1; ERC-721/1155 classification, holder concentration and broader asset graph remain next.
    - Bitcoin UTXO ownership-free flow graph now has transaction-local prevout/output evidence; cross-transaction spend graph and spend-condition semantics remain next.
 
 3. Liquidity / market structure

@@ -28,6 +28,7 @@ type CustomerScanResult struct {
 	EVMAuthority        *EVMSpenderAuthoritySnapshot `json:"evm_authority,omitempty"`
 	InvestigationPlan   *UniversalInvestigationPlan  `json:"investigation_plan,omitempty"`
 	TransactionEvidence *IntelligenceEvidence        `json:"transaction_evidence,omitempty"`
+	AssetEvidence       *IntelligenceEvidence        `json:"asset_evidence,omitempty"`
 }
 
 // BuildCustomerScanResult builds the customer-facing evidence envelope. It is
@@ -134,6 +135,29 @@ func CustomerScanResultFromEVMAuthority(target CustomerScanTarget, projection Ne
 	result.Reasons = NormalizeWeb3TrustReasons(append(result.Reasons, authority.Reasons...))
 	result.Trust.Reasons = append([]string(nil), result.Reasons...)
 	result.EVMAuthority = &authority
+	return result, nil
+}
+
+func CustomerScanResultWithEVMAssetEvidence(result CustomerScanResult, target CustomerScanTarget, projection NetworkProbeIntelligenceProjection) (CustomerScanResult, error) {
+	if target.Route != CustomerScanRouteEVMProbe || target.Kind != CustomerScanTargetEVMAddress {
+		return CustomerScanResult{}, errors.New("EVM asset evidence requires EVM address scan route")
+	}
+	if result.Target.Raw != target.Raw || result.Target.NetworkHint != target.NetworkHint {
+		return CustomerScanResult{}, errors.New("customer result does not match EVM asset target")
+	}
+	if projection.Subject.ChainFamily != IntelligenceChainFamilyEVM ||
+		!strings.EqualFold(strings.TrimSpace(projection.Subject.Raw), strings.TrimSpace(target.Raw)) ||
+		!strings.EqualFold(strings.TrimSpace(projection.Subject.Network), strings.TrimSpace(target.NetworkHint)) ||
+		projection.Evidence.SubjectID != projection.Subject.ID ||
+		projection.Evidence.Status != IntelligenceEvidenceObserved ||
+		!strings.EqualFold(strings.TrimSpace(projection.Evidence.Address), strings.TrimSpace(target.Raw)) {
+		return CustomerScanResult{}, errors.New("EVM asset evidence is not bound to customer target")
+	}
+	evidence := projection.Evidence
+	result.AssetEvidence = &evidence
+	result.EvidenceRefs = nonEmptyIntelligenceRefs(append(result.EvidenceRefs, evidence.ID))
+	result.Reasons = NormalizeWeb3TrustReasons(append(result.Reasons, "EVM_ERC20_LIKE_SURFACE_OBSERVED"))
+	result.Trust.Reasons = append([]string(nil), result.Reasons...)
 	return result, nil
 }
 

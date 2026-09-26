@@ -286,6 +286,32 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 			writeCustomerScanError(w, http.StatusBadGateway, "evm_authority_result_unavailable")
 			return
 		}
+
+		if probe.ContractCodeState == "contract_code_observed" {
+			assetProbe, assetErr := networktarget.ProbeEVMERC20Asset(ctx, nil, endpoint, probe)
+			if assetErr != nil {
+				reason := "EVM_ASSET_PROBE_UNAVAILABLE"
+				if errors.Is(assetErr, networktarget.ErrEVMERC20SurfaceNotObserved) {
+					reason = "EVM_ERC20_LIKE_SURFACE_NOT_OBSERVED"
+				}
+				result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, reason))
+				result.Trust.Reasons = append([]string(nil), result.Reasons...)
+			} else {
+				assetProjection, assetProjectionErr := services.AdaptEVMAssetEvidence(assetProbe, observedAt)
+				if assetProjectionErr != nil {
+					result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "EVM_ASSET_PROJECTION_UNAVAILABLE"))
+					result.Trust.Reasons = append([]string(nil), result.Reasons...)
+				} else {
+					withAsset, attachErr := services.CustomerScanResultWithEVMAssetEvidence(result, target, assetProjection)
+					if attachErr != nil {
+						result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, "EVM_ASSET_RESULT_UNAVAILABLE"))
+						result.Trust.Reasons = append([]string(nil), result.Reasons...)
+					} else {
+						result = withAsset
+					}
+				}
+			}
+		}
 		writeCustomerScanResult(w, http.StatusOK, result)
 	case services.CustomerScanRouteBitcoinProbe:
 		endpoint := configuredBitcoinEsploraEndpoint()

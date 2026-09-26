@@ -71,6 +71,22 @@ function verdictSummary(classification,entries){
   return{tone:'limited',label:'LIMITED EVIDENCE',title:'Evidence returned without a completed observation.',copy:'Koschei did not promote incomplete evidence into a safety claim.'};
 }
 
+function assetRows(evidence){
+  if(!evidence)return '';
+  const a=evidence.attributes||{};
+  const rows=[
+    ['Interface',a.interface_state],
+    ['Name',a.name],
+    ['Symbol',a.symbol],
+    ['Decimals',a.decimals],
+    ['Total supply',a.total_supply],
+    ['Contract balance',a.contract_balance],
+    ['Compliance claimed',a.standards_compliance_claimed===true?'YES':a.standards_compliance_claimed===false?'NO':undefined]
+  ];
+  return '<div class="cus-authority"><div class="cus-subhead"><span>Asset surface</span><b>Observed only</b></div>'+
+    rows.filter(([,value])=>value!==undefined&&value!==null&&value!=='').map(([key,value])=>'<div class="cus-row"><span>'+esc(key)+'</span><b title="'+esc(value)+'">'+esc(short(value))+'</b></div>').join('')+'</div>';
+}
+
 function transactionRows(evidence){
   if(!evidence)return '';
   const a=evidence.attributes||{};
@@ -114,6 +130,7 @@ function resultCard(entry){
     <details class="cus-details"><summary>Technical evidence</summary>
       ${renderTrust(result.trust||{})}
       ${authority?`<div class="cus-authority"><div class="cus-subhead"><span>Authority surface</span><b>Observed evidence</b></div>${authorityRows(authority)}</div>`:''}
+      ${assetRows(result.asset_evidence)}
       ${transactionRows(result.transaction_evidence)}
       <div class="cus-reasons"><div class="cus-subhead"><span>Reason codes</span><b>${reasons.length}</b></div>${reasons.length?reasons.map(reason=>`<code>${esc(reason)}</code>`).join(''):'<span class="cus-empty">No reason code attached.</span>'}</div>
       <div class="cus-reasons"><div class="cus-subhead">Evidence references</div>${(result.evidence_refs||[]).map(ref=>`<code>${esc(ref)}</code>`).join('')||'<span class="cus-empty">No reference was attached.</span>'}</div>
