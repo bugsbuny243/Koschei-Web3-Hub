@@ -23,47 +23,47 @@ const (
 var ErrBitcoinTransactionNotFound = errors.New("bitcoin_transaction_not_found")
 
 type BitcoinTransactionEvidenceResult struct {
-	SchemaVersion         string                          `json:"schema_version"`
-	Network               string                          `json:"network"`
-	GenesisHash           string                          `json:"genesis_hash"`
-	ExpectedGenesisHash   string                          `json:"expected_genesis_hash"`
-	GenesisResponseSHA256 string                          `json:"genesis_response_sha256,omitempty"`
-	TransactionID         string                          `json:"transaction_id"`
-	Version               int64                           `json:"version"`
-	Locktime              int64                           `json:"locktime"`
-	InputCount            int                             `json:"input_count"`
-	OutputCount           int                             `json:"output_count"`
-	Size                  int64                           `json:"size"`
-	Weight                int64                           `json:"weight"`
-	FeeSats               int64                           `json:"fee_sats"`
-	Coinbase              bool                            `json:"coinbase"`
-	TotalInputSats        int64                           `json:"total_input_sats"`
-	TotalOutputSats       int64                           `json:"total_output_sats"`
-	DerivedFeeSats        int64                           `json:"derived_fee_sats"`
-	FeeBalanceChecked     bool                            `json:"fee_balance_checked"`
-	FeeConsistent         bool                            `json:"fee_consistent"`
-	Inputs                []BitcoinTransactionInputFlow   `json:"inputs"`
-	Outputs               []BitcoinTransactionOutputFlow  `json:"outputs"`
-	Confirmed             bool                            `json:"confirmed"`
-	BlockHeight           int64                           `json:"block_height,omitempty"`
-	BlockHash             string                          `json:"block_hash,omitempty"`
-	BlockTimeUnix         int64                           `json:"block_time_unix,omitempty"`
-	TransactionSHA256     string                          `json:"transaction_response_sha256"`
-	AnalysisPerformed     bool                            `json:"analysis_performed"`
-	EvidenceStatus        string                          `json:"evidence_status"`
-	LiveAvailability      string                          `json:"live_availability"`
+	SchemaVersion         string                         `json:"schema_version"`
+	Network               string                         `json:"network"`
+	GenesisHash           string                         `json:"genesis_hash"`
+	ExpectedGenesisHash   string                         `json:"expected_genesis_hash"`
+	GenesisResponseSHA256 string                         `json:"genesis_response_sha256,omitempty"`
+	TransactionID         string                         `json:"transaction_id"`
+	Version               int64                          `json:"version"`
+	Locktime              int64                          `json:"locktime"`
+	InputCount            int                            `json:"input_count"`
+	OutputCount           int                            `json:"output_count"`
+	Size                  int64                          `json:"size"`
+	Weight                int64                          `json:"weight"`
+	FeeSats               int64                          `json:"fee_sats"`
+	Coinbase              bool                           `json:"coinbase"`
+	TotalInputSats        int64                          `json:"total_input_sats"`
+	TotalOutputSats       int64                          `json:"total_output_sats"`
+	DerivedFeeSats        int64                          `json:"derived_fee_sats"`
+	FeeBalanceChecked     bool                           `json:"fee_balance_checked"`
+	FeeConsistent         bool                           `json:"fee_consistent"`
+	Inputs                []BitcoinTransactionInputFlow  `json:"inputs"`
+	Outputs               []BitcoinTransactionOutputFlow `json:"outputs"`
+	Confirmed             bool                           `json:"confirmed"`
+	BlockHeight           int64                          `json:"block_height,omitempty"`
+	BlockHash             string                         `json:"block_hash,omitempty"`
+	BlockTimeUnix         int64                          `json:"block_time_unix,omitempty"`
+	TransactionSHA256     string                         `json:"transaction_response_sha256"`
+	AnalysisPerformed     bool                           `json:"analysis_performed"`
+	EvidenceStatus        string                         `json:"evidence_status"`
+	LiveAvailability      string                         `json:"live_availability"`
 }
 
 type BitcoinTransactionInputFlow struct {
-	Index                       int    `json:"index"`
-	PreviousTxID                string `json:"previous_txid,omitempty"`
-	PreviousVout                int64  `json:"previous_vout"`
-	Coinbase                    bool   `json:"coinbase"`
-	Sequence                    uint64 `json:"sequence"`
-	PreviousValueSats           int64  `json:"previous_value_sats"`
-	PreviousScriptType          string `json:"previous_script_type,omitempty"`
-	PreviousAddress             string `json:"previous_address,omitempty"`
-	PreviousScriptPubKeySHA256  string `json:"previous_scriptpubkey_sha256,omitempty"`
+	Index                      int    `json:"index"`
+	PreviousTxID               string `json:"previous_txid,omitempty"`
+	PreviousVout               int64  `json:"previous_vout"`
+	Coinbase                   bool   `json:"coinbase"`
+	Sequence                   uint64 `json:"sequence"`
+	PreviousValueSats          int64  `json:"previous_value_sats"`
+	PreviousScriptType         string `json:"previous_script_type,omitempty"`
+	PreviousAddress            string `json:"previous_address,omitempty"`
+	PreviousScriptPubKeySHA256 string `json:"previous_scriptpubkey_sha256,omitempty"`
 }
 
 type BitcoinTransactionOutputFlow struct {
@@ -90,14 +90,14 @@ type bitcoinTransactionInputResponse struct {
 }
 
 type bitcoinTransactionResponse struct {
-	TxID     string                            `json:"txid"`
-	Version  int64                             `json:"version"`
-	Locktime int64                             `json:"locktime"`
-	Vin      []bitcoinTransactionInputResponse `json:"vin"`
+	TxID     string                             `json:"txid"`
+	Version  int64                              `json:"version"`
+	Locktime int64                              `json:"locktime"`
+	Vin      []bitcoinTransactionInputResponse  `json:"vin"`
 	Vout     []bitcoinTransactionOutputResponse `json:"vout"`
-	Size     int64                             `json:"size"`
-	Weight   int64                             `json:"weight"`
-	Fee      int64                             `json:"fee"`
+	Size     int64                              `json:"size"`
+	Weight   int64                              `json:"weight"`
+	Fee      int64                              `json:"fee"`
 	Status   struct {
 		Confirmed   bool   `json:"confirmed"`
 		BlockHeight int64  `json:"block_height"`

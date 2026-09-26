@@ -21,17 +21,17 @@ func TestProbeBitcoinTransactionObserved(t *testing.T) {
 				"vin": []any{map[string]any{
 					"txid": strings.Repeat("c", 64), "vout": 1, "is_coinbase": false, "sequence": 4294967293,
 					"prevout": map[string]any{
-						"scriptpubkey": "76a914" + strings.Repeat("1", 40) + "88ac",
-						"scriptpubkey_type": "p2pkh",
+						"scriptpubkey":         "76a914" + strings.Repeat("1", 40) + "88ac",
+						"scriptpubkey_type":    "p2pkh",
 						"scriptpubkey_address": "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
-						"value": 1500,
+						"value":                1500,
 					},
 				}},
 				"vout": []any{map[string]any{
-					"scriptpubkey": "76a914" + strings.Repeat("2", 40) + "88ac",
-					"scriptpubkey_type": "p2pkh",
+					"scriptpubkey":         "76a914" + strings.Repeat("2", 40) + "88ac",
+					"scriptpubkey_type":    "p2pkh",
 					"scriptpubkey_address": "1BoatSLRHtKNngkdXEeobR76b53LETtpyT",
-					"value": 600,
+					"value":                600,
 				}},
 				"size": 180, "weight": 720, "fee": 900,
 				"status": map[string]any{"confirmed": true, "block_height": 900000, "block_hash": blockHash, "block_time": 1700000000},
