@@ -53,7 +53,7 @@ need('public/index.html', 'Coverage without theatre');
 need('public/index.html', 'Production core');
 need('public/index.html', 'LIVE CORE');
 need('public/index.html', 'PROBE READY');
-need('public/index.html', '/css/koschei-home.css?v=3');
+need('public/index.html', '/css/koschei-home.css?v=4');
 need('public/index.html', 'Enter Intelligence Console');
 need('public/index.html', 'Evidence first · Unknown stays unknown');
 
