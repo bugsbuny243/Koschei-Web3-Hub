@@ -8,6 +8,12 @@ import (
 
 func TestCoreCustomerSurfacesAreSourceEnglishWave2(t *testing.T) {
 	files := map[string][]string{
+		"public/login.html": {
+			"Sign In · Koschei Web3",
+			"Koschei Web3 · Secure Access",
+			"Open command center",
+			"Authentication changes access — never the evidence, verdict or confidence.",
+		},
 		"public/index.html": {
 			"Koschei Web3 | Security Intelligence",
 			"Security decisions,",
