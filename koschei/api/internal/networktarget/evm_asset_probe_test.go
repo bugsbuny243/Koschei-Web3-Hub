@@ -1,6 +1,7 @@
 package networktarget
 
 import (
+	"errors"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
