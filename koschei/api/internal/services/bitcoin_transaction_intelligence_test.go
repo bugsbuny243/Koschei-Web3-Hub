@@ -32,7 +32,9 @@ func TestAdaptBitcoinTransactionEvidence(t *testing.T) {
 		LiveAvailability:    "checked",
 	}
 	projection, err := AdaptBitcoinTransactionEvidence(result, time.Unix(1700000100, 0).UTC())
-	if err != nil {\n\t\tt.Fatal(err)\n\t}
+	if err != nil {
+		t.Fatal(err)
+	}
 	if projection.Subject.Kind != IntelligenceSubjectTransaction || projection.Subject.Chain != "bitcoin" {
 		t.Fatalf("unexpected subject: %+v", projection.Subject)
 	}

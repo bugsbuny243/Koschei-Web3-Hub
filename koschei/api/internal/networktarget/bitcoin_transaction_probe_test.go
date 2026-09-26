@@ -29,7 +29,9 @@ func TestProbeBitcoinTransactionObserved(t *testing.T) {
 	}))
 	defer server.Close()
 	got, err := ProbeBitcoinTransaction(t.Context(), server.Client(), server.URL, txid)
-	if err != nil {\n\t\tt.Fatal(err)\n\t}
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got.TransactionID != txid || !got.Confirmed || got.BlockHeight != 900000 || got.InputCount != 1 || got.OutputCount != 1 || got.FeeSats != 900 {
 		t.Fatalf("unexpected result: %+v", got)
 	}
