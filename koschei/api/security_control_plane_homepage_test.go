@@ -31,7 +31,7 @@ func TestHomepageKeepsKoscheiWeb3EvidenceFirstProductTruth(t *testing.T) {
 		"Production core",
 		"LIVE CORE",
 		"PROBE READY",
-		"/css/koschei-home.css?v=2",
+		"/css/koschei-home.css?v=3",
 	} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("homepage missing evidence-first product contract %q", required)
