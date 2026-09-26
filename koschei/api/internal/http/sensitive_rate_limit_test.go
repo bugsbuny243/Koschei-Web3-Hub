@@ -95,6 +95,16 @@ func TestConsumeSharedSensitiveLimitIsAtomicAcrossPools(t *testing.T) {
 	cleanupSharedRateLimitTestBucket(t, dbOne, keyHash, route)
 	defer cleanupSharedRateLimitTestBucket(t, dbOne, keyHash, route)
 
+	// Seed one active bucket so this test exercises concurrent ON CONFLICT updates
+	// without becoming flaky when the wall clock crosses a fixed-window boundary
+	// while the goroutines are running. Window rollover behavior is covered
+	// separately by TestConsumeSharedSensitiveLimitResetsExpiredWindow.
+	if _, err := dbOne.Exec(`INSERT INTO security_rate_limit_buckets
+		(bucket_key_hash,route,window_started_at,window_seconds,request_count,expires_at)
+		VALUES($1,$2,statement_timestamp(),60,0,statement_timestamp()+interval '1 minute')`, keyHash, route); err != nil {
+		t.Fatalf("seed shared rate limit bucket: %v", err)
+	}
+
 	rule := sensitiveLimitRule{Limit: 5, Window: time.Minute}
 	const requests = 20
 	var allowed atomic.Int64
