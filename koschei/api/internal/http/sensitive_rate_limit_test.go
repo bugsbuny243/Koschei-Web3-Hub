@@ -95,24 +95,25 @@ func TestConsumeSharedSensitiveLimitIsAtomicAcrossPools(t *testing.T) {
 	cleanupSharedRateLimitTestBucket(t, dbOne, keyHash, route)
 	defer cleanupSharedRateLimitTestBucket(t, dbOne, keyHash, route)
 
-	// Seed one active bucket so this test exercises concurrent ON CONFLICT updates
-	// without becoming flaky when the wall clock crosses a fixed-window boundary
-	// while the goroutines are running. Window rollover behavior is covered
-	// separately by TestConsumeSharedSensitiveLimitResetsExpiredWindow.
-	if _, err := dbOne.Exec(`INSERT INTO security_rate_limit_buckets
-		(bucket_key_hash,route,window_started_at,window_seconds,request_count,expires_at)
-		VALUES($1,$2,statement_timestamp(),60,0,statement_timestamp()+interval '1 minute')`, keyHash, route); err != nil {
+	// Atomicity is independent of rollover cadence. Use the maximum production
+	// window so concurrent requests cannot accidentally straddle a minute edge
+	// and make a legitimate fixed-window reset look like a lost update.
+	rule := sensitiveLimitRule{Limit: 5, Window: 24 * time.Hour}
+	_, err := dbOne.Exec(`
+		WITH current_window AS (
+			SELECT to_timestamp(
+				floor(extract(epoch FROM statement_timestamp()) / 86400::double precision) * 86400::double precision
+			) AS window_started_at
+		)
+		INSERT INTO security_rate_limit_buckets
+			(bucket_key_hash,route,window_started_at,window_seconds,request_count,expires_at)
+		SELECT $1,$2,window_started_at,86400,0,window_started_at + interval '1 day'
+		FROM current_window
+	`, keyHash, route)
+	if err != nil {
 		t.Fatalf("seed shared rate limit bucket: %v", err)
 	}
 
-	rule := sensitiveLimitRule{Limit: 5, Window: time.Minute}
-	// Seed an active bucket so this atomicity test cannot straddle a real clock
-	// fixed-window boundary and mistake a legitimate reset for a lost update.
-	if _, err := dbOne.Exec(`INSERT INTO security_rate_limit_buckets
-		(bucket_key_hash,route,window_started_at,window_seconds,request_count,expires_at)
-		VALUES($1,$2,statement_timestamp(),60,0,statement_timestamp()+interval '5 minutes')`, keyHash, route); err != nil {
-		t.Fatal(err)
-	}
 	const requests = 20
 	var allowed atomic.Int64
 	var maxCount atomic.Int64
