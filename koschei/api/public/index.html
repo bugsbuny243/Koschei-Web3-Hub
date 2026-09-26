@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#090b0f">
 <title>Koschei Web3 | Security Intelligence</title>
 <link rel="canonical" href="https://tradepigloball.co/">
-<link rel="stylesheet" href="/css/koschei-home.css?v=2">
+<link rel="stylesheet" href="/css/koschei-home.css?v=3">
 </head>
 <body>
 <main class="home-page">
@@ -18,7 +18,7 @@
         <span class="brand-copy"><strong>Koschei Web3</strong><small>Security Intelligence</small></span>
       </a>
       <nav class="header-nav" aria-label="Primary navigation">
-        <a href="#platform">Platform</a>
+        <a href="#platform">Capabilities</a>
         <a href="#evidence">Evidence</a>
         <a href="#coverage">Coverage</a>
       </nav>
@@ -32,7 +32,7 @@
       <div class="hero-copy">
         <div class="product-kicker"><span class="status-dot"></span> Evidence-led Web3 security intelligence</div>
         <h1 id="hero-title">Security decisions,<br><span>with proof attached.</span></h1>
-        <p class="hero-lead">Koschei Web3 connects chain state, transaction context, spending authority, delegation and upgrade control into one accountable evidence path. What is observed stays observed. What is unknown stays unknown.</p>
+        <p class="hero-lead">Koschei Web3 investigates addresses, contracts, tokens and transactions across supported chains; traces authority and approvals; runs evidence-led preflight; correlates ARVIS investigations; and keeps alerts, watchlists and proof in one read-only security surface. What is observed stays observed. What is unknown stays unknown.</p>
         <div class="hero-actions">
           <a class="btn primary large" href="/dashboard">Enter Intelligence Console <span aria-hidden="true">↗</span></a>
           <a class="btn ghost large" href="#platform">Explore the platform</a>
@@ -75,32 +75,49 @@
     </section>
 
     <section class="section platform" id="platform">
-      <div class="section-intro">
-        <div><p class="eyebrow">One intelligence surface</p><h2>Built for the question after the scan.</h2></div>
-        <p>Koschei is designed to answer not only <em>what is this address?</em>, but <em>what code, permission and authority can materially affect it now?</em></p>
+      <div class="section-intro command-intro">
+        <div>
+          <p class="eyebrow">One intelligence surface</p>
+          <h2>Everything Koschei Web3 can do,<br>without the dashboard maze.</h2>
+        </div>
+        <p><strong>Built for the question after the scan.</strong> Start with a public target, then move from identity to authority, approvals, transaction context, evidence correlation, monitoring and professional integration without leaving the security model.</p>
       </div>
-      <div class="feature-grid">
-        <article class="feature feature-large">
-          <span class="feature-index">01</span>
-          <div><small>Identity & chain state</small><h3>Address Intelligence</h3><p>Classify supported targets, resolve network context and surface observable account or contract state without inventing existence, ownership or safety.</p></div>
-          <div class="feature-tags"><span>EVM</span><span>Solana</span><span>Bitcoin</span></div>
+
+      <div class="capability-grid" aria-label="Koschei Web3 capabilities">
+        <article class="capability-card">
+          <span class="capability-icon">◎</span><div><small>Identity & chain state</small><h3>Address Intelligence</h3><p>Classify supported public targets, resolve network context and surface observable account or contract state.</p></div><a href="/scan">Analyze →</a>
         </article>
-        <article class="feature">
-          <span class="feature-index">02</span>
-          <div><small>Control plane</small><h3>Authority Intelligence</h3><p>Expose EIP-7702 delegation and standard ERC-1967 implementation, admin and beacon authority as bounded evidence.</p></div>
+        <article class="capability-card">
+          <span class="capability-icon">⌘</span><div><small>Control plane</small><h3>Authority Intelligence</h3><p>Expose delegation, upgrade authority, admin roles and permission scope as bounded evidence.</p></div><a href="/scan">Inspect →</a>
         </article>
-        <article class="feature">
-          <span class="feature-index">03</span>
-          <div><small>Spending surface</small><h3>Approval Intelligence</h3><p>Model allowance, permit and transaction-scoped approval semantics without confusing permission with safety.</p></div>
+        <article class="capability-card">
+          <span class="capability-icon">◈</span><div><small>Spending surface</small><h3>Approval Intelligence</h3><p>Inspect ERC-20 allowance and supported approval semantics without confusing permission with safety.</p></div><a href="/scan">Inspect →</a>
         </article>
-        <article class="feature">
-          <span class="feature-index">04</span>
-          <div><small>Execution context</small><h3>Transaction Preflight</h3><p>Inspect supported transaction context before execution and preserve the evidence that changed the decision.</p></div>
+        <article class="capability-card">
+          <span class="capability-icon">⇄</span><div><small>Execution context</small><h3>Transaction Preflight</h3><p>Inspect supported transaction context before execution and preserve the evidence that changed the decision.</p></div><a href="/scan?mode=transaction">Preflight →</a>
         </article>
-        <article class="feature">
-          <span class="feature-index">05</span>
-          <div><small>Evidence maturity</small><h3>Trust Vector</h3><p>Keep claimed, observed, authorized, available, verified and finalized states separate instead of collapsing them into one score.</p></div>
+        <article class="capability-card flagship-capability">
+          <span class="capability-icon">◉</span><div><small>Evidence correlation</small><h3>ARVIS Investigation</h3><p>Move from a target to explainable relationships, provenance, unresolved gaps and deterministic evidence-backed conclusions.</p></div><a href="/arvis-chat">Open ARVIS →</a>
         </article>
+        <article class="capability-card">
+          <span class="capability-icon">!</span><div><small>Monitoring</small><h3>Evidence & Alerts</h3><p>Review account-backed alerts and investigation evidence without silently inventing missing telemetry.</p></div><a href="/dashboard#evidence">Review →</a>
+        </article>
+        <article class="capability-card">
+          <span class="capability-icon">★</span><div><small>Continuous attention</small><h3>Watchlists</h3><p>Track supported public targets and bring account-scoped monitoring events back into the evidence workflow.</p></div><a href="/watchlist">Watch →</a>
+        </article>
+        <article class="capability-card">
+          <span class="capability-icon">⌁</span><div><small>Chain-specific adapters</small><h3>Cross-chain Evidence</h3><p>Keep one reasoning model while Solana, EVM and Bitcoin evidence collectors preserve their own boundaries.</p></div><a href="#coverage">Coverage →</a>
+        </article>
+        <article class="capability-card">
+          <span class="capability-icon">&lt;/&gt;</span><div><small>Teams & builders</small><h3>API / Professional Access</h3><p>Use the customer workspace and supported programmatic surfaces without collapsing evidence states into marketing scores.</p></div><a href="/account">Access →</a>
+        </article>
+      </div>
+
+      <div class="capability-principles" aria-label="Koschei operating principles">
+        <div><b>READ-ONLY</b><span>No custody or private keys</span></div>
+        <div><b>FAIL-CLOSED</b><span>Missing evidence never becomes safe</span></div>
+        <div><b>EVIDENCE-LED</b><span>Source, time and provenance stay attached</span></div>
+        <div><b>ARVIS</b><span>Verdict authority remains explicit</span></div>
       </div>
     </section>
 
