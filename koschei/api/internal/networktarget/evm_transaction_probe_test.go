@@ -115,7 +115,7 @@ func TestProbeEVMTransactionBindsReceiptAndExecutionState(t *testing.T) {
 
 func TestClassifyEVMStandardLogKeepsERC721ApprovalLayoutEvidenceOnly(t *testing.T) {
 	summary := EVMTransactionLogSummary{
-		Topics:    []string{
+		Topics: []string{
 			evmApprovalEventTopic,
 			"0x" + strings.Repeat("0", 24) + strings.Repeat("1", 40),
 			"0x" + strings.Repeat("0", 24) + strings.Repeat("2", 40),
