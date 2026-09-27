@@ -57,3 +57,7 @@ Verified billing webhook payloads are not stored verbatim. The provider-neutral 
 ## Historical records
 
 Existing databases may contain Paddle schema/history from retired billing experiments. Applied migrations and historical rows remain for audit and migration integrity, but Paddle is not an accepted runtime provider and has no active checkout, webhook, public-config or browser CSP surface.
+
+## Canonical Professional price
+
+The public Koschei Web3 Professional price is **USD 199**. Polar remains the hosted checkout authority for the billing interval and final payment terms. A checkout redirect never grants product access; only a verified Polar webhook may activate the Professional entitlement.

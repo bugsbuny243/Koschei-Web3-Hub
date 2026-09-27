@@ -13,6 +13,7 @@ func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 		"Enter the ARVIS universe.",
 		`data-polar-plan="professional"`,
 		"Professional is the only paid customer plan.",
+		"$199",
 		"The server decides access. The browser never invents it.",
 		"polar-checkout-v1.js",
 	} {
@@ -27,6 +28,7 @@ func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 		"<h2>Free Core</h2>",
 		"$299 / month",
 		"$999 / month",
+		"$999",
 		"$4,999 / month",
 	} {
 		if strings.Contains(pricing, forbidden) {
