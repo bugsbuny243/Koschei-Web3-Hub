@@ -28,6 +28,8 @@ func TestEntitlementStoreProvisioningContract(t *testing.T) {
 		"order_id UUID",
 		"CREATE TABLE IF NOT EXISTS credit_events",
 		"CREATE TABLE IF NOT EXISTS billing_provider_events",
+		"CREATE TABLE IF NOT EXISTS kosc_payment_quotes",
+		"CREATE TABLE IF NOT EXISTS kosc_payment_settlements",
 		"raw_sha256 TEXT NOT NULL",
 	} {
 		if !strings.Contains(sql, required) {
