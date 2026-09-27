@@ -39,6 +39,16 @@ type koscSettlementEvidence struct {
 	WalletRawDecrease *big.Int
 }
 
+type koscSignatureStatus struct {
+	Slot               int64  `json:"slot"`
+	Err                any    `json:"err"`
+	ConfirmationStatus string `json:"confirmationStatus"`
+}
+
+type koscSignatureStatusesResult struct {
+	Value []*koscSignatureStatus `json:"value"`
+}
+
 func (h *Handler) KOSCSettle(w http.ResponseWriter, r *http.Request) {
 	claims, ok := userFromContext(r.Context())
 	if !ok {
@@ -122,10 +132,42 @@ func (h *Handler) KOSCSettle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rpcURL := strings.TrimSpace(h.SolanaRPC.URL("solana-mainnet"))
-	txResult, err := services.SolanaGetTransactionJSONParsed(r.Context(), rpcURL, request.Signature)
+	var signatureStatuses koscSignatureStatusesResult
+	if err := h.SolanaRPC.Call(
+		r.Context(),
+		"solana-mainnet",
+		"getSignatureStatuses",
+		[]any{[]string{request.Signature}, map[string]any{"searchTransactionHistory": true}},
+		&signatureStatuses,
+		5*time.Second,
+	); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "kosc_finality_unavailable"})
+		return
+	}
+	finalizedSlot, err := validateKOSCFinalizedStatus(signatureStatuses)
 	if err != nil {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "kosc_payment_not_finalized"})
+		return
+	}
+
+	var txResult services.SolanaTransactionResult
+	if err := h.SolanaRPC.Call(
+		r.Context(),
+		"solana-mainnet",
+		"getTransaction",
+		[]any{request.Signature, map[string]any{
+			"encoding":                       "jsonParsed",
+			"commitment":                     "finalized",
+			"maxSupportedTransactionVersion": 1,
+		}},
+		&txResult,
+		24*time.Hour,
+	); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "kosc_transaction_unavailable"})
+		return
+	}
+	if txResult == nil || creatorIntelInt64(txResult["slot"]) != finalizedSlot {
+		writeJSON(w, http.StatusConflict, map[string]string{"error": "kosc_finalized_slot_mismatch"})
 		return
 	}
 	evidence, err := verifyKOSCSettlementTransaction(txResult, wallet, cfg.Mint, cfg.Treasury, requiredRaw)
@@ -195,6 +237,23 @@ func loadKOSCQuote(ctx context.Context, store *sql.DB, quoteID, subject string) 
 	var row koscQuoteLedgerRow
 	err := store.QueryRowContext(ctx, "SELECT lower(email),wallet_address,mint,treasury,raw_amount::text,access_days,status,expires_at FROM kosc_payment_quotes WHERE id=$1::uuid AND auth_subject=$2", quoteID, subject).Scan(&row.Email, &row.Wallet, &row.Mint, &row.Treasury, &row.RawAmount, &row.AccessDays, &row.Status, &row.ExpiresAt)
 	return row, err
+}
+
+func validateKOSCFinalizedStatus(result koscSignatureStatusesResult) (int64, error) {
+	if len(result.Value) != 1 || result.Value[0] == nil {
+		return 0, errors.New("signature status unavailable")
+	}
+	status := result.Value[0]
+	if status.Err != nil {
+		return 0, errors.New("payment transaction failed")
+	}
+	if status.Slot <= 0 {
+		return 0, errors.New("finalized slot unavailable")
+	}
+	if !strings.EqualFold(strings.TrimSpace(status.ConfirmationStatus), "finalized") {
+		return 0, errors.New("payment transaction is not finalized")
+	}
+	return status.Slot, nil
 }
 
 func verifyKOSCSettlementTransaction(tx services.SolanaTransactionResult, wallet, mint, treasury string, requiredRaw *big.Int) (koscSettlementEvidence, error) {

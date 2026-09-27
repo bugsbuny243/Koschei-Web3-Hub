@@ -100,3 +100,24 @@ func TestVerifyKOSCSettlementTransactionRejectsNonSigner(t *testing.T) {
 		t.Fatal("expected non-signer settlement rejection")
 	}
 }
+
+
+func TestValidateKOSCFinalizedStatusRequiresFinalizedSuccessfulSignature(t *testing.T) {
+	slot, err := validateKOSCFinalizedStatus(koscSignatureStatusesResult{Value: []*koscSignatureStatus{{
+		Slot: 991, ConfirmationStatus: "finalized",
+	}}})
+	if err != nil || slot != 991 {
+		t.Fatalf("finalized status rejected: slot=%d err=%v", slot, err)
+	}
+	for _, tc := range []koscSignatureStatusesResult{
+		{},
+		{Value: []*koscSignatureStatus{nil}},
+		{Value: []*koscSignatureStatus{{Slot: 991, ConfirmationStatus: "confirmed"}}},
+		{Value: []*koscSignatureStatus{{Slot: 0, ConfirmationStatus: "finalized"}}},
+		{Value: []*koscSignatureStatus{{Slot: 991, Err: map[string]any{"InstructionError": []any{0, "Custom"}}, ConfirmationStatus: "finalized"}}},
+	} {
+		if _, err := validateKOSCFinalizedStatus(tc); err == nil {
+			t.Fatalf("non-finalized/failed status accepted: %#v", tc)
+		}
+	}
+}
