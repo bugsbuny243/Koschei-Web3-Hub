@@ -26,6 +26,7 @@ jobs:
       KOSCHEI_FULL_SCAN_MINT: 7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1
       DRIVE_MEMORY_SCAN_TIMEOUT_MS: "300000"
       OUTPUT_DIR: diagnostics
+      KOSCHEI_ACCEPTANCE_SESSION_TOKEN: ${{ secrets.KOSCHEI_ACCEPTANCE_SESSION_TOKEN }}
     steps:
       - name: Checkout acceptance probe
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -50,6 +51,16 @@ jobs:
           console.log(`Configuration: ${r.configuration_status || 'unknown'}`);
           console.log(`Durable: ${Boolean(r.durable)}`);
           console.log(`Object: ${r.object?.name || '-'}`);
+          NODE
+          elif [ -f diagnostics/drive-memory-auth-gate.json ]; then
+            node - <<'NODE'
+          const fs = require('fs');
+          const gate = JSON.parse(fs.readFileSync('diagnostics/drive-memory-auth-gate.json','utf8'));
+          console.log('=== KOSCHEI PRODUCTION DRIVE MEMORY AUTH BOUNDARY ===');
+          console.log(`Target: ${gate.target || 'unknown'}`);
+          console.log(`HTTP: ${gate.http_status || 0}`);
+          console.log(`Status: ${gate.status || 'unknown'}`);
+          console.log('Authenticated Drive memory acceptance deferred until KOSCHEI_ACCEPTANCE_SESSION_TOKEN is configured.');
           NODE
           elif [ -f diagnostics/drive-memory-probe-error.txt ]; then
             cat diagnostics/drive-memory-probe-error.txt

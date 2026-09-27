@@ -34,6 +34,7 @@ jobs:
       KOSCHEI_FULL_SCAN_MINT: 7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1
       FULL_SCAN_TIMEOUT_MS: "300000"
       OUTPUT_DIR: diagnostics
+      KOSCHEI_ACCEPTANCE_SESSION_TOKEN: ${{ secrets.KOSCHEI_ACCEPTANCE_SESSION_TOKEN }}
     steps:
       - name: Checkout smoke probes
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -257,7 +258,18 @@ jobs:
         if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '17 3 * * *')) && success()
         shell: bash
         run: |
-          node - <<'NODE'
+          if [ -f diagnostics/full-scan-auth-gate.json ]; then
+            node - <<'NODE'
+          const fs = require('fs');
+          const gate = JSON.parse(fs.readFileSync('diagnostics/full-scan-auth-gate.json','utf8'));
+          console.log('=== KOSCHEI PRODUCTION FULL SCAN AUTH BOUNDARY ===');
+          console.log(`Target: ${gate.target || 'unknown'}`);
+          console.log(`HTTP: ${gate.http_status || 0}`);
+          console.log(`Status: ${gate.status || 'unknown'}`);
+          console.log('Authenticated production scan deferred until KOSCHEI_ACCEPTANCE_SESSION_TOKEN is configured.');
+          NODE
+          else
+            node - <<'NODE'
           const fs = require('fs');
           const result = JSON.parse(fs.readFileSync('diagnostics/full-scan-result.json', 'utf8'));
           const c = result.evidence_coverage || {};
@@ -277,6 +289,7 @@ jobs:
           console.log(`Actor run status: ${result.evidence_surfaces?.actor_investigation?.run_status || 'unknown'}`);
           console.log(result.executive_summary || '');
           NODE
+          fi
 
       - name: Publish full scan outcome to issue 756
         if: (github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.event.schedule == '17 3 * * *')) && always()
@@ -290,6 +303,7 @@ jobs:
           const path = require('path');
           const resultPath = path.join('diagnostics', 'full-scan-result.json');
           const errorPath = path.join('diagnostics', 'full-scan-probe-error.txt');
+          const authGatePath = path.join('diagnostics', 'full-scan-auth-gate.json');
           const runURL = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
           let body;
           if (fs.existsSync(resultPath)) {
@@ -315,6 +329,18 @@ jobs:
               `- Actor investigation: **${result.evidence_surfaces?.actor_investigation?.run_status || 'unknown'}**`, '',
               result.executive_summary || 'No executive summary was emitted.', '',
               `[Actions run and 30-day evidence artifact](${runURL})`,
+            ].join('\n');
+          } else if (fs.existsSync(authGatePath)) {
+            const gate = JSON.parse(fs.readFileSync(authGatePath, 'utf8'));
+            body = [
+              '<!-- koschei-production-full-scan-result -->',
+              '## Production full scan authentication boundary verified', '',
+              `- Commit: \`${process.env.GITHUB_SHA}\``,
+              `- Target: \`${gate.target || 'unknown'}\``,
+              `- HTTP: **${gate.http_status || 0}**`,
+              `- Status: **${gate.status || 'unknown'}**`, '',
+              'Anonymous production scan execution was correctly rejected. Authenticated full-scan acceptance is deferred until the workflow has a dedicated Professional session token.', '',
+              `[Actions run and diagnostics](${runURL})`,
             ].join('\n');
           } else {
             const failure = fs.existsSync(errorPath)

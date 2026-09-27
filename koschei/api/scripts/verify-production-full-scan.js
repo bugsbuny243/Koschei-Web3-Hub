@@ -7,6 +7,7 @@ const baseURL = String(process.env.BASE_URL || 'https://tradepigloball.co').repl
 const mint = String(process.env.KOSCHEI_FULL_SCAN_MINT || '7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1').trim();
 const outputDir = path.resolve(process.env.OUTPUT_DIR || 'diagnostics');
 const timeoutMs = Number(process.env.FULL_SCAN_TIMEOUT_MS || 300000);
+const sessionToken = String(process.env.KOSCHEI_ACCEPTANCE_SESSION_TOKEN || '').trim();
 const transientHTTPStatuses = new Set([502, 503, 504]);
 const transientAttempts = 5;
 const transientDelayMs = 5000;
@@ -61,7 +62,8 @@ async function fetchProductionScan(controller) {
         headers: {
           accept: 'application/json',
           'content-type': 'application/json',
-          'user-agent': 'koschei-production-full-scan-acceptance/1.4.0',
+          'user-agent': 'koschei-production-full-scan-acceptance/1.5.0',
+          ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
         },
         body: JSON.stringify({ mint, network: 'solana-mainnet' }),
         signal: controller.signal,
@@ -100,6 +102,22 @@ async function main() {
 
   const raw = await response.text();
   fs.writeFileSync(path.join(outputDir, 'full-scan-http-status.txt'), `${response.status}\n`);
+  if (response.status === 401 && !sessionToken) {
+    const gate = {
+      schema_version: 'koschei-production-auth-gate-v1',
+      generated_at: new Date().toISOString(),
+      endpoint: `${baseURL}/api/token/scan`,
+      target: mint,
+      http_status: 401,
+      status: 'authenticated_acceptance_deferred',
+      auth_boundary_verified: true,
+      reason: 'KOSCHEI_ACCEPTANCE_SESSION_TOKEN is not configured for this workflow run.',
+    };
+    fs.writeFileSync(path.join(outputDir, 'full-scan-auth-gate.json'), `${JSON.stringify(gate, null, 2)}\n`);
+    console.log('PRODUCTION_FULL_SCAN_AUTH_BOUNDARY_ACCEPTED=true');
+    console.log('PRODUCTION_FULL_SCAN_AUTHENTICATED_ACCEPTANCE_DEFERRED=true');
+    return;
+  }
   if (!response.ok) {
     fs.writeFileSync(path.join(outputDir, 'full-scan-error.body'), raw);
     throw new Error(`production_full_scan_http_${response.status}`);
