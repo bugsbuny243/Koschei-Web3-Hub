@@ -12,8 +12,9 @@ import (
 	"koschei/api/internal/services"
 )
 
-// OwnerOperationsStatus is the KOSCH-era owner dashboard contract. It avoids
-// legacy checkout, package and entitlement concepts entirely.
+// OwnerOperationsStatus is the owner operations contract. Historical token
+// telemetry never grants commercial access; Professional authorization is
+// resolved only through the commercial entitlement plane.
 func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) {
 	db := h.DBRead
 	if db == nil {
