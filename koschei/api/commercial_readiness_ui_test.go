@@ -8,6 +8,7 @@ import (
 
 func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 	pricing := mustReadCommercialSurface(t, "public/pricing.html")
+	koscCheckout := mustReadCommercialSurface(t, "public/js/kosc-checkout-v1.js")
 	for _, required := range []string{
 		"ONE ACCESS CONTRACT · PROFESSIONAL",
 		"Enter the ARVIS universe.",
@@ -25,6 +26,17 @@ func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 			t.Errorf("pricing missing %q", required)
 		}
 	}
+	for _, required := range []string{
+		"CANONICAL_KOS_MINT='7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1'",
+		"data?.finalized!==true",
+		"kosc_payment_not_finalized",
+		"kosc_finalized_slot_mismatch",
+	} {
+		if !strings.Contains(koscCheckout, required) {
+			t.Errorf("KOS checkout contract missing %q", required)
+		}
+	}
+
 	for _, forbidden := range []string{
 		"COMMERCIAL CHECKOUT PAUSED",
 		"Evidence first. Paid checkout later.",

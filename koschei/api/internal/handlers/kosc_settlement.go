@@ -229,6 +229,7 @@ func (h *Handler) KOSCSettle(w http.ResponseWriter, r *http.Request) {
 		"access_expires_at":   entitlementExpires,
 		"observed_slot":       evidence.Slot,
 		"observed_raw_amount": evidence.TreasuryRawDelta.String(),
+		"finalized":           true,
 		"settlement_status":   "verified",
 	})
 }

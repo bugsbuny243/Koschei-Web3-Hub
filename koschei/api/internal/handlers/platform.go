@@ -35,7 +35,7 @@ func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 			},
 			"billing_provider":    "polar",
 			"wallet_verification": "identity_only",
-			"token_access":        "payment_channel_not_enabled",
+			"token_access":        "feature_gated_settlement_only_no_holder_access",
 			"custodial":           false,
 		},
 	})

@@ -3,6 +3,7 @@
 if(window.__koscheiKOSCCheckoutV1)return;
 window.__koscheiKOSCCheckoutV1=true;
 
+const CANONICAL_KOS_MINT='7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1';
 const text=value=>String(value??'').trim();
 const quoteButtons=()=>Array.from(document.querySelectorAll('[data-kosc-plan]'));
 const panel=()=>document.getElementById('koscCheckoutPanel');
@@ -64,6 +65,8 @@ async function requestQuote(button){
       if(data?.error==='kosc_checkout_paused'||response.status===503)throw new Error('KOS settlement is not enabled yet.');
       throw new Error('A live KOS quote could not be created.');
     }
+    if(text(data?.mint)!==CANONICAL_KOS_MINT)throw new Error('The quote returned an unexpected KOS mint. No payment should be sent.');
+    if(text(data?.plan)!=='professional'||text(data?.usd_price)!=='199')throw new Error('The quote does not match the Professional $199 access contract.');
     activeQuote=data;
     if(amountNode())amountNode().textContent=text(data?.token_amount)+' KOS';
     if(metaNode())metaNode().textContent='$'+text(data?.usd_price)+' reference · '+text(data?.access_days)+' day access · expires '+formatExpiry(data?.expires_at);
@@ -100,12 +103,15 @@ async function verifySettlement(){
     if(response.status===401){login();return;}
     if(!response.ok){
       if(data?.error==='kosc_quote_expired'||data?.error==='kosc_quote_not_open')throw new Error('This quote is no longer open. Request a new live quote.');
+      if(data?.error==='kosc_payment_not_finalized')throw new Error('The Solana payment is not finalized yet. Wait for finality and retry.');
+      if(data?.error==='kosc_finalized_slot_mismatch')throw new Error('Finalized signature status and transaction evidence do not match. Request a new quote if needed.');
       if(data?.error==='kosc_payment_not_verified')throw new Error('The finalized transaction does not prove the quoted KOS payment from your verified wallet to the configured treasury.');
       if(data?.error==='kosc_settlement_replay_or_conflict')throw new Error('This transaction or quote has already been used.');
       throw new Error('KOS payment could not be verified.');
     }
+    if(data?.ok!==true||text(data?.plan)!=='professional'||data?.finalized!==true)throw new Error('Settlement response did not prove finalized Professional activation.');
     activeQuote=null;
-    setDetail('Professional access activated from verified KOS settlement. Open Account to confirm your entitlement.');
+    setDetail('Professional access activated from verified finalized KOS settlement. Open Account to confirm your entitlement.');
     button.textContent='Verified';
     if(signatureInput())signatureInput().disabled=true;
     return;
