@@ -17,6 +17,10 @@ requireText(html,'ONE ACCESS CONTRACT · PROFESSIONAL','single-plan disclosure')
 requireText(html,'Enter the ARVIS universe.','universe headline');
 requireText(html,'One plan. The real system.','single-plan headline');
 requireText(html,'data-polar-plan="professional"','Professional Polar checkout action');
+requireText(html,'data-kosc-plan="professional"','Professional KOS settlement action');
+requireText(html,'/js/kosc-checkout-v1.js?v=1','KOS settlement client');
+requireText(html,'Get live KOS quote','live KOS quote copy');
+requireText(html,'Token holdings alone do not grant access.','KOS access boundary');
 requireText(html,'/js/polar-checkout-v1.js?v=1','secure checkout client');
 requireText(html,'Professional is the only paid customer plan.','single paid plan copy');
 requireText(html,'$199','canonical Professional price');
