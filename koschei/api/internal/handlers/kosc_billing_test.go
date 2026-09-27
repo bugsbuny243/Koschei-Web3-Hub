@@ -38,7 +38,6 @@ func TestKOSCCheckoutConfigFailsClosedWithoutExplicitEnablement(t *testing.T) {
 	}
 }
 
-
 func TestKOSCCheckoutConfigRejectsNonCanonicalMint(t *testing.T) {
 	t.Setenv("KOSCHEI_KOSC_CHECKOUT_ENABLED", "true")
 	t.Setenv("KOSCHEI_TOKEN_NETWORK", "solana-mainnet")
