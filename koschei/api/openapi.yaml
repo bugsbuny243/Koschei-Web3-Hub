@@ -5384,7 +5384,7 @@
     "/api/kosc/quote": {
       "post": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "post_api_kosc_quote",
+        "operationId": "post__api_kosc_quote",
         "parameters": [],
         "requestBody": {
           "content": {
@@ -5461,7 +5461,7 @@
     "/api/kosc/settle": {
       "post": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "post_api_kosc_settle",
+        "operationId": "post__api_kosc_settle",
         "parameters": [],
         "requestBody": {
           "content": {
