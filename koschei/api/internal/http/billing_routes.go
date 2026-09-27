@@ -23,4 +23,5 @@ func registerBillingRoutes(mux *http.ServeMux, h *handlers.Handler) {
 	mux.HandleFunc("/api/polar/checkout", requiresEntitlementStore(h, handlers.RequireAuth(method(http.MethodPost, billing.PolarCheckoutCommercial))))
 	mux.HandleFunc("/api/polar/webhook", requiresEntitlementStore(h, method(http.MethodPost, billing.PolarWebhook)))
 	mux.HandleFunc("/api/kosc/quote", requiresDB(h, requiresEntitlementStore(h, handlers.RequireAuth(method(http.MethodPost, h.KOSCQuote)))))
+	mux.HandleFunc("/api/kosc/settle", requiresDB(h, requiresEntitlementStore(h, handlers.RequireAuth(method(http.MethodPost, h.KOSCSettle)))))
 }
