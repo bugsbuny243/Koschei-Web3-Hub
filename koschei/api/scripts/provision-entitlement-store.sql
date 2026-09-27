@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS app_user_profiles (
     credits INTEGER NOT NULL DEFAULT 0,
     wallet_address TEXT,
     status TEXT NOT NULL DEFAULT 'active',
+    banned_at TIMESTAMPTZ,
+    ban_reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

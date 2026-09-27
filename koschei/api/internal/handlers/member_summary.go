@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -44,8 +45,39 @@ func (h *Handler) provisionMember(ctx context.Context, claims neonJWTClaims) (me
 	if email == "" || sub == "" {
 		return memberSummaryResponse{}, errors.New("verified token is missing member identity")
 	}
+	if h == nil || (h.DB == nil && h.EntitlementDB == nil) {
+		return memberSummaryResponse{}, errors.New("member persistence is unavailable")
+	}
 
-	tx, err := h.DB.BeginTx(ctx, nil)
+	var applicationSummary memberSummaryResponse
+	if h.DB != nil {
+		summary, err := provisionMemberOnDB(ctx, h.DB, sub, email)
+		if err != nil {
+			return memberSummaryResponse{}, fmt.Errorf("provision application identity: %w", err)
+		}
+		applicationSummary = summary
+	}
+
+	if h.EntitlementDB != nil && h.EntitlementDB != h.DB {
+		entitlementSummary, err := provisionMemberOnDB(ctx, h.EntitlementDB, sub, email)
+		if err != nil {
+			return memberSummaryResponse{}, fmt.Errorf("provision commercial identity: %w", err)
+		}
+		// Commercial state is authoritative for plan and paid output capacity.
+		// Mirroring a verified identity never grants paid access by itself.
+		return entitlementSummary, nil
+	}
+	if h.DB != nil {
+		return applicationSummary, nil
+	}
+	return provisionMemberOnDB(ctx, h.EntitlementDB, sub, email)
+}
+
+func provisionMemberOnDB(ctx context.Context, database *sql.DB, sub, email string) (memberSummaryResponse, error) {
+	if database == nil {
+		return memberSummaryResponse{}, errors.New("member database is unavailable")
+	}
+	tx, err := database.BeginTx(ctx, nil)
 	if err != nil {
 		return memberSummaryResponse{}, err
 	}

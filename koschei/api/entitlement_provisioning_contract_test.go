@@ -16,6 +16,8 @@ func TestEntitlementStoreProvisioningContract(t *testing.T) {
 		"CREATE TABLE IF NOT EXISTS app_user_profiles",
 		"auth_subject TEXT UNIQUE",
 		"status TEXT NOT NULL DEFAULT 'active'",
+		"banned_at TIMESTAMPTZ",
+		"ban_reason TEXT",
 		"CREATE TABLE IF NOT EXISTS entitlements",
 		"payment_provider TEXT",
 		"external_payment_id TEXT",

@@ -21,17 +21,21 @@ func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 		"runtime_control_plane": runtimecfg.ControlPlaneHealthSnapshot(),
 		"neonAuthUrl":           configuredPublicNeonAuthURL(),
 		"access": map[string]any{
-			"provider":  "free_core_plus_saas_entitlements",
-			"mode":      "public_free_core_paid_saas",
-			"free_core": []string{"safe_check", "basic_token_scan"},
-			"plans": map[string]any{
-				"starter":      map[string]any{"paid": true, "entry_investigation": true},
-				"professional": map[string]any{"paid": true, "advanced_radar_preview": true, "watchlist_preview": true},
-				"enterprise":   map[string]any{"paid": true, "developer_preview_eligible": true},
+			"provider": "professional_saas_entitlement",
+			"mode":     "public_proof_plus_professional_saas",
+			"public_proof": []string{
+				"documentation",
+				"published_evidence",
 			},
-			"billing_provider":    "paddle",
+			"plans": map[string]any{
+				"professional": map[string]any{
+					"paid":      true,
+					"price_usd": 199,
+				},
+			},
+			"billing_provider":    "polar",
 			"wallet_verification": "identity_only",
-			"token_access":        "retired_audit_only",
+			"token_access":        "payment_channel_not_enabled",
 			"custodial":           false,
 		},
 	})
@@ -51,9 +55,6 @@ func (h *Handler) Provision(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
-	if !h.RequireDB(w) {
-		return
-	}
 	summary, err := h.provisionMember(r.Context(), claims)
 	if err != nil {
 		log.Printf("provisionMember failed: %v", err)
@@ -64,7 +65,7 @@ func (h *Handler) Provision(w http.ResponseWriter, r *http.Request) {
 		"ok":    "true",
 		"sub":   claims.Sub,
 		"email": summary.Email,
-		"plan":  freePlanID,
+		"plan":  summary.Plan,
 	})
 }
 
