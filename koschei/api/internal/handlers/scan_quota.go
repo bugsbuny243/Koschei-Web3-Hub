@@ -8,7 +8,7 @@ import (
 
 // quotaResponseWriter is shared by the SaaS output reservation middleware. It
 // records enough of the response to decide whether a reserved output should be
-// consumed or refunded. No token-balance or KOSCH-tier state is involved.
+// consumed or refunded. No token-balance or legacy token-tier state is involved.
 const quotaDecisionBodyLimit = 4 << 20
 
 type quotaResponseWriter struct {

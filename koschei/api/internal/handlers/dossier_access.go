@@ -8,7 +8,7 @@ import (
 // DossierAccess accepts owner credentials, Enterprise API keys or an Enterprise
 // user session. The selected path is explicit so one credential type never falls
 // through into another authentication mechanism. Commercial authorization comes
-// only from active SaaS entitlements; KOSCH holdings and token-access snapshots
+// only from active SaaS entitlements; KOSC holdings and token-access snapshots
 // do not authorize dossier export. The resulting export remains private by
 // default even when the canonical bundle itself is durable.
 func (h *Handler) DossierAccess(next http.HandlerFunc) http.HandlerFunc {

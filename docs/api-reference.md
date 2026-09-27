@@ -14,7 +14,7 @@ Authorization: Bearer CUSTOMER_SESSION_TOKEN
 
 Operational customer routes authorize through one commercial entitlement: **Professional**. Paid output-capacity enforcement remains server-owned. Missing, expired or inconsistent entitlement state fails closed.
 
-KOSCH holdings, wallet balances, historical token tiers and `token_access_snapshots` do not grant, upgrade or discount commercial access.
+KOSC holdings, wallet balances, historical token tiers and `token_access_snapshots` do not grant, upgrade or discount commercial access. Verified KOSC settlement is an alternate payment path into the same Professional entitlement as Polar.
 
 Authentication: customer session + active Professional entitlement.
 
@@ -246,7 +246,7 @@ Signed medium-or-higher ARVIS verdicts and non-`allow` Transaction Guard decisio
 POST /api/v1/dossier/
 ```
 
-Owner credentials retain their explicit administrative path. Customer-session and developer-key export paths use the Professional commercial boundary. KOSCH holdings and historical token-access snapshots never authorize export.
+Owner credentials retain their explicit administrative path. Customer-session and developer-key export paths use the Professional commercial boundary. KOSC holdings and historical token-access snapshots never authorize export. Access still resolves through the active Professional entitlement, including when that entitlement was activated by verified KOSC settlement.
 
 Dossier export operates on existing evidence/snapshots and preserves provenance, limitations and publication boundaries. Public discovery surfaces include `GET /api/public/cases` and `GET /api/public/soc/feed`.
 
