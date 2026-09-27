@@ -3,6 +3,8 @@ package handlers
 import (
 	"math/big"
 	"testing"
+
+	"koschei/api/internal/services"
 )
 
 func TestKOSCRawAmountForUSDUsesCeiling(t *testing.T) {
@@ -33,5 +35,69 @@ func TestKOSCCheckoutConfigFailsClosedWithoutExplicitEnablement(t *testing.T) {
 	t.Setenv("KOSCHEI_KOSC_CHECKOUT_ENABLED", "false")
 	if _, err := loadKOSCCheckoutConfig(); err == nil {
 		t.Fatal("expected disabled checkout")
+	}
+}
+
+
+func TestKOSCCheckoutConfigRejectsNonCanonicalMint(t *testing.T) {
+	t.Setenv("KOSCHEI_KOSC_CHECKOUT_ENABLED", "true")
+	t.Setenv("KOSCHEI_TOKEN_NETWORK", "solana-mainnet")
+	t.Setenv("KOSCHEI_TOKEN_MINT", "11111111111111111111111111111111")
+	t.Setenv("KOSCHEI_TOKEN_TREASURY", "So11111111111111111111111111111111111111112")
+	t.Setenv("JUPITER_API_KEY", "test-key")
+	t.Setenv("KOSCHEI_KOSC_ACCESS_DAYS", "30")
+	if _, err := loadKOSCCheckoutConfig(); err == nil {
+		t.Fatal("expected non-canonical mint rejection")
+	}
+}
+
+func TestVerifyKOSCSettlementTransactionBindsSignerTreasuryAndRawAmount(t *testing.T) {
+	wallet := "11111111111111111111111111111111"
+	treasury := "So11111111111111111111111111111111111111112"
+	mint := canonicalKOSCMint
+	tx := services.SolanaTransactionResult{
+		"slot":      float64(999),
+		"blockTime": float64(1700000000),
+		"transaction": map[string]any{
+			"message": map[string]any{
+				"accountKeys": []any{
+					map[string]any{"pubkey": wallet, "signer": true},
+					map[string]any{"pubkey": "SourceToken111", "signer": false},
+					map[string]any{"pubkey": "TreasuryToken111", "signer": false},
+				},
+			},
+		},
+		"meta": map[string]any{
+			"err": nil,
+			"preTokenBalances": []any{
+				map[string]any{"accountIndex": float64(1), "mint": mint, "owner": wallet, "uiTokenAmount": map[string]any{"amount": "60000000", "decimals": float64(6)}},
+				map[string]any{"accountIndex": float64(2), "mint": mint, "owner": treasury, "uiTokenAmount": map[string]any{"amount": "10000000", "decimals": float64(6)}},
+			},
+			"postTokenBalances": []any{
+				map[string]any{"accountIndex": float64(1), "mint": mint, "owner": wallet, "uiTokenAmount": map[string]any{"amount": "10000000", "decimals": float64(6)}},
+				map[string]any{"accountIndex": float64(2), "mint": mint, "owner": treasury, "uiTokenAmount": map[string]any{"amount": "60000000", "decimals": float64(6)}},
+			},
+		},
+	}
+	required := big.NewInt(50000000)
+	evidence, err := verifyKOSCSettlementTransaction(tx, wallet, mint, treasury, required)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if evidence.Slot != 999 || evidence.TreasuryRawDelta.Cmp(required) != 0 || evidence.WalletRawDecrease.Cmp(required) != 0 {
+		t.Fatalf("unexpected settlement evidence: %+v", evidence)
+	}
+}
+
+func TestVerifyKOSCSettlementTransactionRejectsNonSigner(t *testing.T) {
+	wallet := "11111111111111111111111111111111"
+	treasury := "So11111111111111111111111111111111111111112"
+	tx := services.SolanaTransactionResult{
+		"slot":        float64(1),
+		"transaction": map[string]any{"message": map[string]any{"accountKeys": []any{map[string]any{"pubkey": wallet, "signer": false}}}},
+		"meta":        map[string]any{"err": nil, "preTokenBalances": []any{}, "postTokenBalances": []any{}},
+	}
+	if _, err := verifyKOSCSettlementTransaction(tx, wallet, canonicalKOSCMint, treasury, big.NewInt(1)); err == nil {
+		t.Fatal("expected non-signer settlement rejection")
 	}
 }
