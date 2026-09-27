@@ -35,7 +35,7 @@ func TestCommercialIdentitySplitPlaneSourceContract(t *testing.T) {
 		`"professional": map[string]any{`,
 		`"price_usd": 199`,
 		`"billing_provider":    "polar"`,
-		`"token_access":        "payment_channel_not_enabled"`,
+		`"token_access":        "feature_gated_settlement_only_no_holder_access"`,
 		`"plan":  summary.Plan`,
 	} {
 		if !strings.Contains(platform, required) {
