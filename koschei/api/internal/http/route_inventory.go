@@ -59,6 +59,7 @@ func productionRouteInventory() []routeInventoryGroup {
 		}},
 		{Name: "billing", Auth: "customer_session_or_verified_provider_webhook", Routes: []string{
 			"POST /api/polar/checkout", "POST /api/polar/webhook",
+			"POST /api/kosc/quote",
 		}},
 		{Name: "owner", Auth: "owner_session", Routes: []string{
 			"POST /api/owner/login", "POST /api/owner/logout", "GET /api/owner/command-center", "GET /api/owner/operations", "GET /api/owner/token-telemetry",
