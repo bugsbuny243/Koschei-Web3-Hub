@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const baseURL = String(process.env.BASE_URL || 'https://tradepigloball.co').replace(/\/$/, '');
-const mint = String(process.env.KOSCHEI_FULL_SCAN_MINT || 'HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump').trim();
+const mint = String(process.env.KOSCHEI_FULL_SCAN_MINT || '7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1').trim();
 const outputDir = path.resolve(process.env.OUTPUT_DIR || 'diagnostics');
 const timeoutMs = Number(process.env.FULL_SCAN_TIMEOUT_MS || 300000);
 const transientHTTPStatuses = new Set([502, 503, 504]);
