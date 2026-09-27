@@ -12,21 +12,27 @@ function requireText(source,needle,label){if(!source.includes(needle))throw new 
 
 requireValue(manifest.ok===true,'manifest must remain ok');
 requireValue(manifest.product==='Koschei ARVIS','product identity changed');
-requireValue(manifest.version==='security-ecosystem-v6-canonical-scan-boundary','manifest version must be v6 canonical scan boundary');
+requireValue(manifest.version==='security-ecosystem-v7-professional-dual-settlement','manifest version must be v7 Professional dual settlement');
 requireValue(manifest.surface==='Security Evidence Ecosystem','canonical surface label missing');
 requireValue(manifest.ecosystem?.runtime_integration_state==='incubation_only','runtime integration boundary changed');
-requireValue(manifest.ecosystem?.official_asset?.identity_only===true,'KOSCH must remain identity/access only');
+requireValue(manifest.ecosystem?.official_asset?.mint==='7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1','official KOSC mint mismatch');
+requireValue(manifest.ecosystem?.official_asset?.symbol==='KOSC','official KOSC symbol mismatch');
+requireValue(manifest.ecosystem?.official_asset?.holdings_grant_access===false,'KOSC holdings must not grant access');
 requireValue(manifest.incubation_policy?.sentinel_runtime_integrated===false,'Sentinel runtime boundary changed');
 requireValue(manifest.incubation_policy?.language_runtime_integrated===false,'language runtime boundary changed');
 requireValue(manifest.incubation_policy?.sentinel_verdict_authority===false,'Sentinel must not gain verdict authority');
 requireValue(manifest.incubation_policy?.future_integration_requires_explicit_owner_approval===true,'future integration approval boundary changed');
 requireValue(manifest.provider_policy?.missing_provider_data==='unavailable_or_withheld_not_fabricated','missing-provider fail-closed policy changed');
 requireValue(Array.isArray(manifest.immutable_rules)&&manifest.immutable_rules.includes('No evidence, no claim'),'no-evidence/no-claim rule missing');
+requireValue(manifest.access_model?.professional_price_usd===199,'Professional price must remain USD 199');
+requireValue(manifest.access_model?.settlement_channels?.includes('polar'),'Polar settlement channel missing');
+requireValue(manifest.access_model?.settlement_channels?.includes('kosc'),'KOSC settlement channel missing');
+requireValue(manifest.access_model?.holdings_grant_access===false,'holder access must remain disabled');
 requireValue(manifest.access_model?.premium?.includes('deep scan'),'premium canonical Deep Scan capability missing');
 requireValue(!manifest.access_model?.premium?.includes('security radar'),'legacy Security Radar capability must not be advertised as canonical');
 const surfaces=Array.isArray(manifest.customer_surfaces)?manifest.customer_surfaces:[];
 requireValue(surfaces.includes('/scan?mode=deep'),'canonical Deep Scan customer surface missing');
-requireValue(surfaces.includes('/kosch'),'canonical KOSCH customer surface missing');
+requireValue(surfaces.includes('/pricing'),'canonical Professional pricing surface missing');
 requireValue(!surfaces.includes('/security-radar'),'legacy security-radar must not be a canonical customer surface');
 requireValue(!surfaces.includes('/kosch-access'),'legacy KOSCH alias must not be a canonical customer surface');
 
