@@ -171,6 +171,9 @@ func loadKOSCCheckoutConfig() (koscCheckoutConfig, error) {
 	if _, err := decodeSolanaPublicKey(cfg.Mint); err != nil {
 		return koscCheckoutConfig{}, errors.New("kosc mint is invalid")
 	}
+	if cfg.Mint != canonicalKOSCMint {
+		return koscCheckoutConfig{}, errors.New("configured kosc mint does not match canonical mint")
+	}
 	if _, err := decodeSolanaPublicKey(cfg.Treasury); err != nil {
 		return koscCheckoutConfig{}, errors.New("kosc treasury is invalid")
 	}
