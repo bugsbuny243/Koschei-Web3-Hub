@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 20
     env:
       BASE_URL: https://tradepigloball.co
-      KOSCHEI_FULL_SCAN_MINT: HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump
+      KOSCHEI_FULL_SCAN_MINT: 7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1
       FULL_SCAN_TIMEOUT_MS: "300000"
       OUTPUT_DIR: diagnostics
     steps:
