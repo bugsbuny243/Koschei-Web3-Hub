@@ -101,7 +101,6 @@ func TestVerifyKOSCSettlementTransactionRejectsNonSigner(t *testing.T) {
 	}
 }
 
-
 func TestValidateKOSCFinalizedStatusRequiresFinalizedSuccessfulSignature(t *testing.T) {
 	slot, err := validateKOSCFinalizedStatus(koscSignatureStatusesResult{Value: []*koscSignatureStatus{{
 		Slot: 991, ConfirmationStatus: "finalized",
