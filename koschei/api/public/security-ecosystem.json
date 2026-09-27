@@ -2,7 +2,7 @@
   "ok": true,
   "product": "Koschei ARVIS",
   "surface": "Security Evidence Ecosystem",
-  "version": "security-ecosystem-v6-canonical-scan-boundary",
+  "version": "security-ecosystem-v7-professional-dual-settlement",
   "positioning": "Koschei ARVIS remains a production-independent deterministic Solana security product. Koschei Sentinel and the Koschei language mature separately in offline incubation until explicit future integration gates pass.",
   "ecosystem": {
     "contract": "/docs/koschei-ecosystem-contract-v1.md",
@@ -28,12 +28,13 @@
       }
     ],
     "official_asset": {
-      "symbol": "KOSCH",
+      "symbol": "KOSC",
       "network": "solana-mainnet",
-      "mint": "HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump",
-      "pump_callout": "https://pump.fun/callouts/HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump/62c9a163-75a7-4f45-914c-1c9479d3a5ec",
-      "identity_only": true,
-      "disclaimer": "Asset identity or holdings never change evidence, verdicts, compiler rules, model promotion gates or integration readiness."
+      "mint": "7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1",
+      "pump_callout": "https://pump.fun/callouts/7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1/713a17a0-494e-41b9-8411-2ee764c9b65c",
+      "commercial_role": "alternate_professional_settlement_channel",
+      "holdings_grant_access": false,
+      "disclaimer": "KOSC holdings never change evidence, verdicts, signatures, compiler rules, model promotion gates or integration readiness. Professional access activates only after verified server-side settlement."
     }
   },
   "incubation_policy": {
@@ -50,11 +51,12 @@
     "shared_identity_is_not_runtime_integration": true
   },
   "access_model": {
-    "provider": "free core plus KOSCH premium",
-    "mode": "public_basic_verified_holder_premium",
-    "free_core": [
-      "public safe check",
-      "basic token fundamentals"
+    "provider": "professional_saas_polar_or_kosc",
+    "mode": "public_proof_professional_dual_settlement",
+    "professional_price_usd": 199,
+    "settlement_channels": [
+      "polar",
+      "kosc"
     ],
     "premium": [
       "deep scan",
@@ -65,9 +67,9 @@
       "developer API",
       "advanced deterministic agents"
     ],
-    "wallet_proof": "Phantom one-time message signature",
-    "legacy_payment_providers": [],
-    "package_outputs": false
+    "wallet_proof": "signed Solana wallet required for KOSC settlement",
+    "holdings_grant_access": false,
+    "package_outputs": true
   },
   "provider_policy": {
     "preserve_existing_helius_paths": true,
@@ -207,20 +209,21 @@
     "/scan?mode=deep",
     "/exposure-report",
     "/reports",
-    "/kosch",
     "/api/token/scan",
     "/api/v1/risk/badge",
-    "/widget.js"
+    "/widget.js",
+    "/pricing"
   ],
   "immutable_rules": [
     "No evidence, no claim",
     "Basic security checks remain public and rate limited",
-    "KOSCH unlocks documented premium depth; it does not remove free access",
-    "KOSCH holdings cannot change evidence, grades, signatures, compiler rules, model promotion or integration readiness",
     "Sentinel is not connected to customer runtime during incubation",
     "Koschei language is not a Web3 production dependency during incubation",
     "A temporary event gap cannot lower a fresh structural token floor",
     "Customers cannot alter verdict thresholds",
-    "Infrastructure mints remain internal and do not become public risk cards"
+    "Infrastructure mints remain internal and do not become public risk cards",
+    "KOSC is an alternate settlement channel into the canonical Professional entitlement",
+    "KOSC holdings alone never grant access",
+    "KOSC cannot change evidence, grades, signatures, compiler rules, model promotion or integration readiness"
   ]
 }
