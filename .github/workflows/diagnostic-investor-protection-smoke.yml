@@ -14,7 +14,7 @@ jobs:
     timeout-minutes: 10
     env:
       BASE_URL: https://tradepigloball.co
-      TEST_MINT: HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump
+      TEST_MINT: 7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1
     steps:
       - name: Probe production investor protection contract
         shell: bash
