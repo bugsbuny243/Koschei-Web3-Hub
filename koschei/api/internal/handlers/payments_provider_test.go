@@ -9,6 +9,7 @@ func TestNormalizePaymentProviderAcceptsSupportedProviders(t *testing.T) {
 		"shopier":        "shopier",
 		" SHOPIER ":      "shopier",
 		"shopier_manual": "shopier_manual",
+		"kosc":           "kosc",
 		"owner_manual":   "owner_manual",
 	}
 	for input, want := range tests {
