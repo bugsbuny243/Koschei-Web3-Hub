@@ -9,7 +9,7 @@ import (
 func TestTransactionGuardActorMemoryCandidatesIncludeAuthorityAndTokenOwners(t *testing.T) {
 	const (
 		wallet   = "7YWHMfk9JZe0LM2B9S1yXWBHLDvTw3pAUJ2g7MzoFj3d"
-		owner    = "HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump"
+		owner    = "7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1"
 		delegate = "yHCxqFDSWNSVQpBmx6GBbMUAZrxD7VuXPWgqvha6PRe"
 	)
 	decoded := transactionGuardDecodedTransaction{
@@ -30,7 +30,7 @@ func TestTransactionGuardActorMemoryCandidatesIncludeAuthorityAndTokenOwners(t *
 }
 
 func TestAggregateTransactionGuardActorMemoryGraphPreservesEvidenceStatusWithoutVerdictAuthority(t *testing.T) {
-	const address = "HHPpU9u56Bwxov12nf7DXUCuv6h1q5j1xgGS3yukpump"
+	const address = "7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1"
 	graph := transactionGuardActorMemoryGraph{
 		Version: transactionGuardActorMemoryGraphVersion, Network: "solana-mainnet", Complete: true,
 		Status: "complete_no_matches", SubjectsChecked: 1, Subjects: []transactionGuardActorMemorySubject{},
