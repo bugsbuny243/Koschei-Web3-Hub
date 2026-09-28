@@ -10,7 +10,7 @@ on:
       since:
         description: "RFC3339 inclusive window start"
         required: true
-        default: "2026-09-21T05:30:00Z"
+        default: "2026-09-21T05:35:00Z"
         type: string
       until:
         description: "RFC3339 exclusive window end"
