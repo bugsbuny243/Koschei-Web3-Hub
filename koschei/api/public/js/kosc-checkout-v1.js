@@ -66,7 +66,7 @@ async function requestQuote(button){
       throw new Error('A live KOSC quote could not be created.');
     }
     if(text(data?.mint)!==CANONICAL_KOSC_MINT)throw new Error('The quote returned an unexpected KOSC mint. No payment should be sent.');
-    if(text(data?.plan)!=='professional'||text(data?.usd_price)!=='199')throw new Error('The quote does not match the Professional $199 access contract.');
+    if(text(data?.plan)!=='professional'||text(data?.usd_price)!=='199'||Number(data?.access_days)!==30)throw new Error('The quote does not match the Professional $199 / 30-day access contract.');
     activeQuote=data;
     if(amountNode())amountNode().textContent=text(data?.token_amount)+' KOSC';
     if(metaNode())metaNode().textContent='$'+text(data?.usd_price)+' reference · '+text(data?.access_days)+' day access · expires '+formatExpiry(data?.expires_at);
