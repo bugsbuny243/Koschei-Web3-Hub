@@ -28,7 +28,7 @@ func run(parent context.Context) error {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(parent, 60*time.Second)
+	ctx, cancel := context.WithTimeout(parent, 2*time.Minute)
 	defer cancel()
 
 	if strings.TrimSpace(os.Getenv("KOSCHEI_CLICKHOUSE_SCHEMA_APPLY")) == "1" {
