@@ -19,7 +19,10 @@ import (
 	"koschei/api/internal/services"
 )
 
-const koscProfessionalPriceUSD = "199"
+const (
+	koscProfessionalPriceUSD = "199"
+	koscProfessionalAccessDays = 30
+)
 
 var (
 	errKOSCCheckoutDisabled = errors.New("kosc checkout disabled")
@@ -178,10 +181,10 @@ func loadKOSCCheckoutConfig() (koscCheckoutConfig, error) {
 		return koscCheckoutConfig{}, errors.New("kosc treasury is invalid")
 	}
 	days, err := strconv.Atoi(strings.TrimSpace(os.Getenv("KOSCHEI_KOSC_ACCESS_DAYS")))
-	if err != nil || days < 1 || days > 3650 {
-		return koscCheckoutConfig{}, errors.New("kosc access term is not configured")
+	if err != nil || days != koscProfessionalAccessDays {
+		return koscCheckoutConfig{}, errors.New("kosc access term must match canonical 30-day Professional contract")
 	}
-	cfg.AccessDays = days
+	cfg.AccessDays = koscProfessionalAccessDays
 	if raw := strings.TrimSpace(os.Getenv("KOSCHEI_KOSC_QUOTE_TTL_SECONDS")); raw != "" {
 		seconds, err := strconv.Atoi(raw)
 		if err != nil || seconds < 60 || seconds > 900 {
