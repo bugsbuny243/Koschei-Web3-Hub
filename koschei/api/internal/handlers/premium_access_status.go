@@ -6,6 +6,7 @@ type premiumAccessStatus struct {
 	Active           bool   `json:"active"`
 	Source           string `json:"source"`
 	Plan             string `json:"plan"`
+	PaymentProvider  string `json:"payment_provider,omitempty"`
 	RequiredPlan     string `json:"required_plan"`
 	OutputsTotal     int    `json:"outputs_total"`
 	OutputsRemaining int    `json:"outputs_remaining"`
@@ -28,7 +29,8 @@ func (h *Handler) PremiumAccessStatus(w http.ResponseWriter, r *http.Request) {
 		Active:           evaluation.Active,
 		Source:           "entitlement",
 		Plan:             evaluation.Plan,
-		RequiredPlan:     "starter",
+		PaymentProvider:  evaluation.PaymentProvider,
+		RequiredPlan:     "professional",
 		OutputsTotal:     evaluation.OutputsTotal,
 		OutputsRemaining: evaluation.OutputsRemaining,
 		StartsAt:         evaluation.StartsAt,
