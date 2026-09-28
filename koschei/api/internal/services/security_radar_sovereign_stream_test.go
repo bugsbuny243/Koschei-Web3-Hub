@@ -21,6 +21,27 @@ func TestSecurityRadarStreamIngestModeJournal(t *testing.T) {
 	}
 }
 
+
+func TestSecurityRadarPostgresRawJournalAllowedOutsideProduction(t *testing.T) {
+	t.Setenv("APP_ENV", "test")
+	t.Setenv("KOSCHEI_STREAM_POSTGRES_RAW_JOURNAL_ENABLED", "")
+	if !securityRadarPostgresRawJournalAllowed() {
+		t.Fatal("non-production raw journal should remain available for tests and local validation")
+	}
+}
+
+func TestSecurityRadarPostgresRawJournalRequiresExplicitProductionApproval(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("KOSCHEI_STREAM_POSTGRES_RAW_JOURNAL_ENABLED", "")
+	if securityRadarPostgresRawJournalAllowed() {
+		t.Fatal("production raw PostgreSQL journal was enabled without explicit approval")
+	}
+	t.Setenv("KOSCHEI_STREAM_POSTGRES_RAW_JOURNAL_ENABLED", "true")
+	if !securityRadarPostgresRawJournalAllowed() {
+		t.Fatal("explicit production raw-journal approval was ignored")
+	}
+}
+
 func TestEnqueueSecurityRadarJournalEventHonorsBackpressure(t *testing.T) {
 	queue := make(chan SecurityRadarStreamEventRecord, 1)
 	queue <- SecurityRadarStreamEventRecord{Signature: "first"}
