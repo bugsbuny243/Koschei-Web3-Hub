@@ -203,7 +203,24 @@ func (h *Handler) KOSCSettle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entitlementExpires := time.Now().UTC().Add(time.Duration(cfg.AccessDays) * 24 * time.Hour)
+	now := time.Now().UTC()
+	entitlementBase := now
+	var existingMaxExpiry sql.NullTime
+	if err := dbtx.QueryRowContext(r.Context(), `
+		SELECT MAX(expires_at)
+		FROM entitlements
+		WHERE lower(email)=lower($1)
+		  AND status='active'
+		  AND lower(COALESCE(plan_id,''))='professional'
+		  AND expires_at > now()
+	`, email).Scan(&existingMaxExpiry); err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "kosc_entitlement_extension_unavailable"})
+		return
+	}
+	if existingMaxExpiry.Valid && existingMaxExpiry.Time.After(entitlementBase) {
+		entitlementBase = existingMaxExpiry.Time.UTC()
+	}
+	entitlementExpires := entitlementBase.Add(time.Duration(cfg.AccessDays) * 24 * time.Hour)
 	activation, err := activatePackageEntitlementDetailedTx(r.Context(), dbtx, email, "professional", "kosc", request.Signature, "", "", "", entitlementExpires)
 	if err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "kosc_entitlement_activation_failed"})
