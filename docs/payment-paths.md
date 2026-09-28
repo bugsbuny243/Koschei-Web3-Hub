@@ -65,7 +65,7 @@ The public Koschei Web3 Professional price is **USD 199**. Polar remains the hos
 
 ## KOSC payment channel
 
-KOSC is an alternate settlement path into the same Professional entitlement. Token holdings or holder tiers never grant access.
+KOSC is an alternate settlement path into the same Professional entitlement. The canonical KOSC settlement term is **30 days of Professional access for the USD 199 reference price**. Token holdings or holder tiers never grant access.
 
 The quote stage is fail-closed and requires an authenticated customer, a previously verified Solana mainnet wallet, an independently configured official mint and treasury, an explicit access term, on-chain mint verification and an available Jupiter Price V3 observation. A quote does not activate access.
 
@@ -85,4 +85,4 @@ The customer payment path now preserves several additional production invariants
 
 ### Deployment gate still required
 
-Repository completion is not production billing acceptance. Production checkout remains fail-closed until the dedicated entitlement store is configured and verified and the explicit commercial checkout gate is enabled. KOSC additionally requires an explicit access term in `KOSCHEI_KOSC_ACCESS_DAYS`. These are deployment/business configuration, not values that should be guessed or silently defaulted by application code.
+Repository completion is not production billing acceptance. Production checkout remains fail-closed until the dedicated entitlement store is configured and verified and the explicit commercial checkout gate is enabled. KOSC additionally requires the canonical access term `KOSCHEI_KOSC_ACCESS_DAYS=30`. These are deployment/business configuration, not values that should be guessed or silently defaulted by application code.
