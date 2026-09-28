@@ -38,6 +38,22 @@ func TestKOSCCheckoutConfigFailsClosedWithoutExplicitEnablement(t *testing.T) {
 	}
 }
 
+func TestKOSCCheckoutConfigAcceptsCanonicalThirtyDayTerm(t *testing.T) {
+	t.Setenv("KOSCHEI_KOSC_CHECKOUT_ENABLED", "true")
+	t.Setenv("KOSCHEI_TOKEN_NETWORK", "solana-mainnet")
+	t.Setenv("KOSCHEI_TOKEN_MINT", canonicalKOSCMint)
+	t.Setenv("KOSCHEI_TOKEN_TREASURY", "So11111111111111111111111111111111111111112")
+	t.Setenv("JUPITER_API_KEY", "test-key")
+	t.Setenv("KOSCHEI_KOSC_ACCESS_DAYS", "30")
+	cfg, err := loadKOSCCheckoutConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AccessDays != 30 {
+		t.Fatalf("access days = %d want 30", cfg.AccessDays)
+	}
+}
+
 func TestKOSCCheckoutConfigRejectsNonCanonicalMint(t *testing.T) {
 	t.Setenv("KOSCHEI_KOSC_CHECKOUT_ENABLED", "true")
 	t.Setenv("KOSCHEI_TOKEN_NETWORK", "solana-mainnet")
