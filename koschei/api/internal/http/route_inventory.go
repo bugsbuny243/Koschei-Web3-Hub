@@ -68,7 +68,7 @@ func productionRouteInventory() []routeInventoryGroup {
 			"GET /api/owner/actor-memory/matches", "GET /api/owner/radar/continuity", "GET /api/owner/radar/provider-memory",
 			"GET /api/owner/defense/tracks", "POST /api/owner/defense/investigate", "POST /api/owner/defense/actor-acceptance", "POST /api/owner/defense/distribution",
 			"POST /api/owner/web3/shield/preflight", "POST /api/owner/web3/transaction-guard", "POST /api/owner/web3/transaction-guard/state-recheck", "POST /api/owner/web3/address-poisoning/check", "POST /api/owner/web3/defense-validation", "POST /api/owner/web3/execution-assurance/safe/verify",
-			"/api/owner/radar/sources", "GET /api/owner/security-events", "GET /api/owner/route-map", "/api/owner/feedback",
+			"/api/owner/radar/sources", "GET /api/owner/security-events", "/api/owner/incidents", "/api/owner/incidents/", "GET /api/owner/route-map", "/api/owner/feedback",
 			"GET /api/owner/users", "POST /api/owner/users/ban", "POST /api/owner/users/remove", "POST /api/owner/command", "POST /api/owner/brain", "/api/owner/chat", "GET /api/owner/health", "GET /api/owner/status",
 			"POST /api/owner/dossier/publications", "POST /api/owner/arvis/acceptance",
 		}},
