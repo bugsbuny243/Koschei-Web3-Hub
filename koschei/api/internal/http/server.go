@@ -176,6 +176,8 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/api/owner/web3/execution-assurance/safe/verify", requiresDB(h, ownerOnly(h, method("POST", h.SafeExecutionAssuranceV1))))
 	mux.HandleFunc("/api/owner/radar/sources", requiresDB(h, ownerOnly(h, h.OwnerRadarSources)))
 	mux.HandleFunc("/api/owner/security-events", requiresDB(h, ownerOnly(h, method("GET", h.OwnerSecurityEvents))))
+	mux.HandleFunc("/api/owner/incidents", requiresDB(h, ownerOnly(h, h.OwnerIncidents)))
+	mux.HandleFunc("/api/owner/incidents/", requiresDB(h, ownerOnly(h, h.OwnerIncidentItem)))
 	mux.HandleFunc("/api/owner/route-map", ownerOnly(h, method("GET", ownerRouteMap)))
 	mux.HandleFunc("/api/owner/feedback", requiresDB(h, ownerOnly(h, h.OwnerFeedback)))
 	mux.HandleFunc("/api/owner/users", requiresDB(h, ownerOnly(h, method("GET", h.OwnerUsersV2))))
