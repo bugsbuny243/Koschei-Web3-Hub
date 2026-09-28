@@ -69,6 +69,16 @@ jobs:
           test -n "${CLICKHOUSE_USER}"
           test -n "${CLICKHOUSE_PASSWORD}"
 
+      - name: Wake ClickHouse and verify schema before source snapshot
+        working-directory: koschei/api
+        env:
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_DATABASE: koschei_web3
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+          CLICKHOUSE_TIMEOUT_MS: "120000"
+        run: go run ./cmd/clickhouse-schema
+
       - name: Copy bounded window and verify row/content parity
         working-directory: koschei/api
         env:
