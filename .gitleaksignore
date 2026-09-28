@@ -24,3 +24,8 @@ a455be911c6cff06e7587dd6557a56123c2bc189:koschei/api/evidence/production-full-sc
 a455be911c6cff06e7587dd6557a56123c2bc189:koschei/api/evidence/production-full-scan/2026-08-03-kosch/urd-c005-owner-concentration.json:generic-api-key:55
 a455be911c6cff06e7587dd6557a56123c2bc189:koschei/api/evidence/production-full-scan/2026-08-03-kosch/urd-c005-owner-concentration.json:generic-api-key:64
 a455be911c6cff06e7587dd6557a56123c2bc189:koschei/api/evidence/production-full-scan/2026-08-03-kosch/urd-c005-owner-concentration.json:generic-api-key:70
+
+# False positive: provider redaction regression fixture uses a synthetic
+# test-only credential string to prove query/header/env values are scrubbed.
+# This exemption is pinned to the exact historical finding fingerprint.
+84ba4ce9c9522c54647d9e6fabdb8649f2277ff4:koschei/api/internal/services/provider_error_redaction_test.go:generic-api-key:27
