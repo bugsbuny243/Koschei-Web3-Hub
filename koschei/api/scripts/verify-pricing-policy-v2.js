@@ -17,10 +17,10 @@ requireText(html,'ONE ACCESS CONTRACT · PROFESSIONAL','single-plan disclosure')
 requireText(html,'Enter the ARVIS universe.','universe headline');
 requireText(html,'One plan. The real system.','single-plan headline');
 requireText(html,'data-polar-plan="professional"','Professional Polar checkout action');
-requireText(html,'data-kosc-plan="professional"','Professional KOS settlement action');
-requireText(html,'/js/kosc-checkout-v1.js?v=1','KOS settlement client');
-requireText(html,'Get live KOS quote','live KOS quote copy');
-requireText(html,'Token holdings alone do not grant access.','KOS access boundary');
+requireText(html,'data-kosc-plan="professional"','Professional KOSC settlement action');
+requireText(html,'/js/kosc-checkout-v1.js?v=1','KOSC settlement client');
+requireText(html,'Get live KOSC quote','live KOSC quote copy');
+requireText(html,'Token holdings alone do not grant access.','KOSC access boundary');
 requireText(html,'/js/polar-checkout-v1.js?v=1','secure checkout client');
 requireText(html,'Professional is the only paid customer plan.','single paid plan copy');
 requireText(html,'$199','canonical Professional price');
@@ -49,6 +49,8 @@ requireText(planAccess,'FROM entitlements','entitlement source');
 requireText(planAccess,"status='active'",'active entitlement requirement');
 requireText(planAccess,'EnforcePlanOutput','entitlement output metering');
 requireText(premiumAccess,'Source:           "entitlement"','premium access entitlement source');
+requireText(premiumAccess,'RequiredPlan:     "professional"','Professional required-plan response');
+requireText(premiumAccess,'PaymentProvider:  evaluation.PaymentProvider','payment provider response');
 requireText(premiumAccess,'OutputsRemaining: evaluation.OutputsRemaining','remaining capacity response');
 forbid(premiumAccess,/token_(?:tier|amount)/i,'asset-backed premium access fields');
 
