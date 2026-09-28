@@ -124,8 +124,12 @@ FORMAT JSON`)
 	if len(metadata.Data) != 1 {
 		return fmt.Errorf("ClickHouse stream table metadata returned %d rows", len(metadata.Data))
 	}
-	if metadata.Data[0].Engine != "ReplacingMergeTree" {
-		return fmt.Errorf("ClickHouse stream table engine=%q want ReplacingMergeTree", metadata.Data[0].Engine)
+	switch metadata.Data[0].Engine {
+	case "ReplacingMergeTree", "SharedReplacingMergeTree":
+		// ClickHouse Cloud may transparently materialize the managed shared
+		// equivalent while preserving ReplacingMergeTree semantics.
+	default:
+		return fmt.Errorf("ClickHouse stream table engine=%q want ReplacingMergeTree or SharedReplacingMergeTree", metadata.Data[0].Engine)
 	}
 	wantSorting := "network, module_id, stream_mode, event_date, event_id"
 	if metadata.Data[0].SortingKey != wantSorting {
