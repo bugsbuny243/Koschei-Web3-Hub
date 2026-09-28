@@ -12,6 +12,7 @@ import (
 type planAccessEvaluation struct {
 	Active           bool       `json:"active"`
 	Plan             string     `json:"plan"`
+	PaymentProvider  string     `json:"payment_provider,omitempty"`
 	OutputsTotal     int        `json:"outputs_total"`
 	OutputsRemaining int        `json:"outputs_remaining"`
 	StartsAt         *time.Time `json:"starts_at,omitempty"`
@@ -92,18 +93,18 @@ func (h *Handler) evaluatePlanAccess(ctx context.Context, authSubject, claimEmai
 		return planAccessEvaluation{Plan: "none", Source: "entitlement"}, nil
 	}
 
-	var plan string
+	var plan, paymentProvider string
 	var total, remaining int
 	var startsAt, expiresAt sql.NullTime
 	err := store.QueryRowContext(ctx, `
-		SELECT COALESCE(plan_id,''), COALESCE(outputs_total,0), COALESCE(outputs_remaining,0), starts_at, expires_at
+		SELECT COALESCE(plan_id,''), COALESCE(payment_provider,''), COALESCE(outputs_total,0), COALESCE(outputs_remaining,0), starts_at, expires_at
 		FROM entitlements
 		WHERE lower(email)=lower($1)
 		  AND status='active'
 		  AND lower(COALESCE(plan_id,''))='professional'
 		  AND (expires_at IS NULL OR expires_at > now())
 		ORDER BY updated_at DESC NULLS LAST, created_at DESC
-		LIMIT 1`, email).Scan(&plan, &total, &remaining, &startsAt, &expiresAt)
+		LIMIT 1`, email).Scan(&plan, &paymentProvider, &total, &remaining, &startsAt, &expiresAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return planAccessEvaluation{Plan: "none", Source: "entitlement"}, nil
 	}
@@ -123,6 +124,7 @@ func (h *Handler) evaluatePlanAccess(ctx context.Context, authSubject, claimEmai
 	return planAccessEvaluation{
 		Active:           true,
 		Plan:             plan,
+		PaymentProvider:  strings.ToLower(strings.TrimSpace(paymentProvider)),
 		OutputsTotal:     total,
 		OutputsRemaining: remaining,
 		StartsAt:         nullTimePtr(startsAt),
