@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const maxTrustedMigrationBytes = 64 << 10
@@ -68,34 +69,64 @@ func (c *Client) ApplyTrustedMigration(ctx context.Context, migrationSQL string)
 	return nil
 }
 
+var trustedMigrationRetryDelays = []time.Duration{2 * time.Second, 5 * time.Second}
+
 func (c *Client) applyTrustedMigrationStatement(ctx context.Context, statement string) error {
 	migrationURL := *c.endpoint
+	var lastErr error
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, migrationURL.String(), strings.NewReader(statement))
-	if err != nil {
-		return fmt.Errorf("build ClickHouse migration request: %w", err)
-	}
-	c.applyHeaders(req)
-	// CREATE DATABASE must not depend on the target database already existing.
-	// Omitting the database header lets ClickHouse execute it in the default
-	// database context while preserving the same authenticated user.
-	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(statement)), "CREATE DATABASE ") {
-		req.Header.Del("X-ClickHouse-Database")
-	}
-	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
+	for attempt := 0; attempt <= len(trustedMigrationRetryDelays); attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, migrationURL.String(), strings.NewReader(statement))
+		if err != nil {
+			return fmt.Errorf("build ClickHouse migration request: %w", err)
+		}
+		c.applyHeaders(req)
+		// CREATE DATABASE must not depend on the target database already existing.
+		// Omitting the database header lets ClickHouse execute it in the default
+		// database context while preserving the same authenticated user.
+		if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(statement)), "CREATE DATABASE ") {
+			req.Header.Del("X-ClickHouse-Database")
+		}
+		req.Header.Set("Content-Type", "text/plain; charset=utf-8")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("ClickHouse migration request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-		return nil
-	}
+		resp, requestErr := c.httpClient.Do(req)
+		if requestErr == nil {
+			message, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+			_ = resp.Body.Close()
+			if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+				return nil
+			}
+			lastErr = fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(message)))
+			if !retryableClickHouseSchemaStatus(resp.StatusCode) {
+				return lastErr
+			}
+		} else {
+			lastErr = fmt.Errorf("ClickHouse migration request failed: %w", requestErr)
+		}
 
-	message, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	return fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(message)))
+		if attempt == len(trustedMigrationRetryDelays) {
+			break
+		}
+		timer := time.NewTimer(trustedMigrationRetryDelays[attempt])
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return fmt.Errorf("ClickHouse migration retry cancelled: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+	return lastErr
+}
+
+func retryableClickHouseSchemaStatus(status int) bool {
+	switch status {
+	case http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 // VerifyStreamEventsSchema verifies the contract required by the shadow copier.
