@@ -55,6 +55,6 @@ jobs:
           CLICKHOUSE_DATABASE: koschei_web3
           CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
           CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
-          CLICKHOUSE_TIMEOUT_MS: "10000"
+          CLICKHOUSE_TIMEOUT_MS: "30000"
           KOSCHEI_CLICKHOUSE_SCHEMA_APPLY: "1"
         run: go run ./cmd/clickhouse-schema
