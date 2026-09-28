@@ -166,6 +166,14 @@ func Current() Snapshot {
 				FrontendSurfaces: []string{"/dashboard"},
 			},
 			{
+				ID: "operator-incident-workflow", Layer: "response", Domain: "security-operations", Mode: "implemented", EvidenceAuthority: "operator_workflow_only", Activation: "owner session plus application database",
+				DependsOn:        []string{"watchlist-alert-and-webhook-plane", "durable-evidence-memory"},
+				BackendSurfaces:  []string{"/api/owner/incidents", "/api/owner/incidents/"},
+				FrontendSurfaces: []string{"/owner-production"},
+				Telemetry:        []string{"incident status", "severity", "linked evidence refs", "linked alert refs", "linked dossier refs", "append-only operator action timeline"},
+				Notes:            []string{"operator response state never mutates ARVIS evidence, grades or signatures", "incident state is operational workflow metadata, not a security verdict"},
+			},
+			{
 				ID: "sentinel-fabric-observation", Layer: "model", Domain: "sentinel", Mode: "observe", EvidenceAuthority: "no_web3_decision_authority", Activation: "versioned Fabric contracts only",
 				DependsOn:       []string{"global-radar-event-plane"},
 				BackendSurfaces: []string{"/fabric", "/fabric/capabilities"},
