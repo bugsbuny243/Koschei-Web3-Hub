@@ -122,7 +122,8 @@ KOSCHEI_CLICKHOUSE_SHADOW_BATCH_SIZE=10000
 # Refuse unexpectedly large source windows. Default 100,000; hard cap 10,000,000.
 KOSCHEI_CLICKHOUSE_SHADOW_MAX_ROWS=100000
 
-# HTTPS request timeout. Default 5 seconds; bounded to 250..30,000 ms.
+# HTTPS request timeout. Default 5 seconds; bounded to 250..120,000 ms.
+# Backfill workflows use a longer value so a sleeping ClickHouse Cloud service can wake safely.
 CLICKHOUSE_TIMEOUT_MS=5000
 ```
 
