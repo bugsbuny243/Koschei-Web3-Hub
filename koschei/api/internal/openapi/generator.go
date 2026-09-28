@@ -152,6 +152,7 @@ func normalizePattern(pattern string) string {
 	overrides := map[string]string{
 		"/api/account/api-keys/":    "/api/account/api-keys/{id}/revoke",
 		"/api/owner/radar/jobs/":    "/api/owner/radar/jobs/{id}",
+		"/api/owner/incidents/":     "/api/owner/incidents/{id}",
 		"/api/v1/radar/jobs/":       "/api/v1/radar/jobs/{id}",
 		"/api/jobs/":                "/api/jobs/{id}",
 		"/api/v1/dossier/":          "/api/v1/dossier/{case_ref}",

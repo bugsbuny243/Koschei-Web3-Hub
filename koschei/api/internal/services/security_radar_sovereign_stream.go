@@ -50,6 +50,10 @@ func StartSecurityRadarSovereignStreamIfEnabled(ctx context.Context, db *sql.DB)
 	if db == nil || !securityRadarStreamEnabled() {
 		return func() {}
 	}
+	if !securityRadarPostgresRawJournalAllowed() {
+		log.Printf("security radar sovereign journal blocked: production PostgreSQL raw journal requires explicit approval")
+		return func() {}
+	}
 	wssURL := resolveSecurityRadarWSSURL()
 	if wssURL == "" {
 		log.Printf("security radar sovereign journal not started: no WSS URL could be resolved")

@@ -62,6 +62,10 @@ func StartSecurityRadarStreamIfEnabled(ctx context.Context, db *sql.DB) func() {
 	if db == nil || !securityRadarStreamEnabled() {
 		return func() {}
 	}
+	if !securityRadarPostgresRawJournalAllowed() {
+		log.Printf("security radar PostgreSQL raw stream blocked: production requires KOSCHEI_STREAM_POSTGRES_RAW_JOURNAL_ENABLED=true")
+		return func() {}
+	}
 	wssURL := resolveSecurityRadarWSSURL()
 	if wssURL == "" {
 		log.Printf("security radar SBX-1 stream not started: no WSS URL could be resolved from SOLANA_WSS_URL, provider WSS env, SOLANA_RPC_URL, or ALCHEMY_API_KEY")
@@ -75,6 +79,13 @@ func StartSecurityRadarStreamIfEnabled(ctx context.Context, db *sql.DB) func() {
 
 func securityRadarStreamEnabled() bool {
 	return envBool("RADAR_STREAM_ENABLED") || envBool("KOSCHEI_AUTO_RADAR_ENABLED") || strings.EqualFold(strings.TrimSpace(os.Getenv("KOSCHEI_SOLANA_WATCH_MODE")), "stream")
+}
+
+func securityRadarPostgresRawJournalAllowed() bool {
+	if !strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
+		return true
+	}
+	return envBool("KOSCHEI_STREAM_POSTGRES_RAW_JOURNAL_ENABLED")
 }
 
 func resolveSecurityRadarWSSURL() string {
