@@ -61,7 +61,8 @@ function parsePremium(result){
 function renderPremium(premium){
   if(!premium.available){setBadge('premiumState','unavailable','bad');setText('plan','—');setText('accessSource','—');setText('outputCapacity','—');setText('planExpiresAt','—');setState('unavailable','UNAVAILABLE','SaaS entitlement status could not be verified.');return;}
   const access=premium.access,plan=text(access.plan||'none').toUpperCase();
-  setText('plan',plan);setText('accessSource','entitlement');setText('outputCapacity',`${displayCount(access.outputs_remaining)} / ${displayCount(access.outputs_total)}`);setText('planExpiresAt',displayDate(access.expires_at));
+  const provider=text(access.payment_provider).toLowerCase();
+  setText('plan',plan);setText('accessSource',provider?`entitlement · ${provider.toUpperCase()}`:'entitlement');setText('outputCapacity',`${displayCount(access.outputs_remaining)} / ${displayCount(access.outputs_total)}`);setText('planExpiresAt',displayDate(access.expires_at));
   if(premium.active){setBadge('premiumState','active','good');setState('active','ACTIVE',`${plan} SaaS entitlement is active. Token holdings are not part of this decision.`);return;}
   setBadge('premiumState','inactive','warn');setState('inactive','INACTIVE','No active paid SaaS entitlement is attached to this account.');
 }
@@ -97,11 +98,31 @@ async function unlinkWallet(){
   await runButton(button,'Removing…',async()=>{try{const data=await write('/api/auth/wallet/unlink',{method:'POST',body:'{}'});if(data?.ok!==true||data?.unlinked!==true)throw new Error('Wallet unlink response is incomplete.');showMessage('Wallet identity link removed. Your SaaS entitlement is unchanged.','warn');await load({preserveMessage:true});}catch(error){showMessage(error.message||'Wallet unlink failed.','bad');}});
 }
 
+async function waitForBillingActivation(){
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('billing')!=='success')return;
+  showMessage('Payment completed at the provider. Waiting for the verified billing webhook to activate Professional access…','warn');
+  for(let attempt=0;attempt<6;attempt++){
+    const result=await read('/api/auth/premium-access');
+    const premium=parsePremium(result);
+    renderPremium(premium);
+    if(premium.available&&premium.active){
+      showMessage('Professional access is active. The verified server-side entitlement is now available.','good');
+      params.delete('billing');
+      const query=params.toString();
+      history.replaceState(null,'',window.location.pathname+(query?'?'+query:'')+window.location.hash);
+      return;
+    }
+    await new Promise(resolve=>setTimeout(resolve,2000));
+  }
+  showMessage('Payment returned successfully, but Professional access is still waiting for verified billing confirmation. Use Refresh access shortly; the checkout redirect itself does not grant access.','warn');
+}
 async function bootstrap(){
   try{await KoscheiAuth.init();}catch{}
   if(!KoscheiAuth.requireAuth('/login.html'))return;
   $('accessConnect')?.addEventListener('click',connectWallet);$('accessRefresh')?.addEventListener('click',()=>load());$('accessUnlink')?.addEventListener('click',unlinkWallet);$('accessSignOut')?.addEventListener('click',()=>KoscheiAuth.signOut());
   await load();
+  await waitForBillingActivation();
 }
 
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bootstrap);else bootstrap();
