@@ -165,3 +165,34 @@ Two independent controls remain off by default:
 Recovery never trusts a replacement branch merely because the primary endpoint changed. The worker loads previously stored canonical checkpoints, probes the same historical height through both primary and confirmation providers, requires matching block hash and parent hash, and only then writes a `rewind` checkpoint. The search is bounded by `KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_MAX_REORG_REWIND` and cannot exceed 64 blocks.
 
 Provider agreement here is an operational lineage check, not a consensus-finality proof or ARVIS verdict.
+
+
+## Operator incident workflow v1 — 2026-09-28
+
+The Security Center now has an owner-only incident-response workflow rather than a read-only audit-events page.
+
+Persistence:
+
+- `security_incident_cases` stores bounded operator case state: severity, status, network, target and links to existing evidence/alert/dossier references.
+- `security_incident_actions` is an append-only operator timeline for creation, investigation, containment, resolution, notes, severity changes and evidence-link actions.
+- Migration: `123_security_center_incident_workflow.sql`.
+
+Owner API:
+
+- `GET|POST /api/owner/incidents`
+- `GET|POST /api/owner/incidents/{id}`
+
+Owner Control Center:
+
+- the Security page reads both the existing security audit stream and the incident queue;
+- an owner can open a case and move it through `open -> investigating -> contained -> resolved/closed`;
+- linked evidence references remain references to existing source material instead of being copied into a new verdict system.
+
+Authority boundary:
+
+- incident status is operational response metadata only;
+- resolving or closing an incident cannot change an ARVIS grade, verdict signature, evidence row or source dossier;
+- AI explanation is not an incident-state authority;
+- missing linked evidence is not converted into safety.
+
+This completes the first implementation slice of the previously listed operator-incident-workflow hardening item. Future work should connect eligible deterministic alerts/dossiers to case creation suggestions without automatically declaring an incident or changing verdict authority.
