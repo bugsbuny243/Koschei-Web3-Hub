@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 const trustedMigrationFixture = `
@@ -111,6 +112,40 @@ func TestApplyTrustedMigrationUsesSeparateAuthenticatedRequests(t *testing.T) {
 	}
 	if request != 2 {
 		t.Fatalf("migration requests=%d want 2", request)
+	}
+}
+
+func TestApplyTrustedMigrationRetriesTransientStatus(t *testing.T) {
+	originalDelays := trustedMigrationRetryDelays
+	trustedMigrationRetryDelays = []time.Duration{0}
+	defer func() { trustedMigrationRetryDelays = originalDelays }()
+
+	request := 0
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		request++
+		if request == 1 {
+			http.Error(w, "warming up", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client, err := New(Config{
+		HTTPURL:    server.URL,
+		Database:   "koschei_web3",
+		User:       "schema-user",
+		Password:   "schema-password",
+		HTTPClient: server.Client(),
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	if err := client.ApplyTrustedMigration(context.Background(), trustedMigrationFixture); err != nil {
+		t.Fatalf("apply migration after transient failure: %v", err)
+	}
+	if request != 3 {
+		t.Fatalf("requests=%d want 3 (retry database create plus table create)", request)
 	}
 }
 
