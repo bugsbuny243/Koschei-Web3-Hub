@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	koscProfessionalPriceUSD = "199"
+	koscProfessionalPriceUSD    = "199"
 	koscProfessionalAccessDays = 30
 )
 
