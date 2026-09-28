@@ -15,7 +15,7 @@ func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 		`data-polar-plan="professional"`,
 		`data-kosc-plan="professional"`,
 		"kosc-checkout-v1.js",
-		"Get live KOS quote",
+		"Get live KOSC quote",
 		"Token holdings alone do not grant access.",
 		"Professional is the only paid customer plan.",
 		"$199",
@@ -27,13 +27,13 @@ func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 		}
 	}
 	for _, required := range []string{
-		"CANONICAL_KOS_MINT='7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1'",
+		"CANONICAL_KOSC_MINT='7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1'",
 		"data?.finalized!==true",
 		"kosc_payment_not_finalized",
 		"kosc_finalized_slot_mismatch",
 	} {
 		if !strings.Contains(koscCheckout, required) {
-			t.Errorf("KOS checkout contract missing %q", required)
+			t.Errorf("KOSC checkout contract missing %q", required)
 		}
 	}
 
