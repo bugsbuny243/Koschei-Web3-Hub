@@ -10,7 +10,7 @@ on:
       since:
         description: "RFC3339 inclusive window start"
         required: true
-        default: "2026-09-21T05:29:00Z"
+        default: "2026-09-21T05:30:00Z"
         type: string
       until:
         description: "RFC3339 exclusive window end"
@@ -20,7 +20,7 @@ on:
       max_rows:
         description: "Abort if source window exceeds this row count"
         required: true
-        default: "5000"
+        default: "20000"
         type: string
 
 permissions:
@@ -78,7 +78,7 @@ jobs:
           CLICKHOUSE_DATABASE: koschei_web3
           CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
           CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
-          CLICKHOUSE_TIMEOUT_MS: "30000"
+          CLICKHOUSE_TIMEOUT_MS: "90000"
           KOSCHEI_CLICKHOUSE_SHADOW_SINCE: ${{ inputs.since }}
           KOSCHEI_CLICKHOUSE_SHADOW_UNTIL: ${{ inputs.until }}
           KOSCHEI_CLICKHOUSE_SHADOW_BATCH_SIZE: "1000"
