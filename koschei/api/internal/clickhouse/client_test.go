@@ -136,6 +136,56 @@ func TestInsertStreamEventsUsesSecureHeadersAsyncBatchAndPayloadHashes(t *testin
 	}
 }
 
+func TestInsertStreamEventsRetriesTransientFailureWithSamePayload(t *testing.T) {
+	originalDelays := streamInsertRetryDelays
+	streamInsertRetryDelays = []time.Duration{0}
+	defer func() { streamInsertRetryDelays = originalDelays }()
+
+	requests := 0
+	var firstBody, secondBody []byte
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read request body: %v", err)
+		}
+		switch requests {
+		case 1:
+			firstBody = append([]byte(nil), body...)
+			http.Error(w, "warming up", http.StatusServiceUnavailable)
+		case 2:
+			secondBody = append([]byte(nil), body...)
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Fatalf("unexpected request count %d", requests)
+		}
+	}))
+	defer server.Close()
+
+	client, err := New(Config{
+		HTTPURL:    server.URL,
+		User:       "shadow-user",
+		Password:   "shadow-password",
+		HTTPClient: server.Client(),
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	event := StreamEvent{
+		EventID:   "11111111-1111-1111-1111-111111111111",
+		CreatedAt: time.Date(2026, 9, 21, 5, 29, 0, 0, time.UTC),
+	}
+	if err := client.InsertStreamEvents(context.Background(), []StreamEvent{event}); err != nil {
+		t.Fatalf("insert after transient failure: %v", err)
+	}
+	if requests != 2 {
+		t.Fatalf("requests=%d want 2", requests)
+	}
+	if string(firstBody) != string(secondBody) {
+		t.Fatal("retry must replay byte-identical payload with the same ingest_version")
+	}
+}
+
 func TestCountDistinctStreamEventsUsesBoundedQuery(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()

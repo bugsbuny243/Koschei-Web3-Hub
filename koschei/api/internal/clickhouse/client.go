@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	DefaultDatabase     = "koschei_web3"
-	StreamSchemaVersion = uint16(1)
-	maxParityRows       = uint64(10000000)
+	DefaultDatabase      = "koschei_web3"
+	StreamSchemaVersion  = uint16(1)
+	maxParityRows        = uint64(10000000)
+	maxHTTPTimeoutMillis = 120000
 )
 
 type Config struct {
@@ -172,7 +173,7 @@ func (a *StreamParityAccumulator) addRow(row streamParityRow) {
 func NewFromEnv() (*Client, error) {
 	timeout := 5 * time.Second
 	if raw := strings.TrimSpace(os.Getenv("CLICKHOUSE_TIMEOUT_MS")); raw != "" {
-		if ms, err := strconv.Atoi(raw); err == nil && ms >= 250 && ms <= 30000 {
+		if ms, err := strconv.Atoi(raw); err == nil && ms >= 250 && ms <= maxHTTPTimeoutMillis {
 			timeout = time.Duration(ms) * time.Millisecond
 		}
 	}
@@ -230,6 +231,8 @@ func New(cfg Config) (*Client, error) {
 	}, nil
 }
 
+var streamInsertRetryDelays = []time.Duration{2 * time.Second, 5 * time.Second}
+
 func (c *Client) InsertStreamEvents(ctx context.Context, events []StreamEvent) error {
 	if c == nil || len(events) == 0 {
 		return nil
@@ -247,6 +250,7 @@ func (c *Client) InsertStreamEvents(ctx context.Context, events []StreamEvent) e
 			return fmt.Errorf("encode ClickHouse shadow stream event: %w", err)
 		}
 	}
+	payload := append([]byte(nil), body.Bytes()...)
 
 	insertURL := *c.endpoint
 	query := insertURL.Query()
@@ -256,25 +260,53 @@ func (c *Client) InsertStreamEvents(ctx context.Context, events []StreamEvent) e
 	query.Set("date_time_input_format", "best_effort")
 	insertURL.RawQuery = query.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, insertURL.String(), &body)
-	if err != nil {
-		return fmt.Errorf("build ClickHouse shadow insert request: %w", err)
-	}
-	c.applyHeaders(req)
-	req.Header.Set("Content-Type", "application/x-ndjson")
+	var lastErr error
+	for attempt := 0; attempt <= len(streamInsertRetryDelays); attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, insertURL.String(), bytes.NewReader(payload))
+		if err != nil {
+			return fmt.Errorf("build ClickHouse shadow insert request: %w", err)
+		}
+		c.applyHeaders(req)
+		req.Header.Set("Content-Type", "application/x-ndjson")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("ClickHouse shadow insert request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-		return nil
-	}
+		resp, requestErr := c.httpClient.Do(req)
+		if requestErr == nil {
+			message, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+			_ = resp.Body.Close()
+			if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+				return nil
+			}
+			lastErr = fmt.Errorf("ClickHouse shadow insert failed status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(message)))
+			if !retryableClickHouseInsertStatus(resp.StatusCode) {
+				return lastErr
+			}
+		} else {
+			lastErr = fmt.Errorf("ClickHouse shadow insert request failed: %w", requestErr)
+		}
 
-	message, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	return fmt.Errorf("ClickHouse shadow insert failed status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(message)))
+		if attempt == len(streamInsertRetryDelays) {
+			break
+		}
+		timer := time.NewTimer(streamInsertRetryDelays[attempt])
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return fmt.Errorf("ClickHouse shadow insert retry cancelled: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+	return lastErr
+}
+
+func retryableClickHouseInsertStatus(status int) bool {
+	switch status {
+	case http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *Client) CountDistinctStreamEvents(ctx context.Context, since, until time.Time) (uint64, error) {
