@@ -232,11 +232,6 @@ func (h *Handler) ownerIncidentCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
-	item, err := scanOwnerIncident(tx.QueryRowContext(r.Context(), ownerIncidentSelectSQL()+`
-		WHERE false`))
-	_ = item
-	_ = err
-
 	var created ownerIncidentRecord
 	row := tx.QueryRowContext(r.Context(), `
 		INSERT INTO security_incident_cases
