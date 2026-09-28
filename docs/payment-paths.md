@@ -70,3 +70,19 @@ KOSC is an alternate settlement path into the same Professional entitlement. Tok
 The quote stage is fail-closed and requires an authenticated customer, a previously verified Solana mainnet wallet, an independently configured official mint and treasury, an explicit access term, on-chain mint verification and an available Jupiter Price V3 observation. A quote does not activate access.
 
 A later settlement stage must verify a finalized Solana transaction against the stored quote before Professional can be activated. The payment channel must not affect ARVIS evidence, grading or verdict authority.
+
+
+## Payment hardening update — 2026-09-28
+
+The customer payment path now preserves several additional production invariants:
+
+- `GET /api/auth/premium-access` reports `required_plan=professional` and the payment provider attached to the authoritative entitlement row.
+- The Polar success return at `/account?billing=success` does not assume checkout success means access. The account client polls the server-side entitlement briefly and only reports Professional active after the verified webhook has activated it.
+- KOSC UI copy and the canonical mint identity use the `KOSC` symbol consistently.
+- KOSC configuration explicitly requires `KOSCHEI_TOKEN_NETWORK=solana-mainnet`; the example environment now includes that required setting.
+- A verified KOSC settlement extends from the latest finite active Professional expiry when one exists, rather than always restarting the purchased term from the settlement timestamp. Independent provider entitlements remain separate evidence-bearing rows.
+- KOSC still requires a finalized, signer-bound Solana transaction that proves sufficient raw-token decrease from the verified customer wallet and sufficient raw-token increase at the configured treasury. Holdings alone never grant access.
+
+### Deployment gate still required
+
+Repository completion is not production billing acceptance. Production checkout remains fail-closed until the dedicated entitlement store is configured and verified and the explicit commercial checkout gate is enabled. KOSC additionally requires an explicit access term in `KOSCHEI_KOSC_ACCESS_DAYS`. These are deployment/business configuration, not values that should be guessed or silently defaulted by application code.
