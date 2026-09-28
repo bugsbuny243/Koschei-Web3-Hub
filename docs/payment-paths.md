@@ -86,3 +86,17 @@ The customer payment path now preserves several additional production invariants
 ### Deployment gate still required
 
 Repository completion is not production billing acceptance. Production checkout remains fail-closed until the dedicated entitlement store is configured and verified and the explicit commercial checkout gate is enabled. KOSC additionally requires the canonical access term `KOSCHEI_KOSC_ACCESS_DAYS=30`. These are deployment/business configuration, not values that should be guessed or silently defaulted by application code.
+
+
+## KOSC treasury readiness — 2026-09-28
+
+KOSC settlement remains intentionally disabled in production because no dedicated treasury wallet has been configured yet.
+
+Current production rule:
+
+- Polar may remain the active hosted checkout path.
+- KOSC pricing is contractually defined as USD 199 reference value for 30 days of Professional access.
+- The KOSC quote/settlement endpoint must remain disabled until a dedicated Solana treasury public address is configured and verified.
+- No seed phrase, private key or browser wallet secret belongs in Railway, GitHub, logs, support messages or the Koschei database.
+- The treasury configuration requires only the public Solana address.
+- Token holdings alone continue to grant no access.
