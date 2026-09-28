@@ -18,10 +18,10 @@ import (
 )
 
 const (
-	DefaultDatabase       = "koschei_web3"
-	StreamSchemaVersion   = uint16(1)
-	maxParityRows         = uint64(10000000)
-	maxHTTPTimeoutMillis  = 120000
+	DefaultDatabase      = "koschei_web3"
+	StreamSchemaVersion  = uint16(1)
+	maxParityRows        = uint64(10000000)
+	maxHTTPTimeoutMillis = 120000
 )
 
 type Config struct {
