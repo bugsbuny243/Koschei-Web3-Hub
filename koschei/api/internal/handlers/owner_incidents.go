@@ -12,21 +12,21 @@ import (
 const ownerIncidentDecisionBoundary = "operator incident state links evidence and response actions; it never changes ARVIS evidence, grades, signatures, or deterministic verdict authority"
 
 type ownerIncidentRecord struct {
-	ID          string     `json:"id"`
-	IncidentRef string     `json:"incident_ref"`
-	Title       string     `json:"title"`
-	Severity    string     `json:"severity"`
-	Status      string     `json:"status"`
-	Network     string     `json:"network"`
-	Target      string     `json:"target"`
-	Summary     string     `json:"summary"`
-	EvidenceRefs []string  `json:"evidence_refs"`
-	AlertRefs    []string  `json:"alert_refs"`
-	DossierRefs  []string  `json:"dossier_refs"`
-	CreatedBy   string     `json:"created_by"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	ResolvedAt *time.Time  `json:"resolved_at,omitempty"`
+	ID           string     `json:"id"`
+	IncidentRef  string     `json:"incident_ref"`
+	Title        string     `json:"title"`
+	Severity     string     `json:"severity"`
+	Status       string     `json:"status"`
+	Network      string     `json:"network"`
+	Target       string     `json:"target"`
+	Summary      string     `json:"summary"`
+	EvidenceRefs []string   `json:"evidence_refs"`
+	AlertRefs    []string   `json:"alert_refs"`
+	DossierRefs  []string   `json:"dossier_refs"`
+	CreatedBy    string     `json:"created_by"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	ResolvedAt   *time.Time `json:"resolved_at,omitempty"`
 }
 
 type ownerIncidentActionRecord struct {
