@@ -12,7 +12,7 @@ const NAV=[
   {id:'system',icon:'⚙',label:'System',title:'System health',eyebrow:'Production dependencies and controls'},
   {id:'brain',icon:'◆',label:'Assistant',title:'Owner assistant',eyebrow:'Production evidence · deterministic Radar · explanation'}
 ];
-const state={active:'command',operations:null,arvis:null,customers:[],tokenTelemetry:null,feedback:[],security:[],lastScan:null,loading:false};
+const state={active:'command',operations:null,arvis:null,customers:[],tokenTelemetry:null,feedback:[],security:[],incidents:[],lastScan:null,loading:false};
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>{if(v===null||v===undefined||v==='')return'—';const n=Number(v);return Number.isFinite(n)?new Intl.NumberFormat('en-US',{maximumFractionDigits:4}).format(n):'—'};
@@ -163,8 +163,84 @@ function renderTokenTelemetry(){
 
 async function loadFeedback(){const root=$('feedbackContent');root.innerHTML=loadingCard('Geri bildirimler yükleniyor…');try{const d=await api('/api/owner/feedback?limit=200');state.feedback=arr(d.items);renderFeedback()}catch(e){root.innerHTML=pageError(e.message,'feedback');bindRetry()}}
 function renderFeedback(){const items=state.feedback;$('feedbackContent').innerHTML=`<article class="card"><div class="card-head"><div><span class="eyebrow">Müşteri sinyalleri</span><h2>Geri bildirim kuyruğu</h2></div><span class="badge warn">${num(items.length)} kayıt</span></div>${items.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Tarih</th><th>Kategori</th><th>Başlık / mesaj</th><th>İletişim</th><th>Durum</th></tr></thead><tbody>${items.map(x=>`<tr><td>${dt(x.created_at)}</td><td>${badge(x.category||'other')}</td><td><b>${esc(x.subject||'—')}</b><div class="muted small">${esc(short(x.message,120))}</div></td><td>${esc(x.contact_email||'—')}</td><td>${badge(x.status||'new')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Geri bildirim yok.</div>'}</article>`}
-async function loadSecurity(){const root=$('securityContent');root.innerHTML=loadingCard('Güvenlik olayları yükleniyor…');try{const d=await api('/api/owner/security-events?limit=200');state.security=arr(d.events);renderSecurity()}catch(e){root.innerHTML=pageError(e.message,'security');bindRetry()}}
-function renderSecurity(){const items=state.security,critical=items.filter(x=>tone(x.severity)==='bad').length;$('securityContent').innerHTML=`<div class="grid compact-grid">${kpi('Toplam olay',num(items.length),'Son 200 denetim kaydı','tone-cyan','◇')}${kpi('Kritik / hata',num(critical),'Owner incelemesi',critical?'tone-red':'tone-green','!')}<article class="card span-12"><div class="card-head"><div><span class="eyebrow">Denetim akışı</span><h2>Kim, ne zaman, ne yaptı?</h2></div></div>${items.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Zaman</th><th>Olay</th><th>Aktör</th><th>Yol / IP</th><th>Önem</th><th>Metadata</th></tr></thead><tbody>${items.map(x=>`<tr><td>${dt(x.created_at)}</td><td><b>${esc(x.event_type)}</b></td><td>${esc(x.actor_type||'—')}<div class="mono">${esc(short(x.actor_id,25))}</div></td><td class="mono">${esc(x.path||'—')}<br>${esc(x.ip||'')}</td><td>${badge(x.severity)}</td><td class="mono">${esc(short(JSON.stringify(x.metadata||{}),90))}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Güvenlik olayı yok.</div>'}</article></div>`}
+async function loadSecurity(){
+  const root=$('securityContent');
+  root.innerHTML=loadingCard('Güvenlik olayları ve incident kuyruğu yükleniyor…');
+  try{
+    const [eventsData,incidentData]=await Promise.all([
+      api('/api/owner/security-events?limit=200'),
+      api('/api/owner/incidents?limit=100')
+    ]);
+    state.security=arr(eventsData.events);
+    state.incidents=arr(incidentData.incidents);
+    renderSecurity();
+  }catch(e){
+    root.innerHTML=pageError(e.message,'security');
+    bindRetry();
+  }
+}
+function renderSecurity(){
+  const items=state.security,incidents=state.incidents;
+  const critical=items.filter(x=>tone(x.severity)==='bad').length;
+  const openIncidents=incidents.filter(x=>!['resolved','closed'].includes(String(x.status||'').toLowerCase())).length;
+  const incidentRows=incidents.map(x=>`<tr>
+    <td><b class="mono">${esc(x.incident_ref||x.id||'—')}</b><div class="muted small">${dt(x.updated_at)}</div></td>
+    <td>${badge(x.severity||'unknown')}</td>
+    <td>${badge(x.status||'unknown')}</td>
+    <td><b>${esc(x.title||'Untitled incident')}</b><div class="muted small">${esc(short(x.summary||'',120))}</div></td>
+    <td class="mono">${esc(short(x.network||'',20))}<br>${esc(short(x.target||'',34))}</td>
+    <td><div class="actions">
+      <button class="btn" type="button" data-incident-action="investigate" data-incident-id="${esc(x.id)}">Investigate</button>
+      <button class="btn" type="button" data-incident-action="contain" data-incident-id="${esc(x.id)}">Contain</button>
+      <button class="btn primary" type="button" data-incident-action="resolve" data-incident-id="${esc(x.id)}">Resolve</button>
+    </div></td>
+  </tr>`).join('');
+  $('securityContent').innerHTML=`<div class="grid compact-grid">
+    ${kpi('Audit events',num(items.length),'Last 200 security audit records','tone-cyan','◇')}
+    ${kpi('Critical / error',num(critical),'Owner review',critical?'tone-red':'tone-green','!')}
+    ${kpi('Open incidents',num(openIncidents),'Operational response cases',openIncidents?'tone-red':'tone-green','◎')}
+    <article class="card span-12">
+      <div class="card-head"><div><span class="eyebrow">Incident response</span><h2>Evidence-linked operator cases</h2><p class="muted">Incident state is operational metadata only. It never rewrites ARVIS evidence, grades or signatures.</p></div><span class="badge warn">${num(incidents.length)} cases</span></div>
+      <form id="incidentCreateForm" class="form-grid" style="margin-bottom:14px">
+        <label>Title<input class="input" name="title" maxlength="180" required placeholder="What needs operator response?"></label>
+        <label>Severity<select class="input" name="severity"><option>medium</option><option>high</option><option>critical</option><option>low</option><option>info</option></select></label>
+        <label>Network<input class="input" name="network" maxlength="96" placeholder="solana-mainnet"></label>
+        <label>Target<input class="input" name="target" maxlength="512" placeholder="wallet / token / tx / system target"></label>
+        <label style="grid-column:1/-1">Summary<textarea class="input" name="summary" maxlength="4000" rows="3" placeholder="Evidence-backed operator note"></textarea></label>
+        <div><button class="btn primary" type="submit">Open incident</button></div>
+      </form>
+      ${incidents.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Case</th><th>Severity</th><th>Status</th><th>Title</th><th>Target</th><th>Response</th></tr></thead><tbody>${incidentRows}</tbody></table></div>`:'<div class="empty">No incident cases yet.</div>'}
+    </article>
+    <article class="card span-12"><div class="card-head"><div><span class="eyebrow">Audit stream</span><h2>Who did what, and when?</h2></div></div>${items.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Time</th><th>Event</th><th>Actor</th><th>Path / IP</th><th>Severity</th><th>Metadata</th></tr></thead><tbody>${items.map(x=>`<tr><td>${dt(x.created_at)}</td><td><b>${esc(x.event_type)}</b></td><td>${esc(x.actor_type||'—')}<div class="mono">${esc(short(x.actor_id,25))}</div></td><td class="mono">${esc(x.path||'—')}<br>${esc(x.ip||'')}</td><td>${badge(x.severity)}</td><td class="mono">${esc(short(JSON.stringify(x.metadata||{}),90))}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No security audit events.</div>'}</article>
+  </div>`;
+  const form=$('incidentCreateForm');
+  if(form)form.onsubmit=async event=>{
+    event.preventDefault();
+    const fd=new FormData(form);
+    const body={
+      title:String(fd.get('title')||'').trim(),
+      severity:String(fd.get('severity')||'medium').trim(),
+      network:String(fd.get('network')||'').trim(),
+      target:String(fd.get('target')||'').trim(),
+      summary:String(fd.get('summary')||'').trim()
+    };
+    try{
+      await api('/api/owner/incidents',{method:'POST',body:JSON.stringify(body)});
+      toast('Incident opened.');
+      await loadSecurity();
+    }catch(error){toast(error.message,true)}
+  };
+  document.querySelectorAll('[data-incident-action]').forEach(button=>button.onclick=async()=>{
+    const id=String(button.dataset.incidentId||'').trim(),action=String(button.dataset.incidentAction||'').trim();
+    if(!id||!action)return;
+    button.disabled=true;
+    try{
+      await api('/api/owner/incidents/'+encodeURIComponent(id),{method:'POST',body:JSON.stringify({action,summary:'Owner control-center action'})});
+      toast('Incident updated.');
+      await loadSecurity();
+    }catch(error){toast(error.message,true);button.disabled=false}
+  });
+}
 function renderSystem(){
   const d=state.operations||{},services=obj(d.services);
   $('systemContent').innerHTML=`<div class="grid compact-grid">
