@@ -21,7 +21,6 @@ func TestSecurityRadarStreamIngestModeJournal(t *testing.T) {
 	}
 }
 
-
 func TestSecurityRadarPostgresRawJournalAllowedOutsideProduction(t *testing.T) {
 	t.Setenv("APP_ENV", "test")
 	t.Setenv("KOSCHEI_STREAM_POSTGRES_RAW_JOURNAL_ENABLED", "")
