@@ -54,16 +54,15 @@ func TestApplyTrustedMigrationRejectsDestructiveOrUnrelatedSQL(t *testing.T) {
 	}
 }
 
-func TestApplyTrustedMigrationUsesAuthHeadersAndBody(t *testing.T) {
+func TestApplyTrustedMigrationUsesSeparateAuthenticatedRequests(t *testing.T) {
+	request := 0
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		request++
 		if r.Method != http.MethodPost {
 			t.Fatalf("method=%s", r.Method)
 		}
-		if r.URL.Query().Get("multiquery") != "1" {
-			t.Fatal("migration request must opt into multiquery")
-		}
-		if got := r.Header.Get("X-ClickHouse-Database"); got != "koschei_web3" {
-			t.Fatalf("database header=%q", got)
+		if got := r.URL.Query().Get("multiquery"); got != "" {
+			t.Fatalf("legacy multiquery setting must not be sent, got %q", got)
 		}
 		if got := r.Header.Get("X-ClickHouse-User"); got != "schema-user" {
 			t.Fatalf("user header=%q", got)
@@ -75,8 +74,23 @@ func TestApplyTrustedMigrationUsesAuthHeadersAndBody(t *testing.T) {
 		if err != nil {
 			t.Fatalf("read body: %v", err)
 		}
-		if string(body) != trustedMigrationFixture {
-			t.Fatal("migration body changed")
+		switch request {
+		case 1:
+			if got := r.Header.Get("X-ClickHouse-Database"); got != "" {
+				t.Fatalf("CREATE DATABASE must not depend on target database header, got %q", got)
+			}
+			if string(body) != "CREATE DATABASE IF NOT EXISTS koschei_web3" {
+				t.Fatalf("unexpected database statement: %q", string(body))
+			}
+		case 2:
+			if got := r.Header.Get("X-ClickHouse-Database"); got != "koschei_web3" {
+				t.Fatalf("table database header=%q", got)
+			}
+			if !strings.HasPrefix(string(body), "CREATE TABLE IF NOT EXISTS koschei_web3.security_radar_stream_events") {
+				t.Fatalf("unexpected table statement: %q", string(body))
+			}
+		default:
+			t.Fatalf("unexpected migration request %d", request)
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -94,6 +108,9 @@ func TestApplyTrustedMigrationUsesAuthHeadersAndBody(t *testing.T) {
 	}
 	if err := client.ApplyTrustedMigration(context.Background(), trustedMigrationFixture); err != nil {
 		t.Fatalf("apply migration: %v", err)
+	}
+	if request != 2 {
+		t.Fatalf("migration requests=%d want 2", request)
 	}
 }
 

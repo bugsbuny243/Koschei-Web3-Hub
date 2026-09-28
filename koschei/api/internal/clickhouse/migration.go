@@ -46,6 +46,11 @@ func VerifyTrustedMigrationSHA256(migrationSQL, expectedHex string) error {
 
 // ApplyTrustedMigration executes only the narrow additive ClickHouse DDL used by
 // the Koschei shadow journal. It intentionally refuses mutation/destructive SQL.
+//
+// ClickHouse Cloud 26.6 does not accept the legacy "multiquery" HTTP setting.
+// Execute each already-validated additive statement as its own HTTPS request
+// instead. The migration uses only CREATE ... IF NOT EXISTS, so a partial retry
+// remains idempotent.
 func (c *Client) ApplyTrustedMigration(ctx context.Context, migrationSQL string) error {
 	if c == nil {
 		return fmt.Errorf("ClickHouse client is unavailable")
@@ -54,16 +59,29 @@ func (c *Client) ApplyTrustedMigration(ctx context.Context, migrationSQL string)
 		return err
 	}
 
-	migrationURL := *c.endpoint
-	query := migrationURL.Query()
-	query.Set("multiquery", "1")
-	migrationURL.RawQuery = query.Encode()
+	statements := trustedMigrationStatements(migrationSQL)
+	for index, statement := range statements {
+		if err := c.applyTrustedMigrationStatement(ctx, statement); err != nil {
+			return fmt.Errorf("ClickHouse migration statement %d/%d failed: %w", index+1, len(statements), err)
+		}
+	}
+	return nil
+}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, migrationURL.String(), strings.NewReader(migrationSQL))
+func (c *Client) applyTrustedMigrationStatement(ctx context.Context, statement string) error {
+	migrationURL := *c.endpoint
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, migrationURL.String(), strings.NewReader(statement))
 	if err != nil {
 		return fmt.Errorf("build ClickHouse migration request: %w", err)
 	}
 	c.applyHeaders(req)
+	// CREATE DATABASE must not depend on the target database already existing.
+	// Omitting the database header lets ClickHouse execute it in the default
+	// database context while preserving the same authenticated user.
+	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(statement)), "CREATE DATABASE ") {
+		req.Header.Del("X-ClickHouse-Database")
+	}
 	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
 
 	resp, err := c.httpClient.Do(req)
@@ -77,7 +95,7 @@ func (c *Client) ApplyTrustedMigration(ctx context.Context, migrationSQL string)
 	}
 
 	message, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	return fmt.Errorf("ClickHouse migration failed status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(message)))
+	return fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(message)))
 }
 
 // VerifyStreamEventsSchema verifies the contract required by the shadow copier.
@@ -178,8 +196,7 @@ func validateTrustedMigration(migrationSQL string) error {
 		return fmt.Errorf("ClickHouse migration exceeds %d byte safety limit", maxTrustedMigrationBytes)
 	}
 
-	withoutComments := stripSQLLineComments(trimmed)
-	statements := strings.Split(withoutComments, ";")
+	statements := trustedMigrationStatements(trimmed)
 	seenStreamTable := false
 	seenStatement := false
 	for _, rawStatement := range statements {
@@ -216,6 +233,18 @@ func validateTrustedMigration(migrationSQL string) error {
 		return fmt.Errorf("ClickHouse migration is missing security_radar_stream_events CREATE TABLE")
 	}
 	return nil
+}
+
+func trustedMigrationStatements(value string) []string {
+	withoutComments := stripSQLLineComments(value)
+	rawStatements := strings.Split(withoutComments, ";")
+	statements := make([]string, 0, len(rawStatements))
+	for _, rawStatement := range rawStatements {
+		if statement := strings.TrimSpace(rawStatement); statement != "" {
+			statements = append(statements, statement)
+		}
+	}
+	return statements
 }
 
 func stripSQLLineComments(value string) string {
