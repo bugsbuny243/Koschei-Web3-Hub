@@ -1,0 +1,86 @@
+name: ClickHouse Shadow Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type COPY to run a bounded PostgreSQL -> ClickHouse shadow copy"
+        required: true
+        type: string
+      since:
+        description: "RFC3339 inclusive window start"
+        required: true
+        default: "2026-09-21T05:29:00Z"
+        type: string
+      until:
+        description: "RFC3339 exclusive window end"
+        required: true
+        default: "2026-09-21T05:30:00Z"
+        type: string
+      max_rows:
+        description: "Abort if source window exceeds this row count"
+        required: true
+        default: "5000"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clickhouse-shadow-backfill
+  cancel-in-progress: false
+
+jobs:
+  copy:
+    name: Copy bounded shadow window and verify parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Require explicit copy confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          test "${CONFIRM}" = "COPY"
+
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Validate required secrets
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_READ_URL}" ] && [ -z "${DATABASE_URL}" ]; then
+            echo "DATABASE_READ_URL or DATABASE_URL secret is required" >&2
+            exit 1
+          fi
+          test -n "${CLICKHOUSE_HTTP_URL}"
+          test -n "${CLICKHOUSE_USER}"
+          test -n "${CLICKHOUSE_PASSWORD}"
+
+      - name: Copy bounded window and verify row/content parity
+        working-directory: koschei/api
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_DATABASE: koschei_web3
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+          CLICKHOUSE_TIMEOUT_MS: "30000"
+          KOSCHEI_CLICKHOUSE_SHADOW_SINCE: ${{ inputs.since }}
+          KOSCHEI_CLICKHOUSE_SHADOW_UNTIL: ${{ inputs.until }}
+          KOSCHEI_CLICKHOUSE_SHADOW_BATCH_SIZE: "1000"
+          KOSCHEI_CLICKHOUSE_SHADOW_MAX_ROWS: ${{ inputs.max_rows }}
+        run: go run ./cmd/clickhouse-shadow
