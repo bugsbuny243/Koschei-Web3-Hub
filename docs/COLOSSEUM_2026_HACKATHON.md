@@ -92,6 +92,30 @@ Representative commits / merges:
 - `0ba2b7a` — test shipped verifier package in CI
 - `9c52ffe` — merge forged-verdict rejection fix
 
+### Week 2 submission status
+
+The Week 2 Colosseum project update has been submitted.
+
+Submission notes:
+
+- A 60-second ARVIS product/security-radar update video was submitted for the second-week update.
+- The application identifies the active ecosystem token as KOSC on Solana mainnet.
+- Official KOSC mint used by the submission and current public product contract: `7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1`.
+- The live token reference points to the corresponding Pump.fun Callout for that mint.
+- Judge notes state that Koschei ARVIS is built by the sole founder/developer and distinguish external RPC/data services from project contributors.
+- The submission describes ARVIS as an evidence-first security decision layer rather than a generic token scanner and avoids unverifiable traction claims.
+
+### Public access-contract consistency
+
+During the hackathon period, stale public copy from the retired holder-access model was removed from directly reachable pages so the UI matches the server-side authorization contract.
+
+Representative commits:
+
+- `a36771c` — update the public Solana security page to the canonical Professional entitlement model and current KOSC settlement semantics.
+- `8c5d00a` — update the structural exposure report to require and describe Professional entitlement instead of retired KOSCH holder access.
+
+KOSC remains a settlement channel only. Token holdings do not grant access and do not alter evidence, grades, signatures, compiler rules, model promotion, or integration readiness.
+
 ## Hackathon demo scope
 
 The final demo should focus on work that can be demonstrated and traced to hackathon-period commits:
@@ -111,6 +135,6 @@ For final submission, each claimed hackathon feature should be linked to its rel
 
 ## Status
 
-Last updated: 2026-09-20.
+Last updated: 2026-09-28.
 
 This file should be updated as meaningful hackathon work lands. Existing pre-hackathon functionality must remain clearly distinguished from new event-period work.
