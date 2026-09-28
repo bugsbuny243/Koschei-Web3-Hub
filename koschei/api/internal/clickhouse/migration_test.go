@@ -125,7 +125,7 @@ func TestVerifyStreamEventsSchemaChecksEngineSortAndTypes(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.Contains(query, "FROM system.tables"):
-			_, _ = fmt.Fprint(w, `{"data":[{"engine":"ReplacingMergeTree","sorting_key":"network, module_id, stream_mode, event_date, event_id"}]}`)
+			_, _ = fmt.Fprint(w, `{"data":[{"engine":"SharedReplacingMergeTree","sorting_key":"network, module_id, stream_mode, event_date, event_id"}]}`)
 		case strings.Contains(query, "FROM system.columns"):
 			if !strings.Contains(query, "decoded_sha256") || !strings.Contains(query, "raw_event_sha256") {
 				t.Fatal("schema verification must require evidence payload hashes")
