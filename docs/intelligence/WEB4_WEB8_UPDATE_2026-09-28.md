@@ -61,3 +61,58 @@ Source: https://datatracker.ietf.org/doc/draft-hillier-conformance-continuity/
 ## Web7 / Web8
 
 No accepted IETF/W3C standards named Web7 or Web8 were identified in this update window. Keep them as internal research labels only.
+
+## Additional agent-protocol watch — surfaced 2026-09-28
+
+### AAuth Protocol v11 — published 2026-09-25
+
+The individual Internet-Draft `draft-hardt-oauth-aauth-protocol-11` defines agent-to-resource authorization with five access modes, key-bound agent identity, signed requests, mission-scoped governance and resource-managed session tokens.
+
+Koschei relevance:
+- useful research input for separating agent identity, person authority, mission scope and resource access;
+- aligns with the rule that authentication never implies authorization;
+- should remain an adapter/research input until the protocol has formal standards standing.
+
+Source:
+https://datatracker.ietf.org/doc/html/draft-hardt-oauth-aauth-protocol-11
+
+### Agent Execution Protocol (AEP) — current draft 04
+
+`draft-sato-soos-aep-04` describes a normative boundary between an agent reasoning loop and a governing enforcement component that authorizes actions and records tamper-evident state transitions.
+
+Koschei relevance:
+- strong architectural comparison point for ARVIS pre-sign authority, Lang policy enforcement and Sentinel observe-mode evaluation;
+- reinforces a hard boundary between model reasoning and deterministic enforcement.
+
+Source:
+https://datatracker.ietf.org/doc/draft-sato-soos-aep/
+
+### A2A protocol roadmap and current security model
+
+The A2A roadmap (updated 2026-09-15) prioritizes v1.1 robustness, bidirectional streaming, elicitation/human-in-the-loop flows and validation tooling. The current specification keeps authentication at the protocol/transport boundary and authorization server-side, scoped by identity, skill, action, data policy or OAuth scope.
+
+Koschei relevance:
+- A2A is a useful horizontal agent-to-agent transport candidate while MCP remains a tool/data integration surface;
+- every A2A task and streaming event must remain subject to explicit authorization and evidence boundaries before entering Koschei's trusted graph.
+
+Sources:
+https://a2a-protocol.org/latest/roadmap/
+https://a2a-protocol.org/dev/specification/
+
+### MCP security proposals to track
+
+Active MCP proposal work includes:
+- SEP-3140: Signed Capability Declarations & Trustworthy Trust Labels;
+- SEP-3004: Tamper-Evident Audit Record Contract;
+- SEP-2848: Asynchronous Approval for Tool Calls;
+- SEP-2643: Structured Authorization Denials.
+
+Koschei relevance:
+- capability declarations belong in discovery/provenance, not verdict authority;
+- tamper-evident tool-call records could map into the evidence plane;
+- asynchronous approval and structured denials match human-in-the-loop and explicit refusal semantics;
+- these are proposal-stage items unless separately promoted by MCP governance.
+
+Sources:
+https://github.com/modelcontextprotocol/modelcontextprotocol/pulls
+https://plan.modelcontextprotocol.io/seps
