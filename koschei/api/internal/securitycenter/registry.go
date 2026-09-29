@@ -76,9 +76,10 @@ func Current() Snapshot {
 			},
 			{
 				ID: "runtime-health-registry", Layer: "control-plane", Domain: "runtime-observability", Mode: "implemented", EvidenceAuthority: "operational_status_only", Activation: "always available in HTTP runtime; entries reflect configured components",
-				BackendSurfaces: []string{"/fabric/security-center/runtime-health"},
-				Telemetry:       []string{"configured", "live", "degraded", "unavailable", "disabled", "stopped", "last success/failure", "cycle and observation counters"},
-				Notes:           []string{"runtime health is not chain risk", "endpoint identities and secrets are never exposed"},
+				BackendSurfaces:  []string{"/fabric/security-center/runtime-health"},
+				FrontendSurfaces: []string{"/fabric/security-center"},
+				Telemetry:        []string{"configured", "live", "degraded", "unavailable", "disabled", "stopped", "last success/failure", "cycle and observation counters", "periodic success freshness and deadline"},
+				Notes:            []string{"runtime health is not chain risk", "endpoint identities and secrets are never exposed"},
 			},
 			{
 				ID: "continuous-multi-network-block-ingest", Layer: "ingest", Domain: "evm-utxo", Mode: "conditional", EvidenceAuthority: "observation_only", Activation: "KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED=1 plus event/checkpoint ClickHouse and explicit network allowlist",

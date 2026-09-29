@@ -207,7 +207,12 @@ func StartGlobalRadarBackgroundTelemetry(ctx context.Context, cfg GlobalRadarBac
 		interval = time.Hour
 	}
 	if cfg.Health != nil {
-		cfg.Health.Register("worker.global-radar-background-telemetry", "worker", "", true)
+		maxAge := 2*interval + 2*time.Minute
+		cfg.Health.RegisterPeriodic("worker.global-radar-background-telemetry", "worker", "", true, maxAge)
+		for _, target := range cfg.Targets {
+			healthID := "global-radar.telemetry." + strings.ToLower(strings.TrimSpace(target.NetworkID)) + "." + strings.ToLower(strings.TrimSpace(target.Kind))
+			cfg.Health.RegisterPeriodic(healthID, "network_telemetry", target.NetworkID, true, maxAge)
+		}
 		cfg.Health.Register("global-radar.telemetry.snapshot-sink", "storage", "", true)
 		if cfg.EventSink != nil {
 			cfg.Health.Register("global-radar.telemetry.event-sink", "storage", "", true)

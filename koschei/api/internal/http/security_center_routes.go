@@ -16,7 +16,7 @@ func registerSecurityCenterRoutes(mux *http.ServeMux, registries ...*runtimeheal
 	}
 	mux.HandleFunc("/fabric/security-center/capabilities", method(http.MethodGet, securityCenterCapabilities))
 	mux.HandleFunc("/fabric/security-center/runtime-health", method(http.MethodGet, securityCenterRuntimeHealth(registry)))
-	mux.HandleFunc("/fabric/security-center", method(http.MethodGet, securityCenterSurface))
+	mux.HandleFunc("/fabric/security-center", method(http.MethodGet, securityCenterSurface(registry)))
 }
 
 func securityCenterRuntimeHealth(registry *runtimehealth.Registry) http.HandlerFunc {
@@ -41,15 +41,22 @@ var securityCenterPage = template.Must(template.New("security-center").Parse(`<!
 </style></head><body><main class="wrap">
 <nav class="top"><div class="brand"><span data-cipher="KOSCHEI GLOBAL CRYPTO SECURITY CENTER">KOSCHEI GLOBAL CRYPTO SECURITY CENTER</span></div><div class="nav"><a href="/fabric">Fabric</a><a href="/fabric/networks">Networks</a><a href="/fabric/security-center/runtime-health">Runtime Health</a><a href="/scan">Intelligence Desk</a><a href="/dashboard">Console</a></div></nav>
 <section class="hero"><article class="card"><span class="eyebrow">FEDERATED SECURITY CONTROL PLANE · ADDITIVE</span><h1>One evidence graph. Many security surfaces.</h1><p>{{.Purpose}}</p><div class="truth"><span>preserve existing: {{.PreserveExisting}}</span><span>breaking changes: {{.BreakingChanges}}</span><span>{{len .Networks}} registered networks</span><span>{{len .Capabilities}} security capabilities</span></div><p style="margin-top:18px"><b>Decision boundary:</b> {{.DecisionAuthority}}</p><p style="margin-top:10px"><b>Evidence rule:</b> {{.EvidenceRule}}</p></article><article class="card world"><canvas data-koschei-security-world aria-label="Koschei security network flow visualization"></canvas><div class="world-note">Visualization only. Runtime availability and evidence maturity are reported separately; this canvas never represents live telemetry.</div></article></section>
+<section class="section" aria-labelledby="runtime-heading"><h2 id="runtime-heading">Radar operational health</h2><p>Snapshot: {{.Runtime.GeneratedAt.Format "2006-01-02 15:04:05 UTC"}} · <a href="/fabric/security-center">Refresh status</a>. These are component checks, not a chain coverage or safety verdict. A fresh cycle may contain zero observations.</p><div class="truth">{{range $state, $count := .Runtime.Counts}}<span>{{$state}}: {{$count}}</span>{{end}}</div><p>Periodic checks become degraded when their success deadline expires. Not monitored means freshness is unverified; a startup check alone does not establish continuous availability.</p><div class="table-wrap"><table class="table"><thead><tr><th>Component / network</th><th>State</th><th>Freshness</th><th>Last successful check (UTC)</th><th>Cycles / observations</th></tr></thead><tbody>{{range .Runtime.Entries}}<tr><td><b>{{.ID}}</b>{{if .NetworkID}}<br>{{.NetworkID}}{{end}}</td><td>{{.State}}</td><td>{{.Freshness}}{{if .MaxAgeSeconds}}<br>Deadline: {{.MaxAgeSeconds}} seconds{{end}}</td><td>{{if .LastSuccessAt}}{{.LastSuccessAt.Format "2006-01-02 15:04:05"}}{{else}}No successful check{{end}}</td><td>{{.SuccessfulCycles}} succeeded / {{.FailedCycles}} failed<br>{{.Observations}} observations</td></tr>{{else}}<tr><td colspan="5">Runtime health unavailable. No registered component evidence.</td></tr>{{end}}</tbody></table></div></section>
 <section class="section"><h2>Security capability graph</h2><p>Every capability keeps its own authority boundary, activation gate and operational surface.</p><div class="grid">{{range .Capabilities}}<article class="card cap"><span class="eyebrow">{{.Layer}} · {{.Domain}}</span><h3>{{.ID}}</h3><div class="meta"><span>mode: <b>{{.Mode}}</b></span><span>authority: <b>{{.EvidenceAuthority}}</b></span><span>activation: <b>{{.Activation}}</b></span>{{if .NetworkIDs}}<span>networks: <b>{{len .NetworkIDs}}</b></span>{{end}}</div><div class="surfaces">{{range .BackendSurfaces}}<span class="surface">{{.}}</span>{{end}}{{range .FrontendSurfaces}}<span class="surface">{{.}}</span>{{end}}</div></article>{{end}}</div></section>
 <section class="section tables"><article><h2>Registered networks</h2><p>Catalog presence is not a live-health claim.</p><div class="table-wrap"><table class="table"><thead><tr><th>Network</th><th>Family</th><th>Collector</th><th>Node telemetry</th></tr></thead><tbody>{{range .Networks}}<tr><td><b>{{.Name}}</b><br><span class="eyebrow">{{.ID}}</span></td><td>{{.Family}}<br>{{.ConsensusFamily}}</td><td>{{.CollectorStatus}}</td><td>{{.NodeTelemetryStatus}}</td></tr>{{end}}</tbody></table></div></article><article><h2>Preserved runtime assets</h2><p>No registered module is deleted merely because it is not currently co-executed.</p><div class="table-wrap"><table class="table"><thead><tr><th>Asset</th><th>State</th><th>Surface / reason</th></tr></thead><tbody>{{range .AssetBindings}}<tr><td><code>{{.Asset}}</code><br><span class="eyebrow">{{.Kind}}</span></td><td class="state {{.State}}">{{.State}}</td><td><b>{{.Surface}}</b><br>{{.Reason}}</td></tr>{{end}}</tbody></table></div></article></section>
 <div class="footer">Schema {{.SchemaVersion}} · Repository capability metadata, not deployment health · Unknown stays unknown · No private-key custody.</div>
 </main><script src="/js/cipher.js?v=2"></script><script src="/js/koschei-security-world.js?v=2"></script><script src="/js/feedback-button.js?v=2"></script></body></html>`))
 
-func securityCenterSurface(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	if err := securityCenterPage.Execute(w, securitycenter.Current()); err != nil {
-		http.Error(w, "security center unavailable", http.StatusInternalServerError)
+func securityCenterSurface(registry *runtimehealth.Registry) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		data := struct {
+			securitycenter.Snapshot
+			Runtime runtimehealth.Snapshot
+		}{securitycenter.Current(), registry.Snapshot()}
+		if err := securityCenterPage.Execute(w, data); err != nil {
+			http.Error(w, "security center unavailable", http.StatusInternalServerError)
+		}
 	}
 }

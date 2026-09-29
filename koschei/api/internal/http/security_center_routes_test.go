@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -24,6 +25,41 @@ func TestSecurityCenterCapabilityRoute(t *testing.T) {
 		if !strings.Contains(res.Body.String(), want) {
 			t.Fatalf("capability response missing %q", want)
 		}
+	}
+}
+
+func TestSecurityCenterShowsOperationalEvidenceWithoutProviderErrors(t *testing.T) {
+	r := runtimehealth.New()
+	r.Register("worker.global-radar-head-ingest", "worker", "", false)
+	r.Register("storage.database", "storage", "", true)
+	r.Success("storage.database", 0)
+	r.Register("<script>component</script>", "worker", "", true)
+	r.Failure("<script>component</script>", errors.New("private-provider-detail"))
+	mux := http.NewServeMux()
+	registerSecurityCenterRoutes(mux, r)
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/fabric/security-center", nil))
+	body := res.Body.String()
+	for _, want := range []string{"Radar operational health", "disabled: 1", "inactive", "not_monitored", "No successful check", "0 observations", "&lt;script&gt;component&lt;/script&gt;"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("missing %q in operational panel", want)
+		}
+	}
+	if strings.Contains(body, "private-provider-detail") || strings.Contains(body, "<script>component</script>") {
+		t.Fatal("operational panel exposed raw provider errors or unescaped IDs")
+	}
+	if res.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("operational snapshot must not be cached")
+	}
+}
+
+func TestSecurityCenterMissingRegistryDoesNotClaimHealth(t *testing.T) {
+	mux := http.NewServeMux()
+	registerSecurityCenterRoutes(mux)
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/fabric/security-center", nil))
+	if !strings.Contains(res.Body.String(), "Runtime health unavailable. No registered component evidence.") {
+		t.Fatal("missing health evidence must remain explicit")
 	}
 }
 

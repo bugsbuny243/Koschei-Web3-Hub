@@ -521,11 +521,12 @@ func StartGlobalRadarHeadIngest(ctx context.Context, cfg GlobalRadarHeadIngestCo
 		interval = 5 * time.Minute
 	}
 	if cfg.Health != nil {
-		cfg.Health.Register("worker.global-radar-head-ingest", "worker", "", true)
+		maxAge := 2*interval + 90*time.Second
+		cfg.Health.RegisterPeriodic("worker.global-radar-head-ingest", "worker", "", true, maxAge)
 		cfg.Health.Register("global-radar.head.event-sink", "storage", "", true)
 		cfg.Health.Register("global-radar.head.checkpoint-store", "storage", "", true)
 		for _, target := range cfg.Targets {
-			cfg.Health.Register(GlobalRadarHeadIngestTargetHealthID(target), "head_ingest", target.NetworkID, true)
+			cfg.Health.RegisterPeriodic(GlobalRadarHeadIngestTargetHealthID(target), "head_ingest", target.NetworkID, true, maxAge)
 			if strings.TrimSpace(target.ConfirmationEndpoint) != "" || cfg.RequireConfirmation {
 				cfg.Health.Register(GlobalRadarHeadIngestConfirmationHealthID(target), "block_confirmation", target.NetworkID, strings.TrimSpace(target.ConfirmationEndpoint) != "")
 			}

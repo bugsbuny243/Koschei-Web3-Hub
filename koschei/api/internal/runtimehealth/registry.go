@@ -34,6 +34,11 @@ type Entry struct {
 	LastFailureAt       *time.Time `json:"last_failure_at,omitempty"`
 	LastError           string     `json:"last_error,omitempty"`
 	UpdatedAt           time.Time  `json:"updated_at"`
+	Freshness           string     `json:"freshness"`
+	MaxAgeSeconds       float64    `json:"max_age_seconds,omitempty"`
+	FreshUntil          *time.Time `json:"fresh_until,omitempty"`
+	registeredAt        time.Time
+	maxAge              time.Duration
 }
 
 type Snapshot struct {
@@ -54,6 +59,17 @@ func New() *Registry {
 }
 
 func (r *Registry) Register(id, kind, networkID string, configured bool) {
+	r.register(id, kind, networkID, configured, 0)
+}
+
+// RegisterPeriodic opts a recurring component into freshness monitoring.
+// Re-registering a component never refreshes its successful-cycle deadline.
+// Components without a periodic check remain explicitly not_monitored.
+func (r *Registry) RegisterPeriodic(id, kind, networkID string, configured bool, maxAge time.Duration) {
+	r.register(id, kind, networkID, configured, maxAge)
+}
+
+func (r *Registry) register(id, kind, networkID string, configured bool, maxAge time.Duration) {
 	if r == nil {
 		return
 	}
@@ -66,6 +82,12 @@ func (r *Registry) Register(id, kind, networkID string, configured bool) {
 	defer r.mu.Unlock()
 
 	entry := r.entries[id]
+	if entry.registeredAt.IsZero() || (configured && (!entry.Configured || entry.State == StateStopped)) {
+		entry.registeredAt = now
+	}
+	if maxAge > 0 {
+		entry.maxAge = maxAge
+	}
 	entry.ID = id
 	entry.Kind = strings.TrimSpace(kind)
 	entry.NetworkID = strings.ToLower(strings.TrimSpace(networkID))
@@ -169,6 +191,32 @@ func (r *Registry) Snapshot() Snapshot {
 	r.mu.RLock()
 	entries := make([]Entry, 0, len(r.entries))
 	for _, entry := range r.entries {
+		entry.Freshness = "not_monitored"
+		if !entry.Configured || entry.State == StateStopped {
+			entry.Freshness = "inactive"
+		} else if entry.maxAge > 0 {
+			entry.MaxAgeSeconds = entry.maxAge.Seconds()
+			baseline := entry.registeredAt
+			entry.Freshness = "awaiting_success"
+			if entry.LastSuccessAt != nil && !entry.LastSuccessAt.Before(baseline) {
+				baseline = *entry.LastSuccessAt
+				entry.Freshness = "fresh"
+			}
+			entry.FreshUntil = timePtr(baseline.Add(entry.maxAge))
+			if !now.Before(*entry.FreshUntil) {
+				entry.Freshness = "stale"
+				if entry.State == StateLive || entry.State == StateConfigured {
+					entry.State = StateDegraded
+				}
+			}
+		}
+		// Snapshots own their timestamps; callers cannot mutate registry state.
+		if entry.LastSuccessAt != nil {
+			entry.LastSuccessAt = timePtr(*entry.LastSuccessAt)
+		}
+		if entry.LastFailureAt != nil {
+			entry.LastFailureAt = timePtr(*entry.LastFailureAt)
+		}
 		entries = append(entries, entry)
 	}
 	r.mu.RUnlock()
