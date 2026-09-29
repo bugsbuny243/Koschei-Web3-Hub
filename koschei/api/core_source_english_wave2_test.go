@@ -20,7 +20,7 @@ func TestCoreCustomerSurfacesAreSourceEnglishWave2(t *testing.T) {
 		},
 		"public/account.html": {
 			"Professional Access",
-			"Verify with Phantom",
+			"Verify Solana wallet",
 			"Identity only.",
 			"Current customer access",
 			"Professional is the single operational customer plan",
