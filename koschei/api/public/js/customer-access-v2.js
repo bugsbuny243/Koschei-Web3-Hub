@@ -75,11 +75,19 @@ async function load({preserveMessage=false}={}){
 
 async function runButton(button,label,work){if(!button||button.disabled)return;const previous=button.textContent;button.disabled=true;button.textContent=label;try{await work();}finally{button.disabled=false;button.textContent=previous;}}
 
+function mobileBrowserWithoutPhantom(){
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'')&&!phantom();
+}
+
 async function connectWallet(){
   const button=$('accessConnect');
   await runButton(button,'Waiting for wallet…',async()=>{
     try{
-      const provider=phantom();if(!provider||provider.isPhantom!==true)throw new Error('Phantom wallet was not found in this browser.');
+      const provider=phantom();
+      if(!provider||provider.isPhantom!==true){
+        if(mobileBrowserWithoutPhantom())throw new Error('On mobile, open this Account page inside Phantom\'s in-app browser, then tap Verify with Phantom again.');
+        throw new Error('Phantom wallet was not found in this browser.');
+      }
       const connection=await provider.connect(),wallet=text(connection?.publicKey?.toString());if(!wallet)throw new Error('Phantom did not return a wallet address.');
       const challenge=await write('/api/auth/wallet/challenge',{method:'POST',body:JSON.stringify({wallet_address:wallet,network:currentNetwork})});
       if(!text(challenge?.message)||!text(challenge?.challenge_id)||text(challenge?.wallet_address)!==wallet||!text(challenge?.network))throw new Error('Wallet verification challenge is incomplete or inconsistent.');
