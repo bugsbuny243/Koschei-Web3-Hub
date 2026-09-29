@@ -10,17 +10,17 @@ on:
       since:
         description: "RFC3339 inclusive window start"
         required: true
-        default: "2026-09-21T05:30:00Z"
+        default: "2026-09-21T05:35:00Z"
         type: string
       until:
         description: "RFC3339 exclusive window end"
         required: true
-        default: "2026-09-21T05:35:00Z"
+        default: "2026-09-21T05:50:00Z"
         type: string
       max_rows:
         description: "Abort if source window exceeds this row count"
         required: true
-        default: "20000"
+        default: "50000"
         type: string
 
 permissions:
@@ -42,6 +42,22 @@ jobs:
         run: |
           set -euo pipefail
           test "${CONFIRM}" = "COPY"
+
+      - name: Validate bounded row cap input
+        env:
+          MAX_ROWS: ${{ inputs.max_rows }}
+        run: |
+          set -euo pipefail
+          case "${MAX_ROWS}" in
+            ''|*[!0-9]*)
+              echo "max_rows must be an integer" >&2
+              exit 1
+              ;;
+          esac
+          if [ "${MAX_ROWS}" -lt 1 ] || [ "${MAX_ROWS}" -gt 100000 ]; then
+            echo "max_rows must be between 1 and 100000" >&2
+            exit 1
+          fi
 
       - name: Checkout
         uses: actions/checkout@v7
