@@ -1,7 +1,9 @@
 package runtimehealth
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -125,5 +127,37 @@ func TestUnmonitoredHealthAndSnapshotTimestampIsolation(t *testing.T) {
 	*s.Entries[0].LastSuccessAt = time.Time{}
 	if !r.Snapshot().Entries[0].LastSuccessAt.Equal(original) {
 		t.Fatal("snapshot caller changed registry timestamp")
+	}
+}
+
+func TestIngestProgressPreservesUnknownZeroAndProviderRegression(t *testing.T) {
+	r := New()
+	r.Register("head", "head_ingest", "ethereum-mainnet", true)
+	head, cursor := uint64(105), uint64(100)
+	r.RecordIngestProgress("head", &head, &cursor, false, false)
+	p := r.Snapshot().Entries[0].Ingest
+	if p.Status != "catching_up" || *p.PendingBlocks != 5 {
+		t.Fatalf("backlog: %#v", p)
+	}
+	*p.DurableCursor = 999
+	head = 100
+	if *r.Snapshot().Entries[0].Ingest.DurableCursor != 100 || *r.Snapshot().Entries[0].Ingest.ObservedHead != 105 {
+		t.Fatal("progress aliases caller memory")
+	}
+	r.RecordIngestProgress("head", &head, &cursor, false, false)
+	raw, _ := json.Marshal(r.Snapshot())
+	if !strings.Contains(string(raw), `"pending_blocks":"0"`) {
+		t.Fatalf("zero must remain present and exact: %s", raw)
+	}
+	head = 99
+	r.RecordIngestProgress("head", &head, &cursor, true, false)
+	p = r.Snapshot().Entries[0].Ingest
+	if p.Status != "provider_behind_cursor" || p.PendingBlocks != nil {
+		t.Fatalf("provider regression underflow: %#v", p)
+	}
+	r.RecordIngestProgress("head", nil, nil, true, true)
+	p = r.Snapshot().Entries[0].Ingest
+	if p.Status != "reorg_recheck_required" || p.PendingBlocks != nil || p.DurableCursor != nil {
+		t.Fatalf("reorg must remain unverified: %#v", p)
 	}
 }

@@ -105,3 +105,19 @@ func TestSecurityCenterRuntimeHealthRoute(t *testing.T) {
 		t.Fatalf("runtime health response did not report live state: %s", res.Body.String())
 	}
 }
+
+func TestSecurityCenterRendersZeroPendingBlocks(t *testing.T) {
+	r := runtimehealth.New()
+	r.Register("head", "head_ingest", "ethereum-mainnet", true)
+	height := uint64(100)
+	r.RecordIngestProgress("head", &height, &height, false, false)
+	mux := http.NewServeMux()
+	registerSecurityCenterRoutes(mux, r)
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/fabric/security-center", nil))
+	for _, want := range []string{"Observed head: 100", "Durable cursor: 100", "Pending blocks: 0", "zero does not prove historical completeness"} {
+		if !strings.Contains(res.Body.String(), want) {
+			t.Fatalf("missing %q", want)
+		}
+	}
+}

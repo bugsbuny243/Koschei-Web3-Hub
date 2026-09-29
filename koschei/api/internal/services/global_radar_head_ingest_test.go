@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"koschei/api/internal/radarcursor"
 	"koschei/api/internal/radarevent"
+	"koschei/api/internal/runtimehealth"
 )
 
 type headIngestCursorStore struct {
@@ -377,5 +379,52 @@ func TestRunGlobalRadarHeadIngestCycleAutomaticallyRewindsToTwoProviderCommonAnc
 	latest := store.items[key]
 	if latest.Height != 99 || latest.BlockHash != hash99 || latest.State != radarcursor.StateRewind {
 		t.Fatalf("unexpected rewind checkpoint: %#v", latest)
+	}
+}
+
+type failingProgressCursor struct {
+	*headIngestCursorStore
+	fail bool
+}
+
+func (s *failingProgressCursor) SaveGlobalRadarIngestCheckpoint(ctx context.Context, c radarcursor.Checkpoint) error {
+	if s.fail {
+		return errors.New("injected checkpoint failure")
+	}
+	return s.headIngestCursorStore.SaveGlobalRadarIngestCheckpoint(ctx, c)
+}
+func TestGlobalRadarProgressWaitsForDurableCheckpointAndRecovers(t *testing.T) {
+	parent := "0x" + strings.Repeat("a", 64)
+	server := evmHeadIngestServer(t, 101, "0x"+strings.Repeat("d", 64), parent, nil, false)
+	defer server.Close()
+	target := GlobalRadarHeadIngestTarget{Kind: GlobalRadarHeadIngestEVM, NetworkID: "ethereum-mainnet", Endpoint: server.URL}
+	key := GlobalRadarHeadIngestCursorKey(target)
+	store := &failingProgressCursor{headIngestCursorStore: newHeadIngestCursorStore(), fail: true}
+	store.items[key] = radarcursor.Checkpoint{CursorKey: key, NetworkID: target.NetworkID, StreamKind: target.Kind, Height: 100, BlockHash: parent, ParentHash: "0x" + strings.Repeat("b", 64), SourceEventSHA256: strings.Repeat("1", 64), State: radarcursor.StateCanonical, ObservedAt: time.Now().UTC()}
+	health := runtimehealth.New()
+	cfg := GlobalRadarHeadIngestConfig{EventSink: &headIngestEventSink{}, CursorStore: store, Targets: []GlobalRadarHeadIngestTarget{target}, HTTPClient: server.Client(), Health: health}
+	progress := func() *runtimehealth.IngestProgress {
+		for _, e := range health.Snapshot().Entries {
+			if e.ID == GlobalRadarHeadIngestTargetHealthID(target) {
+				return e.Ingest
+			}
+		}
+		t.Fatal("missing ingest progress")
+		return nil
+	}
+	if _, err := RunGlobalRadarHeadIngestCycle(context.Background(), cfg); err == nil {
+		t.Fatal("expected injected storage failure")
+	}
+	p := progress()
+	if p == nil || p.DurableCursor == nil || *p.DurableCursor != 100 || p.PendingBlocks == nil || *p.PendingBlocks != 1 || p.Status != "cycle_failed" {
+		t.Fatalf("advanced before durable checkpoint: %#v", p)
+	}
+	store.fail = false
+	if _, err := RunGlobalRadarHeadIngestCycle(context.Background(), cfg); err != nil {
+		t.Fatal(err)
+	}
+	p = progress()
+	if p.DurableCursor == nil || *p.DurableCursor != 101 || p.PendingBlocks == nil || *p.PendingBlocks != 0 || p.Status != "at_observed_head" {
+		t.Fatalf("failed to report recovery: %#v", p)
 	}
 }

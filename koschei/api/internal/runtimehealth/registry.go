@@ -21,24 +21,76 @@ const (
 )
 
 type Entry struct {
-	ID                  string     `json:"id"`
-	Kind                string     `json:"kind"`
-	NetworkID           string     `json:"network_id,omitempty"`
-	State               State      `json:"state"`
-	Configured          bool       `json:"configured"`
-	SuccessfulCycles    uint64     `json:"successful_cycles"`
-	FailedCycles        uint64     `json:"failed_cycles"`
-	Observations        uint64     `json:"observations"`
-	ConsecutiveFailures uint64     `json:"consecutive_failures"`
-	LastSuccessAt       *time.Time `json:"last_success_at,omitempty"`
-	LastFailureAt       *time.Time `json:"last_failure_at,omitempty"`
-	LastError           string     `json:"last_error,omitempty"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	Freshness           string     `json:"freshness"`
-	MaxAgeSeconds       float64    `json:"max_age_seconds,omitempty"`
-	FreshUntil          *time.Time `json:"fresh_until,omitempty"`
+	ID                  string          `json:"id"`
+	Kind                string          `json:"kind"`
+	NetworkID           string          `json:"network_id,omitempty"`
+	State               State           `json:"state"`
+	Configured          bool            `json:"configured"`
+	SuccessfulCycles    uint64          `json:"successful_cycles"`
+	FailedCycles        uint64          `json:"failed_cycles"`
+	Observations        uint64          `json:"observations"`
+	ConsecutiveFailures uint64          `json:"consecutive_failures"`
+	LastSuccessAt       *time.Time      `json:"last_success_at,omitempty"`
+	LastFailureAt       *time.Time      `json:"last_failure_at,omitempty"`
+	LastError           string          `json:"last_error,omitempty"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+	Freshness           string          `json:"freshness"`
+	MaxAgeSeconds       float64         `json:"max_age_seconds,omitempty"`
+	FreshUntil          *time.Time      `json:"fresh_until,omitempty"`
+	Ingest              *IngestProgress `json:"ingest,omitempty"`
 	registeredAt        time.Time
 	maxAge              time.Duration
+}
+
+// Heights are decimal strings in JSON to preserve uint64 precision in browsers.
+// Pending blocks describe cursor distance, not proven missing historical data.
+type IngestProgress struct {
+	ObservedHead  *uint64   `json:"observed_head,omitempty,string"`
+	DurableCursor *uint64   `json:"durable_cursor,omitempty,string"`
+	PendingBlocks *uint64   `json:"pending_blocks,omitempty,string"`
+	Status        string    `json:"status"`
+	CheckedAt     time.Time `json:"checked_at"`
+}
+
+func (r *Registry) RecordIngestProgress(id string, head, cursor *uint64, failed, reorg bool) {
+	if r == nil || strings.TrimSpace(id) == "" {
+		return
+	}
+	p := IngestProgress{ObservedHead: copyHeight(head), DurableCursor: copyHeight(cursor), Status: "unknown", CheckedAt: r.now().UTC()}
+	if head != nil && cursor != nil {
+		if *head < *cursor {
+			p.Status = "provider_behind_cursor"
+		} else {
+			pending := *head - *cursor
+			p.PendingBlocks = &pending
+			p.Status = "at_observed_head"
+			if pending > 0 {
+				p.Status = "catching_up"
+			}
+		}
+	}
+	if failed && p.Status != "provider_behind_cursor" {
+		p.Status = "cycle_failed"
+	}
+	if reorg {
+		p.Status = "reorg_recheck_required"
+		p.PendingBlocks = nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	id = strings.TrimSpace(id)
+	e := r.entries[id]
+	e.ID = id
+	e.Ingest = &p
+	r.entries[id] = e
+}
+
+func copyHeight(v *uint64) *uint64 {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
 }
 
 type Snapshot struct {
@@ -191,6 +243,13 @@ func (r *Registry) Snapshot() Snapshot {
 	r.mu.RLock()
 	entries := make([]Entry, 0, len(r.entries))
 	for _, entry := range r.entries {
+		if entry.Ingest != nil {
+			p := *entry.Ingest
+			p.ObservedHead = copyHeight(p.ObservedHead)
+			p.DurableCursor = copyHeight(p.DurableCursor)
+			p.PendingBlocks = copyHeight(p.PendingBlocks)
+			entry.Ingest = &p
+		}
 		entry.Freshness = "not_monitored"
 		if !entry.Configured || entry.State == StateStopped {
 			entry.Freshness = "inactive"

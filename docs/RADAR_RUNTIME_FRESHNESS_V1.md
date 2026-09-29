@@ -43,7 +43,33 @@ recovery, failed startup, stopped/disabled states, restart and timestamp
 isolation. HTTP tests cover missing evidence, disabled components, unmonitored
 startup checks, HTML escaping and omission of raw provider errors.
 
-Next increments remain: per-network head/cursor lag and gap accounting,
+Next increments remain: durable historical gap accounting,
 durable replay acceptance under injected failures, verified archive recovery,
 and bounded production promotion. Fresh worker cycles alone cannot satisfy
 those gates. Web3, Sentinel and Lang retain their existing authority boundaries.
+
+
+## Per-network ingestion progress
+
+Head ingestion now publishes `ingest` on each target health entry: the observed
+provider head, last successfully persisted cursor, pending block distance,
+status, and check time. Heights/counts serialize as decimal strings to preserve
+uint64 precision. Missing values are omitted and shown as Unknown, never zero.
+
+The cursor advances only after both events and the checkpoint are accepted.
+Failures preserve the last confirmed cursor; a later successful cycle reports
+recovery. Provider regression does not underflow the backlog counter. Reorg
+paths withhold cursor/backlog until the next cycle reads authoritative state.
+A new failed cycle replaces prior observations instead of retaining apparent
+current coverage. Health success/failure counters remain separate.
+
+Pending distance is not a historical gap inventory. Bootstrap begins at the
+observed head, so zero backlog cannot establish full history, completeness,
+finality, or a security verdict. Older progress remains timestamped and must be
+read alongside worker state and freshness. Process restart requires another
+cycle to rebuild this operational projection from durable checkpoints.
+
+Failure-injection coverage proves a checkpoint write error cannot advance the
+reported cursor and that the next successful cycle recovers. Additional tests
+cover provider regression, missing values, zero backlog serialization, snapshot
+isolation, and the operator display of zero versus unknown.
