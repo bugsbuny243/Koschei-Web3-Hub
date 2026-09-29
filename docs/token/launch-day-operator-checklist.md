@@ -9,7 +9,7 @@ This checklist is for the wallet/operator flow only. It does not require or reco
 - Token name: **Koschei ARVIS**
 - Symbol: **KOSCHEI**
 - Launch wallet: `6ue2XG6mzY8gLvRCF3yrwe5rLB8HvfBhiWK13smahYkg`
-- Treasury wallet: `DMAz2dHdiE7NKyBeUpNYyLt7B8YQEg27wD2atEwMfnPj`
+- Treasury wallet: `9aCTEAfFDdMk5o1ScqHZWr8gCcUDgSKUeGc264gMQbTF`
 - Risk disclosure: `https://tradepigloball.co/token-disclosure`
 - Founder/treasury disclosure: `https://tradepigloball.co/token-vesting`
 - Token gate at launch: disabled
