@@ -15,7 +15,7 @@ func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 		`data-polar-plan="professional"`,
 		`data-kosc-plan="professional"`,
 		"kosc-checkout-v1.js",
-		"Pay with KOSC · live quote",
+		"Get live KOSC quote",
 		"Token holdings alone do not grant access.",
 		"Professional is the only paid customer plan.",
 		"$199",
