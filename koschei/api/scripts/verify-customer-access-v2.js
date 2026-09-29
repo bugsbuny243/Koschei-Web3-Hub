@@ -18,8 +18,8 @@ requireText(account,'Your identity opens the door. The entitlement opens the sys
 requireText(account,'Koschei Professional is the single operational customer plan','single operational plan');
 requireText(account,'id="plan"','plan field');
 requireText(account,'id="outputCapacity"','output capacity field');
-requireText(account,'API-key management requires an active Professional entitlement.','Professional API key boundary');
-requireText(account,'/js/customer-access-v2.js?v=3','account access controller');
+requireText(account,'API-key management requires an active Professional SaaS entitlement.','Professional API key boundary');
+requireText(account,'/js/customer-access-v2.js?v=4','account access controller');
 requireText(account,'/pricing','pricing route');
 requireText(account,'/css/koschei.css?v=1','universe stylesheet');
 forbid(account,/KOSCH Access|TOKEN ACCESS EVIDENCE|Official mint snapshot|LIVE TOKEN POLICY|ARVIS EARLY ACCESS|STARTER\+|ENTERPRISE\+/i,'retired access UI');
