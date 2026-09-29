@@ -13,7 +13,10 @@ function setBadge(id,label,tone=''){const node=$(id);if(!node)return;node.textCo
 function showMessage(message,tone='warn'){const node=$('accessMessage');if(!node)return;node.textContent=message;node.className=`access-message show ${tone}`;}
 function clearMessage(){const node=$('accessMessage');if(node){node.textContent='';node.className='access-message';}}
 function setState(state,title,detail){const card=$('accessStateCard');if(card)card.dataset.state=state;setText('accessState',title);setText('accessDetail',detail);}
-function phantom(){return window.phantom?.solana||window.solana||null;}
+function solanaProvider(){
+  const candidates=[window.phantom?.solana,window.solana,window.backpack?.solana,window.glowSolana];
+  return candidates.find(provider=>provider&&typeof provider.connect==='function'&&typeof provider.signMessage==='function')||null;
+}
 function signatureBase64(signature){let value='';for(const byte of signature)value+=String.fromCharCode(byte);return btoa(value);}
 function displayDate(value){if(!value)return'—';const parsed=new Date(value);return Number.isNaN(parsed.getTime())?'—':parsed.toLocaleString();}
 function displayCount(value){const parsed=Number(value);return Number.isFinite(parsed)?new Intl.NumberFormat('en-US').format(parsed):'—';}
@@ -48,7 +51,7 @@ function renderWallet(wallet){
   const unlink=$('accessUnlink'),connect=$('accessConnect');
   if(!wallet.available){setText('wallet','Unavailable');setBadge('walletState','status unavailable','bad');if(unlink)unlink.hidden=true;return;}
   if(wallet.linked){currentNetwork=wallet.network||currentNetwork;setText('wallet',wallet.address);setBadge('walletState','verified identity','good');if(unlink)unlink.hidden=false;if(connect)connect.textContent='Change wallet';return;}
-  setText('wallet','Not linked');setBadge('walletState','optional','warn');if(unlink)unlink.hidden=true;if(connect)connect.textContent='Verify with Phantom';
+  setText('wallet','Not linked');setBadge('walletState','optional','warn');if(unlink)unlink.hidden=true;if(connect)connect.textContent='Verify Solana wallet';
 }
 
 function parsePremium(result){
@@ -79,12 +82,14 @@ async function connectWallet(){
   const button=$('accessConnect');
   await runButton(button,'Waiting for wallet…',async()=>{
     try{
-      const provider=phantom();if(!provider||provider.isPhantom!==true)throw new Error('Phantom wallet was not found in this browser.');
-      const connection=await provider.connect(),wallet=text(connection?.publicKey?.toString());if(!wallet)throw new Error('Phantom did not return a wallet address.');
+      const provider=solanaProvider();
+      if(!provider)throw new Error('No compatible Solana wallet provider was found in this browser. Open this page inside a Solana wallet browser that supports connect and message signing.');
+      const connection=await provider.connect(),wallet=text(connection?.publicKey?.toString()||provider.publicKey?.toString());
+      if(!wallet)throw new Error('The wallet did not return a Solana address.');
       const challenge=await write('/api/auth/wallet/challenge',{method:'POST',body:JSON.stringify({wallet_address:wallet,network:currentNetwork})});
       if(!text(challenge?.message)||!text(challenge?.challenge_id)||text(challenge?.wallet_address)!==wallet||!text(challenge?.network))throw new Error('Wallet verification challenge is incomplete or inconsistent.');
       button.textContent='Sign verification message…';
-      const signed=await provider.signMessage(new TextEncoder().encode(challenge.message),'utf8');if(!signed?.signature)throw new Error('Phantom did not return a verification message signature.');
+      const signed=await provider.signMessage(new TextEncoder().encode(challenge.message),'utf8');if(!signed?.signature)throw new Error('The wallet did not return a verification message signature.');
       const verified=await write('/api/auth/wallet/verify',{method:'POST',body:JSON.stringify({challenge_id:challenge.challenge_id,signature:signatureBase64(signed.signature)})});
       if(verified?.ok!==true||verified?.verified!==true||text(verified?.wallet_address)!==wallet)throw new Error('Wallet verification response is incomplete or inconsistent.');
       showMessage('Wallet identity verification completed. This does not change your SaaS plan.','good');await load({preserveMessage:true});
