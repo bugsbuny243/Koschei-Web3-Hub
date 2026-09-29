@@ -44,6 +44,25 @@ func TestLoadConfigAtDefaultsSinceRelativeToExplicitUntil(t *testing.T) {
 	}
 }
 
+func TestLoadConfigAtFallsBackWhenMaxRowsExceedsHardCap(t *testing.T) {
+	t.Setenv("DATABASE_READ_URL", "postgres://shadow-source.example/koschei")
+	t.Setenv("KOSCHEI_CLICKHOUSE_SHADOW_SINCE", "2026-09-21T01:00:00Z")
+	t.Setenv("KOSCHEI_CLICKHOUSE_SHADOW_UNTIL", "2026-09-21T03:00:00Z")
+	t.Setenv("KOSCHEI_CLICKHOUSE_SHADOW_MAX_ROWS", "100000000")
+
+	now := time.Date(2026, 9, 22, 4, 30, 0, 0, time.UTC)
+	cfg, err := loadConfigAt(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := cfg.maxRows, defaultMaxRows; got != want {
+		t.Fatalf("maxRows=%d want safe fallback %d", got, want)
+	}
+	if cfg.maxRows > maxAllowedRows {
+		t.Fatalf("maxRows=%d exceeded hard cap %d", cfg.maxRows, maxAllowedRows)
+	}
+}
+
 func TestLoadConfigAtRejectsFutureUntil(t *testing.T) {
 	t.Setenv("DATABASE_READ_URL", "postgres://shadow-source.example/koschei")
 	t.Setenv("KOSCHEI_CLICKHOUSE_SHADOW_UNTIL", "2026-09-22T05:00:00Z")
