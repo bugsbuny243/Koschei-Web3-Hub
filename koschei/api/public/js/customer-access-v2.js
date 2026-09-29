@@ -14,7 +14,7 @@ function showMessage(message,tone='warn'){const node=$('accessMessage');if(!node
 function clearMessage(){const node=$('accessMessage');if(node){node.textContent='';node.className='access-message';}}
 function setState(state,title,detail){const card=$('accessStateCard');if(card)card.dataset.state=state;setText('accessState',title);setText('accessDetail',detail);}
 function solanaProvider(){
-  const candidates=[window.phantom?.solana,window.solana,window.backpack?.solana,window.glowSolana];
+  const candidates=[window.phantom,window.phantom?.solana,window.solana,window.backpack?.solana,window.glowSolana];
   return candidates.find(provider=>provider&&typeof provider.connect==='function'&&typeof provider.signMessage==='function')||null;
 }
 function signatureBase64(signature){let value='';for(const byte of signature)value+=String.fromCharCode(byte);return btoa(value);}
