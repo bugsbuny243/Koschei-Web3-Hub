@@ -122,7 +122,6 @@ func TestSecurityCenterRendersZeroPendingBlocks(t *testing.T) {
 	}
 }
 
-
 func TestSecurityCenterSurfacesCoverageAttentionWithoutClaimingMissingHistory(t *testing.T) {
 	r := runtimehealth.New()
 	r.Register("head", "head_ingest", "ethereum-mainnet", true)
