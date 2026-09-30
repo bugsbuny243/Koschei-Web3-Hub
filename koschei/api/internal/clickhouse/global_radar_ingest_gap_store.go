@@ -16,7 +16,7 @@ import (
 const globalRadarIngestGapSortingKey = "cursor_key, gap_key"
 
 type globalRadarIngestGapRow struct {
-	GapKey            string     `json:"gap_key"`
+	GapKey             string     `json:"gap_key"`
 	SchemaVersion      string     `json:"schema_version"`
 	CursorKey          string     `json:"cursor_key"`
 	NetworkID          string     `json:"network_id"`
@@ -33,7 +33,7 @@ type globalRadarIngestGapRow struct {
 }
 
 type globalRadarIngestGapReadRow struct {
-	GapKey            string `json:"gap_key"`
+	GapKey             string `json:"gap_key"`
 	SchemaVersion      string `json:"schema_version"`
 	CursorKey          string `json:"cursor_key"`
 	NetworkID          string `json:"network_id"`
