@@ -161,3 +161,67 @@ func TestIngestProgressPreservesUnknownZeroAndProviderRegression(t *testing.T) {
 		t.Fatalf("reorg must remain unverified: %#v", p)
 	}
 }
+
+
+func TestCoverageAssessmentTracksCurrentLagBlindSpotAndReorg(t *testing.T) {
+	now := time.Date(2026, 9, 30, 3, 0, 0, 0, time.UTC)
+	r := New()
+	r.now = func() time.Time { return now }
+	r.RegisterPeriodic("head", "head_ingest", "ethereum-mainnet", true, time.Minute)
+
+	head, cursor := uint64(100), uint64(100)
+	r.Success("head", 1)
+	r.RecordIngestProgress("head", &head, &cursor, false, false)
+	s := r.Snapshot()
+	e := s.Entries[0]
+	if e.CoverageStatus != CoverageCurrent || e.CoverageAttention || s.CoverageCounts[CoverageCurrent] != 1 {
+		t.Fatalf("current coverage: %#v", s)
+	}
+
+	head = 105
+	r.RecordIngestProgress("head", &head, &cursor, false, false)
+	e = r.Snapshot().Entries[0]
+	if e.CoverageStatus != CoverageLagging || e.CoverageAttention {
+		t.Fatalf("bounded catch-up is not a blind spot: %#v", e)
+	}
+
+	head = 99
+	r.RecordIngestProgress("head", &head, &cursor, true, false)
+	e = r.Snapshot().Entries[0]
+	if e.CoverageStatus != CoverageBlindSpot || !e.CoverageAttention || e.CoverageReason != "provider_head_is_behind_durable_cursor" {
+		t.Fatalf("provider regression must require attention: %#v", e)
+	}
+
+	head = 105
+	r.RecordIngestProgress("head", &head, &cursor, true, false)
+	e = r.Snapshot().Entries[0]
+	if e.CoverageStatus != CoverageLagging || !e.CoverageAttention || e.CoverageReason != "latest_ingest_cycle_failed" {
+		t.Fatalf("fresh failed cycle must be a lagging attention signal: %#v", e)
+	}
+
+	r.RecordIngestProgress("head", nil, nil, true, true)
+	e = r.Snapshot().Entries[0]
+	if e.CoverageStatus != CoverageReorgGuard || !e.CoverageAttention {
+		t.Fatalf("reorg must enter lineage guard: %#v", e)
+	}
+
+	r.RecordIngestProgress("head", &head, &cursor, false, false)
+	now = now.Add(2 * time.Minute)
+	e = r.Snapshot().Entries[0]
+	if e.CoverageStatus != CoverageBlindSpot || !e.CoverageAttention || e.CoverageReason != "head_ingest_freshness_deadline_expired" {
+		t.Fatalf("expired freshness must become a blind spot: %#v", e)
+	}
+}
+
+func TestCoverageAssessmentDoesNotClaimCoverageForOtherComponents(t *testing.T) {
+	r := New()
+	r.Register("database", "storage", "", true)
+	r.Success("database", 0)
+	s := r.Snapshot()
+	if got := s.Entries[0].CoverageStatus; got != CoverageNotApplicable {
+		t.Fatalf("coverage status=%q", got)
+	}
+	if len(s.CoverageCounts) != 0 {
+		t.Fatalf("non-ingest components must not inflate coverage counts: %#v", s.CoverageCounts)
+	}
+}
