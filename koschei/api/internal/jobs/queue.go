@@ -96,8 +96,7 @@ func normalizedNATSPrefix(value string) string {
 	if value == "" {
 		return defaultNATSSubjectPrefix
 	}
-	if strings.ContainsAny(value, " 	
-*>") {
+	if strings.ContainsAny(value, " \t\r\n*>") {
 		return defaultNATSSubjectPrefix
 	}
 	return value
@@ -108,8 +107,7 @@ func natsJobSubject(prefix, jobType string) string {
 	token := strings.ToLower(strings.TrimSpace(jobType))
 	token = strings.ReplaceAll(token, "_", "-")
 	token = strings.Trim(token, ".")
-	if token == "" || strings.ContainsAny(token, " 	
-*>") {
+	if token == "" || strings.ContainsAny(token, " \t\r\n*>") {
 		token = "unknown"
 	}
 	return prefix + "." + token
