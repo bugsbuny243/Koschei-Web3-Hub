@@ -223,3 +223,21 @@ Truth boundary:
 - `recognized` does not mean `verified`;
 - `transaction_enriched_mint` is the explicit enrichment boundary used by the current Solana stream pipeline;
 - a counted verdict must be a signed `final_verdict_engine` row with verified evidence;\n- durable alert metrics count newly created deduplicated alert rows; repeated occurrences may update the same row and are not falsely presented as new alerts;\n- the metrics describe persisted pipeline rows and do not claim chain-wide or global coverage.
+
+
+## Cross-process worker wake v1 — 2026-09-30
+
+Separated `api` and `worker` runtime roles must not turn an in-process wake optimization into a hidden delivery dependency.
+
+The job contract is therefore explicit:
+
+1. `web3_jobs` in PostgreSQL is the durable source of truth.
+2. Enqueue commits the PostgreSQL row before any wake signal is emitted.
+3. The local `workerwake` gate remains the fastest same-process signal.
+4. When `NATS_URL` is configured, Core NATS publishes a cross-process wake hint after the database commit.
+5. Worker/combined runtimes subscribe to canonical-investigation and legacy token-scan wake subjects and signal the same local gate.
+6. NATS publication or subscription failure does not delete, acknowledge, complete or fail a job.
+7. The existing bounded worker recovery ceiling remains the correctness fallback and PostgreSQL `FOR UPDATE SKIP LOCKED` remains the claim boundary.
+8. JetStream persistence/replay is deliberately not claimed here because job durability is already owned by PostgreSQL.
+
+Runtime health exposes `worker.cross-process-job-wake` as an operational component. Its health describes remote wake latency availability, not job durability.

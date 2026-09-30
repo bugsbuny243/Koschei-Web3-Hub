@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"koschei/api/internal/handlers"
 	"koschei/api/internal/jobs"
+	"koschei/api/internal/runtimehealth"
 	"koschei/api/internal/services"
 	"koschei/api/internal/web3"
 )
@@ -48,6 +50,7 @@ func startBackgroundRuntime(
 	db, readDB *sql.DB,
 	solanaRPC *web3.SolanaRPC,
 	jobStore *jobs.Store,
+	runtimeHealth *runtimehealth.Registry,
 	globalRadarBackground *services.GlobalRadarBackgroundTelemetryConfig,
 	globalRadarHeadIngest *services.GlobalRadarHeadIngestConfig,
 ) func() {
@@ -65,6 +68,11 @@ func startBackgroundRuntime(
 	if db == nil {
 		log.Printf("PostgreSQL-backed background runtime not started: APP_DATABASE_URL is not configured")
 	} else {
+		if natsURL := strings.TrimSpace(os.Getenv("NATS_URL")); natsURL != "" {
+			stops = append(stops, jobs.StartNATSWakeBridge(ctx, natsURL, os.Getenv("NATS_SUBJECT_PREFIX"), runtimeHealth))
+		} else if runtimeHealth != nil {
+			runtimeHealth.Register(jobs.NATSWakeHealthID, "worker", "", false)
+		}
 		stops = append(stops,
 			services.StartSecurityRadarWatcher(ctx, db, solanaRPC),
 			services.StartSecurityRadarSovereignStreamIfEnabled(ctx, db),
