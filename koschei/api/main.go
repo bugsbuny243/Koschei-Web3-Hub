@@ -19,6 +19,7 @@ import (
 	apihttp "koschei/api/internal/http"
 	"koschei/api/internal/jobs"
 	"koschei/api/internal/runtimehealth"
+	"koschei/api/internal/runtimeinstance"
 	"koschei/api/internal/services"
 	"koschei/api/internal/web3"
 )
@@ -94,6 +95,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: invalid KOSCHEI_RUNTIME_ROLE: %v", err)
 	}
+	runtimeInstance := runtimeinstance.New(appDB, string(role), role.servesHTTP(), role.runsBackgroundWorkers(), runtimeHealth)
+	stopRuntimeInstance := runtimeInstance.Start(appCtx)
+	defer stopRuntimeInstance()
+	instanceMeta := runtimeInstance.Metadata()
+	log.Printf("runtime instance heartbeat id=%s role=%s service=%s environment=%s region=%s",
+		instanceMeta.InstanceID, instanceMeta.RuntimeRole, instanceMeta.ServiceName, instanceMeta.EnvironmentName, instanceMeta.Region)
 	globalRadarSink, err := buildGlobalRadarSnapshotSink(appCtx)
 	if err != nil {
 		runtimeHealth.Register("storage.global-radar-graph-clickhouse", "storage", "", true)
