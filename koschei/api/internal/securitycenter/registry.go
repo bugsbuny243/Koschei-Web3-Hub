@@ -118,7 +118,7 @@ func Current() Snapshot {
 				ID: "global-radar-coverage-alert-lifecycle", Layer: "response", Domain: "multi-network-operations", Mode: "implemented", EvidenceAuthority: "operational_notification_only", Activation: "APP_DATABASE_URL plus background runtime and head-ingest health entries",
 				NetworkIDs:       []string{"ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet", "bitcoin-mainnet"},
 				DependsOn:        []string{"runtime-health-registry", "continuous-multi-network-block-ingest", "watchlist-alert-and-webhook-plane"},
-				BackendSurfaces:  []string{"global_radar_coverage_episodes", "security_alert_events", "security_alert_deliveries", "/fabric/security-center/runtime-health"},
+				BackendSurfaces:  []string{"global_radar_coverage_episodes", "security_alert_events", "security_alert_deliveries", "/fabric/security-center/runtime-health", "/api/owner/radar/coverage-episodes"},
 				FrontendSurfaces: []string{"/fabric/security-center"},
 				Telemetry:        []string{"open/recovered coverage episodes", "deduplicated attention alerts", "recovery alerts", "coverage reason transitions", "durable alert-delivery rows and delivery status"},
 				Notes:            []string{"blind_spot is an operational monitoring-confidence signal, not proof of historical chain-data loss", "catching_up alone does not close or open a blind-spot episode", "recovery requires current head/cursor alignment", "ARVIS verdict authority is unchanged"},
@@ -192,11 +192,11 @@ func Current() Snapshot {
 			},
 			{
 				ID: "operator-incident-workflow", Layer: "response", Domain: "security-operations", Mode: "implemented", EvidenceAuthority: "operator_workflow_only", Activation: "owner session plus application database",
-				DependsOn:        []string{"watchlist-alert-and-webhook-plane", "durable-evidence-memory"},
+				DependsOn:        []string{"watchlist-alert-and-webhook-plane", "durable-evidence-memory", "global-radar-coverage-alert-lifecycle"},
 				BackendSurfaces:  []string{"/api/owner/incidents", "/api/owner/incidents/"},
 				FrontendSurfaces: []string{"/owner-production"},
-				Telemetry:        []string{"incident status", "severity", "linked evidence refs", "linked alert refs", "linked dossier refs", "append-only operator action timeline"},
-				Notes:            []string{"operator response state never mutates ARVIS evidence, grades or signatures", "incident state is operational workflow metadata, not a security verdict"},
+				Telemetry:        []string{"incident status", "severity", "linked evidence refs", "persisted-alert-backed alert refs", "linked dossier refs", "coverage episode ownership via alert identity", "append-only operator action timeline"},
+				Notes:            []string{"new incident alert links must resolve to persisted security_alert_events", "coverage episode ownership is derived from alert identity without changing episode or verdict authority", "operator response state never mutates ARVIS evidence, grades or signatures", "incident state is operational workflow metadata, not a security verdict"},
 			},
 			{
 				ID: "sentinel-fabric-observation", Layer: "model", Domain: "sentinel", Mode: "observe", EvidenceAuthority: "no_web3_decision_authority", Activation: "versioned Fabric contracts only",
