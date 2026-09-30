@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	natsWakeHealthID         = "worker.cross-process-job-wake"
+	NATSWakeHealthID         = "worker.cross-process-job-wake"
 	natsWakeReconnectBackoff = 5 * time.Second
 	natsWakeStopTimeout      = 5 * time.Second
 )
@@ -26,7 +26,7 @@ type natsWakeBinding struct {
 func StartNATSWakeBridge(ctx context.Context, rawURL, prefix string, health *runtimehealth.Registry) func() {
 	rawURL = strings.TrimSpace(rawURL)
 	if health != nil {
-		health.Register(natsWakeHealthID, "worker", "", rawURL != "")
+		health.Register(NATSWakeHealthID, "worker", "", rawURL != "")
 	}
 	if rawURL == "" {
 		return func() {}
@@ -46,7 +46,7 @@ func StartNATSWakeBridge(ctx context.Context, rawURL, prefix string, health *run
 		case <-time.After(natsWakeStopTimeout):
 		}
 		if health != nil {
-			health.Stop(natsWakeHealthID)
+			health.Stop(NATSWakeHealthID)
 		}
 	}
 }
@@ -66,13 +66,13 @@ func runNATSWakeBridge(ctx context.Context, rawURL, prefix string, health *runti
 				}
 				log.Printf("NATS cross-process wake disconnected: %v", disconnectErr)
 				if health != nil {
-					health.Failure(natsWakeHealthID, disconnectErr)
+					health.Failure(NATSWakeHealthID, disconnectErr)
 				}
 			}),
 			nats.ReconnectHandler(func(conn *nats.Conn) {
 				log.Printf("NATS cross-process wake reconnected server=%s", conn.ConnectedUrl())
 				if health != nil {
-					health.Success(natsWakeHealthID, 0)
+					health.Success(NATSWakeHealthID, 0)
 				}
 			}),
 			nats.ClosedHandler(func(_ *nats.Conn) {
@@ -88,7 +88,7 @@ func runNATSWakeBridge(ctx context.Context, rawURL, prefix string, health *runti
 			}
 			log.Printf("NATS cross-process wake connection failed: %v", err)
 			if health != nil {
-				health.Failure(natsWakeHealthID, err)
+				health.Failure(NATSWakeHealthID, err)
 			}
 			if !waitNATSWakeRetry(ctx) {
 				return
@@ -104,7 +104,7 @@ func runNATSWakeBridge(ctx context.Context, rawURL, prefix string, health *runti
 			sub, subErr := conn.Subscribe(binding.Subject, func(_ *nats.Msg) {
 				workerwake.Signal(wakeName)
 				if health != nil {
-					health.Success(natsWakeHealthID, 1)
+					health.Success(NATSWakeHealthID, 1)
 				}
 			})
 			if subErr != nil {
@@ -128,7 +128,7 @@ func runNATSWakeBridge(ctx context.Context, rawURL, prefix string, health *runti
 			}
 			log.Printf("NATS cross-process wake subscribe failed: %v", err)
 			if health != nil {
-				health.Failure(natsWakeHealthID, err)
+				health.Failure(NATSWakeHealthID, err)
 			}
 			if !waitNATSWakeRetry(ctx) {
 				return
@@ -137,7 +137,7 @@ func runNATSWakeBridge(ctx context.Context, rawURL, prefix string, health *runti
 		}
 
 		if health != nil {
-			health.Success(natsWakeHealthID, 0)
+			health.Success(NATSWakeHealthID, 0)
 		}
 		log.Printf("NATS cross-process wake live subjects=%d", len(bindings))
 
