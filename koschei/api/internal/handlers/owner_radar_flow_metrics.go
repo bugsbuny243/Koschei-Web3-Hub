@@ -28,14 +28,14 @@ type ownerRadarFlowQueue struct {
 }
 
 type ownerRadarFlowRatios struct {
-	RecognizedPerCollected15MinBP       int64 `json:"recognized_per_collected_15m_basis_points"`
-	RecognizedPerCollected24hBP         int64 `json:"recognized_per_collected_24h_basis_points"`
-	EnrichedPerCollected15MinBP         int64 `json:"enriched_per_collected_15m_basis_points"`
-	EnrichedPerCollected24hBP           int64 `json:"enriched_per_collected_24h_basis_points"`
-	ProcessedPerEnriched15MinBP         int64 `json:"processed_per_enriched_15m_basis_points"`
-	ProcessedPerEnriched24hBP           int64 `json:"processed_per_enriched_24h_basis_points"`
-	VerifiedVerdictsPerEnriched15MinBP  int64 `json:"verified_verdicts_per_enriched_15m_basis_points"`
-	VerifiedVerdictsPerEnriched24hBP    int64 `json:"verified_verdicts_per_enriched_24h_basis_points"`
+	RecognizedPerCollected15MinBP      int64 `json:"recognized_per_collected_15m_basis_points"`
+	RecognizedPerCollected24hBP        int64 `json:"recognized_per_collected_24h_basis_points"`
+	EnrichedPerCollected15MinBP        int64 `json:"enriched_per_collected_15m_basis_points"`
+	EnrichedPerCollected24hBP          int64 `json:"enriched_per_collected_24h_basis_points"`
+	ProcessedPerEnriched15MinBP        int64 `json:"processed_per_enriched_15m_basis_points"`
+	ProcessedPerEnriched24hBP          int64 `json:"processed_per_enriched_24h_basis_points"`
+	VerifiedVerdictsPerEnriched15MinBP int64 `json:"verified_verdicts_per_enriched_15m_basis_points"`
+	VerifiedVerdictsPerEnriched24hBP   int64 `json:"verified_verdicts_per_enriched_24h_basis_points"`
 }
 
 type ownerRadarFlowFreshness struct {
@@ -58,22 +58,22 @@ type ownerRadarFlowTruthBoundary struct {
 }
 
 type ownerRadarFlowMetricsResponse struct {
-	SchemaVersion    string                    `json:"schema_version"`
-	GeneratedAt      time.Time                 `json:"generated_at"`
-	Scope            string                    `json:"scope"`
-	Collected        ownerRadarFlowStage       `json:"collected"`
-	Recognized       ownerRadarFlowStage       `json:"recognized"`
-	Enriched         ownerRadarFlowStage       `json:"enriched"`
-	Processed        ownerRadarFlowStage       `json:"processed"`
-	VerifiedVerdicts ownerRadarFlowStage       `json:"verified_verdicts"`
-	DurableAlerts     ownerRadarFlowStage       `json:"durable_alerts"`
-	Queue            ownerRadarFlowQueue       `json:"queue"`
-	Ratios           ownerRadarFlowRatios      `json:"ratios"`
-	Freshness        ownerRadarFlowFreshness   `json:"freshness"`
-	EvidenceQuality  map[string]int64          `json:"evidence_quality_last_24_hours"`
-	NetworkEvents    map[string]int64          `json:"network_events_last_24_hours"`
-	AlertTypes       map[string]int64          `json:"alert_types_last_24_hours"`
-	AlertSeverities  map[string]int64          `json:"alert_severities_last_24_hours"`
+	SchemaVersion    string                      `json:"schema_version"`
+	GeneratedAt      time.Time                   `json:"generated_at"`
+	Scope            string                      `json:"scope"`
+	Collected        ownerRadarFlowStage         `json:"collected"`
+	Recognized       ownerRadarFlowStage         `json:"recognized"`
+	Enriched         ownerRadarFlowStage         `json:"enriched"`
+	Processed        ownerRadarFlowStage         `json:"processed"`
+	VerifiedVerdicts ownerRadarFlowStage         `json:"verified_verdicts"`
+	DurableAlerts    ownerRadarFlowStage         `json:"durable_alerts"`
+	Queue            ownerRadarFlowQueue         `json:"queue"`
+	Ratios           ownerRadarFlowRatios        `json:"ratios"`
+	Freshness        ownerRadarFlowFreshness     `json:"freshness"`
+	EvidenceQuality  map[string]int64            `json:"evidence_quality_last_24_hours"`
+	NetworkEvents    map[string]int64            `json:"network_events_last_24_hours"`
+	AlertTypes       map[string]int64            `json:"alert_types_last_24_hours"`
+	AlertSeverities  map[string]int64            `json:"alert_severities_last_24_hours"`
 	TruthBoundary    ownerRadarFlowTruthBoundary `json:"truth_boundary"`
 }
 
