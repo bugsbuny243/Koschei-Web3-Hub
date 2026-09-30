@@ -209,7 +209,12 @@ jobs:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
         run: |
           set -o pipefail
-          go test -v ./internal/services -run '^TestGlobalRadarCoverageAlertLifecyclePostgres17      - name: Upload Go test log
+          go test -v ./internal/services -run '^TestGlobalRadarCoverageAlertLifecyclePostgres17$' -count=1 2>&1 | tee "${RUNNER_TEMP}/global-radar-coverage-lifecycle-postgres17.txt"
+      - name: Test
+        run: |
+          set -o pipefail
+          go test ./... 2>&1 | tee "${RUNNER_TEMP}/go-test-required.txt"
+      - name: Upload Go test log
         if: always()
         uses: actions/upload-artifact@v7
         with:
