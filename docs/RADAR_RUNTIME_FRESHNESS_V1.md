@@ -43,8 +43,9 @@ recovery, failed startup, stopped/disabled states, restart and timestamp
 isolation. HTTP tests cover missing evidence, disabled components, unmonitored
 startup checks, HTML escaping and omission of raw provider errors.
 
-Next increments remain: durable historical gap accounting,
-durable replay acceptance under injected failures, verified archive recovery,
+Durable historical gap accounting is now implemented for concrete sequential
+head-ingest failures. Remaining increments include broader injected-failure
+replay acceptance, verified archive recovery,
 and bounded production promotion. Fresh worker cycles alone cannot satisfy
 those gates. Web3, Sentinel and Lang retain their existing authority boundaries.
 
@@ -138,3 +139,18 @@ database polling.
 The truth boundary is unchanged: a coverage alert describes current monitoring
 confidence. It is not proof that historical blocks, transactions or events are
 missing, and recovery does not prove historical completeness or finality.
+
+
+## Durable gap ledger
+
+The head-ingest worker now records concrete sequential ingest failures in the
+ClickHouse `global_radar_ingest_gaps` ledger. The ledger distinguishes
+ordinary bounded catch-up from a replay-required gap. Open episodes carry the
+next height still requiring durable replay; replay progress is advanced only
+after event persistence and checkpoint persistence succeed.
+
+On restart, an open gap is reconciled against the durable checkpoint so a
+successful checkpoint write cannot leave the gap permanently stale if the
+subsequent gap-state write failed. A resolved gap proves only that Koschei
+replayed the recorded range. It does not establish chain-wide historical
+completeness or finality.

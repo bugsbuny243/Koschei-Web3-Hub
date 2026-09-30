@@ -98,3 +98,24 @@ Build source adapters that emit this envelope from:
 - Sui and Aptos identity/network observations. Both probes now retain the exact bounded identity-response SHA-256 needed for native provenance.
 
 After that, the same event stream becomes the input to the cross-chain entity graph.
+
+
+## Durable ingest gap accounting
+
+ClickHouse migration `008_global_radar_ingest_gaps.sql` adds
+`koschei.global-radar-ingest-gap.v1`. A gap episode is created only after
+sequential head ingest fails at a concrete height. Ordinary distance between
+the durable cursor and the observed provider head is backlog, not a gap.
+
+Each episode records the original failed range, the next height that still
+requires replay, the bounded end height, failure reason, and open/resolved
+timestamps. Repeated failure extends the same open episode instead of creating
+duplicate history. Successful replay advances `next_height` only after the
+canonical event batch and durable checkpoint have been persisted. If checkpoint
+persistence succeeds but the gap update fails, the next cycle reconciles the
+open gap against the durable checkpoint before continuing.
+
+`resolved` means the recorded failed range has been durably replayed through
+its end height. It does not prove full source-chain history, mempool
+completeness, finality, or absence of gaps that predate the first durable
+checkpoint.

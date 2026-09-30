@@ -91,6 +91,15 @@ func Current() Snapshot {
 				Notes:            []string{"cursor advances only after event persistence", "parent/hash discontinuity never silently advances", "no mempool or full transaction-body completeness claim", "ARVIS verdict authority is unchanged"},
 			},
 			{
+				ID: "durable-ingest-gap-accounting", Layer: "recovery", Domain: "multi-network-operations", Mode: "implemented", EvidenceAuthority: "operational_replay_state_only", Activation: "Global Radar event ClickHouse plus continuous head ingest",
+				NetworkIDs:       []string{"ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet", "bitcoin-mainnet"},
+				DependsOn:        []string{"continuous-multi-network-block-ingest", "durable-evidence-memory"},
+				BackendSurfaces:  []string{"global_radar_ingest_gaps", "global_radar_ingest_checkpoints", "global_radar_events"},
+				FrontendSurfaces: []string{"/fabric/security-center"},
+				Telemetry:        []string{"gap episode identity", "initial failed height", "next replay height", "bounded end height", "failure reason", "open/resolved state", "detection/update/recovery timestamps"},
+				Notes:            []string{"backlog alone is not a gap", "a gap opens only after sequential ingest fails at a concrete height", "replay advances next_height only after durable event and checkpoint persistence", "resolved means the recorded range was replayed; it does not prove source-chain historical completeness"},
+			},
+			{
 				ID: "multi-provider-lineage-confirmation", Layer: "verification", Domain: "evm-utxo", Mode: "conditional", EvidenceAuthority: "operational_lineage_confirmation_only", Activation: "independent confirmation RPC plus KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_REQUIRE_CONFIRMATION=1 and/or KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_AUTO_REORG_RECOVERY=1",
 				NetworkIDs:       []string{"ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet", "bitcoin-mainnet"},
 				DependsOn:        []string{"continuous-multi-network-block-ingest", "durable-evidence-memory"},

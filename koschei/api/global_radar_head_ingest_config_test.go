@@ -30,6 +30,14 @@ func (globalRadarHeadConfigCursorStore) LoadGlobalRadarCanonicalCheckpointAtHeig
 	return radarcursor.Checkpoint{}, false, nil
 }
 
+func (globalRadarHeadConfigCursorStore) LoadOpenGlobalRadarIngestGap(context.Context, string) (radarcursor.Gap, bool, error) {
+	return radarcursor.Gap{}, false, nil
+}
+
+func (globalRadarHeadConfigCursorStore) SaveGlobalRadarIngestGap(context.Context, radarcursor.Gap) error {
+	return nil
+}
+
 func TestBuildGlobalRadarHeadIngestConfigDisabledByDefault(t *testing.T) {
 	t.Setenv("KOSCHEI_GLOBAL_RADAR_HEAD_INGEST_ENABLED", "")
 	health := runtimehealth.New()
