@@ -74,4 +74,4 @@ Koschei also contains a background watchlist monitor, but it runs only when **bo
 
 ## Compatibility
 
-The feature remains account-scoped and additive to the evidence engine. Paid watchlist authorization is based only on the active Professional SaaS entitlement. KOSC holdings and removed package labels do not grant or upgrade watchlist access. A verified KOSC settlement may activate the same Professional entitlement used by Polar.
+The feature remains account-scoped and additive to the evidence engine. Paid watchlist authorization is based only on the active Professional SaaS entitlement. KOSCH holder balances and removed package labels do not grant or upgrade watchlist access. KOSC holdings likewise do not grant or upgrade watchlist access. A verified KOSC settlement may activate the same Professional entitlement used by Polar.
