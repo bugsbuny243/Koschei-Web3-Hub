@@ -223,7 +223,6 @@ func (h *Handler) ownerIncidentCreate(w http.ResponseWriter, r *http.Request) {
 	input.AlertRefs = trimIncidentRefs(input.AlertRefs, 64)
 	input.DossierRefs = trimIncidentRefs(input.DossierRefs, 64)
 	evidenceJSON, _ := json.Marshal(input.EvidenceRefs)
-	alertJSON, _ := json.Marshal(input.AlertRefs)
 	dossierJSON, _ := json.Marshal(input.DossierRefs)
 
 	tx, err := h.DB.BeginTx(r.Context(), nil)
@@ -247,6 +246,21 @@ func (h *Handler) ownerIncidentCreate(w http.ResponseWriter, r *http.Request) {
 		resolvedEvidenceSources[ref] = source
 	}
 
+	resolvedAlertSources := make(map[string]string, len(input.AlertRefs))
+	for _, ref := range input.AlertRefs {
+		source, resolveErr := incidentAlertSource(r.Context(), tx, ref)
+		if resolveErr != nil {
+			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident alert reference could not be resolved")
+			return
+		}
+		if source == "" {
+			writeAPIError(w, http.StatusConflict, APICodeConflict, "Incident alert reference does not resolve to a persisted alert record")
+			return
+		}
+		resolvedAlertSources[ref] = source
+	}
+	alertJSON, _ := json.Marshal(input.AlertRefs)
+
 	var created ownerIncidentRecord
 	row := tx.QueryRowContext(r.Context(), `
 		INSERT INTO security_incident_cases
@@ -263,7 +277,7 @@ func (h *Handler) ownerIncidentCreate(w http.ResponseWriter, r *http.Request) {
 	payload, _ := json.Marshal(map[string]any{
 		"severity": input.Severity, "network": input.Network, "target": input.Target,
 		"evidence_refs": input.EvidenceRefs, "evidence_sources": resolvedEvidenceSources,
-		"alert_refs": input.AlertRefs, "dossier_refs": input.DossierRefs,
+		"alert_refs": input.AlertRefs, "alert_sources": resolvedAlertSources, "dossier_refs": input.DossierRefs,
 	})
 	if _, err := tx.ExecContext(r.Context(), `
 		INSERT INTO security_incident_actions (incident_id,action_type,actor,summary,payload)
@@ -430,6 +444,35 @@ func incidentEvidenceSource(ctx context.Context, tx *sql.Tx, ref string) (string
 	return source, err
 }
 
+func incidentAlertSource(ctx context.Context, tx *sql.Tx, ref string) (string, error) {
+	ref = strings.TrimSpace(ref)
+	if tx == nil || ref == "" {
+		return "", nil
+	}
+	var source, eventType string
+	err := tx.QueryRowContext(ctx, `
+		SELECT source,event_type
+		FROM security_alert_events
+		WHERE id::text=$1
+		LIMIT 1
+	`, ref).Scan(&source, &eventType)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	source = strings.TrimSpace(source)
+	eventType = strings.TrimSpace(eventType)
+	if source == "" {
+		source = "unknown"
+	}
+	if eventType == "" {
+		eventType = "unknown"
+	}
+	return "security_alert_event:" + source + ":" + eventType, nil
+}
+
 func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id string) {
 	var input ownerIncidentActionRequest
 	if err := decodeJSON(r, &input); err != nil {
@@ -495,6 +538,19 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 		}
 	}
 
+	resolvedAlertSource := ""
+	if input.Action == "link_alert" {
+		resolvedAlertSource, err = incidentAlertSource(r.Context(), tx, input.Ref)
+		if err != nil {
+			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident alert reference could not be resolved")
+			return
+		}
+		if resolvedAlertSource == "" {
+			writeAPIError(w, http.StatusConflict, APICodeConflict, "Incident alert reference does not resolve to a persisted alert record")
+			return
+		}
+	}
+
 	if status := nextStatus; status != "" {
 		_, err = tx.ExecContext(r.Context(), `
 			UPDATE security_incident_cases
@@ -539,6 +595,9 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	}
 	if resolvedEvidenceSource != "" {
 		payloadFields["ref_source"] = resolvedEvidenceSource
+	}
+	if resolvedAlertSource != "" {
+		payloadFields["ref_source"] = resolvedAlertSource
 	}
 	payload, _ := json.Marshal(payloadFields)
 	if _, err := tx.ExecContext(r.Context(), `
