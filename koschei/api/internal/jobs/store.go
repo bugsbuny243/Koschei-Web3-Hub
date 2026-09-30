@@ -6,19 +6,30 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
 	"koschei/api/internal/workerwake"
 )
 
-type Store struct{ DB *sql.DB }
+type Store struct {
+	DB        *sql.DB
+	WakeQueue Queue
+}
 
 type jobScanner interface {
 	Scan(dest ...any) error
 }
 
 func NewStore(db *sql.DB) *Store { return &Store{DB: db} }
+
+func (s *Store) SetWakeQueue(queue Queue) {
+	if s == nil {
+		return
+	}
+	s.WakeQueue = queue
+}
 
 func (s *Store) Create(ctx context.Context, in CreateInput) (Job, error) {
 	if s == nil || s.DB == nil {
@@ -37,7 +48,7 @@ func (s *Store) Create(ctx context.Context, in CreateInput) (Job, error) {
 		in.UserID, in.Email, in.Type, in.Network, in.Target, payload,
 	))
 	if err == nil {
-		signalCanonicalInvestigationJob(in.Type)
+		s.signalJob(job)
 	}
 	return job, err
 }
@@ -92,7 +103,7 @@ func (s *Store) CreateUniqueActive(ctx context.Context, in CreateInput, dedupeKe
 			return Job{}, false, commitErr
 		}
 		if existing.Status == "queued" {
-			signalCanonicalInvestigationJob(existing.Type)
+			s.signalJob(existing)
 		}
 		return existing, false, nil
 	}
@@ -115,7 +126,7 @@ func (s *Store) CreateUniqueActive(ctx context.Context, in CreateInput, dedupeKe
 	}
 	// Signal only after commit (#697): a wake before the row is visible would be
 	// coalesced away and the job would wait for the recovery ceiling.
-	signalCanonicalInvestigationJob(created.Type)
+	s.signalJob(created)
 	return created, true, nil
 }
 
@@ -256,6 +267,18 @@ func (s *Store) RetryOrFail(ctx context.Context, id, code, message string) (stri
 		workerwake.Signal(workerwake.CanonicalInvestigation)
 	}
 	return status, err
+}
+
+func (s *Store) signalJob(job Job) {
+	signalCanonicalInvestigationJob(job.Type)
+	if s == nil || s.WakeQueue == nil {
+		return
+	}
+	if err := s.WakeQueue.Publish(job); err != nil {
+		// The PostgreSQL row is the durable source of truth. Remote wake delivery
+		// is a latency hint only; the worker recovery ceiling remains the fallback.
+		log.Printf("job remote wake publish failed id=%s type=%s: %v", job.ID, job.Type, err)
+	}
 }
 
 func signalCanonicalInvestigationJob(jobType string) {
