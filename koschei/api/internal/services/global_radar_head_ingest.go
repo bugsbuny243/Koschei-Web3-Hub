@@ -109,7 +109,12 @@ func RunGlobalRadarHeadIngestCycle(ctx context.Context, cfg GlobalRadarHeadInges
 	return totalPersisted, nil
 }
 
-func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadIngestConfig, target GlobalRadarHeadIngestTarget, observedAt time.Time) (int, error) {
+func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadIngestConfig, target GlobalRadarHeadIngestTarget, observedAt time.Time) (persistedCount int, runErr error) {
+	var reportedHead, reportedCursor *uint64
+	reorg := false
+	defer func() {
+		cfg.Health.RecordIngestProgress(GlobalRadarHeadIngestTargetHealthID(target), reportedHead, reportedCursor, runErr != nil, reorg)
+	}()
 	cursorKey := GlobalRadarHeadIngestCursorKey(target)
 	checkpoint, found, err := cfg.CursorStore.LoadGlobalRadarIngestCheckpoint(ctx, cursorKey)
 	if err != nil {
@@ -126,7 +131,10 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 			checkpoint.StreamKind != strings.ToLower(strings.TrimSpace(target.Kind)) {
 			return 0, fmt.Errorf("durable head checkpoint identity mismatch")
 		}
+		reportedCursor = &checkpoint.Height
 		if checkpoint.State == radarcursor.StateReorgObserved {
+			reorg = true
+			reportedCursor = nil
 			if !cfg.AutoReorgRecovery {
 				return 0, fmt.Errorf("durable head checkpoint is frozen after reorg observation")
 			}
@@ -142,6 +150,7 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 	if err != nil {
 		return 0, err
 	}
+	reportedHead = &headHeight
 	if found && headHeight < checkpoint.Height {
 		return 0, fmt.Errorf("provider head %d is behind durable checkpoint %d", headHeight, checkpoint.Height)
 	}
@@ -169,7 +178,11 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 		if err := confirmGlobalRadarHeadBundle(ctx, cfg, target, bundle, observedAt); err != nil {
 			return 0, err
 		}
-		return persistGlobalRadarHeadBundle(ctx, cfg, target, cursorKey, bundle, maxEvents)
+		count, err := persistGlobalRadarHeadBundle(ctx, cfg, target, cursorKey, bundle, maxEvents)
+		if err == nil {
+			reportedCursor = &bundle.height
+		}
+		return count, err
 	}
 
 	if headHeight == checkpoint.Height {
@@ -182,6 +195,8 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 		}
 		if bundle.blockHash != checkpoint.BlockHash {
 			reason := fmt.Sprintf("reorg observed at height %d: stored=%s current=%s", checkpoint.Height, checkpoint.BlockHash, bundle.blockHash)
+			reorg = true
+			reportedCursor = nil
 			return 0, handleGlobalRadarReorg(ctx, cfg, target, checkpoint, observedAt, reason)
 		}
 		return 0, nil
@@ -203,6 +218,8 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 		}
 		if bundle.parentHash != current.BlockHash {
 			reason := fmt.Sprintf("reorg observed before height %d: expected_parent=%s observed_parent=%s", height, current.BlockHash, bundle.parentHash)
+			reorg = true
+			reportedCursor = nil
 			return persisted, handleGlobalRadarReorg(ctx, cfg, target, current, observedAt, reason)
 		}
 		count, err := persistGlobalRadarHeadBundle(ctx, cfg, target, cursorKey, bundle, maxEvents)
@@ -210,6 +227,7 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 		if err != nil {
 			return persisted, err
 		}
+		reportedCursor = &bundle.height
 		current = radarcursor.Checkpoint{
 			CursorKey:         cursorKey,
 			NetworkID:         strings.ToLower(strings.TrimSpace(target.NetworkID)),
@@ -521,11 +539,12 @@ func StartGlobalRadarHeadIngest(ctx context.Context, cfg GlobalRadarHeadIngestCo
 		interval = 5 * time.Minute
 	}
 	if cfg.Health != nil {
-		cfg.Health.Register("worker.global-radar-head-ingest", "worker", "", true)
+		maxAge := 2*interval + 90*time.Second
+		cfg.Health.RegisterPeriodic("worker.global-radar-head-ingest", "worker", "", true, maxAge)
 		cfg.Health.Register("global-radar.head.event-sink", "storage", "", true)
 		cfg.Health.Register("global-radar.head.checkpoint-store", "storage", "", true)
 		for _, target := range cfg.Targets {
-			cfg.Health.Register(GlobalRadarHeadIngestTargetHealthID(target), "head_ingest", target.NetworkID, true)
+			cfg.Health.RegisterPeriodic(GlobalRadarHeadIngestTargetHealthID(target), "head_ingest", target.NetworkID, true, maxAge)
 			if strings.TrimSpace(target.ConfirmationEndpoint) != "" || cfg.RequireConfirmation {
 				cfg.Health.Register(GlobalRadarHeadIngestConfirmationHealthID(target), "block_confirmation", target.NetworkID, strings.TrimSpace(target.ConfirmationEndpoint) != "")
 			}
