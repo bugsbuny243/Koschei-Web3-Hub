@@ -1,0 +1,84 @@
+name: Global Radar Operator Ownership Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/internal/handlers/owner_incidents.go"
+      - "koschei/api/internal/handlers/owner_radar_coverage_episodes.go"
+      - "koschei/api/internal/handlers/owner_radar_coverage_episodes_postgres_test.go"
+      - "koschei/api/internal/http/server.go"
+      - "koschei/api/internal/http/route_inventory.go"
+      - ".github/workflows/global-radar-operator-ownership-acceptance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/handlers/owner_incidents.go"
+      - "koschei/api/internal/handlers/owner_radar_coverage_episodes.go"
+      - "koschei/api/internal/handlers/owner_radar_coverage_episodes_postgres_test.go"
+      - "koschei/api/internal/http/server.go"
+      - "koschei/api/internal/http/route_inventory.go"
+      - ".github/workflows/global-radar-operator-ownership-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ownership:
+    name: Prove coverage alert ownership on PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: koschei_coverage_ownership_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d koschei_coverage_ownership_ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Download modules
+        run: go mod download
+      - name: Require clean Go formatting
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l internal/handlers/owner_incidents.go internal/handlers/owner_radar_coverage_episodes.go internal/handlers/owner_radar_coverage_episodes_postgres_test.go)"
+          test -z "${unformatted}" || { printf 'unformatted files:\n%s\n' "${unformatted}" >&2; exit 1; }
+      - name: Verify migration numbering
+        run: python3 scripts/check_migration_numbering.py
+      - name: Apply migrations on PostgreSQL 17
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          for migration in $(find migrations -maxdepth 1 -type f -name '*.sql' | sort); do
+            psql \
+              --host=127.0.0.1 \
+              --port=5432 \
+              --username=postgres \
+              --dbname=koschei_coverage_ownership_ci \
+              --set=ON_ERROR_STOP=1 \
+              --file="${migration}" >/dev/null
+          done
+      - name: Run owner coverage ownership acceptance
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_coverage_ownership_ci?sslmode=disable
+        run: |
+          set -euo pipefail
+          go test -v ./internal/handlers \
+            -run '^(TestIncidentAlertReferenceIntegrityPostgres17|TestOwnerCoverageEpisodeOwnershipPostgres17)$' \
+            -count=1
