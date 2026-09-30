@@ -114,6 +114,13 @@ func Current() Snapshot {
 				Notes:           []string{"bounded windows avoid all-time hot-store scans", "recognized does not mean verified", "metrics describe persisted pipeline rows and do not claim chain-wide coverage"},
 			},
 			{
+				ID: "cross-process-job-wake", Layer: "orchestration", Domain: "worker-runtime", Mode: "implemented", EvidenceAuthority: "operational_status_only", Activation: "APP_DATABASE_URL required; NATS_URL is optional latency acceleration",
+				DependsOn:       []string{"runtime-health-registry"},
+				BackendSurfaces: []string{"web3_jobs", "/fabric/security-center/runtime-health"},
+				Telemetry:       []string{"worker.cross-process-job-wake configured/live/degraded/unavailable state", "remote wake observations", "last success/failure"},
+				Notes:           []string{"PostgreSQL web3_jobs remains the durable job authority", "Core NATS carries wake hints only; no JetStream or replay guarantee is claimed", "worker recovery ceiling remains the bounded fallback when remote wake is unavailable"},
+			},
+			{
 				ID: "multi-network-native-probes", Layer: "sensor", Domain: "evm-utxo-move", Mode: "probe_ready", EvidenceAuthority: "evidence_only", Activation: "network endpoint configuration",
 				NetworkIDs:       allNetworks,
 				BackendSurfaces:  []string{"/fabric/networks/probe", "/fabric/networks/probe/intelligence", "/api/scan/approval"},
