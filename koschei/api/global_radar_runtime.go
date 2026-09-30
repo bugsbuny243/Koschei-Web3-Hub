@@ -44,7 +44,9 @@ type globalRadarEventStore interface {
 	apihttp.GlobalRadarEventSink
 	apihttp.GlobalRadarEventReader
 	radarcursor.RecoveryStore
+	radarcursor.GapStore
 	VerifyGlobalRadarIngestCheckpointSchema(context.Context) error
+	VerifyGlobalRadarIngestGapSchema(context.Context) error
 }
 
 func buildGlobalRadarEventSink(parent context.Context) (globalRadarEventStore, error) {
@@ -64,6 +66,9 @@ func buildGlobalRadarEventSink(parent context.Context) (globalRadarEventStore, e
 	}
 	if err := client.VerifyGlobalRadarIngestCheckpointSchema(ctx); err != nil {
 		return nil, fmt.Errorf("verify Global Radar ClickHouse ingest checkpoint schema: %w", err)
+	}
+	if err := client.VerifyGlobalRadarIngestGapSchema(ctx); err != nil {
+		return nil, fmt.Errorf("verify Global Radar ClickHouse ingest gap schema: %w", err)
 	}
 	return client, nil
 }
@@ -270,8 +275,12 @@ func buildGlobalRadarHeadIngestConfig(eventSink services.GlobalRadarTelemetryEve
 			health.Register(services.GlobalRadarHeadIngestTargetHealthID(target), "head_ingest", target.NetworkID, true)
 		}
 	}
+	gapStore, ok := cursorStore.(radarcursor.GapStore)
+	if !ok {
+		return nil, fmt.Errorf("Global Radar head ingest requires durable ingest gap storage")
+	}
 	return &services.GlobalRadarHeadIngestConfig{
-		EventSink: eventSink, CursorStore: cursorStore, Targets: targets, Interval: interval, Health: health,
+		EventSink: eventSink, CursorStore: cursorStore, GapStore: gapStore, Targets: targets, Interval: interval, Health: health,
 		MaxBlocksPerCycle: maxBlocksPerCycle, MaxEventsPerBlock: maxEventsPerBlock,
 		RequireConfirmation: requireConfirmation, AutoReorgRecovery: autoReorgRecovery, MaxReorgRewind: uint64(maxReorgRewind),
 	}, nil
