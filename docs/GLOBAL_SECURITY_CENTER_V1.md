@@ -196,3 +196,30 @@ Authority boundary:
 - missing linked evidence is not converted into safety.
 
 This completes the first implementation slice of the previously listed operator-incident-workflow hardening item. Future work should connect eligible deterministic alerts/dossiers to case creation suggestions without automatically declaring an incident or changing verdict authority.
+
+
+## Radar flow observability v1 — 2026-09-30
+
+The owner control plane now exposes a bounded pipeline-depth view:
+
+- `GET /api/owner/radar/flow-metrics`
+- schema: `koschei.radar-flow-metrics.v1`
+- owner authentication and application persistence are required.
+
+The endpoint measures separate persisted stages instead of treating raw collection volume as equivalent to verified evidence:
+
+1. collected stream rows;
+2. recognized rows whose module is known;
+3. transaction-enriched mint evidence;
+4. completed ARVIS stream-processing work;
+5. signed final-verdict-engine decisions backed by verified evidence;\n6. new durable `security_alert_events` rows, measured separately from verdicts.\n
+Each stage reports bounded 15-minute and 24-hour counts plus latest-observation freshness. The endpoint also reports the last-24-hour evidence-quality distribution, per-network collected-event distribution, pending/processing/stale/failed/exhausted queue state and stage-throughput ratios in basis points.
+
+These ratios are operational throughput ratios, not cohort conversion rates. They can exceed 100% when a worker drains older backlog during the measurement window.
+
+Truth boundary:
+
+- no all-time hot-store scan is required by this endpoint;
+- `recognized` does not mean `verified`;
+- `transaction_enriched_mint` is the explicit enrichment boundary used by the current Solana stream pipeline;
+- a counted verdict must be a signed `final_verdict_engine` row with verified evidence;\n- durable alert metrics count newly created deduplicated alert rows; repeated occurrences may update the same row and are not falsely presented as new alerts;\n- the metrics describe persisted pipeline rows and do not claim chain-wide or global coverage.
