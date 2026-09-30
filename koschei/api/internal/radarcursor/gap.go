@@ -20,18 +20,18 @@ const (
 
 type Gap struct {
 	GapKey             string     `json:"gap_key"`
-	SchemaVersion       string     `json:"schema_version"`
-	CursorKey           string     `json:"cursor_key"`
-	NetworkID           string     `json:"network_id"`
-	StreamKind          string     `json:"stream_kind"`
-	InitialStartHeight  uint64     `json:"initial_start_height"`
-	NextHeight          uint64     `json:"next_height"`
-	EndHeight           uint64     `json:"end_height"`
-	Reason              string     `json:"reason"`
-	State               string     `json:"state"`
-	DetectedAt           time.Time  `json:"detected_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
-	ResolvedAt           *time.Time `json:"resolved_at,omitempty"`
+	SchemaVersion      string     `json:"schema_version"`
+	CursorKey          string     `json:"cursor_key"`
+	NetworkID          string     `json:"network_id"`
+	StreamKind         string     `json:"stream_kind"`
+	InitialStartHeight uint64     `json:"initial_start_height"`
+	NextHeight         uint64     `json:"next_height"`
+	EndHeight          uint64     `json:"end_height"`
+	Reason             string     `json:"reason"`
+	State              string     `json:"state"`
+	DetectedAt         time.Time  `json:"detected_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	ResolvedAt         *time.Time `json:"resolved_at,omitempty"`
 }
 
 type GapStore interface {
@@ -51,7 +51,7 @@ func NewGap(cursorKey, networkID, streamKind string, startHeight, endHeight uint
 	}, "\n")
 	sum := sha256.Sum256([]byte(material))
 	return (Gap{
-		GapKey:            hex.EncodeToString(sum[:]),
+		GapKey:             hex.EncodeToString(sum[:]),
 		SchemaVersion:      GapSchemaVersion,
 		CursorKey:          cursorKey,
 		NetworkID:          networkID,
@@ -61,8 +61,8 @@ func NewGap(cursorKey, networkID, streamKind string, startHeight, endHeight uint
 		EndHeight:          endHeight,
 		Reason:             reason,
 		State:              GapStateOpen,
-		DetectedAt:          detectedAt,
-		UpdatedAt:           detectedAt,
+		DetectedAt:         detectedAt,
+		UpdatedAt:          detectedAt,
 	}).Canonical()
 }
 
