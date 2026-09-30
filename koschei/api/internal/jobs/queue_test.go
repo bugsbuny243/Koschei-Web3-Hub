@@ -21,7 +21,7 @@ func (q *recordingWakeQueue) Close() error { return nil }
 
 func TestNormalizedNATSPrefix(t *testing.T) {
 	cases := map[string]string{
-		"":                  defaultNATSSubjectPrefix,
+		"":                 defaultNATSSubjectPrefix,
 		"  koschei.web3  ": "koschei.web3",
 		".custom.jobs.":    "custom.jobs",
 		"bad > prefix":     defaultNATSSubjectPrefix,
