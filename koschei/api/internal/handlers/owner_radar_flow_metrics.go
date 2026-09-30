@@ -52,6 +52,7 @@ type ownerRadarFlowTruthBoundary struct {
 	EnrichedEvidenceDefinition string `json:"enriched_evidence_definition"`
 	VerdictDefinition          string `json:"verdict_definition"`
 	RatioUnit                  string `json:"ratio_unit"`
+	RatioSemantics             string `json:"ratio_semantics"`
 }
 
 type ownerRadarFlowMetricsResponse struct {
@@ -103,6 +104,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 			count(*) FILTER (WHERE created_at > now() - interval '24 hours'),
 			COALESCE(max(created_at)::text,'')
 		FROM security_radar_stream_events
+		WHERE created_at > now() - interval '24 hours'
 	`)
 	if err != nil {
 		return out, err
@@ -113,7 +115,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 			count(*) FILTER (WHERE created_at > now() - interval '24 hours'),
 			COALESCE(max(created_at)::text,'')
 		FROM security_radar_stream_events
-		WHERE module_id <> 'unknown'
+		WHERE created_at > now() - interval '24 hours' AND module_id <> 'unknown'
 	`)
 	if err != nil {
 		return out, err
@@ -124,7 +126,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 			count(*) FILTER (WHERE created_at > now() - interval '24 hours'),
 			COALESCE(max(created_at)::text,'')
 		FROM security_radar_stream_events
-		WHERE evidence_quality='transaction_enriched_mint'
+		WHERE created_at > now() - interval '24 hours' AND evidence_quality='transaction_enriched_mint'
 	`)
 	if err != nil {
 		return out, err
@@ -135,7 +137,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 			count(*) FILTER (WHERE processed_at > now() - interval '24 hours'),
 			COALESCE(max(processed_at)::text,'')
 		FROM arvis_stream_processing
-		WHERE status='completed'
+		WHERE processed_at > now() - interval '24 hours' AND status='completed'
 	`)
 	if err != nil {
 		return out, err
@@ -147,7 +149,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 			count(*) FILTER (WHERE created_at > now() - interval '24 hours'),
 			COALESCE(max(created_at)::text,'')
 		FROM security_radar_verdicts
-		WHERE module_id='final_verdict_engine' AND signed=true AND `+verifiedSQL)
+		WHERE created_at > now() - interval '24 hours' AND module_id='final_verdict_engine' AND signed=true AND `+verifiedSQL)
 	if err != nil {
 		return out, err
 	}
@@ -216,6 +218,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 		EnrichedEvidenceDefinition: "security_radar_stream_events.evidence_quality=transaction_enriched_mint",
 		VerdictDefinition:          "final_verdict_engine AND signed=true AND verified_evidence=true",
 		RatioUnit:                  "basis_points_10000_equals_100_percent",
+		RatioSemantics:             "windowed throughput ratios are not cohort conversion rates and may exceed 100 percent when backlog is processed",
 	}
 	return out, nil
 }
