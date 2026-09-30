@@ -1,5 +1,13 @@
 {
   "known_duplicate_prefixes": {
+    "120": [
+      "120_entitlement_commercial_shape.sql",
+      "120_unified_verdict_ed25519_authentication.sql"
+    ],
+    "121": [
+      "121_kosc_checkout_v1.sql",
+      "121_security_radar_arm_ed25519_authentication.sql"
+    ],
     "029": [
       "029_unified_reports.sql",
       "029_zero_free_entitlements.sql"

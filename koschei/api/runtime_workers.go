@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"koschei/api/internal/alerts"
 	"koschei/api/internal/handlers"
 	"koschei/api/internal/jobs"
 	"koschei/api/internal/runtimehealth"
@@ -58,7 +59,7 @@ func startBackgroundRuntime(
 		return func() {}
 	}
 
-	stops := make([]func(), 0, 6)
+	stops := make([]func(), 0, 8)
 	if globalRadarBackground != nil {
 		stops = append(stops, services.StartGlobalRadarBackgroundTelemetry(ctx, *globalRadarBackground))
 	}
@@ -74,6 +75,8 @@ func startBackgroundRuntime(
 			runtimeHealth.Register(jobs.NATSWakeHealthID, "worker", "", false)
 		}
 		stops = append(stops,
+			alerts.StartDeliveryWorker(ctx, db),
+			services.StartGlobalRadarCoverageAlertLifecycle(ctx, db, runtimeHealth),
 			services.StartSecurityRadarWatcher(ctx, db, solanaRPC),
 			services.StartSecurityRadarSovereignStreamIfEnabled(ctx, db),
 			handlers.StartCanonicalInvestigationJobWorker(ctx, db, readDB, solanaRPC, jobStore),
