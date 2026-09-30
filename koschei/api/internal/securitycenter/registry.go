@@ -115,6 +115,15 @@ func Current() Snapshot {
 				Notes:           []string{"bounded windows avoid all-time hot-store scans", "recognized does not mean verified", "metrics describe persisted pipeline rows and do not claim chain-wide coverage"},
 			},
 			{
+				ID: "global-radar-coverage-alert-lifecycle", Layer: "response", Domain: "multi-network-operations", Mode: "implemented", EvidenceAuthority: "operational_notification_only", Activation: "APP_DATABASE_URL plus background runtime and head-ingest health entries",
+				NetworkIDs:       []string{"ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "optimism-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet", "bitcoin-mainnet"},
+				DependsOn:        []string{"runtime-health-registry", "continuous-multi-network-block-ingest", "watchlist-alert-and-webhook-plane"},
+				BackendSurfaces:  []string{"global_radar_coverage_episodes", "security_alert_events", "security_alert_deliveries", "/fabric/security-center/runtime-health"},
+				FrontendSurfaces: []string{"/fabric/security-center"},
+				Telemetry:        []string{"open/recovered coverage episodes", "deduplicated attention alerts", "recovery alerts", "coverage reason transitions", "delivery worker health via durable outbox"},
+				Notes:            []string{"blind_spot is an operational monitoring-confidence signal, not proof of historical chain-data loss", "catching_up alone does not close or open a blind-spot episode", "recovery requires current head/cursor alignment", "ARVIS verdict authority is unchanged"},
+			},
+			{
 				ID: "cross-process-job-wake", Layer: "orchestration", Domain: "worker-runtime", Mode: "implemented", EvidenceAuthority: "operational_status_only", Activation: "APP_DATABASE_URL required; NATS_URL is optional latency acceleration",
 				DependsOn:       []string{"runtime-health-registry"},
 				BackendSurfaces: []string{"web3_jobs", "/fabric/security-center/runtime-health"},
