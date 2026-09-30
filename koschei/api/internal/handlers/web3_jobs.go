@@ -91,9 +91,6 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "job create failed"})
 		return
 	}
-	if h.JobQueue != nil {
-		_ = h.JobQueue.Publish(job)
-	}
 	pollURL := "/api/jobs/" + job.ID
 	if jobType == CanonicalInvestigationJobType {
 		pollURL = "/api/v1/radar/jobs/" + job.ID
