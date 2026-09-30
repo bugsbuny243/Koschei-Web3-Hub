@@ -9,6 +9,16 @@ import (
 
 const SchemaVersion = "koschei.runtime-health.v1"
 
+const (
+	CoverageNotApplicable = "not_applicable"
+	CoverageInactive      = "inactive"
+	CoverageUnknown       = "unknown"
+	CoverageCurrent       = "current"
+	CoverageLagging       = "lagging"
+	CoverageBlindSpot     = "blind_spot"
+	CoverageReorgGuard    = "reorg_guard"
+)
+
 type State string
 
 const (
@@ -38,6 +48,9 @@ type Entry struct {
 	MaxAgeSeconds       float64         `json:"max_age_seconds,omitempty"`
 	FreshUntil          *time.Time      `json:"fresh_until,omitempty"`
 	Ingest              *IngestProgress `json:"ingest,omitempty"`
+	CoverageStatus       string          `json:"coverage_status,omitempty"`
+	CoverageReason       string          `json:"coverage_reason,omitempty"`
+	CoverageAttention    bool            `json:"coverage_attention_required,omitempty"`
 	registeredAt        time.Time
 	maxAge              time.Duration
 }
@@ -98,6 +111,7 @@ type Snapshot struct {
 	GeneratedAt   time.Time     `json:"generated_at"`
 	Entries       []Entry       `json:"entries"`
 	Counts        map[State]int `json:"counts"`
+	CoverageCounts map[string]int `json:"coverage_counts"`
 }
 
 type Registry struct {
@@ -237,7 +251,7 @@ func (r *Registry) Stop(id string) {
 func (r *Registry) Snapshot() Snapshot {
 	now := time.Now().UTC()
 	if r == nil {
-		return Snapshot{SchemaVersion: SchemaVersion, GeneratedAt: now, Entries: []Entry{}, Counts: map[State]int{}}
+		return Snapshot{SchemaVersion: SchemaVersion, GeneratedAt: now, Entries: []Entry{}, Counts: map[State]int{}, CoverageCounts: map[string]int{}}
 	}
 	now = r.now().UTC()
 	r.mu.RLock()
@@ -269,6 +283,7 @@ func (r *Registry) Snapshot() Snapshot {
 				}
 			}
 		}
+		entry.CoverageStatus, entry.CoverageReason, entry.CoverageAttention = assessCoverage(entry)
 		// Snapshots own their timestamps; callers cannot mutate registry state.
 		if entry.LastSuccessAt != nil {
 			entry.LastSuccessAt = timePtr(*entry.LastSuccessAt)
@@ -290,10 +305,46 @@ func (r *Registry) Snapshot() Snapshot {
 		return entries[i].ID < entries[j].ID
 	})
 	counts := map[State]int{}
+	coverageCounts := map[string]int{}
 	for _, entry := range entries {
 		counts[entry.State]++
+		if entry.CoverageStatus != "" && entry.CoverageStatus != CoverageNotApplicable {
+			coverageCounts[entry.CoverageStatus]++
+		}
 	}
-	return Snapshot{SchemaVersion: SchemaVersion, GeneratedAt: now, Entries: entries, Counts: counts}
+	return Snapshot{SchemaVersion: SchemaVersion, GeneratedAt: now, Entries: entries, Counts: counts, CoverageCounts: coverageCounts}
+}
+
+func assessCoverage(entry Entry) (status, reason string, attention bool) {
+	if strings.TrimSpace(entry.Kind) != "head_ingest" {
+		return CoverageNotApplicable, "component_is_not_head_ingest", false
+	}
+	if !entry.Configured || entry.State == StateDisabled || entry.State == StateStopped {
+		return CoverageInactive, "head_ingest_not_active", false
+	}
+	if entry.Freshness == "stale" {
+		return CoverageBlindSpot, "head_ingest_freshness_deadline_expired", true
+	}
+	if entry.State == StateUnavailable {
+		return CoverageBlindSpot, "head_ingest_unavailable", true
+	}
+	if entry.Ingest == nil {
+		return CoverageUnknown, "ingest_progress_not_observed", false
+	}
+	switch entry.Ingest.Status {
+	case "reorg_recheck_required":
+		return CoverageReorgGuard, "canonical_lineage_recheck_required", true
+	case "provider_behind_cursor":
+		return CoverageBlindSpot, "provider_head_is_behind_durable_cursor", true
+	case "cycle_failed":
+		return CoverageLagging, "latest_ingest_cycle_failed", true
+	case "catching_up":
+		return CoverageLagging, "durable_cursor_is_behind_observed_head", false
+	case "at_observed_head":
+		return CoverageCurrent, "durable_cursor_matches_observed_provider_head", false
+	default:
+		return CoverageUnknown, "ingest_progress_state_unknown", false
+	}
 }
 
 func timePtr(value time.Time) *time.Time {
