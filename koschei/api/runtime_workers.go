@@ -71,7 +71,7 @@ func startBackgroundRuntime(
 		if natsURL := strings.TrimSpace(os.Getenv("NATS_URL")); natsURL != "" {
 			stops = append(stops, jobs.StartNATSWakeBridge(ctx, natsURL, os.Getenv("NATS_SUBJECT_PREFIX"), runtimeHealth))
 		} else if runtimeHealth != nil {
-			runtimeHealth.Register("worker.cross-process-job-wake", "worker", "", false)
+			runtimeHealth.Register(jobs.NATSWakeHealthID, "worker", "", false)
 		}
 		stops = append(stops,
 			services.StartSecurityRadarWatcher(ctx, db, solanaRPC),
