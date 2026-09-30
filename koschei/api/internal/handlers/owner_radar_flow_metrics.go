@@ -51,6 +51,7 @@ type ownerRadarFlowTruthBoundary struct {
 	RecognizedMeansVerified    bool   `json:"recognized_means_verified"`
 	EnrichedEvidenceDefinition string `json:"enriched_evidence_definition"`
 	VerdictDefinition          string `json:"verdict_definition"`
+	AlertDefinition            string `json:"alert_definition"`
 	RatioUnit                  string `json:"ratio_unit"`
 	RatioSemantics             string `json:"ratio_semantics"`
 }
@@ -64,11 +65,14 @@ type ownerRadarFlowMetricsResponse struct {
 	Enriched         ownerRadarFlowStage       `json:"enriched"`
 	Processed        ownerRadarFlowStage       `json:"processed"`
 	VerifiedVerdicts ownerRadarFlowStage       `json:"verified_verdicts"`
+	DurableAlerts     ownerRadarFlowStage       `json:"durable_alerts"`
 	Queue            ownerRadarFlowQueue       `json:"queue"`
 	Ratios           ownerRadarFlowRatios      `json:"ratios"`
 	Freshness        ownerRadarFlowFreshness   `json:"freshness"`
 	EvidenceQuality  map[string]int64          `json:"evidence_quality_last_24_hours"`
 	NetworkEvents    map[string]int64          `json:"network_events_last_24_hours"`
+	AlertTypes       map[string]int64          `json:"alert_types_last_24_hours"`
+	AlertSeverities  map[string]int64          `json:"alert_severities_last_24_hours"`
 	TruthBoundary    ownerRadarFlowTruthBoundary `json:"truth_boundary"`
 }
 
@@ -153,6 +157,17 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 	if err != nil {
 		return out, err
 	}
+	out.DurableAlerts, err = stage(`
+		SELECT
+			count(*) FILTER (WHERE created_at > now() - interval '15 minutes'),
+			count(*) FILTER (WHERE created_at > now() - interval '24 hours'),
+			COALESCE(max(created_at)::text,'')
+		FROM security_alert_events
+		WHERE created_at > now() - interval '24 hours'
+	`)
+	if err != nil {
+		return out, err
+	}
 
 	if err := h.DBRead.QueryRowContext(ctx, `
 		SELECT
@@ -194,6 +209,28 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 	if err != nil {
 		return out, err
 	}
+	out.AlertTypes, err = h.ownerRadarFlowBreakdown(ctx, `
+		SELECT event_type, count(*)
+		FROM security_alert_events
+		WHERE created_at > now() - interval '24 hours'
+		GROUP BY event_type
+		ORDER BY count(*) DESC
+		LIMIT 16
+	`)
+	if err != nil {
+		return out, err
+	}
+	out.AlertSeverities, err = h.ownerRadarFlowBreakdown(ctx, `
+		SELECT severity, count(*)
+		FROM security_alert_events
+		WHERE created_at > now() - interval '24 hours'
+		GROUP BY severity
+		ORDER BY count(*) DESC
+		LIMIT 8
+	`)
+	if err != nil {
+		return out, err
+	}
 
 	out.Ratios = ownerRadarFlowRatios{
 		RecognizedPerCollected15MinBP:      radarFlowBasisPoints(out.Recognized.Last15Minutes, out.Collected.Last15Minutes),
@@ -217,6 +254,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 		RecognizedMeansVerified:    false,
 		EnrichedEvidenceDefinition: "security_radar_stream_events.evidence_quality=transaction_enriched_mint",
 		VerdictDefinition:          "final_verdict_engine AND signed=true AND verified_evidence=true",
+		AlertDefinition:            "new durable security_alert_events rows; repeat deduped occurrences may update the same row instead of creating another row",
 		RatioUnit:                  "basis_points_10000_equals_100_percent",
 		RatioSemantics:             "windowed throughput ratios are not cohort conversion rates and may exceed 100 percent when backlog is processed",
 	}
