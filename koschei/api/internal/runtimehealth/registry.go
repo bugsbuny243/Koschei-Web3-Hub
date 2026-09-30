@@ -48,9 +48,9 @@ type Entry struct {
 	MaxAgeSeconds       float64         `json:"max_age_seconds,omitempty"`
 	FreshUntil          *time.Time      `json:"fresh_until,omitempty"`
 	Ingest              *IngestProgress `json:"ingest,omitempty"`
-	CoverageStatus       string          `json:"coverage_status,omitempty"`
-	CoverageReason       string          `json:"coverage_reason,omitempty"`
-	CoverageAttention    bool            `json:"coverage_attention_required,omitempty"`
+	CoverageStatus      string          `json:"coverage_status,omitempty"`
+	CoverageReason      string          `json:"coverage_reason,omitempty"`
+	CoverageAttention   bool            `json:"coverage_attention_required,omitempty"`
 	registeredAt        time.Time
 	maxAge              time.Duration
 }
@@ -107,10 +107,10 @@ func copyHeight(v *uint64) *uint64 {
 }
 
 type Snapshot struct {
-	SchemaVersion string        `json:"schema_version"`
-	GeneratedAt   time.Time     `json:"generated_at"`
-	Entries       []Entry       `json:"entries"`
-	Counts        map[State]int `json:"counts"`
+	SchemaVersion  string         `json:"schema_version"`
+	GeneratedAt    time.Time      `json:"generated_at"`
+	Entries        []Entry        `json:"entries"`
+	Counts         map[State]int  `json:"counts"`
 	CoverageCounts map[string]int `json:"coverage_counts"`
 }
 
