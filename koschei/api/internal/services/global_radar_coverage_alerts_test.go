@@ -136,7 +136,6 @@ func TestCoverageAlertSeverity(t *testing.T) {
 	}
 }
 
-
 func TestGlobalRadarCoverageAlertLifecyclePostgres17(t *testing.T) {
 	databaseURL := os.Getenv("KOSCHEI_TEST_DATABASE_URL")
 	if databaseURL == "" {
