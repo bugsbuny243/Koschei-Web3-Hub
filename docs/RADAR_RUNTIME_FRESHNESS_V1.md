@@ -130,9 +130,9 @@ system-channel severity threshold remains authoritative.
 
 The background runtime now starts the existing security-alert delivery worker
 when application PostgreSQL is available. The coverage lifecycle reconciler
-checks the in-memory runtime snapshot every 30 seconds, but it loads open
-episodes from PostgreSQL only at startup and writes only on lifecycle
-transitions or alert-link repair. It does not reintroduce high-frequency empty
+checks the in-memory runtime snapshot every 30 seconds. After a successful
+initialization, open episodes are loaded from PostgreSQL once; later database
+writes occur only on lifecycle transitions or alert-link repair. It does not reintroduce high-frequency empty
 database polling.
 
 The truth boundary is unchanged: a coverage alert describes current monitoring
