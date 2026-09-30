@@ -162,7 +162,6 @@ func TestIngestProgressPreservesUnknownZeroAndProviderRegression(t *testing.T) {
 	}
 }
 
-
 func TestCoverageAssessmentTracksCurrentLagBlindSpotAndReorg(t *testing.T) {
 	now := time.Date(2026, 9, 30, 3, 0, 0, 0, time.UTC)
 	r := New()
