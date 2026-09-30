@@ -1,9 +1,16 @@
 package services
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
+	"os"
 	"testing"
+	"time"
 
 	"koschei/api/internal/runtimehealth"
+
+	_ "github.com/lib/pq"
 )
 
 func TestCoverageLifecycleAction(t *testing.T) {
@@ -126,5 +133,101 @@ func TestCoverageAlertSeverity(t *testing.T) {
 	}
 	if got := coverageAlertSeverity(runtimehealth.CoverageCurrent); got != "info" {
 		t.Fatalf("current severity=%q", got)
+	}
+}
+
+
+func TestGlobalRadarCoverageAlertLifecyclePostgres17(t *testing.T) {
+	databaseURL := os.Getenv("KOSCHEI_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("KOSCHEI_TEST_DATABASE_URL is not set")
+	}
+	t.Setenv("TELEGRAM_BOT_TOKEN", "")
+	t.Setenv("TELEGRAM_CHAT_ID", "")
+	t.Setenv("DISCORD_WEBHOOK_URL", "")
+
+	db, err := sql.Open("postgres", databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+	if err := db.PingContext(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	componentID := fmt.Sprintf("coverage-test-%d", time.Now().UnixNano())
+	networkID := "ethereum-mainnet"
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM global_radar_coverage_episodes WHERE component_id=$1", componentID)
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM security_alert_events WHERE payload->>'component_id'=$1", componentID)
+	})
+
+	health := runtimehealth.New()
+	health.Register(componentID, "head_ingest", networkID, true)
+	state := &coverageLifecycleState{open: map[string]coverageEpisode{}}
+
+	head, cursor := uint64(99), uint64(100)
+	health.RecordIngestProgress(componentID, &head, &cursor, true, false)
+	if err := reconcileGlobalRadarCoverageAlerts(ctx, db, health, state); err != nil {
+		t.Fatal(err)
+	}
+
+	var firstEpisodeID, openAlertID, episodeStatus string
+	if err := db.QueryRowContext(ctx, `
+		SELECT id::text,COALESCE(open_alert_id::text,''),status
+		FROM global_radar_coverage_episodes
+		WHERE component_id=$1
+		ORDER BY opened_at DESC
+		LIMIT 1`, componentID).Scan(&firstEpisodeID, &openAlertID, &episodeStatus); err != nil {
+		t.Fatal(err)
+	}
+	if firstEpisodeID == "" || openAlertID == "" || episodeStatus != "open" {
+		t.Fatalf("unexpected open episode id=%q alert=%q status=%q", firstEpisodeID, openAlertID, episodeStatus)
+	}
+
+	if err := reconcileGlobalRadarCoverageAlerts(ctx, db, health, state); err != nil {
+		t.Fatal(err)
+	}
+	var occurrenceCount int
+	if err := db.QueryRowContext(ctx, "SELECT occurrence_count FROM security_alert_events WHERE id=$1", openAlertID).Scan(&occurrenceCount); err != nil {
+		t.Fatal(err)
+	}
+	if occurrenceCount != 1 {
+		t.Fatalf("same coverage observation emitted duplicate alert occurrence_count=%d", occurrenceCount)
+	}
+
+	head = 100
+	cursor = 100
+	health.RecordIngestProgress(componentID, &head, &cursor, false, false)
+	if err := reconcileGlobalRadarCoverageAlerts(ctx, db, health, state); err != nil {
+		t.Fatal(err)
+	}
+	var recoveredAt sql.NullTime
+	var recoveryAlertID string
+	if err := db.QueryRowContext(ctx, `
+		SELECT status,recovered_at,COALESCE(recovery_alert_id::text,'')
+		FROM global_radar_coverage_episodes
+		WHERE id=$1`, firstEpisodeID).Scan(&episodeStatus, &recoveredAt, &recoveryAlertID); err != nil {
+		t.Fatal(err)
+	}
+	if episodeStatus != "recovered" || !recoveredAt.Valid || recoveryAlertID == "" {
+		t.Fatalf("episode did not recover status=%q recovered=%v alert=%q", episodeStatus, recoveredAt.Valid, recoveryAlertID)
+	}
+
+	head = 99
+	health.RecordIngestProgress(componentID, &head, &cursor, true, false)
+	if err := reconcileGlobalRadarCoverageAlerts(ctx, db, health, state); err != nil {
+		t.Fatal(err)
+	}
+	var episodeCount, openCount int
+	if err := db.QueryRowContext(ctx, `
+		SELECT count(*),count(*) FILTER (WHERE status='open')
+		FROM global_radar_coverage_episodes
+		WHERE component_id=$1`, componentID).Scan(&episodeCount, &openCount); err != nil {
+		t.Fatal(err)
+	}
+	if episodeCount != 2 || openCount != 1 {
+		t.Fatalf("reopen did not create a new single open episode total=%d open=%d", episodeCount, openCount)
 	}
 }
