@@ -82,12 +82,13 @@ func main() {
 		web3.RPCProviderHost(web3.SolanaRPCFallbackURL("solana-mainnet")),
 	)
 
-	jobStore := jobs.NewStore(appDB)
 	jobQueue := jobs.Queue(jobs.NoopQueue{})
 	if natsURL := os.Getenv("NATS_URL"); natsURL != "" {
 		jobQueue = jobs.NewNATSQueue(natsURL, os.Getenv("NATS_SUBJECT_PREFIX"))
 	}
 	defer jobQueue.Close()
+	jobStore := jobs.NewStore(appDB)
+	jobStore.SetWakeQueue(jobQueue)
 
 	role, err := parseRuntimeRole(os.Getenv("KOSCHEI_RUNTIME_ROLE"))
 	if err != nil {
@@ -126,7 +127,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar head ingest is invalid: %v", err)
 	}
-	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore, globalRadarBackground, globalRadarHeadIngest)
+	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore, runtimeHealth, globalRadarBackground, globalRadarHeadIngest)
 	defer stopBackgroundRuntime()
 	log.Printf("runtime role=%s http=%t background_workers=%t", role, role.servesHTTP(), role.runsBackgroundWorkers())
 	if !role.servesHTTP() {
