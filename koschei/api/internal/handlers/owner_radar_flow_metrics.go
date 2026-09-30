@@ -154,7 +154,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 			count(*) FILTER (WHERE created_at > now() - interval '24 hours'),
 			COALESCE(max(created_at)::text,'')
 		FROM security_radar_verdicts
-		WHERE created_at > now() - interval '24 hours' AND module_id='final_verdict_engine' AND signed=true AND `+verifiedSQL)
+		WHERE created_at > now() - interval '24 hours' AND module_id='final_verdict_engine' AND signed=true AND ` + verifiedSQL)
 	if err != nil {
 		return out, err
 	}
