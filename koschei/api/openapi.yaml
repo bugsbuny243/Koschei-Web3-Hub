@@ -10585,7 +10585,7 @@
             "ownerSession": []
           }
         ],
-        "summary": "GET /api/owner/radar/flow-metrics",
+        "summary": "GET /api/owner/radar/coverage-episodes",
         "tags": [
           "owner"
         ],
