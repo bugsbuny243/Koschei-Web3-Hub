@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -232,6 +233,20 @@ func (h *Handler) ownerIncidentCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback()
 
+	resolvedEvidenceSources := make(map[string]string, len(input.EvidenceRefs))
+	for _, ref := range input.EvidenceRefs {
+		source, resolveErr := incidentEvidenceSource(r.Context(), tx, ref)
+		if resolveErr != nil {
+			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident evidence reference could not be resolved")
+			return
+		}
+		if source == "" {
+			writeAPIError(w, http.StatusConflict, APICodeConflict, "Incident evidence reference does not resolve to a persisted evidence record")
+			return
+		}
+		resolvedEvidenceSources[ref] = source
+	}
+
 	var created ownerIncidentRecord
 	row := tx.QueryRowContext(r.Context(), `
 		INSERT INTO security_incident_cases
@@ -247,7 +262,8 @@ func (h *Handler) ownerIncidentCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	payload, _ := json.Marshal(map[string]any{
 		"severity": input.Severity, "network": input.Network, "target": input.Target,
-		"evidence_refs": input.EvidenceRefs, "alert_refs": input.AlertRefs, "dossier_refs": input.DossierRefs,
+		"evidence_refs": input.EvidenceRefs, "evidence_sources": resolvedEvidenceSources,
+		"alert_refs": input.AlertRefs, "dossier_refs": input.DossierRefs,
 	})
 	if _, err := tx.ExecContext(r.Context(), `
 		INSERT INTO security_incident_actions (incident_id,action_type,actor,summary,payload)
@@ -344,6 +360,76 @@ func incidentActionStatus(action string) string {
 	}
 }
 
+func incidentStatusTransitionAllowed(current, next string) bool {
+	current = strings.ToLower(strings.TrimSpace(current))
+	next = strings.ToLower(strings.TrimSpace(next))
+	if current == "" || next == "" || current == next {
+		return false
+	}
+	switch current {
+	case "open":
+		return next == "investigating" || next == "contained"
+	case "investigating":
+		return next == "open" || next == "contained" || next == "resolved"
+	case "contained":
+		return next == "open" || next == "investigating" || next == "resolved"
+	case "resolved":
+		return next == "open" || next == "closed"
+	case "closed":
+		return next == "open"
+	default:
+		return false
+	}
+}
+
+func incidentEvidenceSource(ctx context.Context, tx *sql.Tx, ref string) (string, error) {
+	ref = strings.TrimSpace(ref)
+	if tx == nil || ref == "" {
+		return "", nil
+	}
+	var source string
+	err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE((
+			SELECT source_kind
+			FROM (
+				SELECT 'security_radar_stream_event'::text AS source_kind
+				FROM security_radar_stream_events
+				WHERE id::text=$1 OR signature=$1
+				UNION ALL
+				SELECT 'security_radar_event'::text
+				FROM security_radar_events
+				WHERE id::text=$1 OR signature=$1
+				UNION ALL
+				SELECT 'security_radar_verdict'::text
+				FROM security_radar_verdicts
+				WHERE id::text=$1 OR signature=$1
+				UNION ALL
+				SELECT 'defense_program_artifact'::text
+				FROM defense_program_artifacts
+				WHERE artifact_ref=$1
+				UNION ALL
+				SELECT 'defense_program_finding'::text
+				FROM defense_program_findings
+				WHERE finding_ref=$1
+				UNION ALL
+				SELECT 'defense_program_deployment'::text
+				FROM defense_program_deployments
+				WHERE snapshot_ref=$1
+				UNION ALL
+				SELECT 'defense_program_graph_node'::text
+				FROM defense_program_graph_nodes
+				WHERE node_ref=$1
+				UNION ALL
+				SELECT 'defense_program_graph_edge'::text
+				FROM defense_program_graph_edges
+				WHERE edge_ref=$1
+			) resolved
+			LIMIT 1
+		), '')
+	`, ref).Scan(&source)
+	return source, err
+}
+
 func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id string) {
 	var input ownerIncidentActionRequest
 	if err := decodeJSON(r, &input); err != nil {
@@ -382,8 +468,8 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	}
 	defer tx.Rollback()
 
-	var exists string
-	if err := tx.QueryRowContext(r.Context(), "SELECT id::text FROM security_incident_cases WHERE id=$1::uuid FOR UPDATE", id).Scan(&exists); err == sql.ErrNoRows {
+	var exists, currentStatus string
+	if err := tx.QueryRowContext(r.Context(), "SELECT id::text,status FROM security_incident_cases WHERE id=$1::uuid FOR UPDATE", id).Scan(&exists, &currentStatus); err == sql.ErrNoRows {
 		writeAPIError(w, http.StatusNotFound, APICodeNotFound, "Incident was not found")
 		return
 	} else if err != nil {
@@ -391,7 +477,25 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	if status := incidentActionStatus(input.Action); status != "" {
+	nextStatus := incidentActionStatus(input.Action)
+	if nextStatus != "" && !incidentStatusTransitionAllowed(currentStatus, nextStatus) {
+		writeAPIError(w, http.StatusConflict, APICodeConflict, "Incident status transition is not allowed")
+		return
+	}
+	resolvedEvidenceSource := ""
+	if input.Action == "link_evidence" {
+		resolvedEvidenceSource, err = incidentEvidenceSource(r.Context(), tx, input.Ref)
+		if err != nil {
+			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident evidence reference could not be resolved")
+			return
+		}
+		if resolvedEvidenceSource == "" {
+			writeAPIError(w, http.StatusConflict, APICodeConflict, "Incident evidence reference does not resolve to a persisted evidence record")
+			return
+		}
+	}
+
+	if status := nextStatus; status != "" {
 		_, err = tx.ExecContext(r.Context(), `
 			UPDATE security_incident_cases
 			SET status=$2,
@@ -424,7 +528,19 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	payload, _ := json.Marshal(map[string]any{"severity": input.Severity, "ref": input.Ref})
+	payloadFields := map[string]any{"severity": input.Severity, "ref": input.Ref}
+	if nextStatus != "" {
+		payloadFields["status_from"] = currentStatus
+		payloadFields["status_to"] = nextStatus
+		payloadFields["operational_state_only"] = true
+		if input.Action == "contain" {
+			payloadFields["containment_claim"] = "operator_workflow_state_not_enforcement_proof"
+		}
+	}
+	if resolvedEvidenceSource != "" {
+		payloadFields["ref_source"] = resolvedEvidenceSource
+	}
+	payload, _ := json.Marshal(payloadFields)
 	if _, err := tx.ExecContext(r.Context(), `
 		INSERT INTO security_incident_actions (incident_id,action_type,actor,summary,payload)
 		VALUES ($1::uuid,$2,'owner',$3,$4::jsonb)
