@@ -106,6 +106,14 @@ func Current() Snapshot {
 				Telemetry:        []string{"deterministic A-F verdict", "Ed25519 verdict signing", "evidence references"},
 			},
 			{
+				ID: "radar-flow-observability", Layer: "observability", Domain: "solana-arvis-operations", Mode: "implemented", EvidenceAuthority: "operational_metrics_only", Activation: "APP_DATABASE_URL plus owner authentication",
+				NetworkIDs:      []string{"solana-mainnet"},
+				DependsOn:       []string{"solana-arvis-evidence-and-verdict", "durable-evidence-memory"},
+				BackendSurfaces: []string{"/api/owner/radar/flow-metrics"},
+				Telemetry:       []string{"15-minute and 24-hour collected/recognized/enriched/processed/verified-verdict counts", "evidence-quality distribution", "network event distribution", "queue backlog and staleness", "stage throughput basis points", "stage freshness age"},
+				Notes:           []string{"bounded windows avoid all-time hot-store scans", "recognized does not mean verified", "metrics describe persisted pipeline rows and do not claim chain-wide coverage"},
+			},
+			{
 				ID: "multi-network-native-probes", Layer: "sensor", Domain: "evm-utxo-move", Mode: "probe_ready", EvidenceAuthority: "evidence_only", Activation: "network endpoint configuration",
 				NetworkIDs:       allNetworks,
 				BackendSurfaces:  []string{"/fabric/networks/probe", "/fabric/networks/probe/intelligence", "/api/scan/approval"},
