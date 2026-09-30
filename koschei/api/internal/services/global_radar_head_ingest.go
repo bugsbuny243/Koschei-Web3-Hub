@@ -37,6 +37,7 @@ type GlobalRadarHeadIngestTarget struct {
 type GlobalRadarHeadIngestConfig struct {
 	EventSink           GlobalRadarTelemetryEventSink
 	CursorStore         radarcursor.RecoveryStore
+	GapStore            radarcursor.GapStore
 	Targets             []GlobalRadarHeadIngestTarget
 	Interval            time.Duration
 	HTTPClient          *http.Client
@@ -131,6 +132,12 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 			checkpoint.StreamKind != strings.ToLower(strings.TrimSpace(target.Kind)) {
 			return 0, fmt.Errorf("durable head checkpoint identity mismatch")
 		}
+		if err := reconcileGlobalRadarIngestGapToCheckpoint(ctx, cfg, checkpoint, observedAt); err != nil {
+			if cfg.Health != nil {
+				cfg.Health.Failure(globalRadarHeadGapStoreHealthID, err)
+			}
+			return 0, err
+		}
 		reportedCursor = &checkpoint.Height
 		if checkpoint.State == radarcursor.StateReorgObserved {
 			reorg = true
@@ -211,10 +218,18 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 	for height := current.Height + 1; height <= lastHeight; height++ {
 		bundle, err := collectGlobalRadarHeadBundle(ctx, cfg.HTTPClient, target, height, observedAt)
 		if err != nil {
-			return persisted, err
+			gapErr := recordGlobalRadarIngestGap(ctx, cfg, target, cursorKey, height, lastHeight, "block_collect_failed", observedAt)
+			if gapErr != nil && cfg.Health != nil {
+				cfg.Health.Failure(globalRadarHeadGapStoreHealthID, gapErr)
+			}
+			return persisted, errors.Join(err, gapErr)
 		}
 		if err := confirmGlobalRadarHeadBundle(ctx, cfg, target, bundle, observedAt); err != nil {
-			return persisted, err
+			gapErr := recordGlobalRadarIngestGap(ctx, cfg, target, cursorKey, height, lastHeight, "confirmation_failed", observedAt)
+			if gapErr != nil && cfg.Health != nil {
+				cfg.Health.Failure(globalRadarHeadGapStoreHealthID, gapErr)
+			}
+			return persisted, errors.Join(err, gapErr)
 		}
 		if bundle.parentHash != current.BlockHash {
 			reason := fmt.Sprintf("reorg observed before height %d: expected_parent=%s observed_parent=%s", height, current.BlockHash, bundle.parentHash)
@@ -225,6 +240,16 @@ func runGlobalRadarHeadIngestTarget(ctx context.Context, cfg GlobalRadarHeadInge
 		count, err := persistGlobalRadarHeadBundle(ctx, cfg, target, cursorKey, bundle, maxEvents)
 		persisted += count
 		if err != nil {
+			gapErr := recordGlobalRadarIngestGap(ctx, cfg, target, cursorKey, height, lastHeight, "bundle_persist_failed", observedAt)
+			if gapErr != nil && cfg.Health != nil {
+				cfg.Health.Failure(globalRadarHeadGapStoreHealthID, gapErr)
+			}
+			return persisted, errors.Join(err, gapErr)
+		}
+		if err := advanceGlobalRadarIngestGap(ctx, cfg, cursorKey, bundle.height, observedAt); err != nil {
+			if cfg.Health != nil {
+				cfg.Health.Failure(globalRadarHeadGapStoreHealthID, err)
+			}
 			return persisted, err
 		}
 		reportedCursor = &bundle.height
@@ -543,6 +568,7 @@ func StartGlobalRadarHeadIngest(ctx context.Context, cfg GlobalRadarHeadIngestCo
 		cfg.Health.RegisterPeriodic("worker.global-radar-head-ingest", "worker", "", true, maxAge)
 		cfg.Health.Register("global-radar.head.event-sink", "storage", "", true)
 		cfg.Health.Register("global-radar.head.checkpoint-store", "storage", "", true)
+		cfg.Health.Register(globalRadarHeadGapStoreHealthID, "storage", "", cfg.GapStore != nil)
 		for _, target := range cfg.Targets {
 			cfg.Health.RegisterPeriodic(GlobalRadarHeadIngestTargetHealthID(target), "head_ingest", target.NetworkID, true, maxAge)
 			if strings.TrimSpace(target.ConfirmationEndpoint) != "" || cfg.RequireConfirmation {
