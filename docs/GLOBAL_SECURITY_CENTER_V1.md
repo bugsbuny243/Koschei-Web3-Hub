@@ -225,6 +225,26 @@ Truth boundary:
 - a counted verdict must be a signed `final_verdict_engine` row with verified evidence;\n- durable alert metrics count newly created deduplicated alert rows; repeated occurrences may update the same row and are not falsely presented as new alerts;\n- the metrics describe persisted pipeline rows and do not claim chain-wide or global coverage.
 
 
+## Global Radar operator ownership v1 — 2026-09-30
+
+Coverage alert episodes are now visible to the owner control plane without turning operational monitoring state into an automatic incident verdict.
+
+Owner API:
+
+- `GET /api/owner/radar/coverage-episodes`
+- optional filters: `status=open|recovered`, `network`, and bounded `limit`;
+- each episode returns its durable attention/recovery alert IDs and incidents that explicitly reference those alert IDs.
+
+Incident-link integrity is fail-closed for new alert references:
+
+- incident creation resolves every supplied `alert_refs` value against persisted `security_alert_events`;
+- the `link_alert` action rejects an unresolved alert reference;
+- the append-only incident action payload records the resolved alert source/event type;
+- existing source evidence and ARVIS verdict authority remain unchanged.
+
+Ownership is explicit, not automatic. A coverage episode is associated with an incident only after an owner links its persisted alert identity through the incident workflow. Opening, investigating, containing, resolving or closing the incident remains a separate operator action. A `blind_spot` episode is still a monitoring-confidence condition, not proof of historical data loss, exploitation, containment or chain safety.
+
+
 ## Cross-process worker wake v1 — 2026-09-30
 
 Separated `api` and `worker` runtime roles must not turn an in-process wake optimization into a hidden delivery dependency.
