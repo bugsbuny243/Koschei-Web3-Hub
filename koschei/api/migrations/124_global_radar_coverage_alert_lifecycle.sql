@@ -20,9 +20,9 @@ CREATE TABLE IF NOT EXISTS global_radar_coverage_episodes (
         coverage_status IN ('lagging','blind_spot','reorg_guard','current')
     ),
     CONSTRAINT global_radar_coverage_episodes_recovery_shape CHECK (
-        (status='open' AND recovered_at IS NULL)
+        (status='open' AND coverage_status IN ('lagging','blind_spot','reorg_guard') AND recovered_at IS NULL)
         OR
-        (status='recovered' AND recovered_at IS NOT NULL)
+        (status='recovered' AND coverage_status='current' AND recovered_at IS NOT NULL)
     )
 );
 
