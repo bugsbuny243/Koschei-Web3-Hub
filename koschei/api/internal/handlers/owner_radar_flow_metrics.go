@@ -142,7 +142,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 			count(*) FILTER (WHERE processed_at > now() - interval '24 hours'),
 			COALESCE(max(processed_at)::text,'')
 		FROM arvis_stream_processing
-		WHERE processed_at > now() - interval '24 hours' AND status='completed'
+		WHERE status='completed' AND updated_at > now() - interval '24 hours'
 	`)
 	if err != nil {
 		return out, err
@@ -178,6 +178,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 			count(*) FILTER (WHERE status='failed' AND updated_at > now() - interval '15 minutes'),
 			count(*) FILTER (WHERE status='exhausted' OR (status='failed' AND attempts >= 3))
 		FROM arvis_stream_processing
+		WHERE status IN ('pending','processing','failed','exhausted')
 	`).Scan(
 		&out.Queue.Pending,
 		&out.Queue.Processing,
