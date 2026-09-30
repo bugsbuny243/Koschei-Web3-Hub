@@ -102,3 +102,39 @@ is in progress and is not by itself a blind spot.
 The projection is derived during snapshot generation and does not mutate the
 underlying runtime registry, ARVIS evidence, verdicts, incident state, or chain
 data.
+
+
+## Coverage alert lifecycle
+
+Operational coverage attention is persisted as an episode in
+`global_radar_coverage_episodes`. The lifecycle is intentionally separate from
+ARVIS evidence, verdicts and operator incident authority.
+
+An episode opens only when a head-ingest entry has
+`coverage_attention_required=true`. Repeated observations of the same state do
+not create new episodes. A change in coverage status or reason updates the open
+episode and reuses the same alert dedupe identity, allowing severity escalation
+without manufacturing duplicate incidents.
+
+An episode is recovered only after the head-ingest projection returns to
+`current`, meaning the durable cursor again matches the most recently observed
+provider head. `lagging`, `unknown`, `inactive` and bounded catch-up do not
+silently close an open episode. A later attention state after recovery creates a
+new episode with a new alert identity.
+
+Attention alerts are written through the existing durable
+`security_alert_events` / `security_alert_deliveries` path. `blind_spot` and
+`reorg_guard` are high severity; attention-bearing `lagging` is medium.
+Recovery is recorded as a low-severity durable event. The existing configured
+system-channel severity threshold remains authoritative.
+
+The background runtime now starts the existing security-alert delivery worker
+when application PostgreSQL is available. The coverage lifecycle reconciler
+checks the in-memory runtime snapshot every 30 seconds, but it loads open
+episodes from PostgreSQL only at startup and writes only on lifecycle
+transitions or alert-link repair. It does not reintroduce high-frequency empty
+database polling.
+
+The truth boundary is unchanged: a coverage alert describes current monitoring
+confidence. It is not proof that historical blocks, transactions or events are
+missing, and recovery does not prove historical completeness or finality.
