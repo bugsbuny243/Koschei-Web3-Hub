@@ -43,6 +43,7 @@ type ownerRadarFlowFreshness struct {
 	EnrichedAgeSeconds  int64 `json:"enriched_age_seconds,omitempty"`
 	ProcessedAgeSeconds int64 `json:"processed_age_seconds,omitempty"`
 	VerdictAgeSeconds   int64 `json:"verdict_age_seconds,omitempty"`
+	AlertAgeSeconds     int64 `json:"alert_age_seconds,omitempty"`
 }
 
 type ownerRadarFlowTruthBoundary struct {
@@ -247,6 +248,7 @@ func (h *Handler) ownerRadarFlowMetrics(ctx context.Context, now time.Time) (own
 		EnrichedAgeSeconds:  radarFlowAgeSeconds(now, out.Enriched.LastAt),
 		ProcessedAgeSeconds: radarFlowAgeSeconds(now, out.Processed.LastAt),
 		VerdictAgeSeconds:   radarFlowAgeSeconds(now, out.VerifiedVerdicts.LastAt),
+		AlertAgeSeconds:     radarFlowAgeSeconds(now, out.DurableAlerts.LastAt),
 	}
 	out.TruthBoundary = ownerRadarFlowTruthBoundary{
 		PersistedRowsOnly:          true,
