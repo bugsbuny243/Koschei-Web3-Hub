@@ -73,3 +73,32 @@ Failure-injection coverage proves a checkpoint write error cannot advance the
 reported cursor and that the next successful cycle recovers. Additional tests
 cover provider regression, missing values, zero backlog serialization, snapshot
 isolation, and the operator display of zero versus unknown.
+
+
+## Derived coverage status
+
+Head-ingest entries now expose an additive operational coverage projection:
+`coverage_status`, `coverage_reason`, and
+`coverage_attention_required`. The runtime snapshot also exposes
+`coverage_counts` for head-ingest entries only.
+
+- `current`: the durable cursor matches the most recently observed provider
+  head.
+- `lagging`: the cursor is behind the observed head, or the latest ingest
+  cycle failed while the freshness deadline has not yet expired.
+- `blind_spot`: the periodic freshness deadline expired, the head-ingest
+  target is unavailable, or the provider head is behind the durable cursor.
+- `reorg_guard`: canonical lineage requires re-check before normal coverage
+  can be claimed.
+- `unknown`: no usable ingest-progress observation exists yet.
+- `inactive`: the head-ingest target is disabled or stopped.
+
+This is an operational confidence signal, not a historical-loss detector.
+`blind_spot` means current monitoring evidence is insufficient to claim
+continuous head coverage. It does not prove that historical blocks, events, or
+transactions are missing. `lagging` with pending blocks means bounded catch-up
+is in progress and is not by itself a blind spot.
+
+The projection is derived during snapshot generation and does not mutate the
+underlying runtime registry, ARVIS evidence, verdicts, incident state, or chain
+data.

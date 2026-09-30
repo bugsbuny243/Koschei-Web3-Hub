@@ -121,3 +121,29 @@ func TestSecurityCenterRendersZeroPendingBlocks(t *testing.T) {
 		}
 	}
 }
+
+func TestSecurityCenterSurfacesCoverageAttentionWithoutClaimingMissingHistory(t *testing.T) {
+	r := runtimehealth.New()
+	r.Register("head", "head_ingest", "ethereum-mainnet", true)
+	head, cursor := uint64(99), uint64(100)
+	r.RecordIngestProgress("head", &head, &cursor, true, false)
+
+	mux := http.NewServeMux()
+	registerSecurityCenterRoutes(mux, r)
+
+	htmlRes := httptest.NewRecorder()
+	mux.ServeHTTP(htmlRes, httptest.NewRequest(http.MethodGet, "/fabric/security-center", nil))
+	for _, want := range []string{"blind_spot", "provider_head_is_behind_durable_cursor", "attention required", "not proof that historical chain data is missing"} {
+		if !strings.Contains(htmlRes.Body.String(), want) {
+			t.Fatalf("security center missing coverage signal %q: %s", want, htmlRes.Body.String())
+		}
+	}
+
+	jsonRes := httptest.NewRecorder()
+	mux.ServeHTTP(jsonRes, httptest.NewRequest(http.MethodGet, "/fabric/security-center/runtime-health", nil))
+	for _, want := range []string{`"coverage_status":"blind_spot"`, `"coverage_attention_required":true`, `"coverage_counts":{"blind_spot":1}`} {
+		if !strings.Contains(jsonRes.Body.String(), want) {
+			t.Fatalf("runtime health missing %q: %s", want, jsonRes.Body.String())
+		}
+	}
+}
