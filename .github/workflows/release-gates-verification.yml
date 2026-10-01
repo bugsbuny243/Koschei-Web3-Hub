@@ -119,6 +119,7 @@ jobs:
     timeout-minutes: 12
     env:
       BASE_URL: https://tradepigloball.co
+      EXPECTED_REVISION: ${{ github.sha }}
     steps:
       - name: Checkout acceptance verifier
         uses: actions/checkout@v7
@@ -153,6 +154,32 @@ jobs:
             done
             echo "RELEASE_ACCEPTANCE_TIMEOUT: ${path} never exposed ${marker}." >&2
             exit 32
+          }
+
+          wait_revision() {
+            local attempts="${1:-36}" code=""
+            for attempt in $(seq 1 "${attempts}"); do
+              code="$(curl --silent --show-error --max-time 20 \
+                --output diagnostics/version-revision.body \
+                --write-out '%{http_code}' \
+                "${BASE_URL}/api/version" || true)"
+              if [ "${code}" = "200" ] && grep -Fq "\"revision\":\"${EXPECTED_REVISION}\"" diagnostics/version-revision.body; then
+                echo "PASS exact deployed revision ${EXPECTED_REVISION} attempt=${attempt}"
+                return 0
+              fi
+              case "${code}" in
+                000|200|502|503|504)
+                  echo "WAIT exact deployed revision attempt=${attempt}/${attempts} code=${code}" >&2
+                  ;;
+                *)
+                  echo "RELEASE_ACCEPTANCE_FAILURE: /api/version returned HTTP ${code} while waiting for exact revision." >&2
+                  exit 41
+                  ;;
+              esac
+              sleep 10
+            done
+            echo "RELEASE_ACCEPTANCE_TIMEOUT: deployed /api/version never reported expected revision ${EXPECTED_REVISION}." >&2
+            exit 42
           }
 
           probe_customer_protected_route() {
@@ -230,6 +257,7 @@ jobs:
           }
 
           wait_contract health /health '"status":"ok"'
+          wait_revision
           wait_contract login /login 'KOSCHEI ARVIS'
           wait_contract scan /scan 'public-solana-scan.js'
           wait_contract cases '/api/public/cases?limit=100' '"ok":true'
