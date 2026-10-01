@@ -126,7 +126,11 @@ func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler, planAccess rout
 	}))
 	mux.HandleFunc("/api/version", method("GET", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"app": runtimecfg.Load().AppName, "status": "ok", "access": "free-core-saas-entitlement"})
+		payload := map[string]string{"app": runtimecfg.Load().AppName, "status": "ok", "access": "free-core-saas-entitlement"}
+		if revision := currentDeploymentRevision(); revision != "" {
+			payload["revision"] = revision
+		}
+		_ = json.NewEncoder(w).Encode(payload)
 	}))
 	mux.HandleFunc("/api/auth/register", method("POST", h.Register))
 	mux.HandleFunc("/api/auth/login", method("POST", h.Login))
