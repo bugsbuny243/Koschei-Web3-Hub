@@ -14,7 +14,66 @@ type RestoreAcceptanceResult struct {
 	Rows               int64  `json:"rows"`
 	SourceTables       int64  `json:"source_tables"`
 	ChecksumMismatches int64  `json:"checksum_mismatches"`
+	TypedRows          int64  `json:"typed_rows"`
+	TypedSourceTables  int64  `json:"typed_source_tables"`
+	SourceIDMismatches int64  `json:"source_id_mismatches"`
 	ObjectSHA256       string `json:"object_sha256"`
+}
+
+type typedRestoreTarget struct {
+	IDColumn string
+	Query    string
+}
+
+var typedRestoreTargets = map[string]typedRestoreTarget{
+	"security_radar_verdicts": {
+		IDColumn: "id",
+		Query: `
+			SELECT COALESCE(to_jsonb(r)->>$2,''),
+			       encode(sha256(convert_to(to_jsonb(r)::text,'UTF8')),'hex')
+			FROM jsonb_populate_record(NULL::public.security_radar_verdicts,$1::jsonb) AS r
+		`,
+	},
+	"security_radar_events": {
+		IDColumn: "id",
+		Query: `
+			SELECT COALESCE(to_jsonb(r)->>$2,''),
+			       encode(sha256(convert_to(to_jsonb(r)::text,'UTF8')),'hex')
+			FROM jsonb_populate_record(NULL::public.security_radar_events,$1::jsonb) AS r
+		`,
+	},
+	"security_radar_seen_signatures": {
+		IDColumn: "id",
+		Query: `
+			SELECT COALESCE(to_jsonb(r)->>$2,''),
+			       encode(sha256(convert_to(to_jsonb(r)::text,'UTF8')),'hex')
+			FROM jsonb_populate_record(NULL::public.security_radar_seen_signatures,$1::jsonb) AS r
+		`,
+	},
+	"arvis_stream_processing": {
+		IDColumn: "stream_event_id",
+		Query: `
+			SELECT COALESCE(to_jsonb(r)->>$2,''),
+			       encode(sha256(convert_to(to_jsonb(r)::text,'UTF8')),'hex')
+			FROM jsonb_populate_record(NULL::public.arvis_stream_processing,$1::jsonb) AS r
+		`,
+	},
+	"security_radar_stream_events": {
+		IDColumn: "id",
+		Query: `
+			SELECT COALESCE(to_jsonb(r)->>$2,''),
+			       encode(sha256(convert_to(to_jsonb(r)::text,'UTF8')),'hex')
+			FROM jsonb_populate_record(NULL::public.security_radar_stream_events,$1::jsonb) AS r
+		`,
+	},
+	"token_trade_events": {
+		IDColumn: "id",
+		Query: `
+			SELECT COALESCE(to_jsonb(r)->>$2,''),
+			       encode(sha256(convert_to(to_jsonb(r)::text,'UTF8')),'hex')
+			FROM jsonb_populate_record(NULL::public.token_trade_events,$1::jsonb) AS r
+		`,
+	},
 }
 
 func VerifyRestoreAcceptance(ctx context.Context, db *sql.DB, data []byte, expectedObjectSHA256 string) (RestoreAcceptanceResult, error) {
@@ -58,6 +117,7 @@ func VerifyRestoreAcceptance(ctx context.Context, db *sql.DB, data []byte, expec
 		return result, fmt.Errorf("create retention restore staging table: %w", err)
 	}
 
+	typedTables := map[string]struct{}{}
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	scanner.Buffer(make([]byte, 64*1024), retentionVerifyMaxLineBytes)
 	for scanner.Scan() {
@@ -69,17 +129,39 @@ func VerifyRestoreAcceptance(ctx context.Context, db *sql.DB, data []byte, expec
 		if err := json.Unmarshal(line, &row); err != nil {
 			return result, fmt.Errorf("decode staged retention restore row: %w", err)
 		}
+		row.SourceTable = strings.TrimSpace(row.SourceTable)
+		row.SourceID = strings.TrimSpace(row.SourceID)
+		row.RowChecksum = strings.ToLower(strings.TrimSpace(row.RowChecksum))
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO koschei_retention_restore_stage
 				(source_table,source_id,row_checksum,payload)
 			VALUES ($1,$2,$3,$4::jsonb)
-		`, strings.TrimSpace(row.SourceTable), strings.TrimSpace(row.SourceID), strings.ToLower(strings.TrimSpace(row.RowChecksum)), string(row.Payload)); err != nil {
+		`, row.SourceTable, row.SourceID, row.RowChecksum, string(row.Payload)); err != nil {
 			return result, fmt.Errorf("stage retention restore row %s/%s: %w", row.SourceTable, row.SourceID, err)
+		}
+
+		target, ok := typedRestoreTargets[row.SourceTable]
+		if !ok {
+			return result, fmt.Errorf("retention restore source table %q is not a managed retention target", row.SourceTable)
+		}
+		var restoredSourceID, restoredChecksum string
+		if err := tx.QueryRowContext(ctx, target.Query, string(row.Payload), target.IDColumn).
+			Scan(&restoredSourceID, &restoredChecksum); err != nil {
+			return result, fmt.Errorf("typed retention restore %s/%s: %w", row.SourceTable, row.SourceID, err)
+		}
+		result.TypedRows++
+		typedTables[row.SourceTable] = struct{}{}
+		if strings.TrimSpace(restoredSourceID) != row.SourceID {
+			result.SourceIDMismatches++
+		}
+		if !strings.EqualFold(strings.TrimSpace(restoredChecksum), row.RowChecksum) {
+			result.ChecksumMismatches++
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return result, fmt.Errorf("scan staged retention restore object: %w", err)
 	}
+	result.TypedSourceTables = int64(len(typedTables))
 
 	var stagedRows, sourceTables, mismatches int64
 	if err := tx.QueryRowContext(ctx, `
@@ -95,15 +177,19 @@ func VerifyRestoreAcceptance(ctx context.Context, db *sql.DB, data []byte, expec
 	}
 	result.SourceTables = sourceTables
 	result.ChecksumMismatches += mismatches
-	if stagedRows != verified.Rows {
-		return result, fmt.Errorf("retention restore row-count mismatch: exported=%d staged=%d", verified.Rows, stagedRows)
+	if stagedRows != verified.Rows || result.TypedRows != verified.Rows {
+		return result, fmt.Errorf("retention restore row-count mismatch: exported=%d staged=%d typed=%d", verified.Rows, stagedRows, result.TypedRows)
+	}
+	if result.SourceIDMismatches != 0 {
+		return result, fmt.Errorf("retention restore source-id parity failed: mismatches=%d", result.SourceIDMismatches)
 	}
 	if result.ChecksumMismatches != 0 {
 		return result, fmt.Errorf("retention restore checksum parity failed: mismatches=%d", result.ChecksumMismatches)
 	}
 
 	// The acceptance transaction is intentionally never committed. Successful
-	// reconstruction proves that the exported object can be restored into
-	// PostgreSQL canonical jsonb form without mutating production source tables.
+	// reconstruction proves that each managed retention payload can still be
+	// interpreted by its current source-table row type without mutating live
+	// security evidence.
 	return result, nil
 }
