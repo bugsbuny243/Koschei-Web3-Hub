@@ -11,13 +11,13 @@ import (
 )
 
 type RestoreAcceptanceResult struct {
-	Rows                    int64  `json:"rows"`
-	SourceTables            int64  `json:"source_tables"`
-	ChecksumMismatches      int64  `json:"checksum_mismatches"`
-	TypedRows               int64  `json:"typed_rows"`
-	TypedSourceTables       int64  `json:"typed_source_tables"`
-	SourceIDMismatches      int64  `json:"source_id_mismatches"`
-	ObjectSHA256            string `json:"object_sha256"`
+	Rows               int64  `json:"rows"`
+	SourceTables       int64  `json:"source_tables"`
+	ChecksumMismatches int64  `json:"checksum_mismatches"`
+	TypedRows          int64  `json:"typed_rows"`
+	TypedSourceTables  int64  `json:"typed_source_tables"`
+	SourceIDMismatches int64  `json:"source_id_mismatches"`
+	ObjectSHA256       string `json:"object_sha256"`
 }
 
 type typedRestoreTarget struct {
