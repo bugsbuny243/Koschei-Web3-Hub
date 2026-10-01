@@ -16,6 +16,9 @@ Koschei's radar retention path separates four states:
 - rejects duplicate source identities;
 - opens a transaction-scoped PostgreSQL restore staging table;
 - reconstructs every source identity, checksum and payload into that table;
+- requires every source table to be one of the production retention-managed targets;
+- round-trips every payload through that source table's **current PostgreSQL row type**;
+- requires the typed row to reproduce the archived source ID and canonical payload checksum;
 - verifies staged row-count parity;
 - verifies staged canonical-payload checksum parity;
 - intentionally rolls the transaction back.
@@ -23,7 +26,9 @@ Koschei's radar retention path separates four states:
 The restore acceptance never writes reconstructed records to production source
 tables. It proves that the archived bytes can be reconstructed into PostgreSQL
 canonical JSON without allowing an automated restore command to overwrite live
-security evidence.
+security evidence. If an archived payload no longer round-trips through the current
+source-table schema, acceptance fails explicitly; schema evolution then requires a
+reviewed restore migration rather than silently dropping or inventing fields.
 
 ## Post-prune acceptance
 
@@ -37,7 +42,8 @@ archive staging rows
   -> archive staging prune
   -> read exported NDJSON only
   -> PostgreSQL restore-stage reconstruction
-  -> row-count + checksum parity
+  -> source-table typed reconstruction
+  -> source-ID + row-count + checksum parity
 ```
 
 This proves the restore path does not depend on the staging archive rows still
