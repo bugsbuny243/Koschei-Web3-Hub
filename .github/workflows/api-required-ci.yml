@@ -111,6 +111,10 @@ jobs:
           path: ${{ runner.temp }}/retention-export-postgres17.txt
           if-no-files-found: warn
           retention-days: 7
+      - name: Validate retention restore acceptance on PostgreSQL 17
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
+        run: go test -v ./internal/services/retentionexport -run '^TestVerifyRestoreAcceptancePostgres17$' -count=1
       - name: Validate immutable dossier storage
         env:
           PGPASSWORD: postgres

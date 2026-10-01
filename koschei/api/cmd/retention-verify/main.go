@@ -17,7 +17,11 @@ import (
 
 func main() {
 	var filePath string
+	var expectedSHA256 string
+	var restoreAcceptance bool
 	flag.StringVar(&filePath, "file", "", "path to one exported retention NDJSON object")
+	flag.StringVar(&expectedSHA256, "sha256", "", "expected SHA-256 of the exported object")
+	flag.BoolVar(&restoreAcceptance, "restore-acceptance", false, "reconstruct the export into transaction-scoped PostgreSQL restore staging and verify parity")
 	flag.Parse()
 
 	filePath = strings.TrimSpace(filePath)
@@ -48,13 +52,25 @@ func main() {
 		exitError("database ping: " + err.Error())
 	}
 
+	if restoreAcceptance {
+		result, err := retentionexport.VerifyRestoreAcceptance(ctx, db, data, expectedSHA256)
+		if err != nil {
+			payload, _ := json.Marshal(map[string]any{"ok": false, "mode": "restore_acceptance", "result": result, "error": err.Error()})
+			fmt.Fprintln(os.Stderr, string(payload))
+			os.Exit(1)
+		}
+		payload, _ := json.Marshal(map[string]any{"ok": true, "mode": "restore_acceptance", "result": result})
+		fmt.Println(string(payload))
+		return
+	}
+
 	result, err := retentionexport.VerifyExportObject(ctx, db, data)
 	if err != nil {
-		payload, _ := json.Marshal(map[string]any{"ok": false, "result": result, "error": err.Error()})
+		payload, _ := json.Marshal(map[string]any{"ok": false, "mode": "verify", "result": result, "error": err.Error()})
 		fmt.Fprintln(os.Stderr, string(payload))
 		os.Exit(1)
 	}
-	payload, _ := json.Marshal(map[string]any{"ok": true, "result": result})
+	payload, _ := json.Marshal(map[string]any{"ok": true, "mode": "verify", "result": result})
 	fmt.Println(string(payload))
 }
 
