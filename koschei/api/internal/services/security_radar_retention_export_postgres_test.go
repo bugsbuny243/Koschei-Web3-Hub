@@ -60,7 +60,8 @@ func TestRetentionArchiveExportPostgres17(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sink, err := retentionexport.NewFilesystemSink(t.TempDir())
+	exportRoot := t.TempDir()
+	sink, err := retentionexport.NewFilesystemSink(exportRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,5 +109,22 @@ func TestRetentionArchiveExportPostgres17(t *testing.T) {
 	}
 	if remaining != 0 {
 		t.Fatalf("archive rows remain after verified export prune: %d", remaining)
+	}
+
+	parts := strings.Split(result.LastExportRef, "#sha256=")
+	if len(parts) != 2 || !strings.HasPrefix(parts[0], "filesystem://") || len(parts[1]) != 64 {
+		t.Fatalf("invalid export ref for restore acceptance: %q", result.LastExportRef)
+	}
+	exportedPath := strings.TrimPrefix(parts[0], "filesystem://")
+	exportedObject, err := os.ReadFile(exportedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restoreResult, err := retentionexport.VerifyRestoreAcceptance(ctx, db, exportedObject, parts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restoreResult.Rows != 2 || restoreResult.ChecksumMismatches != 0 || restoreResult.SourceTables != 1 {
+		t.Fatalf("unexpected post-prune restore acceptance: %+v", restoreResult)
 	}
 }
