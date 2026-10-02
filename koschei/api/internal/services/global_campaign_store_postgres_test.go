@@ -41,16 +41,16 @@ func TestGlobalCampaignStorePostgres17(t *testing.T) {
 
 	observedAt := time.Date(2026, 10, 2, 1, 0, 0, 0, time.UTC)
 	first := NewGlobalCampaign(GlobalCampaign{
-		CampaignRef:        campaignRef,
-		Revision:           1,
-		State:              GlobalCampaignEmerging,
-		FirstObservedAt:    observedAt,
-		LastObservedAt:     observedAt,
-		Networks:           []string{"ethereum", "solana"},
-		Subjects:           []string{"subject:alpha"},
-		ObservationRefs:    []string{"observation:alpha"},
+		CampaignRef:         campaignRef,
+		Revision:            1,
+		State:               GlobalCampaignEmerging,
+		FirstObservedAt:     observedAt,
+		LastObservedAt:      observedAt,
+		Networks:            []string{"ethereum", "solana"},
+		Subjects:            []string{"subject:alpha"},
+		ObservationRefs:     []string{"observation:alpha"},
 		ObservedAnchorCount: 1,
-		RulesetVersion:     "campaign-ci.v1",
+		RulesetVersion:      "campaign-ci.v1",
 	})
 	if err := ValidateGlobalCampaign(first); err != nil {
 		t.Fatalf("fixture invalid: %v", err)
