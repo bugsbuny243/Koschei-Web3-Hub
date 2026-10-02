@@ -11,13 +11,19 @@ import (
 	"time"
 )
 
-const GlobalCampaignTemporalCorrelatorVersion = "koschei.global-campaign-temporal-correlator.v1"
+const (
+	GlobalCampaignTemporalCorrelatorVersion = "koschei.global-campaign-temporal-correlator.v1"
+	GlobalCampaignTemporalMaxEvents         = 4096
+	GlobalCampaignTemporalMaxCorrelations   = 10000
+)
 
 var (
 	ErrGlobalCampaignTemporalEvidenceRefRequired = errors.New("global campaign temporal evidence reference is required")
 	ErrGlobalCampaignTemporalTimestampRequired   = errors.New("global campaign temporal evidence timestamp is required")
 	ErrGlobalCampaignTemporalEvidenceConflict    = errors.New("global campaign temporal evidence reference has divergent canonical content")
 	ErrGlobalCampaignTemporalEvidenceState       = errors.New("global campaign temporal evidence state is unsupported")
+	ErrGlobalCampaignTemporalVerifiedRefBoundary = errors.New("global campaign temporal verified reference must also be present in the canonical context references")
+	ErrGlobalCampaignTemporalBudgetExceeded      = errors.New("global campaign temporal correlation budget exceeded")
 )
 
 var globalCampaignTemporalWindows = []struct {
@@ -32,17 +38,23 @@ var globalCampaignTemporalWindows = []struct {
 }
 
 // GlobalCampaignTemporalEvent is a reference-first event projection. Ref must
-// identify already-retained evidence. The correlator never invents a timestamp,
-// entity attribution, bridge proof, verdict, grade, or containment decision.
+// identify already-retained evidence. Generic RelationRefs and BridgeLinkRefs
+// are correlation context only. A caller may populate VerifiedRelationRefs or
+// VerifiedBridgeLinkRefs only from an already-verified persistent relation or
+// bridge-link contract; the temporal layer never upgrades generic refs itself.
+// The correlator never invents a timestamp, entity attribution, bridge proof,
+// verdict, grade, or containment decision.
 type GlobalCampaignTemporalEvent struct {
-	Ref            string    `json:"ref"`
-	Network        string    `json:"network"`
-	Kind           string    `json:"kind"`
-	ObservedAt     time.Time `json:"observed_at"`
-	EvidenceState  string    `json:"evidence_state"`
-	RelationRefs   []string  `json:"relation_refs,omitempty"`
-	BridgeLinkRefs []string  `json:"bridge_link_refs,omitempty"`
-	Invalidated    bool      `json:"invalidated"`
+	Ref                    string    `json:"ref"`
+	Network                string    `json:"network"`
+	Kind                   string    `json:"kind"`
+	ObservedAt             time.Time `json:"observed_at"`
+	EvidenceState          string    `json:"evidence_state"`
+	RelationRefs           []string  `json:"relation_refs,omitempty"`
+	BridgeLinkRefs         []string  `json:"bridge_link_refs,omitempty"`
+	VerifiedRelationRefs   []string  `json:"verified_relation_refs,omitempty"`
+	VerifiedBridgeLinkRefs []string  `json:"verified_bridge_link_refs,omitempty"`
+	Invalidated            bool      `json:"invalidated"`
 }
 
 // GlobalCampaignTemporalCorrelation describes a deterministic event-time
@@ -51,17 +63,19 @@ type GlobalCampaignTemporalEvent struct {
 // a verified cross-network result requires a shared explicit verified bridge
 // link. Otherwise the result remains observed/watch/inferred context.
 type GlobalCampaignTemporalCorrelation struct {
-	LeftRef        string   `json:"left_ref"`
-	RightRef       string   `json:"right_ref"`
-	LeftNetwork    string   `json:"left_network"`
-	RightNetwork   string   `json:"right_network"`
-	Window         string   `json:"window"`
-	DeltaSeconds   int64    `json:"delta_seconds"`
-	EvidenceState  string   `json:"evidence_state"`
-	CrossNetwork   bool     `json:"cross_network"`
-	WatchOnly      bool     `json:"watch_only"`
-	RelationRefs   []string `json:"relation_refs,omitempty"`
-	BridgeLinkRefs []string `json:"bridge_link_refs,omitempty"`
+	LeftRef                string   `json:"left_ref"`
+	RightRef               string   `json:"right_ref"`
+	LeftNetwork            string   `json:"left_network"`
+	RightNetwork           string   `json:"right_network"`
+	Window                 string   `json:"window"`
+	DeltaSeconds           int64    `json:"delta_seconds"`
+	EvidenceState          string   `json:"evidence_state"`
+	CrossNetwork           bool     `json:"cross_network"`
+	WatchOnly              bool     `json:"watch_only"`
+	RelationRefs           []string `json:"relation_refs,omitempty"`
+	BridgeLinkRefs         []string `json:"bridge_link_refs,omitempty"`
+	VerifiedRelationRefs   []string `json:"verified_relation_refs,omitempty"`
+	VerifiedBridgeLinkRefs []string `json:"verified_bridge_link_refs,omitempty"`
 }
 
 type GlobalCampaignTemporalCorrelationReport struct {
@@ -91,8 +105,19 @@ type GlobalCampaignTemporalCorrelationReport struct {
 // content. Input arrival order does not affect the result or fingerprint.
 // Exact duplicate refs are idempotent; divergent content for one ref fails
 // closed. Invalidated/reorg-revoked evidence remains visible in InvalidatedRefs
-// but cannot participate in active correlations.
+// but cannot participate in active correlations. Work is bounded so a dense
+// telemetry batch cannot create unbounded quadratic output; larger campaigns
+// must be chunked and replayed through deterministic windows by the caller.
 func BuildGlobalCampaignTemporalCorrelation(campaignRef string, events []GlobalCampaignTemporalEvent) (GlobalCampaignTemporalCorrelationReport, error) {
+	if len(events) > GlobalCampaignTemporalMaxEvents {
+		return GlobalCampaignTemporalCorrelationReport{}, fmt.Errorf(
+			"%w: events=%d max_events=%d",
+			ErrGlobalCampaignTemporalBudgetExceeded,
+			len(events),
+			GlobalCampaignTemporalMaxEvents,
+		)
+	}
+
 	out := GlobalCampaignTemporalCorrelationReport{
 		Version:         GlobalCampaignTemporalCorrelatorVersion,
 		CampaignRef:     strings.TrimSpace(campaignRef),
@@ -102,10 +127,11 @@ func BuildGlobalCampaignTemporalCorrelation(campaignRef string, events []GlobalC
 		Correlations:    []GlobalCampaignTemporalCorrelation{},
 		Limitations: []string{
 			"Temporal proximity alone is correlation context and never proves common control, identity, intent or wrongdoing.",
-			"Cross-network VERIFIED continuity requires an explicit shared verified bridge-link reference; timing similarity alone remains non-verified context.",
-			"Same-network VERIFIED correlation requires an explicit shared verified relation reference; co-occurrence alone remains non-verified context.",
+			"Cross-network VERIFIED continuity requires an explicit shared verified bridge-link reference; timing similarity or a generic bridge reference alone remains non-verified context.",
+			"Same-network VERIFIED correlation requires an explicit shared verified relation reference; co-occurrence or a generic relation reference alone remains non-verified context.",
 			"signed_artifact is distinct from verified on-chain evidence and cannot by itself upgrade a temporal correlation to VERIFIED.",
 			"Invalidated or reorg-revoked evidence is excluded from active correlations; missing evidence is not interpreted as safety.",
+			"Temporal work is batch-bounded; callers must deterministically chunk and replay larger campaign timelines rather than relying on silent truncation.",
 		},
 	}
 
@@ -126,6 +152,14 @@ func BuildGlobalCampaignTemporalCorrelation(campaignRef string, events []GlobalC
 			window, ok := globalCampaignTemporalWindow(delta)
 			if !ok {
 				break
+			}
+			if len(out.Correlations) >= GlobalCampaignTemporalMaxCorrelations {
+				return GlobalCampaignTemporalCorrelationReport{}, fmt.Errorf(
+					"%w: correlations=%d max_correlations=%d",
+					ErrGlobalCampaignTemporalBudgetExceeded,
+					len(out.Correlations)+1,
+					GlobalCampaignTemporalMaxCorrelations,
+				)
 			}
 			correlation := correlateGlobalCampaignTemporalPair(normalized[i], normalized[j], window, delta)
 			out.Correlations = append(out.Correlations, correlation)
@@ -171,6 +205,14 @@ func normalizeGlobalCampaignTemporalEvents(events []GlobalCampaignTemporalEvent)
 		}
 		event.RelationRefs = normalizeGlobalCampaignStrings(event.RelationRefs)
 		event.BridgeLinkRefs = normalizeGlobalCampaignStrings(event.BridgeLinkRefs)
+		event.VerifiedRelationRefs = normalizeGlobalCampaignStrings(event.VerifiedRelationRefs)
+		event.VerifiedBridgeLinkRefs = normalizeGlobalCampaignStrings(event.VerifiedBridgeLinkRefs)
+		if !globalCampaignTemporalRefsSubset(event.VerifiedRelationRefs, event.RelationRefs) {
+			return nil, nil, fmt.Errorf("%w: ref=%s kind=relation", ErrGlobalCampaignTemporalVerifiedRefBoundary, event.Ref)
+		}
+		if !globalCampaignTemporalRefsSubset(event.VerifiedBridgeLinkRefs, event.BridgeLinkRefs) {
+			return nil, nil, fmt.Errorf("%w: ref=%s kind=bridge_link", ErrGlobalCampaignTemporalVerifiedRefBoundary, event.Ref)
+		}
 
 		canonicalHash := hashGlobalCampaignTemporalEvent(event)
 		if previousHash, exists := hashByRef[event.Ref]; exists {
@@ -191,6 +233,14 @@ func normalizeGlobalCampaignTemporalEvents(events []GlobalCampaignTemporalEvent)
 			continue
 		}
 		active = append(active, event)
+	}
+	if len(active)+len(invalidated) > GlobalCampaignTemporalMaxEvents {
+		return nil, nil, fmt.Errorf(
+			"%w: unique_events=%d max_events=%d",
+			ErrGlobalCampaignTemporalBudgetExceeded,
+			len(active)+len(invalidated),
+			GlobalCampaignTemporalMaxEvents,
+		)
 	}
 	sort.Strings(invalidated)
 	sort.SliceStable(active, func(i, j int) bool {
@@ -229,13 +279,15 @@ func globalCampaignTemporalWindow(delta time.Duration) (string, bool) {
 func correlateGlobalCampaignTemporalPair(left, right GlobalCampaignTemporalEvent, window string, delta time.Duration) GlobalCampaignTemporalCorrelation {
 	sharedRelations := intersectGlobalCampaignStrings(left.RelationRefs, right.RelationRefs)
 	sharedBridges := intersectGlobalCampaignStrings(left.BridgeLinkRefs, right.BridgeLinkRefs)
+	sharedVerifiedRelations := intersectGlobalCampaignStrings(left.VerifiedRelationRefs, right.VerifiedRelationRefs)
+	sharedVerifiedBridges := intersectGlobalCampaignStrings(left.VerifiedBridgeLinkRefs, right.VerifiedBridgeLinkRefs)
 	crossNetwork := left.Network != right.Network
 	explicitVerifiedLink := false
 	if left.Network != "" && right.Network != "" && left.EvidenceState == "verified" && right.EvidenceState == "verified" {
 		if crossNetwork {
-			explicitVerifiedLink = len(sharedBridges) > 0
+			explicitVerifiedLink = len(sharedVerifiedBridges) > 0
 		} else {
-			explicitVerifiedLink = len(sharedRelations) > 0
+			explicitVerifiedLink = len(sharedVerifiedRelations) > 0
 		}
 	}
 
@@ -251,18 +303,36 @@ func correlateGlobalCampaignTemporalPair(left, right GlobalCampaignTemporalEvent
 	}
 
 	return GlobalCampaignTemporalCorrelation{
-		LeftRef:        left.Ref,
-		RightRef:       right.Ref,
-		LeftNetwork:    left.Network,
-		RightNetwork:   right.Network,
-		Window:         window,
-		DeltaSeconds:   int64(delta / time.Second),
-		EvidenceState:  state,
-		CrossNetwork:   crossNetwork,
-		WatchOnly:      watchOnly,
-		RelationRefs:   sharedRelations,
-		BridgeLinkRefs: sharedBridges,
+		LeftRef:                left.Ref,
+		RightRef:               right.Ref,
+		LeftNetwork:            left.Network,
+		RightNetwork:           right.Network,
+		Window:                 window,
+		DeltaSeconds:           int64(delta / time.Second),
+		EvidenceState:          state,
+		CrossNetwork:           crossNetwork,
+		WatchOnly:              watchOnly,
+		RelationRefs:           sharedRelations,
+		BridgeLinkRefs:         sharedBridges,
+		VerifiedRelationRefs:   sharedVerifiedRelations,
+		VerifiedBridgeLinkRefs: sharedVerifiedBridges,
 	}
+}
+
+func globalCampaignTemporalRefsSubset(subset, superset []string) bool {
+	if len(subset) == 0 {
+		return true
+	}
+	set := make(map[string]struct{}, len(superset))
+	for _, value := range superset {
+		set[value] = struct{}{}
+	}
+	for _, value := range subset {
+		if _, ok := set[value]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func intersectGlobalCampaignStrings(left, right []string) []string {
