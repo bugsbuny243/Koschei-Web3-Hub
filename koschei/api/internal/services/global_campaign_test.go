@@ -9,14 +9,14 @@ func TestGlobalCampaignCanonicalDeterminism(t *testing.T) {
 	observed := time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC)
 
 	a := NewGlobalCampaign(GlobalCampaign{
-		CampaignRef:    "KCAM1-example",
-		Revision:       1,
-		State:          GlobalCampaignActive,
+		CampaignRef:     "KCAM1-example",
+		Revision:        1,
+		State:           GlobalCampaignActive,
 		FirstObservedAt: observed,
 		LastObservedAt:  observed.Add(5 * time.Minute),
-		Networks:       []string{"solana-mainnet", "ethereum-mainnet", "solana-mainnet"},
-		Actors:         []string{"actor-b", "actor-a", "actor-a"},
-		Assets:         []string{"asset-x"},
+		Networks:        []string{"solana-mainnet", "ethereum-mainnet", "solana-mainnet"},
+		Actors:          []string{"actor-b", "actor-a", "actor-a"},
+		Assets:          []string{"asset-x"},
 		ObservationRefs: []string{"obs-2", "obs-1", "obs-1"},
 		RelationRefs:    []string{"rel-1"},
 		BridgeLinkRefs:  []string{"bridge-1"},
@@ -26,8 +26,8 @@ func TestGlobalCampaignCanonicalDeterminism(t *testing.T) {
 		CampaignRef:     "KCAM1-example",
 		Revision:        1,
 		State:           GlobalCampaignActive,
-		FirstObservedAt:  observed,
-		LastObservedAt:   observed.Add(5 * time.Minute),
+		FirstObservedAt: observed,
+		LastObservedAt:  observed.Add(5 * time.Minute),
 		Networks:        []string{"ethereum-mainnet", "solana-mainnet"},
 		Actors:          []string{"actor-a", "actor-b"},
 		Assets:          []string{"asset-x"},
@@ -53,18 +53,18 @@ func TestGlobalCampaignCanonicalDeterminism(t *testing.T) {
 
 func TestGlobalCampaignAuthorityBoundaryFailsClosed(t *testing.T) {
 	campaign := NewGlobalCampaign(GlobalCampaign{
-		CampaignRef:             "KCAM1-boundary",
-		State:                   GlobalCampaignEscalating,
-		VerdictAuthority:        true,
-		GradeAuthority:          true,
-		ContainmentAuthority:    true,
-		SameOperatorClaim:       true,
-		RealWorldIdentityClaim:  true,
-		WrongdoingClaim:         true,
-		VerifiedAnchorCount:     -1,
-		ObservedAnchorCount:     -1,
-		TransitionReasonCodes:   []string{" VERIFIED_BRIDGE_LINK ", "VERIFIED_BRIDGE_LINK"},
-		TransitionEvidenceRefs:  []string{" rel-1 ", "rel-1"},
+		CampaignRef:            "KCAM1-boundary",
+		State:                  GlobalCampaignEscalating,
+		VerdictAuthority:       true,
+		GradeAuthority:         true,
+		ContainmentAuthority:   true,
+		SameOperatorClaim:      true,
+		RealWorldIdentityClaim: true,
+		WrongdoingClaim:        true,
+		VerifiedAnchorCount:    -1,
+		ObservedAnchorCount:    -1,
+		TransitionReasonCodes:  []string{" VERIFIED_BRIDGE_LINK ", "VERIFIED_BRIDGE_LINK"},
+		TransitionEvidenceRefs: []string{" rel-1 ", "rel-1"},
 	})
 
 	if campaign.VerdictAuthority || campaign.GradeAuthority || campaign.ContainmentAuthority {
