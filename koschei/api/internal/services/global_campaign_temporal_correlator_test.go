@@ -11,13 +11,13 @@ import (
 func TestGlobalCampaignTemporalCorrelationArrivalOrderAndReplayStable(t *testing.T) {
 	base := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
 	events := []GlobalCampaignTemporalEvent{
-		{Ref: "obs:3", Network: "solana", Kind: "exit", ObservedAt: base.Add(12 * time.Minute), EvidenceState: "observed"},
+		{Ref: "obs:3", SubjectID: "subject:c", Network: "solana", Kind: "exit", ObservedAt: base.Add(12 * time.Minute), EvidenceState: "observed"},
 		{
-			Ref: "obs:1", Network: "solana", Kind: "funding", ObservedAt: base, EvidenceState: "verified",
+			Ref: "obs:1", SubjectID: "subject:a", Network: "solana", Kind: "funding", ObservedAt: base, EvidenceState: "verified",
 			RelationRefs: []string{"relation:funded", "relation:funded"}, VerifiedRelationRefs: []string{"relation:funded"},
 		},
 		{
-			Ref: "obs:2", Network: "solana", Kind: "creation", ObservedAt: base.Add(4 * time.Minute), EvidenceState: "verified",
+			Ref: "obs:2", SubjectID: "subject:b", Network: "solana", Kind: "creation", ObservedAt: base.Add(4 * time.Minute), EvidenceState: "verified",
 			RelationRefs: []string{"relation:funded"}, VerifiedRelationRefs: []string{"relation:funded"},
 		},
 	}
@@ -47,7 +47,7 @@ func TestGlobalCampaignTemporalCorrelationArrivalOrderAndReplayStable(t *testing
 
 func TestGlobalCampaignTemporalCorrelationDuplicateEvidenceIsIdempotent(t *testing.T) {
 	at := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
-	event := GlobalCampaignTemporalEvent{Ref: "obs:1", Network: "solana", Kind: "funding", ObservedAt: at, EvidenceState: "verified"}
+	event := GlobalCampaignTemporalEvent{Ref: "obs:1", SubjectID: "subject:a", Network: "solana", Kind: "funding", ObservedAt: at, EvidenceState: "verified"}
 	one, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{event})
 	if err != nil {
 		t.Fatal(err)
@@ -64,8 +64,8 @@ func TestGlobalCampaignTemporalCorrelationDuplicateEvidenceIsIdempotent(t *testi
 func TestGlobalCampaignTemporalCorrelationDivergentDuplicateFailsClosed(t *testing.T) {
 	at := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
 	_, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
-		{Ref: "obs:1", Network: "solana", Kind: "funding", ObservedAt: at, EvidenceState: "verified"},
-		{Ref: "obs:1", Network: "solana", Kind: "creation", ObservedAt: at, EvidenceState: "verified"},
+		{Ref: "obs:1", SubjectID: "subject:a", Network: "solana", Kind: "funding", ObservedAt: at, EvidenceState: "verified"},
+		{Ref: "obs:1", SubjectID: "subject:a", Network: "solana", Kind: "creation", ObservedAt: at, EvidenceState: "verified"},
 	})
 	if !errors.Is(err, ErrGlobalCampaignTemporalEvidenceConflict) {
 		t.Fatalf("expected divergent evidence conflict, got %v", err)
@@ -74,7 +74,7 @@ func TestGlobalCampaignTemporalCorrelationDivergentDuplicateFailsClosed(t *testi
 
 func TestGlobalCampaignTemporalCorrelationMissingTimestampFailsClosed(t *testing.T) {
 	_, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
-		{Ref: "obs:1", Network: "solana", Kind: "funding", EvidenceState: "verified"},
+		{Ref: "obs:1", SubjectID: "subject:a", Network: "solana", Kind: "funding", EvidenceState: "verified"},
 	})
 	if !errors.Is(err, ErrGlobalCampaignTemporalTimestampRequired) {
 		t.Fatalf("expected timestamp error, got %v", err)
@@ -85,7 +85,7 @@ func TestGlobalCampaignTemporalVerifiedRefMustBeCanonicalContextRef(t *testing.T
 	at := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
 	_, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
 		{
-			Ref: "obs:1", Network: "solana", Kind: "funding", ObservedAt: at, EvidenceState: "verified",
+			Ref: "obs:1", SubjectID: "subject:a", Network: "solana", Kind: "funding", ObservedAt: at, EvidenceState: "verified",
 			VerifiedRelationRefs: []string{"relation:verified-but-not-context"},
 		},
 	})
@@ -119,8 +119,8 @@ func TestGlobalCampaignTemporalWindowBoundariesAreInclusiveAndDeterministic(t *t
 func TestGlobalCampaignTemporalGenericRelationRefCannotVerify(t *testing.T) {
 	base := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
 	report, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
-		{Ref: "obs:1", Network: "solana", Kind: "funding", ObservedAt: base, EvidenceState: "verified", RelationRefs: []string{"relation:context-only"}},
-		{Ref: "obs:2", Network: "solana", Kind: "creation", ObservedAt: base.Add(time.Second), EvidenceState: "verified", RelationRefs: []string{"relation:context-only"}},
+		{Ref: "obs:1", SubjectID: "subject:a", Network: "solana", Kind: "funding", ObservedAt: base, EvidenceState: "verified", RelationRefs: []string{"relation:context-only"}},
+		{Ref: "obs:2", SubjectID: "subject:b", Network: "solana", Kind: "creation", ObservedAt: base.Add(time.Second), EvidenceState: "verified", RelationRefs: []string{"relation:context-only"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -134,11 +134,32 @@ func TestGlobalCampaignTemporalGenericRelationRefCannotVerify(t *testing.T) {
 	}
 }
 
+func TestGlobalCampaignTemporalSameSubjectVerifiedRelationCannotVerify(t *testing.T) {
+	base := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
+	report, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
+		{
+			Ref: "obs:1", SubjectID: "subject:a", Network: "solana", Kind: "funding", ObservedAt: base, EvidenceState: "verified",
+			RelationRefs: []string{"relation:verified"}, VerifiedRelationRefs: []string{"relation:verified"},
+		},
+		{
+			Ref: "obs:2", SubjectID: "subject:a", Network: "solana", Kind: "state", ObservedAt: base.Add(time.Second), EvidenceState: "verified",
+			RelationRefs: []string{"relation:verified"}, VerifiedRelationRefs: []string{"relation:verified"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := report.Correlations[0]
+	if got.EvidenceState == "verified" || !got.WatchOnly || report.VerifiedLinkCount != 0 {
+		t.Fatalf("same-subject observations were over-promoted: %#v / verified=%d", got, report.VerifiedLinkCount)
+	}
+}
+
 func TestGlobalCampaignTemporalCrossNetworkTimingAloneCannotVerify(t *testing.T) {
 	base := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
 	report, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
-		{Ref: "sol:tx:1", Network: "solana", Kind: "bridge_source", ObservedAt: base, EvidenceState: "verified"},
-		{Ref: "eth:tx:1", Network: "ethereum", Kind: "bridge_destination", ObservedAt: base.Add(30 * time.Second), EvidenceState: "verified"},
+		{Ref: "sol:tx:1", SubjectID: "subject:sol", Network: "solana", Kind: "bridge_source", ObservedAt: base, EvidenceState: "verified"},
+		{Ref: "eth:tx:1", SubjectID: "subject:eth", Network: "ethereum", Kind: "bridge_destination", ObservedAt: base.Add(30 * time.Second), EvidenceState: "verified"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -155,8 +176,8 @@ func TestGlobalCampaignTemporalCrossNetworkTimingAloneCannotVerify(t *testing.T)
 func TestGlobalCampaignTemporalGenericBridgeRefCannotVerify(t *testing.T) {
 	base := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
 	report, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
-		{Ref: "sol:tx:1", Network: "solana", Kind: "bridge_source", ObservedAt: base, EvidenceState: "verified", BridgeLinkRefs: []string{"bridge-link:context-only"}},
-		{Ref: "eth:tx:1", Network: "ethereum", Kind: "bridge_destination", ObservedAt: base.Add(30 * time.Second), EvidenceState: "verified", BridgeLinkRefs: []string{"bridge-link:context-only"}},
+		{Ref: "sol:tx:1", SubjectID: "subject:sol", Network: "solana", Kind: "bridge_source", ObservedAt: base, EvidenceState: "verified", BridgeLinkRefs: []string{"bridge-link:context-only"}},
+		{Ref: "eth:tx:1", SubjectID: "subject:eth", Network: "ethereum", Kind: "bridge_destination", ObservedAt: base.Add(30 * time.Second), EvidenceState: "verified", BridgeLinkRefs: []string{"bridge-link:context-only"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -174,11 +195,11 @@ func TestGlobalCampaignTemporalCrossNetworkVerifiedBridgeCanVerifyContinuity(t *
 	base := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
 	report, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
 		{
-			Ref: "sol:tx:1", Network: "solana", Kind: "bridge_source", ObservedAt: base, EvidenceState: "verified",
+			Ref: "sol:tx:1", SubjectID: "subject:sol", Network: "solana", Kind: "bridge_source", ObservedAt: base, EvidenceState: "verified",
 			BridgeLinkRefs: []string{"bridge-link:abc"}, VerifiedBridgeLinkRefs: []string{"bridge-link:abc"},
 		},
 		{
-			Ref: "eth:tx:1", Network: "ethereum", Kind: "bridge_destination", ObservedAt: base.Add(30 * time.Second), EvidenceState: "verified",
+			Ref: "eth:tx:1", SubjectID: "subject:eth", Network: "ethereum", Kind: "bridge_destination", ObservedAt: base.Add(30 * time.Second), EvidenceState: "verified",
 			BridgeLinkRefs: []string{"bridge-link:abc"}, VerifiedBridgeLinkRefs: []string{"bridge-link:abc"},
 		},
 	})
@@ -197,8 +218,8 @@ func TestGlobalCampaignTemporalCrossNetworkVerifiedBridgeCanVerifyContinuity(t *
 func TestGlobalCampaignTemporalInferredOnlyStaysWatchOnly(t *testing.T) {
 	base := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
 	report, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
-		{Ref: "hyp:1", Network: "solana", Kind: "hypothesis", ObservedAt: base, EvidenceState: "inferred", RelationRefs: []string{"relation:x"}},
-		{Ref: "hyp:2", Network: "solana", Kind: "hypothesis", ObservedAt: base.Add(time.Second), EvidenceState: "inferred", RelationRefs: []string{"relation:x"}},
+		{Ref: "hyp:1", SubjectID: "subject:a", Network: "solana", Kind: "hypothesis", ObservedAt: base, EvidenceState: "inferred", RelationRefs: []string{"relation:x"}},
+		{Ref: "hyp:2", SubjectID: "subject:b", Network: "solana", Kind: "hypothesis", ObservedAt: base.Add(time.Second), EvidenceState: "inferred", RelationRefs: []string{"relation:x"}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -213,11 +234,11 @@ func TestGlobalCampaignTemporalInvalidatedEvidenceCannotRemainActive(t *testing.
 	base := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
 	report, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
 		{
-			Ref: "obs:reorged", Network: "ethereum", Kind: "transfer", ObservedAt: base, EvidenceState: "verified",
+			Ref: "obs:reorged", SubjectID: "subject:a", Network: "ethereum", Kind: "transfer", ObservedAt: base, EvidenceState: "verified",
 			RelationRefs: []string{"relation:x"}, VerifiedRelationRefs: []string{"relation:x"}, Invalidated: true,
 		},
 		{
-			Ref: "obs:live", Network: "ethereum", Kind: "transfer", ObservedAt: base.Add(time.Second), EvidenceState: "verified",
+			Ref: "obs:live", SubjectID: "subject:b", Network: "ethereum", Kind: "transfer", ObservedAt: base.Add(time.Second), EvidenceState: "verified",
 			RelationRefs: []string{"relation:x"}, VerifiedRelationRefs: []string{"relation:x"},
 		},
 	})
@@ -236,11 +257,11 @@ func TestGlobalCampaignTemporalSignedArtifactCannotUpgradeCorrelation(t *testing
 	base := time.Date(2026, 10, 2, 3, 0, 0, 0, time.UTC)
 	report, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", []GlobalCampaignTemporalEvent{
 		{
-			Ref: "artifact:1", Network: "solana", Kind: "signed_verdict", ObservedAt: base, EvidenceState: "signed_artifact",
+			Ref: "artifact:1", SubjectID: "subject:a", Network: "solana", Kind: "signed_verdict", ObservedAt: base, EvidenceState: "signed_artifact",
 			RelationRefs: []string{"relation:x"}, VerifiedRelationRefs: []string{"relation:x"},
 		},
 		{
-			Ref: "obs:1", Network: "solana", Kind: "transfer", ObservedAt: base.Add(time.Second), EvidenceState: "verified",
+			Ref: "obs:1", SubjectID: "subject:b", Network: "solana", Kind: "transfer", ObservedAt: base.Add(time.Second), EvidenceState: "verified",
 			RelationRefs: []string{"relation:x"}, VerifiedRelationRefs: []string{"relation:x"},
 		},
 	})
@@ -258,7 +279,7 @@ func TestGlobalCampaignTemporalEventBudgetFailsClosed(t *testing.T) {
 	events := make([]GlobalCampaignTemporalEvent, GlobalCampaignTemporalMaxEvents+1)
 	for i := range events {
 		events[i] = GlobalCampaignTemporalEvent{
-			Ref: fmt.Sprintf("obs:%05d", i), Network: "solana", Kind: "transfer", ObservedAt: base, EvidenceState: "observed",
+			Ref: fmt.Sprintf("obs:%05d", i), SubjectID: fmt.Sprintf("subject:%05d", i), Network: "solana", Kind: "transfer", ObservedAt: base, EvidenceState: "observed",
 		}
 	}
 	_, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", events)
@@ -274,7 +295,7 @@ func TestGlobalCampaignTemporalCorrelationBudgetFailsClosed(t *testing.T) {
 	events := make([]GlobalCampaignTemporalEvent, 142)
 	for i := range events {
 		events[i] = GlobalCampaignTemporalEvent{
-			Ref: fmt.Sprintf("obs:%03d", i), Network: "solana", Kind: "transfer", ObservedAt: base, EvidenceState: "observed",
+			Ref: fmt.Sprintf("obs:%03d", i), SubjectID: fmt.Sprintf("subject:%03d", i), Network: "solana", Kind: "transfer", ObservedAt: base, EvidenceState: "observed",
 		}
 	}
 	_, err := BuildGlobalCampaignTemporalCorrelation("KCAM1-A", events)
