@@ -61,8 +61,8 @@ func PersistGlobalCampaignRevision(ctx context.Context, db *sql.DB, campaign Glo
 }
 
 // persistGlobalCampaignRevisionTx is the transaction-scoped persistence core.
-// Callers that perform candidate lookup must hold their lookup anchor locks in
-// the same transaction before invoking this helper.
+// Candidate-resolution callers are responsible for evidence-anchor locking;
+// this helper serializes the stable campaign identity itself.
 func persistGlobalCampaignRevisionTx(ctx context.Context, tx *sql.Tx, campaign GlobalCampaign) (GlobalCampaignPersistResult, error) {
 	if tx == nil {
 		return GlobalCampaignPersistResult{}, ErrGlobalCampaignStoreUnavailable
@@ -78,10 +78,6 @@ func persistGlobalCampaignRevisionTx(ctx context.Context, tx *sql.Tx, campaign G
 		return GlobalCampaignPersistResult{}, fmt.Errorf("global campaign last observation precedes first observation")
 	}
 
-	anchors := globalCampaignLookupAnchorsFromCampaign(campaign)
-	if err := lockGlobalCampaignAnchorsTx(ctx, tx, anchors); err != nil {
-		return GlobalCampaignPersistResult{}, err
-	}
 	if err := lockGlobalCampaignRefTx(ctx, tx, campaign.CampaignRef); err != nil {
 		return GlobalCampaignPersistResult{}, err
 	}
