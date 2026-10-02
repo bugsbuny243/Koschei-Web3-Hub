@@ -201,7 +201,9 @@ func validateCanonicalGlobalCampaignRadarSnapshot(snapshot GlobalRadarSnapshot) 
 			return GlobalRadarSnapshot{}, fmt.Errorf("%w: duplicate observation=%s", ErrGlobalCampaignRadarEvidenceInvalid, observation.ObservationID)
 		}
 		observationByID[observation.ObservationID] = observation
-		evidenceByID[observation.Evidence.ID] = observation.Evidence
+		if err := registerGlobalCampaignRadarEvidence(evidenceByID, observation.Evidence, "observation="+observation.ObservationID); err != nil {
+			return GlobalRadarSnapshot{}, err
+		}
 		observations = append(observations, observation)
 	}
 
@@ -216,7 +218,9 @@ func validateCanonicalGlobalCampaignRadarSnapshot(snapshot GlobalRadarSnapshot) 
 		if err != nil || !reflect.DeepEqual(rebuilt, link) {
 			return GlobalRadarSnapshot{}, fmt.Errorf("%w: bridge=%s", ErrGlobalCampaignRadarEvidenceInvalid, link.LinkID)
 		}
-		evidenceByID[link.LinkEvidence.ID] = link.LinkEvidence
+		if err := registerGlobalCampaignRadarEvidence(evidenceByID, link.LinkEvidence, "bridge="+link.LinkID); err != nil {
+			return GlobalRadarSnapshot{}, err
+		}
 		bridgeLinks = append(bridgeLinks, link)
 	}
 
@@ -252,6 +256,21 @@ func validateCanonicalGlobalCampaignRadarSnapshot(snapshot GlobalRadarSnapshot) 
 		return GlobalRadarSnapshot{}, fmt.Errorf("%w: %v", ErrGlobalCampaignRadarSnapshotInvalid, err)
 	}
 	return canonical, nil
+}
+
+func registerGlobalCampaignRadarEvidence(index map[string]IntelligenceEvidence, evidence IntelligenceEvidence, owner string) error {
+	evidenceID := strings.TrimSpace(evidence.ID)
+	if evidenceID == "" {
+		return fmt.Errorf("%w: %s empty evidence id", ErrGlobalCampaignRadarEvidenceInvalid, owner)
+	}
+	if previous, exists := index[evidenceID]; exists {
+		if !reflect.DeepEqual(previous, evidence) {
+			return fmt.Errorf("%w: divergent duplicate evidence=%s owner=%s", ErrGlobalCampaignRadarEvidenceInvalid, evidenceID, owner)
+		}
+		return nil
+	}
+	index[evidenceID] = evidence
+	return nil
 }
 
 func findGlobalCampaignTemporalCorrelation(correlations []GlobalCampaignTemporalCorrelation, leftRef, rightRef string) (GlobalCampaignTemporalCorrelation, bool) {
