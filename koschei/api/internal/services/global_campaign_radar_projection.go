@@ -24,45 +24,45 @@ var (
 // GlobalRadarBridgeLink. It does not infer actor identity, common control,
 // malicious intent, a campaign verdict, or containment authority.
 type GlobalCampaignCrossNetworkContinuity struct {
-	BridgeLinkRef             string `json:"bridge_link_ref"`
-	BridgeProtocol            string `json:"bridge_protocol"`
-	BridgeTransferID          string `json:"bridge_transfer_id"`
-	SourceObservationRef      string `json:"source_observation_ref"`
-	DestinationObservationRef string `json:"destination_observation_ref"`
-	SourceSubjectID           string `json:"source_subject_id"`
-	DestinationSubjectID      string `json:"destination_subject_id"`
-	SourceNetwork             string `json:"source_network"`
-	DestinationNetwork        string `json:"destination_network"`
-	SourceTransactionHash     string `json:"source_transaction_hash"`
+	BridgeLinkRef              string `json:"bridge_link_ref"`
+	BridgeProtocol             string `json:"bridge_protocol"`
+	BridgeTransferID           string `json:"bridge_transfer_id"`
+	SourceObservationRef       string `json:"source_observation_ref"`
+	DestinationObservationRef  string `json:"destination_observation_ref"`
+	SourceSubjectID            string `json:"source_subject_id"`
+	DestinationSubjectID       string `json:"destination_subject_id"`
+	SourceNetwork              string `json:"source_network"`
+	DestinationNetwork         string `json:"destination_network"`
+	SourceTransactionHash      string `json:"source_transaction_hash"`
 	DestinationTransactionHash string `json:"destination_transaction_hash"`
-	LinkEvidenceRef           string `json:"link_evidence_ref"`
-	RelationRef               string `json:"relation_ref"`
-	EvidenceState             string `json:"evidence_state"`
-	VerificationBoundary      string `json:"verification_boundary"`
-	TemporalAvailable         bool   `json:"temporal_available"`
-	TemporalWindow            string `json:"temporal_window,omitempty"`
-	TemporalDeltaSeconds      int64  `json:"temporal_delta_seconds"`
-	TemporalEvidenceState     string `json:"temporal_evidence_state,omitempty"`
+	LinkEvidenceRef            string `json:"link_evidence_ref"`
+	RelationRef                string `json:"relation_ref"`
+	EvidenceState              string `json:"evidence_state"`
+	VerificationBoundary       string `json:"verification_boundary"`
+	TemporalAvailable          bool   `json:"temporal_available"`
+	TemporalWindow             string `json:"temporal_window,omitempty"`
+	TemporalDeltaSeconds       int64  `json:"temporal_delta_seconds"`
+	TemporalEvidenceState      string `json:"temporal_evidence_state,omitempty"`
 }
 
 // GlobalCampaignRadarProjection is a read-only campaign-centered projection of
 // canonical Global Radar observations, relations, and bridge links. It reuses
 // the existing Radar graph instead of creating a second relationship authority.
 type GlobalCampaignRadarProjection struct {
-	Version                string                                 `json:"version"`
-	CampaignRef            string                                 `json:"campaign_ref"`
-	SnapshotGeneratedAt    time.Time                              `json:"snapshot_generated_at"`
-	Events                 []GlobalCampaignTemporalEvent          `json:"events"`
-	CrossNetworkContinuity []GlobalCampaignCrossNetworkContinuity `json:"cross_network_continuity"`
+	Version                string                                  `json:"version"`
+	CampaignRef            string                                  `json:"campaign_ref"`
+	SnapshotGeneratedAt    time.Time                               `json:"snapshot_generated_at"`
+	Events                 []GlobalCampaignTemporalEvent           `json:"events"`
+	CrossNetworkContinuity []GlobalCampaignCrossNetworkContinuity  `json:"cross_network_continuity"`
 	Temporal               GlobalCampaignTemporalCorrelationReport `json:"temporal"`
-	FingerprintSHA256      string                                 `json:"fingerprint_sha256"`
-	VerdictAuthority       bool                                   `json:"verdict_authority"`
-	GradeAuthority         bool                                   `json:"grade_authority"`
-	ContainmentAuthority   bool                                   `json:"containment_authority"`
-	SameOperatorClaim      bool                                   `json:"same_operator_claim"`
-	RealWorldIdentityClaim bool                                   `json:"real_world_identity_claim"`
-	WrongdoingClaim        bool                                   `json:"wrongdoing_claim"`
-	Limitations            []string                               `json:"limitations"`
+	FingerprintSHA256      string                                  `json:"fingerprint_sha256"`
+	VerdictAuthority       bool                                    `json:"verdict_authority"`
+	GradeAuthority         bool                                    `json:"grade_authority"`
+	ContainmentAuthority   bool                                    `json:"containment_authority"`
+	SameOperatorClaim      bool                                    `json:"same_operator_claim"`
+	RealWorldIdentityClaim bool                                    `json:"real_world_identity_claim"`
+	WrongdoingClaim        bool                                    `json:"wrongdoing_claim"`
+	Limitations            []string                                `json:"limitations"`
 }
 
 // BuildGlobalCampaignRadarProjection validates the supplied snapshot back
