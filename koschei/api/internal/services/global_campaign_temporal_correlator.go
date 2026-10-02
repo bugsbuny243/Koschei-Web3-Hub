@@ -42,10 +42,13 @@ var globalCampaignTemporalWindows = []struct {
 // are correlation context only. A caller may populate VerifiedRelationRefs or
 // VerifiedBridgeLinkRefs only from an already-verified persistent relation or
 // bridge-link contract; the temporal layer never upgrades generic refs itself.
+// SubjectID is the canonical Global Radar subject identity and is required on
+// both sides before an explicit relation/bridge can upgrade a pair to VERIFIED.
 // The correlator never invents a timestamp, entity attribution, bridge proof,
 // verdict, grade, or containment decision.
 type GlobalCampaignTemporalEvent struct {
 	Ref                    string    `json:"ref"`
+	SubjectID              string    `json:"subject_id,omitempty"`
 	Network                string    `json:"network"`
 	Kind                   string    `json:"kind"`
 	ObservedAt             time.Time `json:"observed_at"`
@@ -59,12 +62,15 @@ type GlobalCampaignTemporalEvent struct {
 
 // GlobalCampaignTemporalCorrelation describes a deterministic event-time
 // relationship candidate. Temporal proximity alone is never VERIFIED. A
-// verified same-network result requires a shared explicit verified relation;
-// a verified cross-network result requires a shared explicit verified bridge
-// link. Otherwise the result remains observed/watch/inferred context.
+// verified same-network result requires distinct canonical subjects plus a
+// shared explicit verified relation; a verified cross-network result requires
+// distinct canonical subjects plus a shared explicit verified bridge link.
+// Otherwise the result remains observed/watch/inferred context.
 type GlobalCampaignTemporalCorrelation struct {
 	LeftRef                string   `json:"left_ref"`
 	RightRef               string   `json:"right_ref"`
+	LeftSubjectID          string   `json:"left_subject_id,omitempty"`
+	RightSubjectID         string   `json:"right_subject_id,omitempty"`
 	LeftNetwork            string   `json:"left_network"`
 	RightNetwork           string   `json:"right_network"`
 	Window                 string   `json:"window"`
@@ -127,8 +133,8 @@ func BuildGlobalCampaignTemporalCorrelation(campaignRef string, events []GlobalC
 		Correlations:    []GlobalCampaignTemporalCorrelation{},
 		Limitations: []string{
 			"Temporal proximity alone is correlation context and never proves common control, identity, intent or wrongdoing.",
-			"Cross-network VERIFIED continuity requires an explicit shared verified bridge-link reference; timing similarity or a generic bridge reference alone remains non-verified context.",
-			"Same-network VERIFIED correlation requires an explicit shared verified relation reference; co-occurrence or a generic relation reference alone remains non-verified context.",
+			"Cross-network VERIFIED continuity requires distinct canonical subjects and an explicit shared verified bridge-link reference; timing similarity or a generic bridge reference alone remains non-verified context.",
+			"Same-network VERIFIED correlation requires distinct canonical subjects and an explicit shared verified relation reference; co-occurrence or a generic relation reference alone remains non-verified context.",
 			"signed_artifact is distinct from verified on-chain evidence and cannot by itself upgrade a temporal correlation to VERIFIED.",
 			"Invalidated or reorg-revoked evidence is excluded from active correlations; missing evidence is not interpreted as safety.",
 			"Temporal work is batch-bounded; callers must deterministically chunk and replay larger campaign timelines rather than relying on silent truncation.",
@@ -197,6 +203,7 @@ func normalizeGlobalCampaignTemporalEvents(events []GlobalCampaignTemporalEvent)
 			return nil, nil, fmt.Errorf("%w: %s", ErrGlobalCampaignTemporalTimestampRequired, event.Ref)
 		}
 		event.ObservedAt = event.ObservedAt.UTC()
+		event.SubjectID = strings.TrimSpace(event.SubjectID)
 		event.Network = normalizeRadarNetwork(event.Network)
 		event.Kind = strings.TrimSpace(event.Kind)
 		event.EvidenceState = strings.ToLower(strings.TrimSpace(event.EvidenceState))
@@ -250,6 +257,9 @@ func normalizeGlobalCampaignTemporalEvents(events []GlobalCampaignTemporalEvent)
 		if active[i].Network != active[j].Network {
 			return active[i].Network < active[j].Network
 		}
+		if active[i].SubjectID != active[j].SubjectID {
+			return active[i].SubjectID < active[j].SubjectID
+		}
 		if active[i].Ref != active[j].Ref {
 			return active[i].Ref < active[j].Ref
 		}
@@ -282,8 +292,9 @@ func correlateGlobalCampaignTemporalPair(left, right GlobalCampaignTemporalEvent
 	sharedVerifiedRelations := intersectGlobalCampaignStrings(left.VerifiedRelationRefs, right.VerifiedRelationRefs)
 	sharedVerifiedBridges := intersectGlobalCampaignStrings(left.VerifiedBridgeLinkRefs, right.VerifiedBridgeLinkRefs)
 	crossNetwork := left.Network != right.Network
+	distinctCanonicalSubjects := left.SubjectID != "" && right.SubjectID != "" && left.SubjectID != right.SubjectID
 	explicitVerifiedLink := false
-	if left.Network != "" && right.Network != "" && left.EvidenceState == "verified" && right.EvidenceState == "verified" {
+	if distinctCanonicalSubjects && left.Network != "" && right.Network != "" && left.EvidenceState == "verified" && right.EvidenceState == "verified" {
 		if crossNetwork {
 			explicitVerifiedLink = len(sharedVerifiedBridges) > 0
 		} else {
@@ -305,6 +316,8 @@ func correlateGlobalCampaignTemporalPair(left, right GlobalCampaignTemporalEvent
 	return GlobalCampaignTemporalCorrelation{
 		LeftRef:                left.Ref,
 		RightRef:               right.Ref,
+		LeftSubjectID:          left.SubjectID,
+		RightSubjectID:         right.SubjectID,
 		LeftNetwork:            left.Network,
 		RightNetwork:           right.Network,
 		Window:                 window,
