@@ -39,6 +39,7 @@ jobs:
           files="$(gofmt -l internal/services/global_campaign_radar_projection.go internal/services/global_campaign_radar_projection_test.go)"
           if [ -n "${files}" ]; then
             printf '%s\n' "${files}"
+            gofmt -d internal/services/global_campaign_radar_projection.go internal/services/global_campaign_radar_projection_test.go
             exit 1
           fi
       - name: Run Radar projection acceptance under race detector
