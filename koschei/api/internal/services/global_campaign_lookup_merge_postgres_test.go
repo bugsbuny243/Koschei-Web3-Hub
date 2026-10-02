@@ -148,8 +148,8 @@ func TestGlobalCampaignLookupMergePostgres17(t *testing.T) {
 
 	beforeAmbiguousRevision := replay.Campaign.Revision
 	if _, err := MaterializeAndPersistGlobalCampaign(ctx, db, GlobalCampaignMaterializerInput{
-		ObservedAt:   t0.Add(4 * time.Minute),
-		RelationRefs: []string{relationB, separateRelation},
+		ObservedAt:     t0.Add(4 * time.Minute),
+		RelationRefs:   []string{relationB, separateRelation},
 		RulesetVersion: "campaign-ci.v1",
 	}); !errors.Is(err, ErrGlobalCampaignAmbiguousCandidates) {
 		t.Fatalf("ambiguous candidate error=%v want=%v", err, ErrGlobalCampaignAmbiguousCandidates)
