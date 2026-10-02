@@ -8,26 +8,26 @@ import (
 func TestMaterializeGlobalCampaignIsOrderIndependent(t *testing.T) {
 	observed := time.Date(2026, 10, 2, 0, 30, 0, 0, time.UTC)
 	a := MaterializeGlobalCampaign(GlobalCampaignMaterializerInput{
-		ObservedAt:            observed,
-		Networks:              []string{"ethereum-mainnet", "solana-mainnet"},
-		Actors:                []string{"actor-b", "actor-a"},
-		ObservationRefs:       []string{"obs-2", "obs-1"},
-		RelationRefs:          []string{"rel-2", "rel-1"},
-		BridgeLinkRefs:        []string{"bridge-1"},
-		VerifiedAnchorCount:   2,
-		ObservedAnchorCount:   1,
-		RulesetVersion:        "campaign-rules-v1",
+		ObservedAt:          observed,
+		Networks:            []string{"ethereum-mainnet", "solana-mainnet"},
+		Actors:              []string{"actor-b", "actor-a"},
+		ObservationRefs:     []string{"obs-2", "obs-1"},
+		RelationRefs:        []string{"rel-2", "rel-1"},
+		BridgeLinkRefs:      []string{"bridge-1"},
+		VerifiedAnchorCount: 2,
+		ObservedAnchorCount: 1,
+		RulesetVersion:      "campaign-rules-v1",
 	})
 	b := MaterializeGlobalCampaign(GlobalCampaignMaterializerInput{
-		ObservedAt:            observed,
-		Networks:              []string{"solana-mainnet", "ethereum-mainnet"},
-		Actors:                []string{"actor-a", "actor-b"},
-		ObservationRefs:       []string{"obs-1", "obs-2"},
-		RelationRefs:          []string{"rel-1", "rel-2"},
-		BridgeLinkRefs:        []string{"bridge-1"},
-		VerifiedAnchorCount:   2,
-		ObservedAnchorCount:   1,
-		RulesetVersion:        "campaign-rules-v1",
+		ObservedAt:          observed,
+		Networks:            []string{"solana-mainnet", "ethereum-mainnet"},
+		Actors:              []string{"actor-a", "actor-b"},
+		ObservationRefs:     []string{"obs-1", "obs-2"},
+		RelationRefs:        []string{"rel-1", "rel-2"},
+		BridgeLinkRefs:      []string{"bridge-1"},
+		VerifiedAnchorCount: 2,
+		ObservedAnchorCount: 1,
+		RulesetVersion:      "campaign-rules-v1",
 	})
 
 	if a.CampaignRef == "" || a.CampaignRef != b.CampaignRef {
@@ -51,9 +51,9 @@ func TestMaterializeGlobalCampaignPreservesExistingIdentity(t *testing.T) {
 		ExistingCampaignRef: first.CampaignRef,
 		ExistingRevision:    first.Revision + 1,
 		ExistingState:       GlobalCampaignActive,
-		ObservedAt:           time.Date(2026, 10, 2, 0, 35, 0, 0, time.UTC),
-		RelationRefs:         []string{"rel-1", "rel-2"},
-		ObservationRefs:      []string{"obs-1", "obs-2"},
+		ObservedAt:          time.Date(2026, 10, 2, 0, 35, 0, 0, time.UTC),
+		RelationRefs:        []string{"rel-1", "rel-2"},
+		ObservationRefs:     []string{"obs-1", "obs-2"},
 	})
 
 	if first.CampaignRef == "" {
