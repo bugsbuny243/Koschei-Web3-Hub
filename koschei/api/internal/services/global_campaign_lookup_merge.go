@@ -8,7 +8,6 @@ import (
 	"math"
 	"sort"
 	"strings"
-	"time"
 )
 
 var (
@@ -91,15 +90,30 @@ func MaterializeAndPersistGlobalCampaign(ctx context.Context, db *sql.DB, in Glo
 		campaign := MaterializeGlobalCampaign(in)
 		result, err = persistGlobalCampaignRevisionTx(ctx, tx, campaign)
 	case 1:
-		merged, changed, mergeErr := MergeGlobalCampaignMaterial(candidates[0].Campaign, in)
+		campaignRef := candidates[0].Campaign.CampaignRef
+		if err := lockGlobalCampaignRefTx(ctx, tx, campaignRef); err != nil {
+			return GlobalCampaignPersistResult{}, err
+		}
+		stored, found, loadErr := loadGlobalCampaignRowTx(ctx, tx, campaignRef, true)
+		if loadErr != nil {
+			return GlobalCampaignPersistResult{}, loadErr
+		}
+		if !found {
+			return GlobalCampaignPersistResult{}, fmt.Errorf("%w: candidate %s disappeared before merge", ErrGlobalCampaignStoredCorrupt, campaignRef)
+		}
+		current, decodeErr := decodeStoredGlobalCampaign(campaignRef, stored)
+		if decodeErr != nil {
+			return GlobalCampaignPersistResult{}, decodeErr
+		}
+		if !globalCampaignAnchorsOverlap(anchors, globalCampaignLookupAnchorsFromCampaign(current)) {
+			return GlobalCampaignPersistResult{}, fmt.Errorf("%w: candidate %s no longer shares incoming evidence", ErrGlobalCampaignRevisionConflict, campaignRef)
+		}
+		merged, changed, mergeErr := MergeGlobalCampaignMaterial(current, in)
 		if mergeErr != nil {
 			return GlobalCampaignPersistResult{}, mergeErr
 		}
 		if !changed {
-			if err := replaceGlobalCampaignAnchorIndexTx(ctx, tx, candidates[0].Campaign); err != nil {
-				return GlobalCampaignPersistResult{}, err
-			}
-			result = GlobalCampaignPersistResult{Campaign: candidates[0].Campaign, Idempotent: true}
+			result, err = persistGlobalCampaignRevisionTx(ctx, tx, current)
 			break
 		}
 		result, err = persistGlobalCampaignRevisionTx(ctx, tx, merged)
@@ -230,6 +244,10 @@ func appendGlobalCampaignAnchors(dst []globalCampaignAnchor, kind string, refs [
 }
 
 func normalizeGlobalCampaignAnchors(in []globalCampaignAnchor) []globalCampaignAnchor {
+	for index := range in {
+		in[index].Kind = strings.TrimSpace(in[index].Kind)
+		in[index].Ref = strings.TrimSpace(in[index].Ref)
+	}
 	sort.Slice(in, func(i, j int) bool {
 		if in[i].Kind == in[j].Kind {
 			return in[i].Ref < in[j].Ref
@@ -238,8 +256,6 @@ func normalizeGlobalCampaignAnchors(in []globalCampaignAnchor) []globalCampaignA
 	})
 	out := make([]globalCampaignAnchor, 0, len(in))
 	for _, anchor := range in {
-		anchor.Kind = strings.TrimSpace(anchor.Kind)
-		anchor.Ref = strings.TrimSpace(anchor.Ref)
 		if anchor.Kind == "" || anchor.Ref == "" {
 			continue
 		}
@@ -249,6 +265,24 @@ func normalizeGlobalCampaignAnchors(in []globalCampaignAnchor) []globalCampaignA
 		out = append(out, anchor)
 	}
 	return out
+}
+
+func globalCampaignAnchorsOverlap(a, b []globalCampaignAnchor) bool {
+	a = normalizeGlobalCampaignAnchors(append([]globalCampaignAnchor{}, a...))
+	b = normalizeGlobalCampaignAnchors(append([]globalCampaignAnchor{}, b...))
+	i := 0
+	j := 0
+	for i < len(a) && j < len(b) {
+		if a[i] == b[j] {
+			return true
+		}
+		if a[i].Kind < b[j].Kind || (a[i].Kind == b[j].Kind && a[i].Ref < b[j].Ref) {
+			i++
+		} else {
+			j++
+		}
+	}
+	return false
 }
 
 func lockGlobalCampaignAnchorsTx(ctx context.Context, tx *sql.Tx, anchors []globalCampaignAnchor) error {
@@ -364,16 +398,6 @@ func mergeGlobalCampaignStrings(current, incoming []string) []string {
 
 func maxGlobalCampaignInt(a, b int) int {
 	if a > b {
-		return a
-	}
-	return b
-}
-
-func minGlobalCampaignTime(a, b time.Time) time.Time {
-	if a.IsZero() {
-		return b
-	}
-	if b.IsZero() || a.Before(b) {
 		return a
 	}
 	return b
