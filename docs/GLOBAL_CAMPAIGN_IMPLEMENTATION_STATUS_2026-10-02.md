@@ -30,11 +30,24 @@
    - PostgreSQL 17 acceptance coverage for revision persistence and corruption detection
    - compact canonical campaign memory only; no raw radar event-body duplication
 
+5. `feat/global-campaign-v1-lookup-merge`
+   - PostgreSQL current-revision evidence-anchor index
+   - DB-backed existing-campaign candidate lookup using canonical evidence references only
+   - deterministic single-candidate merge across partial arrival windows
+   - stable campaign identity and lifecycle-state preservation during material convergence
+   - replay-stable no-op behavior when incoming evidence adds no material state
+   - fail-closed ambiguous multi-campaign matches instead of silent identity collapse
+   - fail-closed ruleset-version conflicts
+   - sorted evidence-anchor advisory locking plus stable campaign-ref serialization
+   - current revision reload under campaign lock before merge, preventing stale concurrent writers
+   - PostgreSQL 17 race-detector acceptance for disjoint-anchor concurrent convergence
+   - entity-only hints and verdict references excluded from automatic candidate matching
+
 ## Not yet implemented
 
-- DB-backed existing-campaign candidate lookup and deterministic merge/convergence across partial arrival windows
+- deliberate evidence-backed campaign-to-campaign alias/merge contract for resolving ambiguous identities
 - ClickHouse-backed heavy campaign event history
-- cross-chain temporal window correlation
+- cross-chain temporal window correlation and campaign-window scheduling
 - bridge adapter expansion
 - Sentinel Fabric campaign evidence/opinion contracts
 - campaign-to-incident linkage
@@ -45,7 +58,9 @@
 
 ## Persistence boundary
 
-PostgreSQL stores only the stable campaign identity, immutable canonical revisions and the current projection. Heavy/raw radar event history is not copied into campaign memory. A revision is accepted only when the canonical Global Campaign validator passes. Revision 1 must be the first persisted state; later writes must be exactly contiguous. An exact replay is idempotent, while a same-revision payload/hash mismatch, a stale write, a revision jump, invalid state transition, or persisted metadata/payload/hash disagreement fails closed.
+PostgreSQL stores only the stable campaign identity, immutable canonical revisions, the current projection, and a compact evidence-reference lookup index. Heavy/raw radar event history is not copied into campaign memory. A revision is accepted only when the canonical Global Campaign validator passes. Revision 1 must be the first persisted state; later writes must be exactly contiguous. An exact replay is idempotent, while a same-revision payload/hash mismatch, a stale write, a revision jump, invalid state transition, persisted metadata/payload/hash disagreement, ambiguous candidate set, or ruleset conflict fails closed.
+
+Automatic candidate convergence requires shared canonical evidence references. Subjects, actors, assets, contracts, pools, bridges, and verdict references can be preserved as campaign context but cannot by themselves cause automatic campaign identity merging.
 
 ## Authority boundary
 
