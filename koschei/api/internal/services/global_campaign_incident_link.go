@@ -19,17 +19,17 @@ var (
 )
 
 type GlobalCampaignIncidentLink struct {
-	IncidentID         string    `json:"incident_id"`
-	IncidentRef        string    `json:"incident_ref"`
-	CampaignRef        string    `json:"campaign_ref"`
-	CampaignRevision   int64     `json:"campaign_revision"`
-	EvidenceHashSHA256 string    `json:"evidence_hash_sha256"`
-	LinkedBy           string    `json:"linked_by"`
-	LinkedAt           time.Time `json:"linked_at"`
-	Inserted           bool      `json:"inserted"`
-	Idempotent         bool      `json:"idempotent"`
-	VerdictAuthority   bool      `json:"verdict_authority"`
-	ContainmentAuthority bool    `json:"containment_authority"`
+	IncidentID           string    `json:"incident_id"`
+	IncidentRef          string    `json:"incident_ref"`
+	CampaignRef          string    `json:"campaign_ref"`
+	CampaignRevision     int64     `json:"campaign_revision"`
+	EvidenceHashSHA256   string    `json:"evidence_hash_sha256"`
+	LinkedBy             string    `json:"linked_by"`
+	LinkedAt             time.Time `json:"linked_at"`
+	Inserted             bool      `json:"inserted"`
+	Idempotent           bool      `json:"idempotent"`
+	VerdictAuthority     bool      `json:"verdict_authority"`
+	ContainmentAuthority bool      `json:"containment_authority"`
 }
 
 // LinkGlobalCampaignToIncident appends an exact campaign revision reference to
