@@ -44,6 +44,29 @@ func PersistGlobalCampaignRevision(ctx context.Context, db *sql.DB, campaign Glo
 	if db == nil {
 		return GlobalCampaignPersistResult{}, ErrGlobalCampaignStoreUnavailable
 	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return GlobalCampaignPersistResult{}, fmt.Errorf("begin global campaign persistence: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	result, err := persistGlobalCampaignRevisionTx(ctx, tx, campaign)
+	if err != nil {
+		return GlobalCampaignPersistResult{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return GlobalCampaignPersistResult{}, fmt.Errorf("commit global campaign revision: %w", err)
+	}
+	return result, nil
+}
+
+// persistGlobalCampaignRevisionTx is the transaction-scoped persistence core.
+// Candidate-resolution callers are responsible for evidence-anchor locking;
+// this helper serializes the stable campaign identity itself.
+func persistGlobalCampaignRevisionTx(ctx context.Context, tx *sql.Tx, campaign GlobalCampaign) (GlobalCampaignPersistResult, error) {
+	if tx == nil {
+		return GlobalCampaignPersistResult{}, ErrGlobalCampaignStoreUnavailable
+	}
 	campaign, payload, err := canonicalGlobalCampaignForStore(campaign)
 	if err != nil {
 		return GlobalCampaignPersistResult{}, err
@@ -55,19 +78,8 @@ func PersistGlobalCampaignRevision(ctx context.Context, db *sql.DB, campaign Glo
 		return GlobalCampaignPersistResult{}, fmt.Errorf("global campaign last observation precedes first observation")
 	}
 
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return GlobalCampaignPersistResult{}, fmt.Errorf("begin global campaign persistence: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	// Serialize writers for one stable campaign identity, including the first
-	// insert where no current row exists yet to lock with SELECT ... FOR UPDATE.
-	var advisoryResult any
-	if err := tx.QueryRowContext(ctx,
-		`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, campaign.CampaignRef,
-	).Scan(&advisoryResult); err != nil {
-		return GlobalCampaignPersistResult{}, fmt.Errorf("lock global campaign %q: %w", campaign.CampaignRef, err)
+	if err := lockGlobalCampaignRefTx(ctx, tx, campaign.CampaignRef); err != nil {
+		return GlobalCampaignPersistResult{}, err
 	}
 
 	storedRow, found, err := loadGlobalCampaignRowTx(ctx, tx, campaign.CampaignRef, true)
@@ -84,8 +96,8 @@ func PersistGlobalCampaignRevision(ctx context.Context, db *sql.DB, campaign Glo
 		if err := insertGlobalCampaignCurrentTx(ctx, tx, campaign, payload); err != nil {
 			return GlobalCampaignPersistResult{}, err
 		}
-		if err := tx.Commit(); err != nil {
-			return GlobalCampaignPersistResult{}, fmt.Errorf("commit global campaign revision: %w", err)
+		if err := replaceGlobalCampaignAnchorIndexTx(ctx, tx, campaign); err != nil {
+			return GlobalCampaignPersistResult{}, err
 		}
 		return GlobalCampaignPersistResult{Campaign: campaign, Inserted: true}, nil
 	}
@@ -98,8 +110,8 @@ func PersistGlobalCampaignRevision(ctx context.Context, db *sql.DB, campaign Glo
 		if campaign.EvidenceHashSHA256 != current.EvidenceHashSHA256 {
 			return GlobalCampaignPersistResult{}, fmt.Errorf("%w: campaign=%s revision=%d", ErrGlobalCampaignRevisionConflict, campaign.CampaignRef, campaign.Revision)
 		}
-		if err := tx.Commit(); err != nil {
-			return GlobalCampaignPersistResult{}, fmt.Errorf("commit idempotent global campaign replay: %w", err)
+		if err := replaceGlobalCampaignAnchorIndexTx(ctx, tx, current); err != nil {
+			return GlobalCampaignPersistResult{}, err
 		}
 		return GlobalCampaignPersistResult{Campaign: current, Idempotent: true}, nil
 	}
@@ -163,10 +175,20 @@ func PersistGlobalCampaignRevision(ctx context.Context, db *sql.DB, campaign Glo
 	if rows != 1 {
 		return GlobalCampaignPersistResult{}, fmt.Errorf("%w: current projection changed during write", ErrGlobalCampaignRevisionConflict)
 	}
-	if err := tx.Commit(); err != nil {
-		return GlobalCampaignPersistResult{}, fmt.Errorf("commit global campaign revision: %w", err)
+	if err := replaceGlobalCampaignAnchorIndexTx(ctx, tx, campaign); err != nil {
+		return GlobalCampaignPersistResult{}, err
 	}
 	return GlobalCampaignPersistResult{Campaign: campaign, Inserted: true}, nil
+}
+
+func lockGlobalCampaignRefTx(ctx context.Context, tx *sql.Tx, campaignRef string) error {
+	var advisoryResult any
+	if err := tx.QueryRowContext(ctx,
+		`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, campaignRef,
+	).Scan(&advisoryResult); err != nil {
+		return fmt.Errorf("lock global campaign %q: %w", campaignRef, err)
+	}
+	return nil
 }
 
 // LoadCurrentGlobalCampaign returns the validated current campaign projection.
