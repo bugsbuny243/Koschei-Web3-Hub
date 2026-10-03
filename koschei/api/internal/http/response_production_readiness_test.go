@@ -3,6 +3,9 @@ package http
 import (
 	"crypto/ed25519"
 	"encoding/base64"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"koschei/api/internal/services"
@@ -62,5 +65,36 @@ func TestResponseProductionReadinessTelemetryNilEnvironmentFailsClosed(t *testin
 	}
 	if len(status.Blockers) != 6 {
 		t.Fatalf("expected six runtime/repository blockers with compile-time schemas pinned, got %d: %v", len(status.Blockers), status.Blockers)
+	}
+}
+
+func TestOwnerRouteMapIncludesResponseProductionReadinessTelemetry(t *testing.T) {
+	for key, value := range responseReadinessRuntimeEnv() {
+		t.Setenv(key, value)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "https://example.test/api/owner/route-map", nil)
+	recorder := httptest.NewRecorder()
+	ownerRouteMap(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("owner route map status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var payload map[string]any
+	if err := json.NewDecoder(recorder.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode owner route map: %v", err)
+	}
+	telemetry, ok := payload["response_production_readiness"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing response production readiness telemetry: %#v", payload["response_production_readiness"])
+	}
+	if telemetry["state"] != services.GlobalCampaignResponseProductionReadinessBlocked || telemetry["production_claim_allowed"] != false {
+		t.Fatalf("owner telemetry must expose blocked production claim: %#v", telemetry)
+	}
+	if telemetry["blocker_count"] != float64(1) {
+		t.Fatalf("expected one blocker in complete runtime fixture, got %#v", telemetry["blocker_count"])
+	}
+	blockers, ok := telemetry["blockers"].([]any)
+	if !ok || len(blockers) != 1 || blockers[0] != services.GlobalCampaignResponseProductionBlockerForwarderMissing {
+		t.Fatalf("unexpected owner readiness blockers: %#v", telemetry["blockers"])
 	}
 }
