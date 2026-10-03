@@ -1,0 +1,46 @@
+name: Global Campaign Fabric Contract Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/internal/services/global_campaign*.go"
+      - ".github/workflows/global-campaign-fabric-contract-acceptance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/services/global_campaign*.go"
+      - ".github/workflows/global-campaign-fabric-contract-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fabric-contract:
+    name: Prove observe-only Fabric campaign evidence contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Download modules
+        run: go mod download
+      - name: Verify gofmt
+        run: |
+          set -euo pipefail
+          files="$(gofmt -l internal/services/global_campaign_fabric_contract.go internal/services/global_campaign_fabric_contract_test.go)"
+          if [ -n "${files}" ]; then
+            printf '%s\n' "${files}"
+            gofmt -d internal/services/global_campaign_fabric_contract.go internal/services/global_campaign_fabric_contract_test.go
+            exit 1
+          fi
+      - name: Run Fabric campaign contract acceptance under race detector
+        run: |
+          set -euo pipefail
+          go test -race -v ./internal/services -run '^TestFabricCampaignEvidenceContract' -count=1

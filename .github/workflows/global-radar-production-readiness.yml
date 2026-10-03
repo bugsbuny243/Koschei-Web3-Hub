@@ -1,0 +1,46 @@
+name: Global Radar Production Readiness Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/internal/services/global_radar_production_readiness*.go"
+      - ".github/workflows/global-radar-production-readiness.yml"
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/services/global_radar_production_readiness*.go"
+      - ".github/workflows/global-radar-production-readiness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    name: Prove fail-closed production readiness evidence gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Download modules
+        run: go mod download
+      - name: Verify gofmt
+        run: |
+          set -euo pipefail
+          files="$(gofmt -l internal/services/global_radar_production_readiness.go internal/services/global_radar_production_readiness_test.go)"
+          if [ -n "${files}" ]; then
+            printf '%s\n' "${files}"
+            gofmt -d internal/services/global_radar_production_readiness.go internal/services/global_radar_production_readiness_test.go
+            exit 1
+          fi
+      - name: Run production readiness acceptance under race detector
+        run: |
+          set -euo pipefail
+          go test -race -v ./internal/services -run '^TestGlobalRadarProductionReadiness' -count=1

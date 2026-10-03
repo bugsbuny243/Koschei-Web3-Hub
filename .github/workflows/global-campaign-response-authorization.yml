@@ -1,0 +1,48 @@
+name: Global Campaign Response Authorization Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/internal/services/global_campaign_response_authorization*.go"
+      - "koschei/api/internal/services/global_campaign_fabric_contract*.go"
+      - ".github/workflows/global-campaign-response-authorization.yml"
+  push:
+    branches: [main]
+    paths:
+      - "koschei/api/internal/services/global_campaign_response_authorization*.go"
+      - "koschei/api/internal/services/global_campaign_fabric_contract*.go"
+      - ".github/workflows/global-campaign-response-authorization.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  response-authorization:
+    name: Prove fail-closed campaign response authorization
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Download modules
+        run: go mod download
+      - name: Verify gofmt
+        run: |
+          set -euo pipefail
+          files="$(gofmt -l internal/services/global_campaign_response_authorization.go internal/services/global_campaign_response_authorization_test.go)"
+          if [ -n "${files}" ]; then
+            printf '%s\n' "${files}"
+            gofmt -d internal/services/global_campaign_response_authorization.go internal/services/global_campaign_response_authorization_test.go
+            exit 1
+          fi
+      - name: Run response authorization acceptance under race detector
+        run: |
+          set -euo pipefail
+          go test -race -v ./internal/services -run '^TestGlobalCampaignResponse' -count=1

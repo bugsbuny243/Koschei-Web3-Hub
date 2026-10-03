@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -49,6 +50,7 @@ func BuildGlobalRadarSnapshot(
 	networkIDs := map[string]bool{}
 	subjectIDs := map[string]bool{}
 	evidenceIDs := map[string]bool{}
+	evidenceByID := map[string]IntelligenceEvidence{}
 	observationIDs := map[string]bool{}
 	coverage := GlobalRadarSnapshotCoverage{RiskScoreProduced: false}
 
@@ -65,6 +67,9 @@ func BuildGlobalRadarSnapshot(
 		if observation.Subject.ID == "" || observation.Evidence.ID == "" ||
 			observation.Evidence.SubjectID != observation.Subject.ID {
 			return GlobalRadarSnapshot{}, errors.New("global radar observation identity mismatch")
+		}
+		if err := recordGlobalRadarEvidenceIdentity(evidenceByID, observation.Evidence); err != nil {
+			return GlobalRadarSnapshot{}, err
 		}
 		networkIDs[observation.Subject.Network] = true
 		subjectIDs[observation.Subject.ID] = true
@@ -95,6 +100,9 @@ func BuildGlobalRadarSnapshot(
 		if !subjectIDs[link.SourceObservation.Subject.ID] ||
 			!subjectIDs[link.DestinationObservation.Subject.ID] {
 			return GlobalRadarSnapshot{}, errors.New("bridge link endpoints are missing from snapshot observations")
+		}
+		if err := recordGlobalRadarEvidenceIdentity(evidenceByID, link.LinkEvidence); err != nil {
+			return GlobalRadarSnapshot{}, err
 		}
 		evidenceIDs[link.LinkEvidence.ID] = true
 	}
@@ -175,6 +183,21 @@ func BuildGlobalRadarSnapshot(
 		VerdictRefs:   append([]GlobalRadarVerdictReference(nil), verdictRefs...),
 		Coverage:      coverage,
 	}, nil
+}
+
+func recordGlobalRadarEvidenceIdentity(byID map[string]IntelligenceEvidence, evidence IntelligenceEvidence) error {
+	id := strings.TrimSpace(evidence.ID)
+	if id == "" {
+		return errors.New("global radar evidence id is required")
+	}
+	if existing, ok := byID[id]; ok {
+		if !reflect.DeepEqual(existing, evidence) {
+			return errors.New("global radar evidence id has divergent content")
+		}
+		return nil
+	}
+	byID[id] = evidence
+	return nil
 }
 
 func globalRadarMissingEvidenceCount(attributes map[string]any) int {
