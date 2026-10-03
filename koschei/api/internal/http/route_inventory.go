@@ -15,11 +15,12 @@ type routeInventoryGroup struct {
 func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"ok":           true,
-		"generated_at": time.Now().UTC().Format(time.RFC3339),
-		"source":       "server_boot_chain",
-		"access_model": "public_proof_plus_professional_entitlement",
-		"groups":       productionRouteInventory(),
+		"ok":                            true,
+		"generated_at":                  time.Now().UTC().Format(time.RFC3339),
+		"source":                        "server_boot_chain",
+		"access_model":                  "public_proof_plus_professional_entitlement",
+		"response_production_readiness": ownerResponseProductionReadinessTelemetry(),
+		"groups":                        productionRouteInventory(),
 		"rules": []string{
 			"A handler is live only when registered in the server boot chain.",
 			"The production route inventory is contract-tested against literal API registrations.",
@@ -35,6 +36,7 @@ func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 			"Signed medium-or-higher ARVIS verdicts and non-allow transaction guard decisions enter the durable alert pipeline.",
 			"Defense validation recomputes isolated execution evidence and authenticates independent collector observations; it never submits mainnet transactions or mutates production controls.",
 			"Safe execution assurance independently recomputes the complete Safe EIP-712 transaction hash and Execution Proof and requires a fresh Ed25519 attestation from the server-configured trusted producer before ALLOW; caller-selected trust material cannot authorize the request.",
+			"Global Campaign response production readiness remains fail-closed until a concrete production forwarder, exact deployed revision, runtime identity and independent effect collector are all evidence-backed.",
 			"Defense OS routes are registered only when KOSCHEI_DEFENSE_OS_ENABLED=true.",
 		},
 	})
