@@ -37,7 +37,8 @@ func TestGlobalCampaignWorkerLeasePostgres17(t *testing.T) {
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cleanupCancel()
-		_, _ = db.ExecContext(cleanupCtx, `DELETE FROM global_campaign_worker_leases WHERE lease_key = ANY($1)`, pqStringArray{leaseKey, contentionKey})
+		_, _ = db.ExecContext(cleanupCtx, `DELETE FROM global_campaign_worker_leases WHERE lease_key=$1`, leaseKey)
+		_, _ = db.ExecContext(cleanupCtx, `DELETE FROM global_campaign_worker_leases WHERE lease_key=$1`, contentionKey)
 	})
 
 	t0 := time.Date(2026, 10, 3, 1, 0, 0, 0, time.UTC)
@@ -114,17 +115,4 @@ func TestGlobalCampaignWorkerLeasePostgres17(t *testing.T) {
 	if winners.Load() != 1 || busy.Load() != contenders-1 {
 		t.Fatalf("contention winners=%d busy=%d want 1/%d", winners.Load(), busy.Load(), contenders-1)
 	}
-}
-
-type pqStringArray []string
-
-func (a pqStringArray) Value() (driver.Value, error) {
-	if len(a) == 0 {
-		return "{}", nil
-	}
-	parts := make([]string, len(a))
-	for i, v := range a {
-		parts[i] = `"` + strings.ReplaceAll(strings.ReplaceAll(v, `\`, `\\`), `"`, `\"`) + `"`
-	}
-	return "{" + strings.Join(parts, ",") + "}", nil
 }
