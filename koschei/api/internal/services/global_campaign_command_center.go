@@ -16,13 +16,11 @@ const GlobalCampaignCommandCenterSchemaVersion = "koschei.global-campaign-comman
 
 type GlobalCampaignCommandCenterResponseState string
 
-const (
-	GlobalCampaignCommandCenterMonitoring           GlobalCampaignCommandCenterResponseState = "monitoring"
-	GlobalCampaignCommandCenterProposed             GlobalCampaignCommandCenterResponseState = "proposed"
-	GlobalCampaignCommandCenterAuthorized           GlobalCampaignCommandCenterResponseState = "authorized"
-	GlobalCampaignCommandCenterExecuted             GlobalCampaignCommandCenterResponseState = "executed"
-	GlobalCampaignCommandCenterContainmentVerified  GlobalCampaignCommandCenterResponseState = "containment_verified"
-)
+const GlobalCampaignCommandCenterMonitoring GlobalCampaignCommandCenterResponseState = "monitoring"
+const GlobalCampaignCommandCenterProposed GlobalCampaignCommandCenterResponseState = "proposed"
+const GlobalCampaignCommandCenterAuthorized GlobalCampaignCommandCenterResponseState = "authorized"
+const GlobalCampaignCommandCenterExecuted GlobalCampaignCommandCenterResponseState = "executed"
+const GlobalCampaignCommandCenterContainmentVerified GlobalCampaignCommandCenterResponseState = "containment_verified"
 
 var (
 	ErrGlobalCampaignCommandCenterInvalid  = errors.New("global campaign command center snapshot is invalid")
