@@ -16,14 +16,14 @@ const (
 	GlobalCampaignResponseProductionReadinessBlocked       = "BLOCKED"
 	GlobalCampaignResponseProductionReadinessReady         = "READY"
 
-	GlobalCampaignResponseProductionBlockerForwarderMissing       = "concrete_production_forwarder_missing"
-	GlobalCampaignResponseProductionBlockerDeploymentUnpinned     = "deployed_revision_unpinned"
-	GlobalCampaignResponseProductionBlockerForwarderIdentity      = "forwarder_identity_missing"
-	GlobalCampaignResponseProductionBlockerForwarderArtifact      = "forwarder_artifact_unverified"
-	GlobalCampaignResponseProductionBlockerProductionIdentity     = "production_identity_missing"
-	GlobalCampaignResponseProductionBlockerEffectCollector        = "independent_effect_collector_missing"
-	GlobalCampaignResponseProductionBlockerAuthorizationContract  = "response_authorization_contract_mismatch"
-	GlobalCampaignResponseProductionBlockerEffectProofContract    = "response_effect_proof_contract_mismatch"
+	GlobalCampaignResponseProductionBlockerForwarderMissing      = "concrete_production_forwarder_missing"
+	GlobalCampaignResponseProductionBlockerDeploymentUnpinned    = "deployed_revision_unpinned"
+	GlobalCampaignResponseProductionBlockerForwarderIdentity     = "forwarder_identity_missing"
+	GlobalCampaignResponseProductionBlockerForwarderArtifact     = "forwarder_artifact_unverified"
+	GlobalCampaignResponseProductionBlockerProductionIdentity    = "production_identity_missing"
+	GlobalCampaignResponseProductionBlockerEffectCollector       = "independent_effect_collector_missing"
+	GlobalCampaignResponseProductionBlockerAuthorizationContract = "response_authorization_contract_mismatch"
+	GlobalCampaignResponseProductionBlockerEffectProofContract   = "response_effect_proof_contract_mismatch"
 )
 
 // This stays false until a concrete production SafeForwarder implementation is
@@ -35,15 +35,15 @@ const globalCampaignResponseConcreteProductionForwarderLinked = false
 var ErrGlobalCampaignResponseProductionReadinessInvalid = errors.New("global campaign response production readiness is invalid")
 
 type GlobalCampaignResponseProductionReadinessEvidence struct {
-	DeploymentRef             string `json:"deployment_ref"`
-	DeployedRevision          string `json:"deployed_revision"`
-	ForwarderRef              string `json:"forwarder_ref"`
-	ForwarderArtifactSHA256   string `json:"forwarder_artifact_sha256"`
-	ProductionIdentityRef     string `json:"production_identity_ref"`
-	EffectCollectorProducer   string `json:"effect_collector_producer"`
-	EffectCollectorPublicKey  string `json:"effect_collector_public_key"`
-	AuthorizationSchema       string `json:"authorization_schema"`
-	EffectProofSchema         string `json:"effect_proof_schema"`
+	DeploymentRef            string `json:"deployment_ref"`
+	DeployedRevision         string `json:"deployed_revision"`
+	ForwarderRef             string `json:"forwarder_ref"`
+	ForwarderArtifactSHA256  string `json:"forwarder_artifact_sha256"`
+	ProductionIdentityRef    string `json:"production_identity_ref"`
+	EffectCollectorProducer  string `json:"effect_collector_producer"`
+	EffectCollectorPublicKey string `json:"effect_collector_public_key"`
+	AuthorizationSchema      string `json:"authorization_schema"`
+	EffectProofSchema        string `json:"effect_proof_schema"`
 }
 
 // GlobalCampaignResponseProductionReadiness is an evidence-backed claim guard,
@@ -51,14 +51,14 @@ type GlobalCampaignResponseProductionReadinessEvidence struct {
 // production containment claim are impossible even if all runtime fields are
 // caller-populated.
 type GlobalCampaignResponseProductionReadiness struct {
-	SchemaVersion              string                                                  `json:"schema_version"`
-	State                      string                                                  `json:"state"`
-	Evidence                   GlobalCampaignResponseProductionReadinessEvidence       `json:"evidence"`
-	ConcreteForwarderLinked    bool                                                    `json:"concrete_forwarder_linked"`
-	ProductionContainmentReady bool                                                    `json:"production_containment_ready"`
-	ProductionClaimAllowed     bool                                                    `json:"production_claim_allowed"`
-	Blockers                   []string                                                `json:"blockers"`
-	ReadinessHashSHA256        string                                                  `json:"readiness_hash_sha256"`
+	SchemaVersion              string                                            `json:"schema_version"`
+	State                      string                                            `json:"state"`
+	Evidence                   GlobalCampaignResponseProductionReadinessEvidence `json:"evidence"`
+	ConcreteForwarderLinked    bool                                              `json:"concrete_forwarder_linked"`
+	ProductionContainmentReady bool                                              `json:"production_containment_ready"`
+	ProductionClaimAllowed     bool                                              `json:"production_claim_allowed"`
+	Blockers                   []string                                          `json:"blockers"`
+	ReadinessHashSHA256        string                                            `json:"readiness_hash_sha256"`
 }
 
 func EvaluateGlobalCampaignResponseProductionReadiness(evidence GlobalCampaignResponseProductionReadinessEvidence) GlobalCampaignResponseProductionReadiness {
