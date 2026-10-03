@@ -50,16 +50,16 @@ type GlobalCampaignEffectAttestationBinding struct {
 }
 
 type GlobalCampaignEffectAttestation struct {
-	SchemaVersion       string    `json:"schema_version"`
+	SchemaVersion       string                                 `json:"schema_version"`
 	Binding             GlobalCampaignEffectAttestationBinding `json:"binding"`
-	BindingHashSHA256   string    `json:"binding_hash_sha256"`
-	EvidenceEventSHA256 string    `json:"evidence_event_sha256"`
-	Producer            string    `json:"producer"`
-	AuthenticatedAt     time.Time `json:"authenticated_at"`
-	Authenticated       bool      `json:"authenticated"`
-	ExecutionAuthority  bool      `json:"execution_authority"`
-	SubmissionAuthority bool      `json:"submission_authority"`
-	AttestationSHA256   string    `json:"attestation_sha256"`
+	BindingHashSHA256   string                                 `json:"binding_hash_sha256"`
+	EvidenceEventSHA256 string                                 `json:"evidence_event_sha256"`
+	Producer            string                                 `json:"producer"`
+	AuthenticatedAt     time.Time                              `json:"authenticated_at"`
+	Authenticated       bool                                   `json:"authenticated"`
+	ExecutionAuthority  bool                                   `json:"execution_authority"`
+	SubmissionAuthority bool                                   `json:"submission_authority"`
+	AttestationSHA256   string                                 `json:"attestation_sha256"`
 }
 
 func BuildGlobalCampaignEffectAttestationBinding(
