@@ -20,7 +20,7 @@ var (
 type GlobalCampaignWorkerLease struct {
 	LeaseKey       string    `json:"lease_key"`
 	LeaseOwner     string    `json:"lease_owner"`
-	FencingToken  int64     `json:"fencing_token"`
+	FencingToken   int64     `json:"fencing_token"`
 	LeaseExpiresAt time.Time `json:"lease_expires_at"`
 	AcquiredAt     time.Time `json:"acquired_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
@@ -79,7 +79,7 @@ func AcquireGlobalCampaignWorkerLease(ctx context.Context, db *sql.DB, leaseKey,
 	next := GlobalCampaignWorkerLease{
 		LeaseKey:       leaseKey,
 		LeaseOwner:     owner,
-		FencingToken:  current.FencingToken + 1,
+		FencingToken:   current.FencingToken + 1,
 		LeaseExpiresAt: expiresAt,
 		AcquiredAt:     now,
 		UpdatedAt:      now,
