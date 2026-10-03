@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	responseDeploymentRefEnv           = "KOSCHEI_RESPONSE_DEPLOYMENT_REF"
-	responseForwarderRefEnv            = "KOSCHEI_RESPONSE_FORWARDER_REF"
-	responseForwarderArtifactSHAEnv    = "KOSCHEI_RESPONSE_FORWARDER_ARTIFACT_SHA256"
-	responseProductionIdentityRefEnv   = "KOSCHEI_RESPONSE_PRODUCTION_IDENTITY_REF"
-	responseEffectCollectorProducerEnv = "KOSCHEI_RESPONSE_EFFECT_COLLECTOR_PRODUCER"
+	responseDeploymentRefEnv            = "KOSCHEI_RESPONSE_DEPLOYMENT_REF"
+	responseForwarderRefEnv             = "KOSCHEI_RESPONSE_FORWARDER_REF"
+	responseForwarderArtifactSHAEnv     = "KOSCHEI_RESPONSE_FORWARDER_ARTIFACT_SHA256"
+	responseProductionIdentityRefEnv    = "KOSCHEI_RESPONSE_PRODUCTION_IDENTITY_REF"
+	responseEffectCollectorProducerEnv  = "KOSCHEI_RESPONSE_EFFECT_COLLECTOR_PRODUCER"
 	responseEffectCollectorPublicKeyEnv = "KOSCHEI_RESPONSE_EFFECT_COLLECTOR_PUBLIC_KEY"
 )
 
