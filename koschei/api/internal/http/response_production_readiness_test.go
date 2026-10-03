@@ -12,13 +12,13 @@ func responseReadinessRuntimeEnv() map[string]string {
 	privateKey := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
 	publicKey := privateKey.Public().(ed25519.PublicKey)
 	return map[string]string{
-		responseDeploymentRefEnv:             "railway:koschei-api:production",
-		"RAILWAY_GIT_COMMIT_SHA":             "f75d37b13d0407f2da7979c3e65cd588b95f52f5",
-		responseForwarderRefEnv:              "safe-forwarder:production-1",
-		responseForwarderArtifactSHAEnv:      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		responseProductionIdentityRefEnv:     "runtime:koschei-api-production",
-		responseEffectCollectorProducerEnv:   "collector:response-effect-production",
-		responseEffectCollectorPublicKeyEnv:  base64.RawURLEncoding.EncodeToString(publicKey),
+		responseDeploymentRefEnv:            "railway:koschei-api:production",
+		"RAILWAY_GIT_COMMIT_SHA":            "f75d37b13d0407f2da7979c3e65cd588b95f52f5",
+		responseForwarderRefEnv:             "safe-forwarder:production-1",
+		responseForwarderArtifactSHAEnv:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		responseProductionIdentityRefEnv:    "runtime:koschei-api-production",
+		responseEffectCollectorProducerEnv:  "collector:response-effect-production",
+		responseEffectCollectorPublicKeyEnv: base64.RawURLEncoding.EncodeToString(publicKey),
 	}
 }
 
