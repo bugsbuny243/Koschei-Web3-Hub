@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	GlobalCampaignResponseProposalSchemaVersion       = "koschei.response-proposal.v1"
+	GlobalCampaignResponseProposalSchemaVersion      = "koschei.response-proposal.v1"
 	GlobalCampaignResponseAuthorizationSchemaVersion = "koschei.response-authorization.v1"
-	GlobalCampaignResponseAuthorizerOperator          = "operator"
+	GlobalCampaignResponseAuthorizerOperator         = "operator"
 )
 
 var (
