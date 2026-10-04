@@ -1,0 +1,41 @@
+name: Apply OpenAPI Route Diff
+
+on:
+  push:
+    branches:
+      - integration/radar-runtime-wiring-2026-10-04
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: integration/radar-runtime-wiring-2026-10-04
+          fetch-depth: 0
+
+      - name: Apply generated route diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .github/openapi-route.patch.b64 > /tmp/openapi-route.patch
+          echo "1252d081b348741eea8b09076288092574572252e66ae5a4f7a117ce0e74e62d  /tmp/openapi-route.patch" | sha256sum -c -
+          git apply --check /tmp/openapi-route.patch
+          git apply /tmp/openapi-route.patch
+          git diff --check
+
+      - name: Commit generated contract update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/openapi-route.patch.b64
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add koschei/api/openapi.yaml
+          git commit -m "docs: regenerate OpenAPI contract for Radar campaigns"
+          git push origin HEAD:integration/radar-runtime-wiring-2026-10-04
