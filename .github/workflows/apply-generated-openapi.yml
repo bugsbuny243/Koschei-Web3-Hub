@@ -1,0 +1,39 @@
+name: Apply Generated OpenAPI Contract
+
+on:
+  push:
+    branches:
+      - integration/radar-runtime-wiring-2026-10-04
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: integration/radar-runtime-wiring-2026-10-04
+          fetch-depth: 0
+
+      - name: Restore generated contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .github/openapi.generated.yaml.gz.b64 | gzip -d > koschei/api/openapi.yaml
+          echo "bb275281bd78a628547f5aa135ef3632daf413ebf38a4b9eec8f5d6c17bcf93c  koschei/api/openapi.yaml" | sha256sum -c -
+          git diff --check
+
+      - name: Commit generated contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/openapi.generated.yaml.gz.b64
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add koschei/api/openapi.yaml
+          git commit -m "docs: regenerate OpenAPI contract for Radar campaigns"
+          git push origin HEAD:integration/radar-runtime-wiring-2026-10-04
