@@ -635,8 +635,9 @@ func (h *Handler) saveSecurityRadarBundle(ctx context.Context, userID, source st
 	if h == nil || h.DB == nil || !services.SecurityRadarHasLiveEvidence(bundle) {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
+	parentCtx := ctx
+	dbCtx, cancelDB := context.WithTimeout(parentCtx, 5*time.Second)
+	defer cancelDB()
 	verdicts := services.ArvisArmsFromBundle(bundle)
 	if len(verdicts) == 0 {
 		verdicts = []services.SecurityRadarVerdict{bundle.PumpSybilRadar, bundle.RaydiumPoolGuardian, bundle.WalletlessClaimShield}
@@ -645,7 +646,18 @@ func (h *Handler) saveSecurityRadarBundle(ctx context.Context, userID, source st
 		if !services.SecurityRadarVerdictHasVerifiedEvidence(verdict) {
 			continue
 		}
-		if err := h.saveSecurityRadarVerdict(ctx, userID, source, verdict); err != nil {
+		if err := h.saveSecurityRadarVerdict(dbCtx, userID, source, verdict); err != nil {
+			return err
+		}
+	}
+	if h.GlobalRadarSink != nil {
+		snapshot, err := services.ProjectSecurityRadarBundleToGlobalRadar(bundle, time.Now().UTC())
+		if err != nil {
+			return err
+		}
+		radarCtx, cancelRadar := context.WithTimeout(parentCtx, 5*time.Second)
+		defer cancelRadar()
+		if err := h.GlobalRadarSink.InsertGlobalRadarSnapshot(radarCtx, snapshot); err != nil {
 			return err
 		}
 	}

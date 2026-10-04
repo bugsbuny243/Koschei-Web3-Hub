@@ -127,7 +127,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar head ingest is invalid: %v", err)
 	}
-	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore, runtimeHealth, globalRadarBackground, globalRadarHeadIngest)
+	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore, runtimeHealth, globalRadarBackground, globalRadarHeadIngest, globalRadarSink)
 	defer stopBackgroundRuntime()
 	log.Printf("runtime role=%s http=%t background_workers=%t", role, role.servesHTTP(), role.runsBackgroundWorkers())
 	if !role.servesHTTP() {

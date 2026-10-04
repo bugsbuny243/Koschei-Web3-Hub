@@ -13,18 +13,20 @@ import (
 	"koschei/api/internal/handlers"
 	"koschei/api/internal/jobs"
 	"koschei/api/internal/runtimecfg"
+	"koschei/api/internal/services"
 	"koschei/api/internal/web3"
 )
 
 type serverConfig struct {
-	dbRead                 *sql.DB
-	entitlementDB          *sql.DB
-	cache                  cache.Cache
-	solanaRPC              *web3.SolanaRPC
-	jobStore               *jobs.Store
-	jobQueue               jobs.Queue
-	globalRadarGraphReader GlobalRadarGraphReader
-	globalRadarEventReader GlobalRadarEventReader
+	dbRead                  *sql.DB
+	entitlementDB           *sql.DB
+	cache                   cache.Cache
+	solanaRPC               *web3.SolanaRPC
+	jobStore                *jobs.Store
+	jobQueue                jobs.Queue
+	globalRadarGraphReader  GlobalRadarGraphReader
+	globalRadarEventReader  GlobalRadarEventReader
+	globalRadarSnapshotSink services.GlobalRadarSnapshotSink
 }
 
 type Option func(*serverConfig)
@@ -47,7 +49,14 @@ func WithSolanaRPC(rpc *web3.SolanaRPC) Option { return func(c *serverConfig) { 
 func WithJobStore(store *jobs.Store) Option    { return func(c *serverConfig) { c.jobStore = store } }
 func WithJobQueue(queue jobs.Queue) Option     { return func(c *serverConfig) { c.jobQueue = queue } }
 func WithGlobalRadarGraphReader(reader GlobalRadarGraphReader) Option {
-	return func(c *serverConfig) { c.globalRadarGraphReader = reader }
+	return func(c *serverConfig) {
+		c.globalRadarGraphReader = reader
+		if reader != nil {
+			if sink, ok := any(reader).(services.GlobalRadarSnapshotSink); ok {
+				c.globalRadarSnapshotSink = sink
+			}
+		}
+	}
 }
 func WithGlobalRadarEventReader(reader GlobalRadarEventReader) Option {
 	return func(c *serverConfig) { c.globalRadarEventReader = reader }
@@ -74,7 +83,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	if config.solanaRPC == nil {
 		config.solanaRPC = web3.NewSolanaRPC(config.cache)
 	}
-	h := &handlers.Handler{DB: db, DBRead: config.dbRead, EntitlementDB: config.entitlementDB, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue, CourtClient: handlers.NewCourtNarrativeClientFromEnv()}
+	h := &handlers.Handler{DB: db, DBRead: config.dbRead, EntitlementDB: config.entitlementDB, AdminPassword: adminPassword, Limiter: handlers.NewLimiter(), DBInitError: dbInitError, Cache: config.cache, SolanaRPC: config.solanaRPC, JobStore: config.jobStore, JobQueue: config.jobQueue, CourtClient: handlers.NewCourtNarrativeClientFromEnv(), GlobalRadarSink: config.globalRadarSnapshotSink}
 	mux := http.NewServeMux()
 
 	planTierAccess := func(plan string, next http.HandlerFunc) http.HandlerFunc {
@@ -98,6 +107,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	registerOwnerRoutes(mux, h, staticDir)
 	mux.HandleFunc("/api/owner/radar/global/records", ownerOnly(h, method("GET", ownerGlobalRadarGraphRecords(config.globalRadarGraphReader))))
 	mux.HandleFunc("/api/owner/radar/global/events", ownerOnly(h, method("GET", ownerGlobalRadarEvents(config.globalRadarEventReader))))
+	mux.HandleFunc("/api/owner/radar/global/campaigns", requiresDB(h, ownerOnly(h, method("GET", h.OwnerGlobalCampaigns))))
 	registerDefenseOSRoutes(mux, h)
 	registerProductRoutes(mux, h, planTier, planTierAccess)
 	registerDeveloperAPIRoutes(mux, h, apiKeyProfessional, apiKeyProfessionalMetered)

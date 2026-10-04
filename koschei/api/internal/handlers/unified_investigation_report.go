@@ -24,6 +24,7 @@ type unifiedInvestigationAssembly struct {
 	CampaignGenomeSnapshot    services.CampaignGenomeSnapshot
 	CampaignGenomePersistence string
 	CampaignGenomeMatches     services.CampaignGenomeMatchReport
+	CampaignTempo             services.CampaignTempoFingerprintReport
 	OperationalMemory         services.ActorOperationalMemoryReport
 	FundingOutcomeMemory      services.FundingClusterOutcomeMemory
 	IncidentCorpus            services.SecurityIncidentCorpusView
@@ -482,7 +483,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 		ActorDossier: actorDossier, ActorTrack: actorTrack, ActorVerdict: actorVerdict,
 		CampaignGenome: campaignGenome, CampaignGenomeSnapshot: campaignGenomeSnapshot,
 		CampaignGenomePersistence: campaignGenomePersistence, CampaignGenomeMatches: campaignGenomeMatches,
-		OperationalMemory: operationalMemory, FundingOutcomeMemory: fundingOutcomeMemory,
+		CampaignTempo: campaignTempo, OperationalMemory: operationalMemory, FundingOutcomeMemory: fundingOutcomeMemory,
 		IncidentCorpus: incidentCorpus, ActorIncidentHistory: actorIncidentHistory, BehavioralSignatures: behavioralSignatures,
 		Behavior: behavior, UnifiedVerdict: unifiedVerdict, Threat: threat,
 		CombinedEvidence: combinedEvidence, Modules: modules, Structural: structural,

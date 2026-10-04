@@ -82,7 +82,7 @@ func CanonicalInvestigationJobWorkerEnabled() bool {
 // StartCanonicalInvestigationJobWorker starts a database-backed consumer. It has
 // no investigation-wide timeout: shutdown cancels it, while individual network
 // calls retain their own bounded timeouts and retry semantics.
-func StartCanonicalInvestigationJobWorker(ctx context.Context, db, readDB *sql.DB, solanaRPC *web3.SolanaRPC, store *jobs.Store) func() {
+func StartCanonicalInvestigationJobWorker(ctx context.Context, db, readDB *sql.DB, solanaRPC *web3.SolanaRPC, store *jobs.Store, globalRadarSink services.GlobalRadarSnapshotSink) func() {
 	if !CanonicalInvestigationJobWorkerEnabled() || db == nil {
 		return func() {}
 	}
@@ -91,7 +91,7 @@ func StartCanonicalInvestigationJobWorker(ctx context.Context, db, readDB *sql.D
 	}
 	workerCtx, cancel := context.WithCancel(ctx)
 	worker := &canonicalInvestigationJobWorker{
-		Handler:    &Handler{DB: db, DBRead: readDB, SolanaRPC: solanaRPC, JobStore: store},
+		Handler:    &Handler{DB: db, DBRead: readDB, SolanaRPC: solanaRPC, JobStore: store, GlobalRadarSink: globalRadarSink},
 		Store:      store,
 		PollEvery:  time.Duration(canonicalWorkerEnvInt("KOSCHEI_CANONICAL_JOB_POLL_SECONDS", 2, 1, 60)) * time.Second,
 		StaleAfter: time.Duration(canonicalWorkerEnvInt("KOSCHEI_CANONICAL_JOB_STALE_SECONDS", 7200, 300, 86400)) * time.Second,
@@ -229,10 +229,15 @@ func (w *canonicalInvestigationJobWorker) processJob(ctx context.Context, job jo
 		unifiedPersistence, unifiedHistory := w.Handler.persistUnifiedRadarVerdict(
 			ctx, assembly.DB, network, "token", target, assembly.UnifiedVerdict, assembly.Behavior,
 		)
+		campaignRuntime := persistGlobalCampaignFromAssembly(ctx, assembly.DB, target, network, assembly)
+		if campaignRuntime.Status == "failed" {
+			log.Printf("global campaign runtime materialization failed target=%s error=%s", target, campaignRuntime.Error)
+		}
 		report = assembly.Report
 		report["final_verdict_persistence"] = unifiedPersistence
 		report["final_verdict_history"] = unifiedHistory
 		report["behavior_evidence_persistence"] = behaviorPersistence
+		report["global_campaign_runtime"] = campaignRuntime
 		attachCanonicalInvestigationDiagnostics(report)
 	case radarTargetWallet:
 		var err error

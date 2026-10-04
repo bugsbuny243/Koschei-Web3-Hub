@@ -85,6 +85,17 @@ func TestGlobalCampaignWorkerLeasePostgres17(t *testing.T) {
 		t.Fatalf("worker B release: %v", err)
 	}
 
+	c, err := AcquireGlobalCampaignWorkerLease(ctx, db, leaseKey, "worker:c", t0.Add(4*time.Minute+time.Second), 2*time.Minute)
+	if err != nil {
+		t.Fatalf("worker C reacquire after release: %v", err)
+	}
+	if c.FencingToken != 3 {
+		t.Fatalf("reacquire token=%d want 3; fencing tokens must never reset after release", c.FencingToken)
+	}
+	if err := AssertGlobalCampaignWorkerLease(ctx, db, b, t0.Add(4*time.Minute+time.Second)); !errors.Is(err, ErrGlobalCampaignWorkerLeaseFenced) {
+		t.Fatalf("released worker B assert error=%v want fenced", err)
+	}
+
 	const contenders = 8
 	var winners atomic.Int32
 	var busy atomic.Int32

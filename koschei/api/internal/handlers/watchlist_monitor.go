@@ -21,14 +21,14 @@ type dueWatchlistTarget struct {
 // StartWatchlistMonitor turns the existing watchlist snapshot engine into
 // continuous retail protection only when both automatic scanning and the
 // watchlist worker are explicitly enabled. Manual refresh remains available.
-func StartWatchlistMonitor(parent context.Context, db *sql.DB) func() {
+func StartWatchlistMonitor(parent context.Context, db *sql.DB, globalRadarSink services.GlobalRadarSnapshotSink) func() {
 	ctx, cancel := context.WithCancel(parent)
 	if db == nil || !watchlistMonitorEnabled() {
 		return cancel
 	}
 	interval := watchlistMonitorInterval()
 	batchSize := watchlistMonitorBatchSize()
-	h := &Handler{DB: db, DBRead: db}
+	h := &Handler{DB: db, DBRead: db, GlobalRadarSink: globalRadarSink}
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()

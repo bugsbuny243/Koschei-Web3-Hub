@@ -15,21 +15,23 @@ import (
 
 	"koschei/api/internal/cache"
 	"koschei/api/internal/jobs"
+	"koschei/api/internal/services"
 	"koschei/api/internal/web3"
 )
 
 type Handler struct {
-	DB            *sql.DB
-	DBRead        *sql.DB
-	EntitlementDB *sql.DB
-	AdminPassword string
-	Limiter       *rateLimiter
-	DBInitError   string
-	Cache         cache.Cache
-	SolanaRPC     *web3.SolanaRPC
-	JobStore      *jobs.Store
-	JobQueue      jobs.Queue
-	CourtClient   CourtNarrativeClient
+	DB              *sql.DB
+	DBRead          *sql.DB
+	EntitlementDB   *sql.DB
+	AdminPassword   string
+	Limiter         *rateLimiter
+	DBInitError     string
+	Cache           cache.Cache
+	SolanaRPC       *web3.SolanaRPC
+	JobStore        *jobs.Store
+	JobQueue        jobs.Queue
+	CourtClient     CourtNarrativeClient
+	GlobalRadarSink services.GlobalRadarSnapshotSink
 
 	publicRadarTelemetry *publicRadarTelemetryCache
 }
