@@ -1,0 +1,68 @@
+name: Audit Runtime and Global Campaign Acceptance
+
+on:
+  pull_request:
+    paths: ["koschei/api/**", ".env.example", ".github/workflows/global-campaign-runtime.yml"]
+  push:
+    branches: [main]
+    paths: ["koschei/api/**", ".env.example", ".github/workflows/global-campaign-runtime.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: koschei_campaign_runtime_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U postgres -d koschei_campaign_runtime_ci"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Migration numbering
+        run: python3 scripts/check_migration_numbering.py
+      - name: Apply migrations on PostgreSQL 17
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          for migration in $(find migrations -maxdepth 1 -type f -name '*.sql' | sort); do
+            psql --host=127.0.0.1 --port=5432 --username=postgres \
+              --dbname=koschei_campaign_runtime_ci --set=ON_ERROR_STOP=1 \
+              --file="${migration}" >/dev/null
+          done
+      - name: Native PostgreSQL runtime and fencing acceptance
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_campaign_runtime_ci?sslmode=disable
+        run: go test -race -v ./internal/services -run '^TestGlobalCampaign(Runtime|WorkerLease)Postgres17$' -count=1
+      - name: Go tests and static analysis
+        run: |
+          set -euo pipefail
+          go test ./... -count=1
+          go vet ./...
+      - name: Customer contracts and operator UI
+        run: |
+          set -euo pipefail
+          for script in verify-customer-transaction-preflight-v1.js verify-customer-transaction-preflight-ui-v1.js verify-developers-contract-v2.js verify-integration-pilot-v2.js verify-token-2022-scanner-v2.js verify-webhooks-v2.js verify-public-scan-request-guard.js; do
+            node "scripts/${script}"
+          done
+          node --test public/js/__tests__/*

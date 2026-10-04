@@ -3,7 +3,6 @@ package agents
 import (
 	"context"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -20,24 +19,6 @@ type AdminEscalation struct {
 	CreatedAt      time.Time  `json:"created_at"`
 	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
 	ResolvedAt     *time.Time `json:"resolved_at,omitempty"`
-}
-
-var escalationWorkerOnce sync.Once
-
-func (s *Service) StartEscalationWorker() {
-	if s.db == nil {
-		return
-	}
-	escalationWorkerOnce.Do(func() {
-		go func() {
-			ticker := time.NewTicker(time.Minute)
-			defer ticker.Stop()
-			for {
-				s.detectMissedLeads(context.Background())
-				<-ticker.C
-			}
-		}()
-	})
 }
 
 func (s *Service) detectMissedLeads(ctx context.Context) {

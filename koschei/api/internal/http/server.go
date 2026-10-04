@@ -96,6 +96,7 @@ func NewServer(db *sql.DB, dbInitError string, adminPassword string, corsOrigin 
 	registerCoreRoutes(mux, h, planAccess)
 	registerAccountRoutes(mux, h, planTierAccess)
 	registerOwnerRoutes(mux, h, staticDir)
+	registerGlobalCampaignOwnerRoutes(mux, h, staticDir)
 	mux.HandleFunc("/api/owner/radar/global/records", ownerOnly(h, method("GET", ownerGlobalRadarGraphRecords(config.globalRadarGraphReader))))
 	mux.HandleFunc("/api/owner/radar/global/events", ownerOnly(h, method("GET", ownerGlobalRadarEvents(config.globalRadarEventReader))))
 	registerDefenseOSRoutes(mux, h)

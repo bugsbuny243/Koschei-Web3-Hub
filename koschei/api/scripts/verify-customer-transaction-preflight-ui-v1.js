@@ -48,10 +48,10 @@ if (!scan.includes('/js/customer-transaction-preflight-v1.js?v=2')) {
 if (scan.includes('/js/customer-transaction-preflight-v1.js?v=1')) {
   throw new Error('scan page still references the stale v1 transaction preflight asset URL');
 }
-if (!scan.includes('Transaction Preflight') || !scan.includes('Professional+ before signing')) {
+if (!scan.includes('Transaction Preflight') || !scan.includes('Professional transaction preflight')) {
   throw new Error('scan page does not label the Professional transaction capability truthfully');
 }
-if (!command.includes("{label:'Transaction Preflight',href:'/scan?mode=transaction',access:'PROFESSIONAL+'}")) {
+if (!command.includes("{label:'Transaction Preflight',href:'/scan?mode=transaction',access:'PROFESSIONAL'}")) {
   throw new Error('customer command center is missing the Professional Transaction Preflight capability');
 }
 console.log('customer transaction preflight UI v1 contract verified');

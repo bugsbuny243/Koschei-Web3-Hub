@@ -9,7 +9,7 @@ const route='mux.HandleFunc("/api/customer/web3/transaction-preflight", solana(r
 if(!server.includes(route))throw new Error("customer transaction preflight must reuse configured Guard V2 behind Professional metered planTier");
 if(!inventory.includes('POST /api/customer/web3/transaction-preflight'))throw new Error("customer transaction preflight missing from production route inventory");
 if(!generator.includes('case path == "/api/customer/web3/transaction-preflight" || path == "/api/customer/web3/transaction-state-recheck":'))throw new Error("OpenAPI auth classifier missing Professional customer preflight/recheck");
-if(!accessTest.includes('is entitlement-only so the same signing decision is not charged twice'))throw new Error("product tier contract does not separate metered preflight from entitlement-only state recheck");
+if(!server.includes('planTierAccess("professional", customerStateRecheckRateLimit(h.DB, method("POST", h.TransactionGuardStateRecheck)))'))throw new Error("state recheck must use Professional entitlement without metered planTier");
 if(!accessTest.includes('wantAccess := []string{"professional"}'))throw new Error("state recheck entitlement-only Professional tier expectation missing");
 if(/apiKeyEnterprise[^\n]*transaction-preflight/.test(server))throw new Error("customer transaction preflight must not require developer API key");
 if(server.includes('planTier("starter", method("POST", h.TransactionGuardV2Configured))'))throw new Error("customer transaction preflight must not be Starter-gated");

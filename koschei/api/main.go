@@ -94,6 +94,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: invalid KOSCHEI_RUNTIME_ROLE: %v", err)
 	}
+	stopTradePI := apihttp.StartTradePIAgentRuntime(appCtx, role.runsBackgroundWorkers())
+	defer stopTradePI()
 	globalRadarSink, err := buildGlobalRadarSnapshotSink(appCtx)
 	if err != nil {
 		runtimeHealth.Register("storage.global-radar-graph-clickhouse", "storage", "", true)
@@ -114,6 +116,10 @@ func main() {
 	if globalRadarEventSink != nil {
 		runtimeHealth.Success("storage.global-radar-event-clickhouse", 0)
 	}
+	globalRadarSink, globalCampaignRuntime, err := buildGlobalCampaignRuntime(appCtx, appDB, globalRadarSink, runtimeHealth)
+	if err != nil {
+		log.Fatalf("CRITICAL: configured Global Campaign runtime is unavailable: %v", err)
+	}
 	globalRadarBackground, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarSink, globalRadarEventSink)
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar background telemetry is invalid: %v", err)
@@ -127,7 +133,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: configured Global Radar head ingest is invalid: %v", err)
 	}
-	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore, runtimeHealth, globalRadarBackground, globalRadarHeadIngest)
+	stopBackgroundRuntime := startBackgroundRuntime(appCtx, role, appDB, appReadDB, solanaRPC, jobStore, runtimeHealth, globalRadarBackground, globalRadarHeadIngest, globalCampaignRuntime)
 	defer stopBackgroundRuntime()
 	log.Printf("runtime role=%s http=%t background_workers=%t", role, role.servesHTTP(), role.runsBackgroundWorkers())
 	if !role.servesHTTP() {
@@ -170,6 +176,7 @@ func main() {
 		apihttp.WithGlobalRadarSnapshotSink(globalRadarSink),
 		apihttp.WithGlobalRadarEventSink(globalRadarEventSink),
 		apihttp.WithRuntimeHealthRegistry(runtimeHealth),
+		apihttp.WithFabricDB(appDB),
 	))
 	server := newHTTPServer(port, handler)
 

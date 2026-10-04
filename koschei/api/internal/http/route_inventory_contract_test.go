@@ -12,7 +12,7 @@ import (
 
 var literalHandleFuncPattern = regexp.MustCompile(`mux\.HandleFunc\("([^"]+)"`)
 
-func registeredAPIRoutesFromSource(t *testing.T) map[string]struct{} {
+func registeredAPIRoutesFromSource(t *testing.T, extraFiles ...string) map[string]struct{} {
 	t.Helper()
 	_, currentFile, _, ok := runtime.Caller(0)
 	if !ok {
@@ -25,7 +25,9 @@ func registeredAPIRoutesFromSource(t *testing.T) map[string]struct{} {
 		"watchlist_routes.go",
 		"dossier_routes.go",
 		"defense_routes.go",
+		"global_campaign_owner_routes.go",
 	}
+	files = append(files, extraFiles...)
 	out := map[string]struct{}{}
 	for _, name := range files {
 		data, err := os.ReadFile(filepath.Join(baseDir, name))
@@ -83,7 +85,9 @@ func TestProductionRouteInventoryMatchesBootChain(t *testing.T) {
 }
 
 func TestDatabaseOptionalPathsAreRegistered(t *testing.T) {
-	registered := registeredAPIRoutesFromSource(t)
+	// TradePI is registered separately and remains outside the Web3 product
+	// inventory. Its explicit public sandbox still needs a real boot route.
+	registered := registeredAPIRoutesFromSource(t, "agent_routes.go")
 	stale := []string{}
 	for path := range databaseOptionalAPIPaths {
 		if _, ok := registered[path]; !ok {

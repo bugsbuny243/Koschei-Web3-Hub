@@ -18,7 +18,7 @@ requireText(html,'/transaction-firewall','B2B guard route');
 requireText(html,'id="pilotForm"','pilot form');
 requireText(html,'id="website"','honeypot field');
 requireText(html,'id="pilotNotice"','accessible intake notice');
-requireText(html,'does not provision API access, change KOSCH tier, create a customer entitlement','intake entitlement boundary');
+requireText(html,'does not provision API access, create a customer entitlement','intake entitlement boundary');
 requireText(html,'Do not submit a seed phrase, private key, API secret, authorization token, or customer personal data.','secret/privacy boundary');
 requireText(html,'/js/integration-pilot-v2.js?v=1','external pilot controller');
 if(html.includes('/security-radar'))throw new Error('pilot must not advertise legacy security-radar');

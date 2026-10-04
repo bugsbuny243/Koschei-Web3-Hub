@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -24,24 +23,6 @@ type operatorNotificationItem struct {
 	Reason           string
 	EscalationAt     time.Time
 	EscalationStatus string
-}
-
-var operatorNotificationWorkerOnce sync.Once
-
-func (s *Service) StartOperatorNotificationWorker() {
-	if s.db == nil {
-		return
-	}
-	operatorNotificationWorkerOnce.Do(func() {
-		go func() {
-			ticker := time.NewTicker(time.Minute)
-			defer ticker.Stop()
-			for {
-				s.deliverOneOperatorNotification(context.Background())
-				<-ticker.C
-			}
-		}()
-	})
 }
 
 func (s *Service) deliverOneOperatorNotification(ctx context.Context) {

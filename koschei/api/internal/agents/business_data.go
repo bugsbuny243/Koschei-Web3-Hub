@@ -34,7 +34,10 @@ type KnowledgeEntry struct {
 
 func (s *Service) RegisterProviderEvent(ctx context.Context, tenantID string, channel Channel, providerMessageID string) (bool, error) {
 	if s.db == nil {
-		return true, nil
+		return false, ErrPersistenceUnavailable
+	}
+	if strings.TrimSpace(providerMessageID) == "" {
+		return false, fmt.Errorf("provider message id required")
 	}
 	result, err := s.db.ExecContext(ctx, `
 INSERT INTO tradepi_agent_provider_events (tenant_id, channel, provider_message_id)
