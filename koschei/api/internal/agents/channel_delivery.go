@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	"koschei/api/internal/outbound"
 )
 
 var graphVersionPattern = regexp.MustCompile(`^v[0-9]+(?:\.[0-9]+)?$`)
@@ -47,14 +50,21 @@ func SendWhatsAppTextFrom(ctx context.Context, phoneID, to, text string) error {
 	if err != nil {
 		return err
 	}
-	endpoint := fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", version, phoneID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	endpoint := "https://graph.facebook.com/" + url.PathEscape(version) + "/" + url.PathEscape(phoneID) + "/messages"
+	validated, err := outbound.ValidateFixedHTTPSHost(endpoint, "graph.facebook.com")
+	if err != nil {
+		return fmt.Errorf("validate WhatsApp endpoint: %w", err)
+	}
+	// #nosec G704 -- authority is fixed to graph.facebook.com; path segments are escaped and redirects are host-pinned below.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, validated.String(), bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	client := outbound.HardenFixedHostClient(&http.Client{Timeout: 10 * time.Second}, "graph.facebook.com")
+	// #nosec G704 -- request authority and every redirect are restricted to graph.facebook.com.
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -74,12 +84,20 @@ func SendTelegramText(ctx context.Context, chatID, text string) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.telegram.org/bot"+token+"/sendMessage", bytes.NewReader(payload))
+	endpoint := "https://api.telegram.org/bot" + token + "/sendMessage"
+	validated, err := outbound.ValidateFixedHTTPSHost(endpoint, "api.telegram.org")
+	if err != nil {
+		return fmt.Errorf("validate Telegram endpoint: %w", err)
+	}
+	// #nosec G704 -- authority is fixed to api.telegram.org and redirects are host-pinned below.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, validated.String(), bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	client := outbound.HardenFixedHostClient(&http.Client{Timeout: 10 * time.Second}, "api.telegram.org")
+	// #nosec G704 -- request authority and every redirect are restricted to api.telegram.org.
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
