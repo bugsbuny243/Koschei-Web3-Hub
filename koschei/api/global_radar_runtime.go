@@ -112,6 +112,12 @@ func buildGlobalRadarBackgroundTelemetryConfig(sink services.GlobalRadarSnapshot
 					targets = append(targets, services.GlobalRadarTelemetryTarget{Kind: services.GlobalRadarTelemetryEthereumBeacon, NetworkID: networkID, Endpoint: beacon})
 				}
 			}
+		case "solana-mainnet":
+			endpoint := firstConfiguredGlobalRadarEndpoint("SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL")
+			if endpoint == "" {
+				return nil, fmt.Errorf("an explicit Solana RPC endpoint is required for solana-mainnet Global Radar background telemetry")
+			}
+			targets = append(targets, services.GlobalRadarTelemetryTarget{Kind: services.GlobalRadarTelemetrySolanaValidators, NetworkID: networkID, Endpoint: endpoint})
 		case "bitcoin-mainnet":
 			endpoint := strings.TrimSpace(os.Getenv("BITCOIN_CORE_RPC_URL"))
 			if endpoint == "" {
@@ -133,6 +139,15 @@ func buildGlobalRadarBackgroundTelemetryConfig(sink services.GlobalRadarSnapshot
 		eventSink = eventSinks[0]
 	}
 	return &services.GlobalRadarBackgroundTelemetryConfig{Sink: sink, EventSink: eventSink, Targets: targets, Interval: interval}, nil
+}
+
+func firstConfiguredGlobalRadarEndpoint(names ...string) string {
+	for _, name := range names {
+		if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func globalRadarEVMEndpoint(networkID string) string {
