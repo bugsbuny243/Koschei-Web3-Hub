@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"net/url"
 	"path"
@@ -82,7 +83,7 @@ func (s *S3Sink) Put(ctx context.Context, key string, data []byte) (string, erro
 		return "", err
 	}
 	request.Header.Set("Content-Type", "application/x-ndjson")
-	response, err := s.client.Do(request)
+	response, err := outboundhttp.Do(s.client, request)
 	if err != nil {
 		return "", err
 	}
@@ -99,7 +100,7 @@ func (s *S3Sink) Get(ctx context.Context, key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	response, err := s.client.Do(request)
+	response, err := outboundhttp.Do(s.client, request)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,7 @@ func (s *S3Sink) signedRequest(ctx context.Context, method, key string, body []b
 	if body != nil {
 		reader = bytes.NewReader(body)
 	}
-	request, err := http.NewRequestWithContext(ctx, method, objectURL.String(), reader)
+	request, err := outboundhttp.NewRequest(ctx, method, objectURL.String(), reader)
 	if err != nil {
 		return nil, err
 	}

@@ -21,6 +21,11 @@
       if (data.version !== 'koschei.global-campaign-runtime.v1' || !Array.isArray(data.campaigns) || !data.runtime) throw new Error('Campaign response cannot be verified.');
       field(runtime, 'Materializer', data.runtime.enabled ? 'Enabled' : 'Disabled');
       field(runtime, 'Pending / failed', `${data.runtime.pending} / ${data.runtime.failed}`);
+      if (data.runtime.handoff) {
+        field(runtime, 'Radar delivery pending / publishing / failed', `${data.runtime.handoff.pending} / ${data.runtime.handoff.publishing} / ${data.runtime.handoff.failed}`);
+        field(runtime, 'Completed radar deliveries', data.runtime.handoff.completed);
+        field(runtime, 'Oldest undelivered snapshot', data.runtime.handoff.oldest_outstanding_at);
+      }
       field(runtime, 'Processed sources', data.runtime.processed);
       field(runtime, 'Latest processed source', data.runtime.latest_processed_at);
       field(runtime, 'Oldest pending source', data.runtime.oldest_pending_at);
@@ -38,6 +43,7 @@
         field(facts, 'Response', command.response_state);
         field(facts, 'Containment', 'Unverified');
         field(facts, 'Missing evidence', (command.missing_evidence || []).join(', '));
+        if (snapshot.threat_families) field(facts, 'Technical threat families / complete', `${snapshot.threat_families.finding_count} / ${snapshot.threat_families.complete}`);
         field(facts, 'Evidence hash', c.evidence_hash_sha256);
         article.append(facts);
         const details = document.createElement('details');

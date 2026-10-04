@@ -20,11 +20,7 @@ type campaignRadarStore struct {
 }
 
 func (s *campaignRadarStore) InsertGlobalRadarSnapshot(ctx context.Context, snapshot services.GlobalRadarSnapshot) error {
-	if err := s.globalRadarGraphStore.InsertGlobalRadarSnapshot(ctx, snapshot); err != nil {
-		return err
-	}
-	_, err := services.EnqueueGlobalCampaignRadarSnapshot(ctx, s.db, snapshot)
-	return err
+	return services.StageGlobalRadarCampaignSnapshot(ctx, s.db, snapshot)
 }
 
 func buildGlobalCampaignRuntime(parent context.Context, db *sql.DB, sink globalRadarGraphStore, health *runtimehealth.Registry) (globalRadarGraphStore, *services.GlobalCampaignRuntimeConfig, error) {
@@ -45,6 +41,6 @@ func buildGlobalCampaignRuntime(parent context.Context, db *sql.DB, sink globalR
 	if _, err := rand.Read(identity[:]); err != nil {
 		return nil, nil, err
 	}
-	cfg := &services.GlobalCampaignRuntimeConfig{DB: db, Owner: "campaign:" + hex.EncodeToString(identity[:]), Health: health}
+	cfg := &services.GlobalCampaignRuntimeConfig{DB: db, Owner: "campaign:" + hex.EncodeToString(identity[:]), Health: health, SnapshotSink: sink}
 	return &campaignRadarStore{globalRadarGraphStore: sink, db: db}, cfg, nil
 }

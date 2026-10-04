@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"os"
 	"strings"
@@ -258,7 +259,7 @@ func callSolanaRPC(client *http.Client, rpcURL, method string, params interface{
 	if err != nil {
 		return err
 	}
-	resp, err := client.Post(rpcURL, "application/json", bytes.NewReader(body))
+	resp, err := outboundhttp.Post(client, rpcURL, "application/json", bytes.NewReader(body))
 	if err != nil {
 		web3.LogRPCFailure(method, rpcURL, 0, err)
 		return err

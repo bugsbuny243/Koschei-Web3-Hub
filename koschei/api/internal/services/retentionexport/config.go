@@ -62,12 +62,20 @@ func RunFromEnv(ctx context.Context, db *sql.DB) (Result, error) {
 	if err != nil {
 		return Result{Enabled: true, Sink: strings.TrimSpace(config.Sink)}, err
 	}
+	checkCtx, checkCancel := operationContext(ctx)
+	err = CheckSinkConnection(checkCtx, sink, config.Prefix)
+	checkCancel()
+	if err != nil {
+		return Result{Enabled: true, Sink: config.Sink}, err
+	}
 	exporter := Exporter{
 		Repository: NewSQLRepository(db),
 		Sink:       sink,
 		Config:     config,
 	}
-	return exporter.Run(ctx)
+	result, err := exporter.Run(ctx)
+	result.ConnectionVerified = true
+	return result, err
 }
 
 func envString(name, fallback string) string {

@@ -60,6 +60,7 @@ type Config struct {
 }
 
 type Result struct {
+	ConnectionVerified bool
 	Enabled            bool
 	LockAcquired       bool
 	RunID              string

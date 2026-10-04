@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"os"
 	"regexp"
@@ -593,13 +594,13 @@ func fetchAlchemyTransfers(source web3EventSource) ([]alchemyTransfer, error) {
 	out := []alchemyTransfer{}
 	for _, param := range params {
 		body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "alchemy_getAssetTransfers", "params": []any{param}})
-		req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+		req, err := outboundhttp.NewRequest(context.Background(), http.MethodPost, endpoint, bytes.NewReader(body))
 		if err != nil {
 			return nil, err
 		}
 		req.Header.Set("Content-Type", "application/json")
 		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(req)
+		resp, err := outboundhttp.Do(client, req)
 		if err != nil {
 			return nil, err
 		}

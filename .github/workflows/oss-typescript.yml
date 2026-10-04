@@ -34,10 +34,20 @@ jobs:
         working-directory: ${{ matrix.package }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
       - run: npm install --no-audit --no-fund
       - run: npm run check
       - run: npm test
-      - run: npm pack --dry-run
+      - name: Build reviewable package and checksum evidence
+        run: |
+          mkdir -p release-package
+          npm pack --pack-destination release-package
+          sha256sum release-package/*.tgz > release-package/SHA256SUMS
+          printf '%s\n' "${GITHUB_SHA}" > release-package/SOURCE_REVISION
+      - uses: actions/upload-artifact@v7
+        with:
+          name: package-${{ strategy.job-index }}-${{ github.sha }}
+          path: ${{ matrix.package }}/release-package/
+          retention-days: 30
