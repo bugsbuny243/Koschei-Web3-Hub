@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"koschei/api/internal/outboundhttp"
 	"koschei/api/internal/web3"
 )
 
@@ -19,6 +20,17 @@ const guardedSolanaSignatureMethod = "getSignaturesForAddress"
 
 type solanaRPCSignaturePressureTransport struct {
 	base http.RoundTripper
+}
+
+func (t *solanaRPCSignaturePressureTransport) ProtectOutboundTransport() (http.RoundTripper, error) {
+	if t == nil {
+		return nil, outboundhttp.ErrUnsafeDestination
+	}
+	base, err := outboundhttp.ProtectTransport(t.base)
+	if err != nil {
+		return nil, err
+	}
+	return &solanaRPCSignaturePressureTransport{base: base}, nil
 }
 
 var solanaRPCSignaturePressure = struct {
@@ -145,14 +157,15 @@ func solanaRPCSignaturePressureGuardEnabled(req *http.Request) bool {
 	if req == nil || req.URL == nil {
 		return false
 	}
-	if !strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production") {
-		return false
-	}
+	enabled := strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
 	if raw := strings.TrimSpace(os.Getenv("SOLANA_RPC_SIGNATURE_GUARD_ENABLED")); raw != "" {
-		enabled, err := strconv.ParseBool(raw)
-		if err == nil && !enabled {
-			return false
+		configured, err := strconv.ParseBool(raw)
+		if err == nil {
+			enabled = configured
 		}
+	}
+	if !enabled {
+		return false
 	}
 	return strings.EqualFold(strings.TrimSpace(req.Header.Get("X-Koschei-RPC-Method")), guardedSolanaSignatureMethod)
 }

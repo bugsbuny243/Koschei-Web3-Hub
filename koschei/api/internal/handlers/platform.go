@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"koschei/api/internal/outboundhttp"
 	"log"
 	"net/http"
 	"os"
@@ -115,13 +116,13 @@ func (h *Handler) Web3Health(w http.ResponseWriter, r *http.Request) {
 		errorText = "Alchemy API key is not configured"
 	} else {
 		client := &http.Client{Timeout: 5 * time.Second}
-		req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, cfg.url, strings.NewReader(cfg.body))
+		req, err := outboundhttp.NewRequest(r.Context(), http.MethodPost, cfg.url, strings.NewReader(cfg.body))
 		if err != nil {
 			status = "error"
 			errorText = err.Error()
 		} else {
 			req.Header.Set("Content-Type", "application/json")
-			resp, err := client.Do(req)
+			resp, err := outboundhttp.Do(client, req)
 			if err != nil {
 				status = "error"
 				errorText = err.Error()
@@ -178,13 +179,13 @@ func (h *Handler) web3SolanaHealth(w http.ResponseWriter, r *http.Request) {
 	errorText := ""
 	body := `{"jsonrpc":"2.0","id":1,"method":"getHealth"}`
 	client := &http.Client{Timeout: 5 * time.Second}
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, rpcURL, strings.NewReader(body))
+	req, err := outboundhttp.NewRequest(r.Context(), http.MethodPost, rpcURL, strings.NewReader(body))
 	if err != nil {
 		status = "error"
 		errorText = err.Error()
 	} else {
 		req.Header.Set("Content-Type", "application/json")
-		resp, err := client.Do(req)
+		resp, err := outboundhttp.Do(client, req)
 		if err != nil {
 			status = "error"
 			errorText = err.Error()

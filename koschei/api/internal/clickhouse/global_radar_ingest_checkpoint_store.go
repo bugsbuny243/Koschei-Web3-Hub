@@ -188,7 +188,7 @@ func (c *Client) VerifyGlobalRadarIngestCheckpointSchema(ctx context.Context) er
 	if len(metadata.Data) != 1 {
 		return fmt.Errorf("ClickHouse Global Radar ingest checkpoint table metadata returned %d rows", len(metadata.Data))
 	}
-	if metadata.Data[0].Engine != "ReplacingMergeTree" {
+	if !isReplacingMergeTreeEngine(metadata.Data[0].Engine) {
 		return fmt.Errorf("ClickHouse Global Radar ingest checkpoint table engine=%q want ReplacingMergeTree", metadata.Data[0].Engine)
 	}
 	if metadata.Data[0].SortingKey != globalRadarIngestCheckpointSortingKey {

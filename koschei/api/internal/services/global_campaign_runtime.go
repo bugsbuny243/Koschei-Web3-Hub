@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"koschei/api/internal/runtimehealth"
+	"koschei/api/internal/workerwake"
 )
 
 const GlobalCampaignRuntimeHealthID = "worker.global-campaign-materializer"
@@ -24,9 +25,10 @@ const globalCampaignRuntimeMaxObservations = 128
 var ErrGlobalCampaignRuntimeInput = errors.New("invalid or oversized campaign runtime input")
 
 type GlobalCampaignRuntimeConfig struct {
-	DB     *sql.DB
-	Owner  string
-	Health *runtimehealth.Registry
+	DB           *sql.DB
+	Owner        string
+	Health       *runtimehealth.Registry
+	SnapshotSink GlobalRadarSnapshotSink
 }
 
 // Only references and C6/C7 projections cross this boundary, never raw payloads.
@@ -37,24 +39,26 @@ type globalCampaignRuntimeJob struct {
 }
 
 type GlobalCampaignRuntimeSnapshot struct {
-	Version     string                              `json:"version"`
-	SourceRef   string                              `json:"source_ref"`
-	Campaign    GlobalCampaign                      `json:"campaign"`
-	Radar       GlobalCampaignRadarProjection       `json:"radar"`
-	Fabric      FabricCampaignEvidenceContract      `json:"fabric"`
-	Command     GlobalCampaignCommandCenterSnapshot `json:"command"`
-	ProcessedAt time.Time                           `json:"processed_at"`
+	Version        string                              `json:"version"`
+	SourceRef      string                              `json:"source_ref"`
+	Campaign       GlobalCampaign                      `json:"campaign"`
+	Radar          GlobalCampaignRadarProjection       `json:"radar"`
+	Fabric         FabricCampaignEvidenceContract      `json:"fabric"`
+	Command        GlobalCampaignCommandCenterSnapshot `json:"command"`
+	ThreatFamilies GlobalCampaignThreatFamilyReport    `json:"threat_families"`
+	ProcessedAt    time.Time                           `json:"processed_at"`
 }
 
 type GlobalCampaignRuntimeStatus struct {
-	Enabled           bool       `json:"enabled"`
-	Pending           int64      `json:"pending"`
-	Failed            int64      `json:"failed"`
-	Processed         int64      `json:"processed"`
-	OldestPendingAt   *time.Time `json:"oldest_pending_at,omitempty"`
-	LatestProcessedAt *time.Time `json:"latest_processed_at,omitempty"`
-	Scope             string     `json:"scope"`
-	AutomaticResponse bool       `json:"automatic_response"`
+	Handoff           GlobalRadarCampaignHandoffStatus `json:"handoff"`
+	Enabled           bool                             `json:"enabled"`
+	Pending           int64                            `json:"pending"`
+	Failed            int64                            `json:"failed"`
+	Processed         int64                            `json:"processed"`
+	OldestPendingAt   *time.Time                       `json:"oldest_pending_at,omitempty"`
+	LatestProcessedAt *time.Time                       `json:"latest_processed_at,omitempty"`
+	Scope             string                           `json:"scope"`
+	AutomaticResponse bool                             `json:"automatic_response"`
 }
 
 func VerifyGlobalCampaignRuntimeSchema(ctx context.Context, db *sql.DB) error {
@@ -65,7 +69,8 @@ func VerifyGlobalCampaignRuntimeSchema(ctx context.Context, db *sql.DB) error {
 	err := db.QueryRowContext(ctx, `SELECT to_regclass('global_campaign_runtime_queue') IS NOT NULL
         AND to_regclass('global_campaign_current') IS NOT NULL
         AND to_regclass('global_campaign_anchor_index') IS NOT NULL
-        AND to_regclass('global_campaign_worker_leases') IS NOT NULL`).Scan(&ok)
+        AND to_regclass('global_campaign_worker_leases') IS NOT NULL
+ AND to_regclass('global_radar_campaign_handoffs') IS NOT NULL`).Scan(&ok)
 	if err != nil {
 		return err
 	}
@@ -269,6 +274,21 @@ func EnqueueGlobalCampaignRadarSnapshot(ctx context.Context, db *sql.DB, snapsho
 		return 0, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	inserted, err := enqueueGlobalCampaignRuntimeJobsTx(ctx, tx, jobs)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	workerwake.Signal(globalCampaignWake)
+	return inserted, nil
+}
+
+func enqueueGlobalCampaignRuntimeJobsTx(ctx context.Context, tx *sql.Tx, jobs []globalCampaignRuntimeJob) (int, error) {
+	if len(jobs) == 0 {
+		return 0, nil
+	}
 	// Bound outstanding work across all producers, including separate API pods.
 	var ignored any
 	if err := tx.QueryRowContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('global-campaign-runtime-queue',0))`).Scan(&ignored); err != nil {
@@ -297,9 +317,6 @@ func EnqueueGlobalCampaignRadarSnapshot(ctx context.Context, db *sql.DB, snapsho
 		if pending+inserted > 10000 {
 			return 0, errors.New("campaign runtime queue capacity reached")
 		}
-	}
-	if err := tx.Commit(); err != nil {
-		return 0, err
 	}
 	return inserted, nil
 }
@@ -380,7 +397,11 @@ func ProcessGlobalCampaignRuntimeJob(ctx context.Context, db *sql.DB, lease Glob
 		return false, err
 	}
 	radar.FingerprintSHA256 = hashGlobalCampaignRadarProjection(radar)
-	fabric, err := BuildFabricCampaignEvidenceContract(result.Campaign, radar.Temporal, radar, GlobalCampaignThreatFamilyReport{}, nil)
+	threats, err := buildGlobalCampaignRuntimeThreatFamilies(result.Campaign.CampaignRef, radar)
+	if err != nil {
+		return false, err
+	}
+	fabric, err := BuildFabricCampaignEvidenceContract(result.Campaign, radar.Temporal, radar, threats, nil)
 	if err != nil {
 		return false, err
 	}
@@ -390,7 +411,7 @@ func ProcessGlobalCampaignRuntimeJob(ctx context.Context, db *sql.DB, lease Glob
 		return false, err
 	}
 	snapshot := GlobalCampaignRuntimeSnapshot{Version: GlobalCampaignRuntimeVersion, SourceRef: source,
-		Campaign: result.Campaign, Radar: radar, Fabric: fabric, Command: command, ProcessedAt: databaseNow.UTC()}
+		Campaign: result.Campaign, Radar: radar, Fabric: fabric, Command: command, ThreatFamilies: threats, ProcessedAt: databaseNow.UTC()}
 	output, err := json.Marshal(snapshot)
 	if err != nil {
 		return false, err
@@ -417,17 +438,18 @@ func ProcessGlobalCampaignRuntimeJob(ctx context.Context, db *sql.DB, lease Glob
 }
 
 func StartGlobalCampaignRuntime(parent context.Context, cfg GlobalCampaignRuntimeConfig) func() {
-	if cfg.DB == nil || cfg.Owner == "" {
+	if cfg.DB == nil || cfg.Owner == "" || cfg.SnapshotSink == nil {
 		return func() {}
 	}
 	ctx, cancel := context.WithCancel(parent)
 	done := make(chan struct{})
-	cfg.Health.RegisterPeriodic(GlobalCampaignRuntimeHealthID, "worker", "", true, time.Minute)
+	cfg.Health.RegisterPeriodic(GlobalCampaignRuntimeHealthID, "worker", "", true, 2*workerwake.RecoveryCeiling())
+	cfg.Health.RegisterPeriodic(globalRadarHandoffHealthID, "worker", "", true, 2*workerwake.RecoveryCeiling())
+	gate := workerwake.Get(globalCampaignWake)
 	go func() {
 		defer close(done)
 		defer cfg.Health.Stop(GlobalCampaignRuntimeHealthID)
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
+		defer cfg.Health.Stop(globalRadarHandoffHealthID)
 		var lease GlobalCampaignWorkerLease
 		defer func() {
 			releaseCtx, releaseCancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -441,18 +463,37 @@ func StartGlobalCampaignRuntime(parent context.Context, cfg GlobalCampaignRuntim
 				return
 			}
 			cycle, cycleCancel := context.WithTimeout(ctx, 25*time.Second)
+			gate.Drain()
+			handed := 0
+			var handoffErr error
+			for handed < 5 {
+				worked, err := ProcessGlobalRadarCampaignHandoff(cycle, cfg.DB, cfg.SnapshotSink, cfg.Owner)
+				if err != nil {
+					handoffErr = err
+					break
+				}
+				if !worked {
+					break
+				}
+				handed++
+			}
+			if handoffErr != nil {
+				cfg.Health.Failure(globalRadarHandoffHealthID, handoffErr)
+			} else {
+				cfg.Health.Success(globalRadarHandoffHealthID, handed)
+			}
 			var err error
-			var now time.Time
-			err = cfg.DB.QueryRowContext(cycle, `SELECT clock_timestamp()`).Scan(&now)
-			if err == nil {
-				if lease.FencingToken > 0 && lease.LeaseExpiresAt.After(now) {
-					lease, err = RenewGlobalCampaignWorkerLease(cycle, cfg.DB, lease, now, time.Minute)
-				} else {
+			var hasJobs bool
+			err = cfg.DB.QueryRowContext(cycle, `SELECT EXISTS(SELECT 1 FROM global_campaign_runtime_queue WHERE status='pending')`).Scan(&hasJobs)
+			if err == nil && hasJobs {
+				var now time.Time
+				err = cfg.DB.QueryRowContext(cycle, `SELECT clock_timestamp()`).Scan(&now)
+				if err == nil {
 					lease, err = AcquireGlobalCampaignWorkerLease(cycle, cfg.DB, globalCampaignRuntimeLeaseKey, cfg.Owner, now, time.Minute)
 				}
 			}
 			processed := 0
-			for err == nil && processed < 5 {
+			for err == nil && hasJobs && processed < 5 {
 				var worked bool
 				worked, err = ProcessGlobalCampaignRuntimeJob(cycle, cfg.DB, lease)
 				if !worked {
@@ -460,17 +501,26 @@ func StartGlobalCampaignRuntime(parent context.Context, cfg GlobalCampaignRuntim
 				}
 				processed++
 			}
-			if err != nil {
+			if errors.Is(err, ErrGlobalCampaignWorkerLeaseBusy) {
+				cfg.Health.Success(GlobalCampaignRuntimeHealthID, 0)
+			} else if err != nil {
 				cfg.Health.Failure(GlobalCampaignRuntimeHealthID, err)
 			} else {
 				cfg.Health.Success(GlobalCampaignRuntimeHealthID, processed)
 			}
-			cycleCancel()
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
+			if lease.FencingToken > 0 {
+				_ = ReleaseGlobalCampaignWorkerLease(cycle, cfg.DB, lease, time.Now().UTC())
+				lease = GlobalCampaignWorkerLease{}
 			}
+			sleep := globalCampaignRuntimeSleep(cycle, cfg.DB)
+			if err != nil || handoffErr != nil {
+				sleep = time.Minute
+			}
+			if errors.Is(err, ErrGlobalCampaignWorkerLeaseBusy) {
+				sleep = 10 * time.Second
+			}
+			cycleCancel()
+			gate.Wait(ctx, sleep)
 		}
 	}()
 	var once sync.Once
@@ -486,6 +536,10 @@ func ReadGlobalCampaignRuntime(ctx context.Context, db *sql.DB, enabled bool) (G
 	err := db.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE status='pending'),count(*) FILTER (WHERE status='failed'),
         count(*) FILTER (WHERE status='processed'), min(created_at) FILTER (WHERE status='pending'),max(processed_at) FILTER (WHERE status='processed')
         FROM global_campaign_runtime_queue`).Scan(&status.Pending, &status.Failed, &status.Processed, &status.OldestPendingAt, &status.LatestProcessedAt)
+	if err != nil {
+		return status, snapshots, err
+	}
+	status.Handoff, err = readGlobalRadarCampaignHandoffStatus(ctx, db)
 	if err != nil {
 		return status, snapshots, err
 	}
@@ -523,6 +577,17 @@ func ReadGlobalCampaignRuntime(ctx context.Context, db *sql.DB, enabled bool) (G
 	return status, snapshots, rows.Err()
 }
 
+func buildGlobalCampaignRuntimeThreatFamilies(campaignRef string, radar GlobalCampaignRadarProjection) (GlobalCampaignThreatFamilyReport, error) {
+	threats, err := BuildGlobalCampaignThreatFamilies(GlobalCampaignThreatFamilyInput{CampaignRef: campaignRef, Radar: radar})
+	if err != nil {
+		return threats, err
+	}
+	threats.Complete = false
+	threats.Limitations = append(threats.Limitations, "Tempo and ARVIS threat-pathway inputs have not been collected for this source window.")
+	threats.FingerprintSHA256 = hashGlobalCampaignThreatFamilyReport(threats)
+	return threats, nil
+}
+
 func validateGlobalCampaignRuntimeSnapshot(snapshot GlobalCampaignRuntimeSnapshot) error {
 	if snapshot.Version != GlobalCampaignRuntimeVersion || snapshot.SourceRef == "" || snapshot.ProcessedAt.IsZero() {
 		return ErrGlobalCampaignStoredCorrupt
@@ -539,7 +604,18 @@ func validateGlobalCampaignRuntimeSnapshot(snapshot GlobalCampaignRuntimeSnapsho
 	if snapshot.Radar.FingerprintSHA256 != hashGlobalCampaignRadarProjection(snapshot.Radar) {
 		return ErrGlobalCampaignStoredCorrupt
 	}
-	fabric, err := BuildFabricCampaignEvidenceContract(snapshot.Campaign, snapshot.Radar.Temporal, snapshot.Radar, GlobalCampaignThreatFamilyReport{}, nil)
+	var threats GlobalCampaignThreatFamilyReport
+	if snapshot.ThreatFamilies.Version != "" {
+		rebuilt, err := buildGlobalCampaignRuntimeThreatFamilies(snapshot.Campaign.CampaignRef, snapshot.Radar)
+		if err != nil {
+			return err
+		}
+		if !reflect.DeepEqual(rebuilt, snapshot.ThreatFamilies) {
+			return ErrGlobalCampaignStoredCorrupt
+		}
+		threats = rebuilt
+	}
+	fabric, err := BuildFabricCampaignEvidenceContract(snapshot.Campaign, snapshot.Radar.Temporal, snapshot.Radar, threats, nil)
 	if err != nil {
 		return err
 	}

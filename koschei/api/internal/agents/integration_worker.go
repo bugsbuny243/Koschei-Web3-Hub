@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"os"
 	"strings"
@@ -81,7 +82,7 @@ func deliverIntegrationWebhook(ctx context.Context, item integrationOutboxItem) 
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -90,7 +91,7 @@ func deliverIntegrationWebhook(ctx context.Context, item integrationOutboxItem) 
 	if secret := strings.TrimSpace(os.Getenv("TRADEPI_CALENDAR_WEBHOOK_SECRET")); secret != "" {
 		req.Header.Set("Authorization", "Bearer "+secret)
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := outboundhttp.Do(&http.Client{Timeout: 10 * time.Second}, req)
 	if err != nil {
 		return err
 	}

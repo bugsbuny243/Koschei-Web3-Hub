@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -82,7 +83,7 @@ func ProbeSuiMainnetIdentity(ctx context.Context, client *http.Client, endpoint 
 	if err != nil {
 		return SuiMainnetIdentityProbeResult{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return SuiMainnetIdentityProbeResult{}, err
 	}
@@ -140,7 +141,7 @@ func ProbeAptosMainnetIdentity(ctx context.Context, client *http.Client, endpoin
 		client = &http.Client{Timeout: 8 * time.Second}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := outboundhttp.NewRequest(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return AptosMainnetIdentityProbeResult{}, err
 	}
@@ -226,7 +227,7 @@ func moveIdentityDoJSON(client *http.Client, req *http.Request, target any) erro
 }
 
 func moveIdentityDoJSONWithDigest(client *http.Client, req *http.Request, target any) (string, error) {
-	resp, err := client.Do(req)
+	resp, err := outboundhttp.Do(client, req)
 	if err != nil {
 		return "", err
 	}

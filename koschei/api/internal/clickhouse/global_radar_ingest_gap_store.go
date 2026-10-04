@@ -186,7 +186,7 @@ func (c *Client) VerifyGlobalRadarIngestGapSchema(ctx context.Context) error {
 	if err := c.queryJSON(ctx, metadataURL.String(), &metadata); err != nil {
 		return fmt.Errorf("verify ClickHouse Global Radar ingest gap table metadata: %w", err)
 	}
-	if len(metadata.Data) != 1 || metadata.Data[0].Engine != "ReplacingMergeTree" || metadata.Data[0].SortingKey != globalRadarIngestGapSortingKey {
+	if len(metadata.Data) != 1 || !isReplacingMergeTreeEngine(metadata.Data[0].Engine) || metadata.Data[0].SortingKey != globalRadarIngestGapSortingKey {
 		return fmt.Errorf("ClickHouse Global Radar ingest gap table metadata is invalid")
 	}
 

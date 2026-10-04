@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"os"
 	"strings"
@@ -415,10 +417,13 @@ func evmDecode(chain, network, hash string) (map[string]any, bool) {
 	}
 	call := func(method string) map[string]any {
 		body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method, "params": []string{hash}})
-		req, _ := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+		req, err := outboundhttp.NewRequest(context.Background(), http.MethodPost, endpoint, bytes.NewReader(body))
+		if err != nil {
+			return nil
+		}
 		req.Header.Set("Content-Type", "application/json")
 		client := &http.Client{Timeout: 8 * time.Second}
-		resp, err := client.Do(req)
+		resp, err := outboundhttp.Do(client, req)
 		if err != nil {
 			return nil
 		}

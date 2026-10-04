@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"os"
 	"strings"
@@ -943,8 +944,11 @@ func ownerTriggerDeploy(ctx context.Context) (string, string, map[string]any) {
 	if url == "" {
 		return "error", "Render deploy hook URL yapılandırılmamış.", nil
 	}
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return "error", "Deploy destination rejected", nil
+	}
+	resp, err := outboundhttp.Do(&http.Client{Timeout: 10 * time.Second}, req)
 	if err != nil {
 		return "error", "Deploy tetiklenemedi: " + err.Error(), nil
 	}
@@ -966,7 +970,7 @@ func ownerGitHubRequest(ctx context.Context, method, path string, payload any) (
 		b, _ := json.Marshal(payload)
 		body = bytes.NewReader(b)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, "https://api.github.com"+path, body)
+	req, err := outboundhttp.NewRequest(ctx, method, "https://api.github.com"+path, body)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -976,7 +980,7 @@ func ownerGitHubRequest(ctx context.Context, method, path string, payload any) (
 	if payload != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	resp, err := (&http.Client{Timeout: 12 * time.Second}).Do(req)
+	resp, err := outboundhttp.Do(&http.Client{Timeout: 12 * time.Second}, req)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1001,9 +1005,12 @@ func ownerHTTPHealth(ctx context.Context, endpoint, envKey string) map[string]an
 	if strings.TrimSpace(os.Getenv(envKey)) == "" {
 		return map[string]any{"state": "Disconnected", "detail": envKey + " missing"}
 	}
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := outboundhttp.NewRequest(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return map[string]any{"state": "Disconnected", "detail": "destination rejected"}
+	}
 	req.Header.Set("Authorization", "Bearer "+os.Getenv(envKey))
-	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+	resp, err := outboundhttp.Do(&http.Client{Timeout: 5 * time.Second}, req)
 	if err != nil {
 		return map[string]any{"state": "Timeout", "detail": err.Error()}
 	}

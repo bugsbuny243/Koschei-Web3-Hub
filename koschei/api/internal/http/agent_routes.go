@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"os"
 	"strconv"
@@ -376,13 +377,13 @@ func sendTelegramText(r *http.Request, token string, chatID int64, text string) 
 		return err
 	}
 	endpoint := "https://api.telegram.org/bot" + token + "/sendMessage"
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, endpoint, bytes.NewReader(body))
+	req, err := outboundhttp.NewRequest(r.Context(), http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := outboundhttp.Do(client, req)
 	if err != nil {
 		return err
 	}

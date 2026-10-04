@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"net/url"
 	"os"
@@ -25,7 +26,7 @@ func trustedJupiterGETJSON(ctx context.Context, client *http.Client, endpoint st
 	if client == nil {
 		client = http.DefaultClient
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
+	req, err := outboundhttp.NewRequest(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -34,7 +35,7 @@ func trustedJupiterGETJSON(ctx context.Context, client *http.Client, endpoint st
 	if apiKey := jupiterAPIKeyForQuoteEndpoint(parsed.String()); apiKey != "" {
 		req.Header.Set("x-api-key", apiKey)
 	}
-	resp, err := client.Do(req)
+	resp, err := outboundhttp.Do(client, req)
 	if err != nil {
 		return err
 	}
