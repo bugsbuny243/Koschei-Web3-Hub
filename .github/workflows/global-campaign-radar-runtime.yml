@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'koschei/api/runtime_workers.go'
+      - 'koschei/api/global_radar_runtime.go'
+      - 'koschei/api/global_radar_background_config_test.go'
+      - 'koschei/api/internal/services/global_radar_background_telemetry.go'
+      - 'koschei/api/internal/services/global_radar_background_telemetry_test.go'
       - 'koschei/api/internal/services/global_campaign_radar_runtime.go'
       - 'koschei/api/internal/services/global_campaign_radar_runtime_test.go'
       - 'koschei/api/migrations/129_global_campaign_radar_ingest.sql'
@@ -12,6 +16,10 @@ on:
     branches: [main]
     paths:
       - 'koschei/api/runtime_workers.go'
+      - 'koschei/api/global_radar_runtime.go'
+      - 'koschei/api/global_radar_background_config_test.go'
+      - 'koschei/api/internal/services/global_radar_background_telemetry.go'
+      - 'koschei/api/internal/services/global_radar_background_telemetry_test.go'
       - 'koschei/api/internal/services/global_campaign_radar_runtime.go'
       - 'koschei/api/internal/services/global_campaign_radar_runtime_test.go'
       - 'koschei/api/migrations/129_global_campaign_radar_ingest.sql'
@@ -35,9 +43,9 @@ jobs:
       - name: gofmt
         run: |
           set -euo pipefail
-          test -z "$(gofmt -l runtime_workers.go internal/services/global_campaign_radar_runtime.go internal/services/global_campaign_radar_runtime_test.go)"
+          test -z "$(gofmt -l runtime_workers.go global_radar_runtime.go global_radar_background_config_test.go internal/services/global_radar_background_telemetry.go internal/services/global_radar_background_telemetry_test.go internal/services/global_campaign_radar_runtime.go internal/services/global_campaign_radar_runtime_test.go)"
       - name: Runtime and campaign acceptance
         run: |
           set -euo pipefail
-          go test -race ./internal/services -run '^(TestProjectSecurityRadarVerdict|TestGlobalCampaign)' -count=1
-          go test -race . -run '^Test(ParseRuntimeRole|RuntimeRoleCapabilities)' -count=1
+          go test -race ./internal/services -run '^(TestProjectSecurityRadarVerdict|TestGlobalCampaign|TestCollectGlobalRadarBackgroundTelemetryPersistsSolanaValidatorObservations|TestProjectSolanaValidatorTelemetry)' -count=1
+          go test -race . -run '^(TestParseRuntimeRole|TestRuntimeRoleCapabilities|TestBuildGlobalRadarBackgroundTelemetryConfig)' -count=1
