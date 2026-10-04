@@ -70,6 +70,7 @@ jobs:
       - name: Reachable vulnerability scan
         run: |
           "${RUNNER_TEMP}/security-bin/govulncheck" ./...
+      # Broad G703/G704 suppression is intentionally removed: fix or narrowly justify each sink.
       - name: High-confidence static security scan
         run: |
           "${RUNNER_TEMP}/security-bin/gosec" -severity high -confidence high -exclude-generated ./...
