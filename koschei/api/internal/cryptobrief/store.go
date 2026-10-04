@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -358,6 +359,7 @@ func (s *Service) RefreshFeeds(ctx context.Context) (int, error) {
 		items, e := FetchFeed(ctx, s.Client, source, now)
 		if e != nil {
 			failed = true
+			log.Printf("crypto brief source unavailable source=%s code=%s", source.ID, e.Error())
 			_, _ = s.DB.ExecContext(ctx, `UPDATE crypto_brief_sources SET error_code=$2 WHERE source_id=$1`, source.ID, e.Error())
 			continue
 		}
@@ -386,6 +388,7 @@ func (s *Service) RefreshFeeds(ctx context.Context) (int, error) {
 		if e = tx.Commit(); e != nil {
 			return n, e
 		}
+		log.Printf("crypto brief source synchronized source=%s items=%d", source.ID, len(items))
 	}
 	if failed {
 		return n, errors.New("news_source_unavailable")
