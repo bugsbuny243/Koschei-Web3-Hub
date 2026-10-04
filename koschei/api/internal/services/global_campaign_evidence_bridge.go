@@ -169,14 +169,14 @@ func buildGlobalCampaignActorEvidenceSnapshot(ctx context.Context, db *sql.DB, r
 
 	relationEvidenceID := "actor-relation:" + strings.TrimSpace(row.ID)
 	attributes := map[string]any{
-		"source_subject_id": sourceSubject.ID,
-		"target_subject_id": targetSubject.ID,
-		"source_network":    sourceSubject.Network,
-		"target_network":    targetSubject.Network,
-		"relation":          strings.TrimSpace(row.Relation),
-		"counterpart_kind":  strings.TrimSpace(row.CounterpartKind),
-		"evidence_key":      strings.TrimSpace(row.EvidenceKey),
-		"source":            strings.TrimSpace(row.Source),
+		"source_subject_id":  sourceSubject.ID,
+		"target_subject_id":  targetSubject.ID,
+		"source_network":     sourceSubject.Network,
+		"target_network":     targetSubject.Network,
+		"relation":           strings.TrimSpace(row.Relation),
+		"counterpart_kind":   strings.TrimSpace(row.CounterpartKind),
+		"evidence_key":       strings.TrimSpace(row.EvidenceKey),
+		"source":             strings.TrimSpace(row.Source),
 		"authority_boundary": "verified_relation_projection_only",
 	}
 	if strings.TrimSpace(row.TokenMint) != "" {
