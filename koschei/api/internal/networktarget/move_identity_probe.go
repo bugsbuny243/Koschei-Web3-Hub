@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"koschei/api/internal/outbound"
 )
 
 const moveIdentityResponseLimit = 128 * 1024
@@ -70,7 +72,7 @@ func ProbeSuiMainnetIdentity(ctx context.Context, client *http.Client, endpoint 
 	if observedAt.IsZero() {
 		return SuiMainnetIdentityProbeResult{}, fmt.Errorf("sui_identity_observed_at_required")
 	}
-	parsed, err := validateMoveIdentityEndpoint(endpoint)
+	parsed, err := validateMoveIdentityEndpoint(ctx, endpoint)
 	if err != nil {
 		return SuiMainnetIdentityProbeResult{}, err
 	}
@@ -82,7 +84,7 @@ func ProbeSuiMainnetIdentity(ctx context.Context, client *http.Client, endpoint 
 	if err != nil {
 		return SuiMainnetIdentityProbeResult{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, parsed.String(), bytes.NewReader(payload))
 	if err != nil {
 		return SuiMainnetIdentityProbeResult{}, err
 	}
@@ -132,7 +134,7 @@ func ProbeAptosMainnetIdentity(ctx context.Context, client *http.Client, endpoin
 	if observedAt.IsZero() {
 		return AptosMainnetIdentityProbeResult{}, fmt.Errorf("aptos_identity_observed_at_required")
 	}
-	parsed, err := validateMoveIdentityEndpoint(endpoint)
+	parsed, err := validateMoveIdentityEndpoint(ctx, endpoint)
 	if err != nil {
 		return AptosMainnetIdentityProbeResult{}, err
 	}
@@ -140,7 +142,7 @@ func ProbeAptosMainnetIdentity(ctx context.Context, client *http.Client, endpoin
 		client = &http.Client{Timeout: 8 * time.Second}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {
 		return AptosMainnetIdentityProbeResult{}, err
 	}
@@ -211,13 +213,17 @@ func ProbeAptosMainnetIdentity(ctx context.Context, client *http.Client, endpoin
 	}, nil
 }
 
-func validateMoveIdentityEndpoint(endpoint string) (*url.URL, error) {
+func validateMoveIdentityEndpoint(ctx context.Context, endpoint string) (*url.URL, error) {
 	endpoint = strings.TrimSpace(endpoint)
 	parsed, err := url.Parse(endpoint)
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
 		return nil, fmt.Errorf("move_identity_endpoint_invalid")
 	}
-	return parsed, nil
+	validated, err := outbound.ValidateOperatorURL(ctx, parsed.String())
+	if err != nil {
+		return nil, fmt.Errorf("move_identity_endpoint_invalid: %w", err)
+	}
+	return validated, nil
 }
 
 func moveIdentityDoJSON(client *http.Client, req *http.Request, target any) error {
@@ -226,6 +232,16 @@ func moveIdentityDoJSON(client *http.Client, req *http.Request, target any) erro
 }
 
 func moveIdentityDoJSONWithDigest(client *http.Client, req *http.Request, target any) (string, error) {
+	if req == nil || req.URL == nil {
+		return "", fmt.Errorf("move_identity_request_invalid")
+	}
+	validated, err := outbound.ValidateOperatorURL(req.Context(), req.URL.String())
+	if err != nil {
+		return "", fmt.Errorf("move_identity_endpoint_invalid: %w", err)
+	}
+	req.URL = validated
+	client = outbound.HardenOperatorClient(req.Context(), client)
+	// #nosec G704 -- request URL passes the shared SSRF boundary and every redirect is revalidated.
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
