@@ -130,3 +130,54 @@ func TestCollectGlobalRadarBackgroundTelemetryPersistsSuccessfulTargetsAndReport
 		t.Fatalf("partial cycle did not persist successful evidence: %#v", snapshot)
 	}
 }
+
+func TestCollectGlobalRadarBackgroundTelemetryPersistsSolanaValidatorObservations(t *testing.T) {
+	resetSolanaRPCCachesForTest()
+	t.Cleanup(resetSolanaRPCCachesForTest)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		var req solanaRPCRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatal(err)
+		}
+		if req.Method != "getVoteAccounts" {
+			t.Fatalf("unexpected method %q", req.Method)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"jsonrpc": "2.0", "id": req.ID,
+			"result": map[string]any{
+				"current": []any{map[string]any{
+					"votePubkey":     "Vote111111111111111111111111111111111111111",
+					"nodePubkey":     "Node111111111111111111111111111111111111111",
+					"activatedStake": 75, "commission": 5, "lastVote": 100, "rootSlot": 90, "epochVoteAccount": true,
+				}},
+				"delinquent": []any{map[string]any{
+					"votePubkey":     "Vote222222222222222222222222222222222222222",
+					"nodePubkey":     "Node222222222222222222222222222222222222222",
+					"activatedStake": 25, "commission": 10, "lastVote": 80, "rootSlot": 70, "epochVoteAccount": true,
+				}},
+			},
+		})
+	}))
+	defer server.Close()
+
+	sink := &globalRadarTelemetryRecordingSink{}
+	snapshot, err := CollectGlobalRadarBackgroundTelemetry(context.Background(), GlobalRadarBackgroundTelemetryConfig{
+		Sink: sink,
+		Targets: []GlobalRadarTelemetryTarget{{
+			Kind: GlobalRadarTelemetrySolanaValidators, NetworkID: "solana-mainnet", Endpoint: server.URL,
+		}},
+		Now: func() time.Time { return time.Date(2026, 10, 4, 6, 0, 0, 0, time.UTC) },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sink.snapshots) != 1 || len(snapshot.Observations) != 2 {
+		t.Fatalf("snapshots=%d observations=%d", len(sink.snapshots), len(snapshot.Observations))
+	}
+	for _, observation := range snapshot.Observations {
+		if observation.Subject.Network != "solana-mainnet" || observation.ObservationKind != GlobalRadarObservationNode || observation.DecisionState != "evidence_only_no_verdict_created" {
+			t.Fatalf("unexpected Solana validator observation: %#v", observation)
+		}
+	}
+}
