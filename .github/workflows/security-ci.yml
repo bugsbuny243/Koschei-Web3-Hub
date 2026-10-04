@@ -72,9 +72,7 @@ jobs:
           "${RUNNER_TEMP}/security-bin/govulncheck" ./...
       - name: High-confidence static security scan
         run: |
-          # Issue #653 tracks the bounded legacy G703/G704 taint backlog.
-          # Every other high-severity/high-confidence rule remains blocking.
-          "${RUNNER_TEMP}/security-bin/gosec" -severity high -confidence high -exclude-generated -exclude=G703,G704 ./...
+          "${RUNNER_TEMP}/security-bin/gosec" -severity high -confidence high -exclude-generated ./...
 
   npm-security:
     name: npm audit (oss/event-normalizer)
