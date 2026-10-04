@@ -26,6 +26,7 @@ func registeredAPIRoutesFromSource(t *testing.T, extraFiles ...string) map[strin
 		"dossier_routes.go",
 		"defense_routes.go",
 		"global_campaign_owner_routes.go",
+		"crypto_brief_routes.go",
 	}
 	files = append(files, extraFiles...)
 	out := map[string]struct{}{}

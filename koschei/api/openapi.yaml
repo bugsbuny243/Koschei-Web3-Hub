@@ -1,6 +1,44 @@
 {
   "components": {
     "schemas": {
+      "CryptoBriefRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "channel": {
+            "enum": [
+              "telegram",
+              "whatsapp"
+            ],
+            "type": "string"
+          },
+          "consent": {
+            "description": "Must be true when requesting a pairing challenge.",
+            "type": "boolean"
+          },
+          "preferences": {
+            "additionalProperties": true,
+            "description": "PUT requires networks/topics arrays, daily or hourly cadence, timezone and quiet_start/quiet_end hours (0-23).",
+            "type": "object"
+          },
+          "state": {
+            "enum": [
+              "active",
+              "paused",
+              "disconnected"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "channel"
+        ],
+        "type": "object"
+      },
+      "CryptoBriefResponse": {
+        "additionalProperties": true,
+        "description": "Versioned public news, isolated customer subscription state, one-use pairing details, or aggregate operator telemetry. News is publisher-reported and does not authorize a security decision.",
+        "type": "object"
+      },
       "ErrorResponse": {
         "additionalProperties": true,
         "properties": {
@@ -4957,6 +4995,562 @@
         "x-koschei-route-source": "route_inventory.go"
       }
     },
+    "/api/crypto-brief/feed": {
+      "get": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "get__api_crypto_brief_feed",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [],
+        "summary": "GET /api/crypto-brief/feed",
+        "tags": [
+          "crypto_brief_public"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "public",
+        "x-koschei-route-source": "route_inventory.go"
+      }
+    },
+    "/api/customer/crypto-brief": {
+      "delete": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "delete__api_customer_crypto_brief",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryptoBriefRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [],
+        "summary": "DELETE /api/customer/crypto-brief",
+        "tags": [
+          "crypto_brief_customer"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "customer_session",
+        "x-koschei-route-source": "route_inventory.go"
+      },
+      "get": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "get__api_customer_crypto_brief",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [],
+        "summary": "GET /api/customer/crypto-brief",
+        "tags": [
+          "crypto_brief_customer"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "customer_session",
+        "x-koschei-route-source": "route_inventory.go"
+      },
+      "patch": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "patch__api_customer_crypto_brief",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryptoBriefRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [],
+        "summary": "PATCH /api/customer/crypto-brief",
+        "tags": [
+          "crypto_brief_customer"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "customer_session",
+        "x-koschei-route-source": "route_inventory.go"
+      },
+      "put": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "put__api_customer_crypto_brief",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryptoBriefRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [],
+        "summary": "PUT /api/customer/crypto-brief",
+        "tags": [
+          "crypto_brief_customer"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "customer_session",
+        "x-koschei-route-source": "route_inventory.go"
+      }
+    },
+    "/api/customer/crypto-brief/pair": {
+      "post": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "post__api_customer_crypto_brief_pair",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryptoBriefRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [],
+        "summary": "POST /api/customer/crypto-brief/pair",
+        "tags": [
+          "crypto_brief_customer"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "customer_session",
+        "x-koschei-route-source": "route_inventory.go"
+      }
+    },
     "/api/customer/web3/transaction-preflight": {
       "post": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
@@ -6746,6 +7340,117 @@
           }
         ],
         "summary": "GET /api/owner/creator-intelligence",
+        "tags": [
+          "owner"
+        ],
+        "x-koschei-auth-tier": "owner_session",
+        "x-koschei-inventory-auth": "owner_session",
+        "x-koschei-route-source": "route_inventory.go"
+      }
+    },
+    "/api/owner/crypto-brief": {
+      "get": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "get__api_owner_crypto_brief",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Identity credential missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authenticated identity lacks the required access tier."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "summary": "GET /api/owner/crypto-brief",
         "tags": [
           "owner"
         ],

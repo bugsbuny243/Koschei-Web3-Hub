@@ -114,7 +114,7 @@
   }
 
   ready(function(){
-    var links=[['/live','Live SOC'],['/cases','Cases'],['/scan','Token Scan'],['/transaction-shield','Transaction Shield'],['/safe-check','Safe Check'],['/scan?mode=deep','Deep Scan'],['/dashboard','Workspace'],['/pricing','Professional']];
+    var links=[['/live','Live SOC'],['/cases','Cases'],['/scan','Token Scan'],['/transaction-shield','Transaction Shield'],['/safe-check','Safe Check'],['/scan?mode=deep','Deep Scan'],['/dashboard','Workspace'],['/crypto-brief','Crypto Brief'],['/pricing','Professional']];
     var current=(location.pathname||'/').replace(/\.html$/,'').replace(/\/$/,'')||'/';
     var existing=document.querySelector('.top .nav, header.top nav.nav, nav.top .nav');
     var nav=existing||document.createElement('nav');
