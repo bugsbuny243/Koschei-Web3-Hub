@@ -30,7 +30,7 @@ FORMAT JSON`)
 	if len(metadata.Data) != 1 {
 		return fmt.Errorf("ClickHouse Global Radar table metadata returned %d rows", len(metadata.Data))
 	}
-	if metadata.Data[0].Engine != "ReplacingMergeTree" {
+	if !isReplacingMergeTreeEngine(metadata.Data[0].Engine) {
 		return fmt.Errorf("ClickHouse Global Radar table engine=%q want ReplacingMergeTree", metadata.Data[0].Engine)
 	}
 	if metadata.Data[0].SortingKey != globalRadarGraphSortingKey {
@@ -77,4 +77,9 @@ FORMAT JSON`)
 		return fmt.Errorf("ClickHouse Global Radar required column contract matched %d of 18 columns", firstSchemaCount(columns))
 	}
 	return nil
+}
+
+// ClickHouse Cloud rewrites reviewed ReplacingMergeTree DDL to its shared variant.
+func isReplacingMergeTreeEngine(engine string) bool {
+	return engine == "ReplacingMergeTree" || engine == "SharedReplacingMergeTree" || engine == "ReplicatedReplacingMergeTree"
 }

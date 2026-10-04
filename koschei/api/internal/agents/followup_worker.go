@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -17,25 +16,6 @@ type followupItem struct {
 	ChannelAccountID int64
 	Body             string
 	Attempts         int
-}
-
-var followupWorkerOnce sync.Once
-
-func (s *Service) StartFollowupWorker() {
-	if s.db == nil {
-		return
-	}
-	followupWorkerOnce.Do(func() {
-		go func() {
-			ticker := time.NewTicker(time.Minute)
-			defer ticker.Stop()
-			for {
-				s.recoverStaleFollowups(context.Background())
-				s.deliverOneFollowup(context.Background())
-				<-ticker.C
-			}
-		}()
-	})
 }
 
 func (s *Service) recoverStaleFollowups(ctx context.Context) {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"os"
 	"strings"
@@ -21,20 +22,6 @@ type integrationOutboxItem struct {
 
 func (s *Service) IntegrationEnabled() bool {
 	return s.db != nil && strings.TrimSpace(os.Getenv("TRADEPI_CALENDAR_WEBHOOK_URL")) != ""
-}
-
-func (s *Service) startIntegrationWorker() {
-	if !s.IntegrationEnabled() {
-		return
-	}
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			s.deliverOneIntegration(context.Background())
-			<-ticker.C
-		}
-	}()
 }
 
 func (s *Service) deliverOneIntegration(ctx context.Context) {
@@ -95,7 +82,7 @@ func deliverIntegrationWebhook(ctx context.Context, item integrationOutboxItem) 
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -104,7 +91,7 @@ func deliverIntegrationWebhook(ctx context.Context, item integrationOutboxItem) 
 	if secret := strings.TrimSpace(os.Getenv("TRADEPI_CALENDAR_WEBHOOK_SECRET")); secret != "" {
 		req.Header.Set("Authorization", "Bearer "+secret)
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := outboundhttp.Do(&http.Client{Timeout: 10 * time.Second}, req)
 	if err != nil {
 		return err
 	}

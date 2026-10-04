@@ -27,8 +27,8 @@ var arvisHealthCache = struct {
 }{}
 
 // Health is the public liveness endpoint used by Railway and external
-// transport monitors. Koschei Web3 is intentionally stateless for application
-// blockchain/radar/evidence data, so PostgreSQL is not a readiness dependency.
+// transport monitors. It reports the configured application persistence mode
+// without making a database call or turning liveness into a readiness probe.
 // Customer indicators explicitly request a bounded observation refresh; plain
 // /health never collects evidence or waits for the collection lock.
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
@@ -38,10 +38,14 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		arvis = h.cachedArvisHealth(ctx)
 	}
+	persistence, database := "stateless", "not_used"
+	if h.DB != nil {
+		persistence, database = "postgresql", "configured"
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":      "ok",
-		"persistence": "stateless",
-		"database":    "not_used",
+		"persistence": persistence,
+		"database":    database,
 		"service":     "koschei-web3",
 		"arvis":       arvis,
 	})

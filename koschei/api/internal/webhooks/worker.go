@@ -14,10 +14,12 @@ import (
 	"sync"
 	"time"
 
+	"koschei/api/internal/runtimehealth"
 	"koschei/api/internal/workerwake"
 )
 
 const (
+	DeliveryHealthID  = "worker.customer-webhook-delivery"
 	deliveryBatchSize = 10
 	// deliveryErrorBackoff is the retry delay after a failed claim: short enough
 	// that a pending delivery is not stranded, long enough to avoid a hot loop.
@@ -37,14 +39,23 @@ type deliveryRecord struct {
 	MaxAttempts      int
 }
 
-func StartDeliveryWorker(parent context.Context, db *sql.DB) func() {
+func StartDeliveryWorker(parent context.Context, db *sql.DB, registries ...*runtimehealth.Registry) func() {
+	var health *runtimehealth.Registry
+	if len(registries) > 0 {
+		health = registries[0]
+	}
+	const healthID = DeliveryHealthID
+	health.Register(healthID, "worker", "", db != nil)
 	if db == nil {
 		return func() {}
 	}
 	ctx, cancel := context.WithCancel(parent)
 	client := NewDeliveryClient()
 	var once sync.Once
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
+		defer health.Stop(healthID)
 		if transport, ok := client.Transport.(*http.Transport); ok {
 			defer transport.CloseIdleConnections()
 		}
@@ -62,6 +73,7 @@ func StartDeliveryWorker(parent context.Context, db *sql.DB) func() {
 			gate.Drain()
 			processed, err := processDeliveryBatch(ctx, db, client)
 			if err != nil {
+				health.Failure(healthID, err)
 				if ctx.Err() == nil {
 					log.Printf("webhook delivery worker: %v", err)
 				}
@@ -71,6 +83,7 @@ func StartDeliveryWorker(parent context.Context, db *sql.DB) func() {
 				gate.Wait(ctx, deliveryErrorBackoff)
 				continue
 			}
+			health.Success(healthID, processed)
 			// A full batch means the queue is still backed up: continue draining
 			// without sleeping. Anything less means the queue is empty or the
 			// remaining rows are scheduled for later.
@@ -84,7 +97,7 @@ func StartDeliveryWorker(parent context.Context, db *sql.DB) func() {
 			gate.Wait(ctx, sleep)
 		}
 	}()
-	return func() { once.Do(cancel) }
+	return func() { once.Do(cancel); <-done }
 }
 
 // processDeliveryBatch claims and delivers up to deliveryBatchSize rows and

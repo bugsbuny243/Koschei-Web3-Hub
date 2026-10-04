@@ -55,7 +55,9 @@ func startBackgroundRuntime(
 	runtimeHealth *runtimehealth.Registry,
 	globalRadarBackground *services.GlobalRadarBackgroundTelemetryConfig,
 	globalRadarHeadIngest *services.GlobalRadarHeadIngestConfig,
+	campaignConfigs ...*services.GlobalCampaignRuntimeConfig,
 ) func() {
+	runtimeHealth.Register(webhooks.DeliveryHealthID, "worker", "", role.runsBackgroundWorkers() && db != nil)
 	if !role.runsBackgroundWorkers() {
 		return func() {}
 	}

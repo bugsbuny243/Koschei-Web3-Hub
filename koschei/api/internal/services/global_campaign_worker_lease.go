@@ -147,7 +147,9 @@ func ReleaseGlobalCampaignWorkerLease(ctx context.Context, db *sql.DB, lease Glo
 	if err := AssertGlobalCampaignWorkerLease(ctx, db, lease, now); err != nil {
 		return err
 	}
-	result, err := db.ExecContext(ctx, `DELETE FROM global_campaign_worker_leases WHERE lease_key=$1 AND lease_owner=$2 AND fencing_token=$3`, lease.LeaseKey, lease.LeaseOwner, lease.FencingToken)
+	// Preserve the generation after release. Deleting it lets a stale token
+	// become valid again when the same owner reacquires the key.
+	result, err := db.ExecContext(ctx, `UPDATE global_campaign_worker_leases SET lease_expires_at=$4, updated_at=$4 WHERE lease_key=$1 AND lease_owner=$2 AND fencing_token=$3 AND lease_expires_at>$4`, lease.LeaseKey, lease.LeaseOwner, lease.FencingToken, now)
 	if err != nil {
 		return fmt.Errorf("release worker lease: %w", err)
 	}

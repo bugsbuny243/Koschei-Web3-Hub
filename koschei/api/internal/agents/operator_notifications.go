@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -24,24 +24,6 @@ type operatorNotificationItem struct {
 	Reason           string
 	EscalationAt     time.Time
 	EscalationStatus string
-}
-
-var operatorNotificationWorkerOnce sync.Once
-
-func (s *Service) StartOperatorNotificationWorker() {
-	if s.db == nil {
-		return
-	}
-	operatorNotificationWorkerOnce.Do(func() {
-		go func() {
-			ticker := time.NewTicker(time.Minute)
-			defer ticker.Stop()
-			for {
-				s.deliverOneOperatorNotification(context.Background())
-				<-ticker.C
-			}
-		}()
-	})
 }
 
 func (s *Service) deliverOneOperatorNotification(ctx context.Context) {
@@ -162,7 +144,7 @@ func deliverOperatorWebhook(ctx context.Context, item operatorNotificationItem) 
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
@@ -171,7 +153,7 @@ func deliverOperatorWebhook(ctx context.Context, item operatorNotificationItem) 
 	if secret := strings.TrimSpace(os.Getenv("TRADEPI_OPERATOR_WEBHOOK_SECRET")); secret != "" {
 		req.Header.Set("Authorization", "Bearer "+secret)
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := outboundhttp.Do(&http.Client{Timeout: 10 * time.Second}, req)
 	if err != nil {
 		return err
 	}

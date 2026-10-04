@@ -262,8 +262,7 @@ jobs:
         if: always()
         run: |
           set -o pipefail
-          # G703/G704 are tracked as a bounded legacy taint-analysis backlog.
-          "${RUNNER_TEMP}/security-bin/gosec" -exclude=G703,G704 -severity high -confidence high -fmt=text ./... 2>&1 | tee "${RUNNER_TEMP}/gosec.txt"
+          "${RUNNER_TEMP}/security-bin/gosec" -severity high -confidence high -fmt=text ./... 2>&1 | tee "${RUNNER_TEMP}/gosec.txt"
       - name: Upload security scanner logs
         if: always()
         uses: actions/upload-artifact@v7

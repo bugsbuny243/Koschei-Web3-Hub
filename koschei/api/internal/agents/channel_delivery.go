@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"os"
 	"regexp"
@@ -48,13 +49,13 @@ func SendWhatsAppTextFrom(ctx context.Context, phoneID, to, text string) error {
 		return err
 	}
 	endpoint := fmt.Sprintf("https://graph.facebook.com/%s/%s/messages", version, phoneID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := outboundhttp.Do(&http.Client{Timeout: 10 * time.Second}, req)
 	if err != nil {
 		return err
 	}
@@ -74,12 +75,12 @@ func SendTelegramText(ctx context.Context, chatID, text string) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.telegram.org/bot"+token+"/sendMessage", bytes.NewReader(payload))
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, "https://api.telegram.org/bot"+token+"/sendMessage", bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := outboundhttp.Do(&http.Client{Timeout: 10 * time.Second}, req)
 	if err != nil {
 		return err
 	}

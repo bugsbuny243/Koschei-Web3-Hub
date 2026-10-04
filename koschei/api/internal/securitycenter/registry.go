@@ -133,6 +133,14 @@ func Current() Snapshot {
 				Notes:            []string{"blind_spot is an operational monitoring-confidence signal, not proof of historical chain-data loss", "catching_up alone does not close or open a blind-spot episode", "recovery requires current head/cursor alignment", "ARVIS verdict authority is unchanged"},
 			},
 			{
+				ID: "global-campaign-runtime", Layer: "correlation", Domain: "campaign-operations", Mode: "observe", EvidenceAuthority: "canonical_reference_projection_only", Activation: "KOSCHEI_GLOBAL_CAMPAIGN_RUNTIME_ENABLED=1; APP_DATABASE_URL; verified graph storage; migrations through 129",
+				DependsOn:        []string{"cross-network-evidence-graph", "runtime-health-registry"},
+				BackendSurfaces:  []string{"/api/owner/campaigns", "global_campaign_runtime_queue"},
+				FrontendSurfaces: []string{"/owner/campaigns", "/fabric/security-center"},
+				Telemetry:        []string{"worker.global-campaign-materializer", "pending/failed/processed source counts", "oldest pending and last processed timestamps"},
+				Notes:            []string{"verified linked snapshots only", "threat inputs remain missing until connected", "automatic response disabled; no containment authority"},
+			},
+			{
 				ID: "cross-process-job-wake", Layer: "orchestration", Domain: "worker-runtime", Mode: "implemented", EvidenceAuthority: "operational_status_only", Activation: "APP_DATABASE_URL required; NATS_URL is optional latency acceleration",
 				DependsOn:       []string{"runtime-health-registry"},
 				BackendSurfaces: []string{"web3_jobs", "/fabric/security-center/runtime-health"},

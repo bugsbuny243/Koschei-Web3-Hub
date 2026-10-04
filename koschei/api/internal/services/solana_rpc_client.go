@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"koschei/api/internal/outboundhttp"
 	"net/http"
 	"os"
 	"strconv"
@@ -301,14 +302,14 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 			web3.LogRPCFailure(method, rpcURL, 0, err)
 			return zero, err
 		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, rpcURL, bytes.NewReader(payload))
+		req, err := outboundhttp.NewRequest(ctx, http.MethodPost, rpcURL, bytes.NewReader(payload))
 		if err != nil {
 			web3.LogRPCFailure(method, rpcURL, 0, err)
 			return zero, err
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Koschei-RPC-Method", method)
-		res, err := solanaRPCClient.Do(req)
+		res, err := outboundhttp.Do(solanaRPCClient, req)
 		if err != nil {
 			return zero, err
 		}
