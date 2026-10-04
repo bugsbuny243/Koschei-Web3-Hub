@@ -275,6 +275,14 @@ func operation(route Route, method string) map[string]any {
 	operationResponses := responses(route.AuthTier)
 	requestSchemaRef := "#/components/schemas/GenericRequest"
 	requestBodyRequired := false
+	if strings.Contains(route.Path, "/crypto-brief") {
+		description = "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states."
+		operationResponses["200"] = response("News, channel preferences, a pairing challenge or aggregate operational status.", "#/components/schemas/CryptoBriefResponse")
+		operationResponses["503"] = response("News storage, a source or channel configuration is unavailable.", "#/components/schemas/ErrorResponse")
+		operationResponses["409"] = response("Channel state cannot be changed or requires disconnecting before pairing.", "#/components/schemas/ErrorResponse")
+		requestSchemaRef = "#/components/schemas/CryptoBriefRequest"
+		requestBodyRequired = method != "get"
+	}
 	if route.Path == "/api/customer/web3/transaction-state-recheck" && method == "post" {
 		description = "Verifies a signed state-bound Transaction Guard permit and re-reads only the bounded witnessed Solana account set immediately before signing. Proceed only when the HTTP response succeeds and the body reports ok=true and safe_to_proceed=true. Expired permits return 409 and unavailable or incomplete current-state evidence returns 503; both require withholding the prior preflight decision."
 		operationResponses["409"] = response("State-bound permit expired; run a fresh Transaction Guard simulation before signing.", "#/components/schemas/EvidenceResponse")
@@ -294,7 +302,7 @@ func operation(route Route, method string) map[string]any {
 		"responses":                operationResponses,
 		"security":                 security(route.AuthTier),
 	}
-	if method == "post" || method == "put" || method == "patch" {
+	if method == "post" || method == "put" || method == "patch" || method == "delete" && route.Path == "/api/customer/crypto-brief" {
 		operation["requestBody"] = map[string]any{
 			"required": requestBodyRequired,
 			"content":  map[string]any{"application/json": map[string]any{"schema": map[string]any{"$ref": requestSchemaRef}}},
@@ -355,6 +363,8 @@ func security(auth string) []any {
 
 func schemas() map[string]any {
 	return map[string]any{
+		"CryptoBriefResponse": map[string]any{"type": "object", "additionalProperties": true, "description": "Versioned public news, isolated customer subscription state, one-use pairing details, or aggregate operator telemetry. News is publisher-reported and does not authorize a security decision."},
+		"CryptoBriefRequest":  map[string]any{"type": "object", "additionalProperties": false, "required": []string{"channel"}, "properties": map[string]any{"channel": map[string]any{"type": "string", "enum": []string{"telegram", "whatsapp"}}, "consent": map[string]any{"type": "boolean", "description": "Must be true when requesting a pairing challenge."}, "state": map[string]any{"type": "string", "enum": []string{"active", "paused", "disconnected"}}, "preferences": map[string]any{"type": "object", "description": "PUT requires networks/topics arrays, daily or hourly cadence, timezone and quiet_start/quiet_end hours (0-23).", "additionalProperties": true}}},
 		"GenericRequest": map[string]any{
 			"type": "object", "additionalProperties": true,
 			"description": "Operation-specific JSON input. Unknown or missing required evidence inputs fail closed.",

@@ -53,7 +53,11 @@ jobs:
       - name: Native PostgreSQL runtime and fencing acceptance
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_campaign_runtime_ci?sslmode=disable
-        run: go test -race -v ./internal/services -run '^TestGlobalCampaign(Runtime|WorkerLease)Postgres17$' -count=1
+        run: go test -race -v ./internal/services -run '^Test(GlobalCampaign(Runtime|WorkerLease)|GlobalRadarCampaignHandoff)Postgres17$' -count=1
+      - name: Native customer news consent, dedup and delivery recovery
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_campaign_runtime_ci?sslmode=disable
+        run: go test -race -v ./internal/cryptobrief -run '^TestCryptoBriefPostgres17$' -count=1
       - name: Go tests and static analysis
         run: |
           set -euo pipefail

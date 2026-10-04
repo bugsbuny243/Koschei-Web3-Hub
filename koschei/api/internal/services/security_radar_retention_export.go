@@ -16,6 +16,9 @@ func (w *securityRadarRetentionWorker) exportPendingArchive(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("%s archive export failed: %w", phase, err)
 	}
+	if result.ConnectionVerified {
+		log.Printf("radar archive sink connection verified sink=%s phase=%s restore_proof=false", result.Sink, phase)
+	}
 	if result.ExportedRows > 0 {
 		log.Printf("radar retention export run %s phase=%s sink=%s rows=%d objects=%d bytes=%d ref=%s",
 			result.RunID, phase, result.Sink, result.ExportedRows, result.ObjectCount,

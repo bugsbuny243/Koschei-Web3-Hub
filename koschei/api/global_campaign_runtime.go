@@ -21,18 +21,14 @@ type campaignRadarStore struct {
 
 // Startup-only handoffs to the background lifecycle. The concrete ClickHouse
 // graph client implements replay while campaignRadarStore preserves the canonical
-// ClickHouse-first -> PostgreSQL queue write path for verified evidence projection.
+// PostgreSQL-first durable publication handoff for verified evidence projection.
 var (
 	globalCampaignReplaySource services.GlobalCampaignReplaySource
 	globalCampaignEvidenceSink services.GlobalRadarSnapshotSink
 )
 
 func (s *campaignRadarStore) InsertGlobalRadarSnapshot(ctx context.Context, snapshot services.GlobalRadarSnapshot) error {
-	if err := s.globalRadarGraphStore.InsertGlobalRadarSnapshot(ctx, snapshot); err != nil {
-		return err
-	}
-	_, err := services.EnqueueGlobalCampaignRadarSnapshot(ctx, s.db, snapshot)
-	return err
+	return services.StageGlobalRadarCampaignSnapshot(ctx, s.db, snapshot)
 }
 
 func buildGlobalCampaignRuntime(parent context.Context, db *sql.DB, sink globalRadarGraphStore, health *runtimehealth.Registry) (globalRadarGraphStore, *services.GlobalCampaignRuntimeConfig, error) {
@@ -68,6 +64,6 @@ func buildGlobalCampaignRuntime(parent context.Context, db *sql.DB, sink globalR
 	if _, err := rand.Read(identity[:]); err != nil {
 		return nil, nil, err
 	}
-	cfg := &services.GlobalCampaignRuntimeConfig{DB: db, Owner: "campaign:" + hex.EncodeToString(identity[:]), Health: health}
+	cfg := &services.GlobalCampaignRuntimeConfig{DB: db, Owner: "campaign:" + hex.EncodeToString(identity[:]), Health: health, SnapshotSink: sink}
 	return campaignStore, cfg, nil
 }

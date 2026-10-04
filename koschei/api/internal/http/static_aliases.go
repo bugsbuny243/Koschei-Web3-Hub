@@ -12,6 +12,8 @@ func registerStaticAliases(mux *http.ServeMux, staticDir string) {
 	// scanner. The customer scan API is registered by NewServer so it can receive
 	// the configured Solana RPC dependency instead of depending on static wiring.
 	registerFabricRoutes(mux)
+	registerStaticFileAlias(mux, "/crypto-brief", filepath.Join(staticDir, "crypto-brief.html"))
+	registerStaticFileAlias(mux, "/crypto-brief/", filepath.Join(staticDir, "crypto-brief.html"))
 
 	// TradePI AI Agents shares the existing deployment but owns an isolated
 	// namespace and does not alter Koschei Web3 security behavior.
