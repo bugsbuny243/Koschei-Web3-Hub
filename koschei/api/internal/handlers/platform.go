@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"koschei/api/internal/outbound"
 	"koschei/api/internal/runtimecfg"
 	"koschei/api/internal/web3"
 )
@@ -114,22 +115,36 @@ func (h *Handler) Web3Health(w http.ResponseWriter, r *http.Request) {
 		status = "no_api_key"
 		errorText = "Alchemy API key is not configured"
 	} else {
-		client := &http.Client{Timeout: 5 * time.Second}
-		req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, cfg.url, strings.NewReader(cfg.body))
-		if err != nil {
+		validated, validateErr := outbound.ValidateFixedHTTPSHost(cfg.url,
+			"eth-sepolia.g.alchemy.com",
+			"base-sepolia.g.alchemy.com",
+			"arb-sepolia.g.alchemy.com",
+			"polygon-amoy.g.alchemy.com",
+			"opt-sepolia.g.alchemy.com",
+		)
+		if validateErr != nil {
 			status = "error"
-			errorText = err.Error()
+			errorText = validateErr.Error()
 		} else {
-			req.Header.Set("Content-Type", "application/json")
-			resp, err := client.Do(req)
+			client := outbound.HardenFixedHostClient(&http.Client{Timeout: 5 * time.Second}, validated.Hostname())
+			// #nosec G704 -- Alchemy authority is restricted to the code-owned allowlist above; redirects remain pinned to the validated host.
+			req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, validated.String(), strings.NewReader(cfg.body))
 			if err != nil {
 				status = "error"
 				errorText = err.Error()
 			} else {
-				resp.Body.Close()
-				if resp.StatusCode >= http.StatusBadRequest {
+				req.Header.Set("Content-Type", "application/json")
+				// #nosec G704 -- request authority and every redirect are restricted to the validated Alchemy host.
+				resp, err := client.Do(req)
+				if err != nil {
 					status = "error"
-					errorText = fmt.Sprintf("Alchemy returned HTTP %d", resp.StatusCode)
+					errorText = err.Error()
+				} else {
+					resp.Body.Close()
+					if resp.StatusCode >= http.StatusBadRequest {
+						status = "error"
+						errorText = fmt.Sprintf("Alchemy returned HTTP %d", resp.StatusCode)
+					}
 				}
 			}
 		}
@@ -177,22 +192,30 @@ func (h *Handler) web3SolanaHealth(w http.ResponseWriter, r *http.Request) {
 	status := "online"
 	errorText := ""
 	body := `{"jsonrpc":"2.0","id":1,"method":"getHealth"}`
-	client := &http.Client{Timeout: 5 * time.Second}
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, rpcURL, strings.NewReader(body))
-	if err != nil {
+	validated, validateErr := outbound.ValidateOperatorURL(r.Context(), rpcURL)
+	if validateErr != nil {
 		status = "error"
-		errorText = err.Error()
+		errorText = validateErr.Error()
 	} else {
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := client.Do(req)
+		client := outbound.HardenOperatorClient(r.Context(), &http.Client{Timeout: 5 * time.Second})
+		// #nosec G704 -- endpoint passed the shared SSRF boundary; redirects are revalidated by HardenOperatorClient.
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, validated.String(), strings.NewReader(body))
 		if err != nil {
 			status = "error"
 			errorText = err.Error()
 		} else {
-			resp.Body.Close()
-			if resp.StatusCode >= http.StatusBadRequest {
+			req.Header.Set("Content-Type", "application/json")
+			// #nosec G704 -- request authority and every redirect pass the shared outbound SSRF boundary.
+			resp, err := client.Do(req)
+			if err != nil {
 				status = "error"
-				errorText = fmt.Sprintf("Solana RPC returned HTTP %d", resp.StatusCode)
+				errorText = err.Error()
+			} else {
+				resp.Body.Close()
+				if resp.StatusCode >= http.StatusBadRequest {
+					status = "error"
+					errorText = fmt.Sprintf("Solana RPC returned HTTP %d", resp.StatusCode)
+				}
 			}
 		}
 	}
