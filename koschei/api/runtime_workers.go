@@ -62,12 +62,15 @@ func startBackgroundRuntime(
 		return func() {}
 	}
 
-	stops := make([]func(), 0, 10)
+	stops := make([]func(), 0, 12)
 	for _, cfg := range campaignConfigs {
 		if cfg != nil {
 			stops = append(stops, services.StartGlobalCampaignRuntime(ctx, *cfg))
 			if globalCampaignReplaySource != nil {
 				stops = append(stops, services.StartGlobalCampaignReconciler(ctx, cfg.DB, globalCampaignReplaySource, cfg.Health))
+			}
+			if globalCampaignEvidenceSink != nil {
+				stops = append(stops, services.StartGlobalCampaignEvidenceBridge(ctx, cfg.DB, globalCampaignEvidenceSink, cfg.Health))
 			}
 		}
 	}
