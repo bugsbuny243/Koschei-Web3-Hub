@@ -112,6 +112,9 @@ func (c *Client) LoadGlobalRadarIngestCheckpoint(ctx context.Context, cursorKey 
 	params.Set("query", queryText)
 	params.Set("param_cursor", cursorKey)
 	params.Set("max_execution_time", "10")
+	params.Set("max_rows_to_read", "1000000")
+	params.Set("max_bytes_to_read", "268435456")
+	params.Set("timeout_before_checking_execution_speed", "0")
 	params.Set("max_result_rows", "1")
 	params.Set("result_overflow_mode", "throw")
 	queryURL.RawQuery = params.Encode()
@@ -172,6 +175,9 @@ func (c *Client) VerifyGlobalRadarIngestCheckpointSchema(ctx context.Context) er
 	params.Set("query", "SELECT engine, sorting_key FROM system.tables WHERE database={db:String} AND name='global_radar_ingest_checkpoints' FORMAT JSON")
 	params.Set("param_db", c.database)
 	params.Set("max_execution_time", "10")
+	params.Set("max_rows_to_read", "1000000")
+	params.Set("max_bytes_to_read", "268435456")
+	params.Set("timeout_before_checking_execution_speed", "0")
 	params.Set("max_result_rows", "10")
 	metadataURL.RawQuery = params.Encode()
 
@@ -182,7 +188,7 @@ func (c *Client) VerifyGlobalRadarIngestCheckpointSchema(ctx context.Context) er
 	if len(metadata.Data) != 1 {
 		return fmt.Errorf("ClickHouse Global Radar ingest checkpoint table metadata returned %d rows", len(metadata.Data))
 	}
-	if metadata.Data[0].Engine != "ReplacingMergeTree" {
+	if !isReplacingMergeTreeEngine(metadata.Data[0].Engine) {
 		return fmt.Errorf("ClickHouse Global Radar ingest checkpoint table engine=%q want ReplacingMergeTree", metadata.Data[0].Engine)
 	}
 	if metadata.Data[0].SortingKey != globalRadarIngestCheckpointSortingKey {
@@ -230,6 +236,9 @@ func (c *Client) LoadGlobalRadarCanonicalCheckpointAtHeight(ctx context.Context,
 	params.Set("param_cursor", cursorKey)
 	params.Set("param_height", fmt.Sprintf("%d", height))
 	params.Set("max_execution_time", "10")
+	params.Set("max_rows_to_read", "1000000")
+	params.Set("max_bytes_to_read", "268435456")
+	params.Set("timeout_before_checking_execution_speed", "0")
 	params.Set("max_result_rows", "1")
 	params.Set("result_overflow_mode", "throw")
 	queryURL.RawQuery = params.Encode()

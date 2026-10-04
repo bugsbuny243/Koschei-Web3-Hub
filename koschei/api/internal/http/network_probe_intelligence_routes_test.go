@@ -143,8 +143,10 @@ func TestExistingNetworkProbeResponseContractStaysFlat(t *testing.T) {
 
 func TestNetworkProbeIntelligenceRouteIsMountedAndFailsClosedWithoutRPC(t *testing.T) {
 	t.Setenv("ETHEREUM_RPC_URL", "")
+	t.Setenv("OWNER_SECRET", "test-probe-owner")
 	request := httptest.NewRequest(http.MethodPost, "/fabric/networks/probe/intelligence", strings.NewReader(`{"network":"ethereum-mainnet","address":"0x1111111111111111111111111111111111111111"}`))
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Owner-Secret", "test-probe-owner")
 	response := httptest.NewRecorder()
 	MountFabric(http.NotFoundHandler()).ServeHTTP(response, request)
 	if response.Code != http.StatusServiceUnavailable {

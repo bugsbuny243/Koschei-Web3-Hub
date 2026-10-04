@@ -13,7 +13,7 @@ function requireText(source,needle,label){if(!source.includes(needle))throw new 
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
 
 requireText(html,'<html lang="en">','Token-2022 scanner language');
-requireText(html,'Starter SaaS plan or higher','Starter SaaS access copy');
+requireText(html,'Professional SaaS plan or higher','Professional SaaS access copy');
 requireText(html,'Dedicated /api/v1/token/extensions','dedicated route copy');
 requireText(html,'Unresolved extension state → WITHHOLD','withhold policy copy');
 requireText(html,'/scan?mode=deep','canonical Deep Scan route');
@@ -29,7 +29,7 @@ forbid(html,/\son[a-z]+\s*=/i,'inline event handler');
 
 requireText(server,'planTier := func(plan string, next http.HandlerFunc) http.HandlerFunc','central SaaS plan gate');
 requireText(server,'return handlers.RequireAuth(h.RequirePlanTier(plan, h.EnforcePlanOutput(next)))','central SaaS plan + output enforcement');
-requireText(server,'mux.HandleFunc("/api/v1/token/extensions", solana(risk(requiresDB(h, planTier("starter", method("POST", h.TokenScan))))))','dedicated Starter TokenScan route');
+requireText(server,'mux.HandleFunc("/api/v1/token/extensions", solana(risk(requiresDB(h, planTier("professional", method("POST", h.TokenScan))))))','dedicated Professional TokenScan route');
 requireText(server,'mux.HandleFunc("/api/token/scan", solana(risk(method("POST", h.TokenScan))))','public compatibility TokenScan route');
 forbid(server,/koschTier\(|RequireTokenTier|EnforceScanQuota/,'legacy token authorization in boot chain');
 
@@ -69,4 +69,4 @@ requireText(css,'.token2022-verdict.warn','withhold/warn state styles');
 requireText(css,'.token2022-verdict.bad','block state styles');
 requireText(css,'.token2022-extension.high','high extension styles');
 requireText(css,'@media(max-width:650px)','mobile Token-2022 layout');
-console.log('Token-2022 scanner v2 + Starter SaaS contract: ok');
+console.log('Token-2022 scanner v2 + Professional SaaS contract: ok');

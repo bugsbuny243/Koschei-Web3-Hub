@@ -109,6 +109,9 @@ func (c *Client) LoadOpenGlobalRadarIngestGap(ctx context.Context, cursorKey str
 	params.Set("query", "SELECT gap_key,schema_version,cursor_key,network_id,stream_kind,initial_start_height,next_height,end_height,reason,state,toUnixTimestamp64Milli(detected_at) AS detected_at_ms,toUnixTimestamp64Milli(updated_at) AS updated_at_ms,if(isNull(resolved_at),NULL,toUnixTimestamp64Milli(resolved_at)) AS resolved_at_ms,gap_version FROM global_radar_ingest_gaps FINAL WHERE cursor_key={cursor:String} AND state='open' ORDER BY updated_at DESC,gap_version DESC LIMIT 1 FORMAT JSONEachRow")
 	params.Set("param_cursor", cursorKey)
 	params.Set("max_execution_time", "10")
+	params.Set("max_rows_to_read", "1000000")
+	params.Set("max_bytes_to_read", "268435456")
+	params.Set("timeout_before_checking_execution_speed", "0")
 	params.Set("max_result_rows", "1")
 	params.Set("result_overflow_mode", "throw")
 	queryURL.RawQuery = params.Encode()
@@ -174,13 +177,16 @@ func (c *Client) VerifyGlobalRadarIngestGapSchema(ctx context.Context) error {
 	params.Set("query", "SELECT engine, sorting_key FROM system.tables WHERE database={db:String} AND name='global_radar_ingest_gaps' FORMAT JSON")
 	params.Set("param_db", c.database)
 	params.Set("max_execution_time", "10")
+	params.Set("max_rows_to_read", "1000000")
+	params.Set("max_bytes_to_read", "268435456")
+	params.Set("timeout_before_checking_execution_speed", "0")
 	params.Set("max_result_rows", "10")
 	metadataURL.RawQuery = params.Encode()
 	var metadata tableMetadataResponse
 	if err := c.queryJSON(ctx, metadataURL.String(), &metadata); err != nil {
 		return fmt.Errorf("verify ClickHouse Global Radar ingest gap table metadata: %w", err)
 	}
-	if len(metadata.Data) != 1 || metadata.Data[0].Engine != "ReplacingMergeTree" || metadata.Data[0].SortingKey != globalRadarIngestGapSortingKey {
+	if len(metadata.Data) != 1 || !isReplacingMergeTreeEngine(metadata.Data[0].Engine) || metadata.Data[0].SortingKey != globalRadarIngestGapSortingKey {
 		return fmt.Errorf("ClickHouse Global Radar ingest gap table metadata is invalid")
 	}
 

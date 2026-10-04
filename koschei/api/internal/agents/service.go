@@ -34,15 +34,18 @@ func (d *DemoInventory) Search(_ context.Context, query string) ([]Vehicle, erro
 }
 
 type Service struct {
-	mu    sync.RWMutex
-	leads map[string]Lead
-	core  *Core
-	db    *sql.DB
-	llm   *LLMClient
+	mu             sync.RWMutex
+	leads          map[string]Lead
+	core           *Core
+	workerCancel   context.CancelFunc
+	workerWG       sync.WaitGroup
+	workersStarted bool
+	db             *sql.DB
+	llm            *LLMClient
 }
 
 func NewService() *Service {
-	s := &Service{leads: map[string]Lead{}, core: NewCore(NewDemoInventory()), llm: NewLLMClientFromEnv()}
+	s := &Service{leads: map[string]Lead{}, core: NewCore(nil), llm: NewLLMClientFromEnv()}
 	if dsn := strings.TrimSpace(os.Getenv("DATABASE_URL")); dsn != "" {
 		if db, err := sql.Open("postgres", dsn); err == nil {
 			db.SetMaxOpenConns(2)
@@ -51,8 +54,12 @@ func NewService() *Service {
 			s.db = db
 		}
 	}
-	s.startIntegrationWorker()
 	return s
+}
+
+// NewDemoService is an explicit fixture sandbox with no database or provider.
+func NewDemoService() *Service {
+	return &Service{leads: map[string]Lead{}, core: NewCore(NewDemoInventory())}
 }
 
 func (s *Service) PersistenceEnabled() bool { return s.db != nil }

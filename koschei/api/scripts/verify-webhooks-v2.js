@@ -14,7 +14,7 @@ function requireText(source,needle,label){if(!source.includes(needle))throw new 
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
 
 requireText(html,'<html lang="en">','webhook page language');
-requireText(html,'Enterprise eligibility required','Enterprise access copy');
+requireText(html,'Professional SaaS entitlement required','Enterprise access copy');
 requireText(html,'Server-owned endpoint limit','server-owned limit copy');
 requireText(html,'One-time plaintext secret','one-time secret copy');
 requireText(html,'Delivery transports existing watchlist alert evidence','verdict authority boundary');
@@ -29,8 +29,8 @@ forbid(html,/<script(?![^>]*\bsrc=)[^>]*>/i,'inline runtime script');
 forbid(html,/\son[a-z]+\s*=/i,'inline event handler');
 
 requireText(routes,'func registerWatchlistRoutes(mux *http.ServeMux, h *handlers.Handler, proMetered routeGate, enterprise routeGate)','Enterprise route gate parameter');
-requireText(routes,'mux.HandleFunc("/api/webhooks", requiresDB(h, enterprise(h.WebhookEndpoints)))','Enterprise webhook management route');
-requireText(routes,'mux.HandleFunc("/api/webhooks/", requiresDB(h, enterprise(h.WebhookEndpointItem)))','Enterprise webhook action route');
+requireText(routes,'mux.HandleFunc("/api/webhooks", requiresDB(h, enterprise(h.WebhookEndpoints)))','Professional webhook management route');
+requireText(routes,'mux.HandleFunc("/api/webhooks/", requiresDB(h, enterprise(h.WebhookEndpointItem)))','Professional webhook action route');
 requireText(routes,'mux.HandleFunc("/api/webhooks/deliveries", requiresDB(h, enterprise(h.WebhookDeliveries)))','Enterprise delivery list route');
 requireText(routes,'mux.HandleFunc("/api/webhooks/deliveries/", requiresDB(h, enterprise(h.WebhookDeliveryItem)))','Enterprise delivery action route');
 
@@ -49,7 +49,7 @@ requireText(worker,'req.Header.Set("X-Koschei-Signature", Signature(secret, time
 requireText(worker,'req.Header.Set("X-Koschei-Timestamp", timestamp)','delivery timestamp header');
 requireText(worker,'resp.StatusCode == http.StatusRequestTimeout || resp.StatusCode == http.StatusTooEarly || resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500','retryable HTTP contract');
 requireText(worker,"status=CASE WHEN failure_count+1>=20 THEN 'paused' ELSE status END",'automatic endpoint pause threshold');
-requireText(docs,'active **Enterprise KOSCH eligibility**','documented Enterprise route gate');
+requireText(docs,'active **Professional entitlement**','documented Enterprise route gate');
 requireText(docs,'Webhook management itself does not consume a scan unit','documented non-metered management contract');
 requireText(docs,'Secrets are encrypted at rest with AES-GCM','documented secret storage');
 requireText(docs,'A secret is returned only when the endpoint is created or rotated.','documented one-time secret lifecycle');
@@ -88,4 +88,4 @@ requireText(css,'.webhook-secret','secret panel styles');
 requireText(css,'.webhook-status.bad','dead-letter/failure styles');
 requireText(css,'.webhook-error-box','degraded state styles');
 requireText(css,'@media(max-width:620px)','mobile webhook layout');
-console.log('Enterprise webhooks v2 contract: ok');
+console.log('Professional webhooks v2 contract: ok');

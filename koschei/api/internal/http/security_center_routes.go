@@ -23,7 +23,7 @@ func securityCenterRuntimeHealth(registry *runtimehealth.Registry) http.HandlerF
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(registry.Snapshot())
+		_ = json.NewEncoder(w).Encode(registry.PublicSnapshot())
 	}
 }
 
@@ -54,7 +54,7 @@ func securityCenterSurface(registry *runtimehealth.Registry) http.HandlerFunc {
 		data := struct {
 			securitycenter.Snapshot
 			Runtime runtimehealth.Snapshot
-		}{securitycenter.Current(), registry.Snapshot()}
+		}{securitycenter.Current(), registry.PublicSnapshot()}
 		if err := securityCenterPage.Execute(w, data); err != nil {
 			http.Error(w, "security center unavailable", http.StatusInternalServerError)
 		}

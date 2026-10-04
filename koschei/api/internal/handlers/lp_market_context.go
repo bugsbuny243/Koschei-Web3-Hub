@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"koschei/api/internal/outboundhttp"
 	"math"
 	"net/http"
 	"net/url"
@@ -472,13 +473,13 @@ func accountDataBytes(value any) ([]byte, error) {
 	return nil, fmt.Errorf("unsupported account data")
 }
 func getOptionalJSON(ctx context.Context, client *http.Client, endpoint string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := outboundhttp.NewRequest(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "Koschei-ARVIS-Market-Context/1.0")
-	resp, err := client.Do(req)
+	resp, err := outboundhttp.Do(client, req)
 	if err != nil {
 		return err
 	}

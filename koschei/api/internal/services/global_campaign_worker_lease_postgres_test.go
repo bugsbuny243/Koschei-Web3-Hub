@@ -84,6 +84,15 @@ func TestGlobalCampaignWorkerLeasePostgres17(t *testing.T) {
 	if err := ReleaseGlobalCampaignWorkerLease(ctx, db, b, t0.Add(4*time.Minute)); err != nil {
 		t.Fatalf("worker B release: %v", err)
 	}
+	// Release must not erase the monotonic generation, even when an owner
+	// identifier is reused by a restarted process.
+	reacquired, err := AcquireGlobalCampaignWorkerLease(ctx, db, leaseKey, "worker:b", t0.Add(4*time.Minute+time.Second), 2*time.Minute)
+	if err != nil || reacquired.FencingToken <= b.FencingToken {
+		t.Fatalf("reacquisition lost generation: lease=%+v error=%v", reacquired, err)
+	}
+	if err := AssertGlobalCampaignWorkerLease(ctx, db, b, t0.Add(4*time.Minute+2*time.Second)); !errors.Is(err, ErrGlobalCampaignWorkerLeaseFenced) {
+		t.Fatalf("released stale token became valid again: %v", err)
+	}
 
 	c, err := AcquireGlobalCampaignWorkerLease(ctx, db, leaseKey, "worker:c", t0.Add(4*time.Minute+time.Second), 2*time.Minute)
 	if err != nil {

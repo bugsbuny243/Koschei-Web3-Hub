@@ -18,10 +18,17 @@ if(mismatch.accepted||mismatch.reason!=='target_mismatch'||mismatch.expected!=='
   throw new Error(`target mismatch accepted: ${JSON.stringify(mismatch)}`);
 }
 
-const accepted=guard.accept(second,{target:' minttwo '});
-if(!accepted.accepted)throw new Error(`case-insensitive target match rejected: ${JSON.stringify(accepted)}`);
+const caseMismatch=guard.accept(second,{target:'minttwo'});
+if(caseMismatch.accepted)throw new Error('case-sensitive Solana identity mismatch accepted');
+const accepted=guard.accept(second,{target:' MintTwo '});
+if(!accepted.accepted)throw new Error(`exact target match rejected: ${JSON.stringify(accepted)}`);
 if(!guard.finish(second))throw new Error('active request could not finish');
 if(guard.isActive(second))throw new Error('finished request remained active');
 if(guard.finish(first))throw new Error('stale request finished the active slot');
 
-console.log('public scan stale-response contract: ok');
+const solanaRoot=root();
+const solana=guard.begin(solanaRoot,'7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1');
+if(guard.accept(solana,{mint:'7X9v77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1'}).accepted)throw new Error('Base58 target substitution accepted');
+const evm=guard.begin(root(),'0xabcdefabcdefabcdefabcdefabcdefabcdefabcd');
+if(!guard.accept(evm,{target:'0xABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD'}).accepted)throw new Error('canonical EVM hex target rejected');
+console.log('public scan identity and stale-response contract: ok');

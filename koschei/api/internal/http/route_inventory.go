@@ -44,6 +44,8 @@ func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 
 func productionRouteInventory() []routeInventoryGroup {
 	return []routeInventoryGroup{
+		{Name: "crypto_brief_public", Auth: "public", Routes: []string{"GET /api/crypto-brief/feed"}},
+		{Name: "crypto_brief_customer", Auth: "customer_session", Routes: []string{"GET|PUT|PATCH|DELETE /api/customer/crypto-brief", "POST /api/customer/crypto-brief/pair"}},
 		{Name: "public_and_system", Auth: "public_or_mixed", Routes: []string{
 			"GET /health", "GET /api/config", "GET /api/version", "GET /api/web3/health", "GET /api/web3/health/logs",
 			"POST /api/analytics/event", "GET /api/v1/risk/badge",
@@ -64,6 +66,8 @@ func productionRouteInventory() []routeInventoryGroup {
 			"POST /api/kosc/quote", "POST /api/kosc/settle",
 		}},
 		{Name: "owner", Auth: "owner_session", Routes: []string{
+			"GET /api/owner/crypto-brief",
+			"GET /api/owner/campaigns",
 			"POST /api/owner/login", "POST /api/owner/logout", "GET /api/owner/command-center", "GET /api/owner/operations", "GET /api/owner/token-telemetry",
 			"GET /api/owner/arvis", "POST /api/owner/arvis/scan", "POST /api/owner/radar/unified", "POST /api/owner/radar/jobs", "GET /api/owner/radar/jobs/",
 			"POST /api/owner/radar/funding-corpus/warmup", "GET /api/owner/radar/global/records", "GET /api/owner/radar/global/events", "GET /api/owner/radar/global/campaigns", "GET /api/owner/radar/flow-metrics", "GET /api/owner/radar/coverage-episodes", "GET /api/owner/creator-intelligence", "GET /api/owner/wallet-linkage", "GET /api/owner/actor-intelligence",

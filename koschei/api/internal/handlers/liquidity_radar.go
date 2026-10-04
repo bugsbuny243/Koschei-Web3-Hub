@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"koschei/api/internal/outboundhttp"
 	"math"
 	"net/http"
 	"net/url"
@@ -164,7 +165,7 @@ func postWebhook(ctx context.Context, rawURL string, payload map[string]any, pro
 		return err
 	}
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -175,7 +176,7 @@ func postWebhook(ctx context.Context, rawURL string, payload map[string]any, pro
 			return http.ErrUseLastResponse
 		},
 	}
-	res, err := client.Do(req)
+	res, err := outboundhttp.Do(client, req)
 	if err != nil {
 		return err
 	}

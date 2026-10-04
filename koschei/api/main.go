@@ -94,6 +94,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("CRITICAL: invalid KOSCHEI_RUNTIME_ROLE: %v", err)
 	}
+	stopTradePI := apihttp.StartTradePIAgentRuntime(appCtx, role.runsBackgroundWorkers())
+	defer stopTradePI()
 	globalRadarSink, err := buildGlobalRadarSnapshotSink(appCtx)
 	if err != nil {
 		runtimeHealth.Register("storage.global-radar-graph-clickhouse", "storage", "", true)
@@ -113,6 +115,10 @@ func main() {
 	runtimeHealth.Register("storage.global-radar-event-clickhouse", "storage", "", globalRadarEventSink != nil)
 	if globalRadarEventSink != nil {
 		runtimeHealth.Success("storage.global-radar-event-clickhouse", 0)
+	}
+	globalRadarSink, globalCampaignRuntime, err := buildGlobalCampaignRuntime(appCtx, appDB, globalRadarSink, runtimeHealth)
+	if err != nil {
+		log.Fatalf("CRITICAL: configured Global Campaign runtime is unavailable: %v", err)
 	}
 	globalRadarBackground, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarSink, globalRadarEventSink)
 	if err != nil {
@@ -170,6 +176,7 @@ func main() {
 		apihttp.WithGlobalRadarSnapshotSink(globalRadarSink),
 		apihttp.WithGlobalRadarEventSink(globalRadarEventSink),
 		apihttp.WithRuntimeHealthRegistry(runtimeHealth),
+		apihttp.WithFabricDB(appDB),
 	))
 	server := newHTTPServer(port, handler)
 

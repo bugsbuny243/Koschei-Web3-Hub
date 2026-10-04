@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"koschei/api/internal/alerts"
+	"koschei/api/internal/cryptobrief"
 	"koschei/api/internal/handlers"
 	"koschei/api/internal/jobs"
 	"koschei/api/internal/runtimehealth"
@@ -57,7 +58,10 @@ func startBackgroundRuntime(
 	globalRadarHeadIngest *services.GlobalRadarHeadIngestConfig,
 	globalRadarSink services.GlobalRadarSnapshotSink,
 ) func() {
+	runtimeHealth.Register(webhooks.DeliveryHealthID, "worker", "", role.runsBackgroundWorkers() && db != nil)
 	if !role.runsBackgroundWorkers() {
+		runtimeHealth.Register("crypto-brief-feeds", "worker", "", false)
+		runtimeHealth.Register("crypto-brief-delivery", "worker", "", false)
 		return func() {}
 	}
 
@@ -77,6 +81,7 @@ func startBackgroundRuntime(
 			runtimeHealth.Register(jobs.NATSWakeHealthID, "worker", "", false)
 		}
 		stops = append(stops,
+			cryptobrief.Start(ctx, db, runtimeHealth),
 			alerts.StartDeliveryWorker(ctx, db),
 			webhooks.StartDeliveryWorker(ctx, db),
 			services.StartGlobalRadarCoverageAlertLifecycle(ctx, db, runtimeHealth),

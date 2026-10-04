@@ -18,7 +18,7 @@ requireText(html,'Customer session ≠ API key','auth separation');
 requireText(html,'keep developer API keys server-side','server-side API key boundary');
 requireText(html,'localStorage, or sessionStorage','explicit browser-storage warning');
 requireText(html,'Route registration does not by itself mean','route/readiness boundary');
-requireText(html,'KOSCH holdings do not authorize, upgrade, discount, or meter commercial access.','token separation');
+requireText(html,'KOSC holdings alone do not authorize, upgrade, discount, or meter commercial access.','token separation');
 requireText(html,'Professional entitlement + API key','Professional API boundary');
 requireText(html,'Legacy paths no longer mean free execution.','legacy operational gate boundary');
 requireText(html,'/scan?mode=deep','canonical Deep Scan route');
@@ -57,7 +57,7 @@ if(/Token-2022[^<]{0,200}POST \/api\/token\/scan/i.test(html.replace(/\s+/g,' ')
 
 requireText(apiRef,'Authentication: customer session + active Professional entitlement.','customer API auth reference');
 requireText(apiRef,'Authentication: developer API key + active Professional entitlement.','developer API auth reference');
-requireText(apiRef,'KOSCH holdings, wallet balances, historical token tiers and `token_access_snapshots` do not grant, upgrade or discount commercial access.','API reference token separation');
+requireText(apiRef,'KOSC holdings, wallet balances, historical token tiers and `token_access_snapshots` do not grant, upgrade or discount commercial access.','API reference token separation');
 requireText(apiRef,'A registered route is an integration contract, not by itself a claim','API reference readiness boundary');
 requireText(apiRef,'When verified evidence is unavailable, ARVIS withholds the authoritative verdict instead of fabricating a grade.','signed verdict fail-closed rule');
 requireText(apiRef,'Developer API keys are identity credentials. Registered developer routes require an active Professional entitlement','developer key identity boundary');

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"koschei/api/internal/outboundhttp"
 	"math"
 	"net/http"
 	"os"
@@ -233,7 +234,7 @@ func (h *Handler) submitJitoBundle(ctx context.Context, transactions []string) (
 	}
 	payload := map[string]any{"jsonrpc": "2.0", "id": 1, "method": "sendBundle", "params": []any{transactions}}
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return "", "request_build_failed", err
 	}
@@ -242,7 +243,7 @@ func (h *Handler) submitJitoBundle(ctx context.Context, transactions []string) (
 		req.Header.Set("Authorization", "Bearer "+auth)
 	}
 	client := &http.Client{Timeout: 8 * time.Second}
-	res, err := client.Do(req)
+	res, err := outboundhttp.Do(client, req)
 	if err != nil {
 		return "", "network_error", err
 	}

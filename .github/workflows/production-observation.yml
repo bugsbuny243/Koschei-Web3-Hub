@@ -1,0 +1,39 @@
+name: Production Observation Evidence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/production-observation.yml'
+      - 'koschei/api/scripts/sample-production-readiness.mjs'
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-observation
+  cancel-in-progress: false
+
+jobs:
+  sample:
+    name: Record live evidence without asserting readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Record exact revision, coverage and durable queue observations
+        env:
+          KOSCHEI_OWNER_SECRET: ${{ secrets.KOSCHEI_OWNER_SECRET }}
+        run: node koschei/api/scripts/sample-production-readiness.mjs diagnostics/production-sample.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: production-observation-${{ github.run_id }}
+          path: diagnostics/production-sample.json*
+          retention-days: 30

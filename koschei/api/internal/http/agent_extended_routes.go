@@ -36,7 +36,6 @@ type agentKnowledgeUpsertRequest struct {
 }
 
 func registerTradePIAgentExtendedRoutes(mux *http.ServeMux) {
-	tradePIAgentService.StartFollowupWorker()
 	mux.HandleFunc("/webhooks/whatsapp", tradePIWhatsAppWebhook)
 	mux.HandleFunc("/api/agents/admin/catalog", tradePIAgentAdminCatalog)
 	mux.HandleFunc("/api/agents/admin/catalog/upsert", tradePIAgentAdminCatalogUpsert)
@@ -72,7 +71,7 @@ func tradePIWhatsAppReceive(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if secret := strings.TrimSpace(os.Getenv("WHATSAPP_APP_SECRET")); secret != "" && !validWhatsAppSignature(body, r.Header.Get("X-Hub-Signature-256"), secret) {
+	if secret := strings.TrimSpace(os.Getenv("WHATSAPP_APP_SECRET")); secret == "" || !validWhatsAppSignature(body, r.Header.Get("X-Hub-Signature-256"), secret) {
 		http.Error(w, "invalid signature", http.StatusUnauthorized)
 		return
 	}

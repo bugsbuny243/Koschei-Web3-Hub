@@ -15,7 +15,9 @@ func configureSolanaRPCSignatureGuardTest(t *testing.T, primaryURL, fallbackURL 
 	t.Helper()
 	resetSolanaRPCCachesForTest()
 	resetSolanaRPCSignaturePressureForTest()
-	t.Setenv("APP_ENV", "production")
+	// The pressure guard is explicitly enabled; local test providers use the
+	// development connection boundary. Production SSRF is tested separately.
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("SOLANA_RPC_SIGNATURE_GUARD_ENABLED", "true")
 	t.Setenv("SOLANA_RPC_URL", primaryURL)
 	t.Setenv("SOLANA_RPC_FALLBACK_URL", fallbackURL)
