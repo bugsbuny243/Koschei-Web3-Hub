@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"koschei/api/internal/outbound"
 	"koschei/api/internal/services"
 	"koschei/api/internal/web3"
 )
@@ -258,7 +259,19 @@ func callSolanaRPC(client *http.Client, rpcURL, method string, params interface{
 	if err != nil {
 		return err
 	}
-	resp, err := client.Post(rpcURL, "application/json", bytes.NewReader(body))
+	validated, err := outbound.ValidateOperatorURL(context.Background(), rpcURL)
+	if err != nil {
+		return fmt.Errorf("rpc endpoint rejected: %w", err)
+	}
+	client = outbound.HardenOperatorClient(context.Background(), client)
+	// #nosec G704 -- endpoint passed the shared SSRF boundary; redirects are revalidated by HardenOperatorClient.
+	req, err := http.NewRequest(http.MethodPost, validated.String(), bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	// #nosec G704 -- request authority and every redirect pass the shared outbound SSRF boundary.
+	resp, err := client.Do(req)
 	if err != nil {
 		web3.LogRPCFailure(method, rpcURL, 0, err)
 		return err
