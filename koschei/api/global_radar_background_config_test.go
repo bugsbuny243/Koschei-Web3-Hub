@@ -49,3 +49,16 @@ func TestBuildGlobalRadarBackgroundTelemetryConfigUsesExplicitNetworks(t *testin
 		t.Fatalf("targets=%d want 4", len(config.Targets))
 	}
 }
+
+func TestBuildGlobalRadarBackgroundTelemetryConfigIncludesSolanaValidatorTelemetry(t *testing.T) {
+	t.Setenv("KOSCHEI_GLOBAL_RADAR_BACKGROUND_ENABLED", "1")
+	t.Setenv("KOSCHEI_GLOBAL_RADAR_BACKGROUND_NETWORKS", "solana-mainnet")
+	t.Setenv("SOLANA_RPC_URL", "https://solana.example")
+	config, err := buildGlobalRadarBackgroundTelemetryConfig(globalRadarBackgroundTestSink{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(config.Targets) != 1 || config.Targets[0].Kind != services.GlobalRadarTelemetrySolanaValidators || config.Targets[0].NetworkID != "solana-mainnet" {
+		t.Fatalf("unexpected Solana telemetry targets: %#v", config.Targets)
+	}
+}
