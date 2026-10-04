@@ -2,9 +2,12 @@ package http
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"html/template"
 	"net/http"
+
+	"koschei/api/internal/handlers"
 
 	"koschei/api/internal/radarevent"
 	"koschei/api/internal/runtimehealth"
@@ -23,9 +26,14 @@ type fabricConfig struct {
 	globalRadarSnapshotSink GlobalRadarSnapshotSink
 	globalRadarEventSink    GlobalRadarEventSink
 	runtimeHealth           *runtimehealth.Registry
+	db                      *sql.DB
 }
 
 type FabricOption func(*fabricConfig)
+
+func WithFabricDB(db *sql.DB) FabricOption {
+	return func(config *fabricConfig) { config.db = db }
+}
 
 func WithGlobalRadarSnapshotSink(sink GlobalRadarSnapshotSink) FabricOption {
 	return func(config *fabricConfig) {
@@ -72,34 +80,38 @@ type fabricPackageState struct {
 }
 
 type fabricSnapshot struct {
-	SchemaVersion          string               `json:"schemaVersion"`
-	Workspace              string               `json:"workspace"`
-	IntegrationMode        string               `json:"integrationMode"`
-	PreserveExisting       bool                 `json:"preserveExisting"`
-	BreakingChangesAllowed bool                 `json:"breakingChangesAllowed"`
-	BackendFrontendParity  bool                 `json:"backendFrontendParity"`
-	SecurityPackage        string               `json:"securityPackage"`
-	AcceptanceCaseCount    int                  `json:"acceptanceCaseCount"`
-	SharedEnvelopeSchema   string               `json:"sharedEnvelopeSchema"`
-	NativeSchemaMutation   bool                 `json:"nativeSchemaMutation"`
-	P0Blockers             []string             `json:"p0Blockers"`
-	PackageStates          []fabricPackageState `json:"packageStates"`
-	Components             []fabricComponent    `json:"components"`
+	BackendFrontendParityVerified bool                 `json:"backendFrontendParityVerified"`
+	EvidenceSource                string               `json:"evidenceSource"`
+	SchemaVersion                 string               `json:"schemaVersion"`
+	Workspace                     string               `json:"workspace"`
+	IntegrationMode               string               `json:"integrationMode"`
+	PreserveExisting              bool                 `json:"preserveExisting"`
+	BreakingChangesAllowed        bool                 `json:"breakingChangesAllowed"`
+	BackendFrontendParity         bool                 `json:"backendFrontendParity"`
+	SecurityPackage               string               `json:"securityPackage"`
+	AcceptanceCaseCount           int                  `json:"acceptanceCaseCount"`
+	SharedEnvelopeSchema          string               `json:"sharedEnvelopeSchema"`
+	NativeSchemaMutation          bool                 `json:"nativeSchemaMutation"`
+	P0Blockers                    []string             `json:"p0Blockers"`
+	PackageStates                 []fabricPackageState `json:"packageStates"`
+	Components                    []fabricComponent    `json:"components"`
 }
 
 func currentFabricSnapshot() fabricSnapshot {
 	return fabricSnapshot{
-		SchemaVersion:          "1.0",
-		Workspace:              "koschei-unified",
-		IntegrationMode:        "federated",
-		PreserveExisting:       true,
-		BreakingChangesAllowed: false,
-		BackendFrontendParity:  true,
-		SecurityPackage:        "Koschei-Web3-Web6-Guvenlik-Calisma-Paketi-2026-09-08.md",
-		AcceptanceCaseCount:    14,
-		SharedEnvelopeSchema:   "fabric.security-case-envelope.v1",
-		NativeSchemaMutation:   false,
-		P0Blockers:             []string{"CORE-01", "CORE-02", "CORE-04", "SIGN-01", "MODEL-04", "LANG-01", "LANG-02", "SUPPLY-02"},
+		SchemaVersion:                 "1.0",
+		Workspace:                     "koschei-unified",
+		IntegrationMode:               "federated",
+		PreserveExisting:              true,
+		BreakingChangesAllowed:        false,
+		BackendFrontendParity:         true,
+		BackendFrontendParityVerified: false,
+		EvidenceSource:                "repository_manifest",
+		SecurityPackage:               "Koschei-Web3-Web6-Guvenlik-Calisma-Paketi-2026-09-08.md",
+		AcceptanceCaseCount:           14,
+		SharedEnvelopeSchema:          "fabric.security-case-envelope.v1",
+		NativeSchemaMutation:          false,
+		P0Blockers:                    []string{"CORE-01", "CORE-02", "CORE-04", "SIGN-01", "MODEL-04", "LANG-01", "LANG-02", "SUPPLY-02"},
 		PackageStates: []fabricPackageState{
 			{ID: "A", Name: "status-record-correction", State: "in-progress", WorkPackages: []string{"CORE-02"}},
 			{ID: "B", Name: "working-web3-foundation", State: "blocked", WorkPackages: []string{"CORE-01", "CORE-02", "CORE-03"}},
@@ -140,10 +152,10 @@ func registerFabricRoutes(mux *http.ServeMux, configs ...fabricConfig) {
 	registerSecurityCenterRoutes(mux, config.runtimeHealth)
 	mux.HandleFunc("/fabric/networks/live", method(http.MethodGet, networkProbePage))
 	mux.HandleFunc("/fabric/networks/deployment", method(http.MethodGet, networkDeploymentCatalogHandler))
-	mux.HandleFunc("/fabric/networks/probe", method(http.MethodPost, networkTargetProbe))
-	mux.HandleFunc("/fabric/networks/probe/intelligence", method(http.MethodPost, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/fabric/networks/probe", method(http.MethodPost, fabricProbeProtection(config, networkTargetProbe)))
+	mux.HandleFunc("/fabric/networks/probe/intelligence", ownerOnly(&handlers.Handler{DB: config.db}, method(http.MethodPost, fabricProbeProtection(config, func(w http.ResponseWriter, r *http.Request) {
 		networkTargetProbeWithStores(w, r, nil, config.globalRadarSnapshotSink, config.globalRadarEventSink)
-	}))
+	}))))
 	mux.HandleFunc("/fabric/radar/global", method(http.MethodGet, globalRadarSnapshotHandler))
 	// Fabric is still experimental. Keep its capability contract outside /api/*
 	// until it is deliberately promoted into the production OpenAPI contract.

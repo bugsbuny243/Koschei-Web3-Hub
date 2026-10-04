@@ -5,7 +5,11 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
   const activeByRoot=new WeakMap();
-  const norm=value=>String(value||'').trim().toLowerCase();
+  const norm=value=>{
+    const clean=String(value||'').trim();
+    // Hex EVM identities are case-insensitive. Base58 Solana identities are not.
+    return /^0x[0-9a-fA-F]{40}$/.test(clean)?clean.toLowerCase():clean;
+  };
   function begin(root,target){
     if(!root)throw new Error('scan_result_root_missing');
     const clean=String(target||'').trim();

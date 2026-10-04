@@ -16,6 +16,10 @@ import (
 
 var tradePIAgentService = agents.NewService()
 
+// The public sandbox owns a separate in-memory fixture service. It never
+// writes customer leads, followups, revenue or channel state into PostgreSQL.
+var tradePIAgentDemoService = agents.NewDemoService()
+
 type agentDemoRequest struct {
 	TenantID    string `json:"tenant_id"`
 	UserID      string `json:"user_id"`
@@ -298,14 +302,13 @@ func tradePIAgentDemo(w http.ResponseWriter, r *http.Request) {
 		TenantID: req.TenantID, Channel: agents.ChannelWeb, ChannelUserID: req.UserID,
 		DisplayName: req.DisplayName, Text: req.Text, ReceivedAt: time.Now().UTC(),
 	}
-	result := tradePIAgentService.Handle(r.Context(), msg)
-	tradePIAgentService.RecordOutbound(r.Context(), msg, result.Reply)
+	result := tradePIAgentDemoService.Handle(r.Context(), msg)
 	writeTradePIAgentJSON(w, result)
 }
 
 func tradePITelegramWebhook(w http.ResponseWriter, r *http.Request) {
 	secret := strings.TrimSpace(os.Getenv("TELEGRAM_WEBHOOK_SECRET"))
-	if secret != "" && r.Header.Get("X-Telegram-Bot-Api-Secret-Token") != secret {
+	if secret == "" || !constantTimeAgentEqual(r.Header.Get("X-Telegram-Bot-Api-Secret-Token"), secret) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -334,8 +337,22 @@ func tradePITelegramWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimSpace(payload.Message.From.FirstName + " " + payload.Message.From.LastName)
+	if payload.UpdateID <= 0 {
+		http.Error(w, "invalid update id", http.StatusBadRequest)
+		return
+	}
+	tenantID := firstNonEmpty(os.Getenv("TRADEPI_DEFAULT_TENANT"), "demo-automotive")
+	fresh, err := tradePIAgentService.RegisterProviderEvent(r.Context(), tenantID, agents.ChannelTelegram, "update:"+int64String(payload.UpdateID))
+	if err != nil {
+		http.Error(w, "channel persistence unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if !fresh {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	msg := agents.Message{
-		TenantID: firstNonEmpty(os.Getenv("TRADEPI_DEFAULT_TENANT"), "demo-automotive"),
+		TenantID: tenantID,
 		Channel:  agents.ChannelTelegram, ChannelChatID: int64String(payload.Message.Chat.ID),
 		ChannelUserID: int64String(payload.Message.From.ID), DisplayName: name,
 		Text: payload.Message.Text, ReceivedAt: time.Unix(payload.Message.Date, 0).UTC(),

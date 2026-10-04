@@ -62,6 +62,24 @@ func MaterializeAndPersistGlobalCampaign(ctx context.Context, db *sql.DB, in Glo
 	if db == nil {
 		return GlobalCampaignPersistResult{}, ErrGlobalCampaignStoreUnavailable
 	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return GlobalCampaignPersistResult{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	result, err := materializeAndPersistGlobalCampaignTx(ctx, tx, in)
+	if err != nil {
+		return GlobalCampaignPersistResult{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return GlobalCampaignPersistResult{}, err
+	}
+	return result, nil
+}
+
+// Shared transaction core lets the runtime pin its lease, queue acknowledgement
+// and campaign revision to a single commit boundary.
+func materializeAndPersistGlobalCampaignTx(ctx context.Context, tx *sql.Tx, in GlobalCampaignMaterializerInput) (GlobalCampaignPersistResult, error) {
 	if err := validateGlobalCampaignManagedIdentityInput(in); err != nil {
 		return GlobalCampaignPersistResult{}, err
 	}
@@ -69,12 +87,6 @@ func MaterializeAndPersistGlobalCampaign(ctx context.Context, db *sql.DB, in Glo
 	if len(anchors) == 0 {
 		return GlobalCampaignPersistResult{}, ErrGlobalCampaignLookupEvidenceRequired
 	}
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return GlobalCampaignPersistResult{}, fmt.Errorf("begin global campaign lookup/merge: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
 
 	if err := lockGlobalCampaignAnchorsTx(ctx, tx, anchors); err != nil {
 		return GlobalCampaignPersistResult{}, err
@@ -127,9 +139,6 @@ func MaterializeAndPersistGlobalCampaign(ctx context.Context, db *sql.DB, in Glo
 	}
 	if err != nil {
 		return GlobalCampaignPersistResult{}, err
-	}
-	if err := tx.Commit(); err != nil {
-		return GlobalCampaignPersistResult{}, fmt.Errorf("commit global campaign lookup/merge: %w", err)
 	}
 	return result, nil
 }

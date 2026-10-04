@@ -315,6 +315,18 @@ func (r *Registry) Snapshot() Snapshot {
 	return Snapshot{SchemaVersion: SchemaVersion, GeneratedAt: now, Entries: entries, Counts: counts, CoverageCounts: coverageCounts}
 }
 
+// PublicSnapshot preserves operational evidence without exposing provider URLs,
+// credentials, SQL errors or other details contained in wrapped errors.
+func (r *Registry) PublicSnapshot() Snapshot {
+	snapshot := r.Snapshot()
+	for i := range snapshot.Entries {
+		if snapshot.Entries[i].LastError != "" {
+			snapshot.Entries[i].LastError = "component_check_failed"
+		}
+	}
+	return snapshot
+}
+
 func assessCoverage(entry Entry) (status, reason string, attention bool) {
 	if strings.TrimSpace(entry.Kind) != "head_ingest" {
 		return CoverageNotApplicable, "component_is_not_head_ingest", false

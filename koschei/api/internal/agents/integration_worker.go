@@ -23,20 +23,6 @@ func (s *Service) IntegrationEnabled() bool {
 	return s.db != nil && strings.TrimSpace(os.Getenv("TRADEPI_CALENDAR_WEBHOOK_URL")) != ""
 }
 
-func (s *Service) startIntegrationWorker() {
-	if !s.IntegrationEnabled() {
-		return
-	}
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			s.deliverOneIntegration(context.Background())
-			<-ticker.C
-		}
-	}()
-}
-
 func (s *Service) deliverOneIntegration(ctx context.Context) {
 	item, ok := s.claimIntegration(ctx)
 	if !ok {
