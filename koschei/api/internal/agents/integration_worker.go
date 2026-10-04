@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/outbound"
 )
 
 type integrationOutboxItem struct {
@@ -72,6 +74,10 @@ func deliverIntegrationWebhook(ctx context.Context, item integrationOutboxItem) 
 	if endpoint == "" {
 		return fmt.Errorf("calendar webhook not configured")
 	}
+	validated, err := outbound.ValidateOperatorURL(ctx, endpoint)
+	if err != nil {
+		return fmt.Errorf("calendar webhook rejected: %w", err)
+	}
 	body, err := json.Marshal(map[string]any{
 		"event_type": item.EventType,
 		"tenant_id":  item.TenantID,
@@ -81,7 +87,8 @@ func deliverIntegrationWebhook(ctx context.Context, item integrationOutboxItem) 
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	// #nosec G704 -- endpoint passed ValidateOperatorURL; redirects are revalidated by HardenOperatorClient.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, validated.String(), bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -90,7 +97,9 @@ func deliverIntegrationWebhook(ctx context.Context, item integrationOutboxItem) 
 	if secret := strings.TrimSpace(os.Getenv("TRADEPI_CALENDAR_WEBHOOK_SECRET")); secret != "" {
 		req.Header.Set("Authorization", "Bearer "+secret)
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	client := outbound.HardenOperatorClient(ctx, &http.Client{Timeout: 10 * time.Second})
+	// #nosec G704 -- request and every redirect pass the shared outbound SSRF boundary.
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
