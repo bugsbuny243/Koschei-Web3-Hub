@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"koschei/api/internal/cryptobrief"
@@ -22,14 +23,35 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Dedicated Crypto Brief Telegram configuration is incomplete.")
 		os.Exit(1)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	payload := map[string]any{"url": "https://tradepigloball.co/integrations/crypto-brief/telegram", "secret_token": c.TelegramSecret, "allowed_updates": []string{"message"}, "drop_pending_updates": false}
+	webhookURL := "https://tradepigloball.co/integrations/crypto-brief/telegram"
+	var identity struct {
+		Username string `json:"username"`
+		Bot      bool   `json:"is_bot"`
+	}
+	call(ctx, c, "getMe", map[string]any{}, &identity)
+	if !identity.Bot || !strings.EqualFold(identity.Username, c.TelegramUsername) {
+		fmt.Fprintln(os.Stderr, "Configured public username does not match the dedicated bot.")
+		os.Exit(1)
+	}
+	var webhook struct {
+		URL string `json:"url"`
+	}
+	call(ctx, c, "getWebhookInfo", map[string]any{}, &webhook)
+	if webhook.URL != "" && webhook.URL != webhookURL {
+		fmt.Fprintln(os.Stderr, "This bot already owns another webhook. Use a dedicated Crypto Brief bot.")
+		os.Exit(1)
+	}
+	call(ctx, c, "setWebhook", map[string]any{"url": webhookURL, "secret_token": c.TelegramSecret, "allowed_updates": []string{"message"}, "drop_pending_updates": false}, nil)
+	fmt.Println("Crypto Brief Telegram webhook configured. Test a consenting customer connection before marking delivery live.")
+}
+func call(ctx context.Context, c cryptobrief.Config, method string, payload any, result any) {
 	data, e := json.Marshal(payload)
 	if e != nil {
 		fail()
 	}
-	req, e := outboundhttp.NewRequest(ctx, "POST", "https://api.telegram.org/bot"+c.TelegramToken+"/setWebhook", bytes.NewReader(data))
+	req, e := outboundhttp.NewRequest(ctx, "POST", "https://api.telegram.org/bot"+c.TelegramToken+"/"+method, bytes.NewReader(data))
 	if e != nil {
 		fail()
 	}
@@ -43,12 +65,15 @@ func main() {
 	if e != nil || len(body) > 65536 || res.StatusCode != 200 {
 		fail()
 	}
-	var result struct {
-		OK bool `json:"ok"`
+	var response struct {
+		OK     bool            `json:"ok"`
+		Result json.RawMessage `json:"result"`
 	}
-	if json.Unmarshal(body, &result) != nil || !result.OK {
+	if json.Unmarshal(body, &response) != nil || !response.OK {
 		fail()
 	}
-	fmt.Println("Crypto Brief Telegram webhook configured. Test a consenting customer connection before marking delivery live.")
+	if result != nil && json.Unmarshal(response.Result, result) != nil {
+		fail()
+	}
 }
 func fail() { fmt.Fprintln(os.Stderr, "Telegram webhook setup could not be verified."); os.Exit(1) }
