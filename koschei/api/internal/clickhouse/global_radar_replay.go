@@ -105,7 +105,7 @@ FORMAT JSONEachRow`)
 			return nil, err
 		}
 		out = append(out, services.GlobalCampaignReplayItem{
-			Cursor: services.GlobalCampaignReplayCursor{RecordedAt: recordedAt, SnapshotSHA256: strings.TrimSpace(head.SnapshotSHA256)},
+			Cursor:   services.GlobalCampaignReplayCursor{RecordedAt: recordedAt, SnapshotSHA256: strings.TrimSpace(head.SnapshotSHA256)},
 			Snapshot: snapshot,
 		})
 	}
