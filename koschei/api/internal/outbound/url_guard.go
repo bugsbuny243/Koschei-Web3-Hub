@@ -121,6 +121,33 @@ func HardenOperatorClient(ctx context.Context, client *http.Client) *http.Client
 	return &clone
 }
 
+// HardenFixedHostClient pins redirects to the same explicit HTTPS host set used
+// for the original request. This closes redirect-based SSRF for provider APIs
+// whose authority is owned by code rather than runtime configuration.
+func HardenFixedHostClient(client *http.Client, allowedHosts ...string) *http.Client {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	clone := *client
+	previous := client.CheckRedirect
+	clone.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return fmt.Errorf("too many fixed-host redirects")
+		}
+		if req == nil || req.URL == nil {
+			return fmt.Errorf("fixed-host redirect target is unavailable")
+		}
+		if _, err := ValidateFixedHTTPSHost(req.URL.String(), allowedHosts...); err != nil {
+			return fmt.Errorf("fixed-host redirect rejected: %w", err)
+		}
+		if previous != nil {
+			return previous(req, via)
+		}
+		return nil
+	}
+	return &clone
+}
+
 func forbiddenIP(ip net.IP) bool {
 	if ip == nil {
 		return true
