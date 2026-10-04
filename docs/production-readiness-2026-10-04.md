@@ -52,7 +52,7 @@ from a real archived-row export/restore proof; its log explicitly says
   exclusion, stale ACK/retry fencing, uncertain publication retry, atomic enqueue,
   receipt compaction and poison quarantine. A single-connection test pool proves
   no SQL transaction spans external publication.
-- Migration 130 was applied successfully on the separate Neon branch
+- Migration 132 was applied successfully on the separate Neon branch
   `readiness-20261004`, PostgreSQL 17.11. Production migrations run through the
   existing application migration ledger on deployment.
 - Go tests, vet/build, targeted race checks, 99 browser unit tests and gosec run
@@ -92,7 +92,7 @@ from a real archived-row export/restore proof; its log explicitly says
 
 Disable `KOSCHEI_GLOBAL_CAMPAIGN_RUNTIME_ENABLED` to stop new campaign handoffs;
 retain the outbox and receipts for recovery. Roll back application code to
-`176ac2163002e21ceb22f58e0eebf2e693731019` if needed. Migration 130 is additive
+`176ac2163002e21ceb22f58e0eebf2e693731019` if needed. Migration 132 is additive
 and must remain in place; no rollback deletes evidence. To suspend external export,
 set `KOSCHEI_RADAR_ARCHIVE_EXPORT_SINK=disabled` and redeploy; the existing archive
 backlog guard remains enforced. Do not reduce the retention window or delete old
