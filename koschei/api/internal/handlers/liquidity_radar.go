@@ -164,6 +164,7 @@ func postWebhook(ctx context.Context, rawURL string, payload map[string]any, pro
 		return err
 	}
 	body, _ := json.Marshal(payload)
+	// #nosec G704 -- trustedWebhookURL enforces HTTPS, exact Telegram/Discord hosts and paths; security tests cover accepted/rejected destinations.
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -175,6 +176,7 @@ func postWebhook(ctx context.Context, rawURL string, payload map[string]any, pro
 			return http.ErrUseLastResponse
 		},
 	}
+	// #nosec G704 -- redirects are disabled and the request authority was provider-allowlisted by trustedWebhookURL.
 	res, err := client.Do(req)
 	if err != nil {
 		return err
