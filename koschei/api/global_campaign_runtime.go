@@ -19,6 +19,10 @@ type campaignRadarStore struct {
 	db *sql.DB
 }
 
+// Startup-only handoff to the background lifecycle. The concrete ClickHouse
+// graph client implements this interface when campaign runtime is enabled.
+var globalCampaignReplaySource services.GlobalCampaignReplaySource
+
 func (s *campaignRadarStore) InsertGlobalRadarSnapshot(ctx context.Context, snapshot services.GlobalRadarSnapshot) error {
 	if err := s.globalRadarGraphStore.InsertGlobalRadarSnapshot(ctx, snapshot); err != nil {
 		return err
@@ -31,6 +35,7 @@ func buildGlobalCampaignRuntime(parent context.Context, db *sql.DB, sink globalR
 	enabled := strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_CAMPAIGN_RUNTIME_ENABLED")) == "1"
 	health.Register(services.GlobalCampaignRuntimeHealthID, "worker", "", enabled)
 	if !enabled {
+		globalCampaignReplaySource = nil
 		return sink, nil, nil
 	}
 	if db == nil || sink == nil {
@@ -41,6 +46,14 @@ func buildGlobalCampaignRuntime(parent context.Context, db *sql.DB, sink globalR
 	if err := services.VerifyGlobalCampaignRuntimeSchema(ctx, db); err != nil {
 		return nil, nil, err
 	}
+	if err := services.VerifyGlobalCampaignReconciliationSchema(ctx, db); err != nil {
+		return nil, nil, err
+	}
+	replaySource, ok := sink.(services.GlobalCampaignReplaySource)
+	if !ok {
+		return nil, nil, fmt.Errorf("campaign runtime requires a replay-capable Global Radar graph store")
+	}
+	globalCampaignReplaySource = replaySource
 	var identity [16]byte
 	if _, err := rand.Read(identity[:]); err != nil {
 		return nil, nil, err
