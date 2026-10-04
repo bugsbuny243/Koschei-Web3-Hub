@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"koschei/api/internal/outbound"
 	"koschei/api/internal/web3"
 )
 
@@ -283,6 +284,12 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 	if rpcURL == "" {
 		return zero, fmt.Errorf("solana rpc url is empty")
 	}
+	validatedURL, err := outbound.ValidateOperatorURL(ctx, rpcURL)
+	if err != nil {
+		return zero, fmt.Errorf("solana rpc url rejected: %w", err)
+	}
+	rpcURL = validatedURL.String()
+	client := outbound.HardenOperatorClient(ctx, solanaRPCClient)
 	payload, err := json.Marshal(solanaRPCRequest{JSONRPC: "2.0", ID: 1, Method: method, Params: params})
 	if err != nil {
 		web3.LogRPCFailure(method, rpcURL, 0, err)
@@ -301,6 +308,7 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 			web3.LogRPCFailure(method, rpcURL, 0, err)
 			return zero, err
 		}
+		// #nosec G704 -- rpcURL passed ValidateOperatorURL; redirects are revalidated by HardenOperatorClient.
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, rpcURL, bytes.NewReader(payload))
 		if err != nil {
 			web3.LogRPCFailure(method, rpcURL, 0, err)
@@ -308,7 +316,8 @@ func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) 
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Koschei-RPC-Method", method)
-		res, err := solanaRPCClient.Do(req)
+		// #nosec G704 -- request authority and every redirect pass the shared outbound SSRF boundary.
+		res, err := client.Do(req)
 		if err != nil {
 			return zero, err
 		}
