@@ -15,10 +15,11 @@ import (
 )
 
 const (
-	GlobalRadarTelemetryEVMNode        = "evm_node"
-	GlobalRadarTelemetryEthereumBeacon = "ethereum_beacon"
-	GlobalRadarTelemetryBitcoinCore    = "bitcoin_core_node"
-	GlobalRadarTelemetryBitcoinPoW     = "bitcoin_pow_network"
+	GlobalRadarTelemetryEVMNode          = "evm_node"
+	GlobalRadarTelemetryEthereumBeacon   = "ethereum_beacon"
+	GlobalRadarTelemetryBitcoinCore      = "bitcoin_core_node"
+	GlobalRadarTelemetryBitcoinPoW       = "bitcoin_pow_network"
+	GlobalRadarTelemetrySolanaValidators = "solana_validators"
 )
 
 type GlobalRadarSnapshotSink interface {
@@ -64,6 +65,32 @@ func CollectGlobalRadarBackgroundTelemetry(ctx context.Context, cfg GlobalRadarB
 		if cfg.Health != nil {
 			cfg.Health.Register(healthID, "network_telemetry", target.NetworkID, true)
 		}
+		if strings.EqualFold(strings.TrimSpace(target.Kind), GlobalRadarTelemetrySolanaValidators) {
+			report, err := ProbeSolanaValidatorTelemetry(ctx, strings.TrimSpace(target.Endpoint), now)
+			if err != nil {
+				wrapped := fmt.Errorf("%s/%s: %w", strings.TrimSpace(target.NetworkID), strings.TrimSpace(target.Kind), err)
+				errs = append(errs, wrapped)
+				if cfg.Health != nil {
+					cfg.Health.Failure(healthID, wrapped)
+				}
+				continue
+			}
+			projected, err := ProjectSolanaValidatorTelemetryToGlobalRadar(report)
+			if err != nil {
+				wrapped := fmt.Errorf("%s/%s: %w", strings.TrimSpace(target.NetworkID), strings.TrimSpace(target.Kind), err)
+				errs = append(errs, wrapped)
+				if cfg.Health != nil {
+					cfg.Health.Failure(healthID, wrapped)
+				}
+				continue
+			}
+			observations = append(observations, projected...)
+			if cfg.Health != nil {
+				cfg.Health.Success(healthID, len(projected))
+			}
+			continue
+		}
+
 		observation, event, err := collectGlobalRadarTelemetryTarget(ctx, cfg.HTTPClient, target, now)
 		if err != nil {
 			wrapped := fmt.Errorf("%s/%s: %w", strings.TrimSpace(target.NetworkID), strings.TrimSpace(target.Kind), err)
