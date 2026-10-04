@@ -20,6 +20,7 @@ func (h *Handler) OwnerRadarOverviewFast(w http.ResponseWriter, r *http.Request)
 	items := []services.SecurityRadarVerdictRecord{}
 	sources := []services.SecurityRadarSource{}
 	highVolumePump := []services.PumpHighVolumeOwnerItem{}
+	globalCampaigns := []services.GlobalCampaign{}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
@@ -34,13 +35,18 @@ func (h *Handler) OwnerRadarOverviewFast(w http.ResponseWriter, r *http.Request)
 		if loaded, err := store.LatestPumpHighVolumeReportsExact(ctx, 50); err == nil {
 			highVolumePump = loaded
 		}
+		if loaded, err := services.ListCurrentGlobalCampaigns(ctx, db, 25); err == nil {
+			globalCampaigns = loaded
+		}
 		items = withoutPumpHighVolumeLegacyFinals(items, highVolumePump)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok": true, "generated_at": time.Now().UTC(), "items": items,
-		"high_volume_pump": highVolumePump,
-		"sources":          sources, "pipeline": h.securityRadarStreamStats(ctx),
+		"high_volume_pump":          highVolumePump,
+		"global_campaigns":          globalCampaigns,
+		"global_campaign_authority": "correlation_only",
+		"sources":                   sources, "pipeline": h.securityRadarStreamStats(ctx),
 	})
 }
 
