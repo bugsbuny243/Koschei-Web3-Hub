@@ -14,6 +14,7 @@ import (
 	"koschei/api/internal/runtimehealth"
 	"koschei/api/internal/services"
 	"koschei/api/internal/web3"
+	"koschei/api/internal/webhooks"
 )
 
 type runtimeRole string
@@ -59,7 +60,7 @@ func startBackgroundRuntime(
 		return func() {}
 	}
 
-	stops := make([]func(), 0, 8)
+	stops := make([]func(), 0, 16)
 	if globalRadarBackground != nil {
 		stops = append(stops, services.StartGlobalRadarBackgroundTelemetry(ctx, *globalRadarBackground))
 	}
@@ -76,11 +77,17 @@ func startBackgroundRuntime(
 		}
 		stops = append(stops,
 			alerts.StartDeliveryWorker(ctx, db),
+			webhooks.StartDeliveryWorker(ctx, db),
 			services.StartGlobalRadarCoverageAlertLifecycle(ctx, db, runtimeHealth),
 			services.StartSecurityRadarWatcher(ctx, db, solanaRPC),
 			services.StartSecurityRadarSovereignStreamIfEnabled(ctx, db),
+			services.StartActorDefenseCorrelator(ctx, db),
+			services.StartPumpPortalRadarIfEnabled(ctx, db),
+			services.StartGlobalCampaignRadarRuntime(ctx, db),
+			handlers.StartWatchlistMonitor(ctx, db),
 			handlers.StartCanonicalInvestigationJobWorker(ctx, db, readDB, solanaRPC, jobStore),
 			handlers.StartCanonicalPumpJobScheduler(ctx, db, jobStore),
+			handlers.StartAutopublishWorker(ctx, db),
 		)
 	}
 	return func() {
