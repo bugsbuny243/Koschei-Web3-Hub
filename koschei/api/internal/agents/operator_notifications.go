@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/outbound"
 )
 
 type operatorNotificationItem struct {
@@ -127,6 +129,10 @@ func deliverOperatorWebhook(ctx context.Context, item operatorNotificationItem) 
 	if endpoint == "" {
 		return fmt.Errorf("operator webhook not configured")
 	}
+	validated, err := outbound.ValidateOperatorURL(ctx, endpoint)
+	if err != nil {
+		return fmt.Errorf("operator webhook rejected: %w", err)
+	}
 	payload, err := json.Marshal(map[string]any{
 		"event_type":    "sales.missed_hot_lead",
 		"tenant_id":     item.TenantID,
@@ -143,7 +149,8 @@ func deliverOperatorWebhook(ctx context.Context, item operatorNotificationItem) 
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	// #nosec G704 -- endpoint passed ValidateOperatorURL; redirects are revalidated by HardenOperatorClient.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, validated.String(), bytes.NewReader(payload))
 	if err != nil {
 		return err
 	}
@@ -152,7 +159,9 @@ func deliverOperatorWebhook(ctx context.Context, item operatorNotificationItem) 
 	if secret := strings.TrimSpace(os.Getenv("TRADEPI_OPERATOR_WEBHOOK_SECRET")); secret != "" {
 		req.Header.Set("Authorization", "Bearer "+secret)
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	client := outbound.HardenOperatorClient(ctx, &http.Client{Timeout: 10 * time.Second})
+	// #nosec G704 -- request and every redirect pass the shared outbound SSRF boundary.
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
