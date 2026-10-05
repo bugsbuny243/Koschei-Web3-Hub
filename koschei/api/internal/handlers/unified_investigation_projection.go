@@ -11,8 +11,9 @@ func unifiedInvestigationTechnicalProjection(report map[string]any) map[string]a
 		"launch_forensics", "market", "lp_control", "jupiter_market_context",
 		"source_context", "structural_memory", "modules", "evidence_arms", "evidence",
 		"behavior_signals", "trade_ledger_aggregates", "transaction_evidence",
-		"evidence_references", "actor_investigation", "graph",
-		"investigation_output_policy", "evidence_policy",
+		"evidence_references", "creator_intelligence", "creator_distribution",
+		"actor_coordination_intelligence", "public_promotion_intelligence",
+		"actor_investigation", "graph", "investigation_output_policy", "evidence_policy",
 	}
 	out := make(map[string]any, len(keys)+1)
 	for _, key := range keys {
