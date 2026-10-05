@@ -5,6 +5,9 @@ const scan = fs.readFileSync('public/scan.html', 'utf8');
 const command = fs.readFileSync('public/js/customer-command-center-v1.js', 'utf8');
 new Function(overlay);
 
+// Keep the retired Professional preflight implementation testable as a rollback/internal
+// artifact, but do not mount it on the customer single-radar surface. Customer target
+// dispatch is now owned by the canonical ARVIS Radar flow.
 const required = [
   '/api/customer/web3/transaction-preflight',
   '/api/customer/web3/transaction-state-recheck',
@@ -30,7 +33,7 @@ const required = [
   "transaction.value=''"
 ];
 for (const marker of required) {
-  if (!overlay.includes(marker)) throw new Error(`missing customer preflight UI marker: ${marker}`);
+  if (!overlay.includes(marker)) throw new Error(`missing retained preflight implementation marker: ${marker}`);
 }
 for (const forbidden of [
   '/api/public/transaction-simulate',
@@ -39,19 +42,27 @@ for (const forbidden of [
   'X-API-Key',
   'Authorization: Bearer'
 ]) {
-  if (overlay.includes(forbidden)) throw new Error(`customer preflight UI violates boundary: ${forbidden}`);
+  if (overlay.includes(forbidden)) throw new Error(`retained preflight implementation violates boundary: ${forbidden}`);
 }
-if (!overlay.includes("},true);")) throw new Error('transaction submit interception must run in capture phase');
-if (!scan.includes('/js/customer-transaction-preflight-v1.js?v=3')) {
-  throw new Error('scan page does not mount the current Professional transaction preflight/recheck overlay');
+if (!overlay.includes("},true);")) throw new Error('retained transaction submit interception must run in capture phase');
+
+for (const marker of [
+  'customer-single-radar',
+  'ONE RADAR · ONE TARGET',
+  'id="target"',
+  'id="scanNetwork"',
+  'id="radarResults"',
+  'ARVIS uses the target format and network to choose the investigation path.'
+]) {
+  if (!scan.includes(marker)) throw new Error(`single ARVIS Radar contract missing: ${marker}`);
 }
-if (scan.includes('/js/customer-transaction-preflight-v1.js?v=1')) {
-  throw new Error('scan page still references the stale v1 transaction preflight asset URL');
+if (scan.includes('/js/customer-transaction-preflight-v1.js')) {
+  throw new Error('customer scan must not mount the retired Professional transaction preflight overlay');
 }
-if (!scan.includes('<option value="transaction">Solana transaction before signing</option>') || !overlay.includes('Professional Transaction Preflight')) {
-  throw new Error('the shared radar must retain the Professional transaction capability');
+if (scan.includes('Solana transaction before signing') || scan.includes('Professional Transaction Preflight')) {
+  throw new Error('customer scan must not expose a duplicate transaction/preflight scanner mode');
 }
 if (!command.includes("{label:'ARVIS Radar',href:'/scan',mode:'primary'}") || command.includes("href:'/scan?mode=transaction'")) {
-  throw new Error('transaction preflight must be selected inside the single ARVIS Radar, not a duplicate menu entry');
+  throw new Error('transaction investigation must remain inside the single ARVIS Radar, not a duplicate menu entry');
 }
-console.log('customer transaction preflight UI v1 contract verified');
+console.log('customer transaction capability retained behind the single ARVIS Radar contract');
