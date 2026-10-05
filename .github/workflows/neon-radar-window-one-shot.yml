@@ -1,0 +1,86 @@
+name: Neon radar migration window one-shot
+
+on:
+  push:
+    branches:
+      - migration/neon-to-clickhouse-inventory-20261005
+    paths:
+      - .github/workflows/neon-radar-window-one-shot.yml
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Choose source
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${DATABASE_READ_URL}" ]; then
+            printf '%s' "${DATABASE_READ_URL}" > "${RUNNER_TEMP}/source_url"
+          elif [ -n "${DATABASE_URL}" ]; then
+            printf '%s' "${DATABASE_URL}" > "${RUNNER_TEMP}/source_url"
+          else
+            exit 1
+          fi
+          chmod 600 "${RUNNER_TEMP}/source_url"
+
+      - name: Measure indexed radar bounds and known shadow window
+        run: |
+          set -euo pipefail
+          SOURCE_URL="$(cat "${RUNNER_TEMP}/source_url")"
+          OUT="${RUNNER_TEMP}/radar-window.txt"
+          : > "${OUT}"
+
+          echo '=== indexes ===' >> "${OUT}"
+          psql "${SOURCE_URL}" -X -v ON_ERROR_STOP=1 -P pager=off -Atc "
+            select indexname || E'\t' || indexdef
+            from pg_indexes
+            where schemaname='public' and tablename='security_radar_stream_events'
+            order by indexname;
+          " >> "${OUT}"
+
+          echo >> "${OUT}"
+          echo '=== source bounds ===' >> "${OUT}"
+          psql "${SOURCE_URL}" -X -v ON_ERROR_STOP=1 -P pager=off -Atc "
+            select min(created_at), max(created_at)
+            from public.security_radar_stream_events;
+          " >> "${OUT}"
+
+          echo >> "${OUT}"
+          echo '=== source rows in existing ClickHouse shadow window [2026-09-21 05:29, 06:20 UTC) ===' >> "${OUT}"
+          psql "${SOURCE_URL}" -X -v ON_ERROR_STOP=1 -P pager=off -Atc "
+            select count(*)
+            from public.security_radar_stream_events
+            where created_at >= timestamptz '2026-09-21 05:29:00+00'
+              and created_at <  timestamptz '2026-09-21 06:20:00+00';
+          " >> "${OUT}"
+
+          echo >> "${OUT}"
+          echo '=== last complete hour row count ===' >> "${OUT}"
+          psql "${SOURCE_URL}" -X -v ON_ERROR_STOP=1 -P pager=off -Atc "
+            with b as (
+              select date_trunc('hour', max(created_at)) as until_ts
+              from public.security_radar_stream_events
+            )
+            select b.until_ts - interval '1 hour', b.until_ts, count(*)
+            from public.security_radar_stream_events s cross join b
+            where s.created_at >= b.until_ts - interval '1 hour'
+              and s.created_at < b.until_ts
+            group by b.until_ts;
+          " >> "${OUT}"
+
+          cat "${OUT}"
+
+      - name: Upload measurement
+        uses: actions/upload-artifact@v7
+        with:
+          name: neon-radar-window
+          path: ${{ runner.temp }}/radar-window.txt
+          if-no-files-found: error
+          retention-days: 7
