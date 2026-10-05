@@ -198,6 +198,10 @@ func arvisTelegramContextLines(envelope map[string]any) []string {
 	if strings.EqualFold(strings.TrimSpace(stringFromMap(trade, "market_behavior_status")), "bounded_pattern_observed") {
 		out = append(out, "Market behavior: suspicious bounded timing pattern observed — requires corroboration")
 	}
+	manipulation, _ := report["market_manipulation_intelligence"].(map[string]any)
+	if strings.EqualFold(strings.TrimSpace(stringFromMap(manipulation, "status")), "round_trip_churn_candidates_observed") {
+		out = append(out, "Market manipulation screen: balanced 24h round-trip churn candidate(s) observed — indicator only, not proof of wash trading")
+	}
 	coordination, _ := report["actor_coordination_intelligence"].(map[string]any)
 	if strings.EqualFold(strings.TrimSpace(stringFromMap(coordination, "status")), "coordination_patterns_observed") {
 		out = append(out, "Actor coordination: evidence-backed correlation pattern(s) observed — not an identity or wrongdoing claim")
