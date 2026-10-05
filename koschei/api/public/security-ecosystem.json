@@ -1,29 +1,29 @@
 {
   "ok": true,
-  "product": "Koschei ARVIS",
-  "surface": "Security Evidence Ecosystem",
-  "version": "security-ecosystem-v7-professional-dual-settlement",
-  "positioning": "Koschei ARVIS remains a production-independent deterministic Solana security product. Koschei Sentinel and the Koschei language mature separately in offline incubation until explicit future integration gates pass.",
+  "product": "Koschei Web3 Hub",
+  "surface": "Unified Security Ecosystem",
+  "version": "security-ecosystem-v8-unified-professional",
+  "positioning": "Koschei Web3 Hub is the customer security center. ARVIS owns deterministic evidence and signed Web3 verdicts, Koschei Sentinel joins through Koschei Fabric as an observe-first cybersecurity intelligence layer, and Koschei Lang remains the capability-secure programming language and licensed developer toolchain included in Professional.",
   "ecosystem": {
     "contract": "/docs/koschei-ecosystem-contract-v1.md",
-    "runtime_integration_state": "incubation_only",
+    "runtime_integration_state": "federated_active",
     "projects": [
       {
         "id": "koschei-web3-hub",
-        "role": "deterministic Solana evidence, durable security memory and signed verdicts",
-        "status": "production_independent",
+        "role": "customer security center, deterministic multi-network evidence, durable security memory and signed verdicts",
+        "status": "production_active",
         "repository": "https://github.com/bugsbuny243/Koschei-Web3-Hub"
       },
       {
         "id": "koschei-lang",
-        "role": "independent capability-secure programming language research and development",
-        "status": "incubating_not_runtime_integrated",
+        "role": "independent capability-secure programming language, compiler/runtime, Matrix policy layer and licensed developer toolchain",
+        "status": "professional_package_active_adapter_boundary",
         "repository": "https://github.com/bugsbuny243/koschei-lang"
       },
       {
         "id": "koschei-sentinel",
-        "role": "offline evidence-grounded Solana security model training and evaluation",
-        "status": "incubating_not_runtime_integrated",
+        "role": "evidence-grounded cybersecurity model, code security reasoning and ARVIS commentary through Koschei Fabric",
+        "status": "fabric_observe_active_customer_authority_disabled",
         "repository": "https://github.com/bugsbuny243/koschei-sentinel"
       }
     ],
@@ -32,31 +32,46 @@
       "network": "solana-mainnet",
       "mint": "7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1",
       "pump_callout": "https://pump.fun/callouts/7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1/713a17a0-494e-41b9-8411-2ee764c9b65c",
-      "commercial_role": "alternate_professional_settlement_channel",
+      "commercial_role": "unified_ecosystem_professional_settlement_channel",
+      "ecosystem_scope": [
+        "koschei-web3-hub",
+        "koschei-sentinel",
+        "koschei-lang"
+      ],
+      "single_official_token": true,
+      "separate_module_tokens": false,
       "holdings_grant_access": false,
-      "disclaimer": "KOSC holdings never change evidence, verdicts, signatures, compiler rules, model promotion gates or integration readiness. Professional access activates only after verified server-side settlement."
+      "disclaimer": "KOSC is the single official ecosystem token for Koschei Web3 Hub, Sentinel and Lang. Holdings never change evidence, verdicts, signatures, compiler rules, model promotion gates or integration readiness. Professional access activates only after verified server-side settlement."
     }
   },
-  "incubation_policy": {
-    "sentinel_runtime_integrated": false,
-    "language_runtime_integrated": false,
+  "integration_policy": {
+    "web3_customer_center_active": true,
+    "arvis_deterministic_verdict_authority": true,
+    "sentinel_fabric_registered": true,
+    "sentinel_observe_first": true,
     "sentinel_customer_requests_enabled": false,
     "sentinel_verdict_authority": false,
     "sentinel_production_writes_enabled": false,
-    "language_production_components_enabled": false,
-    "language_build_dependency_enabled": false,
-    "offline_sentinel_training_exports_allowed": true,
-    "offline_language_benchmarks_allowed": true,
-    "future_integration_requires_explicit_owner_approval": true,
-    "shared_identity_is_not_runtime_integration": true
+    "language_professional_package_included": true,
+    "language_runtime_build_dependency_enabled": false,
+    "language_fabric_adapter_boundary": true,
+    "telegram_arvis_customer_delivery": true,
+    "cross_project_contracts_required": true,
+    "shared_identity_is_not_shared_authority": true
   },
   "access_model": {
     "provider": "professional_saas_polar_or_kosc",
-    "mode": "public_proof_professional_dual_settlement",
+    "mode": "single_professional_entitlement_unified_ecosystem",
     "professional_price_usd": 199,
     "settlement_channels": [
       "polar",
       "kosc"
+    ],
+    "included_products": [
+      "Koschei Web3 Hub",
+      "ARVIS",
+      "Koschei Sentinel",
+      "Koschei Lang"
     ],
     "premium": [
       "deep scan",
@@ -65,7 +80,10 @@
       "watchlist",
       "webhooks",
       "developer API",
-      "advanced deterministic agents"
+      "advanced deterministic agents",
+      "ARVIS scan delivery to paired Telegram",
+      "Koschei Lang licensed developer toolchain",
+      "Sentinel observe/shadow intelligence through Fabric"
     ],
     "wallet_proof": "signed Solana wallet required for KOSC settlement",
     "holdings_grant_access": false,
@@ -112,8 +130,8 @@
     "final_verdict_engine_count": 1,
     "total_arm_count": 14,
     "scoring": "deterministic evidence-backed risk rules",
-    "ai_role": "offline incubation and benchmark research only; no customer runtime role",
-    "language_role": "offline benchmark and interoperability research only; no production runtime role"
+    "ai_role": "Koschei Sentinel integrates through Fabric in observe/shadow mode; model output cannot replace, lower or silently mint ARVIS deterministic verdict authority",
+    "language_role": "Koschei Lang is the independent capability-secure programming language and Professional developer toolchain; production interaction uses explicit Fabric adapters rather than importing Lang internals into Web3"
   },
   "feed_policy": {
     "one_card_per_token": true,
@@ -211,18 +229,21 @@
     "/reports",
     "/api/token/scan",
     "/api/v1/risk/badge",
+    "/api/customer/crypto-brief",
     "/widget.js",
     "/pricing"
   ],
   "immutable_rules": [
     "No evidence, no claim",
     "Basic security checks remain public and rate limited",
-    "Sentinel is not connected to customer runtime during incubation",
-    "Koschei language is not a Web3 production dependency during incubation",
+    "ARVIS deterministic signed verdict remains final",
+    "Sentinel cannot silently gain verdict authority or production write authority",
+    "Koschei Lang keeps ownership of language, compiler/runtime, Matrix, policy and proof internals",
+    "Cross-project integration uses explicit contracts and adapters",
     "A temporary event gap cannot lower a fresh structural token floor",
     "Customers cannot alter verdict thresholds",
     "Infrastructure mints remain internal and do not become public risk cards",
-    "KOSC is an alternate settlement channel into the canonical Professional entitlement",
+    "KOSC is the single official token for Web3 Hub, Sentinel and Lang and an alternate settlement channel into the canonical Professional entitlement",
     "KOSC holdings alone never grant access",
     "KOSC cannot change evidence, grades, signatures, compiler rules, model promotion or integration readiness"
   ]
