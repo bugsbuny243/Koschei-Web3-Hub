@@ -50,6 +50,18 @@ func TestCaseFromARVISEnvelopeRequiresSignedLiveEvidence(t *testing.T) {
 	}
 }
 
+func TestConfigRequiresAuthenticatedObserveBoundary(t *testing.T) {
+	t.Setenv("APP_ENV", "test")
+	server := httptest.NewServer(http.NotFoundHandler())
+	defer server.Close()
+	if (Config{Enabled: true, BaseURL: server.URL}).Ready() {
+		t.Fatal("Sentinel adapter became ready without API token")
+	}
+	if !(Config{Enabled: true, BaseURL: server.URL, Token: "fabric-secret"}).Ready() {
+		t.Fatal("authenticated Sentinel adapter did not become ready")
+	}
+}
+
 func TestObservePreservesARVISAuthorityAndIdentity(t *testing.T) {
 	t.Setenv("APP_ENV", "test")
 	securityCase := SecurityCase{
@@ -65,6 +77,9 @@ func TestObservePreservesARVISAuthorityAndIdentity(t *testing.T) {
 		if r.URL.Path != "/v1/opinions" || r.Method != http.MethodPost {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
+		if r.Header.Get("Authorization") != "Bearer fabric-secret" {
+			t.Fatalf("missing authenticated Fabric request: %q", r.Header.Get("Authorization"))
+		}
 		var received SecurityCase
 		if err := json.NewDecoder(r.Body).Decode(&received); err != nil {
 			t.Fatal(err)
@@ -76,22 +91,22 @@ func TestObservePreservesARVISAuthorityAndIdentity(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(CheckedOpinion{
 			Accepted: true,
 			Opinion: Opinion{
-				SchemaVersion:    "sentinel.opinion.v1",
-				CaseID:           securityCase.CaseID,
-				VerdictSignature: securityCase.SignedVerdict.Signature,
-				Authority:        "The signed deterministic verdict is final; this output is commentary only.",
-				Assessment:       "EXPLANATION_ONLY",
-				Claims:           []EvidenceClaim{},
-				Limitations:      []string{},
+				SchemaVersion:      "sentinel.opinion.v1",
+				CaseID:             securityCase.CaseID,
+				VerdictSignature:   securityCase.SignedVerdict.Signature,
+				Authority:          "The signed deterministic verdict is final; this output is commentary only.",
+				Assessment:         "EXPLANATION_ONLY",
+				Claims:             []EvidenceClaim{},
+				Limitations:        []string{},
 				RecommendedActions: []string{},
-				Engine:           "sentinel-baseline-v0.1",
+				Engine:             "sentinel-baseline-v0.1",
 			},
 			PolicyViolations: []string{},
 		})
 	}))
 	defer server.Close()
 
-	observation, err := Observe(t.Context(), server.Client(), Config{Enabled: true, BaseURL: server.URL}, securityCase)
+	observation, err := Observe(t.Context(), server.Client(), Config{Enabled: true, BaseURL: server.URL, Token: "fabric-secret"}, securityCase)
 	if err != nil {
 		t.Fatal(err)
 	}
