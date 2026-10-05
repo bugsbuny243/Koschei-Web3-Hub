@@ -15,7 +15,7 @@ class Element {
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 function harness({loggedIn=true,items=[],configured=true}={}){
  const nodes={};const calls=[];const defaults={networks:[],topics:[],cadence:'daily',timezone:'Europe/Istanbul',quiet_start:23,quiet_end:8};
- const subscriptions=['telegram','whatsapp'].map(channel=>({channel,configured,template_configured:false,state:'disconnected',preferences:defaults}));
+ const subscriptions=[{channel:'telegram',configured,template_configured:true,state:'disconnected',preferences:defaults}];
  const document={getElementById(id){return nodes[id]||(nodes[id]=new Element());},createElement(){return new Element();},querySelectorAll(){return [];}};
  document.getElementById('briefConsent');
  const auth={init:async()=>{},isLoggedIn:()=>loggedIn,apiCall:async(url,options={})=>{calls.push({url,options});return {ok:true,status:200,json:async()=>url.endsWith('/pair')?{url:'https://t.me/FixtureBot?start=fixture',command:'/start fixture',expires_at:new Date(Date.now()+600000).toISOString()}:{subscriptions}};}};
@@ -25,11 +25,11 @@ function harness({loggedIn=true,items=[],configured=true}={}){
 test('public news can load without a customer session; connecting requires login',async()=>{
  const h=harness({loggedIn:false});await settle();assert.equal(h.calls.length,0);assert.equal(h.nodes.briefLogin.hidden,false);assert.equal(h.nodes.briefPreferences.hidden,true);assert.match(h.nodes.briefAuthState.textContent,/giriş yapın/);
 });
-test('a bot connection cannot start without explicit consent',async()=>{
+test('a Telegram connection cannot start without explicit consent',async()=>{
  const h=harness();await settle();const pair=h.nodes.briefChannels.children[0].children[2].children[0];await pair.events.click();assert.equal(h.calls.filter(x=>x.url.endsWith('/pair')).length,0);assert.match(h.nodes.briefMessage.textContent,/bildirim iznini/);
 });
-test('consent saves preferences and returns a temporary channel challenge without browser storage',async()=>{
- const h=harness();await settle();h.nodes.briefConsent.checked=true;const pair=h.nodes.briefChannels.children[0].children[2].children[0];await pair.events.click();const call=h.calls.find(x=>x.url.endsWith('/pair'));assert.ok(call);assert.equal(JSON.parse(call.options.body).consent,true);assert.equal(h.nodes.briefPairing.hidden,false);assert.match(h.nodes.briefPairLink.href,/^https:\/\/t.me\/FixtureBot/);assert.equal(h.nodes.briefPairCommand.textContent,'/start fixture');
+test('consent saves only Telegram preferences and returns a temporary challenge without browser storage',async()=>{
+ const h=harness();await settle();h.nodes.briefConsent.checked=true;const pair=h.nodes.briefChannels.children[0].children[2].children[0];await pair.events.click();const pairCall=h.calls.find(x=>x.url.endsWith('/pair'));assert.ok(pairCall);assert.equal(JSON.parse(pairCall.options.body).consent,true);assert.equal(JSON.parse(pairCall.options.body).channel,'telegram');const preferenceCalls=h.calls.filter(x=>x.url==='/api/customer/crypto-brief'&&x.options.method==='PUT');assert.ok(preferenceCalls.length>=1);assert.ok(preferenceCalls.every(x=>JSON.parse(x.options.body).channel==='telegram'));assert.equal(h.nodes.briefPairing.hidden,false);assert.match(h.nodes.briefPairLink.href,/^https:\/\/t.me\/FixtureBot/);assert.equal(h.nodes.briefPairCommand.textContent,'/start fixture');
 });
 test('publisher strings remain text and foreign news links are rejected',async()=>{
  const title='<img src=x onerror=alert(1)>';const base={source_id:'fixture',title,published_at:new Date().toISOString(),networks:['solana'],topics:['network']};
