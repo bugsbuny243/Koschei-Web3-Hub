@@ -10,15 +10,16 @@ import (
 
 	"koschei/api/internal/alerts"
 	"koschei/api/internal/cryptobrief"
+	"koschei/api/internal/sentinelclient"
 )
 
 const maxSecurityRadarAlertBody = 1 << 20
 
 // SecurityRadarCheckWithAlerts preserves the existing investigation response
 // contract and adds durable side effects only after the canonical customer scan
-// completed. Security alerts remain severity-gated, while customer Telegram
-// delivery is independent and covers every successful ARVIS scan for customers
-// who explicitly paired and activated Telegram.
+// completed. Security alerts remain severity-gated, customer Telegram delivery
+// covers every successful scan, and Sentinel is observe-only commentary over a
+// signed evidence-backed ARVIS result.
 func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Request) {
 	rawBody, err := io.ReadAll(io.LimitReader(r.Body, maxSecurityRadarAlertBody+1))
 	if err != nil {
@@ -48,6 +49,9 @@ func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Re
 			if alertID != "" {
 				envelope["alert_event_id"] = alertID
 			}
+			if observation, ok := observeARVISWithSentinel(r, envelope); ok {
+				envelope["sentinel_observation"] = observation
+			}
 			if h.queueARVISCustomerTelegram(r, target, envelope) {
 				envelope["telegram_delivery_queued"] = true
 			}
@@ -67,6 +71,25 @@ func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Re
 	_, _ = w.Write(responseBody)
 }
 
+func observeARVISWithSentinel(r *http.Request, envelope map[string]any) (sentinelclient.Observation, bool) {
+	if r == nil {
+		return sentinelclient.Observation{}, false
+	}
+	config := sentinelclient.ConfigFromEnv()
+	if !config.Ready() {
+		return sentinelclient.Observation{}, false
+	}
+	securityCase, ok := sentinelclient.CaseFromARVISEnvelope(envelope)
+	if !ok {
+		return sentinelclient.Observation{}, false
+	}
+	observation, err := sentinelclient.Observe(r.Context(), nil, config, securityCase)
+	if err != nil {
+		return sentinelclient.Observation{}, false
+	}
+	return observation, true
+}
+
 func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope map[string]any) string {
 	if r == nil || h == nil || h.DB == nil {
 		return ""
@@ -81,7 +104,7 @@ func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope
 	if !signed {
 		return ""
 	}
-	riskLevel := strings.ToLower(strings.TrimSpace(stringFromMap(final, "risk_level")))
+	riskLevel := arvisRiskLevelFromFinal(final)
 	if riskLevel != "medium" && riskLevel != "high" && riskLevel != "critical" {
 		return ""
 	}
@@ -90,7 +113,7 @@ func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope
 		return ""
 	}
 	grade := strings.TrimSpace(stringFromMap(final, "grade"))
-	ruleVersion := strings.TrimSpace(stringFromMap(final, "rule_version"))
+	ruleVersion := strings.TrimSpace(firstNonEmptyString(stringFromMap(final, "rule_version"), stringFromMap(final, "ruleset_version")))
 	verdict := strings.TrimSpace(stringFromMap(final, "verdict"))
 	recommendation := strings.TrimSpace(stringFromMap(final, "recommendation"))
 	claims, _ := userFromContext(r.Context())
@@ -117,6 +140,24 @@ func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope
 		return ""
 	}
 	return id
+}
+
+func arvisRiskLevelFromFinal(final map[string]any) string {
+	if explicit := strings.ToLower(strings.TrimSpace(stringFromMap(final, "risk_level"))); explicit != "" {
+		return explicit
+	}
+	switch strings.ToUpper(strings.TrimSpace(stringFromMap(final, "grade"))) {
+	case "F":
+		return "critical"
+	case "D":
+		return "high"
+	case "C":
+		return "medium"
+	case "B", "A":
+		return "low"
+	default:
+		return "info"
+	}
 }
 
 // queueARVISCustomerTelegram is intentionally best-effort. A provider or queue
@@ -151,7 +192,7 @@ func arvisCustomerTelegramMessage(target string, envelope map[string]any) (strin
 		status = "completed"
 	}
 	final, _ := envelope["final_verdict"].(map[string]any)
-	riskLevel := strings.TrimSpace(stringFromMap(final, "risk_level"))
+	riskLevel := arvisRiskLevelFromFinal(final)
 	grade := strings.TrimSpace(stringFromMap(final, "grade"))
 	verdict := strings.TrimSpace(stringFromMap(final, "verdict"))
 	recommendation := strings.TrimSpace(stringFromMap(final, "recommendation"))
@@ -163,7 +204,7 @@ func arvisCustomerTelegramMessage(target string, envelope map[string]any) (strin
 		parts = append(parts, "Target: "+target)
 	}
 	parts = append(parts, "Status: "+strings.ToUpper(status))
-	if riskLevel != "" {
+	if riskLevel != "" && riskLevel != "info" {
 		parts = append(parts, "Risk: "+strings.ToUpper(riskLevel))
 	}
 	if grade != "" {
@@ -185,6 +226,9 @@ func arvisCustomerTelegramMessage(target string, envelope map[string]any) (strin
 		if raw, err := json.Marshal(summary); err == nil {
 			parts = append(parts, "Analysis: "+string(raw))
 		}
+	}
+	if _, ok := envelope["sentinel_observation"]; ok {
+		parts = append(parts, "Sentinel: observe-only commentary attached to the Web3 result")
 	}
 	if signature != "" {
 		parts = append(parts, "Signature: "+signature)
