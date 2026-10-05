@@ -1,0 +1,85 @@
+name: Full Neon radar to ClickHouse backfill
+
+on:
+  push:
+    branches:
+      - migration/neon-to-clickhouse-inventory-20261005
+    paths:
+      - .github/workflows/neon-radar-full-backfill-one-shot.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-radar-full-backfill
+  cancel-in-progress: false
+
+jobs:
+  copy-hour:
+    name: Radar hour ${{ matrix.hour }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        hour: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Resolve deterministic source window
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_ENV"
+          from datetime import datetime, timedelta, timezone
+          index = int("${{ matrix.hour }}")
+          start = datetime(2026, 9, 21, 5, 0, 0, tzinfo=timezone.utc) + timedelta(hours=index)
+          end = start + timedelta(hours=1)
+          print("RADAR_SINCE=" + start.strftime("%Y-%m-%dT%H:%M:%SZ"))
+          print("RADAR_UNTIL=" + end.strftime("%Y-%m-%dT%H:%M:%SZ"))
+          PY
+
+      - name: Validate source and target secrets
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_READ_URL}" ] && [ -z "${DATABASE_URL}" ]; then
+            echo "DATABASE_READ_URL or DATABASE_URL is required" >&2
+            exit 1
+          fi
+          test -n "${CLICKHOUSE_HTTP_URL}"
+          test -n "${CLICKHOUSE_USER}"
+          test -n "${CLICKHOUSE_PASSWORD}"
+
+      - name: Build bounded parity copier
+        working-directory: koschei/api
+        run: go build -o "$RUNNER_TEMP/clickhouse-shadow" ./cmd/clickhouse-shadow
+
+      - name: Copy hour and require exact row/content parity
+        working-directory: koschei/api
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_DATABASE: koschei_web3
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+          CLICKHOUSE_TIMEOUT_MS: "120000"
+          KOSCHEI_CLICKHOUSE_SHADOW_SINCE: ${{ env.RADAR_SINCE }}
+          KOSCHEI_CLICKHOUSE_SHADOW_UNTIL: ${{ env.RADAR_UNTIL }}
+          KOSCHEI_CLICKHOUSE_SHADOW_BATCH_SIZE: "50000"
+          KOSCHEI_CLICKHOUSE_SHADOW_MAX_ROWS: "1000000"
+        run: "$RUNNER_TEMP/clickhouse-shadow"
