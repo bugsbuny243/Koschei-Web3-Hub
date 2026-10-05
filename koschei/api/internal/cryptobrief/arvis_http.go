@@ -125,16 +125,16 @@ func (s *Service) ARVISTelegramStatusHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 	respond(w, http.StatusOK, map[string]any{
-		"schema_version":      "koschei.arvis-telegram.v1",
-		"configured":          s.Config.Ready("telegram"),
-		"webhook_verified":    s.telegramVerified.Load(),
-		"active_customers":    active,
-		"paused_customers":    paused,
-		"pending_deliveries":  pending,
-		"accepted_deliveries": accepted,
+		"schema_version":       "koschei.arvis-telegram.v1",
+		"configured":           s.Config.Ready("telegram"),
+		"webhook_verified":     s.telegramVerified.Load(),
+		"active_customers":     active,
+		"paused_customers":     paused,
+		"pending_deliveries":   pending,
+		"accepted_deliveries":  accepted,
 		"uncertain_deliveries": uncertain,
-		"failed_deliveries":   failed,
-		"purpose":             "arvis_scan_result_delivery",
+		"failed_deliveries":    failed,
+		"purpose":              "arvis_scan_result_delivery",
 	})
 }
 
