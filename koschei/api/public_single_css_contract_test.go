@@ -18,7 +18,6 @@ func TestPublicSiteUsesApprovedSurfaceScopedCSSFiles(t *testing.T) {
 	}
 	sort.Strings(files)
 	want := []string{
-		filepath.FromSlash("public/css/crypto-brief.css"),
 		filepath.FromSlash("public/css/customer-radar-v1.css"),
 		filepath.FromSlash("public/css/customer-universal-address-scan-v1.css"),
 		filepath.FromSlash("public/css/evm-authority-desk.css"),
