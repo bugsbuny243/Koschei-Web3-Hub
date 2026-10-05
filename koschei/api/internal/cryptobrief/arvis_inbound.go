@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
-	"time"
 
 	"koschei/api/internal/workerwake"
 )
@@ -146,5 +145,3 @@ func (s *Service) latestARVISResult(ctx context.Context, tx *sql.Tx, customer st
 	}
 	return FormatARVISResult(target, network, envelope)
 }
-
-var _ = time.Second
