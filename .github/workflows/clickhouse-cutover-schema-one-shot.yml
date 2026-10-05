@@ -6,6 +6,8 @@ on:
       - migration/neon-to-clickhouse-inventory-20261005
     paths:
       - .github/workflows/clickhouse-cutover-schema-one-shot.yml
+      - koschei/api/internal/clickhouse/**
+      - koschei/api/cmd/clickhouse-*/**
 
 permissions:
   contents: read
@@ -27,6 +29,13 @@ jobs:
         with:
           go-version-file: koschei/api/go.mod
           cache-dependency-path: koschei/api/go.sum
+
+      - name: Verify ClickHouse migration code
+        working-directory: koschei/api
+        run: |
+          set -euo pipefail
+          test -z "$(gofmt -l internal/clickhouse/publication_migration.go internal/clickhouse/verdict_migration.go internal/clickhouse/arvis_read_index_migration.go internal/clickhouse/global_radar_migration.go cmd/clickhouse-global-radar-schema/main.go)"
+          go test ./internal/clickhouse
 
       - name: Validate ClickHouse secrets
         env:
