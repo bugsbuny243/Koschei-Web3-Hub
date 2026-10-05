@@ -11,7 +11,7 @@ Koschei Telegram is a secondary delivery surface for customer ARVIS investigatio
 5. Missing or unverified evidence remains explicit and is never converted into a safe conclusion.
 6. Notification failure never changes the ARVIS result or causes a completed investigation to become failed.
 
-Background recursive/system investigations are not pushed to customers. Only customer-requested canonical jobs are mirrored.
+Background recursive/system investigations are not pushed to customers. Only customer-requested canonical jobs are mirrored. RSS/news ingestion, scheduled crypto-news digests and public news pages are not part of the ARVIS Telegram product.
 
 ## Customer controls
 
