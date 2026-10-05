@@ -48,7 +48,7 @@ func run(parent context.Context) error {
 			bodies = append(bodies, string(payload))
 		}
 		for i, body := range bodies {
-			if err := client.ApplyTrustedMigration(ctx, body); err != nil {
+			if err := client.ApplyTrustedGlobalRadarMigration(ctx, body); err != nil {
 				return err
 			}
 			log.Printf("Global Radar additive migration applied path=%s checksum_verified=true", migrations[i])
