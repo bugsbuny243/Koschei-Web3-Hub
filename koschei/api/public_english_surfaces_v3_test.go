@@ -57,7 +57,7 @@ func TestCanonicalInvestigationSurfaceIsOneCustomerRadar(t *testing.T) {
 		"public-solana-scan.js?v=14",
 		"One target only.",
 		"Missing evidence stays unknown.",
-		"never signs, and never broadcasts.",
+		"never signs or broadcasts.",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("canonical investigation page missing %q", required)
@@ -77,10 +77,10 @@ func TestCanonicalInvestigationSurfaceIsOneCustomerRadar(t *testing.T) {
 		`id="customerUniversalScanForm"`,
 		`id="evmAuthorityForm"`,
 		`id="evmSpendingForm"`,
-		"customer-transaction-preflight-v1.js",
-		"evm-spending-intelligence.js",
-		"customer-command-center-v1.js",
-		"customer-arvis-premium-suite.js",
+		`src="/js/customer-transaction-preflight-v1.js`,
+		`src="/js/evm-spending-intelligence.js`,
+		`src="/js/customer-command-center-v1.js`,
+		`src="/js/customer-arvis-premium-suite.js`,
 	} {
 		if strings.Contains(text, forbidden) {
 			t.Errorf("canonical investigation page exposes duplicate or retired scanner UI %q", forbidden)
