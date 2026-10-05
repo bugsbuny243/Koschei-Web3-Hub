@@ -100,11 +100,11 @@ type CheckedOpinion struct {
 }
 
 type Observation struct {
-	Mode       string         `json:"mode"`
-	Authority  string         `json:"authority"`
-	Accepted   bool           `json:"accepted"`
-	Opinion    Opinion        `json:"opinion"`
-	Violations []string       `json:"policy_violations"`
+	Mode       string   `json:"mode"`
+	Authority  string   `json:"authority"`
+	Accepted   bool     `json:"accepted"`
+	Opinion    Opinion  `json:"opinion"`
+	Violations []string `json:"policy_violations"`
 }
 
 func Observe(ctx context.Context, client *http.Client, config Config, securityCase SecurityCase) (Observation, error) {
@@ -285,6 +285,7 @@ func stringSlice(raw any) []string {
 				if value = strings.TrimSpace(value); value != "" {
 					out = append(out, value)
 				}
+			}
 			return out
 		}
 		return []string{}
