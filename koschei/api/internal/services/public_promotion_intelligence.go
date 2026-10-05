@@ -6,30 +6,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 )
 
 const PublicPromotionIntelligenceVersion = "koschei.public-promotion-intelligence.v1"
 
 type PublicPromotionIntelligence struct {
-	Version                string                           `json:"version"`
-	Network                string                           `json:"network"`
-	AssetRef               string                           `json:"asset_ref"`
-	Available              bool                             `json:"available"`
-	Complete               bool                             `json:"complete"`
-	Status                 string                           `json:"status"`
+	Version                 string                           `json:"version"`
+	Network                 string                           `json:"network"`
+	AssetRef                string                           `json:"asset_ref"`
+	Available               bool                             `json:"available"`
+	Complete                bool                             `json:"complete"`
+	Status                  string                           `json:"status"`
 	CurrentObservationCount int                              `json:"current_observation_count"`
 	RelatedObservationCount int                              `json:"related_observation_count"`
-	CurrentObservations    []PublicPromotionObservation     `json:"current_observations"`
-	RelatedObservations    []PublicPromotionObservation     `json:"related_observations"`
-	Correlation            PublicPromotionCorrelationReport `json:"correlation"`
-	VerdictAuthority       bool                             `json:"verdict_authority"`
-	GradeAuthority         bool                             `json:"grade_authority"`
-	SameOperatorClaim      bool                             `json:"same_operator_claim"`
-	RealWorldIdentityClaim bool                             `json:"real_world_identity_claim"`
-	WrongdoingClaim        bool                             `json:"wrongdoing_claim"`
-	MarketManipulationClaim bool                            `json:"market_manipulation_claim"`
-	Limitations            []string                         `json:"limitations"`
+	CurrentObservations     []PublicPromotionObservation     `json:"current_observations"`
+	RelatedObservations     []PublicPromotionObservation     `json:"related_observations"`
+	Correlation             PublicPromotionCorrelationReport `json:"correlation"`
+	VerdictAuthority        bool                             `json:"verdict_authority"`
+	GradeAuthority          bool                             `json:"grade_authority"`
+	SameOperatorClaim       bool                             `json:"same_operator_claim"`
+	RealWorldIdentityClaim  bool                             `json:"real_world_identity_claim"`
+	WrongdoingClaim         bool                             `json:"wrongdoing_claim"`
+	MarketManipulationClaim bool                             `json:"market_manipulation_claim"`
+	Limitations             []string                         `json:"limitations"`
 }
 
 func NewPublicPromotionIntelligenceUnavailable(network, assetRef, status, limitation string) PublicPromotionIntelligence {
@@ -37,13 +36,13 @@ func NewPublicPromotionIntelligenceUnavailable(network, assetRef, status, limita
 		status = "source_unavailable"
 	}
 	out := PublicPromotionIntelligence{
-		Version: PublicPromotionIntelligenceVersion,
-		Network: strings.ToLower(strings.TrimSpace(network)),
-		AssetRef: strings.TrimSpace(assetRef),
-		Status: status,
+		Version:             PublicPromotionIntelligenceVersion,
+		Network:             strings.ToLower(strings.TrimSpace(network)),
+		AssetRef:            strings.TrimSpace(assetRef),
+		Status:              status,
 		CurrentObservations: []PublicPromotionObservation{},
 		RelatedObservations: []PublicPromotionObservation{},
-		Correlation: BuildPublicPromotionCorrelationReport(nil),
+		Correlation:         BuildPublicPromotionCorrelationReport(nil),
 		Limitations: []string{
 			"Public-source promotion evidence is optional context and never changes the deterministic ARVIS verdict by itself.",
 			"Public account/domain/claim overlap does not prove common control, manipulation, fraud, criminal identity or coordinated intent.",
