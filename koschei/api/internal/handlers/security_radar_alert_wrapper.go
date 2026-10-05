@@ -9,13 +9,16 @@ import (
 	"strings"
 
 	"koschei/api/internal/alerts"
+	"koschei/api/internal/cryptobrief"
 )
 
 const maxSecurityRadarAlertBody = 1 << 20
 
 // SecurityRadarCheckWithAlerts preserves the existing investigation response
-// contract and adds a durable alert only after a signed, evidence-ready verdict
-// has been produced. The alert pipeline never changes the deterministic grade.
+// contract and adds durable side effects only after the canonical customer scan
+// completed. Security alerts remain severity-gated, while customer Telegram
+// delivery is independent and covers every successful ARVIS scan for customers
+// who explicitly paired and activated Telegram.
 func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Request) {
 	rawBody, err := io.ReadAll(io.LimitReader(r.Body, maxSecurityRadarAlertBody+1))
 	if err != nil {
@@ -38,16 +41,18 @@ func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Re
 	defer result.Body.Close()
 	responseBody, _ := io.ReadAll(result.Body)
 
-	alertID := ""
 	if result.StatusCode >= 200 && result.StatusCode < 300 && h != nil && h.DB != nil {
 		var envelope map[string]any
 		if json.Unmarshal(responseBody, &envelope) == nil {
-			alertID = h.emitARVISVerdictAlert(r, target, envelope)
+			alertID := h.emitARVISVerdictAlert(r, target, envelope)
 			if alertID != "" {
 				envelope["alert_event_id"] = alertID
-				if encoded, marshalErr := json.Marshal(envelope); marshalErr == nil {
-					responseBody = encoded
-				}
+			}
+			if h.queueARVISCustomerTelegram(r, target, envelope) {
+				envelope["telegram_delivery_queued"] = true
+			}
+			if encoded, marshalErr := json.Marshal(envelope); marshalErr == nil {
+				responseBody = encoded
 			}
 		}
 	}
@@ -112,6 +117,80 @@ func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope
 		return ""
 	}
 	return id
+}
+
+// queueARVISCustomerTelegram is intentionally best-effort. A provider or queue
+// problem must never change the deterministic scan result returned to the user.
+// The cryptobrief subscription store already owns consent, pairing, recipient
+// isolation, webhook verification, retries and provider delivery.
+func (h *Handler) queueARVISCustomerTelegram(r *http.Request, target string, envelope map[string]any) bool {
+	if r == nil || h == nil || h.DB == nil {
+		return false
+	}
+	claims, ok := userFromContext(r.Context())
+	if !ok || strings.TrimSpace(claims.Sub) == "" {
+		return false
+	}
+	message, resultID := arvisCustomerTelegramMessage(target, envelope)
+	if message == "" {
+		return false
+	}
+	queued, err := cryptobrief.New(h.DB).QueueARVISResult(r.Context(), claims.Sub, resultID, message)
+	return err == nil && queued
+}
+
+func arvisCustomerTelegramMessage(target string, envelope map[string]any) (string, string) {
+	if envelope == nil {
+		return "", ""
+	}
+	if target == "" {
+		target = strings.TrimSpace(stringFromMap(envelope, "target"))
+	}
+	status := strings.TrimSpace(stringFromMap(envelope, "status"))
+	if status == "" {
+		status = "completed"
+	}
+	final, _ := envelope["final_verdict"].(map[string]any)
+	riskLevel := strings.TrimSpace(stringFromMap(final, "risk_level"))
+	grade := strings.TrimSpace(stringFromMap(final, "grade"))
+	verdict := strings.TrimSpace(stringFromMap(final, "verdict"))
+	recommendation := strings.TrimSpace(stringFromMap(final, "recommendation"))
+	signature := strings.TrimSpace(stringFromMap(final, "signature"))
+	hasEvidence, _ := envelope["has_live_evidence"].(bool)
+
+	parts := []string{"🛡️ Koschei ARVIS · Scan Result"}
+	if target != "" {
+		parts = append(parts, "Target: "+target)
+	}
+	parts = append(parts, "Status: "+strings.ToUpper(status))
+	if riskLevel != "" {
+		parts = append(parts, "Risk: "+strings.ToUpper(riskLevel))
+	}
+	if grade != "" {
+		parts = append(parts, "Grade: "+grade)
+	}
+	if verdict != "" {
+		parts = append(parts, "Verdict: "+verdict)
+	}
+	if recommendation != "" {
+		parts = append(parts, "Recommendation: "+recommendation)
+	}
+	if hasEvidence {
+		parts = append(parts, "Evidence: live evidence verified")
+	} else {
+		parts = append(parts, "Evidence: incomplete / pending — not treated as SAFE")
+	}
+
+	if summary, ok := envelope["analysis_summary"].(map[string]any); ok && len(summary) > 0 {
+		if raw, err := json.Marshal(summary); err == nil {
+			parts = append(parts, "Analysis: "+string(raw))
+		}
+	}
+	if signature != "" {
+		parts = append(parts, "Signature: "+signature)
+	}
+	parts = append(parts, "Koschei Professional · Web3 + ARVIS + Sentinel + Lang")
+	return strings.Join(parts, "\n"), signature
 }
 
 func arvisAlertDedupeKey(authSubject, signature string) string {
