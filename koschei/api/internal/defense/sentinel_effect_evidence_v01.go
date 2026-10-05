@@ -14,9 +14,9 @@ import (
 type EffectAgreement string
 
 const (
-	EffectAgree    EffectAgreement = "agree"
-	EffectDisagree EffectAgreement = "disagree"
-	EffectUnknown  EffectAgreement = "unknown"
+	ObservedEffectAgree    EffectAgreement = "agree"
+	ObservedEffectDisagree EffectAgreement = "disagree"
+	ObservedEffectUnknown  EffectAgreement = "unknown"
 )
 
 // ObservedDefensiveEffect is evidence produced from an observation boundary
@@ -34,12 +34,12 @@ type ObservedDefensiveEffect struct {
 
 func (e ObservedDefensiveEffect) Agreement() EffectAgreement {
 	if strings.TrimSpace(e.ExpectedState) == "" || strings.TrimSpace(e.ObservedState) == "" {
-		return EffectUnknown
+		return ObservedEffectUnknown
 	}
 	if strings.TrimSpace(e.ExpectedState) == strings.TrimSpace(e.ObservedState) {
-		return EffectAgree
+		return ObservedEffectAgree
 	}
-	return EffectDisagree
+	return ObservedEffectDisagree
 }
 
 func (e ObservedDefensiveEffect) Digest() string {
@@ -61,9 +61,9 @@ func RequireVerifiedDefensiveEffect(e ObservedDefensiveEffect) error {
 		return errors.New("observed effect evidence digest is required")
 	}
 	switch e.Agreement() {
-	case EffectAgree:
+	case ObservedEffectAgree:
 		return nil
-	case EffectDisagree:
+	case ObservedEffectDisagree:
 		return errors.New("observed defensive effect disagrees with expected state")
 	default:
 		return errors.New("observed defensive effect is unknown")
