@@ -137,6 +137,12 @@ func TestCryptoBriefPostgres17(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	// Fixtures explicitly simulate successful setup; no Telegram API is used.
+	s.telegramVerificationRequired = true
+	if _, found, e := s.claim(ctx); e != nil || found {
+		t.Fatal("Telegram delivery claimed before webhook verification")
+	}
+	s.telegramVerified.Store(true)
 	first, found, e := s.claim(ctx)
 	if e != nil || !found {
 		t.Fatalf("claim: %v", e)
