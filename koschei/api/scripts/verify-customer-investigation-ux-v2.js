@@ -18,7 +18,7 @@ requireText(html,'/js/customer-scan-entry.js?v=1','target router');
 requireText(html,'/js/customer-universal-address-scan-v1.js?v=3','single-radar controller');
 requireText(html,'/js/public-solana-scan.js?v=14','legacy evidence adapter bootstrap');
 requireText(html,'Missing evidence stays unknown.','evidence boundary');
-requireText(html,'never signs, and never broadcasts.','custody boundary');
+requireText(html,'never signs or broadcasts.','custody boundary');
 
 if((html.match(/<form\b/g)||[]).length!==1)throw new Error('scan html: exactly one customer request form is required');
 for(const needle of [
