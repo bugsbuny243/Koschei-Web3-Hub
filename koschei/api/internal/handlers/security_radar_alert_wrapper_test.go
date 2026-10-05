@@ -66,6 +66,46 @@ func TestARVISTelegramMessageUsesStandaloneWeb3Identity(t *testing.T) {
 	}
 }
 
+func TestARVISTelegramMessageIncludesBoundedContextWithoutMakingClaims(t *testing.T) {
+	message, _ := arvisCustomerTelegramMessage("MintContext", map[string]any{
+		"status":            "ready",
+		"has_live_evidence": true,
+		"final_verdict": map[string]any{
+			"risk_level": "high",
+			"grade":      "D",
+			"signature":  "context-result-1",
+		},
+		"investigation_report": map[string]any{
+			"trade_ledger_aggregates": map[string]any{
+				"market_behavior_status": "bounded_pattern_observed",
+			},
+			"actor_coordination_intelligence": map[string]any{
+				"status": "coordination_patterns_observed",
+			},
+			"public_promotion_intelligence": map[string]any{
+				"status": "cross_asset_public_promotion_overlap_observed",
+			},
+		},
+	})
+	for _, want := range []string{
+		"suspicious bounded timing pattern observed",
+		"requires corroboration",
+		"Actor coordination: evidence-backed correlation pattern(s) observed",
+		"not an identity or wrongdoing claim",
+		"Public promotion: cross-asset public-source overlap observed",
+		"context only",
+	} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("Telegram bounded context missing %q: %s", want, message)
+		}
+	}
+	for _, forbidden := range []string{"wash trading proven", "manipulation proven", "criminal group", "same operator confirmed"} {
+		if strings.Contains(strings.ToLower(message), forbidden) {
+			t.Fatalf("Telegram message made unsupported claim %q: %s", forbidden, message)
+		}
+	}
+}
+
 func TestARVISTelegramMessageDoesNotCallPendingEvidenceSafe(t *testing.T) {
 	message, resultID := arvisCustomerTelegramMessage("MintPending", map[string]any{
 		"status":            "evidence_pending",
