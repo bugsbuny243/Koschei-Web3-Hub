@@ -1,0 +1,60 @@
+name: ClickHouse cutover schema one-shot
+
+on:
+  push:
+    branches:
+      - migration/neon-to-clickhouse-inventory-20261005
+    paths:
+      - .github/workflows/clickhouse-cutover-schema-one-shot.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clickhouse-cutover-schema-one-shot
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Validate ClickHouse secrets
+        env:
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${CLICKHOUSE_HTTP_URL}"
+          test -n "${CLICKHOUSE_USER}"
+          test -n "${CLICKHOUSE_PASSWORD}"
+
+      - name: Apply reviewed additive ClickHouse schemas 001-008
+        working-directory: koschei/api
+        env:
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_DATABASE: koschei_web3
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+          CLICKHOUSE_TIMEOUT_MS: "120000"
+          KOSCHEI_CLICKHOUSE_SCHEMA_APPLY: "1"
+          KOSCHEI_CLICKHOUSE_PUBLICATION_SCHEMA_APPLY: "1"
+          KOSCHEI_CLICKHOUSE_VERDICT_SCHEMA_APPLY: "1"
+          KOSCHEI_CLICKHOUSE_ARVIS_READ_INDEXES_APPLY: "1"
+        run: |
+          set -euo pipefail
+          go run ./cmd/clickhouse-schema
+          go run ./cmd/clickhouse-publication-schema
+          go run ./cmd/clickhouse-verdict-schema
+          go run ./cmd/clickhouse-arvis-read-indexes
+          go run ./cmd/clickhouse-global-radar-schema
