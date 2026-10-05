@@ -3,37 +3,42 @@ const fs=require('node:fs');
 const path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'public','scan.html'),'utf8');
-const ux=fs.readFileSync(path.join(root,'public','js','customer-investigation-ux-v2.js'),'utf8');
-const premium=fs.readFileSync(path.join(root,'public','js','customer-arvis-premium-suite.js'),'utf8');
 const css=fs.readFileSync(path.join(root,'public','css','koschei.css'),'utf8');
 
 function requireText(source,needle,label){if(!source.includes(needle))throw new Error(`${label}: missing ${needle}`);}
+function forbidText(source,needle,label){if(source.includes(needle))throw new Error(`${label}: duplicate customer scanner UI returned: ${needle}`);}
 
 requireText(html,'/css/koschei.css?v=1','scan html');
-requireText(html,'/js/customer-investigation-ux-v2.js?v=1','scan html');
-requireText(html,'/js/customer-arvis-premium-suite.js?v=2','scan html premium cache key');
-requireText(ux,'ALLOW is not a safety guarantee','allow boundary');
-requireText(ux,'Full technical evidence','technical disclosure');
-requireText(ux,'Source evidence panels','source disclosure');
-requireText(ux,"details.appendChild(grid)",'premium grid preservation');
-requireText(ux,"body.appendChild(node)",'source panel preservation');
-requireText(ux,"'.public-investigation-card,#lp-control-evidence,.lp-control-card,#full-scan-live-evidence,.live-evidence-card'",'source panel selector');
-requireText(ux,'WHAT MATTERS NOW','customer hierarchy');
-requireText(ux,'WHAT IS UNRESOLVED','unresolved hierarchy');
-requireText(premium,'customerPayloadKey','idempotent premium mount');
-requireText(premium,'existing.dataset.customerPayloadKey===key','same-payload remount guard');
-requireText(premium,'koschei:customer-premium-mounted','customer mount event');
-requireText(premium,"value.includes('/api/arvis/preflight')",'quick-scan stale payload guard');
-requireText(premium,"value.includes('/api/public/transaction-simulate')",'transaction stale payload guard');
-requireText(premium,"latestPayload=null",'stale premium payload clear');
-requireText(css,'.customer-result-summary','summary styles');
-requireText(css,'.customer-full-technical','technical disclosure styles');
-requireText(css,'.customer-source-panels','source disclosure styles');
+requireText(html,'ONE RADAR · ONE TARGET','single-radar heading');
+requireText(html,'id="scanForm"','single request form');
+requireText(html,'id="target"','single target input');
+requireText(html,'id="scanNetwork"','network context');
+requireText(html,'id="customerUniversalResultsWrap"','single result surface');
+requireText(html,'/js/customer-scan-entry.js?v=1','target router');
+requireText(html,'/js/customer-universal-address-scan-v1.js?v=3','single-radar controller');
+requireText(html,'/js/public-solana-scan.js?v=14','legacy evidence adapter bootstrap');
+requireText(html,'Missing evidence stays unknown.','evidence boundary');
+requireText(html,'never signs, and never broadcasts.','custody boundary');
 
-const publicScanIndex=html.indexOf('/js/public-solana-scan.js?v=14');
-const uxIndex=html.indexOf('/js/customer-investigation-ux-v2.js?v=1');
-if(publicScanIndex<0||uxIndex<publicScanIndex)throw new Error('scan html: customer UX v2 must load after public scan renderer');
+if((html.match(/<form\b/g)||[]).length!==1)throw new Error('scan html: exactly one customer request form is required');
+for(const needle of [
+  '<option value="token">Solana token</option>',
+  '<option value="quick">Site or URL</option>',
+  '<option value="transaction">Solana transaction before signing</option>',
+  '<option value="spending">EVM token allowance</option>',
+  '/js/customer-investigation-ux-v2.js?v=1',
+  '/js/customer-arvis-premium-suite.js?v=2',
+  '/js/customer-transaction-preflight-v1.js',
+  '/js/evm-spending-intelligence.js',
+  '/js/customer-command-center-v1.js'
+])forbidText(html,needle,'scan html');
 
-if(/verdict_authority\s*=\s*true|grade_authority\s*=\s*true/.test(ux))throw new Error('customer UI must not grant verdict or grade authority');
-if(ux.includes('.removeChild(grid)')||ux.includes('grid.remove()'))throw new Error('premium evidence grid must be moved into disclosure, not deleted');
-console.log('customer investigation UX v2 contract: ok');
+const routeIndex=html.indexOf('/js/customer-scan-entry.js?v=1');
+const controllerIndex=html.indexOf('/js/customer-universal-address-scan-v1.js?v=3');
+const legacyIndex=html.indexOf('/js/public-solana-scan.js?v=14');
+if(routeIndex<0||controllerIndex<routeIndex||legacyIndex<controllerIndex)throw new Error('scan html: single-radar script order is invalid');
+
+requireText(css,'.customer-result-summary','retained customer result summary styles');
+requireText(css,'.customer-full-technical','retained technical disclosure styles');
+requireText(css,'.customer-source-panels','retained source disclosure styles');
+console.log('customer investigation UX v2 contract: true single radar ok');
