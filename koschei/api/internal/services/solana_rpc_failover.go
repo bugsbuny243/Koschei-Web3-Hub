@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"koschei/api/internal/outboundhttp"
 	"koschei/api/internal/web3"
 )
 
@@ -40,6 +41,21 @@ func init() {
 		base = http.DefaultTransport
 	}
 	solanaRPCClient.Transport = &solanaFailoverTransport{base: base}
+}
+
+// ProtectOutboundTransport preserves the production outbound-HTTP security
+// boundary when the Solana client is wrapped with failover behavior. Without
+// this contract the nested custom RoundTripper is correctly rejected by
+// outboundhttp in production before any RPC lookup can run.
+func (t *solanaFailoverTransport) ProtectOutboundTransport() (http.RoundTripper, error) {
+	if t == nil {
+		return nil, outboundhttp.ErrUnsafeDestination
+	}
+	base, err := outboundhttp.ProtectTransport(t.base)
+	if err != nil {
+		return nil, err
+	}
+	return &solanaFailoverTransport{base: base}, nil
 }
 
 func (t *solanaFailoverTransport) RoundTrip(req *http.Request) (*http.Response, error) {
