@@ -19,8 +19,8 @@ import (
 const PublicPromotionEvidenceSchemaVersion = "koschei.public-promotion-evidence.v1"
 
 var (
-	ErrPublicPromotionEvidenceInvalid    = errors.New("public promotion evidence is invalid")
-	ErrPublicPromotionEvidenceStoreDown  = errors.New("public promotion evidence store unavailable")
+	ErrPublicPromotionEvidenceInvalid   = errors.New("public promotion evidence is invalid")
+	ErrPublicPromotionEvidenceStoreDown = errors.New("public promotion evidence store unavailable")
 )
 
 type PublicPromotionEvidenceState string
@@ -260,8 +260,8 @@ func BuildPublicPromotionCorrelationReport(observations []PublicPromotionObserva
 		refs   map[string]struct{}
 	}
 	groups := map[string]map[string]*group{
-		"shared_public_actor":      {},
-		"shared_public_domain":     {},
+		"shared_public_actor":        {},
+		"shared_public_domain":       {},
 		"repeated_claim_fingerprint": {},
 	}
 	for _, raw := range observations {
@@ -270,12 +270,12 @@ func BuildPublicPromotionCorrelationReport(observations []PublicPromotionObserva
 			continue
 		}
 		keys := map[string]string{
-			"shared_public_actor":      observation.Platform + ":" + observation.PublicActor,
-			"shared_public_domain":     observation.CanonicalDomain,
+			"shared_public_actor":        publicPromotionActorCorrelationKey(observation),
+			"shared_public_domain":       publicPromotionDomainCorrelationKey(observation),
 			"repeated_claim_fingerprint": observation.ClaimFingerprintSHA256,
 		}
 		for kind, key := range keys {
-			if key == "" || key == observation.Platform+":" {
+			if key == "" {
 				continue
 			}
 			g := groups[kind][key]
@@ -308,7 +308,7 @@ func BuildPublicPromotionCorrelationReport(observations []PublicPromotionObserva
 			case "shared_public_actor":
 				reason = "same public account/handle observed in promotion evidence for distinct assets"
 			case "shared_public_domain":
-				reason = "same public domain observed in promotion evidence for distinct assets"
+				reason = "same project/public website domain observed in promotion evidence for distinct assets"
 			case "repeated_claim_fingerprint":
 				reason = "same normalized public claim fingerprint observed across distinct assets"
 			}
@@ -331,14 +331,18 @@ func BuildPublicPromotionCorrelationReport(observations []PublicPromotionObserva
 	return report
 }
 
-// PublicPromotionCampaignMaterial exposes a public observation to the existing
-// Global Campaign evidence model without treating the public actor as an on-chain
-// actor and without manufacturing a relation anchor. The observation cannot
-// automatically merge unrelated campaigns merely because a handle/domain repeats.
-func PublicPromotionCampaignMaterial(observation PublicPromotionObservation) (GlobalCampaignMaterializerInput, error) {
+// PublicPromotionCampaignMaterial attaches a public observation to Global
+// Campaign only when an upstream evidence system has already supplied at least
+// one verified canonical relation reference. Public overlap itself never
+// manufactures a relation anchor or campaign identity.
+func PublicPromotionCampaignMaterial(observation PublicPromotionObservation, verifiedRelationRefs []string) (GlobalCampaignMaterializerInput, error) {
 	normalized, err := NormalizePublicPromotionObservation(observation)
 	if err != nil {
 		return GlobalCampaignMaterializerInput{}, err
+	}
+	relationRefs := normalizeGlobalCampaignStrings(verifiedRelationRefs)
+	if len(relationRefs) == 0 {
+		return GlobalCampaignMaterializerInput{}, fmt.Errorf("%w: verified relation reference required before campaign attachment", ErrPublicPromotionEvidenceInvalid)
 	}
 	verified := 0
 	observed := 0
@@ -349,14 +353,14 @@ func PublicPromotionCampaignMaterial(observation PublicPromotionObservation) (Gl
 		observed = 1
 	}
 	return GlobalCampaignMaterializerInput{
-		ObservedAt:           normalized.ObservedAt,
-		Networks:             []string{normalized.Network},
-		Subjects:             []string{normalized.AssetRef},
-		Assets:               []string{normalized.AssetRef},
-		ObservationRefs:      []string{normalized.ObservationRef},
-		VerifiedAnchorCount:  verified,
-		ObservedAnchorCount:  observed,
-		RulesetVersion:       "koschei.public-promotion-correlation.v1",
+		ObservedAt:          normalized.ObservedAt,
+		Networks:            []string{normalized.Network},
+		Subjects:            []string{normalized.AssetRef},
+		Assets:              []string{normalized.AssetRef},
+		ObservationRefs:     []string{normalized.ObservationRef},
+		RelationRefs:        relationRefs,
+		VerifiedAnchorCount: verified,
+		ObservedAnchorCount: observed,
 	}, nil
 }
 
@@ -380,6 +384,9 @@ func canonicalizePublicPromotionURL(raw string) (string, string, error) {
 	if hostname == "" {
 		return "", "", errors.New("canonical_url host is required")
 	}
+	if !isPublicPromotionHostname(hostname) {
+		return "", "", errors.New("canonical_url must identify a public host")
+	}
 	port := u.Port()
 	if (u.Scheme == "http" && port == "80") || (u.Scheme == "https" && port == "443") {
 		port = ""
@@ -402,6 +409,17 @@ func canonicalizePublicPromotionURL(raw string) (string, string, error) {
 		u.Path = "/"
 	}
 	return u.String(), hostname, nil
+}
+
+func isPublicPromotionHostname(hostname string) bool {
+	if hostname == "localhost" || strings.HasSuffix(hostname, ".localhost") || strings.HasSuffix(hostname, ".local") {
+		return false
+	}
+	ip := net.ParseIP(hostname)
+	if ip == nil {
+		return true
+	}
+	return !ip.IsLoopback() && !ip.IsPrivate() && !ip.IsUnspecified() && !ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast()
 }
 
 func normalizePublicPromotionPlatform(raw string) string {
@@ -458,6 +476,25 @@ func normalizePublicPromotionActor(platform, actor string) string {
 	return truncateRunes(actor, 160)
 }
 
+func publicPromotionActorCorrelationKey(observation PublicPromotionObservation) string {
+	if observation.PublicActor == "" {
+		return ""
+	}
+	return observation.Platform + ":" + observation.PublicActor
+}
+
+func publicPromotionDomainCorrelationKey(observation PublicPromotionObservation) string {
+	if observation.CanonicalDomain == "" {
+		return ""
+	}
+	switch observation.Platform {
+	case "website", "other":
+		return observation.CanonicalDomain
+	default:
+		return ""
+	}
+}
+
 func normalizePublicPromotionClaim(raw string) string {
 	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(raw)), " "))
 }
@@ -470,12 +507,22 @@ func normalizePublicPromotionMetadata(in map[string]string) map[string]string {
 	for rawKey, rawValue := range in {
 		key := truncateRunes(strings.ToLower(strings.TrimSpace(rawKey)), 80)
 		value := truncateRunes(strings.TrimSpace(rawValue), 240)
-		if key == "" || value == "" {
+		if key == "" || value == "" || sensitivePublicPromotionMetadataKey(key) {
 			continue
 		}
 		out[key] = value
 	}
 	return out
+}
+
+func sensitivePublicPromotionMetadataKey(key string) bool {
+	key = strings.ToLower(strings.TrimSpace(key))
+	for _, fragment := range []string{"password", "passwd", "secret", "token", "api_key", "apikey", "authorization", "cookie", "private_key"} {
+		if strings.Contains(key, fragment) {
+			return true
+		}
+	}
+	return false
 }
 
 func hashPublicPromotionObservation(observation PublicPromotionObservation) string {
