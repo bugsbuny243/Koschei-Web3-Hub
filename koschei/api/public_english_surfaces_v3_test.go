@@ -39,7 +39,7 @@ func TestPrimaryPublicSurfacesAreSourceEnglish(t *testing.T) {
 	}
 }
 
-func TestCanonicalInvestigationSurfaceMountsProfessionalModesAndEvidenceControllers(t *testing.T) {
+func TestCanonicalInvestigationSurfaceIsOneCustomerRadar(t *testing.T) {
 	body, err := os.ReadFile("public/scan.html")
 	if err != nil {
 		t.Fatalf("read canonical investigation page: %v", err)
@@ -47,19 +47,17 @@ func TestCanonicalInvestigationSurfaceMountsProfessionalModesAndEvidenceControll
 	text := string(body)
 	for _, required := range []string{
 		"ARVIS Radar",
-		"One target, one investigation.",
+		"ONE RADAR · ONE TARGET",
 		`id="scanForm"`,
 		`id="radarMode"`,
 		`id="scanNetwork"`,
-		`<option value="token">`,
-		`<option value="transaction">`,
-		`<option value="spending">`,
-		"arvis-premium-contract.js",
-		"customer-arvis-premium-suite.js",
-		"data-customer-arvis-result",
+		`id="target"`,
+		`id="customerUniversalResultsWrap"`,
+		"customer-universal-address-scan-v1.js?v=3",
 		"public-solana-scan.js?v=14",
+		"One target only.",
 		"Missing evidence stays unknown.",
-		"never signs or broadcasts.",
+		"never signs, and never broadcasts.",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("canonical investigation page missing %q", required)
@@ -68,9 +66,24 @@ func TestCanonicalInvestigationSurfaceMountsProfessionalModesAndEvidenceControll
 	if strings.Count(text, "<form ") != 1 {
 		t.Error("canonical investigation page must have one request form")
 	}
-	for _, forbidden := range []string{`data-scan-mode="quick"`, `href="/safe-check"`, `href="/transaction-shield"`, `href="/security-radar"`, `id="customerUniversalScanForm"`, `id="evmAuthorityForm"`, `id="evmSpendingForm"`} {
+	for _, forbidden := range []string{
+		`<option value="token">Solana token</option>`,
+		`<option value="quick">Site or URL</option>`,
+		`<option value="transaction">Solana transaction before signing</option>`,
+		`<option value="spending">EVM token allowance</option>`,
+		`href="/safe-check"`,
+		`href="/transaction-shield"`,
+		`href="/security-radar"`,
+		`id="customerUniversalScanForm"`,
+		`id="evmAuthorityForm"`,
+		`id="evmSpendingForm"`,
+		"customer-transaction-preflight-v1.js",
+		"evm-spending-intelligence.js",
+		"customer-command-center-v1.js",
+		"customer-arvis-premium-suite.js",
+	} {
 		if strings.Contains(text, forbidden) {
-			t.Errorf("canonical investigation page contains retired or duplicate scanner contract %q", forbidden)
+			t.Errorf("canonical investigation page exposes duplicate or retired scanner UI %q", forbidden)
 		}
 	}
 }
