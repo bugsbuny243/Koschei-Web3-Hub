@@ -3,8 +3,6 @@ package clickhouse
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 )
 
@@ -24,27 +22,13 @@ func (c *Client) ApplyTrustedPublicationMigration(ctx context.Context, migration
 		return err
 	}
 
-	migrationURL := *c.endpoint
-	query := migrationURL.Query()
-	query.Set("multiquery", "1")
-	migrationURL.RawQuery = query.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, migrationURL.String(), strings.NewReader(migrationSQL))
-	if err != nil {
-		return fmt.Errorf("build ClickHouse publication migration request: %w", err)
+	statements := trustedMigrationStatements(migrationSQL)
+	for index, statement := range statements {
+		if err := c.applyTrustedMigrationStatement(ctx, statement); err != nil {
+			return fmt.Errorf("ClickHouse publication migration statement %d/%d failed: %w", index+1, len(statements), err)
+		}
 	}
-	c.applyHeaders(req)
-	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("ClickHouse publication migration request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-		return nil
-	}
-	message, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	return fmt.Errorf("ClickHouse publication migration failed status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(message)))
+	return nil
 }
 
 func (c *Client) VerifyPublicationLedgerSchema(ctx context.Context) error {
