@@ -1,30 +1,31 @@
 {
   "ok": true,
-  "product": "Koschei ARVIS",
-  "surface": "Security Evidence Ecosystem",
-  "version": "security-ecosystem-v7-professional-dual-settlement",
-  "positioning": "Koschei ARVIS remains a production-independent deterministic Solana security product. Koschei Sentinel and the Koschei language mature separately in offline incubation until explicit future integration gates pass.",
+  "product": "Koschei Web3 Hub",
+  "engine": "ARVIS",
+  "surface": "Crypto Security & Intelligence",
+  "version": "web3-v8-standalone-crypto-intelligence",
+  "positioning": "Koschei Web3 Hub is an independent crypto security and intelligence product. ARVIS is its evidence, investigation, correlation and signed-decision engine. Koschei Sentinel and Koschei Lang are separate products sold separately and are not included in Web3 entitlement.",
+  "product_boundary": {
+    "standalone_product": true,
+    "sold_separately": true,
+    "included_products": [
+      "Koschei Web3 Hub",
+      "ARVIS"
+    ],
+    "shared_entitlement_with_sentinel": false,
+    "shared_entitlement_with_lang": false,
+    "sentinel_relationship": "separate product; optional future versioned interoperability only",
+    "lang_relationship": "separate product; optional future SDK/adapter interoperability only"
+  },
   "ecosystem": {
     "contract": "/docs/koschei-ecosystem-contract-v1.md",
-    "runtime_integration_state": "incubation_only",
+    "runtime_integration_state": "web3_standalone",
     "projects": [
       {
         "id": "koschei-web3-hub",
-        "role": "deterministic Solana evidence, durable security memory and signed verdicts",
-        "status": "production_independent",
+        "role": "crypto security intelligence, deterministic evidence, durable security memory and signed verdicts",
+        "status": "standalone_product",
         "repository": "https://github.com/bugsbuny243/Koschei-Web3-Hub"
-      },
-      {
-        "id": "koschei-lang",
-        "role": "independent capability-secure programming language research and development",
-        "status": "incubating_not_runtime_integrated",
-        "repository": "https://github.com/bugsbuny243/koschei-lang"
-      },
-      {
-        "id": "koschei-sentinel",
-        "role": "offline evidence-grounded Solana security model training and evaluation",
-        "status": "incubating_not_runtime_integrated",
-        "repository": "https://github.com/bugsbuny243/koschei-sentinel"
       }
     ],
     "official_asset": {
@@ -32,44 +33,69 @@
       "network": "solana-mainnet",
       "mint": "7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1",
       "pump_callout": "https://pump.fun/callouts/7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1/713a17a0-494e-41b9-8411-2ee764c9b65c",
-      "commercial_role": "alternate_professional_settlement_channel",
+      "commercial_role": "alternate_web3_professional_settlement_channel",
       "holdings_grant_access": false,
-      "disclaimer": "KOSC holdings never change evidence, verdicts, signatures, compiler rules, model promotion gates or integration readiness. Professional access activates only after verified server-side settlement."
+      "disclaimer": "KOSC holdings never change Web3 evidence, verdicts, signatures or risk rules. Web3 Professional access activates only after verified server-side settlement."
     }
   },
-  "incubation_policy": {
-    "sentinel_runtime_integrated": false,
-    "language_runtime_integrated": false,
-    "sentinel_customer_requests_enabled": false,
-    "sentinel_verdict_authority": false,
-    "sentinel_production_writes_enabled": false,
-    "language_production_components_enabled": false,
-    "language_build_dependency_enabled": false,
-    "offline_sentinel_training_exports_allowed": true,
-    "offline_language_benchmarks_allowed": true,
-    "future_integration_requires_explicit_owner_approval": true,
-    "shared_identity_is_not_runtime_integration": true
+  "standalone_policy": {
+    "web3_runtime_independent": true,
+    "arvis_is_internal_engine": true,
+    "sentinel_is_included": false,
+    "lang_is_included": false,
+    "sentinel_runtime_dependency": false,
+    "lang_runtime_dependency": false,
+    "cross_product_interoperability_requires_versioned_contracts": true,
+    "cross_product_interoperability_never_implies_shared_entitlement": true
   },
   "access_model": {
-    "provider": "professional_saas_polar_or_kosc",
-    "mode": "public_proof_professional_dual_settlement",
+    "provider": "web3_professional_saas_polar_or_kosc",
+    "mode": "standalone_web3_professional_dual_settlement",
     "professional_price_usd": 199,
     "settlement_channels": [
       "polar",
       "kosc"
     ],
+    "included_products": [
+      "Koschei Web3 Hub",
+      "ARVIS"
+    ],
     "premium": [
       "deep scan",
       "exposure reports",
-      "graph",
+      "evidence graph",
       "watchlist",
       "webhooks",
       "developer API",
-      "advanced deterministic agents"
+      "advanced deterministic agents",
+      "ARVIS scan delivery to paired Telegram"
     ],
     "wallet_proof": "signed Solana wallet required for KOSC settlement",
     "holdings_grant_access": false,
     "package_outputs": true
+  },
+  "intelligence_target": {
+    "scope": "multi-network crypto security and intelligence",
+    "current_strongest_lane": "solana",
+    "current_strengths": [
+      "token authority and structural token intelligence",
+      "holder concentration",
+      "funding and sybil relationships",
+      "launch distribution and sniper timing",
+      "transaction intent and program relation evidence"
+    ],
+    "buildout_targets": [
+      "creator and repeat-operator memory",
+      "liquidity manipulation and drain attribution",
+      "market manipulation indicators",
+      "multi-wallet and campaign graphs",
+      "public hype, promotion and community coordination evidence",
+      "contract behavior intelligence",
+      "phishing, impersonation and fake-contract intelligence",
+      "cross-chain movement and campaign correlation",
+      "additional chain-specific verified evidence adapters"
+    ],
+    "truth_rule": "No evidence, no claim. Correlation is not identity. Coordination is not automatically fraud. Missing evidence is UNKNOWN, never SAFE."
   },
   "provider_policy": {
     "preserve_existing_helius_paths": true,
@@ -112,8 +138,9 @@
     "final_verdict_engine_count": 1,
     "total_arm_count": 14,
     "scoring": "deterministic evidence-backed risk rules",
-    "ai_role": "offline incubation and benchmark research only; no customer runtime role",
-    "language_role": "offline benchmark and interoperability research only; no production runtime role"
+    "arvis_role": "internal Web3 evidence, investigation, correlation and signed-decision engine",
+    "external_ai_dependency": false,
+    "external_language_dependency": false
   },
   "feed_policy": {
     "one_card_per_token": true,
@@ -211,19 +238,21 @@
     "/reports",
     "/api/token/scan",
     "/api/v1/risk/badge",
+    "/api/customer/crypto-brief",
     "/widget.js",
     "/pricing"
   ],
   "immutable_rules": [
     "No evidence, no claim",
     "Basic security checks remain public and rate limited",
-    "Sentinel is not connected to customer runtime during incubation",
-    "Koschei language is not a Web3 production dependency during incubation",
+    "Koschei Web3 Hub is sold separately from Koschei Sentinel and Koschei Lang",
+    "ARVIS is the internal Web3 investigation engine, not a separate cross-product entitlement",
+    "Cross-product interoperability never creates shared entitlement",
     "A temporary event gap cannot lower a fresh structural token floor",
     "Customers cannot alter verdict thresholds",
     "Infrastructure mints remain internal and do not become public risk cards",
-    "KOSC is an alternate settlement channel into the canonical Professional entitlement",
+    "KOSC is an alternate settlement channel into Web3 Professional entitlement",
     "KOSC holdings alone never grant access",
-    "KOSC cannot change evidence, grades, signatures, compiler rules, model promotion or integration readiness"
+    "KOSC cannot change evidence, grades, signatures or Web3 risk rules"
   ]
 }
