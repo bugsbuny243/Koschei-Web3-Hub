@@ -70,8 +70,8 @@ func TestObservePreservesARVISAuthorityAndIdentity(t *testing.T) {
 		TargetRef:     "MintABC",
 		Network:       "solana-mainnet",
 		SignedVerdict: SignedVerdict{Grade: "D", Signature: "signature-123456", Summary: "ARVIS final", TriggeredRules: []string{"URD-C001"}},
-		Evidence: []EvidenceItem{{EvidenceID: "e-1", Kind: "pump_sybil_radar", Statement: "Verified evidence", Confidence: "VERIFIED", RuleIDs: []string{}, Attributes: map[string]any{"source": "arvis"}}},
-		Limitations: []string{},
+		Evidence:      []EvidenceItem{{EvidenceID: "e-1", Kind: "pump_sybil_radar", Statement: "Verified evidence", Confidence: "VERIFIED", RuleIDs: []string{}, Attributes: map[string]any{"source": "arvis"}}},
+		Limitations:   []string{},
 	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/opinions" || r.Method != http.MethodPost {
