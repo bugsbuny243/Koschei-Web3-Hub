@@ -156,11 +156,15 @@ func TestCustomerRouteVisibilityIsNotOwnedByOwnerDashboardCSS(t *testing.T) {
 	scan := readSurfaceV3(t, "public/scan.html")
 	for _, required := range []string{
 		"body.koschei-enterprise main.page{display:block!important",
-		"/js/customer-command-center-v1.js?v=6",
+		"/js/customer-scan-entry.js?v=1",
+		"/js/customer-universal-address-scan-v1.js?v=3",
 	} {
 		if !strings.Contains(scan, required) {
-			t.Fatalf("scan recovery contract missing %q", required)
+			t.Fatalf("single radar visibility contract missing %q", required)
 		}
+	}
+	if strings.Contains(scan, `src="/js/customer-command-center-v1.js`) {
+		t.Fatal("single radar must not mount the retired customer command center")
 	}
 
 	for _, path := range []string{"public/docs.html", "public/docs-api.html", "public/docs-sdk.html"} {
