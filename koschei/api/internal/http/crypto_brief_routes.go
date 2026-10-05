@@ -18,5 +18,4 @@ func registerCryptoBriefRoutes(mux *http.ServeMux, h *handlers.Handler, staticDi
 		http.ServeFile(w, r, filepath.Join(staticDir, "crypto-brief-operations.html"))
 	})))
 	mux.HandleFunc("/integrations/crypto-brief/telegram", requiresDB(h, service.TelegramHTTP))
-	mux.HandleFunc("/integrations/crypto-brief/whatsapp", requiresDB(h, service.WhatsAppHTTP))
 }
