@@ -37,15 +37,15 @@ func TestApplyTrustedVerdictShadowMigrationUsesExistingSecureHeaders(t *testing.
 		if r.Header.Get("X-ClickHouse-Database") != "koschei_web3" || r.Header.Get("X-ClickHouse-User") != "schema-user" || r.Header.Get("X-ClickHouse-Key") != "schema-password" {
 			t.Fatal("schema request auth/database headers missing or changed")
 		}
-		if r.URL.Query().Get("multiquery") != "1" {
-			t.Fatal("schema request must opt into multiquery")
+		if got := r.URL.Query().Get("multiquery"); got != "" {
+			t.Fatalf("legacy multiquery setting must not be sent, got %q", got)
 		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			t.Fatalf("read migration body: %v", err)
 		}
-		if string(body) != validVerdictMigrationFixture {
-			t.Fatalf("migration body changed: %q", body)
+		if strings.TrimSpace(string(body)) != strings.TrimSuffix(strings.TrimSpace(validVerdictMigrationFixture), ";") {
+			t.Fatalf("migration statement changed: %q", body)
 		}
 		w.WriteHeader(http.StatusOK)
 	}))
