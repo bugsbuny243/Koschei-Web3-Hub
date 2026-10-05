@@ -65,8 +65,10 @@ FORMAT JSON`)
 		if !ok {
 			return fmt.Errorf("unexpected ClickHouse publication ledger table %q", table.Name)
 		}
-		if table.Engine != "MergeTree" {
-			return fmt.Errorf("ClickHouse publication table %s engine=%q want MergeTree", table.Name, table.Engine)
+		switch table.Engine {
+		case "MergeTree", "SharedMergeTree":
+		default:
+			return fmt.Errorf("ClickHouse publication table %s engine=%q want MergeTree or SharedMergeTree", table.Name, table.Engine)
 		}
 		if table.SortingKey != wantSorting {
 			return fmt.Errorf("ClickHouse publication table %s sorting_key=%q want %q", table.Name, table.SortingKey, wantSorting)
