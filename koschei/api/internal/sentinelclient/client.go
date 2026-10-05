@@ -28,15 +28,20 @@ const (
 type Config struct {
 	Enabled bool
 	BaseURL string
+	Token   string
 }
 
 func ConfigFromEnv() Config {
 	enabled := strings.EqualFold(strings.TrimSpace(os.Getenv("KOSCHEI_SENTINEL_OBSERVE_ENABLED")), "true") || strings.TrimSpace(os.Getenv("KOSCHEI_SENTINEL_OBSERVE_ENABLED")) == "1"
-	return Config{Enabled: enabled, BaseURL: strings.TrimSpace(os.Getenv("KOSCHEI_SENTINEL_BASE_URL"))}
+	return Config{
+		Enabled: enabled,
+		BaseURL: strings.TrimSpace(os.Getenv("KOSCHEI_SENTINEL_BASE_URL")),
+		Token:   strings.TrimSpace(os.Getenv("KOSCHEI_SENTINEL_API_TOKEN")),
+	}
 }
 
 func (c Config) Ready() bool {
-	if !c.Enabled || c.BaseURL == "" {
+	if !c.Enabled || c.BaseURL == "" || c.Token == "" {
 		return false
 	}
 	_, err := outboundhttp.ValidateURL(strings.TrimRight(c.BaseURL, "/") + "/v1/opinions")
@@ -118,6 +123,7 @@ func Observe(ctx context.Context, client *http.Client, config Config, securityCa
 		return Observation{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+config.Token)
 	req.Header.Set("User-Agent", "Koschei-Web3-Sentinel-Fabric/1.0")
 	if client == nil {
 		client = &http.Client{Timeout: 10 * time.Second}
@@ -279,7 +285,6 @@ func stringSlice(raw any) []string {
 				if value = strings.TrimSpace(value); value != "" {
 					out = append(out, value)
 				}
-			}
 			return out
 		}
 		return []string{}
