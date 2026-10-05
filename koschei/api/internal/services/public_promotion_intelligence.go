@@ -56,8 +56,10 @@ func NewPublicPromotionIntelligenceUnavailable(network, assetRef, status, limita
 
 // LoadPublicPromotionIntelligence loads the current asset's retained public
 // promotion evidence, then expands only through explicit public evidence keys
-// already observed for that asset (same public account, domain or normalized
-// claim fingerprint). It never crawls private groups or manufactures identity.
+// already observed for that asset. Social platforms correlate by public account
+// and normalized claim fingerprint; domain correlation is reserved for project
+// websites/other public web sources so common hosts such as x.com or t.me cannot
+// widen an investigation by themselves.
 func LoadPublicPromotionIntelligence(ctx context.Context, db *sql.DB, network, assetRef string, currentLimit, relatedLimit int) (PublicPromotionIntelligence, error) {
 	network = strings.ToLower(strings.TrimSpace(network))
 	assetRef = strings.TrimSpace(assetRef)
@@ -117,7 +119,10 @@ func loadRelatedPublicPromotionEvidence(ctx context.Context, db *sql.DB, network
 			SELECT DISTINCT
 				platform,
 				NULLIF(btrim(public_actor),'') AS public_actor,
-				NULLIF(btrim(canonical_domain),'') AS canonical_domain,
+				CASE
+					WHEN platform IN ('website','other') THEN NULLIF(btrim(canonical_domain),'')
+					ELSE NULL
+				END AS canonical_domain,
 				NULLIF(btrim(claim_fingerprint_sha256),'') AS claim_fingerprint_sha256
 			FROM public.public_promotion_evidence
 			WHERE network=$1
@@ -128,7 +133,11 @@ func loadRelatedPublicPromotionEvidence(ctx context.Context, db *sql.DB, network
 			FROM public.public_promotion_evidence e
 			JOIN current_keys k ON (
 				(k.public_actor IS NOT NULL AND e.platform=k.platform AND e.public_actor=k.public_actor)
-				OR (k.canonical_domain IS NOT NULL AND e.canonical_domain=k.canonical_domain)
+				OR (
+					k.canonical_domain IS NOT NULL
+					AND e.platform IN ('website','other')
+					AND e.canonical_domain=k.canonical_domain
+				)
 				OR (k.claim_fingerprint_sha256 IS NOT NULL AND e.claim_fingerprint_sha256=k.claim_fingerprint_sha256)
 			)
 			WHERE e.network=$1
