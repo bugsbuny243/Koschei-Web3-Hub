@@ -38,3 +38,50 @@ func TestARVISAlertPayloadRemainsScoreFree(t *testing.T) {
 		t.Fatalf("evidence identity missing: %#v", payload)
 	}
 }
+
+func TestARVISTelegramMessageUsesStandaloneWeb3Identity(t *testing.T) {
+	message, resultID := arvisCustomerTelegramMessage("MintABC", map[string]any{
+		"status":            "ready",
+		"has_live_evidence": true,
+		"final_verdict": map[string]any{
+			"risk_level":     "high",
+			"grade":          "D",
+			"verdict":        "coordinated launch risk",
+			"recommendation": "manual review",
+			"signature":      "signed-result-123",
+		},
+	})
+	for _, want := range []string{"Koschei Web3 · ARVIS", "MintABC", "Risk: HIGH", "Grade: D", "coordinated launch risk", "live evidence verified"} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("telegram result missing %q: %s", want, message)
+		}
+	}
+	for _, forbidden := range []string{"Sentinel", "Lang", "unified Professional"} {
+		if strings.Contains(message, forbidden) {
+			t.Fatalf("standalone Web3 Telegram result leaked bundled product %q: %s", forbidden, message)
+		}
+	}
+	if resultID != "signed-result-123" {
+		t.Fatalf("result id=%q", resultID)
+	}
+}
+
+func TestARVISTelegramMessageDoesNotCallPendingEvidenceSafe(t *testing.T) {
+	message, resultID := arvisCustomerTelegramMessage("MintPending", map[string]any{
+		"status":            "evidence_pending",
+		"has_live_evidence": false,
+		"final_verdict": map[string]any{
+			"risk_level":     "unknown",
+			"recommendation": "collect_more_evidence",
+			"signed":         false,
+		},
+	})
+	if resultID != "" {
+		t.Fatalf("unsigned result unexpectedly got signature id=%q", resultID)
+	}
+	for _, want := range []string{"EVIDENCE_PENDING", "Risk: UNKNOWN", "incomplete / pending", "not treated as SAFE"} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("pending Telegram result missing %q: %s", want, message)
+		}
+	}
+}
