@@ -109,12 +109,19 @@
   function isActiveNavItem(href,current){
     var mode=new URLSearchParams(location.search||'').get('mode');
     if(href==='/scan?mode=deep')return current==='/scan'&&mode==='deep';
-    if(href==='/scan')return current==='/scan'&&mode!=='deep';
+    if(href==='/scan')return current==='/scan'||current.startsWith('/scan/');
     return current===href;
   }
 
   ready(function(){
-    var links=[['/live','Live SOC'],['/cases','Cases'],['/scan','Token Scan'],['/transaction-shield','Transaction Shield'],['/safe-check','Safe Check'],['/scan?mode=deep','Deep Scan'],['/dashboard','Workspace'],['/crypto-brief','Crypto Brief'],['/pricing','Professional']];
+    if(document.body.classList.contains('customer-single-radar')){
+      var radarPath=(location.pathname||'/').replace(/\.html$/,'').replace(/\/$/,'')||'/';
+      translate(document.body);
+      loadInvestigationShare(radarPath);
+      loadProfessionalDeepScanRoute(radarPath);
+      return;
+    }
+    var links=[['/dashboard','Workspace'],['/scan','ARVIS Radar'],['/reports','History'],['/watchlist','Watchlist'],['/crypto-brief','News'],['/account','Account'],['/pricing','Professional']];
     var current=(location.pathname||'/').replace(/\.html$/,'').replace(/\/$/,'')||'/';
     var existing=document.querySelector('.top .nav, header.top nav.nav, nav.top .nav');
     var nav=existing||document.createElement('nav');
@@ -124,9 +131,9 @@
     links.forEach(function(item){var anchor=document.createElement('a');anchor.href=item[0];anchor.textContent=item[1];if(isActiveNavItem(item[0],current))anchor.setAttribute('aria-current','page');nav.appendChild(anchor);});
     if(!existing){var top=document.querySelector('header.top,.top');if(top){nav.className+=' detached';top.parentNode.insertBefore(nav,top.nextSibling);}}
     if(['/scan','/dashboard','/account'].includes(current)&&!document.querySelector('.koschei-professional-strip')){var professional=document.createElement('section');professional.className='koschei-safety-strip koschei-professional-strip';professional.innerHTML='<div><b>Professional</b><span>Paid customer investigations and capacity are authorized by the active Professional entitlement. Checkout is hosted securely by Polar.</span></div><span><a href="/pricing">View Professional</a></span>';var professionalAnchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(professionalAnchor&&professionalAnchor.parentNode){professionalAnchor.parentNode.insertBefore(professional,professionalAnchor.nextSibling);}}
-    if(current==='/dashboard'&&!document.querySelector('.koschei-dashboard-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip koschei-dashboard-safety-strip';strip.innerHTML='<div><b>Ask Koschei before buying or signing.</b><span>ARVIS investigation and transaction evidence stay inside the Koschei Web3 security workflow.</span></div><span><a href="/scan">ARVIS Investigation</a> <a href="/transaction-shield">Transaction Shield</a></span>';var stripAnchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(stripAnchor&&stripAnchor.parentNode){stripAnchor.parentNode.insertBefore(strip,stripAnchor.nextSibling);}}
+    if(current==='/dashboard'&&!document.querySelector('.koschei-dashboard-safety-strip')){var strip=document.createElement('section');strip.className='koschei-safety-strip koschei-dashboard-safety-strip';strip.innerHTML='<div><b>Ask Koschei before buying or signing.</b><span>ARVIS investigation and transaction evidence stay inside the Koschei Web3 security workflow.</span></div><span><a href="/scan">ARVIS Radar</a></span>';var stripAnchor=document.querySelector('.koschei-global-nav')||document.querySelector('header.top,.top');if(stripAnchor&&stripAnchor.parentNode){stripAnchor.parentNode.insertBefore(strip,stripAnchor.nextSibling);}}
     var bottom=document.querySelector('nav.bottom');if(bottom)bottom.remove();
-    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei Web3 · ARVIS Intelligence</span><span><a href="/live">Live SOC</a> · <a href="/cases">Cases</a> · <a href="/scan">ARVIS Investigation</a> · <a href="/transaction-shield">Transaction Shield</a> · <a href="/safe-check">Safe Check</a> · <a href="/pricing">Professional</a></span>';document.body.appendChild(footer);}
+    if(!document.querySelector('.koschei-footer')){var footer=document.createElement('footer');footer.className='koschei-footer';footer.innerHTML='<span>Koschei Web3 · ARVIS Intelligence</span><span><a href="/live">Live SOC</a> · <a href="/cases">Cases</a> · <a href="/scan">ARVIS Radar</a> · <a href="/pricing">Professional</a></span>';document.body.appendChild(footer);}
     if(current==='/safe-check')document.title='Safe Check — Koschei Web3 / ARVIS';
     if(current==='/security-radar')document.title='ARVIS Security Radar — Koschei Web3';
     translate(document.body);

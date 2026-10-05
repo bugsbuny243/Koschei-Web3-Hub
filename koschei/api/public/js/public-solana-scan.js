@@ -9,7 +9,7 @@ function installScanViewContract(){
   }
   if(!window.__koscheiUnifiedScanNavigation&&!document.querySelector('script[data-koschei-unified-scan-navigation]')){
     const script=document.createElement('script');
-    script.src='/js/unified-scan-navigation.js?v=1';
+    script.src='/js/unified-scan-navigation.js?v=2';
     script.dataset.koscheiUnifiedScanNavigation='1';
     document.head.appendChild(script);
   }
@@ -17,6 +17,9 @@ function installScanViewContract(){
 installScanViewContract();
 const OFFICIAL_KOSC_MINT='7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1';
 const MODES={
+  address:{summary:'Collect read-only address or transaction evidence on the selected network. Missing sources stay unknown.',button:'Investigate target'},
+  lookup:{summary:'Read the transaction evidence on the selected network.',button:'Investigate target'},
+  spending:{summary:'Read the current ERC-20 allowance and spender authority. This does not approve or revoke spending.',button:'Read allowance'},
   quick:{summary:'Run a fast preflight for a token, wallet, site, or transaction intent. Holder, liquidity, and deep graph coverage may remain unresolved.',button:'Run Quick Check'},
   token:{summary:'Collect the complete token evidence file: authority state, owner-resolved distribution, launch context, graph relations, liquidity, and explicit evidence limits.',button:'Run Token Investigation'},
   transaction:{summary:'Simulate a base64 serialized Solana transaction before signing. Koschei never signs, broadcasts, or requests wallet custody.',button:'Simulate Transaction'},
@@ -28,6 +31,10 @@ const form=$('scanForm'),submit=$('submit'),target=$('target'),kind=$('kind'),ki
 const requestGuard=window.KoscheiPublicScanGuard;
 const TOKEN_SCAN_TIMEOUT_MS=210000;
 let activeMode='token';
+const modePicker=$('radarMode')?.tagName==='SELECT'?$('radarMode'):null,scanNetwork=modePicker?$('scanNetwork'):null;
+window.KoscheiRadar=Object.freeze({get mode(){return activeMode;}});
+let activeRequest=null,requestGeneration=0;
+function invalidateRequest(){requestGeneration++;activeRequest?.abort();activeRequest=null;submit.disabled=false;submit.textContent=MODES[activeMode].button;}
 let lastSharePayload={};
 const clamp=n=>Math.max(0,Math.min(100,Math.round(Number(n)||0)));
 const level=r=>r>=85?'critical':r>=65?'high':r>=35?'medium':'low';
@@ -115,6 +122,7 @@ function updateModeURL(){
   history.replaceState({},'',`/scan?${query.toString()}`);
 }
 function applyMode(next,{updateURL=false,reset=true}={}){
+  invalidateRequest();
   activeMode=canonicalMode(next);
   document.querySelectorAll('[data-scan-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.scanMode===activeMode)));
   const isTransaction=activeMode==='transaction';
@@ -122,6 +130,22 @@ function applyMode(next,{updateURL=false,reset=true}={}){
   target.required=!isTransaction;transaction.required=isTransaction;
   kind.disabled=activeMode==='token';kindLabel.hidden=activeMode==='token';
   if(activeMode==='token')kind.value='token';
+  if(modePicker){
+    modePicker.value=['lookup','deep'].includes(activeMode)?(activeMode==='lookup'?'address':'token'):activeMode;
+    if(form.dataset)form.dataset.radarMode=activeMode;
+    const addressMode=activeMode==='address'||activeMode==='lookup',spendingMode=activeMode==='spending';
+    scanNetwork.disabled=!addressMode&&!spendingMode;
+    if(scanNetwork.disabled)scanNetwork.value='solana-mainnet';
+    for(const option of scanNetwork.options)option.disabled=spendingMode&&!['','ethereum-mainnet','base-mainnet','arbitrum-mainnet','optimism-mainnet','polygon-mainnet','bnb-mainnet','avalanche-mainnet'].includes(option.value);
+    if(spendingMode&&scanNetwork.selectedOptions[0]?.disabled)scanNetwork.value='';
+    const spendingFields=$('evmSpendingFields');if(spendingFields)spendingFields.hidden=!spendingMode;
+    for(const id of ['evmSpendingOwner','evmSpendingSpender']){const input=$(id);if(input)input.required=spendingMode;}
+    kindLabel.hidden=activeMode!=='deep';
+    if(activeMode==='quick')kind.value='site';
+    target.placeholder=spendingMode?'0x token contract':activeMode==='quick'?'https://example.com':activeMode==='token'||activeMode==='deep'?'Public Solana target':'Wallet, contract address or transaction hash';
+    for(const id of ['customerUniversalResultsWrap','evmSpendingResult','customerUniversalRecovery']){const node=$(id);if(node)node.hidden=true;}
+    document.dispatchEvent(new CustomEvent('koschei:radar-mode-changed',{detail:{mode:activeMode}}));
+  }
   modeSummary.textContent=MODES[activeMode].summary;submit.textContent=MODES[activeMode].button;
   if(reset){empty.hidden=false;empty.innerHTML='<h2>Evidence coverage and all attached ARVIS results appear here.</h2><p class="sub" style="margin-top:9px">Select a mode, provide the required target, and run the canonical investigation workflow.</p>';resetResult()}
   if(updateURL)updateModeURL();
@@ -140,46 +164,53 @@ async function runTransaction(){
 
 async function runTargetScan(){
   const value=target.value.trim();if(!value)return;
+  const generation=++requestGeneration,controller=new AbortController();activeRequest=controller;
   const tokenScan=activeMode==='token'||(activeMode==='deep'&&kind.value==='token');
   const requestToken=tokenScan&&requestGuard?requestGuard.begin(result,value):null;
   submit.disabled=true;submit.textContent=tokenScan?'Collecting complete evidence…':'Running preflight…';
   renderWorking(tokenScan?'Technical investigation is running':'Quick preflight is running',tokenScan?'Collector results, holder resolution, live windows, launch context, and market evidence are being assembled.':'ARVIS is evaluating the target against the fast preflight evidence boundary.');
   try{
     if(tokenScan){
-      const data=await fetchJSON('/api/token/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mint:value,network:'solana-mainnet'})});
+      const data=await fetchJSON('/api/token/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mint:value,network:'solana-mainnet'}),signal:controller.signal});
+      if(generation!==requestGeneration)return;
       const report=data.investigation_report;
       const decision=requestToken?requestGuard.accept(requestToken,report):{accepted:true};
       if(!decision.accepted){if(decision.reason==='stale_response')return;throw new Error(`scan_target_mismatch:${decision.expected}:${decision.returned}`)}
       if(!renderTechnicalReport(report,value))throw new Error('investigation_report_missing');
     }else{
       const intent=[activeMode==='deep'?'deep_radar_requested':'quick_check',note.value.trim()].filter(Boolean).join(': ');
-      const data=await fetchJSON('/api/arvis/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:value,kind:kind.value,intent,note:note.value.trim()})});
+      const data=await fetchJSON('/api/arvis/preflight',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({target:value,kind:kind.value,intent,note:note.value.trim()}),signal:controller.signal});
+      if(generation!==requestGeneration)return;
       renderPreflight(data,value);
     }
   }catch(error){
+    if(generation!==requestGeneration)return;
     if(requestToken&&requestGuard&&!requestGuard.isActive(requestToken))return;
     const mismatch=String(error?.message||'').startsWith('scan_target_mismatch:');
     renderFailure(mismatch?'scan target mismatch':'no technical result',mismatch?new Error('A stale or different target result was rejected.'):error);
   }finally{
-    const ownsUI=!requestToken||!requestGuard||requestGuard.isActive(requestToken);
+    const ownsUI=generation===requestGeneration&&(!requestToken||!requestGuard||requestGuard.isActive(requestToken));
     if(requestToken&&requestGuard)requestGuard.finish(requestToken);
-    if(ownsUI){submit.disabled=false;submit.textContent=MODES[activeMode].button}
+    if(ownsUI){activeRequest=null;submit.disabled=false;submit.textContent=MODES[activeMode].button}
   }
 }
 
 async function runScan(){if(activeMode==='transaction')return runTransaction();return runTargetScan()}
-form.addEventListener('submit',event=>{event.preventDefault();runScan()});
+form.addEventListener('submit',event=>{if(['address','lookup','spending'].includes(activeMode))return;event.preventDefault();runScan()});
+modePicker?.addEventListener('change',()=>applyMode(modePicker.value,{updateURL:true,reset:true}));
+if(modePicker)target.addEventListener('input',()=>{invalidateRequest();resetResult();});
 document.querySelectorAll('[data-scan-mode]').forEach(button=>button.addEventListener('click',()=>applyMode(button.dataset.scanMode,{updateURL:true,reset:true})));
 result.addEventListener('click',async event=>{const button=event.target.closest('[data-copy-ref]');if(!button)return;try{await navigator.clipboard.writeText(button.dataset.copyRef||'');const previous=button.innerHTML;button.textContent='Copied';setTimeout(()=>{button.innerHTML=previous},900)}catch{}});
 share.addEventListener('click',async()=>{try{if(window.KoscheiInvestigationShare){window.KoscheiInvestigationShare.open(lastSharePayload);return}const url=lastSharePayload.url||location.href;if(navigator.share)await navigator.share({title:'Koschei ARVIS technical investigation',text:'Koschei ARVIS evidence result',url});else{await navigator.clipboard.writeText(url);share.textContent='Link copied'}}catch{}});
 
 const params=new URLSearchParams(location.search);
 const pathMint=location.pathname.startsWith('/scan/')?decodeURIComponent(location.pathname.slice(6).split('/')[0]||''):'';
-const initialMode=canonicalMode(params.get('mode')||(pathMint?'token':'token'));
+const initialMode=canonicalMode(params.get('mode')||((pathMint||params.has('mint'))?'token':'address'));
 const initialKind=params.get('kind')||'token';
+if(scanNetwork)scanNetwork.value=params.get('network')||'';
 applyMode(initialMode,{updateURL:false,reset:false});
 if(['token','wallet','site','transaction'].includes(initialKind)&&activeMode!=='token')kind.value=initialKind;
 const initial=pathMint||params.get('mint')||params.get('target')||'';
-const addressEntry=params.get('mode')==='address'||(!params.has('mode')&&!pathMint&&!params.has('mint'));
+const addressEntry=params.get('mode')==='address'||params.get('mode')==='lookup'||params.get('mode')==='spending'||(!params.has('mode')&&!pathMint&&!params.has('mint'));
 if(initial&&activeMode!=='transaction'&&!addressEntry){target.value=initial;runScan()}
 })();

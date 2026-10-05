@@ -13,12 +13,11 @@ func TestGlobalShellProducesEnglishNavigationAndMessages(t *testing.T) {
 	}
 	text := string(body)
 	for _, required := range []string{
-		"['/live','Live SOC']",
-		"['/cases','Cases']",
-		"['/scan','Token Scan']",
-		"['/transaction-shield','Transaction Shield']",
-		"['/safe-check','Safe Check']",
-		"['/scan?mode=deep','Deep Scan']",
+		"['/scan','ARVIS Radar']",
+		"['/reports','History']",
+		"['/watchlist','Watchlist']",
+		"['/crypto-brief','News']",
+		"['/account','Account']",
 		"['/dashboard','Workspace']",
 		"nav.setAttribute('aria-label','Main navigation')",
 		"document.documentElement.lang='en'",
@@ -35,6 +34,10 @@ func TestGlobalShellProducesEnglishNavigationAndMessages(t *testing.T) {
 		"nav.setAttribute('aria-label','Ana menü')",
 		"run.textContent='Kontrol ediliyor…'",
 		"Koschei ARVIS · Solana güvenlik merkezi</span>",
+		"['/scan','Token Scan']",
+		"['/scan?mode=deep','Deep Scan']",
+		"['/transaction-shield','Transaction Shield']",
+		"['/safe-check','Safe Check']",
 	} {
 		if strings.Contains(text, forbidden) {
 			t.Errorf("global shell still produces Turkish UI contract %q", forbidden)

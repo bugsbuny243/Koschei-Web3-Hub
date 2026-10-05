@@ -19,5 +19,8 @@ for(const page of ['dashboard.html','scan.html']){
 const html=fs.readFileSync(path.join(root,'scan.html'),'utf8');
 assert.ok(html.indexOf('customer-scan-entry.js')<html.indexOf('public-solana-scan.js'),'Route contract must load before legacy scan bootstrap');
 assert.match(html,/data-koschei-enhancement="universal-address-scan-v1"/,'Static controller must suppress duplicate dynamic loading');
-assert.match(html,/id="advancedTools"/,'Existing investigation modes must remain reachable');
+assert.match(html,/id="radarMode"/,'Existing investigation adapters must share one target selector');
+assert.equal((html.match(/<form\b/g)||[]).length,1,'The radar page must have exactly one request form');
+assert.match(html,/id="scanNetwork"/,'The shared form must keep explicit network context');
+for(const id of ['customerUniversalScanForm','evmAuthorityForm','evmSpendingForm'])assert.ok(!html.includes(`id="${id}"`),`Duplicate ${id} must not return`);
 console.log(`Customer console wiring: ${checked} asset references resolved; entry, results and tool modes connected.`);

@@ -15,7 +15,7 @@ function setNav(open){
 function installNavigation(){
   const trigger=$('mobileMenu');
   trigger?.addEventListener('click',()=>setNav(!document.body.classList.contains('nav-open')));
-  document.querySelectorAll('.side-nav a').forEach(link=>link.addEventListener('click',()=>setNav(false)));
+  document.querySelectorAll('.side-nav a, .workspace-links a').forEach(link=>link.addEventListener('click',()=>setNav(false)));
   document.addEventListener('click',event=>{
     if(!document.body.classList.contains('nav-open'))return;
     const sidebar=$('sidebar');

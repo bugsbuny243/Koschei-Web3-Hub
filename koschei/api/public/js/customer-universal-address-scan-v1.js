@@ -161,8 +161,10 @@ function install(){
   const section=document.getElementById('customerUniversalScan'),routing=window.KoscheiScanEntry;
   if(!section||!routing)return;
   const $=id=>document.getElementById(id);
-  const form=$('customerUniversalScanForm'),input=$('customerUniversalTarget'),network=$('customerUniversalNetwork');
-  const submit=$('customerUniversalSubmit'),cancel=$('customerUniversalCancel'),status=$('customerUniversalStatus');
+  const shared=Boolean($('radarMode'));
+  const form=shared?$('scanForm'):$('customerUniversalScanForm'),input=shared?$('target'):$('customerUniversalTarget'),network=shared?$('scanNetwork'):$('customerUniversalNetwork');
+  const submit=shared?$('submit'):$('customerUniversalSubmit'),cancel=$('customerUniversalCancel'),status=$('customerUniversalStatus');
+  const active=()=>!shared||['address','lookup'].includes(window.KoscheiRadar?.mode);
   const wrap=$('customerUniversalResultsWrap'),overview=$('customerUniversalOverview'),results=$('customerUniversalResults');
   const recovery=$('customerUniversalRecovery'),advanced=$('advancedTools');
   let pending=null,generation=0;
@@ -170,18 +172,20 @@ function install(){
   function stop(){
     generation++;
     pending?.abort();pending=null;
-    form.removeAttribute('aria-busy');submit.disabled=false;submit.textContent='Analyze target';cancel.hidden=true;
+    form.removeAttribute('aria-busy');if(active()){submit.disabled=false;submit.textContent=shared?'Investigate target':'Analyze target';}cancel.hidden=true;
   }
   function invalidate(){
     stop();wrap.hidden=true;recovery.hidden=true;
     status.textContent='Ready to analyze the current target and network.';
     input.removeAttribute('aria-invalid');
   }
-  input.addEventListener('input',invalidate);network.addEventListener('change',invalidate);
-  cancel.addEventListener('click',()=>{stop();wrap.hidden=true;status.textContent='Analysis canceled. You can start another request.';});
+  input.addEventListener('input',()=>{if(active())invalidate();});network.addEventListener('change',()=>{if(active())invalidate();});
+  if(shared)document.addEventListener('koschei:radar-mode-changed',()=>{stop();wrap.hidden=true;recovery.hidden=true;status.textContent='Ready. Enter a target for this investigation.';});
+  cancel.addEventListener('click',()=>{if(!active())return;stop();wrap.hidden=true;status.textContent='Analysis canceled. You can start another request.';});
   window.addEventListener('pagehide',stop);
 
   async function runScan(){
+    if(!active())return;
     stop();wrap.hidden=true;recovery.hidden=true;
     const request=routing.resolve(input.value,network.value);
     if(request.error){
@@ -202,6 +206,7 @@ function install(){
       const entry={network:request.network,label:request.label,http:response.status,ok:response.ok,data};
       overview.innerHTML=summaryBlock({family:request.family,label:request.label+' '+(request.kind==='transaction'?'transaction':'address')},[entry]);
       results.innerHTML=resultCard(entry);wrap.hidden=false;
+      if(shared)$('empty').hidden=true;
       status.textContent=response.ok?'Analysis complete. Review the findings, limits and technical evidence below.':(errorCopy[response.status]||'Analysis could not complete. Review the source error below and try again.');
       if([401,402,403].includes(response.status)){
         const link=document.createElement('a');
@@ -209,7 +214,7 @@ function install(){
         link.textContent=response.status===401?'Sign in to continue':'Review account access';
         recovery.replaceChildren(link);recovery.hidden=false;
       }
-      if(response.ok&&request.family==='solana'){
+      if(!shared&&response.ok&&request.family==='solana'){
         const link=document.createElement('a');link.href='/arvis-chat?'+new URLSearchParams({target:request.target,network:request.network});
         link.textContent='Continue with ARVIS investigation';recovery.replaceChildren(link);recovery.hidden=false;
       }
@@ -219,10 +224,10 @@ function install(){
       wrap.hidden=true;
     }finally{
       clearTimeout(timer);
-      if(current===generation){pending=null;submit.disabled=false;submit.textContent='Analyze target';cancel.hidden=true;form.removeAttribute('aria-busy');}
+      if(current===generation){pending=null;submit.disabled=false;submit.textContent=shared?'Investigate target':'Analyze target';cancel.hidden=true;form.removeAttribute('aria-busy');}
     }
   }
-  form.addEventListener('submit',event=>{event.preventDefault();runScan();});
+  form.addEventListener('submit',event=>{if(!active())return;event.preventDefault();runScan();});
   const params=new URLSearchParams(location.search),addressView=routing.isAddressView();
   if(advanced){
     advanced.open=!addressView;

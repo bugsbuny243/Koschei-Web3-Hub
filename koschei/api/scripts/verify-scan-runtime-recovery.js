@@ -104,7 +104,7 @@ async function customerDeepScenario(){
   assert(globalShellSource.includes('koschei-professional-strip'),'Professional access is not exposed on customer work surfaces');
   assert(globalShellSource.includes('/js/professional-deep-scan-route.js?v=1'),'canonical Professional deep route loader is missing');
   assert(ownerHTML.includes('/js/owner-court-ui.js?v=5'),'owner deep scan cache key is stale');
-  assert(scanHTML.includes('/js/public-solana-scan.js?v=13'),'public scan runtime cache key is stale');
+  assert(scanHTML.includes('/js/public-solana-scan.js?v=14'),'public scan runtime cache key is stale');
 
   console.log('Professional customer and owner deep scan canonical routing contracts: ok');
 })().catch(error=>{

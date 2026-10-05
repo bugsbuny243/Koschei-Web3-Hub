@@ -17,8 +17,9 @@
   function navClassFor(nav){if(nav.classList.contains('ops-nav-links'))return'ops-btn';if(nav.classList.contains('pricing-links'))return'pricing-btn';return'';}
 
   function installCustomerNavigation(){
+    if(document.body.classList.contains('customer-single-radar'))return;
     const current=cleanPath(location.pathname);
-    const topLinks=[['/','Home'],['/scan','Scan'],['/reports','Activity'],['/dashboard','Workspace'],['/pricing','Plans']];
+    const topLinks=[['/','Home'],['/scan','ARVIS Radar'],['/reports','Activity'],['/dashboard','Workspace'],['/pricing','Plans']];
     const nav=document.querySelector('.koschei-global-nav')||document.querySelector('.top .nav,header.top nav.nav,nav.top .nav,.ops-nav-links,.pricing-links');
     if(nav){
       const linkClass=navClassFor(nav);nav.classList.add('customer-nav-v3');nav.innerHTML='';
@@ -26,7 +27,7 @@
     }
     if(!document.querySelector('.customer-mobile-nav-v3')){
       const mobile=document.createElement('nav');mobile.className='customer-mobile-nav-v3';mobile.setAttribute('aria-label','Customer navigation');
-      const items=[['/','⌂','Home'],['/scan','⌕','Scan'],['/reports','≡','Activity'],['/account','○','Account']];
+      const items=[['/','⌂','Home'],['/scan','⌕','Radar'],['/reports','≡','Activity'],['/account','○','Account']];
       for(const [href,icon,label] of items){const a=document.createElement('a');a.href=href;a.innerHTML=`<b aria-hidden="true">${icon}</b><span>${label}</span>`;if(navActive(href,current))a.setAttribute('aria-current','page');mobile.appendChild(a);}
       document.body.appendChild(mobile);
     }
@@ -70,8 +71,8 @@
     const current=cleanPath(location.pathname);
     if(current==='/scan'||current.startsWith('/scan/')){
       loadStyle('/css/koschei.css?v=1','customer-result-guidance-v3');
-      loadStyle('/css/customer-universal-address-scan-v1.css?v=2','universal-address-scan-v1');
-      loadEnhancement('/js/customer-universal-address-scan-v1.js?v=2','universal-address-scan-v1');
+      loadStyle('/css/customer-universal-address-scan-v1.css?v=3','universal-address-scan-v1');
+      loadEnhancement('/js/customer-universal-address-scan-v1.js?v=3','universal-address-scan-v1');
       // The static address desk owns input and mode state. Retain the legacy
       // enhancer only for older pages that do not include the new desk.
       if(!document.getElementById('customerUniversalScan'))loadEnhancement('/js/customer-scan-flow-v3.js?v=1','scan-v3');

@@ -7,9 +7,10 @@ const shell=fs.readFileSync(path.join(root,'public','js','koschei-global-shell.j
 function requireText(source,needle,label){if(!source.includes(needle))throw new Error(`${label}: missing ${needle}`);}
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
 
-requireText(shell,"['/scan?mode=deep','Deep Scan']",'canonical deep scan global nav');
+requireText(shell,"['/scan','ARVIS Radar']",'single radar global nav');
+forbid(shell,/\['\/scan\?mode=deep','Deep Scan'\]/,'duplicate deep scan menu entry');
 requireText(shell,"if(href==='/scan?mode=deep')return current==='/scan'&&mode==='deep'",'deep scan active state');
-requireText(shell,"if(href==='/scan')return current==='/scan'&&mode!=='deep'",'token scan active state');
+requireText(shell,"if(href==='/scan')return current==='/scan'||current.startsWith('/scan/')",'all investigation modes share radar active state');
 requireText(shell,"if(current!=='/security-radar'||window.KoscheiInvestigationShare",'legacy share compatibility');
 requireText(shell,"if(current==='/security-radar')document.title='ARVIS Security Radar — Koschei Web3'",'ARVIS radar title remains inside Koschei Web3');
 requireText(shell,'installBoundedAPIFetch();','bounded API fetch remains installed');

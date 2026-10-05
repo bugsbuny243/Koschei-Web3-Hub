@@ -69,7 +69,7 @@ test('result identity binds schema, exact address and chain',()=>{
 // Minimal DOM hosts exercise the real controller with asynchronous transports.
 // These are explicit test fixtures, never included in the product bundle.
 class Node {
- constructor(){this.value='';this.textContent='';this.hidden=true;this.disabled=false;this.innerHTML='';this.attrs={};this.events={};this.children=[];}
+ constructor(){this.value='';this.textContent='';this.hidden=true;this.disabled=false;this.innerHTML='';this.attrs={};this.events={};this.children=[];this.dataset={};}
  addEventListener(name,fn){(this.events[name]??=[]).push(fn);}
  dispatch(name){for(const fn of this.events[name]||[])fn({preventDefault(){}});}
  setAttribute(name,value){this.attrs[name]=value;}
@@ -77,16 +77,25 @@ class Node {
  focus(){this.focused=true;}
  replaceChildren(...nodes){this.children=nodes;}
 }
-function harness(fetch,search=''){
+function harness(fetch,search='',shared=false){
  const ids=['customerUniversalScan','customerUniversalScanForm','customerUniversalTarget','customerUniversalNetwork','customerUniversalSubmit','customerUniversalCancel','customerUniversalStatus','customerUniversalResultsWrap','customerUniversalOverview','customerUniversalResults','customerUniversalRecovery','advancedTools'];
+ if(shared)ids.push('scanForm','target','scanNetwork','submit','radarMode','kind','kindLabel','note','transaction','wallet','targetFields','transactionFields','modeSummary','empty','result','shareResult','openExplorer','evmSpendingFields','evmSpendingOwner','evmSpendingSpender','evmSpendingResult');
  const nodes=Object.fromEntries(ids.map(id=>[id,new Node()]));
+ if(shared){
+  nodes.radarMode.tagName='SELECT';nodes.scanNetwork.options=['','solana-mainnet','base-mainnet','ethereum-mainnet','bitcoin-mainnet'].map(value=>({value,disabled:false}));
+  Object.defineProperty(nodes.scanNetwork,'selectedOptions',{get(){return nodes.scanNetwork.options.filter(option=>option.value===nodes.scanNetwork.value);}});
+ }
  const timers=new Map();let timerID=0;
  const window={addEventListener(){}};
- const context=vm.createContext({window,URLSearchParams,AbortController,SyntaxError,Error,location:{search,pathname:'/scan'},history:{replaceState(){}},setTimeout(fn){timers.set(++timerID,fn);return timerID;},clearTimeout(id){timers.delete(id);},fetch,document:{readyState:'complete',getElementById:id=>nodes[id],querySelectorAll:()=>[],createElement:()=>new Node()}});
+ const events={};
+ const document={readyState:'complete',getElementById:id=>nodes[id],querySelector:()=>({}),querySelectorAll:()=>[],createElement:()=>new Node(),addEventListener(name,fn){(events[name]??=[]).push(fn);},dispatchEvent(event){for(const fn of events[event.type]||[])fn(event);}};
+ const context=vm.createContext({window,URLSearchParams,AbortController,SyntaxError,Error,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},location:{search,pathname:'/scan'},history:{replaceState(){}},setTimeout(fn){timers.set(++timerID,fn);return timerID;},clearTimeout(id){timers.delete(id);},fetch,document});
  vm.runInContext(source('customer-scan-entry.js'),context);
+ if(shared)vm.runInContext(source('public-solana-scan.js'),context);
  vm.runInContext(source('customer-universal-address-scan-v1.js'),context);
- const submit=(target=evm,network='base-mainnet')=>{nodes.customerUniversalTarget.value=target;nodes.customerUniversalNetwork.value=network;nodes.customerUniversalScanForm.dispatch('submit');};
- return {nodes,submit,timers};
+ const submit=(target=evm,network='base-mainnet')=>{nodes[shared?'target':'customerUniversalTarget'].value=target;nodes[shared?'scanNetwork':'customerUniversalNetwork'].value=network;nodes[shared?'scanForm':'customerUniversalScanForm'].dispatch('submit');};
+ const mode=value=>{nodes.radarMode.value=value;nodes.radarMode.dispatch('change');};
+ return {nodes,submit,timers,mode};
 }
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
 const response=(status,data)=>({status,ok:status>=200&&status<300,json:async()=>data});
@@ -172,4 +181,38 @@ test('shared transport preserves full token collector time while keeping ordinar
  await window.fetch('/api/token/scan');assert.equal(delays.at(-1),210000);
  await window.fetch('/api/scan');assert.equal(delays.at(-1),15000);
  await window.fetch('/health');assert.equal(delays.at(-1),10000);
+});
+
+
+test('one shared radar form sends address evidence once and suppresses the Solana token adapter',async()=>{
+ const calls=[];const h=harness(async(url,options)=>{calls.push({url,options});return response(200,envelope());},'',true);
+ h.submit();await settle();
+ assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/scan');
+ assert.equal(h.nodes.customerUniversalResultsWrap.hidden,false);
+});
+test('the same form selects a full token investigation without a second address request',async()=>{
+ const calls=[];const h=harness(async(url,options)=>{calls.push({url,options});return response(503,{error:'explicit_fixture_source_unavailable'});},'',true);
+ h.mode('token');h.submit(sol,'solana-mainnet');await settle();
+ assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/token/scan');
+ assert.deepEqual(JSON.parse(calls[0].options.body),{mint:sol,network:'solana-mainnet'});
+ assert.equal(h.nodes.customerUniversalResultsWrap.hidden,true);
+});
+test('site selection uses the existing preflight adapter through the same form',async()=>{
+ const calls=[];const h=harness(async(url,options)=>{calls.push({url,options});return response(503,{error:'explicit_fixture_source_unavailable'});},'',true);
+ h.mode('quick');h.submit('https://example.test','solana-mainnet');await settle();
+ assert.equal(calls.length,1);assert.equal(calls[0].url,'/api/arvis/preflight');
+ assert.equal(JSON.parse(calls[0].options.body).kind,'site');
+});
+test('changing target type cancels address evidence and withholds a late response',async()=>{
+ let complete;const h=harness(()=>new Promise(resolve=>{complete=resolve;}),'',true);
+ h.submit();h.mode('token');complete(response(200,envelope()));await settle();
+ assert.equal(h.nodes.customerUniversalResultsWrap.hidden,true);
+ assert.equal(h.nodes.submit.disabled,false);
+});
+test('changing target type also withholds a late full token report',async()=>{
+ let complete;const h=harness(()=>new Promise(resolve=>{complete=resolve;}),'',true);
+ h.mode('token');h.submit(sol,'solana-mainnet');h.mode('address');
+ complete(response(200,{investigation_report:{target:sol}}));await settle();
+ assert.equal(h.nodes.result.hidden,true);assert.equal(h.nodes.result.innerHTML,'');
+ assert.equal(h.nodes.submit.disabled,false);
 });
