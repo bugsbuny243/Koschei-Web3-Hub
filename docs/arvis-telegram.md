@@ -49,4 +49,10 @@ The current production secret names retain the historical `KOSCHEI_CRYPTO_BRIEF_
 
 Migration `133_crypto_brief.sql` created the current pairing and delivery tables. Their historical names are retained temporarily as a compatibility persistence layer while the wider Neon/PostgreSQL to ClickHouse architecture is being migrated. RSS/news tables are not part of the active ARVIS Telegram runtime.
 
+## Release invariants
+
+- Pairing, queue deduplication, pause/resume/disconnect, webhook verification and uncertain-send fencing are covered by PostgreSQL integration tests.
+- The public Crypto Brief page and its frontend assets remain retired.
+- CI must stay gofmt-clean and the generated OpenAPI contract must match the registered ARVIS Telegram routes.
+
 Do not reintroduce WhatsApp or RSS/news scheduling into this product path.
