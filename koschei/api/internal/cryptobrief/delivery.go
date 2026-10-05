@@ -113,7 +113,11 @@ func (s *Service) claim(ctx context.Context) (delivery, bool, error) {
 			JOIN crypto_brief_subscriptions s ON s.id=d.subscription_id
 			WHERE d.state='pending'
 			  AND d.due_at<=clock_timestamp()
-			  AND d.dedup_key LIKE 'arvis:%' OR d.dedup_key LIKE 'reply:%'
+			  AND s.channel='telegram'
+			  AND s.state='active'
+			  AND s.recipient IS NOT NULL
+			  AND $1
+			  AND (d.dedup_key LIKE 'arvis:%' OR d.dedup_key LIKE 'reply:%')
 			ORDER BY d.due_at,d.id
 			FOR UPDATE OF d SKIP LOCKED
 			LIMIT 1
@@ -126,8 +130,7 @@ func (s *Service) claim(ctx context.Context) (delivery, bool, error) {
 		)
 		SELECT d.id,d.subscription_id,d.fencing_token,d.body,d.attempts,s.channel,s.recipient,s.last_inbound_at,d.dedup_key
 		FROM claimed d
-		JOIN crypto_brief_subscriptions s ON s.id=d.subscription_id
-		WHERE s.channel='telegram' AND s.state='active' AND s.recipient IS NOT NULL AND $1`, s.telegramDeliveryReady()).Scan(
+		JOIN crypto_brief_subscriptions s ON s.id=d.subscription_id`, s.telegramDeliveryReady()).Scan(
 		&d.id, &d.subscription, &d.token, &d.body, &d.attempts, &d.channel, &d.recipient, &d.inbound, &d.key,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
