@@ -19,7 +19,7 @@ import (
 const (
 	defaultBatchSize = 10000
 	defaultMaxRows   = 100000
-	maxAllowedRows   = 100000
+	maxAllowedRows   = 1000000
 )
 
 type config struct {

@@ -1,0 +1,73 @@
+name: ClickHouse cutover schema one-shot
+
+on:
+  push:
+    branches:
+      - migration/neon-to-clickhouse-inventory-20261005
+    paths:
+      - .github/workflows/clickhouse-cutover-schema-one-shot.yml
+      - koschei/api/internal/clickhouse/**
+      - koschei/api/cmd/clickhouse-*/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clickhouse-cutover-schema-one-shot
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Verify ClickHouse migration code
+        working-directory: koschei/api
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l internal/clickhouse/publication_migration.go internal/clickhouse/verdict_migration.go internal/clickhouse/arvis_read_index_migration.go internal/clickhouse/global_radar_migration.go cmd/clickhouse-global-radar-schema/main.go)"
+          if [ -n "${unformatted}" ]; then
+            printf 'unformatted ClickHouse migration files:\n%s\n' "${unformatted}" >&2
+            exit 1
+          fi
+          go test ./internal/clickhouse
+
+      - name: Validate ClickHouse secrets
+        env:
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${CLICKHOUSE_HTTP_URL}"
+          test -n "${CLICKHOUSE_USER}"
+          test -n "${CLICKHOUSE_PASSWORD}"
+
+      - name: Apply required reviewed additive ClickHouse schemas
+        working-directory: koschei/api
+        env:
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_DATABASE: koschei_web3
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+          CLICKHOUSE_TIMEOUT_MS: "120000"
+          KOSCHEI_CLICKHOUSE_SCHEMA_APPLY: "1"
+          KOSCHEI_CLICKHOUSE_PUBLICATION_SCHEMA_APPLY: "1"
+          KOSCHEI_CLICKHOUSE_VERDICT_SCHEMA_APPLY: "1"
+        run: |
+          set -euo pipefail
+          go run ./cmd/clickhouse-schema
+          go run ./cmd/clickhouse-publication-schema
+          go run ./cmd/clickhouse-verdict-schema
+          # Migration 004 only adds optional data-skipping indexes. The current
+          # service user lacks ALTER ADD INDEX, so do not block the data cutover.
+          go run ./cmd/clickhouse-global-radar-schema

@@ -1,0 +1,92 @@
+name: Final Neon radar to ClickHouse parity
+
+on:
+  workflow_run:
+    workflows:
+      - Full Neon radar to ClickHouse backfill
+    types:
+      - completed
+  push:
+    branches:
+      - migration/neon-to-clickhouse-inventory-20261005
+    paths:
+      - .github/workflows/neon-radar-final-parity.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/migration/neon-to-clickhouse-inventory-20261005') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'migration/neon-to-clickhouse-inventory-20261005') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validate source and target secrets
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_READ_URL}" ] && [ -z "${DATABASE_URL}" ]; then
+            echo "DATABASE_READ_URL or DATABASE_URL is required" >&2
+            exit 1
+          fi
+          test -n "${CLICKHOUSE_HTTP_URL}"
+          test -n "${CLICKHOUSE_USER}"
+          test -n "${CLICKHOUSE_PASSWORD}"
+
+      - name: Compare exact source and target coverage
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${DATABASE_READ_URL}" ]; then
+            SOURCE_URL="${DATABASE_READ_URL}"
+          else
+            SOURCE_URL="${DATABASE_URL}"
+          fi
+
+          source_tsv="${RUNNER_TEMP}/source.tsv"
+          target_tsv="${RUNNER_TEMP}/target.tsv"
+          psql "${SOURCE_URL}" -X -v ON_ERROR_STOP=1 -A -t -F $'\t' -c \
+            "SELECT count(*), min(created_at), max(created_at) FROM public.security_radar_stream_events" \
+            > "${source_tsv}"
+
+          query="SELECT countDistinct(event_id), min(created_at), max(created_at) FROM koschei_web3.security_radar_stream_events FORMAT TSVRaw"
+          curl --fail-with-body --silent --show-error \
+            -H "X-ClickHouse-User: ${CLICKHOUSE_USER}" \
+            -H "X-ClickHouse-Key: ${CLICKHOUSE_PASSWORD}" \
+            -H "X-ClickHouse-Database: koschei_web3" \
+            --data-binary "${query}" \
+            "${CLICKHOUSE_HTTP_URL}" > "${target_tsv}"
+
+          python - <<'PY'
+          from pathlib import Path
+          import os
+
+          source = Path(os.environ["RUNNER_TEMP"] + "/source.tsv").read_text().strip().split("\t")
+          target = Path(os.environ["RUNNER_TEMP"] + "/target.tsv").read_text().strip().split("\t")
+          if len(source) != 3 or len(target) != 3:
+              raise SystemExit("unexpected final parity row shape")
+          source_count = int(source[0])
+          target_count = int(target[0])
+          if source_count != target_count:
+              raise SystemExit(f"FINAL RADAR PARITY FAILED source={source_count} target_distinct={target_count}")
+          def ms(value: str) -> str:
+              value = value.replace("T", " ").replace("+00", "").replace("Z", "")
+              if "." not in value:
+                  return value + ".000"
+              head, frac = value.split(".", 1)
+              digits = "".join(ch for ch in frac if ch.isdigit())
+              return head + "." + (digits + "000")[:3]
+          if ms(source[1]) != ms(target[1]) or ms(source[2]) != ms(target[2]):
+              raise SystemExit(f"FINAL RADAR BOUNDS FAILED source=[{ms(source[1])},{ms(source[2])}] target=[{ms(target[1])},{ms(target[2])}]")
+          print(f"FINAL RADAR PARITY OK rows={source_count} bounds=[{ms(source[1])},{ms(source[2])}] payloads_redacted=true")
+          PY

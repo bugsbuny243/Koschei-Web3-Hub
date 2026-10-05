@@ -1,0 +1,66 @@
+name: Neon radar backfill pilot one-shot
+
+on:
+  push:
+    branches:
+      - migration/neon-to-clickhouse-inventory-20261005
+    paths:
+      - .github/workflows/neon-radar-backfill-pilot-one-shot.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-radar-backfill-pilot
+  cancel-in-progress: false
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+
+      - name: Validate migration command
+        working-directory: koschei/api
+        run: go test ./cmd/clickhouse-shadow ./internal/clickhouse
+
+      - name: Validate source and target secrets
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_READ_URL}" ] && [ -z "${DATABASE_URL}" ]; then
+            echo "DATABASE_READ_URL or DATABASE_URL is required" >&2
+            exit 1
+          fi
+          test -n "${CLICKHOUSE_HTTP_URL}"
+          test -n "${CLICKHOUSE_USER}"
+          test -n "${CLICKHOUSE_PASSWORD}"
+
+      - name: Copy first missing radar window and verify exact parity
+        working-directory: koschei/api
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_DATABASE: koschei_web3
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+          CLICKHOUSE_TIMEOUT_MS: "120000"
+          KOSCHEI_CLICKHOUSE_SHADOW_SINCE: "2026-09-21T06:20:00Z"
+          KOSCHEI_CLICKHOUSE_SHADOW_UNTIL: "2026-09-21T07:00:00Z"
+          KOSCHEI_CLICKHOUSE_SHADOW_BATCH_SIZE: "50000"
+          KOSCHEI_CLICKHOUSE_SHADOW_MAX_ROWS: "1000000"
+        run: go run ./cmd/clickhouse-shadow

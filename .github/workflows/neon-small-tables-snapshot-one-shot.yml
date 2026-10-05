@@ -1,0 +1,302 @@
+name: Snapshot all non-radar Neon tables to ClickHouse
+
+on:
+  push:
+    branches:
+      - migration/neon-to-clickhouse-inventory-20261005
+    paths:
+      - .github/workflows/neon-small-tables-snapshot-one-shot.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-small-tables-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate source and target secrets
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_READ_URL}" ] && [ -z "${DATABASE_URL}" ]; then
+            echo "DATABASE_READ_URL or DATABASE_URL is required" >&2
+            exit 1
+          fi
+          test -n "${CLICKHOUSE_HTTP_URL}"
+          test -n "${CLICKHOUSE_USER}"
+          test -n "${CLICKHOUSE_PASSWORD}"
+
+      - name: Create append-safe snapshot archive tables
+        env:
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          ch() {
+            curl --fail-with-body --silent --show-error \
+              -H "X-ClickHouse-User: ${CLICKHOUSE_USER}" \
+              -H "X-ClickHouse-Key: ${CLICKHOUSE_PASSWORD}" \
+              -H "X-ClickHouse-Database: koschei_web3" \
+              --data-binary "$1" \
+              "${CLICKHOUSE_HTTP_URL}"
+          }
+          ch "CREATE TABLE IF NOT EXISTS koschei_web3.postgres_snapshot_rows (
+            source_schema LowCardinality(String),
+            source_table LowCardinality(String),
+            row_key FixedString(64),
+            row_json String,
+            row_sha256 FixedString(64),
+            snapshot_version UInt64,
+            snapshot_at DateTime64(3, 'UTC')
+          ) ENGINE = ReplacingMergeTree(snapshot_version)
+          ORDER BY (source_schema, source_table, row_key)"
+          ch "CREATE TABLE IF NOT EXISTS koschei_web3.postgres_snapshot_manifests (
+            source_schema LowCardinality(String),
+            source_table LowCardinality(String),
+            primary_key_columns Array(String),
+            row_count UInt64,
+            content_sha256 FixedString(64),
+            snapshot_version UInt64,
+            snapshot_at DateTime64(3, 'UTC')
+          ) ENGINE = ReplacingMergeTree(snapshot_version)
+          ORDER BY (source_schema, source_table)"
+
+      - name: Extract every non-radar user table without logging row contents
+        env:
+          DATABASE_READ_URL: ${{ secrets.DATABASE_READ_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -n "${DATABASE_READ_URL}" ]; then
+            export SOURCE_URL="${DATABASE_READ_URL}"
+          else
+            export SOURCE_URL="${DATABASE_URL}"
+          fi
+          python - <<'PY'
+          import csv
+          import hashlib
+          import json
+          import os
+          import subprocess
+          import time
+          from pathlib import Path
+
+          source = os.environ["SOURCE_URL"]
+          out_dir = Path(os.environ["RUNNER_TEMP"]) / "postgres-snapshot"
+          out_dir.mkdir(parents=True, exist_ok=True)
+          rows_path = out_dir / "rows.jsonl"
+          manifests_path = out_dir / "manifests.jsonl"
+          source_manifest_path = out_dir / "source-manifest.json"
+          version = int(time.time() * 1000)
+          snapshot_at_ms = version
+
+          def sql_literal(value: str) -> str:
+              return "'" + value.replace("'", "''") + "'"
+
+          def ident(value: str) -> str:
+              return '"' + value.replace('"', '""') + '"'
+
+          def psql(query: str) -> str:
+              proc = subprocess.run(
+                  ["psql", source, "-X", "-v", "ON_ERROR_STOP=1", "-A", "-t", "-F", "\t", "-c", query],
+                  check=True,
+                  stdout=subprocess.PIPE,
+                  stderr=subprocess.PIPE,
+                  text=True,
+              )
+              return proc.stdout
+
+          table_lines = psql("""
+              SELECT n.nspname, c.relname
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+              WHERE c.relkind IN ('r','p')
+                AND n.nspname NOT LIKE 'pg_%'
+                AND n.nspname <> 'information_schema'
+              ORDER BY n.nspname, c.relname
+          """)
+          tables = []
+          for line in table_lines.splitlines():
+              if not line.strip():
+                  continue
+              schema, table = line.split("\t", 1)
+              if schema == "public" and table == "security_radar_stream_events":
+                  continue
+              tables.append((schema, table))
+
+          manifests = []
+          total_rows = 0
+          with rows_path.open("w", encoding="utf-8") as rows_out, manifests_path.open("w", encoding="utf-8") as manifests_out:
+              for schema, table in tables:
+                  pk_query = f"""
+                      SELECT a.attname
+                      FROM pg_index i
+                      JOIN pg_class c ON c.oid=i.indrelid
+                      JOIN pg_namespace n ON n.oid=c.relnamespace
+                      JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord) ON true
+                      JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.attnum
+                      WHERE i.indisprimary
+                        AND n.nspname={sql_literal(schema)}
+                        AND c.relname={sql_literal(table)}
+                      ORDER BY k.ord
+                  """
+                  pk_cols = [x for x in psql(pk_query).splitlines() if x]
+                  relation = f"{ident(schema)}.{ident(table)}"
+                  if pk_cols:
+                      pk_expr = "jsonb_build_array(" + ",".join(f"t.{ident(c)}" for c in pk_cols) + ")::text"
+                      order_expr = ",".join(f"t.{ident(c)}::text" for c in pk_cols)
+                  else:
+                      pk_expr = "to_jsonb(t)::text"
+                      order_expr = "to_jsonb(t)::text"
+                  data_query = f"SELECT {pk_expr}, to_jsonb(t)::text FROM {relation} AS t ORDER BY {order_expr}"
+                  raw = psql(data_query)
+                  pairs = []
+                  count = 0
+                  for line in raw.splitlines():
+                      if not line:
+                          continue
+                      try:
+                          pk_json, row_json = line.split("\t", 1)
+                      except ValueError as exc:
+                          raise RuntimeError(f"unexpected psql row shape for {schema}.{table}") from exc
+                      row_key = hashlib.sha256((schema + "\0" + table + "\0" + pk_json).encode()).hexdigest()
+                      row_sha = hashlib.sha256(row_json.encode()).hexdigest()
+                      rows_out.write(json.dumps({
+                          "source_schema": schema,
+                          "source_table": table,
+                          "row_key": row_key,
+                          "row_json": row_json,
+                          "row_sha256": row_sha,
+                          "snapshot_version": version,
+                          "snapshot_at": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(snapshot_at_ms / 1000)) + ".000",
+                      }, separators=(",", ":")) + "\n")
+                      pairs.append((row_key, row_sha))
+                      count += 1
+                  fingerprint = hashlib.sha256()
+                  for row_key, row_sha in sorted(pairs):
+                      fingerprint.update(f"{row_key}:{row_sha}\n".encode())
+                  manifest = {
+                      "source_schema": schema,
+                      "source_table": table,
+                      "primary_key_columns": pk_cols,
+                      "row_count": count,
+                      "content_sha256": fingerprint.hexdigest(),
+                      "snapshot_version": version,
+                      "snapshot_at": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(snapshot_at_ms / 1000)) + ".000",
+                  }
+                  manifests.append(manifest)
+                  manifests_out.write(json.dumps(manifest, separators=(",", ":")) + "\n")
+                  total_rows += count
+
+          source_manifest_path.write_text(json.dumps({"snapshot_version": version, "tables": manifests}, separators=(",", ":")), encoding="utf-8")
+          Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8").write(f"SNAPSHOT_VERSION={version}\n")
+          print(f"source snapshot prepared tables={len(manifests)} rows={total_rows} payloads_redacted=true")
+          PY
+
+      - name: Insert snapshot rows and manifests into ClickHouse
+        env:
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          insert_file() {
+            local table="$1"
+            local file="$2"
+            local payload="${RUNNER_TEMP}/${table}.payload"
+            printf 'INSERT INTO koschei_web3.%s FORMAT JSONEachRow\n' "${table}" > "${payload}"
+            cat "${file}" >> "${payload}"
+            curl --fail-with-body --silent --show-error \
+              -H "X-ClickHouse-User: ${CLICKHOUSE_USER}" \
+              -H "X-ClickHouse-Key: ${CLICKHOUSE_PASSWORD}" \
+              -H "X-ClickHouse-Database: koschei_web3" \
+              --data-binary "@${payload}" \
+              "${CLICKHOUSE_HTTP_URL}"
+            rm -f "${payload}"
+          }
+          insert_file postgres_snapshot_rows "${RUNNER_TEMP}/postgres-snapshot/rows.jsonl"
+          insert_file postgres_snapshot_manifests "${RUNNER_TEMP}/postgres-snapshot/manifests.jsonl"
+
+      - name: Verify target counts and content hashes without reading row payloads
+        env:
+          CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          export TARGET_TSV="${RUNNER_TEMP}/postgres-snapshot/target-hashes.tsv"
+          query="SELECT source_schema, source_table, row_key, row_sha256 FROM koschei_web3.postgres_snapshot_rows FINAL WHERE snapshot_version=${SNAPSHOT_VERSION} ORDER BY source_schema, source_table, row_key FORMAT TSVRaw"
+          curl --fail-with-body --silent --show-error \
+            -H "X-ClickHouse-User: ${CLICKHOUSE_USER}" \
+            -H "X-ClickHouse-Key: ${CLICKHOUSE_PASSWORD}" \
+            -H "X-ClickHouse-Database: koschei_web3" \
+            --data-binary "${query}" \
+            "${CLICKHOUSE_HTTP_URL}" > "${TARGET_TSV}"
+          export TARGET_MANIFESTS="${RUNNER_TEMP}/postgres-snapshot/target-manifests.jsonl"
+          manifest_query="SELECT source_schema, source_table, primary_key_columns, row_count, content_sha256, snapshot_version FROM koschei_web3.postgres_snapshot_manifests FINAL WHERE snapshot_version=${SNAPSHOT_VERSION} ORDER BY source_schema, source_table FORMAT JSONEachRow"
+          curl --fail-with-body --silent --show-error \
+            -H "X-ClickHouse-User: ${CLICKHOUSE_USER}" \
+            -H "X-ClickHouse-Key: ${CLICKHOUSE_PASSWORD}" \
+            -H "X-ClickHouse-Database: koschei_web3" \
+            --data-binary "${manifest_query}" \
+            "${CLICKHOUSE_HTTP_URL}" > "${TARGET_MANIFESTS}"
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from collections import defaultdict
+          from pathlib import Path
+
+          base = Path(os.environ["RUNNER_TEMP"]) / "postgres-snapshot"
+          source = json.loads((base / "source-manifest.json").read_text(encoding="utf-8"))
+          expected = {(x["source_schema"], x["source_table"]): x for x in source["tables"]}
+
+          pairs = defaultdict(list)
+          target_tsv = Path(os.environ["TARGET_TSV"])
+          for line in target_tsv.read_text(encoding="utf-8").splitlines():
+              if not line:
+                  continue
+              schema, table, row_key, row_sha = line.split("\t")
+              pairs[(schema, table)].append((row_key, row_sha))
+
+          target_manifests = {}
+          for line in Path(os.environ["TARGET_MANIFESTS"]).read_text(encoding="utf-8").splitlines():
+              if not line:
+                  continue
+              row = json.loads(line)
+              target_manifests[(row["source_schema"], row["source_table"])] = row
+
+          if set(target_manifests) != set(expected):
+              missing = sorted(set(expected) - set(target_manifests))
+              extra = sorted(set(target_manifests) - set(expected))
+              raise SystemExit(f"manifest table mismatch missing={missing} extra={extra}")
+
+          total = 0
+          for key, manifest in expected.items():
+              fingerprint = hashlib.sha256()
+              for row_key, row_sha in sorted(pairs.get(key, [])):
+                  fingerprint.update(f"{row_key}:{row_sha}\n".encode())
+              got_count = len(pairs.get(key, []))
+              got_sha = fingerprint.hexdigest()
+              if got_count != manifest["row_count"] or got_sha != manifest["content_sha256"]:
+                  raise SystemExit(f"snapshot parity failed table={key[0]}.{key[1]} source_rows={manifest['row_count']} target_rows={got_count}")
+              target_manifest = target_manifests[key]
+              if int(target_manifest["row_count"]) != manifest["row_count"] or target_manifest["content_sha256"] != manifest["content_sha256"]:
+                  raise SystemExit(f"manifest parity failed table={key[0]}.{key[1]}")
+              total += got_count
+          print(f"ClickHouse non-radar snapshot parity ok tables={len(expected)} rows={total} payloads_redacted=true")
+          PY
