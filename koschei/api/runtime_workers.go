@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -60,8 +61,7 @@ func startBackgroundRuntime(
 ) func() {
 	runtimeHealth.Register(webhooks.DeliveryHealthID, "worker", "", role.runsBackgroundWorkers() && db != nil)
 	if !role.runsBackgroundWorkers() {
-		runtimeHealth.Register("crypto-brief-feeds", "worker", "", false)
-		runtimeHealth.Register("crypto-brief-delivery", "worker", "", false)
+		runtimeHealth.Register("arvis-telegram-delivery", "worker", "", false)
 		return func() {}
 	}
 
@@ -91,6 +91,40 @@ func startBackgroundRuntime(
 		} else if runtimeHealth != nil {
 			runtimeHealth.Register(jobs.NATSWakeHealthID, "worker", "", false)
 		}
+
+		arvisTelegram := cryptobrief.New(db)
+		if jobStore != nil {
+			jobStore.SetCompletionHook(func(hookCtx context.Context, job jobs.Job, result any) error {
+				if strings.TrimSpace(job.Type) != handlers.CanonicalInvestigationJobType || strings.TrimSpace(job.UserID) == "" {
+					return nil
+				}
+				var request struct {
+					Mode string `json:"mode"`
+				}
+				if len(job.RequestPayload) > 0 && string(job.RequestPayload) != "null" {
+					_ = json.Unmarshal(job.RequestPayload, &request)
+				}
+				// Recursive/system investigations remain internal evidence. Telegram
+				// mirrors customer-requested scan results, not every background branch.
+				if strings.TrimSpace(request.Mode) != "customer_canonical_job" {
+					return nil
+				}
+				envelope, ok := result.(map[string]any)
+				if !ok {
+					encoded, err := json.Marshal(result)
+					if err != nil {
+						return err
+					}
+					envelope = map[string]any{}
+					if err := json.Unmarshal(encoded, &envelope); err != nil {
+						return err
+					}
+				}
+				_, err := arvisTelegram.QueueARVISResult(hookCtx, job.UserID, job.ID, job.Target, job.Network, envelope)
+				return err
+			})
+		}
+
 		stops = append(stops,
 			cryptobrief.Start(ctx, db, runtimeHealth),
 			alerts.StartDeliveryWorker(ctx, db),
