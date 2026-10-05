@@ -31,9 +31,17 @@ These systems should be extended rather than duplicated.
 
 ### A. Multi-wallet / repeat-operator intelligence
 
-Current state: **substantial foundation already implemented; expansion required, not a greenfield build.**
+Current state: **substantial foundation already implemented; customer-facing coordination projection added in this branch.**
 
 Existing code already supports persistent funding clusters and actor operational memory. Direct verified relations remain distinct from shared-funder or operational-overlap inference. Campaign-genome matching explicitly does not prove common identity, control or wrongdoing.
+
+Branch expansion:
+
+- `actor_coordination_intelligence` composes the existing retained actor/funder memory instead of creating a second graph;
+- repeated creator/deployer activity, repeated dominant-holder activity, related-wallet recurrence, shared-funder clusters and retained liquidity-removal history are exposed as explicit signals;
+- verified technical campaign fingerprints can be shown as technical correlations;
+- the same projection is available in wallet investigations and canonical token dossiers;
+- coordination output has no grade, verdict, same-operator, real-world identity, criminal-group or market-manipulation authority.
 
 Remaining work:
 
@@ -46,7 +54,7 @@ A cluster is not automatically one person. Common control/ownership must never b
 
 ### B. Market-manipulation intelligence
 
-Current state: **partial deterministic engine already implemented.**
+Current state: **partial deterministic engine already implemented; two evidence-scoped screening layers now exist in this branch.**
 
 Existing unified-radar behavior rules already cover:
 
@@ -55,13 +63,20 @@ Existing unified-radar behavior rules already cover:
 - creator-sell acceleration;
 - dominant-holder first-exit behavior.
 
-The deterministic verdict boundary already prevents inferred/watch-only signals from becoming grade-changing evidence by themselves.
+Branch expansion:
+
+- bounded recent transaction rows produce rapid round-trip and synchronized opposite-side burst indicators with explicit temporal coverage requirements;
+- persisted `token_trade_events` now feed a 24-hour balanced round-trip churn classifier;
+- the persisted classifier requires at least 3 buys, 3 sells, 5 SOL gross flow and a net/gross ratio no greater than 0.15 before a wallet is surfaced as a churn candidate;
+- the result is attached to canonical token dossiers as `market_manipulation_intelligence`;
+- `wash_trading_proven`, `manipulation_claim`, `same_operator_claim` and `verdict_authority` remain false in this v1 layer;
+- the deterministic verdict boundary remains unchanged.
 
 Remaining work:
 
-- self-flow and circular-flow detection;
-- wash-like repeated counterparty/flow patterns;
-- synchronized multi-wallet entry/exit timing;
+- transaction-counterparty self-flow and circular-flow proof;
+- repeated counterparty/flow motifs across venues and assets;
+- stronger synchronized multi-wallet entry/exit timing with funding/topology corroboration;
 - stronger liquidity add/remove attribution and reserve-delta timelines;
 - repeated market-maker/funding-cluster reuse across assets;
 - pump/dump trajectory timelines with exact price/volume/liquidity provenance;
@@ -84,7 +99,7 @@ Remaining work:
 
 ### D. Public hype / promotion / community coordination intelligence
 
-Current state: **real product gap; first provenance-safe foundation is being added in this branch.**
+Current state: **provenance-safe branch foundation implemented; provider coverage remains incomplete.**
 
 Branch foundation:
 
@@ -96,7 +111,8 @@ Branch foundation:
 - repeated public actor, public domain and normalized-claim fingerprints can produce cross-asset **inferred/watch-only** correlation signals;
 - public handles are not promoted into on-chain actor identities;
 - public-source overlap has no verdict, grade, same-operator, real-world-identity or wrongdoing authority;
-- an observation can be represented as Global Campaign evidence without manufacturing a relation anchor.
+- an observation can be represented as Global Campaign evidence without manufacturing a relation anchor;
+- canonical token dossiers now expose `public_promotion_intelligence` with confidence/limitations and cross-asset overlap context.
 
 Still required before this becomes a complete customer feature:
 
@@ -106,8 +122,7 @@ Still required before this becomes a complete customer feature:
 - synchronized public-post versus on-chain-event timelines;
 - public claim versus on-chain evidence comparison;
 - measurable bot-like/coordinated-public-activity indicators with defensible thresholds;
-- ARVIS investigation output that shows public evidence, confidence and limitations;
-- customer UI/report/API surfaces and opted-in notification policy.
+- richer customer UI/report visualization and opted-in notification policy.
 
 Do not scrape or infer private groups/messages that the system is not lawfully authorized to access. Do not call a community criminal or fraudulent merely because it is promotional, repetitive or coordinated.
 
@@ -193,13 +208,13 @@ Delivery targets remain the Web3 application, reports, API/webhooks and opted-in
 
 P0 — preserve standalone Web3 identity, evidence authority boundaries and fail-closed behavior.
 
-P1 — complete the public promotion/community evidence foundation: provider adapters, official provenance bindings, replay/idempotency and public/on-chain timeline correlation.
+P1 — harden actor coordination and market-behavior screening with replayable counterparty/circular-flow evidence and false-positive tests.
 
-P2 — expose actor operational memory, campaign evidence and public evidence in one customer investigation view without merging identity authority.
+P2 — complete public promotion/community evidence provider adapters, official provenance bindings, replay/idempotency and public/on-chain timeline correlation.
 
-P3 — extend market-manipulation evidence with circular/wash-like flow, synchronized multi-wallet behavior and liquidity attribution.
+P3 — expose actor, campaign, market-behavior and public evidence in one customer investigation view without merging identity authority.
 
-P4 — deepen contract/transaction semantics and phishing/impersonation provenance.
+P4 — deepen liquidity/MEV attribution, contract/transaction semantics and phishing/impersonation provenance.
 
 P5 — expand verified multi-network adapters and cross-chain campaign movement evidence.
 
