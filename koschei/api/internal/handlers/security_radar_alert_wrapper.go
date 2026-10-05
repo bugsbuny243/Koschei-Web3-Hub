@@ -181,10 +181,32 @@ func arvisCustomerTelegramMessage(target string, envelope map[string]any) (strin
 	} else {
 		parts = append(parts, "Evidence: incomplete / pending — not treated as SAFE")
 	}
+	parts = append(parts, arvisTelegramContextLines(envelope)...)
 	if signature != "" {
 		parts = append(parts, "Signature: "+signature)
 	}
 	return strings.Join(parts, "\n"), signature
+}
+
+func arvisTelegramContextLines(envelope map[string]any) []string {
+	report, _ := envelope["investigation_report"].(map[string]any)
+	if report == nil {
+		return nil
+	}
+	out := []string{}
+	trade, _ := report["trade_ledger_aggregates"].(map[string]any)
+	if strings.EqualFold(strings.TrimSpace(stringFromMap(trade, "market_behavior_status")), "bounded_pattern_observed") {
+		out = append(out, "Market behavior: suspicious bounded timing pattern observed — requires corroboration")
+	}
+	coordination, _ := report["actor_coordination_intelligence"].(map[string]any)
+	if strings.EqualFold(strings.TrimSpace(stringFromMap(coordination, "status")), "coordination_patterns_observed") {
+		out = append(out, "Actor coordination: evidence-backed correlation pattern(s) observed — not an identity or wrongdoing claim")
+	}
+	promotion, _ := report["public_promotion_intelligence"].(map[string]any)
+	if strings.EqualFold(strings.TrimSpace(stringFromMap(promotion, "status")), "cross_asset_public_promotion_overlap_observed") {
+		out = append(out, "Public promotion: cross-asset public-source overlap observed — context only")
+	}
+	return out
 }
 
 func arvisAlertDedupeKey(authSubject, signature string) string {
