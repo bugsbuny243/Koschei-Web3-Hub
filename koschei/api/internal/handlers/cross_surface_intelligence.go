@@ -9,9 +9,9 @@ import (
 )
 
 // attachCrossSurfaceIntelligence enriches the canonical token investigation
-// with retained actor-coordination and public-promotion evidence. It never
-// changes the deterministic ARVIS verdict and never turns correlation into an
-// identity, wrongdoing, manipulation or criminal-group claim.
+// with retained actor-coordination, market-behavior and public-promotion
+// evidence. It never changes the deterministic ARVIS verdict and never turns
+// correlation into an identity, wrongdoing, manipulation or criminal-group claim.
 func (h *Handler) attachCrossSurfaceIntelligence(ctx context.Context, report map[string]any) {
 	if h == nil || report == nil || isActorDossierReport(report) {
 		return
@@ -60,6 +60,28 @@ func (h *Handler) attachCrossSurfaceIntelligence(ctx context.Context, report map
 		report["actor_investigation"] = actor
 	}
 
+	marketManipulation, marketErr := services.LoadMarketManipulationIntelligence(
+		ctx,
+		db,
+		target,
+		dossierParseTime(dossierString(report["generated_at"])),
+		services.MarketManipulationDefaultLimit,
+	)
+	if marketErr != nil {
+		marketManipulation.Status = "trade_ledger_query_failed"
+		marketManipulation.Available = false
+		marketManipulation.Complete = false
+		marketManipulation.WashTradingProven = false
+		marketManipulation.ManipulationClaim = false
+		marketManipulation.SameOperatorClaim = false
+		marketManipulation.VerdictAuthority = false
+		marketManipulation.Limitations = append(
+			marketManipulation.Limitations,
+			"Trade-ledger manipulation intelligence query failed; no wash-trading or manipulation claim was emitted.",
+		)
+	}
+	report["market_manipulation_intelligence"] = marketManipulation
+
 	promotion, promotionErr := services.LoadPublicPromotionIntelligence(ctx, db, network, target, 100, 500)
 	if promotionErr != nil && promotion.Status == "" {
 		promotion = services.NewPublicPromotionIntelligenceUnavailable(
@@ -76,6 +98,9 @@ func (h *Handler) attachCrossSurfaceIntelligence(ctx context.Context, report map
 		policy = map[string]any{}
 	}
 	policy["coordination_intelligence_can_change_grade"] = false
+	policy["market_manipulation_intelligence_can_change_grade"] = false
+	policy["round_trip_churn_is_not_wash_trading_proof"] = true
+	policy["market_manipulation_requires_corroboration"] = true
 	policy["public_promotion_intelligence_can_change_grade"] = false
 	policy["public_promotion_overlap_is_not_operator_identity"] = true
 	policy["public_promotion_overlap_is_not_manipulation_verdict"] = true
