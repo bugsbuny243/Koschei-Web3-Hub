@@ -19,6 +19,11 @@ func (h *Handler) persistDossierSourceSnapshot(ctx context.Context, report map[s
 	// never start a second RPC crawl merely to populate presentation aliases.
 	attachCreatorReportProjections(report)
 
+	// Join retained actor/funding and public-promotion evidence into the token
+	// report before diagnostics and hashing. These surfaces are context-only and
+	// cannot change the deterministic verdict or manufacture identity claims.
+	h.attachCrossSurfaceIntelligence(ctx, report)
+
 	if _, attached := report["defense_agent_runtime"]; !attached {
 		target := dossierSnapshotTarget(report)
 		network := firstNonEmptyString(dossierString(report["network"]), "solana-mainnet")
