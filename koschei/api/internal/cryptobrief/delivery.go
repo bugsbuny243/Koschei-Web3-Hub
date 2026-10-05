@@ -130,7 +130,7 @@ func (s *Service) claim(ctx context.Context) (delivery, bool, error) {
 	var d delivery
 	var quietStart, quietEnd int
 	var tz string
-	e = s.DB.QueryRowContext(ctx, `WITH candidate AS (SELECT d.id FROM crypto_brief_deliveries d JOIN crypto_brief_subscriptions s ON s.id=d.subscription_id WHERE d.state='pending' AND d.due_at<=clock_timestamp() AND s.state='active' AND ((s.channel='telegram' AND $1) OR (s.channel='whatsapp' AND $2)) ORDER BY d.due_at,d.id FOR UPDATE OF d SKIP LOCKED LIMIT 1), claimed AS (UPDATE crypto_brief_deliveries SET state='sending',lease_until=clock_timestamp()+interval '2 minutes',fencing_token=fencing_token+1,attempts=attempts+1,updated_at=clock_timestamp() WHERE id IN (SELECT id FROM candidate) RETURNING *) SELECT d.id,d.subscription_id,d.fencing_token,d.body,d.attempts,s.channel,s.recipient,s.last_inbound_at,s.quiet_start,s.quiet_end,s.timezone,d.dedup_key FROM claimed d JOIN crypto_brief_subscriptions s ON s.id=d.subscription_id`, s.Config.Ready("telegram"), s.Config.Ready("whatsapp")).Scan(&d.id, &d.subscription, &d.token, &d.body, &d.attempts, &d.channel, &d.recipient, &d.inbound, &quietStart, &quietEnd, &tz, &d.key)
+	e = s.DB.QueryRowContext(ctx, `WITH candidate AS (SELECT d.id FROM crypto_brief_deliveries d JOIN crypto_brief_subscriptions s ON s.id=d.subscription_id WHERE d.state='pending' AND d.due_at<=clock_timestamp() AND s.state='active' AND ((s.channel='telegram' AND $1) OR (s.channel='whatsapp' AND $2)) ORDER BY d.due_at,d.id FOR UPDATE OF d SKIP LOCKED LIMIT 1), claimed AS (UPDATE crypto_brief_deliveries SET state='sending',lease_until=clock_timestamp()+interval '2 minutes',fencing_token=fencing_token+1,attempts=attempts+1,updated_at=clock_timestamp() WHERE id IN (SELECT id FROM candidate) RETURNING *) SELECT d.id,d.subscription_id,d.fencing_token,d.body,d.attempts,s.channel,s.recipient,s.last_inbound_at,s.quiet_start,s.quiet_end,s.timezone,d.dedup_key FROM claimed d JOIN crypto_brief_subscriptions s ON s.id=d.subscription_id`, s.telegramDeliveryReady(), s.Config.Ready("whatsapp")).Scan(&d.id, &d.subscription, &d.token, &d.body, &d.attempts, &d.channel, &d.recipient, &d.inbound, &quietStart, &quietEnd, &tz, &d.key)
 	if errors.Is(e, sql.ErrNoRows) {
 		return d, false, nil
 	}
@@ -149,7 +149,9 @@ func (s *Service) ProcessOne(ctx context.Context, sender Sender, now time.Time) 
 	if e != nil {
 		result = SendResult{State: "pending", Reason: "consent_check_unavailable", RetryAfter: 15 * time.Minute}
 	} else if active {
-		if Quiet(now, d.preferences) && !strings.HasPrefix(d.key, "reply:") {
+		if d.channel == "telegram" && !s.telegramDeliveryReady() {
+			result = SendResult{State: "pending", Reason: "telegram_webhook_not_verified", RetryAfter: 15 * time.Minute}
+		} else if Quiet(now, d.preferences) && !strings.HasPrefix(d.key, "reply:") {
 			result = SendResult{State: "pending", Reason: "customer_quiet_hours", RetryAfter: time.Hour}
 		} else {
 			sendCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
@@ -188,9 +190,11 @@ func Start(ctx context.Context, db *sql.DB, health *runtimehealth.Registry) func
 	health.RegisterPeriodic("crypto-brief-feeds", "worker", "", enabled, time.Hour)
 	health.RegisterPeriodic("crypto-brief-delivery", "worker", "", enabled, 30*time.Minute)
 	if !enabled {
+		health.RegisterPeriodic(telegramWebhookHealthID, "worker", "", false, 2*time.Hour)
 		return func() {}
 	}
 	workerCtx, cancel := context.WithCancel(ctx)
+	startTelegramWebhook(workerCtx, s, health)
 	go func() {
 		gate := workerwake.Get(wakeID)
 		lastCleanup := time.Time{}

@@ -26,7 +26,7 @@ Set configuration directly in Railway's protected variable editor. Do not send c
 | `ENABLED` | `1` starts public news polling and customer delivery workers. |
 | `TELEGRAM_BOT_TOKEN` | Dedicated BotFather bot token, runtime secret. |
 | `TELEGRAM_USERNAME` | Dedicated public bot username, without `@`. |
-| `TELEGRAM_WEBHOOK_SECRET` | At least 32 characters, provided as Telegram's webhook header secret. |
+| `TELEGRAM_WEBHOOK_SECRET` | 32–256 characters from `A-Z`, `a-z`, `0-9`, `_`, `-`; provided as Telegram's webhook header secret. |
 | `WHATSAPP_ACCESS_TOKEN` | Dedicated Meta Cloud API runtime secret. |
 | `WHATSAPP_PHONE_NUMBER_ID` | Business phone number ID. |
 | `WHATSAPP_NUMBER` | Public business number, international digits, no `+`. |
@@ -36,7 +36,9 @@ Set configuration directly in Railway's protected variable editor. Do not send c
 | `WHATSAPP_TEMPLATE_NAME` | Meta-approved news template with exactly one body text parameter. |
 | `WHATSAPP_TEMPLATE_LANGUAGE` | Approved language code; default `tr`. |
 
-From the trusted deployment environment with those variables already provided, run `go run ./cmd/crypto-brief-telegram` to register `https://tradepigloball.co/integrations/crypto-brief/telegram`. This only changes the dedicated bot's webhook and never prints its token. Register Meta callback `https://tradepigloball.co/integrations/crypto-brief/whatsapp`, using the verification secret in the protected Meta console, and subscribe to messages/statuses. Meta template text may use `Kripto gündeminiz: {{1}}. Bildirimleri durdurmak için DUR yazın.`; approval must be verified in Meta, not inferred from a configured name.
+After setting the dedicated Telegram variables in Railway and deploying, the background runtime automatically verifies the bot identity, registers `https://tradepigloball.co/integrations/crypto-brief/telegram`, and reads the provider configuration back. It never replaces another webhook, discards pending updates, or prints credentials. Telegram deliveries remain queued until this verification succeeds. The operator runtime panel includes `crypto-brief-telegram-webhook`; a successful cycle proves the configured webhook, not receipt of a message. Verification repeats hourly; failed setup retries after 15 minutes and blocks Telegram sending until successful verification. The standalone `go run ./cmd/crypto-brief-telegram` command remains available in the trusted deployment environment as a manual check using the same validation.
+
+Register Meta callback `https://tradepigloball.co/integrations/crypto-brief/whatsapp`, using the verification secret in the protected Meta console, and subscribe to messages/statuses. Meta template text may use `Kripto gündeminiz: {{1}}. Bildirimleri durdurmak için DUR yazın.`; approval must be verified in Meta, not inferred from a configured name.
 
 For customer acceptance, log into `/crypto-brief`, choose preferences, check consent and connect a channel. Verify an actual message on the customer's device, `/gundem`, `DUR`, and `SIL`. Record the provider acceptance/receipt and operator queue state without copying customer identifiers. No production channel delivery was demonstrated during implementation because the dedicated provider credentials were absent.
 

@@ -12,6 +12,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/lib/pq"
@@ -33,6 +34,7 @@ type Config struct {
 var digits = regexp.MustCompile(`^[0-9]{5,20}$`)
 var botUsername = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{4,31}$`)
 var telegramToken = regexp.MustCompile(`^[0-9]+:[A-Za-z0-9_-]+$`)
+var telegramWebhookSecret = regexp.MustCompile(`^[A-Za-z0-9_-]{32,256}$`)
 var graphVersion = regexp.MustCompile(`^v[0-9]{1,2}\.[0-9]{1,2}$`)
 var templateName = regexp.MustCompile(`^[a-z0-9_]{1,128}$`)
 var templateLanguage = regexp.MustCompile(`^[a-z]{2,3}(_[A-Z]{2})?$`)
@@ -51,7 +53,7 @@ func (c Config) Ready(channel string) bool {
 	}
 	switch channel {
 	case "telegram":
-		return telegramToken.MatchString(c.TelegramToken) && len(c.TelegramSecret) >= 32 && botUsername.MatchString(c.TelegramUsername)
+		return telegramToken.MatchString(c.TelegramToken) && telegramWebhookSecret.MatchString(c.TelegramSecret) && botUsername.MatchString(c.TelegramUsername)
 	case "whatsapp":
 		return c.WhatsAppToken != "" && digits.MatchString(c.WhatsAppPhoneID) && len(c.WhatsAppSecret) >= 16 && len(c.WhatsAppVerify) >= 32 && graphVersion.MatchString(c.WhatsAppVersion) && digits.MatchString(c.WhatsAppNumber)
 	}
@@ -62,13 +64,15 @@ func (c Config) TemplateReady() bool {
 }
 
 type Service struct {
-	DB     *sql.DB
-	Client *http.Client
-	Config Config
+	DB                           *sql.DB
+	Client                       *http.Client
+	Config                       Config
+	telegramVerificationRequired bool
+	telegramVerified             atomic.Bool
 }
 
 func New(db *sql.DB) *Service {
-	return &Service{DB: db, Client: &http.Client{Timeout: 10 * time.Second}, Config: ConfigFromEnv()}
+	return &Service{DB: db, Client: &http.Client{Timeout: 10 * time.Second}, Config: ConfigFromEnv(), telegramVerificationRequired: true}
 }
 
 type Preferences struct {
