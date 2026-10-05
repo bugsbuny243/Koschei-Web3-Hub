@@ -52,7 +52,7 @@ jobs:
           test -n "${CLICKHOUSE_USER}"
           test -n "${CLICKHOUSE_PASSWORD}"
 
-      - name: Apply reviewed additive ClickHouse schemas 001-008
+      - name: Apply required reviewed additive ClickHouse schemas
         working-directory: koschei/api
         env:
           CLICKHOUSE_HTTP_URL: ${{ secrets.CLICKHOUSE_HTTP_URL }}
@@ -63,11 +63,11 @@ jobs:
           KOSCHEI_CLICKHOUSE_SCHEMA_APPLY: "1"
           KOSCHEI_CLICKHOUSE_PUBLICATION_SCHEMA_APPLY: "1"
           KOSCHEI_CLICKHOUSE_VERDICT_SCHEMA_APPLY: "1"
-          KOSCHEI_CLICKHOUSE_ARVIS_READ_INDEXES_APPLY: "1"
         run: |
           set -euo pipefail
           go run ./cmd/clickhouse-schema
           go run ./cmd/clickhouse-publication-schema
           go run ./cmd/clickhouse-verdict-schema
-          go run ./cmd/clickhouse-arvis-read-indexes
+          # Migration 004 only adds optional data-skipping indexes. The current
+          # service user lacks ALTER ADD INDEX, so do not block the data cutover.
           go run ./cmd/clickhouse-global-radar-schema
