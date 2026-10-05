@@ -2,138 +2,175 @@
 
 Date: 2026-10-05
 
-This audit translates the standalone Web3 product mission into evidence-backed implementation priorities. It does not claim features are production-ready when the repository marks them partial, planned or schema-only.
+This audit translates the standalone Web3 product mission into evidence-backed implementation priorities. It was corrected after a direct code/migration audit so existing capabilities are not rebuilt or described as missing. It does not claim a branch-only feature is production-ready before merge, migration and release gates pass.
 
-## Current strong foundation
+## Product boundary
 
-The existing repository already has strong evidence paths for:
+Koschei Web3 Hub is an independent commercial crypto security/intelligence product. ARVIS is its investigation, evidence-correlation, scanning and decision engine. Koschei Sentinel and Koschei Lang are separate products and are not Web3 entitlements.
+
+## Confirmed existing foundation
+
+The repository already contains substantial production-oriented foundations for:
 
 - Solana token intelligence;
 - token authority and holder concentration;
 - holder/funding/sybil relationships;
 - launch distribution and sniper timing;
 - transaction intent and program-relation analysis;
-- evidence graph and deterministic verdict concepts.
+- persistent funding-cluster memory;
+- actor operational memory across verified relations, shared funders and repeated token contexts;
+- campaign-genome memory with explicit anti-attribution boundaries;
+- durable Global Campaign revisions and evidence-anchor lookup;
+- durable trade-event memory through `token_trade_events`;
+- deterministic market/holder behavior rules including volume/liquidity gaps, holder/liquidity pressure, creator-sell acceleration and dominant-holder exit;
+- evidence graph, incident memory and deterministic verdict concepts.
 
-These should remain the base rather than being replaced by a new umbrella product.
+These systems should be extended rather than duplicated.
 
-## Current partial areas
+## Corrected status by intelligence lane
 
-The repository already describes these as partial evidence paths and they need completion:
+### A. Multi-wallet / repeat-operator intelligence
 
-1. **Creator / repeat-operator memory**
-   - Persist durable actor-index history.
-   - Correlate deployer, creator, funding, dominant-holder, LP and exit behavior across launches.
-   - Keep inferred links watch-only until direct evidence exists.
+Current state: **substantial foundation already implemented; expansion required, not a greenfield build.**
 
-2. **Liquidity manipulation / drain attribution**
-   - Attach signed add/remove events, reserve deltas, LP authority and actor relationships.
-   - Detect coordinated liquidity movement and exit patterns without treating every withdrawal as malicious.
+Existing code already supports persistent funding clusters and actor operational memory. Direct verified relations remain distinct from shared-funder or operational-overlap inference. Campaign-genome matching explicitly does not prove common identity, control or wrongdoing.
 
-3. **MEV / sandwich intelligence**
-   - Attach route, slippage and pool-state before/after evidence.
-   - Separate execution-risk analysis from unsupported attacker attribution.
+Remaining work:
 
-4. **Watch intelligence**
-   - Make observations durable across time and targets.
-   - Promote only independently verified evidence into customer claims.
+- improve deployer/creator/holder/LP-role recurrence coverage across launches;
+- add stronger coordinated timing signatures with replayable evidence;
+- expose cluster lineage/supersession cleanly in customer investigations;
+- enrich cross-token actor histories without collapsing inferred clusters into one person.
 
-## Planned or missing areas required by the product mission
+A cluster is not automatically one person. Common control/ownership must never be claimed from timing or shared infrastructure alone.
 
-### A. Market-manipulation intelligence
+### B. Market-manipulation intelligence
 
-Current state: planned evidence path.
+Current state: **partial deterministic engine already implemented.**
 
-Required evidence lanes:
+Existing unified-radar behavior rules already cover:
 
-- self-flow / circular-flow detection;
-- wash-like trading patterns;
-- coordinated entry and exit timing;
-- artificial volume versus liquidity gaps;
-- repeated market-maker or funding-cluster reuse;
-- dominant-wallet pressure and synchronized selling;
-- pump/dump trajectory evidence;
-- price/volume/liquidity anomaly timelines with provenance.
+- abnormal volume/liquidity gaps;
+- holder/liquidity pressure;
+- creator-sell acceleration;
+- dominant-holder first-exit behavior.
 
-Output must say "manipulation indicators" unless the evidence supports a stronger factual claim.
+The deterministic verdict boundary already prevents inferred/watch-only signals from becoming grade-changing evidence by themselves.
 
-### B. Multi-wallet and operator-group intelligence
+Remaining work:
 
-Current state: strong sybil/funding foundation, incomplete actor memory.
+- self-flow and circular-flow detection;
+- wash-like repeated counterparty/flow patterns;
+- synchronized multi-wallet entry/exit timing;
+- stronger liquidity add/remove attribution and reserve-delta timelines;
+- repeated market-maker/funding-cluster reuse across assets;
+- pump/dump trajectory timelines with exact price/volume/liquidity provenance;
+- independent replay tests proving false-positive resistance.
 
-Required additions:
+Customer output must say **manipulation indicators** unless stronger factual evidence exists.
 
-- wallet-cluster lineage across multiple tokens;
-- shared-funder and common-recipient recurrence;
-- deployer/creator/holder/LP-role reuse;
-- coordinated wallet timing signatures;
-- cluster persistence and supersession history;
-- campaign-level graph views spanning launches, wallets, pools and public project identities.
+### C. Durable campaign intelligence
 
-A cluster is not automatically one person. Common control/ownership must never be claimed from timing alone.
+Current state: **strong foundation implemented.**
 
-### C. Public hype / promotion / community coordination intelligence
+The repository already has append-oriented campaign-genome evidence, revisioned Global Campaign state, canonical evidence hashes and evidence-anchor lookup/merge logic. Entity-only hints and verdict references are intentionally excluded from automatic campaign matching where they would create unsafe identity convergence.
 
-Current state: project/metadata and social metadata surfaces exist, but no complete verified campaign-evidence pipeline is established.
+Remaining work:
 
-Required additions:
+- enrich campaign material from new evidence lanes without creating a second graph model;
+- expose campaign timelines and evidence quality in customer investigation views;
+- connect public-source observations only through explicit evidence references or verified relations;
+- preserve ambiguity/fail-closed behavior when several campaigns could match.
 
-- public project-site and public social-account provenance;
-- time-bound public promotion observations;
-- repeated promoter/project relationships;
-- synchronized public-post / on-chain event timelines;
+### D. Public hype / promotion / community coordination intelligence
+
+Current state: **real product gap; first provenance-safe foundation is being added in this branch.**
+
+Branch foundation:
+
+- migration `134_public_promotion_evidence.sql` adds an append-only public evidence store;
+- canonical public URL/domain provenance is retained;
+- public account/handle, external item ID, source reference and observation/publication times are recorded;
+- bounded excerpts are fingerprinted rather than treated as verdict text;
+- exact evidence observations receive deterministic `KPUB1-*` references;
+- repeated public actor, public domain and normalized-claim fingerprints can produce cross-asset **inferred/watch-only** correlation signals;
+- public handles are not promoted into on-chain actor identities;
+- public-source overlap has no verdict, grade, same-operator, real-world-identity or wrongdoing authority;
+- an observation can be represented as Global Campaign evidence without manufacturing a relation anchor.
+
+Still required before this becomes a complete customer feature:
+
+- lawful public-source provider adapters for supported platforms;
+- verified official project-site/social-account provenance binding;
+- source-specific replay/idempotency tests;
+- synchronized public-post versus on-chain-event timelines;
 - public claim versus on-chain evidence comparison;
-- bot-like or coordinated-public-activity indicators only when measurable evidence exists;
-- campaign graph linking public identities, projects, wallets and launches with confidence labels.
+- measurable bot-like/coordinated-public-activity indicators with defensible thresholds;
+- ARVIS investigation output that shows public evidence, confidence and limitations;
+- customer UI/report/API surfaces and opted-in notification policy.
 
-Do not scrape or infer private groups/messages that the system is not lawfully authorized to access. Do not call a community criminal or fraudulent merely because it is promotional or coordinated.
+Do not scrape or infer private groups/messages that the system is not lawfully authorized to access. Do not call a community criminal or fraudulent merely because it is promotional, repetitive or coordinated.
 
-### D. Contract and transaction behavior intelligence
+### E. Liquidity / MEV / execution intelligence
 
-Required additions beyond current token/transaction foundations:
+Current state: **partial.**
+
+Remaining work:
+
+- signed/traceable add-remove liquidity attribution;
+- reserve and pool-state before/after evidence;
+- LP authority relationships;
+- route/slippage and sandwich-like execution evidence;
+- clear separation between execution risk and attacker attribution.
+
+A withdrawal or MEV-like ordering pattern is not automatically malicious.
+
+### F. Contract and transaction behavior intelligence
+
+Current state: **strong Solana transaction/token foundation; deeper semantics and broader networks still required.**
+
+Remaining work:
 
 - richer instruction/function semantics;
 - privilege and upgrade paths;
 - hidden/indirect transfer restrictions where observable;
 - approval/delegation and authority-change sequences;
-- honeypot-like behavior evidence where executable simulation or verified transaction evidence supports it;
+- honeypot-like behavior only where executable simulation or verified transaction evidence supports it;
 - proxy/implementation and privileged-admin relationships on supported EVM networks;
 - malicious interaction patterns with exact transaction evidence.
 
-### E. Cross-chain intelligence
+### G. Scam / impersonation / phishing surface intelligence
 
-Current state: schema-only / no production evidence arm for serious cross-chain claims.
+Current state: **partial incident/security memory; public provenance lane now has a branch foundation.**
 
-Required additions:
+Remaining work:
+
+- verified official-domain and public-account provenance;
+- fake mint/contract similarity with evidence;
+- impersonation/domain lookalike evidence;
+- claim-site and unsafe-instruction observations;
+- malicious-address and incident-memory correlation;
+- provenance-preserving customer warnings tied to concrete evidence.
+
+### H. Cross-chain / global network intelligence
+
+Current state: **partial contracts/schema and campaign concepts; not complete production evidence coverage.**
+
+Remaining work:
 
 - chain-specific verified adapters;
 - bridge deposit/withdrawal correlation;
 - wrapped/native asset lineage;
-- cross-chain wallet/entity graph edges;
+- cross-chain wallet/entity evidence edges;
 - repeated campaign movement across chains;
-- peel-chain and conversion patterns only when supported by traceable evidence;
+- peel/conversion patterns only when supported by traceable evidence;
 - explicit UNKNOWN when a bridge or destination cannot be verified.
 
-### F. Scam / impersonation / phishing surface intelligence
+"All crypto" is the product mission and coverage target, not a present-tense claim that every chain and venue is already covered. Solana remains the strongest evidence lane while additional networks must pass explicit readiness gates.
 
-Required additions:
+## Customer delivery status
 
-- verified official-domain and public-account provenance;
-- fake mint/contract similarity and impersonation evidence;
-- claim-site and unsafe-instruction evidence;
-- malicious-address and incident-memory correlation;
-- provenance-preserving URL/domain observations;
-- customer warning language tied to concrete evidence.
-
-### G. Global network coverage
-
-The product target is multi-network, but each network must have its own evidence adapter. "All crypto" is the long-term scope, not a claim that every chain is currently covered.
-
-Priority should be determined by customer value and evidence quality, with Solana preserved as the strongest lane while adding EVM and other chain adapters behind explicit readiness gates.
-
-## Customer output target
-
-A customer should not receive raw noise. ARVIS should turn evidence into an investigation view containing:
+The customer should receive an investigation, not raw noise. The target ARVIS view contains:
 
 - what was detected;
 - target/project/token/wallet identities;
@@ -148,23 +185,25 @@ A customer should not receive raw noise. ARVIS should turn evidence into an inve
 - recommended defensive action;
 - signed verdict where the deterministic verdict contract applies.
 
-Delivery targets include the Web3 application, reports, API/webhooks and opted-in Telegram notifications.
+This branch also adds the first customer-specific Telegram result-delivery path by reusing the existing consented Telegram pairing. That is an initial lane for successful ARVIS radar checks, not yet proof that every asynchronous ARVIS scan surface is covered.
 
-## Implementation order
+Delivery targets remain the Web3 application, reports, API/webhooks and opted-in Telegram notifications.
 
-P0 — preserve evidence/authority contracts and standalone Web3 product identity.
+## Corrected implementation order
 
-P1 — complete creator/repeat-operator memory and liquidity attribution.
+P0 — preserve standalone Web3 identity, evidence authority boundaries and fail-closed behavior.
 
-P2 — implement deterministic market-manipulation evidence rules and durable campaign graphs.
+P1 — complete the public promotion/community evidence foundation: provider adapters, official provenance bindings, replay/idempotency and public/on-chain timeline correlation.
 
-P3 — build public hype/promotion/community evidence ingestion with provenance and confidence boundaries.
+P2 — expose actor operational memory, campaign evidence and public evidence in one customer investigation view without merging identity authority.
 
-P4 — expand contract semantics and multi-network evidence adapters.
+P3 — extend market-manipulation evidence with circular/wash-like flow, synchronized multi-wallet behavior and liquidity attribution.
 
-P5 — add cross-chain verified movement/campaign correlation.
+P4 — deepen contract/transaction semantics and phishing/impersonation provenance.
 
-P6 — unify customer investigation output and opted-in notification delivery across all ARVIS scan types.
+P5 — expand verified multi-network adapters and cross-chain campaign movement evidence.
+
+P6 — cover all relevant ARVIS scan/event surfaces with customer-selected Web3 delivery channels, including Telegram, API/webhooks and reports.
 
 ## Non-negotiable truth rule
 
