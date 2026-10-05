@@ -6,13 +6,18 @@ on:
       - Full Neon radar to ClickHouse backfill
     types:
       - completed
+  push:
+    branches:
+      - migration/neon-to-clickhouse-inventory-20261005
+    paths:
+      - .github/workflows/neon-radar-final-parity.yml
 
 permissions:
   contents: read
 
 jobs:
   verify:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'migration/neon-to-clickhouse-inventory-20261005' }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/migration/neon-to-clickhouse-inventory-20261005') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'migration/neon-to-clickhouse-inventory-20261005') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -74,8 +79,6 @@ jobs:
           target_count = int(target[0])
           if source_count != target_count:
               raise SystemExit(f"FINAL RADAR PARITY FAILED source={source_count} target_distinct={target_count}")
-          # PostgreSQL retains microseconds while the canonical ClickHouse shadow table is millisecond precision.
-          # Compare the bounds at millisecond precision only.
           def ms(value: str) -> str:
               value = value.replace("T", " ").replace("+00", "").replace("Z", "")
               if "." not in value:
