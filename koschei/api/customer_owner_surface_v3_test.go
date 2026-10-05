@@ -19,7 +19,7 @@ func TestCustomerSurfaceV3KeepsOneSimpleNavigationAndScanEntry(t *testing.T) {
 	product := readSurfaceV3(t, "public/js/koschei-product-v2.js")
 	for _, required := range []string{
 		"['/','Home']",
-		"['/scan','Scan']",
+		"['/scan','ARVIS Radar']",
 		"['/reports','Activity']",
 		"['/dashboard','Workspace']",
 		"['/pricing','Plans']",
@@ -27,6 +27,7 @@ func TestCustomerSurfaceV3KeepsOneSimpleNavigationAndScanEntry(t *testing.T) {
 		"customer-scan-flow-v3.js",
 		"customer-result-guidance-v3.js",
 		"customer-workspace-plans-v3.js",
+		"if(document.body.classList.contains('customer-single-radar'))return;",
 	} {
 		if !strings.Contains(product, required) {
 			t.Fatalf("customer product shell missing %q", required)
@@ -155,7 +156,7 @@ func TestCustomerRouteVisibilityIsNotOwnedByOwnerDashboardCSS(t *testing.T) {
 	scan := readSurfaceV3(t, "public/scan.html")
 	for _, required := range []string{
 		"body.koschei-enterprise main.page{display:block!important",
-		"/js/customer-command-center-v1.js?v=5",
+		"/js/customer-command-center-v1.js?v=6",
 	} {
 		if !strings.Contains(scan, required) {
 			t.Fatalf("scan recovery contract missing %q", required)

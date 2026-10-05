@@ -17,18 +17,18 @@ function reject(file, text) {
 // Investigation/report evidence contract. The internal controller may retain
 // compatibility parsing for old quick-preflight responses, but the customer UI
 // no longer exposes free Quick Check execution. Pin the current Intelligence
-// Desk evidence and read-only boundaries instead of retired visual copy.
+// Radar evidence and read-only boundaries instead of retired visual copy.
 need('public/js/public-solana-scan.js', 'Pending evidence arms and monitoring windows');
 need('public/js/public-solana-scan.js', 'Missing evidence = no safety decision');
 need('public/js/public-solana-scan.js', '/api/public/transaction-simulate');
 need('public/js/lp-control-evidence-card.js', 'Havuz hareket geçmişi bu taramada doğrulanamadı');
-need('public/scan.html', 'INTELLIGENCE DESK');
-need('public/scan.html', 'Evidence provenance');
-need('public/scan.html', 'Unavailable or incomplete evidence cannot silently improve a risk outcome.');
-need('public/scan.html', 'Transaction simulation never signs or broadcasts.');
-need('public/scan.html', 'data-scan-mode="token"');
-need('public/scan.html', 'data-scan-mode="transaction"');
-need('public/scan.html', 'data-scan-mode="deep"');
+need('public/scan.html', 'ARVIS Radar');
+need('public/js/customer-universal-address-scan-v1.js', 'Evidence references');
+need('public/scan.html', 'Missing evidence stays unknown.');
+need('public/scan.html', 'never signs or broadcasts.');
+need('public/scan.html', '<option value="token">');
+need('public/scan.html', '<option value="transaction">');
+need('public/js/public-solana-scan.js', 'deep:');
 need('public/scan.html', 'data-customer-arvis-result');
 need('public/scan.html', '/css/koschei.css?v=1');
 reject('public/scan.html', 'data-scan-mode="quick"');

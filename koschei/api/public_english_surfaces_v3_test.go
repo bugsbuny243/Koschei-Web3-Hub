@@ -46,24 +46,29 @@ func TestCanonicalInvestigationSurfaceMountsProfessionalModesAndEvidenceControll
 	}
 	text := string(body)
 	for _, required := range []string{
-		"INTELLIGENCE DESK",
-		"Investigate an address or EVM transaction.",
-		"Every material state keeps its source boundary",
-		"data-scan-mode=\"token\"",
-		"data-scan-mode=\"transaction\"",
-		"data-scan-mode=\"deep\"",
+		"ARVIS Radar",
+		"One target, one investigation.",
+		`id="scanForm"`,
+		`id="radarMode"`,
+		`id="scanNetwork"`,
+		`<option value="token">`,
+		`<option value="transaction">`,
+		`<option value="spending">`,
 		"arvis-premium-contract.js",
 		"customer-arvis-premium-suite.js",
 		"data-customer-arvis-result",
-		"public-solana-scan.js?v=13",
-		"Unavailable or incomplete evidence cannot silently improve a risk outcome.",
-		"Transaction simulation never signs or broadcasts.",
+		"public-solana-scan.js?v=14",
+		"Missing evidence stays unknown.",
+		"never signs or broadcasts.",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("canonical investigation page missing %q", required)
 		}
 	}
-	for _, forbidden := range []string{`data-scan-mode="quick"`, `href="/safe-check"`, `href="/transaction-shield"`, `href="/security-radar"`} {
+	if strings.Count(text, "<form ") != 1 {
+		t.Error("canonical investigation page must have one request form")
+	}
+	for _, forbidden := range []string{`data-scan-mode="quick"`, `href="/safe-check"`, `href="/transaction-shield"`, `href="/security-radar"`, `id="customerUniversalScanForm"`, `id="evmAuthorityForm"`, `id="evmSpendingForm"`} {
 		if strings.Contains(text, forbidden) {
 			t.Errorf("canonical investigation page contains retired or duplicate scanner contract %q", forbidden)
 		}
@@ -77,21 +82,25 @@ func TestDashboardIsCurrentCustomerSecurityWorkspace(t *testing.T) {
 	}
 	text := string(body)
 	for _, required := range []string{
-		"Koschei Web3 | Intelligence Console",
-		"Customer intelligence workspace",
-		"Security Overview",
-		"ARVIS intelligence map",
-		"Live operational truth",
-		"Live account state",
-		"Security Capabilities",
+		"Koschei Web3 | Customer Workspace",
+		"Customer workspace",
+		"One radar. Your evidence.",
+		"ARVIS Radar",
+		"Your latest activity",
+		"CHECKING ACCOUNT DATA",
+		`id="dashboardUniversalScanForm"`,
+		`id="dashboardScanNetwork"`,
 		"Missing evidence remains unknown.",
-		"Solana is the live chain core.",
+		"Unavailable records remain unavailable.",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("dashboard missing workspace contract %q", required)
 		}
 	}
-	for _, forbidden := range []string{`id="mint"`, `id="scan"`, "/api/token/scan", "data-customer-arvis-result", "Signed report vault", "PROFESSIONAL · ARVIS COMMAND UNIVERSE"} {
+	if strings.Count(text, "<form ") != 1 {
+		t.Error("dashboard must have one radar entry form")
+	}
+	for _, forbidden := range []string{`id="mint"`, `id="scan"`, "/api/token/scan", "data-customer-arvis-result", "Signed report vault", "PROFESSIONAL · ARVIS COMMAND UNIVERSE", `class="tool-card`, `class="intel-map`, `href="/scan?mode=deep"`} {
 		if strings.Contains(text, forbidden) {
 			t.Errorf("dashboard contains duplicate or retired workspace behavior %q", forbidden)
 		}
@@ -114,7 +123,7 @@ func TestUnifiedScanBehaviorKeepsRealLegacyEndpointsWithoutExposingQuickModeUI(t
 		"Deep Radar",
 		"Missing evidence = no safety decision",
 		"window.__koscheiUnifiedScanNavigation",
-		"script.src='/js/unified-scan-navigation.js?v=1'",
+		"script.src='/js/unified-scan-navigation.js?v=2'",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("unified scan behavior missing %q", required)

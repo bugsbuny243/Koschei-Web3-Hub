@@ -19,6 +19,7 @@ func TestPublicSiteUsesApprovedSurfaceScopedCSSFiles(t *testing.T) {
 	sort.Strings(files)
 	want := []string{
 		filepath.FromSlash("public/css/crypto-brief.css"),
+		filepath.FromSlash("public/css/customer-radar-v1.css"),
 		filepath.FromSlash("public/css/customer-universal-address-scan-v1.css"),
 		filepath.FromSlash("public/css/evm-authority-desk.css"),
 		filepath.FromSlash("public/css/global-campaigns.css"),
@@ -85,7 +86,7 @@ func TestPublicSiteUsesApprovedSurfaceScopedCSSFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read dashboard: %v", err)
 	}
-	for _, href := range []string{`/css/koschei-dashboard.css?v=3`, `/css/koschei-dashboard-premium.css?v=4`} {
+	for _, href := range []string{`/css/koschei-dashboard.css?v=3`, `/css/koschei-dashboard-premium.css?v=5`} {
 		if !strings.Contains(string(dashboardBody), href) {
 			t.Fatalf("dashboard missing current stylesheet %q", href)
 		}
