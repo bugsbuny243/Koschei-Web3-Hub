@@ -3,8 +3,6 @@ package clickhouse
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 )
 
@@ -15,27 +13,13 @@ func (c *Client) ApplyTrustedVerdictShadowMigration(ctx context.Context, migrati
 	if err := validateTrustedVerdictShadowMigration(migrationSQL); err != nil {
 		return err
 	}
-	migrationURL := *c.endpoint
-	query := migrationURL.Query()
-	query.Set("multiquery", "1")
-	migrationURL.RawQuery = query.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, migrationURL.String(), strings.NewReader(migrationSQL))
-	if err != nil {
-		return fmt.Errorf("build ClickHouse verdict migration request: %w", err)
+	statements := trustedMigrationStatements(migrationSQL)
+	for index, statement := range statements {
+		if err := c.applyTrustedMigrationStatement(ctx, statement); err != nil {
+			return fmt.Errorf("ClickHouse verdict migration statement %d/%d failed: %w", index+1, len(statements), err)
+		}
 	}
-	c.applyHeaders(req)
-	req.Header.Set("Content-Type", "text/plain; charset=utf-8")
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("ClickHouse verdict migration request failed: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
-		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-		return nil
-	}
-	message, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	return fmt.Errorf("ClickHouse verdict migration failed status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(message)))
+	return nil
 }
 
 func (c *Client) VerifyVerdictShadowSchema(ctx context.Context) error {
@@ -59,8 +43,10 @@ FORMAT JSON`)
 	if len(metadata.Data) != 1 {
 		return fmt.Errorf("ClickHouse verdict table metadata returned %d rows", len(metadata.Data))
 	}
-	if metadata.Data[0].Engine != "ReplacingMergeTree" {
-		return fmt.Errorf("ClickHouse verdict table engine=%q want ReplacingMergeTree", metadata.Data[0].Engine)
+	switch metadata.Data[0].Engine {
+	case "ReplacingMergeTree", "SharedReplacingMergeTree":
+	default:
+		return fmt.Errorf("ClickHouse verdict table engine=%q want ReplacingMergeTree or SharedReplacingMergeTree", metadata.Data[0].Engine)
 	}
 	if metadata.Data[0].SortingKey != "module_id, verdict_id" {
 		return fmt.Errorf("ClickHouse verdict table sorting_key=%q want %q", metadata.Data[0].SortingKey, "module_id, verdict_id")
