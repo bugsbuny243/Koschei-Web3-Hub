@@ -850,3 +850,22 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,su
   .dashboard .intel-map::before{animation:none!important}
 }
 
+
+/* Customer home keeps a single radar entry; account activity follows it. */
+.single-radar-workspace .content{padding-top:24px}
+.single-radar-workspace .workspace-heading{margin:0 0 24px}
+.single-radar-workspace .workspace-heading h1{margin:8px 0 10px;font-size:clamp(28px,3.5vw,44px);line-height:1.15;letter-spacing:-.035em}
+.single-radar-workspace .workspace-heading p{max-width:700px;font-size:16px;line-height:1.6;color:#aab9b0}
+.single-radar-workspace .dashboard-scan-entry{margin:0 0 20px;padding:24px}
+.single-radar-workspace .dashboard-scan-entry h2{font-size:24px;margin:8px 0}
+.single-radar-workspace .radar-entry-link{display:inline-block;margin-top:8px;padding:6px 0;color:#a6e7c9;font-size:14px}
+.single-radar-workspace .workspace-kpi{min-height:120px;padding:18px}
+.single-radar-workspace .workspace-live-head{min-height:0;padding:18px;gap:12px;flex-wrap:wrap}
+.single-radar-workspace .workspace-live-head p{font-size:14px}
+.single-radar-workspace .workspace-command-head a{color:#a6e7c9;font-size:12px}
+.single-radar-workspace .workspace-command{min-height:0}
+.single-radar-workspace .sidebar-foot{font-size:12px}
+@media(max-width:820px){.single-radar-workspace .topbar{grid-template-columns:auto minmax(0,1fr) auto}.single-radar-workspace .top-status{display:none}.single-radar-workspace .workspace-heading{margin-bottom:20px}.single-radar-workspace .dashboard-scan-entry{padding:18px}.single-radar-workspace .dashboard-scan-form{grid-template-columns:1fr}.single-radar-workspace .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.single-radar-workspace .workspace-kpi strong{font-size:24px}.single-radar-workspace .workspace-live-head{display:flex}.single-radar-workspace .workspace-live-head>div{flex-basis:100%}.single-radar-workspace .workspace-live-state{max-width:100%;white-space:normal}.single-radar-workspace .workspace-command-grid{grid-template-columns:1fr}}
+@media(max-width:820px){.single-radar-workspace .sidebar{visibility:hidden!important}.single-radar-workspace.nav-open .sidebar{visibility:visible!important}}
+
+@media(max-width:820px){.single-radar-workspace #workspaceAccessKpi strong{font-size:16px;overflow-wrap:normal}}

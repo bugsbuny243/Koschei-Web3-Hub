@@ -1,15 +1,23 @@
 // REGISTERED: active on /scan and backed by /api/scan/approval as of 2026-09-25.
 (()=>{
 'use strict';
-const form=document.getElementById('evmSpendingForm');
+const shared=Boolean(document.getElementById('radarMode'));
+const form=document.getElementById('evmSpendingForm')||(shared?document.getElementById('scanForm'):null);
 if(!form)return;
-const network=document.getElementById('evmSpendingNetwork');
-const token=document.getElementById('evmSpendingToken');
+const network=document.getElementById('evmSpendingNetwork')||document.getElementById('scanNetwork');
+const token=document.getElementById('evmSpendingToken')||document.getElementById('target');
 const owner=document.getElementById('evmSpendingOwner');
 const spender=document.getElementById('evmSpendingSpender');
-const submit=document.getElementById('evmSpendingSubmit');
-const status=document.getElementById('evmSpendingStatus');
+const submit=document.getElementById('evmSpendingSubmit')||document.getElementById('submit');
+const status=document.getElementById('evmSpendingStatus')||document.getElementById('customerUniversalStatus');
 const result=document.getElementById('evmSpendingResult');
+const active=()=>!shared||window.KoscheiRadar?.mode==='spending';
+let generation=0,pending=null;
+function invalidate(){generation++;pending?.abort();pending=null;result.hidden=true;}
+if(shared){
+  document.addEventListener('koschei:radar-mode-changed',invalidate);
+  for(const input of [token,owner,spender,network])input.addEventListener(input===network?'change':'input',()=>{if(active()){invalidate();submit.disabled=false;submit.textContent='Read allowance';}});
+}
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const short=value=>{const text=String(value||'');return text.length>26?`${text.slice(0,12)}…${text.slice(-10)}`:text};
 const validAddress=value=>/^0x[0-9a-fA-F]{40}$/.test(String(value||'').trim());
@@ -60,7 +68,11 @@ function render(payload){
 }
 
 form.addEventListener('submit',async event=>{
+  if(!active())return;
   event.preventDefault();
+  if(shared)event.stopImmediatePropagation();
+  invalidate();
+  const current=++generation,controller=new AbortController();pending=controller;
   const values={network:network.value,token:token.value.trim(),owner:owner.value.trim(),spender:spender.value.trim()};
   if(!validAddress(values.token)||!validAddress(values.owner)||!validAddress(values.spender)){
     status.textContent='Token, owner and spender must each be a 20-byte EVM address.';
@@ -74,18 +86,24 @@ form.addEventListener('submit',async event=>{
   status.dataset.state='loading';
   result.hidden=true;
   try{
-    const response=await fetch('/api/scan/approval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values)});
+    const response=await fetch('/api/scan/approval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(values),signal:controller.signal});
     const data=await response.json().catch(()=>({}));
+    if(current!==generation)return;
     if(!response.ok)throw new Error(data.error||`HTTP ${response.status}`);
+    if(shared){
+      const returned=data?.result;
+      if(!returned||returned.network!==values.network||['token','owner','spender'].some(key=>String(returned[key]||'').toLowerCase()!==values[key].toLowerCase()))throw new Error('The returned allowance does not match this target, owner, spender and network. The result was withheld.');
+    }
     render(data);
+    if(shared)document.getElementById('empty').hidden=true;
     status.textContent='Current allowance observed. Creation mechanism and owner intent were not inferred.';
     status.dataset.state='ready';
   }catch(error){
+    if(current!==generation)return;
     status.textContent=`Spending intelligence unavailable: ${error?.message||'unknown error'}`;
     status.dataset.state='error';
   }finally{
-    submit.disabled=false;
-    submit.textContent='Read spending authority';
+    if(current===generation){pending=null;submit.disabled=false;submit.textContent=shared?'Read allowance':'Read spending authority';}
   }
-});
+},shared);
 })();

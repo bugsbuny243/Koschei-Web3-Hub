@@ -45,7 +45,7 @@ function normalizeLinks(root=document){
     if(!scanLinks.length)return;
     const keep=scanLinks[0];
     keep.href='/scan';
-    keep.textContent='Scan Center';
+    keep.textContent='ARVIS Radar';
     keep.setAttribute('data-canonical-scan-link','1');
     scanLinks.slice(1).forEach(anchor=>anchor.remove());
     cleanSeparators(group);

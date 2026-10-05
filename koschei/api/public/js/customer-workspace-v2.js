@@ -69,7 +69,7 @@ function renderLatestInvestigation(items){
   const host=$('workspaceLatestReport');if(!host)return;clearNode(host);
   if(!Array.isArray(items)){host.append(domNode('div','workspace-command-empty','Canonical investigation history is unavailable. Missing history is not treated as an empty vault.'));return;}
   const latest=items[0]||null;
-  if(!latest){host.append(domNode('div','workspace-command-empty','No canonical investigation job is retained yet. Start at Deep Scan to create a metered investigation.'));return;}
+  if(!latest){host.append(domNode('div','workspace-command-empty','No canonical investigation job is retained yet. Start an investigation in ARVIS Radar.'));return;}
   const state=historyState(latest.status),target=text(latest.target),network=text(latest.network),evidence=historyEvidenceState(latest),verdict=historyDecisionText(latest,'verdict'),grade=historyDecisionText(latest,'grade');
   const card=domNode('article','workspace-report-card');
   const top=domNode('div','workspace-report-card__top'),identity=domNode('div');
@@ -78,7 +78,7 @@ function renderLatestInvestigation(items){
   const meta=domNode('div','workspace-report-meta');
   for(const [label,value] of [['Verdict',verdict],['Grade',grade],['Evidence',evidence]]){const wrap=domNode('div');wrap.append(domNode('label','',label),domNode('strong','',value));meta.append(wrap);}
   const actions=domNode('div','workspace-report-actions');
-  if(target){const reinvestigate=domNode('a','primary','Re-investigate target');reinvestigate.href=network==='solana-mainnet'?`/arvis-chat?target=${encodeURIComponent(target)}`:`/scan?mode=address&target=${encodeURIComponent(target)}&network=${encodeURIComponent(network)}`;actions.append(reinvestigate);}
+  if(target){const reinvestigate=domNode('a','primary','Re-investigate target');reinvestigate.href=`/scan?mode=address&target=${encodeURIComponent(target)}&network=${encodeURIComponent(network)}`;actions.append(reinvestigate);}
   const historyLink=domNode('a','','Open investigation history');historyLink.href='/reports';actions.append(historyLink);
   card.append(top,meta,actions);host.append(card);
 }

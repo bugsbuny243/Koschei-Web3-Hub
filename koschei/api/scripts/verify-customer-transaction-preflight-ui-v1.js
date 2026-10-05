@@ -42,16 +42,16 @@ for (const forbidden of [
   if (overlay.includes(forbidden)) throw new Error(`customer preflight UI violates boundary: ${forbidden}`);
 }
 if (!overlay.includes("},true);")) throw new Error('transaction submit interception must run in capture phase');
-if (!scan.includes('/js/customer-transaction-preflight-v1.js?v=2')) {
+if (!scan.includes('/js/customer-transaction-preflight-v1.js?v=3')) {
   throw new Error('scan page does not mount the current Professional transaction preflight/recheck overlay');
 }
 if (scan.includes('/js/customer-transaction-preflight-v1.js?v=1')) {
   throw new Error('scan page still references the stale v1 transaction preflight asset URL');
 }
-if (!scan.includes('Transaction Preflight') || !scan.includes('Professional transaction preflight')) {
-  throw new Error('scan page does not label the Professional transaction capability truthfully');
+if (!scan.includes('<option value="transaction">Solana transaction before signing</option>') || !overlay.includes('Professional Transaction Preflight')) {
+  throw new Error('the shared radar must retain the Professional transaction capability');
 }
-if (!command.includes("{label:'Transaction Preflight',href:'/scan?mode=transaction',access:'PROFESSIONAL'}")) {
-  throw new Error('customer command center is missing the Professional Transaction Preflight capability');
+if (!command.includes("{label:'ARVIS Radar',href:'/scan',mode:'primary'}") || command.includes("href:'/scan?mode=transaction'")) {
+  throw new Error('transaction preflight must be selected inside the single ARVIS Radar, not a duplicate menu entry');
 }
 console.log('customer transaction preflight UI v1 contract verified');

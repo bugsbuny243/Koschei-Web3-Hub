@@ -8,6 +8,7 @@ const recheckEndpoint='/api/customer/web3/transaction-state-recheck';
 let pendingRecheck=null;
 let authLoaderPromise=null;
 let authInitPromise=null;
+let preflightGeneration=0,preflightPending=null;
 const form=document.getElementById('scanForm');
 const submit=document.getElementById('submit');
 const transaction=document.getElementById('transaction');
@@ -34,6 +35,10 @@ function syncCopy(){
 }
 
 document.querySelectorAll('[data-scan-mode]').forEach(button=>button.addEventListener('click',()=>queueMicrotask(syncCopy)));
+function invalidatePreflight(){preflightGeneration++;preflightPending?.abort();preflightPending=null;invalidateStateRecheckUI();if(active()){submit.disabled=false;queueMicrotask(syncCopy);}}
+document.addEventListener('koschei:radar-mode-changed',invalidatePreflight);
+transaction.addEventListener('input',invalidatePreflight);
+wallet?.addEventListener('input',invalidatePreflight);
 queueMicrotask(syncCopy);
 
 async function ensureCustomerAuth(){
@@ -197,6 +202,7 @@ form.addEventListener('submit',async event=>{
   event.stopImmediatePropagation();
   const serialized=transaction.value.trim();
   if(!serialized)return;
+  const current=++preflightGeneration,controller=new AbortController();preflightPending=controller;
   submit.disabled=true;
   submit.textContent='Validating before signing…';
   working();
@@ -204,19 +210,21 @@ form.addEventListener('submit',async event=>{
     const response=await customerAPI(endpoint,{
       method:'POST',
       credentials:'same-origin',
+      signal:controller.signal,
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({transaction:serialized,encoding:'base64',network:'solana-mainnet',wallet:wallet?.value.trim()||''})
     });
     const data=await response.json().catch(()=>({}));
+    if(current!==preflightGeneration)return;
     if(!response.ok){accessFailure(response.status,data.message||data.error||data.code||`HTTP ${response.status}`);return;}
     prepareStateRecheck(data);
     render(data);
     transaction.value='';
   }catch(error){
+    if(current!==preflightGeneration)return;
     accessFailure(0,error?.message||'Transaction Preflight evidence service unavailable.');
   }finally{
-    submit.disabled=false;
-    syncCopy();
+    if(current===preflightGeneration){preflightPending=null;submit.disabled=false;syncCopy();}
   }
 },true);
 window.addEventListener('pagehide',invalidateStateRecheckUI);

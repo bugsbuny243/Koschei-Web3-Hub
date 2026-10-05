@@ -4,16 +4,12 @@ if(window.__koscheiCustomerCommandCenterV1)return;
 window.__koscheiCustomerCommandCenterV1=true;
 
 const routes=[
-  {label:'Command Center',href:'/dashboard',access:'PROFESSIONAL'},
-  {label:'Address analysis',href:'/scan',access:'READ-ONLY'},
-  {label:'ARVIS Investigation',href:'/arvis-chat',mode:'primary',access:'PROFESSIONAL'},
-  {label:'Deep Investigation',href:'/scan?mode=deep',access:'PROFESSIONAL'},
-  {label:'Transaction Preflight',href:'/scan?mode=transaction',access:'PROFESSIONAL'},
-  {label:'Evidence History',href:'/reports',access:'PROFESSIONAL'},
-  {label:'Watchlist & Alerts',href:'/watchlist',access:'PROFESSIONAL'},
-  {label:'Evidence Cases',href:'/cases',access:'PUBLIC PROOF'},
-  {label:'API Reference',href:'/docs/api',access:'PROFESSIONAL API'},
-  {label:'Account & Access',href:'/account',access:'ACCOUNT'}
+  {label:'Workspace',href:'/dashboard'},
+  {label:'ARVIS Radar',href:'/scan',mode:'primary'},
+  {label:'Investigation History',href:'/reports'},
+  {label:'Watchlist & Alerts',href:'/watchlist'},
+  {label:'News & Notifications',href:'/crypto-brief'},
+  {label:'Account & Access',href:'/account'}
 ];
 
 function ensureUniverse(){
@@ -26,11 +22,9 @@ function ensureUniverse(){
 
 function activeFor(href){
   const url=new URL(href,location.origin),current=location.pathname.replace(/\.html$/,'');
+  if(url.pathname==='/scan')return current==='/scan'||current.startsWith('/scan/');
   if(current!==url.pathname)return false;
-  if(current==='/scan'){
-    const mode=new URLSearchParams(location.search).get('mode')||'address';
-    return (url.searchParams.get('mode')||'address')===mode;
-  }
+
   return true;
 }
 
@@ -48,7 +42,7 @@ function closePalette(){const node=document.querySelector('.customer-command-pal
 function buildPalette(){
   const wrap=document.createElement('div');wrap.className='customer-command-palette';wrap.hidden=true;wrap.setAttribute('role','dialog');wrap.setAttribute('aria-modal','true');wrap.setAttribute('aria-label','Koschei command palette');
   const panel=document.createElement('div');panel.className='customer-command-palette__panel';
-  const input=document.createElement('input');input.type='search';input.placeholder='Enter the ARVIS universe…';input.setAttribute('aria-label','Filter customer commands');
+  const input=document.createElement('input');input.type='search';input.placeholder='Find a workspace page…';input.setAttribute('aria-label','Filter customer commands');
   const list=document.createElement('div');list.className='customer-command-palette__list';
   const render=()=>{const query=input.value.trim().toLowerCase();list.replaceChildren();routes.filter(item=>(item.label+' '+(item.access||'')).toLowerCase().includes(query)).forEach(item=>{const node=link(item);node.classList.add('customer-command-result');list.appendChild(node);});};
   input.addEventListener('input',render);wrap.addEventListener('click',event=>{if(event.target===wrap)closePalette();});panel.append(input,list);wrap.appendChild(panel);document.body.appendChild(wrap);render();return wrap;
@@ -58,11 +52,11 @@ function openPalette(){const node=palette();node.hidden=false;node.querySelector
 
 function buildSidebar(){
   const aside=document.createElement('aside');aside.className='customer-sidebar';aside.id='customerSidebar';
-  const brand=document.createElement('a');brand.href='/';brand.className='customer-sidebar__brand';brand.innerHTML='<span class="customer-sidebar__mark">K</span><span><strong>Koschei Web3</strong><small>ARVIS Security Universe</small></span>';
-  const label=document.createElement('div');label.className='customer-section-label';label.textContent='Investigation Universe';
+  const brand=document.createElement('a');brand.href='/';brand.className='customer-sidebar__brand';brand.innerHTML='<span class="customer-sidebar__mark">K</span><span><strong>Koschei Web3</strong><small>Customer workspace</small></span>';
+  const label=document.createElement('div');label.className='customer-section-label';label.textContent='Your workspace';
   const nav=document.createElement('nav');nav.className='customer-sidebar__nav';nav.setAttribute('aria-label','Customer security workspace');
   routes.forEach(item=>nav.appendChild(link(item)));
-  const quick=document.createElement('button');quick.type='button';quick.className='customer-command-trigger';quick.textContent='Open command gateway';quick.setAttribute('aria-keyshortcuts','Control+K Meta+K');quick.addEventListener('click',openPalette);nav.appendChild(quick);
+  const quick=document.createElement('button');quick.type='button';quick.className='customer-command-trigger';quick.textContent='Find a page';quick.setAttribute('aria-keyshortcuts','Control+K Meta+K');quick.addEventListener('click',openPalette);nav.appendChild(quick);
   const footer=document.createElement('div');footer.className='customer-sidebar__footer';
   const status=document.createElement('span');status.innerHTML='<i class="customer-status-dot"></i>Professional is the single operational customer entitlement. Public proof pages do not execute investigations.';
   footer.append(status,utilityLink('Professional Access','/pricing'),utilityLink('Home','/'));
@@ -71,7 +65,7 @@ function buildSidebar(){
 
 function enhanceHeader(main){
   const header=main.querySelector('.top, .ops-nav');if(!header)return;
-  const trigger=document.createElement('button');trigger.type='button';trigger.className=(header.classList.contains('ops-nav')?'ops-btn ':'btn ')+'customer-mobile-trigger';trigger.textContent='Gateway';
+  const trigger=document.createElement('button');trigger.type='button';trigger.className=(header.classList.contains('ops-nav')?'ops-btn ':'btn ')+'customer-mobile-trigger';trigger.textContent='Menu';
   trigger.setAttribute('aria-controls','customerSidebar');trigger.setAttribute('aria-expanded','false');
   trigger.addEventListener('click',()=>{const open=document.body.classList.toggle('customer-nav-open');trigger.setAttribute('aria-expanded',open?'true':'false');});
   header.prepend(trigger);
