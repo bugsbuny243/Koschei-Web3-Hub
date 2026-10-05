@@ -13,20 +13,22 @@ function requireText(source,needle,label){if(!source.includes(needle))throw new 
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
 
 requireText(html,'<html lang="en">','pricing language');
-requireText(html,'ONE ACCESS CONTRACT · PROFESSIONAL','single-plan disclosure');
-requireText(html,'Enter the ARVIS universe.','universe headline');
-requireText(html,'One plan. The real system.','single-plan headline');
+requireText(html,'KOSCHEI WEB3 · PROFESSIONAL','standalone Web3 plan disclosure');
+requireText(html,'Enter Koschei Web3.','Web3 headline');
+requireText(html,'One Web3 plan. The real system.','single Web3 plan headline');
+requireText(html,'Koschei Web3 Professional is the only paid Web3 customer plan.','single paid Web3 plan copy');
+requireText(html,'Koschei Sentinel and Koschei Lang are separate products and are not included in this Web3 entitlement.','separate product boundary');
+requireText(html,'Paired Telegram delivery for ARVIS scan results','ARVIS Telegram delivery feature');
 requireText(html,'data-polar-plan="professional"','Professional Polar checkout action');
 requireText(html,'data-kosc-plan="professional"','Professional KOSC settlement action');
 requireText(html,'/js/kosc-checkout-v1.js?v=1','KOSC settlement client');
 requireText(html,'Get live KOSC quote','live KOSC quote copy');
 requireText(html,'Token holdings alone do not grant access.','KOSC access boundary');
 requireText(html,'/js/polar-checkout-v1.js?v=1','secure checkout client');
-requireText(html,'Professional is the only paid customer plan.','single paid plan copy');
-requireText(html,'$199','canonical Professional price');
+requireText(html,'$199','canonical Web3 Professional price');
 requireText(html,'There is no free investigation tier, no Starter package and no Enterprise package.','removed package disclosure');
 requireText(html,'The server decides access. The browser never invents it.','server-side entitlement authority');
-requireText(html,'PROFESSIONAL</strong>','Professional policy card');
+requireText(html,'WEB3 PROFESSIONAL</strong>','Web3 Professional policy card');
 requireText(html,'SERVER-SIDE','server authority card');
 requireText(html,'FAIL-CLOSED','evidence boundary card');
 requireText(html,'/css/koschei.css?v=1','universe stylesheet');
@@ -59,4 +61,4 @@ requireText(css,'.pricing-policy-grid','pricing contract layout');
 requireText(css,'@media(max-width:620px)','mobile pricing layout');
 requireText(universe,'body.koschei-universe','universe body contract');
 requireText(universe,'.universe-entry','universe entry contract');
-console.log('pricing Professional-only universe contract: ok');
+console.log('pricing standalone Web3 Professional contract: ok');
