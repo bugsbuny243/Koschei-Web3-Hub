@@ -79,6 +79,9 @@ func TestARVISTelegramMessageIncludesBoundedContextWithoutMakingClaims(t *testin
 			"trade_ledger_aggregates": map[string]any{
 				"market_behavior_status": "bounded_pattern_observed",
 			},
+			"market_manipulation_intelligence": map[string]any{
+				"status": "round_trip_churn_candidates_observed",
+			},
 			"actor_coordination_intelligence": map[string]any{
 				"status": "coordination_patterns_observed",
 			},
@@ -90,6 +93,8 @@ func TestARVISTelegramMessageIncludesBoundedContextWithoutMakingClaims(t *testin
 	for _, want := range []string{
 		"suspicious bounded timing pattern observed",
 		"requires corroboration",
+		"balanced 24h round-trip churn candidate(s) observed",
+		"indicator only, not proof of wash trading",
 		"Actor coordination: evidence-backed correlation pattern(s) observed",
 		"not an identity or wrongdoing claim",
 		"Public promotion: cross-asset public-source overlap observed",
