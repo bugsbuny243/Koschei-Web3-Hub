@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#080d11">
   <title>KOSCHEİ WEB3 · Owner Control Center</title>
   <link rel="stylesheet" href="/css/koschei.css?v=1">
-  <link rel="stylesheet" href="/css/owner-access-gate.css?v=1">
+  <link rel="stylesheet" href="/css/owner-access-gate.css?v=2">
 </head>
 <body class="owner-command-v2">
   <main id="loginView" class="login-wrap hidden">
@@ -17,10 +17,10 @@
       <form id="loginForm" novalidate><div class="field"><label for="loginWallet">Owner identity</label><input class="input" id="loginWallet" autocomplete="username" placeholder="email or wallet" required></div><div class="field"><label for="loginSecret">Owner secret</label><input class="input" id="loginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET" required></div><button class="btn primary full" id="loginButton" type="submit">Enter Owner Control Center</button><div id="loginError" class="error-box hidden" role="alert"></div></form>
     </section>
   </main>
-  <div id="appView" class="owner-app hidden">
+  <div id="appView" class="owner-app">
     <aside class="sidebar"><div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span><strong>KOSCHEİ WEB3</strong><small>Owner Control Center</small></span></div><nav class="sidebar-nav" id="desktopNav" aria-label="Owner navigation"></nav><div class="sidebar-foot"><div class="session-box"><b>Owner session</b><span id="sessionState">Secure httpOnly session</span></div><button class="btn danger" id="logoutButton" type="button">Sign out</button></div></aside>
     <main class="main"><header class="topbar"><div class="topbar-title"><span class="eyebrow" id="pageEyebrow">Production evidence · SaaS · system health</span><h1 id="pageTitle">Operations overview</h1></div><div class="top-actions"><span class="sync-pill" title="Latest production evidence synchronization"><span class="dot warn" id="syncDot"></span><span id="syncText">Connecting</span></span><button class="btn" id="refreshButton" type="button">Refresh data</button><button class="btn danger mobile-logout" id="mobileLogoutButton" type="button">Sign out</button></div></header>
-      <section class="page active" id="page-command"><div id="commandContent"></div></section><section class="page" id="page-arvis"><div id="arvisContent"></div></section><section class="page" id="page-customers"><div id="customersContent"></div></section><section class="page" id="page-access"><div id="accessContent"></div></section><section class="page" id="page-feedback"><div id="feedbackContent"></div></section><section class="page" id="page-security"><div id="securityContent"></div></section><section class="page" id="page-system"><div id="systemContent"></div></section><section class="page" id="page-brain"><div id="brainContent"></div></section>
+      <section class="page active" id="page-command"><div id="commandContent"><div class="card loading">Loading owner production data…</div></div></section><section class="page" id="page-arvis"><div id="arvisContent"></div></section><section class="page" id="page-customers"><div id="customersContent"></div></section><section class="page" id="page-access"><div id="accessContent"></div></section><section class="page" id="page-feedback"><div id="feedbackContent"></div></section><section class="page" id="page-security"><div id="securityContent"></div></section><section class="page" id="page-system"><div id="systemContent"></div></section><section class="page" id="page-brain"><div id="brainContent"></div></section>
     <p><a href="/owner/campaigns">Global Campaign evidence and runtime status</a></p>
     </main><nav class="mobile-nav" id="mobileNav" aria-label="Mobile owner navigation"></nav>
   </div>
