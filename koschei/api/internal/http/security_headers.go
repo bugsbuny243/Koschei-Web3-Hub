@@ -31,10 +31,13 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// sensitiveStaticProbePath rejects common repository, environment, credential and
-// server-configuration paths before they can reach the public FileServer/SPA
-// fallback. We intentionally return an ordinary 404 so the public surface does
-// not disclose whether a similarly named private file exists on the host.
+// sensitiveStaticProbePath rejects repository, environment, credential,
+// test-only and server-configuration paths before they can reach the public
+// FileServer/SPA fallback. The files remain in the repository for CI and
+// compatibility work; this function only prevents them from becoming a public
+// production HTTP surface. We intentionally return an ordinary 404 so the
+// public surface does not disclose whether a similarly named private file
+// exists on the host.
 //
 // /.well-known is deliberately not treated as a blanket dotfile: standards such
 // as ACME and security.txt may legitimately use that namespace.
@@ -52,7 +55,8 @@ func sensitiveStaticProbePath(rawPath string) bool {
 			".npmrc", ".yarnrc", ".pypirc", ".netrc", ".htaccess", ".htpasswd",
 			".ds_store", "id_rsa", "id_ed25519", "credentials.json", "service-account.json",
 			"vercel.json", "railway.json", "railway.toml", "dockerfile", "docker-compose.yml",
-			"docker-compose.yaml", "go.mod", "go.sum":
+			"docker-compose.yaml", "go.mod", "go.sum", "__tests__", "__fixtures__",
+			"validation-key.txt":
 			return true
 		}
 		for _, suffix := range []string{".pem", ".key", ".p12", ".pfx"} {
