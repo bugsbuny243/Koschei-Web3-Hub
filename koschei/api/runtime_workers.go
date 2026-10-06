@@ -65,7 +65,7 @@ func startBackgroundRuntime(
 		return func() {}
 	}
 
-	stops := make([]func(), 0, 12)
+	stops := make([]func(), 0, 16)
 	for _, cfg := range campaignConfigs {
 		if cfg != nil {
 			stops = append(stops, services.StartGlobalCampaignRuntime(ctx, *cfg))
@@ -98,6 +98,9 @@ func startBackgroundRuntime(
 			services.StartGlobalRadarCoverageAlertLifecycle(ctx, db, runtimeHealth),
 			services.StartSecurityRadarWatcher(ctx, db, solanaRPC),
 			services.StartSecurityRadarSovereignStreamIfEnabled(ctx, db),
+			services.StartPumpPortalRadarIfEnabled(ctx, db),
+			services.StartActorDefenseCorrelator(ctx, db),
+			handlers.StartWatchlistMonitor(ctx, db),
 			handlers.StartCanonicalInvestigationJobWorker(ctx, db, readDB, solanaRPC, jobStore),
 			handlers.StartCanonicalPumpJobScheduler(ctx, db, jobStore),
 		)
