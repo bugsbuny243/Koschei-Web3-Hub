@@ -198,6 +198,9 @@ func registerOwnerRoutes(mux *http.ServeMux, h *handlers.Handler, staticDir stri
 	mux.HandleFunc("/api/owner/status", requiresDB(h, ownerOnly(h, method("GET", h.OwnerStatus))))
 	mux.HandleFunc("/owner", ownerPageHandler(staticDir))
 	mux.HandleFunc("/owner.html", ownerPageHandler(staticDir))
+	ownerApp := ownerOnly(h, ownerApplicationPageHandler(staticDir))
+	mux.HandleFunc("/owner-production", ownerApp)
+	mux.HandleFunc("/owner-production.html", ownerApp)
 }
 
 func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, planTier, planTierAccess tierRouteGate) {

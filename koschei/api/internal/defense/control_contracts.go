@@ -13,11 +13,11 @@ import (
 // verify before a defensive action can ever leave shadow mode.
 
 type SecurityFinding struct {
-	FindingID      string   `json:"finding_id"`
-	Severity       string   `json:"severity"`
-	Confidence     float64  `json:"confidence"`
-	EvidenceIDs    []string `json:"evidence_ids"`
-	DefensiveAction string  `json:"defensive_action"`
+	FindingID       string   `json:"finding_id"`
+	Severity        string   `json:"severity"`
+	Confidence      float64  `json:"confidence"`
+	EvidenceIDs     []string `json:"evidence_ids"`
+	DefensiveAction string   `json:"defensive_action"`
 }
 
 type DefensiveActionRequest struct {
@@ -32,9 +32,9 @@ type DefensiveActionRequest struct {
 }
 
 type DefensivePolicy struct {
-	TenantID       string   `json:"tenant_id"`
-	AllowedActions []string `json:"allowed_actions"`
-	AllowedTargets []string `json:"allowed_targets"`
+	TenantID         string   `json:"tenant_id"`
+	AllowedActions   []string `json:"allowed_actions"`
+	AllowedTargets   []string `json:"allowed_targets"`
 	HumanGateActions []string `json:"human_gate_actions"`
 }
 
@@ -44,11 +44,14 @@ type PolicyDecision struct {
 	Reason                string `json:"reason"`
 }
 
+// ControlEffect* values belong to the deterministic defensive-control receipt
+// contract. Keep them namespaced from Sentinel's independent EffectAgreement
+// contract even where wire values happen to match.
 const (
-	EffectAgree        = "agree"
-	EffectDisagree     = "disagree"
-	EffectIndeterminate = "indeterminate"
-	EffectNotExercised = "not_exercised"
+	ControlEffectAgree         = "agree"
+	ControlEffectDisagree      = "disagree"
+	ControlEffectIndeterminate = "indeterminate"
+	ControlEffectNotExercised  = "not_exercised"
 )
 
 type EffectObservation struct {
@@ -66,12 +69,12 @@ type EffectObservation struct {
 }
 
 type DefensiveReceipt struct {
-	SchemaVersion  string             `json:"schema_version"`
-	Action         DefensiveActionRequest `json:"action"`
-	Policy         PolicyDecision     `json:"policy"`
-	Observation    EffectObservation  `json:"observation"`
-	IssuedAt       time.Time          `json:"issued_at"`
-	ReceiptHash    string             `json:"receipt_hash"`
+	SchemaVersion string                 `json:"schema_version"`
+	Action        DefensiveActionRequest `json:"action"`
+	Policy        PolicyDecision         `json:"policy"`
+	Observation   EffectObservation      `json:"observation"`
+	IssuedAt      time.Time              `json:"issued_at"`
+	ReceiptHash   string                 `json:"receipt_hash"`
 }
 
 func ValidateFinding(f SecurityFinding, knownEvidence []string) error {
@@ -116,23 +119,23 @@ func EvaluateDefensivePolicy(policy DefensivePolicy, req DefensiveActionRequest)
 		return PolicyDecision{Reason: "action is not bound to a finding and evidence"}
 	}
 	return PolicyDecision{
-		Allowed: true,
+		Allowed:               true,
 		RequiresHumanApproval: contains(policy.HumanGateActions, req.Action),
-		Reason: "authorized defensive scope",
+		Reason:                "authorized defensive scope",
 	}
 }
 
 func DeriveEffectAgreement(observation EffectObservation) string {
 	if !observation.ScopeComplete || len(observation.CoverageGaps) > 0 || strings.TrimSpace(observation.ObservedState) == "" {
-		return EffectIndeterminate
+		return ControlEffectIndeterminate
 	}
 	if strings.TrimSpace(observation.ExpectedState) == "" {
-		return EffectNotExercised
+		return ControlEffectNotExercised
 	}
 	if observation.ExpectedState == observation.ObservedState {
-		return EffectAgree
+		return ControlEffectAgree
 	}
-	return EffectDisagree
+	return ControlEffectDisagree
 }
 
 func BuildDefensiveReceipt(req DefensiveActionRequest, decision PolicyDecision, observation EffectObservation, now time.Time) (DefensiveReceipt, error) {
@@ -150,17 +153,17 @@ func BuildDefensiveReceipt(req DefensiveActionRequest, decision PolicyDecision, 
 	}
 	receipt := DefensiveReceipt{
 		SchemaVersion: "koschei-sentinel-defensive-receipt-v1",
-		Action: req,
-		Policy: decision,
-		Observation: observation,
-		IssuedAt: now,
+		Action:        req,
+		Policy:        decision,
+		Observation:   observation,
+		IssuedAt:      now,
 	}
 	receipt.ReceiptHash = hashValue(struct {
-		SchemaVersion string `json:"schema_version"`
-		Action DefensiveActionRequest `json:"action"`
-		Policy PolicyDecision `json:"policy"`
-		Observation EffectObservation `json:"observation"`
-		IssuedAt time.Time `json:"issued_at"`
+		SchemaVersion string                 `json:"schema_version"`
+		Action        DefensiveActionRequest `json:"action"`
+		Policy        PolicyDecision         `json:"policy"`
+		Observation   EffectObservation      `json:"observation"`
+		IssuedAt      time.Time              `json:"issued_at"`
 	}{receipt.SchemaVersion, receipt.Action, receipt.Policy, receipt.Observation, receipt.IssuedAt})
 	return receipt, nil
 }
