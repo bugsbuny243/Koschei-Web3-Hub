@@ -21,7 +21,7 @@ func TestAuthenticatedOwnerShellDoesNotWaitForOperationsBeforeRendering(t *testi
 	if !strings.Contains(body, "Loading owner production data…") {
 		t.Fatal("owner shell must expose a visible loading state while production data loads")
 	}
-	if !strings.Contains(body, `/css/owner-access-gate.css?v=2`) {
+	if !strings.Contains(body, `/css/owner-access-gate.css?v=3`) {
 		t.Fatal("owner production shell did not bust the access-gate stylesheet cache")
 	}
 }
