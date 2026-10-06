@@ -1,0 +1,44 @@
+/* Owner ARVIS scan readability hotfix.
+   Scoped to scan result roots so the rest of the owner control center is unchanged. */
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid > .card {
+  grid-column: span 6;
+  min-width: 0;
+  width: 100%;
+}
+
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid > .card .card-head {
+  min-width: 0;
+}
+
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid > .card h3,
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid > .card p,
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid > .card .muted,
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid > .card .metadata b {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  :is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) !important;
+    gap: 10px;
+  }
+
+  :is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid > .card {
+    grid-column: 1 / -1 !important;
+    width: 100%;
+    min-height: 0;
+    padding: 13px;
+  }
+
+  :is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid > .card .metadata {
+    grid-template-columns: minmax(0,1fr) !important;
+  }
+
+  :is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid > .card .card-head {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) auto;
+    align-items: start;
+  }
+}
