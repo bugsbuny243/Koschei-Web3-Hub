@@ -1,0 +1,11 @@
+[hidden]{display:none!important}
+body.owner-command-v2 #loginView.hidden,
+body.owner-command-v2 #appView.hidden{display:none!important}
+body.owner-login-only{min-height:100vh;background:#080d11}
+.owner-login-shell{min-height:100vh;display:grid;place-items:center;padding:24px}
+.owner-login-shell .login-card{width:min(100%,760px);display:grid;gap:22px;padding:28px;border:1px solid rgba(73,214,170,.2);border-radius:20px;background:rgba(7,18,23,.96);box-shadow:0 24px 80px rgba(0,0,0,.35)}
+.owner-login-shell form{display:grid;gap:14px}
+.owner-login-shell .field{display:grid;gap:7px}
+.owner-login-shell .input{width:100%}
+.owner-login-error{padding:12px 14px;border:1px solid rgba(255,80,110,.4);border-radius:12px;color:#ff8ca2;background:rgba(255,80,110,.08)}
+@media(max-width:640px){.owner-login-shell{padding:14px}.owner-login-shell .login-card{padding:20px;border-radius:16px}}

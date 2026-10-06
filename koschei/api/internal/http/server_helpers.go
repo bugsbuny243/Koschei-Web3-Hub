@@ -121,6 +121,9 @@ func redirectToDashboard(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/dashboard", http.StatusFound)
 }
 
+// ownerPageHandler serves only the public login surface. The private owner
+// application is registered separately behind ownerOnly and is never a static
+// fallback asset for an unauthenticated request.
 func ownerPageHandler(staticDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -128,14 +131,33 @@ func ownerPageHandler(staticDir string) http.HandlerFunc {
 			return
 		}
 		if staticDir != "" {
-			ownerPath := filepath.Join(staticDir, "owner.html")
-			if info, err := os.Stat(ownerPath); err == nil && !info.IsDir() {
-				http.ServeFile(w, r, ownerPath)
+			loginPath := filepath.Join(staticDir, "owner-login.html")
+			if info, err := os.Stat(loginPath); err == nil && !info.IsDir() {
+				http.ServeFile(w, r, loginPath)
 				return
 			}
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write([]byte("<!doctype html><html lang=tr><meta charset=utf-8><title>Koschei Owner</title><body><h1>Owner paneli bulunamadı.</h1></body></html>"))
+		_, _ = w.Write([]byte("<!doctype html><html lang=tr><meta charset=utf-8><title>Koschei Owner</title><body><h1>Owner giriş paneli bulunamadı.</h1></body></html>"))
+	}
+}
+
+func ownerApplicationPageHandler(staticDir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		if staticDir == "" {
+			http.NotFound(w, r)
+			return
+		}
+		appPath := filepath.Join(staticDir, "owner-production.html")
+		if info, err := os.Stat(appPath); err == nil && !info.IsDir() {
+			http.ServeFile(w, r, appPath)
+			return
+		}
+		http.NotFound(w, r)
 	}
 }
 
