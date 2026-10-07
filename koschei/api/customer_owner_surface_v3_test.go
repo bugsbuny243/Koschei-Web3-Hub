@@ -80,16 +80,15 @@ func TestWorkspaceV3UsesSaaSEntitlementNotTokenHoldings(t *testing.T) {
 	workspace := readSurfaceV3(t, "public/js/customer-workspace-plans-v3.js")
 	for _, required := range []string{
 		"/api/auth/premium-access",
-		"starter",
 		"professional",
-		"enterprise",
-		"Plans change capacity and eligible operational surfaces",
+		"Professional: canonical ARVIS investigation path",
+		"Professional: API credential and registered integration eligibility",
 	} {
 		if !strings.Contains(workspace, required) {
-			t.Fatalf("workspace plan surface missing %q", required)
+			t.Fatalf("workspace Professional access surface missing %q", required)
 		}
 	}
-	for _, forbidden := range []string{"KOSCH", "token_access_snapshots", "wallet balance"} {
+	for _, forbidden := range []string{"starter", "enterprise", "KOSCH", "token_access_snapshots", "wallet balance"} {
 		if strings.Contains(workspace, forbidden) {
 			t.Fatalf("workspace commercial access regressed to token authorization: found %q", forbidden)
 		}
