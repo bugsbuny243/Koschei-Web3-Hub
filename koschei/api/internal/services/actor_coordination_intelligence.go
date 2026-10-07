@@ -23,20 +23,20 @@ type ActorCoordinationSignal struct {
 }
 
 type ActorCoordinationIntelligence struct {
-	Version                string                    `json:"version"`
-	Network                string                    `json:"network"`
-	SubjectWallet          string                    `json:"subject_wallet"`
-	Status                 string                    `json:"status"`
-	Available              bool                      `json:"available"`
-	Complete               bool                      `json:"complete"`
-	SignalCount            int                       `json:"signal_count"`
-	VerifiedSignalCount    int                       `json:"verified_signal_count"`
-	ObservedSignalCount    int                       `json:"observed_signal_count"`
-	Signals                []ActorCoordinationSignal `json:"signals"`
-	VerdictAuthority       bool                      `json:"verdict_authority"`
-	SameOperatorClaim      bool                      `json:"same_operator_claim"`
-	RealWorldIdentityClaim bool                      `json:"real_world_identity_claim"`
-	CriminalGroupClaim     bool                      `json:"criminal_group_claim"`
+	Version                 string                    `json:"version"`
+	Network                 string                    `json:"network"`
+	SubjectWallet           string                    `json:"subject_wallet"`
+	Status                  string                    `json:"status"`
+	Available               bool                      `json:"available"`
+	Complete                bool                      `json:"complete"`
+	SignalCount             int                       `json:"signal_count"`
+	VerifiedSignalCount     int                       `json:"verified_signal_count"`
+	ObservedSignalCount     int                       `json:"observed_signal_count"`
+	Signals                 []ActorCoordinationSignal `json:"signals"`
+	VerdictAuthority        bool                      `json:"verdict_authority"`
+	SameOperatorClaim       bool                      `json:"same_operator_claim"`
+	RealWorldIdentityClaim  bool                      `json:"real_world_identity_claim"`
+	CriminalGroupClaim      bool                      `json:"criminal_group_claim"`
 	MarketManipulationClaim bool                     `json:"market_manipulation_claim"`
 	Limitations            []string                  `json:"limitations"`
 }
