@@ -101,6 +101,7 @@ func startBackgroundRuntime(
 			services.StartPumpPortalRadarIfEnabled(ctx, db),
 			services.StartActorDefenseCorrelator(ctx, db),
 			handlers.StartWatchlistMonitor(ctx, db),
+			handlers.StartAutopublishWorker(ctx, db),
 			handlers.StartCanonicalInvestigationJobWorker(ctx, db, readDB, solanaRPC, jobStore),
 			handlers.StartCanonicalPumpJobScheduler(ctx, db, jobStore),
 		)
