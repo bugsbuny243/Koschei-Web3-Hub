@@ -37,8 +37,8 @@ type ActorCoordinationIntelligence struct {
 	SameOperatorClaim       bool                      `json:"same_operator_claim"`
 	RealWorldIdentityClaim  bool                      `json:"real_world_identity_claim"`
 	CriminalGroupClaim      bool                      `json:"criminal_group_claim"`
-	MarketManipulationClaim bool                     `json:"market_manipulation_claim"`
-	Limitations            []string                  `json:"limitations"`
+	MarketManipulationClaim bool                      `json:"market_manipulation_claim"`
+	Limitations             []string                  `json:"limitations"`
 }
 
 // BuildActorCoordinationIntelligence projects retained actor evidence into a
