@@ -41,11 +41,11 @@ func TestActorCoordinationIntelligenceComposesRetainedEvidence(t *testing.T) {
 		Complete:      true,
 		Sources: []PersistentFundingSourceHistory{
 			{
-				Wallet:                   "funder-1",
-				EvidenceStatus:           "verified_supported",
-				FundedActorCount:         3,
-				CreatedTokenCount:        4,
-				LiquidityRemovalActors:   1,
+				Wallet:                 "funder-1",
+				EvidenceStatus:         "verified_supported",
+				FundedActorCount:       3,
+				CreatedTokenCount:      4,
+				LiquidityRemovalActors: 1,
 				Members: []PersistentFundingClusterMember{
 					{Wallet: "wallet-a"},
 					{Wallet: "wallet-b"},
