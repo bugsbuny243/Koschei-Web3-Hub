@@ -485,6 +485,12 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			"behavioral_signatures_can_change_grade":     false,
 		},
 	}
+	if actorRun.Status == "source_unavailable" {
+		report["source_completeness"] = "incomplete_source"
+		report["source_completeness_reason"] = "creator_source_unavailable"
+	} else {
+		report["source_completeness"] = "complete_or_evidence_bounded"
+	}
 	_ = h.persistDossierSourceSnapshot(ctx, report)
 	return unifiedInvestigationAssembly{
 		Report: report, Core: core, DB: db, Store: store, Creator: creator,
