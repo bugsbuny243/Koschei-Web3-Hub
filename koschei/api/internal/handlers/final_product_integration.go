@@ -32,6 +32,12 @@ func attachFinalProductIntegrationDiagnostics(report map[string]any) {
 		"program_security",
 	)
 
+
+	// Cross-surface intelligence is customer-visible but non-authoritative.
+	coverage.Capabilities["actor_coordination_intelligence"] = canonicalStatusFromRaw("Actor coordination and repeat-operator investigation intelligence", report["actor_coordination_intelligence"], coverage.LiveScanRequested, false, "actor_coordination_intelligence")
+	coverage.Capabilities["market_manipulation_intelligence"] = canonicalStatusFromRaw("Market manipulation investigation intelligence", report["market_manipulation_intelligence"], coverage.LiveScanRequested, false, "market_manipulation_intelligence")
+	coverage.Capabilities["public_promotion_intelligence"] = canonicalStatusFromRaw("Public promotion and hype evidence intelligence", report["public_promotion_intelligence"], coverage.LiveScanRequested, false, "public_promotion_intelligence")
+
 	// Discovery is Helius-first. Preserve the underlying report path while
 	// removing the obsolete provider name from the capability contract.
 	if legacy, ok := coverage.Capabilities["solscan_actor_discovery"]; ok {
