@@ -6156,7 +6156,7 @@
     "/api/dao/proposal-risk": {
       "post": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "post_dao_proposal_risk",
+        "operationId": "post__api_dao_proposal_risk",
         "parameters": [],
         "requestBody": {
           "content": {
@@ -6613,7 +6613,7 @@
     "/api/liquidity/analyze": {
       "post": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "post_liquidity_analyze",
+        "operationId": "post__api_liquidity_analyze",
         "parameters": [],
         "requestBody": {
           "content": {
@@ -6882,7 +6882,7 @@
     "/api/mev/analyze": {
       "post": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "post_mev_analyze",
+        "operationId": "post__api_mev_analyze",
         "parameters": [],
         "requestBody": {
           "content": {
@@ -17530,7 +17530,7 @@
     "/api/wallet/score": {
       "post": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "post_wallet_score",
+        "operationId": "post__api_wallet_score",
         "parameters": [],
         "requestBody": {
           "content": {
