@@ -291,6 +291,8 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	behavior := services.EvaluateUnifiedRadarBehavior(target, creator, core.Market, core.Intelligence, core.Cluster, sales, now)
 	behavior = services.HardenUnifiedRadarBehavior(behavior, storedVerification, core.Cluster)
 	behavior = services.ApplyOwnerConcentrationRuleV110(behavior, core.Intelligence, now)
+	c006Relation := buildRequestScopeC006Relation(ctx, db, distributionRun.Report, core.Intelligence)
+	behavior = services.ApplyCrossTokenCreatorHolderTransferRuleV120(behavior, c006Relation, now)
 	behavior = services.ApplyCrossTokenFundingRecurrenceRuleV130(behavior, core.FundingRecurrence, now)
 	requestScopeExitEvidence := append([]services.ActorDefenseEvidenceRecord{}, actorDossier.Evidence...)
 	requestScopeExitEvidence = append(requestScopeExitEvidence, behavior.Evidence...)
