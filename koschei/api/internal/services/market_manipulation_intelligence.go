@@ -71,11 +71,11 @@ func LoadMarketManipulationIntelligence(ctx context.Context, db *sql.DB, mint st
 		limit = MarketManipulationMaximumLimit
 	}
 	out := MarketManipulationIntelligence{
-		Version:       MarketManipulationIntelligenceVersion,
-		Mint:          mint,
-		Status:        "trade_ledger_unavailable",
-		WindowHours:   MarketManipulationWindowHours,
-		Candidates:    []MarketRoundTripChurnCandidate{},
+		Version:     MarketManipulationIntelligenceVersion,
+		Mint:        mint,
+		Status:      "trade_ledger_unavailable",
+		WindowHours: MarketManipulationWindowHours,
+		Candidates:  []MarketRoundTripChurnCandidate{},
 		Thresholds: map[string]any{
 			"minimum_buy_count":       MarketManipulationMinimumBuyCount,
 			"minimum_sell_count":      MarketManipulationMinimumSellCount,
