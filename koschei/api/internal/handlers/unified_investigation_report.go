@@ -145,8 +145,15 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	if liveRequested {
 		switch {
 		case creator == "":
-			actorRun.Status = "creator_unavailable"
-			actorRun.Limitations = append(actorRun.Limitations, "Token taramasında doğrulanmış creator/deployer cüzdanı çözümlenemedi; actor investigation başlatılmadı.")
+			creatorResolutionStatus := strings.TrimSpace(creatorIntelCleanString(core.SourceContext["creator_resolution_status"]))
+			if creatorResolutionStatus == "provider_unavailable" {
+				actorRun.Status = "source_unavailable"
+				actorStoreStatus = "source_unavailable"
+				actorRun.Limitations = append(actorRun.Limitations, "Creator/deployer source was unavailable during this run; actor investigation is incomplete and this state does not imply safety or creator absence.")
+			} else {
+				actorRun.Status = "creator_unavailable"
+				actorRun.Limitations = append(actorRun.Limitations, "Token taramasında doğrulanmış creator/deployer cüzdanı çözümlenemedi; actor investigation başlatılmadı.")
+			}
 		case store == nil:
 			actorStoreStatus = "request_scope_live"
 			creatorRelation = buildRequestScopeCanonicalCreatorMintRelation(core, creator, network)
