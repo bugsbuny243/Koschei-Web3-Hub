@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestSensitiveStaticProbePathRejectsSecretAndRepositoryPaths(t *testing.T) {
+func TestSensitiveStaticProbePathRejectsSecretRepositoryAndTestOnlyPaths(t *testing.T) {
 	for _, probe := range []string{
 		"/.env",
 		"/.env.local",
@@ -31,6 +31,11 @@ func TestSensitiveStaticProbePathRejectsSecretAndRepositoryPaths(t *testing.T) {
 		"/keys/archive.key",
 		"/keys/client.p12",
 		"/keys/client.pfx",
+		"/js/__tests__/crypto-brief.test.cjs",
+		"/js/__tests__/arvis-canonical-projection.test.mjs",
+		"/js/__fixtures__/cfpk-live-scan.json",
+		"/js/__fixtures__/historical-scan.json",
+		"/validation-key.txt",
 	} {
 		if !sensitiveStaticProbePath(probe) {
 			t.Errorf("probe %q was not rejected", probe)
@@ -38,7 +43,7 @@ func TestSensitiveStaticProbePathRejectsSecretAndRepositoryPaths(t *testing.T) {
 	}
 }
 
-func TestSensitiveStaticProbePathPreservesWellKnownNamespace(t *testing.T) {
+func TestSensitiveStaticProbePathPreservesLegitimatePublicSurface(t *testing.T) {
 	for _, path := range []string{
 		"/.well-known/security.txt",
 		"/.well-known/acme-challenge/token",
@@ -48,7 +53,6 @@ func TestSensitiveStaticProbePathPreservesWellKnownNamespace(t *testing.T) {
 		"/reports",
 		"/watchlist",
 		"/arvis-chat",
-		"/validation-key.txt",
 		"/full-scan-contract-v1.json",
 		"/security-ecosystem.json",
 		"/sitemap.xml",
@@ -74,6 +78,9 @@ func TestSecurityHeadersReturns404BeforeSensitiveProbeCanReachStaticFallback(t *
 		"https://tradepigloball.co/vercel.json",
 		"https://tradepigloball.co/railway.toml",
 		"https://tradepigloball.co/keys/service.pem",
+		"https://tradepigloball.co/js/__tests__/customer-scan-entry.test.cjs",
+		"https://tradepigloball.co/js/__fixtures__/historical-scan.json",
+		"https://tradepigloball.co/validation-key.txt",
 	} {
 		called = false
 		recorder := httptest.NewRecorder()
