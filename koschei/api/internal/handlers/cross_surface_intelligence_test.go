@@ -76,14 +76,14 @@ func TestAttachCrossSurfaceIntelligenceKeepsCorrelationNonAuthoritative(t *testi
 
 func TestUnifiedInvestigationProjectionKeepsCrossSurfaceFields(t *testing.T) {
 	report := map[string]any{
-		"schema_version":                        unifiedInvestigationSchemaVersion,
-		"target":                                "Mint111",
-		"network":                               "solana-mainnet",
-		"actor_coordination_intelligence":       map[string]any{"status": "coordination_patterns_observed"},
-		"market_manipulation_intelligence":      map[string]any{"status": "round_trip_churn_candidates_observed"},
-		"public_promotion_intelligence":         map[string]any{"status": "cross_asset_public_promotion_overlap_observed"},
-		"creator_intelligence":                  map[string]any{"available": true},
-		"creator_distribution":                  map[string]any{"available": true},
+		"schema_version":                  unifiedInvestigationSchemaVersion,
+		"target":                          "Mint111",
+		"network":                         "solana-mainnet",
+		"actor_coordination_intelligence": map[string]any{"status": "coordination_patterns_observed"},
+		"market_manipulation_intelligence": map[string]any{"status": "round_trip_churn_candidates_observed"},
+		"public_promotion_intelligence":   map[string]any{"status": "cross_asset_public_promotion_overlap_observed"},
+		"creator_intelligence":            map[string]any{"available": true},
+		"creator_distribution":            map[string]any{"available": true},
 		"internal_request_only_should_be_hidden": true,
 	}
 	projected := unifiedInvestigationTechnicalProjection(report)
