@@ -32,7 +32,6 @@ func attachFinalProductIntegrationDiagnostics(report map[string]any) {
 		"program_security",
 	)
 
-
 	// Cross-surface intelligence is customer-visible but non-authoritative.
 	coverage.Capabilities["actor_coordination_intelligence"] = canonicalStatusFromRaw("Actor coordination and repeat-operator investigation intelligence", report["actor_coordination_intelligence"], coverage.LiveScanRequested, false, "actor_coordination_intelligence")
 	coverage.Capabilities["market_manipulation_intelligence"] = canonicalStatusFromRaw("Market manipulation investigation intelligence", report["market_manipulation_intelligence"], coverage.LiveScanRequested, false, "market_manipulation_intelligence")
