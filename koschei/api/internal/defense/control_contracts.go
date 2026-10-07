@@ -44,11 +44,14 @@ type PolicyDecision struct {
 	Reason                string `json:"reason"`
 }
 
+// ControlEffect* values belong to the deterministic defensive-control receipt
+// contract. Keep them namespaced from Sentinel's independent EffectAgreement
+// contract even where wire values happen to match.
 const (
-	EffectAgree         = "agree"
-	EffectDisagree      = "disagree"
-	EffectIndeterminate = "indeterminate"
-	EffectNotExercised  = "not_exercised"
+	ControlEffectAgree         = "agree"
+	ControlEffectDisagree      = "disagree"
+	ControlEffectIndeterminate = "indeterminate"
+	ControlEffectNotExercised  = "not_exercised"
 )
 
 type EffectObservation struct {
@@ -124,15 +127,15 @@ func EvaluateDefensivePolicy(policy DefensivePolicy, req DefensiveActionRequest)
 
 func DeriveEffectAgreement(observation EffectObservation) string {
 	if !observation.ScopeComplete || len(observation.CoverageGaps) > 0 || strings.TrimSpace(observation.ObservedState) == "" {
-		return EffectIndeterminate
+		return ControlEffectIndeterminate
 	}
 	if strings.TrimSpace(observation.ExpectedState) == "" {
-		return EffectNotExercised
+		return ControlEffectNotExercised
 	}
 	if observation.ExpectedState == observation.ObservedState {
-		return EffectAgree
+		return ControlEffectAgree
 	}
-	return EffectDisagree
+	return ControlEffectDisagree
 }
 
 func BuildDefensiveReceipt(req DefensiveActionRequest, decision PolicyDecision, observation EffectObservation, now time.Time) (DefensiveReceipt, error) {

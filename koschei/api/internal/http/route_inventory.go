@@ -33,7 +33,6 @@ func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 			"Recipient fate investigation is mint-specific ATA-only and never queries recipient-wide signature history.",
 			"Canonical investigation jobs accept token mint, wallet or token-account targets and continue after the HTTP request ends.",
 			"Owner, customer and automatic Pump discovery routes feed the same canonical investigation worker.",
-			"Customer ARVIS scan results may be mirrored to an explicitly paired Telegram account; Telegram never computes or upgrades the canonical verdict.",
 			"Signed medium-or-higher ARVIS verdicts and non-allow transaction guard decisions enter the durable alert pipeline.",
 			"Defense validation recomputes isolated execution evidence and authenticates independent collector observations; it never submits mainnet transactions or mutates production controls.",
 			"Safe execution assurance independently recomputes the complete Safe EIP-712 transaction hash and Execution Proof and requires a fresh Ed25519 attestation from the server-configured trusted producer before ALLOW; caller-selected trust material cannot authorize the request.",
@@ -45,8 +44,8 @@ func ownerRouteMap(w http.ResponseWriter, r *http.Request) {
 
 func productionRouteInventory() []routeInventoryGroup {
 	return []routeInventoryGroup{
-		{Name: "arvis_telegram_customer", Auth: "customer_session_plus_explicit_pairing_consent", Routes: []string{"GET|PATCH|DELETE /api/customer/arvis/telegram", "POST /api/customer/arvis/telegram/pair"}},
-		{Name: "arvis_telegram_provider", Auth: "telegram_webhook_secret", Routes: []string{"POST /integrations/arvis/telegram"}},
+		{Name: "crypto_brief_public", Auth: "public", Routes: []string{"GET /api/crypto-brief/feed"}},
+		{Name: "crypto_brief_customer", Auth: "customer_session", Routes: []string{"GET|PUT|PATCH|DELETE /api/customer/crypto-brief", "POST /api/customer/crypto-brief/pair"}},
 		{Name: "public_and_system", Auth: "public_or_mixed", Routes: []string{
 			"GET /health", "GET /api/config", "GET /api/version", "GET /api/web3/health", "GET /api/web3/health/logs",
 			"POST /api/analytics/event", "GET /api/v1/risk/badge",
@@ -67,7 +66,7 @@ func productionRouteInventory() []routeInventoryGroup {
 			"POST /api/kosc/quote", "POST /api/kosc/settle",
 		}},
 		{Name: "owner", Auth: "owner_session", Routes: []string{
-			"GET /api/owner/arvis/telegram",
+			"GET /api/owner/crypto-brief",
 			"GET /api/owner/campaigns",
 			"POST /api/owner/login", "POST /api/owner/logout", "GET /api/owner/command-center", "GET /api/owner/operations", "GET /api/owner/token-telemetry",
 			"GET /api/owner/arvis", "POST /api/owner/arvis/scan", "POST /api/owner/radar/unified", "POST /api/owner/radar/jobs", "GET /api/owner/radar/jobs/",

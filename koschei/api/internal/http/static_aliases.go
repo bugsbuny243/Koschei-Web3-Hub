@@ -12,13 +12,8 @@ func registerStaticAliases(mux *http.ServeMux, staticDir string) {
 	// scanner. The customer scan API is registered by NewServer so it can receive
 	// the configured Solana RPC dependency instead of depending on static wiring.
 	registerFabricRoutes(mux)
-
-	// Crypto Brief/news is retired. Telegram now mirrors customer ARVIS results
-	// and is managed from the account surface; old public URLs must not render a
-	// standalone news product even if a legacy asset remains on disk.
-	for _, route := range []string{"/crypto-brief", "/crypto-brief/", "/crypto-brief.html"} {
-		registerCanonicalRedirect(mux, route, "/account#arvis-telegram")
-	}
+	registerStaticFileAlias(mux, "/crypto-brief", filepath.Join(staticDir, "crypto-brief.html"))
+	registerStaticFileAlias(mux, "/crypto-brief/", filepath.Join(staticDir, "crypto-brief.html"))
 
 	// TradePI AI Agents shares the existing deployment but owns an isolated
 	// namespace and does not alter Koschei Web3 security behavior.

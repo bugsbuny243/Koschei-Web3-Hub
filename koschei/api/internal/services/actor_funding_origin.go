@@ -461,7 +461,7 @@ func compactActorFundingError(err error) string {
 	if err == nil {
 		return ""
 	}
-	message := strings.TrimSpace(err.Error())
+	message := strings.TrimSpace(RedactProviderCredentials(err.Error()))
 	if len(message) > 240 {
 		message = message[:240]
 	}

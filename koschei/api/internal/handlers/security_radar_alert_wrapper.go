@@ -9,16 +9,13 @@ import (
 	"strings"
 
 	"koschei/api/internal/alerts"
-	"koschei/api/internal/cryptobrief"
 )
 
 const maxSecurityRadarAlertBody = 1 << 20
 
 // SecurityRadarCheckWithAlerts preserves the existing investigation response
-// contract, mirrors every successful customer ARVIS result to the customer's
-// explicitly paired Telegram account, and adds a durable security alert only
-// after a signed, evidence-ready risky verdict has been produced. Neither
-// delivery path changes the deterministic grade.
+// contract and adds a durable alert only after a signed, evidence-ready verdict
+// has been produced. The alert pipeline never changes the deterministic grade.
 func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Request) {
 	rawBody, err := io.ReadAll(io.LimitReader(r.Body, maxSecurityRadarAlertBody+1))
 	if err != nil {
@@ -45,15 +42,6 @@ func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Re
 	if result.StatusCode >= 200 && result.StatusCode < 300 && h != nil && h.DB != nil {
 		var envelope map[string]any
 		if json.Unmarshal(responseBody, &envelope) == nil {
-			claims, _ := userFromContext(r.Context())
-			if claims.Sub != "" {
-				// Telegram is a secondary delivery surface for the canonical ARVIS
-				// result. A missing/unpaired Telegram account is a no-op and must
-				// never fail or alter the investigation response.
-				_, _ = cryptobrief.New(h.DB).QueueARVISResult(
-					r.Context(), claims.Sub, "", target, strings.TrimSpace(input.Network), envelope,
-				)
-			}
 			alertID = h.emitARVISVerdictAlert(r, target, envelope)
 			if alertID != "" {
 				envelope["alert_event_id"] = alertID

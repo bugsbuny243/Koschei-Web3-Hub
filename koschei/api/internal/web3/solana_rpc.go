@@ -280,21 +280,26 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	}
 
 	var lastErr error
+	onlyCooldownBlocker := true
+	var earliestCooldown time.Time
 	endpointTimeout := solanaRPCEndpointTimeout()
 	endpoints := uniqueRPCURLs(s.URL(network), SolanaRPCFallbackURL(network))
 	for index, endpoint := range endpoints {
 		if signaturePressure {
 			if until, cooling := solanaRPCSignatureEndpointCooldown(endpoint); cooling {
 				lastErr = fmt.Errorf("solana signature rpc endpoint cooling down until %s", until.UTC().Format(time.RFC3339))
+				earliestCooldown = earlierSolanaRPCCooldown(earliestCooldown, until)
 				continue
 			}
 		}
 		if until, cooling := SolanaRPCProviderCooldown(endpoint); cooling {
 			lastErr = fmt.Errorf("solana rpc provider cooling down until %s", until.UTC().Format(time.RFC3339))
+			earliestCooldown = earlierSolanaRPCCooldown(earliestCooldown, until)
 			continue
 		}
 		if until, cooling := s.rpcEndpointCooldown(endpoint); cooling {
 			lastErr = fmt.Errorf("solana rpc endpoint cooling down until %s", until.UTC().Format(time.RFC3339))
+			earliestCooldown = earlierSolanaRPCCooldown(earliestCooldown, until)
 			continue
 		}
 		if err := s.waitForRPCSlot(ctx); err != nil {
@@ -303,6 +308,7 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 		if err := WaitForSolanaRPCProviderSlot(ctx, endpoint); err != nil {
 			return err
 		}
+		onlyCooldownBlocker = false
 		attemptCtx, cancel := solanaRPCAttemptContext(ctx, endpointTimeout, len(endpoints)-index)
 		err := callSolanaRPC(attemptCtx, client, endpoint, method, body, target)
 		attemptErr := attemptCtx.Err()
@@ -329,6 +335,11 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	}
 	if lastErr == nil {
 		lastErr = fmt.Errorf("solana rpc endpoint unavailable")
+	}
+	if onlyCooldownBlocker && !earliestCooldown.IsZero() && !solanaRPCCooldownRetryUsed(ctx) {
+		if waitForBoundedSolanaRPCCooldown(ctx, earliestCooldown) {
+			return s.Call(markSolanaRPCCooldownRetryUsed(ctx), network, method, params, target, ttl)
+		}
 	}
 	return lastErr
 }
@@ -462,4 +473,44 @@ func callSolanaRPC(ctx context.Context, client *http.Client, endpoint, method st
 		return err
 	}
 	return nil
+}
+
+type solanaRPCCooldownRetryContextKey struct{}
+
+func earlierSolanaRPCCooldown(current, candidate time.Time) time.Time {
+	if candidate.IsZero() {
+		return current
+	}
+	if current.IsZero() || candidate.Before(current) {
+		return candidate
+	}
+	return current
+}
+
+func solanaRPCCooldownRetryUsed(ctx context.Context) bool {
+	used, _ := ctx.Value(solanaRPCCooldownRetryContextKey{}).(bool)
+	return used
+}
+
+func markSolanaRPCCooldownRetryUsed(ctx context.Context) context.Context {
+	return context.WithValue(ctx, solanaRPCCooldownRetryContextKey{}, true)
+}
+
+func waitForBoundedSolanaRPCCooldown(ctx context.Context, until time.Time) bool {
+	delay := time.Until(until)
+	if delay <= 0 {
+		return true
+	}
+	deadline, ok := ctx.Deadline()
+	if !ok || time.Until(deadline) <= delay {
+		return false
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
 }

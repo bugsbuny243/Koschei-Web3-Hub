@@ -55,7 +55,7 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 			analysisCtx = services.WithSecurityRadarStore(parent, services.NewSecurityRadarStore(historyDB))
 		}
 	}
-	analysis := services.AnalyzeArvisRadarsContext(analysisCtx, req)
+	analysis := services.AnalyzeArvisRadarsContextIsolated(analysisCtx, req)
 	bundle := services.EvidenceBackedSecurityRadarBundleContext(analysisCtx, analysis.Bundle)
 	roles := services.ArvisHolderRolesFromBundle(bundle)
 	distribution := radarDetailHolderDistributionFromRoles(roles)

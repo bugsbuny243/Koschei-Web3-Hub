@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -190,4 +191,20 @@ func metadataLimitationsContain(values []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+func TestProviderSourceUnavailableErrorClassifiesCooldownRateLimitAndTimeout(t *testing.T) {
+	for _, message := range []string{
+		"solana rpc provider cooling down until 2026-10-07T01:00:00Z",
+		"rpc returned 429 too many requests",
+		"context deadline exceeded",
+		"request timed out",
+	} {
+		if !providerSourceUnavailableError(errors.New(message)) {
+			t.Fatalf("expected provider outage classification for %q", message)
+		}
+	}
+	if providerSourceUnavailableError(errors.New("metadata decoded but creator field was empty")) {
+		t.Fatal("metadata_without_creator condition must not be classified as provider outage")
+	}
 }

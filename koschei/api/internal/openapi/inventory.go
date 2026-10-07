@@ -180,8 +180,6 @@ func normalizedInventoryAuth(inventoryAuth, path, filename string) string {
 		return "public"
 	case "owner_session":
 		return "owner_session"
-	case "customer_session", "customer_session_plus_explicit_pairing_consent":
-		return "customer_session"
 	case "api_key_plus_professional_entitlement":
 		return "api_key_plus_professional_entitlement"
 	case "customer_session_plus_professional_entitlement", "professional_saas_entitlement":

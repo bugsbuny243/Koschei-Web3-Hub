@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#080d11">
+  <title>KOSCHEİ WEB3 · Owner Login</title>
+  <link rel="stylesheet" href="/css/koschei.css?v=1">
+  <link rel="stylesheet" href="/css/owner-access-gate.css?v=2">
+</head>
+<body class="owner-login-only">
+  <main class="owner-login-shell">
+    <section class="login-card" aria-labelledby="ownerLoginTitle">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">K</span><span><strong>KOSCHEİ WEB3</strong><small>Owner Control Center</small></span></div>
+      <div class="login-copy">
+        <span class="eyebrow">Owner only · authenticated production access</span>
+        <h1 id="ownerLoginTitle">Sign in before the owner application is served.</h1>
+        <p class="muted">The private owner workspace is not rendered on this page. A valid owner session is required before the production control center can be opened.</p>
+        <div class="production-note">Deterministic result · evidence first · owner data stays behind server-side authorization</div>
+      </div>
+      <form id="ownerLoginForm" novalidate>
+        <div class="field"><label for="ownerLoginWallet">Owner identity</label><input class="input" id="ownerLoginWallet" autocomplete="username" placeholder="email or wallet"></div>
+        <div class="field"><label for="ownerLoginSecret">Owner secret</label><input class="input" id="ownerLoginSecret" type="password" autocomplete="current-password" placeholder="OWNER_SECRET" required></div>
+        <button class="btn primary full" id="ownerLoginButton" type="submit">Enter Owner Control Center</button>
+        <div id="ownerLoginError" class="owner-login-error" role="alert" hidden></div>
+      </form>
+    </section>
+  </main>
+  <script src="/js/owner-login.js?v=1"></script>
+</body>
+</html>

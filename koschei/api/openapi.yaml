@@ -4995,110 +4995,21 @@
         "x-koschei-route-source": "route_inventory.go"
       }
     },
-    "/api/customer/arvis/telegram": {
-      "delete": {
-        "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "delete__api_customer_arvis_telegram",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EvidenceResponse"
-                }
-              }
-            },
-            "description": "Evidence-backed result, including valid WITHHOLD outcomes."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Invalid request."
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Identity credential missing or invalid."
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Authenticated identity lacks the required access tier."
-          },
-          "405": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Method not allowed."
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Rate or quota limit reached."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal failure; no unsupported verdict is emitted."
-          }
-        },
-        "security": [
-          {
-            "sessionBearer": []
-          }
-        ],
-        "summary": "DELETE /api/customer/arvis/telegram",
-        "tags": [
-          "arvis_telegram_customer"
-        ],
-        "x-koschei-auth-tier": "customer_session",
-        "x-koschei-inventory-auth": "customer_session_plus_explicit_pairing_consent",
-        "x-koschei-route-source": "route_inventory.go"
-      },
+    "/api/crypto-brief/feed": {
       "get": {
-        "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "get__api_customer_arvis_telegram",
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "get__api_crypto_brief_feed",
         "parameters": [],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvidenceResponse"
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
                 }
               }
             },
-            "description": "Evidence-backed result, including valid WITHHOLD outcomes."
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
           },
           "400": {
             "content": {
@@ -5110,26 +5021,6 @@
             },
             "description": "Invalid request."
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Identity credential missing or invalid."
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Authenticated identity lacks the required access tier."
-          },
           "405": {
             "content": {
               "application/json": {
@@ -5139,6 +5030,16 @@
               }
             },
             "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
           },
           "429": {
             "content": {
@@ -5159,146 +5060,53 @@
               }
             },
             "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
           }
         },
-        "security": [
-          {
-            "sessionBearer": []
-          }
-        ],
-        "summary": "GET /api/customer/arvis/telegram",
+        "security": [],
+        "summary": "GET /api/crypto-brief/feed",
         "tags": [
-          "arvis_telegram_customer"
+          "crypto_brief_public"
         ],
-        "x-koschei-auth-tier": "customer_session",
-        "x-koschei-inventory-auth": "customer_session_plus_explicit_pairing_consent",
-        "x-koschei-route-source": "route_inventory.go"
-      },
-      "patch": {
-        "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "patch__api_customer_arvis_telegram",
-        "parameters": [],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GenericRequest"
-              }
-            }
-          },
-          "required": false
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EvidenceResponse"
-                }
-              }
-            },
-            "description": "Evidence-backed result, including valid WITHHOLD outcomes."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Invalid request."
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Identity credential missing or invalid."
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Authenticated identity lacks the required access tier."
-          },
-          "405": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Method not allowed."
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Rate or quota limit reached."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal failure; no unsupported verdict is emitted."
-          }
-        },
-        "security": [
-          {
-            "sessionBearer": []
-          }
-        ],
-        "summary": "PATCH /api/customer/arvis/telegram",
-        "tags": [
-          "arvis_telegram_customer"
-        ],
-        "x-koschei-auth-tier": "customer_session",
-        "x-koschei-inventory-auth": "customer_session_plus_explicit_pairing_consent",
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "public",
         "x-koschei-route-source": "route_inventory.go"
       }
     },
-    "/api/customer/arvis/telegram/pair": {
-      "post": {
-        "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "post__api_customer_arvis_telegram_pair",
+    "/api/customer/crypto-brief": {
+      "delete": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "delete__api_customer_crypto_brief",
         "parameters": [],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GenericRequest"
+                "$ref": "#/components/schemas/CryptoBriefRequest"
               }
             }
           },
-          "required": false
+          "required": true
         },
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvidenceResponse"
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
                 }
               }
             },
-            "description": "Evidence-backed result, including valid WITHHOLD outcomes."
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
           },
           "400": {
             "content": {
@@ -5310,26 +5118,6 @@
             },
             "description": "Invalid request."
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Identity credential missing or invalid."
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Authenticated identity lacks the required access tier."
-          },
           "405": {
             "content": {
               "application/json": {
@@ -5339,6 +5127,16 @@
               }
             },
             "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
           },
           "429": {
             "content": {
@@ -5359,19 +5157,397 @@
               }
             },
             "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
           }
         },
-        "security": [
-          {
-            "sessionBearer": []
-          }
-        ],
-        "summary": "POST /api/customer/arvis/telegram/pair",
+        "security": [],
+        "summary": "DELETE /api/customer/crypto-brief",
         "tags": [
-          "arvis_telegram_customer"
+          "crypto_brief_customer"
         ],
-        "x-koschei-auth-tier": "customer_session",
-        "x-koschei-inventory-auth": "customer_session_plus_explicit_pairing_consent",
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "customer_session",
+        "x-koschei-route-source": "route_inventory.go"
+      },
+      "get": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "get__api_customer_crypto_brief",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [],
+        "summary": "GET /api/customer/crypto-brief",
+        "tags": [
+          "crypto_brief_customer"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "customer_session",
+        "x-koschei-route-source": "route_inventory.go"
+      },
+      "patch": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "patch__api_customer_crypto_brief",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryptoBriefRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [],
+        "summary": "PATCH /api/customer/crypto-brief",
+        "tags": [
+          "crypto_brief_customer"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "customer_session",
+        "x-koschei-route-source": "route_inventory.go"
+      },
+      "put": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "put__api_customer_crypto_brief",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryptoBriefRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [],
+        "summary": "PUT /api/customer/crypto-brief",
+        "tags": [
+          "crypto_brief_customer"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "customer_session",
+        "x-koschei-route-source": "route_inventory.go"
+      }
+    },
+    "/api/customer/crypto-brief/pair": {
+      "post": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "post__api_customer_crypto_brief_pair",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryptoBriefRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [],
+        "summary": "POST /api/customer/crypto-brief/pair",
+        "tags": [
+          "crypto_brief_customer"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "customer_session",
         "x-koschei-route-source": "route_inventory.go"
       }
     },
@@ -6596,97 +6772,6 @@
         "x-koschei-route-source": "route_inventory.go"
       }
     },
-    "/api/owner/arvis/telegram": {
-      "get": {
-        "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
-        "operationId": "get__api_owner_arvis_telegram",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EvidenceResponse"
-                }
-              }
-            },
-            "description": "Evidence-backed result, including valid WITHHOLD outcomes."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Invalid request."
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Identity credential missing or invalid."
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Authenticated identity lacks the required access tier."
-          },
-          "405": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Method not allowed."
-          },
-          "429": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Rate or quota limit reached."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal failure; no unsupported verdict is emitted."
-          }
-        },
-        "security": [
-          {
-            "ownerSession": []
-          }
-        ],
-        "summary": "GET /api/owner/arvis/telegram",
-        "tags": [
-          "owner"
-        ],
-        "x-koschei-auth-tier": "owner_session",
-        "x-koschei-inventory-auth": "owner_session",
-        "x-koschei-route-source": "route_inventory.go"
-      }
-    },
     "/api/owner/brain": {
       "post": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
@@ -7255,6 +7340,117 @@
           }
         ],
         "summary": "GET /api/owner/creator-intelligence",
+        "tags": [
+          "owner"
+        ],
+        "x-koschei-auth-tier": "owner_session",
+        "x-koschei-inventory-auth": "owner_session",
+        "x-koschei-route-source": "route_inventory.go"
+      }
+    },
+    "/api/owner/crypto-brief": {
+      "get": {
+        "description": "Source-labelled public news and consenting customer channel preferences. Publisher reports are not security verdicts. Pairing requires an authenticated customer, explicit consent and a one-use connection code. Provider acceptance and confirmed delivery are different states.",
+        "operationId": "get__api_owner_crypto_brief",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoBriefResponse"
+                }
+              }
+            },
+            "description": "News, channel preferences, a pairing challenge or aggregate operational status."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Identity credential missing or invalid."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Authenticated identity lacks the required access tier."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Channel state cannot be changed or requires disconnecting before pairing."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "News storage, a source or channel configuration is unavailable."
+          }
+        },
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "summary": "GET /api/owner/crypto-brief",
         "tags": [
           "owner"
         ],

@@ -16,9 +16,8 @@ import (
 	"koschei/api/internal/workerwake"
 )
 
-const TelegramWebhookURL = "https://tradepigloball.co/integrations/arvis/telegram"
-const legacyTelegramWebhookURL = "https://tradepigloball.co/integrations/crypto-brief/telegram"
-const telegramWebhookHealthID = "arvis-telegram-webhook"
+const TelegramWebhookURL = "https://tradepigloball.co/integrations/crypto-brief/telegram"
+const telegramWebhookHealthID = "crypto-brief-telegram-webhook"
 
 var (
 	errTelegramSetup      = errors.New("telegram_webhook_setup_failed")
@@ -27,9 +26,9 @@ var (
 	errTelegramUnverified = errors.New("telegram_webhook_not_verified")
 )
 
-// ConfigureTelegramWebhook binds only the configured dedicated ARVIS customer
-// bot. Provider bodies and HTTP errors can contain credentials and must never be
-// returned. Verification proves configuration, not receipt of a customer message.
+// ConfigureTelegramWebhook binds only the configured dedicated bot. Provider
+// bodies and HTTP errors can contain credentials and must never be returned.
+// Verification proves configuration, not receipt of a customer message.
 func ConfigureTelegramWebhook(ctx context.Context, c Config, client *http.Client) error {
 	if !c.Ready("telegram") {
 		return ErrChannelUnavailable
@@ -54,7 +53,7 @@ func ConfigureTelegramWebhook(ctx context.Context, c Config, client *http.Client
 	if err := telegramSetupCall(ctx, c, client, "getWebhookInfo", map[string]any{}, &webhook); err != nil {
 		return err
 	}
-	if webhook.URL != "" && webhook.URL != TelegramWebhookURL && webhook.URL != legacyTelegramWebhookURL {
+	if webhook.URL != "" && webhook.URL != TelegramWebhookURL {
 		return errTelegramConflict
 	}
 	var accepted bool
@@ -67,6 +66,8 @@ func ConfigureTelegramWebhook(ctx context.Context, c Config, client *http.Client
 	if !accepted {
 		return errTelegramUnverified
 	}
+	// Decode the readback into fresh fields; missing JSON properties must not
+	// inherit the values returned before registration.
 	webhook.URL = ""
 	webhook.AllowedUpdates = nil
 	if err := telegramSetupCall(ctx, c, client, "getWebhookInfo", map[string]any{}, &webhook); err != nil {
@@ -131,11 +132,11 @@ func startTelegramWebhook(ctx context.Context, s *Service, health *runtimehealth
 			wait := time.Hour
 			if err != nil {
 				health.Failure(telegramWebhookHealthID, err)
-				log.Print("ARVIS Telegram webhook setup failed")
+				log.Print("crypto brief Telegram webhook setup failed")
 				wait = 15 * time.Minute
 			} else {
 				health.Success(telegramWebhookHealthID, 1)
-				log.Print("ARVIS Telegram webhook configuration verified; customer result delivery still requires a real test")
+				log.Print("crypto brief Telegram webhook configuration verified; customer delivery still requires a real test")
 			}
 			timer := time.NewTimer(wait)
 			select {

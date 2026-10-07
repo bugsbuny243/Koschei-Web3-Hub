@@ -13,12 +13,9 @@ import (
 	"koschei/api/internal/workerwake"
 )
 
-type CompletionHook func(context.Context, Job, any) error
-
 type Store struct {
-	DB             *sql.DB
-	WakeQueue      Queue
-	CompletionHook CompletionHook
+	DB        *sql.DB
+	WakeQueue Queue
 }
 
 type jobScanner interface {
@@ -32,13 +29,6 @@ func (s *Store) SetWakeQueue(queue Queue) {
 		return
 	}
 	s.WakeQueue = queue
-}
-
-func (s *Store) SetCompletionHook(hook CompletionHook) {
-	if s == nil {
-		return
-	}
-	s.CompletionHook = hook
 }
 
 func (s *Store) Create(ctx context.Context, in CreateInput) (Job, error) {
@@ -253,24 +243,8 @@ func (s *Store) Complete(ctx context.Context, id string, result any) error {
 	if err != nil {
 		return err
 	}
-	job, err := scanJob(s.DB.QueryRowContext(ctx, `
-		UPDATE web3_jobs
-		SET status='completed',progress=100,result_payload=$2,error_code=NULL,error_message=NULL,completed_at=now(),updated_at=now()
-		WHERE id=$1
-		RETURNING id,user_id,email,job_type,status,network,target,request_payload,
-		          COALESCE(result_payload,'null'::jsonb),COALESCE(error_code,''),COALESCE(error_message,''),
-		          progress,attempts,queued_at,updated_at`, id, b))
-	if err != nil {
-		return err
-	}
-	if s.CompletionHook != nil {
-		// Completion is already durable. Notification failures must not roll a
-		// successfully finished investigation back into a failed/retry state.
-		if hookErr := s.CompletionHook(ctx, job, result); hookErr != nil {
-			log.Printf("job completion hook failed id=%s type=%s: %v", job.ID, job.Type, hookErr)
-		}
-	}
-	return nil
+	_, err = s.DB.ExecContext(ctx, `UPDATE web3_jobs SET status='completed',progress=100,result_payload=$2,error_code=NULL,error_message=NULL,completed_at=now(),updated_at=now() WHERE id=$1`, id, b)
+	return err
 }
 
 func (s *Store) Fail(ctx context.Context, id, code, message string) error {

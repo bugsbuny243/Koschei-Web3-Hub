@@ -36,12 +36,12 @@ func TestPolicyRejectsCrossTenantAndUnauthorizedTarget(t *testing.T) {
 
 func TestEffectAgreementPreservesIndeterminateState(t *testing.T) {
 	observation := EffectObservation{ExpectedState: "isolated", ObservedState: "isolated", ScopeComplete: false, CoverageGaps: []string{"network-observer-unavailable"}}
-	if got := DeriveEffectAgreement(observation); got != EffectIndeterminate {
+	if got := DeriveEffectAgreement(observation); got != ControlEffectIndeterminate {
 		t.Fatalf("expected indeterminate, got %q", got)
 	}
 	observation.ScopeComplete = true
 	observation.CoverageGaps = nil
-	if got := DeriveEffectAgreement(observation); got != EffectAgree {
+	if got := DeriveEffectAgreement(observation); got != ControlEffectAgree {
 		t.Fatalf("expected agree, got %q", got)
 	}
 }
@@ -55,7 +55,7 @@ func TestReceiptBindsPolicyActionAndObservedEffect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected receipt error: %v", err)
 	}
-	if receipt.Observation.Agreement != EffectAgree || receipt.ReceiptHash == "" {
+	if receipt.Observation.Agreement != ControlEffectAgree || receipt.ReceiptHash == "" {
 		t.Fatalf("receipt missing verified agreement/hash: %+v", receipt)
 	}
 
