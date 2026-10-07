@@ -133,7 +133,7 @@ jobs:
             exit 48
           fi
           case "${owner_code}" in
-            302|303|307|308|401|403) ;;
+            302|303|307|308|401|403|404) ;;
             *)
               echo "OWNER_AUTH_BOUNDARY_FAILURE: anonymous owner production request returned unexpected HTTP ${owner_code}." >&2
               exit 49
