@@ -18,4 +18,8 @@ func registerCryptoBriefRoutes(mux *http.ServeMux, h *handlers.Handler, staticDi
 		http.ServeFile(w, r, filepath.Join(staticDir, "crypto-brief-operations.html"))
 	})))
 	mux.HandleFunc("/integrations/crypto-brief/telegram", requiresDB(h, service.TelegramHTTP))
+	mux.HandleFunc("/api/customer/arvis/telegram", requiresDB(h, handlers.RequireAuth(service.ARVISTelegramHTTP(handlers.AuthenticatedSubject))))
+	mux.HandleFunc("/api/customer/arvis/telegram/pair", requiresDB(h, handlers.RequireAuth(service.ARVISTelegramPairHTTP(handlers.AuthenticatedSubject))))
+	mux.HandleFunc("/api/owner/arvis/telegram", requiresDB(h, ownerOnly(h, method("GET", service.ARVISTelegramStatusHTTP))))
+	mux.HandleFunc("/integrations/arvis/telegram", requiresDB(h, service.ARVISTelegramWebhookHTTP))
 }
