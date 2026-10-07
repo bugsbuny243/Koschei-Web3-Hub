@@ -77,9 +77,9 @@ func LoadMarketManipulationIntelligence(ctx context.Context, db *sql.DB, mint st
 		WindowHours:   MarketManipulationWindowHours,
 		Candidates:    []MarketRoundTripChurnCandidate{},
 		Thresholds: map[string]any{
-			"minimum_buy_count":      MarketManipulationMinimumBuyCount,
-			"minimum_sell_count":     MarketManipulationMinimumSellCount,
-			"minimum_gross_sol":      MarketManipulationMinimumGrossSOL,
+			"minimum_buy_count":       MarketManipulationMinimumBuyCount,
+			"minimum_sell_count":      MarketManipulationMinimumSellCount,
+			"minimum_gross_sol":       MarketManipulationMinimumGrossSOL,
 			"maximum_net_gross_ratio": MarketManipulationMaximumNetGross,
 		},
 		Limitations: []string{
