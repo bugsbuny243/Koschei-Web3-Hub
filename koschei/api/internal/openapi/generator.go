@@ -204,6 +204,8 @@ func authTier(path, filename string) string {
 		return "customer_session_plus_professional_entitlement"
 	case strings.HasPrefix(path, "/api/account/"):
 		return "customer_session_plus_professional_entitlement"
+	case path == "/api/customer/arvis/telegram" || path == "/api/customer/arvis/telegram/pair":
+		return "customer_session"
 	case strings.HasPrefix(path, "/api/auth/wallet/") || path == "/api/auth/premium-access" || path == "/api/me" || path == "/api/web3/health/logs" || path == "/api/v1/radar/jobs/{id}" || path == "/api/jobs/{id}":
 		return "customer_session"
 	case path == "/api/v1/radar/feed" || path == "/api/v1/radar/creator-intelligence" || path == "/api/v1/radar/actor-intelligence" || path == "/api/v1/radar/graph" || path == "/api/v1/radar/exposure" || path == "/api/v1/radar/court":
