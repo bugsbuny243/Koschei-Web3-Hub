@@ -64,8 +64,12 @@ func ApplyCrossTokenCreatorHolderTransferRuleV120(report UnifiedRadarBehaviorRep
 	hasParsedSignature := strings.TrimSpace(relation.TransferSignature) != "" && relation.Slot > 0
 	ownerResolved := relation.RecipientOwnerResolved && strings.TrimSpace(relation.RecipientOwnerWallet) != ""
 	if !relation.Available || !creatorResolved {
-		signal.Summary = "EVIDENCE PENDING: creator wallet transfer linkage was not evaluated because verified creator/deployer evidence is unavailable."
-		signal.Limitations = append(signal.Limitations, "URD-C006 requires a VERIFIED creator/deployer wallet before cross-token transfer linkage can affect a grade.")
+		reason := strings.TrimSpace(relation.Status)
+		if reason == "" {
+			reason = "required evidence unavailable"
+		}
+		signal.Summary = "EVIDENCE PENDING: URD-C006 was not evaluated because " + reason + "."
+		signal.Limitations = append(signal.Limitations, "Missing evidence is unavailable, not empty or safe; URD-C006 cannot affect a grade until its evidence contract is complete.")
 	} else if !hasParsedSignature {
 		signal.Summary = "EVIDENCE PENDING: stored aggregates or incomplete transfer rows cannot trigger URD-C006 without a parsed transaction signature and slot."
 		signal.Limitations = append(signal.Limitations, "No signature, no trigger; aggregate-only transfer evidence is watch/pending context.")

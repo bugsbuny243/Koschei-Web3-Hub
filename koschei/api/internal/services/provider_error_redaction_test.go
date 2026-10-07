@@ -34,3 +34,15 @@ func TestRedactProviderCredentialsCoversCommonForms(t *testing.T) {
 		}
 	}
 }
+
+func TestCompactActorFundingErrorRedactsProviderCredentialBeforeTruncation(t *testing.T) {
+	const secret = "super-secret-helius-key"
+	err := errors.New("https://mainnet.helius-rpc.com/?api-key=" + secret + ": solana rpc provider cooling down")
+	got := compactActorFundingError(err)
+	if strings.Contains(got, secret) {
+		t.Fatalf("compact actor funding error leaked provider credential: %q", got)
+	}
+	if !strings.Contains(got, "api-key=[redacted]") {
+		t.Fatalf("compact actor funding error missing redaction marker: %q", got)
+	}
+}

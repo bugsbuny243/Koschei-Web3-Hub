@@ -246,3 +246,21 @@ func TestSecurityProviderDrivesRPCWhenWeb3ProviderAuto(t *testing.T) {
 		t.Fatalf("security provider preference got %q", got)
 	}
 }
+
+func TestBoundedCooldownRetryRequiresRemainingRequestBudget(t *testing.T) {
+	ctxShort, cancelShort := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	defer cancelShort()
+	if waitForBoundedSolanaRPCCooldown(ctxShort, time.Now().Add(100*time.Millisecond)) {
+		t.Fatal("cooldown wait must not consume a request budget shorter than the cooldown")
+	}
+
+	ctxLong, cancelLong := context.WithTimeout(t.Context(), time.Second)
+	defer cancelLong()
+	if !waitForBoundedSolanaRPCCooldown(ctxLong, time.Now().Add(5*time.Millisecond)) {
+		t.Fatal("bounded cooldown shorter than remaining request budget should be retried once")
+	}
+	retryCtx := markSolanaRPCCooldownRetryUsed(ctxLong)
+	if !solanaRPCCooldownRetryUsed(retryCtx) {
+		t.Fatal("retry marker was not preserved")
+	}
+}

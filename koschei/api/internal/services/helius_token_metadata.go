@@ -168,7 +168,11 @@ func FetchHeliusTokenMetadata(ctx context.Context, rpcURL, mint string) HeliusTo
 	}
 
 	if !out.Available {
-		out.Status = "collection_failed"
+		if providerSourceUnavailableError(assetErr) || providerSourceUnavailableError(creationErr) {
+			out.Status = "provider_unavailable"
+		} else {
+			out.Status = "collection_failed"
+		}
 		return out
 	}
 	if out.Creator == "" {
@@ -344,4 +348,21 @@ func postHeliusRPC(ctx context.Context, endpoint string, payload []byte, maxBody
 		return nil, fmt.Errorf("helius RPC status %d: %s", res.StatusCode, compactClusterError(fmt.Errorf("%s", strings.TrimSpace(string(body)))))
 	}
 	return body, nil
+}
+
+func providerSourceUnavailableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	for _, marker := range []string{
+		"cooling down", "429", "too many requests", "rate limit",
+		"context deadline exceeded", "deadline exceeded", "timeout", "timed out",
+		"connection refused", "connection reset", "temporary failure",
+	} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
 }
