@@ -17,11 +17,11 @@ func TestPublicToolPricesUsesSingleProfessionalContract(t *testing.T) {
 	}
 
 	var payload struct {
-		SchemaVersion string `json:"schema_version"`
-		Plan string `json:"plan"`
-		PriceUSD int `json:"price_usd"`
-		AccessDays int `json:"access_days"`
-		PaymentPaths []map[string]any `json:"payment_paths"`
+		SchemaVersion string           `json:"schema_version"`
+		Plan          string           `json:"plan"`
+		PriceUSD      int              `json:"price_usd"`
+		AccessDays    int              `json:"access_days"`
+		PaymentPaths  []map[string]any `json:"payment_paths"`
 	}
 	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
