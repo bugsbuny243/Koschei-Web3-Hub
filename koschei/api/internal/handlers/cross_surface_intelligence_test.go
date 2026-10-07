@@ -11,7 +11,7 @@ func TestAttachCrossSurfaceIntelligenceKeepsCorrelationNonAuthoritative(t *testi
 	dossier := services.ActorDefenseDossier{
 		Wallet:  "Creator111",
 		Network: "solana-mainnet",
-		Track:   services.ActorDefenseTrack{
+		Track: services.ActorDefenseTrack{
 			Network:           "solana-mainnet",
 			TargetKind:        "wallet",
 			TargetID:          "Creator111",
