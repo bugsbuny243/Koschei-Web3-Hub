@@ -36,14 +36,14 @@ type MarketRoundTripChurnCandidate struct {
 }
 
 type MarketManipulationIntelligence struct {
-	Version                 string                          `json:"version"`
-	Mint                    string                          `json:"mint"`
-	Status                  string                          `json:"status"`
-	Available               bool                            `json:"available"`
-	Complete                bool                            `json:"complete"`
-	WindowHours             int                             `json:"window_hours"`
-	CandidateCount          int                             `json:"candidate_count"`
-	Candidates              []MarketRoundTripChurnCandidate `json:"candidates"`
+	Version            string                          `json:"version"`
+	Mint               string                          `json:"mint"`
+	Status             string                          `json:"status"`
+	Available          bool                            `json:"available"`
+	Complete           bool                            `json:"complete"`
+	WindowHours        int                             `json:"window_hours"`
+	CandidateCount     int                             `json:"candidate_count"`
+	Candidates         []MarketRoundTripChurnCandidate `json:"candidates"`
 	WashTradingProven       bool                            `json:"wash_trading_proven"`
 	ManipulationClaim       bool                            `json:"manipulation_claim"`
 	SameOperatorClaim       bool                            `json:"same_operator_claim"`
