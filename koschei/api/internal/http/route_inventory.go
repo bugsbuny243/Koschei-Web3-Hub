@@ -81,7 +81,7 @@ func productionRouteInventory() []routeInventoryGroup {
 			"POST /api/owner/dossier/publications", "POST /api/owner/arvis/acceptance",
 		}},
 		{Name: "professional_customer_operations", Auth: "customer_session_plus_professional_entitlement", Routes: []string{
-			"POST /api/arvis/preflight", "POST /api/token/scan",
+			"POST /api/arvis/preflight", "POST /api/token/scan", "POST /api/wallet/score", "POST /api/mev/analyze", "POST /api/liquidity/analyze", "POST /api/dao/proposal-risk",
 			"POST /api/v1/token/extensions", "POST /api/v1/address-poisoning/check", "POST /api/customer/web3/transaction-preflight", "POST /api/customer/web3/transaction-state-recheck",
 			"POST /api/v1/radar/check", "POST /api/v1/radar/jobs", "GET /api/v1/radar/jobs/", "GET /api/v1/radar/detail", "GET /api/v1/radar/feed",
 			"GET /api/v1/radar/creator-intelligence", "GET /api/v1/radar/actor-intelligence", "GET /api/v1/radar/graph", "GET /api/v1/radar/exposure", "POST /api/v1/radar/court",

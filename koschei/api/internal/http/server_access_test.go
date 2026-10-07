@@ -28,7 +28,7 @@ func TestProductRouteTierMapIsProfessionalOnly(t *testing.T) {
 	// metered investigation, radar and durable-job create routes use the same
 	// Professional authorization contract. The immediate state recheck remains
 	// entitlement-only so one signing decision is not charged twice.
-	wantMetered := []string{"professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional"}
+	wantMetered := []string{"professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional", "professional"}
 	if !reflect.DeepEqual(meteredTiers, wantMetered) {
 		t.Fatalf("metered route tiers=%v want=%v", meteredTiers, wantMetered)
 	}
