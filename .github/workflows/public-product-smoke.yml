@@ -122,11 +122,27 @@ jobs:
           checked_page safe_check /safe-check "arvis-premium-contract.js"
           checked_page transaction_shield /transaction-shield "arvis-premium-contract.js"
           checked_page security_radar /security-radar "arvis-premium-contract.js"
-          checked_page owner_production /owner-production.html "owner-control-center.js?v=13"
+          owner_code="$(probe owner_production /owner-production.html)"
+          echo "owner_production_code=${owner_code}" | tee -a diagnostics/result.txt
+          if [ "${owner_code}" = "200" ]; then
+            echo 'OWNER_AUTH_BOUNDARY_FAILURE: anonymous owner production request returned HTTP 200.' >&2
+            exit 47
+          fi
+          if grep -Fq 'owner-control-center.js?v=13' diagnostics/owner_production.body || grep -Fq 'arvis-complete-evidence-v3.js' diagnostics/owner_production.body; then
+            echo 'OWNER_AUTH_BOUNDARY_FAILURE: anonymous owner production response exposed private owner markers.' >&2
+            exit 48
+          fi
+          case "${owner_code}" in
+            302|303|307|308|401|403) ;;
+            *)
+              echo "OWNER_AUTH_BOUNDARY_FAILURE: anonymous owner production request returned unexpected HTTP ${owner_code}." >&2
+              exit 49
+              ;;
+          esac
           checked_page complete_evidence_asset /js/arvis-complete-evidence-v3.js "completeEvidenceVersion='3.0.0'"
           checked_page social_renderer_asset /js/arvis-social-render-v2-publish.js "socialRendererVersion='2.0.0'"
 
-          for page in arvis_scan arvis_dashboard safe_check transaction_shield security_radar owner_production; do
+          for page in arvis_scan arvis_dashboard safe_check transaction_shield security_radar; do
             grep -Fq '<html lang="en">' "diagnostics/${page}.body" || {
               echo "ARVIS_LANGUAGE_FAILURE: ${page} is not response-English." >&2
               exit 33
@@ -142,10 +158,33 @@ jobs:
               exit 34
             }
           done
-          grep -Fq 'arvis-complete-evidence-v3.js' diagnostics/owner_production.body || {
-            echo 'OWNER_ARVIS_CONTRACT_FAILURE: owner production is missing Complete Evidence v3.' >&2
-            exit 35
-          }
+          if [ -n "${KOSCHEI_ACCEPTANCE_SESSION_TOKEN:-}" ]; then
+            owner_auth_code="$(curl --location --silent --show-error --max-time 25 \
+              --header "Authorization: Bearer ${KOSCHEI_ACCEPTANCE_SESSION_TOKEN}" \
+              --dump-header diagnostics/owner_production_auth.headers \
+              --output diagnostics/owner_production_auth.body \
+              --write-out '%{http_code}' \
+              "${BASE_URL}/owner-production.html" || true)"
+            echo "owner_production_auth_code=${owner_auth_code}" | tee -a diagnostics/result.txt
+            [ "${owner_auth_code}" = "200" ] || {
+              echo "OWNER_AUTHENTICATED_CONTRACT_FAILURE: authenticated owner production returned HTTP ${owner_auth_code}." >&2
+              exit 50
+            }
+            grep -Fq 'owner-control-center.js?v=13' diagnostics/owner_production_auth.body || {
+              echo 'OWNER_AUTHENTICATED_CONTRACT_FAILURE: authenticated owner production is missing owner control center.' >&2
+              exit 51
+            }
+            grep -Fq 'arvis-complete-evidence-v3.js' diagnostics/owner_production_auth.body || {
+              echo 'OWNER_ARVIS_CONTRACT_FAILURE: authenticated owner production is missing Complete Evidence v3.' >&2
+              exit 35
+            }
+            grep -Fq '<html lang="en">' diagnostics/owner_production_auth.body || {
+              echo 'ARVIS_LANGUAGE_FAILURE: authenticated owner production is not response-English.' >&2
+              exit 33
+            }
+          else
+            echo 'OWNER_AUTHENTICATED_CHECK_DEFERRED: KOSCHEI_ACCEPTANCE_SESSION_TOKEN is not configured; anonymous isolation passed.' | tee -a diagnostics/result.txt
+          fi
 
           if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
             wait_expect_200 auth_english_asset /js/english-auth-presentation.js "__koscheiAuthEnglishOverlayInstalled"
