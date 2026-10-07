@@ -1,11 +1,36 @@
 [hidden]{display:none!important}
 body.owner-command-v2 #loginView.hidden,
 body.owner-command-v2 #appView.hidden{display:none!important}
-body.owner-login-only{min-height:100vh;background:#080d11}
+body.owner-login-only{min-height:100vh;background:#080d11;color:#edf7fa}
 .owner-login-shell{min-height:100vh;display:grid;place-items:center;padding:24px}
-.owner-login-shell .login-card{width:min(100%,760px);display:grid;gap:22px;padding:28px;border:1px solid rgba(73,214,170,.2);border-radius:20px;background:rgba(7,18,23,.96);box-shadow:0 24px 80px rgba(0,0,0,.35)}
+.owner-login-shell .login-card{width:min(100%,760px);display:grid;gap:22px;padding:28px;border:1px solid rgba(73,214,170,.2);border-radius:20px;background:rgba(7,18,23,.96);box-shadow:0 24px 80px rgba(0,0,0,.35);color:#edf7fa}
+.owner-login-shell .brand{display:flex;align-items:center;gap:12px;min-width:0}
+.owner-login-shell .brand>span:last-child{display:grid;gap:2px;min-width:0}
+.owner-login-shell .brand strong{color:#f5fbfd!important;font-size:1rem;line-height:1.1;letter-spacing:.02em}
+.owner-login-shell .brand small{color:#9fb2ba!important;font-size:.78rem;line-height:1.25}
+.owner-login-shell .eyebrow{color:#66e4c0!important}
+.owner-login-shell h1{margin:0;color:#f5fbfd!important;font-size:clamp(1.65rem,4.8vw,2.75rem);line-height:1.08;letter-spacing:-.025em}
+.owner-login-shell .muted{color:#a8bbc2!important;font-size:.98rem;line-height:1.6}
+.owner-login-shell .production-note{color:#d8f8ee!important;background:rgba(35,142,111,.14);border-color:rgba(73,214,170,.28)}
 .owner-login-shell form{display:grid;gap:14px}
 .owner-login-shell .field{display:grid;gap:7px}
-.owner-login-shell .input{width:100%}
+.owner-login-shell label{color:#dce8ec!important;font-weight:650}
+.owner-login-shell .input{width:100%;min-height:48px;color:#f2f8fa;background:#050b0e;border-color:rgba(122,173,191,.2)}
+.owner-login-shell .input::placeholder{color:#63767e}
+.owner-login-shell .btn.primary{min-height:48px;font-weight:750}
 .owner-login-error{padding:12px 14px;border:1px solid rgba(255,80,110,.4);border-radius:12px;color:#ff8ca2;background:rgba(255,80,110,.08)}
-@media(max-width:640px){.owner-login-shell{padding:14px}.owner-login-shell .login-card{padding:20px;border-radius:16px}}
+@media(max-width:640px){.owner-login-shell{padding:14px}.owner-login-shell .login-card{padding:20px;border-radius:16px;gap:18px}.owner-login-shell h1{font-size:clamp(1.5rem,7vw,2.1rem)}.owner-login-shell .muted{font-size:.94rem}}
+
+/* Owner ARVIS scan readability. Scoped so access/login and other owner surfaces are unchanged. */
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid>.card{grid-column:span 6;min-width:0;width:100%}
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid>.card .card-head{min-width:0}
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid>.card h3,
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid>.card p,
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid>.card .muted,
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid>.card .metadata b{word-break:normal;overflow-wrap:anywhere}
+@media(max-width:760px){
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid{display:grid;grid-template-columns:minmax(0,1fr)!important;gap:10px}
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid>.card{grid-column:1/-1!important;width:100%;min-height:0;padding:13px}
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid>.card .metadata{grid-template-columns:minmax(0,1fr)!important}
+:is(#ownerRadarResult,#ownerBrainScanResult) .grid.compact-grid>.card .card-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start}
+}

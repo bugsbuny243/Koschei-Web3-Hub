@@ -605,7 +605,7 @@ func summarizeUnifiedTransactionEvidence(values []unifiedTransactionEvidence) ma
 			roundTrip++
 		}
 	}
-	summary := map[string]any{
+	return map[string]any{
 		"available": len(values) > 0, "status": "bounded_live_transaction_window",
 		"trade_count": int64(len(values)), "buy_count": buy, "sell_count": sell,
 		"transfer_in_count": transferIn, "transfer_out_count": transferOut,
@@ -613,10 +613,6 @@ func summarizeUnifiedTransactionEvidence(values []unifiedTransactionEvidence) ma
 		"wash_classification": "not_proven",
 		"interpretation":      "Counts are bounded live wallet observations; they are not complete market-wide trade history.",
 	}
-	for key, value := range boundedMarketBehaviorIndicators(values) {
-		summary[key] = value
-	}
-	return summary
 }
 
 func applyUnifiedLiveEvidenceReferences(refs map[string]unifiedEvidenceReference, live unifiedLiveInvestigationReport) map[string]unifiedEvidenceReference {

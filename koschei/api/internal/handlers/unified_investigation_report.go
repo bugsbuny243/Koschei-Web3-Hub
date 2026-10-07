@@ -145,8 +145,15 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	if liveRequested {
 		switch {
 		case creator == "":
-			actorRun.Status = "creator_unavailable"
-			actorRun.Limitations = append(actorRun.Limitations, "Token taramasında doğrulanmış creator/deployer cüzdanı çözümlenemedi; actor investigation başlatılmadı.")
+			creatorResolutionStatus := strings.TrimSpace(creatorIntelCleanString(core.SourceContext["creator_resolution_status"]))
+			if creatorResolutionStatus == "provider_unavailable" {
+				actorRun.Status = "source_unavailable"
+				actorStoreStatus = "source_unavailable"
+				actorRun.Limitations = append(actorRun.Limitations, "Creator/deployer source was unavailable during this run; actor investigation is incomplete and this state does not imply safety or creator absence.")
+			} else {
+				actorRun.Status = "creator_unavailable"
+				actorRun.Limitations = append(actorRun.Limitations, "Token taramasında doğrulanmış creator/deployer cüzdanı çözümlenemedi; actor investigation başlatılmadı.")
+			}
 		case store == nil:
 			actorStoreStatus = "request_scope_live"
 			creatorRelation = buildRequestScopeCanonicalCreatorMintRelation(core, creator, network)
@@ -291,6 +298,8 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	behavior := services.EvaluateUnifiedRadarBehavior(target, creator, core.Market, core.Intelligence, core.Cluster, sales, now)
 	behavior = services.HardenUnifiedRadarBehavior(behavior, storedVerification, core.Cluster)
 	behavior = services.ApplyOwnerConcentrationRuleV110(behavior, core.Intelligence, now)
+	c006Relation := buildRequestScopeC006Relation(ctx, db, distributionRun.Report, core.Intelligence)
+	behavior = services.ApplyCrossTokenCreatorHolderTransferRuleV120(behavior, c006Relation, now)
 	behavior = services.ApplyCrossTokenFundingRecurrenceRuleV130(behavior, core.FundingRecurrence, now)
 	requestScopeExitEvidence := append([]services.ActorDefenseEvidenceRecord{}, actorDossier.Evidence...)
 	requestScopeExitEvidence = append(requestScopeExitEvidence, behavior.Evidence...)
@@ -475,6 +484,12 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			"campaign_tempo_can_change_grade":            false,
 			"behavioral_signatures_can_change_grade":     false,
 		},
+	}
+	if actorRun.Status == "source_unavailable" {
+		report["source_completeness"] = "incomplete_source"
+		report["source_completeness_reason"] = "creator_source_unavailable"
+	} else {
+		report["source_completeness"] = "complete_or_evidence_bounded"
 	}
 	_ = h.persistDossierSourceSnapshot(ctx, report)
 	return unifiedInvestigationAssembly{

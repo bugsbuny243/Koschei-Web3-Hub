@@ -9,15 +9,13 @@ import (
 	"strings"
 
 	"koschei/api/internal/alerts"
-	"koschei/api/internal/cryptobrief"
 )
 
 const maxSecurityRadarAlertBody = 1 << 20
 
 // SecurityRadarCheckWithAlerts preserves the existing investigation response
-// contract. Signed evidence-ready medium/high/critical verdicts still create
-// durable security alerts. Separately, every successful customer scan may be
-// queued to that customer's explicitly paired Telegram channel.
+// contract and adds a durable alert only after a signed, evidence-ready verdict
+// has been produced. The alert pipeline never changes the deterministic grade.
 func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Request) {
 	rawBody, err := io.ReadAll(io.LimitReader(r.Body, maxSecurityRadarAlertBody+1))
 	if err != nil {
@@ -40,19 +38,13 @@ func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Re
 	defer result.Body.Close()
 	responseBody, _ := io.ReadAll(result.Body)
 
+	alertID := ""
 	if result.StatusCode >= 200 && result.StatusCode < 300 && h != nil && h.DB != nil {
 		var envelope map[string]any
 		if json.Unmarshal(responseBody, &envelope) == nil {
-			changed := false
-			if alertID := h.emitARVISVerdictAlert(r, target, envelope); alertID != "" {
+			alertID = h.emitARVISVerdictAlert(r, target, envelope)
+			if alertID != "" {
 				envelope["alert_event_id"] = alertID
-				changed = true
-			}
-			if h.queueARVISCustomerTelegram(r, target, envelope) {
-				envelope["telegram_delivery_queued"] = true
-				changed = true
-			}
-			if changed {
 				if encoded, marshalErr := json.Marshal(envelope); marshalErr == nil {
 					responseBody = encoded
 				}
@@ -120,97 +112,6 @@ func (h *Handler) emitARVISVerdictAlert(r *http.Request, target string, envelope
 		return ""
 	}
 	return id
-}
-
-// queueARVISCustomerTelegram is best-effort. Telegram/provider failure must not
-// change the deterministic ARVIS response returned to the customer.
-func (h *Handler) queueARVISCustomerTelegram(r *http.Request, target string, envelope map[string]any) bool {
-	if r == nil || h == nil || h.DB == nil {
-		return false
-	}
-	claims, ok := userFromContext(r.Context())
-	if !ok || strings.TrimSpace(claims.Sub) == "" {
-		return false
-	}
-	message, resultID := arvisCustomerTelegramMessage(target, envelope)
-	if message == "" {
-		return false
-	}
-	queued, err := cryptobrief.New(h.DB).QueueARVISResult(r.Context(), claims.Sub, resultID, message)
-	return err == nil && queued
-}
-
-func arvisCustomerTelegramMessage(target string, envelope map[string]any) (string, string) {
-	if envelope == nil {
-		return "", ""
-	}
-	if target == "" {
-		target = strings.TrimSpace(stringFromMap(envelope, "target"))
-	}
-	status := strings.TrimSpace(stringFromMap(envelope, "status"))
-	if status == "" {
-		status = "completed"
-	}
-	final, _ := envelope["final_verdict"].(map[string]any)
-	riskLevel := strings.TrimSpace(stringFromMap(final, "risk_level"))
-	grade := strings.TrimSpace(stringFromMap(final, "grade"))
-	verdict := strings.TrimSpace(stringFromMap(final, "verdict"))
-	recommendation := strings.TrimSpace(stringFromMap(final, "recommendation"))
-	signature := strings.TrimSpace(stringFromMap(final, "signature"))
-	hasEvidence, _ := envelope["has_live_evidence"].(bool)
-
-	parts := []string{"🛡️ Koschei Web3 · ARVIS Scan Result"}
-	if target != "" {
-		parts = append(parts, "Target: "+target)
-	}
-	parts = append(parts, "Status: "+strings.ToUpper(status))
-	if riskLevel != "" {
-		parts = append(parts, "Risk: "+strings.ToUpper(riskLevel))
-	}
-	if grade != "" {
-		parts = append(parts, "Grade: "+grade)
-	}
-	if verdict != "" {
-		parts = append(parts, "Verdict: "+verdict)
-	}
-	if recommendation != "" {
-		parts = append(parts, "Recommendation: "+recommendation)
-	}
-	if hasEvidence {
-		parts = append(parts, "Evidence: live evidence verified")
-	} else {
-		parts = append(parts, "Evidence: incomplete / pending — not treated as SAFE")
-	}
-	parts = append(parts, arvisTelegramContextLines(envelope)...)
-	if signature != "" {
-		parts = append(parts, "Signature: "+signature)
-	}
-	return strings.Join(parts, "\n"), signature
-}
-
-func arvisTelegramContextLines(envelope map[string]any) []string {
-	report, _ := envelope["investigation_report"].(map[string]any)
-	if report == nil {
-		return nil
-	}
-	out := []string{}
-	trade, _ := report["trade_ledger_aggregates"].(map[string]any)
-	if strings.EqualFold(strings.TrimSpace(stringFromMap(trade, "market_behavior_status")), "bounded_pattern_observed") {
-		out = append(out, "Market behavior: suspicious bounded timing pattern observed — requires corroboration")
-	}
-	manipulation, _ := report["market_manipulation_intelligence"].(map[string]any)
-	if strings.EqualFold(strings.TrimSpace(stringFromMap(manipulation, "status")), "round_trip_churn_candidates_observed") {
-		out = append(out, "Market manipulation screen: balanced 24h round-trip churn candidate(s) observed — indicator only, not proof of wash trading")
-	}
-	coordination, _ := report["actor_coordination_intelligence"].(map[string]any)
-	if strings.EqualFold(strings.TrimSpace(stringFromMap(coordination, "status")), "coordination_patterns_observed") {
-		out = append(out, "Actor coordination: evidence-backed correlation pattern(s) observed — not an identity or wrongdoing claim")
-	}
-	promotion, _ := report["public_promotion_intelligence"].(map[string]any)
-	if strings.EqualFold(strings.TrimSpace(stringFromMap(promotion, "status")), "cross_asset_public_promotion_overlap_observed") {
-		out = append(out, "Public promotion: cross-asset public-source overlap observed — context only")
-	}
-	return out
 }
 
 func arvisAlertDedupeKey(authSubject, signature string) string {

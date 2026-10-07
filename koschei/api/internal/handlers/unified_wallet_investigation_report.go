@@ -83,7 +83,6 @@ func (h *Handler) buildUnifiedWalletInvestigationReport(ctx context.Context, req
 			"Persistent funding-cluster memory query failed without changing the deterministic verdict.",
 		)
 	}
-	coordinationIntelligence := services.BuildActorCoordinationIntelligence(final, fundingClusterMemory, campaignGenome)
 	fundingClusterOutcomes, fundingOutcomeErr := services.LoadPersistentFundingClusterOutcomes(ctx, db, wallet, network, 100)
 	if fundingOutcomeErr != nil {
 		fundingClusterOutcomes = services.NewPersistentFundingClusterOutcomeUnavailableReport(
@@ -133,7 +132,6 @@ func (h *Handler) buildUnifiedWalletInvestigationReport(ctx context.Context, req
 			"funding_origin":             funding,
 			"funding_origin_persistence": fundingPersistence,
 			"funding_cluster_memory":     fundingClusterMemory,
-			"coordination_intelligence":  coordinationIntelligence,
 			"funding_cluster_outcomes":   fundingClusterOutcomes,
 			"funding_trajectory_graph":   fundingTrajectoryGraph,
 			"actor_live_evidence":        coverage,
@@ -147,21 +145,19 @@ func (h *Handler) buildUnifiedWalletInvestigationReport(ctx context.Context, req
 		"behavior_signals":            behavior,
 		"investigation_output_policy": services.SharedInvestigationOutputPolicy(),
 		"evidence_policy": map[string]any{
-			"numeric_final_score_disabled":                   true,
-			"numeric_rug_probability_disabled":               true,
-			"no_evidence_no_claim":                           true,
-			"inferred_watch_only":                            true,
-			"unverified_excluded":                            true,
-			"external_attribution_is_observed_only":          true,
-			"identity_scope":                                 "onchain_wallet_only",
-			"same_campaign_genome_not_identity":              true,
-			"shared_funder_is_not_operator_identity":         true,
-			"coordination_patterns_not_operator_identity":    true,
-			"coordination_patterns_not_manipulation_verdict": true,
-			"inactive_lifecycle_is_not_rug_claim":            true,
-			"trajectory_graph_is_evidence_projection":        true,
-			"entity_resolution_is_not_identity_claim":        true,
-			"caller_type_changes_evidence":                   false,
+			"numeric_final_score_disabled":            true,
+			"numeric_rug_probability_disabled":        true,
+			"no_evidence_no_claim":                    true,
+			"inferred_watch_only":                     true,
+			"unverified_excluded":                     true,
+			"external_attribution_is_observed_only":   true,
+			"identity_scope":                          "onchain_wallet_only",
+			"same_campaign_genome_not_identity":       true,
+			"shared_funder_is_not_operator_identity":  true,
+			"inactive_lifecycle_is_not_rug_claim":     true,
+			"trajectory_graph_is_evidence_projection": true,
+			"entity_resolution_is_not_identity_claim": true,
+			"caller_type_changes_evidence":            false,
 		},
 	}
 	attachCanonicalWalletIntegrationCoverage(report)
@@ -184,7 +180,6 @@ func attachCanonicalWalletIntegrationCoverage(report map[string]any) {
 	put("created_mint_portfolio", canonicalStatusFromRaw("Created-mint portfolio discovery and RPC verification", external["created_mint_portfolio"], live, true, "actor_investigation.external_discovery.created_mint_portfolio"))
 	put("funding_origin", canonicalStatusFromRaw("Actor funding origin", actor["funding_origin"], live, true, "actor_investigation.funding_origin"))
 	put("persistent_funding_cluster_memory", canonicalStatusFromRaw("Persistent funding-cluster memory", actor["funding_cluster_memory"], live, false, "actor_investigation.funding_cluster_memory"))
-	put("actor_coordination_intelligence", canonicalStatusFromRaw("Evidence-backed actor coordination intelligence", actor["coordination_intelligence"], live, false, "actor_investigation.coordination_intelligence"))
 	put("persistent_funding_cluster_outcomes", canonicalStatusFromRaw("Persistent funding-cluster token outcomes", actor["funding_cluster_outcomes"], live, false, "actor_investigation.funding_cluster_outcomes"))
 	put("persistent_funding_trajectory_graph", canonicalStatusFromRaw("Persistent temporal funding trajectory graph", actor["funding_trajectory_graph"], live, false, "actor_investigation.funding_trajectory_graph"))
 	put("actor_live_transaction_evidence", canonicalStatusFromRaw("Actor live transaction evidence", actor["actor_live_evidence"], live, true, "actor_investigation.actor_live_evidence"))

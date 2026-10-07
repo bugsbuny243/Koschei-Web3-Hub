@@ -10,16 +10,14 @@ func TestCommercialReadinessCustomerSurfaces(t *testing.T) {
 	pricing := mustReadCommercialSurface(t, "public/pricing.html")
 	koscCheckout := mustReadCommercialSurface(t, "public/js/kosc-checkout-v1.js")
 	for _, required := range []string{
-		"KOSCHEI WEB3 · PROFESSIONAL",
-		"Enter Koschei Web3.",
+		"ONE ACCESS CONTRACT · PROFESSIONAL",
+		"Enter the ARVIS universe.",
 		`data-polar-plan="professional"`,
 		`data-kosc-plan="professional"`,
 		"kosc-checkout-v1.js",
 		"Get live KOSC quote",
 		"Token holdings alone do not grant access.",
-		"Koschei Web3 Professional is the only paid Web3 customer plan.",
-		"There is no free investigation tier, no Starter package and no Enterprise package.",
-		"Koschei Sentinel and Koschei Lang are separate products and are not included in this Web3 entitlement.",
+		"Professional is the only paid customer plan.",
 		"$199",
 		"The server decides access. The browser never invents it.",
 		"polar-checkout-v1.js",
