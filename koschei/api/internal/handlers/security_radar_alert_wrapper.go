@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"koschei/api/internal/alerts"
+	"koschei/api/internal/cryptobrief"
 )
 
 const maxSecurityRadarAlertBody = 1 << 20
@@ -43,6 +44,7 @@ func (h *Handler) SecurityRadarCheckWithAlerts(w http.ResponseWriter, r *http.Re
 		var envelope map[string]any
 		if json.Unmarshal(responseBody, &envelope) == nil {
 			alertID = h.emitARVISVerdictAlert(r, target, envelope)
+			h.queueSignedARVISTelegramResult(r, target, envelope)
 			if alertID != "" {
 				envelope["alert_event_id"] = alertID
 				if encoded, marshalErr := json.Marshal(envelope); marshalErr == nil {
@@ -139,4 +141,33 @@ func stringFromMap(values map[string]any, key string) string {
 	}
 	value, _ := values[key].(string)
 	return value
+}
+
+// queueSignedARVISTelegramResult is a secondary, consent-gated delivery of a
+// canonical signed verdict; it never changes the HTTP response or verdict.
+func (h *Handler) queueSignedARVISTelegramResult(r *http.Request, target string, envelope map[string]any) {
+	if r == nil || h == nil || h.DB == nil || !eligibleSignedARVISResult(envelope) {
+		return
+	}
+	claims, ok := userFromContext(r.Context())
+	if !ok || strings.TrimSpace(claims.Sub) == "" {
+		return
+	}
+	final, _ := envelope["final_verdict"].(map[string]any)
+	signature := strings.TrimSpace(stringFromMap(final, "signature"))
+	network := strings.TrimSpace(stringFromMap(envelope, "network"))
+	_, _ = cryptobrief.New(h.DB).QueueARVISResult(r.Context(), claims.Sub, signature, target, network, envelope)
+}
+
+func eligibleSignedARVISResult(envelope map[string]any) bool {
+	if !strings.EqualFold(strings.TrimSpace(stringFromMap(envelope, "status")), "ready") {
+		return false
+	}
+	hasEvidence, _ := envelope["has_live_evidence"].(bool)
+	final, _ := envelope["final_verdict"].(map[string]any)
+	if !hasEvidence || final == nil {
+		return false
+	}
+	signed, _ := final["signed"].(bool)
+	return signed && strings.TrimSpace(stringFromMap(final, "signature")) != ""
 }
