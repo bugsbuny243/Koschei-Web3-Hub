@@ -143,7 +143,6 @@ func stringFromMap(values map[string]any, key string) string {
 	return value
 }
 
- 
 // queueSignedARVISTelegramResult is a secondary, consent-gated delivery of a
 // canonical signed verdict; it never changes the HTTP response or verdict.
 func (h *Handler) queueSignedARVISTelegramResult(r *http.Request, target string, envelope map[string]any) {
@@ -157,7 +156,7 @@ func (h *Handler) queueSignedARVISTelegramResult(r *http.Request, target string,
 	final, _ := envelope["final_verdict"].(map[string]any)
 	signature := strings.TrimSpace(stringFromMap(final, "signature"))
 	network := strings.TrimSpace(stringFromMap(envelope, "network"))
-	_, _ = (&cryptobrief.Service{DB: h.DB}).QueueARVISResult(r.Context(), claims.Sub, signature, target, network, envelope)
+	_, _ = cryptobrief.New(h.DB).QueueARVISResult(r.Context(), claims.Sub, signature, target, network, envelope)
 }
 
 func eligibleSignedARVISResult(envelope map[string]any) bool {
