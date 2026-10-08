@@ -51,7 +51,9 @@ func TestEligibleSignedARVISResultRequiresReadyEvidenceAndSignature(t *testing.T
 	for _, mutate := range []func(map[string]any){
 		func(v map[string]any) { v["status"] = "incomplete" },
 		func(v map[string]any) { v["has_live_evidence"] = false },
-		func(v map[string]any) { v["final_verdict"] = map[string]any{"signed": false, "signature": "proof-1"} },
+		func(v map[string]any) {
+			v["final_verdict"] = map[string]any{"signed": false, "signature": "proof-1"}
+		},
 		func(v map[string]any) { v["final_verdict"] = map[string]any{"signed": true} },
 	} {
 		candidate := map[string]any{
