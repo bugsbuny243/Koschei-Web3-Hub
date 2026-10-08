@@ -5,8 +5,6 @@
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const state = {
     csrf: sessionStorage.getItem('koschei_csrf') || cryptoRandom(),
-    token: '',
-    apiKey: '',
     alerts: []
   };
   sessionStorage.setItem('koschei_csrf', state.csrf);
@@ -76,9 +74,10 @@
     headers.set('Accept', 'application/json');
     headers.set('X-CSRF-Token', state.csrf);
     if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-    if (state.token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${state.token}`);
-    if (state.apiKey && !headers.has('X-API-Key')) headers.set('X-API-Key', state.apiKey);
-    const res = await fetch(path, { ...options, headers, credentials: 'same-origin' });
+    if (!window.KoscheiAuth || typeof window.KoscheiAuth.apiCall !== 'function') {
+      throw new Error('Müşteri oturumu gerekli. Lütfen giriş yapın.');
+    }
+    const res = await window.KoscheiAuth.apiCall(path, { ...options, headers });
     const text = await res.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
@@ -115,14 +114,22 @@
     event.currentTarget.setAttribute('aria-expanded', String(open));
   });
 
-  $('#authToken').value = state.token;
-  $('#apiKey').value = state.apiKey;
-  $('#settingsForm').addEventListener('submit', (event) => {
-    event.preventDefault();
-    state.token = $('#authToken').value.trim();
-    state.apiKey = $('#apiKey').value.trim();
-    showToast('Kimlik bilgileri yalnızca bu sayfa oturumunda tutuluyor.');
-  });
+  // Authentication is managed by the canonical KoscheiAuth customer session.
+  // Never persist or accept bearer/API credentials in this dashboard.
+  const settingsForm = $('#settingsForm');
+  if (settingsForm) {
+    settingsForm.querySelectorAll('input').forEach((input) => {
+      if (input.id === 'authToken' || input.id === 'apiKey') {
+        input.value = '';
+        input.disabled = true;
+        input.placeholder = 'Müşteri oturumu kullanılıyor';
+      }
+    });
+    settingsForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      showToast('Kimlik doğrulama müşteri oturumuyla yönetiliyor.');
+    });
+  }
 
   async function boot() {
     try {
