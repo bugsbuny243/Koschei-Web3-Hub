@@ -15000,6 +15000,73 @@
         "x-koschei-route-source": "route_inventory.go"
       }
     },
+    "/api/public/tool-prices": {
+      "get": {
+        "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
+        "operationId": "get__api_public_tool_prices",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceResponse"
+                }
+              }
+            },
+            "description": "Evidence-backed result, including valid WITHHOLD outcomes."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid request."
+          },
+          "405": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Method not allowed."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Rate or quota limit reached."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal failure; no unsupported verdict is emitted."
+          }
+        },
+        "security": [],
+        "summary": "GET /api/public/tool-prices",
+        "tags": [
+          "public_and_system"
+        ],
+        "x-koschei-auth-tier": "public",
+        "x-koschei-inventory-auth": "public_or_mixed",
+        "x-koschei-route-source": "route_inventory.go"
+      }
+    },
     "/api/public/transaction-simulate": {
       "post": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
