@@ -5,8 +5,8 @@
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const state = {
     csrf: sessionStorage.getItem('koschei_csrf') || cryptoRandom(),
-    token: localStorage.getItem('koschei_auth_token') || '',
-    apiKey: localStorage.getItem('koschei_api_key') || '',
+    token: '',
+    apiKey: '',
     alerts: []
   };
   sessionStorage.setItem('koschei_csrf', state.csrf);
@@ -121,9 +121,7 @@
     event.preventDefault();
     state.token = $('#authToken').value.trim();
     state.apiKey = $('#apiKey').value.trim();
-    localStorage.setItem('koschei_auth_token', state.token);
-    localStorage.setItem('koschei_api_key', state.apiKey);
-    showToast('API ayarları kaydedildi.');
+    showToast('Kimlik bilgileri yalnızca bu sayfa oturumunda tutuluyor.');
   });
 
   async function boot() {
@@ -168,12 +166,16 @@
     event.preventDefault();
     const node = $('#mevResult');
     const payload = objectFromForm(event.currentTarget);
-    if (!payload.tx_signature && !payload.raw_transaction) payload.raw_transaction = `sim-${Date.now()}`;
+    if (!payload.tx_signature && !payload.raw_transaction) {
+      renderEmpty(node, 'İşlem kanıtı gerekli', 'MEV analizi için gerçek işlem imzası veya işlem verisi girin.');
+      return;
+    }
     setLoading(node, 'MEV simülasyonu çalışıyor…');
     try {
       const data = await apiFetch('/api/mev/analyze', { method: 'POST', body: JSON.stringify(payload) });
       renderResult(node, data, ['risk_score', 'risk_level', 'estimated_loss_usd', 'recommended_tip_sol', 'signals']);
-      $('#heroSaved').textContent = fmtUSD.format(Number(data.mev_saved_usd || data.estimated_loss_usd || 0));
+      $('#heroSaved').textContent = Number.isFinite(Number(data.mev_saved_usd)) && data.mev_saved_usd != null
+        ? fmtUSD.format(Number(data.mev_saved_usd)) : 'Doğrulanmadı';
       showToast('MEV Shield raporu hazır.');
     } catch (err) { renderEmpty(node, 'MEV analizi alınamadı', err.message); showToast(err.message, 'error'); }
   });
@@ -186,19 +188,18 @@
       const data = await apiFetch('/api/public/impact');
       const cards = normalizeImpact(data);
       cards.forEach((card) => addMetric(metrics, card.label, card.value));
-      cards.forEach((card, idx) => addBar(bars, card.label, Math.min(100, Number(card.numeric || idx * 18 + 30))));
+      cards.forEach((card) => { if (card.numeric != null) addBar(bars, card.label, Math.min(100, Number(card.numeric))); });
     } catch (err) {
-      [['MEV saved', '$0'], ['Liquidity protected', '$0'], ['DAO protected', '$0']].forEach(([label, value]) => addMetric(metrics, label, value));
-      addBar(bars, 'API bekleniyor', 18);
+      addMetric(metrics, 'Etki verisi', 'Kullanılamıyor');
     }
   }
 
   function normalizeImpact(data) {
     const src = data.metrics || data.impact || data;
     return [
-      { label: 'MEV saved', value: fmtUSD.format(Number(src.mev_saved_usd || src.total_mev_saved_usd || 0)), numeric: src.mev_saved_usd || src.total_mev_saved_usd || 0 },
-      { label: 'Liquidity protected', value: fmtUSD.format(Number(src.liquidity_loss_prevented_usd || 0)), numeric: src.liquidity_loss_prevented_usd || 0 },
-      { label: 'DAO protected', value: fmtUSD.format(Number(src.proposal_loss_prevented_usd || 0)), numeric: src.proposal_loss_prevented_usd || 0 }
+      { label: 'MEV saved', value: src.mev_saved_usd != null || src.total_mev_saved_usd != null ? fmtUSD.format(Number(src.mev_saved_usd ?? src.total_mev_saved_usd)) : 'Doğrulanmadı', numeric: src.mev_saved_usd ?? src.total_mev_saved_usd ?? null },
+      { label: 'Liquidity protected', value: src.liquidity_loss_prevented_usd != null ? fmtUSD.format(Number(src.liquidity_loss_prevented_usd)) : 'Doğrulanmadı', numeric: src.liquidity_loss_prevented_usd ?? null },
+      { label: 'DAO protected', value: src.proposal_loss_prevented_usd != null ? fmtUSD.format(Number(src.proposal_loss_prevented_usd)) : 'Doğrulanmadı', numeric: src.proposal_loss_prevented_usd ?? null }
     ];
   }
 
@@ -240,7 +241,7 @@
       state.alerts = state.alerts.slice(0, 8);
       $('#heroAlerts').textContent = String(state.alerts.length);
       renderAlerts();
-      showToast('Liquidity Radar alarmı üretildi.');
+      showToast('Likidite ön değerlendirmesi oluşturuldu; canlı zincir alarmı değildir.');
     } catch (err) { showToast(err.message, 'error'); }
   });
 
@@ -250,7 +251,7 @@
     if (!state.alerts.length) {
       const empty = document.createElement('p');
       empty.className = 'muted';
-      empty.textContent = 'Henüz alarm yok. Formu çalıştırdığınızda real-time liste burada güncellenecek.';
+      empty.textContent = 'Henüz ön değerlendirme yok. Form sonuçları canlı zincir alarmı değildir.';
       root.append(empty);
       return;
     }
@@ -264,7 +265,7 @@
       sev.textContent = `${alert.severity} • ${alert.score}`;
       strong.append(pool, sev);
       const msg = document.createElement('span');
-      msg.textContent = alert.message || 'Alarm üretildi.';
+      msg.textContent = alert.message || 'İstek verilerine dayalı ön değerlendirme.';
       item.append(strong, msg);
       root.append(item);
     });
