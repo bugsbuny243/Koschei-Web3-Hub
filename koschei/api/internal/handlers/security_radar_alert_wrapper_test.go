@@ -41,9 +41,9 @@ func TestARVISAlertPayloadRemainsScoreFree(t *testing.T) {
 
 func TestEligibleSignedARVISResultRequiresReadyEvidenceAndSignature(t *testing.T) {
 	valid := map[string]any{
-		"status": "ready",
+		"status":            "ready",
 		"has_live_evidence": true,
-		"final_verdict": map[string]any{"signed": true, "signature": "proof-1"},
+		"final_verdict":     map[string]any{"signed": true, "signature": "proof-1"},
 	}
 	if !eligibleSignedARVISResult(valid) {
 		t.Fatal("signed evidence-ready verdict must be eligible")
@@ -57,9 +57,9 @@ func TestEligibleSignedARVISResultRequiresReadyEvidenceAndSignature(t *testing.T
 		func(v map[string]any) { v["final_verdict"] = map[string]any{"signed": true} },
 	} {
 		candidate := map[string]any{
-			"status": "ready",
+			"status":            "ready",
 			"has_live_evidence": true,
-			"final_verdict": map[string]any{"signed": true, "signature": "proof-1"},
+			"final_verdict":     map[string]any{"signed": true, "signature": "proof-1"},
 		}
 		mutate(candidate)
 		if eligibleSignedARVISResult(candidate) {
