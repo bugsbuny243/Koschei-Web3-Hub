@@ -30,10 +30,25 @@ function installUniversalScanEntry(){
   const network=$('dashboardScanNetwork'),status=$('dashboardScanStatus');
   if(!form||!input||!network)return;
   form.addEventListener('submit',event=>{
-    const route=window.KoscheiScanEntry?.url(input.value,network.value);
-    if(!route)return; // The static GET form remains usable if the helper fails.
     event.preventDefault();
-    if(route.error){status.textContent=route.error;(route.needsNetwork?network:input).focus();return;}
+    // Never fall back to the static GET form: it hardcodes address mode and
+    // can silently misroute transaction hashes when the shared helper fails.
+    const helper=window.KoscheiScanEntry;
+    if(!helper||typeof helper.url!=='function'){
+      if(status)status.textContent='Radar routing is unavailable. Open ARVIS Radar directly and select the network.';
+      return;
+    }
+    let route;
+    try{route=helper.url(input.value,network.value);}
+    catch(_error){
+      if(status)status.textContent='Radar routing is unavailable. Open ARVIS Radar directly.';
+      return;
+    }
+    if(!route||!route.url){
+      if(status)status.textContent=route?.error||'Unable to resolve the target. Verify the address and network.';
+      (route?.needsNetwork?network:input).focus();
+      return;
+    }
     location.assign(route.url);
   });
 }
