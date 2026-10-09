@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   full-verification:
-    name: Go 1.26.7, PostgreSQL 17, race and evidence gates
+    name: Go 1.26.9, PostgreSQL 17, race and evidence gates
     runs-on: ubuntu-latest
     timeout-minutes: 45
     services:
@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Set up Go 1.26.7
+      - name: Set up Go 1.26.9
         uses: actions/setup-go@v7
         with:
           go-version-file: koschei/api/go.mod
