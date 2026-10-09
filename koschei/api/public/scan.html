@@ -53,7 +53,7 @@ body.koschei-enterprise main.page{display:block!important;visibility:visible!imp
 <footer class="product-footer"><span>Koschei Web3 · ARVIS Radar</span><nav><a href="/dashboard">Workspace</a><a href="/reports">History</a><a href="/watchlist">Watchlist</a></nav><span>Evidence first · Unknown stays unknown</span></footer>
 </main>
 <script>
-(()=>{const p=new URLSearchParams(location.search);const pathTarget=location.pathname.startsWith('/scan/')?decodeURIComponent(location.pathname.slice(6).split('/')[0]||''):'';if(pathTarget&&!p.get('target')){p.set('target',pathTarget);p.set('network','solana-mainnet')}if(p.get('mode')&&!['address','lookup'].includes(p.get('mode')))p.set('mode','address');if(pathTarget||p.get('mode'))history.replaceState({},'',`/scan${p.toString()?`?${p}`:''}`)})();
+(()=>{const p=new URLSearchParams(location.search);const pathTarget=location.pathname.startsWith('/scan/')?decodeURIComponent(location.pathname.slice(6).split('/')[0]||''):'';if(pathTarget&&!p.get('target')){p.set('target',pathTarget)}if(p.get('mode')&&!['address','lookup'].includes(p.get('mode')))p.set('mode','address');if(pathTarget||p.get('mode'))history.replaceState({},'',`/scan${p.toString()?`?${p}`:''}`)})();
 </script>
 <script src="/js/customer-scan-entry.js?v=1"></script>
 <script src="/js/customer-universal-address-scan-v1.js?v=3" data-koschei-enhancement="universal-address-scan-v1"></script>
