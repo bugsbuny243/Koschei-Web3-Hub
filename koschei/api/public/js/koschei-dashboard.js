@@ -29,11 +29,24 @@ function installUniversalScanEntry(){
   const form=$('dashboardUniversalScanForm'),input=$('dashboardUniversalTarget');
   const network=$('dashboardScanNetwork'),status=$('dashboardScanStatus');
   if(!form||!input||!network)return;
-  form.addEventListener('submit',event=>{
+  const guidance='Read-only analysis. No wallet connection or private keys. Evidence must be verified by ARVIS.';
+  const updateGuidance=()=>{
+    if(!status)return;
+    if(!input.value.trim()){status.textContent=guidance;return;}
     const route=window.KoscheiScanEntry?.url(input.value,network.value);
-    if(!route)return; // The static GET form remains usable if the helper fails.
+    if(!route){status.textContent='Target validation is unavailable. Try again when the radar is ready.';return;}
+    if(route.error){status.textContent=route.error;return;}
+    status.textContent=route.kind==='transaction'
+      ? 'Transaction lookup selected. Network evidence is checked by ARVIS; no safety verdict is implied.'
+      : 'Address investigation selected. Format validation is not on-chain evidence or a safety verdict.';
+  };
+  input.addEventListener('input',updateGuidance);
+  network.addEventListener('change',updateGuidance);
+  form.addEventListener('submit',event=>{
     event.preventDefault();
-    if(route.error){status.textContent=route.error;(route.needsNetwork?network:input).focus();return;}
+    const route=window.KoscheiScanEntry?.url(input.value,network.value);
+    if(!route){if(status)status.textContent='Target validation is unavailable. Navigation was stopped.';return;}
+    if(route.error){if(status)status.textContent=route.error;(route.needsNetwork?network:input).focus();return;}
     location.assign(route.url);
   });
 }
