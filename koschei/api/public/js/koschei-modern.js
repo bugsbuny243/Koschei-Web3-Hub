@@ -55,7 +55,7 @@
     grid.className = 'result-grid';
     const safeData = data && typeof data === 'object' ? data : {};
     const entries = Object.entries(safeData);
-    const ordered = [...preferredKeys.filter((key) => key in safeData).map((key) => [key, safeData[key]], ...entries.filter(([key]) => !preferredKeys.includes(key))];
+    const ordered = [...preferredKeys.filter((key) => key in safeData).map((key) => [key, safeData[key]]), ...entries.filter(([key]) => !preferredKeys.includes(key))];
     ordered.slice(0, 10).forEach(([key, value]) => {
       const item = document.createElement('div');
       item.className = 'result-item';
