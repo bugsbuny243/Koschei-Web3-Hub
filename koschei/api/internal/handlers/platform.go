@@ -42,6 +42,20 @@ func (h *Handler) Config(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+func (h *Handler) PublicToolPrices(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"schema_version": "koschei-professional-access-v1",
+		"plan":           "professional",
+		"price_usd":      199,
+		"access_days":    koscProfessionalAccessDays,
+		"payment_paths": []map[string]any{
+			{"provider": "polar", "currency": "USD", "amount": 199},
+			{"provider": "kosc", "currency": "KOSC", "usd_equivalent": koscProfessionalPriceUSD, "quote_endpoint": "/api/kosc/quote"},
+		},
+		"note": "All supported payment paths grant the same Professional entitlement. There are no per-tool, Starter, or Enterprise plans.",
+	})
+}
+
 func configuredURL(envKey, fallback string) string {
 	if value := strings.TrimSpace(os.Getenv(envKey)); value != "" {
 		return value

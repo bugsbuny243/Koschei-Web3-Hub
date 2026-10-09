@@ -44,7 +44,7 @@
     const response=await KoscheiAuth.apiCall(path,{...options,headers});
     const raw=await response.text();let data={};
     if(raw){try{data=JSON.parse(raw);}catch{throw new Error('The credential service returned invalid JSON.');}}
-    if(!response.ok){const enterprise=[401,402,403].includes(response.status)?'An active Enterprise SaaS entitlement and verified customer session are required for API-key management. ':'';throw new Error(enterprise+text(data?.message||data?.error,`Credential request failed with HTTP ${response.status}`));}
+    if(!response.ok){const access=[401,402,403].includes(response.status)?'An active Professional entitlement and verified customer session are required for API-key management. ':'';throw new Error(access+text(data?.message||data?.error,`Credential request failed with HTTP ${response.status}`));}
     return data;
   }
 

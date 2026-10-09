@@ -143,6 +143,7 @@ func registerCoreRoutes(mux *http.ServeMux, h *handlers.Handler, planAccess rout
 	mux.HandleFunc("/api/arvis/preflight", method("POST", h.ARVISPreflight))
 	mux.HandleFunc("/api/public/impact", method("GET", h.PublicImpact))
 	mux.HandleFunc("/api/public/metrics", method("GET", h.GetPublicMetrics))
+	mux.HandleFunc("/api/public/tool-prices", method("GET", h.PublicToolPrices))
 	mux.HandleFunc("/api/agent/health", requiresDB(h, method("GET", h.AgentTool)))
 	mux.HandleFunc("/api/agent/wallet-score", requiresDB(h, planAccess(method("POST", h.AgentTool))))
 	mux.HandleFunc("/api/agent/risk-summary", requiresDB(h, planAccess(method("POST", h.AgentTool))))

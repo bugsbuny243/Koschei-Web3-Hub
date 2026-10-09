@@ -5,8 +5,6 @@
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
   const state = {
     csrf: sessionStorage.getItem('koschei_csrf') || cryptoRandom(),
-    token: localStorage.getItem('koschei_auth_token') || '',
-    apiKey: localStorage.getItem('koschei_api_key') || '',
     alerts: []
   };
   sessionStorage.setItem('koschei_csrf', state.csrf);
@@ -21,6 +19,7 @@
   }
 
   function showToast(message, type = 'ok') {
+    if (!toast) return;
     toast.textContent = message;
     toast.className = `toast show ${type === 'error' ? 'error' : ''}`;
     window.setTimeout(() => toast.className = 'toast', 3600);
@@ -54,8 +53,9 @@
     node.replaceChildren();
     const grid = document.createElement('div');
     grid.className = 'result-grid';
-    const entries = Object.entries(data || {});
-    const ordered = [...preferredKeys.filter((key) => key in data).map((key) => [key, data[key]]), ...entries.filter(([key]) => !preferredKeys.includes(key))];
+    const safeData = data && typeof data === 'object' ? data : {};
+    const entries = Object.entries(safeData);
+    const ordered = [...preferredKeys.filter((key) => key in safeData).map((key) => [key, safeData[key]]), ...entries.filter(([key]) => !preferredKeys.includes(key))];
     ordered.slice(0, 10).forEach(([key, value]) => {
       const item = document.createElement('div');
       item.className = 'result-item';
@@ -76,9 +76,11 @@
     headers.set('Accept', 'application/json');
     headers.set('X-CSRF-Token', state.csrf);
     if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-    if (state.token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${state.token}`);
-    if (state.apiKey && !headers.has('X-API-Key')) headers.set('X-API-Key', state.apiKey);
-    const res = await fetch(path, { ...options, headers, credentials: 'same-origin' });
+    if (!window.KoscheiAuth || typeof window.KoscheiAuth.apiCall !== 'function') {
+      throw new Error('Müşteri oturumu gerekli. Lütfen giriş yapın.');
+    }
+    const res = await window.KoscheiAuth.apiCall(path, { ...options, headers });
+    if (!res) throw new Error('API bağlantısı kurulamadı.');
     const text = await res.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
@@ -103,28 +105,34 @@
     const target = id || 'home';
     $$('.view').forEach((view) => view.classList.toggle('is-active', view.id === target));
     $$('.nav-links a[data-route]').forEach((link) => link.classList.toggle('active', link.dataset.route === target));
-    $('#navLinks').classList.remove('open');
-    $('.nav-toggle').setAttribute('aria-expanded', 'false');
+    $('#navLinks')?.classList.remove('open');
+    $('.nav-toggle')?.setAttribute('aria-expanded', 'false');
     if (target === 'impact') loadImpact();
   }
 
   window.addEventListener('hashchange', () => routeTo(location.hash.slice(1) || 'home'));
   $$('#navLinks [data-route], .hero-actions [data-route]').forEach((link) => link.addEventListener('click', () => routeTo(link.dataset.route)));
-  $('.nav-toggle').addEventListener('click', (event) => {
+  $('.nav-toggle')?.addEventListener('click', (event) => {
     const open = $('#navLinks').classList.toggle('open');
     event.currentTarget.setAttribute('aria-expanded', String(open));
   });
 
-  $('#authToken').value = state.token;
-  $('#apiKey').value = state.apiKey;
-  $('#settingsForm').addEventListener('submit', (event) => {
-    event.preventDefault();
-    state.token = $('#authToken').value.trim();
-    state.apiKey = $('#apiKey').value.trim();
-    localStorage.setItem('koschei_auth_token', state.token);
-    localStorage.setItem('koschei_api_key', state.apiKey);
-    showToast('API ayarları kaydedildi.');
-  });
+  // Authentication is managed by the canonical KoscheiAuth customer session.
+  // Never persist or accept bearer/API credentials in this dashboard.
+  const settingsForm = $('#settingsForm');
+  if (settingsForm) {
+    settingsForm.querySelectorAll('input').forEach((input) => {
+      if (input.id === 'authToken' || input.id === 'apiKey') {
+        input.value = '';
+        input.disabled = true;
+        input.placeholder = 'Müşteri oturumu kullanılıyor';
+      }
+    });
+    settingsForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      showToast('Kimlik doğrulama müşteri oturumuyla yönetiliyor.');
+    });
+  }
 
   async function boot() {
     try {
@@ -145,12 +153,12 @@
   $('#walletForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const node = $('#walletResult');
-    setLoading(node, 'Wallet score hesaplanıyor…');
+    setLoading(node, 'Cüzdan kanıtları inceleniyor…');
     try {
       const data = await apiFetch('/api/wallet/score', { method: 'POST', body: JSON.stringify(objectFromForm(event.currentTarget)) });
-      renderResult(node, data, ['score', 'risk_level', 'balance', 'tx_count', 'findings']);
-      showToast('Wallet Score tamamlandı.');
-    } catch (err) { renderEmpty(node, 'Wallet Score alınamadı', err.message); showToast(err.message, 'error'); }
+      renderResult(node, data, ['status', 'has_live_evidence', 'final_verdict', 'evidence', 'findings']);
+      showToast('Cüzdan inceleme sonucu hazır; kanıt durumunu kontrol edin.');
+    } catch (err) { renderEmpty(node, 'Cüzdan incelemesi alınamadı', err.message); showToast(err.message, 'error'); }
   });
 
   $('#tokenForm').addEventListener('submit', async (event) => {
@@ -168,12 +176,16 @@
     event.preventDefault();
     const node = $('#mevResult');
     const payload = objectFromForm(event.currentTarget);
-    if (!payload.tx_signature && !payload.raw_transaction) payload.raw_transaction = `sim-${Date.now()}`;
+    if (!payload.tx_signature && !payload.raw_transaction) {
+      renderEmpty(node, 'İşlem kanıtı gerekli', 'MEV analizi için gerçek işlem imzası veya işlem verisi girin.');
+      return;
+    }
     setLoading(node, 'MEV simülasyonu çalışıyor…');
     try {
       const data = await apiFetch('/api/mev/analyze', { method: 'POST', body: JSON.stringify(payload) });
       renderResult(node, data, ['risk_score', 'risk_level', 'estimated_loss_usd', 'recommended_tip_sol', 'signals']);
-      $('#heroSaved').textContent = fmtUSD.format(Number(data.mev_saved_usd || data.estimated_loss_usd || 0));
+      $('#heroSaved').textContent = Number.isFinite(Number(data.mev_saved_usd)) && data.mev_saved_usd != null
+        ? fmtUSD.format(Number(data.mev_saved_usd)) : 'Doğrulanmadı';
       showToast('MEV Shield raporu hazır.');
     } catch (err) { renderEmpty(node, 'MEV analizi alınamadı', err.message); showToast(err.message, 'error'); }
   });
@@ -186,19 +198,18 @@
       const data = await apiFetch('/api/public/impact');
       const cards = normalizeImpact(data);
       cards.forEach((card) => addMetric(metrics, card.label, card.value));
-      cards.forEach((card, idx) => addBar(bars, card.label, Math.min(100, Number(card.numeric || idx * 18 + 30))));
+      cards.forEach((card) => { if (card.numeric != null) addBar(bars, card.label, Math.min(100, Number(card.numeric))); });
     } catch (err) {
-      [['MEV saved', '$0'], ['Liquidity protected', '$0'], ['DAO protected', '$0']].forEach(([label, value]) => addMetric(metrics, label, value));
-      addBar(bars, 'API bekleniyor', 18);
+      addMetric(metrics, 'Etki verisi', 'Kullanılamıyor');
     }
   }
 
   function normalizeImpact(data) {
     const src = data.metrics || data.impact || data;
     return [
-      { label: 'MEV saved', value: fmtUSD.format(Number(src.mev_saved_usd || src.total_mev_saved_usd || 0)), numeric: src.mev_saved_usd || src.total_mev_saved_usd || 0 },
-      { label: 'Liquidity protected', value: fmtUSD.format(Number(src.liquidity_loss_prevented_usd || 0)), numeric: src.liquidity_loss_prevented_usd || 0 },
-      { label: 'DAO protected', value: fmtUSD.format(Number(src.proposal_loss_prevented_usd || 0)), numeric: src.proposal_loss_prevented_usd || 0 }
+      { label: 'MEV saved', value: src.mev_saved_usd != null || src.total_mev_saved_usd != null ? fmtUSD.format(Number(src.mev_saved_usd ?? src.total_mev_saved_usd)) : 'Doğrulanmadı', numeric: src.mev_saved_usd ?? src.total_mev_saved_usd ?? null },
+      { label: 'Liquidity protected', value: src.liquidity_loss_prevented_usd != null ? fmtUSD.format(Number(src.liquidity_loss_prevented_usd)) : 'Doğrulanmadı', numeric: src.liquidity_loss_prevented_usd ?? null },
+      { label: 'DAO protected', value: src.proposal_loss_prevented_usd != null ? fmtUSD.format(Number(src.proposal_loss_prevented_usd)) : 'Doğrulanmadı', numeric: src.proposal_loss_prevented_usd ?? null }
     ];
   }
 
@@ -240,7 +251,7 @@
       state.alerts = state.alerts.slice(0, 8);
       $('#heroAlerts').textContent = String(state.alerts.length);
       renderAlerts();
-      showToast('Liquidity Radar alarmı üretildi.');
+      showToast('Likidite ön değerlendirmesi oluşturuldu; canlı zincir alarmı değildir.');
     } catch (err) { showToast(err.message, 'error'); }
   });
 
@@ -250,7 +261,7 @@
     if (!state.alerts.length) {
       const empty = document.createElement('p');
       empty.className = 'muted';
-      empty.textContent = 'Henüz alarm yok. Formu çalıştırdığınızda real-time liste burada güncellenecek.';
+      empty.textContent = 'Henüz ön değerlendirme yok. Form sonuçları canlı zincir alarmı değildir.';
       root.append(empty);
       return;
     }
@@ -264,7 +275,7 @@
       sev.textContent = `${alert.severity} • ${alert.score}`;
       strong.append(pool, sev);
       const msg = document.createElement('span');
-      msg.textContent = alert.message || 'Alarm üretildi.';
+      msg.textContent = alert.message || 'İstek verilerine dayalı ön değerlendirme.';
       item.append(strong, msg);
       root.append(item);
     });

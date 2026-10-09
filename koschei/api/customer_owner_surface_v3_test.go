@@ -85,7 +85,7 @@ func TestWorkspaceV3UsesSaaSEntitlementNotTokenHoldings(t *testing.T) {
 		"Polar and KOSC are alternative payment methods for the same server-side entitlement.",
 	} {
 		if !strings.Contains(workspace, required) {
-			t.Fatalf("workspace plan surface missing %q", required)
+			t.Fatalf("workspace Professional access surface missing %q", required)
 		}
 	}
 	for _, forbidden := range []string{"starter", "enterprise", "KOSCH", "token_access_snapshots", "wallet balance"} {
