@@ -1,6 +1,6 @@
 module koschei/api
 
-go 1.26.7
+go 1.26.9
 
 require (
 	github.com/lib/pq v1.12.3
