@@ -81,8 +81,8 @@ func TestWorkspaceV3UsesSaaSEntitlementNotTokenHoldings(t *testing.T) {
 	for _, required := range []string{
 		"/api/auth/premium-access",
 		"professional",
-		"Professional: canonical ARVIS investigation path",
-		"Professional: API credential and registered integration eligibility",
+		"Koschei has one operational customer package: Professional.",
+		"Polar and KOSC are alternative payment methods for the same server-side entitlement.",
 	} {
 		if !strings.Contains(workspace, required) {
 			t.Fatalf("workspace Professional access surface missing %q", required)
