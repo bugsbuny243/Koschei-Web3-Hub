@@ -16,6 +16,14 @@ for(const page of ['dashboard.html','scan.html']){
  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);
  assert.equal(new Set(ids).size,ids.length,`Duplicate form/result ID in ${page}`);
 }
+// The workspace must never submit the static address-mode form when the
+// shared router is unavailable: transaction hashes require lookup mode.
+const dashboardJS=fs.readFileSync(path.join(root,'js/koschei-dashboard.js'),'utf8');
+assert.match(dashboardJS,/function installUniversalScanEntry\(/,'Workspace must retain canonical radar entry');
+const radarEntry=dashboardJS.split('function installUniversalScanEntry()')[1]?.split('async function hydrateHealth()')[0]||'';
+assert.match(radarEntry,/event\.preventDefault\(\)/,'Radar entry must prevent the hard-coded GET fallback');
+assert.match(radarEntry,/typeof helper\.url!=='function'/,'Missing shared router must fail closed');
+assert.match(radarEntry,/route\?\.needsNetwork\?network:input/,'Network ambiguity must focus the network selector');
 const html=fs.readFileSync(path.join(root,'scan.html'),'utf8');
 assert.ok(html.indexOf('customer-scan-entry.js')<html.indexOf('public-solana-scan.js'),'Route contract must load before legacy scan bootstrap');
 assert.match(html,/data-koschei-enhancement="universal-address-scan-v1"/,'Static controller must suppress duplicate dynamic loading');
