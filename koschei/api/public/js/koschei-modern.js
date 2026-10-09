@@ -19,6 +19,7 @@
   }
 
   function showToast(message, type = 'ok') {
+    if (!toast) return;
     toast.textContent = message;
     toast.className = `toast show ${type === 'error' ? 'error' : ''}`;
     window.setTimeout(() => toast.className = 'toast', 3600);
@@ -52,8 +53,9 @@
     node.replaceChildren();
     const grid = document.createElement('div');
     grid.className = 'result-grid';
-    const entries = Object.entries(data || {});
-    const ordered = [...preferredKeys.filter((key) => key in data).map((key) => [key, data[key]]), ...entries.filter(([key]) => !preferredKeys.includes(key))];
+    const safeData = data && typeof data === 'object' ? data : {};
+    const entries = Object.entries(safeData);
+    const ordered = [...preferredKeys.filter((key) => key in safeData).map((key) => [key, safeData[key]], ...entries.filter(([key]) => !preferredKeys.includes(key))];
     ordered.slice(0, 10).forEach(([key, value]) => {
       const item = document.createElement('div');
       item.className = 'result-item';
@@ -78,6 +80,7 @@
       throw new Error('Müşteri oturumu gerekli. Lütfen giriş yapın.');
     }
     const res = await window.KoscheiAuth.apiCall(path, { ...options, headers });
+    if (!res) throw new Error('API bağlantısı kurulamadı.');
     const text = await res.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
@@ -102,14 +105,14 @@
     const target = id || 'home';
     $$('.view').forEach((view) => view.classList.toggle('is-active', view.id === target));
     $$('.nav-links a[data-route]').forEach((link) => link.classList.toggle('active', link.dataset.route === target));
-    $('#navLinks').classList.remove('open');
-    $('.nav-toggle').setAttribute('aria-expanded', 'false');
+    $('#navLinks')?.classList.remove('open');
+    $('.nav-toggle')?.setAttribute('aria-expanded', 'false');
     if (target === 'impact') loadImpact();
   }
 
   window.addEventListener('hashchange', () => routeTo(location.hash.slice(1) || 'home'));
   $$('#navLinks [data-route], .hero-actions [data-route]').forEach((link) => link.addEventListener('click', () => routeTo(link.dataset.route)));
-  $('.nav-toggle').addEventListener('click', (event) => {
+  $('.nav-toggle')?.addEventListener('click', (event) => {
     const open = $('#navLinks').classList.toggle('open');
     event.currentTarget.setAttribute('aria-expanded', String(open));
   });
@@ -150,12 +153,12 @@
   $('#walletForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const node = $('#walletResult');
-    setLoading(node, 'Wallet score hesaplanıyor…');
+    setLoading(node, 'Cüzdan kanıtları inceleniyor…');
     try {
       const data = await apiFetch('/api/wallet/score', { method: 'POST', body: JSON.stringify(objectFromForm(event.currentTarget)) });
-      renderResult(node, data, ['score', 'risk_level', 'balance', 'tx_count', 'findings']);
-      showToast('Wallet Score tamamlandı.');
-    } catch (err) { renderEmpty(node, 'Wallet Score alınamadı', err.message); showToast(err.message, 'error'); }
+      renderResult(node, data, ['status', 'has_live_evidence', 'final_verdict', 'evidence', 'findings']);
+      showToast('Cüzdan inceleme sonucu hazır; kanıt durumunu kontrol edin.');
+    } catch (err) { renderEmpty(node, 'Cüzdan incelemesi alınamadı', err.message); showToast(err.message, 'error'); }
   });
 
   $('#tokenForm').addEventListener('submit', async (event) => {
