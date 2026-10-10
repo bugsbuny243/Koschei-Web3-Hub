@@ -50,8 +50,9 @@ function matchesResult(data,request){
   const result=data?.result,target=result?.target;
   return data?.schema_version==='koschei-customer-scan-v1'&&
     target?.raw===request.target&&target?.network_hint===request.network&&
-    typeof result.trust==='object'&&result.trust!==null&&
-    typeof result.status==='string'&&Array.isArray(result.evidence_refs);
+    typeof result.trust==='object'&&result.trust!==null&&!Array.isArray(result.trust)&&
+    typeof result.status==='string'&&result.status.length>0&&
+    Array.isArray(result.evidence_refs)&&result.evidence_refs.every(ref=>typeof ref==='string');
 }
 window.KoscheiScanEntry=Object.freeze({networks,classify,resolve,url,isAddressView,matchesResult});
 })();
