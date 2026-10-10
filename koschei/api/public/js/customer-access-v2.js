@@ -66,6 +66,7 @@ function renderPremium(premium){
   const access=premium.access,plan=text(access.plan||'none').toUpperCase();
   const provider=text(access.payment_provider).toLowerCase();
   setText('plan',plan);setText('accessSource',provider?`entitlement · ${provider.toUpperCase()}`:'entitlement');setText('outputCapacity',`${displayCount(access.outputs_remaining)} / ${displayCount(access.outputs_total)}`);setText('planExpiresAt',displayDate(access.expires_at));
+  if(premium.active&&text(access.plan).toLowerCase()!=='professional'){setBadge('premiumState','unverified','bad');setState('unavailable','UNVERIFIED','The account returned an active entitlement for a plan that is not the current Professional product. Professional access was not confirmed.');return;}
   if(premium.active){setBadge('premiumState','active','good');setState('active','ACTIVE',`${plan} SaaS entitlement is active. Token holdings are not part of this decision.`);return;}
   setBadge('premiumState','inactive','warn');setState('inactive','INACTIVE','No active paid SaaS entitlement is attached to this account.');
 }
