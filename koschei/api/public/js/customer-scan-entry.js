@@ -51,7 +51,7 @@ function matchesResult(data,request){
   return data?.schema_version==='koschei-customer-scan-v1'&&
     target?.raw===request.target&&target?.network_hint===request.network&&
     typeof result.trust==='object'&&result.trust!==null&&
-    typeof result.status==='string'&&Array.isArray(result.evidence_refs||[]);
+    typeof result.status==='string'&&Array.isArray(result.evidence_refs);
 }
 window.KoscheiScanEntry=Object.freeze({networks,classify,resolve,url,isAddressView,matchesResult});
 })();

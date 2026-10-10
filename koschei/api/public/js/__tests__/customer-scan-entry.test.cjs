@@ -216,3 +216,12 @@ test('changing target type also withholds a late full token report',async()=>{
  assert.equal(h.nodes.result.hidden,true);assert.equal(h.nodes.result.innerHTML,'');
  assert.equal(h.nodes.submit.disabled,false);
 });
+
+// Missing evidence references are not silently substituted with an empty list.
+test('result identity requires an explicit evidence_refs array',()=>{
+ const request=router.resolve(evm,'base-mainnet');
+ const withoutRefs=envelope();delete withoutRefs.result.evidence_refs;
+ assert.equal(router.matchesResult(withoutRefs,request),false);
+ assert.equal(router.matchesResult({...envelope(),result:{...envelope().result,evidence_refs:null}},request),false);
+ assert.equal(router.matchesResult({...envelope(),result:{...envelope().result,evidence_refs:[]}},request),true);
+});
