@@ -225,3 +225,13 @@ test('result identity requires an explicit evidence_refs array',()=>{
  assert.equal(router.matchesResult({...envelope(),result:{...envelope().result,evidence_refs:null}},request),false);
  assert.equal(router.matchesResult({...envelope(),result:{...envelope().result,evidence_refs:[]}},request),true);
 });
+
+test('malformed trust, status and evidence reference values fail closed',()=>{
+ const request=router.resolve(evm,'base-mainnet');
+ const base=envelope();
+ assert.equal(router.matchesResult({...base,result:{...base.result,trust:[]}},request),false);
+ assert.equal(router.matchesResult({...base,result:{...base.result,status:''}},request),false);
+ assert.equal(router.matchesResult({...base,result:{...base.result,evidence_refs:[null]}},request),false);
+ assert.equal(router.matchesResult({...base,result:{...base.result,evidence_refs:[{id:'fake'}]}},request),false);
+ assert.equal(router.matchesResult({...base,result:{...base.result,evidence_refs:[]}},request),true);
+});
