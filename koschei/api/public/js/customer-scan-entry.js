@@ -52,7 +52,7 @@ function matchesResult(data,request){
     target?.raw===request.target&&target?.network_hint===request.network&&
     typeof result.trust==='object'&&result.trust!==null&&!Array.isArray(result.trust)&&
     typeof result.status==='string'&&result.status.length>0&&
-    Array.isArray(result.evidence_refs)&&result.evidence_refs.every(ref=>typeof ref==='string');
+    Array.isArray(result.evidence_refs)&&result.evidence_refs.every(ref=>typeof ref==='string'&&ref.trim().length>0);
 }
 window.KoscheiScanEntry=Object.freeze({networks,classify,resolve,url,isAddressView,matchesResult});
 })();
