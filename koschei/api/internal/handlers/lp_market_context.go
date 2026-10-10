@@ -44,7 +44,7 @@ type solanaRPCCall func(context.Context, string, string, any, any) error
 
 func (h *Handler) lpRPC() solanaRPCCall {
 	return func(ctx context.Context, network, method string, params any, out any) error {
-		return h.callSolanaRPC(ctx, &http.Client{Timeout: 10 * time.Second}, solanaRPCURL(network, os.Getenv("ALCHEMY_API_KEY")), network, method, params, out)
+		return h.SolanaRPC.Call(ctx, network, method, params, out, 0)
 	}
 }
 

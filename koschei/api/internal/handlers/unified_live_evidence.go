@@ -292,7 +292,7 @@ func (h *Handler) fetchUnifiedTransactions(ctx context.Context, network, rpcURL 
 			defer wg.Done()
 			for signature := range jobs {
 				var tx services.SolanaTransactionResult
-				err := h.SolanaRPC.Call(ctx, network, "getTransaction", []any{signature, map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": 0}}, &tx, 24*time.Hour)
+				err := h.SolanaRPC.Call(ctx, network, "getTransaction", []any{signature, map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": services.SolanaMaxSupportedTransactionVersion}}, &tx, 24*time.Hour)
 				select {
 				case results <- unifiedTransactionFetchResult{signature: signature, tx: tx, err: err}:
 				case <-ctx.Done():
