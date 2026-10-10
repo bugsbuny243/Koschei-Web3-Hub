@@ -111,7 +111,7 @@ async function waitForBillingActivation(){
     const result=await read('/api/auth/premium-access');
     const premium=parsePremium(result);
     renderPremium(premium);
-    if(premium.available&&premium.active){
+    if(premium.available&&premium.active&&text(premium.access?.plan).toLowerCase()==='professional'){
       showMessage('Professional access is active. The verified server-side entitlement is now available.','good');
       params.delete('billing');
       const query=params.toString();
