@@ -207,7 +207,7 @@ func (e *UnifiedEngine) AnalyzeTX(ctx context.Context, req UnifiedAnalyzeRequest
 		return skipped(ModuleTXDecoder, "TX decoder requires target_type=tx", started)
 	}
 	var tx txRPCResult
-	err := e.RPC.Call(ctx, req.Network, "getTransaction", []any{req.TargetID, map[string]any{"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}}, &tx, web3.TTLFor("getTransaction", nil))
+	err := e.RPC.Call(ctx, req.Network, "getTransaction", []any{req.TargetID, map[string]any{"encoding": "jsonParsed", "maxSupportedTransactionVersion": SolanaMaxSupportedTransactionVersion}}, &tx, web3.TTLFor("getTransaction", nil))
 	if err != nil {
 		return failed(ModuleTXDecoder, err, started)
 	}
