@@ -3,10 +3,13 @@ package services
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/web3"
 )
 
 // AnalyzeArvisRadarsContextIsolated keeps foreground investigations from
@@ -33,6 +36,14 @@ func AnalyzeArvisRadarsContextIsolated(ctx context.Context, req SecurityRadarReq
 	}
 
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
+	// Reserve 20 seconds for response serialization and transport before the 210s client abort.
+	const interactiveStageCeiling = 190 * time.Second
+	if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > interactiveStageCeiling {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, interactiveStageCeiling)
+		defer cancel()
+	}
+	log.Printf("arvis scan start: solana_rpc_host=%s", web3.RPCProviderHost(web3.SolanaRPCURL(req.Network, os.Getenv("ALCHEMY_API_KEY"))))
 	profile := collectRadarEvidenceContextIsolated(ctx, req)
 	sourceModule := arvisSourceModule(req.Mode)
 
@@ -149,7 +160,10 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 	profile := radarEvidenceProfile{Target: req.Target, Network: req.Network, DataQuality: "no_rpc_evidence", EvidenceStatus: "insufficient_evidence"}
 	rpcURL := strings.TrimSpace(os.Getenv("SOLANA_RPC_URL"))
 	if rpcURL == "" {
-		profile.Errors = append(profile.Errors, "SOLANA_RPC_URL is not configured")
+		rpcURL = web3.SolanaRPCURL(req.Network, os.Getenv("ALCHEMY_API_KEY"))
+	}
+	if rpcURL == "" {
+		profile.Errors = append(profile.Errors, "provider_not_configured: no Solana RPC endpoint configured")
 		return profile
 	}
 	profile.RPCConfigured = true
@@ -260,6 +274,9 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 		}
 	}
 
+	if parent.Err() != nil {
+		profile.Errors = append(profile.Errors, "interactive investigation deadline reached; evidence is partial")
+	}
 	if profile.LiveRPC {
 		profile.DataQuality = "live_rpc_evidence"
 		profile.EvidenceStatus = "verified_rpc_observation"
