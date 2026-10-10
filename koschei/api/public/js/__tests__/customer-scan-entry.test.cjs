@@ -239,7 +239,7 @@ test('malformed trust, status and evidence reference values fail closed',()=>{
 test('blank evidence reference entries are rejected without requiring evidence to exist',()=>{
  const request=router.resolve(evm,'base-mainnet');
  const base=envelope();
- for(const ref of ['', '   ', '\\n\\t']){
+ for(const ref of ['', '   ', '\n\t']){
   assert.equal(router.matchesResult({...base,result:{...base.result,evidence_refs:[ref]}},request),false);
  }
  assert.equal(router.matchesResult({...base,result:{...base.result,evidence_refs:[]}},request),true);
