@@ -207,7 +207,7 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL string, signatures []string) (map[string]SolanaTransactionResult, int, error) {
 	requests := make([]solanaRPCRequest, 0, len(signatures))
 	for i, signature := range signatures {
-		requests = append(requests, solanaRPCRequest{JSONRPC: "2.0", ID: i + 1, Method: "getTransaction", Params: []any{signature, map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": 0}}})
+		requests = append(requests, solanaRPCRequest{JSONRPC: "2.0", ID: i + 1, Method: "getTransaction", Params: []any{signature, map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": SolanaMaxSupportedTransactionVersion}}})
 	}
 	payload, err := json.Marshal(requests)
 	if err != nil {
