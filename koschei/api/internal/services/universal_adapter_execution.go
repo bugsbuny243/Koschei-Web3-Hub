@@ -11,9 +11,9 @@ import (
 // UniversalAdapterCollection is the result of an actual read-only collector
 // invocation. A declared profile by itself is never evidence of execution.
 type UniversalAdapterCollection struct {
-	Route       string                 `json:"route"`
-	Executable  bool                   `json:"executable"`
-	Evidence    []IntelligenceEvidence `json:"evidence,omitempty"`
+	Route       string                    `json:"route"`
+	Executable  bool                      `json:"executable"`
+	Evidence    []IntelligenceEvidence    `json:"evidence,omitempty"`
 	Limitations []radaradapter.Limitation `json:"limitations,omitempty"`
 }
 
