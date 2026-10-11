@@ -21,7 +21,6 @@ type TronAccountObservation struct {
 	Address           string
 	Provider          string
 	RawResponseSHA256 string
-	BlockNumber      int64
 	Permissions       []TronPermissionFinding
 }
 
@@ -65,17 +64,13 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 		return TronAccountObservation{}, errors.New("tron account response exceeds 1 MiB")
 	}
 	var account struct {
-		Address     string `json:"address"`
-		BlockNumber int64  `json:"block_number"`
+		Address string `json:"address"`
 	}
 	if err := json.Unmarshal(raw, &account); err != nil {
 		return TronAccountObservation{}, err
 	}
 	if canonicalTronPermissionSigner(account.Address) != canonical {
 		return TronAccountObservation{}, errors.New("tron provider account address mismatch or missing")
-	}
-	if account.BlockNumber <= 0 {
-		return TronAccountObservation{}, errors.New("tron account response lacks a block number")
 	}
 	permissions, err := ParseTronAccountPermissions(raw)
 	if err != nil {
@@ -87,15 +82,15 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 		Address:           canonical,
 		Provider:          endpoint,
 		RawResponseSHA256: hex.EncodeToString(digest[:]),
-		BlockNumber:      account.BlockNumber,
 		Permissions:       permissions,
 	}, nil
 }
 
 // EvidenceRows exposes collected Tron permissions as observed-only rows. A
-// positive chain height is mandatory: unanchored RPC responses are not evidence.
-func (observation TronAccountObservation) EvidenceRows(observedAt time.Time) ([]EvidenceRow, error) {
-	if observation.Network != "tron-mainnet" || observation.BlockNumber <= 0 ||
+// positive, independently supplied chain height is mandatory. This height alone
+// does not prove the account response came from that block.
+func (observation TronAccountObservation) EvidenceRows(observedAt time.Time, verifiedBlockHeight int64) ([]EvidenceRow, error) {
+	if observation.Network != "tron-mainnet" || verifiedBlockHeight <= 0 ||
 		canonicalTronPermissionSigner(observation.Address) != observation.Address ||
 		observation.Provider == "" || len(observation.RawResponseSHA256) != 64 ||
 		observedAt.IsZero() || len(observation.Permissions) == 0 {
@@ -109,7 +104,7 @@ func (observation TronAccountObservation) EvidenceRows(observedAt time.Time) ([]
 			Status:    "observed",
 			Source:    observation.Provider,
 			ObservedAt: observedAt,
-			Height:    strconv.FormatInt(observation.BlockNumber, 10),
+			Height:    strconv.FormatInt(verifiedBlockHeight, 10),
 			RawHash:   observation.RawResponseSHA256,
 			Attributes: map[string]any{
 				"permission_id": permission.ID,
