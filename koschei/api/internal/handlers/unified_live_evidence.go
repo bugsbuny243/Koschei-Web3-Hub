@@ -154,6 +154,10 @@ func (h *Handler) collectUnifiedTokenLiveEvidence(ctx context.Context, core hold
 	out.RelevantTransactions = len(out.Transactions)
 	if out.WalletsCompleted == out.WalletsRequested {
 		out.Status = "complete"
+	} else if ctx.Err() != nil {
+		// Preserve the deadline signal even when earlier wallets supplied evidence.
+		// "partial" alone would hide that the investigation was interrupted.
+		out.Status = "partial_timeout"
 	} else if out.WalletsCompleted > 0 || len(out.Transactions) > 0 {
 		out.Status = "partial"
 	} else if out.Status == "source_unavailable" {
