@@ -8,7 +8,7 @@ import (
 func TestValidLiquidityRadarInputs(t *testing.T) {
 	tests := []struct {
 		name string
-		req liquidityRadarRequest
+		req  liquidityRadarRequest
 		want bool
 	}{
 		{name: "valid", req: liquidityRadarRequest{ReserveDropPct: 35, RemovedLiquidity: 50000, BlockDelay: 1}, want: true},
