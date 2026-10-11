@@ -68,7 +68,21 @@ func ValidateEvidence(subject SubjectIdentity, rows []EvidenceRow) error {
 		strings.TrimSpace(subject.IdentityValue) == "" || strings.TrimSpace(subject.NativeID) == "" {
 		return errors.New("incomplete chain subject identity")
 	}
+	seen := make(map[string]struct{}, len(rows))
 	for _, row := range rows {
+		if _, exists := seen[row.ID]; exists {
+			return errors.New("duplicate evidence row id")
+		}
+		seen[row.ID] = struct{}{}
+		if row.SubjectID != subject.NativeID {
+			return errors.New("evidence subject does not match native identity")
+		}
+		switch strings.ToLower(strings.TrimSpace(row.Status)) {
+		case "verified", "observed", "inferred", "unverified":
+		default:
+			return errors.New("unknown evidence status")
+		}
+
 		if strings.TrimSpace(row.ID) == "" || strings.TrimSpace(row.SubjectID) == "" ||
 			strings.TrimSpace(row.Source) == "" || strings.TrimSpace(row.Height) == "" ||
 			strings.TrimSpace(row.RawHash) == "" || row.ObservedAt.IsZero() {
