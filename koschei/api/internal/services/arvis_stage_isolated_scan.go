@@ -274,9 +274,6 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 		}
 	}
 
-	if parent.Err() != nil {
-		profile.Errors = append(profile.Errors, "interactive investigation deadline reached; evidence is partial")
-	}
 	if profile.LiveRPC {
 		profile.DataQuality = "live_rpc_evidence"
 		profile.EvidenceStatus = "verified_rpc_observation"
@@ -284,6 +281,11 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 			profile.DataQuality = "partial_rpc_evidence"
 			profile.EvidenceStatus = "target_not_confirmed_as_token_mint"
 		}
+	}
+	if parent.Err() != nil {
+		profile.Errors = append(profile.Errors, "interactive investigation deadline reached; evidence is partial")
+		profile.DataQuality = "partial_rpc_evidence"
+		profile.EvidenceStatus = "partial_rpc_evidence_deadline"
 	}
 	return profile
 }
