@@ -24,8 +24,8 @@ func TestSolanaTransactionRequestsVersionOneSupport(t *testing.T) {
 		if !ok {
 			t.Fatalf("getTransaction config=%#v", params[1])
 		}
-		if got := config["maxSupportedTransactionVersion"]; got != float64(solanaMaxSupportedTransactionVersion) {
-			t.Fatalf("maxSupportedTransactionVersion=%v want=%d", got, solanaMaxSupportedTransactionVersion)
+		if got := config["maxSupportedTransactionVersion"]; got != float64(SolanaMaxSupportedTransactionVersion) {
+			t.Fatalf("maxSupportedTransactionVersion=%v want=%d", got, SolanaMaxSupportedTransactionVersion)
 		}
 		writeTransactionResult(w, "version-one-supported")
 	}))
