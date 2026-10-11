@@ -436,6 +436,9 @@ func (w *SecurityRadarStreamWorker) decodeLogsPayload(payload []byte) (SecurityR
 // for enrichment rather than being silently classified as safe.
 func isPureRadarStreamTrade(event SecurityRadarStreamEventRecord) bool {
 	logs := radarStringSlice(event.Decoded["logs"])
+	if typed, ok := event.Decoded["logs"].([]string); ok {
+		logs = typed
+	}
 	text := strings.ToLower(strings.Join(logs, "\n"))
 	if !strings.Contains(text, "instruction: buy") && !strings.Contains(text, "instruction: sell") {
 		return false
