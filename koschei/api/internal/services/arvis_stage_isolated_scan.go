@@ -282,8 +282,10 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 	}
 	if parent.Err() != nil {
 		profile.Errors = append(profile.Errors, "interactive investigation deadline reached; evidence is partial")
-		profile.DataQuality = "partial_rpc_evidence"
-		profile.EvidenceStatus = "partial_rpc_evidence_deadline"
+		if profile.LiveRPC {
+			profile.DataQuality = "partial_rpc_evidence"
+			profile.EvidenceStatus = "partial_rpc_evidence_deadline"
+		}
 	}
 	return profile
 }
