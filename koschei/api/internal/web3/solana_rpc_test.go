@@ -267,12 +267,11 @@ func TestBoundedCooldownRetryRequiresRemainingRequestBudget(t *testing.T) {
 }
 
 func TestSolanaRPCUnconfiguredFailsClosed(t *testing.T) {
-	for _, key := range []string{
-		"SOLANA_RPC_URL", "SOLANA_RPC_FALLBACK_URL", "ALCHEMY_SOLANA_RPC_URL",
-		"HELIUS_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL", "ALCHEMY_API_KEY",
-		"SOLANA_DEVNET_RPC_URL", "ALCHEMY_SOLANA_DEVNET_RPC_URL",
-		"SOLANA_DEVNET_RPC_FALLBACK_URL",
-	} {
+	for _, key := range strings.Fields(
+		"SOLANA_RPC_URL SOLANA_RPC_FALLBACK_URL ALCHEMY_SOLANA_RPC_URL " +
+			"HELIUS_SOLANA_RPC_URL QUICKNODE_SOLANA_RPC_URL ALCHEMY_API_KEY " +
+			"SOLANA_DEVNET_RPC_URL ALCHEMY_SOLANA_DEVNET_RPC_URL SOLANA_DEVNET_RPC_FALLBACK_URL",
+	) {
 		t.Setenv(key, "")
 	}
 	if got := SolanaRPCURL("solana-mainnet", ""); got != "" {
