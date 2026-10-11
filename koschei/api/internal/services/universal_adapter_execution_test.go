@@ -24,8 +24,12 @@ func (unsupportedFixtureAdapter) Supports(radaradapter.Target) bool { return fal
 func (unsupportedFixtureAdapter) Collect(context.Context, radaradapter.Target) ([]radaradapter.EvidenceRow, []radaradapter.Limitation, error) {
 	panic("unsupported collector must never execute")
 }
-func (unsupportedFixtureAdapter) Subject() radaradapter.SubjectIdentity { return radaradapter.SubjectIdentity{} }
-func (unsupportedFixtureAdapter) Capability() radaradapter.Capability { return radaradapter.Capability{} }
+func (unsupportedFixtureAdapter) Subject() radaradapter.SubjectIdentity {
+	return radaradapter.SubjectIdentity{}
+}
+func (unsupportedFixtureAdapter) Capability() radaradapter.Capability {
+	return radaradapter.Capability{}
+}
 
 func TestUniversalAdapterRejectsUnsupportedTarget(t *testing.T) {
 	plan := UniversalInvestigationPlan{Subject: IntelligenceSubject{ID: "test-subject", Raw: "test", Network: "testnet", Kind: "address"}}
@@ -42,8 +46,11 @@ func TestUniversalAdapterHonorsCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	plan := UniversalInvestigationPlan{Subject: IntelligenceSubject{
-		ID: "test-subject", CanonicalRef: "fixture:account",
-		Raw: "account", Network: "testnet", Kind: "address",
+		ID:           "test-subject",
+		CanonicalRef: "fixture:account",
+		Raw:          "account",
+		Network:      "testnet",
+		Kind:         "address",
 	}}
 	_, err := ExecuteUniversalAdapter(ctx, plan, unsupportedFixtureAdapter{})
 	if err == nil {
