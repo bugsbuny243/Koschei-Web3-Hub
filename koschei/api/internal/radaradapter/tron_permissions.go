@@ -64,7 +64,7 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 		var total int64
 		seenKeys := make(map[string]bool, len(permission.Keys))
 		for _, key := range permission.Keys {
-			if strings.TrimSpace(key.Address) == "" || key.Weight <= 0 {
+			if !validTronPermissionAddress(key.Address) || key.Weight <= 0 {
 				return nil, errors.New("tron permission key is incomplete")
 			}
 			if seenKeys[key.Address] {
@@ -86,4 +86,31 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 		})
 	}
 	return findings, nil
+}
+
+
+// Tron account APIs may return a 21-byte hex address (41 prefix) or a
+// 34-character Base58Check address. This validates shape only; a live
+// collector must additionally verify the Base58Check checksum.
+func validTronPermissionAddress(address string) bool {
+	if address != strings.TrimSpace(address) {
+		return false
+	}
+	if len(address) == 42 && strings.HasPrefix(address, "41") {
+		for _, char := range address[2:] {
+			if !strings.ContainsRune("0123456789abcdefABCDEF", char) {
+				return false
+			}
+		}
+		return true
+	}
+	if len(address) == 34 && strings.HasPrefix(address, "T") {
+		for _, char := range address {
+			if !strings.ContainsRune("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz", char) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
