@@ -52,6 +52,9 @@ func TestCollectTronMainnetPermissionsFailsClosed(t *testing.T) {
 		{name: "missing account identity", code: 200, body: `{"owner_permission":{"id":0,"threshold":1}}`},
 		{name: "wrong account identity", code: 200, body: `{"address":"41bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","owner_permission":{"id":0,"threshold":1}}`},
 		{name: "no permissions", code: 200, body: `{"address":"` + account + `"}`},
+		{name: "invalid JSON", code: 200, body: `{"address":`},
+		{name: "oversized response", code: 200, body: strings.Repeat("x", (1<<20)+1)},
+		{name: "invalid signer", code: 200, body: `{"address":"` + account + `","owner_permission":{"id":0,"threshold":1,"keys":[{"address":"not-tron","weight":1}]}}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := &http.Client{Transport: tronAccountRoundTrip(func(*http.Request) (*http.Response, error) {
