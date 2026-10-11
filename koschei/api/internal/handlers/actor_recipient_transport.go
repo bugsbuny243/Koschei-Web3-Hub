@@ -43,7 +43,7 @@ func (t *koscheiActorRecipientTransport) Transaction(ctx context.Context, signat
 	var out map[string]any
 	err := t.h.callSolanaRPC(ctx, t.client, t.rpcURL, t.network, "getTransaction", []any{
 		strings.TrimSpace(signature),
-		map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": 0},
+		map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": services.SolanaMaxSupportedTransactionVersion},
 	}, &out)
 	return out, err
 }

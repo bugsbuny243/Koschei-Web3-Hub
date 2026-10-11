@@ -82,7 +82,7 @@ func configuredSolanaRPCURL(network, apiKey string) string {
 		if strings.TrimSpace(apiKey) != "" {
 			return "https://solana-mainnet.g.alchemy.com/v2/" + strings.TrimSpace(apiKey)
 		}
-		return "https://api.mainnet-beta.solana.com"
+		return ""
 	}
 	for _, key := range []string{"SOLANA_DEVNET_RPC_URL", "ALCHEMY_SOLANA_DEVNET_RPC_URL"} {
 		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
@@ -92,7 +92,7 @@ func configuredSolanaRPCURL(network, apiKey string) string {
 	if strings.TrimSpace(apiKey) != "" {
 		return "https://solana-devnet.g.alchemy.com/v2/" + strings.TrimSpace(apiKey)
 	}
-	return "https://api.devnet.solana.com"
+	return ""
 }
 
 func preferredMainnetRPCKeys(provider string) []string {
@@ -146,19 +146,18 @@ func SolanaRPCFallbackURL(network string) string {
 		if key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")); key != "" {
 			candidates = append(candidates, "https://solana-mainnet.g.alchemy.com/v2/"+key)
 		}
-		candidates = append(candidates, "https://api.mainnet-beta.solana.com")
 		for _, candidate := range candidates {
 			if candidate == "" || RPCProviderHost(candidate) == primaryHost {
 				continue
 			}
 			return candidate
 		}
-		return "https://api.mainnet-beta.solana.com"
+		return ""
 	}
 	if value := strings.TrimSpace(os.Getenv("SOLANA_DEVNET_RPC_FALLBACK_URL")); value != "" {
 		return value
 	}
-	return "https://api.devnet.solana.com"
+	return ""
 }
 
 func solanaRPCEndpointTimeout() time.Duration {
@@ -257,6 +256,12 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	if ttl <= 0 {
 		ttl = TTLFor(method, params)
 	}
+	// A cached response must never bypass the provider-not-configured gate.
+	// Validate endpoint configuration before returning any previously cached evidence.
+	endpoints := uniqueRPCURLs(s.URL(network), SolanaRPCFallbackURL(network))
+	if len(endpoints) == 0 {
+		return fmt.Errorf("provider_not_configured: no Solana RPC endpoint configured for %s", network)
+	}
 	key := s.CacheKey(network, method, params)
 	if ok, err := s.Cache.GetJSON(ctx, key, target); err == nil && ok {
 		return nil
@@ -283,7 +288,6 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	onlyCooldownBlocker := true
 	var earliestCooldown time.Time
 	endpointTimeout := solanaRPCEndpointTimeout()
-	endpoints := uniqueRPCURLs(s.URL(network), SolanaRPCFallbackURL(network))
 	for index, endpoint := range endpoints {
 		if signaturePressure {
 			if until, cooling := solanaRPCSignatureEndpointCooldown(endpoint); cooling {

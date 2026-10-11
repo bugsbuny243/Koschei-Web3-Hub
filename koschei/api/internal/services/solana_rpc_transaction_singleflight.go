@@ -14,7 +14,10 @@ import (
 
 var solanaTransactionFetchGroup singleflight.Group
 
-const solanaMaxSupportedTransactionVersion = 1
+// SolanaMaxSupportedTransactionVersion is the maximum transaction version whose
+// evidence parsing ARVIS currently supports. Version 1 must not be advertised
+// until its transactionConfig resource and priority evidence is handled.
+const SolanaMaxSupportedTransactionVersion = 0
 
 // solanaGetTransactionJSONParsedSingleflight suppresses identical in-flight
 // transaction fetches before they consume the services RPC budget, local pacing
@@ -37,7 +40,7 @@ func solanaGetTransactionJSONParsedSingleflight(ctx context.Context, rpcURL, sig
 		result, callErr := solanaRPCDo[SolanaTransactionResult](workCtx, rpcURL, "getTransaction", []any{signature, map[string]any{
 			"encoding":                       "jsonParsed",
 			"commitment":                     "confirmed",
-			"maxSupportedTransactionVersion": solanaMaxSupportedTransactionVersion,
+			"maxSupportedTransactionVersion": SolanaMaxSupportedTransactionVersion,
 		}})
 		if callErr != nil {
 			return nil, callErr
@@ -75,7 +78,7 @@ func solanaTransactionSharedFetchTimeout() time.Duration {
 func solanaTransactionFetchKey(rpcURL, signature string) string {
 	// The endpoint may contain a provider credential. Hash it with the exact
 	// request identity so the singleflight map never retains or logs raw keys.
-	material := strings.TrimSpace(rpcURL) + "\ngetTransaction\n" + strings.TrimSpace(signature) + fmt.Sprintf("\njsonParsed\nconfirmed\n%d", solanaMaxSupportedTransactionVersion)
+	material := strings.TrimSpace(rpcURL) + "\ngetTransaction\n" + strings.TrimSpace(signature) + fmt.Sprintf("\njsonParsed\nconfirmed\n%d", SolanaMaxSupportedTransactionVersion)
 	digest := sha256.Sum256([]byte(material))
 	return hex.EncodeToString(digest[:])
 }

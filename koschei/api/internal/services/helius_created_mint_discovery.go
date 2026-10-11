@@ -137,7 +137,7 @@ func fetchHeliusCreatedMintPage(ctx context.Context, endpoint, wallet, paginatio
 		"sortOrder":                      "desc",
 		"limit":                          limit,
 		"encoding":                       "jsonParsed",
-		"maxSupportedTransactionVersion": 0,
+		"maxSupportedTransactionVersion": SolanaMaxSupportedTransactionVersion,
 		"filters": map[string]any{
 			"status": "succeeded",
 		},

@@ -154,6 +154,10 @@ func (h *Handler) collectUnifiedTokenLiveEvidence(ctx context.Context, core hold
 	out.RelevantTransactions = len(out.Transactions)
 	if out.WalletsCompleted == out.WalletsRequested {
 		out.Status = "complete"
+	} else if ctx.Err() != nil {
+		// Preserve the deadline signal even when earlier wallets supplied evidence.
+		// "partial" alone would hide that the investigation was interrupted.
+		out.Status = "partial_timeout"
 	} else if out.WalletsCompleted > 0 || len(out.Transactions) > 0 {
 		out.Status = "partial"
 	} else if out.Status == "source_unavailable" {
@@ -292,7 +296,7 @@ func (h *Handler) fetchUnifiedTransactions(ctx context.Context, network, rpcURL 
 			defer wg.Done()
 			for signature := range jobs {
 				var tx services.SolanaTransactionResult
-				err := h.SolanaRPC.Call(ctx, network, "getTransaction", []any{signature, map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": 0}}, &tx, 24*time.Hour)
+				err := h.SolanaRPC.Call(ctx, network, "getTransaction", []any{signature, map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": services.SolanaMaxSupportedTransactionVersion}}, &tx, 24*time.Hour)
 				select {
 				case results <- unifiedTransactionFetchResult{signature: signature, tx: tx, err: err}:
 				case <-ctx.Done():

@@ -63,3 +63,15 @@ func TestBackgroundRadarKeepsBoundedLegacyPath(t *testing.T) {
 		t.Fatalf("background timeout=%s want=6.5s", got)
 	}
 }
+
+func TestExpiredForegroundRadarStageDoesNotResetParentDeadline(t *testing.T) {
+	req := SecurityRadarRequest{Mode: "owner_unified_manual_scan"}
+	parent, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	stage, stageCancel := radarEvidenceStageContext(parent, req, "holder_cluster")
+	defer stageCancel()
+	if stage.Err() != context.Canceled {
+		t.Fatalf("expired parent must prevent holder cluster work, got %v", stage.Err())
+	}
+}

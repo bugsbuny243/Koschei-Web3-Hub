@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/web3"
 )
 
 // AnalyzeArvisRadarsContextIsolated keeps foreground investigations from
@@ -33,7 +35,16 @@ func AnalyzeArvisRadarsContextIsolated(ctx context.Context, req SecurityRadarReq
 	}
 
 	generatedAt := time.Now().UTC().Format(time.RFC3339)
+	// Reserve 20 seconds for response serialization and transport before the 210s client abort.
+	const interactiveStageCeiling = 190 * time.Second
+	if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > interactiveStageCeiling {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, interactiveStageCeiling)
+		defer cancel()
+	}
 	profile := collectRadarEvidenceContextIsolated(ctx, req)
+	// The same bounded context remains active for the entire isolated analyzer,
+	// including arm construction and policy evaluation below.
 	sourceModule := arvisSourceModule(req.Mode)
 
 	pump := buildPumpProgramApplicabilityArm(req, profile, generatedAt)
@@ -149,7 +160,10 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 	profile := radarEvidenceProfile{Target: req.Target, Network: req.Network, DataQuality: "no_rpc_evidence", EvidenceStatus: "insufficient_evidence"}
 	rpcURL := strings.TrimSpace(os.Getenv("SOLANA_RPC_URL"))
 	if rpcURL == "" {
-		profile.Errors = append(profile.Errors, "SOLANA_RPC_URL is not configured")
+		rpcURL = web3.SolanaRPCURL(req.Network, os.Getenv("ALCHEMY_API_KEY"))
+	}
+	if rpcURL == "" {
+		profile.Errors = append(profile.Errors, "provider_not_configured: no Solana RPC endpoint configured")
 		return profile
 	}
 	profile.RPCConfigured = true
@@ -243,7 +257,7 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 		profile.Errors = append(profile.Errors, compactRadarError("getSignaturesForAddress", signaturesErr))
 	}
 
-	if profile.IsTokenMint && profile.HolderRoles.Available {
+	if parent.Err() == nil && profile.IsTokenMint && profile.HolderRoles.Available {
 		clusterCtx, clusterCancel := radarEvidenceStageContext(parent, req, "holder_cluster")
 		profile.HolderCluster = AnalyzeSolanaHolderCluster(clusterCtx, rpcURL, req.Target, profile.HolderRoles, profile.TargetOldestBlockTime, profile.TargetOldestSlot)
 		clusterCancel()
@@ -266,6 +280,13 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 		if !profile.IsTokenMint {
 			profile.DataQuality = "partial_rpc_evidence"
 			profile.EvidenceStatus = "target_not_confirmed_as_token_mint"
+		}
+	}
+	if parent.Err() != nil {
+		profile.Errors = append(profile.Errors, "interactive investigation deadline reached; evidence is partial")
+		if profile.LiveRPC {
+			profile.DataQuality = "partial_rpc_evidence"
+			profile.EvidenceStatus = "partial_rpc_evidence_deadline"
 		}
 	}
 	return profile

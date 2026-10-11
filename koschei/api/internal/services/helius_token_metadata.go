@@ -227,7 +227,7 @@ func fetchHeliusMintCreationObservation(ctx context.Context, endpoint, mint stri
 		"sortOrder":                      "asc",
 		"limit":                          20,
 		"encoding":                       "jsonParsed",
-		"maxSupportedTransactionVersion": 0,
+		"maxSupportedTransactionVersion": SolanaMaxSupportedTransactionVersion,
 		"filters": map[string]any{
 			"status": "succeeded",
 		},

@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"koschei/api/internal/services"
 )
 
 type canonicalCreatorRelationVerification struct {
@@ -132,7 +134,7 @@ func (h *Handler) verifyCanonicalCreatorRelation(ctx context.Context, target, ne
 	var tx map[string]any
 	if err := h.callSolanaRPC(verifyCtx, client, rpcURL, network, "getTransaction", []any{
 		out.Signature,
-		map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": 0},
+		map[string]any{"encoding": "jsonParsed", "commitment": "confirmed", "maxSupportedTransactionVersion": services.SolanaMaxSupportedTransactionVersion},
 	}, &tx); err != nil {
 		out.Status = "canonical_transaction_unavailable"
 		out.Limitations = append(out.Limitations, compactRadarDetailError(err))
