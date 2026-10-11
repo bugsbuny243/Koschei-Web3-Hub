@@ -31,6 +31,8 @@ func TestTronPermissionParserFailsClosed(t *testing.T) {
 	for _, raw := range []string{
 		`{}`,
 		`{"owner_permission":{"id":0,"threshold":0}}`,
+		`{"owner_permission":{"type":0,"id":2,"threshold":1,"keys":[{"address":"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","weight":1}]}}`,
+		`{"active_permission":[{"type":2,"id":1,"threshold":1,"keys":[{"address":"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","weight":1}]}]}`,
 		`{"active_permission":[{"id":2,"threshold":1,"keys":[{"address":"abc","weight":-1}]}]}`,
 		`{"active_permission":[{"id":2,"threshold":1},{"id":2,"threshold":1}]}`,
 		`not json`,
