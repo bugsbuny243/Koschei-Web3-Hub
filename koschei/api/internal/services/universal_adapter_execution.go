@@ -31,13 +31,17 @@ func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPla
 		result.Limitations = []radaradapter.Limitation{{Code: "UNSUPPORTED_TARGET", Reason: "Runtime collector does not support this target."}}
 		return result, nil
 	}
-	if strings.TrimSpace(plan.Subject.ID) == "" {
+	if strings.TrimSpace(plan.Subject.ID) == "" || strings.TrimSpace(plan.Subject.CanonicalRef) == "" {
 		return result, errors.New("unclassified universal adapter subject")
 	}
 	rows, limitations, err := adapter.Collect(ctx, target)
 	result.Limitations = append(result.Limitations, limitations...)
 	if err != nil {
 		return result, err
+	}
+	if len(rows) == 0 {
+		result.Limitations = append(result.Limitations, radaradapter.Limitation{Code: "NO_EVIDENCE", Reason: "Collector returned no reproducible evidence; safety cannot be inferred."})
+		return result, nil
 	}
 	evidence, err := AdaptRadarEvidence(plan.Subject, adapter.Subject(), rows)
 	if err != nil {
