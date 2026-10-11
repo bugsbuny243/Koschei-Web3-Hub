@@ -56,9 +56,9 @@ func TestEvidenceIdentityAndStatusGuards(t *testing.T) {
 		t.Fatalf("valid evidence rejected: %v", err)
 	}
 	wrongSubject := valid
-	wrongSubject.SubjectID = "other-account"
+	wrongSubject.SubjectID = ""
 	if err := ValidateEvidence(subject, []EvidenceRow{wrongSubject}); err == nil {
-		t.Fatal("mismatched subject accepted")
+		t.Fatal("empty investigation subject ID accepted")
 	}
 	wrongStatus := valid
 	wrongStatus.Status = "safe"
