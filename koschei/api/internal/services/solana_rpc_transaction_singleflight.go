@@ -14,8 +14,10 @@ import (
 
 var solanaTransactionFetchGroup singleflight.Group
 
-// SolanaMaxSupportedTransactionVersion is the maximum version accepted by ARVIS transaction RPC requests.
-const SolanaMaxSupportedTransactionVersion = 1
+// SolanaMaxSupportedTransactionVersion is the maximum transaction version whose
+// evidence parsing ARVIS currently supports. Version 1 must not be advertised
+// until its transactionConfig resource and priority evidence is handled.
+const SolanaMaxSupportedTransactionVersion = 0
 
 // solanaGetTransactionJSONParsedSingleflight suppresses identical in-flight
 // transaction fetches before they consume the services RPC budget, local pacing
