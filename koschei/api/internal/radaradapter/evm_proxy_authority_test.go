@@ -14,7 +14,9 @@ func TestEVMProxyAuthorityStorage(t *testing.T) {
 	impl := strings.Repeat("a", 40)
 	admin := strings.Repeat("b", 40)
 	result, err := ParseEVMProxyAuthority(evmSlot(impl), evmSlot(admin), evmSlot(strings.Repeat("0", 40)))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if result.Implementation != "0x"+impl || result.Admin != "0x"+admin || result.Beacon != "" {
 		t.Fatalf("unexpected proxy slots: %+v", result)
 	}
