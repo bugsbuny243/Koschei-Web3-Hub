@@ -99,19 +99,19 @@ func (observation TronAccountObservation) EvidenceRows(observedAt time.Time, ver
 	rows := make([]EvidenceRow, 0, len(observation.Permissions))
 	for _, permission := range observation.Permissions {
 		rows = append(rows, EvidenceRow{
-			ID:        "tron-permission-" + permission.ID,
+			ID:         "tron-permission-" + permission.ID,
 			SubjectID: observation.Address,
-			Status:    "observed",
-			Source:    observation.Provider,
+			Status:     "observed",
+			Source:     observation.Provider,
 			ObservedAt: observedAt,
-			Height:    strconv.FormatInt(verifiedBlockHeight, 10),
-			RawHash:   observation.RawResponseSHA256,
+			Height:     strconv.FormatInt(verifiedBlockHeight, 10),
+			RawHash:    observation.RawResponseSHA256,
 			Attributes: map[string]any{
-				"permission_id": permission.ID,
-				"permission_type": permission.Type,
-				"threshold": permission.Threshold,
-				"total_weight": permission.TotalWeight,
-				"threshold_reachable": permission.ThresholdReachable,
+				"permission_id":        permission.ID,
+				"permission_type":      permission.Type,
+				"threshold":            permission.Threshold,
+				"total_weight":         permission.TotalWeight,
+				"threshold_reachable":  permission.ThresholdReachable,
 			},
 		})
 	}
