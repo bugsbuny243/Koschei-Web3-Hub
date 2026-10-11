@@ -528,6 +528,10 @@ func (w *SecurityRadarStreamWorker) enrichEventTarget(ctx context.Context, event
 }
 
 func (s *SecurityRadarStore) InsertStreamEvent(ctx context.Context, event SecurityRadarStreamEventRecord) (string, error) {
+	// Fail closed at the persistence boundary as well as in the WSS worker.
+	if event.TargetType != "token" || !isLikelyRadarSolanaAddress(strings.TrimSpace(event.Target)) || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) {
+		return "", fmt.Errorf("stream event requires a token mint target, got type=%q", event.TargetType)
+	}
 	if s == nil || s.DB == nil {
 		return "", nil
 	}
