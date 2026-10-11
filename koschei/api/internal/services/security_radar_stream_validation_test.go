@@ -44,3 +44,15 @@ func TestRadarStreamLifecycleNotFiltered(t *testing.T) {
 		t.Fatal("lifecycle signal must not be dropped with trade noise")
 	}
 }
+
+func TestInsertStreamEventRejectsUnenrichedTokenHint(t *testing.T) {
+	store := &SecurityRadarStore{}
+	_, err := store.InsertStreamEvent(context.Background(), SecurityRadarStreamEventRecord{
+		TargetType:      "token",
+		Target:          strings.Repeat("1", 44),
+		EvidenceQuality: "decoded_stream_hint",
+	})
+	if err == nil {
+		t.Fatal("token-shaped address without transaction evidence must be rejected")
+	}
+}
