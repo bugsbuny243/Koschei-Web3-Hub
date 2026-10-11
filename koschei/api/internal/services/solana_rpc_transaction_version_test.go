@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestSolanaTransactionRequestsVersionOneSupport(t *testing.T) {
+func TestSolanaTransactionRequestsOnlySupportedVersion(t *testing.T) {
 	configureSolanaTransactionSingleflightTest(t)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -27,15 +27,15 @@ func TestSolanaTransactionRequestsVersionOneSupport(t *testing.T) {
 		if got := config["maxSupportedTransactionVersion"]; got != float64(SolanaMaxSupportedTransactionVersion) {
 			t.Fatalf("maxSupportedTransactionVersion=%v want=%d", got, SolanaMaxSupportedTransactionVersion)
 		}
-		writeTransactionResult(w, "version-one-supported")
+		writeTransactionResult(w, "supported-version")
 	}))
 	defer server.Close()
 
-	result, err := SolanaGetTransactionJSONParsed(context.Background(), server.URL, "version-one-signature")
+	result, err := SolanaGetTransactionJSONParsed(context.Background(), server.URL, "supported-version-signature")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result["signature"] != "version-one-supported" {
+	if result["signature"] != "supported-version" {
 		t.Fatalf("unexpected transaction result: %#v", result)
 	}
 }
