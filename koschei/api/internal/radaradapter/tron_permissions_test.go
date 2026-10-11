@@ -13,8 +13,12 @@ func TestTronPermissionThresholds(t *testing.T) {
 		]}]
 	}`)
 	findings, err := ParseTronAccountPermissions(raw)
-	if err != nil { t.Fatal(err) }
-	if len(findings) != 2 { t.Fatalf("expected 2 permissions, got %d", len(findings)) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(findings) != 2 {
+		t.Fatalf("expected 2 permissions, got %d", len(findings))
+	}
 	if !findings[0].ThresholdReachable || findings[0].TotalWeight != 2 {
 		t.Fatalf("owner permission threshold: %+v", findings[0])
 	}
