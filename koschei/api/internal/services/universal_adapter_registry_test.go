@@ -64,10 +64,10 @@ type incompleteRegistryAdapter struct {
 
 func (a incompleteRegistryAdapter) Capability() radaradapter.Capability {
 	return radaradapter.Capability{
-		Networks: []string{"fixture"},
+		Networks:    []string{"fixture"},
 		TargetKinds: []string{""},
 		DataSources: []string{"fixture"},
-		Fixture: "universal_adapter_registry_test.go",
+		Fixture:     "universal_adapter_registry_test.go",
 	}
 }
 
