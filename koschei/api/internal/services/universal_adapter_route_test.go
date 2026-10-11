@@ -41,3 +41,23 @@ func TestDeclaredRouteCannotBecomeExecutableFromEvidence(t *testing.T) {
 		t.Fatalf("declared route promoted incorrectly: %+v", result)
 	}
 }
+
+func TestKnownLiveRouteAcceptsObservedEvidenceOnly(t *testing.T) {
+	plan := UniversalInvestigationPlan{
+		Subject: IntelligenceSubject{
+			ID: "subject-1", CanonicalRef: "fixture:account", Network: "ethereum-mainnet",
+			Kind: "address", Raw: "account",
+		},
+		Route: UniversalDispatchEVMProbe,
+	}
+	result, err := ExecuteUniversalAdapter(context.Background(), plan, routeEvidenceFixture{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Executable || result.Route != UniversalDispatchEVMProbe || len(result.Evidence) != 1 {
+		t.Fatalf("live route should return collected evidence: %+v", result)
+	}
+	if result.Evidence[0].Status != IntelligenceEvidenceObserved {
+		t.Fatal("adapter must not award independent verification")
+	}
+}
