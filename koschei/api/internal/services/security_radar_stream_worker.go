@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/sha1"
 	"crypto/tls"
 	"database/sql"
@@ -557,14 +558,19 @@ func (s *SecurityRadarStore) InsertStreamEvent(ctx context.Context, event Securi
 		return "", nil
 	}
 	decoded, _ := json.Marshal(nonNilMap(event.Decoded))
+	rawBytes, err := json.Marshal(nonNilMap(event.RawEvent))
+	if err != nil {
+		return "", fmt.Errorf("marshal raw stream notification: %w", err)
+	}
+	rawHash := fmt.Sprintf("%x", sha256.Sum256(rawBytes))
 	// Store only the canonical decoded payload; the raw notification is redundant.
 	// Keep the legacy raw_event column nullable until the parity audit is approved.
 	var id string
 	err := s.DB.QueryRowContext(ctx, `
-		INSERT INTO security_radar_stream_events (provider,stream_mode,network,module_id,event_type,target,target_type,signature,slot,program_id,evidence_quality,decoded,raw_event,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),$7,NULLIF($8,''),NULLIF($9,0),NULLIF($10,''),$11,$12::jsonb,NULL,now(),now())
+		INSERT INTO security_radar_stream_events (provider,stream_mode,network,module_id,event_type,target,target_type,signature,slot,program_id,evidence_quality,decoded,raw_event,raw_event_sha256,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),$7,NULLIF($8,''),NULLIF($9,0),NULLIF($10,''),$11,$12::jsonb,NULL,$13,now(),now())
 		ON CONFLICT DO NOTHING
-		RETURNING id::text`, firstRadarValue(event.Provider, SecurityRadarStreamProvider), firstRadarValue(event.StreamMode, SecurityRadarStreamModeLogs), normalizeRadarNetwork(event.Network), firstRadarValue(event.ModuleID, "unknown"), firstRadarValue(event.EventType, "stream_event"), strings.TrimSpace(event.Target), firstRadarValue(event.TargetType, "unknown"), strings.TrimSpace(event.Signature), event.Slot, strings.TrimSpace(event.ProgramID), firstRadarValue(event.EvidenceQuality, "raw_stream"), string(decoded)).Scan(&id)
+		RETURNING id::text`, firstRadarValue(event.Provider, SecurityRadarStreamProvider), firstRadarValue(event.StreamMode, SecurityRadarStreamModeLogs), normalizeRadarNetwork(event.Network), firstRadarValue(event.ModuleID, "unknown"), firstRadarValue(event.EventType, "stream_event"), strings.TrimSpace(event.Target), firstRadarValue(event.TargetType, "unknown"), strings.TrimSpace(event.Signature), event.Slot, strings.TrimSpace(event.ProgramID), firstRadarValue(event.EvidenceQuality, "raw_stream"), string(decoded), rawHash).Scan(&id)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
