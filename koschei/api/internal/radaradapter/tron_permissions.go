@@ -68,10 +68,14 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 			if !validTronPermissionAddress(key.Address) || key.Weight <= 0 {
 				return nil, errors.New("tron permission key is incomplete")
 			}
-			if seenKeys[key.Address] {
+			signerID := key.Address
+			if strings.HasPrefix(signerID, "41") {
+				signerID = strings.ToLower(signerID)
+			}
+			if seenKeys[signerID] {
 				return nil, errors.New("duplicate tron permission signer")
 			}
-			seenKeys[key.Address] = true
+			seenKeys[signerID] = true
 			if total > int64(^uint64(0)>>1)-key.Weight {
 				return nil, errors.New("tron permission weight overflow")
 			}
