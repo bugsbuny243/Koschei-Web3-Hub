@@ -69,3 +69,30 @@ func TestTronPermissionCanonicalSignerIdentity(t *testing.T) {
 		t.Fatal("hex and Base58Check addresses for same signer must canonicalize identically")
 	}
 }
+
+func TestTronActiveOperationsMask(t *testing.T) {
+	const signer = "41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const validMask = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+	for _, tc := range []struct {
+		name string
+		mask string
+		ok   bool
+	}{
+		{"valid", validMask, true},
+		{"short", "ff", false},
+		{"non-hex", "gg" + validMask[2:], false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := []byte(`{"active_permission":[{"id":2,"type":2,"threshold":1,"operations":"` + tc.mask +
+				`","keys":[{"address":"` + signer + `","weight":1}]}]}`)
+			findings, err := ParseTronAccountPermissions(raw)
+			if tc.ok {
+				if err != nil || len(findings) != 1 || findings[0].Operations != tc.mask {
+					t.Fatalf("expected preserved operations mask: %+v, %v", findings, err)
+				}
+			} else if err == nil {
+				t.Fatal("accepted invalid Tron operations mask")
+			}
+		})
+	}
+}
