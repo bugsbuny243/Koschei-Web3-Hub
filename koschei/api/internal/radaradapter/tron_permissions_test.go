@@ -47,13 +47,13 @@ func TestTronPermissionParserFailsClosed(t *testing.T) {
 func TestTronPermissionAddressShape(t *testing.T) {
 	for _, address := range []string{
 		"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-		"TAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		"TR7NHqjeKQxGTCi8q8ZY4pL8ot7C8V8C",
 	} {
 		if !validTronPermissionAddress(address) {
 			t.Fatalf("expected valid address shape: %s", address)
 		}
 	}
-	for _, address := range []string{"", "abc", " 41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "41gggggggggggggggggggggggggggggggggggggggg", "T000000000000000000000000000000000"} {
+	for _, address := range []string{"", "abc", " 41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "41gggggggggggggggggggggggggggggggggggggggg", "T000000000000000000000000000000000", "TAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"} {
 		if validTronPermissionAddress(address) {
 			t.Fatalf("accepted invalid address shape: %s", address)
 		}
