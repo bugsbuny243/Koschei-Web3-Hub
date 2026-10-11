@@ -30,7 +30,7 @@ type tronPermissionJSON struct {
 	Type       int    `json:"type"`
 	Threshold  int64  `json:"threshold"`
 	Operations string `json:"operations"`
-	Keys      []struct {
+	Keys       []struct {
 		Address string `json:"address"`
 		Weight  int64  `json:"weight"`
 	} `json:"keys"`
