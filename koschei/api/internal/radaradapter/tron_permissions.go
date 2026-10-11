@@ -10,26 +10,26 @@ import (
 // TronPermissionFinding describes an account permission's signing threshold.
 // It is a read-only observation, not a compromise or safety verdict.
 type TronPermissionFinding struct {
-	ID string
-	Type int
-	Threshold int64
-	TotalWeight int64
-	KeyCount int
+	ID                 string
+	Type               int
+	Threshold          int64
+	TotalWeight        int64
+	KeyCount           int
 	ThresholdReachable bool
 }
 
 type tronPermissionResponse struct {
-	OwnerPermission *tronPermissionJSON `json:"owner_permission"`
-	ActivePermission []tronPermissionJSON `json:"active_permission"`
-	WitnessPermission *tronPermissionJSON `json:"witness_permission"`
+	OwnerPermission   *tronPermissionJSON  `json:"owner_permission"`
+	ActivePermission  []tronPermissionJSON `json:"active_permission"`
+	WitnessPermission *tronPermissionJSON  `json:"witness_permission"`
 }
 type tronPermissionJSON struct {
-	ID int `json:"id"`
-	Type int `json:"type"`
+	ID        int   `json:"id"`
+	Type      int   `json:"type"`
 	Threshold int64 `json:"threshold"`
-	Keys []struct {
+	Keys      []struct {
 		Address string `json:"address"`
-		Weight int64 `json:"weight"`
+		Weight  int64  `json:"weight"`
 	} `json:"keys"`
 }
 
@@ -77,11 +77,11 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 			total += key.Weight
 		}
 		findings = append(findings, TronPermissionFinding{
-			ID: fmt.Sprintf("%d", permission.ID),
-			Type: permission.Type,
-			Threshold: permission.Threshold,
-			TotalWeight: total,
-			KeyCount: len(permission.Keys),
+			ID:                 fmt.Sprintf("%d", permission.ID),
+			Type:               permission.Type,
+			Threshold:          permission.Threshold,
+			TotalWeight:        total,
+			KeyCount:           len(permission.Keys),
 			ThresholdReachable: total >= permission.Threshold,
 		})
 	}
