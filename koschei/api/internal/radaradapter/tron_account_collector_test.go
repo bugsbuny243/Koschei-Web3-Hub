@@ -28,7 +28,7 @@ func TestCollectTronMainnetPermissions(t *testing.T) {
 			t.Fatalf("unexpected getaccount request: %s", body)
 		}
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(
-			`{"address":"`+account+`","owner_permission":{"id":0,"type":0,"threshold":1,"keys":[{"address":"`+account+`","weight":1}]}}`,
+			`{"address":"` + account + `","owner_permission":{"id":0,"type":0,"threshold":1,"keys":[{"address":"` + account + `","weight":1}]}}`,
 		)), Header: make(http.Header)}, nil
 	})}
 	observation, err := CollectTronMainnetPermissions(context.Background(), client, account)
