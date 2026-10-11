@@ -36,7 +36,8 @@ func StartArvisRadarHeartbeat(ctx context.Context, db *sql.DB) func() {
 		}
 	}
 	if rpcURL == "" {
-		rpcURL = defaultSolanaMainnetRPC
+		log.Printf("arvis radar heartbeat disabled: provider_not_configured")
+		return func() {}
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	go arvisRadarHeartbeatLoop(ctx, NewSecurityRadarStore(db), rpcURL)
