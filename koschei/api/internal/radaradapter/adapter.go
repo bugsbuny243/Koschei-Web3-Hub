@@ -19,10 +19,10 @@ type Target struct {
 
 // SubjectIdentity binds a subject to a chain's native identity primitive.
 type SubjectIdentity struct {
-	Network          string
-	IdentityKind     string
-	IdentityValue    string
-	NativeID         string
+	Network       string
+	IdentityKind  string
+	IdentityValue string
+	NativeID      string
 }
 
 // EvidenceRow is a transport-neutral collection row. Integration with the
