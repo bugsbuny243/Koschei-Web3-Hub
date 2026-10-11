@@ -57,3 +57,22 @@ func TestRegistryRejectsNilAdapter(t *testing.T) {
 		t.Fatal("nil adapter must be rejected")
 	}
 }
+
+type incompleteRegistryAdapter struct {
+	registryFixtureAdapter
+}
+
+func (a incompleteRegistryAdapter) Capability() radaradapter.Capability {
+	return radaradapter.Capability{
+		Networks: []string{"fixture"},
+		TargetKinds: []string{""},
+		DataSources: []string{"fixture"},
+		Fixture: "universal_adapter_registry_test.go",
+	}
+}
+
+func TestRegistryRejectsEmptyTargetKind(t *testing.T) {
+	if _, err := NewUniversalAdapterRegistry(incompleteRegistryAdapter{}); err == nil {
+		t.Fatal("empty declared target kind must be rejected")
+	}
+}
