@@ -458,7 +458,7 @@ func (w *SecurityRadarStreamWorker) persistEvent(ctx context.Context, event Secu
 	}
 	event = w.enrichEventTarget(ctx, event)
 	// A signature is not a mint: never persist a misleading token-target row.
-	if event.TargetType != "token" || !isLikelyRadarSolanaAddress(strings.TrimSpace(event.Target)) || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) {
+	if event.TargetType != "token" || event.EvidenceQuality != "transaction_enriched_mint" || !isLikelyRadarSolanaAddress(strings.TrimSpace(event.Target)) || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) {
 		log.Printf("security radar stream event skipped without verified mint target signature=%s module=%s", event.Signature, event.ModuleID)
 		return
 	}
@@ -554,7 +554,7 @@ func (w *SecurityRadarStreamWorker) enrichEventTarget(ctx context.Context, event
 
 func (s *SecurityRadarStore) InsertStreamEvent(ctx context.Context, event SecurityRadarStreamEventRecord) (string, error) {
 	// Fail closed at the persistence boundary as well as in the WSS worker.
-	if event.TargetType != "token" || !isLikelyRadarSolanaAddress(strings.TrimSpace(event.Target)) || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) {
+	if event.TargetType != "token" || event.EvidenceQuality != "transaction_enriched_mint" || !isLikelyRadarSolanaAddress(strings.TrimSpace(event.Target)) || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) {
 		return "", fmt.Errorf("stream event requires a token mint target, got type=%q", event.TargetType)
 	}
 	if s == nil || s.DB == nil {
