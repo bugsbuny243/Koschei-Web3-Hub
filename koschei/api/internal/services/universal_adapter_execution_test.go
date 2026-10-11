@@ -37,3 +37,16 @@ func TestUniversalAdapterRejectsUnsupportedTarget(t *testing.T) {
 		t.Fatalf("unsupported collector incorrectly executed: %+v", result)
 	}
 }
+
+func TestUniversalAdapterHonorsCancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	plan := UniversalInvestigationPlan{Subject: IntelligenceSubject{
+		ID: "test-subject", CanonicalRef: "fixture:account",
+		Raw: "account", Network: "testnet", Kind: "address",
+	}}
+	_, err := ExecuteUniversalAdapter(ctx, plan, unsupportedFixtureAdapter{})
+	if err == nil {
+		t.Fatal("cancelled context must stop collection")
+	}
+}
