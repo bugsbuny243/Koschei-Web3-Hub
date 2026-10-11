@@ -430,7 +430,28 @@ func (w *SecurityRadarStreamWorker) decodeLogsPayload(payload []byte) (SecurityR
 	return SecurityRadarStreamEventRecord{Provider: SecurityRadarStreamProvider, StreamMode: SecurityRadarStreamModeLogs, Network: w.Network, ModuleID: moduleID, EventType: eventType, Target: target, TargetType: targetTypeForRadarModule(moduleID), Signature: signature, Slot: radarInt64(contextValue["slot"]), ProgramID: programID, EvidenceQuality: evidenceQualityForRadarModule(moduleID), Decoded: decoded, RawEvent: raw}, signature != "" || moduleID != "unknown"
 }
 
+// isPureRadarStreamTrade conservatively filters logs with an explicit buy/sell
+// instruction and no lifecycle or authority transition. Unknown logs are retained
+// for enrichment rather than being silently classified as safe.
+func isPureRadarStreamTrade(event SecurityRadarStreamEventRecord) bool {
+	logs := radarStringSlice(event.Decoded["logs"])
+	text := strings.ToLower(strings.Join(logs, "\n"))
+	if !strings.Contains(text, "instruction: buy") && !strings.Contains(text, "instruction: sell") {
+		return false
+	}
+	for _, marker := range []string{"instruction: initialize", "instruction: creat", "instruction: mintto", "instruction: setauthority", "instruction: freeze", "instruction: thaw", "instruction: close", "instruction: withdraw", "instruction: lock", "instruction: addliquidity", "instruction: removeliquidity"} {
+		if strings.Contains(text, marker) {
+			return false
+		}
+	}
+	return true
+}
+
 func (w *SecurityRadarStreamWorker) persistEvent(ctx context.Context, event SecurityRadarStreamEventRecord) {
+	// Pure swap trades are volume telemetry, not durable verdict evidence.
+	if isPureRadarStreamTrade(event) {
+		return
+	}
 	event = w.enrichEventTarget(ctx, event)
 	// A signature is not a mint: never persist a misleading token-target row.
 	if event.TargetType != "token" || !isLikelyRadarSolanaAddress(strings.TrimSpace(event.Target)) || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) {
