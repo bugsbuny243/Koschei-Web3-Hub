@@ -569,7 +569,7 @@ func (s *SecurityRadarStore) InsertStreamEvent(ctx context.Context, event Securi
 	// Store only the canonical decoded payload; the raw notification is redundant.
 	// Keep the legacy raw_event column nullable until the parity audit is approved.
 	var id string
-	err := s.DB.QueryRowContext(ctx, `
+	err = s.DB.QueryRowContext(ctx, `
 		INSERT INTO security_radar_stream_events (provider,stream_mode,network,module_id,event_type,target,target_type,signature,slot,program_id,evidence_quality,decoded,raw_event,raw_event_sha256,created_at,updated_at)
 		VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),$7,NULLIF($8,''),NULLIF($9,0),NULLIF($10,''),$11,$12::jsonb,NULL,$13,now(),now())
 		ON CONFLICT DO NOTHING
