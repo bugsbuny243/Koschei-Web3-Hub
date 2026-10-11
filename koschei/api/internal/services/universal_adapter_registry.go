@@ -47,6 +47,9 @@ func NewUniversalAdapterRegistry(adapters ...radaradapter.Adapter) (*UniversalAd
 // Collect resolves a collector by Supports, not by a static adapter profile.
 // Ambiguous matches fail closed instead of silently selecting a provider.
 func (registry *UniversalAdapterRegistry) Collect(ctx context.Context, plan UniversalInvestigationPlan) (UniversalAdapterCollection, error) {
+	if err := ctx.Err(); err != nil {
+		return UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}, err
+	}
 	if registry == nil {
 		return ExecuteUniversalAdapter(ctx, plan, nil)
 	}
