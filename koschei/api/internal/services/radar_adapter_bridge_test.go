@@ -25,3 +25,12 @@ func TestAdaptRadarEvidenceRejectsMismatch(t *testing.T) {
  rows:=[]radaradapter.EvidenceRow{{ID:"evidence-1",SubjectID:"wrong-subject",Source:"fixture-provider",Height:"123",RawHash:"sha256:fixture",ObservedAt:time.Now()}}
  if _,err:=AdaptRadarEvidence(subject,identity,rows);err==nil {t.Fatal("mismatched subject accepted")}
 }
+
+func TestAdaptRadarEvidenceRejectsDuplicateIDs(t *testing.T) {
+	subject := IntelligenceSubject{ID: "subject-1", CanonicalRef: "fixture:account", Network: "ethereum-mainnet"}
+	identity := radaradapter.SubjectIdentity{Network: "ethereum-mainnet", IdentityKind: "chain_id", IdentityValue: "1", NativeID: "account"}
+	row := radaradapter.EvidenceRow{ID: "duplicate", SubjectID: "subject-1", Source: "fixture", Height: "123", RawHash: "sha256:fixture", ObservedAt: time.Now()}
+	if _, err := AdaptRadarEvidence(subject, identity, []radaradapter.EvidenceRow{row, row}); err == nil {
+		t.Fatal("duplicate evidence IDs must be rejected")
+	}
+}
