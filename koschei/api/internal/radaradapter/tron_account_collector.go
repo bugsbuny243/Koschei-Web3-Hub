@@ -100,7 +100,7 @@ func (observation TronAccountObservation) EvidenceRows(observedAt time.Time, ver
 	for _, permission := range observation.Permissions {
 		rows = append(rows, EvidenceRow{
 			ID:         "tron-permission-" + permission.ID,
-			SubjectID: observation.Address,
+			SubjectID:  observation.Address,
 			Status:     "observed",
 			Source:     observation.Provider,
 			ObservedAt: observedAt,
