@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // TronPermissionFinding describes an account permission's signing threshold.
@@ -61,10 +62,15 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 			return nil, errors.New("tron permission threshold must be positive")
 		}
 		var total int64
+		seenKeys := make(map[string]bool, len(permission.Keys))
 		for _, key := range permission.Keys {
-			if key.Address == "" || key.Weight <= 0 {
+			if strings.TrimSpace(key.Address) == "" || key.Weight <= 0 {
 				return nil, errors.New("tron permission key is incomplete")
 			}
+			if seenKeys[key.Address] {
+				return nil, errors.New("duplicate tron permission signer")
+			}
+			seenKeys[key.Address] = true
 			if total > int64(^uint64(0)>>1)-key.Weight {
 				return nil, errors.New("tron permission weight overflow")
 			}
