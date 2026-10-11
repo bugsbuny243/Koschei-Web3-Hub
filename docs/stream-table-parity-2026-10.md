@@ -34,7 +34,7 @@ Before any retention enablement, select preserved evidence classes and copy them
 - Dropped indexes: **none**.
 - Recovered rows: **not measured**.
 - New raw notification storage: SHA-256 digest in `raw_event_sha256`; raw JSON no longer duplicated for new writes.
-- Retention: `KOSCHEI_STREAM_RETENTION_DAYS=14` by default, `KOSCHEI_STREAM_RETENTION_ENABLED=false` by default.
+- Retention: `KOSCHEI_STREAM_RETENTION_DAYS=14` by default, `KOSCHEI_STREAM_RETENTION_ENABLED=false` by default. A separate `KOSCHEI_STREAM_RETENTION_PARITY_APPROVED=true` is also required before any deletion.
 - Retention execution: worker-only function, no scheduler or API route wired. **Do not enable until parity and backup approval.**
 
 ## Remaining acceptance gates
