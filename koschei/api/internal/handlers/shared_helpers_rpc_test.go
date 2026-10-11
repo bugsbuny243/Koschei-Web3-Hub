@@ -16,7 +16,7 @@ func TestSolanaRPCURLPrefersExplicitNativeEndpointOverLegacyAlchemyKey(t *testin
 	}
 }
 
-func TestSolanaRPCURLFallsBackToPublicSolanaWithoutProviderConfig(t *testing.T) {
+func TestSolanaRPCURLFailsClosedWithoutProviderConfig(t *testing.T) {
 	t.Setenv("SOLANA_RPC_URL", "")
 	t.Setenv("ALCHEMY_SOLANA_RPC_URL", "")
 	t.Setenv("HELIUS_SOLANA_RPC_URL", "")
@@ -26,7 +26,7 @@ func TestSolanaRPCURLFallsBackToPublicSolanaWithoutProviderConfig(t *testing.T) 
 	t.Setenv("SECURITY_PROVIDER", "auto")
 
 	got := solanaRPCURL("solana-mainnet", "")
-	if got != "https://api.mainnet-beta.solana.com" {
-		t.Fatalf("provider-free mainnet fallback=%q", got)
+	if got != "" {
+		t.Fatalf("unconfigured mainnet RPC must fail closed, got %q", got)
 	}
 }
