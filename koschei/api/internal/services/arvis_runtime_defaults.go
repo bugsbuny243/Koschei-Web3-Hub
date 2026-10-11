@@ -13,7 +13,9 @@ func init() {
 		_ = os.Setenv("PUMP_SWAP_PROGRAM_ID", defaultPumpSwapProgramID)
 	}
 	if strings.TrimSpace(os.Getenv("SOLANA_RPC_URL")) == "" {
-		_ = os.Setenv("SOLANA_RPC_URL", resolvedArvisRPCURLFromEnv())
+		if resolved := resolvedArvisRPCURLFromEnv(); resolved != "" {
+			_ = os.Setenv("SOLANA_RPC_URL", resolved)
+		}
 	}
 	if strings.TrimSpace(os.Getenv("ARVIS_HEARTBEAT_SECONDS")) == "" {
 		if hasConfiguredArvisRPCProvider() {
