@@ -28,3 +28,19 @@ func TestInsertStreamEventRejectsSignatureTargetType(t *testing.T) {
 		t.Fatal("signature target type must not be accepted by mint evidence persistence")
 	}
 }
+
+func TestPureRadarStreamTradeFiltered(t *testing.T) {
+	for _, instruction := range []string{"Instruction: Buy", "Instruction: Sell"} {
+		event := SecurityRadarStreamEventRecord{Decoded: map[string]any{"logs": []string{instruction}}}
+		if !isPureRadarStreamTrade(event) {
+			t.Fatalf("pure trade %q must be filtered", instruction)
+		}
+	}
+}
+
+func TestRadarStreamLifecycleNotFiltered(t *testing.T) {
+	event := SecurityRadarStreamEventRecord{Decoded: map[string]any{"logs": []string{"Instruction: Buy", "Instruction: InitializeMint"}}}
+	if isPureRadarStreamTrade(event) {
+		t.Fatal("lifecycle signal must not be dropped with trade noise")
+	}
+}
