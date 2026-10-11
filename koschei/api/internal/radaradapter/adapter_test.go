@@ -38,3 +38,16 @@ func TestMissingProvenanceRejected(t *testing.T) {
  if err:=ValidateEvidence(adapter.Subject(),[]EvidenceRow{{ID:"incomplete"}}); err==nil {t.Fatal("incomplete evidence accepted")}
  if err:=ValidateEvidence(SubjectIdentity{},nil); err==nil {t.Fatal("incomplete subject accepted")}
 }
+
+func TestEvidenceIdentityAndStatusGuards(t *testing.T) {
+ subject := fixtureAdapter{}.Subject()
+ valid := EvidenceRow{ID:"row-1", SubjectID:subject.NativeID, Status:"observed", Source:"fixture", Height:"123", RawHash:"sha256:fixture", ObservedAt:time.Date(2026,10,11,0,0,0,0,time.UTC)}
+ if err:=ValidateEvidence(subject, []EvidenceRow{valid}); err!=nil {t.Fatalf("valid evidence rejected: %v",err)}
+ wrongSubject:=valid
+ wrongSubject.SubjectID="other-account"
+ if err:=ValidateEvidence(subject, []EvidenceRow{wrongSubject}); err==nil {t.Fatal("mismatched subject accepted")}
+ wrongStatus:=valid
+ wrongStatus.Status="safe"
+ if err:=ValidateEvidence(subject, []EvidenceRow{wrongStatus}); err==nil {t.Fatal("unknown status accepted")}
+ if err:=ValidateEvidence(subject, []EvidenceRow{valid,valid}); err==nil {t.Fatal("duplicate evidence ID accepted")}
+}
