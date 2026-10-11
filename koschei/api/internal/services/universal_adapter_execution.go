@@ -31,7 +31,7 @@ func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPla
 		result.Limitations = []radaradapter.Limitation{{Code: "UNSUPPORTED_TARGET", Reason: "Runtime collector does not support this target."}}
 		return result, nil
 	}
-	if strings.TrimSpace(plan.Subject.ID) == "" || strings.TrimSpace(plan.Subject.CanonicalRef) == "" {
+	if strings.TrimSpace(plan.Subject.ID) == "" || strings.TrimSpace(plan.Subject.CanonicalRef) == "" || strings.TrimSpace(plan.Subject.Network) == "" || strings.TrimSpace(plan.Subject.Raw) == "" {
 		return result, errors.New("unclassified universal adapter subject")
 	}
 	rows, limitations, err := adapter.Collect(ctx, target)
