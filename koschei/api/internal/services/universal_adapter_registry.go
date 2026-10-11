@@ -21,8 +21,13 @@ func NewUniversalAdapterRegistry(adapters ...radaradapter.Adapter) (*UniversalAd
 			return nil, errors.New("nil runtime adapter")
 		}
 		capability := adapter.Capability()
-		if len(capability.Networks) == 0 || len(capability.TargetKinds) == 0 || len(capability.DataSources) == 0 {
+		if len(capability.Networks) == 0 || len(capability.TargetKinds) == 0 || len(capability.DataSources) == 0 || strings.TrimSpace(capability.Fixture) == "" {
 			return nil, errors.New("runtime adapter has incomplete capability declaration")
+		}
+		for _, network := range capability.Networks {
+			if strings.TrimSpace(network) == "" {
+				return nil, errors.New("runtime adapter declares empty network")
+			}
 		}
 		registry.adapters = append(registry.adapters, adapter)
 	}
