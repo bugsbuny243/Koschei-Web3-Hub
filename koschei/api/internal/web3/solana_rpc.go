@@ -256,6 +256,12 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	if ttl <= 0 {
 		ttl = TTLFor(method, params)
 	}
+	// A cached response must never bypass the provider-not-configured gate.
+	// Validate endpoint configuration before returning any previously cached evidence.
+	endpoints := uniqueRPCURLs(s.URL(network), SolanaRPCFallbackURL(network))
+	if len(endpoints) == 0 {
+		return fmt.Errorf("provider_not_configured: no Solana RPC endpoint configured for %s", network)
+	}
 	key := s.CacheKey(network, method, params)
 	if ok, err := s.Cache.GetJSON(ctx, key, target); err == nil && ok {
 		return nil
@@ -282,10 +288,6 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	onlyCooldownBlocker := true
 	var earliestCooldown time.Time
 	endpointTimeout := solanaRPCEndpointTimeout()
-	endpoints := uniqueRPCURLs(s.URL(network), SolanaRPCFallbackURL(network))
-	if len(endpoints) == 0 {
-		return fmt.Errorf("provider_not_configured: no Solana RPC endpoint configured for %s", network)
-	}
 	for index, endpoint := range endpoints {
 		if signaturePressure {
 			if until, cooling := solanaRPCSignatureEndpointCooldown(endpoint); cooling {
