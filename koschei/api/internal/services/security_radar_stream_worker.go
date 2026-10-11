@@ -432,6 +432,11 @@ func (w *SecurityRadarStreamWorker) decodeLogsPayload(payload []byte) (SecurityR
 
 func (w *SecurityRadarStreamWorker) persistEvent(ctx context.Context, event SecurityRadarStreamEventRecord) {
 	event = w.enrichEventTarget(ctx, event)
+	// A signature is not a mint: never persist a misleading token-target row.
+	if event.TargetType != "token" || !isLikelyRadarSolanaAddress(strings.TrimSpace(event.Target)) || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) {
+		log.Printf("security radar stream event skipped without verified mint target signature=%s module=%s", event.Signature, event.ModuleID)
+		return
+	}
 	if _, err := w.Store.InsertStreamEvent(ctx, event); err != nil {
 		log.Printf("security radar stream insert failed: %v", err)
 		return
