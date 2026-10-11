@@ -76,3 +76,18 @@ func TestRegistryRejectsEmptyTargetKind(t *testing.T) {
 		t.Fatal("empty declared target kind must be rejected")
 	}
 }
+
+func TestRegistryHonorsCancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	registry, err := NewUniversalAdapterRegistry(registryFixtureAdapter{"fixture"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = registry.Collect(ctx, UniversalInvestigationPlan{
+		Subject: IntelligenceSubject{Network: "fixture", Kind: "address", Raw: "account"},
+	})
+	if err == nil {
+		t.Fatal("cancelled context must stop registry dispatch")
+	}
+}
