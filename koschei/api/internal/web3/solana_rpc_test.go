@@ -286,3 +286,23 @@ func TestSolanaRPCUnconfiguredFailsClosed(t *testing.T) {
 		t.Fatalf("expected provider_not_configured, got %v", err)
 	}
 }
+
+func TestSolanaRPCUnconfiguredRejectsCachedEvidence(t *testing.T) {
+	for _, key := range strings.Fields(
+		"SOLANA_RPC_URL SOLANA_RPC_FALLBACK_URL ALCHEMY_SOLANA_RPC_URL " +
+			"HELIUS_SOLANA_RPC_URL QUICKNODE_SOLANA_RPC_URL ALCHEMY_API_KEY",
+	) {
+		t.Setenv(key, "")
+	}
+	rpcCache := cache.NewMemory()
+	rpc := &SolanaRPC{Client: http.DefaultClient, Cache: rpcCache, KeyPrefix: "test"}
+	params := []any{"cached-signature"}
+	key := rpc.CacheKey("solana-mainnet", "getTransaction", params)
+	if err := rpcCache.SetJSON(context.Background(), key, map[string]any{"cached": true}, time.Hour); err != nil {
+		t.Fatalf("seed RPC cache: %v", err)
+	}
+	var out map[string]any
+	if err := rpc.Call(context.Background(), "solana-mainnet", "getTransaction", params, &out, time.Hour); err == nil || !strings.Contains(err.Error(), "provider_not_configured") {
+		t.Fatalf("cached response bypassed provider validation: %v", err)
+	}
+}
