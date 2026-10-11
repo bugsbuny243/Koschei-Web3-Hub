@@ -1,6 +1,7 @@
 package radaradapter
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -89,8 +90,7 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 }
 
 // Tron account APIs may return a 21-byte hex address (41 prefix) or a
-// 34-character Base58Check address. This validates shape only; a live
-// collector must additionally verify the Base58Check checksum.
+// 34-character Base58Check address. Both encodings are validated locally.
 func validTronPermissionAddress(address string) bool {
 	if address != strings.TrimSpace(address) {
 		return false
@@ -104,8 +104,30 @@ func validTronPermissionAddress(address string) bool {
 		return true
 	}
 	if len(address) == 34 && strings.HasPrefix(address, "T") {
+		const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+		decoded := make([]byte, 25)
 		for _, char := range address {
-			if !strings.ContainsRune("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz", char) {
+			index := strings.IndexRune(alphabet, char)
+			if index < 0 {
+				return false
+			}
+			carry := index
+			for i := len(decoded) - 1; i >= 0; i-- {
+				carry += int(decoded[i]) * 58
+				decoded[i] = byte(carry)
+				carry >>= 8
+			}
+			if carry != 0 {
+				return false
+			}
+		}
+		if decoded[0] != 0x41 {
+			return false
+		}
+		first := sha256.Sum256(decoded[:21])
+		second := sha256.Sum256(first[:])
+		for i := 0; i < 4; i++ {
+			if decoded[21+i] != second[i] {
 				return false
 			}
 		}
