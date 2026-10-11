@@ -158,7 +158,7 @@ func SolanaRPCFallbackURL(network string) string {
 	if value := strings.TrimSpace(os.Getenv("SOLANA_DEVNET_RPC_FALLBACK_URL")); value != "" {
 		return value
 	}
-	return "https://api.devnet.solana.com"
+	return ""
 }
 
 func solanaRPCEndpointTimeout() time.Duration {
