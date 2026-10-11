@@ -35,9 +35,9 @@ func TestResolvedArvisRPCURLBuildsAlchemyURL(t *testing.T) {
 	}
 }
 
-func TestResolvedArvisRPCURLFallsBackToPublicMainnet(t *testing.T) {
+func TestResolvedArvisRPCURLWithoutProviderIsEmpty(t *testing.T) {
 	clearArvisRPCTestEnv(t)
-	if got := resolvedArvisRPCURLFromEnv(); got != defaultSolanaMainnetRPC {
-		t.Fatalf("expected public fallback %s, got %s", defaultSolanaMainnetRPC, got)
+	if got := resolvedArvisRPCURLFromEnv(); got != "" {
+		t.Fatalf("expected no implicit public fallback, got %q", got)
 	}
 }
