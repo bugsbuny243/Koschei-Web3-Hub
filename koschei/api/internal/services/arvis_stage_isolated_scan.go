@@ -3,13 +3,10 @@ package services
 import (
 	"context"
 	"fmt"
-	"log"
 	"math"
-	"os"
 	"strings"
 	"time"
 
-	"koschei/api/internal/web3"
 )
 
 // AnalyzeArvisRadarsContextIsolated keeps foreground investigations from
@@ -43,7 +40,6 @@ func AnalyzeArvisRadarsContextIsolated(ctx context.Context, req SecurityRadarReq
 		ctx, cancel = context.WithTimeout(ctx, interactiveStageCeiling)
 		defer cancel()
 	}
-	log.Printf("arvis scan start: solana_rpc_host=%s", web3.RPCProviderHost(web3.SolanaRPCURL(req.Network, os.Getenv("ALCHEMY_API_KEY"))))
 	profile := collectRadarEvidenceContextIsolated(ctx, req)
 	sourceModule := arvisSourceModule(req.Mode)
 
