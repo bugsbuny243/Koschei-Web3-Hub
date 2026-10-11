@@ -22,6 +22,9 @@ type UniversalAdapterCollection struct {
 // individually migrated with parity fixtures. No grades are produced here.
 func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPlan, adapter radaradapter.Adapter) (UniversalAdapterCollection, error) {
 	result := UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly, Evidence: []IntelligenceEvidence{}}
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
 	if adapter == nil {
 		result.Limitations = []radaradapter.Limitation{{Code: "NO_EXECUTABLE_COLLECTOR", Reason: "No runtime collector is registered for this target."}}
 		return result, nil
@@ -35,6 +38,9 @@ func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPla
 		return result, errors.New("unclassified universal adapter subject")
 	}
 	rows, limitations, err := adapter.Collect(ctx, target)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return result, ctxErr
+	}
 	result.Limitations = append(result.Limitations, limitations...)
 	if err != nil {
 		return result, err
