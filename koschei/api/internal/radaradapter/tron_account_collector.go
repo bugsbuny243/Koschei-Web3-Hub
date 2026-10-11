@@ -77,7 +77,10 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 	}
 	digest := sha256.Sum256(raw)
 	return TronAccountObservation{
-		Network: "tron-mainnet", Address: canonical, Provider: endpoint,
-		RawResponseSHA256: hex.EncodeToString(digest[:]), Permissions: permissions,
+		Network:          "tron-mainnet",
+		Address:          canonical,
+		Provider:         endpoint,
+		RawResponseSHA256: hex.EncodeToString(digest[:]),
+		Permissions:      permissions,
 	}, nil
 }
