@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-const defaultSolanaMainnetRPC = "https://api.mainnet-beta.solana.com"
-
 func init() {
 	if strings.TrimSpace(os.Getenv("PUMP_FUN_PROGRAM_ID")) == "" {
 		_ = os.Setenv("PUMP_FUN_PROGRAM_ID", defaultPumpProgramID)
@@ -42,7 +40,7 @@ func resolvedArvisRPCURLFromEnv() string {
 	if key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")); key != "" {
 		return "https://solana-mainnet.g.alchemy.com/v2/" + key
 	}
-	return defaultSolanaMainnetRPC
+	return ""
 }
 
 func hasConfiguredArvisRPCProvider() bool {
