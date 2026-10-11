@@ -74,9 +74,6 @@ func ValidateEvidence(subject SubjectIdentity, rows []EvidenceRow) error {
 			return errors.New("duplicate evidence row id")
 		}
 		seen[row.ID] = struct{}{}
-		if row.SubjectID != subject.NativeID {
-			return errors.New("evidence subject does not match native identity")
-		}
 		switch strings.ToLower(strings.TrimSpace(row.Status)) {
 		case "verified", "observed", "inferred", "unverified":
 		default:
