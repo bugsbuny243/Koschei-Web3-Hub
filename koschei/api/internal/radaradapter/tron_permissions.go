@@ -12,6 +12,7 @@ import (
 // It is a read-only observation, not a compromise or safety verdict.
 type TronPermissionFinding struct {
 	ID                 string
+	Operations         string
 	Type               int
 	Threshold          int64
 	TotalWeight        int64
@@ -28,6 +29,7 @@ type tronPermissionJSON struct {
 	ID        int   `json:"id"`
 	Type      int   `json:"type"`
 	Threshold int64 `json:"threshold"`
+	Operations string `json:"operations"`
 	Keys      []struct {
 		Address string `json:"address"`
 		Weight  int64  `json:"weight"`
@@ -59,6 +61,16 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 			return nil, errors.New("invalid or repeated tron permission ID")
 		}
 		seen[permission.ID] = true
+		if permission.Type == 2 && permission.Operations != "" {
+		if len(permission.Operations) != 64 {
+			return nil, errors.New("invalid tron active permission operations mask length")
+		}
+		for _, digit := range permission.Operations {
+			if !strings.ContainsRune("0123456789abcdefABCDEF", digit) {
+				return nil, errors.New("invalid tron active permission operations mask encoding")
+			}
+		}
+	}
 		if permission.Threshold <= 0 {
 			return nil, errors.New("tron permission threshold must be positive")
 		}
@@ -80,6 +92,7 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 		}
 		findings = append(findings, TronPermissionFinding{
 			ID:                 fmt.Sprintf("%d", permission.ID),
+			Operations:         strings.ToLower(permission.Operations),
 			Type:               permission.Type,
 			Threshold:          permission.Threshold,
 			TotalWeight:        total,
