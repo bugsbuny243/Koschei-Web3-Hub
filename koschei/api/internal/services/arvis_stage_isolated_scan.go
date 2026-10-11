@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 	"strings"
 	"time"
 
+	"koschei/api/internal/web3"
 )
 
 // AnalyzeArvisRadarsContextIsolated keeps foreground investigations from
