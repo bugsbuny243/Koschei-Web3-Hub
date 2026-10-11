@@ -53,10 +53,7 @@ func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPla
 	if err != nil {
 		return result, err
 	}
-	if len(evidence) == 0 {
-		result.Limitations = append(result.Limitations, radaradapter.Limitation{Code: "NO_EVIDENCE", Reason: "Collector returned no reproducible evidence; safety cannot be inferred."})
-		return result, nil
-	}
+	
 	if plan.Route != UniversalDispatchSolanaCore && plan.Route != UniversalDispatchSolanaTx && plan.Route != UniversalDispatchEVMProbe && plan.Route != UniversalDispatchEVMTransaction && plan.Route != UniversalDispatchBitcoinProbe && plan.Route != UniversalDispatchMoveIdentity {
 		result.Limitations = append(result.Limitations, radaradapter.Limitation{Code: "NO_EXECUTABLE_ROUTE", Reason: "Collected evidence cannot promote a declared or unsupported route into an executable scan."})
 		result.Evidence = evidence
