@@ -44,7 +44,6 @@ func TestTronPermissionParserFailsClosed(t *testing.T) {
 	}
 }
 
-
 func TestTronPermissionAddressShape(t *testing.T) {
 	for _, address := range []string{
 		"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
