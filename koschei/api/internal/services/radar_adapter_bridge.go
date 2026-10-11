@@ -43,17 +43,17 @@ func AdaptRadarEvidence(subject IntelligenceSubject, identity radaradapter.Subje
 		attributes["native_chain_identity_kind"] = identity.IdentityKind
 		attributes["native_chain_identity"] = identity.IdentityValue
 		out = append(out, IntelligenceEvidence{
-			ID         : row.ID,
-			SubjectID  : subject.ID,
+			ID:          row.ID,
+			SubjectID:   subject.ID,
 			ChainFamily: subject.ChainFamily,
-			Chain      : subject.Chain,
-			Network    : subject.Network,
-			Source     : row.Source,
-			Status     : IntelligenceEvidenceObserved,
+			Chain:       subject.Chain,
+			Network:     subject.Network,
+			Source:      row.Source,
+			Status:      IntelligenceEvidenceObserved,
 			BlockOrSlot: height,
-			ObservedAt : row.ObservedAt,
-			Provenance : "radaradapter_read_only",
-			Attributes : attributes,
+			ObservedAt:  row.ObservedAt,
+			Provenance:  "radaradapter_read_only",
+			Attributes:  attributes,
 		})
 	}
 	return out, nil
