@@ -1,0 +1,38 @@
+package radaradapter
+
+import "testing"
+
+func TestTronPermissionThresholds(t *testing.T) {
+	raw := []byte(`{
+		"owner_permission":{"type":0,"id":0,"threshold":2,"keys":[
+			{"address":"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","weight":1},
+			{"address":"41bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","weight":1}
+		]},
+		"active_permission":[{"type":2,"id":2,"threshold":3,"keys":[
+			{"address":"41cccccccccccccccccccccccccccccccccccccccc","weight":1}
+		]}]
+	}`)
+	findings, err := ParseTronAccountPermissions(raw)
+	if err != nil { t.Fatal(err) }
+	if len(findings) != 2 { t.Fatalf("expected 2 permissions, got %d", len(findings)) }
+	if !findings[0].ThresholdReachable || findings[0].TotalWeight != 2 {
+		t.Fatalf("owner permission threshold: %+v", findings[0])
+	}
+	if findings[1].ThresholdReachable || findings[1].TotalWeight != 1 {
+		t.Fatalf("active permission threshold: %+v", findings[1])
+	}
+}
+
+func TestTronPermissionParserFailsClosed(t *testing.T) {
+	for _, raw := range []string{
+		`{}`,
+		`{"owner_permission":{"id":0,"threshold":0}}`,
+		`{"active_permission":[{"id":2,"threshold":1,"keys":[{"address":"abc","weight":-1}]}]}`,
+		`{"active_permission":[{"id":2,"threshold":1},{"id":2,"threshold":1}]}`,
+		`not json`,
+	} {
+		if _, err := ParseTronAccountPermissions([]byte(raw)); err == nil {
+			t.Fatalf("invalid permission accepted: %s", raw)
+		}
+	}
+}
