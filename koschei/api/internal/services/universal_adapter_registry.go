@@ -80,11 +80,11 @@ func (registry *UniversalAdapterRegistry) ExecutableCapabilities() []radaradapte
 			continue
 		}
 		copyCapability := radaradapter.Capability{
-			Networks: append([]string(nil), capability.Networks...),
-			TargetKinds: append([]string(nil), capability.TargetKinds...),
-			DataSources: append([]string(nil), capability.DataSources...),
+			Networks:         append([]string(nil), capability.Networks...),
+			TargetKinds:      append([]string(nil), capability.TargetKinds...),
+			DataSources:      append([]string(nil), capability.DataSources...),
 			RequiresArchival: capability.RequiresArchival,
-			Fixture: strings.TrimSpace(capability.Fixture),
+			Fixture:          strings.TrimSpace(capability.Fixture),
 		}
 		out = append(out, copyCapability)
 	}
