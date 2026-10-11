@@ -68,10 +68,7 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 			if !validTronPermissionAddress(key.Address) || key.Weight <= 0 {
 				return nil, errors.New("tron permission key is incomplete")
 			}
-			signerID := key.Address
-			if strings.HasPrefix(signerID, "41") {
-				signerID = strings.ToLower(signerID)
-			}
+			signerID := canonicalTronPermissionSigner(key.Address)
 			if seenKeys[signerID] {
 				return nil, errors.New("duplicate tron permission signer")
 			}
@@ -96,16 +93,20 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 // Tron account APIs may return a 21-byte hex address (41 prefix) or a
 // 34-character Base58Check address. Both encodings are validated locally.
 func validTronPermissionAddress(address string) bool {
+	return canonicalTronPermissionSigner(address) != ""
+}
+
+func canonicalTronPermissionSigner(address string) string {
 	if address != strings.TrimSpace(address) {
-		return false
+		return ""
 	}
 	if len(address) == 42 && strings.HasPrefix(address, "41") {
 		for _, char := range address[2:] {
 			if !strings.ContainsRune("0123456789abcdefABCDEF", char) {
-				return false
+				return ""
 			}
 		}
-		return true
+		return strings.ToLower(address)
 	}
 	if len(address) == 34 && strings.HasPrefix(address, "T") {
 		const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -113,7 +114,7 @@ func validTronPermissionAddress(address string) bool {
 		for _, char := range address {
 			index := strings.IndexRune(alphabet, char)
 			if index < 0 {
-				return false
+				return ""
 			}
 			carry := index
 			for i := len(decoded) - 1; i >= 0; i-- {
@@ -122,20 +123,20 @@ func validTronPermissionAddress(address string) bool {
 				carry >>= 8
 			}
 			if carry != 0 {
-				return false
+				return ""
 			}
 		}
 		if decoded[0] != 0x41 {
-			return false
+			return ""
 		}
 		first := sha256.Sum256(decoded[:21])
 		second := sha256.Sum256(first[:])
 		for i := 0; i < 4; i++ {
 			if decoded[21+i] != second[i] {
-				return false
+				return ""
 			}
 		}
-		return true
+		return fmt.Sprintf("%x", decoded[:21])
 	}
-	return false
+	return ""
 }
