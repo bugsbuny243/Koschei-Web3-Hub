@@ -146,7 +146,6 @@ func SolanaRPCFallbackURL(network string) string {
 		if key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")); key != "" {
 			candidates = append(candidates, "https://solana-mainnet.g.alchemy.com/v2/"+key)
 		}
-		
 		for _, candidate := range candidates {
 			if candidate == "" || RPCProviderHost(candidate) == primaryHost {
 				continue
