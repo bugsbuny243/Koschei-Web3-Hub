@@ -111,7 +111,7 @@ func (observation TronAccountObservation) EvidenceRows(observedAt time.Time, ver
 			RawHash: observation.RawResponseSHA256,
 			Attributes: map[string]any{"permission_id": permission.ID, "permission_type": permission.Type,
 				"threshold": permission.Threshold, "total_weight": permission.TotalWeight,
-				"threshold_reachable": permission.ThresholdReachable},
+				"threshold_reachable": permission.ThresholdReachable, "operations": permission.Operations},
 		})
 	}
 	subject := SubjectIdentity{Network: observation.Network, IdentityKind: "account", IdentityValue: observation.Address, NativeID: observation.Address}
