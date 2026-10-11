@@ -43,6 +43,8 @@ func AnalyzeArvisRadarsContextIsolated(ctx context.Context, req SecurityRadarReq
 		defer cancel()
 	}
 	profile := collectRadarEvidenceContextIsolated(ctx, req)
+	// The same bounded context remains active for the entire isolated analyzer,
+	// including arm construction and policy evaluation below.
 	sourceModule := arvisSourceModule(req.Mode)
 
 	pump := buildPumpProgramApplicabilityArm(req, profile, generatedAt)
@@ -255,7 +257,7 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 		profile.Errors = append(profile.Errors, compactRadarError("getSignaturesForAddress", signaturesErr))
 	}
 
-	if profile.IsTokenMint && profile.HolderRoles.Available {
+	if parent.Err() == nil && profile.IsTokenMint && profile.HolderRoles.Available {
 		clusterCtx, clusterCancel := radarEvidenceStageContext(parent, req, "holder_cluster")
 		profile.HolderCluster = AnalyzeSolanaHolderCluster(clusterCtx, rpcURL, req.Target, profile.HolderRoles, profile.TargetOldestBlockTime, profile.TargetOldestSlot)
 		clusterCancel()
