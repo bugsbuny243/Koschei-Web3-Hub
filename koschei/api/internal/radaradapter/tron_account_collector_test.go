@@ -77,3 +77,24 @@ func TestCollectTronMainnetPermissionsFailsClosed(t *testing.T) {
 		t.Fatal("accepted invalid Tron target")
 	}
 }
+
+func TestCollectTronMainnetPermissionsRejectsRedirect(t *testing.T) {
+	const account = "41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	calls := 0
+	client := &http.Client{Transport: tronAccountRoundTrip(func(req *http.Request) (*http.Response, error) {
+		calls++
+		if calls > 1 {
+			t.Fatal("followed Tron provider redirect")
+		}
+		response := &http.Response{StatusCode: http.StatusFound, Header: make(http.Header),
+			Body: io.NopCloser(strings.NewReader(""))}
+		response.Header.Set("Location", "https://example.com/collect")
+		return response, nil
+	})}
+	if _, err := CollectTronMainnetPermissions(context.Background(), client, account); err == nil {
+		t.Fatal("accepted redirected Tron provider response")
+	}
+	if calls != 1 {
+		t.Fatalf("expected one provider request, got %d", calls)
+	}
+}
