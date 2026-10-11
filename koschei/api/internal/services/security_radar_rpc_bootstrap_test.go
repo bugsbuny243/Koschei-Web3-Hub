@@ -41,3 +41,16 @@ func TestNormalizeProductionSolanaRPCURLPreservesMainnet(t *testing.T) {
 		t.Fatalf("mainnet should be preserved: got %q", got)
 	}
 }
+
+func TestNormalizeProductionSolanaRPCURLWithoutProviderFailsClosed(t *testing.T) {
+	got := normalizeProductionSolanaRPCURL("https://api.devnet.solana.com", "production", "", "")
+	if got != "" {
+		t.Fatalf("expected no production public fallback, got %q", got)
+	}
+}
+
+func TestNormalizeProductionSolanaRPCURLEmptyInput(t *testing.T) {
+	if got := normalizeProductionSolanaRPCURL("", "production", "", ""); got != "" {
+		t.Fatalf("expected empty URL without a configured provider, got %q", got)
+	}
+}
