@@ -79,3 +79,30 @@ func TestConfigureSecurityRadarRPCPreservesDevelopmentDevnet(t *testing.T) {
 		t.Fatalf("development RPC unexpectedly changed: %q", got)
 	}
 }
+
+func TestConfigureSecurityRadarRPCWithoutProviderDoesNotInstallPublicFallback(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	for _, key := range []string{
+		"SOLANA_RPC_URL", "ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL",
+		"QUICKNODE_SOLANA_RPC_URL", "ALCHEMY_API_KEY",
+	} {
+		t.Setenv(key, "")
+	}
+	configureSecurityRadarRPC()
+	if got := os.Getenv("SOLANA_RPC_URL"); got != "" {
+		t.Fatalf("unconfigured provider must remain unset, got %q", got)
+	}
+}
+
+func TestConfigureSecurityRadarRPCUsesConfiguredProvider(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("SOLANA_RPC_URL", "")
+	t.Setenv("ALCHEMY_SOLANA_RPC_URL", "")
+	t.Setenv("HELIUS_SOLANA_RPC_URL", "https://helius.example/rpc")
+	t.Setenv("QUICKNODE_SOLANA_RPC_URL", "")
+	t.Setenv("ALCHEMY_API_KEY", "")
+	configureSecurityRadarRPC()
+	if got := os.Getenv("SOLANA_RPC_URL"); got != "https://helius.example/rpc" {
+		t.Fatalf("configured provider not selected, got %q", got)
+	}
+}
