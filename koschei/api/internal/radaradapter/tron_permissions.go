@@ -26,9 +26,9 @@ type tronPermissionResponse struct {
 	WitnessPermission *tronPermissionJSON  `json:"witness_permission"`
 }
 type tronPermissionJSON struct {
-	ID        int   `json:"id"`
-	Type      int   `json:"type"`
-	Threshold int64 `json:"threshold"`
+	ID         int    `json:"id"`
+	Type       int    `json:"type"`
+	Threshold  int64  `json:"threshold"`
 	Operations string `json:"operations"`
 	Keys      []struct {
 		Address string `json:"address"`
@@ -62,15 +62,15 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 		}
 		seen[permission.ID] = true
 		if permission.Type == 2 && permission.Operations != "" {
-		if len(permission.Operations) != 64 {
-			return nil, errors.New("invalid tron active permission operations mask length")
-		}
-		for _, digit := range permission.Operations {
-			if !strings.ContainsRune("0123456789abcdefABCDEF", digit) {
-				return nil, errors.New("invalid tron active permission operations mask encoding")
+			if len(permission.Operations) != 64 {
+				return nil, errors.New("invalid tron active permission operations mask length")
+			}
+			for _, digit := range permission.Operations {
+				if !strings.ContainsRune("0123456789abcdefABCDEF", digit) {
+					return nil, errors.New("invalid tron active permission operations mask encoding")
+				}
 			}
 		}
-	}
 		if permission.Threshold <= 0 {
 			return nil, errors.New("tron permission threshold must be positive")
 		}
