@@ -37,6 +37,7 @@ func TestTronPermissionParserFailsClosed(t *testing.T) {
 		`{"owner_permission":{"id":0,"threshold":1,"keys":[{"address":"41aaaa","weight":1}]}}`,
 		`{"owner_permission":{"id":0,"threshold":1,"keys":[{"address":"41zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz","weight":1}]}}`,
 		`{"owner_permission":{"id":0,"threshold":2,"keys":[{"address":"41aaaa","weight":1},{"address":"41aaaa","weight":1}]}}`,
+		`{"owner_permission":{"id":0,"threshold":2,"keys":[{"address":"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","weight":1},{"address":"41AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","weight":1}]}}`,
 	} {
 		if _, err := ParseTronAccountPermissions([]byte(raw)); err == nil {
 			t.Fatalf("invalid permission accepted: %s", raw)
