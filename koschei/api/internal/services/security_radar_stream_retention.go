@@ -31,7 +31,9 @@ func securityRadarStreamRetentionPolicy() StreamRetentionPolicy {
 
 // RunSecurityRadarStreamRetention deletes only decoded hints after an explicit
 // opt-in. It must be invoked from the designated worker, never an API request.
-// Operators must complete and verify the parity/backup audit before enabling it.\n// Both KOSCHEI_STREAM_RETENTION_ENABLED and\n// KOSCHEI_STREAM_RETENTION_PARITY_APPROVED must be explicitly set.
+// Operators must complete and verify the parity/backup audit before enabling it.
+// Both KOSCHEI_STREAM_RETENTION_ENABLED and
+// KOSCHEI_STREAM_RETENTION_PARITY_APPROVED must be explicitly set.
 func RunSecurityRadarStreamRetention(ctx context.Context, db *sql.DB) (int64, error) {
 	policy := securityRadarStreamRetentionPolicy()
 	if !policy.Enabled {
