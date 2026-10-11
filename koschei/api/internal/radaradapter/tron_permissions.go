@@ -61,6 +61,18 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 			return nil, errors.New("invalid or repeated tron permission ID")
 		}
 		seen[permission.ID] = true
+		if permission.Type == 2 && permission.ID < 2 {
+			return nil, errors.New("tron active permission ID must be at least 2")
+		}
+		if permission.Type == 0 && permission.ID != 0 {
+			return nil, errors.New("tron owner permission ID must be zero")
+		}
+		if permission.Type == 1 && permission.ID != 1 {
+			return nil, errors.New("tron witness permission ID must be one")
+		}
+		if permission.Type < 0 || permission.Type > 2 {
+			return nil, errors.New("unknown tron permission type")
+		}
 		if permission.Type == 2 && permission.Operations != "" {
 			if len(permission.Operations) != 64 {
 				return nil, errors.New("invalid tron active permission operations mask length")
