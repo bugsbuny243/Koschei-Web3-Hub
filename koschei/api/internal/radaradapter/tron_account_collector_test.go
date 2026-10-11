@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 type tronAccountRoundTrip func(*http.Request) (*http.Response, error)
@@ -34,6 +35,13 @@ func TestCollectTronMainnetPermissions(t *testing.T) {
 	observation, err := CollectTronMainnetPermissions(context.Background(), client, account)
 	if err != nil {
 		t.Fatal(err)
+	}
+	rows, err := observation.EvidenceRows(time.Now(), 12345)
+	if err != nil || len(rows) != 1 || rows[0].Status != "observed" || rows[0].Height != "12345" {
+		t.Fatalf("unexpected evidence rows: %+v, %v", rows, err)
+	}
+	if _, err := observation.EvidenceRows(time.Now(), 0); err == nil {
+		t.Fatal("accepted evidence without block height")
 	}
 	if observation.Network != "tron-mainnet" || len(observation.RawResponseSHA256) != 64 ||
 		len(observation.Permissions) != 1 || !observation.Permissions[0].ThresholdReachable {
