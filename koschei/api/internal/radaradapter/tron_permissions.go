@@ -88,7 +88,6 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 	return findings, nil
 }
 
-
 // Tron account APIs may return a 21-byte hex address (41 prefix) or a
 // 34-character Base58Check address. This validates shape only; a live
 // collector must additionally verify the Base58Check checksum.
