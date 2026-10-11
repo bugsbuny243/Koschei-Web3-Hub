@@ -12,7 +12,7 @@ func init() {
 			current = value
 		} else if key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")); key != "" {
 			current = "https://solana-mainnet.g.alchemy.com/v2/" + key
-				}
+		}
 	}
 
 	current = normalizeProductionSolanaRPCURL(
