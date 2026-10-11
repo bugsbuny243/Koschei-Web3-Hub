@@ -21,7 +21,7 @@ func (a registryFixtureAdapter) Subject() radaradapter.SubjectIdentity {
 	return radaradapter.SubjectIdentity{Network: a.network, IdentityKind: "fixture", IdentityValue: "fixture", NativeID: "fixture"}
 }
 func (a registryFixtureAdapter) Capability() radaradapter.Capability {
-	return radaradapter.Capability{Networks: []string{a.network}, TargetKinds: []string{"address"}, DataSources: []string{"fixture"}}
+	return radaradapter.Capability{Networks: []string{a.network}, TargetKinds: []string{"address"}, DataSources: []string{"fixture"}, Fixture: "universal_adapter_registry_test.go"}
 }
 
 func TestRegistryNoRuntimeAdapter(t *testing.T) {
