@@ -36,6 +36,13 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 	if client == nil {
 		client = &http.Client{Timeout: 8 * time.Second}
 	}
+	// Never allow a provider redirect to turn a read-only account query into
+	// an unreviewed request to another host.
+	bounded := *client
+	bounded.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	if bounded.Timeout == 0 || bounded.Timeout > 8*time.Second {
+		bounded.Timeout = 8 * time.Second
+	}
 	body, err := json.Marshal(struct {
 		Address string `json:"address"`
 		Visible bool   `json:"visible"`
@@ -48,7 +55,7 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 		return TronAccountObservation{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	resp, err := bounded.Do(req)
 	if err != nil {
 		return TronAccountObservation{}, err
 	}
@@ -92,7 +99,7 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 func (observation TronAccountObservation) EvidenceRows(observedAt time.Time, verifiedBlockHeight int64) ([]EvidenceRow, error) {
 	if observation.Network != "tron-mainnet" || verifiedBlockHeight <= 0 ||
 		canonicalTronPermissionSigner(observation.Address) != observation.Address ||
-		observation.Provider == "" || len(observation.RawResponseSHA256) != 64 ||
+		observation.Provider != "https://api.trongrid.io/wallet/getaccount" || len(observation.RawResponseSHA256) != 64 ||
 		observedAt.IsZero() || len(observation.Permissions) == 0 {
 		return nil, errors.New("incomplete tron observation provenance")
 	}
