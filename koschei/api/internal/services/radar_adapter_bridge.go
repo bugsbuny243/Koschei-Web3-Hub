@@ -21,7 +21,12 @@ func AdaptRadarEvidence(subject IntelligenceSubject, identity radaradapter.Subje
 		return nil, err
 	}
 	out := make([]IntelligenceEvidence, 0, len(rows))
+	seenEvidenceIDs := make(map[string]struct{}, len(rows))
 	for _, row := range rows {
+		if _, duplicate := seenEvidenceIDs[row.ID]; duplicate {
+			return nil, errors.New("duplicate radar evidence ID")
+		}
+		seenEvidenceIDs[row.ID] = struct{}{}
 		if row.SubjectID != subject.ID {
 			return nil, errors.New("radar evidence subject ID mismatch")
 		}
