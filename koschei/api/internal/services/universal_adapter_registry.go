@@ -77,3 +77,18 @@ func (registry *UniversalAdapterRegistry) ExecutableCapabilities() []radaradapte
 	}
 	return out
 }
+
+// HasRuntimeCollector reports whether exactly one registered adapter supports
+// the target. This is a runtime claim, not proof of a successful scan.
+func (registry *UniversalAdapterRegistry) HasRuntimeCollector(target radaradapter.Target) bool {
+	if registry == nil {
+		return false
+	}
+	matches := 0
+	for _, adapter := range registry.adapters {
+		if adapter.Supports(target) {
+			matches++
+		}
+	}
+	return matches == 1
+}
