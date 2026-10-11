@@ -12,9 +12,7 @@ func init() {
 			current = value
 		} else if key := strings.TrimSpace(os.Getenv("ALCHEMY_API_KEY")); key != "" {
 			current = "https://solana-mainnet.g.alchemy.com/v2/" + key
-		} else {
-			current = "https://api.mainnet-beta.solana.com"
-		}
+				}
 	}
 
 	current = normalizeProductionSolanaRPCURL(
@@ -23,7 +21,9 @@ func init() {
 		os.Getenv("ALCHEMY_SOLANA_RPC_URL"),
 		os.Getenv("ALCHEMY_API_KEY"),
 	)
-	_ = os.Setenv("SOLANA_RPC_URL", current)
+	if current != "" {
+		_ = os.Setenv("SOLANA_RPC_URL", current)
+	}
 }
 
 func normalizeProductionSolanaRPCURL(rpcURL, appEnv, alchemyURL, alchemyKey string) string {
@@ -39,7 +39,7 @@ func normalizeProductionSolanaRPCURL(rpcURL, appEnv, alchemyURL, alchemyKey stri
 	if alchemyKey = strings.TrimSpace(alchemyKey); alchemyKey != "" {
 		return "https://solana-mainnet.g.alchemy.com/v2/" + alchemyKey
 	}
-	return "https://api.mainnet-beta.solana.com"
+	return ""
 }
 
 func isSolanaDevnetRPCURL(value string) bool {
