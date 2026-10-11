@@ -38,6 +38,7 @@ func TestTronPermissionParserFailsClosed(t *testing.T) {
 		`{"owner_permission":{"id":0,"threshold":1,"keys":[{"address":"41zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz","weight":1}]}}`,
 		`{"owner_permission":{"id":0,"threshold":2,"keys":[{"address":"41aaaa","weight":1},{"address":"41aaaa","weight":1}]}}`,
 		`{"owner_permission":{"id":0,"threshold":2,"keys":[{"address":"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","weight":1},{"address":"41AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","weight":1}]}}`,
+		`{"owner_permission":{"id":0,"threshold":2,"keys":[{"address":"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","weight":1},{"address":"TRXcKoEvHr6Y38VMcDYGBEYKznvH3XUX4g","weight":1}]}}`,
 	} {
 		if _, err := ParseTronAccountPermissions([]byte(raw)); err == nil {
 			t.Fatalf("invalid permission accepted: %s", raw)
@@ -58,5 +59,13 @@ func TestTronPermissionAddressShape(t *testing.T) {
 		if validTronPermissionAddress(address) {
 			t.Fatalf("accepted invalid address shape: %s", address)
 		}
+	}
+}
+
+func TestTronPermissionCanonicalSignerIdentity(t *testing.T) {
+	hexSigner := "41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	base58Signer := "TRXcKoEvHr6Y38VMcDYGBEYKznvH3XUX4g"
+	if canonicalTronPermissionSigner(hexSigner) != canonicalTronPermissionSigner(base58Signer) {
+		t.Fatal("hex and Base58Check addresses for same signer must canonicalize identically")
 	}
 }
