@@ -16,11 +16,11 @@ import (
 // TronAccountObservation contains raw-response provenance and parsed permission
 // observations. It is not a verified security verdict or a risk score.
 type TronAccountObservation struct {
-	Network          string
-	Address          string
-	Provider         string
+	Network           string
+	Address           string
+	Provider          string
 	RawResponseSHA256 string
-	Permissions      []TronPermissionFinding
+	Permissions       []TronPermissionFinding
 }
 
 // CollectTronMainnetPermissions performs a read-only getaccount request against
