@@ -42,11 +42,7 @@ func (adapter *TronWalletAdapter) Subject() SubjectIdentity {
 }
 
 func (adapter *TronWalletAdapter) Capability() Capability {
-	return Capability{
-		Networks: []string{"tron-mainnet"}, TargetKinds: []string{"wallet", "account"},
-		DataSources: []string{"https://api.trongrid.io/wallet/getaccount"},
-		RequiresArchival: false, Fixture: "tron-account-permissions",
-	}
+	return Capability{Networks: []string{"tron-mainnet"}, TargetKinds: []string{"wallet", "account"}, DataSources: []string{"https://api.trongrid.io/wallet/getaccount"}, RequiresArchival: false, Fixture: "tron-account-permissions"}
 }
 
 func (adapter *TronWalletAdapter) Collect(ctx context.Context, target Target) ([]EvidenceRow, []Limitation, error) {
