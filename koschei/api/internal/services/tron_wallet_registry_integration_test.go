@@ -54,9 +54,13 @@ func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *test
 	if len(result.Limitations) < 2 {
 		t.Fatalf("missing unanchored-height and route limitations: %+v", result)
 	}
-	plan.Route = UniversalDispatchTronWallet
-	plan.EvidenceOnly = true
-	plan.VerdictAuthority = UniversalVerdictEvidenceOnly
+	plan, err = registry.PrepareTronWalletPlan(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Executable || plan.Route != UniversalDispatchTronWallet || !plan.EvidenceOnly || plan.VerdictAuthority != UniversalVerdictEvidenceOnly {
+		t.Fatalf("Tron runtime plan must require collection: %+v", plan)
+	}
 	executable, err := registry.Collect(context.Background(), plan)
 	if err != nil {
 		t.Fatal(err)
