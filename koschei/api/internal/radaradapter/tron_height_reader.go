@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -28,6 +29,9 @@ func ReadTronMainnetHeight(ctx context.Context, client *http.Client) (int64, err
 		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if apiKey := os.Getenv("TRONGRID_API_KEY"); apiKey != "" {
+		req.Header.Set("TRON-PRO-API-KEY", apiKey)
+	}
 	resp, err := bounded.Do(req)
 	if err != nil {
 		return 0, err
