@@ -96,6 +96,12 @@ func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *test
 	if _, err := (*UniversalAdapterRegistry)(nil).PrepareTronWalletPlan(plan); err == nil {
 		t.Fatal("nil Tron registry must not prepare an executable plan")
 	}
+	if executable.Evidence[0].Status != IntelligenceEvidenceObserved {
+		t.Fatal("Tron evidence must remain observed")
+	}
+	if executable.Executable && len(executable.Evidence) == 0 {
+		t.Fatal("Tron route cannot claim execution without evidence")
+	}
 	if !registry.HasRuntimeCollector(radaradapter.Target{Network: "tron-mainnet", Kind: "account", Raw: account}) {
 		t.Fatal("installed Tron collector not discoverable")
 	}
