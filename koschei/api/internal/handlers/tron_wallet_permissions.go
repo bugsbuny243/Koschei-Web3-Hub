@@ -36,12 +36,12 @@ func (h *Handler) TronWalletPermissions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"network": "tron-mainnet",
-		"address": adapter.Subject().NativeID,
-		"evidence_status": "observed",
+		"network":                       "tron-mainnet",
+		"address":                       adapter.Subject().NativeID,
+		"evidence_status":               "observed",
 		"account_state_height_verified": false,
-		"verdict": "not_assessed",
-		"evidence": result.Evidence,
-		"limitations": result.Limitations,
+		"verdict":                       "not_assessed",
+		"evidence":                      result.Evidence,
+		"limitations":                   result.Limitations,
 	})
 }
