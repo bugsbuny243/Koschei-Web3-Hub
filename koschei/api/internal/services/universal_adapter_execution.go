@@ -66,6 +66,21 @@ func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPla
 		return result, err
 	}
 
+	if plan.Route == UniversalDispatchTronWallet {
+		if plan.Subject.Network != "tron-mainnet" || (plan.Subject.Kind != "account" && plan.Subject.Kind != "wallet") ||
+			plan.VerdictAuthority != UniversalVerdictEvidenceOnly || !plan.EvidenceOnly {
+			return result, errors.New("tron executable route requires evidence-only wallet plan")
+		}
+		for _, row := range rows {
+			if row.Status != "observed" || row.Attributes["account_state_height_verified"] != false {
+				return result, errors.New("tron wallet evidence must remain unanchored and observed")
+			}
+		}
+		result.Route = UniversalDispatchTronWallet
+		result.Executable = true
+		result.Evidence = evidence
+		return result, nil
+	}
 	if plan.Route != UniversalDispatchSolanaCore && plan.Route != UniversalDispatchSolanaTx && plan.Route != UniversalDispatchEVMProbe && plan.Route != UniversalDispatchEVMTransaction && plan.Route != UniversalDispatchBitcoinProbe && plan.Route != UniversalDispatchMoveIdentity {
 		result.Limitations = append(result.Limitations, radaradapter.Limitation{Code: "NO_EXECUTABLE_ROUTE", Reason: "Collected evidence cannot promote a declared or unsupported route into an executable scan."})
 		result.Evidence = evidence
