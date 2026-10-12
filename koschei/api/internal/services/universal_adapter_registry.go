@@ -153,8 +153,10 @@ func (registry *UniversalAdapterRegistry) CollectTronWalletPermissions(ctx conte
 		return collected, errors.New("tron permissions evidence unavailable")
 	}
 	for _, evidence := range collected.Evidence {
-		if evidence.Status != IntelligenceEvidenceObserved || evidence.SubjectID != prepared.Subject.ID {
-			return UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}, errors.New("tron permission evidence is not observed or subject-bound")
+		if evidence.Status != IntelligenceEvidenceObserved || evidence.SubjectID != prepared.Subject.ID ||
+			evidence.Network != "tron-mainnet" || evidence.Provenance != "radaradapter_read_only" ||
+			evidence.Attributes["account_state_height_verified"] != false {
+			return UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}, errors.New("tron permission evidence lacks observed-only provenance")
 		}
 	}
 	return collected, nil
