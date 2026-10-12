@@ -164,3 +164,22 @@ func (registry *UniversalAdapterRegistry) CollectTronWalletPermissions(ctx conte
 	}
 	return collected, nil
 }
+
+// CollectTronWalletAddress constructs a narrowly scoped account subject from
+// the caller's target. The native adapter validates Tron address syntax;
+// no generic address classifier or verdict pipeline is bypassed.
+func (registry *UniversalAdapterRegistry) CollectTronWalletAddress(ctx context.Context, address string) (UniversalAdapterCollection, error) {
+	result := UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return result, errors.New("tron account address is required")
+	}
+	subject := IntelligenceSubject{
+		ID: "tron-mainnet:account:" + address,
+		CanonicalRef: "tron-mainnet:account:" + address,
+		Network: "tron-mainnet",
+		Kind: "account",
+		Raw: address,
+	}
+	return registry.CollectTronWalletPermissions(ctx, UniversalInvestigationPlan{Subject: subject})
+}
