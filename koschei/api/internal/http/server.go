@@ -228,6 +228,7 @@ func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, planTier, pl
 	mux.HandleFunc("/api/v1/radar/creator-intelligence", solana(requiresDB(h, planTier("professional", method("GET", h.OwnerCreatorIntelligence)))))
 	mux.HandleFunc("/api/v1/radar/actor-intelligence", solana(requiresDB(h, planTier("professional", method("GET", h.OwnerActorSecurityIntelligence)))))
 	mux.HandleFunc("/api/v1/radar/graph", solana(requiresDB(h, planTier("professional", method("GET", h.SecurityRadarGraph)))))
+	mux.HandleFunc("/api/v1/radar/tron-wallet-permissions", requiresDB(h, planTier("professional", method("GET", h.TronWalletPermissions))))
 	mux.HandleFunc("/api/v1/radar/exposure", solana(requiresDB(h, planTier("professional", method("GET", h.SecurityRadarExposureReport)))))
 	mux.HandleFunc("/api/v1/radar/court", solana(requiresDB(h, planTier("professional", method("POST", h.SecurityRadarCourt)))))
 }
