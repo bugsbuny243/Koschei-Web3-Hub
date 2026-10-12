@@ -24,9 +24,9 @@ func TestReadTronMainnetHeight(t *testing.T) {
 
 func TestReadTronMainnetHeightFailsClosed(t *testing.T) {
 	for _, tc := range []struct {
-		name string
+		name   string
 		status int
-		body string
+		body   string
 	}{
 		{"HTTP failure", 429, "{}"},
 		{"missing height", 200, "{}"},
