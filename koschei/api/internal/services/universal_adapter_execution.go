@@ -29,6 +29,11 @@ func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPla
 		result.Limitations = []radaradapter.Limitation{{Code: "NO_EXECUTABLE_COLLECTOR", Reason: "No runtime collector is registered for this target."}}
 		return result, nil
 	}
+	if plan.Route == UniversalDispatchTronWallet {
+		if _, ok := adapter.(*radaradapter.TronWalletAdapter); !ok {
+			return result, errors.New("tron executable route requires native Tron wallet adapter")
+		}
+	}
 	target := radaradapter.Target{Network: plan.Subject.Network, Kind: plan.Subject.Kind, Raw: plan.Subject.Raw}
 	if !adapter.Supports(target) {
 		result.Limitations = []radaradapter.Limitation{{Code: "UNSUPPORTED_TARGET", Reason: "Runtime collector does not support this target."}}
