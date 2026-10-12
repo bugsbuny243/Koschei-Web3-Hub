@@ -121,6 +121,9 @@ func (registry *UniversalAdapterRegistry) PrepareTronWalletPlan(plan UniversalIn
 			continue
 		}
 		identity := adapter.Subject()
+		if _, native := adapter.(*radaradapter.TronWalletAdapter); !native {
+			return plan, errors.New("tron plan requires native wallet collector")
+		}
 		if identity.Network != "tron-mainnet" || identity.IdentityKind != "account" ||
 			strings.TrimSpace(identity.NativeID) == "" {
 			return plan, errors.New("tron collector native account identity unavailable")
