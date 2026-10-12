@@ -103,6 +103,9 @@ func (observation TronAccountObservation) EvidenceRows(observedAt time.Time, ver
 		observedAt.IsZero() || len(observation.Permissions) == 0 {
 		return nil, errors.New("incomplete tron observation provenance")
 	}
+	if _, err := hex.DecodeString(observation.RawResponseSHA256); err != nil {
+		return nil, errors.New("invalid tron response digest encoding")
+	}
 	rows := make([]EvidenceRow, 0, len(observation.Permissions))
 	for _, permission := range observation.Permissions {
 		rows = append(rows, EvidenceRow{
@@ -111,7 +114,8 @@ func (observation TronAccountObservation) EvidenceRows(observedAt time.Time, ver
 			RawHash: observation.RawResponseSHA256,
 			Attributes: map[string]any{"permission_id": permission.ID, "permission_type": permission.Type,
 				"threshold": permission.Threshold, "total_weight": permission.TotalWeight,
-				"threshold_reachable": permission.ThresholdReachable, "operations": permission.Operations},
+				"threshold_reachable": permission.ThresholdReachable, "operations": permission.Operations,
+				"account_state_height_verified": false},
 		})
 	}
 	subject := SubjectIdentity{Network: observation.Network, IdentityKind: "account", IdentityValue: observation.Address, NativeID: observation.Address}
