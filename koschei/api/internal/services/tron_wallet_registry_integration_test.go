@@ -82,6 +82,11 @@ func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *test
 		bounded.Evidence[0].Attributes["account_state_height_verified"] != false {
 		t.Fatalf("Tron bounded evidence lost provenance restrictions: %+v", bounded.Evidence[0])
 	}
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := registry.CollectTronWalletPermissions(canceled, plan); err != context.Canceled {
+		t.Fatalf("canceled Tron collection should stop before execution: %v", err)
+	}
 	plan.VerdictAuthority = UniversalVerdictExistingRulesOnly
 	if _, err := registry.Collect(context.Background(), plan); err == nil {
 		t.Fatal("Tron route accepted grade authority")
