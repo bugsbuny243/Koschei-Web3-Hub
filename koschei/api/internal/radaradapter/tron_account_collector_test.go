@@ -40,6 +40,13 @@ func TestCollectTronMainnetPermissions(t *testing.T) {
 	if err != nil || len(rows) != 1 || rows[0].Status != "observed" || rows[0].Height != "12345" {
 		t.Fatalf("unexpected evidence rows: %+v, %v", rows, err)
 	}
+	if rows[0].Attributes["account_state_height_verified"] != false {
+		t.Fatal("unanchored account state incorrectly presented as verified")
+	}
+	observation.RawResponseSHA256 = strings.Repeat("z", 64)
+	if _, err := observation.EvidenceRows(time.Now(), 12345); err == nil {
+		t.Fatal("accepted non-hex raw response digest")
+	}
 	if _, err := observation.EvidenceRows(time.Now(), 0); err == nil {
 		t.Fatal("accepted evidence without block height")
 	}
