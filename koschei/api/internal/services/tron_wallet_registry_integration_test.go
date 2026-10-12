@@ -69,6 +69,13 @@ func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *test
 		executable.Evidence[0].Status != IntelligenceEvidenceObserved {
 		t.Fatalf("Tron evidence-only route failed: %+v", executable)
 	}
+	bounded, err := registry.CollectTronWalletPermissions(context.Background(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bounded.Executable || len(bounded.Evidence) != 1 || bounded.Evidence[0].Status != IntelligenceEvidenceObserved {
+		t.Fatalf("bounded Tron collection failed: %+v", bounded)
+	}
 	plan.VerdictAuthority = UniversalVerdictExistingRulesOnly
 	if _, err := registry.Collect(context.Background(), plan); err == nil {
 		t.Fatal("Tron route accepted grade authority")
