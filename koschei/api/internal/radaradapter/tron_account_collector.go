@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 )
@@ -55,6 +56,9 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 		return TronAccountObservation{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if apiKey := os.Getenv("TRONGRID_API_KEY"); apiKey != "" {
+		req.Header.Set("TRON-PRO-API-KEY", apiKey)
+	}
 	resp, err := bounded.Do(req)
 	if err != nil {
 		return TronAccountObservation{}, err
