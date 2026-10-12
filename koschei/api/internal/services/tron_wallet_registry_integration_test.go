@@ -54,6 +54,21 @@ func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *test
 	if len(result.Limitations) < 2 {
 		t.Fatalf("missing unanchored-height and route limitations: %+v", result)
 	}
+	plan.Route = UniversalDispatchTronWallet
+	plan.EvidenceOnly = true
+	plan.VerdictAuthority = UniversalVerdictEvidenceOnly
+	executable, err := registry.Collect(context.Background(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !executable.Executable || executable.Route != UniversalDispatchTronWallet || len(executable.Evidence) != 1 ||
+		executable.Evidence[0].Status != IntelligenceEvidenceObserved {
+		t.Fatalf("Tron evidence-only route failed: %+v", executable)
+	}
+	plan.VerdictAuthority = UniversalVerdictExistingRulesOnly
+	if _, err := registry.Collect(context.Background(), plan); err == nil {
+		t.Fatal("Tron route accepted grade authority")
+	}
 	if !registry.HasRuntimeCollector(radaradapter.Target{Network: "tron-mainnet", Kind: "account", Raw: account}) {
 		t.Fatal("installed Tron collector not discoverable")
 	}
