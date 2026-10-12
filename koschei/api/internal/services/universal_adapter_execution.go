@@ -33,6 +33,11 @@ func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPla
 		if _, ok := adapter.(*radaradapter.TronWalletAdapter); !ok {
 			return result, errors.New("tron executable route requires native Tron wallet adapter")
 		}
+		if plan.Subject.Network != "tron-mainnet" || (plan.Subject.Kind != "account" && plan.Subject.Kind != "wallet") ||
+			adapter.Subject().Network != "tron-mainnet" || adapter.Subject().IdentityKind != "account" ||
+			plan.VerdictAuthority != UniversalVerdictEvidenceOnly || !plan.EvidenceOnly {
+			return result, errors.New("tron executable route requires evidence-only wallet plan")
+		}
 	}
 	target := radaradapter.Target{Network: plan.Subject.Network, Kind: plan.Subject.Kind, Raw: plan.Subject.Raw}
 	if !adapter.Supports(target) {
@@ -72,11 +77,6 @@ func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPla
 	}
 
 	if plan.Route == UniversalDispatchTronWallet {
-		if plan.Subject.Network != "tron-mainnet" || (plan.Subject.Kind != "account" && plan.Subject.Kind != "wallet") ||
-			adapter.Subject().Network != "tron-mainnet" || adapter.Subject().IdentityKind != "account" ||
-			plan.VerdictAuthority != UniversalVerdictEvidenceOnly || !plan.EvidenceOnly {
-			return result, errors.New("tron executable route requires evidence-only wallet plan")
-		}
 		for _, row := range rows {
 			if row.Status != "observed" || row.Attributes["account_state_height_verified"] != false {
 				return result, errors.New("tron wallet evidence must remain unanchored and observed")
