@@ -67,11 +67,11 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 	if resp.StatusCode != http.StatusOK {
 		return TronAccountObservation{}, fmt.Errorf("tron getaccount HTTP %d", resp.StatusCode)
 	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20+1))
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20 + 1))
 	if err != nil {
 		return TronAccountObservation{}, err
 	}
-	if len(raw) > (1 << 20) {
+	if len(raw) > 1<<20 {
 		return TronAccountObservation{}, errors.New("tron account response exceeds 1 MiB")
 	}
 	var account struct {
