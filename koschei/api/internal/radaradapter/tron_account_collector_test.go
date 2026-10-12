@@ -56,6 +56,25 @@ func TestCollectTronMainnetPermissions(t *testing.T) {
 	}
 }
 
+func TestCollectTronMainnetPermissionsSendsConfiguredAPIKey(t *testing.T) {
+	t.Setenv("TRONGRID_API_KEY", "test-tron-key")
+	const account = "41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	requests := 0
+	client := &http.Client{Transport: tronAccountRoundTrip(func(req *http.Request) (*http.Response, error) {
+		requests++
+		if req.Header.Get("TRON-PRO-API-KEY") != "test-tron-key" {
+			t.Fatal("TronGrid getaccount request omitted configured API key")
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
+			`{"address":"` + account + `","owner_permission":{"id":0,"type":0,"threshold":1,"keys":[{"address":"` + account + `","weight":1}]}}`,
+		)), Header: make(http.Header)}, nil
+	})}
+	observation, err := CollectTronMainnetPermissions(context.Background(), client, account)
+	if err != nil || len(observation.Permissions) != 1 || requests != 1 {
+		t.Fatalf("permissions=%d requests=%d err=%v", len(observation.Permissions), requests, err)
+	}
+}
+
 func TestCollectTronMainnetPermissionsFailsClosed(t *testing.T) {
 	const account = "41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	for _, tc := range []struct {
