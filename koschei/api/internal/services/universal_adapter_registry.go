@@ -141,6 +141,9 @@ func (registry *UniversalAdapterRegistry) PrepareTronWalletPlan(plan UniversalIn
 // permission probe through an explicitly registered native collector. It does
 // not register a public route or produce a safety verdict.
 func (registry *UniversalAdapterRegistry) CollectTronWalletPermissions(ctx context.Context, plan UniversalInvestigationPlan) (UniversalAdapterCollection, error) {
+	if err := ctx.Err(); err != nil {
+		return UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}, err
+	}
 	prepared, err := registry.PrepareTronWalletPlan(plan)
 	if err != nil {
 		return UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}, err
