@@ -49,6 +49,18 @@ func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPla
 		result.Limitations = append(result.Limitations, radaradapter.Limitation{Code: "NO_EVIDENCE", Reason: "Collector returned no reproducible evidence; safety cannot be inferred."})
 		return result, nil
 	}
+	// Tron collectors use the native account address as their row subject.
+	// Rebind only after confirming it matches the installed adapter identity;
+	// never trust an arbitrary collector-supplied subject ID.
+	if plan.Subject.Network == "tron-mainnet" {
+		identity := adapter.Subject()
+		for i := range rows {
+			if rows[i].SubjectID != identity.NativeID {
+				return result, errors.New("tron evidence native account identity mismatch")
+			}
+			rows[i].SubjectID = plan.Subject.ID
+		}
+	}
 	evidence, err := AdaptRadarEvidence(plan.Subject, adapter.Subject(), rows)
 	if err != nil {
 		return result, err
