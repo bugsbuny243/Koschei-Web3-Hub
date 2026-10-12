@@ -105,3 +105,32 @@ func (registry *UniversalAdapterRegistry) HasRuntimeCollector(target radaradapte
 	}
 	return matches == 1
 }
+
+
+// PrepareTronWalletPlan enables a Tron permission probe only when exactly one
+// explicitly installed native-account collector matches the classified target.
+// This does not register an adapter or enable any customer-facing endpoint.
+func (registry *UniversalAdapterRegistry) PrepareTronWalletPlan(plan UniversalInvestigationPlan) (UniversalInvestigationPlan, error) {
+	target := radaradapter.Target{Network: plan.Subject.Network, Kind: plan.Subject.Kind, Raw: plan.Subject.Raw}
+	if target.Network != "tron-mainnet" || (target.Kind != "account" && target.Kind != "wallet") ||
+		strings.TrimSpace(plan.Subject.ID) == "" || strings.TrimSpace(plan.Subject.CanonicalRef) == "" ||
+		strings.TrimSpace(target.Raw) == "" || !registry.HasRuntimeCollector(target) {
+		return plan, errors.New("tron wallet requires a classified subject and exactly one installed collector")
+	}
+	for _, adapter := range registry.adapters {
+		if !adapter.Supports(target) {
+			continue
+		}
+		identity := adapter.Subject()
+		if identity.Network != "tron-mainnet" || identity.IdentityKind != "account" ||
+			strings.TrimSpace(identity.NativeID) == "" {
+			return plan, errors.New("tron collector native account identity unavailable")
+		}
+		plan.Route = UniversalDispatchTronWallet
+		plan.Executable = false // collection, not declaration, determines execution
+		plan.EvidenceOnly = true
+		plan.VerdictAuthority = UniversalVerdictEvidenceOnly
+		return plan, nil
+	}
+	return plan, errors.New("tron wallet collector unavailable")
+}
