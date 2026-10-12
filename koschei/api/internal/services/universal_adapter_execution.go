@@ -68,6 +68,7 @@ func ExecuteUniversalAdapter(ctx context.Context, plan UniversalInvestigationPla
 
 	if plan.Route == UniversalDispatchTronWallet {
 		if plan.Subject.Network != "tron-mainnet" || (plan.Subject.Kind != "account" && plan.Subject.Kind != "wallet") ||
+			adapter.Subject().Network != "tron-mainnet" || adapter.Subject().IdentityKind != "account" ||
 			plan.VerdictAuthority != UniversalVerdictEvidenceOnly || !plan.EvidenceOnly {
 			return result, errors.New("tron executable route requires evidence-only wallet plan")
 		}
