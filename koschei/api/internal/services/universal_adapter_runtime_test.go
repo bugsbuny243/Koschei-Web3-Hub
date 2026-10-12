@@ -40,3 +40,18 @@ func TestRuntimeCollectorEmptyEvidenceStaysUnexecuted(t *testing.T) {
 		t.Fatalf("empty evidence must not imply successful scan: %+v", result)
 	}
 }
+
+func TestTronExecutableRouteRejectsNonNativeAdapter(t *testing.T) {
+	plan := UniversalInvestigationPlan{
+		Subject: IntelligenceSubject{
+			ID: "fixture-subject", CanonicalRef: "fixture:account",
+			Network: "fixture", Kind: "address", Raw: "example",
+		},
+		Route: UniversalDispatchTronWallet,
+		EvidenceOnly: true,
+		VerdictAuthority: UniversalVerdictEvidenceOnly,
+	}
+	if _, err := ExecuteUniversalAdapter(context.Background(), plan, registryFixtureAdapter{"fixture"}); err == nil {
+		t.Fatal("Tron executable route accepted non-native adapter")
+	}
+}
