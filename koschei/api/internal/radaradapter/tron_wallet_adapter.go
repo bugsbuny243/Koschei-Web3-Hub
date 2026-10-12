@@ -67,6 +67,5 @@ func (adapter *TronWalletAdapter) Collect(ctx context.Context, target Target) ([
 	if err != nil {
 		return nil, nil, err
 	}
-	return rows, []Limitation{{Code: "TRON_ACCOUNT_HEIGHT_UNANCHORED",
-		Reason: "A separately observed chain height does not prove getaccount state at that height; evidence remains observed."}}, nil
+	return rows, []Limitation{{Code: "TRON_ACCOUNT_HEIGHT_UNANCHORED", Reason: "A separately observed chain height does not prove getaccount state at that height; evidence remains observed."}}, nil
 }
