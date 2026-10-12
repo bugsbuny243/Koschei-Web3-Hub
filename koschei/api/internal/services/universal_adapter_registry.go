@@ -174,9 +174,32 @@ func (registry *UniversalAdapterRegistry) CollectTronWalletAddress(ctx context.C
 	if address == "" {
 		return result, errors.New("tron account address is required")
 	}
+	// Bind subject identity to the native collector's canonical account ID.
+	// Base58Check and hex representations of one account must not create
+	// different evidence subjects. Ambiguous matches fail closed.
+	target := radaradapter.Target{Network: "tron-mainnet", Kind: "account", Raw: address}
+	var canonical string
+	if registry != nil {
+		for _, adapter := range registry.adapters {
+			if !adapter.Supports(target) {
+				continue
+			}
+			if canonical != "" {
+				return result, errors.New("ambiguous tron account collector")
+			}
+			identity := adapter.Subject()
+			if identity.Network != "tron-mainnet" || identity.IdentityKind != "account" || strings.TrimSpace(identity.NativeID) == "" {
+				return result, errors.New("tron collector native account identity unavailable")
+			}
+			canonical = identity.NativeID
+		}
+	}
+	if canonical == "" {
+		return result, errors.New("tron account collector unavailable")
+	}
 	subject := IntelligenceSubject{
-		ID:           "tron-mainnet:account:" + address,
-		CanonicalRef: "tron-mainnet:account:" + address,
+		ID:           "tron-mainnet:account:" + canonical,
+		CanonicalRef: "tron-mainnet:account:" + canonical,
 		Network:      "tron-mainnet",
 		Kind:         "account",
 		Raw:          address,
