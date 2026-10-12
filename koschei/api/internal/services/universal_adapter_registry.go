@@ -136,3 +136,26 @@ func (registry *UniversalAdapterRegistry) PrepareTronWalletPlan(plan UniversalIn
 	}
 	return plan, errors.New("tron wallet collector unavailable")
 }
+
+// CollectTronWalletPermissions runs a deliberately bounded, read-only Tron
+// permission probe through an explicitly registered native collector. It does
+// not register a public route or produce a safety verdict.
+func (registry *UniversalAdapterRegistry) CollectTronWalletPermissions(ctx context.Context, plan UniversalInvestigationPlan) (UniversalAdapterCollection, error) {
+	prepared, err := registry.PrepareTronWalletPlan(plan)
+	if err != nil {
+		return UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}, err
+	}
+	collected, err := registry.Collect(ctx, prepared)
+	if err != nil {
+		return collected, err
+	}
+	if !collected.Executable || collected.Route != UniversalDispatchTronWallet || len(collected.Evidence) == 0 {
+		return collected, errors.New("tron permissions evidence unavailable")
+	}
+	for _, evidence := range collected.Evidence {
+		if evidence.Status != IntelligenceEvidenceObserved || evidence.SubjectID != prepared.Subject.ID {
+			return UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}, errors.New("tron permission evidence is not observed or subject-bound")
+		}
+	}
+	return collected, nil
+}
