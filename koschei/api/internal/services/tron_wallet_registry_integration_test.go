@@ -87,6 +87,18 @@ func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *test
 	if _, err := registry.CollectTronWalletPermissions(canceled, plan); err != context.Canceled {
 		t.Fatalf("canceled Tron collection should stop before execution: %v", err)
 	}
+	byAddress, err := registry.CollectTronWalletAddress(context.Background(), account)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !byAddress.Executable || len(byAddress.Evidence) != 1 ||
+		byAddress.Evidence[0].Status != IntelligenceEvidenceObserved ||
+		byAddress.Evidence[0].SubjectID != "tron-mainnet:account:"+account {
+		t.Fatalf("Tron address bridge did not return subject-bound observed evidence: %+v", byAddress)
+	}
+	if _, err := registry.CollectTronWalletAddress(context.Background(), "not-a-tron-address"); err == nil {
+		t.Fatal("Tron address bridge accepted invalid account syntax")
+	}
 	plan.VerdictAuthority = UniversalVerdictExistingRulesOnly
 	if _, err := registry.Collect(context.Background(), plan); err == nil {
 		t.Fatal("Tron route accepted grade authority")
