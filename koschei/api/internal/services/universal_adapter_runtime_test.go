@@ -47,8 +47,8 @@ func TestTronExecutableRouteRejectsNonNativeAdapter(t *testing.T) {
 			ID: "fixture-subject", CanonicalRef: "fixture:account",
 			Network: "fixture", Kind: "address", Raw: "example",
 		},
-		Route: UniversalDispatchTronWallet,
-		EvidenceOnly: true,
+		Route:            UniversalDispatchTronWallet,
+		EvidenceOnly:     true,
 		VerdictAuthority: UniversalVerdictEvidenceOnly,
 	}
 	if _, err := ExecuteUniversalAdapter(context.Background(), plan, registryFixtureAdapter{"fixture"}); err == nil {
