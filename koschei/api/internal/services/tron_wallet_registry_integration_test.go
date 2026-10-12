@@ -73,6 +73,16 @@ func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *test
 	if _, err := registry.Collect(context.Background(), plan); err == nil {
 		t.Fatal("Tron route accepted grade authority")
 	}
+	wrongNetwork := plan
+	wrongNetwork.Subject.Network = "ethereum-mainnet"
+	if _, err := registry.PrepareTronWalletPlan(wrongNetwork); err == nil {
+		t.Fatal("Tron runtime plan accepted a foreign network")
+	}
+	wrongKind := plan
+	wrongKind.Subject.Kind = "contract"
+	if _, err := registry.PrepareTronWalletPlan(wrongKind); err == nil {
+		t.Fatal("Tron runtime plan accepted a contract target")
+	}
 	duplicate, err := NewUniversalAdapterRegistry(adapter, adapter)
 	if err != nil {
 		t.Fatal(err)
