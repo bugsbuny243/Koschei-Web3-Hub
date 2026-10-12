@@ -106,7 +106,6 @@ func (registry *UniversalAdapterRegistry) HasRuntimeCollector(target radaradapte
 	return matches == 1
 }
 
-
 // PrepareTronWalletPlan enables a Tron permission probe only when exactly one
 // explicitly installed native-account collector matches the classified target.
 // This does not register an adapter or enable any customer-facing endpoint.
