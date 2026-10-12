@@ -18,7 +18,9 @@ func (transport tronRegistryTransport) RoundTrip(req *http.Request) (*http.Respo
 
 func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *testing.T) {
 	const account = "41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	requests := 0
 	client := &http.Client{Transport: tronRegistryTransport(func(req *http.Request) (*http.Response, error) {
+		requests++
 		var payload string
 		switch req.URL.Path {
 		case "/wallet/getnowblock":
@@ -100,9 +102,23 @@ func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *test
 		t.Fatal("Tron address bridge accepted invalid account syntax")
 	}
 	plan.VerdictAuthority = UniversalVerdictExistingRulesOnly
+	beforeUnauthorized := requests
 	if _, err := registry.Collect(context.Background(), plan); err == nil {
 		t.Fatal("Tron route accepted grade authority")
 	}
+	if requests != beforeUnauthorized {
+		t.Fatalf("unauthorized Tron plan contacted RPC: before=%d after=%d", beforeUnauthorized, requests)
+	}
+	plan.VerdictAuthority = UniversalVerdictEvidenceOnly
+	plan.EvidenceOnly = false
+	beforeUnauthorized = requests
+	if _, err := registry.Collect(context.Background(), plan); err == nil {
+		t.Fatal("Tron route accepted non-evidence-only plan")
+	}
+	if requests != beforeUnauthorized {
+		t.Fatalf("non-evidence-only Tron plan contacted RPC: before=%d after=%d", beforeUnauthorized, requests)
+	}
+	plan.EvidenceOnly = true
 	wrongNetwork := plan
 	wrongNetwork.Subject.Network = "ethereum-mainnet"
 	if _, err := registry.PrepareTronWalletPlan(wrongNetwork); err == nil {
