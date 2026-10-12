@@ -14,9 +14,9 @@ type TronHeightReader func(context.Context) (int64, error)
 // TronWalletAdapter is an explicit read-only adapter for Tron account permissions.
 // The universal dispatcher must still authorize the route before execution.
 type TronWalletAdapter struct {
-	Client *http.Client
+	Client     *http.Client
 	ReadHeight TronHeightReader
-	target string
+	target     string
 }
 
 func NewTronWalletAdapter(client *http.Client, height TronHeightReader, address string) (*TronWalletAdapter, error) {
