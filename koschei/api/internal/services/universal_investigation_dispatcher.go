@@ -7,6 +7,7 @@ import (
 )
 
 const (
+	UniversalDispatchTronWallet       = "tron_wallet_permissions_observed"
 	UniversalDispatchSolanaCore       = "solana_live_core"
 	UniversalDispatchSolanaTx         = "solana_transaction_intelligence"
 	UniversalDispatchEVMProbe         = "evm_read_only_probe"
