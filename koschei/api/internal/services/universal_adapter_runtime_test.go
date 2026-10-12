@@ -55,3 +55,20 @@ func TestTronExecutableRouteRejectsNonNativeAdapter(t *testing.T) {
 		t.Fatal("Tron executable route accepted non-native adapter")
 	}
 }
+
+func TestTronPlanRejectsNonNativeCollector(t *testing.T) {
+	registry, err := NewUniversalAdapterRegistry(registryFixtureAdapter{"fixture"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := UniversalInvestigationPlan{
+		Subject: IntelligenceSubject{
+			ID: "fixture-subject", CanonicalRef: "fixture:account",
+			Network: "fixture", Kind: "address", Raw: "example",
+		},
+		Route: UniversalDispatchDeclaredOnly,
+	}
+	if _, err := registry.PrepareTronWalletPlan(plan); err == nil {
+		t.Fatal("non-Tron target was accepted for Tron plan")
+	}
+}
