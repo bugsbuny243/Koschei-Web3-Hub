@@ -73,6 +73,19 @@ func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *test
 	if _, err := registry.Collect(context.Background(), plan); err == nil {
 		t.Fatal("Tron route accepted grade authority")
 	}
+	duplicate, err := NewUniversalAdapterRegistry(adapter, adapter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if duplicate.HasRuntimeCollector(radaradapter.Target{Network: "tron-mainnet", Kind: "account", Raw: account}) {
+		t.Fatal("ambiguous Tron collectors must not be advertised as available")
+	}
+	if _, err := duplicate.PrepareTronWalletPlan(plan); err == nil {
+		t.Fatal("ambiguous Tron collectors must fail closed during plan preparation")
+	}
+	if _, err := (*UniversalAdapterRegistry)(nil).PrepareTronWalletPlan(plan); err == nil {
+		t.Fatal("nil Tron registry must not prepare an executable plan")
+	}
 	if !registry.HasRuntimeCollector(radaradapter.Target{Network: "tron-mainnet", Kind: "account", Raw: account}) {
 		t.Fatal("installed Tron collector not discoverable")
 	}
