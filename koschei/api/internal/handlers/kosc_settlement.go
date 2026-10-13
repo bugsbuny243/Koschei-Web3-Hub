@@ -158,7 +158,7 @@ func (h *Handler) KOSCSettle(w http.ResponseWriter, r *http.Request) {
 		[]any{request.Signature, map[string]any{
 			"encoding":                       "jsonParsed",
 			"commitment":                     "finalized",
-			"maxSupportedTransactionVersion": 1,
+			"maxSupportedTransactionVersion": services.SolanaMaxSupportedTransactionVersion,
 		}},
 		&txResult,
 		24*time.Hour,

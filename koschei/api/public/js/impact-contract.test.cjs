@@ -1,0 +1,21 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const path=require('node:path');
+test('public impact renders record counts and withholds unverified claims',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../impact.html'),'utf8');
+ const nodes=new Map();
+ const row={children:Array.from({length:5},()=>({textContent:'',firstChild:{textContent:''}}))};
+ const document={getElementById(id){if(!nodes.has(id))nodes.set(id,{textContent:'',style:{},classList:{add(){},remove(){}},innerHTML:''});return nodes.get(id);},querySelectorAll(){return [row];}};
+ const context=vm.createContext({document,Intl,Date,fetch:()=>new Promise(()=>{})});
+ vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
+ context.render({ok:true,mev_events_count:3,liquidity_alerts_count:1,generated_outputs_count:7,total_saved_usd:999999,recent_logs:[{source:'fixture',risk_level:'critical',amount_usd:123456,occurred_at:'2026-10-13'}]});
+ assert.equal(nodes.get('saved').textContent,'Kanıt yok');
+ assert.equal(nodes.get('blocked').textContent,'4');
+ assert.equal(nodes.get('wallets').textContent,'7');
+ assert.equal(nodes.get('mevBar').style.width,'75%');
+ assert.equal(row.children[1].textContent,'Değerlendirilmedi');
+ assert.equal(row.children[2].textContent,'Kanıt yok');
+ assert.doesNotMatch(html,/Engellenen Saldırı Sayısı/);
+});

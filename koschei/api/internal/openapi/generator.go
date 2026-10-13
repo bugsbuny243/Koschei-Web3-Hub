@@ -292,6 +292,10 @@ func operation(route Route, method string) map[string]any {
 		requestSchemaRef = "#/components/schemas/TransactionStateRecheckRequest"
 		requestBodyRequired = true
 	}
+	if route.Path == "/api/v1/radar/tron-wallet-permissions" {
+		description = "Read-only Tron account permission observations. Collection never issues a grade or proves account state at the separately observed head height."
+		operationResponses["503"] = response("Tron permission evidence unavailable.", "#/components/schemas/ErrorResponse")
+	}
 	operation := map[string]any{
 		"operationId":              operationID(method, route.Path),
 		"summary":                  strings.ToUpper(method) + " " + route.Path,
@@ -300,7 +304,7 @@ func operation(route Route, method string) map[string]any {
 		"x-koschei-auth-tier":      route.AuthTier,
 		"x-koschei-inventory-auth": route.InventoryAuth,
 		"x-koschei-route-source":   route.InventorySource,
-		"parameters":               pathParameters(route.Path),
+		"parameters":               append(pathParameters(route.Path), queryParameters(route.Path)...),
 		"responses":                operationResponses,
 		"security":                 security(route.AuthTier),
 	}
@@ -311,6 +315,17 @@ func operation(route Route, method string) map[string]any {
 		}
 	}
 	return operation
+}
+
+func queryParameters(path string) []any {
+	if path != "/api/v1/radar/tron-wallet-permissions" {
+		return []any{}
+	}
+	return []any{map[string]any{
+		"name": "address", "in": "query", "required": true,
+		"description": "Tron account address, Base58Check (T...) or 21-byte hex (41...).",
+		"schema":      map[string]any{"type": "string", "minLength": 34, "maxLength": 128},
+	}}
 }
 
 func pathParameters(path string) []any {
