@@ -30,6 +30,7 @@ type TronAccountObservation struct {
 // A single provider response is observational evidence, not independent confirmation.
 func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, address string) (TronAccountObservation, error) {
 	const endpoint = "https://api.trongrid.io/wallet/getaccount"
+	const maxResponseBytes = 1048576
 	canonical := canonicalTronPermissionSigner(address)
 	if canonical == "" {
 		return TronAccountObservation{}, errors.New("invalid tron account address")
@@ -67,11 +68,11 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 	if resp.StatusCode != http.StatusOK {
 		return TronAccountObservation{}, fmt.Errorf("tron getaccount HTTP %d", resp.StatusCode)
 	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, (1<<20)+1))
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return TronAccountObservation{}, err
 	}
-	if len(raw) > 1<<20 {
+	if len(raw) > maxResponseBytes {
 		return TronAccountObservation{}, errors.New("tron account response exceeds 1 MiB")
 	}
 	var account struct {
