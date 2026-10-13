@@ -68,7 +68,7 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 	if resp.StatusCode != http.StatusOK {
 		return TronAccountObservation{}, fmt.Errorf("tron getaccount HTTP %d", resp.StatusCode)
 	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes + 1))
 	if err != nil {
 		return TronAccountObservation{}, err
 	}
