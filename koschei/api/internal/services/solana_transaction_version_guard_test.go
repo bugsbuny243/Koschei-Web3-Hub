@@ -58,8 +58,8 @@ func TestSolanaTransactionVersionLiterals(t *testing.T) {
 				return true
 			}
 			n, err := strconv.ParseInt(value.Value, 0, 64)
-			if err == nil && n < SolanaMaxSupportedTransactionVersion {
-				t.Errorf("%s: hardcoded maxSupportedTransactionVersion=%d is below %d", path, n, SolanaMaxSupportedTransactionVersion)
+			if err == nil && n != SolanaMaxSupportedTransactionVersion {
+				t.Errorf("%s: hardcoded maxSupportedTransactionVersion=%d must equal %d", path, n, SolanaMaxSupportedTransactionVersion)
 			}
 			return true
 		})

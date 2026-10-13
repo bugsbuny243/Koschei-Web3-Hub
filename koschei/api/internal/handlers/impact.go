@@ -10,25 +10,26 @@ import (
 	"time"
 )
 
-const publicImpactCacheKey = "public-impact:v2"
+const publicImpactCacheKey = "public-impact:v3"
 
 var publicImpactCacheTTL = 60 * time.Second
 
 type publicImpactMetrics struct {
-	OK                           bool                        `json:"ok"`
-	Unavailable                  bool                        `json:"unavailable"`
-	Error                        string                      `json:"error,omitempty"`
-	Statement                    string                      `json:"statement"`
-	VerificationNote             string                      `json:"verification_note"`
-	NoCustody                    string                      `json:"no_custody"`
-	TotalSavedUSD                float64                     `json:"total_saved_usd"`
-	MEVEstimatedLossPreventedUSD float64                     `json:"mev_estimated_loss_prevented_usd"`
-	LiquidityLossPreventedUSD    float64                     `json:"liquidity_loss_prevented_usd"`
-	RugPullsPrevented            int64                       `json:"rug_pulls_prevented"`
+	OK               bool   `json:"ok"`
+	Unavailable      bool   `json:"unavailable"`
+	Error            string `json:"error,omitempty"`
+	Statement        string `json:"statement"`
+	VerificationNote string `json:"verification_note"`
+	NoCustody        string `json:"no_custody"`
+	// Legacy fields remain source-compatible but cannot publish unverified claims.
+	TotalSavedUSD                float64                     `json:"-"`
+	MEVEstimatedLossPreventedUSD float64                     `json:"-"`
+	LiquidityLossPreventedUSD    float64                     `json:"-"`
+	RugPullsPrevented            int64                       `json:"-"`
 	ActiveProtectedWallets       int64                       `json:"active_protected_wallets"`
-	Last24HBiggestPrevention     *publicImpactPreventionLog  `json:"last_24h_biggest_prevention,omitempty"`
-	Last24HPreventedUSD          float64                     `json:"last_24h_prevented_usd"`
-	Last7DPreventedUSD           float64                     `json:"last_7d_prevented_usd"`
+	Last24HBiggestPrevention     *publicImpactPreventionLog  `json:"-"`
+	Last24HPreventedUSD          float64                     `json:"-"`
+	Last7DPreventedUSD           float64                     `json:"-"`
 	MEVEventsCount               int64                       `json:"mev_events_count"`
 	LiquidityAlertsCount         int64                       `json:"liquidity_alerts_count"`
 	SystemActiveUsers            int64                       `json:"system_active_users"`
@@ -47,9 +48,9 @@ type publicImpactMetrics struct {
 
 type publicImpactPreventionLog struct {
 	Source              string    `json:"source"`
-	AmountUSD           float64   `json:"amount_usd"`
-	RiskScore           int       `json:"risk_score"`
-	RiskLevel           string    `json:"risk_level"`
+	AmountUSD           float64   `json:"-"`
+	RiskScore           int       `json:"-"`
+	RiskLevel           string    `json:"-"`
 	AnonymizedSubject   string    `json:"anonymized_subject"`
 	TransactionHint     string    `json:"transaction_hint,omitempty"`
 	OccurredAt          time.Time `json:"occurred_at"`
@@ -122,34 +123,6 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 	if err != nil {
 		return publicImpactMetrics{}, err
 	}
-	mevSaved, err := safeImpactFloat(ctx, db, `SELECT COALESCE(SUM(estimated_loss_usd),0)::float FROM mev_protection_events`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
-	liquiditySaved, err := safeImpactFloat(ctx, db, `SELECT COALESCE(SUM(loss_prevented_usd),0)::float FROM liquidity_drain_alerts`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
-	last24hSaved, err := safeImpactFloat(ctx, db, `
-		SELECT COALESCE(SUM(amount_usd),0)::float
-		FROM (
-			SELECT estimated_loss_usd AS amount_usd FROM mev_protection_events WHERE created_at >= now() - interval '24 hours'
-			UNION ALL
-			SELECT loss_prevented_usd AS amount_usd FROM liquidity_drain_alerts WHERE created_at >= now() - interval '24 hours'
-		) impact_amounts`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
-	last7dSaved, err := safeImpactFloat(ctx, db, `
-		SELECT COALESCE(SUM(amount_usd),0)::float
-		FROM (
-			SELECT estimated_loss_usd AS amount_usd FROM mev_protection_events WHERE created_at >= now() - interval '7 days'
-			UNION ALL
-			SELECT loss_prevented_usd AS amount_usd FROM liquidity_drain_alerts WHERE created_at >= now() - interval '7 days'
-		) impact_amounts`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
 	activeWallets, err := safeImpactCount(ctx, db, `
 		SELECT GREATEST(
 			COALESCE((SELECT COUNT(DISTINCT lower(user_wallet)) FROM mev_protection_events WHERE user_wallet <> ''),0),
@@ -159,10 +132,6 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 		return publicImpactMetrics{}, err
 	}
 	systemActiveUsers, err := safeImpactCount(ctx, db, `SELECT COALESCE(MAX(active_users),0)::bigint FROM system_analytics`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
-	biggest, err := latestBiggestPrevention(ctx, db)
 	if err != nil {
 		return publicImpactMetrics{}, err
 	}
@@ -177,10 +146,6 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 		return publicImpactMetrics{}, err
 	}
 	liquidityAlerts, err := count(`SELECT COUNT(*) FROM liquidity_drain_alerts`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
-	rugPulls, err := count(`SELECT COUNT(*) FROM liquidity_drain_alerts WHERE risk_score >= 45 OR upper(severity) IN ('YÜKSEK','KRİTİK','HIGH','CRITICAL')`)
 	if err != nil {
 		return publicImpactMetrics{}, err
 	}
@@ -206,32 +171,25 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 	}
 
 	return publicImpactMetrics{
-		OK:                           true,
-		Statement:                    "Koschei Public Shield is a no-custody public-good risk prevention layer for Web3 builders and users.",
-		VerificationNote:             "These metrics are backed by read-only database aggregates from blockchain-verifiable event records.",
-		NoCustody:                    "No private keys. No seed phrases. No custody. Read-only intelligence.",
-		TotalSavedUSD:                roundUSD(mevSaved + liquiditySaved),
-		MEVEstimatedLossPreventedUSD: roundUSD(mevSaved),
-		LiquidityLossPreventedUSD:    roundUSD(liquiditySaved),
-		RugPullsPrevented:            rugPulls,
-		ActiveProtectedWallets:       activeWallets,
-		Last24HBiggestPrevention:     biggest,
-		Last24HPreventedUSD:          roundUSD(last24hSaved),
-		Last7DPreventedUSD:           roundUSD(last7dSaved),
-		MEVEventsCount:               mevEvents,
-		LiquidityAlertsCount:         liquidityAlerts,
-		SystemActiveUsers:            systemActiveUsers,
-		GeneratedOutputsCount:        generated,
-		ModulesLiveCount:             len(mods),
-		SupportedNetworksCount:       networks,
-		ChainChecksCount:             chainChecks,
-		WatchlistSourceCount:         watchlistSources,
-		Web3EventCount:               web3Events,
-		LiveModules:                  mods,
-		RecentLogs:                   recentLogs,
-		PublicRoadmap:                []string{"Publish verifiable public-good impact snapshots", "Open-source MEV Shield and Liquidity Radar safety modules", "Add community-maintained risk feeds for Solana and Ethereum"},
-		UpdatedAt:                    time.Now().UTC(),
-		CacheTTLSeconds:              int(publicImpactCacheTTL.Seconds()),
+		OK:                     true,
+		Statement:              "Koschei Public Shield is a no-custody public-good risk prevention layer for Web3 builders and users.",
+		VerificationNote:       "Counts represent module records, not prevented attacks. Loss amounts and risk scores are withheld because independent on-chain evidence is unavailable.",
+		NoCustody:              "No private keys. No seed phrases. No custody. Read-only intelligence.",
+		ActiveProtectedWallets: activeWallets,
+		MEVEventsCount:         mevEvents,
+		LiquidityAlertsCount:   liquidityAlerts,
+		SystemActiveUsers:      systemActiveUsers,
+		GeneratedOutputsCount:  generated,
+		ModulesLiveCount:       len(mods),
+		SupportedNetworksCount: networks,
+		ChainChecksCount:       chainChecks,
+		WatchlistSourceCount:   watchlistSources,
+		Web3EventCount:         web3Events,
+		LiveModules:            mods,
+		RecentLogs:             recentLogs,
+		PublicRoadmap:          []string{"Publish verifiable public-good impact snapshots", "Open-source MEV Shield and Liquidity Radar safety modules", "Add community-maintained risk feeds for Solana and Ethereum"},
+		UpdatedAt:              time.Now().UTC(),
+		CacheTTLSeconds:        int(publicImpactCacheTTL.Seconds()),
 	}, nil
 }
 
@@ -273,48 +231,19 @@ func safeImpactCount(ctx context.Context, db *sql.DB, query string) (int64, erro
 	return count, err
 }
 
-func latestBiggestPrevention(ctx context.Context, db *sql.DB) (*publicImpactPreventionLog, error) {
-	rows, err := db.QueryContext(ctx, `
-		SELECT source, subject, tx_hint, amount_usd::float, risk_score, risk_level, created_at
-		FROM (
-			SELECT 'MEV Shield' AS source, user_wallet AS subject, tx_signature AS tx_hint, estimated_loss_usd AS amount_usd, risk_score, risk_level, created_at
-			FROM mev_protection_events
-			WHERE created_at >= now() - interval '24 hours'
-			UNION ALL
-			SELECT 'Liquidity Radar' AS source, COALESCE(NULLIF(pool_address,''), token_mint) AS subject, '' AS tx_hint, loss_prevented_usd AS amount_usd, risk_score, severity AS risk_level, created_at
-			FROM liquidity_drain_alerts
-			WHERE created_at >= now() - interval '24 hours'
-		) recent_preventions
-		ORDER BY amount_usd DESC, created_at DESC
-		LIMIT 1`)
-	if isUndefinedImpactSource(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	if !rows.Next() {
-		return nil, rows.Err()
-	}
-	var source, subject, txHint, level string
-	var amount float64
-	var score int
-	var occurredAt time.Time
-	if err := rows.Scan(&source, &subject, &txHint, &amount, &score, &level, &occurredAt); err != nil {
-		return nil, err
-	}
-	return &publicImpactPreventionLog{Source: source, AmountUSD: roundUSD(amount), RiskScore: score, RiskLevel: level, AnonymizedSubject: anonymizeImpactSubject(subject), TransactionHint: anonymizeImpactSubject(txHint), OccurredAt: occurredAt, VerifiabilityStatus: "Blockchain-verifiable event; public view is anonymized for user safety."}, rows.Err()
+// Kept as a compatibility helper. Synthetic amounts cannot establish a biggest prevention.
+func latestBiggestPrevention(context.Context, *sql.DB) (*publicImpactPreventionLog, error) {
+	return nil, nil
 }
 
 func recentImpactPreventionLogs(ctx context.Context, db *sql.DB) ([]publicImpactPreventionLog, error) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT source, subject, tx_hint, amount_usd::float, risk_score, risk_level, created_at
+		SELECT source, subject, tx_hint, created_at
 		FROM (
-			SELECT 'MEV Shield' AS source, user_wallet AS subject, tx_signature AS tx_hint, estimated_loss_usd AS amount_usd, risk_score, risk_level, created_at
+			SELECT 'MEV Shield' AS source, user_wallet AS subject, tx_signature AS tx_hint, created_at
 			FROM mev_protection_events
 			UNION ALL
-			SELECT 'Liquidity Radar' AS source, COALESCE(NULLIF(pool_address,''), token_mint) AS subject, '' AS tx_hint, loss_prevented_usd AS amount_usd, risk_score, severity AS risk_level, created_at
+			SELECT 'Liquidity Radar' AS source, COALESCE(NULLIF(pool_address,''), token_mint) AS subject, '' AS tx_hint, created_at
 			FROM liquidity_drain_alerts
 		) recent_preventions
 		ORDER BY created_at DESC
@@ -329,14 +258,12 @@ func recentImpactPreventionLogs(ctx context.Context, db *sql.DB) ([]publicImpact
 
 	logs := []publicImpactPreventionLog{}
 	for rows.Next() {
-		var source, subject, txHint, level string
-		var amount float64
-		var score int
+		var source, subject, txHint string
 		var occurredAt time.Time
-		if err := rows.Scan(&source, &subject, &txHint, &amount, &score, &level, &occurredAt); err != nil {
+		if err := rows.Scan(&source, &subject, &txHint, &occurredAt); err != nil {
 			return nil, err
 		}
-		logs = append(logs, publicImpactPreventionLog{Source: source, AmountUSD: roundUSD(amount), RiskScore: score, RiskLevel: level, AnonymizedSubject: anonymizeImpactSubject(subject), TransactionHint: anonymizeImpactSubject(txHint), OccurredAt: occurredAt, VerifiabilityStatus: "Blockchain-verifiable event; public view is anonymized for user safety."})
+		logs = append(logs, publicImpactPreventionLog{Source: source, AnonymizedSubject: anonymizeImpactSubject(subject), TransactionHint: anonymizeImpactSubject(txHint), OccurredAt: occurredAt, VerifiabilityStatus: "Module-recorded event; no verified loss prevention or risk assessment is claimed."})
 	}
 	return logs, rows.Err()
 }

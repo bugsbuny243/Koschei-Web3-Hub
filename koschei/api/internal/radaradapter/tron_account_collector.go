@@ -68,7 +68,7 @@ func CollectTronMainnetPermissions(ctx context.Context, client *http.Client, add
 	if resp.StatusCode != http.StatusOK {
 		return TronAccountObservation{}, fmt.Errorf("tron getaccount HTTP %d", resp.StatusCode)
 	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes + 1))
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		return TronAccountObservation{}, err
 	}
@@ -114,7 +114,7 @@ func (observation TronAccountObservation) EvidenceRows(observedAt time.Time, ver
 	rows := make([]EvidenceRow, 0, len(observation.Permissions))
 	for _, permission := range observation.Permissions {
 		rows = append(rows, EvidenceRow{
-			ID:         "tron-permission-" + permission.ID,
+			ID:         "tron-permission-" + observation.Address + "-" + observation.RawResponseSHA256 + "-" + strconv.FormatInt(verifiedBlockHeight, 10) + "-" + observedAt.UTC().Format(time.RFC3339Nano) + "-" + permission.ID,
 			SubjectID:  observation.Address,
 			Status:     "observed",
 			Source:     observation.Provider,

@@ -210,9 +210,6 @@ func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, planTier, pl
 	badge := func(next http.HandlerFunc) http.HandlerFunc { return requireRuntimeFeature(featurePublicBadge, next) }
 	mux.HandleFunc("/api/token/scan", solana(risk(method("POST", h.TokenScan))))
 	mux.HandleFunc("/api/wallet/score", solana(requiresDB(h, planTier("professional", method("POST", h.SecurityRadarCheckWithAlerts)))))
-	mux.HandleFunc("/api/mev/analyze", solana(requiresDB(h, planTier("professional", method("POST", h.AnalyzeMEV)))))
-	mux.HandleFunc("/api/liquidity/analyze", solana(requiresDB(h, planTier("professional", method("POST", h.LiquidityDrainAnalyze)))))
-	mux.HandleFunc("/api/dao/proposal-risk", requiresDB(h, planTier("professional", method("POST", h.DAOGuardianAnalyze))))
 	mux.HandleFunc("/api/v1/risk/badge", solana(badge(method("GET", h.SecurityRiskBadge))))
 	mux.HandleFunc("/api/v1/token/extensions", solana(risk(requiresDB(h, planTier("professional", method("POST", h.TokenScan))))))
 	mux.HandleFunc("/api/v1/address-poisoning/check", solana(requiresDB(h, planTier("professional", method("POST", h.AddressPoisoningCheck)))))

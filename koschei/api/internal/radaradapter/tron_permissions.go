@@ -25,11 +25,44 @@ type tronPermissionResponse struct {
 	ActivePermission  []tronPermissionJSON `json:"active_permission"`
 	WitnessPermission *tronPermissionJSON  `json:"witness_permission"`
 }
+
+// tronPermissionType accepts protobuf JSON names as well as numeric wire values.
+type tronPermissionType int
+
+func (value *tronPermissionType) UnmarshalJSON(raw []byte) error {
+	var number int
+	if len(raw) > 0 && raw[0] == '"' {
+		var name string
+		if err := json.Unmarshal(raw, &name); err != nil {
+			return err
+		}
+		switch name {
+		case "Owner":
+			number = 0
+		case "Witness":
+			number = 1
+		case "Active":
+			number = 2
+		default:
+			return errors.New("unknown tron permission type name")
+		}
+	} else {
+		if err := json.Unmarshal(raw, &number); err != nil {
+			return err
+		}
+	}
+	if number < 0 || number > 2 {
+		return errors.New("unknown tron permission type")
+	}
+	*value = tronPermissionType(number)
+	return nil
+}
+
 type tronPermissionJSON struct {
-	ID         int    `json:"id"`
-	Type       int    `json:"type"`
-	Threshold  int64  `json:"threshold"`
-	Operations string `json:"operations"`
+	ID         int                `json:"id"`
+	Type       tronPermissionType `json:"type"`
+	Threshold  int64              `json:"threshold"`
+	Operations string             `json:"operations"`
 	Keys       []struct {
 		Address string `json:"address"`
 		Weight  int64  `json:"weight"`
@@ -42,6 +75,19 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 	var response tronPermissionResponse
 	if err := json.Unmarshal(raw, &response); err != nil {
 		return nil, err
+	}
+	// Container and type must agree; a misplaced Owner must never be reported
+	// as a valid Active or Witness permission. Proto3 may omit Owner's zero type.
+	if response.OwnerPermission != nil && response.OwnerPermission.Type != 0 {
+		return nil, errors.New("tron owner permission type mismatch")
+	}
+	if response.WitnessPermission != nil && response.WitnessPermission.Type != 1 {
+		return nil, errors.New("tron witness permission type mismatch")
+	}
+	for _, permission := range response.ActivePermission {
+		if permission.Type != 2 {
+			return nil, errors.New("tron active permission type mismatch")
+		}
 	}
 	permissions := make([]tronPermissionJSON, 0, len(response.ActivePermission)+2)
 	if response.OwnerPermission != nil {
@@ -105,7 +151,7 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 		findings = append(findings, TronPermissionFinding{
 			ID:                 fmt.Sprintf("%d", permission.ID),
 			Operations:         strings.ToLower(permission.Operations),
-			Type:               permission.Type,
+			Type:               int(permission.Type),
 			Threshold:          permission.Threshold,
 			TotalWeight:        total,
 			KeyCount:           len(permission.Keys),

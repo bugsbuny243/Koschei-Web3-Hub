@@ -198,11 +198,14 @@ func (registry *UniversalAdapterRegistry) CollectTronWalletAddress(ctx context.C
 		return result, errors.New("tron account collector unavailable")
 	}
 	subject := IntelligenceSubject{
-		ID:           "tron-mainnet:account:" + canonical,
-		CanonicalRef: "tron-mainnet:account:" + canonical,
-		Network:      "tron-mainnet",
-		Kind:         "account",
-		Raw:          address,
+		ID:                  "tron-mainnet:account:" + canonical,
+		CanonicalRef:        "tron-mainnet:account:" + canonical,
+		ChainFamily:         IntelligenceChainFamilyTron,
+		Chain:               "tron",
+		ClassificationBasis: "native_tron_account_address_validation",
+		Network:             "tron-mainnet",
+		Kind:                "account",
+		Raw:                 address,
 	}
 	return registry.CollectTronWalletPermissions(ctx, UniversalInvestigationPlan{Subject: subject})
 }
