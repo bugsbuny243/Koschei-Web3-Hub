@@ -42,9 +42,14 @@ var burnOwnerWallets = map[string]bool{
 
 type solanaRPCCall func(context.Context, string, string, any, any) error
 
+// LP evidence reads must use the shared RPC budget, cooldown and failover policy.
+// Missing RPC infrastructure is unavailable evidence, never a direct-RPC bypass.
 func (h *Handler) lpRPC() solanaRPCCall {
 	return func(ctx context.Context, network, method string, params any, out any) error {
-		return h.callSolanaRPC(ctx, &http.Client{Timeout: 10 * time.Second}, solanaRPCURL(network, os.Getenv("ALCHEMY_API_KEY")), network, method, params, out)
+		if h == nil || h.SolanaRPC == nil {
+			return fmt.Errorf("solana RPC manager unavailable for LP evidence")
+		}
+		return h.SolanaRPC.Call(ctx, network, method, params, out, 0)
 	}
 }
 
