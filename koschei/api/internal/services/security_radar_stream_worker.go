@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/tls"
 	"database/sql"
 	"encoding/base64"
@@ -430,8 +431,37 @@ func (w *SecurityRadarStreamWorker) decodeLogsPayload(payload []byte) (SecurityR
 	return SecurityRadarStreamEventRecord{Provider: SecurityRadarStreamProvider, StreamMode: SecurityRadarStreamModeLogs, Network: w.Network, ModuleID: moduleID, EventType: eventType, Target: target, TargetType: targetTypeForRadarModule(moduleID), Signature: signature, Slot: radarInt64(contextValue["slot"]), ProgramID: programID, EvidenceQuality: evidenceQualityForRadarModule(moduleID), Decoded: decoded, RawEvent: raw}, signature != "" || moduleID != "unknown"
 }
 
+// isPureRadarStreamTrade conservatively filters logs with an explicit buy/sell
+// instruction and no lifecycle or authority transition. Unknown logs are retained
+// for enrichment rather than being silently classified as safe.
+func isPureRadarStreamTrade(event SecurityRadarStreamEventRecord) bool {
+	logs := radarStringSlice(event.Decoded["logs"])
+	if typed, ok := event.Decoded["logs"].([]string); ok {
+		logs = typed
+	}
+	text := strings.ToLower(strings.Join(logs, "\n"))
+	if !strings.Contains(text, "instruction: buy") && !strings.Contains(text, "instruction: sell") {
+		return false
+	}
+	for _, marker := range []string{"instruction: initialize", "instruction: creat", "instruction: mintto", "instruction: setauthority", "instruction: freeze", "instruction: thaw", "instruction: close", "instruction: withdraw", "instruction: lock", "instruction: addliquidity", "instruction: removeliquidity"} {
+		if strings.Contains(text, marker) {
+			return false
+		}
+	}
+	return true
+}
+
 func (w *SecurityRadarStreamWorker) persistEvent(ctx context.Context, event SecurityRadarStreamEventRecord) {
+	// Pure swap trades are volume telemetry, not durable verdict evidence.
+	if isPureRadarStreamTrade(event) {
+		return
+	}
 	event = w.enrichEventTarget(ctx, event)
+	// A signature is not a mint: never persist a misleading token-target row.
+	if event.TargetType != "token" || event.EvidenceQuality != "transaction_enriched_mint" || !isLikelyRadarSolanaAddress(strings.TrimSpace(event.Target)) || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) {
+		log.Printf("security radar stream event skipped without verified mint target signature=%s module=%s", event.Signature, event.ModuleID)
+		return
+	}
 	if _, err := w.Store.InsertStreamEvent(ctx, event); err != nil {
 		log.Printf("security radar stream insert failed: %v", err)
 		return
@@ -523,17 +553,27 @@ func (w *SecurityRadarStreamWorker) enrichEventTarget(ctx context.Context, event
 }
 
 func (s *SecurityRadarStore) InsertStreamEvent(ctx context.Context, event SecurityRadarStreamEventRecord) (string, error) {
+	// Fail closed at the persistence boundary as well as in the WSS worker.
+	if event.TargetType != "token" || event.EvidenceQuality != "transaction_enriched_mint" || !isLikelyRadarSolanaAddress(strings.TrimSpace(event.Target)) || strings.EqualFold(strings.TrimSpace(event.Target), strings.TrimSpace(event.Signature)) {
+		return "", fmt.Errorf("stream event requires a token mint target, got type=%q", event.TargetType)
+	}
 	if s == nil || s.DB == nil {
 		return "", nil
 	}
 	decoded, _ := json.Marshal(nonNilMap(event.Decoded))
-	rawEvent, _ := json.Marshal(nonNilMap(event.RawEvent))
+	rawBytes, err := json.Marshal(nonNilMap(event.RawEvent))
+	if err != nil {
+		return "", fmt.Errorf("marshal raw stream notification: %w", err)
+	}
+	rawHash := fmt.Sprintf("%x", sha256.Sum256(rawBytes))
+	// Store only the canonical decoded payload; the raw notification is redundant.
+	// Keep the legacy raw_event column nullable until the parity audit is approved.
 	var id string
-	err := s.DB.QueryRowContext(ctx, `
-		INSERT INTO security_radar_stream_events (provider,stream_mode,network,module_id,event_type,target,target_type,signature,slot,program_id,evidence_quality,decoded,raw_event,created_at,updated_at)
-		VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),$7,NULLIF($8,''),NULLIF($9,0),NULLIF($10,''),$11,$12::jsonb,$13::jsonb,now(),now())
+	err = s.DB.QueryRowContext(ctx, `
+		INSERT INTO security_radar_stream_events (provider,stream_mode,network,module_id,event_type,target,target_type,signature,slot,program_id,evidence_quality,decoded,raw_event,raw_event_sha256,created_at,updated_at)
+		VALUES ($1,$2,$3,$4,$5,NULLIF($6,''),$7,NULLIF($8,''),NULLIF($9,0),NULLIF($10,''),$11,$12::jsonb,NULL,$13,now(),now())
 		ON CONFLICT DO NOTHING
-		RETURNING id::text`, firstRadarValue(event.Provider, SecurityRadarStreamProvider), firstRadarValue(event.StreamMode, SecurityRadarStreamModeLogs), normalizeRadarNetwork(event.Network), firstRadarValue(event.ModuleID, "unknown"), firstRadarValue(event.EventType, "stream_event"), strings.TrimSpace(event.Target), firstRadarValue(event.TargetType, "unknown"), strings.TrimSpace(event.Signature), event.Slot, strings.TrimSpace(event.ProgramID), firstRadarValue(event.EvidenceQuality, "raw_stream"), string(decoded), string(rawEvent)).Scan(&id)
+		RETURNING id::text`, firstRadarValue(event.Provider, SecurityRadarStreamProvider), firstRadarValue(event.StreamMode, SecurityRadarStreamModeLogs), normalizeRadarNetwork(event.Network), firstRadarValue(event.ModuleID, "unknown"), firstRadarValue(event.EventType, "stream_event"), strings.TrimSpace(event.Target), firstRadarValue(event.TargetType, "unknown"), strings.TrimSpace(event.Signature), event.Slot, strings.TrimSpace(event.ProgramID), firstRadarValue(event.EvidenceQuality, "raw_stream"), string(decoded), rawHash).Scan(&id)
 	if err == sql.ErrNoRows {
 		return "", nil
 	}
