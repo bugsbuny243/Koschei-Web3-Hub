@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const publicImpactCacheKey = "public-impact:v2"
+const publicImpactCacheKey = "public-impact:v3-evidence"
 
 var publicImpactCacheTTL = 60 * time.Second
 
@@ -122,34 +122,8 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 	if err != nil {
 		return publicImpactMetrics{}, err
 	}
-	mevSaved, err := safeImpactFloat(ctx, db, `SELECT COALESCE(SUM(estimated_loss_usd),0)::float FROM mev_protection_events`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
-	liquiditySaved, err := safeImpactFloat(ctx, db, `SELECT COALESCE(SUM(loss_prevented_usd),0)::float FROM liquidity_drain_alerts`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
-	last24hSaved, err := safeImpactFloat(ctx, db, `
-		SELECT COALESCE(SUM(amount_usd),0)::float
-		FROM (
-			SELECT estimated_loss_usd AS amount_usd FROM mev_protection_events WHERE created_at >= now() - interval '24 hours'
-			UNION ALL
-			SELECT loss_prevented_usd AS amount_usd FROM liquidity_drain_alerts WHERE created_at >= now() - interval '24 hours'
-		) impact_amounts`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
-	last7dSaved, err := safeImpactFloat(ctx, db, `
-		SELECT COALESCE(SUM(amount_usd),0)::float
-		FROM (
-			SELECT estimated_loss_usd AS amount_usd FROM mev_protection_events WHERE created_at >= now() - interval '7 days'
-			UNION ALL
-			SELECT loss_prevented_usd AS amount_usd FROM liquidity_drain_alerts WHERE created_at >= now() - interval '7 days'
-		) impact_amounts`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
+	// No independently verified prevented-loss amounts exist in these source tables.
+	// Never promote request-derived estimates into public monetary claims.
 	activeWallets, err := safeImpactCount(ctx, db, `
 		SELECT GREATEST(
 			COALESCE((SELECT COUNT(DISTINCT lower(user_wallet)) FROM mev_protection_events WHERE user_wallet <> ''),0),
@@ -162,14 +136,7 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 	if err != nil {
 		return publicImpactMetrics{}, err
 	}
-	biggest, err := latestBiggestPrevention(ctx, db)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
-	recentLogs, err := recentImpactPreventionLogs(ctx, db)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
+	// Historical rows contain unverified amounts and scores; do not publish them.
 
 	count := func(query string) (int64, error) { return safeImpactCount(ctx, db, query) }
 	mevEvents, err := count(`SELECT COUNT(*) FROM mev_protection_events`)
@@ -177,10 +144,6 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 		return publicImpactMetrics{}, err
 	}
 	liquidityAlerts, err := count(`SELECT COUNT(*) FROM liquidity_drain_alerts`)
-	if err != nil {
-		return publicImpactMetrics{}, err
-	}
-	rugPulls, err := count(`SELECT COUNT(*) FROM liquidity_drain_alerts WHERE risk_score >= 45 OR upper(severity) IN ('YÜKSEK','KRİTİK','HIGH','CRITICAL')`)
 	if err != nil {
 		return publicImpactMetrics{}, err
 	}
@@ -208,16 +171,16 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 	return publicImpactMetrics{
 		OK:                           true,
 		Statement:                    "Koschei Public Shield is a no-custody public-good risk prevention layer for Web3 builders and users.",
-		VerificationNote:             "These metrics are backed by read-only database aggregates from blockchain-verifiable event records.",
+		VerificationNote:             "Event counts are read-only database aggregates. Prevented-loss amounts and risk scores are not independently verified and are not published.",
 		NoCustody:                    "No private keys. No seed phrases. No custody. Read-only intelligence.",
-		TotalSavedUSD:                roundUSD(mevSaved + liquiditySaved),
-		MEVEstimatedLossPreventedUSD: roundUSD(mevSaved),
-		LiquidityLossPreventedUSD:    roundUSD(liquiditySaved),
-		RugPullsPrevented:            rugPulls,
+		TotalSavedUSD:                0,
+		MEVEstimatedLossPreventedUSD: 0,
+		LiquidityLossPreventedUSD:    0,
+		RugPullsPrevented:            0,
 		ActiveProtectedWallets:       activeWallets,
-		Last24HBiggestPrevention:     biggest,
-		Last24HPreventedUSD:          roundUSD(last24hSaved),
-		Last7DPreventedUSD:           roundUSD(last7dSaved),
+		Last24HBiggestPrevention:     nil,
+		Last24HPreventedUSD:          0,
+		Last7DPreventedUSD:           0,
 		MEVEventsCount:               mevEvents,
 		LiquidityAlertsCount:         liquidityAlerts,
 		SystemActiveUsers:            systemActiveUsers,
@@ -228,7 +191,7 @@ func buildPublicImpactMetrics(ctx context.Context, db *sql.DB) (publicImpactMetr
 		WatchlistSourceCount:         watchlistSources,
 		Web3EventCount:               web3Events,
 		LiveModules:                  mods,
-		RecentLogs:                   recentLogs,
+		RecentLogs:                   []publicImpactPreventionLog{},
 		PublicRoadmap:                []string{"Publish verifiable public-good impact snapshots", "Open-source MEV Shield and Liquidity Radar safety modules", "Add community-maintained risk feeds for Solana and Ethereum"},
 		UpdatedAt:                    time.Now().UTC(),
 		CacheTTLSeconds:              int(publicImpactCacheTTL.Seconds()),

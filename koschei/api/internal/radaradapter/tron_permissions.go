@@ -1,6 +1,7 @@
 package radaradapter
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 // It is a read-only observation, not a compromise or safety verdict.
 type TronPermissionFinding struct {
 	ID                 string
+	Operations         string
 	Type               int
 	Threshold          int64
 	TotalWeight        int64
@@ -24,10 +26,11 @@ type tronPermissionResponse struct {
 	WitnessPermission *tronPermissionJSON  `json:"witness_permission"`
 }
 type tronPermissionJSON struct {
-	ID        int   `json:"id"`
-	Type      int   `json:"type"`
-	Threshold int64 `json:"threshold"`
-	Keys      []struct {
+	ID         int    `json:"id"`
+	Type       int    `json:"type"`
+	Threshold  int64  `json:"threshold"`
+	Operations string `json:"operations"`
+	Keys       []struct {
 		Address string `json:"address"`
 		Weight  int64  `json:"weight"`
 	} `json:"keys"`
@@ -58,19 +61,42 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 			return nil, errors.New("invalid or repeated tron permission ID")
 		}
 		seen[permission.ID] = true
+		if permission.Type == 2 && permission.ID < 2 {
+			return nil, errors.New("tron active permission ID must be at least 2")
+		}
+		if permission.Type == 0 && permission.ID != 0 {
+			return nil, errors.New("tron owner permission ID must be zero")
+		}
+		if permission.Type == 1 && permission.ID != 1 {
+			return nil, errors.New("tron witness permission ID must be one")
+		}
+		if permission.Type < 0 || permission.Type > 2 {
+			return nil, errors.New("unknown tron permission type")
+		}
+		if permission.Type == 2 && permission.Operations != "" {
+			if len(permission.Operations) != 64 {
+				return nil, errors.New("invalid tron active permission operations mask length")
+			}
+			for _, digit := range permission.Operations {
+				if !strings.ContainsRune("0123456789abcdefABCDEF", digit) {
+					return nil, errors.New("invalid tron active permission operations mask encoding")
+				}
+			}
+		}
 		if permission.Threshold <= 0 {
 			return nil, errors.New("tron permission threshold must be positive")
 		}
 		var total int64
 		seenKeys := make(map[string]bool, len(permission.Keys))
 		for _, key := range permission.Keys {
-			if strings.TrimSpace(key.Address) == "" || key.Weight <= 0 {
+			if !validTronPermissionAddress(key.Address) || key.Weight <= 0 {
 				return nil, errors.New("tron permission key is incomplete")
 			}
-			if seenKeys[key.Address] {
+			signerID := canonicalTronPermissionSigner(key.Address)
+			if seenKeys[signerID] {
 				return nil, errors.New("duplicate tron permission signer")
 			}
-			seenKeys[key.Address] = true
+			seenKeys[signerID] = true
 			if total > int64(^uint64(0)>>1)-key.Weight {
 				return nil, errors.New("tron permission weight overflow")
 			}
@@ -78,6 +104,7 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 		}
 		findings = append(findings, TronPermissionFinding{
 			ID:                 fmt.Sprintf("%d", permission.ID),
+			Operations:         strings.ToLower(permission.Operations),
 			Type:               permission.Type,
 			Threshold:          permission.Threshold,
 			TotalWeight:        total,
@@ -86,4 +113,55 @@ func ParseTronAccountPermissions(raw []byte) ([]TronPermissionFinding, error) {
 		})
 	}
 	return findings, nil
+}
+
+// Tron account APIs may return a 21-byte hex address (41 prefix) or a
+// 34-character Base58Check address. Both encodings are validated locally.
+func validTronPermissionAddress(address string) bool {
+	return canonicalTronPermissionSigner(address) != ""
+}
+
+func canonicalTronPermissionSigner(address string) string {
+	if address != strings.TrimSpace(address) {
+		return ""
+	}
+	if len(address) == 42 && strings.HasPrefix(address, "41") {
+		for _, char := range address[2:] {
+			if !strings.ContainsRune("0123456789abcdefABCDEF", char) {
+				return ""
+			}
+		}
+		return strings.ToLower(address)
+	}
+	if len(address) == 34 && strings.HasPrefix(address, "T") {
+		const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+		decoded := make([]byte, 25)
+		for _, char := range address {
+			index := strings.IndexRune(alphabet, char)
+			if index < 0 {
+				return ""
+			}
+			carry := index
+			for i := len(decoded) - 1; i >= 0; i-- {
+				carry += int(decoded[i]) * 58
+				decoded[i] = byte(carry)
+				carry >>= 8
+			}
+			if carry != 0 {
+				return ""
+			}
+		}
+		if decoded[0] != 0x41 {
+			return ""
+		}
+		first := sha256.Sum256(decoded[:21])
+		second := sha256.Sum256(first[:])
+		for i := 0; i < 4; i++ {
+			if decoded[21+i] != second[i] {
+				return ""
+			}
+		}
+		return fmt.Sprintf("%x", decoded[:21])
+	}
+	return ""
 }

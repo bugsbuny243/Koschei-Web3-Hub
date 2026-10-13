@@ -31,13 +31,70 @@ func TestTronPermissionParserFailsClosed(t *testing.T) {
 	for _, raw := range []string{
 		`{}`,
 		`{"owner_permission":{"id":0,"threshold":0}}`,
+		`{"owner_permission":{"type":0,"id":2,"threshold":1,"keys":[{"address":"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","weight":1}]}}`,
+		`{"active_permission":[{"type":2,"id":1,"threshold":1,"keys":[{"address":"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","weight":1}]}]}`,
 		`{"active_permission":[{"id":2,"threshold":1,"keys":[{"address":"abc","weight":-1}]}]}`,
 		`{"active_permission":[{"id":2,"threshold":1},{"id":2,"threshold":1}]}`,
 		`not json`,
+		`{"owner_permission":{"id":0,"threshold":1,"keys":[{"address":"41aaaa","weight":1}]}}`,
+		`{"owner_permission":{"id":0,"threshold":1,"keys":[{"address":"41zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz","weight":1}]}}`,
 		`{"owner_permission":{"id":0,"threshold":2,"keys":[{"address":"41aaaa","weight":1},{"address":"41aaaa","weight":1}]}}`,
+		`{"owner_permission":{"id":0,"threshold":2,"keys":[{"address":"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","weight":1},{"address":"41AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","weight":1}]}}`,
+		`{"owner_permission":{"id":0,"threshold":2,"keys":[{"address":"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","weight":1},{"address":"TRXcKoEvHr6Y38VMcDYGBEYKznvH3XUX4g","weight":1}]}}`,
 	} {
 		if _, err := ParseTronAccountPermissions([]byte(raw)); err == nil {
 			t.Fatalf("invalid permission accepted: %s", raw)
 		}
+	}
+}
+
+func TestTronPermissionAddressShape(t *testing.T) {
+	for _, address := range []string{
+		"41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		"TRXcKoEvHr6Y38VMcDYGBEYKznvH3XUX4g",
+	} {
+		if !validTronPermissionAddress(address) {
+			t.Fatalf("expected valid address shape: %s", address)
+		}
+	}
+	for _, address := range []string{"", "abc", " 41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "41gggggggggggggggggggggggggggggggggggggggg", "T000000000000000000000000000000000", "TAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"} {
+		if validTronPermissionAddress(address) {
+			t.Fatalf("accepted invalid address shape: %s", address)
+		}
+	}
+}
+
+func TestTronPermissionCanonicalSignerIdentity(t *testing.T) {
+	hexSigner := "41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	base58Signer := "TRXcKoEvHr6Y38VMcDYGBEYKznvH3XUX4g"
+	if canonicalTronPermissionSigner(hexSigner) != canonicalTronPermissionSigner(base58Signer) {
+		t.Fatal("hex and Base58Check addresses for same signer must canonicalize identically")
+	}
+}
+
+func TestTronActiveOperationsMask(t *testing.T) {
+	const signer = "41aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	const validMask = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+	for _, tc := range []struct {
+		name string
+		mask string
+		ok   bool
+	}{
+		{"valid", validMask, true},
+		{"short", "ff", false},
+		{"non-hex", "gg" + validMask[2:], false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := []byte(`{"active_permission":[{"id":2,"type":2,"threshold":1,"operations":"` + tc.mask +
+				`","keys":[{"address":"` + signer + `","weight":1}]}]}`)
+			findings, err := ParseTronAccountPermissions(raw)
+			if tc.ok {
+				if err != nil || len(findings) != 1 || findings[0].Operations != tc.mask {
+					t.Fatalf("expected preserved operations mask: %+v, %v", findings, err)
+				}
+			} else if err == nil {
+				t.Fatal("accepted invalid Tron operations mask")
+			}
+		})
 	}
 }

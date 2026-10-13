@@ -61,6 +61,10 @@ func (h *Handler) LiquidityDrainAnalyze(w http.ResponseWriter, r *http.Request) 
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "pool_or_token_required"})
 		return
 	}
+	if !validLiquidityRadarInputs(req) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_liquidity_metrics"})
+		return
+	}
 	score := liquidityDrainScore(req)
 	severity := "DÜŞÜK"
 	if score >= 75 {
@@ -90,6 +94,15 @@ func (h *Handler) LiquidityDrainAnalyze(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "risk_score": score, "severity": severity, "liquidity_loss_prevented_usd": lossPrevented, "telegram_queued": emergency.TelegramSent, "discord_queued": emergency.DiscordSent, "sms_queued": req.TwilioPhoneNumber != "", "emergency": emergency, "message": "Likidite boşaltma radarı alarmı üretildi."})
+}
+
+// User-supplied liquidity metrics are hints, not verified on-chain evidence.
+// Reject impossible or non-finite values before scoring, alerting or charging.
+func validLiquidityRadarInputs(req liquidityRadarRequest) bool {
+	return !math.IsNaN(req.ReserveDropPct) && !math.IsInf(req.ReserveDropPct, 0) &&
+		!math.IsNaN(req.RemovedLiquidity) && !math.IsInf(req.RemovedLiquidity, 0) &&
+		req.ReserveDropPct >= 0 && req.ReserveDropPct <= 100 &&
+		req.RemovedLiquidity >= 0 && req.BlockDelay >= 0
 }
 
 func liquidityDrainScore(req liquidityRadarRequest) int {

@@ -105,3 +105,104 @@ func (registry *UniversalAdapterRegistry) HasRuntimeCollector(target radaradapte
 	}
 	return matches == 1
 }
+
+// PrepareTronWalletPlan enables a Tron permission probe only when exactly one
+// explicitly installed native-account collector matches the classified target.
+// This does not register an adapter or enable any customer-facing endpoint.
+func (registry *UniversalAdapterRegistry) PrepareTronWalletPlan(plan UniversalInvestigationPlan) (UniversalInvestigationPlan, error) {
+	target := radaradapter.Target{Network: plan.Subject.Network, Kind: plan.Subject.Kind, Raw: plan.Subject.Raw}
+	if target.Network != "tron-mainnet" || (target.Kind != "account" && target.Kind != "wallet") ||
+		strings.TrimSpace(plan.Subject.ID) == "" || strings.TrimSpace(plan.Subject.CanonicalRef) == "" ||
+		strings.TrimSpace(target.Raw) == "" || !registry.HasRuntimeCollector(target) {
+		return plan, errors.New("tron wallet requires a classified subject and exactly one installed collector")
+	}
+	for _, adapter := range registry.adapters {
+		if !adapter.Supports(target) {
+			continue
+		}
+		identity := adapter.Subject()
+		if _, native := adapter.(*radaradapter.TronWalletAdapter); !native {
+			return plan, errors.New("tron plan requires native wallet collector")
+		}
+		if identity.Network != "tron-mainnet" || identity.IdentityKind != "account" ||
+			strings.TrimSpace(identity.NativeID) == "" {
+			return plan, errors.New("tron collector native account identity unavailable")
+		}
+		plan.Route = UniversalDispatchTronWallet
+		plan.Executable = false // collection, not declaration, determines execution
+		plan.EvidenceOnly = true
+		plan.VerdictAuthority = UniversalVerdictEvidenceOnly
+		return plan, nil
+	}
+	return plan, errors.New("tron wallet collector unavailable")
+}
+
+// CollectTronWalletPermissions runs a deliberately bounded, read-only Tron
+// permission probe through an explicitly registered native collector. It does
+// not register a public route or produce a safety verdict.
+func (registry *UniversalAdapterRegistry) CollectTronWalletPermissions(ctx context.Context, plan UniversalInvestigationPlan) (UniversalAdapterCollection, error) {
+	if err := ctx.Err(); err != nil {
+		return UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}, err
+	}
+	prepared, err := registry.PrepareTronWalletPlan(plan)
+	if err != nil {
+		return UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}, err
+	}
+	collected, err := registry.Collect(ctx, prepared)
+	if err != nil {
+		return collected, err
+	}
+	if !collected.Executable || collected.Route != UniversalDispatchTronWallet || len(collected.Evidence) == 0 {
+		return collected, errors.New("tron permissions evidence unavailable")
+	}
+	for _, evidence := range collected.Evidence {
+		if evidence.Status != IntelligenceEvidenceObserved || evidence.SubjectID != prepared.Subject.ID ||
+			evidence.Network != "tron-mainnet" || evidence.Provenance != "radaradapter_read_only" ||
+			evidence.Attributes["account_state_height_verified"] != false {
+			return UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}, errors.New("tron permission evidence lacks observed-only provenance")
+		}
+	}
+	return collected, nil
+}
+
+// CollectTronWalletAddress constructs a narrowly scoped account subject from
+// the caller's target. The native adapter validates Tron address syntax;
+// no generic address classifier or verdict pipeline is bypassed.
+func (registry *UniversalAdapterRegistry) CollectTronWalletAddress(ctx context.Context, address string) (UniversalAdapterCollection, error) {
+	result := UniversalAdapterCollection{Route: UniversalDispatchDeclaredOnly}
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return result, errors.New("tron account address is required")
+	}
+	// Bind subject identity to the native collector's canonical account ID.
+	// Base58Check and hex representations of one account must not create
+	// different evidence subjects. Ambiguous matches fail closed.
+	target := radaradapter.Target{Network: "tron-mainnet", Kind: "account", Raw: address}
+	var canonical string
+	if registry != nil {
+		for _, adapter := range registry.adapters {
+			if !adapter.Supports(target) {
+				continue
+			}
+			if canonical != "" {
+				return result, errors.New("ambiguous tron account collector")
+			}
+			identity := adapter.Subject()
+			if identity.Network != "tron-mainnet" || identity.IdentityKind != "account" || strings.TrimSpace(identity.NativeID) == "" {
+				return result, errors.New("tron collector native account identity unavailable")
+			}
+			canonical = identity.NativeID
+		}
+	}
+	if canonical == "" {
+		return result, errors.New("tron account collector unavailable")
+	}
+	subject := IntelligenceSubject{
+		ID:           "tron-mainnet:account:" + canonical,
+		CanonicalRef: "tron-mainnet:account:" + canonical,
+		Network:      "tron-mainnet",
+		Kind:         "account",
+		Raw:          address,
+	}
+	return registry.CollectTronWalletPermissions(ctx, UniversalInvestigationPlan{Subject: subject})
+}

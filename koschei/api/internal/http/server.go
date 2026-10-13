@@ -222,6 +222,7 @@ func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, planTier, pl
 	mux.HandleFunc("/api/jobs/token-scan", solana(risk(requiresDB(h, planTier("professional", method("POST", h.CreateWeb3Job))))))
 	mux.HandleFunc("/api/jobs/", solana(requiresDB(h, handlers.RequireAuth(method("GET", h.GetWeb3Job)))))
 	mux.HandleFunc("/api/v1/radar/detail", solana(requiresDB(h, planTier("professional", method("GET", h.SecurityRadarDetailV3)))))
+	mux.HandleFunc("/api/v1/radar/tron-wallet-permissions", requiresDB(h, planTier("professional", method("GET", h.TronWalletPermissions))))
 	mux.HandleFunc("/api/customer/web3/transaction-preflight", solana(requiresDB(h, planTier("professional", method("POST", h.TransactionGuardV2Configured)))))
 	mux.HandleFunc("/api/customer/web3/transaction-state-recheck", solana(requiresDB(h, planTierAccess("professional", customerStateRecheckRateLimit(h.DB, method("POST", h.TransactionGuardStateRecheck))))))
 	mux.HandleFunc("/api/v1/radar/feed", solana(requiresDB(h, planTier("professional", method("GET", h.SecurityRadarFeed)))))

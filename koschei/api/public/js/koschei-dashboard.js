@@ -30,10 +30,16 @@ function installUniversalScanEntry(){
   const network=$('dashboardScanNetwork'),status=$('dashboardScanStatus');
   if(!form||!input||!network)return;
   const guidance='Read-only analysis. No wallet connection or private keys. Evidence must be verified by ARVIS.';
+  const helper=window.KoscheiScanEntry;
+  if(!helper||typeof helper.url!=='function'){
+    if(status)status.textContent='Shared radar routing unavailable. Navigation is disabled.';
+    form.addEventListener('submit',event=>event.preventDefault());
+    return;
+  }
   const updateGuidance=()=>{
     if(!status)return;
     if(!input.value.trim()){status.textContent=guidance;return;}
-    const route=window.KoscheiScanEntry?.url(input.value,network.value);
+    const route=helper.url(input.value,network.value);
     if(!route){status.textContent='Target validation is unavailable. Try again when the radar is ready.';return;}
     if(route.error){status.textContent=route.error;return;}
     status.textContent=route.kind==='transaction'
@@ -44,9 +50,9 @@ function installUniversalScanEntry(){
   network.addEventListener('change',updateGuidance);
   form.addEventListener('submit',event=>{
     event.preventDefault();
-    const route=window.KoscheiScanEntry?.url(input.value,network.value);
+    const route=helper.url(input.value,network.value);
     if(!route){if(status)status.textContent='Target validation is unavailable. Navigation was stopped.';return;}
-    if(route.error){if(status)status.textContent=route.error;(route.needsNetwork?network:input).focus();return;}
+    if(route.error){if(status)status.textContent=route.error;(route?.needsNetwork?network:input).focus();return;}
     location.assign(route.url);
   });
 }
