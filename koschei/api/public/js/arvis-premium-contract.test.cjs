@@ -17,3 +17,14 @@ for(const [name,payload,known,is2022] of [
  if(!known){assert.match(html,/EVIDENCE MISSING/);assert.doesNotMatch(html,/Classic SPL Token program/);}
  if(is2022){assert.doesNotMatch(html,/Classic SPL Token program/);assert.equal(model.extensionUnresolved,true);}
 });
+
+test('classic program needs independently verified mint owner',()=>{
+ const program='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
+ for(const payload of [{token_2022:false},{token_program:program},{mint_owner_program:program,mint_owner_program_evidence_status:'observed'}]){
+  assert.equal(api.normalize(payload).classicVerified,false);
+  assert.match(api.renderPremiumCard(payload),/EVIDENCE MISSING/);
+ }
+ const payload={mint_owner_program:program,mint_owner_program_evidence_status:'verified'};
+ assert.equal(api.normalize(payload).classicVerified,true);
+ assert.match(api.renderPremiumCard(payload),/Classic SPL Token program/);
+});
