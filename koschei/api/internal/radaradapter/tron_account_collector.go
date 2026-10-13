@@ -114,10 +114,23 @@ func (observation TronAccountObservation) EvidenceRows(observedAt time.Time, ver
 	rows := make([]EvidenceRow, 0, len(observation.Permissions))
 	for _, permission := range observation.Permissions {
 		rows = append(rows, EvidenceRow{
-			ID: "tron-permission-" + permission.ID, SubjectID: observation.Address, Status: "observed",
-			Source: observation.Provider, ObservedAt: observedAt, Height: strconv.FormatInt(verifiedBlockHeight, 10),
+			ID:         "tron-permission-" + permission.ID,
+			SubjectID:  observation.Address,
+			Status:     "observed",
+			Source:     observation.Provider,
+			ObservedAt: observedAt,
+			Height:     strconv.FormatInt(verifiedBlockHeight, 10),
 			RawHash:    observation.RawResponseSHA256,
-			Attributes: map[string]any{"permission_id": permission.ID, "permission_type": permission.Type, "threshold": permission.Threshold, "total_weight": permission.TotalWeight, "key_count": permission.KeyCount, "threshold_reachable": permission.ThresholdReachable, "operations": permission.Operations, "account_state_height_verified": false},
+			Attributes: map[string]any{
+				"permission_id":                  permission.ID,
+				"permission_type":                permission.Type,
+				"threshold":                      permission.Threshold,
+				"total_weight":                   permission.TotalWeight,
+				"key_count":                      permission.KeyCount,
+				"threshold_reachable":            permission.ThresholdReachable,
+				"operations":                     permission.Operations,
+				"account_state_height_verified": false,
+			},
 		})
 	}
 	subject := SubjectIdentity{Network: observation.Network, IdentityKind: "account", IdentityValue: observation.Address, NativeID: observation.Address}
