@@ -29,13 +29,14 @@ func (h *Handler) exposureToken2022Section(ctx context.Context, target, network 
 	}
 
 	if err := h.callSolanaRPC(ctx, client, rpcURL, network, "getAccountInfo", []interface{}{target, map[string]string{"encoding": "jsonParsed"}}, &account); err != nil {
-		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": false, "status": "rpc_unavailable", "is_token_2022": false, "evidence": []string{"Token-2022 extension evidence could not be collected from the RPC provider."}}
+		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": false, "status": "rpc_unavailable", "mint_owner_program_evidence_status": "unverified", "evidence": []string{"Token-2022 extension evidence could not be collected from the RPC provider."}}
 	}
 	if account.Value == nil {
-		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": false, "status": "account_not_found", "is_token_2022": false, "evidence": []string{"Target account was not found; Token-2022 extension state is unavailable."}}
+		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": false, "status": "account_not_found", "mint_owner_program_evidence_status": "unverified", "evidence": []string{"Target account was not found; Token-2022 extension state is unavailable."}}
 	}
 
 	info := account.Value.Data.Parsed.Info
+	ownerEvidence := mintOwnerProgramEvidence(account.Value.Owner)
 	isMint := strings.EqualFold(strings.TrimSpace(account.Value.Data.Parsed.Type), "mint")
 	isToken2022 := account.Value.Owner == token2022ProgramID || strings.EqualFold(account.Value.Data.Program, "spl-token-2022")
 	tokenProgram := "spl-token"
@@ -43,7 +44,11 @@ func (h *Handler) exposureToken2022Section(ctx context.Context, target, network 
 		tokenProgram = "token-2022"
 	}
 	if !isMint {
-		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": true, "status": "target_not_mint", "is_token_2022": isToken2022, "token_program": tokenProgram, "account_owner": account.Value.Owner, "evidence": []string{"Target exists, but it is not parsed as a token mint; Token-2022 mint extensions are not applicable."}}
+		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": true, "status": "target_not_mint", "mint_owner_program_evidence_status": "unverified", "token_program": tokenProgram, "account_owner": account.Value.Owner, "evidence": []string{"Target exists, but it is not parsed as a token mint; Token-2022 mint extensions are not applicable."}}
+	}
+
+	if ownerEvidence["mint_owner_program_evidence_status"] != "verified" {
+		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": false, "status": "mint_owner_program_unverified", "mint_owner_program_evidence_status": "unverified", "evidence": []string{"Mint owner program is unknown; Token-2022 extensions cannot be ruled out."}}
 	}
 
 	extensions := []tokenExtensionAssessment{}
@@ -70,7 +75,7 @@ func (h *Handler) exposureToken2022Section(ctx context.Context, target, network 
 	}
 
 	riskIndex := exposureToken2022RiskIndex(isToken2022, penalty, extensions, visibility)
-	return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": extensionEvidenceComplete, "status": extensionResolutionStatus, "risk_index": riskIndex, "risk_level": exposureRiskLevelFromScore(riskIndex), "is_token_2022": isToken2022, "token_program": tokenProgram, "account_owner": account.Value.Owner, "extension_count": len(extensions), "extension_risk_penalty": penalty, "extension_resolution_status": extensionResolutionStatus, "extension_evidence_complete": extensionEvidenceComplete, "final_policy": token2022FinalPolicy(100-riskIndex, extensions, visibility, extensionEvidenceComplete), "extensions": extensions, "transfer_behavior": behavior, "visibility_limitations": visibility, "compatibility_warnings": compatibility, "evidence": findings}
+	return mergeMintOwnerEvidence(ownerEvidence, map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": extensionEvidenceComplete, "status": extensionResolutionStatus, "risk_index": riskIndex, "risk_level": exposureRiskLevelFromScore(riskIndex), "is_token_2022": isToken2022, "token_program": tokenProgram, "account_owner": account.Value.Owner, "extension_count": len(extensions), "extension_risk_penalty": penalty, "extension_resolution_status": extensionResolutionStatus, "extension_evidence_complete": extensionEvidenceComplete, "final_policy": token2022FinalPolicy(100-riskIndex, extensions, visibility, extensionEvidenceComplete), "extensions": extensions, "transfer_behavior": behavior, "visibility_limitations": visibility, "compatibility_warnings": compatibility, "evidence": findings})
 }
 
 func exposureToken2022Status(isToken2022 bool, extensions []tokenExtensionAssessment) string {
@@ -127,4 +132,29 @@ func exposureRiskLevelFromScore(score int) string {
 	default:
 		return "low"
 	}
+}
+
+// mintOwnerProgramEvidence is deliberately tri-state: an unrecognized owner
+// cannot be classified as classic SPL Token or ruled out as Token-2022.
+func mintOwnerProgramEvidence(owner string) map[string]any {
+	owner = strings.TrimSpace(owner)
+	result := map[string]any{"mint_owner_program_evidence_status": "unverified"}
+	switch owner {
+	case token2022ProgramID:
+		result["mint_owner_program"] = owner
+		result["mint_owner_program_evidence_status"] = "verified"
+		result["token_2022"] = true
+	case "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA":
+		result["mint_owner_program"] = owner
+		result["mint_owner_program_evidence_status"] = "verified"
+		result["token_2022"] = false
+	}
+	return result
+}
+
+func mergeMintOwnerEvidence(evidence, section map[string]any) map[string]any {
+	for key, value := range evidence {
+		section[key] = value
+	}
+	return section
 }
