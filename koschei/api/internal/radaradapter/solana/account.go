@@ -3,7 +3,6 @@ package solana
 import (
 	"encoding/base64"
 	"encoding/json"
-	"bytes"
 	"errors"
 )
 
@@ -31,9 +30,7 @@ func DecodeAccountInfo(raw json.RawMessage) (Account, error) {
 			Data       json.RawMessage `json:"data"`
 		} `json:"value"`
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&envelope); err != nil || envelope.Value == nil {
+	if err := json.Unmarshal(raw, &envelope); err != nil || envelope.Value == nil {
 		return Account{}, errors.New("missing Solana account value")
 	}
 	var pair []string
