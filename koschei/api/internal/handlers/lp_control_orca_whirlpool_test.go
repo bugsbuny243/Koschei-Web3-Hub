@@ -10,7 +10,7 @@ import (
 	"koschei/api/internal/services"
 )
 
-// Snapshot returned by Solana getAccountInfo (finalized slot 456946064)
+// Snapshot returned by Solana getAccountInfo (finalized slot 456948159)
 // for Orca PYUSD/USDC Whirlpool 9tXiuRRw7kbejLhZXtxDxYs2REe43uH2e7k1kocgdM9B.
 // Owner: whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc, space: 653.
 // Vault readings were separately checked with getTokenAccountBalance.
@@ -36,7 +36,7 @@ func TestOrcaWhirlpoolPYUSDRealRPCFixture(t *testing.T) {
 				case "getAccountInfo":
 					reads++
 					response := out.(*rpcAccountInfoResponse)
-					response.Context.Slot = 456946064
+					response.Context.Slot = 456948159
 					response.Value = &struct {
 						Owner string `json:"owner"`
 						Data  any    `json:"data"`
@@ -92,7 +92,7 @@ func TestOrcaWhirlpoolRejectsCorruptDiscriminatorAndUnsupportedOwner(t *testing.
 			return errors.New("unsupported program must not cause reserve calls")
 		}
 		response := out.(*rpcAccountInfoResponse)
-		response.Context.Slot = 456946064
+		response.Context.Slot = 456948159
 		response.Value = &struct {
 			Owner string `json:"owner"`
 			Data  any    `json:"data"`
