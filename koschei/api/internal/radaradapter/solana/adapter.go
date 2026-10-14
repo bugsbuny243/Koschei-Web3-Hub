@@ -85,7 +85,7 @@ func (a *Adapter) Collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 	dataRow := r.NewRow(a.subject, "solana-programdata-authority", dataResponse, strconv.FormatUint(slot, 10), map[string]any{
 		"programdata_address": dataAddress,
 		"upgrade_slot": state.Slot,
-		"authority_present": state.HasAuthority,
+		"authority_present": state.Authority != nil,
 		"programdata_owner": dataAccount.Owner,
 	})
 	return []r.EvidenceRow{row, dataRow}, limits, nil
