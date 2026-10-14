@@ -13,7 +13,7 @@ func TestEveryRegisteredNetworkPassesOfflineConformance(t *testing.T) {
 	if len(failures) > 0 {
 		t.Fatal(failures)
 	}
-	if len(registry.Capabilities()) != 23 {
+	if len(registry.Capabilities()) != 24 {
 		t.Fatalf("got %d capabilities", len(registry.Capabilities()))
 	}
 }
