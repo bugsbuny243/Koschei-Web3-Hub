@@ -23,8 +23,9 @@ type ArvisArmCoverage struct {
 	Signed           bool   `json:"signed"`
 	EvidenceVerified bool   `json:"evidence_verified"`
 	EvidenceCount    int    `json:"evidence_count"`
-	Reason           string               `json:"reason,omitempty"`
-	Subchecks        ArvisModuleSubchecks `json:"subchecks"`
+	Reason           string `json:"reason,omitempty"`
+
+	Subchecks ArvisModuleSubchecks `json:"subchecks"`
 }
 
 type ArvisInvestigationCoverage struct {
