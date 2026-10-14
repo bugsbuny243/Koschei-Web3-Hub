@@ -13,6 +13,7 @@ import (
 // or a verdict: a separate independent confirmation path is required.
 func AdaptRadarEvidence(subject IntelligenceSubject, identity radaradapter.SubjectIdentity, rows []radaradapter.EvidenceRow) ([]IntelligenceEvidence, error) {
 	if strings.TrimSpace(subject.ID) == "" ||
+		strings.TrimSpace(string(subject.ChainFamily)) == "" || strings.TrimSpace(subject.Chain) == "" ||
 		!strings.EqualFold(strings.TrimSpace(subject.Network), strings.TrimSpace(identity.Network)) ||
 		strings.TrimSpace(subject.CanonicalRef) == "" {
 		return nil, errors.New("radar subject and native chain identity mismatch")

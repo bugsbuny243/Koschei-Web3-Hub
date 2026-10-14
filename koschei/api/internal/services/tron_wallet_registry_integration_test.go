@@ -43,7 +43,7 @@ func TestTronWalletRegistryCollectsObservedEvidenceWithoutRoutePromotion(t *test
 	}
 	plan := UniversalInvestigationPlan{
 		Subject: IntelligenceSubject{ID: "tron-fixture", CanonicalRef: "tron-mainnet:account:" + account,
-			Network: "tron-mainnet", Kind: "account", Raw: account},
+			ChainFamily: IntelligenceChainFamilyTron, Chain: "tron", Network: "tron-mainnet", Kind: "account", Raw: account},
 		Route: UniversalDispatchDeclaredOnly,
 	}
 	result, err := registry.Collect(context.Background(), plan)

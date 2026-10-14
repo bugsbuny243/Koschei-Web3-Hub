@@ -44,3 +44,30 @@ func TestAdaptRadarEvidenceRejectsDuplicateIDs(t *testing.T) {
 		t.Fatal("duplicate evidence IDs must be rejected")
 	}
 }
+
+func TestAdaptRadarEvidenceRequiresChainIdentity(t *testing.T) {
+	identity := radaradapter.SubjectIdentity{
+		Network: "ethereum-mainnet", IdentityKind: "chain_id",
+		IdentityValue: "1", NativeID: "account",
+	}
+	valid := IntelligenceSubject{
+		ID: "subject-1", CanonicalRef: "fixture:account",
+		ChainFamily: IntelligenceChainFamilyEVM, Chain: "ethereum",
+		Network: "ethereum-mainnet",
+	}
+	for _, tc := range []struct {
+		name string
+		edit func(*IntelligenceSubject)
+	}{
+		{"missing chain family", func(s *IntelligenceSubject) { s.ChainFamily = "" }},
+		{"missing chain", func(s *IntelligenceSubject) { s.Chain = "" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			subject := valid
+			tc.edit(&subject)
+			if _, err := AdaptRadarEvidence(subject, identity, nil); err == nil {
+				t.Fatal("incomplete chain identity accepted")
+			}
+		})
+	}
+}
