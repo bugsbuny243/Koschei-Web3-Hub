@@ -17,7 +17,11 @@ func AdaptRadarEvidence(subject IntelligenceSubject, identity radaradapter.Subje
 		strings.TrimSpace(subject.CanonicalRef) == "" {
 		return nil, errors.New("radar subject and native chain identity mismatch")
 	}
-	// Collector rows must be bound to the classified subject before projection.\n\t// Native-account adapters are validated against NativeID at collection time.\n\tboundIdentity := identity\n\tboundIdentity.NativeID = subject.ID\n\tif err := radaradapter.ValidateEvidence(boundIdentity, rows); err != nil {
+	// Collector rows must be bound to the classified subject before projection.
+	// Native-account adapters are validated against NativeID at collection time.
+	boundIdentity := identity
+	boundIdentity.NativeID = subject.ID
+	if err := radaradapter.ValidateEvidence(boundIdentity, rows); err != nil {
 		return nil, err
 	}
 	out := make([]IntelligenceEvidence, 0, len(rows))
