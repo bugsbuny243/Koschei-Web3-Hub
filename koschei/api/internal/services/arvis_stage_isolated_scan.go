@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -175,6 +176,7 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 	accountCtx, accountCancel := radarEvidenceStageContext(parent, req, "account")
 	account, accountErr := SolanaGetAccountInfoJSONParsed(accountCtx, rpcURL, req.Target)
 	accountCancel()
+	appendStageDeadlineLimitation(&profile, "account", accountErr)
 	if accountErr == nil && account.Value != nil {
 		profile.LiveRPC = true
 		profile.AccountExists = true
@@ -188,6 +190,7 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 	supplyCtx, supplyCancel := radarEvidenceStageContext(parent, req, "supply")
 	supply, supplyErr := SolanaGetTokenSupply(supplyCtx, rpcURL, req.Target)
 	supplyCancel()
+	appendStageDeadlineLimitation(&profile, "supply", supplyErr)
 	if supplyErr == nil {
 		profile.LiveRPC = true
 		profile.IsTokenMint = true
@@ -199,6 +202,7 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 	largestCtx, largestCancel := radarEvidenceStageContext(parent, req, "largest_accounts")
 	largest, largestErr := SolanaGetTokenLargestAccounts(largestCtx, rpcURL, req.Target)
 	largestCancel()
+	appendStageDeadlineLimitation(&profile, "largest_accounts", largestErr)
 	if largestErr == nil {
 		profile.LiveRPC = true
 		profile.IsTokenMint = true
@@ -225,6 +229,7 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 	signaturesCtx, signaturesCancel := radarEvidenceStageContext(parent, req, "signatures")
 	signatures, signaturesErr := SolanaGetSignaturesForAddress(signaturesCtx, rpcURL, req.Target, 100)
 	signaturesCancel()
+	appendStageDeadlineLimitation(&profile, "signatures", signaturesErr)
 	if signaturesErr == nil {
 		profile.LiveRPC = true
 		profile.RecentSignatureCount = len(signatures)
@@ -290,4 +295,13 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 		}
 	}
 	return profile
+}
+
+// appendStageDeadlineLimitation records a named, machine-readable gap rather than
+// treating a timed-out evidence stage as a successful empty observation.
+func appendStageDeadlineLimitation(profile *radarEvidenceProfile, stage string, err error) {
+	if profile == nil || !errors.Is(err, context.DeadlineExceeded) {
+		return
+	}
+	profile.Errors = append(profile.Errors, "STAGE_DEADLINE_EXCEEDED stage="+stage)
 }
