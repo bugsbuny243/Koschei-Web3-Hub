@@ -13,5 +13,19 @@
         "base64"
       ]
     }
+  },
+  "getAccountInfoProgramData": {
+    "context": {
+      "slot": 120
+    },
+    "value": {
+      "lamports": 10,
+      "owner": "BPFLoaderUpgradeab1e11111111111111111111111",
+      "executable": false,
+      "data": [
+        "AwAAAGQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQ==",
+        "base64"
+      ]
+    }
   }
 }
