@@ -9,7 +9,8 @@ test('public impact renders record counts and withholds unverified claims',()=>{
  const row={children:Array.from({length:5},()=>({textContent:'',firstChild:{textContent:''}}))};
  const document={getElementById(id){if(!nodes.has(id))nodes.set(id,{textContent:'',style:{},classList:{add(){},remove(){}},innerHTML:''});return nodes.get(id);},querySelectorAll(){return [row];}};
  const context=vm.createContext({document,Intl,Date,fetch:()=>new Promise(()=>{})});
- vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
+ // Extract this trusted repository fixture; this is not an HTML sanitizer.
+ vm.runInContext(html.match(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/i)[1],context);
  context.render({ok:true,mev_events_count:3,liquidity_alerts_count:1,generated_outputs_count:7,total_saved_usd:999999,recent_logs:[{source:'fixture',risk_level:'critical',amount_usd:123456,occurred_at:'2026-10-13'}]});
  assert.equal(nodes.get('saved').textContent,'Kanıt yok');
  assert.equal(nodes.get('blocked').textContent,'4');

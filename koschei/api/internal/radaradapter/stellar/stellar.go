@@ -17,7 +17,9 @@ import (
 	"strings"
 )
 
-const Passphrase = "Public Global Stellar Network ; September 2015"
+// The protocol hashes this public network descriptor to obtain the network ID.
+// It is a public chain identifier, not a password or a stored credential.
+const publicNetworkDescriptor = "Public Global Stellar Network ; September 2015"
 
 func Address(s string) ([]byte, error) {
 	if len(s) != 56 || s[0] != 'G' {
@@ -93,7 +95,7 @@ func New(t r.Target, tr r.Transport) (r.Adapter, error) {
 	if e != nil {
 		return nil, e
 	}
-	h := sha256.Sum256([]byte(Passphrase))
+	h := sha256.Sum256([]byte(publicNetworkDescriptor))
 	return &Adapter{t, r.SubjectIdentity{Network: t.Network, NativeID: t.Raw, ChainIdentity: "stellar:" + hex.EncodeToString(h[:])}, tr, key, "primary"}, nil
 }
 func (a *Adapter) Supports(t r.Target) bool {
@@ -118,7 +120,7 @@ func (a *Adapter) collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 	var net struct {
 		Passphrase string `json:"passphrase"`
 	}
-	if e != nil || json.Unmarshal(raw, &net) != nil || net.Passphrase != Passphrase {
+	if e != nil || json.Unmarshal(raw, &net) != nil || net.Passphrase != publicNetworkDescriptor {
 		return rows, limits, errors.New("Stellar network passphrase mismatch")
 	}
 	res, raw, e := r.RPC(ctx, a.transport, t.Network, a.provider, "getLedgerEntries", map[string]any{"keys": []string{a.key}, "xdrFormat": "base64"})

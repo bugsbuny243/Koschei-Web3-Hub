@@ -60,6 +60,11 @@ func TestEvidenceIdentityAndStatusGuards(t *testing.T) {
 	if err := ValidateEvidence(subject, []EvidenceRow{wrongSubject}); err == nil {
 		t.Fatal("empty investigation subject ID accepted")
 	}
+	wrongSubjectIdentity := valid
+	wrongSubjectIdentity.SubjectID = "another-account"
+	if err := ValidateEvidence(subject, []EvidenceRow{wrongSubjectIdentity}); err == nil {
+		t.Fatal("evidence from a different native subject accepted")
+	}
 	wrongStatus := valid
 	wrongStatus.Status = "safe"
 	if err := ValidateEvidence(subject, []EvidenceRow{wrongStatus}); err == nil {
