@@ -38,13 +38,13 @@ func (h *Handler) exposureToken2022Section(ctx context.Context, target, network 
 	info := account.Value.Data.Parsed.Info
 	ownerEvidence := mintOwnerProgramEvidence(account.Value.Owner)
 	isMint := strings.EqualFold(strings.TrimSpace(account.Value.Data.Parsed.Type), "mint")
-	isToken2022 := account.Value.Owner == token2022ProgramID || strings.EqualFold(account.Value.Data.Program, "spl-token-2022")
+	isToken2022 := account.Value.Owner == token2022ProgramID
 	tokenProgram := "spl-token"
 	if isToken2022 {
 		tokenProgram = "token-2022"
 	}
 	if !isMint {
-		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": true, "status": "target_not_mint", "mint_owner_program_evidence_status": "unverified", "token_program": tokenProgram, "account_owner": account.Value.Owner, "evidence": []string{"Target exists, but it is not parsed as a token mint; Token-2022 mint extensions are not applicable."}}
+		return map[string]any{"module_id": "token_2022_extensions", "module": "Token-2022 Extension Deep Scanner", "verified": true, "status": "target_not_mint", "mint_owner_program_evidence_status": "unverified", "account_owner": account.Value.Owner, "evidence": []string{"Target exists, but it is not parsed as a token mint; Token-2022 mint extensions are not applicable."}}
 	}
 
 	if ownerEvidence["mint_owner_program_evidence_status"] != "verified" {
