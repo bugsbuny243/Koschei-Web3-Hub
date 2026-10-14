@@ -20,20 +20,62 @@ type arvisModuleSubcheckDefinition struct {
 // Check labels are explicit requirements/observations, not synthetic evidence.
 // Missing confirmation of a required check remains unknown.
 var arvisModuleSubcheckContracts = map[string]arvisModuleSubcheckDefinition{
-	ModulePumpSybilRadar:         {[]string{"token_signature_history", "pump_program_relation"}, []string{"funding_cluster_links"}},
-	ModuleRaydiumPoolGuardian:    {[]string{"pool_program_relation", "pool_reserves"}, []string{"liquidity_movement_history"}},
-	ModuleWalletlessClaimShield:  {[]string{"parsed_claim_instruction", "signer_writable_accounts"}, []string{"claim_domain_context"}},
-	ModuleMEVShield:              {[]string{"swap_route", "slippage_and_pool_state"}, []string{"sandwich_transaction_linkage"}},
-	ModuleTokenAuthorityScanner:  {[]string{"mint_account_observation", "mint_and_freeze_authority"}, []string{"token_2022_extensions"}},
-	ModuleHolderConcentration:    {[]string{"token_largest_accounts", "holder_role_resolution"}, []string{"holder_funding_clusters"}},
-	ModuleLiquidityMovement:      {[]string{"pool_reserve_evidence", "lp_control_evidence"}, []string{"liquidity_delta_transactions"}},
-	ModuleCreatorLinkAnalysis:    {[]string{"creator_relation_evidence"}, []string{"creator_funding_origin"}},
-	ModuleFundingClusterDetector: {[]string{"holder_funding_edges"}, []string{"funding_recurrence"}},
-	ModuleLaunchDistribution:     {[]string{"mint_specific_initial_recipients", "launch_trade_history"}, []string{"creator_linkage"}},
-	ModuleRepeatActorScan:        {[]string{"persistent_actor_memory_lookup"}, []string{"verified_incident_history"}},
-	ModuleSniperTimingDetector:   {[]string{"launch_signature_timing"}, []string{"verified_actor_linkage"}},
-	ModuleClaimSurfaceRisk:       {[]string{"claim_url_or_domain"}, []string{"phishing_indicators"}},
-	ModuleProgramRelationScan:    {[]string{"account_program_owner"}, []string{"program_upgrade_authority"}},
+	ModulePumpSybilRadar: {
+		required: []string{"token_signature_history", "pump_program_relation"},
+		optional: []string{"funding_cluster_links"},
+	},
+	ModuleRaydiumPoolGuardian: {
+		required: []string{"pool_program_relation", "pool_reserves"},
+		optional: []string{"liquidity_movement_history"},
+	},
+	ModuleWalletlessClaimShield: {
+		required: []string{"parsed_claim_instruction", "signer_writable_accounts"},
+		optional: []string{"claim_domain_context"},
+	},
+	ModuleMEVShield: {
+		required: []string{"swap_route", "slippage_and_pool_state"},
+		optional: []string{"sandwich_transaction_linkage"},
+	},
+	ModuleTokenAuthorityScanner: {
+		required: []string{"mint_account_observation", "mint_and_freeze_authority"},
+		optional: []string{"token_2022_extensions"},
+	},
+	ModuleHolderConcentration: {
+		required: []string{"token_largest_accounts", "holder_role_resolution"},
+		optional: []string{"holder_funding_clusters"},
+	},
+	ModuleLiquidityMovement: {
+		required: []string{"pool_reserve_evidence", "lp_control_evidence"},
+		optional: []string{"liquidity_delta_transactions"},
+	},
+	ModuleCreatorLinkAnalysis: {
+		required: []string{"creator_relation_evidence"},
+		optional: []string{"creator_funding_origin"},
+	},
+	ModuleFundingClusterDetector: {
+		required: []string{"holder_funding_edges"},
+		optional: []string{"funding_recurrence"},
+	},
+	ModuleLaunchDistribution: {
+		required: []string{"mint_specific_initial_recipients", "launch_trade_history"},
+		optional: []string{"creator_linkage"},
+	},
+	ModuleRepeatActorScan: {
+		required: []string{"persistent_actor_memory_lookup"},
+		optional: []string{"verified_incident_history"},
+	},
+	ModuleSniperTimingDetector: {
+		required: []string{"launch_signature_timing"},
+		optional: []string{"verified_actor_linkage"},
+	},
+	ModuleClaimSurfaceRisk: {
+		required: []string{"claim_url_or_domain"},
+		optional: []string{"phishing_indicators"},
+	},
+	ModuleProgramRelationScan: {
+		required: []string{"account_program_owner"},
+		optional: []string{"program_upgrade_authority"},
+	},
 }
 
 func arvisModuleSubchecks(arm SecurityRadarVerdict, status string) ArvisModuleSubchecks {
