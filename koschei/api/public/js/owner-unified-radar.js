@@ -176,7 +176,7 @@
             result.innerHTML=`<h3>${esc(report.collector_status)}</h3><p>${esc(report.subject?.network)} · ${esc(report.subject?.canonical_ref)}</p><p>${arr(report.evidence).length} kanıt satırı · ${num(report.provider_request_count)} sağlayıcı isteği · Not: ${esc(report.verdict||'withhold')}</p>${arr(report.limitations).map(l=>`<p class="warning-box"><b>${esc(l.code)}</b> ${esc(l.reason)}</p>`).join('')}<div class="clean-list">${arr(report.evidence).map(row=>`<details><summary>${esc(row.attributes?.relation)} · ${esc(row.status)}</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify({height:row.block_or_slot,source:row.source,observed_at:row.observed_at,...row.attributes},null,2))}</pre></details>`).join('')}</div>`;
           }catch(error){result.textContent=error.name==='AbortError'?'Araştırma zaman aşımına uğradı; tamamlanmış veya güvenli sayılmadı.':error.message}finally{clearTimeout(timer);button.disabled=false}
         });
-      }catch(error){result.textContent=error.message}
+      }catch(error){result.textContent=error.message;}
     });
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mountMultichainRadar,{once:true});else mountMultichainRadar();
