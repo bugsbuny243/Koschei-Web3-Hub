@@ -431,6 +431,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 		"lp_control": core.LPControl, "jupiter_market_context": core.JupiterContext,
 		"exit_liquidity": core.ExitLiquidity, "program_security": unifiedProgramSecuritySurface(core.SourceContext),
 		"source_context": core.SourceContext, "structural_memory": structural,
+		"mint_owner_program_evidence": unifiedMintOwnerEvidenceProjection(core.SourceContext),
 		"modules": modules, "evidence_arms": modules, "evidence": radarDetailEvidence(core.Arms),
 		"behavior_signals": behavior, "trade_ledger_aggregates": tradeLedger,
 		"transaction_evidence": transactionEvidence, "evidence_references": evidenceReferences,
@@ -552,4 +553,18 @@ func (h *Handler) unifiedTradeLedgerAggregates(ctx context.Context, mint string)
 		out["last_observed_at"] = lastSeen.Time.UTC().Format(time.RFC3339)
 	}
 	return out
+}
+
+// unifiedMintOwnerEvidenceProjection keeps unverified states explicit and never
+// synthesizes token_2022=false from missing or unsupported program evidence.
+func unifiedMintOwnerEvidenceProjection(source map[string]any) map[string]any {
+	out := map[string]any{"mint_owner_program_evidence_status": "unverified"}
+	if source == nil || source["mint_owner_program_evidence_status"] != "verified" {
+		return out
+	}
+	owner, ok := source["mint_owner_program"].(string)
+	if !ok {
+		return out
+	}
+	return mintOwnerProgramEvidence(owner)
 }
