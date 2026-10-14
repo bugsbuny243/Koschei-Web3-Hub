@@ -4,8 +4,8 @@ import "testing"
 
 func TestUnifiedMintOwnerEvidenceProjectionFailClosed(t *testing.T) {
 	tests := []struct {
-		name string
-		source map[string]any
+		name     string
+		source   map[string]any
 		verified bool
 	}{
 		{name: "nil"},
