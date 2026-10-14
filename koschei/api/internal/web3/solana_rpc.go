@@ -26,7 +26,9 @@ type SolanaRPC struct {
 
 	limitMu       sync.Mutex
 	nextRequestAt time.Time
-	cooldowns     map[string]time.Time
+	cooldowns          map[string]time.Time
+	forbiddenEndpoints map[string]bool
+	endpointConfig     string
 }
 
 type solanaRPCEnvelope struct {
@@ -289,6 +291,11 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	var earliestCooldown time.Time
 	endpointTimeout := solanaRPCEndpointTimeout()
 	for index, endpoint := range endpoints {
+		if s.rpcEndpointForbidden(endpoint, endpoints) {
+			lastErr = fmt.Errorf("provider=%s rpc status 403", RPCProviderHost(endpoint))
+			onlyCooldownBlocker = false
+			continue
+		}
 		if signaturePressure {
 			if until, cooling := solanaRPCSignatureEndpointCooldown(endpoint); cooling {
 				lastErr = fmt.Errorf("solana signature rpc endpoint cooling down until %s", until.UTC().Format(time.RFC3339))
@@ -326,6 +333,9 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 				if signaturePressure {
 					deferSolanaRPCSignatureEndpoint(endpoint, solanaRPCSignature429Cooldown(statusErr.RetryAfter))
 				}
+			} else if statusErr, ok := err.(*solanaRPCStatusError); ok && statusErr.Status == http.StatusForbidden {
+				s.forbidRPCEndpoint(endpoint)
+				lastErr = fmt.Errorf("provider=%s rpc status 403", RPCProviderHost(endpoint))
 			} else if signaturePressure && ctx.Err() == nil && attemptErr != nil {
 				deferSolanaRPCSignatureEndpoint(endpoint, solanaRPCSignatureTimeoutCooldown())
 			}
@@ -390,6 +400,28 @@ func (s *SolanaRPC) waitForRPCSlot(ctx context.Context) error {
 		case <-timer.C:
 		}
 	}
+}
+
+// rpcEndpointForbidden keeps HTTP 403 providers out of subsequent attempts.
+// An effective endpoint configuration change resets the quarantine.
+func (s *SolanaRPC) rpcEndpointForbidden(endpoint string, endpoints []string) bool {
+	config := strings.Join(endpoints, "\x00")
+	s.limitMu.Lock()
+	defer s.limitMu.Unlock()
+	if s.endpointConfig != config {
+		s.endpointConfig = config
+		s.forbiddenEndpoints = nil
+	}
+	return s.forbiddenEndpoints[endpoint]
+}
+
+func (s *SolanaRPC) forbidRPCEndpoint(endpoint string) {
+	s.limitMu.Lock()
+	defer s.limitMu.Unlock()
+	if s.forbiddenEndpoints == nil {
+		s.forbiddenEndpoints = map[string]bool{}
+	}
+	s.forbiddenEndpoints[endpoint] = true
 }
 
 func (s *SolanaRPC) rpcEndpointCooldown(endpoint string) (time.Time, bool) {
