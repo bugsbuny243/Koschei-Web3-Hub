@@ -431,7 +431,6 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 		"lp_control": core.LPControl, "jupiter_market_context": core.JupiterContext,
 		"exit_liquidity": core.ExitLiquidity, "program_security": unifiedProgramSecuritySurface(core.SourceContext),
 		"source_context": core.SourceContext, "structural_memory": structural,
-		"mint_owner_program_evidence": unifiedMintOwnerEvidenceProjection(core.SourceContext),
 		"modules": modules, "evidence_arms": modules, "evidence": radarDetailEvidence(core.Arms),
 		"behavior_signals": behavior, "trade_ledger_aggregates": tradeLedger,
 		"transaction_evidence": transactionEvidence, "evidence_references": evidenceReferences,
@@ -486,6 +485,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			"behavioral_signatures_can_change_grade":     false,
 		},
 	}
+	report["mint_owner_program_evidence"] = unifiedMintOwnerEvidenceProjection(core.SourceContext)
 	if actorRun.Status == "source_unavailable" {
 		report["source_completeness"] = "incomplete_source"
 		report["source_completeness_reason"] = "creator_source_unavailable"
