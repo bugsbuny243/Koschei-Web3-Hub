@@ -82,10 +82,10 @@ func arvisModuleSubchecks(arm SecurityRadarVerdict, status string) ArvisModuleSu
 	definition := arvisModuleSubcheckContracts[arm.ModuleID]
 	verified := SecurityRadarVerdictHasVerifiedEvidence(arm)
 	out := ArvisModuleSubchecks{
-		Required: append([]string{}, definition.required...),
-		Optional: append([]string{}, definition.optional...),
-		Ran: status == ArvisExecutionCompleted || arvisSignalBool(arm.Signals, "collector_attempted"),
-		EvidencePresent: verified && len(arm.Evidence) > 0,
+		Required:             append([]string{}, definition.required...),
+		Optional:             append([]string{}, definition.optional...),
+		Ran:                  status == ArvisExecutionCompleted || arvisSignalBool(arm.Signals, "collector_attempted"),
+		EvidencePresent:      verified && len(arm.Evidence) > 0,
 		RequiredChecksStatus: "unknown",
 	}
 	if status == ArvisExecutionNotApplicable {
