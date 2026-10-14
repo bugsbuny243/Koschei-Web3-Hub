@@ -23,6 +23,7 @@ import (
 var Fixtures embed.FS
 
 func FixtureTransport(family, network string) r.Transport {
+	accountReads := 0
 	return r.TransportFunc(func(_ context.Context, q r.Request) (r.Response, error) {
 		b, e := Fixtures.ReadFile("fixtures/" + family + ".json")
 		if e != nil {
@@ -37,8 +38,8 @@ func FixtureTransport(family, network string) r.Transport {
 			body, _ := q.Body.(map[string]any)
 			key, _ := body["method"].(string)
 			if key == "getAccountInfo" {
-				params, _ := body["params"].([]any)
-				if len(params) > 0 && params[0] == "11111111111111111111111111111111" {
+				accountReads++
+				if accountReads == 2 {
 					key = "getAccountInfoProgramData"
 				}
 			}
