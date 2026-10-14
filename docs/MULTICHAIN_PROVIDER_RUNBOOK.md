@@ -48,3 +48,28 @@ Published prices and free tiers change. Fixture request counts in the generated 
 - Stellar data APIs: https://developers.stellar.org/docs/data/apis
 
 Read `GET /api/owner/radar/capabilities` with an owner session before attempting live scans. `live_verified: false` stays false because configuration is not a health observation. Live rollout must exercise correct/wrong-network cases and provider failure without exposing provider secrets. All investigations remain observe-only and return WITHHOLD.
+
+## Repeatable smoke gate
+
+From `koschei/api`, `go run ./cmd/radar-smoke` prints configuration status only, without network calls. For live reads, supply an explicit manifest and `-live`:
+
+```json
+[
+  {
+    "target": {"network":"ethereum-mainnet","kind":"wallet","target":"0x0000000000000000000000000000000000000000"},
+    "required_relations": ["evm-code"]
+  }
+]
+```
+
+The zero-address example checks a minimal code-read path only; it is not a known-sweeper or proxy acceptance case. Choose public targets and required relations for each actual rollout scenario. Use `tron-permission-state`, `ton-account-state` or `ton-jetton-wallet-binding` for their respective target classes.
+
+```
+go run ./cmd/radar-smoke -live -manifest /secure/operator-smoke-cases.json
+```
+
+Exit 0 requires the expected relations, correct subject/network binding, source, observation time, chain identity and response hashes while keeping `grade_issued=false` and `verdict=withhold`. Exit 1 means the requested collection assertions failed; exit 2 means an invalid manifest. At most ten cases run sequentially with a 45-second timeout each. The output is a compact provenance receipt, not provider credentials or raw upstream content. Store receipts with your deployment evidence; a passing smoke covers only its asserted relations.
+
+On 2026-10-14, configuration inspection in the development runtime found no `RADAR_PROVIDERS_JSON`. No live-provider success is claimed. The tool's negative-path test proves missing evidence cannot pass.
+
+Tron V1 token-history reference: https://developers.tron.network/reference/get-trc20-transaction-info-by-account-address . The collector caps the result at 50 events, validates account/token identities and preserves integer values as strings. The endpoint may contain TRC-721 and approval events too; it does not prove a fungible standard or current allowance. A confirmed-head context is labeled separately from an event's unknown block height.

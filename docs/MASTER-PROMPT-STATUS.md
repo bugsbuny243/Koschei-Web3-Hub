@@ -6,7 +6,7 @@ This change implements read-only collection behind the existing `radaradapter.Ad
 
 | Priority | Scope | Implemented | Boundaries |
 |---|---|---|---|
-| 1 | Tron | Base58Check/hex, pinned mainnet genesis, confirmed permission state, numeric/named enums, weighted thresholds, active operation masks, recovery authority, two-host comparison, failover, contract origin, TRC-20 constants, recent permission changes | External control is not proof of fraud. Snapshot reads follow the confirmed head; they are not archival state proofs. No private-key possession claim. |
+| 1 | Tron | Base58Check/hex, pinned mainnet genesis, confirmed permission state, numeric/named enums, weighted thresholds, active operation masks, recovery authority, two-host comparison, failover, contract origin, TRC-20 constants, recent permission changes and bounded indexed token events | External control is not proof of fraud. Snapshot reads follow the confirmed head; they are not archival state proofs. No private-key possession claim. |
 | 2 | EVM, 14 chain IDs | EIP-55, chain identity, block-hash-pinned code/storage/calls, 7702 designator and delegate hash, source-pinned sweeper registry, EIP-1967 implementation/admin/beacon, UUPS and Diamond interfaces, implementation code hash, owner/Safe-compatible/timelock interfaces, bounded ERC-20/NFT/Permit2 permissions, governance events, transaction/receipt authorization binding | Interface compatibility is not verified Safe code identity. Discovery covers 512 blocks with pair caps. Unknown historical approvals and off-chain signatures remain unknown. No unsupported RPC fallback to latest. |
 | 3 | TON | Raw/friendly address normalization, workchain/testnet checks, mainnet identity, account cell hashes, indexed jetton-master state, pinned canonical master plus `get_wallet_address` and `get_wallet_data` binding, trace completeness/failure checks | Indexed completeness is not an independent full message-tree proof or economic settlement verdict. Getters are sequential; no atomic historical claim. |
 | 4 | Cosmos/IBC | Hub, Osmosis, Celestia, Injective, Sei native; HRP/checksum, chain identity, outgoing authz/feegrant, governance proposals, IBC channel/client state | 100-entry window; no exhaustive grant history, packet reconciliation or bridge solvency verdict. |
@@ -41,3 +41,7 @@ node --test public/js/arvis-premium-contract.test.cjs public/js/impact-contract.
 ```
 
 Fixtures are explicitly synthetic and cover schema, identity, binding, checksum, omitted evidence, wrong-chain responses, critical confirmation, transport budgets and no-grade behavior. Database integration suites still require their configured database environment; local skips are not production validation.
+
+## October 14 follow-up
+
+Added `cmd/radar-smoke` with explicit expected-relation assertions and sanitized provenance receipts. Missing provider configuration or evidence cannot pass. Tron V1 token events now preserve uint values and distinguish historical approval events from current permissions. Fixed the gofmt issue reported by both Sensitive Static Probe CI and Release Gates Verification; their replacement runs must pass before promotion. API Required CI and CodeQL passed on the preceding commit.

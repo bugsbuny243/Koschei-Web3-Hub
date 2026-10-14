@@ -39,7 +39,7 @@ Executable = synthetic offline fixture conformance, not deployed/healthy/complet
 | stellar-mainnet | executable | address, wallet, trustline | Stellar RPC getNetwork/getLedgerEntries XDR | Historical ledger entries/events require Hubble or an archive; no implicit SDF mainnet RPC or Horizon fallback. | stellar/stellar_test.go | 2 |
 | sui-mainnet | existing_separate_route | address | Existing production collector retained; not claimed by the new adapter registry. |  | internal/networktarget/move_identity_probe_test.go | 0 |
 | ton-mainnet | executable | jetton_wallet, address, wallet, contract, token, transaction | toncenter v2 live state; toncenter v3 account/jetton/trace index | Old traces require indexed or archival provider access. | ton/ton_test.go | 3 |
-| tron-mainnet | executable | address, wallet, token, contract | walletsolidity/getaccount; wallet/getcontract; TronGrid indexed history | Deep historical traces require an archive/indexer; bounded transfers are not holder balances. | tron/testdata/account.json | 7 |
+| tron-mainnet | executable | address, wallet, token, contract | walletsolidity/getaccount; wallet/getcontract; TronGrid indexed history | Deep historical traces require an archive/indexer; bounded transfers are not holder balances. | tron/testdata/account.json | 8 |
 | xrpl-mainnet | declared_not_executable |  |  | Protocol-specific collector, fixtures and provider configuration required. |  | 0 |
 | zksync-mainnet | executable | address, wallet, contract, token, transaction, governance | JSON-RPC block-hash-pinned state; EIP-1967/7702; bounded logs and allowance calls | Historical state and traces require archive/debug support; bounded logs cannot enumerate all approvals. | evm/evm_test.go | 7 |
 

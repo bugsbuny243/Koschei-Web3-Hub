@@ -350,6 +350,9 @@ func (a *Adapter) Collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 			}
 		}
 	}
+	tokenRows, tokenLimits := a.tokenHistory(ctx, height)
+	rows = append(rows, tokenRows...)
+	limits = append(limits, tokenLimits...)
 	limits = append(limits, r.Limitation{Code: "bounded_history", Reason: "At most 50 confirmed indexed transactions are inspected. Missing updates are not proof that permissions never changed; transfer samples are not holder concentration."})
 	return rows, limits, nil
 }
