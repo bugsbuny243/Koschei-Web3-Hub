@@ -14,9 +14,9 @@ const (
 // ProgramData is the upgradeable loader's on-chain ProgramData account header.
 // Authority nil means the authority was explicitly revoked, not unreadable.
 type ProgramData struct {
-	Slot uint64
+	Slot      uint64
 	Authority *[32]byte
-	Bytecode []byte
+	Bytecode  []byte
 }
 
 // DecodeProgram requires the exact 36-byte program account state.
