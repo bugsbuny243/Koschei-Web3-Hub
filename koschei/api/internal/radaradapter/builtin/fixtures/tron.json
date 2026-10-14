@@ -1,0 +1,33 @@
+{
+  "/wallet/getblockbynum": {
+    "blockID": "00000000000000001ebf88508a03865c71d452e25f4d51194196a1d22b6653dc"
+  },
+  "/walletsolidity/getnowblock": {
+    "blockID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "block_header": {
+      "raw_data": {
+        "number": 100
+      }
+    }
+  },
+  "/walletsolidity/getaccount": {
+    "address": "410000000000000000000000000000000000000000",
+    "owner_permission": {
+      "id": 0,
+      "threshold": 1,
+      "keys": [
+        {
+          "address": "410000000000000000000000000000000000000000",
+          "weight": 1
+        }
+      ]
+    },
+    "active_permission": [],
+    "account_resource": {
+      "energy_usage": 0
+    }
+  },
+  "/v1/accounts/T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb/transactions": {
+    "data": []
+  }
+}

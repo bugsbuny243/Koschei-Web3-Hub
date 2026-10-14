@@ -157,5 +157,29 @@
     }finally{clearTimeout(timer)}
   }
 
+  function mountMultichainRadar(){
+    const page=document.getElementById('page-arvis');if(!page||document.getElementById('multichainRadar'))return;
+    const section=document.createElement('section');section.id='multichainRadar';section.className='card section-gap';
+    section.innerHTML='<h2>Çok ağlı kanıt araştırması</h2><p>Çalışan adaptör ve sağlayıcı durumu ayrı gösterilir. Kanıt eksikliği güvenli anlamına gelmez.</p><button class="btn" type="button" data-load>Ağları ve hedefleri yükle</button><div data-controls></div><div data-result aria-live="polite"></div>';
+    page.appendChild(section);
+    section.querySelector('[data-load]').addEventListener('click',async()=>{
+      const controls=section.querySelector('[data-controls]'),result=section.querySelector('[data-result]');
+      try{
+        const response=await fetch('/api/owner/radar/capabilities',{credentials:'same-origin'});if(!response.ok)throw new Error('Owner oturumu veya yetkinlik verisi alınamadı.');
+        const data=await response.json(),capabilities=arr(data.capabilities),runtime=arr(data.runtime);
+        controls.innerHTML=`<form class="section-gap" data-investigate><label>Ağ<select class="input" name="network">${capabilities.map(c=>`<option value="${esc(c.network)}">${esc(c.network)}</option>`).join('')}</select></label><label>Hedef türü<select class="input" name="kind"></select></label><label>Adres / işlem / hedef<input class="input" name="target" required maxlength="512" autocomplete="off"></label><p data-readiness></p><p>Jetton cüzdanı: owner|master|wallet. Stellar trustline: holder|code|issuer. Frontend: operatörce tanımlı HTTPS adresi.</p><button class="btn primary" type="submit">Kanıtları topla</button></form><details><summary>Gerçek yetkinlik matrisi</summary><div style="overflow:auto"><table><thead><tr><th>Ağ</th><th>Çalışan hedefler</th><th>Kaynak</th><th>Arşiv gereksinimi</th></tr></thead><tbody>${capabilities.map(c=>`<tr><td>${esc(c.network)}</td><td>${arr(c.target_classes).map(esc).join(', ')}</td><td>${arr(c.sources).map(esc).join(', ')}</td><td>${arr(c.archival_requirements).map(esc).join(' ')||'—'}</td></tr>`).join('')}</tbody></table></div></details>`;
+        const form=controls.querySelector('form');const network=form.elements.network,kind=form.elements.kind;
+        const update=()=>{const c=capabilities.find(c=>c.network===network.value);kind.innerHTML=arr(c?.target_classes).map(k=>`<option value="${esc(k)}">${esc(k)}</option>`).join('');const rt=runtime.find(r=>r.capability?.network===network.value);controls.querySelector('[data-readiness]').textContent=`Sağlayıcı: ${rt?.runtime_status||'unknown'} · Canlı çalışması henüz doğrulanmadı.`};network.addEventListener('change',update);update();
+        form.addEventListener('submit',async event=>{
+          event.preventDefault();const button=form.querySelector('button');button.disabled=true;result.textContent='Kanıtlar toplanıyor…';const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),50000);
+          try{const response=await fetch('/api/owner/radar/investigate',{method:'POST',credentials:'same-origin',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({network:network.value,kind:kind.value,target:form.elements.target.value.trim()})});const report=await response.json();if(!report.collector_status)throw new Error(report.error||'Araştırma sonucu alınamadı.');
+            result.innerHTML=`<h3>${esc(report.collector_status)}</h3><p>${esc(report.subject?.network)} · ${esc(report.subject?.canonical_ref)}</p><p>${arr(report.evidence).length} kanıt satırı · ${num(report.provider_request_count)} sağlayıcı isteği · Not: ${esc(report.verdict||'withhold')}</p>${arr(report.limitations).map(l=>`<p class="warning-box"><b>${esc(l.code)}</b> ${esc(l.reason)}</p>`).join('')}<div class="clean-list">${arr(report.evidence).map(row=>`<details><summary>${esc(row.attributes?.relation)} · ${esc(row.status)}</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify({height:row.block_or_slot,source:row.source,observed_at:row.observed_at,...row.attributes},null,2))}</pre></details>`).join('')}</div>`;
+          }catch(error){result.textContent=error.name==='AbortError'?'Araştırma zaman aşımına uğradı; tamamlanmış veya güvenli sayılmadı.':error.message}finally{clearTimeout(timer);button.disabled=false}
+        });
+      }catch(error){result.textContent=error.message}
+    });
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mountMultichainRadar,{once:true});else mountMultichainRadar();
+
   window.OwnerRadarKit={...kit,scan,renderUnified};
 })();

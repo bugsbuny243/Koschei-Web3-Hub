@@ -141,11 +141,16 @@
     } catch (err) {
       $('#apiStatus').textContent = `API uyarısı: ${err.message}`;
     }
-    $('#heroTools').textContent = '6';
+    $('#heroTools').textContent = '2';
+    for (const id of ['mevForm', 'liquidityForm', 'daoForm']) {
+      const form = document.getElementById(id);
+      form.setAttribute('aria-disabled', 'true');
+      form.querySelectorAll('input,textarea,select,button').forEach(el => { el.disabled = true; });
+    }
     renderEmpty($('#walletResult'), 'Hazır', 'Cüzdan adresi girip API çağrısını başlatın.');
     renderEmpty($('#tokenResult'), 'Hazır', 'Mint adresi girip token risk sinyallerini görüntüleyin.');
-    renderEmpty($('#mevResult'), 'Hazır', 'Swap parametreleriyle sandwich riskini ölçün.');
-    renderEmpty($('#daoResult'), 'Hazır', 'Treasury proposal parametreleriyle risk skoru üretin.');
+    renderEmpty($('#mevResult'), 'Hazır', 'Kanıta dayalı doğrulama tamamlanana kadar devre dışı.');
+    renderEmpty($('#daoResult'), 'Hazır', 'Kanıta dayalı doğrulama tamamlanana kadar devre dışı.');
     renderAlerts();
     routeTo(location.hash.slice(1) || 'home');
   }
@@ -172,22 +177,10 @@
     } catch (err) { renderEmpty(node, 'Token taraması alınamadı', err.message); showToast(err.message, 'error'); }
   });
 
-  $('#mevForm').addEventListener('submit', async (event) => {
+  // This legacy scorer is quarantined: no request-supplied grades or broadcasts.
+  $('#mevForm').addEventListener('submit', (event) => {
     event.preventDefault();
-    const node = $('#mevResult');
-    const payload = objectFromForm(event.currentTarget);
-    if (!payload.tx_signature && !payload.raw_transaction) {
-      renderEmpty(node, 'İşlem kanıtı gerekli', 'MEV analizi için gerçek işlem imzası veya işlem verisi girin.');
-      return;
-    }
-    setLoading(node, 'MEV simülasyonu çalışıyor…');
-    try {
-      const data = await apiFetch('/api/mev/analyze', { method: 'POST', body: JSON.stringify(payload) });
-      renderResult(node, data, ['risk_score', 'risk_level', 'estimated_loss_usd', 'recommended_tip_sol', 'signals']);
-      $('#heroSaved').textContent = Number.isFinite(Number(data.mev_saved_usd)) && data.mev_saved_usd != null
-        ? fmtUSD.format(Number(data.mev_saved_usd)) : 'Doğrulanmadı';
-      showToast('MEV Shield raporu hazır.');
-    } catch (err) { renderEmpty(node, 'MEV analizi alınamadı', err.message); showToast(err.message, 'error'); }
+    showToast('Bu modül kanıta dayalı doğrulama tamamlanana kadar devre dışı.', 'error');
   });
 
   async function loadImpact() {
@@ -242,17 +235,10 @@
 
   $('#refreshImpact').addEventListener('click', loadImpact);
 
-  $('#liquidityForm').addEventListener('submit', async (event) => {
+  // This legacy scorer is quarantined: no request-supplied grades or broadcasts.
+  $('#liquidityForm').addEventListener('submit', (event) => {
     event.preventDefault();
-    const payload = objectFromForm(event.currentTarget);
-    try {
-      const data = await apiFetch('/api/liquidity/analyze', { method: 'POST', body: JSON.stringify(payload) });
-      state.alerts.unshift({ pool: payload.pool_address || payload.token_mint, severity: data.severity, score: data.risk_score, message: data.message });
-      state.alerts = state.alerts.slice(0, 8);
-      $('#heroAlerts').textContent = String(state.alerts.length);
-      renderAlerts();
-      showToast('Likidite ön değerlendirmesi oluşturuldu; canlı zincir alarmı değildir.');
-    } catch (err) { showToast(err.message, 'error'); }
+    showToast('Bu modül kanıta dayalı doğrulama tamamlanana kadar devre dışı.', 'error');
   });
 
   function renderAlerts() {
@@ -281,17 +267,10 @@
     });
   }
 
-  $('#daoForm').addEventListener('submit', async (event) => {
+  // This legacy scorer is quarantined: no request-supplied grades or broadcasts.
+  $('#daoForm').addEventListener('submit', (event) => {
     event.preventDefault();
-    const node = $('#daoResult');
-    const payload = objectFromForm(event.currentTarget);
-    payload.instructions = String(payload.instructions || '').split('\n').map((line) => line.trim()).filter(Boolean);
-    setLoading(node, 'DAO proposal riski ölçülüyor…');
-    try {
-      const data = await apiFetch('/api/dao/proposal-risk', { method: 'POST', body: JSON.stringify(payload) });
-      renderResult(node, data, ['risk_score', 'risk_level', 'treasury_at_risk_usd', 'proposal_loss_prevented_usd', 'message']);
-      showToast('DAO Guardian raporu hazır.');
-    } catch (err) { renderEmpty(node, 'DAO riski alınamadı', err.message); showToast(err.message, 'error'); }
+    showToast('Bu modül kanıta dayalı doğrulama tamamlanana kadar devre dışı.', 'error');
   });
 
   boot();

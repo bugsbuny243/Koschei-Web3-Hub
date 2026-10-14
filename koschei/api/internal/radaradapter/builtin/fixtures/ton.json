@@ -1,0 +1,29 @@
+{
+  "/api/v3/masterchainInfo": {
+    "last": {
+      "global_id": -239,
+      "seqno": 100,
+      "root_hash": "fixture-root"
+    }
+  },
+  "/api/v2/getAddressInformation": {
+    "ok": true,
+    "result": {
+      "state": "active",
+      "code": "",
+      "block_id": {
+        "seqno": 99,
+        "root_hash": "fixture-block"
+      }
+    }
+  },
+  "/api/v3/accountStates": {
+    "accounts": [
+      {
+        "address": "0:0000000000000000000000000000000000000000000000000000000000000000",
+        "code_hash": "fixture-code-hash",
+        "status": "active"
+      }
+    ]
+  }
+}

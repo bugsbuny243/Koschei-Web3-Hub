@@ -210,9 +210,6 @@ func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, planTier, pl
 	badge := func(next http.HandlerFunc) http.HandlerFunc { return requireRuntimeFeature(featurePublicBadge, next) }
 	mux.HandleFunc("/api/token/scan", solana(risk(method("POST", h.TokenScan))))
 	mux.HandleFunc("/api/wallet/score", solana(requiresDB(h, planTier("professional", method("POST", h.SecurityRadarCheckWithAlerts)))))
-	mux.HandleFunc("/api/mev/analyze", solana(requiresDB(h, planTier("professional", method("POST", h.AnalyzeMEV)))))
-	mux.HandleFunc("/api/liquidity/analyze", solana(requiresDB(h, planTier("professional", method("POST", h.LiquidityDrainAnalyze)))))
-	mux.HandleFunc("/api/dao/proposal-risk", requiresDB(h, planTier("professional", method("POST", h.DAOGuardianAnalyze))))
 	mux.HandleFunc("/api/v1/risk/badge", solana(badge(method("GET", h.SecurityRiskBadge))))
 	mux.HandleFunc("/api/v1/token/extensions", solana(risk(requiresDB(h, planTier("professional", method("POST", h.TokenScan))))))
 	mux.HandleFunc("/api/v1/address-poisoning/check", solana(requiresDB(h, planTier("professional", method("POST", h.AddressPoisoningCheck)))))
@@ -222,6 +219,7 @@ func registerProductRoutes(mux *http.ServeMux, h *handlers.Handler, planTier, pl
 	mux.HandleFunc("/api/jobs/token-scan", solana(risk(requiresDB(h, planTier("professional", method("POST", h.CreateWeb3Job))))))
 	mux.HandleFunc("/api/jobs/", solana(requiresDB(h, handlers.RequireAuth(method("GET", h.GetWeb3Job)))))
 	mux.HandleFunc("/api/v1/radar/detail", solana(requiresDB(h, planTier("professional", method("GET", h.SecurityRadarDetailV3)))))
+	mux.HandleFunc("/api/v1/radar/investigate", requiresDB(h, planTier("professional", method("POST", h.RadarInvestigate))))
 	mux.HandleFunc("/api/v1/radar/tron-wallet-permissions", requiresDB(h, planTier("professional", method("GET", h.TronWalletPermissions))))
 	mux.HandleFunc("/api/customer/web3/transaction-preflight", solana(requiresDB(h, planTier("professional", method("POST", h.TransactionGuardV2Configured)))))
 	mux.HandleFunc("/api/customer/web3/transaction-state-recheck", solana(requiresDB(h, planTierAccess("professional", customerStateRecheckRateLimit(h.DB, method("POST", h.TransactionGuardStateRecheck))))))

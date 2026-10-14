@@ -1,3 +1,5 @@
+// QUARANTINED 2026-10-13: request-supplied scoring is not chain evidence.
+// Do not register these handlers. Guarded by TestQuarantinedHandlersAreNotRouted.
 // OUT OF SCOPE. Not routed.
 package handlers
 

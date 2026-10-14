@@ -59,7 +59,7 @@ func sensitiveStaticProbePath(rawPath string) bool {
 			"validation-key.txt":
 			return true
 		}
-		for _, suffix := range []string{".pem", ".key", ".p12", ".pfx"} {
+		for _, suffix := range []string{".pem", ".key", ".p12", ".pfx", ".test.cjs", ".test.mjs", ".test.js"} {
 			if strings.HasSuffix(segment, suffix) {
 				return true
 			}

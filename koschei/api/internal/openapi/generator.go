@@ -292,6 +292,17 @@ func operation(route Route, method string) map[string]any {
 		requestSchemaRef = "#/components/schemas/TransactionStateRecheckRequest"
 		requestBodyRequired = true
 	}
+	if route.Path == "/api/v1/radar/tron-wallet-permissions" {
+		description = "Read-only Tron account permission observations. Collection never issues a grade or proves account state at the separately observed head height."
+		operationResponses["503"] = response("Tron permission evidence unavailable.", "#/components/schemas/ErrorResponse")
+	}
+	if route.Path == "/api/owner/radar/investigate" || route.Path == "/api/v1/radar/investigate" {
+		description = "Read-only multi-chain evidence collection. A WITHHOLD verdict never grades an account; limits and unavailable providers remain explicit."
+		requestSchemaRef = "#/components/schemas/RadarInvestigationRequest"
+		requestBodyRequired = true
+		operationResponses["503"] = response("No usable provider evidence available.", "#/components/schemas/EvidenceResponse")
+		operationResponses["501"] = response("No registered collector for the network and target class.", "#/components/schemas/EvidenceResponse")
+	}
 	operation := map[string]any{
 		"operationId":              operationID(method, route.Path),
 		"summary":                  strings.ToUpper(method) + " " + route.Path,
@@ -300,7 +311,7 @@ func operation(route Route, method string) map[string]any {
 		"x-koschei-auth-tier":      route.AuthTier,
 		"x-koschei-inventory-auth": route.InventoryAuth,
 		"x-koschei-route-source":   route.InventorySource,
-		"parameters":               pathParameters(route.Path),
+		"parameters":               append(pathParameters(route.Path), queryParameters(route.Path)...),
 		"responses":                operationResponses,
 		"security":                 security(route.AuthTier),
 	}
@@ -311,6 +322,17 @@ func operation(route Route, method string) map[string]any {
 		}
 	}
 	return operation
+}
+
+func queryParameters(path string) []any {
+	if path != "/api/v1/radar/tron-wallet-permissions" {
+		return []any{}
+	}
+	return []any{map[string]any{
+		"name": "address", "in": "query", "required": true,
+		"description": "Tron account address, Base58Check (T...) or 21-byte hex (41...).",
+		"schema":      map[string]any{"type": "string", "minLength": 34, "maxLength": 128},
+	}}
 }
 
 func pathParameters(path string) []any {
@@ -367,6 +389,11 @@ func schemas() map[string]any {
 	return map[string]any{
 		"CryptoBriefResponse": map[string]any{"type": "object", "additionalProperties": true, "description": "Versioned public news, isolated customer subscription state, one-use pairing details, or aggregate operator telemetry. News is publisher-reported and does not authorize a security decision."},
 		"CryptoBriefRequest":  map[string]any{"type": "object", "additionalProperties": false, "required": []string{"channel"}, "properties": map[string]any{"channel": map[string]any{"type": "string", "enum": []string{"telegram", "whatsapp"}}, "consent": map[string]any{"type": "boolean", "description": "Must be true when requesting a pairing challenge."}, "state": map[string]any{"type": "string", "enum": []string{"active", "paused", "disconnected"}}, "preferences": map[string]any{"type": "object", "description": "PUT requires networks/topics arrays, daily or hourly cadence, timezone and quiet_start/quiet_end hours (0-23).", "additionalProperties": true}}},
+		"RadarInvestigationRequest": map[string]any{"type": "object", "additionalProperties": false, "required": []string{"network", "kind", "target"}, "properties": map[string]any{
+			"network": map[string]any{"type": "string", "minLength": 1, "maxLength": 64},
+			"kind":    map[string]any{"type": "string", "minLength": 1, "maxLength": 40},
+			"target":  map[string]any{"type": "string", "minLength": 1, "maxLength": 512},
+		}},
 		"GenericRequest": map[string]any{
 			"type": "object", "additionalProperties": true,
 			"description": "Operation-specific JSON input. Unknown or missing required evidence inputs fail closed.",

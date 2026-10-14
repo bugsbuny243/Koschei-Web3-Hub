@@ -1,0 +1,9 @@
+{
+  "eth_chainId": "$CHAIN_ID",
+  "eth_getBlockByNumber": {
+    "number": "0x100",
+    "hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "eth_getCode": "0x",
+  "eth_getLogs": []
+}
