@@ -51,7 +51,8 @@ func RPC(ctx context.Context, t Transport, n, p, method string, params any) (Res
 // broadcasting, wallet unlocking, bundling or simulation with side effects.
 func ReadOnlyRPCMethod(method string) bool {
 	switch method {
-	case "eth_chainId", "eth_getBlockByNumber", "eth_getCode", "eth_getStorageAt", "eth_call", "eth_getLogs", "eth_getTransactionByHash", "eth_getTransactionReceipt", "getNetwork", "getLedgerEntries":
+	case "eth_chainId", "eth_getBlockByNumber", "eth_getCode", "eth_getStorageAt", "eth_call", "eth_getLogs", "eth_getTransactionByHash", "eth_getTransactionReceipt", "getNetwork", "getLedgerEntries",
+		"getAccountInfo", "getMultipleAccounts", "getSlot", "getGenesisHash":
 		return true
 	}
 	return false
