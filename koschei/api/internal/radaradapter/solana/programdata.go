@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	ProgramState = uint32(2)
+	ProgramState     = uint32(2)
 	ProgramDataState = uint32(3)
 )
 
