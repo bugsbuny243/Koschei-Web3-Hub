@@ -36,6 +36,12 @@ func FixtureTransport(family, network string) r.Transport {
 			}
 			body, _ := q.Body.(map[string]any)
 			key, _ := body["method"].(string)
+			if key == "getAccountInfo" {
+				params, _ := body["params"].([]any)
+				if len(params) > 0 && params[0] == "11111111111111111111111111111111" {
+					key = "getAccountInfoProgramData"
+				}
+			}
 			value, ok := fixtures[key]
 			if !ok {
 				return r.Response{}, errors.New("fixture has no such method")
