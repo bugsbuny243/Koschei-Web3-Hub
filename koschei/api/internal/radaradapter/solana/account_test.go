@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -31,6 +32,10 @@ func TestAccountInfoStrictEnvelope(t *testing.T) {
 	account.Executable = false
 	if _, err := DecodeUpgradeableProgramAccount(account); err == nil {
 		t.Fatal("non-executable program accepted")
+	}
+	oversized, _ := json.Marshal(map[string]any{"value": map[string]any{"owner": UpgradeableLoaderID, "data": []string{strings.Repeat("A", base64.StdEncoding.EncodedLen(maxRPCAccountBytes)+4), "base64"}}})
+	if _, err := DecodeAccountInfo(oversized); err == nil {
+		t.Fatal("oversized RPC account accepted")
 	}
 	for _, raw := range []string{
 		`{"value":null}`,
