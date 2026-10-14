@@ -105,7 +105,7 @@ func (a *Adapter) Supports(t r.Target) bool {
 }
 func (a *Adapter) Subject() r.SubjectIdentity { return r.CollectorIdentity(a.subject) }
 func (a *Adapter) Capability() r.Capability {
-	return r.Capability{ID: "evm-account-model", Network: a.target.Network, Family: "evm", TargetClasses: []string{"address", "wallet", "contract", "token", "transaction", "governance"}, Sources: []string{"JSON-RPC block-hash-pinned state", "EIP-1967/7702", "bounded logs and allowance calls"}, ArchivalRequirements: []string{"Historical state and traces require archive/debug support; bounded logs cannot enumerate all approvals."}, Fixture: "evm/evm_test.go", EvidenceOnly: true}
+	return r.Capability{ID: "evm-account-model", Network: a.target.Network, Family: "evm", TargetClasses: []string{"address", "wallet", "contract", "token", "transaction", "governance"}, Sources: []string{"JSON-RPC block-hash-pinned state", "EIP-1967/7702", "bounded logs and allowance calls", "EIP-1967 control/implementation-code snapshot comparisons"}, ArchivalRequirements: []string{"Control history needs block-hash archive reads (up to 512 blocks); equal endpoints do not exclude intermediate upgrades. Traces require debug support; bounded logs cannot enumerate all approvals."}, Fixture: "evm/evm_test.go", EvidenceOnly: true}
 }
 func (a *Adapter) rpc(ctx context.Context, m string, p any) (r.Response, json.RawMessage, error) {
 	return r.RPC(ctx, a.transport, a.target.Network, a.provider, m, p)
@@ -141,14 +141,7 @@ func (a *Adapter) collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 	if e != nil {
 		return rows, limits, e
 	}
-	var block struct {
-		Number string `json:"number"`
-		Hash   string `json:"hash"`
-	}
-	if json.Unmarshal(headRaw, &block) != nil || len(block.Hash) != 66 {
-		return rows, limits, errors.New("block identity missing")
-	}
-	height, e := strconv.ParseUint(strings.TrimPrefix(block.Number, "0x"), 16, 64)
+	block, height, e := parseBlockIdentity(headRaw)
 	if e != nil {
 		return rows, limits, e
 	}
@@ -189,6 +182,7 @@ func (a *Adapter) collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 		add("evm-7702-delegation", res, facts)
 	}
 	if len(b) > 0 && !(len(b) == 23 && hex.EncodeToString(b[:3]) == "ef0100") {
+		currentControls := map[string]controlSnapshot{}
 		for _, slot := range []struct{ name, key string }{{"implementation", ImplementationSlot}, {"admin", AdminSlot}, {"beacon", BeaconSlot}} {
 			storage, value, err := a.str(ctx, "eth_getStorageAt", []any{a.subject.NativeID, slot.key, anchor})
 			if err != nil {
@@ -200,6 +194,7 @@ func (a *Adapter) collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 				limits = append(limits, r.Limitation{Code: "proxy_slot_invalid", Reason: slot.name})
 				continue
 			}
+			currentControls[slot.name] = controlSnapshot{addr, storage}
 			add("evm-proxy-"+slot.name, storage, map[string]any{"slot": slot.key, "address": addr})
 			if !isZero(addr) && slot.name == "admin" {
 				a.authority(ctx, addr, anchor, add, &limits)
@@ -226,6 +221,7 @@ func (a *Adapter) collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 				}
 			}
 		}
+		a.controlHistory(ctx, block, height, currentControls, add, &limits)
 		a.authority(ctx, a.subject.NativeID, anchor, add, &limits)
 		diamond, dv, de := a.str(ctx, "eth_call", []any{map[string]any{"to": a.subject.NativeID, "data": selector("facetAddresses()")}, anchor})
 		if de == nil {

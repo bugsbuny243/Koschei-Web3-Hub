@@ -73,3 +73,9 @@ Exit 0 requires the expected relations, correct subject/network binding, source,
 On 2026-10-14, configuration inspection in the development runtime found no `RADAR_PROVIDERS_JSON`. No live-provider success is claimed. The tool's negative-path test proves missing evidence cannot pass.
 
 Tron V1 token-history reference: https://developers.tron.network/reference/get-trc20-transaction-info-by-account-address . The collector caps the result at 50 events, validates account/token identities and preserves integer values as strings. The endpoint may contain TRC-721 and approval events too; it does not prove a fungible standard or current allowance. A confirmed-head context is labeled separately from an event's unknown block height.
+
+### EVM historical control observations
+
+For contract-code subjects, allow up to eight additional read-only RPC calls for `evm-control-history-implementation`, `evm-control-history-admin`, and `evm-control-history-beacon`. Storage and implementation code must support EIP-1898 `{blockHash, requireCanonical:true}` at the current block and up to 512 blocks earlier. No trace/debug endpoint is required for these two-snapshot observations. Providers without that state return `control_history_slot_unknown` or `implementation_history_code_unknown`; their absence is not an unchanged-control finding.
+
+Use the existing owner evidence drawer to inspect both addresses, block hashes, raw response digests and endpoint recheck digests. Runtime request counts include the additional calls. `changed_between_snapshots:false` covers only the two endpoints; it does not exclude an intermediate upgrade and never changes WITHHOLD to a safe verdict. This capability is fixture-verified, not a claim that production archive access is configured.

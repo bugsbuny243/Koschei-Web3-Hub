@@ -38,3 +38,9 @@ test('partial evidence keeps WITHHOLD and escapes provider controlled text',asyn
 test('authentication failure does not render a scan form',async()=>{
  const h=harness([{ok:false}]);await h.nodes.load.events.click();assert.equal(h.nodes.controls.innerHTML,'');assert.match(h.nodes.result.textContent,/Owner oturumu/);
 });
+test('control history and archive gaps remain visible without upgrading the verdict',async()=>{
+ const h=harness([capability,{ok:true,json:async()=>({collector_status:'partial_investigation',verdict:'withhold',limitations:[{code:'control_history_slot_unknown',reason:'admin historical state unavailable'}],evidence:[{status:'observed',block_or_slot:'0x300',source:'rpc.fixture.invalid',attributes:{relation:'evm-control-history-implementation',from_block:'0x100',changed_between_snapshots:true,previous_address:'fixture-before',current_address:'fixture-after',intermediate_changes:'unknown'}}],provider_request_count:8})}]);
+ await h.nodes.load.events.click();await h.nodes.form.events.submit({preventDefault(){}});
+ for(const text of ['evm-control-history-implementation','fixture-before','fixture-after','0x100','0x300','control_history_slot_unknown','withhold'])assert.ok(h.nodes.result.innerHTML.includes(text),text);
+ assert.doesNotMatch(h.nodes.result.innerHTML,/VERIFIED|SAFE/);
+});
