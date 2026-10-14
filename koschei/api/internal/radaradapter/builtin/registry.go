@@ -12,6 +12,7 @@ import (
 	"koschei/api/internal/radaradapter/cosmos"
 	"koschei/api/internal/radaradapter/evm"
 	"koschei/api/internal/radaradapter/frontend"
+	"koschei/api/internal/radaradapter/solana"
 	"koschei/api/internal/radaradapter/stellar"
 	"koschei/api/internal/radaradapter/ton"
 	"koschei/api/internal/radaradapter/tron"
@@ -28,6 +29,20 @@ func FixtureTransport(family, network string) r.Transport {
 			return r.Response{}, e
 		}
 		chain := ""
+		if family == "solana" {
+			var fixtures map[string]json.RawMessage
+			if err := json.Unmarshal(b, &fixtures); err != nil {
+				return r.Response{}, err
+			}
+			body, _ := q.Body.(map[string]any)
+			key, _ := body["method"].(string)
+			value, ok := fixtures[key]
+			if !ok {
+				return r.Response{}, errors.New("fixture has no such method")
+			}
+			payload, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "result": json.RawMessage(value)})
+			return r.Response{Raw: payload, Host: q.Provider + ".fixture.invalid"}, nil
+		}
 		if family == "evm" {
 			chain = fmt.Sprintf("0x%x", evm.Chains[network])
 		}
@@ -70,6 +85,7 @@ func Registry() (*r.Registry, []string) {
 			failures = append(failures, network+": "+e.Error())
 		}
 	}
+	register("solana", "solana-mainnet", "11111111111111111111111111111111", solana.New)
 	register("tron", "tron-mainnet", "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb", tron.New)
 	for network := range evm.Chains {
 		register("evm", network, "0x"+strings.Repeat("0", 40), evm.New)

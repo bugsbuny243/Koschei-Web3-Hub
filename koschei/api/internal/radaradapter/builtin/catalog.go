@@ -16,7 +16,7 @@ func Catalog() []r.Capability {
 	for _, legacy := range []struct {
 		network, family, fixture string
 		targets                  []string
-	}{{"solana-mainnet", "solana", "internal/services/actor_defense_rules_test.go", []string{"address", "token", "transaction"}}, {"bitcoin-mainnet", "utxo", "internal/networktarget/bitcoin_probe_test.go", []string{"address", "transaction"}}, {"sui-mainnet", "move", "internal/networktarget/move_identity_probe_test.go", []string{"address"}}, {"aptos-mainnet", "move", "internal/networktarget/move_identity_probe_test.go", []string{"address"}}} {
+	}{{"bitcoin-mainnet", "utxo", "internal/networktarget/bitcoin_probe_test.go", []string{"address", "transaction"}}, {"sui-mainnet", "move", "internal/networktarget/move_identity_probe_test.go", []string{"address"}}, {"aptos-mainnet", "move", "internal/networktarget/move_identity_probe_test.go", []string{"address"}}} {
 		out = append(out, r.Capability{ID: legacy.family + "-legacy", Network: legacy.network, Family: legacy.family, Status: "existing_separate_route", TargetClasses: legacy.targets, Sources: []string{"Existing production collector retained; not claimed by the new adapter registry."}, Fixture: legacy.fixture, EvidenceOnly: legacy.family != "solana"})
 	}
 	for _, network := range []string{"hyperliquid-core", "xrpl-mainnet", "cardano-mainnet", "polkadot-mainnet", "near-mainnet", "litecoin-mainnet", "dogecoin-mainnet", "bitcoincash-mainnet", "starknet-mainnet"} {
@@ -28,6 +28,8 @@ func Catalog() []r.Capability {
 func SampleTarget(c r.Capability) r.Target {
 	t := r.Target{Network: c.Network, Kind: "address"}
 	switch c.Family {
+	case "solana":
+		t.Raw = "11111111111111111111111111111111"
 	case "tron":
 		t.Raw = "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
 	case "evm":
