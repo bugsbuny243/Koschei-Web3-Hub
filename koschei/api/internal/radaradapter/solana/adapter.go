@@ -2,7 +2,7 @@ package solana
 
 import (
 	"context"
-		"errors"
+	"errors"
 	"strconv"
 
 	r "koschei/api/internal/radaradapter"
@@ -77,7 +77,7 @@ func (a *Adapter) Collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 		return nil, append(limits, r.Limitation{Code: "programdata_invalid", Reason: "Linked ProgramData account is invalid or its upgrade slot exceeds the finalized anchor."}), errors.New("invalid linked ProgramData state")
 	}
 	row := r.NewRow(a.subject, "solana-program-link", res, strconv.FormatUint(slot, 10), map[string]any{
-		"programdata_pubkey_hex": dataAddress,
+		"programdata_address":    dataAddress,
 		"program_owner":          account.Owner,
 		"program_executable":     account.Executable,
 		"lamports":               account.Lamports,
