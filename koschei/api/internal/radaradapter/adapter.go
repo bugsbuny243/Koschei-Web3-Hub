@@ -80,7 +80,7 @@ func ValidateEvidence(subject SubjectIdentity, rows []EvidenceRow) error {
 			return errors.New("unknown evidence status")
 		}
 
-		if strings.TrimSpace(row.ID) == "" || strings.TrimSpace(row.SubjectID) == "" ||
+		if strings.TrimSpace(row.ID) == "" || strings.TrimSpace(row.SubjectID) != strings.TrimSpace(subject.NativeID) ||
 			strings.TrimSpace(row.Source) == "" || strings.TrimSpace(row.Height) == "" ||
 			strings.TrimSpace(row.RawHash) == "" || row.ObservedAt.IsZero() {
 			return errors.New("incomplete reproducible evidence row")
