@@ -16,6 +16,7 @@ const (
 	pumpSwapProgram      = "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 	meteoraDAMMV2Program = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG"
 	meteoraDLMMProgram   = "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo"
+	orcaWhirlpoolProgram = "whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc"
 )
 
 func collectProtocolLPControlEvidence(ctx context.Context, rpc solanaRPCCall, network, mint, creator, pool string) services.LPControlEvidence {
@@ -52,9 +53,11 @@ func collectProtocolLPControlEvidence(ctx context.Context, rpc solanaRPCCall, ne
 		return decodeMeteoraDAMMV2LPControl(ctx, rpc, network, out, data)
 	case meteoraDLMMProgram:
 		return decodeMeteoraDLMMLPControl(ctx, rpc, network, out, data)
+	case orcaWhirlpoolProgram:
+		return decodeOrcaWhirlpoolLPControl(ctx, rpc, network, out, data)
 	default:
 		out.ReasonCode = "unsupported_pool_program"
-		out.Limitations = append(out.Limitations, "The observed pair account is not owned by a pinned Raydium, PumpSwap or Meteora pool program.")
+		out.Limitations = append(out.Limitations, "The observed pair account is not owned by a pinned Raydium, PumpSwap, Meteora or Orca Whirlpool pool program.")
 		return out
 	}
 }
