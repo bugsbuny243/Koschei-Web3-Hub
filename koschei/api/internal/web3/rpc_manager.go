@@ -38,10 +38,11 @@ type rpcEnvelope struct {
 type rpcManagerStatusError struct {
 	Status     int
 	RetryAfter string
+	Provider   string
 }
 
 func (e *rpcManagerStatusError) Error() string {
-	return fmt.Sprintf("rpc status %d", e.Status)
+	return fmt.Sprintf("provider=%s rpc status %d", e.Provider, e.Status)
 }
 
 func NewRPCManager(client HTTPDoer, providers []RPCProviderConfig) *RPCManager {
@@ -109,7 +110,7 @@ func (m *RPCManager) availableProviders(now time.Time) []RPCProviderConfig {
 	out := make([]RPCProviderConfig, 0, len(m.providers))
 	for _, p := range m.providers {
 		st := m.states[p.Name]
-		if st.State == CircuitOpen && now.Before(st.OpenedUntil) {
+		if st.State == CircuitOpen && (st.OpenedUntil.IsZero() || now.Before(st.OpenedUntil)) {
 			continue
 		}
 		if st.State == CircuitOpen && !now.Before(st.OpenedUntil) {
@@ -126,6 +127,12 @@ func (m *RPCManager) recordFailure(p RPCProviderConfig, err error) {
 	st := m.states[p.Name]
 	st.Failures++
 	st.LastError = err.Error()
+	var statusErr *rpcManagerStatusError
+	if errors.As(err, &statusErr) && statusErr.Status == http.StatusForbidden {
+		st.State = CircuitOpen
+		st.OpenedUntil = time.Time{}
+		return
+	}
 	if st.Failures >= p.MaxFailures || st.State == CircuitHalfOpen {
 		st.State = CircuitOpen
 		st.OpenedUntil = time.Now().Add(p.Cooldown)
@@ -168,7 +175,7 @@ func (m *RPCManager) callProvider(ctx context.Context, p RPCProviderConfig, meth
 		actualEndpoint = resp.Request.URL.String()
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		err := &rpcManagerStatusError{Status: resp.StatusCode, RetryAfter: resp.Header.Get("Retry-After")}
+		err := &rpcManagerStatusError{Status: resp.StatusCode, RetryAfter: resp.Header.Get("Retry-After"), Provider: p.Name}
 		LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
 		return err
 	}
@@ -179,7 +186,7 @@ func (m *RPCManager) callProvider(ctx context.Context, p RPCProviderConfig, meth
 	}
 	if envelope.Error != nil {
 		if envelope.Error.Code == http.StatusTooManyRequests {
-			err := &rpcManagerStatusError{Status: http.StatusTooManyRequests}
+			err := &rpcManagerStatusError{Status: http.StatusTooManyRequests, Provider: p.Name}
 			LogRPCFailure(method, actualEndpoint, resp.StatusCode, err)
 			return err
 		}

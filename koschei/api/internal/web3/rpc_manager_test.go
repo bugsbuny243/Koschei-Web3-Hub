@@ -50,3 +50,35 @@ func jsonResponse(body string) *http.Response {
 type ioNopCloser struct{ *strings.Reader }
 
 func (ioNopCloser) Close() error { return nil }
+
+func TestRPCManagerForbiddenProviderQuarantinedAndRedacted(t *testing.T) {
+	calls := map[string]int{}
+	client := roundTrip(func(r *http.Request) (*http.Response, error) {
+		calls[r.URL.Host]++
+		if r.URL.Host == "primary.example" {
+			return &http.Response{StatusCode: http.StatusForbidden, Body: ioNopCloser{strings.NewReader("")}, Header: make(http.Header)}, nil
+		}
+		return jsonResponse(`{"jsonrpc":"2.0","result":{"ok":true}}`), nil
+	})
+	m := NewRPCManager(client, []RPCProviderConfig{
+		{Name: "primary", URL: "https://primary.example/secret-key", Priority: 1, MaxFailures: 5},
+		{Name: "backup", URL: "https://backup.example", Priority: 2},
+	})
+	for i := 0; i < 3; i++ {
+		var result map[string]any
+		provider, err := m.Call(context.Background(), "getSlot", nil, &result)
+		if err != nil || provider != "backup" {
+			t.Fatalf("failover provider=%q err=%v", provider, err)
+		}
+	}
+	if calls["primary.example"] != 1 || calls["backup.example"] != 3 {
+		t.Fatalf("unexpected calls: %v", calls)
+	}
+	state, _ := m.State("primary")
+	if state.State != CircuitOpen || !state.OpenedUntil.IsZero() {
+		t.Fatalf("403 must remain quarantined: %+v", state)
+	}
+	if !strings.Contains(state.LastError, "provider=primary rpc status 403") || strings.Contains(state.LastError, "secret-key") {
+		t.Fatalf("unsafe or missing provider identity: %q", state.LastError)
+	}
+}
