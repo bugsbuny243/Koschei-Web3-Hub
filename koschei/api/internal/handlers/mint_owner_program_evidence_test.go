@@ -4,7 +4,7 @@ import "testing"
 
 func TestMintOwnerProgramEvidenceTriState(t *testing.T) {
 	tests := []struct {
-		name, owner, status string
+		name, owner, status             string
 		hasClassification, token2022 bool
 	}{
 		{"classic", "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "verified", true, false},
