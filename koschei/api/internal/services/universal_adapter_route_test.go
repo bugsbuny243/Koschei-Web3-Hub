@@ -28,7 +28,7 @@ func (routeEvidenceFixture) Collect(_ context.Context, _ radaradapter.Target) ([
 func TestDeclaredRouteCannotBecomeExecutableFromEvidence(t *testing.T) {
 	plan := UniversalInvestigationPlan{
 		Subject: IntelligenceSubject{
-			ID: "subject-1", CanonicalRef: "fixture:account", Network: "ethereum-mainnet",
+			ID: "subject-1", CanonicalRef: "fixture:account", ChainFamily: IntelligenceChainFamilyEVM, Chain: "ethereum", Network: "ethereum-mainnet",
 			Kind: "address", Raw: "account",
 		},
 		Route: UniversalDispatchDeclaredOnly,
@@ -45,7 +45,7 @@ func TestDeclaredRouteCannotBecomeExecutableFromEvidence(t *testing.T) {
 func TestKnownLiveRouteAcceptsObservedEvidenceOnly(t *testing.T) {
 	plan := UniversalInvestigationPlan{
 		Subject: IntelligenceSubject{
-			ID: "subject-1", CanonicalRef: "fixture:account", Network: "ethereum-mainnet",
+			ID: "subject-1", CanonicalRef: "fixture:account", ChainFamily: IntelligenceChainFamilyEVM, Chain: "ethereum", Network: "ethereum-mainnet",
 			Kind: "address", Raw: "account",
 		},
 		Route: UniversalDispatchEVMProbe,
