@@ -31,13 +31,17 @@ func FixtureTransport(family, network string) r.Transport {
 		chain := ""
 		if family == "solana" {
 			var fixtures map[string]json.RawMessage
-			if err := json.Unmarshal(b, &fixtures); err != nil { return r.Response{}, err }
+			if err := json.Unmarshal(b, &fixtures); err != nil {
+				return r.Response{}, err
+			}
 			body, _ := q.Body.(map[string]any)
 			key, _ := body["method"].(string)
 			value, ok := fixtures[key]
-			if !ok { return r.Response{}, errors.New("fixture has no such method") }
-			payload, _ := json.Marshal(map[string]any{"jsonrpc":"2.0","id":1,"result":json.RawMessage(value)})
-			return r.Response{Raw:payload, Host:q.Provider+".fixture.invalid"}, nil
+			if !ok {
+				return r.Response{}, errors.New("fixture has no such method")
+			}
+			payload, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "result": json.RawMessage(value)})
+			return r.Response{Raw: payload, Host: q.Provider + ".fixture.invalid"}, nil
 		}
 		if family == "evm" {
 			chain = fmt.Sprintf("0x%x", evm.Chains[network])
