@@ -24,8 +24,8 @@ type SolanaRPC struct {
 	KeyPrefix     string
 	AlchemyAPIKey string
 
-	limitMu       sync.Mutex
-	nextRequestAt time.Time
+	limitMu            sync.Mutex
+	nextRequestAt      time.Time
 	cooldowns          map[string]time.Time
 	forbiddenEndpoints map[string]bool
 	endpointConfig     string
