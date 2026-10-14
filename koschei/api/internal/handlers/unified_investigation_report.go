@@ -485,6 +485,7 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 			"behavioral_signatures_can_change_grade":     false,
 		},
 	}
+	report["mint_owner_program_evidence"] = unifiedMintOwnerEvidenceProjection(core.SourceContext)
 	if actorRun.Status == "source_unavailable" {
 		report["source_completeness"] = "incomplete_source"
 		report["source_completeness_reason"] = "creator_source_unavailable"
@@ -552,4 +553,18 @@ func (h *Handler) unifiedTradeLedgerAggregates(ctx context.Context, mint string)
 		out["last_observed_at"] = lastSeen.Time.UTC().Format(time.RFC3339)
 	}
 	return out
+}
+
+// unifiedMintOwnerEvidenceProjection keeps unverified states explicit and never
+// synthesizes token_2022=false from missing or unsupported program evidence.
+func unifiedMintOwnerEvidenceProjection(source map[string]any) map[string]any {
+	out := map[string]any{"mint_owner_program_evidence_status": "unverified"}
+	if source == nil || source["mint_owner_program_evidence_status"] != "verified" {
+		return out
+	}
+	owner, ok := source["mint_owner_program"].(string)
+	if !ok {
+		return out
+	}
+	return mintOwnerProgramEvidence(owner)
 }

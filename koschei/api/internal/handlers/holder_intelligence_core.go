@@ -66,6 +66,12 @@ func (h *Handler) runHolderIntelligenceCore(parent context.Context, target, netw
 	fundingRecurrence := services.ArvisFundingRecurrenceFromBundle(bundle)
 	source := h.radarDetailSourceContext(parent, target, network)
 	source = h.resolveCanonicalCreatorSourceContext(parent, target, network, mode, source)
+	if unifiedLiveEvidenceAllowed(mode) {
+		ownerEvidence := h.collectUnifiedMintOwnerEvidence(parent, target, network)
+		for key, value := range ownerEvidence {
+			source[key] = value
+		}
+	}
 	launch := h.analyzeLaunchForensics(parent, target, roles, cluster, source)
 	analysis = services.ApplyLaunchForensicsToAnalysis(analysis, req, launch)
 	market := radarDetailMarketSnapshot(parent, target)

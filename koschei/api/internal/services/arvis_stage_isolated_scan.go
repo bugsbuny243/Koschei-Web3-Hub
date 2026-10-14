@@ -175,8 +175,8 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 
 	accountCtx, accountCancel := radarEvidenceStageContext(parent, req, "account")
 	account, accountErr := SolanaGetAccountInfoJSONParsed(accountCtx, rpcURL, req.Target)
+	appendStageDeadlineLimitation(&profile, "account", accountErr, accountCtx.Err())
 	accountCancel()
-	appendStageDeadlineLimitation(&profile, "account", accountErr)
 	if accountErr == nil && account.Value != nil {
 		profile.LiveRPC = true
 		profile.AccountExists = true
@@ -189,8 +189,8 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 
 	supplyCtx, supplyCancel := radarEvidenceStageContext(parent, req, "supply")
 	supply, supplyErr := SolanaGetTokenSupply(supplyCtx, rpcURL, req.Target)
+	appendStageDeadlineLimitation(&profile, "supply", supplyErr, supplyCtx.Err())
 	supplyCancel()
-	appendStageDeadlineLimitation(&profile, "supply", supplyErr)
 	if supplyErr == nil {
 		profile.LiveRPC = true
 		profile.IsTokenMint = true
@@ -201,8 +201,8 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 
 	largestCtx, largestCancel := radarEvidenceStageContext(parent, req, "largest_accounts")
 	largest, largestErr := SolanaGetTokenLargestAccounts(largestCtx, rpcURL, req.Target)
+	appendStageDeadlineLimitation(&profile, "largest_accounts", largestErr, largestCtx.Err())
 	largestCancel()
-	appendStageDeadlineLimitation(&profile, "largest_accounts", largestErr)
 	if largestErr == nil {
 		profile.LiveRPC = true
 		profile.IsTokenMint = true
@@ -213,6 +213,7 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 
 		rolesCtx, rolesCancel := radarEvidenceStageContext(parent, req, "holder_roles")
 		profile.HolderRoles = AnalyzeSolanaHolderRoles(rolesCtx, rpcURL, profile.TokenSupply, largest.Value)
+		appendStageDeadlineLimitation(&profile, "holder_roles", rolesCtx.Err())
 		rolesCancel()
 		if profile.HolderRoles.Available && profile.HolderRoles.RoleAdjusted && !profile.HolderRoles.BlockingEvidenceGap {
 			profile.LargestHolderPct = int(math.Round(profile.HolderRoles.EffectiveTop1Percentage))
@@ -228,8 +229,8 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 
 	signaturesCtx, signaturesCancel := radarEvidenceStageContext(parent, req, "signatures")
 	signatures, signaturesErr := SolanaGetSignaturesForAddress(signaturesCtx, rpcURL, req.Target, 100)
+	appendStageDeadlineLimitation(&profile, "signatures", signaturesErr, signaturesCtx.Err())
 	signaturesCancel()
-	appendStageDeadlineLimitation(&profile, "signatures", signaturesErr)
 	if signaturesErr == nil {
 		profile.LiveRPC = true
 		profile.RecentSignatureCount = len(signatures)
@@ -265,6 +266,7 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 	if parent.Err() == nil && profile.IsTokenMint && profile.HolderRoles.Available {
 		clusterCtx, clusterCancel := radarEvidenceStageContext(parent, req, "holder_cluster")
 		profile.HolderCluster = AnalyzeSolanaHolderCluster(clusterCtx, rpcURL, req.Target, profile.HolderRoles, profile.TargetOldestBlockTime, profile.TargetOldestSlot)
+		appendStageDeadlineLimitation(&profile, "holder_cluster", clusterCtx.Err())
 		clusterCancel()
 		if store := securityRadarStoreFromContext(parent); store != nil {
 			_ = store.CaptureFundingClusters(parent, req.Target, req.Network, profile.HolderCluster)
@@ -287,6 +289,10 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 			profile.EvidenceStatus = "target_not_confirmed_as_token_mint"
 		}
 	}
+	if hasStageDeadlineLimitation(profile.Errors) && profile.LiveRPC {
+		profile.DataQuality = "partial_rpc_evidence"
+		profile.EvidenceStatus = "partial_rpc_evidence_deadline"
+	}
 	if parent.Err() != nil {
 		profile.Errors = append(profile.Errors, "interactive investigation deadline reached; evidence is partial")
 		if profile.LiveRPC {
@@ -297,11 +303,25 @@ func collectRadarEvidenceContextIsolated(parent context.Context, req SecurityRad
 	return profile
 }
 
-// appendStageDeadlineLimitation records a named, machine-readable gap rather than
-// treating a timed-out evidence stage as a successful empty observation.
-func appendStageDeadlineLimitation(profile *radarEvidenceProfile, stage string, err error) {
-	if profile == nil || !errors.Is(err, context.DeadlineExceeded) {
+// appendStageDeadlineLimitation records a named, machine-readable gap even when
+// a collector swallows the context error and returns an empty successful value.
+func appendStageDeadlineLimitation(profile *radarEvidenceProfile, stage string, errs ...error) {
+	if profile == nil {
 		return
 	}
-	profile.Errors = append(profile.Errors, "STAGE_DEADLINE_EXCEEDED stage="+stage)
+	for _, err := range errs {
+		if errors.Is(err, context.DeadlineExceeded) {
+			profile.Errors = append(profile.Errors, "STAGE_DEADLINE_EXCEEDED stage="+stage)
+			return
+		}
+	}
+}
+
+func hasStageDeadlineLimitation(errors []string) bool {
+	for _, value := range errors {
+		if strings.HasPrefix(value, "STAGE_DEADLINE_EXCEEDED stage=") {
+			return true
+		}
+	}
+	return false
 }
