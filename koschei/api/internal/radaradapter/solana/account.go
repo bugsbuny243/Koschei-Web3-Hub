@@ -17,6 +17,8 @@ type Account struct {
 	Data       []byte
 }
 
+const maxRPCAccountBytes = 16 << 20
+
 // DecodeAccountInfo accepts only the explicit base64 RPC account encoding.
 // Owner, executable and byte representation are preserved for caller checks.
 func DecodeAccountInfo(raw json.RawMessage) (Account, error) {
@@ -34,6 +36,9 @@ func DecodeAccountInfo(raw json.RawMessage) (Account, error) {
 	var pair []string
 	if err := json.Unmarshal(envelope.Value.Data, &pair); err != nil || len(pair) != 2 || pair[1] != "base64" {
 		return Account{}, errors.New("Solana account requires base64 data")
+	}
+	if len(pair[0]) > base64.StdEncoding.EncodedLen(maxRPCAccountBytes) {
+		return Account{}, errors.New("Solana account payload exceeds limit")
 	}
 	data, err := base64.StdEncoding.Strict().DecodeString(pair[0])
 	if err != nil || len(data) == 0 || envelope.Value.Owner == "" {
