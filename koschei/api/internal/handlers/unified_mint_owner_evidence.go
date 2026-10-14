@@ -20,7 +20,7 @@ func (h *Handler) collectUnifiedMintOwnerEvidence(parent context.Context, target
 	var account struct {
 		Value *struct {
 			Owner string `json:"owner"`
-			Data struct {
+			Data  struct {
 				Parsed struct {
 					Type string `json:"type"`
 				} `json:"parsed"`
