@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -73,5 +75,18 @@ func TestExpiredForegroundRadarStageDoesNotResetParentDeadline(t *testing.T) {
 	defer stageCancel()
 	if stage.Err() != context.Canceled {
 		t.Fatalf("expired parent must prevent holder cluster work, got %v", stage.Err())
+	}
+}
+
+func TestStageDeadlineLimitationNamesStage(t *testing.T) {
+	profile := &radarEvidenceProfile{}
+	appendStageDeadlineLimitation(profile, "signatures", context.DeadlineExceeded)
+	if len(profile.Errors) != 1 || profile.Errors[0] != "STAGE_DEADLINE_EXCEEDED stage=signatures" {
+		t.Fatalf("missing named limitation: %v", profile.Errors)
+	}
+	appendStageDeadlineLimitation(profile, "account", errors.New("rpc status 403"))
+	appendStageDeadlineLimitation(profile, "supply", context.Canceled)
+	if len(profile.Errors) != 1 || !strings.Contains(profile.Errors[0], "signatures") {
+		t.Fatalf("unrelated errors must not be labeled deadline: %v", profile.Errors)
 	}
 }
