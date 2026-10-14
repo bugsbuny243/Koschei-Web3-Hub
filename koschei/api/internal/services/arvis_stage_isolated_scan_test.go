@@ -90,3 +90,27 @@ func TestStageDeadlineLimitationNamesStage(t *testing.T) {
 		t.Fatalf("unrelated errors must not be labeled deadline: %v", profile.Errors)
 	}
 }
+
+func TestStageDeadlineDetectsSwallowedCollectorError(t *testing.T) {
+	stage, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	defer cancel()
+	profile := &radarEvidenceProfile{}
+	appendStageDeadlineLimitation(profile, "holder_roles", nil, stage.Err())
+	if len(profile.Errors) != 1 || profile.Errors[0] != "STAGE_DEADLINE_EXCEEDED stage=holder_roles" {
+		t.Fatalf("swallowed deadline did not produce named evidence gap: %v", profile.Errors)
+	}
+	if !hasStageDeadlineLimitation(profile.Errors) {
+		t.Fatal("timeout evidence must drive partial data quality")
+	}
+}
+
+func TestStageDeadlineLimitationDeduplicatesErrorAndContext(t *testing.T) {
+	profile := &radarEvidenceProfile{}
+	appendStageDeadlineLimitation(profile, "holder_cluster", context.DeadlineExceeded, context.DeadlineExceeded)
+	if len(profile.Errors) != 1 || profile.Errors[0] != "STAGE_DEADLINE_EXCEEDED stage=holder_cluster" {
+		t.Fatalf("same stage deadline must be reported once: %v", profile.Errors)
+	}
+	if hasStageDeadlineLimitation([]string{"rpc status 403", "context canceled"}) {
+		t.Fatal("non-deadline errors must not be reported as stage timeout")
+	}
+}
