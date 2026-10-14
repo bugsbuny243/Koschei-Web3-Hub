@@ -12,13 +12,16 @@ import (
 
 // Target preserves the caller's exact identifier and the explicit network scope.
 type Target struct {
-	Network string
-	Kind    string
-	Raw     string
+	Network string `json:"network"`
+	Kind    string `json:"kind"`
+	Raw     string `json:"target"`
 }
 
 // SubjectIdentity binds a subject to a chain's native identity primitive.
 type SubjectIdentity struct {
+	ChainIdentity string `json:"chain_identity,omitempty"`
+	Workchain     *int32 `json:"workchain,omitempty"`
+	AddressForm   string `json:"address_form,omitempty"`
 	Network       string
 	IdentityKind  string
 	IdentityValue string
@@ -29,6 +32,8 @@ type SubjectIdentity struct {
 // existing services.IntelligenceEvidence type belongs to the dispatcher
 // boundary, avoiding an import cycle from services to this package.
 type EvidenceRow struct {
+	Network    string
+	Relation   string
 	ID         string
 	SubjectID  string
 	Status     string
@@ -40,11 +45,20 @@ type EvidenceRow struct {
 }
 
 type Limitation struct {
-	Code   string
-	Reason string
+	Code   string `json:"code"`
+	Reason string `json:"reason"`
 }
 
 type Capability struct {
+	ID                   string   `json:"id,omitempty"`
+	Network              string   `json:"network,omitempty"`
+	Family               string   `json:"family,omitempty"`
+	TargetClasses        []string `json:"target_classes,omitempty"`
+	Sources              []string `json:"sources,omitempty"`
+	ArchivalRequirements []string `json:"archival_requirements,omitempty"`
+	Status               string   `json:"status,omitempty"`
+	EvidenceOnly         bool     `json:"evidence_only"`
+
 	Networks         []string
 	TargetKinds      []string
 	DataSources      []string
@@ -87,4 +101,16 @@ func ValidateEvidence(subject SubjectIdentity, rows []EvidenceRow) error {
 		}
 	}
 	return nil
+}
+
+// CollectorIdentity fills the existing adapter identity fields from an explicit
+// protocol-native chain identity. It does not assert provider availability.
+func CollectorIdentity(s SubjectIdentity) SubjectIdentity {
+	if s.IdentityKind == "" {
+		s.IdentityKind = "chain_identity"
+	}
+	if s.IdentityValue == "" {
+		s.IdentityValue = s.ChainIdentity
+	}
+	return s
 }

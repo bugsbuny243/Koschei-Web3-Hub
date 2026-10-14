@@ -10,6 +10,7 @@ const (
 	IntelligenceChainFamilyCosmos    = "cosmos"
 	IntelligenceChainFamilySubstrate = "substrate"
 	IntelligenceChainFamilyTON       = "ton"
+	IntelligenceChainFamilyTron      = "tron"
 	IntelligenceChainFamilyNEAR      = "near"
 	IntelligenceChainFamilyOffchain  = "offchain"
 

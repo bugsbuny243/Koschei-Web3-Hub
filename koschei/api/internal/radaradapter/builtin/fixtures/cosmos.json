@@ -1,0 +1,22 @@
+{
+  "/cosmos/base/tendermint/v1beta1/blocks/latest": {
+    "block": {
+      "header": {
+        "chain_id": "$CHAIN_ID",
+        "height": "100"
+      }
+    }
+  },
+  "$AUTHZ": {
+    "grants": [],
+    "pagination": {
+      "next_key": null
+    }
+  },
+  "$FEEGRANT": {
+    "allowances": [],
+    "pagination": {
+      "next_key": null
+    }
+  }
+}

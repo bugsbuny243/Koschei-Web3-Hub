@@ -48,6 +48,7 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 		"database":    database,
 		"service":     "koschei-web3",
 		"arvis":       arvis,
+		"multichain":  services.RadarCollectorHealth(),
 	})
 }
 

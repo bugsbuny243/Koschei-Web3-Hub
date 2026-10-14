@@ -73,7 +73,7 @@ func productionRouteInventory() []routeInventoryGroup {
 			"POST /api/owner/login", "POST /api/owner/logout", "GET /api/owner/command-center", "GET /api/owner/operations", "GET /api/owner/token-telemetry",
 			"GET /api/owner/arvis", "POST /api/owner/arvis/scan", "POST /api/owner/radar/unified", "POST /api/owner/radar/jobs", "GET /api/owner/radar/jobs/",
 			"POST /api/owner/radar/funding-corpus/warmup", "GET /api/owner/radar/global/records", "GET /api/owner/radar/global/events", "GET /api/owner/radar/flow-metrics", "GET /api/owner/radar/coverage-episodes", "GET /api/owner/creator-intelligence", "GET /api/owner/wallet-linkage", "GET /api/owner/actor-intelligence",
-			"GET /api/owner/actor-memory/matches", "GET /api/owner/radar/continuity", "GET /api/owner/radar/provider-memory",
+			"GET /api/owner/actor-memory/matches", "GET /api/owner/radar/capabilities", "POST /api/owner/radar/investigate", "GET /api/owner/radar/continuity", "GET /api/owner/radar/provider-memory",
 			"GET /api/owner/defense/tracks", "POST /api/owner/defense/investigate", "POST /api/owner/defense/actor-acceptance", "POST /api/owner/defense/distribution",
 			"POST /api/owner/web3/shield/preflight", "POST /api/owner/web3/transaction-guard", "POST /api/owner/web3/transaction-guard/state-recheck", "POST /api/owner/web3/address-poisoning/check", "POST /api/owner/web3/defense-validation", "POST /api/owner/web3/execution-assurance/safe/verify",
 			"/api/owner/radar/sources", "GET /api/owner/security-events", "/api/owner/incidents", "/api/owner/incidents/", "GET /api/owner/route-map", "/api/owner/feedback",
@@ -81,10 +81,10 @@ func productionRouteInventory() []routeInventoryGroup {
 			"POST /api/owner/dossier/publications", "POST /api/owner/arvis/acceptance",
 		}},
 		{Name: "professional_customer_operations", Auth: "customer_session_plus_professional_entitlement", Routes: []string{
-			"POST /api/arvis/preflight", "POST /api/token/scan", "POST /api/wallet/score", "POST /api/mev/analyze", "POST /api/liquidity/analyze", "POST /api/dao/proposal-risk",
+			"POST /api/arvis/preflight", "POST /api/token/scan", "POST /api/wallet/score",
 			"POST /api/v1/token/extensions", "POST /api/v1/address-poisoning/check", "POST /api/customer/web3/transaction-preflight", "POST /api/customer/web3/transaction-state-recheck",
 			"POST /api/v1/radar/check", "POST /api/v1/radar/jobs", "GET /api/v1/radar/jobs/", "GET /api/v1/radar/detail", "GET /api/v1/radar/feed",
-			"GET /api/v1/radar/tron-wallet-permissions", "GET /api/v1/radar/creator-intelligence", "GET /api/v1/radar/actor-intelligence", "GET /api/v1/radar/graph", "GET /api/v1/radar/exposure", "POST /api/v1/radar/court",
+			"POST /api/v1/radar/investigate", "GET /api/v1/radar/tron-wallet-permissions", "GET /api/v1/radar/creator-intelligence", "GET /api/v1/radar/actor-intelligence", "GET /api/v1/radar/graph", "GET /api/v1/radar/exposure", "POST /api/v1/radar/court",
 			"POST /api/jobs/token-scan", "GET /api/jobs/",
 		}},
 		{Name: "developer_api", Auth: "api_key_plus_professional_entitlement", Routes: []string{

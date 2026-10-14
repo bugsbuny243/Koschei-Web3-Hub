@@ -55,6 +55,12 @@ jobs:
         with:
           go-version-file: koschei/api/go.mod
           cache-dependency-path: koschei/api/go.sum
+      - name: Verify multi-chain capability and API contracts
+        run: |
+          go run ./cmd/radar-capability-gen -check
+          go run ./cmd/openapi-gen -check
+          go test ./internal/radaradapter/... ./internal/services ./internal/handlers ./internal/http -run 'TestEveryRegistered|TestRuntime|TestExtendedPermissions|TestRadarHTTP|TestRadarCollectorOwner|TestReadOnlyTransport'
+          node --test public/js/__tests__/owner-multichain-radar.test.cjs
       - name: Download modules
         run: go mod download
       - name: Validate migrations on PostgreSQL 17
@@ -192,6 +198,7 @@ jobs:
           node scripts/verify-customer-investigation-ui.js
           node scripts/verify-scan-runtime-recovery.js
           node scripts/verify-report-trust-consistency.js
+          node --test public/js/arvis-premium-contract.test.cjs public/js/impact-contract.test.cjs
           node scripts/verify-dossier-contract.mjs
       - name: Check public language and investigation contracts
         run: |
@@ -246,6 +253,12 @@ jobs:
         with:
           go-version-file: koschei/api/go.mod
           cache-dependency-path: koschei/api/go.sum
+      - name: Verify multi-chain capability and API contracts
+        run: |
+          go run ./cmd/radar-capability-gen -check
+          go run ./cmd/openapi-gen -check
+          go test ./internal/radaradapter/... ./internal/services ./internal/handlers ./internal/http -run 'TestEveryRegistered|TestRuntime|TestExtendedPermissions|TestRadarHTTP|TestRadarCollectorOwner|TestReadOnlyTransport'
+          node --test public/js/__tests__/owner-multichain-radar.test.cjs
       - name: Download modules
         run: go mod download
       - name: Install Go security scanners

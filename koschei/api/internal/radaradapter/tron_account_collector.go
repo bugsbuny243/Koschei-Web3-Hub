@@ -114,7 +114,7 @@ func (observation TronAccountObservation) EvidenceRows(observedAt time.Time, ver
 	rows := make([]EvidenceRow, 0, len(observation.Permissions))
 	for _, permission := range observation.Permissions {
 		rows = append(rows, EvidenceRow{
-			ID:         "tron-permission-" + permission.ID,
+			ID:         "tron-permission-" + observation.Address + "-" + observation.RawResponseSHA256 + "-" + strconv.FormatInt(verifiedBlockHeight, 10) + "-" + observedAt.UTC().Format(time.RFC3339Nano) + "-" + permission.ID,
 			SubjectID:  observation.Address,
 			Status:     "observed",
 			Source:     observation.Provider,

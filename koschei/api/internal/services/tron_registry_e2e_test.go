@@ -60,6 +60,7 @@ func TestTronWalletRegistryEndToEndObservedOnly(t *testing.T) {
 	}
 	evidence := collected.Evidence[0]
 	if evidence.SubjectID != "tron-mainnet:account:"+account ||
+		evidence.ChainFamily != "tron" || evidence.Chain != "tron" ||
 		evidence.Status != IntelligenceEvidenceObserved ||
 		evidence.Attributes["account_state_height_verified"] != false {
 		t.Fatalf("Tron evidence promoted or misbound: %+v", evidence)
