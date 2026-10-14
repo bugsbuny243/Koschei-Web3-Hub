@@ -38,7 +38,7 @@ type rpcEnvelope struct {
 type rpcManagerStatusError struct {
 	Status     int
 	RetryAfter string
-	Provider string
+	Provider   string
 }
 
 func (e *rpcManagerStatusError) Error() string {
