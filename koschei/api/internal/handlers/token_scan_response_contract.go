@@ -37,7 +37,6 @@ func (response tokenScanResponse) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 
-	score := response.Score
 	event, err := securityevidence.BuildRadarEventV1(securityevidence.RadarReportInput{
 		ReportJSON: sourceBytes,
 		Subject: securityevidence.Subject{
@@ -47,7 +46,6 @@ func (response tokenScanResponse) MarshalJSON() ([]byte, error) {
 		},
 		Window:   securityevidence.ObservationWindow{},
 		Findings: tokenScanSecurityEvidenceFindings(response),
-		Legacy:   &securityevidence.LegacyObservation{Score: &score},
 	})
 	if err != nil {
 		return nil, err
