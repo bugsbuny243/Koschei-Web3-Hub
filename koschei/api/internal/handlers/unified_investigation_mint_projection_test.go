@@ -15,9 +15,9 @@ func TestUnifiedInvestigationProjectsVerifiedPYUSDMintEvidence(t *testing.T) {
 			Target: pyusd, Network: "solana-mainnet", Mode: "stored_only_projection",
 		},
 		SourceContext: map[string]any{
-			"mint_owner_program": owner,
+			"mint_owner_program":                 owner,
 			"mint_owner_program_evidence_status": "verified",
-			"token_2022": true,
+			"token_2022":                         true,
 			"token_2022_extension_evidence": map[string]any{
 				"status": "resolved", "evidence_complete": true,
 				"extension_count": 2,
@@ -41,9 +41,9 @@ func TestUnifiedInvestigationRejectsUnverifiedMintEvidence(t *testing.T) {
 			Target: "unverified", Network: "solana-mainnet", Mode: "stored_only_projection",
 		},
 		SourceContext: map[string]any{
-			"mint_owner_program": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+			"mint_owner_program":                 "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
 			"mint_owner_program_evidence_status": "unverified",
-			"token_2022": true,
+			"token_2022":                         true,
 			"token_2022_extension_evidence": map[string]any{
 				"status": "resolved", "evidence_complete": true,
 				"extension_count": 1, "extension_names": []string{"permanentDelegate"},
