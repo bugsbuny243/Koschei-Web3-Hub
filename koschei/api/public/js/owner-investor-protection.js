@@ -115,6 +115,12 @@ const observer=new MutationObserver(records=>{
     for(const node of record.addedNodes){
       if(node.nodeType!==1)continue;
       if(node.matches?.('[data-arvis-premium-card]')||node.querySelector?.('[data-arvis-premium-card]'))enhance(node.parentElement||node);
+      // The UX layer may insert the Decision Lens *after* this renderer has
+      // already inserted Investor Protection. Re-apply the authoritative
+      // backend decision as soon as that late lens enters the DOM.
+      const newLens=node.matches?.('.koschei-decision-lens')?node:node.querySelector?.('.koschei-decision-lens');
+      const card=newLens?.closest?.('[data-arvis-premium-card]');
+      if(card)harmonizeDecisionLens(card,obj(currentReport().investor_protection_decision));
     }
   }
 });
