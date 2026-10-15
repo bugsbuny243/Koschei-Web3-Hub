@@ -176,10 +176,11 @@ func arvisArmExecutionStatus(arm SecurityRadarVerdict) string {
 	if SecurityRadarVerdictHasVerifiedEvidence(arm) {
 		return ArvisExecutionCompleted
 	}
-	// These transaction-specific collectors are intentionally not applicable to
-	// a mint-only investigation unless a transaction/claim target is supplied.
+	// These transaction- and claim-URL-specific collectors do not apply to a
+	// mint-only investigation. No supplied claim URL does NOT prove there are
+	// no claim pages elsewhere; it only limits the scope of this scan.
 	switch arm.ModuleID {
-	case ModuleWalletlessClaimShield, ModuleMEVShield:
+	case ModuleWalletlessClaimShield, ModuleClaimSurfaceRisk, ModuleMEVShield:
 		return ArvisExecutionNotApplicable
 	}
 	return ArvisExecutionEvidencePending
