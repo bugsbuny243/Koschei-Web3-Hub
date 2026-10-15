@@ -104,3 +104,48 @@ func TestCoverageMetadataIsAttachedAfterExtensions(t *testing.T) {
 		t.Fatal("investigation output policy metadata missing")
 	}
 }
+
+func TestInvestigationCoverageDoesNotConfusePendingWithAttempted(t *testing.T) {
+	arms := []SecurityRadarVerdict{
+		{ModuleID: ModuleCreatorLinkAnalysis, Signals: map[string]any{"execution_status": ArvisExecutionEvidencePending}},
+		{ModuleID: ModuleTokenAuthorityScanner, Signals: map[string]any{"execution_status": ArvisExecutionEvidencePending, "collector_attempted": true}},
+		{ModuleID: ModuleRepeatActorScan, EvidenceVerified: true, Evidence: []string{"verified actor memory lookup"}, Signals: map[string]any{"execution_status": ArvisExecutionCompleted}},
+		{ModuleID: ModuleMEVShield},
+	}
+	coverage := BuildArvisInvestigationCoverage(arms)
+	if coverage.CapabilityTotal != 4 || coverage.Attempted != 2 {
+		t.Fatalf("architecture total must not be misreported as runtime work: %+v", coverage)
+	}
+	for i, want := range []bool{false, true, true, false} {
+		if got := coverage.Arms[i].Attempted; got != want {
+			t.Fatalf("arm[%d] attempted=%v want=%v", i, got, want)
+		}
+		if got := coverage.Arms[i].Subchecks.Ran; got != want {
+			t.Fatalf("arm[%d] subcheck ran=%v want=%v", i, got, want)
+		}
+	}
+	if coverage.EvidenceProducing != 1 || coverage.NotApplicable != 1 || coverage.EvidencePending != 2 {
+		t.Fatalf("coverage categories unexpectedly changed: %+v", coverage)
+	}
+}
+
+func TestPendingAndDisabledArmsNeverClaimCollectionByDefault(t *testing.T) {
+	req := SecurityRadarRequest{Target: "Mint", Network: "solana-mainnet"}
+	pending := evidencePendingArm("Liquidity", ModuleLiquidityMovement, req, "now", "missing pool data", "missing_pool")
+	if arvisSignalBool(pending.Signals, "collector_attempted") {
+		t.Fatalf("placeholder with no executed collector claimed a scan: %v", pending.Signals)
+	}
+	notApplicable := notApplicableArm("MEV", ModuleMEVShield, req, "now", "transaction not supplied", "no_transaction")
+	if arvisSignalBool(notApplicable.Signals, "collector_attempted") {
+		t.Fatalf("not applicable arm claimed execution: %v", notApplicable.Signals)
+	}
+	disabled := markArvisArmExecution(unavailableArm("Disabled", ModuleCreatorLinkAnalysis, req, "now", "disabled"), ArvisExecutionSourceUnavailable, "module_disabled_by_runtime_policy", false, false)
+	if arvisSignalBool(disabled.Signals, "collector_attempted") {
+		t.Fatalf("disabled collector claimed execution: %v", disabled.Signals)
+	}
+	explicit := SecurityRadarVerdict{Signals: map[string]any{"collector_attempted": true}}
+	attemptedPending := markArvisArmExecution(explicit, ArvisExecutionEvidencePending, "rpc_failed", true, false)
+	if !arvisSignalBool(attemptedPending.Signals, "collector_attempted") {
+		t.Fatal("explicit attempted RPC evidence was discarded")
+	}
+}
