@@ -1,6 +1,9 @@
 package services
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestClaimURLFlowsThroughEvidenceGateWithoutArmGrade(t *testing.T) {
 	req := SecurityRadarRequest{
@@ -56,6 +59,15 @@ func TestMintOnlyPYUSDClaimArmsAreNotApplicableWithoutClaimURL(t *testing.T) {
 		Mode:    "manual_dashboard_check",
 	}
 	analysis := AnalyzeArvisRadars(req)
+	for _, arm := range ArvisArmsFromBundle(analysis.Bundle) {
+		if arm.ModuleID != ModuleWalletlessClaimShield && arm.ModuleID != ModuleClaimSurfaceRisk {
+			continue
+		}
+		if arm.Recommendation != "not_applicable" || arvisArmExecutionStatus(arm) != ArvisExecutionNotApplicable ||
+			!strings.Contains(arm.Verdict, "No claim URL was supplied") || arvisSignalBool(arm.Signals, "collector_attempted") {
+			t.Fatalf("raw claim arm incorrectly reports a failed URL analysis: %#v", arm)
+		}
+	}
 	coverage := BuildArvisInvestigationCoverage(ArvisArmsFromBundle(analysis.Bundle))
 	found := 0
 	for _, arm := range coverage.Arms {
