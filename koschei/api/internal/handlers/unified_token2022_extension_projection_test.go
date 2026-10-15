@@ -14,7 +14,7 @@ func TestUnifiedToken2022ExtensionEvidenceFromMintRPC(t *testing.T) {
 	const classic = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 	tests := []struct {
 		name, owner, parsedInfo, expected string
-		space                             int
+		space, valueSpace                 int
 		complete                          bool
 		count                             int
 	}{
@@ -23,9 +23,27 @@ func TestUnifiedToken2022ExtensionEvidenceFromMintRPC(t *testing.T) {
 			owner:      token2022,
 			parsedInfo: `{"extensions":[{"extension":"transferHook","state":{"programId":"HookProgram"}},{"extension":"permanentDelegate","state":{"delegate":"DelegateWallet"}}]}`,
 			space:      866,
+			valueSpace: 866,
 			expected:   "resolved",
 			complete:   true,
 			count:      2,
+		},
+		{
+			name:       "canonical_value_space_only",
+			owner:      token2022,
+			parsedInfo: `{"extensions":[{"extension":"transferHook"}]}`,
+			valueSpace: 866,
+			expected:   "resolved",
+			complete:   true,
+			count:      1,
+		},
+		{
+			name:       "conflicting_rpc_space_fields",
+			owner:      token2022,
+			parsedInfo: `{"extensions":[{"extension":"transferHook"}]}`,
+			space:      82,
+			valueSpace: 866,
+			expected:   "token_2022_extensions_unresolved",
 		},
 		{
 			name:       "unresolved_extension_space",
@@ -93,7 +111,7 @@ func TestUnifiedToken2022ExtensionEvidenceFromMintRPC(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = fmt.Fprintf(w, `{"jsonrpc":"2.0","id":1,"result":{"value":{"owner":%q,"data":{"parsed":{"type":"mint","info":%s},"space":%d}}}}`, tc.owner, tc.parsedInfo, tc.space)
+				_, _ = fmt.Fprintf(w, `{"jsonrpc":"2.0","id":1,"result":{"value":{"owner":%q,"space":%d,"data":{"parsed":{"type":"mint","info":%s},"space":%d}}}}`, tc.owner, tc.valueSpace, tc.parsedInfo, tc.space)
 			}))
 			defer server.Close()
 			t.Setenv("SOLANA_RPC_URL", server.URL)
