@@ -15,7 +15,16 @@ import (
 
 func configureWeb3SignaturePressureTest(t *testing.T, primaryURL, fallbackURL string) {
 	t.Helper()
+	// This suite tests signature-pressure sharing, not the independent provider
+	// governor. Clear state left by earlier tests and keep the endpoint list
+	// limited to the two local providers supplied by each fixture.
+	ResetSolanaRPCProviderGovernorForTest()
+	t.Cleanup(ResetSolanaRPCProviderGovernorForTest)
 	resetSolanaRPCSignaturePressureForTest()
+	t.Setenv("SOLANA_RPC_GOVERNOR_ENABLED", "false")
+	for _, key := range []string{"ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL", "ALCHEMY_API_KEY"} {
+		t.Setenv(key, "")
+	}
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("SOLANA_RPC_SIGNATURE_GUARD_ENABLED", "true")
 	t.Setenv("SOLANA_RPC_URL", primaryURL)
