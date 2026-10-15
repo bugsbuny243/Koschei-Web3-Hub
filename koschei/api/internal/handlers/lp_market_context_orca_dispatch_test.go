@@ -27,7 +27,7 @@ func TestOrcaMarketDEXDispatchesToVerifiedWhirlpoolCollector(t *testing.T) {
 				Data  any    `json:"data"`
 			}{
 				Owner: orcaWhirlpoolProgram,
-				Data: []any{orcaPYUSDUSDCWhirlpoolRPCFixture, "base64"},
+				Data:  []any{orcaPYUSDUSDCWhirlpoolRPCFixture, "base64"},
 			}
 			return nil
 		case "getTokenAccountBalance":
@@ -47,9 +47,9 @@ func TestOrcaMarketDEXDispatchesToVerifiedWhirlpoolCollector(t *testing.T) {
 		}
 	}
 	market := services.TokenMarketSnapshot{
-		Available: true,
-		BestPairAddress: pool,
-		BestPairDEX: "orca",
+		Available:             true,
+		BestPairAddress:       pool,
+		BestPairDEX:           "orca",
 		BestPairLiquidityUSD: 16600000,
 	}
 	result := collectPrimaryPoolLPControlEvidence(context.Background(), rpc, "solana-mainnet", pyusd, "", market, map[string]any{})
@@ -72,7 +72,7 @@ func TestOrcaMarketDEXDispatchesToVerifiedWhirlpoolCollector(t *testing.T) {
 
 func TestOrcaMarketDEXRejectsUnknownPoolOwner(t *testing.T) {
 	market := services.TokenMarketSnapshot{
-		BestPairDEX: "orca",
+		BestPairDEX:     "orca",
 		BestPairAddress: "9tXiuRRw7kbejLhZXtxDxYs2REe43uH2e7k1kocgdM9B",
 	}
 	rpc := func(_ context.Context, _ string, method string, _ any, out any) error {
@@ -85,7 +85,7 @@ func TestOrcaMarketDEXRejectsUnknownPoolOwner(t *testing.T) {
 			Data  any    `json:"data"`
 		}{
 			Owner: "UnrecognizedOwner1111111111111111111111111",
-			Data: []any{base64.StdEncoding.EncodeToString([]byte("not a trusted pool")), "base64"},
+			Data:  []any{base64.StdEncoding.EncodeToString([]byte("not a trusted pool")), "base64"},
 		}
 		return nil
 	}
