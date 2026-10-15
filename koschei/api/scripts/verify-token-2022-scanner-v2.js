@@ -33,10 +33,25 @@ requireText(server,'mux.HandleFunc("/api/v1/token/extensions", solana(risk(requi
 requireText(server,'mux.HandleFunc("/api/token/scan", solana(risk(method("POST", h.TokenScan))))','public compatibility TokenScan route');
 forbid(server,/koschTier\(|RequireTokenTier|EnforceScanQuota/,'legacy token authorization in boot chain');
 
-for(const field of ['Score                     int                              `json:"score"`','RiskLevel                 string                           `json:"risk_level"`','Extensions                []tokenExtensionAssessment       `json:"extensions"`','ExtensionRiskPenalty      int                              `json:"extension_risk_penalty"`','ExtensionResolutionStatus string                           `json:"extension_resolution_status"`','ExtensionEvidenceComplete bool                             `json:"extension_evidence_complete"`','TransferBehavior          map[string]any                   `json:"transfer_behavior"`','VisibilityLimitations     []string                         `json:"visibility_limitations"`','CompatibilityWarnings     []string                         `json:"compatibility_warnings"`','FinalPolicy               string                           `json:"final_policy"`','HolderAnalysisStatus      string                           `json:"holder_analysis_status"`','VerdictWithheld           bool                             `json:"verdict_withheld"`'])requireText(scanner,field,`TokenScan response field ${field}`);
+// Field/tag presence is a wire-contract check, not a gofmt whitespace snapshot.
+const scanFields={
+  RiskLevel:'risk_level',Extensions:'extensions',ExtensionRiskPenalty:'extension_risk_penalty',
+  ExtensionResolutionStatus:'extension_resolution_status',ExtensionEvidenceComplete:'extension_evidence_complete',
+  TransferBehavior:'transfer_behavior',VisibilityLimitations:'visibility_limitations',
+  CompatibilityWarnings:'compatibility_warnings',FinalPolicy:'final_policy',
+  HolderAnalysisStatus:'holder_analysis_status',VerdictWithheld:'verdict_withheld',
+  TokenHeuristicPenaltyScore:'token_heuristic_penalty_score',
+  NotAFinalRiskScore:'not_a_final_risk_score',FinalScoreDisabledByPolicy:'final_score_disabled_by_policy',
+  Arms:'arms',Coverage:'coverage',ArmCount:'arm_count'
+};
+for(const [field,tag] of Object.entries(scanFields)){
+  const rx=new RegExp(`\\b${field}\\s+[^\\n]+\\x60json:"${tag}"\\x60`);
+  if(!rx.test(scanner))throw new Error(`TokenScan response missing wire field ${field}: ${tag}`);
+}
+if(scanner.includes('`json:"score"`'))throw new Error('legacy final-looking score wire field must not be emitted');
 requireText(scanner,'if holderPolicy == "withhold" {','holder evidence withhold');
 requireText(scanner,'policy = "withhold"','holder policy downgrade');
-requireText(scanner,'VerdictWithheld:           holderPolicy == "withhold" || !extensionEvidenceComplete','authoritative withheld response');
+if(!/VerdictWithheld:\s+holderPolicy == "withhold" \|\| !extensionEvidenceComplete/.test(scanner))throw new Error('authoritative withheld response missing');
 requireText(scanner,'missing evidence is not treated as a safety signal','holder missing-evidence rule');
 requireText(extensions,'Name        string         `json:"name"`','extension name field');
 requireText(extensions,'Severity    string         `json:"severity"`','extension severity field');
@@ -47,8 +62,8 @@ requireText(js,"KoscheiAuth.apiCall('/api/v1/token/extensions'",'dedicated premi
 if(js.includes("apiCall('/api/token/scan'"))throw new Error('premium Token-2022 page must not call generic compatibility scan route');
 requireText(js,"KoscheiAuth.requireAuth('/login.html')",'customer session requirement');
 requireText(js,"data?.verdict_withheld===true||data?.extension_evidence_complete===false",'withheld evidence display gate');
-requireText(js,"raw==='allow'&&(score===null||level!=='low')",'incomplete allow downgrade');
-requireText(js,"score===null?'—':score",'missing safety score display');
+requireText(js,"raw==='allow'&&(penalty===null||level!=='low')",'incomplete allow downgrade');
+requireText(js,"penalty===null?'UNAVAILABLE':penalty",'missing heuristic penalty display');
 requireText(js,"largest===null?'UNAVAILABLE'",'missing largest-holder display');
 requireText(js,"topTen===null?'UNAVAILABLE'",'missing top-ten display');
 requireText(js,"penalty===null?'UNAVAILABLE'",'missing extension penalty display');
