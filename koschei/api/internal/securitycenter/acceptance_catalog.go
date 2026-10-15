@@ -12,43 +12,43 @@ import (
 const AcceptanceCatalogSchemaVersion = "koschei.security-center-acceptance.v1"
 
 const (
-	AcceptanceUnverified = "evidence_not_verified"
+	AcceptanceUnverified  = "evidence_not_verified"
 	AcceptanceNotAssessed = "not_assessed"
 )
 
 type AcceptanceArea struct {
-	ID string `json:"id"`
-	Name string `json:"name"`
-	Lead string `json:"lead"`
-	Phase int `json:"phase"`
-	CheckCount int `json:"check_count"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Lead       string `json:"lead"`
+	Phase      int    `json:"phase"`
+	CheckCount int    `json:"check_count"`
 }
 
 type AcceptanceCheck struct {
-	ID string `json:"id"`
-	Description string `json:"description"`
-	AreaID string `json:"area_id,omitempty"`
-	Lead string `json:"lead"`
-	Phase int `json:"phase"`
-	Applicability string `json:"applicability"`
-	Verification string `json:"verification"`
-	EvidenceRefs []string `json:"evidence_refs"`
+	ID            string   `json:"id"`
+	Description   string   `json:"description"`
+	AreaID        string   `json:"area_id,omitempty"`
+	Lead          string   `json:"lead"`
+	Phase         int      `json:"phase"`
+	Applicability string   `json:"applicability"`
+	Verification  string   `json:"verification"`
+	EvidenceRefs  []string `json:"evidence_refs"`
 }
 
 type AcceptanceCatalog struct {
-	SchemaVersion string `json:"schema_version"`
-	SourceDocument string `json:"source_document"`
-	ScopeNote string `json:"scope_note"`
-	AreaCount int `json:"area_count"`
-	ControlCount int `json:"control_count"`
-	CommonGateCount int `json:"common_gate_count"`
-	VerifiedCount int `json:"verified_count"`
-	Areas []AcceptanceArea `json:"areas"`
-	Checks []AcceptanceCheck `json:"checks"`
+	SchemaVersion   string            `json:"schema_version"`
+	SourceDocument  string            `json:"source_document"`
+	ScopeNote       string            `json:"scope_note"`
+	AreaCount       int               `json:"area_count"`
+	ControlCount    int               `json:"control_count"`
+	CommonGateCount int               `json:"common_gate_count"`
+	VerifiedCount   int               `json:"verified_count"`
+	Areas           []AcceptanceArea  `json:"areas"`
+	Checks          []AcceptanceCheck `json:"checks"`
 }
 
 type requirementDef struct {
-	id string
+	id          string
 	description string
 }
 func checkDef(id, description string) requirementDef {
