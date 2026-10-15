@@ -48,3 +48,56 @@ func TestClaimURLFlowsThroughEvidenceGateWithoutArmGrade(t *testing.T) {
 		t.Fatalf("unexpected final source: %q", source)
 	}
 }
+
+func TestMintOnlyPYUSDClaimArmsAreNotApplicableWithoutClaimURL(t *testing.T) {
+	req := SecurityRadarRequest{
+		Target:  "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo",
+		Network: "solana-mainnet",
+		Mode:    "manual_dashboard_check",
+	}
+	analysis := AnalyzeArvisRadars(req)
+	coverage := BuildArvisInvestigationCoverage(ArvisArmsFromBundle(analysis.Bundle))
+	found := 0
+	for _, arm := range coverage.Arms {
+		if arm.ModuleID != ModuleWalletlessClaimShield && arm.ModuleID != ModuleClaimSurfaceRisk {
+			continue
+		}
+		found++
+		if arm.ExecutionStatus != ArvisExecutionNotApplicable || arm.Applicable || arm.Attempted {
+			t.Fatalf("claim URL not supplied; arm must be not_applicable, not data unavailable: %#v", arm)
+		}
+		if arm.Subchecks.NoEvidenceReason != "not_applicable" ||
+			arm.Subchecks.RequiredChecksStatus != "not_applicable" || arm.Subchecks.Ran {
+			t.Fatalf("claim subchecks must not imply an attempted scan: %#v", arm.Subchecks)
+		}
+	}
+	if found != 2 || coverage.NotApplicable < 2 {
+		t.Fatalf("both claim URL arms must be not applicable to mint-only evidence: %#v", coverage)
+	}
+}
+
+func TestClaimApplicabilityRetainsExplicitCollectionFailuresAndURLObservations(t *testing.T) {
+	req := SecurityRadarRequest{Target: "https://example.org/claim", Network: "solana-mainnet"}
+	analysis := AnalyzeArvisRadars(req)
+	coverage := BuildArvisInvestigationCoverage(ArvisArmsFromBundle(analysis.Bundle))
+	found := 0
+	for _, arm := range coverage.Arms {
+		if arm.ModuleID != ModuleWalletlessClaimShield && arm.ModuleID != ModuleClaimSurfaceRisk {
+			continue
+		}
+		found++
+		if arm.ExecutionStatus != ArvisExecutionCompleted || !arm.EvidenceVerified {
+			t.Fatalf("valid URL evidence must remain completed: %#v", arm)
+		}
+	}
+	if found != 2 {
+		t.Fatalf("expected both URL collectors; got %d", found)
+	}
+	// Explicitly attempted-but-incomplete collection must never be disguised
+	// as not_applicable merely because this is a claim module.
+	partial := evidencePendingArm("Claim Surface Risk", ModuleClaimSurfaceRisk, req, "now", "URL read failed", "claim_url_source_unavailable")
+	partial.Signals["collector_attempted"] = true
+	if status := arvisArmExecutionStatus(partial); status != ArvisExecutionEvidencePending {
+		t.Fatalf("attempted claim URL inspection failed but became %q", status)
+	}
+}
