@@ -72,7 +72,7 @@ func TestUnifiedToken2022ExtensionEvidenceFromMintRPC(t *testing.T) {
 func TestUnifiedToken2022ProjectionCannotTrustUnverifiedOwner(t *testing.T) {
 	untrusted := map[string]any{
 		"mint_owner_program_evidence_status": "unverified",
-		"token_2022": true,
+		"token_2022":                         true,
 		"token_2022_extension_evidence": map[string]any{
 			"status": "resolved", "evidence_complete": true,
 			"extension_count": 1, "extension_names": []string{"permanentDelegate"},
