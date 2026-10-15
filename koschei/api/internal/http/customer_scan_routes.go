@@ -23,8 +23,10 @@ type customerScanRequest struct {
 }
 
 type customerScanEnvelope struct {
-	SchemaVersion string                      `json:"schema_version"`
-	Result        services.CustomerScanResult `json:"result"`
+	SchemaVersion string                         `json:"schema_version"`
+	Result        services.CustomerScanResult    `json:"result"`
+	Coverage      *services.ArvisCoverageSummary `json:"coverage"`
+	ArmCount      *services.ArvisArmCountSummary `json:"arm_count"`
 }
 
 type customerSolanaAccountInfo struct {
@@ -351,7 +353,7 @@ func writeCustomerScanResult(w http.ResponseWriter, status int, result services.
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(customerScanEnvelope{SchemaVersion: customerScanSchemaVersion, Result: result})
+	_ = json.NewEncoder(w).Encode(customerScanEnvelope{SchemaVersion: customerScanSchemaVersion, Result: result, Coverage: result.Coverage, ArmCount: result.ArmCount})
 }
 
 func writeCustomerScanError(w http.ResponseWriter, status int, message string) {
