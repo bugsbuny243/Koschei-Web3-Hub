@@ -32,9 +32,9 @@ func TestSolanaRPCTriesThirdConfiguredProviderAfterTwoForbiddenResponses(t *test
 	}))
 	defer third.Close()
 
-	t.Setenv("SOLANA_RPC_URL", primary.URL+"/?api-key=primary-private")
-	t.Setenv("SOLANA_RPC_FALLBACK_URL", backup.URL+"/?api-key=backup-private")
-	t.Setenv("ALCHEMY_SOLANA_RPC_URL", third.URL+"/?api-key=third-private")
+	t.Setenv("SOLANA_RPC_URL", primary.URL+"/?label=primary")
+	t.Setenv("SOLANA_RPC_FALLBACK_URL", backup.URL+"/?label=backup")
+	t.Setenv("ALCHEMY_SOLANA_RPC_URL", third.URL+"/?label=tertiary")
 	t.Setenv("HELIUS_SOLANA_RPC_URL", "")
 	t.Setenv("QUICKNODE_SOLANA_RPC_URL", "")
 	t.Setenv("ALCHEMY_API_KEY", "")
@@ -64,9 +64,9 @@ func TestSolanaRPCConfiguredEndpointsPreserveOrderedExplicitBackupAndNoPublicFal
 	if got := solanaRPCConfiguredEndpoints("solana-mainnet", ""); len(got) != 0 {
 		t.Fatalf("unconfigured RPC must remain closed: %v", got)
 	}
-	t.Setenv("SOLANA_RPC_URL", "https://first.example.test/rpc?secret=first")
-	t.Setenv("SOLANA_RPC_FALLBACK_URL", "https://backup.example.test/rpc?secret=backup")
-	t.Setenv("ALCHEMY_SOLANA_RPC_URL", "https://third.example.test/rpc?secret=third")
+	t.Setenv("SOLANA_RPC_URL", "https://first.example.test/rpc?label=first")
+	t.Setenv("SOLANA_RPC_FALLBACK_URL", "https://backup.example.test/rpc?label=backup")
+	t.Setenv("ALCHEMY_SOLANA_RPC_URL", "https://third.example.test/rpc?label=third")
 	got := solanaRPCConfiguredEndpoints("solana-mainnet", "")
 	if len(got) < 3 {
 		t.Fatalf("tertiary candidate missing after explicit fallback: %v", got)
