@@ -50,7 +50,7 @@ func AnalyzeArvisRadarsContextIsolated(ctx context.Context, req SecurityRadarReq
 
 	pump := buildPumpProgramApplicabilityArm(req, profile, generatedAt)
 	raydium := buildRaydiumProgramApplicabilityArm(req, profile, generatedAt)
-	claimShield := unavailableArm("Walletless Claim Shield", ModuleWalletlessClaimShield, req, generatedAt, "A parsed claim instruction is required; token-holder evidence is not a claim-surface substitute.")
+	claimShield, claimSurface := buildClaimDiscoveryArms(req, profile, generatedAt)
 	mev := unavailableArm("MEV Shield", ModuleMEVShield, req, generatedAt, "A signed transaction, route and pool context are required for MEV analysis.")
 	authority := buildAuthorityArm(req, profile, generatedAt)
 	holders := buildHolderArm(req, profile, generatedAt)
@@ -60,7 +60,6 @@ func AnalyzeArvisRadarsContextIsolated(ctx context.Context, req SecurityRadarReq
 	launchDistribution := unavailableArm("Launch Distribution", ModuleLaunchDistribution, req, generatedAt, "Mint-specific ATA initial-recipient evidence has not been attached yet.")
 	repeatActors := unavailableArm("Repeat Actor Scan", ModuleRepeatActorScan, req, generatedAt, "Persistent creator/holder actor-index evidence has not been attached yet.")
 	sniper := buildSniperTimingArm(req, profile, generatedAt)
-	claimSurface := unavailableArm("Claim Surface Risk", ModuleClaimSurfaceRisk, req, generatedAt, "URL/domain evidence is required; claim-instruction evidence belongs to Walletless Claim Shield.")
 	program := buildProgramRelationArm(req, profile, generatedAt)
 
 	arms := []SecurityRadarVerdict{
