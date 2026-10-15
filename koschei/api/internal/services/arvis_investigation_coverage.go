@@ -1,6 +1,9 @@
 package services
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 const (
 	ArvisExecutionCompleted         = "completed"
@@ -21,6 +24,8 @@ type ArvisArmCoverage struct {
 	EvidenceVerified bool   `json:"evidence_verified"`
 	EvidenceCount    int    `json:"evidence_count"`
 	Reason           string `json:"reason,omitempty"`
+
+	Subchecks ArvisModuleSubchecks `json:"subchecks"`
 }
 
 type ArvisInvestigationCoverage struct {
@@ -68,7 +73,7 @@ func BuildArvisInvestigationCoverage(arms []SecurityRadarVerdict) ArvisInvestiga
 		entry := ArvisArmCoverage{
 			ModuleID: arm.ModuleID, Module: arm.Module, ExecutionStatus: status,
 			EvidenceStatus: evidenceStatus, Applicable: applicable, Attempted: attempted,
-			Signed: arm.Signed, EvidenceVerified: SecurityRadarVerdictHasVerifiedEvidence(arm), EvidenceCount: len(arm.Evidence), Reason: arvisFirstEvidence(arm.Evidence),
+			Signed: arm.Signed, EvidenceVerified: SecurityRadarVerdictHasVerifiedEvidence(arm), EvidenceCount: len(arm.Evidence), Reason: arvisFirstEvidence(arm.Evidence), Subchecks: arvisModuleSubchecks(arm, status),
 		}
 		coverage.Arms = append(coverage.Arms, entry)
 		if attempted {
@@ -100,6 +105,7 @@ func BuildArvisInvestigationCoverage(arms []SecurityRadarVerdict) ArvisInvestiga
 			coverage.CriticalGaps = append(coverage.CriticalGaps, gap)
 		}
 	}
+	sort.Strings(coverage.CriticalGaps)
 	coverage.Status = "insufficient_coverage"
 	if coverage.EvidenceProducing > 0 {
 		coverage.Status = "partial_investigation"
