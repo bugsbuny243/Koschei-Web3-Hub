@@ -40,7 +40,7 @@ func TestAcceptanceProofNeverPromotesIncompleteEvidence(t *testing.T) {
 		t.Fatalf("well-formed candidate should be eligible for human review: %v", err)
 	}
 	cases := []struct {
-		name string
+		name   string
 		mutate func(*AcceptanceProof)
 	}{
 		{"unknown_control", func(p *AcceptanceProof) { p.CheckID = "WSC-99.9" }},
