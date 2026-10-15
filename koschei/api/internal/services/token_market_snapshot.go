@@ -13,6 +13,7 @@ import (
 )
 
 const defaultTokenMarketEndpoint = "https://api.dexscreener.com/tokens/v1/solana"
+const defaultTokenMarketPairsEndpoint = "https://api.dexscreener.com/token-pairs/v1/solana"
 
 // TokenMarketSnapshot is market context, not an on-chain ownership verdict.
 // Price and USD values are reference estimates from the most liquid returned
@@ -77,8 +78,9 @@ type tokenMarketPair struct {
 }
 
 type TokenMarketClient struct {
-	Endpoint string
-	Client   *http.Client
+	Endpoint      string
+	PairsEndpoint string
+	Client        *http.Client
 }
 
 func NewTokenMarketClient() *TokenMarketClient {
@@ -86,7 +88,11 @@ func NewTokenMarketClient() *TokenMarketClient {
 	if endpoint == "" {
 		endpoint = defaultTokenMarketEndpoint
 	}
-	return &TokenMarketClient{Endpoint: endpoint, Client: &http.Client{Timeout: 8 * time.Second}}
+	pairsEndpoint := strings.TrimRight(strings.TrimSpace(os.Getenv("TOKEN_MARKET_DEXSCREENER_PAIRS_ENDPOINT")), "/")
+	if pairsEndpoint == "" && endpoint == defaultTokenMarketEndpoint {
+		pairsEndpoint = defaultTokenMarketPairsEndpoint
+	}
+	return &TokenMarketClient{Endpoint: endpoint, PairsEndpoint: pairsEndpoint, Client: &http.Client{Timeout: 8 * time.Second}}
 }
 
 func FetchSolanaTokenMarketSnapshot(ctx context.Context, mint string) TokenMarketSnapshot {
@@ -143,6 +149,25 @@ func (c *TokenMarketClient) Fetch(ctx context.Context, mint string) TokenMarketS
 		out.Status = "market_decode_failed"
 		out.Limitations = append(out.Limitations, compactTokenMarketError(err))
 		return out
+	}
+
+	// A single token-listing pair is not evidence that the token has just one
+	// Solana liquidity pool. DEX Screener provides a separate token-pairs API.
+	// Cross-check only sparse responses and never invent missing liquidity when
+	// the second provider endpoint is unavailable.
+	if len(pairs) <= 1 {
+		pairsEndpoint := strings.TrimRight(strings.TrimSpace(c.PairsEndpoint), "/")
+		if pairsEndpoint == "" && endpoint == defaultTokenMarketEndpoint {
+			pairsEndpoint = defaultTokenMarketPairsEndpoint
+		}
+		if pairsEndpoint != "" && pairsEndpoint != endpoint {
+			additional := fetchAdditionalTokenMarketPairs(ctx, client, pairsEndpoint, mint)
+			if len(additional) > 0 {
+				pairs = append(pairs, additional...)
+			} else {
+				out.Limitations = append(out.Limitations, "Secondary token-pairs observations unavailable; market liquidity may be undercounted.")
+			}
+		}
 	}
 
 	seen := map[string]bool{}
@@ -225,6 +250,9 @@ func (c *TokenMarketClient) Fetch(ctx context.Context, mint string) TokenMarketS
 	out.FDVUSD = roundTokenMarketUSD(out.FDVUSD)
 	out.BestPairLiquidityUSD = roundTokenMarketUSD(out.BestPairLiquidityUSD)
 	out.BestPairVolume24hUSD = roundTokenMarketUSD(out.BestPairVolume24hUSD)
+	if out.PairCount <= 1 {
+		out.Limitations = append(out.Limitations, "One or fewer matching Solana pair observations returned; this is not complete chain-wide liquidity coverage.")
+	}
 	if out.PairCount == 0 {
 		out.Status = "no_solana_pairs"
 		out.Limitations = append(out.Limitations, "No Solana market pair was returned for this mint.")
@@ -237,6 +265,33 @@ func (c *TokenMarketClient) Fetch(ctx context.Context, mint string) TokenMarketS
 	}
 	out.Limitations = append(out.Limitations, "USD holder values use the most liquid returned Solana pair reference price and are not guaranteed liquidation proceeds.")
 	return out
+}
+
+// fetchAdditionalTokenMarketPairs is a bounded, optional cross-check using
+// DEX Screener's distinct token-pairs endpoint. Failed requests do not erase
+// successfully observed pairs from the primary endpoint.
+func fetchAdditionalTokenMarketPairs(parent context.Context, client *http.Client, endpoint, mint string) []tokenMarketPair {
+	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/"+mint, nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Koschei-ARVIS-Holder-Intelligence/1.0")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil
+	}
+	var pairs []tokenMarketPair
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&pairs); err != nil {
+		return nil
+	}
+	return pairs
 }
 
 func positiveTokenMarketNumber(value float64) float64 {
