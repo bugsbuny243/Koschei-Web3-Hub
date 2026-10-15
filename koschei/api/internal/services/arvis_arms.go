@@ -79,6 +79,12 @@ func AnalyzeArvisRadarsContext(ctx context.Context, req SecurityRadarRequest) Ar
 		claimShield.Verdict = explanation
 		claimSurface.Verdict = explanation
 	}
+	// Preserve the existing no-URL applicability boundary. When chain evidence is
+	// available, replace both URL-only provisional arms with bounded on-chain
+	// distributor discovery; neither a missing URL nor a no-match proves safety.
+	if parseArvisClaimSurface(req.Target).Available || profile.IsTokenMint {
+		claimShield, claimSurface = buildClaimDiscoveryArms(req, profile, generatedAt)
+	}
 	program := buildProgramRelationArm(req, profile, generatedAt)
 
 	// Exactly fourteen evidence arms. Intelligence Graph is a presentation layer

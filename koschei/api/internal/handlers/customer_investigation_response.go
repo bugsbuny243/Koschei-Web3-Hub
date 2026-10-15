@@ -103,6 +103,7 @@ func attachCustomerAnalysisSummary(assembly *unifiedInvestigationAssembly) map[s
 func customerInvestigationEnvelope(assembly unifiedInvestigationAssembly, charged bool) map[string]any {
 	hasLiveEvidence := services.SecurityRadarHasLiveEvidence(assembly.Core.Bundle)
 	analysisSummary := attachCustomerAnalysisSummary(&assembly)
+	coverage := services.ArvisCoverageFromArms(assembly.Core.Arms)
 	status := customerInvestigationStatus(assembly.UnifiedVerdict, hasLiveEvidence)
 	message := "Full investigation completed."
 	if status == "evidence_pending" {
@@ -119,6 +120,8 @@ func customerInvestigationEnvelope(assembly unifiedInvestigationAssembly, charge
 		"charged":                 charged,
 		"bundle":                  assembly.Core.Bundle,
 		"arms":                    assembly.Core.Arms,
+		"coverage":                coverage,
+		"arm_count":               coverage.ArmCount(),
 		"final_verdict":           assembly.UnifiedVerdict,
 		"analysis_summary":        analysisSummary,
 		"investigation_report":    assembly.Report,

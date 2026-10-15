@@ -29,6 +29,8 @@ type CustomerScanResult struct {
 	InvestigationPlan   *UniversalInvestigationPlan  `json:"investigation_plan,omitempty"`
 	TransactionEvidence *IntelligenceEvidence        `json:"transaction_evidence,omitempty"`
 	AssetEvidence       *IntelligenceEvidence        `json:"asset_evidence,omitempty"`
+	Coverage            *ArvisCoverageSummary        `json:"coverage"`
+	ArmCount            *ArvisArmCountSummary        `json:"arm_count"`
 }
 
 // BuildCustomerScanResult builds the customer-facing evidence envelope. It is
@@ -45,6 +47,8 @@ func BuildCustomerScanResult(target CustomerScanTarget, trust Web3TrustVector, e
 
 	reasons := append([]string{}, target.Reasons...)
 	reasons = append(reasons, trust.Reasons...)
+	coverage := UnrequestedArvisCoverage()
+	armCount := coverage.ArmCount()
 	result := CustomerScanResult{
 		Target:         target,
 		Verdict:        CustomerScanVerdictUnknown,
@@ -52,6 +56,8 @@ func BuildCustomerScanResult(target CustomerScanTarget, trust Web3TrustVector, e
 		Trust:          trust,
 		Reasons:        NormalizeWeb3TrustReasons(reasons),
 		EvidenceRefs:   nonEmptyIntelligenceRefs(evidenceRefs),
+		Coverage:       &coverage,
+		ArmCount:       &armCount,
 	}
 	if target.Route != CustomerScanRouteUnresolved && !target.RequiresNetwork {
 		plan, planErr := UniversalInvestigationPlanForCustomerScanTarget(target)
