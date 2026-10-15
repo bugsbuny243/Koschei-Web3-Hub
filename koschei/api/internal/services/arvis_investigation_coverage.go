@@ -68,7 +68,8 @@ func BuildArvisInvestigationCoverage(arms []SecurityRadarVerdict) ArvisInvestiga
 	for _, arm := range arms {
 		status := arvisArmExecutionStatus(arm)
 		applicable := status != ArvisExecutionNotApplicable
-		attempted := status != ""
+		// A status is a classification, not proof that a collector ran.
+		attempted := status == ArvisExecutionCompleted || arvisSignalBool(arm.Signals, "collector_attempted")
 		evidenceStatus := arvisSignalString(arm.Signals, "evidence_status")
 		entry := ArvisArmCoverage{
 			ModuleID: arm.ModuleID, Module: arm.Module, ExecutionStatus: status,
