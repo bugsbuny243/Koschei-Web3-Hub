@@ -91,7 +91,9 @@ func TestMintOnlyPYUSDClaimArmsAreNotApplicableWithoutClaimURL(t *testing.T) {
 func TestClaimApplicabilityRetainsExplicitCollectionFailuresAndURLObservations(t *testing.T) {
 	req := SecurityRadarRequest{Target: "https://example.org/claim", Network: "solana-mainnet"}
 	analysis := AnalyzeArvisRadars(req)
-	coverage := BuildArvisInvestigationCoverage(ArvisArmsFromBundle(analysis.Bundle))
+	// URL evidence is attached by the explicit claim-surface enrichment pass.
+	bundle := EnrichArvisBundleWithClaimSurface(analysis.Bundle)
+	coverage := BuildArvisInvestigationCoverage(ArvisArmsFromBundle(bundle))
 	found := 0
 	for _, arm := range coverage.Arms {
 		if arm.ModuleID != ModuleWalletlessClaimShield && arm.ModuleID != ModuleClaimSurfaceRisk {
