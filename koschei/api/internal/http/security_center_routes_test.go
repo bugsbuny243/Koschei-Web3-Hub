@@ -147,3 +147,33 @@ func TestSecurityCenterSurfacesCoverageAttentionWithoutClaimingMissingHistory(t 
 		}
 	}
 }
+
+// TestSecurityCenterAcceptanceRoute guarantees that the customer-visible catalog
+// exposes all requested controls without claiming that missing proof is safe.
+func TestSecurityCenterAcceptanceRoute(t *testing.T) {
+	mux := http.NewServeMux()
+	registerSecurityCenterRoutes(mux)
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/fabric/security-center/acceptance", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", res.Code, res.Body.String())
+	}
+	for _, want := range []string{
+		"koschei.security-center-acceptance.v1",
+		`"area_count":34`, `"control_count":170`, `"common_gate_count":8`,
+		`"verified_count":0`, `"id":"WSC-15.1"`, `"id":"WSC-34.5"`,
+		`"id":"G08"`, "evidence_not_verified", "not_assessed",
+	} {
+		if !strings.Contains(res.Body.String(), want) {
+			t.Fatalf("acceptance response missing %q", want)
+		}
+	}
+	if res.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("acceptance register must not be cached")
+	}
+	post := httptest.NewRecorder()
+	mux.ServeHTTP(post, httptest.NewRequest(http.MethodPost, "/fabric/security-center/acceptance", nil))
+	if post.Code == http.StatusOK {
+		t.Fatal("public acceptance endpoint must remain read-only")
+	}
+}
