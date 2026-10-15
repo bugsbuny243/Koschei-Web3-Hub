@@ -70,6 +70,15 @@ func AnalyzeArvisRadarsContext(ctx context.Context, req SecurityRadarRequest) Ar
 	repeatActors := unavailableArm("Repeat Actor Scan", ModuleRepeatActorScan, req, generatedAt, "Persistent creator/holder actor-index evidence has not been attached yet.")
 	sniper := buildSniperTimingArm(req, profile, generatedAt)
 	claimSurface := unavailableArm("Claim Surface Risk", ModuleClaimSurfaceRisk, req, generatedAt, "URL/domain evidence is required; claim-instruction evidence belongs to Walletless Claim Shield.")
+	if strings.HasPrefix(strings.ToLower(req.Network), "solana") && isSyntacticSolanaAddress(req.Target) {
+		// An address-only scan has no supplied claim URL. Both URL-only arms
+		// are out of scope; this does not establish that no external claims exist.
+		const explanation = "No claim URL was supplied with this Solana address; off-chain claim pages were not assessed."
+		claimShield = notApplicableArm("Walletless Claim Shield", ModuleWalletlessClaimShield, req, generatedAt, explanation, "claim_url_not_supplied")
+		claimSurface = notApplicableArm("Claim Surface Risk", ModuleClaimSurfaceRisk, req, generatedAt, explanation, "claim_url_not_supplied")
+		claimShield.Verdict = explanation
+		claimSurface.Verdict = explanation
+	}
 	program := buildProgramRelationArm(req, profile, generatedAt)
 
 	// Exactly fourteen evidence arms. Intelligence Graph is a presentation layer

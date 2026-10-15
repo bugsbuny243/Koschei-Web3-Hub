@@ -1,6 +1,9 @@
 package services
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestClaimURLFlowsThroughEvidenceGateWithoutArmGrade(t *testing.T) {
 	req := SecurityRadarRequest{
@@ -46,5 +49,69 @@ func TestClaimURLFlowsThroughEvidenceGateWithoutArmGrade(t *testing.T) {
 	}
 	if source, _ := bundle.Metadata["final_verdict_source"].(string); source != "EvaluateUnifiedRadarVerdict" {
 		t.Fatalf("unexpected final source: %q", source)
+	}
+}
+
+func TestMintOnlyPYUSDClaimArmsAreNotApplicableWithoutClaimURL(t *testing.T) {
+	req := SecurityRadarRequest{
+		Target:  "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo",
+		Network: "solana-mainnet",
+		Mode:    "manual_dashboard_check",
+	}
+	analysis := AnalyzeArvisRadars(req)
+	for _, arm := range ArvisArmsFromBundle(analysis.Bundle) {
+		if arm.ModuleID != ModuleWalletlessClaimShield && arm.ModuleID != ModuleClaimSurfaceRisk {
+			continue
+		}
+		if arm.Recommendation != "not_applicable" || arvisArmExecutionStatus(arm) != ArvisExecutionNotApplicable ||
+			!strings.Contains(arm.Verdict, "No claim URL was supplied") || arvisSignalBool(arm.Signals, "collector_attempted") {
+			t.Fatalf("raw claim arm incorrectly reports a failed URL analysis: %#v", arm)
+		}
+	}
+	coverage := BuildArvisInvestigationCoverage(ArvisArmsFromBundle(analysis.Bundle))
+	found := 0
+	for _, arm := range coverage.Arms {
+		if arm.ModuleID != ModuleWalletlessClaimShield && arm.ModuleID != ModuleClaimSurfaceRisk {
+			continue
+		}
+		found++
+		if arm.ExecutionStatus != ArvisExecutionNotApplicable || arm.Applicable || arm.Attempted {
+			t.Fatalf("claim URL not supplied; arm must be not_applicable, not data unavailable: %#v", arm)
+		}
+		if arm.Subchecks.NoEvidenceReason != "not_applicable" ||
+			arm.Subchecks.RequiredChecksStatus != "not_applicable" || arm.Subchecks.Ran {
+			t.Fatalf("claim subchecks must not imply an attempted scan: %#v", arm.Subchecks)
+		}
+	}
+	if found != 2 || coverage.NotApplicable < 2 {
+		t.Fatalf("both claim URL arms must be not applicable to mint-only evidence: %#v", coverage)
+	}
+}
+
+func TestClaimApplicabilityRetainsExplicitCollectionFailuresAndURLObservations(t *testing.T) {
+	req := SecurityRadarRequest{Target: "https://example.org/claim", Network: "solana-mainnet"}
+	analysis := AnalyzeArvisRadars(req)
+	// URL evidence is attached by the explicit claim-surface enrichment pass.
+	bundle := EnrichArvisBundleWithClaimSurface(analysis.Bundle)
+	coverage := BuildArvisInvestigationCoverage(ArvisArmsFromBundle(bundle))
+	found := 0
+	for _, arm := range coverage.Arms {
+		if arm.ModuleID != ModuleWalletlessClaimShield && arm.ModuleID != ModuleClaimSurfaceRisk {
+			continue
+		}
+		found++
+		if arm.ExecutionStatus != ArvisExecutionCompleted || !arm.EvidenceVerified {
+			t.Fatalf("valid URL evidence must remain completed: %#v", arm)
+		}
+	}
+	if found != 2 {
+		t.Fatalf("expected both URL collectors; got %d", found)
+	}
+	// Explicitly attempted-but-incomplete collection must never be disguised
+	// as not_applicable merely because this is a claim module.
+	partial := evidencePendingArm("Claim Surface Risk", ModuleClaimSurfaceRisk, req, "now", "URL read failed", "claim_url_source_unavailable")
+	partial.Signals["collector_attempted"] = true
+	if status := arvisArmExecutionStatus(partial); status != ArvisExecutionEvidencePending {
+		t.Fatalf("attempted claim URL inspection failed but became %q", status)
 	}
 }
