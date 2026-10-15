@@ -486,6 +486,17 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 		},
 	}
 	report["mint_owner_program_evidence"] = unifiedMintOwnerEvidenceProjection(core.SourceContext)
+	// A confirmed owner program is separate from parsed Token-2022 extensions.
+	// Preserve unknown classification when the mint RPC observation failed.
+	mintOwnerEvidence := unifiedMintOwnerEvidenceProjection(core.SourceContext)
+	report["mint_owner_program_evidence_status"] = mintOwnerEvidence["mint_owner_program_evidence_status"]
+	if owner, ok := mintOwnerEvidence["mint_owner_program"].(string); ok {
+		report["mint_owner_program"] = owner
+	}
+	if token2022, ok := mintOwnerEvidence["token_2022"].(bool); ok {
+		report["token_2022"] = token2022
+	}
+	report["token_2022_extension_evidence"] = unifiedToken2022ExtensionProjection(core.SourceContext)
 	if actorRun.Status == "source_unavailable" {
 		report["source_completeness"] = "incomplete_source"
 		report["source_completeness_reason"] = "creator_source_unavailable"
