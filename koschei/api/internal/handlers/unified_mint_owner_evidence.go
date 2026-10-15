@@ -21,6 +21,7 @@ func (h *Handler) collectUnifiedMintOwnerEvidence(parent context.Context, target
 	var account struct {
 		Value *struct {
 			Owner string `json:"owner"`
+			Space int    `json:"space"`
 			Data  struct {
 				Parsed struct {
 					Type string         `json:"type"`
@@ -43,13 +44,20 @@ func (h *Handler) collectUnifiedMintOwnerEvidence(parent context.Context, target
 	}
 	info := account.Value.Data.Parsed.Info
 	extensions := parseToken2022Extensions(info)
-	status, complete := token2022ExtensionResolution(true, account.Value.Data.Space, extensions)
+	// Solana RPCs may place parsed account space in value.space as well as
+	// value.data.space. Prefer the account-level value and reject conflicts.
+	accountSpace := account.Value.Space
+	if accountSpace <= 0 {
+		accountSpace = account.Value.Data.Space
+	}
+	spaceConflicts := account.Value.Space > 0 && account.Value.Data.Space > 0 && account.Value.Space != account.Value.Data.Space
+	status, complete := token2022ExtensionResolution(true, accountSpace, extensions)
 	// A partial/invalid jsonParsed extensions array cannot certify that the
 	// entire Token-2022 TLV extension set was decoded.
 	rawExtensions, present := info["extensions"]
 	items, validArray := rawExtensions.([]any)
-	if account.Value.Data.Space < 82 || (account.Value.Data.Space == 82 && len(extensions) > 0) ||
-		(account.Value.Data.Space > 82 && (!present || !validArray)) ||
+	if spaceConflicts || accountSpace < 82 || (accountSpace == 82 && len(extensions) > 0) ||
+		(accountSpace > 82 && (!present || !validArray)) ||
 		(validArray && len(items) != len(extensions)) {
 		status, complete = "token_2022_extensions_unresolved", false
 	}
