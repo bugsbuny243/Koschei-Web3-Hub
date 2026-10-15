@@ -162,6 +162,40 @@ func SolanaRPCFallbackURL(network string) string {
 	return ""
 }
 
+// solanaRPCConfiguredEndpoints enumerates every configured provider in priority
+// order. A preferred/explicit backup may itself be rate-limited or forbidden;
+// returning only one fallback left otherwise configured providers unused.
+func solanaRPCConfiguredEndpoints(network, apiKey string) []string {
+	cfg := runtimecfg.Load()
+	if strings.TrimSpace(network) == "" {
+		network = cfg.SolanaNetwork
+	}
+	endpoints := []string{
+		configuredSolanaRPCURL(network, apiKey),
+		SolanaRPCFallbackURL(network),
+	}
+	if isSolanaMainnet(network) {
+		provider := cfg.Web3Provider
+		if provider == "auto" && cfg.SecurityProvider != "auto" {
+			provider = cfg.SecurityProvider
+		}
+		for _, key := range preferredMainnetRPCKeys(provider) {
+			endpoints = append(endpoints, strings.TrimSpace(os.Getenv(key)))
+		}
+		if key := strings.TrimSpace(apiKey); key != "" {
+			endpoints = append(endpoints, "https://solana-mainnet.g.alchemy.com/v2/"+key)
+		}
+	} else {
+		for _, key := range []string{"SOLANA_DEVNET_RPC_URL", "ALCHEMY_SOLANA_DEVNET_RPC_URL", "SOLANA_DEVNET_RPC_FALLBACK_URL"} {
+			endpoints = append(endpoints, strings.TrimSpace(os.Getenv(key)))
+		}
+		if key := strings.TrimSpace(apiKey); key != "" {
+			endpoints = append(endpoints, "https://solana-devnet.g.alchemy.com/v2/"+key)
+		}
+	}
+	return uniqueRPCURLs(endpoints...)
+}
+
 func solanaRPCEndpointTimeout() time.Duration {
 	if raw := strings.TrimSpace(os.Getenv("SOLANA_RPC_ENDPOINT_TIMEOUT_MS")); raw != "" {
 		if value, err := strconv.Atoi(raw); err == nil && value >= 50 && value <= 30000 {
@@ -260,7 +294,7 @@ func (s *SolanaRPC) Call(ctx context.Context, network, method string, params any
 	}
 	// A cached response must never bypass the provider-not-configured gate.
 	// Validate endpoint configuration before returning any previously cached evidence.
-	endpoints := uniqueRPCURLs(s.URL(network), SolanaRPCFallbackURL(network))
+	endpoints := solanaRPCConfiguredEndpoints(network, s.AlchemyAPIKey)
 	if len(endpoints) == 0 {
 		return fmt.Errorf("provider_not_configured: no Solana RPC endpoint configured for %s", network)
 	}
