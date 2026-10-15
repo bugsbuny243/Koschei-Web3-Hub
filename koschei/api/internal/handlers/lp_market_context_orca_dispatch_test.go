@@ -47,9 +47,9 @@ func TestOrcaMarketDEXDispatchesToVerifiedWhirlpoolCollector(t *testing.T) {
 		}
 	}
 	market := services.TokenMarketSnapshot{
-		Available:             true,
-		BestPairAddress:       pool,
-		BestPairDEX:           "orca",
+		Available:            true,
+		BestPairAddress:      pool,
+		BestPairDEX:          "orca",
 		BestPairLiquidityUSD: 16600000,
 	}
 	result := collectPrimaryPoolLPControlEvidence(context.Background(), rpc, "solana-mainnet", pyusd, "", market, map[string]any{})
