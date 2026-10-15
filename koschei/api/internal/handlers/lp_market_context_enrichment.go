@@ -12,8 +12,10 @@ import (
 	"koschei/api/internal/services"
 )
 
-func (h *Handler) collectCompleteLPControlEvidence(ctx context.Context, network, mint, creator string, market services.TokenMarketSnapshot, source map[string]any) services.LPControlEvidence {
-	rpc := h.lpRPC()
+// collectPrimaryPoolLPControlEvidence owns the DEX-to-protocol fallback used by
+// the complete investigation collector. Its RPC dependency is injected so real
+// Solana account fixtures can exercise the actual dispatch path in tests.
+func collectPrimaryPoolLPControlEvidence(ctx context.Context, rpc solanaRPCCall, network, mint, creator string, market services.TokenMarketSnapshot, source map[string]any) services.LPControlEvidence {
 	lp := collectLPControlEvidence(ctx, rpc, network, mint, creator, market, source)
 	switch lp.ReasonCode {
 	case "amm_v4_layout_not_resolved":
@@ -21,6 +23,12 @@ func (h *Handler) collectCompleteLPControlEvidence(ctx context.Context, network,
 	case "primary_pool_not_raydium", "unrecognized_raydium_pool_program":
 		lp = collectProtocolLPControlEvidence(ctx, rpc, network, mint, creator, strings.TrimSpace(market.BestPairAddress))
 	}
+	return lp
+}
+
+func (h *Handler) collectCompleteLPControlEvidence(ctx context.Context, network, mint, creator string, market services.TokenMarketSnapshot, source map[string]any) services.LPControlEvidence {
+	rpc := h.lpRPC()
+	lp := collectPrimaryPoolLPControlEvidence(ctx, rpc, network, mint, creator, market, source)
 	lp.TokenMint = strings.TrimSpace(mint)
 	if lp.PoolProgram == raydiumCPMMProgram || lp.PoolProgram == raydiumAMMV4Program {
 		lp.ControlModel = "lp_token"
