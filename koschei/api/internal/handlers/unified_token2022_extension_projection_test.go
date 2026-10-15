@@ -32,6 +32,31 @@ func TestUnifiedToken2022ExtensionEvidenceFromMintRPC(t *testing.T) {
 			parsedInfo: `{}`, expected: "token_2022_extensions_unresolved",
 		},
 		{
+			name: "partially_parsed_extensions", owner: token2022,
+			parsedInfo: `{"extensions":[{"extension":"transferHook"},{"state":{"unknown":"entry"}}]}`,
+			space: 866, expected: "token_2022_extensions_unresolved",
+		},
+		{
+			name: "extensions_wrong_json_shape", owner: token2022,
+			parsedInfo: `{"extensions":"not_an_array"}`,
+			space: 866, expected: "token_2022_extensions_unresolved",
+		},
+		{
+			name: "missing_space_even_with_parsed_extensions", owner: token2022,
+			parsedInfo: `{"extensions":[{"extension":"transferHook"}]}`,
+			expected: "token_2022_extensions_unresolved",
+		},
+		{
+			name: "impossible_extensions_in_classic_sized_mint", owner: token2022,
+			parsedInfo: `{"extensions":[{"extension":"transferHook"}]}`,
+			space: 82, expected: "token_2022_extensions_unresolved",
+		},
+		{
+			name: "verified_empty_token2022_mint", owner: token2022,
+			parsedInfo: `{"extensions":[]}`,
+			space: 82, expected: "resolved_empty", complete: true,
+		},
+		{
 			name: "classic_mint", owner: classic,
 			parsedInfo: `{}`, space: 82, expected: "not_applicable",
 		},
