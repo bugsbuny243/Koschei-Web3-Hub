@@ -144,7 +144,9 @@ func markArvisArmExecution(arm SecurityRadarVerdict, status, reasonCode string, 
 		arm.Signals = map[string]any{}
 	}
 	arm.Signals["execution_status"] = status
-	arm.Signals["collector_attempted"] = true
+	// A pending, disabled, or not-applicable arm does not prove its collector ran.
+	// Preserve explicit observations of attempted collection when available.
+	arm.Signals["collector_attempted"] = status == ArvisExecutionCompleted || arvisSignalBool(arm.Signals, "collector_attempted")
 	arm.Signals["applicable"] = applicable
 	arm.Signals["finding_observed"] = findingObserved
 	if strings.TrimSpace(reasonCode) != "" {
