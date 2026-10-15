@@ -14,14 +14,14 @@ func TestUnifiedToken2022ExtensionEvidenceFromMintRPC(t *testing.T) {
 	const classic = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 	tests := []struct {
 		name, owner, parsedInfo, expected string
-		space int
-		complete bool
-		count int
+		space                             int
+		complete                          bool
+		count                             int
 	}{
 		{
 			name: "parsed_token2022_extensions", owner: token2022,
 			parsedInfo: `{"extensions":[{"extension":"transferHook","state":{"programId":"HookProgram"}},{"extension":"permanentDelegate","state":{"delegate":"DelegateWallet"}}]}`,
-			space: 866, expected: "resolved", complete: true, count: 2,
+			space:      866, expected: "resolved", complete: true, count: 2,
 		},
 		{
 			name: "unresolved_extension_space", owner: token2022,
