@@ -51,6 +51,7 @@ type requirementDef struct {
 	id          string
 	description string
 }
+
 func checkDef(id, description string) requirementDef {
 	return requirementDef{id: id, description: description}
 }
@@ -326,11 +327,11 @@ func CurrentAcceptanceCatalog() AcceptanceCatalog {
 	gates, controls := 0, 0
 	for _, definition := range acceptanceRequirements {
 		c := AcceptanceCheck{
-			ID: definition.id,
-			Description: definition.description,
+			ID:            definition.id,
+			Description:   definition.description,
 			Applicability: AcceptanceNotAssessed,
-			Verification: AcceptanceUnverified,
-			EvidenceRefs: []string{},
+			Verification:  AcceptanceUnverified,
+			EvidenceRefs:  []string{},
 		}
 		if strings.HasPrefix(definition.id, "G") {
 			gates++
@@ -353,14 +354,14 @@ func CurrentAcceptanceCatalog() AcceptanceCatalog {
 		checks = append(checks, c)
 	}
 	return AcceptanceCatalog{
-		SchemaVersion: AcceptanceCatalogSchemaVersion,
-		SourceDocument: "docs/security-center/WSC-34-AREAS-170-CONTROLS-2026-10-15.md",
-		ScopeNote: fmt.Sprintf("%d WSC controls and %d common gates are requirements only; none is certified by this catalog. Existing repository capabilities and deployed enforcement require independent evidence.", controls, gates),
-		AreaCount: len(areas),
-		ControlCount: controls,
+		SchemaVersion:   AcceptanceCatalogSchemaVersion,
+		SourceDocument:  "docs/security-center/WSC-34-AREAS-170-CONTROLS-2026-10-15.md",
+		ScopeNote:       fmt.Sprintf("%d WSC controls and %d common gates are requirements only; none is certified by this catalog. Existing repository capabilities and deployed enforcement require independent evidence.", controls, gates),
+		AreaCount:       len(areas),
+		ControlCount:    controls,
 		CommonGateCount: gates,
-		VerifiedCount: 0,
-		Areas: areas,
-		Checks: checks,
+		VerifiedCount:   0,
+		Areas:           areas,
+		Checks:          checks,
 	}
 }
