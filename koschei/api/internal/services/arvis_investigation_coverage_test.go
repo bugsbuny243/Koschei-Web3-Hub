@@ -104,3 +104,27 @@ func TestCoverageMetadataIsAttachedAfterExtensions(t *testing.T) {
 		t.Fatal("investigation output policy metadata missing")
 	}
 }
+
+func TestInvestigationCoverageDoesNotConfusePendingWithAttempted(t *testing.T) {
+	arms := []SecurityRadarVerdict{
+		{ModuleID: ModuleCreatorLinkAnalysis, Signals: map[string]any{"execution_status": ArvisExecutionEvidencePending}},
+		{ModuleID: ModuleTokenAuthorityScanner, Signals: map[string]any{"execution_status": ArvisExecutionEvidencePending, "collector_attempted": true}},
+		{ModuleID: ModuleRepeatActorScan, EvidenceVerified: true, Evidence: []string{"verified actor memory lookup"}, Signals: map[string]any{"execution_status": ArvisExecutionCompleted}},
+		{ModuleID: ModuleMEVShield},
+	}
+	coverage := BuildArvisInvestigationCoverage(arms)
+	if coverage.CapabilityTotal != 4 || coverage.Attempted != 2 {
+		t.Fatalf("architecture total must not be misreported as runtime work: %+v", coverage)
+	}
+	for i, want := range []bool{false, true, true, false} {
+		if got := coverage.Arms[i].Attempted; got != want {
+			t.Fatalf("arm[%d] attempted=%v want=%v", i, got, want)
+		}
+		if got := coverage.Arms[i].Subchecks.Ran; got != want {
+			t.Fatalf("arm[%d] subcheck ran=%v want=%v", i, got, want)
+		}
+	}
+	if coverage.EvidenceProducing != 1 || coverage.NotApplicable != 1 || coverage.EvidencePending != 2 {
+		t.Fatalf("coverage categories unexpectedly changed: %+v", coverage)
+	}
+}
