@@ -24,39 +24,45 @@ type tokenScanRequest struct {
 }
 
 type tokenScanResponse struct {
-	Mint                      string                           `json:"mint"`
-	Network                   string                           `json:"network"`
-	Score                     int                              `json:"score"`
-	RiskLevel                 string                           `json:"risk_level"`
-	Supply                    string                           `json:"supply"`
-	Decimals                  int                              `json:"decimals"`
-	MintAuthority             string                           `json:"mint_authority,omitempty"`
-	FreezeAuthority           string                           `json:"freeze_authority,omitempty"`
-	LargestHolderPercent      float64                          `json:"largest_holder_percent"`
-	TopTenPercent             float64                          `json:"top_ten_percent"`
-	Findings                  []string                         `json:"findings"`
-	TokenProgram              string                           `json:"token_program"`
-	Token2022                 bool                             `json:"token_2022"`
-	Extensions                []tokenExtensionAssessment       `json:"extensions"`
-	ExtensionRiskPenalty      int                              `json:"extension_risk_penalty"`
-	ExtensionResolutionStatus string                           `json:"extension_resolution_status"`
-	ExtensionEvidenceComplete bool                             `json:"extension_evidence_complete"`
-	TransferBehavior          map[string]any                   `json:"transfer_behavior"`
-	VisibilityLimitations     []string                         `json:"visibility_limitations"`
-	CompatibilityWarnings     []string                         `json:"compatibility_warnings"`
-	FinalPolicy               string                           `json:"final_policy"`
-	HolderDistribution        map[string]any                   `json:"holder_distribution"`
-	HolderIntelligence        services.HolderIntelligence      `json:"holder_intelligence"`
-	HolderCluster             services.HolderClusterAnalysis   `json:"holder_cluster"`
-	LaunchForensics           services.LaunchForensicsAnalysis `json:"launch_forensics"`
-	VerifiedEvidence          []string                         `json:"verified_evidence"`
-	Explanation               string                           `json:"explanation"`
-	ExplanationV2             scanExplanationV2                `json:"explanation_v2"`
-	HolderAnalysisStatus      string                           `json:"holder_analysis_status"`
-	VerdictWithheld           bool                             `json:"verdict_withheld"`
-	Disclaimer                string                           `json:"disclaimer"`
-	AnalysisSummary           map[string]any                   `json:"analysis_summary"`
-	InvestigationReport       map[string]any                   `json:"investigation_report"`
+	Mint                       string                           `json:"mint"`
+	Network                    string                           `json:"network"`
+	Score                      int                              `json:"-"` // retained internally for legacy policy calculation
+	TokenHeuristicPenaltyScore int                              `json:"token_heuristic_penalty_score"`
+	NotAFinalRiskScore         bool                             `json:"not_a_final_risk_score"`
+	FinalScoreDisabledByPolicy bool                             `json:"final_score_disabled_by_policy"`
+	Arms                       []services.SecurityRadarVerdict  `json:"arms"`
+	Coverage                   services.ArvisCoverageSummary    `json:"coverage"`
+	ArmCount                   services.ArvisArmCountSummary    `json:"arm_count"`
+	RiskLevel                  string                           `json:"risk_level"`
+	Supply                     string                           `json:"supply"`
+	Decimals                   int                              `json:"decimals"`
+	MintAuthority              string                           `json:"mint_authority,omitempty"`
+	FreezeAuthority            string                           `json:"freeze_authority,omitempty"`
+	LargestHolderPercent       float64                          `json:"largest_holder_percent"`
+	TopTenPercent              float64                          `json:"top_ten_percent"`
+	Findings                   []string                         `json:"findings"`
+	TokenProgram               string                           `json:"token_program"`
+	Token2022                  bool                             `json:"token_2022"`
+	Extensions                 []tokenExtensionAssessment       `json:"extensions"`
+	ExtensionRiskPenalty       int                              `json:"extension_risk_penalty"`
+	ExtensionResolutionStatus  string                           `json:"extension_resolution_status"`
+	ExtensionEvidenceComplete  bool                             `json:"extension_evidence_complete"`
+	TransferBehavior           map[string]any                   `json:"transfer_behavior"`
+	VisibilityLimitations      []string                         `json:"visibility_limitations"`
+	CompatibilityWarnings      []string                         `json:"compatibility_warnings"`
+	FinalPolicy                string                           `json:"final_policy"`
+	HolderDistribution         map[string]any                   `json:"holder_distribution"`
+	HolderIntelligence         services.HolderIntelligence      `json:"holder_intelligence"`
+	HolderCluster              services.HolderClusterAnalysis   `json:"holder_cluster"`
+	LaunchForensics            services.LaunchForensicsAnalysis `json:"launch_forensics"`
+	VerifiedEvidence           []string                         `json:"verified_evidence"`
+	Explanation                string                           `json:"explanation"`
+	ExplanationV2              scanExplanationV2                `json:"explanation_v2"`
+	HolderAnalysisStatus       string                           `json:"holder_analysis_status"`
+	VerdictWithheld            bool                             `json:"verdict_withheld"`
+	Disclaimer                 string                           `json:"disclaimer"`
+	AnalysisSummary            map[string]any                   `json:"analysis_summary"`
+	InvestigationReport        map[string]any                   `json:"investigation_report"`
 }
 
 type rpcEnvelope struct {
@@ -199,39 +205,45 @@ func (h *Handler) TokenScan(w http.ResponseWriter, r *http.Request) {
 	disclaimer := "Koschei provides read-only risk signals based on public on-chain data. Token extensions can be legitimate but may materially change transfer, authority, fee, privacy, or compatibility behavior. This is not financial advice."
 
 	writeJSON(w, http.StatusOK, tokenScanResponse{
-		Mint:                      mint,
-		Network:                   req.Network,
-		Score:                     score,
-		RiskLevel:                 risk,
-		Supply:                    supply.Value.Amount,
-		Decimals:                  supply.Value.Decimals,
-		MintAuthority:             mintAuthority,
-		FreezeAuthority:           freezeAuthority,
-		LargestHolderPercent:      roundPercent(topOne),
-		TopTenPercent:             roundPercent(topTen),
-		Findings:                  findings,
-		TokenProgram:              tokenProgram,
-		Token2022:                 isToken2022,
-		Extensions:                extensions,
-		ExtensionRiskPenalty:      extensionPenalty,
-		ExtensionResolutionStatus: extensionResolutionStatus,
-		ExtensionEvidenceComplete: extensionEvidenceComplete,
-		TransferBehavior:          transferBehavior,
-		VisibilityLimitations:     visibilityLimitations,
-		CompatibilityWarnings:     compatibilityWarnings,
-		FinalPolicy:               policy,
-		HolderDistribution:        holderCore.Distribution,
-		HolderIntelligence:        holderCore.Intelligence,
-		HolderCluster:             holderCore.Cluster,
-		LaunchForensics:           holderCore.LaunchForensics,
-		VerifiedEvidence:          holderIntelligenceCoreEvidence(holderCore),
-		Explanation:               holderIntelligenceCoreExplanation(holderCore),
-		ExplanationV2:             holderIntelligenceCoreExplanationV2(holderCore),
-		HolderAnalysisStatus:      holderIntelligenceCoreStatus(holderCore),
-		VerdictWithheld:           holderPolicy == "withhold" || !extensionEvidenceComplete,
-		Disclaimer:                disclaimer,
-		AnalysisSummary:           analysisSummary,
-		InvestigationReport:       assembly.Report,
+		Mint:                       mint,
+		Network:                    req.Network,
+		Score:                      score,
+		TokenHeuristicPenaltyScore: 100 - score,
+		NotAFinalRiskScore:         true,
+		FinalScoreDisabledByPolicy: true,
+		Arms:                       assembly.Core.Arms,
+		Coverage:                   services.ArvisCoverageFromArms(assembly.Core.Arms),
+		ArmCount:                   services.ArvisCoverageFromArms(assembly.Core.Arms).ArmCount(),
+		RiskLevel:                  risk,
+		Supply:                     supply.Value.Amount,
+		Decimals:                   supply.Value.Decimals,
+		MintAuthority:              mintAuthority,
+		FreezeAuthority:            freezeAuthority,
+		LargestHolderPercent:       roundPercent(topOne),
+		TopTenPercent:              roundPercent(topTen),
+		Findings:                   findings,
+		TokenProgram:               tokenProgram,
+		Token2022:                  isToken2022,
+		Extensions:                 extensions,
+		ExtensionRiskPenalty:       extensionPenalty,
+		ExtensionResolutionStatus:  extensionResolutionStatus,
+		ExtensionEvidenceComplete:  extensionEvidenceComplete,
+		TransferBehavior:           transferBehavior,
+		VisibilityLimitations:      visibilityLimitations,
+		CompatibilityWarnings:      compatibilityWarnings,
+		FinalPolicy:                policy,
+		HolderDistribution:         holderCore.Distribution,
+		HolderIntelligence:         holderCore.Intelligence,
+		HolderCluster:              holderCore.Cluster,
+		LaunchForensics:            holderCore.LaunchForensics,
+		VerifiedEvidence:           holderIntelligenceCoreEvidence(holderCore),
+		Explanation:                holderIntelligenceCoreExplanation(holderCore),
+		ExplanationV2:              holderIntelligenceCoreExplanationV2(holderCore),
+		HolderAnalysisStatus:       holderIntelligenceCoreStatus(holderCore),
+		VerdictWithheld:            holderPolicy == "withhold" || !extensionEvidenceComplete,
+		Disclaimer:                 disclaimer,
+		AnalysisSummary:            analysisSummary,
+		InvestigationReport:        assembly.Report,
 	})
 }
 
