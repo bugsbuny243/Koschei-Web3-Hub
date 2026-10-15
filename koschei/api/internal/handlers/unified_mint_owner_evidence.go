@@ -41,9 +41,16 @@ func (h *Handler) collectUnifiedMintOwnerEvidence(parent context.Context, target
 	if ownerEvidence["token_2022"] != true {
 		return ownerEvidence
 	}
-	extensions := parseToken2022Extensions(account.Value.Data.Parsed.Info)
+	info := account.Value.Data.Parsed.Info
+	extensions := parseToken2022Extensions(info)
 	status, complete := token2022ExtensionResolution(true, account.Value.Data.Space, extensions)
-	if account.Value.Data.Space <= 0 && len(extensions) == 0 {
+	// A partial/invalid jsonParsed extensions array cannot certify that the
+	// entire Token-2022 TLV extension set was decoded.
+	rawExtensions, present := info["extensions"]
+	items, validArray := rawExtensions.([]any)
+	if account.Value.Data.Space < 82 || (account.Value.Data.Space == 82 && len(extensions) > 0) ||
+		(account.Value.Data.Space > 82 && (!present || !validArray)) ||
+		(validArray && len(items) != len(extensions)) {
 		status, complete = "token_2022_extensions_unresolved", false
 	}
 	names := make([]string, 0, len(extensions))
