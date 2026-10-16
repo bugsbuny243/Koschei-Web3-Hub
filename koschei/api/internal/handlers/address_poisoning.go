@@ -22,11 +22,11 @@ type addressPoisoningRequest struct {
 }
 
 type addressPoisoningMatch struct {
-	KnownAddress string `json:"known_address"`
-	Signal       string `json:"signal"`
-	Prefix       int    `json:"prefix"`
-	Suffix       int    `json:"suffix"`
-	RiskBonus    int    `json:"risk_bonus"`
+	KnownAddress   string `json:"known_address"`
+	Signal         string `json:"signal"`
+	Prefix         int    `json:"prefix"`
+	Suffix         int    `json:"suffix"`
+	RiskBonus      int    `json:"risk_bonus"`
 	EvidenceSource string `json:"evidence_source"`
 }
 
@@ -225,26 +225,26 @@ func evaluateAddressPoisoning(wallet, candidate string, contacts []string, rpcEv
 		findingState = "incomplete_evidence"
 	}
 	return map[string]any{
-		"ok":                     true,
-		"module":                 "Address Poisoning Shield",
-		"module_id":              "address_poisoning_shield",
-		"wallet":                 wallet,
-		"candidate":              candidate,
-		"risk_index":             risk,
-		"risk_level":             exposureRiskLevelFromScore(risk),
-		"policy":                 policy,
-		"verdict":                verdict,
-		"matches":                matches,
-		"observed_contact_count": len(contacts),
+		"ok":                                true,
+		"module":                            "Address Poisoning Shield",
+		"module_id":                         "address_poisoning_shield",
+		"wallet":                            wallet,
+		"candidate":                         candidate,
+		"risk_index":                        risk,
+		"risk_level":                        exposureRiskLevelFromScore(risk),
+		"policy":                            policy,
+		"verdict":                           verdict,
+		"matches":                           matches,
+		"observed_contact_count":            len(contacts),
 		"observed_outbound_recipient_count": len(chainRecipients),
-		"rpc_evidence":           rpcEvidence,
-		"coverage_status":        coverageStatus,
-		"finding_state":          findingState,
-		"enforcement_status":     "not_connected",
-		"analysis_scope":         "visible_prefix_suffix_comparison_against_unverified_user_contacts_and_bounded_successful_wallet_outbound_sol_and_token_transfer_recipients",
-		"limitation":             "UNKNOWN_OR_HISTORICAL_RECIPIENTS_NOT_RULED_OUT",
-		"evidence_policy":        map[string]any{"no_evidence_no_claim": true, "safe_terms": []string{"lookalike risk", "possible address poisoning", "recipient verification required"}, "blocked_terms_without_proof": []string{"the wallet is hacked", "confirmed thief", "fraud"}},
-		"disclaimer":             "Read-only recipient-risk analysis. This is not an accusation or financial advice.",
+		"rpc_evidence":                      rpcEvidence,
+		"coverage_status":                   coverageStatus,
+		"finding_state":                     findingState,
+		"enforcement_status":                "not_connected",
+		"analysis_scope":                    "visible_prefix_suffix_comparison_against_unverified_user_contacts_and_bounded_successful_wallet_outbound_sol_and_token_transfer_recipients",
+		"limitation":                        "UNKNOWN_OR_HISTORICAL_RECIPIENTS_NOT_RULED_OUT",
+		"evidence_policy":                   map[string]any{"no_evidence_no_claim": true, "safe_terms": []string{"lookalike risk", "possible address poisoning", "recipient verification required"}, "blocked_terms_without_proof": []string{"the wallet is hacked", "confirmed thief", "fraud"}},
+		"disclaimer":                        "Read-only recipient-risk analysis. This is not an accusation or financial advice.",
 	}
 }
 
