@@ -72,14 +72,22 @@ func (h *Handler) AddressPoisoningCheck(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, result)
 }
 
+// A devnet request must not silently read the mainnet endpoint from
+// SOLANA_RPC_URL. The shared resolver keeps network-specific provider routing.
+func addressPoisoningRPCURL(network string) string {
+	return solanaRPCURL(network, os.Getenv("ALCHEMY_API_KEY"))
+}
+
 func (h *Handler) collectAddressPoisoningContacts(ctx context.Context, wallet, network string, limit int) ([]string, map[string]any) {
 	ctx, cancel := context.WithTimeout(ctx, 7500*time.Millisecond)
 	defer cancel()
-	rpcURL := strings.TrimSpace(os.Getenv("SOLANA_RPC_URL"))
+	rpcURL := addressPoisoningRPCURL(network)
+	evidence := map[string]any{"collected": false, "provider": "solana_rpc", "signature_limit": limit, "network": network}
 	if rpcURL == "" {
-		rpcURL = solanaRPCURL(network, os.Getenv("ALCHEMY_API_KEY"))
+		evidence["error"] = "rpc_not_configured_for_requested_network"
+		evidence["coverage_status"] = "unavailable"
+		return nil, evidence
 	}
-	evidence := map[string]any{"collected": false, "provider": "solana_rpc", "signature_limit": limit}
 	signatures, err := services.SolanaGetSignaturesForAddress(ctx, rpcURL, wallet, limit)
 	if err != nil {
 		evidence["error"] = compactAddressPoisoningError(err)
