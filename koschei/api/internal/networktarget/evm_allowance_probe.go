@@ -75,7 +75,7 @@ func ProbeEVMAllowance(ctx context.Context, client *http.Client, endpoint, netwo
 	if err != nil {
 		return EVMAllowanceProbeResult{}, fmt.Errorf("evm_allowance_unavailable: %w", err)
 	}
-	amount, err := parseEVMUint256(value)
+	amount, err := parseEVMAllowanceABIWord(value)
 	if err != nil {
 		return EVMAllowanceProbeResult{}, fmt.Errorf("evm_allowance_result_invalid")
 	}
@@ -111,6 +111,18 @@ func normalizeEVMCallAddress(value string) (string, error) {
 
 func abiAddressWord(address string) string {
 	return strings.Repeat("0", 24) + strings.TrimPrefix(address, "0x")
+}
+
+// parseEVMAllowanceABIWord accepts only the exact 32-byte ABI return word
+// required by ERC-20 allowance(address,address). A truncated "0x0" is not
+// evidence of a zero allowance; it is an incomplete or malformed RPC result.
+// Other EVM surfaces retain their own decoding contracts.
+func parseEVMAllowanceABIWord(value string) (*big.Int, error) {
+	value = strings.TrimSpace(value)
+	if len(value) != 66 || !strings.HasPrefix(value, "0x") {
+		return nil, fmt.Errorf("evm_allowance_abi_word_invalid")
+	}
+	return parseEVMUint256(value)
 }
 
 func parseEVMUint256(value string) (*big.Int, error) {

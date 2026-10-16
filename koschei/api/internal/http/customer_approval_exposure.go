@@ -56,15 +56,18 @@ func buildCustomerApprovalExposure(allowance networktarget.EVMAllowanceProbeResu
 	if !ok || amount.Sign() < 0 || amount.BitLen() > 256 {
 		return out
 	}
+	// Unlimited is a derived property of the numeric ABI observation,
+	// not a trustworthy independent caller label. Both mismatch directions
+	// must fail closed; otherwise max Uint256 may appear as a finite grant.
+	max := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
+	isMaximum := amount.Cmp(max) == 0
+	if allowance.Unlimited != isMaximum {
+		out.Status = "conflicting_allowance_evidence"
+		out.EvidenceStatus = "conflicting"
+		return out
+	}
 	out.EvidenceStatus = "observed"
-	if allowance.Unlimited {
-		// A literal max allowance must agree with the numeric observation.
-		max := new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 256), big.NewInt(1))
-		if amount.Cmp(max) != 0 {
-			out.Status = "conflicting_allowance_evidence"
-			out.EvidenceStatus = "conflicting"
-			return out
-		}
+	if isMaximum {
 		out.Status = "observed_unlimited_allowance"
 		return out
 	}

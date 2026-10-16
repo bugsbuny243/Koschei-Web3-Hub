@@ -67,6 +67,20 @@ func decodeCustomerApprovalScanRequest(r io.Reader) (customerApprovalScanRequest
 	if _, ok := networktarget.ExpectedEVMChainID(request.Network); !ok {
 		return request, errors.New("evm_allowance_unsupported_network")
 	}
+	// Reject malformed owner/token/spender identities before selecting an
+	// RPC endpoint. Invalid request context is not an RPC outage (502).
+	for _, target := range []struct {
+		name    string
+		address string
+	}{
+		{name: "token", address: request.Token},
+		{name: "owner", address: request.Owner},
+		{name: "spender", address: request.Spender},
+	} {
+		if _, err := networktarget.Resolve(request.Network, target.address); err != nil {
+			return request, errors.New("evm_allowance_" + target.name + "_invalid")
+		}
+	}
 	return request, nil
 }
 
