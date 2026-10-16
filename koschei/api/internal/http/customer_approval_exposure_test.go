@@ -46,6 +46,13 @@ func TestApprovalExposureUnlimitedAndFiniteAreDistinct(t *testing.T) {
 	if finite.Status != "observed_nonzero_allowance" {
 		t.Fatalf("finite allowance mislabeled as unlimited: %+v", finite)
 	}
+	// Call-site metadata must never downgrade a literal maximum authorization
+	// into a seemingly finite approval.
+	conflict := buildCustomerApprovalExposure(approvalExposureFixture(max, false))
+	if conflict.Status != "conflicting_allowance_evidence" || conflict.EvidenceStatus != "conflicting" ||
+		conflict.RecommendedAction != "review" || conflict.EnforcementStatus != "not_connected" {
+		t.Fatalf("maximum allowance with false unlimited flag must fail closed: %+v", conflict)
+	}
 }
 
 func TestApprovalExposureMalformedAndMissingEvidenceFailClosed(t *testing.T) {
