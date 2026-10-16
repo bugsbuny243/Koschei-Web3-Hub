@@ -46,7 +46,7 @@ func buildTransactionGuardAttackPaths(
 	analysis := transactionGuardAttackPathAnalysis{
 		Version:     transactionGuardAttackPathVersion,
 		Available:   decoded.Available || cpi.Available || authority.Available,
-		Complete:    decoded.Complete && (!cpi.Required || cpi.Complete) && (!authority.Required || authority.Complete) && (!decoded.AutomaticBalance.Requested || decoded.AutomaticBalance.Complete),
+		Complete:    decoded.Available && decoded.Complete && (!cpi.Required || cpi.Complete) && (!authority.Required || authority.Complete) && (!decoded.AutomaticBalance.Requested || decoded.AutomaticBalance.Complete),
 		Status:      "no_attack_path_observed",
 		Paths:       []transactionGuardAttackPath{},
 		Limitations: []string{},
@@ -160,6 +160,9 @@ func buildTransactionGuardAttackPaths(
 	}
 
 	if len(steps) > 0 {
+		// Bounded findings are still available evidence, even if transaction
+		// decoding failed and completeness must remain false.
+		analysis.Available = true
 		for i := range steps {
 			steps[i].Sequence = i + 1
 		}
@@ -178,6 +181,12 @@ func buildTransactionGuardAttackPaths(
 		analysis.Status = "attack_path_observed"
 	}
 
+	// Without decoded transaction instructions, even observed secondary findings
+	// cannot establish complete coverage of the transaction being signed.
+	if !decoded.Available {
+		analysis.Complete = false
+		analysis.Limitations = append(analysis.Limitations, "Decoded transaction instructions were unavailable; observed or empty attack paths cannot establish complete signing coverage.")
+	}
 	if !analysis.Complete {
 		analysis.Limitations = append(analysis.Limitations, "Attack-path ordering is evidence-linked but must not be interpreted as proven malicious intent or post-signing causation when required decode, simulation, CPI, authority, or balance evidence is incomplete.")
 		if analysis.Status == "no_attack_path_observed" {
