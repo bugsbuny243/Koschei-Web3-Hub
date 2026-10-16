@@ -63,7 +63,7 @@ func Current() Snapshot {
 		Purpose:           "federated evidence collection, correlation, deterministic security decisions, defense validation, alerting and operator visibility",
 		PreserveExisting:  true,
 		BreakingChanges:   false,
-		DecisionAuthority: "ARVIS remains authoritative only where its native evidence and verdict contract is connected; Fabric and Sentinel observe-first paths do not silently promote decisions",
+		DecisionAuthority: "ARVIS is authoritative only for evidence-backed decisions on connected routes; observational data never silently becomes an enforced verdict",
 		EvidenceRule:      "missing evidence stays UNKNOWN or UNAVAILABLE and can never be converted into SAFE",
 		Networks:          networktarget.Catalog(),
 		Capabilities: []Capability{
@@ -215,17 +215,7 @@ func Current() Snapshot {
 				Telemetry:        []string{"incident status", "severity", "linked evidence refs", "persisted-alert-backed alert refs", "linked dossier refs", "coverage episode ownership via alert identity", "append-only operator action timeline"},
 				Notes:            []string{"new incident alert links must resolve to persisted security_alert_events", "coverage episode ownership is derived from alert identity without changing episode or verdict authority", "operator response state never mutates ARVIS evidence, grades or signatures", "incident state is operational workflow metadata, not a security verdict"},
 			},
-			{
-				ID: "sentinel-fabric-observation", Layer: "model", Domain: "sentinel", Mode: "observe", EvidenceAuthority: "no_web3_decision_authority", Activation: "versioned Fabric contracts only",
-				DependsOn:       []string{"global-radar-event-plane"},
-				BackendSurfaces: []string{"/fabric", "/fabric/capabilities"},
-				Notes:           []string{"Sentinel remains an independent cybersecurity model", "observe-first integration cannot mutate Koschei Web3 security internals"},
-			},
-			{
-				ID: "lang-fabric-policy-proof", Layer: "policy-proof", Domain: "koschei-lang", Mode: "observe", EvidenceAuthority: "independent_project", Activation: "versioned adapter/contracts after compatibility gates",
-				BackendSurfaces: []string{"/fabric", "/fabric/capabilities"},
-				Notes:           []string{"Koschei Lang owns compiler/runtime/policy/proof/identity internals", "no direct production dependency on Lang internals"},
-			},
+
 		},
 		AssetBindings: preservedAssetBindings(),
 	}
