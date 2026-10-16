@@ -13,18 +13,17 @@ func testRecipientAddress(mid string) string {
 
 func TestRecipientShieldNoMatchDoesNotAuthorizeSending(t *testing.T) {
 	wallet := testRecipientAddress("W")
-	candidate := testRecipientAddress("C")
 	contacts := []string{testRecipientAddress("D"), testRecipientAddress("E")}
 	evidence := map[string]any{
-		"collected": true,
-		"signature_count": 2,
+		"collected":             true,
+		"signature_count":       2,
 		"transaction_attempted": 2,
-		"transaction_decoded": 2,
-		"transaction_failed": 0,
-		"coverage_status": "bounded_recent_history",
+		"transaction_decoded":   2,
+		"transaction_failed":    0,
+		"coverage_status":       "bounded_recent_history",
 	}
 	// This candidate would have no collision if its visible anchors differ.
-	candidate = "87654321" + strings.Repeat("C", 24) + "HGFEDCBA"
+	candidate := "87654321" + strings.Repeat("C", 24) + "HGFEDCBA"
 	out := evaluateAddressPoisoning(wallet, candidate, contacts, evidence)
 	if out["policy"] == "allow" || out["policy"] != "warn" {
 		t.Fatalf("bounded history cannot authenticate a recipient: %#v", out)
