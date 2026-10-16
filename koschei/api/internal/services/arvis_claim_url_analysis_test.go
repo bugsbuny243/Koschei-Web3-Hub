@@ -47,35 +47,12 @@ func TestClaimRedirectQuerySeparatesCrossOriginFromSameOrigin(t *testing.T) {
 		crossOrigin int
 		nonHTTP     int
 	}{
-		{
-			name: "percent_encoded_cross_origin",
-			input: "https://example.org/claim?next=https%3A%2F%2Fwallet.example.net%2Fconnect",
-			host: "wallet.example.net", parsed: 1, crossOrigin: 1,
-		},
-		{
-			name: "same_origin_default_port",
-			input: "https://example.org/claim?return_url=https%3A%2F%2Fexample.org%3A443%2Fdone",
-			host: "example.org", parsed: 1,
-		},
-		{
-			name: "different_port",
-			input: "https://example.org/claim?callback=https%3A%2F%2Fexample.org%3A8443%2Fdone",
-			host: "example.org", parsed: 1, crossOrigin: 1,
-		},
-		{
-			name: "scheme_relative_redirect",
-			input: "https://example.org/claim?redirect=%2F%2Felsewhere.example%2Fstart",
-			host: "elsewhere.example", parsed: 1, crossOrigin: 1,
-		},
-		{
-			name: "non_http_scheme",
-			input: "https://example.org/claim?next=javascript%3Aalert%281%29",
-			nonHTTP: 1,
-		},
-		{
-			name: "relative_path_not_an_origin",
-			input: "https://example.org/claim?next=%2Fwelcome",
-		},
+		{"percent_encoded_cross_origin", "https://example.org/claim?next=https%3A%2F%2Fwallet.example.net%2Fconnect", "wallet.example.net", 1, 1, 0},
+		{"same_origin_default_port", "https://example.org/claim?return_url=https%3A%2F%2Fexample.org%3A443%2Fdone", "example.org", 1, 0, 0},
+		{"different_port", "https://example.org/claim?callback=https%3A%2F%2Fexample.org%3A8443%2Fdone", "example.org", 1, 1, 0},
+		{"scheme_relative_redirect", "https://example.org/claim?redirect=%2F%2Felsewhere.example%2Fstart", "elsewhere.example", 1, 1, 0},
+		{"non_http_scheme", "https://example.org/claim?next=javascript%3Aalert%281%29", "", 0, 0, 1},
+		{"relative_path_not_an_origin", "https://example.org/claim?next=%2Fwelcome", "", 0, 0, 0},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
