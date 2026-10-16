@@ -98,6 +98,23 @@ func applyARVISPreflightScope(req arvisPreflightRequest, resp arvisPreflightResp
 	resp.NotChecked = []string{}
 	target := strings.TrimSpace(req.Target)
 	if !solanaPreflightAddressLike.MatchString(target) {
+		kind := strings.ToLower(strings.TrimSpace(req.Kind))
+		if arvisPreflightHost(target) != "" || strings.Contains(target, "://") ||
+			strings.Contains(kind, "url") || strings.Contains(kind, "site") || strings.Contains(kind, "claim") {
+			resp.NotChecked = []string{
+				"Yönlendirmeler ve son açılan domain",
+				"DNS/TLS sahipliği, sayfa içeriği ve çalışan JavaScript",
+				"Gerçek cüzdan bağlantısı ve imzalanacak serileştirilmiş işlem",
+				"Token allowance, delegate, NFT operator ve claim sözleşmesi etkisi",
+			}
+			resp.CoverageWarning = "URL için yalnız yerel metin ve host göstergeleri değerlendirildi. Sayfa açılmadı, yönlendirme takip edilmedi ve imzalanacak işlem incelenmedi; dolayısıyla claim güvenli ilan edilemez."
+			if resp.Decision == "allow" {
+				resp.Decision = "review"
+			}
+			if resp.RiskLevel == "low" {
+				resp.RiskLevel = "unknown"
+			}
+		}
 		return resp
 	}
 	resp.NotChecked = []string{
@@ -195,21 +212,20 @@ func evaluateARVISPreflight(req arvisPreflightRequest) arvisPreflightResponse {
 		return resp
 	}
 	if isOfficialKOSCMint(target) {
-		resp.Decision = "review"
-		resp.RiskLevel = "medium"
+		// Official mint identity is not evidence that a surrounding claim,
+		// approval request or signing instruction is safe. Do not return
+		// before screening the supplied intent and note.
 		resp.Score = 40
-		addReason("Bu adres resmi KOSC mint adresiyle eşleşiyor.")
+		addReason("Bu adres resmi KOSC mint adresiyle eşleşiyor; bu eşleşme imza ve claim güvenliğini kanıtlamaz.")
 		addReason("KOSC, Koschei Web3 Professional için alternatif ödeme/settlement kanalıdır; token holdings tek başına erişim vermez.")
 		addStep("İşlem yapmadan önce mint adresini resmi /token sayfasındaki adresle tekrar karşılaştır.")
 		addStep("KOSC ödemesi için yalnızca Koschei'nin doğrulanmış wallet ve server-side settlement akışını kullan.")
-		resp.HumanMessage = "ARVIS ön kontrol sonucu: resmi KOSC mint eşleşti. Bu finansal tavsiye değildir; işlem yapmadan önce zincir üstü bilgileri ve resmi sayfayı doğrula."
-		return resp
 	}
 	if host := arvisPreflightHost(target); host != "" {
 		addReason("Hedef bir web/domain yüzeyi içeriyor; bağlantı ve imza riski domain seviyesinde kontrol edilmeli.")
 		addStep("Domaini resmi sosyal hesaplar ve dokümantasyonla birebir karşılaştır.")
-		if arvisIsTrustedKoscheiHost(host) {
-			addReason("Domain resmi Koschei alan adıyla eşleşiyor.")
+		if arvisIsTrustedKoscheiHost(host) && !strings.Contains(target, "@") {
+			addReason("Host adı Koschei alan adı kaydıyla eşleşiyor; sayfanın veya imzanın güvenli olduğu doğrulanmadı.")
 		} else {
 			raise(58, "review", "medium")
 		}
@@ -296,7 +312,7 @@ func arvisPreflightHost(target string) string {
 		parseValue = "https://" + parseValue
 	}
 	parsed, err := url.Parse(parseValue)
-	if err != nil {
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Opaque != "" {
 		return ""
 	}
 	host := strings.ToLower(strings.TrimSpace(parsed.Hostname()))
