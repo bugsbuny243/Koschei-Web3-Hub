@@ -46,18 +46,28 @@ func (h *Handler) AddressPoisoningCheck(w http.ResponseWriter, r *http.Request) 
 	if network == "" {
 		network = "solana-mainnet"
 	}
+	// The contact collector below is Solana-only. Never treat another chain
+	// as though a Solana signature query had validated its addresses.
+	if network != "solana-mainnet" && network != "solana-devnet" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "address_poisoning_unsupported_network"})
+		return
+	}
+	if len(req.KnownContacts) > 40 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "too_many_known_contacts"})
+		return
+	}
 	limit := req.Limit
 	if limit <= 0 || limit > 20 {
 		limit = 12
 	}
 
 	contacts := normalizeAddressList(req.KnownContacts)
-	rpcEvidence := map[string]any{"collected": false}
-	if len(contacts) == 0 || limit > 0 {
-		observed, evidence := h.collectAddressPoisoningContacts(r.Context(), wallet, network, limit)
-		contacts = appendUniqueAddresses(contacts, observed...)
-		rpcEvidence = evidence
-	}
+	userSuppliedCount := len(contacts)
+	// Even an explicit user-provided contact list is not verified identity;
+	// retain provenance separately from chain-derived observations.
+	observed, rpcEvidence := h.collectAddressPoisoningContacts(r.Context(), wallet, network, limit)
+	contacts = appendUniqueAddresses(contacts, observed...)
+	rpcEvidence["user_supplied_contact_count"] = userSuppliedCount
 	result := evaluateAddressPoisoning(wallet, candidate, contacts, rpcEvidence)
 	writeJSON(w, http.StatusOK, result)
 }
@@ -77,20 +87,38 @@ func (h *Handler) collectAddressPoisoningContacts(ctx context.Context, wallet, n
 	}
 	evidence["collected"] = true
 	evidence["signature_count"] = len(signatures)
+	evidence["coverage_status"] = "bounded_recent_history"
+	if len(signatures) >= limit {
+		evidence["history_may_be_truncated"] = true
+	}
 	contacts := []string{}
 	maxTx := len(signatures)
 	if maxTx > 8 {
 		maxTx = 8
 	}
+	evidence["transaction_attempted"] = maxTx
+	if len(signatures) > maxTx {
+		evidence["history_may_be_truncated"] = true
+	}
+	decoded := 0
+	failed := 0
 	for i := 0; i < maxTx; i++ {
 		if strings.TrimSpace(signatures[i].Signature) == "" {
+			failed++
 			continue
 		}
 		tx, err := services.SolanaGetTransactionJSONParsed(ctx, rpcURL, signatures[i].Signature)
 		if err != nil {
+			failed++
 			continue
 		}
+		decoded++
 		contacts = appendUniqueAddresses(contacts, extractSolanaTransactionAddresses(tx)...)
+	}
+	evidence["transaction_decoded"] = decoded
+	evidence["transaction_failed"] = failed
+	if failed > 0 {
+		evidence["coverage_status"] = "partial_decode_failure"
 	}
 	contacts = removeAddress(contacts, wallet)
 	evidence["contact_count"] = len(contacts)
@@ -126,9 +154,11 @@ func evaluateAddressPoisoning(wallet, candidate string, contacts []string, rpcEv
 		}
 	}
 	sort.SliceStable(matches, func(i, j int) bool { return matches[i].RiskBonus > matches[j].RiskBonus })
-	risk := 8
-	policy := "allow"
-	verdict := "No address-poisoning lookalike was detected from the available evidence."
+	// A bounded history comparison cannot authenticate a transfer recipient.
+	// In particular, no-match is not an allowance to sign or send funds.
+	risk := 25
+	policy := "warn"
+	verdict := "No visible lookalike match was observed in the bounded contact sample. This is not proof that the recipient is trusted; verify the full address independently."
 	if len(matches) > 0 {
 		risk = matches[0].RiskBonus
 		policy = "warn"
@@ -138,9 +168,17 @@ func evaluateAddressPoisoning(wallet, candidate string, contacts []string, rpcEv
 			verdict = "Strong address-poisoning pattern detected. Do not rely on truncated address display."
 		}
 	} else if len(contacts) == 0 {
-		risk = 25
-		policy = "warn"
-		verdict = "No recent contact graph was available; verify the full recipient address out-of-band."
+		verdict = "No usable contact graph was available; verify the full recipient address out-of-band."
+	}
+	coverageStatus, _ := rpcEvidence["coverage_status"].(string)
+	if coverageStatus == "" {
+		coverageStatus = "unavailable"
+	}
+	findingState := "none_observed_in_bounded_scope"
+	if len(matches) > 0 {
+		findingState = "suspected_lookalike"
+	} else if len(contacts) == 0 {
+		findingState = "unavailable"
 	}
 	return map[string]any{
 		"ok":                     true,
@@ -155,6 +193,11 @@ func evaluateAddressPoisoning(wallet, candidate string, contacts []string, rpcEv
 		"matches":                matches,
 		"observed_contact_count": len(contacts),
 		"rpc_evidence":           rpcEvidence,
+		"coverage_status":        coverageStatus,
+		"finding_state":          findingState,
+		"enforcement_status":     "not_connected",
+		"analysis_scope":         "visible_prefix_suffix_comparison_against_user_supplied_and_bounded_recent_solana_contacts",
+		"limitation":             "UNKNOWN_OR_HISTORICAL_RECIPIENTS_NOT_RULED_OUT",
 		"evidence_policy":        map[string]any{"no_evidence_no_claim": true, "safe_terms": []string{"lookalike risk", "possible address poisoning", "recipient verification required"}, "blocked_terms_without_proof": []string{"the wallet is hacked", "confirmed thief", "fraud"}},
 		"disclaimer":             "Read-only recipient-risk analysis. This is not an accusation or financial advice.",
 	}
