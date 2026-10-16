@@ -83,6 +83,7 @@ type transactionGuardV3SignedIntentAssessment struct {
 	NetworkMatched     bool     `json:"network_matched"`
 	PolicyMatched      bool     `json:"policy_matched"`
 	OriginMatched      bool     `json:"origin_matched"`
+	OriginEvidenceStatus string `json:"origin_evidence_status"`
 	Mismatches         []string `json:"mismatches"`
 	Limitations        []string `json:"limitations"`
 }
@@ -204,7 +205,9 @@ func evaluateTransactionGuardV3SignedIntent(input transactionGuardV2Request, sig
 	declaredOrigin := normalizeTransactionGuardV3Origin(payload.UIOrigin)
 	requestOrigin = normalizeTransactionGuardV3Origin(requestOrigin)
 	assessment.OriginMatched = requestOrigin != "" && declaredOrigin != "" && requestOrigin == declaredOrigin
+	assessment.OriginEvidenceStatus = "matched"
 	if requestOrigin == "" {
+		assessment.OriginEvidenceStatus = "unavailable"
 		assessment.Limitations = append(assessment.Limitations, "HTTP Origin was absent or invalid; the signed UI origin has not been independently corroborated by the request transport.")
 		assessment.Mismatches = append(assessment.Mismatches, "Independent request origin evidence is unavailable.")
 		findings = append(findings, transactionFirewallFinding{
@@ -212,6 +215,7 @@ func evaluateTransactionGuardV3SignedIntent(input transactionGuardV2Request, sig
 			Evidence: "HTTP Origin header was missing or malformed; signed origin alone is not transport evidence.", Score: 35,
 		})
 	} else if !assessment.OriginMatched {
+		assessment.OriginEvidenceStatus = "mismatch"
 		assessment.Mismatches = append(assessment.Mismatches, "Signed UI origin differs from the HTTP Origin header.")
 		findings = append(findings, transactionFirewallFinding{
 			Code: "signed_ui_intent_origin_mismatch", Severity: "critical", Title: "Signed UI origin does not match the request origin",
@@ -235,6 +239,8 @@ func evaluateTransactionGuardV3SignedIntent(input transactionGuardV2Request, sig
 			Code: "signed_ui_intent_verified", Severity: "info", Title: "Signed UI intent verified",
 			Evidence: fmt.Sprintf("intent_id=%s signer=%s canonical_hash=%s", payload.IntentID, payload.Signer, assessment.CanonicalHash), Score: 0,
 		})
+	} else if assessment.OriginEvidenceStatus == "unavailable" && len(assessment.Mismatches) == 1 {
+		assessment.Status = "origin_evidence_unavailable"
 	} else {
 		assessment.Status = "signed_ui_intent_mismatch"
 	}
@@ -353,7 +359,7 @@ func normalizeTransactionGuardV3Origin(value string) string {
 	}
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Opaque != "" || parsed.User != nil ||
-		parsed.RawQuery != "" || parsed.Fragment != "" ||
+		parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" ||
 		(parsed.Path != "" && parsed.Path != "/") || parsed.RawPath != "" {
 		return ""
 	}
