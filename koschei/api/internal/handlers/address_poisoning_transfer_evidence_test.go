@@ -161,3 +161,20 @@ func TestRecipientEvidenceProvenanceIsNotWalletEnforcement(t *testing.T) {
 		t.Fatalf("user-supplied address must remain unverified: %#v", userOnly)
 	}
 }
+
+func TestAddressPoisoningRPCURLRespectsRequestedNetwork(t *testing.T) {
+	t.Setenv("SOLANA_RPC_URL", "https://example.invalid/mainnet")
+	t.Setenv("SOLANA_DEVNET_RPC_URL", "https://example.invalid/devnet")
+	t.Setenv("ALCHEMY_API_KEY", "")
+	if got := addressPoisoningRPCURL("solana-mainnet"); got != "https://example.invalid/mainnet" {
+		t.Fatalf("wrong mainnet provider: %q", got)
+	}
+	if got := addressPoisoningRPCURL("solana-devnet"); got != "https://example.invalid/devnet" {
+		t.Fatalf("devnet must not reuse mainnet RPC: %q", got)
+	}
+	t.Setenv("SOLANA_DEVNET_RPC_URL", "")
+	t.Setenv("ALCHEMY_SOLANA_DEVNET_RPC_URL", "")
+	if got := addressPoisoningRPCURL("solana-devnet"); got != "" {
+		t.Fatalf("unconfigured devnet must fail closed, got %q", got)
+	}
+}
