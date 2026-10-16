@@ -64,28 +64,28 @@ type transactionGuardV3SignedIntent struct {
 }
 
 type transactionGuardV3SignedIntentAssessment struct {
-	Requested          bool     `json:"requested"`
-	Required           bool     `json:"required"`
-	Available          bool     `json:"available"`
-	Complete           bool     `json:"complete"`
-	Verified           bool     `json:"verified"`
-	Status             string   `json:"status"`
-	IntentID           string   `json:"intent_id,omitempty"`
-	Signer             string   `json:"signer,omitempty"`
-	UIOrigin           string   `json:"ui_origin,omitempty"`
-	UISummaryHash      string   `json:"ui_summary_hash,omitempty"`
-	IssuedAt           string   `json:"issued_at,omitempty"`
-	ExpiresAt          string   `json:"expires_at,omitempty"`
-	CanonicalHash      string   `json:"canonical_hash,omitempty"`
-	SignatureVerified  bool     `json:"signature_verified"`
-	FingerprintMatched bool     `json:"fingerprint_matched"`
-	WalletMatched      bool     `json:"wallet_matched"`
-	NetworkMatched     bool     `json:"network_matched"`
-	PolicyMatched      bool     `json:"policy_matched"`
-	OriginMatched      bool     `json:"origin_matched"`
-	OriginEvidenceStatus string `json:"origin_evidence_status"`
-	Mismatches         []string `json:"mismatches"`
-	Limitations        []string `json:"limitations"`
+	Requested            bool     `json:"requested"`
+	Required             bool     `json:"required"`
+	Available            bool     `json:"available"`
+	Complete             bool     `json:"complete"`
+	Verified             bool     `json:"verified"`
+	Status               string   `json:"status"`
+	IntentID             string   `json:"intent_id,omitempty"`
+	Signer               string   `json:"signer,omitempty"`
+	UIOrigin             string   `json:"ui_origin,omitempty"`
+	UISummaryHash        string   `json:"ui_summary_hash,omitempty"`
+	IssuedAt             string   `json:"issued_at,omitempty"`
+	ExpiresAt            string   `json:"expires_at,omitempty"`
+	CanonicalHash        string   `json:"canonical_hash,omitempty"`
+	SignatureVerified    bool     `json:"signature_verified"`
+	FingerprintMatched   bool     `json:"fingerprint_matched"`
+	WalletMatched        bool     `json:"wallet_matched"`
+	NetworkMatched       bool     `json:"network_matched"`
+	PolicyMatched        bool     `json:"policy_matched"`
+	OriginMatched        bool     `json:"origin_matched"`
+	OriginEvidenceStatus string   `json:"origin_evidence_status"`
+	Mismatches           []string `json:"mismatches"`
+	Limitations          []string `json:"limitations"`
 }
 
 type transactionGuardV3SignedIntentPayload struct {
