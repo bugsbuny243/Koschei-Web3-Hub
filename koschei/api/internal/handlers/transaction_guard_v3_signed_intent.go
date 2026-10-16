@@ -8,7 +8,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -61,27 +64,28 @@ type transactionGuardV3SignedIntent struct {
 }
 
 type transactionGuardV3SignedIntentAssessment struct {
-	Requested          bool     `json:"requested"`
-	Required           bool     `json:"required"`
-	Available          bool     `json:"available"`
-	Complete           bool     `json:"complete"`
-	Verified           bool     `json:"verified"`
-	Status             string   `json:"status"`
-	IntentID           string   `json:"intent_id,omitempty"`
-	Signer             string   `json:"signer,omitempty"`
-	UIOrigin           string   `json:"ui_origin,omitempty"`
-	UISummaryHash      string   `json:"ui_summary_hash,omitempty"`
-	IssuedAt           string   `json:"issued_at,omitempty"`
-	ExpiresAt          string   `json:"expires_at,omitempty"`
-	CanonicalHash      string   `json:"canonical_hash,omitempty"`
-	SignatureVerified  bool     `json:"signature_verified"`
-	FingerprintMatched bool     `json:"fingerprint_matched"`
-	WalletMatched      bool     `json:"wallet_matched"`
-	NetworkMatched     bool     `json:"network_matched"`
-	PolicyMatched      bool     `json:"policy_matched"`
-	OriginMatched      bool     `json:"origin_matched"`
-	Mismatches         []string `json:"mismatches"`
-	Limitations        []string `json:"limitations"`
+	Requested            bool     `json:"requested"`
+	Required             bool     `json:"required"`
+	Available            bool     `json:"available"`
+	Complete             bool     `json:"complete"`
+	Verified             bool     `json:"verified"`
+	Status               string   `json:"status"`
+	IntentID             string   `json:"intent_id,omitempty"`
+	Signer               string   `json:"signer,omitempty"`
+	UIOrigin             string   `json:"ui_origin,omitempty"`
+	UISummaryHash        string   `json:"ui_summary_hash,omitempty"`
+	IssuedAt             string   `json:"issued_at,omitempty"`
+	ExpiresAt            string   `json:"expires_at,omitempty"`
+	CanonicalHash        string   `json:"canonical_hash,omitempty"`
+	SignatureVerified    bool     `json:"signature_verified"`
+	FingerprintMatched   bool     `json:"fingerprint_matched"`
+	WalletMatched        bool     `json:"wallet_matched"`
+	NetworkMatched       bool     `json:"network_matched"`
+	PolicyMatched        bool     `json:"policy_matched"`
+	OriginMatched        bool     `json:"origin_matched"`
+	OriginEvidenceStatus string   `json:"origin_evidence_status"`
+	Mismatches           []string `json:"mismatches"`
+	Limitations          []string `json:"limitations"`
 }
 
 type transactionGuardV3SignedIntentPayload struct {
@@ -195,18 +199,30 @@ func evaluateTransactionGuardV3SignedIntent(input transactionGuardV2Request, sig
 			Evidence: "The signed expected/required/blocked program lists or account limits differ from the policy evaluated by Guard.", Score: 80,
 		})
 	}
-	assessment.OriginMatched = true
+	// Matching a cryptographic UI-origin claim to an independent request
+	// origin requires an actual, well-formed HTTP Origin header. A missing
+	// header must never be interpreted as a successful origin match.
+	declaredOrigin := normalizeTransactionGuardV3Origin(payload.UIOrigin)
 	requestOrigin = normalizeTransactionGuardV3Origin(requestOrigin)
+	assessment.OriginMatched = requestOrigin != "" && declaredOrigin != "" && requestOrigin == declaredOrigin
+	assessment.OriginEvidenceStatus = "matched"
 	if requestOrigin == "" {
-		assessment.Limitations = append(assessment.Limitations, "The HTTP Origin header was unavailable; origin binding was preserved in the signature but not independently matched to the request transport.")
-	} else if payload.UIOrigin != requestOrigin {
-		assessment.OriginMatched = false
+		assessment.OriginEvidenceStatus = "unavailable"
+		assessment.Limitations = append(assessment.Limitations, "HTTP Origin was absent or invalid; the signed UI origin has not been independently corroborated by the request transport.")
+		assessment.Mismatches = append(assessment.Mismatches, "Independent request origin evidence is unavailable.")
+		findings = append(findings, transactionFirewallFinding{
+			Code: "signed_ui_intent_origin_unavailable", Severity: "high", Title: "Signed UI origin cannot be independently verified",
+			Evidence: "HTTP Origin header was missing or malformed; signed origin alone is not transport evidence.", Score: 35,
+		})
+	} else if !assessment.OriginMatched {
+		assessment.OriginEvidenceStatus = "mismatch"
 		assessment.Mismatches = append(assessment.Mismatches, "Signed UI origin differs from the HTTP Origin header.")
 		findings = append(findings, transactionFirewallFinding{
 			Code: "signed_ui_intent_origin_mismatch", Severity: "critical", Title: "Signed UI origin does not match the request origin",
-			Evidence: fmt.Sprintf("signed_origin=%s request_origin=%s", payload.UIOrigin, requestOrigin), Score: 80,
+			Evidence: fmt.Sprintf("signed_origin=%s request_origin=%s", declaredOrigin, requestOrigin), Score: 80,
 		})
 	}
+	assessment.Limitations = append(assessment.Limitations, "Origin matching compares two request-origin declarations; it does not prove DNS ownership, page integrity or that the web domain is legitimate.")
 	if now.Before(issuedAt.Add(-transactionGuardV3IntentClockSkew)) {
 		assessment.Mismatches = append(assessment.Mismatches, "Signed UI intent was issued in the future.")
 		findings = append(findings, transactionFirewallFinding{Code: "signed_ui_intent_not_yet_valid", Severity: "high", Title: "Signed UI intent is not yet valid", Evidence: payload.IssuedAt, Score: 50})
@@ -223,6 +239,8 @@ func evaluateTransactionGuardV3SignedIntent(input transactionGuardV2Request, sig
 			Code: "signed_ui_intent_verified", Severity: "info", Title: "Signed UI intent verified",
 			Evidence: fmt.Sprintf("intent_id=%s signer=%s canonical_hash=%s", payload.IntentID, payload.Signer, assessment.CanonicalHash), Score: 0,
 		})
+	} else if assessment.OriginEvidenceStatus == "unavailable" && len(assessment.Mismatches) == 1 {
+		assessment.Status = "origin_evidence_unavailable"
 	} else {
 		assessment.Status = "signed_ui_intent_mismatch"
 	}
@@ -335,5 +353,51 @@ func decodeTransactionGuardV3IntentSignature(value string) ([]byte, error) {
 }
 
 func normalizeTransactionGuardV3Origin(value string) string {
-	return strings.ToLower(strings.TrimRight(strings.TrimSpace(value), "/"))
+	value = strings.TrimSpace(value)
+	if value == "" || strings.ContainsAny(value, " \t\r\n\\") {
+		return ""
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Opaque != "" || parsed.User != nil ||
+		parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" ||
+		(parsed.Path != "" && parsed.Path != "/") || parsed.RawPath != "" {
+		return ""
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if (scheme != "http" && scheme != "https") || parsed.Host == "" {
+		return ""
+	}
+	host := strings.ToLower(parsed.Hostname())
+	if host == "" || strings.ContainsAny(host, "%@") || strings.HasSuffix(host, ".") {
+		return ""
+	}
+	if net.ParseIP(host) == nil {
+		// Reject malformed DNS labels and ambiguous authorities, not just a
+		// suspicious substring. Do not resolve or fetch the hostname here.
+		for _, label := range strings.Split(host, ".") {
+			if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+				return ""
+			}
+			for _, char := range label {
+				if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-') {
+					return ""
+				}
+			}
+		}
+	}
+	port := parsed.Port()
+	if port != "" {
+		number, err := strconv.Atoi(port)
+		if err != nil || number < 1 || number > 65535 {
+			return ""
+		}
+	}
+	canonicalHost := host
+	if strings.Contains(host, ":") {
+		canonicalHost = "[" + host + "]"
+	}
+	if port != "" {
+		canonicalHost = net.JoinHostPort(host, port)
+	}
+	return scheme + "://" + canonicalHost
 }
