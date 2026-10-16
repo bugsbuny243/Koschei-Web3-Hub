@@ -9,24 +9,28 @@ import (
 )
 
 type arvisClaimSurfaceEvidence struct {
-	Available         bool
-	Original          string
-	Scheme            string
-	Host              string
-	Port              string
-	Path              string
-	HTTPS             bool
-	SchemeMissing     bool
-	HasUserInfo       bool
-	IPLiteralHost     bool
-	PunycodeHost      bool
-	NonStandardPort   bool
-	ExcessSubdomains  bool
-	SecretTerms       []string
-	SigningTerms      []string
-	RedirectTerms     []string
-	PromotionTerms    []string
-	LongEncodedValues int
+	Available                       bool
+	Original                        string
+	Scheme                          string
+	Host                            string
+	Port                            string
+	Path                            string
+	HTTPS                           bool
+	SchemeMissing                   bool
+	HasUserInfo                     bool
+	IPLiteralHost                   bool
+	PunycodeHost                    bool
+	NonStandardPort                 bool
+	ExcessSubdomains                bool
+	SecretTerms                     []string
+	SigningTerms                    []string
+	RedirectTerms                   []string
+	PromotionTerms                  []string
+	LongEncodedValues               int
+	RedirectHosts                   []string
+	CrossOriginRedirectCandidates   int
+	NonHTTPSchemeRedirectCandidates int
+	ParsedRedirectCandidates        int
 }
 
 func EnrichArvisBundleWithClaimSurface(bundle SecurityRadarBundle) SecurityRadarBundle {
@@ -65,7 +69,7 @@ func EnrichArvisBundleWithClaimSurface(bundle SecurityRadarBundle) SecurityRadar
 func parseArvisClaimSurface(raw string) arvisClaimSurfaceEvidence {
 	raw = strings.TrimSpace(raw)
 	out := arvisClaimSurfaceEvidence{Original: raw}
-	if raw == "" || strings.ContainsAny(raw, "\r\n\t ") {
+	if raw == "" || len(raw) > maxArvisClaimURLBytes || strings.ContainsAny(raw, "\r\n\t ") {
 		return out
 	}
 	candidate := raw
@@ -97,10 +101,19 @@ func parseArvisClaimSurface(raw string) arvisClaimSurfaceEvidence {
 	out.ExcessSubdomains = len(strings.Split(out.Host, ".")) >= 5
 
 	surface := strings.ToLower(parsed.Path + "?" + parsed.RawQuery + "#" + parsed.Fragment)
-	out.SecretTerms = matchedClaimTerms(surface, []string{"seed", "seedphrase", "mnemonic", "privatekey", "private_key", "secretkey", "secret_key", "recoveryphrase", "recovery_phrase"})
-	out.SigningTerms = matchedClaimTerms(surface, []string{"sign", "signature", "transaction", "approve", "authorize", "connectwallet", "connect_wallet", "walletconnect", "wallet_connect"})
-	out.RedirectTerms = matchedClaimTerms(surface, []string{"redirect", "redirect_uri", "returnurl", "return_url", "callback", "continue", "next"})
-	out.PromotionTerms = matchedClaimTerms(surface, []string{"claim", "airdrop", "reward", "bonus", "mint", "whitelist", "presale", "verify"})
+	out.SecretTerms = matchedClaimTerms(surface, claimSecretIndicators)
+	out.SigningTerms = matchedClaimTerms(surface, claimSigningIndicators)
+	out.RedirectTerms = matchedClaimTerms(surface, claimRedirectIndicators)
+	out.PromotionTerms = matchedClaimTerms(surface, claimPromotionIndicators)
+	secret, signing, redirect, promotion, redirects := analyzeArvisClaimURLQuery(parsed)
+	out.SecretTerms = appendUniqueStrings(out.SecretTerms, secret...)
+	out.SigningTerms = appendUniqueStrings(out.SigningTerms, signing...)
+	out.RedirectTerms = appendUniqueStrings(out.RedirectTerms, redirect...)
+	out.PromotionTerms = appendUniqueStrings(out.PromotionTerms, promotion...)
+	out.RedirectHosts = redirects.Hosts
+	out.CrossOriginRedirectCandidates = redirects.CrossOriginCandidateCount
+	out.NonHTTPSchemeRedirectCandidates = redirects.NonHTTPSchemeCandidateCount
+	out.ParsedRedirectCandidates = redirects.ParsedRedirectCount
 	for key, values := range parsed.Query() {
 		keyLower := strings.ToLower(strings.TrimSpace(key))
 		if len(matchedClaimTerms(keyLower, []string{"seed", "mnemonic", "private", "secret", "recovery"})) > 0 {
@@ -147,10 +160,16 @@ func buildClaimSurfaceArm(req SecurityRadarRequest, e arvisClaimSurfaceEvidence,
 	signals["punycode_host"] = e.PunycodeHost
 	signals["non_standard_port"] = e.NonStandardPort
 	signals["excess_subdomains"] = e.ExcessSubdomains
+	signals["redirect_host_candidates"] = e.RedirectHosts
+	signals["parsed_redirect_candidate_count"] = e.ParsedRedirectCandidates
+	signals["cross_origin_redirect_candidate_count"] = e.CrossOriginRedirectCandidates
+	signals["non_http_redirect_scheme_candidate_count"] = e.NonHTTPSchemeRedirectCandidates
+	signals["redirect_destination_verified"] = false
 	evidence := []string{
 		fmt.Sprintf("URL host=%s scheme=%s explicit_https=%t.", e.Host, e.Scheme, e.HTTPS),
 		fmt.Sprintf("IP-literal=%t; punycode=%t; non-standard port=%t; excessive subdomains=%t.", e.IPLiteralHost, e.PunycodeHost, e.NonStandardPort, e.ExcessSubdomains),
 		fmt.Sprintf("Redirect terms=%d; promotion/claim terms=%d.", len(e.RedirectTerms), len(e.PromotionTerms)),
+		fmt.Sprintf("Parsed redirect targets=%d; cross-origin candidates=%d; non-HTTP redirect schemes=%d (URL input only, not followed).", e.ParsedRedirectCandidates, e.CrossOriginRedirectCandidates, e.NonHTTPSchemeRedirectCandidates),
 		"These are structural observations, not a claim that the domain is confirmed malicious.",
 	}
 	arm := verifiedEvidenceArm("Claim Surface Risk", ModuleClaimSurfaceRisk, req, 0, signals, evidence, generatedAt)
@@ -160,22 +179,28 @@ func buildClaimSurfaceArm(req SecurityRadarRequest, e arvisClaimSurfaceEvidence,
 
 func claimEvidenceSignals(e arvisClaimSurfaceEvidence, moduleID string) map[string]any {
 	return map[string]any{
-		"module_id":                  moduleID,
-		"verified_evidence":          true,
-		"real_onchain_evidence":      false,
-		"real_offchain_evidence":     true,
-		"arm_evidence_available":     true,
-		"evidence_status":            "verified_parsed_url",
-		"data_quality":               "parsed_url_evidence",
-		"url_host":                   e.Host,
-		"url_scheme":                 e.Scheme,
-		"explicit_https":             e.HTTPS,
-		"scheme_missing":             e.SchemeMissing,
-		"url_userinfo_present":       e.HasUserInfo,
-		"remote_content_fetched":     false,
-		"wallet_connection_executed": false,
-		"numeric_score_disabled":     true,
-		"grade_effect":               "none_at_arm_layer",
+		"module_id":                   moduleID,
+		"verified_evidence":           true,
+		"real_onchain_evidence":       false,
+		"real_offchain_evidence":      true,
+		"arm_evidence_available":      true,
+		"evidence_status":             "verified_parsed_url",
+		"data_quality":                "parsed_url_evidence",
+		"url_host":                    e.Host,
+		"url_scheme":                  e.Scheme,
+		"explicit_https":              e.HTTPS,
+		"scheme_missing":              e.SchemeMissing,
+		"url_userinfo_present":        e.HasUserInfo,
+		"remote_content_fetched":      false,
+		"wallet_connection_executed":  false,
+		"origin_identity_verified":    false,
+		"signed_transaction_decoded":  false,
+		"contract_or_program_checked": false,
+		"redirect_target_fetched":     false,
+		"decoded_query_depth":         1,
+		"analysis_scope":              "user_supplied_url_structure_only",
+		"numeric_score_disabled":      true,
+		"grade_effect":                "none_at_arm_layer",
 	}
 }
 
