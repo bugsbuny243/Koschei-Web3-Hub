@@ -18,7 +18,7 @@
 <header class="safety-hero">
 <span class="safety-kicker">PRE-SEND RECIPIENT PROTECTION · ADDRESS POISONING</span>
 <h1>Verify the full recipient before you send.</h1>
-<p>Recipient Shield compares the candidate address with recent Solana contact evidence and any trusted addresses you provide. It looks for visible prefix/suffix collisions and lookalike patterns used in address-poisoning attacks. Engine policy and signing guidance stay separate: incomplete contact evidence never becomes a green clear-send state.</p>
+<p>Recipient Shield compares the candidate address with recent Solana contact evidence and any trusted addresses you provide. It looks for visible prefix/suffix collisions and lookalike patterns used in address-poisoning attacks. Engine policy and signing guidance stay separate: a bounded comparison never authenticates a recipient or becomes a green clear-send state.</p>
 <div class="safety-proofline"><span class="safety-chip">Account session required</span><span class="safety-chip">No seed phrase</span><span class="safety-chip">No private key</span><span class="safety-chip">No signature request</span><span class="safety-chip warn">Missing contact evidence ≠ safe</span></div>
 </header>
 <div id="recipientNotice" class="safety-warning recipient-notice" role="status" aria-live="polite" hidden></div>
@@ -44,7 +44,7 @@
 <section class="safety-panel" style="margin-top:14px">
 <span class="safety-kicker">HOW TO READ THE RESULT</span>
 <h2>Policy is evidence. Sending guidance is stricter.</h2>
-<div class="safety-rules"><div class="safety-rule"><b>DO NOT SEND</b><span>Strong lookalike evidence or a blocking engine policy. Verify through a trusted out-of-band channel.</span></div><div class="safety-rule"><b>VERIFY FULL ADDRESS</b><span>Warning state, or engine ALLOW without the complete low-risk RPC contact evidence required for a clear display.</span></div><div class="safety-rule"><b>PREFLIGHT CLEAR</b><span>Displayed only when engine policy is ALLOW, risk is explicitly LOW, a real risk index exists, and RPC contact evidence was collected.</span></div></div>
+<div class="safety-rules"><div class="safety-rule"><b>DO NOT SEND</b><span>Strong lookalike evidence or a blocking engine policy. Verify through a trusted out-of-band channel.</span></div><div class="safety-rule"><b>VERIFY FULL ADDRESS</b><span>Warning state, or engine ALLOW without the complete low-risk RPC contact evidence required for a clear display.</span></div><div class="safety-rule"><b>NO AUTOMATIC CLEAR</b><span>Recent contact comparisons can flag visible impersonation but cannot authenticate a payee or authorize a transfer.</span></div></div>
 </section>
 <p class="safety-fine">Recipient Shield is technical decision support. It does not accuse a wallet owner of fraud or wrongdoing, and it does not replace independent confirmation of a material transfer destination.</p>
 <footer class="safety-footer"><span>Koschei Recipient Shield · pre-send address verification</span><nav><a href="/">Home</a><a href="/safe-check">Safe Check</a><a href="/transaction-shield">Transaction Shield</a><a href="/cases">Evidence Center</a></nav></footer>
