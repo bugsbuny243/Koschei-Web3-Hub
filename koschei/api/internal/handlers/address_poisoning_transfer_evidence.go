@@ -18,12 +18,12 @@ const (
 // not a verified contact book. Only successful parsed wallet-origin transfers
 // can contribute recipient comparisons; account-key and mint appearances do not.
 type addressPoisoningOutboundEvidence struct {
-	Recipients          []string
-	TransferCount       int
-	UnresolvedTransfers int
+	Recipients           []string
+	TransferCount        int
+	UnresolvedTransfers  int
 	UnparsedInstructions int
-	FailedTransaction   bool
-	MissingStructure    bool
+	FailedTransaction    bool
+	MissingStructure     bool
 }
 
 type addressPoisoningTokenAccountOwner struct {
