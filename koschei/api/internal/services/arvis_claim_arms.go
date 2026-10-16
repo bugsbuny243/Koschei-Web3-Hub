@@ -9,28 +9,28 @@ import (
 )
 
 type arvisClaimSurfaceEvidence struct {
-	Available         bool
-	Original          string
-	Scheme            string
-	Host              string
-	Port              string
-	Path              string
-	HTTPS             bool
-	SchemeMissing     bool
-	HasUserInfo       bool
-	IPLiteralHost     bool
-	PunycodeHost      bool
-	NonStandardPort   bool
-	ExcessSubdomains  bool
-	SecretTerms       []string
-	SigningTerms      []string
-	RedirectTerms     []string
-	PromotionTerms    []string
-	LongEncodedValues int
-	RedirectHosts                     []string
-	CrossOriginRedirectCandidates     int
-	NonHTTPSchemeRedirectCandidates   int
-	ParsedRedirectCandidates          int
+	Available                       bool
+	Original                        string
+	Scheme                          string
+	Host                            string
+	Port                            string
+	Path                            string
+	HTTPS                           bool
+	SchemeMissing                   bool
+	HasUserInfo                     bool
+	IPLiteralHost                   bool
+	PunycodeHost                    bool
+	NonStandardPort                 bool
+	ExcessSubdomains                bool
+	SecretTerms                     []string
+	SigningTerms                    []string
+	RedirectTerms                   []string
+	PromotionTerms                  []string
+	LongEncodedValues               int
+	RedirectHosts                   []string
+	CrossOriginRedirectCandidates   int
+	NonHTTPSchemeRedirectCandidates int
+	ParsedRedirectCandidates        int
 }
 
 func EnrichArvisBundleWithClaimSurface(bundle SecurityRadarBundle) SecurityRadarBundle {
@@ -179,28 +179,28 @@ func buildClaimSurfaceArm(req SecurityRadarRequest, e arvisClaimSurfaceEvidence,
 
 func claimEvidenceSignals(e arvisClaimSurfaceEvidence, moduleID string) map[string]any {
 	return map[string]any{
-		"module_id":                  moduleID,
-		"verified_evidence":          true,
-		"real_onchain_evidence":      false,
-		"real_offchain_evidence":     true,
-		"arm_evidence_available":     true,
-		"evidence_status":            "verified_parsed_url",
-		"data_quality":               "parsed_url_evidence",
-		"url_host":                   e.Host,
-		"url_scheme":                 e.Scheme,
-		"explicit_https":             e.HTTPS,
-		"scheme_missing":             e.SchemeMissing,
-		"url_userinfo_present":       e.HasUserInfo,
-		"remote_content_fetched":     false,
-		"wallet_connection_executed": false,
-		"origin_identity_verified":   false,
-		"signed_transaction_decoded": false,
+		"module_id":                   moduleID,
+		"verified_evidence":           true,
+		"real_onchain_evidence":       false,
+		"real_offchain_evidence":      true,
+		"arm_evidence_available":      true,
+		"evidence_status":             "verified_parsed_url",
+		"data_quality":                "parsed_url_evidence",
+		"url_host":                    e.Host,
+		"url_scheme":                  e.Scheme,
+		"explicit_https":              e.HTTPS,
+		"scheme_missing":              e.SchemeMissing,
+		"url_userinfo_present":        e.HasUserInfo,
+		"remote_content_fetched":      false,
+		"wallet_connection_executed":  false,
+		"origin_identity_verified":    false,
+		"signed_transaction_decoded":  false,
 		"contract_or_program_checked": false,
-		"redirect_target_fetched":   false,
-		"decoded_query_depth":        1,
-		"analysis_scope":             "user_supplied_url_structure_only",
-		"numeric_score_disabled":     true,
-		"grade_effect":               "none_at_arm_layer",
+		"redirect_target_fetched":     false,
+		"decoded_query_depth":         1,
+		"analysis_scope":              "user_supplied_url_structure_only",
+		"numeric_score_disabled":      true,
+		"grade_effect":                "none_at_arm_layer",
 	}
 }
 
