@@ -12,7 +12,7 @@ func recipientEvidenceTransaction(keys []any, instructions []any, meta map[strin
 	return services.SolanaTransactionResult{
 		"transaction": map[string]any{
 			"message": map[string]any{
-				"accountKeys": keys,
+				"accountKeys":  keys,
 				"instructions": instructions,
 			},
 		},
@@ -23,7 +23,7 @@ func recipientEvidenceTransaction(keys []any, instructions []any, meta map[strin
 func recipientEvidenceInstruction(programID, kind string, info map[string]any) map[string]any {
 	return map[string]any{
 		"programId": programID,
-		"parsed": map[string]any{"type": kind, "info": info},
+		"parsed":    map[string]any{"type": kind, "info": info},
 	}
 }
 
@@ -67,8 +67,8 @@ func TestRecipientEvidenceTokenOwnerOnlyAndInnerInstructions(t *testing.T) {
 		map[string]any{"pubkey": mint},
 	}
 	tx := recipientEvidenceTransaction(keys, []any{}, map[string]any{
-		"err": nil,
-		"preTokenBalances": []any{
+		"err":               nil,
+		"preTokenBalances":  []any{
 			map[string]any{"accountIndex": float64(1), "owner": wallet, "mint": mint},
 			map[string]any{"accountIndex": float64(2), "owner": recipient, "mint": mint},
 		},
@@ -95,8 +95,8 @@ func TestRecipientEvidenceRejectsUnknownOrConflictingTokenOwner(t *testing.T) {
 	instruction := recipientEvidenceInstruction(addressPoisoningSPLTokenProgramID, "transfer",
 		map[string]any{"source": source, "destination": destination, "authority": wallet, "amount": "10"})
 	tx := recipientEvidenceTransaction([]any{wallet, source, destination}, []any{instruction}, map[string]any{
-		"err": nil,
-		"preTokenBalances": []any{
+		"err":               nil,
+		"preTokenBalances":  []any{
 			map[string]any{"accountIndex": float64(1), "owner": wallet, "mint": mint},
 			map[string]any{"accountIndex": float64(2), "owner": firstOwner, "mint": mint},
 		},
@@ -115,8 +115,8 @@ func TestRecipientEvidenceIgnoresFailedAndOpaqueTransactions(t *testing.T) {
 	transfer := recipientEvidenceInstruction(addressPoisoningSystemProgramID, "transfer",
 		map[string]any{"source": wallet, "destination": recipient, "lamports": float64(10)})
 	for _, test := range []struct {
-		name string
-		tx services.SolanaTransactionResult
+		name               string
+		tx                 services.SolanaTransactionResult
 		failed, incomplete bool
 	}{
 		{"onchain_failed", recipientEvidenceTransaction([]any{wallet, recipient}, []any{transfer}, map[string]any{"err": "InstructionError"}), true, false},
@@ -143,8 +143,8 @@ func TestRecipientEvidenceProvenanceIsNotWalletEnforcement(t *testing.T) {
 	recipient := testRecipientAddress("R")
 	candidate := "12345678" + strings.Repeat("C", 24) + "ABCDEFGH"
 	out := evaluateAddressPoisoning(wallet, candidate, []string{recipient}, map[string]any{
-		"collected": true,
-		"coverage_status": "bounded_recent_history",
+		"collected":           true,
+		"coverage_status":     "bounded_recent_history",
 		"outbound_recipients": []string{recipient},
 	})
 	if out["policy"] != "block" || out["enforcement_status"] != "not_connected" || out["observed_outbound_recipient_count"] != 1 {
