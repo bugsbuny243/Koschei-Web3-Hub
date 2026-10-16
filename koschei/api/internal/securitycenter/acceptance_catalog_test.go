@@ -68,3 +68,17 @@ func TestAcceptanceCatalogDoesNotMutateBetweenRequests(t *testing.T) {
 		t.Fatal("area catalog state leaked across requests")
 	}
 }
+
+func TestSecurityCenterAcceptanceUsesARVISOwnershipOnly(t *testing.T) {
+	snapshot := CurrentAcceptanceCatalog()
+	for _, area := range snapshot.Areas {
+		if area.Lead != "ARVIS" {
+			t.Fatalf("area %s has unexpected separate product %q", area.ID, area.Lead)
+		}
+	}
+	for _, check := range snapshot.Checks {
+		if check.Lead != "ARVIS" {
+			t.Fatalf("control %s has unexpected separate product %q", check.ID, check.Lead)
+		}
+	}
+}
