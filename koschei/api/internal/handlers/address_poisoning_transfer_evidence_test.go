@@ -67,8 +67,8 @@ func TestRecipientEvidenceTokenOwnerOnlyAndInnerInstructions(t *testing.T) {
 		map[string]any{"pubkey": mint},
 	}
 	tx := recipientEvidenceTransaction(keys, []any{}, map[string]any{
-		"err":               nil,
-		"preTokenBalances":  []any{
+		"err": nil,
+		"preTokenBalances": []any{
 			map[string]any{"accountIndex": float64(1), "owner": wallet, "mint": mint},
 			map[string]any{"accountIndex": float64(2), "owner": recipient, "mint": mint},
 		},
@@ -95,8 +95,8 @@ func TestRecipientEvidenceRejectsUnknownOrConflictingTokenOwner(t *testing.T) {
 	instruction := recipientEvidenceInstruction(addressPoisoningSPLTokenProgramID, "transfer",
 		map[string]any{"source": source, "destination": destination, "authority": wallet, "amount": "10"})
 	tx := recipientEvidenceTransaction([]any{wallet, source, destination}, []any{instruction}, map[string]any{
-		"err":               nil,
-		"preTokenBalances":  []any{
+		"err": nil,
+		"preTokenBalances": []any{
 			map[string]any{"accountIndex": float64(1), "owner": wallet, "mint": mint},
 			map[string]any{"accountIndex": float64(2), "owner": firstOwner, "mint": mint},
 		},
