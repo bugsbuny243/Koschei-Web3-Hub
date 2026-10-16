@@ -40,17 +40,17 @@ func extractSolanaOutboundRecipients(tx services.SolanaTransactionResult, wallet
 	result := addressPoisoningOutboundEvidence{Recipients: []string{}}
 	wallet = strings.TrimSpace(wallet)
 	transaction, ok := tx["transaction"].(map[string]any)
-	if !ok {
+	if !ok || transaction == nil {
 		result.MissingStructure = true
 		return result
 	}
 	message, ok := transaction["message"].(map[string]any)
-	if !ok {
+	if !ok || message == nil {
 		result.MissingStructure = true
 		return result
 	}
 	meta, ok := tx["meta"].(map[string]any)
-	if !ok {
+	if !ok || meta == nil {
 		result.MissingStructure = true
 		return result
 	}
