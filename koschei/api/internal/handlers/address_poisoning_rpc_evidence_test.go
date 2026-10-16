@@ -15,22 +15,22 @@ func TestAddressPoisoningHandlerUsesOnlyOutgoingRPCRecipients(t *testing.T) {
 	irrelevant := testRecipientAddress("I")
 	mint := testRecipientAddress("M")
 	for _, fixture := range []struct {
-		name string
+		name            string
 		actualRecipient string
-		wantPolicy string
-		wantFinding string
+		wantPolicy      string
+		wantFinding     string
 	}{
 		{
-			name: "irrelevant_key_looks_similar",
+			name:            "irrelevant_key_looks_similar",
 			actualRecipient: "87654321" + strings.Repeat("R", 24) + "HGFEDCBA",
-			wantPolicy: "warn",
-			wantFinding: "none_observed_in_bounded_scope",
+			wantPolicy:      "warn",
+			wantFinding:     "none_observed_in_bounded_scope",
 		},
 		{
-			name: "actual_outbound_recipient_looks_similar",
+			name:            "actual_outbound_recipient_looks_similar",
 			actualRecipient: testRecipientAddress("R"),
-			wantPolicy: "block",
-			wantFinding: "suspected_lookalike",
+			wantPolicy:      "block",
+			wantFinding:     "suspected_lookalike",
 		},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
@@ -48,19 +48,18 @@ func TestAddressPoisoningHandlerUsesOnlyOutgoingRPCRecipients(t *testing.T) {
 				case "getSignaturesForAddress":
 					result = []any{map[string]any{"signature": "fixture-recipient-sig", "slot": float64(123456)}}
 				case "getTransaction":
-					result = map[string]any{
-						"slot": float64(123456),
-						"meta": map[string]any{"err": nil},
-						"transaction": map[string]any{"message": map[string]any{
-							"accountKeys": []any{wallet, irrelevant, mint, fixture.actualRecipient},
-							"instructions": []any{
-								recipientEvidenceInstruction(addressPoisoningSystemProgramID, "transfer",
-									map[string]any{"source": irrelevant, "destination": wallet, "lamports": float64(1)}),
-								recipientEvidenceInstruction(addressPoisoningSystemProgramID, "transfer",
-									map[string]any{"source": wallet, "destination": fixture.actualRecipient, "lamports": float64(300)}),
-							},
-						}},
-					}
+					tx := recipientEvidenceTransaction(
+						[]any{wallet, irrelevant, mint, fixture.actualRecipient},
+						[]any{
+							recipientEvidenceInstruction(addressPoisoningSystemProgramID, "transfer",
+								map[string]any{"source": irrelevant, "destination": wallet, "lamports": float64(1)}),
+							recipientEvidenceInstruction(addressPoisoningSystemProgramID, "transfer",
+								map[string]any{"source": wallet, "destination": fixture.actualRecipient, "lamports": float64(300)}),
+						},
+						map[string]any{"err": nil},
+					)
+					tx["slot"] = float64(123456)
+					result = tx
 				default:
 					t.Errorf("unexpected RPC method: %s", rpc.Method)
 					http.Error(w, "unsupported fixture RPC method", http.StatusBadRequest)
@@ -73,10 +72,10 @@ func TestAddressPoisoningHandlerUsesOnlyOutgoingRPCRecipients(t *testing.T) {
 			t.Setenv("SOLANA_RPC_URL", server.URL)
 			t.Setenv("ALCHEMY_API_KEY", "")
 			payload, _ := json.Marshal(map[string]any{
-				"network": "solana-mainnet",
-				"wallet": wallet,
+				"network":   "solana-mainnet",
+				"wallet":    wallet,
 				"candidate": candidate,
-				"limit": 1,
+				"limit":     1,
 			})
 			req := httptest.NewRequest(http.MethodPost, "/api/v1/address-poisoning/check", bytes.NewReader(payload))
 			req.Header.Set("Content-Type", "application/json")
@@ -86,12 +85,12 @@ func TestAddressPoisoningHandlerUsesOnlyOutgoingRPCRecipients(t *testing.T) {
 				t.Fatalf("unexpected HTTP result: %d %s", rec.Code, rec.Body.String())
 			}
 			var body struct {
-				Policy string `json:"policy"`
-				FindingState string `json:"finding_state"`
-				EnforcementStatus string `json:"enforcement_status"`
-				ObservedOutboundCount int `json:"observed_outbound_recipient_count"`
-				Matches []addressPoisoningMatch `json:"matches"`
-				RPCEvidence map[string]any `json:"rpc_evidence"`
+				Policy                string                  `json:"policy"`
+				FindingState          string                  `json:"finding_state"`
+				EnforcementStatus     string                  `json:"enforcement_status"`
+				ObservedOutboundCount int                     `json:"observed_outbound_recipient_count"`
+				Matches               []addressPoisoningMatch `json:"matches"`
+				RPCEvidence           map[string]any          `json:"rpc_evidence"`
 			}
 			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 				t.Fatalf("decode response: %v", err)
