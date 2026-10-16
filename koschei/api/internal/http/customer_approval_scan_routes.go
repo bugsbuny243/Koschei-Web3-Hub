@@ -35,6 +35,7 @@ type customerApprovalScanResult struct {
 	Trust            services.Web3TrustVector              `json:"trust"`
 	Reasons          []string                              `json:"reasons"`
 	SpenderAuthority *services.EVMSpenderAuthoritySnapshot `json:"spender_authority,omitempty"`
+	Exposure         customerApprovalExposure              `json:"exposure"`
 }
 
 type customerApprovalScanEnvelope struct {
@@ -110,6 +111,7 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 		Unlimited:        allowance.Unlimited,
 		EvidenceStatus:   allowance.EvidenceStatus,
 		LiveAvailability: allowance.LiveAvailability,
+		Exposure:         buildCustomerApprovalExposure(allowance),
 		Trust:            trust,
 		Reasons:          append([]string(nil), reasons...),
 	}
@@ -143,6 +145,7 @@ func customerApprovalScan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result.SpenderAuthority = &authority
+	result.Exposure.SpenderAuthorityCoverage = "code_and_erc1967_probes_observed"
 	result.Reasons = services.NormalizeWeb3TrustReasons(append(result.Reasons, authority.Reasons...))
 	result.Trust.Reasons = append([]string(nil), result.Reasons...)
 	writeCustomerApprovalScanResult(w, http.StatusOK, result)
