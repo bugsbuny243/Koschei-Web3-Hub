@@ -88,7 +88,7 @@ var acceptanceAreas = []AcceptanceArea{
 	{ID: "29", Name: "Karar motoru ve açıklanabilir rapor"},
 	{ID: "30", Name: "Kullanıcı paneli, ekip ve entegrasyonlar"},
 	{ID: "31", Name: "Merkezin kendi güvenliği ve işletimi"},
-	{ID: "32", Name: "AI ajanları ve Koschei Lang güvenliği"},
+	{ID: "32", Name: "AI ajanları ve ARVIS otomasyon güvenliği"},
 	{ID: "33", Name: "Kalite, kıyaslama ve üretim kabulü"},
 	{ID: "34", Name: "Ek zincir ve uzmanlık adaptörleri"},
 }
@@ -278,16 +278,10 @@ var acceptanceRequirements = []requirementDef{
 }
 
 func acceptanceLead(area int) string {
-	switch area {
-	case 15, 16, 17, 23, 26, 27:
-		return "Sentinel"
-	case 20, 32:
-		return "Koschei Lang"
-	case 2, 3, 29, 30, 31, 33:
-		return "shared_core"
-	default:
-		return "ARVIS"
-	}
+	// All security areas belong to Koschei ARVIS; there are no independent
+	// product identities or ownership hand-offs in this acceptance catalog.
+	_ = area
+	return "ARVIS"
 }
 
 func acceptancePhase(area int) int {
@@ -301,7 +295,7 @@ func acceptancePhase(area int) int {
 	case 18, 19, 20, 21, 22, 23:
 		return 4 // audits, DeFi, bridge and DAO custody
 	default:
-		return 5 // intelligence, Lang and further adapters
+		return 5 // threat intelligence, ARVIS automation and further adapters
 	}
 }
 
@@ -335,7 +329,7 @@ func CurrentAcceptanceCatalog() AcceptanceCatalog {
 		}
 		if strings.HasPrefix(definition.id, "G") {
 			gates++
-			c.Lead = "shared_core"
+			c.Lead = "ARVIS"
 			c.Phase = 1
 		} else {
 			controls++

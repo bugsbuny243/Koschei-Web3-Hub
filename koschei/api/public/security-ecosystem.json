@@ -3,28 +3,16 @@
   "product": "Koschei ARVIS",
   "surface": "Security Evidence Ecosystem",
   "version": "security-ecosystem-v7-professional-dual-settlement",
-  "positioning": "Koschei ARVIS remains a production-independent deterministic Solana security product. Koschei Sentinel and the Koschei language mature separately in offline incubation until explicit future integration gates pass.",
+  "positioning": "Koschei Web3 Güvenlik Merkezi / ARVIS is one evidence-based security product. Separate product identities and unverified runtime integrations are not advertised.",
   "ecosystem": {
-    "contract": "/docs/koschei-ecosystem-contract-v1.md",
-    "runtime_integration_state": "incubation_only",
+    "contract": "/docs/security-center/DELIVERY-ROADMAP-WSC-170.md",
+    "runtime_integration_state": "arvis_only",
     "projects": [
       {
         "id": "koschei-web3-hub",
         "role": "deterministic Solana evidence, durable security memory and signed verdicts",
         "status": "production_independent",
         "repository": "https://github.com/bugsbuny243/Koschei-Web3-Hub"
-      },
-      {
-        "id": "koschei-lang",
-        "role": "independent capability-secure programming language research and development",
-        "status": "incubating_not_runtime_integrated",
-        "repository": "https://github.com/bugsbuny243/koschei-lang"
-      },
-      {
-        "id": "koschei-sentinel",
-        "role": "offline evidence-grounded Solana security model training and evaluation",
-        "status": "incubating_not_runtime_integrated",
-        "repository": "https://github.com/bugsbuny243/koschei-sentinel"
       }
     ],
     "official_asset": {
@@ -34,21 +22,8 @@
       "pump_callout": "https://pump.fun/callouts/7X9V77axASFAV8hKqqn2EfyAz4Qz3tceN8iikfukLqy1/713a17a0-494e-41b9-8411-2ee764c9b65c",
       "commercial_role": "alternate_professional_settlement_channel",
       "holdings_grant_access": false,
-      "disclaimer": "KOSC holdings never change evidence, verdicts, signatures, compiler rules, model promotion gates or integration readiness. Professional access activates only after verified server-side settlement."
+      "disclaimer": "KOSC holdings never change evidence, verdicts, signatures, ARVIS security policies or enforcement readiness. Professional access activates only after verified server-side settlement."
     }
-  },
-  "incubation_policy": {
-    "sentinel_runtime_integrated": false,
-    "language_runtime_integrated": false,
-    "sentinel_customer_requests_enabled": false,
-    "sentinel_verdict_authority": false,
-    "sentinel_production_writes_enabled": false,
-    "language_production_components_enabled": false,
-    "language_build_dependency_enabled": false,
-    "offline_sentinel_training_exports_allowed": true,
-    "offline_language_benchmarks_allowed": true,
-    "future_integration_requires_explicit_owner_approval": true,
-    "shared_identity_is_not_runtime_integration": true
   },
   "access_model": {
     "provider": "professional_saas_polar_or_kosc",
@@ -112,8 +87,7 @@
     "final_verdict_engine_count": 1,
     "total_arm_count": 14,
     "scoring": "deterministic evidence-backed risk rules",
-    "ai_role": "offline incubation and benchmark research only; no customer runtime role",
-    "language_role": "offline benchmark and interoperability research only; no production runtime role"
+    "ai_role": "ARVIS internal analysis and automation are evidence-bound; no autonomous transaction-signing authority is asserted."
   },
   "feed_policy": {
     "one_card_per_token": true,
@@ -217,13 +191,18 @@
   "immutable_rules": [
     "No evidence, no claim",
     "Basic security checks remain public and rate limited",
-    "Sentinel is not connected to customer runtime during incubation",
-    "Koschei language is not a Web3 production dependency during incubation",
     "A temporary event gap cannot lower a fresh structural token floor",
     "Customers cannot alter verdict thresholds",
     "Infrastructure mints remain internal and do not become public risk cards",
     "KOSC is an alternate settlement channel into the canonical Professional entitlement",
     "KOSC holdings alone never grant access",
-    "KOSC cannot change evidence, grades, signatures, compiler rules, model promotion or integration readiness"
-  ]
+    "KOSC cannot change evidence, grades, signatures, decision policies or enforcement readiness"
+  ],
+  "product_boundary": {
+    "canonical_product": "Koschei Web3 Güvenlik Merkezi / ARVIS",
+    "independent_products_advertised": false,
+    "external_runtime_dependencies": [],
+    "missing_evidence_remains_unknown": true,
+    "live_enforcement_requires_separate_proof": true
+  }
 }
