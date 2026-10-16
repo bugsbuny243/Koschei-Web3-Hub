@@ -21,7 +21,7 @@ requireText(html,'id="recipientRun"','recipient submit');
 requireText(html,'id="recipientNotice"','recipient notice');
 requireText(html,'id="recipientResult" aria-live="polite"','accessible result surface');
 requireText(html,'Missing contact evidence ≠ safe','missing-evidence boundary');
-requireText(html,'PREFLIGHT CLEAR','strict clear-state explanation');
+requireText(html,'NO AUTOMATIC CLEAR','bounded recipient-check explanation');
 requireText(html,'/js/koschei-auth.js?v=33','existing frozen auth client');
 requireText(html,'/js/address-poisoning-shield-v2.js?v=1','recipient controller');
 requireOrder(html,'/js/koschei-auth.js?v=33','/js/address-poisoning-shield-v2.js?v=1','auth client before page controller');
@@ -32,13 +32,13 @@ forbid(html,/<script(?![^>]*\bsrc=)[^>]*>/i,'inline script');
 requireText(js,"KoscheiAuth.apiCall('/api/v1/address-poisoning/check'",'existing authenticated API contract');
 requireText(js,"KoscheiAuth.requireAuth('/login.html')",'existing auth requirement');
 requireText(js,"KoscheiAuth.loginURL('/login.html')",'existing reauthentication continuation');
-requireText(js,"if(rawPolicy==='allow'&&risk!==null&&level==='low'&&rpc==='collected')",'strict allow display gate');
+requireText(js,"if(rawPolicy==='allow')return{key:'warn',label:'VERIFY FULL ADDRESS'}",'no false automatic allow gate');
 requireText(js,"risk===null?'—':risk",'missing risk display');
 requireText(js,"observed===null?'UNAVAILABLE'",'missing contact count display');
-requireText(js,"rpc==='collected'?'No lookalike match was returned in the evaluated contact scope.'",'empty match scoped wording');
-requireText(js,"policy.no_evidence_no_claim===true?'ENFORCED':'UNAVAILABLE'",'evidence policy enforcement display');
+requireText(js,"rpc==='collected'?'No lookalike match was returned in the evaluated bounded contact scope; recipient authenticity is not proven.'",'empty match scoped wording');
+requireText(js,"policy.no_evidence_no_claim===true?'DECLARED':'UNAVAILABLE'",'evidence policy metadata distinction');
 requireText(js,'Do not interpret an unavailable check as permission to send.','degraded fail-closed guidance');
-requireText(js,'Engine policy was ALLOW, but the UI did not display a clear-send state','raw policy versus signing guidance boundary');
+requireText(js,'This bounded comparison cannot authorize a transfer','raw policy versus signing guidance boundary');
 requireText(js,"value===null||value===undefined||String(value).trim()===''",'null numeric guard');
 
 forbid(js,/\bfetch\s*\(/,'raw fetch bypassing KoscheiAuth');
@@ -50,7 +50,9 @@ forbid(js,/\b(?:signTransaction|signAllTransactions|signAndSendTransaction|sendT
 forbid(js,/(?:risk_index|risk)\s*\|\|\s*0/,'missing-risk zero fallback');
 forbid(js,/(?:risk_index|risk)\s*\?\?\s*0/,'missing-risk zero fallback');
 
-requireText(css,'.safety-score.good','clear state styling');
+requireText(css,'.safety-score.good','legacy clear state styling');
+requireText(js,"metric('Enforcement'",'explicit enforcement status');
+requireText(js,"metric('Coverage'",'explicit bounded coverage status');
 requireText(css,'.safety-score.warn','warning state styling');
 requireText(css,'.safety-score.bad','blocking state styling');
 requireText(css,'.safety-error','degraded state styling');
