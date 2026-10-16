@@ -215,7 +215,6 @@ func Current() Snapshot {
 				Telemetry:        []string{"incident status", "severity", "linked evidence refs", "persisted-alert-backed alert refs", "linked dossier refs", "coverage episode ownership via alert identity", "append-only operator action timeline"},
 				Notes:            []string{"new incident alert links must resolve to persisted security_alert_events", "coverage episode ownership is derived from alert identity without changing episode or verdict authority", "operator response state never mutates ARVIS evidence, grades or signatures", "incident state is operational workflow metadata, not a security verdict"},
 			},
-
 		},
 		AssetBindings: preservedAssetBindings(),
 	}
