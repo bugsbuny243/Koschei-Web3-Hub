@@ -1,6 +1,9 @@
 package securitycenter
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestCurrentRegistryHasUniqueCapabilityAndAssetIDs(t *testing.T) {
 	snapshot := Current()
@@ -45,6 +48,18 @@ func TestCurrentRegistryCoversEveryRegisteredNetwork(t *testing.T) {
 	for _, network := range snapshot.Networks {
 		if !covered[network.ID] {
 			t.Fatalf("registered network %q is not represented in the security-center graph", network.ID)
+		}
+	}
+}
+
+func TestSecurityCenterRegistersOnlyActualKoscheiSecurityProduct(t *testing.T) {
+	snapshot := Current()
+	if strings.Contains(snapshot.DecisionAuthority, "Sentinel") || strings.Contains(snapshot.DecisionAuthority, "Koschei Lang") {
+		t.Fatal("decision authority must not advertise nonexistent product dependencies")
+	}
+	for _, capability := range snapshot.Capabilities {
+		if strings.HasPrefix(capability.ID, "sentinel-") || strings.HasPrefix(capability.ID, "lang-") {
+			t.Fatalf("nonexistent product surfaced as a capability: %q", capability.ID)
 		}
 	}
 }
