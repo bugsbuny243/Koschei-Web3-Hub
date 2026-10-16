@@ -38,7 +38,7 @@ requireText(js,"observed===null?'UNAVAILABLE'",'missing contact count display');
 requireText(js,"rpc==='collected'?'No lookalike match was returned in the evaluated bounded contact scope; recipient authenticity is not proven.'",'empty match scoped wording');
 requireText(js,"policy.no_evidence_no_claim===true?'DECLARED':'UNAVAILABLE'",'evidence policy metadata distinction');
 requireText(js,'Do not interpret an unavailable check as permission to send.','degraded fail-closed guidance');
-requireText(js,'Engine policy was ALLOW, but the UI did not display a clear-send state','raw policy versus signing guidance boundary');
+requireText(js,'This bounded comparison cannot authorize a transfer','raw policy versus signing guidance boundary');
 requireText(js,"value===null||value===undefined||String(value).trim()===''",'null numeric guard');
 
 forbid(js,/\bfetch\s*\(/,'raw fetch bypassing KoscheiAuth');
