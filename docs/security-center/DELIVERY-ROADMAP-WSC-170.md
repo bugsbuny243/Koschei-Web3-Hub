@@ -1,4 +1,6 @@
-# Koschei Web3 Güvenlik Merkezi — teslim programı
+# Koschei Web3 Güvenlik Merkezi / ARVIS — teslim programı
+
+**Ürün sınırı (güncel kullanıcı talimatı):** Güvenlik ürünü Koschei Web3 Güvenlik Merkezi / ARVIS'tir. Ayrı bir dil, ajan markası veya bağımsız güvenlik ürünü varsayılmaz. Aşağıdaki kontrol başlıkları yetenek alanlarıdır; yeni ürün anlamına gelmez.
 
 **Kaynak sözleşme:** [34 alan / 170 kontrol / 8 ortak kabul](WSC-34-AREAS-170-CONTROLS-2026-10-15.md). Bu, tamamlanan modüllerin listesi **değildir**. **Hiçbir kontrol yalnızca kodun varlığına, yeşil CI'ya veya bir modül adına dayanılarak VERİFİED ilan edilmez.** Her alanın kanıtı ayrı canlı rota + fixture + gözlem kaynağı + sürüm + inceleme kaydı gerektirir.
 
@@ -16,7 +18,7 @@
 | MEV ve piyasa davranışı | WSC-13–14 | İşlem sırası ve ekonomik etkiyle kanıt; verisiz 'MEV engellendi' sözü yok |
 | Token-2022 özel kontroller | WSC-06, WSC-19 | Etkin uzantı, delegate ve transfer-hook simülasyonu; unresolved → WITHHOLD |
 | Sürekli SOC, tehdit analizi ve uyarı | WSC-26–28 | Kayıpsız izleme, teslim makbuzu, worker heartbeat, vaka kapanışı |
-| Koschei Lang ve çoklu ağ | WSC-32, WSC-34 | Yalıtılmış ajan, prompt-injection reddi, ağ bazlı destek sınırları |
+| ARVIS ajan ve çoklu ağ güvenliği | WSC-32, WSC-34 | Yalıtılmış ajan, prompt-injection reddi, ağ bazlı destek sınırları |
 
 ## Beş ayrı yürütme aşaması (170 kontrolün tümü tek kez sahiplenilir)
 
@@ -24,7 +26,7 @@
 2. **Cüzdan/drainer/önleme/SOC (35 kontrol):** WSC-15–17, 24–27. İmza öncesi analiz, zararlı izin, claim, alarm, olay müdahalesi.
 3. **Token/Solana/rug/MEV (55 kontrol):** WSC-04–14. Yetki, holder, lansman, LP, exit simulation, piyasa ve MEV.
 4. **Kod/DeFi/köprü/DAO (30 kontrol):** WSC-18–23. Statik+dynamik test, oracle ve köprü güvenlik denetimi.
-5. **İstihbarat/Lang/ek zincir (15 kontrol):** WSC-28, 32, 34. Vaka kanıtı, araç sınırları ve ağ uzmanlıkları.
+5. **ARVIS istihbarat/otomasyon/ek zincir (15 kontrol):** WSC-28, 32, 34. Vaka kanıtı, ARVIS araç sınırları ve ağ uzmanlıkları.
 
 Her aşama **G01–G08** kriterlerine uyar. İlgili zincir adaptörü yoksa `unsupported`, izin yoksa `not_run`, eksik veri varsa `partial/unavailable`; hiçbir durum `none_observed` veya `allow` ile karıştırılmaz.
 
