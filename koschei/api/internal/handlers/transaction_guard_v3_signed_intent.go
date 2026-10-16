@@ -354,7 +354,7 @@ func decodeTransactionGuardV3IntentSignature(value string) ([]byte, error) {
 
 func normalizeTransactionGuardV3Origin(value string) string {
 	value = strings.TrimSpace(value)
-	if value == "" || strings.ContainsAny(value, " \\t\\r\\n\\\\") {
+	if value == "" || strings.ContainsAny(value, " \t\r\n\\") {
 		return ""
 	}
 	parsed, err := url.Parse(value)
