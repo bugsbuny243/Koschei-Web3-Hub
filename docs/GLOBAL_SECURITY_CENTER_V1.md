@@ -1,5 +1,7 @@
 # Koschei Global Crypto Security Center v1
 
+> **Current product boundary (2026-10-16):** Koschei Web3 Güvenlik Merkezi / ARVIS. Historical integration ideas must not be interpreted as additional existing products.
+
 Date: 2026-09-25
 
 Status: additive control-plane foundation
@@ -19,8 +21,7 @@ The target is a federated crypto-security center that joins:
 - actor-defense memory and repeat-actor correlation;
 - alerting, watchlists and webhooks;
 - durable Postgres/ClickHouse evidence memory;
-- Koschei Sentinel through observe-first Fabric contracts;
-- Koschei Lang through versioned policy/proof adapters without importing Lang internals.
+- ARVIS-observed security telemetry and evidence-linked policies, without any separate product requirement.
 
 ## New capability registry
 
@@ -48,8 +49,7 @@ The registry currently describes these layers independently:
 9. Conditional Defense OS laboratory capabilities.
 10. Durable evidence memory.
 11. Watchlist, alert and webhook response plane.
-12. Sentinel observe-first model integration.
-13. Koschei Lang policy/proof integration boundary.
+12. ARVIS evidence-only observation and policy/proof compatibility boundaries.
 
 ## Frontend/runtime wiring added in this slice
 
@@ -96,8 +96,8 @@ The control plane must preserve these rules:
 - repository capability is not deployment health;
 - historical persisted evidence is not current chain state;
 - a native probe is not ARVIS verdict authority;
-- Sentinel observation cannot silently mutate a Web3 verdict;
-- Lang remains owner of its compiler/runtime/policy/proof internals;
+- ARVIS observations cannot silently mutate a verdict without supported evidence and the canonical decision contract;
+- analysis automation is an internal capability, not an independent product;
 - cross-chain similarity is not proof of identity or common control;
 - no private keys, seed phrases or provider secrets are requested or stored.
 
@@ -112,8 +112,8 @@ The next implementation work should extend the same registry rather than creatin
 5. Bounded queue/backpressure metrics for every streaming collector.
 6. Evidence retention tiers and cryptographic archive manifests.
 7. Cross-network entity graph projections backed only by explicit relation evidence.
-8. Sentinel model-evaluation telemetry in observe/shadow mode before any promotion gate.
-9. Lang policy/proof adapter conformance tests at the Fabric boundary.
+8. ARVIS observation/evaluation telemetry in observe/shadow mode before any promotion gate.
+9. ARVIS policy/proof compatibility tests at the Fabric boundary.
 10. Operator incident workflow linking evidence, alerts, dossiers and response actions without giving AI explanation authority over deterministic verdicts.
 
 
