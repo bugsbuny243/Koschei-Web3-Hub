@@ -157,7 +157,8 @@ func TestRecipientEvidenceProvenanceIsNotWalletEnforcement(t *testing.T) {
 	userOnly := evaluateAddressPoisoning(wallet, candidate, []string{recipient}, map[string]any{"collected": false})
 	found := userOnly["matches"].([]addressPoisoningMatch)
 	if len(found) != 1 || found[0].EvidenceSource != "user_supplied_or_unattributed_unverified" ||
-		userOnly["finding_state"] != "incomplete_evidence" {
+		userOnly["finding_state"] != "suspected_lookalike" ||
+		userOnly["coverage_status"] != "unavailable" {
 		t.Fatalf("user-supplied address must remain unverified: %#v", userOnly)
 	}
 }
