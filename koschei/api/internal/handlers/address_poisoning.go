@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"os"
 	"sort"
@@ -28,6 +27,7 @@ type addressPoisoningMatch struct {
 	Prefix       int    `json:"prefix"`
 	Suffix       int    `json:"suffix"`
 	RiskBonus    int    `json:"risk_bonus"`
+	EvidenceSource string `json:"evidence_source"`
 }
 
 func (h *Handler) AddressPoisoningCheck(w http.ResponseWriter, r *http.Request) {
@@ -102,6 +102,10 @@ func (h *Handler) collectAddressPoisoningContacts(ctx context.Context, wallet, n
 	}
 	decoded := 0
 	failed := 0
+	onchainFailed := 0
+	outboundTransfers := 0
+	unresolvedTransfers := 0
+	unparsedInstructions := 0
 	for i := 0; i < maxTx; i++ {
 		if strings.TrimSpace(signatures[i].Signature) == "" {
 			failed++
@@ -112,16 +116,36 @@ func (h *Handler) collectAddressPoisoningContacts(ctx context.Context, wallet, n
 			failed++
 			continue
 		}
+		extracted := extractSolanaOutboundRecipients(tx, wallet)
+		if extracted.FailedTransaction {
+			onchainFailed++
+			continue
+		}
+		if extracted.MissingStructure {
+			failed++
+			continue
+		}
 		decoded++
-		contacts = appendUniqueAddresses(contacts, extractSolanaTransactionAddresses(tx)...)
+		outboundTransfers += extracted.TransferCount
+		unresolvedTransfers += extracted.UnresolvedTransfers
+		unparsedInstructions += extracted.UnparsedInstructions
+		contacts = appendUniqueAddresses(contacts, extracted.Recipients...)
 	}
 	evidence["transaction_decoded"] = decoded
 	evidence["transaction_failed"] = failed
-	if failed > 0 {
+	evidence["onchain_failed_transaction_count"] = onchainFailed
+	evidence["outbound_transfer_count"] = outboundTransfers
+	evidence["unresolved_transfer_count"] = unresolvedTransfers
+	evidence["unparsed_instruction_count"] = unparsedInstructions
+	if failed > 0 || onchainFailed > 0 {
 		evidence["coverage_status"] = "partial_decode_failure"
+	} else if unresolvedTransfers > 0 || unparsedInstructions > 0 {
+		evidence["coverage_status"] = "partial_transfer_resolution"
 	}
 	contacts = removeAddress(contacts, wallet)
 	evidence["contact_count"] = len(contacts)
+	evidence["outbound_recipients"] = append([]string(nil), contacts...)
+	evidence["contact_basis"] = "successful_parsed_wallet_outbound_transfers_only"
 	return contacts, evidence
 }
 
@@ -130,6 +154,12 @@ func evaluateAddressPoisoning(wallet, candidate string, contacts []string, rpcEv
 	candidate = strings.TrimSpace(candidate)
 	contacts = removeAddress(normalizeAddressList(contacts), wallet)
 	contacts = removeAddress(contacts, candidate)
+	chainRecipients := map[string]bool{}
+	if chainObserved, ok := rpcEvidence["outbound_recipients"].([]string); ok {
+		for _, address := range chainObserved {
+			chainRecipients[address] = true
+		}
+	}
 	matches := make([]addressPoisoningMatch, 0)
 	for _, known := range contacts {
 		if known == "" || known == candidate {
@@ -150,7 +180,11 @@ func evaluateAddressPoisoning(wallet, candidate string, contacts []string, rpcEv
 			bonus, signal = 52, "possible address poisoning lookalike"
 		}
 		if bonus > 0 {
-			matches = append(matches, addressPoisoningMatch{KnownAddress: known, Signal: signal, Prefix: prefix, Suffix: suffix, RiskBonus: bonus})
+			source := "user_supplied_or_unattributed_unverified"
+			if chainRecipients[known] {
+				source = "rpc_observed_wallet_outbound_transfer"
+			}
+			matches = append(matches, addressPoisoningMatch{KnownAddress: known, Signal: signal, Prefix: prefix, Suffix: suffix, RiskBonus: bonus, EvidenceSource: source})
 		}
 	}
 	sort.SliceStable(matches, func(i, j int) bool { return matches[i].RiskBonus > matches[j].RiskBonus })
@@ -179,6 +213,8 @@ func evaluateAddressPoisoning(wallet, candidate string, contacts []string, rpcEv
 		findingState = "suspected_lookalike"
 	} else if len(contacts) == 0 {
 		findingState = "unavailable"
+	} else if coverageStatus != "bounded_recent_history" {
+		findingState = "incomplete_evidence"
 	}
 	return map[string]any{
 		"ok":                     true,
@@ -192,43 +228,16 @@ func evaluateAddressPoisoning(wallet, candidate string, contacts []string, rpcEv
 		"verdict":                verdict,
 		"matches":                matches,
 		"observed_contact_count": len(contacts),
+		"observed_outbound_recipient_count": len(chainRecipients),
 		"rpc_evidence":           rpcEvidence,
 		"coverage_status":        coverageStatus,
 		"finding_state":          findingState,
 		"enforcement_status":     "not_connected",
-		"analysis_scope":         "visible_prefix_suffix_comparison_against_user_supplied_and_bounded_recent_solana_contacts",
+		"analysis_scope":         "visible_prefix_suffix_comparison_against_unverified_user_contacts_and_bounded_successful_wallet_outbound_sol_and_token_transfer_recipients",
 		"limitation":             "UNKNOWN_OR_HISTORICAL_RECIPIENTS_NOT_RULED_OUT",
 		"evidence_policy":        map[string]any{"no_evidence_no_claim": true, "safe_terms": []string{"lookalike risk", "possible address poisoning", "recipient verification required"}, "blocked_terms_without_proof": []string{"the wallet is hacked", "confirmed thief", "fraud"}},
 		"disclaimer":             "Read-only recipient-risk analysis. This is not an accusation or financial advice.",
 	}
-}
-
-func extractSolanaTransactionAddresses(tx services.SolanaTransactionResult) []string {
-	out := []string{}
-	transaction, _ := tx["transaction"].(map[string]any)
-	message, _ := transaction["message"].(map[string]any)
-	if keys, ok := message["accountKeys"].([]any); ok {
-		for _, item := range keys {
-			switch value := item.(type) {
-			case string:
-				out = append(out, value)
-			case map[string]any:
-				out = append(out, strings.TrimSpace(fmt.Sprint(value["pubkey"])))
-			}
-		}
-	}
-	meta, _ := tx["meta"].(map[string]any)
-	for _, key := range []string{"preTokenBalances", "postTokenBalances"} {
-		if balances, ok := meta[key].([]any); ok {
-			for _, item := range balances {
-				if balance, ok := item.(map[string]any); ok {
-					out = append(out, strings.TrimSpace(fmt.Sprint(balance["owner"])))
-					out = append(out, strings.TrimSpace(fmt.Sprint(balance["mint"])))
-				}
-			}
-		}
-	}
-	return normalizeAddressList(out)
 }
 
 func normalizeAddressList(values []string) []string {
