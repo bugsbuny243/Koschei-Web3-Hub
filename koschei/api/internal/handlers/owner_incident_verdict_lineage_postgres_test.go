@@ -43,11 +43,11 @@ func TestOwnerIncidentVerdictLineagePostgres17(t *testing.T) {
 	digestBytes := sha256.Sum256([]byte("synthetic:"+suffix))
 	digest := hex.EncodeToString(digestBytes[:])
 	payload, err := json.Marshal(map[string]string{
-		"signature": signature,
+		"signature":    signature,
 		"evidence_ref": signature,
-		"target": target,
-		"grade": "F",
-		"risk_level": "high",
+		"target":       target,
+		"grade":        "F",
+		"risk_level":  "high",
 		"rule_version": "test-lineage-v1",
 	})
 	if err != nil {
