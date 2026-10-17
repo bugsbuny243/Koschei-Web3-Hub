@@ -79,7 +79,7 @@ func (a *Adapter) Collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 	}})
 	if err != nil || len(witnesses) != 1 {
 		return nil, append(limits, r.Limitation{
-			Code: "raw_account_response_unbound",
+			Code:   "raw_account_response_unbound",
 			Reason: "Original account response bytes did not pass source integrity binding; no program safety conclusion is available.",
 		}), errors.New("solana account source response integrity unavailable")
 	}
