@@ -1,0 +1,23 @@
+name: Owner Source Evidence Health
+on:
+  pull_request:
+    paths:
+      - "koschei/api/public/js/owner-source-evidence-health.js"
+      - "koschei/api/public/owner-production.html"
+      - "koschei/api/scripts/verify-owner-source-evidence-health.js"
+      - ".github/workflows/owner-source-evidence-health.yml"
+  workflow_dispatch:
+jobs:
+  observed-source-health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify source health addon and test syntax
+        run: |
+          node --check koschei/api/public/js/owner-source-evidence-health.js
+          node --check koschei/api/scripts/verify-owner-source-evidence-health.js
+      - name: Regress 11-arm and partial-RPC scope separation
+        run: node koschei/api/scripts/verify-owner-source-evidence-health.js
