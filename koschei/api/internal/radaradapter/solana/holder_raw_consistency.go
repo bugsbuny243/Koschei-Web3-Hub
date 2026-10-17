@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	holderSPLTokenProgramID   = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+	holderSPLTokenProgramID  = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 	holderToken2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
 )
 
@@ -32,11 +32,11 @@ type HolderRawSourceSet struct {
 // HolderRawAccount separates SPL token-account pubkeys, token-program owners,
 // and the controlling wallet/pubkey encoded inside the token account.
 type HolderRawAccount struct {
-	TokenAccount       string `json:"token_account"`
-	OwnerWallet        string `json:"owner_wallet"`
-	TokenProgram       string `json:"token_program"`
-	LargestAmountRaw   string `json:"largest_amount_raw"`
-	ResolvedAmountRaw  string `json:"resolved_amount_raw"`
+	TokenAccount      string `json:"token_account"`
+	OwnerWallet       string `json:"owner_wallet"`
+	TokenProgram      string `json:"token_program"`
+	LargestAmountRaw  string `json:"largest_amount_raw"`
+	ResolvedAmountRaw string `json:"resolved_amount_raw"`
 }
 
 // HolderRawConsistency is a read-only source-consistency projection, never a
