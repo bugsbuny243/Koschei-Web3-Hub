@@ -38,8 +38,8 @@ function run(payload){
   ctx.window.OwnerRadarKit.renderUnified(root,payload);
   return{identity,ctx,root,renderCount:()=>originalRender,scanCount:()=>originalScan};
 }
-const mint='AxJkHRY3puoofyj7Pn512M1SGBgWroXMkEdNPQypkzbu';
-const freeze='2apBGMsS6ti9RyF5TwQTDswXBWskiJP2LD4cUEDqYJjk';
+const mint='11111111111111111111111111111111';
+const freeze='So11111111111111111111111111111111111111112';
 const payload={investigation_report:{legacy_14_arm_radar:{source_context:{
   mint_authority:mint,freeze_authority:freeze,
   limitations:['Creator attribution is discovery-only; reverify via canonical RPC.'],
