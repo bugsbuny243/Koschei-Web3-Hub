@@ -17,10 +17,23 @@
       obj(envelope.legacy_14_arm_radar).source_context,
       envelope.source_context,
     ];
+    const target=rawAddress(report.target||envelope.target);
     for(const item of candidates){
       const source=obj(item);
       if(Object.prototype.hasOwnProperty.call(source,'mint_authority')||
          Object.prototype.hasOwnProperty.call(source,'freeze_authority'))return source;
+      // Production creator resolution retains mint/freeze authority fields
+      // *inside* creator_resolution, not on source_context itself.
+      const resolution=obj(source.creator_resolution);
+      if(!target||rawAddress(resolution.address)!==target)continue;
+      if(Object.prototype.hasOwnProperty.call(resolution,'mint_authority')||
+         Object.prototype.hasOwnProperty.call(resolution,'freeze_authority')){
+        return {
+          mint_authority:resolution.mint_authority,
+          freeze_authority:resolution.freeze_authority,
+          limitations:Array.isArray(resolution.limitations)?resolution.limitations:source.limitations,
+        };
+      }
     }
     return null;
   }
