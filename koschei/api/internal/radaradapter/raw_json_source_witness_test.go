@@ -78,10 +78,14 @@ func TestRawJSONSourceWitnessRejectsMissingAndTamperedSources(t *testing.T) {
 		name string
 		edit func(*SubjectIdentity, *RawJSONObservation)
 	}{
-		{"response tamper", func(_ *SubjectIdentity, o *RawJSONObservation) { o.ResponseJSON = []byte(`{"result":{"context":{"slot":124}}}`) }},
+		{"response tamper", func(_ *SubjectIdentity, o *RawJSONObservation) {
+			o.ResponseJSON = []byte(`{"result":{"context":{"slot":124}}}`)
+		}},
 		{"no source", func(_ *SubjectIdentity, o *RawJSONObservation) { o.ResponseJSON = nil }},
 		{"invalid JSON", func(_ *SubjectIdentity, o *RawJSONObservation) { o.ResponseJSON = []byte("{") }},
-		{"too large", func(_ *SubjectIdentity, o *RawJSONObservation) { o.ResponseJSON = []byte(strings.Repeat(" ", RawJSONSourceWitnessMaxBytes + 1)) }},
+		{"too large", func(_ *SubjectIdentity, o *RawJSONObservation) {
+			o.ResponseJSON = []byte(strings.Repeat(" ", RawJSONSourceWitnessMaxBytes+1))
+		}},
 		{"raw hash incomplete", func(_ *SubjectIdentity, o *RawJSONObservation) { o.Row.RawHash = "not-sha256" }},
 		{"raw hash uppercase", func(_ *SubjectIdentity, o *RawJSONObservation) { o.Row.RawHash = strings.ToUpper(o.Row.RawHash) }},
 		{"cross network", func(_ *SubjectIdentity, o *RawJSONObservation) { o.Row.Network = "ethereum-mainnet" }},
