@@ -108,6 +108,13 @@ async function testBrowserFlow(){
   assert.equal(navClicks,1,'existing incident table must be refreshed via canonical navigation');
   assert.equal(getCount,2,'new queue must be refreshed');
   assert.equal(original.textContent,'original-security-renderer','existing security UI must remain intact');
+  app.classList.add('hidden');
+  onChange();
+  assert.equal(mount.children.length,0,'owner logout must clear cached candidate data');
+  app.classList.remove('hidden');
+  onChange();
+  await new Promise(r=>setImmediate(r));
+  assert.equal(getCount,3,'returning to authenticated Security tab must fetch fresh candidates');
   page.classList.remove('active');
   onChange();
   assert.equal(mount.children.length,0,'leaving security should release stale review content');
