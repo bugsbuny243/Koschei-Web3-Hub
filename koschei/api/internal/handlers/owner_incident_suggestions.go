@@ -65,9 +65,9 @@ func ownerIncidentReviewCandidateFromAlert(alert ownerIncidentAlertSource) owner
 			Title: string(runes), Severity: severity, Target: target,
 			// security_alert_events has no canonical network column.
 			// Do not infer a chain from the alert's target or payload.
-			Network: "",
-			Summary: "Manual triage proposal from a persisted security alert. Verify the underlying source and scope before opening or linking an incident. This is not proof of compromise.",
-			AlertRefs: []string{alert.ID},
+			Network:      "",
+			Summary:      "Manual triage proposal from a persisted security alert. Verify the underlying source and scope before opening or linking an incident. This is not proof of compromise.",
+			AlertRefs:    []string{alert.ID},
 			EvidenceRefs: []string{},
 			DossierRefs:  []string{},
 		},
@@ -151,11 +151,11 @@ func (h *Handler) ownerIncidentSuggestions(w http.ResponseWriter, r *http.Reques
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok": true,
-		"schema_version": ownerIncidentSuggestionSchema,
+		"ok":                true,
+		"schema_version":    ownerIncidentSuggestionSchema,
 		"decision_boundary": ownerIncidentSuggestionBoundary,
-		"source": "persisted_security_alert_events",
-		"window": "alerts_created_in_last_7_days",
+		"source":            "persisted_security_alert_events",
+		"window":            "alerts_created_in_last_7_days",
 		"limitations": []string{
 			"Severity is inherited from alert metadata and is not independent evidence verification.",
 			"Older deduplicated alerts are outside the seven-day created_at window even if last_seen_at is recent.",
