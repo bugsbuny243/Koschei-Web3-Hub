@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -35,6 +37,9 @@ func TestOwnerIncidentReviewCandidateIsNotAnIncident(t *testing.T) {
 	}
 	if len([]rune(got.SuggestedIncident.Title)) > 180 {
 		t.Fatalf("suggestion title exceeds existing incident limit: %#v", got.SuggestedIncident.Title)
+	}
+	if got.ChainEvidenceVerified || got.PayloadHashScope != "sha256_of_postgresql_jsonb_text_read_snapshot_not_source_signature" {
+		t.Fatalf("alert hash was promoted to chain proof: %#v", got)
 	}
 	if len(got.SuggestedIncident.EvidenceRefs) != 0 || len(got.SuggestedIncident.DossierRefs) != 0 {
 		t.Fatalf("suggestion invented unrelated evidence: %#v", got.SuggestedIncident)
@@ -123,6 +128,30 @@ func TestOwnerIncidentSuggestionsReviewAndExplicitCreationPostgres17(t *testing.
 	before := fetch()
 	if len(before) != 1 || before[0].AlertID != highID {
 		t.Fatalf("high/medium separation or source resolution failed: %#v", before)
+	}
+	initialHash := sha256.Sum256([]byte("{}"))
+	if before[0].StoredPayloadSHA256 != hex.EncodeToString(initialHash[:]) || before[0].ChainEvidenceVerified || before[0].CreatedAt.IsZero() {
+		t.Fatalf("DB provenance proof cannot be reconstructed: %#v", before[0])
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE security_alert_events SET payload=$2::jsonb WHERE id=$1::uuid`,
+		highID, `{"internal_trace":"fixture-private-marker"}`); err != nil {
+		t.Fatal(err)
+	}
+	var storedPayload string
+	if err := db.QueryRowContext(ctx, "SELECT payload::text FROM security_alert_events WHERE id=$1::uuid", highID).Scan(&storedPayload); err != nil {
+		t.Fatal(err)
+	}
+	storedHash := sha256.Sum256([]byte(storedPayload))
+	changed := fetch()
+	if len(changed) != 1 || changed[0].StoredPayloadSHA256 != hex.EncodeToString(storedHash[:]) || changed[0].ChainEvidenceVerified {
+		t.Fatalf("persisted JSONB digest not tracked correctly: %#v", changed)
+	}
+	out, err := json.Marshal(changed[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), "fixture-private-marker") || strings.Contains(string(out), "internal_trace") {
+		t.Fatalf("raw alert payload escaped the provenance projection: %s", out)
 	}
 	var caseCount int
 	if err := db.QueryRowContext(ctx, "SELECT count(*) FROM security_incident_cases WHERE target=$1", target).Scan(&caseCount); err != nil || caseCount != 0 {
