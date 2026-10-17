@@ -59,17 +59,29 @@ func (a *Adapter) Collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 	if err != nil {
 		return nil, limits, err
 	}
+	// The first getSlot value is a minimum, not the identity of the later
+	// getAccountInfo result. Read the later context directly from raw bytes.
+	accountSlot, err := accountResponseContextSlot(res.Raw, slot)
+	if err != nil {
+		return nil, append(limits, r.Limitation{
+			Code:   "solana_account_context_slot_unbound",
+			Reason: "The raw account response has no unique valid context.slot at or above the finalized lower bound.",
+		}), errors.New("solana account context slot unavailable")
+	}
 	linked, err := DecodeUpgradeableProgramAccount(account)
 	if err != nil {
 		return nil, append(limits, r.Limitation{
 			Code: "not_upgradeable_program", Reason: "Account is not an executable upgradeable BPF program.",
 		}), err
 	}
-	row := r.NewRow(a.subject, "solana-program-link", res, strconv.FormatUint(slot, 10), map[string]any{
-		"programdata_pubkey_hex": hex.EncodeToString(linked[:]),
-		"program_owner":          account.Owner,
-		"program_executable":     account.Executable,
-		"lamports":               account.Lamports,
+	row := r.NewRow(a.subject, "solana-program-link", res, strconv.FormatUint(accountSlot, 10), map[string]any{
+		"programdata_pubkey_hex":     hex.EncodeToString(linked[:]),
+		"program_owner":              account.Owner,
+		"program_executable":         account.Executable,
+		"lamports":                   account.Lamports,
+		"account_context_slot":       strconv.FormatUint(accountSlot, 10),
+		"requested_min_context_slot": strconv.FormatUint(slot, 10),
+		"account_context_scope":      "raw_rpc_context_slot_not_consensus_or_atomic_snapshot",
 	})
 	// Bind the exact account-response bytes without inferring that getSlot and
 	// getAccountInfo were atomic or that program authority was proven.
