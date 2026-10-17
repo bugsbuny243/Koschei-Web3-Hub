@@ -128,3 +128,35 @@ test('same-card backend AVOID/BLOCK overrides stale or empty lastScan in owner a
  observe([{addedNodes:[lens]}]);
  assert.equal(title.textContent,'Why AVOID?');
 });
+
+test('previous scan decision cannot cross target identity into a different premium card',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'owner-investor-protection.js'),'utf8');
+ const title={textContent:'Why REVIEW?'};
+ const action={textContent:'REVIEW RESULT',dataset:{policy:'review'}};
+ const card={querySelector:selector=>({
+  '.arvis-target':{textContent:'NewMint111111111111111111111111111111111'},
+  '.koschei-decision-lens':lens
+ })[selector]||null};
+ const lens={
+  nodeType:1,dataset:{},
+  matches:selector=>selector==='.koschei-decision-lens',
+  closest:selector=>selector==='[data-arvis-premium-card]'?card:null,
+  querySelector:selector=>({
+   '.koschei-decision-lens__copy h3':title,
+   '.koschei-decision-lens__action':action
+  })[selector]||null
+ };
+ let observer;
+ class MutationObserver{constructor(cb){observer=cb;}observe(){}}
+ const window={
+  OwnerRadarKit:{lastScan:{investigation_report:{
+   target:'OldMint111111111111111111111111111111111',
+   investor_protection_decision:{decision:'AVOID',execution_action:'BLOCK',summary:'Old scan risk'}
+  }}},addEventListener(){}
+ };
+ const document={documentElement:{},readyState:'loading',addEventListener(){}};
+ vm.runInNewContext(source,{window,document,MutationObserver});
+ observer([{addedNodes:[lens]}]);
+ assert.equal(title.textContent,'Why REVIEW?','wrong target must not inherit previous backend AVOID');
+ assert.equal(action.dataset.policy,'review');
+});
