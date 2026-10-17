@@ -36,8 +36,9 @@ func fixtureHolderSources(t *testing.T, slots [3]uint64) HolderRawSourceSet {
 		}))
 	}
 	return HolderRawSourceSet{
-		Mint: holderFixtureMint,
-		CapturedAt: time.Date(2026, time.October, 17, 12, 0, 0, 0, time.UTC),
+		Mint:                   holderFixtureMint,
+		RequestedTokenAccounts: []string{holderFixtureTokenAccount},
+		CapturedAt:             time.Date(2026, time.October, 17, 12, 0, 0, 0, time.UTC),
 		Supply: rpc(slots[0], map[string]any{
 			"amount": "1000", "decimals": 6, "private_secret": "never-expose-me",
 		}),
@@ -132,6 +133,12 @@ func TestReconcileHolderSourcesFailsClosedOnConflicts(t *testing.T) {
 		}},
 		{"wrong mint", func(_ *testing.T, x *HolderRawSourceSet) {
 			x.Mint = holderFixtureTokenAccount
+		}},
+		{"wrong requested token account", func(_ *testing.T, x *HolderRawSourceSet) {
+			x.RequestedTokenAccounts[0] = holderFixtureMint
+		}},
+		{"requested token account missing", func(_ *testing.T, x *HolderRawSourceSet) {
+			x.RequestedTokenAccounts = nil
 		}},
 		{"zero capture timestamp", func(_ *testing.T, x *HolderRawSourceSet) {
 			x.CapturedAt = time.Time{}
