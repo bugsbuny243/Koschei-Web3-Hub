@@ -97,8 +97,15 @@ func solanaRPCWitnessSlot(raw []byte) (uint64, error) {
 // result genuinely omitted context. This preserves existing callers; later
 // review gates must explicitly reject incomplete witness metadata.
 func captureSolanaRPCReadWitness(raw []byte) (SolanaRPCReadWitness, error) {
-	if len(raw) == 0 || len(raw) > 2<<20 || !json.Valid(raw) {
-		return SolanaRPCReadWitness{}, errors.New("Solana RPC witness result invalid or oversized")
+	if len(raw) == 0 || !json.Valid(raw) {
+		return SolanaRPCReadWitness{}, errors.New("Solana RPC witness result invalid")
+	}
+	// The established RPC decoder accepts larger, valid responses. Never
+	// break an existing customer read merely because provenance capture hit
+	// its private memory bound: leave the witness absent and fail closed only
+	// when someone explicitly asks for proof.
+	if len(raw) > 2<<20 {
+		return SolanaRPCReadWitness{}, nil
 	}
 	slot, err := solanaRPCWitnessSlot(raw)
 	if err != nil {
