@@ -137,6 +137,10 @@ func ownerIncidentSelectSQL() string {
 func (h *Handler) OwnerIncidents(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if r.URL.Query().Get("suggestions") == "1" {
+			h.ownerIncidentSuggestions(w, r)
+			return
+		}
 		h.ownerIncidentList(w, r)
 	case http.MethodPost:
 		h.ownerIncidentCreate(w, r)
