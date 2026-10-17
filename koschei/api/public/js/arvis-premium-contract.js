@@ -92,8 +92,8 @@ function normalize(input){
   const ruleset=String(first(final.ruleset_version,report.ruleset_version,envelope.ruleset_version)||'unknown');
   // The cluster's "none" is scoped to holder relationships. It must not
   // silently become the confidence of the signed deterministic grade.
-  const summary=obj(report.analysis_summary||envelope.analysis_summary);
-  const decision=obj(summary.decision);
+  const analysisSummary=obj(report.analysis_summary||envelope.analysis_summary);
+  const decision=obj(analysisSummary.decision);
   const confidenceInput=first(decision.confidence,final.confidence);
   const confidence=String(confidenceInput||'unknown').toLowerCase();
   const confidenceSource=confidenceInput===undefined?'no_decision_confidence_provided':decision.confidence!==undefined&&decision.confidence!==null&&String(decision.confidence).trim()!==''?'analysis_summary.decision.confidence':'final_verdict.confidence';
