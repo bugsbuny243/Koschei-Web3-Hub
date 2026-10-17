@@ -73,7 +73,7 @@ func ownerIncidentReviewCandidateFromAlert(alert ownerIncidentAlertSource) owner
 		ChainEvidenceVerified: false,
 		EvidenceState:         "persisted_alert_not_independent_evidence_verification",
 		ReviewState:           "owner_review_required",
-		SuggestedIncident:     ownerIncidentCreateRequest{
+		SuggestedIncident: ownerIncidentCreateRequest{
 			Title: string(runes), Severity: severity, Target: target,
 			// security_alert_events has no canonical network column.
 			// Do not infer a chain from the alert's target or payload.
