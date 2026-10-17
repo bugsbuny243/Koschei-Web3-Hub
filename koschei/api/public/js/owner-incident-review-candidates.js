@@ -88,10 +88,10 @@
     // Only a valid persisted alert reference and explicit expansion permits a
     // subsequent user-confirmed POST. The server independently checks the ref.
     detail.addEventListener('toggle',()=>{
-      open.disabled=!detail.open||!validID||loading;
+      open.disabled=!detail.open||!validID||!refs||loading;
     });
     open.addEventListener('click',async()=>{
-      if(!detail.open||!validID||!refs||loading)return;
+      if(open.disabled||!detail.open||!validID||!refs||loading)return;
       if(!window.confirm('Create an operator incident linked to alert '+alertID+'? This requires evidence review; the alert alone does not prove compromise.'))return;
       open.disabled=true;
       const body={
@@ -157,7 +157,12 @@
       if(version===requestVersion&&ownerActive()){
         statusCard('Review candidates unavailable','No alert safety assumption can be made. '+error.message,true);
       }
-    }finally{loading=false}
+    }finally{
+      loading=false;
+      // A tab switch while a request was in flight may have skipped the
+      // re-entry fetch. Resume only for the current authenticated tab.
+      if(version!==requestVersion&&ownerActive())void load();
+    }
   }
   function onPageChange(){
     const next=!!ownerActive();
@@ -167,5 +172,7 @@
   // Observe only existing navigation state. Never wrap/replace core functions,
   // intercept existing handlers, or observe the mutable securityContent subtree.
   new MutationObserver(onPageChange).observe(section,{attributes:true,attributeFilter:['class']});
+  const app=document.getElementById('appView');
+  if(app)new MutationObserver(onPageChange).observe(app,{attributes:true,attributeFilter:['class']});
   onPageChange();
 })();
