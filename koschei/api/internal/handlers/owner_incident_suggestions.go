@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,21 +20,27 @@ type ownerIncidentAlertSource struct {
 	Target          string
 	Title           string
 	OccurrenceCount int
+	CreatedAt       time.Time
 	LastSeenAt      time.Time
+	StoredPayload   []byte
 }
 
 type ownerIncidentReviewCandidate struct {
-	AlertID           string                     `json:"alert_id"`
-	Source            string                     `json:"source"`
-	EventType         string                     `json:"event_type"`
-	Severity          string                     `json:"severity"`
-	Target            string                     `json:"target"`
-	AlertTitle        string                     `json:"alert_title"`
-	OccurrenceCount   int                        `json:"occurrence_count"`
-	LastSeenAt        time.Time                  `json:"last_seen_at"`
-	EvidenceState     string                     `json:"evidence_state"`
-	ReviewState       string                     `json:"review_state"`
-	SuggestedIncident ownerIncidentCreateRequest `json:"suggested_incident"`
+	AlertID               string                     `json:"alert_id"`
+	Source                string                     `json:"source"`
+	EventType             string                     `json:"event_type"`
+	Severity              string                     `json:"severity"`
+	Target                string                     `json:"target"`
+	AlertTitle            string                     `json:"alert_title"`
+	OccurrenceCount       int                        `json:"occurrence_count"`
+	CreatedAt             time.Time                  `json:"created_at"`
+	LastSeenAt            time.Time                  `json:"last_seen_at"`
+	StoredPayloadSHA256   string                     `json:"stored_payload_sha256"`
+	PayloadHashScope      string                     `json:"payload_hash_scope"`
+	ChainEvidenceVerified bool                       `json:"chain_evidence_verified"`
+	EvidenceState         string                     `json:"evidence_state"`
+	ReviewState           string                     `json:"review_state"`
+	SuggestedIncident     ownerIncidentCreateRequest `json:"suggested_incident"`
 }
 
 func ownerIncidentReviewCandidateFromAlert(alert ownerIncidentAlertSource) ownerIncidentReviewCandidate {
@@ -55,12 +63,16 @@ func ownerIncidentReviewCandidateFromAlert(alert ownerIncidentAlertSource) owner
 	if !validOwnerIncidentSeverity(severity) {
 		severity = "medium"
 	}
+	payloadHash := sha256.Sum256(alert.StoredPayload)
 	return ownerIncidentReviewCandidate{
 		AlertID: alert.ID, Source: alert.Source, EventType: alert.EventType,
 		Severity: severity, Target: target, AlertTitle: title,
-		OccurrenceCount: alert.OccurrenceCount, LastSeenAt: alert.LastSeenAt,
-		EvidenceState: "persisted_alert_not_independent_evidence_verification",
-		ReviewState:   "owner_review_required",
+		OccurrenceCount: alert.OccurrenceCount, CreatedAt: alert.CreatedAt, LastSeenAt: alert.LastSeenAt,
+		StoredPayloadSHA256:   hex.EncodeToString(payloadHash[:]),
+		PayloadHashScope:      "sha256_of_postgresql_jsonb_text_read_snapshot_not_source_signature",
+		ChainEvidenceVerified: false,
+		EvidenceState:         "persisted_alert_not_independent_evidence_verification",
+		ReviewState:           "owner_review_required",
 		SuggestedIncident: ownerIncidentCreateRequest{
 			Title: string(runes), Severity: severity, Target: target,
 			// security_alert_events has no canonical network column.
@@ -114,7 +126,8 @@ func (h *Handler) ownerIncidentSuggestions(w http.ResponseWriter, r *http.Reques
 	// repeated. This is an explicit triage limitation, never a clean bill.
 	rows, err := db.QueryContext(r.Context(), `
 		SELECT a.id::text, a.source, a.event_type, a.severity, a.target,
-		       a.title, a.occurrence_count, a.last_seen_at
+		       a.title, a.occurrence_count, a.created_at, a.last_seen_at,
+		       a.payload::text
 		FROM security_alert_events a
 		WHERE a.created_at >= now() - interval '7 days'
 		  AND a.severity IN ('high', 'critical')
@@ -138,7 +151,8 @@ func (h *Handler) ownerIncidentSuggestions(w http.ResponseWriter, r *http.Reques
 		var alert ownerIncidentAlertSource
 		if err := rows.Scan(
 			&alert.ID, &alert.Source, &alert.EventType, &alert.Severity,
-			&alert.Target, &alert.Title, &alert.OccurrenceCount, &alert.LastSeenAt,
+			&alert.Target, &alert.Title, &alert.OccurrenceCount,
+			&alert.CreatedAt, &alert.LastSeenAt, &alert.StoredPayload,
 		); err != nil {
 			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident review candidate could not be decoded")
 			return
@@ -161,6 +175,7 @@ func (h *Handler) ownerIncidentSuggestions(w http.ResponseWriter, r *http.Reques
 			"Older deduplicated alerts are outside the seven-day created_at window even if last_seen_at is recent.",
 			"Only alerts without a linked active incident are presented; no incident is created or changed.",
 			"Alert payloads are not interpreted as canonical network or actor attribution.",
+			"Stored JSONB SHA-256 is a snapshot fingerprint only, not an on-chain signature, independent verification, or immutable history.",
 		},
 		"suggestions": suggestions,
 	})

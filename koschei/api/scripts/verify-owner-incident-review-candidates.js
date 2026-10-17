@@ -46,7 +46,9 @@ const example={
   alert_id:alertID,source:'arvis',event_type:'arvis.verdict.created',
   severity:'high',alert_title:'A sample alert <img src=x>',
   target:'target',evidence_state:'persisted_alert_not_independent_evidence_verification',
-  review_state:'owner_review_required',last_seen_at:'2026-10-17T00:00:00Z',
+  review_state:'owner_review_required',created_at:'2026-10-16T21:00:00Z',last_seen_at:'2026-10-17T00:00:00Z',
+  occurrence_count:2,stored_payload_sha256:'a'.repeat(64),
+  payload_hash_scope:'sha256_of_postgresql_jsonb_text_read_snapshot_not_source_signature',chain_evidence_verified:false,
   suggested_incident:{title:'Review ARVIS sample',severity:'high',network:'',target:'target',summary:'Manual review',alert_refs:[alertID]}
 };
 async function testBrowserFlow(){
@@ -93,6 +95,9 @@ async function testBrowserFlow(){
   const open=all.find(x=>x.tag==='button'&&x.textContent==='Open incident after review');
   const details=all.find(x=>x.tag==='details');
   assert.ok(open&&details);
+  assert.ok(all.some(x=>x.textContent==='a'.repeat(64)),'stored JSONB fingerprint missing in review');
+  assert.ok(all.some(x=>String(x.textContent||'').includes('does not authenticate an original chain event')),'provenance scope not disclosed');
+  assert.ok(all.some(x=>String(x.textContent||'').includes('Not verified')),'unverified chain evidence boundary missing');
   assert.equal(open.disabled,true,'candidate must be inspected first');
   await open.click();
   assert.equal(postCount,0,'disabled review flow must never POST before inspection');

@@ -78,6 +78,15 @@
     add(detail,summary,explanation);
     labelled(detail,'Evidence',item.evidence_state);
     labelled(detail,'Review state',item.review_state);
+    labelled(detail,'First recorded',item.created_at);
+    labelled(detail,'Last seen',item.last_seen_at);
+    labelled(detail,'Occurrences',item.occurrence_count==null?'Not supplied':String(item.occurrence_count));
+    const digest=String(item.stored_payload_sha256||'');
+    const validDigest=/^[a-f0-9]{64}$/.test(digest);
+    labelled(detail,'Stored JSONB SHA-256',validDigest?digest:'Unavailable');
+    labelled(detail,'Fingerprint scope',item.payload_hash_scope||'Unavailable');
+    add(detail,node('p','muted small','This fingerprint covers the stored PostgreSQL JSONB text snapshot only. It does not authenticate an original chain event, an alert producer or immutable history.'));
+    labelled(detail,'Independent chain proof','Not verified by this projection');
     labelled(detail,'Proposed network',refs&&refs.network?refs.network:'Unresolved; no inference from target');
     labelled(detail,'Proposed summary',refs&&refs.summary);
     const open=node('button','btn','Open incident after review');
