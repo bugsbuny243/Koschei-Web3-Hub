@@ -38,9 +38,9 @@ func TestOwnerIncidentVerdictLineagePostgres17(t *testing.T) {
 	}
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	target := "synthetic-lineage-" + suffix
-	rawSignature := sha512.Sum512([]byte("synthetic:"+suffix))
+	rawSignature := sha512.Sum512([]byte("synthetic:" + suffix))
 	signature := base64.RawURLEncoding.EncodeToString(rawSignature[:])
-	digestBytes := sha256.Sum256([]byte("synthetic:"+suffix))
+	digestBytes := sha256.Sum256([]byte("synthetic:" + suffix))
 	digest := hex.EncodeToString(digestBytes[:])
 	payload, err := json.Marshal(map[string]string{
 		"signature":    signature,
