@@ -86,7 +86,7 @@
     labelled(detail,'Stored JSONB SHA-256',validDigest?digest:'Unavailable');
     labelled(detail,'Fingerprint scope',item.payload_hash_scope||'Unavailable');
     add(detail,node('p','muted small','This fingerprint covers the stored PostgreSQL JSONB text snapshot only. It does not authenticate an original chain event, an alert producer or immutable history.'));
-    labelled(detail,'Independent chain proof',item.chain_evidence_verified===true?'Declared by source; verify independently':'Not verified');
+    labelled(detail,'Independent chain proof','Not verified by this projection');
     labelled(detail,'Proposed network',refs&&refs.network?refs.network:'Unresolved; no inference from target');
     labelled(detail,'Proposed summary',refs&&refs.summary);
     const open=node('button','btn','Open incident after review');
