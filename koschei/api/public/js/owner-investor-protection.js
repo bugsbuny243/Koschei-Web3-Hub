@@ -13,6 +13,16 @@ function currentReport(){
   return obj(payload.investigation_report||payload.report||payload);
 }
 
+// A remembered scan cannot supply a decision for a different premium card.
+// Owner Assistant and the dedicated Owner Radar do not share a lifecycle.
+function reportForCard(card){
+  const report=currentReport();
+  const visibleTarget=text(card.querySelector('.arvis-target')?.textContent);
+  const reportTarget=text(report.target||obj(report.final_verdict).target);
+  if(visibleTarget&&(!reportTarget||visibleTarget!==reportTarget))return {};
+  return report;
+}
+
 function protectionActionLabel(decision){
   const explicit=text(decision.investor_action).replaceAll('_',' ');
   if(explicit)return explicit;
@@ -25,20 +35,42 @@ function protectionActionLabel(decision){
   }
 }
 
+// Owner assistant premium cards can render outside OwnerRadarKit.scan.
+// When lastScan is stale, the backend decision already projected into the
+// SAME card must take precedence over the legacy local policy chip.
+function decisionFromCard(card){
+  const section=card.querySelector('.koschei-investor-protection');
+  if(!section)return null;
+  const decision=text(section.dataset?.decision).toUpperCase();
+  if(!['AVOID','NOT_CLEARED','REVIEW_FIRST','CLEARED_WITH_LIMITS'].includes(decision))return null;
+  const summary=text(section.querySelector('.koschei-investor-protection__top p')?.textContent);
+  const action=text(section.querySelector('.koschei-investor-protection__action')?.textContent);
+  let execution=text(section.dataset?.executionAction);
+  for(const fact of section.querySelectorAll('.koschei-investor-protection__facts > div')){
+    if(text(fact.querySelector('span')?.textContent).toLowerCase()==='execution'){
+      execution=text(fact.querySelector('b')?.textContent)||execution;
+      break;
+    }
+  }
+  return {decision,summary,investor_action:action,execution_action:execution};
+}
+
 function harmonizeDecisionLens(card,decision){
   const lens=card.querySelector('.koschei-decision-lens');
   if(!lens)return;
-  const decisionName=text(decision.decision).toUpperCase();
+  const authoritative=decisionFromCard(card)||obj(decision);
+  const decisionName=text(authoritative.decision).toUpperCase();
   if(!decisionName)return;
 
   const title=lens.querySelector('.koschei-decision-lens__copy h3');
   const copy=lens.querySelector('.koschei-decision-lens__copy p');
   const action=lens.querySelector('.koschei-decision-lens__action');
   if(title)title.textContent=`Why ${decisionName.replaceAll('_',' ')}?`;
-  if(copy)copy.textContent=text(decision.summary)||'The investor protection contract is authoritative for the customer action.';
+  if(copy)copy.textContent=text(authoritative.summary)||'The investor protection contract is authoritative for the customer action.';
   if(action){
-    action.textContent=protectionActionLabel(decision);
-    action.dataset.policy=text(decision.execution_action).toLowerCase()||text(decision.decision).toLowerCase();
+    action.textContent=protectionActionLabel(authoritative);
+    action.dataset.policy=text(authoritative.execution_action).toLowerCase()||
+      (decisionName==='AVOID'?'block':text(authoritative.decision).toLowerCase());
   }
 
   // Once the backend protection contract exists, the old local policy chip is
@@ -49,13 +81,14 @@ function harmonizeDecisionLens(card,decision){
 }
 
 function renderProtection(card){
-  const report=currentReport();
+  const report=reportForCard(card);
   const decision=obj(report.investor_protection_decision);
   if(!text(decision.decision))return;
 
   card.querySelector('.koschei-investor-protection')?.remove();
   const section=el('section','koschei-investor-protection');
   section.dataset.decision=text(decision.decision).toLowerCase();
+  section.dataset.executionAction=text(decision.execution_action).toLowerCase();
   section.setAttribute('aria-label','Investor protection decision');
 
   const top=el('div','koschei-investor-protection__top');
@@ -119,8 +152,9 @@ const observer=new MutationObserver(records=>{
       // already inserted Investor Protection. Re-apply the authoritative
       // backend decision as soon as that late lens enters the DOM.
       const newLens=node.matches?.('.koschei-decision-lens')?node:node.querySelector?.('.koschei-decision-lens');
-      const card=newLens?.closest?.('[data-arvis-premium-card]');
-      if(card)harmonizeDecisionLens(card,obj(currentReport().investor_protection_decision));
+      const newProtection=node.matches?.('.koschei-investor-protection')?node:node.querySelector?.('.koschei-investor-protection');
+      const card=(newLens||newProtection)?.closest?.('[data-arvis-premium-card]');
+      if(card)harmonizeDecisionLens(card,obj(reportForCard(card).investor_protection_decision));
     }
   }
 });
