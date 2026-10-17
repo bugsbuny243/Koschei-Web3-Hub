@@ -47,7 +47,7 @@ func TestOwnerIncidentVerdictLineagePostgres17(t *testing.T) {
 		"evidence_ref": signature,
 		"target":       target,
 		"grade":        "F",
-		"risk_level":  "high",
+		"risk_level":   "high",
 		"rule_version": "test-lineage-v1",
 	})
 	if err != nil {
