@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	radar "koschei/api/internal/radaradapter"
@@ -105,5 +106,47 @@ func TestSolanaCollectorUsesAccountResponseSlotNotLowerBound(t *testing.T) {
 	}
 	if requests["getSlot"] != 1 || requests["getAccountInfo"] != 1 || len(requests) != 2 {
 		t.Fatalf("context validation caused extra RPC: %#v", requests)
+	}
+}
+
+func TestSolanaCollectorRejectsDuplicateAccountContextWithoutEvidence(t *testing.T) {
+	data := make([]byte, 36)
+	binary.LittleEndian.PutUint32(data, ProgramState)
+	accountReply := []byte(fmt.Sprintf(
+		`{"jsonrpc":"2.0","id":1,"result":{"context":{"slot":42},"context":{"slot":43},"value":{"owner":%q,"executable":true,"data":[%q,"base64"]}}}`,
+		UpgradeableLoaderID, base64.StdEncoding.EncodeToString(data),
+	))
+	transport := radar.TransportFunc(func(_ context.Context, q radar.Request) (radar.Response, error) {
+		body, ok := q.Body.(map[string]any)
+		if !ok {
+			return radar.Response{}, errors.New("invalid RPC request")
+		}
+		method, _ := body["method"].(string)
+		switch method {
+		case "getSlot":
+			return radar.Response{Raw: []byte(`{"jsonrpc":"2.0","id":1,"result":42}`), Host: "fixture.invalid"}, nil
+		case "getAccountInfo":
+			return radar.Response{Raw: accountReply, Host: "fixture.invalid"}, nil
+		default:
+			return radar.Response{}, errors.New("unexpected RPC call")
+		}
+	})
+	target := radar.Target{Network: "solana-mainnet", Kind: "program", Raw: "11111111111111111111111111111111"}
+	adapter, err := New(target, transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, limits, err := adapter.Collect(context.Background(), target)
+	if err == nil || len(rows) != 0 {
+		t.Fatalf("ambiguous raw account context yielded evidence: %#v err=%v", rows, err)
+	}
+	found := false
+	for _, limit := range limits {
+		if limit.Code == "solana_account_context_slot_unbound" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("missing explicit ambiguous-context limitation: %#v", limits)
 	}
 }
