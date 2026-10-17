@@ -126,3 +126,33 @@ func TestHolderRPCReadWitnessRejectsAmbiguousAndInvalidContext(t *testing.T) {
 		}
 	}
 }
+
+func TestHolderRPCWitnessCapturedThroughOriginalEnvelopedDecoder(t *testing.T) {
+	resultBytes := []byte(`{ "context":{"slot":993}, "value":{"amount":"9007199254740993","decimals":6} }`)
+	envelope := append([]byte(`{"jsonrpc":"2.0","id":1,"result":`), resultBytes...)
+	envelope = append(envelope, '}')
+	var decoded struct {
+		Result SolanaTokenSupplyResult `json:"result"`
+	}
+	if err := json.Unmarshal(envelope, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if string(decoded.Result.Witness.RawResult) != string(resultBytes) ||
+		decoded.Result.Witness.Slot != 993 ||
+		decoded.Result.Value.Amount != "9007199254740993" {
+		t.Fatalf("RPC envelope discarded source bytes or rounded the integer amount: %#v", decoded.Result)
+	}
+}
+
+func TestHolderRPCWitnessOversizePreservesLegacyDecodeWithoutGrantingProof(t *testing.T) {
+	raw := []byte(`{"context":{"slot":991},"value":{"amount":"1","decimals":0},"unused":"` +
+		strings.Repeat("x", (2<<20)+1) + `"}`)
+	var result SolanaTokenSupplyResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		t.Fatalf("existing valid oversized response must remain readable: %v", err)
+	}
+	if result.Value.Amount != "1" || result.Witness.Slot != 0 ||
+		len(result.Witness.RawResult) != 0 || result.Witness.VerifySource() == nil {
+		t.Fatalf("oversized response gained unproven witness or lost decoded result: %#v", result)
+	}
+}
