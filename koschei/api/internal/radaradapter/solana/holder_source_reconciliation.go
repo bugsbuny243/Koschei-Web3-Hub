@@ -320,16 +320,16 @@ func ReconcileHolderRawSources(input HolderRawSourceSet) (HolderRawReconciliatio
 		return HolderRawReconciliation{}, err
 	}
 	return HolderRawReconciliation{
-		Status: holderSourceStatus,
-		Mint: input.Mint,
-		RawSupplyAmount: strconv.FormatUint(supply, 10),
+		Status:           holderSourceStatus,
+		Mint:             input.Mint,
+		RawSupplyAmount:  strconv.FormatUint(supply, 10),
 		RawTopAccountSum: topAmountSum.String(),
-		Decimals: uint8(decimals),
-		SupplySlot: slots[0], LargestAccountsSlot: slots[1], TokenAccountsSlot: slots[2],
-		SameReportedSlot: slots[0] == slots[1] && slots[1] == slots[2],
+		Decimals:         uint8(decimals),
+		SupplySlot:       slots[0], LargestAccountsSlot: slots[1], TokenAccountsSlot: slots[2],
+		SameReportedSlot:       slots[0] == slots[1] && slots[1] == slots[2],
 		AtomicSnapshotVerified: false, OwnerIdentityVerified: false,
 		ChainEvidenceVerified: false, VerdictBound: false,
-		TokenAccounts: accounts,
+		TokenAccounts:   accounts,
 		SourceWitnesses: witnesses,
 		Limitations: []string{
 			"Three separate RPC replies are not an atomic snapshot, even with equal context.slot.",
