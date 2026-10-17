@@ -1,0 +1,29 @@
+name: Solana Holder Raw Source Consistency
+
+on:
+  pull_request:
+    paths:
+      - 'koschei/api/internal/radaradapter/solana/holder_raw_consistency.go'
+      - 'koschei/api/internal/radaradapter/solana/holder_raw_consistency_test.go'
+      - '.github/workflows/solana-holder-raw-consistency.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-raw-holder-witness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.9'
+          cache-dependency-path: koschei/api/go.sum
+      - name: Show formatting discrepancies and enforce gofmt
+        run: |
+          gofmt -d koschei/api/internal/radaradapter/solana/holder_raw_consistency.go koschei/api/internal/radaradapter/solana/holder_raw_consistency_test.go
+          test -z "$(gofmt -l koschei/api/internal/radaradapter/solana/holder_raw_consistency.go koschei/api/internal/radaradapter/solana/holder_raw_consistency_test.go)"
+      - name: Run holder raw source regression
+        working-directory: koschei/api
+        run: go test ./internal/radaradapter/solana -run '^TestCheckHolderRawSources' -count=1 -v
