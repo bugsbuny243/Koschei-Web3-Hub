@@ -72,9 +72,9 @@ func TestSolanaCollectorUsesAccountResponseSlotNotLowerBound(t *testing.T) {
 			result = map[string]any{
 				"context": map[string]any{"slot": uint64(43)},
 				"value": map[string]any{
-					"owner": UpgradeableLoaderID,
+					"owner":      UpgradeableLoaderID,
 					"executable": true,
-					"data": []string{base64.StdEncoding.EncodeToString(data), "base64"},
+					"data":       []string{base64.StdEncoding.EncodeToString(data), "base64"},
 				},
 			}
 		default:
