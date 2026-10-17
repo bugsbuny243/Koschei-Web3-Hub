@@ -71,6 +71,21 @@ func (a *Adapter) Collect(ctx context.Context, t r.Target) ([]r.EvidenceRow, []r
 		"program_executable":     account.Executable,
 		"lamports":               account.Lamports,
 	})
+	// Bind the exact account-response bytes without inferring that getSlot and
+	// getAccountInfo were atomic or that program authority was proven.
+	witnesses, err := r.BindRawJSONSourceWitnesses(a.subject, []r.RawJSONObservation{{
+		Row:          row,
+		ResponseJSON: res.Raw,
+	}})
+	if err != nil || len(witnesses) != 1 {
+		return nil, append(limits, r.Limitation{
+			Code: "raw_account_response_unbound",
+			Reason: "Original account response bytes did not pass source integrity binding; no program safety conclusion is available.",
+		}), errors.New("solana account source response integrity unavailable")
+	}
+	row.Attributes["source_integrity_scope"] = witnesses[0].IntegrityStatus
+	row.Attributes["source_integrity_commitment_sha256"] = witnesses[0].CommitmentSHA256
+	row.Attributes["source_integrity_chain_verified"] = false
 	return []r.EvidenceRow{row}, append(limits, r.Limitation{
 		Code: "programdata_not_fetched", Reason: "ProgramData authority and bytecode require a separate validated account read.",
 	}), nil
