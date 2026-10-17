@@ -30,22 +30,22 @@ type ownerIncidentAlertSource struct {
 }
 
 type ownerIncidentReviewCandidate struct {
-	AlertID               string                     `json:"alert_id"`
-	Source                string                     `json:"source"`
-	EventType             string                     `json:"event_type"`
-	Severity              string                     `json:"severity"`
-	Target                string                     `json:"target"`
-	AlertTitle            string                     `json:"alert_title"`
-	OccurrenceCount       int                        `json:"occurrence_count"`
-	CreatedAt             time.Time                  `json:"created_at"`
-	LastSeenAt            time.Time                  `json:"last_seen_at"`
-	StoredPayloadSHA256   string                     `json:"stored_payload_sha256"`
-	PayloadHashScope      string                     `json:"payload_hash_scope"`
-	ChainEvidenceVerified bool                       `json:"chain_evidence_verified"`
+	AlertID               string                      `json:"alert_id"`
+	Source                string                      `json:"source"`
+	EventType             string                      `json:"event_type"`
+	Severity              string                      `json:"severity"`
+	Target                string                      `json:"target"`
+	AlertTitle            string                      `json:"alert_title"`
+	OccurrenceCount       int                         `json:"occurrence_count"`
+	CreatedAt             time.Time                   `json:"created_at"`
+	LastSeenAt            time.Time                   `json:"last_seen_at"`
+	StoredPayloadSHA256   string                      `json:"stored_payload_sha256"`
+	PayloadHashScope      string                      `json:"payload_hash_scope"`
+	ChainEvidenceVerified bool                        `json:"chain_evidence_verified"`
 	VerdictLineage        ownerIncidentVerdictLineage `json:"verdict_lineage"`
-	EvidenceState         string                     `json:"evidence_state"`
-	ReviewState           string                     `json:"review_state"`
-	SuggestedIncident     ownerIncidentCreateRequest `json:"suggested_incident"`
+	EvidenceState         string                      `json:"evidence_state"`
+	ReviewState           string                      `json:"review_state"`
+	SuggestedIncident     ownerIncidentCreateRequest  `json:"suggested_incident"`
 }
 
 // ownerIncidentVerdictLineage reports a constrained persisted-row join, never
