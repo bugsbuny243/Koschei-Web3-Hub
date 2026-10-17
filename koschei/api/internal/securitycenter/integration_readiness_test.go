@@ -50,7 +50,7 @@ func TestIntegrationReadinessRegisteredDisabledAndMissing(t *testing.T) {
 		t.Fatalf("disabled worker: %#v", head)
 	}
 	campaign := readinessRow(t, out.Capabilities, "global-campaign-runtime")
-	if campaign.RuntimeState != "partially_reported" && campaign.RuntimeState != "not_reported" {
+	if campaign.RuntimeState != "not_reported" {
 		t.Fatalf("unobserved campaign worker: %#v", campaign)
 	}
 }
