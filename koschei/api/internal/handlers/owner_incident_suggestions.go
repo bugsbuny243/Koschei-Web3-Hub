@@ -24,9 +24,9 @@ type ownerIncidentAlertSource struct {
 	CreatedAt       time.Time
 	LastSeenAt      time.Time
 	StoredPayload   []byte
-	VerdictMatches int64
-	VerdictID      sql.NullString
-	VerdictNetwork sql.NullString
+	VerdictMatches  int64
+	VerdictID       sql.NullString
+	VerdictNetwork  sql.NullString
 }
 
 type ownerIncidentReviewCandidate struct {
@@ -59,7 +59,7 @@ type ownerIncidentVerdictLineage struct {
 
 func incidentReviewVerdictLineage(alert ownerIncidentAlertSource) ownerIncidentVerdictLineage {
 	lineage := ownerIncidentVerdictLineage{
-		Status: "not_arvis_verdict_alert",
+		Status:    "not_arvis_verdict_alert",
 		Authority: "persisted_signed_verdict_metadata_match_only_not_independent_chain_or_signature_verification",
 	}
 	if alert.Source != "arvis" || alert.EventType != "arvis.verdict.created" {
