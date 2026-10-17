@@ -3,8 +3,8 @@ package handlers
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
