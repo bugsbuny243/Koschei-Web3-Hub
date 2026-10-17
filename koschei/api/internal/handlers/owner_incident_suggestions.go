@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"net/http"
 	"strconv"
@@ -23,24 +24,63 @@ type ownerIncidentAlertSource struct {
 	CreatedAt       time.Time
 	LastSeenAt      time.Time
 	StoredPayload   []byte
+	VerdictMatches  int64
+	VerdictID       sql.NullString
+	VerdictNetwork  sql.NullString
 }
 
 type ownerIncidentReviewCandidate struct {
-	AlertID               string                     `json:"alert_id"`
-	Source                string                     `json:"source"`
-	EventType             string                     `json:"event_type"`
-	Severity              string                     `json:"severity"`
-	Target                string                     `json:"target"`
-	AlertTitle            string                     `json:"alert_title"`
-	OccurrenceCount       int                        `json:"occurrence_count"`
-	CreatedAt             time.Time                  `json:"created_at"`
-	LastSeenAt            time.Time                  `json:"last_seen_at"`
-	StoredPayloadSHA256   string                     `json:"stored_payload_sha256"`
-	PayloadHashScope      string                     `json:"payload_hash_scope"`
-	ChainEvidenceVerified bool                       `json:"chain_evidence_verified"`
-	EvidenceState         string                     `json:"evidence_state"`
-	ReviewState           string                     `json:"review_state"`
-	SuggestedIncident     ownerIncidentCreateRequest `json:"suggested_incident"`
+	AlertID               string                      `json:"alert_id"`
+	Source                string                      `json:"source"`
+	EventType             string                      `json:"event_type"`
+	Severity              string                      `json:"severity"`
+	Target                string                      `json:"target"`
+	AlertTitle            string                      `json:"alert_title"`
+	OccurrenceCount       int                         `json:"occurrence_count"`
+	CreatedAt             time.Time                   `json:"created_at"`
+	LastSeenAt            time.Time                   `json:"last_seen_at"`
+	StoredPayloadSHA256   string                      `json:"stored_payload_sha256"`
+	PayloadHashScope      string                      `json:"payload_hash_scope"`
+	ChainEvidenceVerified bool                        `json:"chain_evidence_verified"`
+	VerdictLineage        ownerIncidentVerdictLineage `json:"verdict_lineage"`
+	EvidenceState         string                      `json:"evidence_state"`
+	ReviewState           string                      `json:"review_state"`
+	SuggestedIncident     ownerIncidentCreateRequest  `json:"suggested_incident"`
+}
+
+// ownerIncidentVerdictLineage reports a constrained persisted-row join, never
+// independent Ed25519, RPC, signer trust, or EvidenceRows verification.
+type ownerIncidentVerdictLineage struct {
+	Status    string `json:"status"`
+	VerdictID string `json:"verdict_id,omitempty"`
+	Network   string `json:"network,omitempty"`
+	Authority string `json:"authority"`
+}
+
+func incidentReviewVerdictLineage(alert ownerIncidentAlertSource) ownerIncidentVerdictLineage {
+	lineage := ownerIncidentVerdictLineage{
+		Status:    "not_arvis_verdict_alert",
+		Authority: "persisted_signed_verdict_metadata_match_only_not_independent_chain_or_signature_verification",
+	}
+	if alert.Source != "arvis" || alert.EventType != "arvis.verdict.created" {
+		return lineage
+	}
+	lineage.Status = "no_exact_persisted_verdict_match"
+	if alert.VerdictMatches != 1 {
+		if alert.VerdictMatches > 1 {
+			lineage.Status = "ambiguous_persisted_verdict_matches"
+		}
+		return lineage
+	}
+	if !alert.VerdictID.Valid || !alert.VerdictNetwork.Valid ||
+		strings.TrimSpace(alert.VerdictID.String) == "" || strings.TrimSpace(alert.VerdictNetwork.String) == "" {
+		lineage.Status = "persisted_verdict_metadata_incomplete"
+		return lineage
+	}
+	lineage.Status = "matched_persisted_signed_verdict_metadata_only"
+	lineage.VerdictID = alert.VerdictID.String
+	lineage.Network = alert.VerdictNetwork.String
+	return lineage
 }
 
 func ownerIncidentReviewCandidateFromAlert(alert ownerIncidentAlertSource) ownerIncidentReviewCandidate {
@@ -71,6 +111,7 @@ func ownerIncidentReviewCandidateFromAlert(alert ownerIncidentAlertSource) owner
 		StoredPayloadSHA256:   hex.EncodeToString(payloadHash[:]),
 		PayloadHashScope:      "sha256_of_postgresql_jsonb_text_read_snapshot_not_source_signature",
 		ChainEvidenceVerified: false,
+		VerdictLineage:        incidentReviewVerdictLineage(alert),
 		EvidenceState:         "persisted_alert_not_independent_evidence_verification",
 		ReviewState:           "owner_review_required",
 		SuggestedIncident: ownerIncidentCreateRequest{
@@ -127,8 +168,27 @@ func (h *Handler) ownerIncidentSuggestions(w http.ResponseWriter, r *http.Reques
 	rows, err := db.QueryContext(r.Context(), `
 		SELECT a.id::text, a.source, a.event_type, a.severity, a.target,
 		       a.title, a.occurrence_count, a.created_at, a.last_seen_at,
-		       a.payload::text
+		       a.payload::text, COALESCE(lineage.match_count,0),
+		       lineage.verdict_id, lineage.verdict_network
 		FROM security_alert_events a
+		LEFT JOIN LATERAL (
+		    SELECT count(*) AS match_count,
+		           min(v.id::text) AS verdict_id,
+		           min(v.network) AS verdict_network
+		    FROM security_radar_verdicts v
+		    WHERE a.source = 'arvis'
+		      AND a.event_type = 'arvis.verdict.created'
+		      AND v.module_id = 'final_verdict_engine'
+		      AND v.signed = true
+		      AND v.signature_algorithm = 'ed25519'
+		      AND v.signature = a.payload->>'signature'
+		      AND v.signature = a.payload->>'evidence_ref'
+		      AND v.target = a.target
+		      AND v.target = a.payload->>'target'
+		      AND v.grade = a.payload->>'grade'
+		      AND v.risk_level = a.payload->>'risk_level'
+		      AND v.rule_version = a.payload->>'rule_version'
+		) lineage ON true
 		WHERE a.created_at >= now() - interval '7 days'
 		  AND a.severity IN ('high', 'critical')
 		  AND ($2='' OR a.target=$2)
@@ -153,6 +213,7 @@ func (h *Handler) ownerIncidentSuggestions(w http.ResponseWriter, r *http.Reques
 			&alert.ID, &alert.Source, &alert.EventType, &alert.Severity,
 			&alert.Target, &alert.Title, &alert.OccurrenceCount,
 			&alert.CreatedAt, &alert.LastSeenAt, &alert.StoredPayload,
+			&alert.VerdictMatches, &alert.VerdictID, &alert.VerdictNetwork,
 		); err != nil {
 			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident review candidate could not be decoded")
 			return
@@ -176,6 +237,7 @@ func (h *Handler) ownerIncidentSuggestions(w http.ResponseWriter, r *http.Reques
 			"Only alerts without a linked active incident are presented; no incident is created or changed.",
 			"Alert payloads are not interpreted as canonical network or actor attribution.",
 			"Stored JSONB SHA-256 is a snapshot fingerprint only, not an on-chain signature, independent verification, or immutable history.",
+			"Verdict lineage requires exact persisted signature, evidence_ref, target, grade, risk level, rule version and signed Ed25519 metadata; a matching row is not independent cryptographic verification or proof of chain inclusion.",
 		},
 		"suggestions": suggestions,
 	})

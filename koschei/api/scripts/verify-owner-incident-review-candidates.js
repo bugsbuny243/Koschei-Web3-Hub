@@ -48,6 +48,7 @@ const example={
   target:'target',evidence_state:'persisted_alert_not_independent_evidence_verification',
   review_state:'owner_review_required',created_at:'2026-10-16T21:00:00Z',last_seen_at:'2026-10-17T00:00:00Z',
   occurrence_count:2,stored_payload_sha256:'a'.repeat(64),
+  verdict_lineage:{status:'matched_persisted_signed_verdict_metadata_only',verdict_id:'22222222-2222-4222-8222-222222222222',network:'solana-mainnet',authority:'persisted_signed_verdict_metadata_match_only_not_independent_chain_or_signature_verification'},
   payload_hash_scope:'sha256_of_postgresql_jsonb_text_read_snapshot_not_source_signature',chain_evidence_verified:false,
   suggested_incident:{title:'Review ARVIS sample',severity:'high',network:'',target:'target',summary:'Manual review',alert_refs:[alertID]}
 };
@@ -98,6 +99,9 @@ async function testBrowserFlow(){
   assert.ok(all.some(x=>x.textContent==='a'.repeat(64)),'stored JSONB fingerprint missing in review');
   assert.ok(all.some(x=>String(x.textContent||'').includes('does not authenticate an original chain event')),'provenance scope not disclosed');
   assert.ok(all.some(x=>String(x.textContent||'').includes('Not verified')),'unverified chain evidence boundary missing');
+  assert.ok(all.some(x=>String(x.textContent||'').includes('matched_persisted_signed_verdict_metadata_only')),'exact verdict match status not shown');
+  assert.ok(all.some(x=>x.textContent==='22222222-2222-4222-8222-222222222222'),'persisted verdict identity missing');
+  assert.ok(all.some(x=>String(x.textContent||'').includes('not a validated EvidenceRows set')),'cryptographic proof boundary not disclosed');
   assert.equal(open.disabled,true,'candidate must be inspected first');
   await open.click();
   assert.equal(postCount,0,'disabled review flow must never POST before inspection');
