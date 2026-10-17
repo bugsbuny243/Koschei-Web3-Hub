@@ -18,9 +18,10 @@ test('PYUSD-shaped holder confidence none never becomes verdict confidence',()=>
   assert.equal(model.confidence,'unknown');
   assert.equal(model.confidenceSource,'no_decision_confidence_provided');
   assert.equal(model.clusterConfidence,'none');
-  assert.match(html,/Decision confidence unknown/);
+  assert.match(html,/Confidence unknown/);
+  assert.match(html,/Decision confidence: unknown/);
   assert.match(html,/Holder-cluster confidence none/);
-  assert.doesNotMatch(html,/Decision confidence none/);
+  assert.doesNotMatch(html,/Decision confidence: none/);
   assert.match(html,/browser does not independently verify this verdict/);
   assert.match(html,/Holder-cluster confidence never substitutes/);
 });
@@ -32,7 +33,8 @@ test('canonical analysis summary confidence overrides narrow holder evidence con
   assert.equal(model.confidence,'low');
   assert.equal(model.confidenceSource,'analysis_summary.decision.confidence');
   assert.equal(model.clusterConfidence,'none');
-  assert.match(html,/Decision confidence low/);
+  assert.match(html,/Confidence low/);
+  assert.match(html,/Decision confidence: low/);
   assert.match(html,/Holder-cluster confidence none/);
 });
 
