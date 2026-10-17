@@ -12,7 +12,7 @@ Thus the addresses should be visible with their **source boundaries**, rather th
 
 A new independent owner-only script `public/js/owner-authority-source-addresses.js` wraps the existing owner radar rendering. It:
 
-- Retrieves only the source-context `mint_authority` and `freeze_authority` from the payload already supplied by the authenticated owner radar UI.
+- Retrieves the source-reported `mint_authority` and `freeze_authority` from either direct `source_context` fields or the **production-shaped `source_context.creator_resolution` fields**. Nested creator-resolution data is eligible only when its `address` exactly matches the report's scanned mint target; an absent/mismatched target fails closed.
 - Renders full-length base58-shaped addresses in an expandable details section alongside the target identity or verdict card.
 - Shows an explicit **source-reported, NOT independently verified canonical RPC** label, never a wallet ownership or malicious intent assertion.
 - Includes up to two source limitations, if present.
@@ -28,7 +28,7 @@ This presentation is *not* an exact token-2022 extension-authority proof. Perman
 ## Acceptance
 
 The Node fake-DOM test `scripts/verify-owner-authority-source-addresses.js` verifies:
-- full mint/freeze pubkeys retained;
+- full mint/freeze pubkeys retained, including nested production-shaped creator-resolution records, with no cross-mint leakage;
 - source limitation present;
 - no duplicate stale drawers;
 - malformed/injected values never enter the DOM as code;
