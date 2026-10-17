@@ -1,0 +1,23 @@
+name: Owner Decision Persistence Truth
+on:
+  pull_request:
+    paths:
+      - "koschei/api/public/js/owner-decision-persistence-truth.js"
+      - "koschei/api/scripts/verify-owner-decision-persistence-truth.js"
+      - "koschei/api/public/owner-production.html"
+      - ".github/workflows/owner-decision-persistence-truth.yml"
+  workflow_dispatch:
+jobs:
+  owner-decision-truth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate syntax
+        run: |
+          node --check koschei/api/public/js/owner-decision-persistence-truth.js
+          node --check koschei/api/scripts/verify-owner-decision-persistence-truth.js
+      - name: Assert current signed decision outranks stale UI and storage limitations remain visible
+        run: node koschei/api/scripts/verify-owner-decision-persistence-truth.js
