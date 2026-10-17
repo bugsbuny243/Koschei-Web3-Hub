@@ -26,21 +26,21 @@ type ownerIncidentAlertSource struct {
 }
 
 type ownerIncidentReviewCandidate struct {
-	AlertID           string                     `json:"alert_id"`
-	Source            string                     `json:"source"`
-	EventType         string                     `json:"event_type"`
-	Severity          string                     `json:"severity"`
-	Target            string                     `json:"target"`
-	AlertTitle        string                     `json:"alert_title"`
-	OccurrenceCount   int                        `json:"occurrence_count"`
-	CreatedAt         time.Time                  `json:"created_at"`
-	LastSeenAt        time.Time                  `json:"last_seen_at"`
-	StoredPayloadSHA256 string                   `json:"stored_payload_sha256"`
-	PayloadHashScope  string                     `json:"payload_hash_scope"`
-	ChainEvidenceVerified bool                   `json:"chain_evidence_verified"`
-	EvidenceState     string                     `json:"evidence_state"`
-	ReviewState       string                     `json:"review_state"`
-	SuggestedIncident ownerIncidentCreateRequest `json:"suggested_incident"`
+	AlertID               string                     `json:"alert_id"`
+	Source                string                     `json:"source"`
+	EventType             string                     `json:"event_type"`
+	Severity              string                     `json:"severity"`
+	Target                string                     `json:"target"`
+	AlertTitle            string                     `json:"alert_title"`
+	OccurrenceCount       int                        `json:"occurrence_count"`
+	CreatedAt             time.Time                  `json:"created_at"`
+	LastSeenAt            time.Time                  `json:"last_seen_at"`
+	StoredPayloadSHA256   string                     `json:"stored_payload_sha256"`
+	PayloadHashScope      string                     `json:"payload_hash_scope"`
+	ChainEvidenceVerified bool                       `json:"chain_evidence_verified"`
+	EvidenceState         string                     `json:"evidence_state"`
+	ReviewState           string                     `json:"review_state"`
+	SuggestedIncident     ownerIncidentCreateRequest `json:"suggested_incident"`
 }
 
 func ownerIncidentReviewCandidateFromAlert(alert ownerIncidentAlertSource) ownerIncidentReviewCandidate {
@@ -68,12 +68,12 @@ func ownerIncidentReviewCandidateFromAlert(alert ownerIncidentAlertSource) owner
 		AlertID: alert.ID, Source: alert.Source, EventType: alert.EventType,
 		Severity: severity, Target: target, AlertTitle: title,
 		OccurrenceCount: alert.OccurrenceCount, CreatedAt: alert.CreatedAt, LastSeenAt: alert.LastSeenAt,
-		StoredPayloadSHA256: hex.EncodeToString(payloadHash[:]),
-		PayloadHashScope: "sha256_of_postgresql_jsonb_text_read_snapshot_not_source_signature",
+		StoredPayloadSHA256:   hex.EncodeToString(payloadHash[:]),
+		PayloadHashScope:      "sha256_of_postgresql_jsonb_text_read_snapshot_not_source_signature",
 		ChainEvidenceVerified: false,
-		EvidenceState: "persisted_alert_not_independent_evidence_verification",
-		ReviewState:   "owner_review_required",
-		SuggestedIncident: ownerIncidentCreateRequest{
+		EvidenceState:         "persisted_alert_not_independent_evidence_verification",
+		ReviewState:           "owner_review_required",
+		SuggestedIncident:     ownerIncidentCreateRequest{
 			Title: string(runes), Severity: severity, Target: target,
 			// security_alert_events has no canonical network column.
 			// Do not infer a chain from the alert's target or payload.
