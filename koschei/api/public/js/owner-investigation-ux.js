@@ -50,6 +50,47 @@ function policyAction(policy){
   return({block:'DO NOT PROCEED',warn:'REVIEW FIRST',withhold:'EVIDENCE REQUIRED',allow:'NO BLOCK RULE FIRED'})[policy]||'REVIEW RESULT';
 }
 
+// This backend contract is authoritative for investor action. A local policy
+// chip may be contextual and may be stale when the premium card is enhanced.
+function protectionLensTruth(report,chipPolicy){
+  const decision=obj(report.investor_protection_decision);
+  const verdict=obj(report.final_verdict);
+  const name=upper(decision.decision);
+  const execution=upper(decision.execution_action);
+  if(name==='AVOID'||execution==='BLOCK'){
+    return{
+      policy:'block',
+      title:'Why AVOID?',
+      copy:text(decision.summary)||'The server reported a blocking investor-protection decision. This target is not cleared for execution.',
+      action:text(decision.investor_action).replaceAll('_',' ')||'AVOID TARGET'
+    };
+  }
+  if(name==='NOT_CLEARED'||execution==='WITHHOLD'){
+    return{
+      policy:'withhold',title:'Why NOT CLEARED?',
+      copy:text(decision.summary)||'The server has not cleared this target. Missing evidence does not imply safety.',
+      action:text(decision.investor_action).replaceAll('_',' ')||'DO NOT TREAT AS SAFE'
+    };
+  }
+  if(name==='REVIEW_FIRST'||execution==='REVIEW'){
+    return{
+      policy:'warn',title:'Why REVIEW FIRST?',
+      copy:text(decision.summary)||'The server requires human review before action.',
+      action:text(decision.investor_action).replaceAll('_',' ')||'REQUIRE EXPERT REVIEW'
+    };
+  }
+  // A hard-trigger verdict with no usable backend action must not claim that
+  // no deterministic block rule fired. Withhold action rather than invent it.
+  if(upper(verdict.verdict)==='HARD_TRIGGER'&&chipPolicy!=='block'){
+    return{
+      policy:'withhold',title:'Why ACTION UNRESOLVED?',
+      copy:'A deterministic hard-trigger verdict is present, but the investor-protection action was not supplied. Do not infer an allow or review-only outcome.',
+      action:'PROTECTION DECISION UNAVAILABLE'
+    };
+  }
+  return null;
+}
+
 function addStat(grid,label,value){
   const item=el('div','koschei-decision-stat');
   item.append(el('span','',label),el('strong','',value||'—'));
@@ -64,7 +105,9 @@ function installDecisionLens(card){
   const head=card.querySelector('.arvis-premium-head');
   if(!head)return;
   const grade=text(card.querySelector('.arvis-grade-orb strong')?.textContent)||'—';
-  const policy=(chipValue(card,'Policy ')||'review').toLowerCase();
+  const chipPolicy=(chipValue(card,'Policy ')||'review').toLowerCase();
+  const truth=protectionLensTruth(currentReport(),chipPolicy);
+  const policy=truth?.policy||chipPolicy;
   const confidence=(chipValue(card,'Confidence ')||'unknown').toLowerCase();
   const signed=[...card.querySelectorAll('.arvis-chip')].some(chip=>upper(chip.textContent).includes('SIGNED VERDICT'));
   const materialCount=card.querySelectorAll('.arvis-evidence-row.bad').length;
@@ -75,8 +118,8 @@ function installDecisionLens(card){
   lens.setAttribute('aria-label','Decision summary');
   const top=el('div','koschei-decision-lens__top');
   const copy=el('div','koschei-decision-lens__copy');
-  copy.append(el('span','koschei-decision-lens__kicker','DECISION LENS'),el('h3','',`Why ${policy.toUpperCase()}?`),el('p','',policyCopy(policy,materialCount,reviewCount)));
-  const action=el('span','koschei-decision-lens__action',policyAction(policy));
+  copy.append(el('span','koschei-decision-lens__kicker','DECISION LENS'),el('h3','',truth?.title||`Why ${policy.toUpperCase()}?`),el('p','',truth?.copy||policyCopy(policy,materialCount,reviewCount)));
+  const action=el('span','koschei-decision-lens__action',truth?.action||policyAction(policy));
   action.dataset.policy=policy;
   top.append(copy,action);
   const grid=el('div','koschei-decision-lens__grid');
