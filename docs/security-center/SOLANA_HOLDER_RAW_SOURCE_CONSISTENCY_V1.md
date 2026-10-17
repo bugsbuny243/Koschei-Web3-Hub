@@ -3,7 +3,7 @@
 State: Draft, opt-in and read-only. This PR is stacked on #1401. It does NOT alter production ARVIS verdicts, holder grades, existing RPC managers, customer APIs, or incident controls.
 
 ## Inputs
-CheckHolderRawSources accepts three ORIGINAL JSON-RPC response byte buffers from the same requested mint:
+CheckHolderRawSources requires an explicit supported network identity (solana-mainnet), a validated requested mint, and three ORIGINAL JSON-RPC response byte buffers from that request:
 - getTokenSupply (exact amount, decimals, reported context.slot)
 - getTokenLargestAccounts (up to 20 token-account addresses and exact raw amounts)
 - getMultipleAccounts with jsonParsed encoding, for the exact ORDERED list of token accounts in the second response.
