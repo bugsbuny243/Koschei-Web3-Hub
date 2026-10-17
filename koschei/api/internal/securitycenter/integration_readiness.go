@@ -114,6 +114,8 @@ func BuildIntegrationReadiness(capabilities Snapshot, runtime *runtimehealth.Sna
 				switch {
 				case attention:
 					row.RuntimeState = "attention_required"
+				case missing && len(row.ObservedProbes) == 0:
+					row.RuntimeState = "not_reported"
 				case missing:
 					row.RuntimeState = "partially_reported"
 				case inactive:
