@@ -34,6 +34,7 @@ type SolanaTokenAmount struct {
 
 type SolanaTokenSupplyResult struct {
 	Value SolanaTokenAmount `json:"value"`
+	Witness SolanaRPCReadWitness `json:"-"`
 }
 
 type SolanaLargestTokenAccount struct {
@@ -43,6 +44,7 @@ type SolanaLargestTokenAccount struct {
 
 type SolanaLargestAccountsResult struct {
 	Value []SolanaLargestTokenAccount `json:"value"`
+	Witness SolanaRPCReadWitness `json:"-"`
 }
 
 type SolanaAccountInfoResult struct {
