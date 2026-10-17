@@ -72,7 +72,7 @@ const pyusdShape={
   holder_cluster:{confidence:'none'},final_verdict:{grade:'D',signed:true},
 };
 out=evaluate(pyusdShape);s=out.content();
-for(const claim of ['7/14 tamamlandı','4/4 cüzdan','0 RPC hatası','0 —','none — yalnız holder_cluster']){
+for(const claim of ['7/14 tamamlandı','4/4 cüzdan','0 RPC hatası','Tamamlanan ama kısmi kaynak kanıtı taşıyan kollar','none — yalnız holder_cluster']){
   assert.ok(s.includes(claim),'PYUSD source diagnostic missing '+claim);
 }
 assert.ok(!s.includes('Desteklenmeyen işlem sürümü'),'unsupported v1 was invented for PYUSD');
