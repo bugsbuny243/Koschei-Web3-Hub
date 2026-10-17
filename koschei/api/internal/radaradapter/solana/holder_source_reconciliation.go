@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -52,6 +53,7 @@ type HolderRawReconciliation struct {
 	Status                 string                          `json:"status"`
 	Mint                   string                          `json:"mint"`
 	RawSupplyAmount        string                          `json:"raw_supply_amount"`
+	RawTopAccountSum       string                          `json:"raw_top_account_sum"`
 	Decimals               uint8                           `json:"decimals"`
 	SupplySlot             uint64                          `json:"supply_slot"`
 	LargestAccountsSlot    uint64                          `json:"largest_accounts_slot"`
@@ -220,6 +222,7 @@ func ReconcileHolderRawSources(input HolderRawSourceSet) (HolderRawReconciliatio
 	}
 
 	accounts := make([]HolderTokenAccountObservation, 0, len(largest))
+	var topAmountSum big.Int
 	seen := make(map[string]bool, len(largest))
 	for i, item := range largest {
 		address, err := holderString(item, "address")
@@ -237,6 +240,7 @@ func ReconcileHolderRawSources(input HolderRawSourceSet) (HolderRawReconciliatio
 		if err != nil {
 			return HolderRawReconciliation{}, err
 		}
+		topAmountSum.Add(&topAmountSum, new(big.Int).SetUint64(largestAmount))
 		largestDecimals, err := holderUint(item, "decimals", 8)
 		if err != nil || largestDecimals != decimals {
 			return HolderRawReconciliation{}, errors.New("largest token account decimals disagree with supply")
@@ -303,6 +307,10 @@ func ReconcileHolderRawSources(input HolderRawSourceSet) (HolderRawReconciliatio
 		})
 	}
 
+	if topAmountSum.Cmp(new(big.Int).SetUint64(supply)) > 0 {
+		return HolderRawReconciliation{}, errors.New("largest account amount sum exceeds separately observed token supply; non-atomic source discrepancy")
+	}
+
 	subject := radar.SubjectIdentity{
 		Network: "solana-mainnet", NativeID: input.Mint, ChainIdentity: "solana:mainnet-beta",
 		IdentityKind: "mint", IdentityValue: input.Mint,
@@ -315,6 +323,7 @@ func ReconcileHolderRawSources(input HolderRawSourceSet) (HolderRawReconciliatio
 		Status: holderSourceStatus,
 		Mint: input.Mint,
 		RawSupplyAmount: strconv.FormatUint(supply, 10),
+		RawTopAccountSum: topAmountSum.String(),
 		Decimals: uint8(decimals),
 		SupplySlot: slots[0], LargestAccountsSlot: slots[1], TokenAccountsSlot: slots[2],
 		SameReportedSlot: slots[0] == slots[1] && slots[1] == slots[2],
