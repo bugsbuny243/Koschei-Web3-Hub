@@ -1,0 +1,23 @@
+name: Owner Source Authority Addresses
+on:
+  pull_request:
+    paths:
+      - "koschei/api/public/js/owner-authority-source-addresses.js"
+      - "koschei/api/public/owner-production.html"
+      - "koschei/api/scripts/verify-owner-authority-source-addresses.js"
+      - ".github/workflows/owner-source-authority-addresses.yml"
+  workflow_dispatch:
+jobs:
+  source-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate owner addon and test syntax
+        run: |
+          node --check koschei/api/public/js/owner-authority-source-addresses.js
+          node --check koschei/api/scripts/verify-owner-authority-source-addresses.js
+      - name: Source-only authority addresses fail-closed regression
+        run: node koschei/api/scripts/verify-owner-authority-source-addresses.js
