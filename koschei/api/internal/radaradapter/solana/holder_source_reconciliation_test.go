@@ -77,7 +77,7 @@ func TestReconcileHolderSourcesPreservesDistinctSlotsAndOwnerAuthority(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Status != holderSourceStatus || got.RawSupplyAmount != "1000" || got.Decimals != 6 ||
+	if got.Status != holderSourceStatus || got.RawSupplyAmount != "1000" || got.RawTopAccountSum != "900" || got.Decimals != 6 ||
 		got.SupplySlot != 101 || got.LargestAccountsSlot != 102 || got.TokenAccountsSlot != 103 ||
 		got.SameReportedSlot || got.AtomicSnapshotVerified || got.OwnerIdentityVerified ||
 		got.ChainEvidenceVerified || got.VerdictBound {
@@ -152,6 +152,9 @@ func TestReconcileHolderSourcesFailsClosedOnConflicts(t *testing.T) {
 		{"largest amount mismatch", func(t *testing.T, x *HolderRawSourceSet) {
 			fixtureHolderRewrite(t, &x.Largest, `"amount":"900"`, `"amount":"901"`)
 		}},
+		{"top accounts exceed supply", func(t *testing.T, x *HolderRawSourceSet) {
+			fixtureHolderRewrite(t, &x.Supply, `"amount":"1000"`, `"amount":"10"`)
+		}},
 		{"non-string amount", func(t *testing.T, x *HolderRawSourceSet) {
 			fixtureHolderRewrite(t, &x.Largest, `"amount":"900"`, `"amount":900`)
 		}},
@@ -206,6 +209,7 @@ func TestReconcileHolderSourcesUsesExactUint64AndToken2022(t *testing.T) {
 		t.Fatal(err)
 	}
 	if out.RawSupplyAmount != "18446744073709551615" ||
+		out.RawTopAccountSum != "18446744073709551614" ||
 		len(out.TokenAccounts) != 1 ||
 		out.TokenAccounts[0].RawAmount != "18446744073709551614" ||
 		out.TokenAccounts[0].TokenProgram != splToken2022ProgramID ||
