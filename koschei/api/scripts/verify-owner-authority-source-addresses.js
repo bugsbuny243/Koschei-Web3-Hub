@@ -73,4 +73,42 @@ sections=out.identity.children.filter(x=>x.className==='owner-authority-source'&
 assert.equal(sections.length,1,'partial source should expose known address');
 strings=descendants(sections[0]).map(x=>x.textContent);
 assert.ok(strings.some(x=>x.includes('revoked sonucu çıkarılamaz')),'absent address must not become revoked');
+
+const scanMint='9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump';
+const nested={investigation_report:{
+  target:scanMint,
+  source_context:{creator_resolution:{
+    address:scanMint,mint_authority:mint,freeze_authority:freeze,
+    limitations:['Creator attribution is discovery-only and must be re-verified from canonical RPC.'],
+  }},
+}};
+out=run(nested);
+sections=out.identity.children.filter(x=>x.className==='owner-authority-source'&&!x.removed);
+assert.equal(sections.length,1,'production-shaped nested creator_resolution was ignored');
+strings=descendants(sections[0]).map(x=>x.textContent);
+assert.ok(strings.includes(mint)&&strings.includes(freeze),'nested mint and freeze authorities not shown in full');
+assert.ok(strings.some(x=>x.includes('discovery-only')),'nested creator attribution boundary lost');
+assert.ok(strings.some(x=>x.includes('bağımsız RPC doğrulaması değil')),'nested source incorrectly promoted to chain proof');
+
+out=run({investigation_report:{
+  target:'So11111111111111111111111111111111111111112',
+  source_context:nested.investigation_report.source_context,
+}});
+assert.equal(out.identity.children.filter(x=>x.className==='owner-authority-source'&&!x.removed).length,0,
+  'cross-token nested authority source was displayed for a different mint');
+
+out=run({investigation_report:{
+  source_context:nested.investigation_report.source_context,
+}});
+assert.equal(out.identity.children.filter(x=>x.className==='owner-authority-source'&&!x.removed).length,0,
+  'nested creator resolution without target identity must fail closed');
+
+out=run({investigation_report:{
+  target:scanMint,source_context:{creator_resolution:{
+    address:scanMint,mint_authority:null,freeze_authority:null,
+  }},
+}});
+assert.equal(out.identity.children.filter(x=>x.className==='owner-authority-source'&&!x.removed).length,0,
+  'null nested authorities must not imply an active or revoked address');
+
 console.log('Owner source authority acceptance passed: exact addresses, discovery boundary, XSS resistance, absence not revoked, idempotent render.');
