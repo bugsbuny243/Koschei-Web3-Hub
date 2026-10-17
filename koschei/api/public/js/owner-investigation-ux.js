@@ -37,6 +37,7 @@ function policyCopy(policy,materialCount,reviewCount){
     case'block':return 'A deterministic blocking condition was reached. Do not treat the target as approved for execution.';
     case'warn':return 'Reviewable evidence is present. The result requires human review before acting.';
     case'withhold':return 'Required evidence is incomplete or unresolved. Koschei refuses to convert missing evidence into safety.';
+    case'review':return 'A contextual REVIEW label is not an investor clearance. Confirm the backend protection decision and any unresolved evidence before acting.';
     default:{
       const remaining=materialCount+reviewCount;
       return remaining>0
