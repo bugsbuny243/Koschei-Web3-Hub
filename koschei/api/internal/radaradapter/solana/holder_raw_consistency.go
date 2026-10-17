@@ -22,6 +22,7 @@ const (
 // RPC transport. RequestedTokenAccounts must be the original ordered request
 // arguments; getMultipleAccounts does not repeat account addresses in results.
 type HolderRawSourceSet struct {
+	Network                string
 	Mint                   string
 	SupplyResponse         []byte
 	LargestResponse        []byte
@@ -168,6 +169,9 @@ func holderValidateSource(raw []byte) error {
 // the real RPC transport, not reconstructed from decoded values. Same reported
 // slots are not independent evidence of atomic reads or canonical consensus.
 func CheckHolderRawSources(in HolderRawSourceSet) (HolderRawConsistency, error) {
+	if in.Network != "solana-mainnet" {
+		return HolderRawConsistency{}, errors.New("holder source requires explicit supported Solana mainnet identity")
+	}
 	if err := holderValidatePubkey(in.Mint); err != nil {
 		return HolderRawConsistency{}, err
 	}
@@ -310,7 +314,7 @@ func CheckHolderRawSources(in HolderRawSourceSet) (HolderRawConsistency, error) 
 		status = "observed_same_reported_slot_consistent_not_independent_proof"
 	}
 	return HolderRawConsistency{
-		Status: status, Network: "solana-mainnet", Mint: in.Mint,
+		Status: status, Network: in.Network, Mint: in.Mint,
 		SupplySlot: supplySlot, LargestSlot: largestSlot, AccountsSlot: accountsSlot, SameReportedSlot: sameSlot,
 		SupplyAmountRaw: supplyText, LargestAccountsSumRaw: sum.String(), Decimals: decimals,
 		SupplyResponseSHA256: holderHash(in.SupplyResponse), LargestResponseSHA256: holderHash(in.LargestResponse),
