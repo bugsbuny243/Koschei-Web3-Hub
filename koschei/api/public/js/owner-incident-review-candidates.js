@@ -87,6 +87,12 @@
     labelled(detail,'Fingerprint scope',item.payload_hash_scope||'Unavailable');
     add(detail,node('p','muted small','This fingerprint covers the stored PostgreSQL JSONB text snapshot only. It does not authenticate an original chain event, an alert producer or immutable history.'));
     labelled(detail,'Independent chain proof','Not verified by this projection');
+    const lineage=item.verdict_lineage&&typeof item.verdict_lineage==='object'?item.verdict_lineage:{};
+    labelled(detail,'Persisted verdict link',lineage.status||'Unavailable');
+    labelled(detail,'Verdict record ID',lineage.verdict_id||'Unresolved');
+    labelled(detail,'Recorded verdict network',lineage.network||'Unresolved');
+    labelled(detail,'Link assurance',lineage.authority||'Exact persisted match not independently verified');
+    add(detail,node('p','muted small','A matching database verdict is not a validated EvidenceRows set, independently checked Ed25519 signature, or blockchain inclusion proof.'));
     labelled(detail,'Proposed network',refs&&refs.network?refs.network:'Unresolved; no inference from target');
     labelled(detail,'Proposed summary',refs&&refs.summary);
     const open=node('button','btn','Open incident after review');
