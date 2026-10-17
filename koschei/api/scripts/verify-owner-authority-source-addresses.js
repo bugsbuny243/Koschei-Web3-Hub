@@ -74,7 +74,7 @@ assert.equal(sections.length,1,'partial source should expose known address');
 strings=descendants(sections[0]).map(x=>x.textContent);
 assert.ok(strings.some(x=>x.includes('revoked sonucu çıkarılamaz')),'absent address must not become revoked');
 
-const scanMint='9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump';
+const scanMint='11111111111111111111111111111111';
 const nested={investigation_report:{
   target:scanMint,
   source_context:{creator_resolution:{
