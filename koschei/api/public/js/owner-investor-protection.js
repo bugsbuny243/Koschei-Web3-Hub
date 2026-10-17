@@ -13,6 +13,16 @@ function currentReport(){
   return obj(payload.investigation_report||payload.report||payload);
 }
 
+// A remembered scan cannot supply a decision for a different premium card.
+// Owner Assistant and the dedicated Owner Radar do not share a lifecycle.
+function reportForCard(card){
+  const report=currentReport();
+  const visibleTarget=text(card.querySelector('.arvis-target')?.textContent);
+  const reportTarget=text(report.target||obj(report.final_verdict).target);
+  if(visibleTarget&&(!reportTarget||visibleTarget!==reportTarget))return {};
+  return report;
+}
+
 function protectionActionLabel(decision){
   const explicit=text(decision.investor_action).replaceAll('_',' ');
   if(explicit)return explicit;
@@ -71,7 +81,7 @@ function harmonizeDecisionLens(card,decision){
 }
 
 function renderProtection(card){
-  const report=currentReport();
+  const report=reportForCard(card);
   const decision=obj(report.investor_protection_decision);
   if(!text(decision.decision))return;
 
@@ -144,7 +154,7 @@ const observer=new MutationObserver(records=>{
       const newLens=node.matches?.('.koschei-decision-lens')?node:node.querySelector?.('.koschei-decision-lens');
       const newProtection=node.matches?.('.koschei-investor-protection')?node:node.querySelector?.('.koschei-investor-protection');
       const card=(newLens||newProtection)?.closest?.('[data-arvis-premium-card]');
-      if(card)harmonizeDecisionLens(card,obj(currentReport().investor_protection_decision));
+      if(card)harmonizeDecisionLens(card,obj(reportForCard(card).investor_protection_decision));
     }
   }
 });
