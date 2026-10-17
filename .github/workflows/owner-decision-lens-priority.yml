@@ -1,0 +1,22 @@
+name: Owner Decision Lens Priority
+on:
+  pull_request:
+    paths:
+      - "koschei/api/public/js/owner-investigation-ux.js"
+      - "koschei/api/scripts/verify-owner-decision-lens-priority.js"
+      - ".github/workflows/owner-decision-lens-priority.yml"
+  workflow_dispatch:
+jobs:
+  investor-decision-priority:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check Node syntax
+        run: |
+          node --check koschei/api/public/js/owner-investigation-ux.js
+          node --check koschei/api/scripts/verify-owner-decision-lens-priority.js
+      - name: Verify server AVOID/BLOCK takes precedence
+        run: node koschei/api/scripts/verify-owner-decision-lens-priority.js
