@@ -1,0 +1,22 @@
+name: Owner Investor Decision Parity
+on:
+  pull_request:
+    paths:
+      - "koschei/api/public/js/owner-investor-protection.js"
+      - "koschei/api/public/js/owner-investor-protection.test.cjs"
+      - ".github/workflows/owner-investor-decision-parity.yml"
+  workflow_dispatch:
+jobs:
+  same-card-verdict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check source and regression syntax
+        run: |
+          node --check koschei/api/public/js/owner-investor-protection.js
+          node --check koschei/api/public/js/owner-investor-protection.test.cjs
+      - name: Assert same-card backend AVOID/BLOCK is never softened by earlier REVIEW state
+        run: node --test koschei/api/public/js/owner-investor-protection.test.cjs
