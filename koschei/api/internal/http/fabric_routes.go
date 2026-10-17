@@ -182,7 +182,7 @@ func MountFabric(base http.Handler, opts ...FabricOption) http.Handler {
 	fabric := securityHeaders(fabricMux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/fabric", "/fabric/capabilities", "/fabric/security-center", "/fabric/security-center/capabilities", "/fabric/security-center/runtime-health", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/radar", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe", "/fabric/networks/probe/intelligence", "/fabric/radar/global":
+		case "/fabric", "/fabric/capabilities", "/fabric/security-center", "/fabric/security-center/capabilities", "/fabric/security-center/acceptance", "/fabric/security-center/runtime-health", "/fabric/security-center/integration-readiness", "/fabric/networks", "/fabric/networks/catalog", "/fabric/networks/radar", "/fabric/networks/resolve", "/fabric/networks/live", "/fabric/networks/deployment", "/fabric/networks/probe", "/fabric/networks/probe/intelligence", "/fabric/radar/global":
 			fabric.ServeHTTP(w, r)
 		default:
 			base.ServeHTTP(w, r)
