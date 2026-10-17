@@ -10,7 +10,7 @@ func TestIncidentVerdictLineageRequiresExactSinglePersistedRecord(t *testing.T) 
 	base := ownerIncidentAlertSource{Source: "arvis", EventType: "arvis.verdict.created"}
 	for _, tc := range []struct {
 		name string
-		src ownerIncidentAlertSource
+		src  ownerIncidentAlertSource
 		want string
 	}{
 		{"unresolved", base, "no_exact_persisted_verdict_match"},
