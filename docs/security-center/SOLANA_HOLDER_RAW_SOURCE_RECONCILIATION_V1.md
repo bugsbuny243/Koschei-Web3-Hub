@@ -17,6 +17,7 @@ The new `ReconcileHolderRawSources` helper does not issue RPC calls. It is not c
 - `getTokenSupply.value.amount`, largest-account balances and decoded `jsonParsed.info.tokenAmount.amount` must be canonical decimal uint64 strings. No float/UI amount is used. Decimal precision is exactly matched.
 - `getTokenLargestAccounts.value` contains 1–20 unique base58 Solana token-account addresses.
 - `getMultipleAccounts.value` cardinality and **caller-recorded ordered request addresses** must match largest accounts exactly.
+- The sum of bounded largest-token-account raw amounts uses arbitrary-precision integers and must not exceed the separately observed total supply. A violation is rejected as an unresolved cross-read discrepancy, not labeled an exploit. This is **not proof of atomic consistency**.
 - Each account's *executable owner* is exactly the SPL Token or Token-2022 program ID. The reported parser type and program must agree. Its parsed mint equals the requested mint. Parsed token amount equals largest-account amount and decimals match supply.
 - A parsed `info.owner` is exposed only as `owner_authority`: a pubkey that may be a PDA or multisig, **not proven economic ownership or personal identity**.
 - Any inconsistent, stale, malformed or ambiguous input returns **error and zero result**. There is no partial `verified` output.
