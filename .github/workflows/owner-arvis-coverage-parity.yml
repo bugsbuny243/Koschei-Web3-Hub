@@ -1,0 +1,22 @@
+name: Owner ARVIS Coverage Parity
+on:
+  pull_request:
+    paths:
+      - "koschei/api/public/js/owner-verdict-card-coverage.js"
+      - "koschei/api/scripts/verify-owner-arvis-coverage-parity.js"
+      - ".github/workflows/owner-arvis-coverage-parity.yml"
+  workflow_dispatch:
+jobs:
+  coverage-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate addon and regression syntax
+        run: |
+          node --check koschei/api/public/js/owner-verdict-card-coverage.js
+          node --check koschei/api/scripts/verify-owner-arvis-coverage-parity.js
+      - name: Verify runtime arm counts independent of investor checklist
+        run: node koschei/api/scripts/verify-owner-arvis-coverage-parity.js
