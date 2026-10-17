@@ -1,0 +1,24 @@
+name: Owner Incident Review UI
+
+on:
+  pull_request:
+    paths:
+      - "koschei/api/public/owner-production.html"
+      - "koschei/api/public/js/owner-incident-review-candidates.js"
+      - "koschei/api/scripts/verify-owner-incident-review-candidates.js"
+      - ".github/workflows/owner-incident-review-ui.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-owner-review-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Check JavaScript syntax
+        run: node --check koschei/api/public/js/owner-incident-review-candidates.js
+      - name: Test owner review UI without network or DB
+        run: node koschei/api/scripts/verify-owner-incident-review-candidates.js
