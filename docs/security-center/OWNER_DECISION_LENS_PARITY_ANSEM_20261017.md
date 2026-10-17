@@ -17,7 +17,7 @@ The Investor Protection module already tries to harmonize late-inserted decision
 
 `owner-investor-protection.js` now prefers a **known backend Investor Protection panel rendered inside the exact same premium card** over the mutable global lastScan value. It extracts the panel's decision, displayed summary, action and execution policy via DOM `textContent` (never raw HTML); only known backend decision kinds are accepted. The panel's source remains the existing backend contract; no alternative grade or risk rule is evaluated by JavaScript.
 
-It also harmonizes when either the decision lens **or the Investor Protection panel** is inserted late. Without any backend decision or on-card panel, the original preexisting conservative behavior is unchanged; no AVOID is inferred.
+It also harmonizes when either the decision lens **or the Investor Protection panel** is inserted late. When falling back to the mutable global scan, it additionally requires the report target to match the mint displayed inside the premium card. A stale global scan can no longer attach another token's action to this card. Without any backend decision or on-card panel, the original preexisting conservative behavior is unchanged; no AVOID is inferred.
 
 ### Test
 
