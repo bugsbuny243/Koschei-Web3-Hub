@@ -228,3 +228,15 @@ func TestMountFabricReadinessPreservesOldRouteGraph(t *testing.T) {
 		t.Fatalf("existing base handler was intercepted: %d %s", oldRoute.Code, oldRoute.Body.String())
 	}
 }
+
+func TestMountFabricPreservesExistingAcceptanceCatalog(t *testing.T) {
+	base := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+	})
+	mounted := MountFabric(base)
+	res := httptest.NewRecorder()
+	mounted.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/fabric/security-center/acceptance", nil))
+	if res.Code != http.StatusOK || !strings.Contains(res.Body.String(), "\"control_count\":170") {
+		t.Fatalf("existing acceptance route did not reach Fabric: %d %s", res.Code, res.Body.String())
+	}
+}
