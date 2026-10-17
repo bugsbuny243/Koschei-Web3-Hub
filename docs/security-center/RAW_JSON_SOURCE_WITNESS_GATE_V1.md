@@ -25,7 +25,9 @@ Every witness explicitly sets:
 - `chain_evidence_verified=false`
 - `verdict_bound=false`
 
-This library does **not** touch the existing ARVIS signing/grade rules, owner APIs, alerts, incident metadata or database migrations. It introduces no background worker, RPC call, UI route or on-chain write.
+The existing Solana upgradeable-program adapter now calls this checker on the **actual getAccountInfo response bytes** before returning its observed program-link row. It adds only three observed-only attributes: source integrity scope, SHA-256 commitment, and `source_integrity_chain_verified=false`. A failed binding returns no collector evidence and a limitation. The existing non-atomic getSlot/getAccountInfo limitation remains. No extra RPC is introduced.
+
+This change does **not** touch ARVIS signing/grade rules, owner APIs, alerts, incident metadata or database migrations. It introduces no new background worker, RPC call, UI route or on-chain write.
 
 ## Next source integration requirements
 For Solana `getTokenSupply`, `getTokenLargestAccounts` and `getMultipleAccounts`:
@@ -33,6 +35,8 @@ For Solana `getTokenSupply`, `getTokenLargestAccounts` and `getMultipleAccounts`
 2. Parse the **same raw response** for `context.slot`, balance, mint, token-program owner and token-account owner; compare the parsed slot with declared row height.
 3. Reconcile holder supply and owner/account roles with exact integer arithmetic; treat non-atomic slots as such.
 4. Link resulting proven observations to a precise verdict ID and signing material only after full independent checks; keep `verified=false` otherwise.
+
+For the first live-code-path integration, test `go test ./internal/radaradapter/solana -run TestSolanaProgramCollectorBindsAccountJSONWithoutExtraRPC -count=1`. This is a fixture-backed code-path test, **not** evidence of a successful production RPC call.
 
 Stage 1-3A pre-existing, locally staged EvidenceRows patch files are not silently applied or marked merged. This module is intentionally a small gate that can be reviewed independently before those patches are adapted to current repository state.
 
