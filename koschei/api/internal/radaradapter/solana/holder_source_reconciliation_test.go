@@ -193,3 +193,23 @@ func TestReconcileHolderSourcesFailsClosedOnConflicts(t *testing.T) {
 		})
 	}
 }
+
+func TestReconcileHolderSourcesUsesExactUint64AndToken2022(t *testing.T) {
+	in := fixtureHolderSources(t, [3]uint64{101, 101, 102})
+	fixtureHolderRewrite(t, &in.Supply, `"amount":"1000"`, `"amount":"18446744073709551615"`)
+	fixtureHolderRewrite(t, &in.Largest, `"amount":"900"`, `"amount":"18446744073709551614"`)
+	fixtureHolderRewrite(t, &in.Accounts, `"amount":"900"`, `"amount":"18446744073709551614"`)
+	fixtureHolderRewrite(t, &in.Accounts, `"owner":"`+splTokenProgramID+`"`, `"owner":"`+splToken2022ProgramID+`"`)
+	fixtureHolderRewrite(t, &in.Accounts, `"program":"spl-token"`, `"program":"spl-token-2022"`)
+	out, err := ReconcileHolderRawSources(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.RawSupplyAmount != "18446744073709551615" ||
+		len(out.TokenAccounts) != 1 ||
+		out.TokenAccounts[0].RawAmount != "18446744073709551614" ||
+		out.TokenAccounts[0].TokenProgram != splToken2022ProgramID ||
+		out.ChainEvidenceVerified || out.VerdictBound {
+		t.Fatalf("exact token-2022 source quantities lost or promoted: %#v", out)
+	}
+}
