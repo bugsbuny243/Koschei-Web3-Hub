@@ -1,0 +1,25 @@
+name: ARVIS Premium Confidence Provenance
+on:
+  pull_request:
+    paths:
+      - "koschei/api/public/js/arvis-premium-contract.js"
+      - "koschei/api/scripts/verify-arvis-premium-confidence-provenance.test.cjs"
+      - "koschei/api/public/js/arvis-premium-contract.test.cjs"
+      - ".github/workflows/arvis-premium-confidence-provenance.yml"
+  workflow_dispatch:
+jobs:
+  confidence-provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check production module and test syntax
+        run: |
+          node --check koschei/api/public/js/arvis-premium-contract.js
+          node --check koschei/api/scripts/verify-arvis-premium-confidence-provenance.test.cjs
+      - name: Verify existing premium and confidence-source regression
+        run: |
+          node --test koschei/api/public/js/arvis-premium-contract.test.cjs
+          node --test koschei/api/scripts/verify-arvis-premium-confidence-provenance.test.cjs
