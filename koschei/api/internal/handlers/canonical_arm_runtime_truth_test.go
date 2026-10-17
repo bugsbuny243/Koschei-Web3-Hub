@@ -14,13 +14,7 @@ func TestCanonicalARVISRuntimeCoverageDoesNotConfuse14ModulesWith7Completed(t *t
 	report := map[string]any{}
 	report["modules"] = modules
 	report["full_scan_live_evidence"] = map[string]any{"status": "complete"}
-	report["investigation_coverage"] = map[string]any{
-		"capability_total": 14, "attempted": 9, "completed": 7,
-		"evidence_producing": 7, "evidence_pending": 6, "not_applicable": 1,
-		"source_unavailable": 0, "insufficient_evidence": 0,
-		"critical_gaps": []string{"holder_funding_relations", "launch_and_first_buyer_history"},
-		"status": "partial_investigation",
-	}
+	report["investigation_coverage"] = map[string]any{"capability_total": 14, "attempted": 9, "completed": 7, "evidence_producing": 7, "evidence_pending": 6, "not_applicable": 1, "source_unavailable": 0, "insufficient_evidence": 0, "critical_gaps": []string{"holder_funding_relations", "launch_and_first_buyer_history"}, "status": "partial_investigation"}
 	coverage := buildCanonicalIntegrationCoverage(report)
 	got := coverage.Capabilities["arvis_14_arm_engine"]
 	if !coverage.LiveScanRequested || got.Status != canonicalCapabilityPartial ||
