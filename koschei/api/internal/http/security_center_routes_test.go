@@ -177,3 +177,54 @@ func TestSecurityCenterAcceptanceRoute(t *testing.T) {
 		t.Fatal("public acceptance endpoint must remain read-only")
 	}
 }
+
+func TestSecurityCenterIntegrationReadinessRouteIsReadOnly(t *testing.T) {
+	registry := runtimehealth.New()
+	registry.Register("worker.global-radar-head-ingest", "head_ingest", "ethereum-mainnet", true)
+	registry.Success("worker.global-radar-head-ingest", 0)
+	mux := http.NewServeMux()
+	registerSecurityCenterRoutes(mux, registry)
+
+	res := httptest.NewRecorder()
+	mux.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/fabric/security-center/integration-readiness", nil))
+	if res.Code != http.StatusOK {
+		t.Fatalf("readiness status=%d body=%s", res.Code, res.Body.String())
+	}
+	for _, token := range []string{
+		"koschei.security-center-integration-readiness.v1",
+		"continuous-multi-network-block-ingest",
+		"observed_operational",
+		"\"acceptance_verified\":false",
+	} {
+		if !strings.Contains(res.Body.String(), token) {
+			t.Fatalf("readiness missing %q: %s", token, res.Body.String())
+		}
+	}
+	if res.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("integration readiness may not be cached")
+	}
+	post := httptest.NewRecorder()
+	mux.ServeHTTP(post, httptest.NewRequest(http.MethodPost, "/fabric/security-center/integration-readiness", nil))
+	if post.Code == http.StatusOK {
+		t.Fatal("readiness route must not accept writes")
+	}
+}
+
+func TestMountFabricReadinessPreservesOldRouteGraph(t *testing.T) {
+	base := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte("original-base-route"))
+	})
+	mounted := MountFabric(base)
+	newRoute := httptest.NewRecorder()
+	mounted.ServeHTTP(newRoute, httptest.NewRequest(http.MethodGet, "/fabric/security-center/integration-readiness", nil))
+	if newRoute.Code != http.StatusOK ||
+		!strings.Contains(newRoute.Body.String(), "\"runtime_registry_available\":false") {
+		t.Fatalf("mounted readiness did not fail closed: %d %s", newRoute.Code, newRoute.Body.String())
+	}
+	oldRoute := httptest.NewRecorder()
+	mounted.ServeHTTP(oldRoute, httptest.NewRequest(http.MethodGet, "/api/existing-service-contract", nil))
+	if oldRoute.Code != http.StatusAccepted || oldRoute.Body.String() != "original-base-route" {
+		t.Fatalf("existing base handler was intercepted: %d %s", oldRoute.Code, oldRoute.Body.String())
+	}
+}
