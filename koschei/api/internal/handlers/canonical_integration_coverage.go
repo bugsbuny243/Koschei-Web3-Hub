@@ -101,10 +101,14 @@ func buildCanonicalIntegrationCoverage(report map[string]any) canonicalIntegrati
 	}
 
 	modules := canonicalSlice(report["modules"])
-	put("arvis_14_arm_engine", canonicalStatusFromCount(
+	armCapability := canonicalStatusFromCount(
 		"ARVIS 14-arm evidence engine", len(modules), 14, true,
 		"modules/evidence_arms", "Canonical report did not expose all 14 architecture arms.",
-	))
+	)
+	if live {
+		armCapability = canonicalArmRuntimeTruth(armCapability, report["investigation_coverage"], len(modules))
+	}
+	put("arvis_14_arm_engine", armCapability)
 	put("holder_intelligence", canonicalStatusFromRaw("Owner-resolved holder intelligence", report["holder_intelligence"], live, true, "holder_intelligence"))
 	put("holder_cluster", canonicalStatusFromRaw("Holder cluster and flow intelligence", report["holder_cluster"], live, true, "holder_cluster"))
 	put("launch_forensics", canonicalStatusFromRaw("Launch forensics", report["launch_forensics"], live, true, "launch_forensics"))

@@ -53,6 +53,7 @@ func TestAttachCanonicalInvestigationDiagnosticsBuildsActorGraphAndCompleteCover
 		},
 	}
 
+	report["investigation_coverage"] = map[string]any{"capability_total": 14, "completed": 14, "evidence_producing": 14, "status": "complete_investigation", "critical_gaps": []string{}}
 	attachCanonicalInvestigationDiagnostics(report)
 	actor := canonicalMap(report["actor_investigation"])
 	graph := canonicalMap(actor["evidence_graph"])
