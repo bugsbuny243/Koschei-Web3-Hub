@@ -28,11 +28,12 @@ type HolderRawRPCSnapshot struct {
 // HolderRawSourceSet must be supplied by an already-authorized read-only RPC
 // path. This parser never fetches, signs, broadcasts or writes to storage.
 type HolderRawSourceSet struct {
-	Mint       string
-	CapturedAt time.Time
-	Supply     HolderRawRPCSnapshot
-	Largest    HolderRawRPCSnapshot
-	Accounts   HolderRawRPCSnapshot
+	Mint                   string
+	RequestedTokenAccounts []string
+	CapturedAt             time.Time
+	Supply                 HolderRawRPCSnapshot
+	Largest                HolderRawRPCSnapshot
+	Accounts               HolderRawRPCSnapshot
 }
 
 // HolderTokenAccountObservation separates an SPL token-account address from
@@ -213,8 +214,9 @@ func ReconcileHolderRawSources(input HolderRawSourceSet) (HolderRawReconciliatio
 		return HolderRawReconciliation{}, fmt.Errorf("token account values: %w", err)
 	}
 	var accountItems []json.RawMessage
-	if err := json.Unmarshal(accountValue, &accountItems); err != nil || len(accountItems) != len(largest) {
-		return HolderRawReconciliation{}, errors.New("token account response count differs from largest accounts")
+	if err := json.Unmarshal(accountValue, &accountItems); err != nil || len(accountItems) != len(largest) ||
+		len(input.RequestedTokenAccounts) != len(largest) {
+		return HolderRawReconciliation{}, errors.New("token account response count or requested address list differs from largest accounts")
 	}
 
 	accounts := make([]HolderTokenAccountObservation, 0, len(largest))
@@ -228,6 +230,9 @@ func ReconcileHolderRawSources(input HolderRawSourceSet) (HolderRawReconciliatio
 			return HolderRawReconciliation{}, errors.New("duplicate or invalid largest token account address")
 		}
 		seen[address] = true
+		if input.RequestedTokenAccounts[i] != address {
+			return HolderRawReconciliation{}, errors.New("requested token account order is not bound to largest account response")
+		}
 		largestAmount, err := holderAmount(item)
 		if err != nil {
 			return HolderRawReconciliation{}, err
