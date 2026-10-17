@@ -14,6 +14,7 @@ type SolanaMultipleAccountInfoResult struct {
 		Slot int64 `json:"slot"`
 	} `json:"context"`
 	Value []*SolanaAccountInfo `json:"value"`
+	Witness SolanaRPCReadWitness `json:"-"`
 }
 
 func SolanaGetMultipleAccountsJSONParsed(ctx context.Context, rpcURL string, addresses []string) (SolanaMultipleAccountInfoResult, error) {
