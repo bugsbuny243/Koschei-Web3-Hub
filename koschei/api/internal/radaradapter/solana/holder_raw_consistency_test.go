@@ -17,7 +17,7 @@ func holderRawFixture() HolderRawSourceSet {
 	supply := fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"result":{"context":{"slot":20},"value":{"amount":"100","decimals":0}},"private":"fixture-secret"}`)
 	largest := fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"result":{"context":{"slot":20},"value":[{"address":%q,"amount":"12","decimals":0}]}}`, holderFixtureTokenAccount)
 	accounts := fmt.Sprintf(`{"jsonrpc":"2.0","id":1,"result":{"context":{"slot":20},"value":[{"owner":%q,"data":{"program":"spl-token","parsed":{"type":"account","info":{"mint":%q,"owner":%q,"tokenAmount":{"amount":"12","decimals":0}}}}}]}}`, holderSPLTokenProgramID, holderFixtureMint, holderFixtureOwnerWallet)
-	return HolderRawSourceSet{Mint: holderFixtureMint, SupplyResponse: []byte(supply), LargestResponse: []byte(largest), AccountsResponse: []byte(accounts), RequestedTokenAccounts: []string{holderFixtureTokenAccount}}
+	return HolderRawSourceSet{Network: "solana-mainnet", Mint: holderFixtureMint, SupplyResponse: []byte(supply), LargestResponse: []byte(largest), AccountsResponse: []byte(accounts), RequestedTokenAccounts: []string{holderFixtureTokenAccount}}
 }
 
 func TestCheckHolderRawSourcesExactSameSlotObservedOnly(t *testing.T) {
@@ -71,6 +71,8 @@ func TestCheckHolderRawSourcesRejectsBrokenProvenance(t *testing.T) {
 		name  string
 		alter func(*HolderRawSourceSet)
 	}{
+		{"missing network", func(s *HolderRawSourceSet) { s.Network = "" }},
+		{"wrong network", func(s *HolderRawSourceSet) { s.Network = "solana-devnet" }},
 		{"missing supply", func(s *HolderRawSourceSet) { s.SupplyResponse = nil }},
 		{"no RPC result", func(s *HolderRawSourceSet) { s.SupplyResponse = []byte(`{"jsonrpc":"2.0","id":1}`) }},
 		{"RPC error with result", func(s *HolderRawSourceSet) {
