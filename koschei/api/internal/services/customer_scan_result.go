@@ -25,6 +25,7 @@ type CustomerScanResult struct {
 	Trust               Web3TrustVector              `json:"trust"`
 	Reasons             []string                     `json:"reasons,omitempty"`
 	EvidenceRefs        []string                     `json:"evidence_refs,omitempty"`
+	NetworkEvidence     *IntelligenceEvidence        `json:"network_evidence,omitempty"`
 	EVMAuthority        *EVMSpenderAuthoritySnapshot `json:"evm_authority,omitempty"`
 	InvestigationPlan   *UniversalInvestigationPlan  `json:"investigation_plan,omitempty"`
 	TransactionEvidence *IntelligenceEvidence        `json:"transaction_evidence,omitempty"`
@@ -114,7 +115,16 @@ func CustomerScanResultFromNetworkProbe(target CustomerScanTarget, projection Ne
 		Observed: true,
 		Reasons:  reasons,
 	}
-	return BuildCustomerScanResult(target, trust, []string{projection.Evidence.ID})
+	result, err := BuildCustomerScanResult(target, trust, []string{projection.Evidence.ID})
+	if err != nil {
+		return CustomerScanResult{}, err
+	}
+	// The full native-adapter evidence must reach the customer. An evidence
+	// reference alone hides observed state, provenance and limitations.
+	// This does not turn a read-only observation into a signed safety grade.
+	evidence := projection.Evidence
+	result.NetworkEvidence = &evidence
+	return result, nil
 }
 
 // CustomerScanResultFromEVMAuthority attaches a current EVM authority snapshot
