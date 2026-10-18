@@ -62,3 +62,23 @@ test('all customer decision labels escape untrusted result markup', () => {
   assert.doesNotMatch(html, /<img/);
   assert.match(html, /&lt;img/);
 });
+
+test('customer sees full native EVM/Bitcoin observations and nested provenance, not just references', () => {
+  for (const network of ['ethereum-mainnet', 'bitcoin-mainnet']) {
+    const customer = result(network, 'evidence_only_no_grade_authority');
+    customer.network_evidence = {
+      id: 'ev-native-1', source: 'network-probe-fixture',
+      provenance: 'synthetic-observation-source', status: 'observed',
+      attributes: {collector_metric_not_in_compact_rows: 37, deep_relation: {evidence_keys: ['a', 'b']}},
+    };
+    customer.asset_evidence = {id:'ev-asset-1', attributes:{holder_observation:{unknown:false}}};
+    const html = card({ok:true, label:network, data:{result:customer}});
+    assert.match(html, /All collected evidence and provenance/);
+    assert.match(html, /Native network observation — complete collector evidence/);
+    assert.match(html, /synthetic-observation-source/);
+    assert.match(html, /collector_metric_not_in_compact_rows/);
+    assert.match(html, /deep_relation/);
+    assert.match(html, /holder_observation/);
+    assert.match(html, /ev-native-1/);
+  }
+});
