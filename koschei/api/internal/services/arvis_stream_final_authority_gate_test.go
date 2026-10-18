@@ -14,7 +14,7 @@ func TestArvisStreamWorkerIsFailClosedUntilCanonicalFinalWired(t *testing.T) {
 func TestArvisStreamFinalAuthorityGateDistinguishesEvidenceGapFromMissingAuthority(t *testing.T) {
 	// No verified collector evidence is a real investigation evidence gap.
 	empty := SecurityRadarBundle{}
-	if err := arvisStreamFinalAuthorityGate(empty, arvisCompatibilityFinal()); !errors.Is(err, errArvisStreamInsufficientEvidence) {
+	if err := arvisStreamFinalAuthorityGate(empty); !errors.Is(err, errArvisStreamInsufficientEvidence) {
 		t.Fatalf("no evidence: got %v; want insufficient evidence", err)
 	}
 
@@ -30,7 +30,7 @@ func TestArvisStreamFinalAuthorityGateDistinguishesEvidenceGapFromMissingAuthori
 	if !SecurityRadarHasLiveEvidence(live) {
 		t.Fatal("test setup: verified evidence must be detectable")
 	}
-	err := arvisStreamFinalAuthorityGate(live, ArvisFinalFromBundle(live))
+	err := arvisStreamFinalAuthorityGate(live)
 	if !errors.Is(err, errArvisStreamCanonicalFinalUnavailable) {
 		t.Fatalf("verified evidence but unsigned final: got %v; want canonical authority failure", err)
 	}
@@ -47,10 +47,12 @@ func TestArvisStreamFinalAuthorityGateRejectsMissingFinalPersistence(t *testing.
 			},
 		},
 	}
-	// Even a populated Signed field is not enough: the legacy 14 arms do not
-	// include a final-verdict persistence row, so the stream job cannot finish.
-	pretendFinal := SecurityRadarFinalVerdict{Signed: true, Signature: "not-an-authentication-proof"}
-	err := arvisStreamFinalAuthorityGate(live, pretendFinal)
+	// Even a forged legacy final-verdict arm cannot establish canonical authority.
+	// An explicit signed-final proof and network/target binding must be wired
+	// through a separate accepted runtime path before promotion can occur.
+	live.Metadata["arvis_arms"] = append(live.Metadata["arvis_arms"].([]SecurityRadarVerdict),
+		SecurityRadarVerdict{ModuleID: ModuleFinalVerdictEngine, EvidenceVerified: true})
+	err := arvisStreamFinalAuthorityGate(live)
 	if !errors.Is(err, errArvisStreamCanonicalFinalUnavailable) {
 		t.Fatalf("no final persistence: got %v; want fail-closed authority error", err)
 	}
