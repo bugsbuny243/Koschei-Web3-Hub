@@ -249,6 +249,11 @@ function install(){
         if(!/^[0-9a-f-]{36}$/i.test(id)||job.poll_url!==pollURL||job.canonical_engine!==true){
           throw new Error('The background job confirmation could not be authenticated.');
         }
+        const savedJobLink=document.createElement('a');
+        savedJobLink.href=pollURL;
+        savedJobLink.textContent='Open retained investigation result';
+        recovery.replaceChildren(button,savedJobLink);
+        recovery.hidden=false;
         const initialHTML=results.innerHTML;
         let polls=0;
         const show=(message,report)=>{if(current!==generation)return;
