@@ -155,7 +155,7 @@ for(const code of [401,402,403,429,503])test(`HTTP ${code} offers honest recover
 test('network timeout restores retry controls',async()=>{
  const h=harness((url,options)=>new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(new Error('aborted')))));
  h.submit();for(const fn of h.timers.values())fn();await settle();
- assert.equal(h.nodes.customerUniversalSubmit.disabled,false);assert.match(h.nodes.customerUniversalStatus.textContent,/15 seconds/);
+ assert.equal(h.nodes.customerUniversalSubmit.disabled,false);assert.match(h.nodes.customerUniversalStatus.textContent,/40 seconds/);
 });
 test('malformed JSON is an error, never an empty success',async()=>{
  const h=harness(async()=>({ok:true,status:200,json:async()=>{throw new SyntaxError('invalid JSON');}}));h.submit();await settle();
