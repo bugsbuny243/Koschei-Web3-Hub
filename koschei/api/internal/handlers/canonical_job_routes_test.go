@@ -1,6 +1,12 @@
 package handlers
 
-import "testing"
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"koschei/api/internal/jobs"
+)
 
 func TestWeb3JobTypeFromPathExposesCanonicalCustomerRoute(t *testing.T) {
 	cases := map[string]string{
@@ -52,5 +58,20 @@ func TestCanonicalPayloadMaxDepthIsBounded(t *testing.T) {
 	}
 	if got := canonicalPayloadMaxDepth(canonicalInvestigationJobPayload{MaxDepth: 2}); got != 2 {
 		t.Fatalf("explicit recursive depth lost: %d", got)
+	}
+}
+
+func TestCustomerCanonicalWorkerRefusesWrongNetworkBeforeLoadingSolanaEvidence(t *testing.T) {
+	for _, network := range []string{"ethereum-mainnet", "base-mainnet", "bitcoin-mainnet", "sui-mainnet"} {
+		t.Run(network, func(t *testing.T) {
+			worker := &canonicalInvestigationJobWorker{}
+			report, err := worker.processJob(context.Background(), jobs.Job{
+				Type: CanonicalInvestigationJobType, Network: network,
+				Target: "0x1111111111111111111111111111111111111111",
+			})
+			if report != nil || err == nil || !strings.Contains(err.Error(), "not connected") {
+				t.Fatalf("wrong network accepted: report=%v err=%v", report, err)
+			}
+		})
 	}
 }
