@@ -17,6 +17,13 @@ import (
 
 const customerScanSchemaVersion = "koschei-customer-scan-v1"
 
+// One customer request may inspect multiple sequential read-only native
+// surfaces (e.g. EVM code, proxy authority and asset metadata). The previous
+// shared 10s deadline regularly risked discarding later collector evidence.
+// Keep a bounded deadline for infrastructure/resource safety; don't trim
+// the customer's findings or require owner-specific routes for extra depth.
+const customerScanCollectorDeadline = 30 * time.Second
+
 type customerScanRequest struct {
 	Target  string `json:"target"`
 	Network string `json:"network,omitempty"`
@@ -107,7 +114,7 @@ func customerScanWithSolanaRPC(w http.ResponseWriter, r *http.Request, solanaRPC
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), customerScanCollectorDeadline)
 	defer cancel()
 	observedAt := time.Now().UTC()
 
