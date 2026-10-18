@@ -17,11 +17,11 @@ func TestCustomerScanResultFromNetworkProbeStaysObserved(t *testing.T) {
 	projection := NetworkProbeIntelligenceProjection{
 		Subject: subject,
 		Evidence: IntelligenceEvidence{
-			ID:        "ev-1",
-			SubjectID: subject.ID,
-			Status:    IntelligenceEvidenceObserved,
-			Source:    "customer_rpc_fixture",
-			Network:   target.NetworkHint,
+			ID:         "ev-1",
+			SubjectID:  subject.ID,
+			Status:     IntelligenceEvidenceObserved,
+			Source:     "customer_rpc_fixture",
+			Network:    target.NetworkHint,
 			Provenance: "synthetic_network_observation",
 			Attributes: map[string]any{"code_hash": "synthetic-hash", "extra_collector_fact": 17},
 		},
