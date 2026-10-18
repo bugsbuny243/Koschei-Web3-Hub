@@ -17,13 +17,22 @@ func TestCustomerCanonicalEvidenceBindingIsNetworkNeutral(t *testing.T) {
 	} {
 		t.Run(network, func(t *testing.T) {
 			event, source, registry := arvisStreamCanonicalAcceptanceFixture(t, true, true)
+			target := event.Target
+			switch network {
+			case "ethereum-mainnet", "base-mainnet", "arbitrum-mainnet", "polygon-mainnet", "bnb-mainnet", "avalanche-mainnet":
+				target = "0x" + strings.Repeat("1", 40)
+			case "bitcoin-mainnet":
+				target = "1BoatSLRHtKNngkdXEeobR76b53LETtpyT"
+			case "sui-mainnet", "aptos-mainnet":
+				target = "0x" + strings.Repeat("a", 64)
+			}
 			verdict := FinalizeUnifiedRadarVerdictContractForNetwork(
-				event.Target, network, source)
+				target, network, source)
 			if !verdict.Signed {
 				t.Fatal("synthetic network fixture signing failed")
 			}
 			err := validateCustomerCanonicalEventEvidenceBinding(
-				event.Target, network, event.Signature, verdict, registry)
+				target, network, event.Signature, verdict, registry)
 			if err != nil {
 				t.Fatalf("valid signed/cited fixture rejected for %s: %v", network, err)
 			}
@@ -34,6 +43,17 @@ func TestCustomerCanonicalEvidenceBindingIsNetworkNeutral(t *testing.T) {
 				t.Fatal("unregistered network unexpectedly accepted")
 			}
 		})
+	}
+}
+
+func TestCustomerCanonicalEvidenceBindingRejectsCrossChainAddressSyntax(t *testing.T) {
+	event, source, registry := arvisStreamCanonicalAcceptanceFixture(t, true, true)
+	// Correctly signed bytes are not sufficient if the supplied target is a
+	// Solana address masquerading as an EVM address.
+	verdict := FinalizeUnifiedRadarVerdictContractForNetwork(event.Target, "ethereum-mainnet", source)
+	err := validateCustomerCanonicalEventEvidenceBinding(event.Target, "ethereum-mainnet", event.Signature, verdict, registry)
+	if err == nil || !strings.Contains(err.Error(), "address format invalid") {
+		t.Fatalf("cross-chain address syntax accepted: %v", err)
 	}
 }
 
