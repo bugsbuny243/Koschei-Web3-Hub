@@ -116,6 +116,24 @@ function transactionRows(evidence){
     rows.filter(([,value])=>value!==undefined&&value!==null&&value!=='').map(([key,value])=>'<div class="cus-row"><span>'+esc(key)+'</span><b title="'+esc(value)+'">'+esc(short(value))+'</b></div>').join('')+'</div>';
 }
 
+// Customer decision availability is derived from the server's per-network
+// investigation plan, never from an owner privilege or an address's syntax.
+// This read-only /api/scan response does NOT contain a verified signed verdict.
+function customerDecisionAvailability(result){
+  const plan=result?.investigation_plan;
+  if(result?.target?.requires_network===true)return{label:'NETWORK REQUIRED',copy:'Select the target network before interpreting evidence or requesting a security decision.'};
+  if(!plan)return{label:'DECISION NOT AVAILABLE',copy:'A supported network investigation plan has not been established. No risk grade or safety conclusion has been issued.'};
+  if(plan.executable!==true)return{label:'COLLECTOR NOT CONNECTED',copy:'This network is registered but its customer evidence collector is not executable. A risk grade is unavailable.'};
+  switch(String(plan.verdict_authority||'')){
+    case 'existing_deterministic_rules_only':
+      return{label:'SIGNED VERDICT NOT PROVIDED',copy:'Deterministic rules are declared for this network, but this customer evidence request alone does not provide a verified signed final decision.'};
+    case 'evidence_only_no_grade_authority':
+      return{label:'EVIDENCE ONLY — NO RISK GRADE',copy:'Network observations can be inspected. This adapter is not authorized to assign a signed risk grade; observed activity is not proof of safety.'};
+    default:
+      return{label:'NO CONNECTED VERDICT AUTHORITY',copy:'No customer risk grade is available for this network. Collected evidence must not be treated as a safety decision.'};
+  }
+}
+
 function resultCard(entry){
   const result=entry.data?.result;
   if(!entry.ok||!result){
@@ -124,9 +142,11 @@ function resultCard(entry){
   }
   const authority=result.evm_authority;
   const reasons=Array.isArray(result.reasons)?result.reasons:[];
+  const decision=customerDecisionAvailability(result);
   return `<article class="cus-network-card">
     <div class="cus-card-head"><div><span>${esc(entry.label)}</span><b>${esc(customerSummary(result))}</b></div><em>${esc(String(result.evidence_status||'unknown').toUpperCase())}</em></div>
     <div class="cus-target">${esc(result.target?.raw||'')}</div>
+    <div class="cus-decision-policy" role="status" aria-label="Customer decision availability"><b>${esc(decision.label)}</b><p>${esc(decision.copy)}</p></div>
     <details class="cus-details"><summary>Technical evidence</summary>
       ${renderTrust(result.trust||{})}
       ${authority?`<div class="cus-authority"><div class="cus-subhead"><span>Authority surface</span><b>Observed evidence</b></div>${authorityRows(authority)}</div>`:''}
