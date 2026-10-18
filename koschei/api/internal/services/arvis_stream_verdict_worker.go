@@ -15,10 +15,8 @@ import (
 	"github.com/lib/pq"
 )
 
-var (
-	errArvisStreamInsufficientEvidence = errors.New("arvis stream insufficient evidence")
-	errArvisStreamCanonicalFinalUnavailable = errors.New("arvis stream canonical signed final verdict is not wired")
-)
+var errArvisStreamInsufficientEvidence = errors.New("arvis stream insufficient evidence")
+var errArvisStreamCanonicalFinalUnavailable = errors.New("arvis stream canonical signed final verdict is not wired")
 
 // This worker must not ingest stream events into an apparently successful
 // verdict lifecycle until the authoritative unified decision and its durable
