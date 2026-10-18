@@ -226,7 +226,7 @@ function install(){
     }
     input.removeAttribute('aria-invalid');network.value=request.network;
     const current=++generation,controller=new AbortController();pending=controller;
-    const timer=setTimeout(()=>controller.abort(),15000);
+    const timer=setTimeout(()=>controller.abort(),40000);
     submit.disabled=true;submit.textContent='Analyzing…';cancel.hidden=false;form.setAttribute('aria-busy','true');
     status.textContent=`Collecting read-only ${request.kind==='transaction'?'transaction':'address'} evidence on ${request.label}…`;
     history.replaceState({},'',routing.url(request.target,request.network).url);
@@ -252,7 +252,7 @@ function install(){
       }
     }catch(error){
       if(current!==generation)return;
-      status.textContent=controller.signal.aborted?'The evidence service did not respond within 15 seconds. Try again.':(error instanceof SyntaxError?'The service returned an unreadable response. Try again.':error.message||'Connection failed. Try again.');
+      status.textContent=controller.signal.aborted?'The evidence service did not respond within 40 seconds. Some network sources may be unavailable; try again.':(error instanceof SyntaxError?'The service returned an unreadable response. Try again.':error.message||'Connection failed. Try again.');
       wrap.hidden=true;
     }finally{
       clearTimeout(timer);
