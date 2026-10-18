@@ -199,6 +199,12 @@ func (w *canonicalInvestigationJobWorker) processJob(ctx context.Context, job jo
 		return nil, fmt.Errorf("canonical job target is required")
 	}
 	network := strings.TrimSpace(firstNonEmptyString(payload.Network, job.Network, "solana-mainnet"))
+	// Existing canonical investigation worker uses Solana-native classification
+	// and collectors. Never run that engine against an EVM/Bitcoin/Move target:
+	// a mislabeled complete report would be worse than an explicit refusal.
+	if job.Type == CanonicalInvestigationJobType && network != "solana-mainnet" {
+		return nil, fmt.Errorf("canonical native evidence collector not connected for network %q", network)
+	}
 	classification := classifyRadarTarget(ctx, target)
 	mode := strings.TrimSpace(payload.Mode)
 	if mode == "" {
