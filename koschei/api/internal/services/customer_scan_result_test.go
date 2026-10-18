@@ -17,6 +17,10 @@ func TestCustomerScanResultFromNetworkProbeStaysObserved(t *testing.T) {
 			ID:        "ev-1",
 			SubjectID: subject.ID,
 			Status:    IntelligenceEvidenceObserved,
+			Source:    "customer_rpc_fixture",
+			Network:   target.NetworkHint,
+			Provenance: "synthetic_network_observation",
+			Attributes: map[string]any{"code_hash": "synthetic-hash", "extra_collector_fact": 17},
 		},
 	}
 
@@ -32,6 +36,14 @@ func TestCustomerScanResultFromNetworkProbeStaysObserved(t *testing.T) {
 	}
 	if result.EvidenceStatus != Web3TrustEvidenceObserved {
 		t.Fatalf("evidence_status=%q", result.EvidenceStatus)
+	}
+	if result.NetworkEvidence == nil || result.NetworkEvidence.ID != "ev-1" ||
+		result.NetworkEvidence.Attributes["extra_collector_fact"] != 17 ||
+		result.NetworkEvidence.Provenance != "synthetic_network_observation" {
+		t.Fatalf("base network probe evidence was dropped from customer result: %#v", result.NetworkEvidence)
+	}
+	if result.Verdict != CustomerScanVerdictReview || result.Trust.Verified || result.Trust.Finalized {
+		t.Fatal("preserving native observation must not manufacture trusted final authority")
 	}
 }
 
