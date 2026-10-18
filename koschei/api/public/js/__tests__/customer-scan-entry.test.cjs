@@ -179,7 +179,7 @@ test('shared transport preserves full token collector time while keeping ordinar
  const context=vm.createContext({window,document,URL,AbortController});
  vm.runInContext(source('koschei-global-shell.js'),context);
  await window.fetch('/api/token/scan');assert.equal(delays.at(-1),210000);
- await window.fetch('/api/scan');assert.equal(delays.at(-1),15000);
+ await window.fetch('/api/scan');assert.equal(delays.at(-1),40000);
  await window.fetch('/health');assert.equal(delays.at(-1),10000);
 });
 
