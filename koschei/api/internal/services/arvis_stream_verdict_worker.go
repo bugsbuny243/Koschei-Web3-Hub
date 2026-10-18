@@ -286,27 +286,16 @@ func prioritizeFinalArvisArm(arms []SecurityRadarVerdict) []SecurityRadarVerdict
 	return ordered
 }
 
-// arvisStreamFinalAuthorityGate distinguishes missing collector evidence from
-// missing canonical decision plumbing. A signed flag alone is not an authority
-// proof; the final needs a dedicated canonical persistence adapter and must not
-// be smuggled into the fourteen evidence arms.
-func arvisStreamFinalAuthorityGate(bundle SecurityRadarBundle, final SecurityRadarFinalVerdict) error {
+// arvisStreamFinalAuthorityGate distinguishes lack of collector evidence from
+// a missing canonical signed final. The existing compatibility final can never
+// establish authority, and a fabricated Signed flag or synthetic final arm
+// cannot substitute for the unified decision/verification/persistence contract.
+// Replacing this guard requires a separately accepted canonical integration.
+func arvisStreamFinalAuthorityGate(bundle SecurityRadarBundle) error {
 	if !SecurityRadarHasLiveEvidence(bundle) {
 		return errArvisStreamInsufficientEvidence
 	}
-	if !final.Signed || strings.TrimSpace(final.Signature) == "" {
-		return errArvisStreamCanonicalFinalUnavailable
-	}
-	arms := ArvisArmsFromBundle(bundle)
-	if len(arms) == 0 {
-		return fmt.Errorf("%w: ARVIS evidence arms missing", errArvisStreamCanonicalFinalUnavailable)
-	}
-	for _, arm := range arms {
-		if arm.ModuleID == ModuleFinalVerdictEngine {
-			return nil
-		}
-	}
-	return fmt.Errorf("%w: signed final persistence arm missing", errArvisStreamCanonicalFinalUnavailable)
+	return errArvisStreamCanonicalFinalUnavailable
 }
 
 func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arvisStreamTarget) error {
@@ -334,8 +323,7 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 	analysis.Bundle.Metadata["source_program_id"] = target.ProgramID
 
 	bundle := EvidenceBackedSecurityRadarBundle(analysis.Bundle)
-	final := ArvisFinalFromBundle(bundle)
-	if err := arvisStreamFinalAuthorityGate(bundle, final); err != nil {
+	if err := arvisStreamFinalAuthorityGate(bundle); err != nil {
 		return err
 	}
 	arms := ArvisArmsFromBundle(bundle)
