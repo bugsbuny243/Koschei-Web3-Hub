@@ -16,7 +16,7 @@ func arvisStreamCanonicalAcceptanceFixture(t *testing.T, referenced, verified bo
 	t.Setenv(unifiedVerdictSigningPrivateKeyEnv, base64.RawURLEncoding.EncodeToString(key))
 
 	event := arvisStreamTarget{
-		ID: "test-stream-event", Target: "MintEvidence123", Network: "solana-mainnet",
+		ID: "test-stream-event", Target: "So11111111111111111111111111111111111111112", Network: "solana-mainnet",
 		Signature: "verified-tx-sig-123", ModuleID: ModulePumpSybilRadar,
 	}
 	evidenceStatus := "verified"
