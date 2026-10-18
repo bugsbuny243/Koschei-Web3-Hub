@@ -4,6 +4,7 @@ const path=require('node:path');
 const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'public','scan.html'),'utf8');
 const css=fs.readFileSync(path.join(root,'public','css','koschei.css'),'utf8');
+const fullEvidenceUX=fs.readFileSync(path.join(root,'public','js','customer-investigation-ux-v2.js'),'utf8');
 
 function requireText(source,needle,label){if(!source.includes(needle))throw new Error(`${label}: missing ${needle}`);}
 function forbidText(source,needle,label){if(source.includes(needle))throw new Error(`${label}: duplicate customer scanner UI returned: ${needle}`);}
@@ -41,4 +42,6 @@ if(routeIndex<0||controllerIndex<routeIndex||legacyIndex<controllerIndex)throw n
 requireText(css,'.customer-result-summary','retained customer result summary styles');
 requireText(css,'.customer-full-technical','retained technical disclosure styles');
 requireText(css,'.customer-source-panels','retained source disclosure styles');
+requireText(fullEvidenceUX,"details.dataset.customerFullTechnical='v2';details.open=true;","premium technical evidence defaults open for customers");
+requireText(fullEvidenceUX,"details.dataset.customerSourcePanels='v2';details.open=true;","native source evidence defaults open for customers");
 console.log('customer investigation UX v2 contract: true single radar ok');
