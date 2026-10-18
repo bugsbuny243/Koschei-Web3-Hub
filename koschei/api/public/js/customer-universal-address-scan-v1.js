@@ -119,6 +119,14 @@ function transactionRows(evidence){
 // Customer decision availability is derived from the server's per-network
 // investigation plan, never from an owner privilege or an address's syntax.
 // This read-only /api/scan response does NOT contain a verified signed verdict.
+// Preserve every returned native-adapter field for the customer, including
+// provenance, metrics and new attributes not yet assigned a compact UI label.
+function fullEvidencePanel(label,evidence){
+  if(!evidence)return '';
+  const details=JSON.stringify(evidence,null,2);
+  return `<details class="cus-details cus-deep-evidence" open><summary>${esc(label)} — complete collector evidence</summary><pre class="cus-raw">${esc(details)}</pre></details>`;
+}
+
 function customerDecisionAvailability(result){
   const plan=result?.investigation_plan;
   if(result?.target?.requires_network===true)return{label:'NETWORK REQUIRED',copy:'Select the target network before interpreting evidence or requesting a security decision.'};
@@ -147,11 +155,15 @@ function resultCard(entry){
     <div class="cus-card-head"><div><span>${esc(entry.label)}</span><b>${esc(customerSummary(result))}</b></div><em>${esc(String(result.evidence_status||'unknown').toUpperCase())}</em></div>
     <div class="cus-target">${esc(result.target?.raw||'')}</div>
     <div class="cus-decision-policy" role="status" aria-label="Customer decision availability"><b>${esc(decision.label)}</b><p>${esc(decision.copy)}</p></div>
-    <details class="cus-details"><summary>Technical evidence</summary>
+    <details class="cus-details" open><summary>All collected evidence and provenance</summary>
       ${renderTrust(result.trust||{})}
+      ${fullEvidencePanel('Native network observation',result.network_evidence)}
       ${authority?`<div class="cus-authority"><div class="cus-subhead"><span>Authority surface</span><b>Observed evidence</b></div>${authorityRows(authority)}</div>`:''}
       ${assetRows(result.asset_evidence)}
       ${transactionRows(result.transaction_evidence)}
+      ${fullEvidencePanel('Authority investigation',authority)}
+      ${fullEvidencePanel('Asset investigation',result.asset_evidence)}
+      ${fullEvidencePanel('Transaction investigation',result.transaction_evidence)}
       <div class="cus-reasons"><div class="cus-subhead"><span>Reason codes</span><b>${reasons.length}</b></div>${reasons.length?reasons.map(reason=>`<code>${esc(reason)}</code>`).join(''):'<span class="cus-empty">No reason code attached.</span>'}</div>
       <div class="cus-reasons"><div class="cus-subhead">Evidence references</div>${(result.evidence_refs||[]).map(ref=>`<code>${esc(ref)}</code>`).join('')||'<span class="cus-empty">No reference was attached.</span>'}</div>
       <details class="cus-details"><summary>Complete response</summary><pre class="cus-raw">${esc(JSON.stringify(entry.data,null,2))}</pre></details>
