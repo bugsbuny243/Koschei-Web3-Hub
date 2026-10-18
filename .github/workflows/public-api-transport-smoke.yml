@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   smoke:
-    name: Distinguish proxy, application and database health
+    name: Verify proxy and API liveness (not database readiness)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -60,10 +60,10 @@ jobs:
               echo "health_code=${health_code}"
             } | tee diagnostics/result.txt
 
-            # A reachable application that explicitly reports dependency
-            # degradation is a real health failure, not a deploy-transition 502.
+            # /health is a liveness endpoint. Treat a non-200 response as an API
+            # health failure without claiming to know which dependency failed.
             if [ "${health_code}" = "503" ]; then
-              echo 'DATABASE_DEPENDENCY_DEGRADED: transport and application are reachable, but /health reports an unavailable dependency.' >&2
+              echo 'APPLICATION_LIVENESS_DEGRADED: transport is reachable, but /health returned 503; dependency root cause is not inferred.' >&2
               exit 14
             fi
 
@@ -72,7 +72,8 @@ jobs:
                 echo 'APPLICATION_FAILURE: /api/version returned an unexpected body.' >&2
                 exit 12
               }
-              echo "PUBLIC_API_HEALTHY: proxy, application and database health checks passed on attempt ${attempt}."
+              grep -Fq '"status":"ok"' diagnostics/health.body || { echo 'APPLICATION_LIVENESS_CONTRACT_FAILURE: /health status is not ok.' >&2; exit 16; }
+              echo "PUBLIC_API_LIVENESS_HEALTHY: proxy and application responded on attempt ${attempt}. /health does not ping PostgreSQL or verify entitlement/worker readiness."
               exit 0
             fi
 
@@ -111,11 +112,11 @@ jobs:
         run: |
           set -euo pipefail
           state=failure
-          description='Public API transport or dependency check failed'
+          description='Public API transport or application liveness check failed'
           target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           if [ "${JOB_STATUS}" = success ]; then
             state=success
-            description='Proxy, application and database health verified'
+            description='Proxy and API liveness verified; database readiness not checked'
             target_url="${BASE_URL}/health"
           fi
           export STATE="${state}" DESCRIPTION="${description}" TARGET_URL="${target_url}"
