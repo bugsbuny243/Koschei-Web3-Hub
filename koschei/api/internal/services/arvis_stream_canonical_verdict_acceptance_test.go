@@ -51,10 +51,10 @@ func arvisStreamCanonicalAcceptanceFixture(t *testing.T, referenced, verified bo
 		t.Fatal("test signer failed to create canonical fixture")
 	}
 	registry, err := NewGlobalRadarTrustedVerdictRegistry([]GlobalRadarTrustedVerdictKey{{
-		KeyID: verdict.KeyID,
+		KeyID:              verdict.KeyID,
 		PublicKeyBase64URL: base64.RawURLEncoding.EncodeToString(key.Public().(ed25519.PublicKey)),
-		ValidFrom: verdict.GeneratedAt.Add(-time.Hour),
-		ValidUntil: verdict.GeneratedAt.Add(time.Hour),
+		ValidFrom:          verdict.GeneratedAt.Add(-time.Hour),
+		ValidUntil:         verdict.GeneratedAt.Add(time.Hour),
 	}})
 	if err != nil {
 		t.Fatal(err)
