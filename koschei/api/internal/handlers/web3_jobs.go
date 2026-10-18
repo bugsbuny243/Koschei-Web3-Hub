@@ -51,6 +51,17 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "target required"})
 		return
 	}
+	// The durable canonical worker currently classifies Solana accounts and
+	// mints. Reject other networks before consuming a premium output or
+	// creating a job; cross-chain customer evidence remains available through
+	// the native /api/scan adapters, not this Solana-only worker.
+	if jobType == CanonicalInvestigationJobType && req.Network != "solana-mainnet" {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
+			"error": "canonical_job_network_collector_not_connected",
+			"network": req.Network,
+		})
+		return
+	}
 	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
@@ -73,6 +84,10 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 		maxDepth := req.MaxDepth
 		if maxDepth <= 0 {
 			maxDepth = canonicalWorkerEnvInt("ACTOR_RECURSIVE_MAX_DEPTH", 1, 1, 3)
+		}
+		// Match owner route's existing 3-hop recursive upper bound.
+		if maxDepth > 3 {
+			maxDepth = 3
 		}
 		payload := canonicalInvestigationJobPayload{
 			Address: resolvedTarget, Network: req.Network, Mode: "customer_canonical_job",
