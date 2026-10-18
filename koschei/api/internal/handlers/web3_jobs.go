@@ -57,7 +57,7 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 	// the native /api/scan adapters, not this Solana-only worker.
 	if jobType == CanonicalInvestigationJobType && req.Network != "solana-mainnet" {
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
-			"error": "canonical_job_network_collector_not_connected",
+			"error":   "canonical_job_network_collector_not_connected",
 			"network": req.Network,
 		})
 		return
