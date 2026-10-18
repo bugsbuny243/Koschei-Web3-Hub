@@ -245,3 +245,47 @@ test('blank evidence reference entries are rejected without requiring evidence t
  assert.equal(router.matchesResult({...base,result:{...base.result,evidence_refs:[]}},request),true);
  assert.equal(router.matchesResult(envelope(),request),true);
 });
+
+test('customer starts full retained ARVIS job and sees entire verified network-bound report',async()=>{
+ const id='12345678-1234-1234-1234-123456789abc',calls=[];
+ const full={final_verdict:{signed:false,grade:'-',limitation:'fixture_not_attested'},
+   all_collector_rows:[{module:'fixture',provenance:{source:'synthetic',height:47}}],
+   nested_technical_facts:{relation_history:[1,2,3]}};
+ const h=harness(async(url,options)=>{
+   calls.push({url,options});
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   if(url==='/api/v1/radar/jobs/'+id)return response(200,{id,job_type:'canonical_investigation',status:'completed',target:sol,network:'solana-mainnet',result:full});
+   throw new Error('unexpected fixture route '+url);
+ });
+ h.submit(sol,'solana-mainnet');await settle();
+ const button=h.nodes.customerUniversalRecovery.children[0];
+ assert.equal(button.textContent,'Run full ARVIS investigation');
+ button.dispatch('click');await settle();await settle();
+ assert.equal(calls.length,3);
+ assert.deepEqual(JSON.parse(calls[1].options.body),{address:sol,network:'solana-mainnet',max_depth:3});
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/Complete retained ARVIS report/);
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/relation_history/);
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/fixture_not_attested/);
+ assert.doesNotMatch(calls.map(c=>c.url).join('|'),/\/api\/owner\//);
+});
+
+test('non-Solana observed scan is not misrouted to Solana canonical engine',async()=>{
+ const h=harness(async()=>response(200,envelope(evm,'base-mainnet')));
+ h.submit(evm,'base-mainnet');await settle();
+ assert.equal(h.nodes.customerUniversalRecovery.hidden,true);
+});
+
+test('deep customer job rejects crossed target result and preserves the initial evidence',async()=>{
+ const id='12345678-1234-1234-1234-123456789abc';
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   return response(200,{id,job_type:'canonical_investigation',status:'completed',target:evm,network:'solana-mainnet',result:{fabricated_risk:'SAFE'}});
+ });
+ h.submit(sol,'solana-mainnet');await settle();
+ h.nodes.customerUniversalRecovery.children[0].dispatch('click');await settle();await settle();
+ assert.doesNotMatch(h.nodes.customerUniversalResults.innerHTML,/fabricated_risk/);
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/Evidence references/);
+ assert.match(h.nodes.customerUniversalStatus.textContent,/history/);
+});
