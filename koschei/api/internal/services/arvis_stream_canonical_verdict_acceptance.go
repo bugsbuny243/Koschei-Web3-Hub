@@ -33,6 +33,11 @@ func validateCustomerCanonicalEventEvidenceBinding(
 	if strings.TrimSpace(verdict.Target) != target || strings.TrimSpace(verdict.Network) != network {
 		return errors.New("canonical decision target/network mismatch")
 	}
+	// Registered network identity alone is insufficient: use the native
+	// per-network address parser, without implying that an account exists.
+	if _, err := networktarget.Resolve(network, target); err != nil {
+		return fmt.Errorf("canonical decision target/network address format invalid: %w", err)
+	}
 	if err := VerifyUnifiedRadarVerdictWithTrustedRegistry(verdict, registry); err != nil {
 		return fmt.Errorf("canonical decision signature authentication failed: %w", err)
 	}
