@@ -199,11 +199,13 @@ function install(){
   const active=()=>!shared||['address','lookup'].includes(window.KoscheiRadar?.mode);
   const wrap=$('customerUniversalResultsWrap'),overview=$('customerUniversalOverview'),results=$('customerUniversalResults');
   const recovery=$('customerUniversalRecovery'),advanced=$('advancedTools');
-  let pending=null,generation=0;
+  let pending=null,generation=0,deepAbort=null,deepPollTimer=null;
 
   function stop(){
     generation++;
     pending?.abort();pending=null;
+    deepAbort?.abort();deepAbort=null;
+    if(deepPollTimer!==null){clearTimeout(deepPollTimer);deepPollTimer=null;}
     form.removeAttribute('aria-busy');if(active()){submit.disabled=false;submit.textContent=shared?'Investigate target':'Analyze target';}cancel.hidden=true;
   }
   function invalidate(){
@@ -215,6 +217,99 @@ function install(){
   if(shared)document.addEventListener('koschei:radar-mode-changed',()=>{stop();wrap.hidden=true;recovery.hidden=true;status.textContent='Ready. Enter a target for this investigation.';});
   cancel.addEventListener('click',()=>{if(!active())return;stop();wrap.hidden=true;status.textContent='Analysis canceled. You can start another request.';});
   window.addEventListener('pagehide',stop);
+
+  // The canonical customer job endpoint is already account-scoped and durable.
+  // Never route this through owner APIs or claim non-Solana collectors exist.
+  function offerCanonicalDeepJob(request){
+    const button=document.createElement('button');
+    button.type='button';button.textContent='Run full ARVIS investigation';
+    button.addEventListener('click',async()=>{
+      const current=generation;
+      if(deepAbort)return;
+      const controller=new AbortController();deepAbort=controller;
+      button.disabled=true;
+      status.textContent='Creating a durable, account-scoped ARVIS investigation…';
+      try{
+        const response=await fetch('/api/v1/radar/jobs',{
+          method:'POST',credentials:'same-origin',cache:'no-store',
+          headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body:JSON.stringify({address:request.target,network:request.network,max_depth:3}),
+          signal:controller.signal
+        });
+        const job=await response.json();
+        if(current!==generation)return;
+        if(!response.ok){
+          status.textContent=response.status===401?'Sign in to run a deep investigation.':
+            [402,403].includes(response.status)?'An active Professional account is required for a deep investigation.':
+            'The deep investigation could not be started. No report was created.';
+          button.disabled=false;return;
+        }
+        const id=String(job?.job_id||'');
+        const pollURL='/api/v1/radar/jobs/'+id;
+        if(!/^[0-9a-f-]{36}$/i.test(id)||job.poll_url!==pollURL||job.canonical_engine!==true){
+          throw new Error('The background job confirmation could not be authenticated.');
+        }
+        const initialHTML=results.innerHTML;
+        let polls=0;
+        const show=(message,report)=>{if(current!==generation)return;
+          results.innerHTML=initialHTML+
+            `<section class="cus-deep-evidence" aria-label="Durable customer investigation"><h3>Deep ARVIS investigation</h3><p>${esc(message)}</p>`+
+            `<p>Account-scoped job: <code>${esc(id)}</code></p>`+
+            (report?fullEvidencePanel('Complete retained ARVIS report',report):'')+
+            '</section>';
+        };
+        show('Queued. The investigation continues on the server and remains in your account history.');
+        const poll=async()=>{
+          if(current!==generation||controller.signal.aborted)return;
+          try{
+            const response=await fetch(pollURL,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'},signal:controller.signal});
+            if(!response.ok)throw new Error('Deep investigation status is temporarily unavailable.');
+            const snapshot=await response.json();
+            if(current!==generation)return;
+            if(snapshot.id!==id||snapshot.job_type!=='canonical_investigation'||
+               snapshot.target!==request.target||snapshot.network!==request.network)
+              throw new Error('The background report does not match this customer target/network.');
+            if(snapshot.status==='completed'){
+              if(!snapshot.result||typeof snapshot.result!=='object'||Array.isArray(snapshot.result))
+                throw new Error('Job completed without readable evidence; no verdict can be inferred.');
+              show('Completed. All retained findings and provenance are shown below.',snapshot.result);
+              status.textContent='Deep investigation complete; the report is also retained in your account.';
+              deepAbort=null;return;
+            }
+            if(snapshot.status==='failed'){
+              show('The background investigation failed. Existing scan evidence remains visible; no complete report is claimed.');
+              status.textContent='Deep investigation failed. Review account history for retry status.';
+              deepAbort=null;return;
+            }
+            if(snapshot.status!=='queued'&&snapshot.status!=='running')
+              throw new Error('The investigation returned an unknown state; no complete report is claimed.');
+            const progress=Number(snapshot.progress);
+            const percentage=Number.isInteger(progress)&&progress>=0&&progress<=100?` (${progress}%)`:'';
+            show('Background investigation '+snapshot.status+percentage+'. Evidence is retained by the job service.');
+            if(++polls>=60){
+              show('Still processing. Automatic checks have stopped; the durable job continues in your account history.');
+              deepAbort=null;return;
+            }
+            deepPollTimer=setTimeout(poll,5000);
+          }catch(error){
+            if(current!==generation||controller.signal.aborted)return;
+            show('Report polling interrupted: '+(error.message||'unknown')+'. The durable job may still be running.');
+            status.textContent='Open your investigation history to inspect the retained job.';
+            deepAbort=null;
+          }
+        };
+        await poll();
+      }catch(error){
+        if(current!==generation||controller.signal.aborted)return;
+        status.textContent='Deep investigation request failed: '+(error.message||'unavailable');
+        button.disabled=false;deepAbort=null;
+      }
+    });
+    const chat=document.createElement('a');
+    chat.href='/arvis-chat?'+new URLSearchParams({target:request.target,network:request.network});
+    chat.textContent='Explore evidence with ARVIS';
+    recovery.replaceChildren(button,chat);recovery.hidden=false;
+  }
 
   async function runScan(){
     if(!active())return;
@@ -246,9 +341,8 @@ function install(){
         link.textContent=response.status===401?'Sign in to continue':'Review account access';
         recovery.replaceChildren(link);recovery.hidden=false;
       }
-      if(!shared&&response.ok&&request.family==='solana'){
-        const link=document.createElement('a');link.href='/arvis-chat?'+new URLSearchParams({target:request.target,network:request.network});
-        link.textContent='Continue with ARVIS investigation';recovery.replaceChildren(link);recovery.hidden=false;
+      if(response.ok&&request.family==='solana'&&request.kind!=='transaction'&&request.network==='solana-mainnet'){
+        offerCanonicalDeepJob(request);
       }
     }catch(error){
       if(current!==generation)return;
