@@ -62,10 +62,6 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
-		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
-		return
-	}
 	requestPayload := any(req)
 	if jobType == CanonicalInvestigationJobType {
 		classification := classifyRadarTarget(r.Context(), target)
@@ -97,6 +93,11 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 			payload.Mint, payload.Address = resolvedTarget, ""
 		}
 		target, requestPayload = resolvedTarget, payload
+	}
+	// Invalid native targets must be refused before any customer usage debit.
+	if _, err := h.requirePremiumOutput(claims.Sub); err != nil {
+		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
+		return
 	}
 	job, err := h.JobStore.Create(r.Context(), jobs.CreateInput{
 		UserID: claims.Sub, Email: claims.Email, Type: jobType,
