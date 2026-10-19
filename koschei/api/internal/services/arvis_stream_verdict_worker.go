@@ -151,7 +151,9 @@ func (w *arvisStreamVerdictWorker) processOne(ctx context.Context, target arvisS
 		log.Printf("arvis stream verdict failed event=%s target=%s module=%s err=%v", target.ID, target.Target, target.ModuleID, err)
 		return
 	}
-	w.markTarget(ctx, target.ID, "completed", "")
+	// Successful completion is durable ONLY inside the canonical signed-final
+	// persistence transaction, which also authenticates the source event.
+	// Never manufacture a completed state from a nil worker error.
 }
 
 func (w *arvisStreamVerdictWorker) pendingTargets(ctx context.Context, limit int) ([]arvisStreamTarget, error) {
@@ -422,16 +424,57 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 	return nil
 }
 
-func (w *arvisStreamVerdictWorker) markTarget(ctx context.Context, eventID, status, lastError string) {
-	processedAt := any(nil)
-	if status == "completed" || status == "insufficient_evidence" {
+// arvisStreamClaimStatusExecer allows the same PostgreSQL transition to run
+// inside rollback-only acceptance tests; it is not an alternate authority.
+type arvisStreamClaimStatusExecer interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+// markArvisStreamNonFinalClaim cannot mark completed, and it cannot downgrade
+// any processing claim backed by an immutable canonical signed-final receipt.
+// READ COMMITTED and the processing row update lock serialize this fallback
+// against persistArvisStreamCanonicalFinalTx, which locks that same claim.
+func markArvisStreamNonFinalClaim(
+	ctx context.Context, exec arvisStreamClaimStatusExecer,
+	eventID, status, lastError string,
+) (bool, error) {
+	if exec == nil || strings.TrimSpace(eventID) == "" {
+		return false, errors.New("ARVIS stream claim or database unavailable")
+	}
+	if status != "failed" && status != "insufficient_evidence" {
+		return false, errors.New("ARVIS stream claim can only be failed or insufficient by fallback")
+	}
+	var processedAt any
+	if status == "insufficient_evidence" {
 		processedAt = time.Now().UTC()
 	}
-	_, _ = w.db.ExecContext(ctx, `
-		UPDATE arvis_stream_processing
+	result, err := exec.ExecContext(ctx, `
+		UPDATE arvis_stream_processing AS p
 		SET status=$2,last_error=$3,processed_at=$4,updated_at=now()
-		WHERE stream_event_id=$1::uuid
+		WHERE p.stream_event_id=$1::uuid
+		  AND p.status='processing'
+		  AND NOT EXISTS (
+		    SELECT 1 FROM arvis_stream_canonical_finals AS f
+		    WHERE f.stream_event_id=p.stream_event_id
+		  )
 	`, eventID, status, compactArvisWorkerError(lastError), processedAt)
+	if err != nil {
+		return false, fmt.Errorf("ARVIS fail-closed claim transition: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return rows == 1, nil
+}
+
+func (w *arvisStreamVerdictWorker) markTarget(ctx context.Context, eventID, status, lastError string) {
+	if w == nil || w.db == nil {
+		return
+	}
+	if _, err := markArvisStreamNonFinalClaim(ctx, w.db, eventID, status, lastError); err != nil {
+		log.Printf("arvis stream claim outcome refused event=%s status=%s err=%v", eventID, status, err)
+	}
 }
 
 func arvisStreamVerdictInterval() time.Duration {

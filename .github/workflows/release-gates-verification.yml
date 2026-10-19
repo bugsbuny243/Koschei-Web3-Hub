@@ -110,6 +110,10 @@ jobs:
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_release_gate?sslmode=disable
         run: go test -v ./internal/services -run '^TestArvisStreamCanonicalRecovery' -count=1
+      - name: Verify ARVIS signed completion protects stream claims on PostgreSQL 17
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_release_gate?sslmode=disable
+        run: go test -v ./internal/services -run '^TestArvisStreamCanonicalClaimOutcome' -count=1
       - name: Test all packages
         run: go test ./...
       - name: Race-test July consolidation packages
