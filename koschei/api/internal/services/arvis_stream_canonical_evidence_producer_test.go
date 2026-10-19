@@ -41,6 +41,7 @@ func arvisStreamCanonicalEvidenceProducerFixture(t *testing.T) (
 	behavior := UnifiedRadarBehaviorReport{
 		RulesetVersion: UnifiedRadarRulesetVersionV140,
 		Mint:           event.Target,
+		GeneratedAt:    time.Date(2026, 10, 18, 12, 0, 0, 0, time.UTC),
 		Signals: []UnifiedRadarSignal{{
 			RuleID: UnifiedRuleCrossTokenExitEventRecurrence,
 			Title: "Transaction-referenced exit recurrence",
