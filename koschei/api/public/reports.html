@@ -8,17 +8,45 @@
 <meta name="theme-color" content="#03060a">
 <title>Koschei Web3 | Investigation History</title>
 <link rel="stylesheet" href="/css/koschei.css?v=1">
+<style>
+.ops-retained-evidence{margin-top:14px;padding:12px;border:1px solid #315043;border-radius:12px}
+.ops-retained-evidence summary{cursor:pointer;font-weight:750;color:#b2f7d3}
+.ops-retained-evidence-json{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.55 ui-monospace,monospace;max-height:65vh;padding:12px;background:#050b08}
+</style>
 </head>
 <body class="koschei-v2 koschei-enterprise">
 <main class="ops-page">
 <nav class="ops-nav"><a class="ops-brand" href="/dashboard"><span class="ops-mark">K</span><span><strong>Koschei Web3</strong><br><small class="ops-muted">Investigation History</small></span></a><div class="ops-nav-links"><a class="ops-btn" href="/dashboard">Workspace</a><a class="ops-btn primary" href="/arvis-chat">ARVIS Investigation</a><a class="ops-btn" href="/watchlist">Monitoring</a><a class="ops-btn" href="/account">Account</a></div></nav>
 <section class="ops-hero universe-gateway"><div><span class="ops-eyebrow">PROFESSIONAL · DURABLE CANONICAL JOB HISTORY</span><h1>History without invented evidence.</h1><p class="ops-muted">This history is account-scoped and backed by retained investigation jobs. Queued, running, completed and failed states remain distinct. A completed job exposes its actual result payload when available; missing result or signature fields never become a synthetic report or signed verdict.</p><div class="ops-actions" style="margin-top:16px"><a class="ops-btn primary" href="/arvis-chat">Open ARVIS investigation</a><button class="ops-btn" id="reportReload" type="button">Reload history</button></div></div><aside class="ops-boundary"><b>Read-only history boundary</b><p>History access requires an active Professional entitlement. Reading retained history does not create a new investigation output. New investigation creation remains metered at its own route. Commercial access is determined only by the active server-side entitlement.</p><p style="margin-top:10px">SIGNED means the completed result explicitly carries <code>signed=true</code>, a non-empty signature, and a ruleset version. Anything less remains UNSIGNED, INCOMPLETE, or UNAVAILABLE.</p></aside></section>
+<section class="ops-panel" aria-label="Start a durable customer investigation">
+  <h2>Start a retained investigation</h2>
+  <p class="ops-muted">Choose a network and public address or transaction hash. Solana supports its canonical ARVIS token/wallet investigation; connected EVM and Bitcoin collectors retain their available native evidence. Native-only reports do not imply a completed historical investigation or signed risk grade. Creating a job consumes a Professional investigation output.</p>
+  <form id="customerDeepJobForm" class="ops-toolbar" autocomplete="off">
+    <label for="customerDeepTarget">Public target</label>
+    <input id="customerDeepTarget" class="ops-input" type="text" required maxlength="128" autocapitalize="none" spellcheck="false" placeholder="Wallet, mint, contract address, or transaction hash">
+    <label for="customerDeepNetwork">Network</label>
+    <select id="customerDeepNetwork" class="ops-select" required>
+      <option value="">Select network</option>
+      <option value="solana-mainnet">Solana</option>
+      <option value="ethereum-mainnet">Ethereum</option>
+      <option value="base-mainnet">Base</option>
+      <option value="arbitrum-mainnet">Arbitrum</option>
+      <option value="optimism-mainnet">Optimism</option>
+      <option value="polygon-mainnet">Polygon</option>
+      <option value="bnb-mainnet">BNB Chain</option>
+      <option value="avalanche-mainnet">Avalanche</option>
+      <option value="bitcoin-mainnet">Bitcoin</option>
+    </select>
+    <button id="customerDeepCreate" class="ops-btn primary" type="submit">Create investigation</button>
+  </form>
+  <p class="ops-muted" id="customerDeepJobState" role="status" aria-live="polite">The backend validates the exact network and target before accepting a metered investigation.</p>
+</section>
 <section class="ops-kpis"><article class="ops-kpi" id="reportTotalKpi"><span>History rows</span><strong>—</strong><small>Loading investigation history.</small></article><article class="ops-kpi" id="reportCompletedKpi"><span>Completed</span><strong>—</strong><small>Loading job states.</small></article><article class="ops-kpi" id="reportSignedKpi"><span>Strictly signed</span><strong>—</strong><small>Loading signature evidence.</small></article><article class="ops-kpi" id="reportLatestKpi"><span>Latest queued</span><strong>—</strong><small>Loading server timestamps.</small></article></section>
 <div class="ops-status" id="reportStatus" role="status"></div>
 <section class="ops-panel"><div class="ops-toolbar"><input class="ops-input" id="reportSearch" type="search" autocomplete="off" placeholder="Search target, job state, verdict, grade, or job ID" aria-label="Search investigation history"><select class="ops-select" id="reportStateFilter" aria-label="Filter investigation history by job state"><option value="">All job states</option><option value="queued">Queued</option><option value="running">Running</option><option value="completed">Completed</option><option value="failed">Failed</option></select><span class="ops-count" id="reportVisibleCount">—/—</span></div><div class="ops-list" id="reportList"><div class="ops-empty">Loading investigation history…</div></div></section>
 </main>
 <script src="/js/koschei-auth.js?v=33"></script>
-<script src="/js/customer-reports-v2.js?v=2"></script>
+<script src="/js/customer-reports-v2.js?v=3"></script>
 <script src="/js/customer-command-center-v1.js?v=6"></script>
 <script src="/js/koschei-global-shell.js?v=6"></script>
 <script src="/js/koschei-product-v2.js?v=5"></script>
