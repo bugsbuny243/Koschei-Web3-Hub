@@ -76,6 +76,17 @@ function render(){
     card.append(head,metadata);
     if(state==='failed'){const error=text(item?.error_message)||text(item?.error_code)||'Failure details unavailable.';card.append(node('p','ops-record-copy',error));}
     if(state==='completed'&&item?.result_available!==true)card.append(node('p','ops-record-copy','Job is marked completed but result payload is unavailable. No verdict or signature state is inferred.'));
+    // A customer must be able to revisit every retained collector field,
+    // nested source digest, limitation and provenance row without owner access.
+    // Render JSON as textContent, never as server-controlled HTML.
+    const retained=resultOf(item);
+    if(retained){
+      const details=node('details','ops-retained-evidence');
+      const summary=node('summary','','View complete retained evidence and provenance');
+      const payload=node('pre','ops-retained-evidence-json',JSON.stringify(retained,null,2));
+      details.append(summary,payload);
+      card.append(details);
+    }
     const actions=node('div','ops-record-actions');
     if(target){actions.append(actionLink('Open in ARVIS',scanURL(target),true));const copy=node('button','ops-btn','Copy target');copy.type='button';copy.dataset.copyTarget=target;actions.append(copy);}
     if(actions.childNodes.length)card.append(actions);
