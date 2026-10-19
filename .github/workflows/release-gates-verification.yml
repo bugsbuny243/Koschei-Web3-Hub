@@ -61,6 +61,7 @@ jobs:
           unformatted="$(gofmt -l .)"
           if [ -n "${unformatted}" ]; then
             printf '%s\n' "${unformatted}"
+            gofmt -d internal/providerintel/client.go internal/providerintel/client_test.go
             exit 1
           fi
       - name: Apply all migrations on PostgreSQL 17
