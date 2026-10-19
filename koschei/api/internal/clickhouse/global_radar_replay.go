@@ -97,7 +97,6 @@ FORMAT JSONEachRow`)
 	return out, nil
 }
 
-
 func decodeGlobalRadarReplayHeadPage(decoder *json.Decoder, limit int) ([]globalRadarReplayHeadRow, error) {
 	if decoder == nil || limit <= 0 || limit > globalRadarReplayMaxSnapshots {
 		return nil, fmt.Errorf("invalid ClickHouse Global Radar replay page limit")
