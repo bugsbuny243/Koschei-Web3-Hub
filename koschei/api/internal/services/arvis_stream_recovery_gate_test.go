@@ -73,7 +73,9 @@ func TestArvisStreamRecoveryIndependentOfScanAndRPCGatesPostgres17(t *testing.T)
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() {
+			// Defer cleanup BEFORE db.Close runs; t.Cleanup would execute after
+			// function-level defers, leaving the fixture database connection closed.
+			defer func() {
 				cleanupCtx, done := context.WithTimeout(context.Background(), 5*time.Second)
 				defer done()
 				_, _ = db.ExecContext(cleanupCtx, "DELETE FROM arvis_stream_processing WHERE stream_event_id=$1::uuid", eventID)
