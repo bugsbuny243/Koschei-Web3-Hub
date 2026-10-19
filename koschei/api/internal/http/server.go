@@ -236,6 +236,8 @@ func registerDeveloperAPIRoutes(mux *http.ServeMux, h *handlers.Handler, profess
 	risk := func(next http.HandlerFunc) http.HandlerFunc { return requireRuntimeFeature(featureRiskScanner, next) }
 	mux.HandleFunc("/api/v1/scan/token", solana(risk(requiresDB(h, professionalMetered(method("POST", h.B2BTokenScan))))))
 	mux.HandleFunc("/api/v1/usage", requiresDB(h, professional(method("GET", h.APIUsage))))
+	mux.HandleFunc("/api/v1/intelligence/provider", requiresDB(h, professionalMetered(method("POST", h.ExternalProviderIntelligence))))
+	mux.HandleFunc("/api/v1/intelligence/provider/capabilities", requiresDB(h, professional(method("GET", h.ExternalProviderCapabilities))))
 	mux.HandleFunc("/api/v1/shield/preflight", solana(requiresDB(h, professionalMetered(method("POST", h.ShieldPreflight)))))
 	mux.HandleFunc("/api/v1/shield/transaction", solana(requiresDB(h, professionalMetered(method("POST", h.TransactionGuardV2Configured)))))
 	mux.HandleFunc("/api/v1/shield/state-recheck", solana(requiresDB(h, professional(method("POST", h.TransactionGuardStateRecheck)))))
