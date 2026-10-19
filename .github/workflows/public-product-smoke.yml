@@ -45,6 +45,9 @@ jobs:
       - name: Verify registry smoke decision tests
         run: node koschei/api/scripts/verify-public-registry-smoke-response.test.js
 
+      - name: Verify versioned unified scan bootstrap contract
+        run: node --test koschei/api/scripts/expected-unified-scan-navigation-marker.test.cjs
+
       - name: Probe public product
         shell: bash
         run: |
@@ -189,7 +192,8 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
             wait_expect_200 auth_english_asset /js/english-auth-presentation.js "__koscheiAuthEnglishOverlayInstalled"
             wait_expect_200 unified_scan_navigation_asset /js/unified-scan-navigation.js "__koscheiUnifiedScanNavigation"
-            wait_expect_200 public_scan_runtime /js/public-solana-scan.js "script.src='/js/unified-scan-navigation.js?v=2'"
+            scan_navigation_marker="$(node koschei/api/scripts/expected-unified-scan-navigation-marker.cjs)"
+            wait_expect_200 public_scan_runtime /js/public-solana-scan.js "${scan_navigation_marker}"
             if [ "${GITHUB_EVENT_NAME}" = "push" ] || [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
               wait_expect_200 full_scan_contract /full-scan-contract-v1.json "koschei-production-full-scan-contract-v1" 36
             fi

@@ -21,14 +21,23 @@ requireText('Publish full scan outcome to issue 756', 'full_scan_issue_step');
 requireText('KOSCHEI_ACCEPTANCE_SESSION_TOKEN: ${{ secrets.KOSCHEI_ACCEPTANCE_SESSION_TOKEN }}', 'acceptance_session_secret_binding');
 requireText('full-scan-auth-gate.json', 'full_scan_auth_deferred_artifact');
 
+// Resolve the navigation version from the checked-out JS bootstrap, not a
+// frozen string embedded in the CI workflow. The workflow invokes the same
+// fail-closed extractor before validating the deployed runtime.
+const { expectedNavigationMarker } = require('./expected-unified-scan-navigation-marker.cjs');
 const scanRuntime = fs.readFileSync(path.resolve(__dirname, '../public/js/public-solana-scan.js'), 'utf8');
-const scanNavigation = scanRuntime.match(/script\.src='(\/js\/unified-scan-navigation\.js\?v=\d+)'/);
-if (!scanNavigation) throw new Error('scan_runtime_navigation_bootstrap_missing');
+const navigationMarker = expectedNavigationMarker(scanRuntime);
+if (!navigationMarker.includes('/js/unified-scan-navigation.js?v=')) {
+  throw new Error('scan_runtime_navigation_bootstrap_missing');
+}
 requireText(
-  'wait_expect_200 public_scan_runtime /js/public-solana-scan.js "script.src=\'' + scanNavigation[1] + '\'"',
-  'scan_runtime_deployment_navigation_version_mismatch'
+  'scan_navigation_marker="$(node koschei/api/scripts/expected-unified-scan-navigation-marker.cjs)"',
+  'scan_runtime_navigation_marker_extractor'
 );
-
+requireText(
+  'wait_expect_200 public_scan_runtime /js/public-solana-scan.js "${scan_navigation_marker}"',
+  'scan_runtime_deployment_navigation_marker_use'
+);
 
 forbidText("if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'\n        run: node koschei/api/scripts/verify-production-full-scan.js", 'push_full_scan_execution');
 forbidText("if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && success()", 'push_full_scan_print');
