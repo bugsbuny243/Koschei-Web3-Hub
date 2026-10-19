@@ -74,24 +74,9 @@ FORMAT JSONEachRow`)
 	}
 
 	limited := &io.LimitedReader{R: resp.Body, N: globalRadarGraphBodyLimit + 1}
-	decoder := json.NewDecoder(limited)
-	heads := make([]globalRadarReplayHeadRow, 0, limit)
-	for {
-		var row globalRadarReplayHeadRow
-		err := decoder.Decode(&row)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("decode ClickHouse Global Radar replay head: %w", err)
-		}
-		if len(heads) >= limit {
-			return nil, fmt.Errorf("ClickHouse Global Radar replay exceeded snapshot limit %d", limit)
-		}
-		if !hex64RE.MatchString(strings.TrimSpace(row.SnapshotSHA256)) || row.RecordedAtNanos <= 0 {
-			return nil, fmt.Errorf("ClickHouse Global Radar replay head has invalid identity")
-		}
-		heads = append(heads, row)
+	heads, err := decodeGlobalRadarReplayHeadPage(json.NewDecoder(limited), limit)
+	if err != nil {
+		return nil, err
 	}
 	if limited.N <= 0 {
 		return nil, fmt.Errorf("ClickHouse Global Radar replay-head response exceeded %d bytes", globalRadarGraphBodyLimit)
@@ -110,6 +95,34 @@ FORMAT JSONEachRow`)
 		})
 	}
 	return out, nil
+}
+
+func decodeGlobalRadarReplayHeadPage(decoder *json.Decoder, limit int) ([]globalRadarReplayHeadRow, error) {
+	if decoder == nil || limit <= 0 || limit > globalRadarReplayMaxSnapshots {
+		return nil, fmt.Errorf("invalid ClickHouse Global Radar replay page limit")
+	}
+	heads := make([]globalRadarReplayHeadRow, 0, limit)
+	for {
+		var row globalRadarReplayHeadRow
+		err := decoder.Decode(&row)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("decode ClickHouse Global Radar replay head: %w", err)
+		}
+		// The upstream query deliberately requests limit+1 to detect another
+		// page. This extra row is NOT an error: the caller persists a durable
+		// cursor for each returned snapshot and resumes after the last one.
+		if len(heads) >= limit {
+			break
+		}
+		if !hex64RE.MatchString(strings.TrimSpace(row.SnapshotSHA256)) || row.RecordedAtNanos <= 0 {
+			return nil, fmt.Errorf("ClickHouse Global Radar replay head has invalid identity")
+		}
+		heads = append(heads, row)
+	}
+	return heads, nil
 }
 
 func (c *Client) readGlobalRadarSnapshotForReplay(ctx context.Context, snapshotSHA256 string, recordedAt time.Time) (services.GlobalRadarSnapshot, error) {
