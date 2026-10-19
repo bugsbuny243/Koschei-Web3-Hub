@@ -68,6 +68,12 @@ func AdaptEVMProbeEvidence(result networktarget.EVMProbeResult, observedAt time.
 	if hash := strings.ToLower(strings.TrimSpace(result.ContractCodeHash)); hash != "" {
 		attributes["contract_code_sha256"] = hash
 	}
+	if digest := strings.ToLower(strings.TrimSpace(result.ChainIDResponseSHA256)); digest != "" {
+		attributes["chain_id_response_sha256"] = digest
+	}
+	if digest := strings.ToLower(strings.TrimSpace(result.ContractCodeResponseSHA256)); digest != "" {
+		attributes["contract_code_response_sha256"] = digest
+	}
 	if delegationTarget != "" {
 		attributes["delegation_target"] = delegationTarget
 	}
@@ -111,6 +117,12 @@ func AdaptBitcoinProbeEvidence(result networktarget.BitcoinProbeResult, observed
 		"evidence_scope":     "read_only_network_probe",
 		"analysis_performed": true,
 		"live_availability":  "checked",
+	}
+	if digest := strings.ToLower(strings.TrimSpace(result.GenesisResponseSHA256)); digest != "" {
+		attributes["genesis_response_sha256"] = digest
+	}
+	if digest := strings.ToLower(strings.TrimSpace(result.AddressResponseSHA256)); digest != "" {
+		attributes["address_response_sha256"] = digest
 	}
 	evidence := buildNetworkProbeEvidence(subject, "bitcoin_esplora_probe", "address_activity", result.ActivityState, observedAt, attributes)
 	return NetworkProbeIntelligenceProjection{Subject: subject, Evidence: evidence}, nil
