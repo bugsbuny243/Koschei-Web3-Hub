@@ -10,6 +10,10 @@ const hasValue=value=>value!==null&&value!==undefined&&String(value).trim()!==''
 const isObject=value=>Boolean(value)&&typeof value==='object'&&!Array.isArray(value);
 const allowedStates=new Set(['queued','running','completed','failed']);
 let history=null;
+const requestedJobID=(()=>{
+  const value=new URLSearchParams(window.location?.search||'').get('job');
+  return /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value||'')?value:'';
+})();
 
 function node(tag,className,value){const el=document.createElement(tag);if(className)el.className=className;if(value!==undefined)el.textContent=String(value);return el;}
 function clear(host){while(host?.firstChild)host.removeChild(host.firstChild);}
@@ -76,6 +80,17 @@ function render(){
     card.append(head,metadata);
     if(state==='failed'){const error=text(item?.error_message)||text(item?.error_code)||'Failure details unavailable.';card.append(node('p','ops-record-copy',error));}
     if(state==='completed'&&item?.result_available!==true)card.append(node('p','ops-record-copy','Job is marked completed but result payload is unavailable. No verdict or signature state is inferred.'));
+    // A customer must be able to revisit every retained collector field,
+    // nested source digest, limitation and provenance row without owner access.
+    // Render JSON as textContent, never as server-controlled HTML.
+    const retained=resultOf(item);
+    if(retained){
+      const details=node('details','ops-retained-evidence');
+      const summary=node('summary','','View complete retained evidence and provenance');
+      const payload=node('pre','ops-retained-evidence-json',JSON.stringify(retained,null,2));
+      details.append(summary,payload);
+      card.append(details);
+    }
     const actions=node('div','ops-record-actions');
     if(target){actions.append(actionLink('Open in ARVIS',scanURL(target),true));const copy=node('button','ops-btn','Copy target');copy.type='button';copy.dataset.copyTarget=target;actions.append(copy);}
     if(actions.childNodes.length)card.append(actions);
@@ -114,5 +129,6 @@ async function load(){
 async function copyTarget(value,button){try{await navigator.clipboard.writeText(value);const previous=button.textContent;button.textContent='Copied';window.setTimeout(()=>{button.textContent=previous;},900);}catch{status('Clipboard access is unavailable in this browser.','bad');}}
 document.addEventListener('click',event=>{const button=event.target.closest('[data-copy-target]');if(button)copyTarget(button.dataset.copyTarget||'',button);});
 $('reportSearch')?.addEventListener('input',render);$('reportStateFilter')?.addEventListener('change',render);$('reportReload')?.addEventListener('click',load);
+if(requestedJobID&&$('reportSearch'))$('reportSearch').value=requestedJobID;
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load);else load();
 })();

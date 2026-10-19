@@ -55,7 +55,7 @@ requireText(reportsHTML,'PROFESSIONAL · DURABLE CANONICAL JOB HISTORY','history
 requireText(reportsHTML,'History access requires an active Professional entitlement.','history entitlement boundary');
 requireText(reportsHTML,'Commercial access is determined only by the active server-side entitlement.','history authority copy');
 requireText(reportsHTML,'signed=true','history strict signed copy');
-requireText(reportsHTML,'/js/customer-reports-v2.js?v=2','history controller');
+requireText(reportsHTML,'/js/customer-reports-v2.js?v=3','history controller');
 requireText(reportsHTML,'/arvis-chat','ARVIS investigation route');
 forbid(reportsHTML,/\bKOSCH\b|token holdings|STARTER\+|ENTERPRISE\+|Basic KOSCH tier/i,'legacy authorization copy');
 
