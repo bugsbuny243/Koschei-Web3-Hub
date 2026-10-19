@@ -10,6 +10,10 @@ const hasValue=value=>value!==null&&value!==undefined&&String(value).trim()!==''
 const isObject=value=>Boolean(value)&&typeof value==='object'&&!Array.isArray(value);
 const allowedStates=new Set(['queued','running','completed','failed']);
 let history=null;
+const requestedJobID=(()=>{
+  const value=new URLSearchParams(window.location?.search||'').get('job');
+  return /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value||'')?value:'';
+})();
 
 function node(tag,className,value){const el=document.createElement(tag);if(className)el.className=className;if(value!==undefined)el.textContent=String(value);return el;}
 function clear(host){while(host?.firstChild)host.removeChild(host.firstChild);}
@@ -125,5 +129,6 @@ async function load(){
 async function copyTarget(value,button){try{await navigator.clipboard.writeText(value);const previous=button.textContent;button.textContent='Copied';window.setTimeout(()=>{button.textContent=previous;},900);}catch{status('Clipboard access is unavailable in this browser.','bad');}}
 document.addEventListener('click',event=>{const button=event.target.closest('[data-copy-target]');if(button)copyTarget(button.dataset.copyTarget||'',button);});
 $('reportSearch')?.addEventListener('input',render);$('reportStateFilter')?.addEventListener('change',render);$('reportReload')?.addEventListener('click',load);
+if(requestedJobID&&$('reportSearch'))$('reportSearch').value=requestedJobID;
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load);else load();
 })();
