@@ -92,6 +92,28 @@ func (h *Handler) evaluatePlanAccess(ctx context.Context, authSubject, claimEmai
 	if email == "" {
 		return planAccessEvaluation{Plan: "none", Source: "entitlement"}, nil
 	}
+	// Owner ban/remove is an IMMEDIATE authorization revocation for BOTH
+	// an existing Neon JWT and an active developer API key. An entitlement
+	// must not override profile status just because the token includes email.
+	// Use the PRIMARY customer DB to avoid stale read-replica status; query
+	// failure is fail-closed instead of quietly granting a paid plan.
+	profileDB := h.DB
+	if profileDB == nil {
+		profileDB = store
+	}
+	var blocked bool
+	if err := profileDB.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM app_user_profiles
+			WHERE status IN ('banned','removed')
+			  AND (auth_subject=$1 OR lower(email)=lower($2))
+		)
+	`, authSubject, email).Scan(&blocked); err != nil {
+		return planAccessEvaluation{}, err
+	}
+	if blocked {
+		return planAccessEvaluation{Plan: "none", Source: "profile_revoked"}, nil
+	}
 
 	var plan, paymentProvider string
 	var total, remaining int
