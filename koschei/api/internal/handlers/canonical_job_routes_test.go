@@ -62,15 +62,29 @@ func TestCanonicalPayloadMaxDepthIsBounded(t *testing.T) {
 }
 
 func TestCustomerCanonicalWorkerRefusesWrongNetworkBeforeLoadingSolanaEvidence(t *testing.T) {
-	for _, network := range []string{"ethereum-mainnet", "base-mainnet", "bitcoin-mainnet", "sui-mainnet"} {
-		t.Run(network, func(t *testing.T) {
+	// Native EVM and Bitcoin addresses are now supported on their own routes,
+	// but no unavailable/mismatched target may fall back to the Solana engine.
+	// A failed native collector must return an error, not an empty completed job.
+	t.Setenv("ETHEREUM_RPC_URL", "")
+	t.Setenv("BASE_RPC_URL", "")
+	for _, tc := range []struct {
+		network string
+		target  string
+		wantErr string
+	}{
+		{"ethereum-mainnet", "0x1111111111111111111111111111111111111111", "native EVM customer collector not configured"},
+		{"base-mainnet", "0x1111111111111111111111111111111111111111", "native EVM customer collector not configured"},
+		{"bitcoin-mainnet", "0x1111111111111111111111111111111111111111", "address_network_format_mismatch"},
+		{"sui-mainnet", "0x1111111111111111111111111111111111111111", "address_network_format_mismatch"},
+	} {
+		t.Run(tc.network, func(t *testing.T) {
 			worker := &canonicalInvestigationJobWorker{}
 			report, err := worker.processJob(context.Background(), jobs.Job{
-				Type: CanonicalInvestigationJobType, Network: network,
-				Target: "0x1111111111111111111111111111111111111111",
+				Type: CanonicalInvestigationJobType, Network: tc.network,
+				Target: tc.target,
 			})
-			if report != nil || err == nil || !strings.Contains(err.Error(), "not connected") {
-				t.Fatalf("wrong network accepted: report=%v err=%v", report, err)
+			if report != nil || err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("mismatched or unavailable native network must fail closed: report=%v err=%v", report, err)
 			}
 		})
 	}
