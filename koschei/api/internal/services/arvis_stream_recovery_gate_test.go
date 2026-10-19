@@ -80,7 +80,7 @@ func TestArvisStreamRecoveryIndependentOfScanAndRPCGatesPostgres17(t *testing.T)
 				defer done()
 				_, _ = db.ExecContext(cleanupCtx, "DELETE FROM arvis_stream_processing WHERE stream_event_id=$1::uuid", eventID)
 				_, _ = db.ExecContext(cleanupCtx, "DELETE FROM security_radar_stream_events WHERE id=$1::uuid", eventID)
-			})
+			}()
 			if _, err := db.ExecContext(ctx, `
 				INSERT INTO arvis_stream_processing
 				(stream_event_id,target,signature,status,attempts,updated_at)
