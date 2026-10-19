@@ -62,7 +62,7 @@ type Client struct {
 
 func NewFromEnv() *Client {
 	return &Client{
-		HTTP: &http.Client{Timeout: 9*time.Second},
+		HTTP: &http.Client{Timeout: 9*time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }},
 		BlockaidKey: strings.TrimSpace(os.Getenv("KOSCHEI_BLOCKAID_API_KEY")),
 		GoPlusKey: strings.TrimSpace(os.Getenv("KOSCHEI_GOPLUS_ACCESS_TOKEN")),
 		BubblemapsKey: strings.TrimSpace(os.Getenv("KOSCHEI_BUBBLEMAPS_API_KEY")),
@@ -142,7 +142,8 @@ func (c *Client) Query(ctx context.Context, in Input) (Result,error) {
 			if len(in.Payload)==0||len(in.Payload)>32768||!json.Valid(in.Payload){return Result{},ErrInvalid}
 			var request map[string]json.RawMessage
 			if err:=json.Unmarshal(in.Payload,&request);err!=nil{return Result{},ErrInvalid}
-			if len(request["data"])==0||len(request["chain"])==0||len(request["account_address"])==0 {return Result{},fmt.Errorf("%w: transaction requires data, chain and account_address",ErrInvalid)}
+			if len(request["data"])==0||len(request["chain"])==0 {return Result{},fmt.Errorf("%w: transaction requires data and chain",ErrInvalid)}
+			if in.Operation=="transaction"&&len(request["account_address"])==0{return Result{},fmt.Errorf("%w: transaction requires account_address",ErrInvalid)}
 			if in.Operation=="transaction_bulk"{
 				var items []json.RawMessage
 				if err:=json.Unmarshal(request["data"],&items);err!=nil||len(items)==0||len(items)>20{return Result{},fmt.Errorf("%w: bulk size must be 1 to 20",ErrInvalid)}
