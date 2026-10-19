@@ -86,7 +86,7 @@ function harness(fetch,search='',shared=false){
   Object.defineProperty(nodes.scanNetwork,'selectedOptions',{get(){return nodes.scanNetwork.options.filter(option=>option.value===nodes.scanNetwork.value);}});
  }
  const timers=new Map();let timerID=0;
- const window={addEventListener(){}};
+ const window={addEventListener(){},KoscheiAuth:{init:async()=>{},isLoggedIn:()=>true,apiCall:(url,options)=>fetch(url,options)}};
  const events={};
  const document={readyState:'complete',getElementById:id=>nodes[id],querySelector:()=>({}),querySelectorAll:()=>[],createElement:()=>new Node(),addEventListener(name,fn){(events[name]??=[]).push(fn);},dispatchEvent(event){for(const fn of events[event.type]||[])fn(event);}};
  const context=vm.createContext({window,URLSearchParams,AbortController,SyntaxError,Error,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},location:{search,pathname:'/scan'},history:{replaceState(){}},setTimeout(fn){timers.set(++timerID,fn);return timerID;},clearTimeout(id){timers.delete(id);},fetch,document});
@@ -260,7 +260,7 @@ test('customer starts full retained ARVIS job and sees entire verified network-b
  });
  h.submit(sol,'solana-mainnet');await settle();
  const button=h.nodes.customerUniversalRecovery.children[0];
- assert.equal(button.textContent,'Run full ARVIS investigation');
+ assert.equal(button.textContent,'Run durable ARVIS investigation');
  button.dispatch('click');await settle();await settle();
  assert.equal(calls.length,3);
  assert.deepEqual(JSON.parse(calls[1].options.body),{address:sol,network:'solana-mainnet',max_depth:3});
@@ -271,10 +271,13 @@ test('customer starts full retained ARVIS job and sees entire verified network-b
  assert.doesNotMatch(calls.map(c=>c.url).join('|'),/\/api\/owner\//);
 });
 
-test('non-Solana observed scan is not misrouted to Solana canonical engine',async()=>{
- const h=harness(async()=>response(200,envelope(evm,'base-mainnet')));
+test('non-Solana observed scan offers a distinctly limited native evidence job, not Solana grade',async()=>{
+ const calls=[];
+ const h=harness(async(url,options)=>{calls.push({url,options});return response(200,envelope(evm,'base-mainnet'));});
  h.submit(evm,'base-mainnet');await settle();
- assert.equal(h.nodes.customerUniversalRecovery.hidden,true);
+ assert.equal(h.nodes.customerUniversalRecovery.hidden,false);
+ assert.equal(h.nodes.customerUniversalRecovery.children[0].textContent,'Run and save native evidence');
+ assert.equal(calls.length,1,'no durable job is submitted without a customer click');
 });
 
 test('deep customer job rejects crossed target result and preserves the initial evidence',async()=>{
@@ -289,4 +292,25 @@ test('deep customer job rejects crossed target result and preserves the initial 
  assert.doesNotMatch(h.nodes.customerUniversalResults.innerHTML,/fabricated_risk/);
  assert.match(h.nodes.customerUniversalResults.innerHTML,/Evidence references/);
  assert.match(h.nodes.customerUniversalStatus.textContent,/history/);
+});
+
+test('EVM native job displays retained evidence without implying completed ARVIS grading',async()=>{
+ const id='12345678-1234-1234-1234-123456789abc',calls=[];
+ const native={schema_version:'koschei-canonical-native-investigation-v1',status:'evidence_only_partial',
+   customer_scan:{network_evidence:{source:'fixture-evm',attributes:{chain_id_response_sha256:'synthetic-digest'}}},
+   final_verdict:{grade:'-',signed:false,withheld:true,risk_level:'unknown'}};
+ const h=harness(async(url,options)=>{
+   calls.push({url,options});
+   if(url==='/api/scan')return response(200,envelope(evm,'base-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   if(url==='/api/v1/radar/jobs/'+id)return response(200,{id,job_type:'canonical_investigation',status:'completed',target:evm,network:'base-mainnet',result:native});
+   throw new Error('unexpected endpoint '+url);
+ });
+ h.submit(evm,'base-mainnet');await settle();
+ h.nodes.customerUniversalRecovery.children[0].dispatch('click');await settle();await settle();
+ assert.equal(calls.length,3);
+ assert.deepEqual(JSON.parse(calls[1].options.body),{address:evm,network:'base-mainnet',max_depth:3});
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/chain_id_response_sha256/);
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/historical collectors and a signed grade are NOT claimed/);
+ assert.doesNotMatch(calls.map(c=>c.url).join('|'),/\/api\/owner\//);
 });
