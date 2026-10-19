@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -16,6 +17,10 @@ import (
 // durable job store. A native probe is NOT a full historical ARVIS analysis;
 // missing collectors and the absence of signed decision authority stay visible.
 func canonicalNativeNetworkJob(ctx context.Context, target, network string) (map[string]any, error) {
+	return canonicalNativeNetworkJobWithClient(ctx, nil, target, network)
+}
+
+func canonicalNativeNetworkJobWithClient(ctx context.Context, client *http.Client, target, network string) (map[string]any, error) {
 	resolution, err := networktarget.Resolve(network, target)
 	if err != nil {
 		return nil, fmt.Errorf("native customer job target: %w", err)
@@ -35,7 +40,7 @@ func canonicalNativeNetworkJob(ctx context.Context, target, network string) (map
 		if endpoint == "" {
 			return nil, fmt.Errorf("native EVM customer collector not configured")
 		}
-		probe, err := networktarget.ProbeEVM(ctx, nil, endpoint, resolution)
+		probe, err := networktarget.ProbeEVM(ctx, client, endpoint, resolution)
 		if err != nil {
 			return nil, fmt.Errorf("native EVM customer observation: %w", err)
 		}
@@ -47,7 +52,7 @@ func canonicalNativeNetworkJob(ctx context.Context, target, network string) (map
 		if err != nil {
 			return nil, err
 		}
-		proxy, proxyErr := networktarget.ProbeEVMProxyAuthority(ctx, nil, endpoint, resolution)
+		proxy, proxyErr := networktarget.ProbeEVMProxyAuthority(ctx, client, endpoint, resolution)
 		if proxyErr != nil {
 			canonicalNativeGap(&result, "EVM_AUTHORITY_PROBE_UNAVAILABLE")
 		} else {
@@ -67,7 +72,7 @@ func canonicalNativeNetworkJob(ctx context.Context, target, network string) (map
 			}
 		}
 		if probe.ContractCodeState == "contract_code_observed" {
-			asset, assetErr := networktarget.ProbeEVMERC20Asset(ctx, nil, endpoint, probe)
+			asset, assetErr := networktarget.ProbeEVMERC20Asset(ctx, client, endpoint, probe)
 			if assetErr != nil {
 				canonicalNativeGap(&result, "EVM_ASSET_PROBE_UNAVAILABLE")
 			} else {
@@ -89,7 +94,7 @@ func canonicalNativeNetworkJob(ctx context.Context, target, network string) (map
 		if endpoint == "" {
 			return nil, fmt.Errorf("native Bitcoin customer collector not configured")
 		}
-		probe, err := networktarget.ProbeBitcoin(ctx, nil, endpoint, resolution)
+		probe, err := networktarget.ProbeBitcoin(ctx, client, endpoint, resolution)
 		if err != nil {
 			return nil, fmt.Errorf("native Bitcoin customer observation: %w", err)
 		}
