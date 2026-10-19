@@ -264,7 +264,7 @@ test('customer starts full retained ARVIS job and sees entire verified network-b
  button.dispatch('click');await settle();await settle();
  assert.equal(calls.length,3);
  assert.deepEqual(JSON.parse(calls[1].options.body),{address:sol,network:'solana-mainnet',max_depth:3});
- assert.equal(h.nodes.customerUniversalRecovery.children[1].href,'/api/v1/radar/jobs/'+id);
+ assert.equal(h.nodes.customerUniversalRecovery.children[1].href,'/reports');
  assert.match(h.nodes.customerUniversalResults.innerHTML,/Complete retained ARVIS report/);
  assert.match(h.nodes.customerUniversalResults.innerHTML,/relation_history/);
  assert.match(h.nodes.customerUniversalResults.innerHTML,/fixture_not_attested/);
