@@ -61,6 +61,9 @@ jobs:
           go run ./cmd/openapi-gen -check
           go test ./internal/radaradapter/... ./internal/services ./internal/handlers ./internal/http -run 'TestEveryRegistered|TestRuntime|TestExtendedPermissions|TestRadarHTTP|TestRadarCollectorOwner|TestReadOnlyTransport'
           node --test public/js/__tests__/owner-multichain-radar.test.cjs
+      - name: Verify public liveness truth contract
+        run: node --test scripts/verify-public-health-liveness.test.cjs
+
       - name: Download modules
         run: go mod download
       - name: Validate migrations on PostgreSQL 17

@@ -27,6 +27,9 @@ jobs:
     env:
       BASE_URL: https://tradepigloball.co
     steps:
+      - name: Verify public health response contract
+        run: node --test koschei/api/scripts/verify-public-health-liveness.test.cjs
+
       - name: Probe public API transport
         id: probe
         shell: bash

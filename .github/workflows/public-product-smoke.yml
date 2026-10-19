@@ -189,7 +189,7 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
             wait_expect_200 auth_english_asset /js/english-auth-presentation.js "__koscheiAuthEnglishOverlayInstalled"
             wait_expect_200 unified_scan_navigation_asset /js/unified-scan-navigation.js "__koscheiUnifiedScanNavigation"
-            wait_expect_200 public_scan_runtime /js/public-solana-scan.js "script.src='/js/unified-scan-navigation.js?v=1'"
+            wait_expect_200 public_scan_runtime /js/public-solana-scan.js "script.src='/js/unified-scan-navigation.js?v=2'"
             if [ "${GITHUB_EVENT_NAME}" = "push" ] || [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
               wait_expect_200 full_scan_contract /full-scan-contract-v1.json "koschei-production-full-scan-contract-v1" 36
             fi
