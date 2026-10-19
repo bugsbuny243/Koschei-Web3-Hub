@@ -270,7 +270,7 @@ func (c *Client) Query(ctx context.Context, in Input) (Result, error) {
 			}
 			endpoint, method = "/v0/relationships/subgraph", http.MethodPost
 			data = map[string]any{
-				"addresses": in.Addresses,
+				"addresses":         in.Addresses,
 				"context_token_key": map[string]string{"chain": chain, "address": in.Address},
 			}
 		default:
