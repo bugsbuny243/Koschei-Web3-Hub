@@ -63,7 +63,11 @@ func stackAddress(raw json.RawMessage) (string, error) {
 	if e != nil {
 		return "", e
 	}
-	addr, e := c.BeginParse().LoadAddr()
+	slice, e := c.BeginParse()
+	if e != nil {
+		return "", errors.New("invalid address cell")
+	}
+	addr, e := slice.LoadAddr()
 	if e != nil || addr == nil {
 		return "", errors.New("invalid cell address")
 	}
