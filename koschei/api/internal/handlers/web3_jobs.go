@@ -8,6 +8,7 @@ import (
 
 	"koschei/api/internal/jobs"
 	"koschei/api/internal/networktarget"
+	"koschei/api/internal/services"
 )
 
 type asyncWeb3Request struct {
@@ -63,7 +64,25 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 			})
 			return
 		}
-		if _, err := networktarget.Resolve(req.Network, target); err != nil {
+		classified, classifyErr := services.ClassifyCustomerScanTarget(target, req.Network)
+		if classifyErr != nil || classified.RequiresNetwork || classified.Route == services.CustomerScanRouteUnresolved {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
+				"error": "canonical_job_target_network_mismatch", "network": req.Network,
+			})
+			return
+		}
+		// Transactions are validated by the chain-specific canonical hash
+		// classifier; address probes still require networktarget.Resolve.
+		if classified.Route == services.CustomerScanRouteTxLookup {
+			if classified.Kind != services.CustomerScanTargetTxHash ||
+				(network.Family == "evm" && !strings.HasPrefix(target, "0x")) ||
+				(req.Network == "bitcoin-mainnet" && strings.HasPrefix(target, "0x")) {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
+					"error": "canonical_job_target_network_mismatch", "network": req.Network,
+				})
+				return
+			}
+		} else if _, err := networktarget.Resolve(req.Network, target); err != nil {
 			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
 				"error": "canonical_job_target_network_mismatch", "network": req.Network,
 			})
