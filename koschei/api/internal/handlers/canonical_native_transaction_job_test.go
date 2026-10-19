@@ -111,6 +111,16 @@ func TestCanonicalNativeBitcoinTransactionRetainsUTXOFlow(t *testing.T) {
 	if attr["fee_sats"] == nil && attr["fee_satoshis"] == nil {
 		t.Fatalf("BTC fee flow evidence missing: %#v", attr)
 	}
+	inputs, inputsOK := attr["input_flows"].([]map[string]any)
+	outputs, outputsOK := attr["output_flows"].([]map[string]any)
+	if !inputsOK || !outputsOK || len(inputs) != 1 || len(outputs) != 1 {
+		t.Fatalf("BTC inputs and outputs were truncated in customer evidence: %#v", attr)
+	}
+	if inputs[0]["previous_value_sats"] != int64(1500) || outputs[0]["value_sats"] != int64(600) ||
+		attr["derived_fee_sats"] != int64(900) || attr["fee_consistent"] != true ||
+		attr["transaction_response_sha256"] == "" {
+		t.Fatalf("BTC value flow integrity or source digest missing: %#v", attr)
+	}
 	if report["final_verdict"].(map[string]any)["withheld"] != true {
 		t.Fatal("Bitcoin UTXO flow observation fabricated safety grade")
 	}
