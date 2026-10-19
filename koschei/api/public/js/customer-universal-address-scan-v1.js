@@ -361,7 +361,9 @@ function install(){
         link.textContent=response.status===401?'Sign in to continue':'Review account access';
         recovery.replaceChildren(link);recovery.hidden=false;
       }
-      if(response.ok&&request.kind==='address'&&['solana','evm','bitcoin'].includes(request.family)){
+      const durableAddress=request.kind==='address'&&['solana','evm','bitcoin'].includes(request.family);
+      const durableTransaction=request.kind==='transaction'&&['evm','bitcoin'].includes(request.family);
+      if(response.ok&&(durableAddress||durableTransaction)){
         offerCanonicalDeepJob(request);
       }
     }catch(error){
