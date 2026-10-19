@@ -34,13 +34,13 @@ func arvisStreamNativeProofFixture(t *testing.T) (
 				"accountKeys": []any{map[string]any{"pubkey": event.Target, "signer": false}},
 				"instructions": []any{map[string]any{
 					"programId": event.ProgramID,
-					"parsed": map[string]any{"type": "mintTo", "info": map[string]any{"mint": event.Target}},
+					"parsed":    map[string]any{"type": "mintTo", "info": map[string]any{"mint": event.Target}},
 				}},
 			},
 		},
 		"meta": map[string]any{
-			"err": nil,
-			"preTokenBalances": []any{map[string]any{"mint": event.Target}},
+			"err":               nil,
+			"preTokenBalances":  []any{map[string]any{"mint": event.Target}},
 			"postTokenBalances": []any{map[string]any{"mint": event.Target}},
 		},
 	}
@@ -87,22 +87,32 @@ func TestArvisStreamNativeTransactionGateRequiresExactSourceProof(t *testing.T) 
 		{"wrong_stream_signature", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.Signature = strings.Repeat("3", 88) }},
 		{"wrong_slot", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.Slot++ }},
 		{"unsupported_network", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.Network = "solana-devnet" }},
-		{"unsupported_source_program", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.ProgramID = "11111111111111111111111111111111" }},
+		{"unsupported_source_program", func(e *arvisStreamTarget, tx SolanaTransactionResult) {
+			e.ProgramID = "11111111111111111111111111111111"
+		}},
 		{"invalid_signature_format", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.Signature = "not-a-solana-signature" }},
 		{"missing_positive_slot", func(e *arvisStreamTarget, tx SolanaTransactionResult) { tx["slot"] = float64(0) }},
 		{"no_meta", func(e *arvisStreamTarget, tx SolanaTransactionResult) { delete(tx, "meta") }},
 		{"absent_execution_status", func(e *arvisStreamTarget, tx SolanaTransactionResult) { delete(tx["meta"].(map[string]any), "err") }},
-		{"failed_transaction", func(e *arvisStreamTarget, tx SolanaTransactionResult) { tx["meta"].(map[string]any)["err"] = map[string]any{"InstructionError": []any{0,"Custom"}} }},
-		{"wrong_response_signature", func(e *arvisStreamTarget, tx SolanaTransactionResult) { tx["transaction"].(map[string]any)["signatures"] = []any{strings.Repeat("4", 88)} }},
-		{"missing_signatures", func(e *arvisStreamTarget, tx SolanaTransactionResult) { delete(tx["transaction"].(map[string]any), "signatures") }},
-		{"no_program_invocation", func(e *arvisStreamTarget, tx SolanaTransactionResult) { tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"] = []any{map[string]any{"programId":defaultRaydiumProgramID}} }},
+		{"failed_transaction", func(e *arvisStreamTarget, tx SolanaTransactionResult) {
+			tx["meta"].(map[string]any)["err"] = map[string]any{"InstructionError": []any{0, "Custom"}}
+		}},
+		{"wrong_response_signature", func(e *arvisStreamTarget, tx SolanaTransactionResult) {
+			tx["transaction"].(map[string]any)["signatures"] = []any{strings.Repeat("4", 88)}
+		}},
+		{"missing_signatures", func(e *arvisStreamTarget, tx SolanaTransactionResult) {
+			delete(tx["transaction"].(map[string]any), "signatures")
+		}},
+		{"no_program_invocation", func(e *arvisStreamTarget, tx SolanaTransactionResult) {
+			tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"] = []any{map[string]any{"programId": defaultRaydiumProgramID}}
+		}},
 		{"missing_mint", func(e *arvisStreamTarget, tx SolanaTransactionResult) {
-			tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"] = []any{map[string]any{"programId":e.ProgramID}}
+			tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"] = []any{map[string]any{"programId": e.ProgramID}}
 			tx["meta"].(map[string]any)["preTokenBalances"] = nil
 			tx["meta"].(map[string]any)["postTokenBalances"] = nil
 		}},
 		{"mint_only_in_account_keys", func(e *arvisStreamTarget, tx SolanaTransactionResult) {
-			tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"] = []any{map[string]any{"programId":e.ProgramID}}
+			tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"] = []any{map[string]any{"programId": e.ProgramID}}
 			tx["meta"].(map[string]any)["preTokenBalances"] = []any{}
 			tx["meta"].(map[string]any)["postTokenBalances"] = []any{}
 		}},
