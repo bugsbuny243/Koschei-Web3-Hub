@@ -16,6 +16,15 @@ import (
 )
 
 var errArvisStreamInsufficientEvidence = errors.New("arvis stream insufficient evidence")
+var errArvisStreamCanonicalFinalUnavailable = errors.New("arvis stream canonical signed final verdict is not wired")
+
+// This worker must not ingest stream events into an apparently successful
+// verdict lifecycle until the authoritative unified decision and its durable
+// signed-final persistence are connected. The fourteen ARVIS evidence arms
+// intentionally do NOT contain ModuleFinalVerdictEngine, and
+// ArvisFinalFromBundle is deliberately an unsigned compatibility placeholder.
+// Keep the integration fail-closed; a configuration flag must not bypass it.
+const arvisStreamCanonicalFinalPipelineWired = false
 
 type arvisStreamTarget struct {
 	ID        string
@@ -29,6 +38,10 @@ type arvisStreamTarget struct {
 
 func StartArvisStreamVerdictWorker(ctx context.Context, db *sql.DB) func() {
 	if db == nil || envBool("ARVIS_STREAM_VERDICT_DISABLED") {
+		return func() {}
+	}
+	if !arvisStreamCanonicalFinalPipelineWired {
+		log.Printf("arvis stream verdict worker withheld: canonical signed-final decision/persistence is not wired; stream events remain pending")
 		return func() {}
 	}
 	ctx, cancel := context.WithCancel(ctx)
@@ -271,6 +284,18 @@ func prioritizeFinalArvisArm(arms []SecurityRadarVerdict) []SecurityRadarVerdict
 	return ordered
 }
 
+// arvisStreamFinalAuthorityGate distinguishes lack of collector evidence from
+// a missing canonical signed final. The existing compatibility final can never
+// establish authority, and a fabricated Signed flag or synthetic final arm
+// cannot substitute for the unified decision/verification/persistence contract.
+// Replacing this guard requires a separately accepted canonical integration.
+func arvisStreamFinalAuthorityGate(bundle SecurityRadarBundle) error {
+	if !SecurityRadarHasLiveEvidence(bundle) {
+		return errArvisStreamInsufficientEvidence
+	}
+	return errArvisStreamCanonicalFinalUnavailable
+}
+
 func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arvisStreamTarget) error {
 	mode := arvisStreamAnalysisMode(target.ModuleID)
 	analysis := AnalyzeArvisRadars(SecurityRadarRequest{Target: target.Target, Network: target.Network, Mode: mode})
@@ -296,14 +321,10 @@ func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arv
 	analysis.Bundle.Metadata["source_program_id"] = target.ProgramID
 
 	bundle := EvidenceBackedSecurityRadarBundle(analysis.Bundle)
-	final := ArvisFinalFromBundle(bundle)
-	if !SecurityRadarHasLiveEvidence(bundle) || !final.Signed {
-		return errArvisStreamInsufficientEvidence
+	if err := arvisStreamFinalAuthorityGate(bundle); err != nil {
+		return err
 	}
 	arms := ArvisArmsFromBundle(bundle)
-	if len(arms) == 0 {
-		return errors.New("arvis arms missing from bundle")
-	}
 
 	finalSaved := false
 	auxiliaryFailures := []string{}

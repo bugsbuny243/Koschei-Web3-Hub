@@ -34,42 +34,26 @@ func arvisRecoverStaleStreamJobs(ctx context.Context, db *sql.DB) {
 	if db == nil {
 		return
 	}
+	// Never infer completion from a legacy radar verdict row's signed=true.
+	// The legacy store uses a different signing domain and this recovery loop
+	// has no trusted-key verification, source-event binding or canonical final
+	// persistence proof. A stale lease therefore remains a retryable failure
+	// (or exhausted) until a separately accepted canonical reconciler exists.
 	result, err := db.ExecContext(ctx, `
-		WITH stale AS (
-			SELECT p.stream_event_id,
-			       EXISTS (
-			         SELECT 1
-			         FROM security_radar_verdicts v
-			         WHERE v.module_id='final_verdict_engine'
-			           AND v.signed=true
-			           AND COALESCE(v.signals->>'source_stream_event_id','')=p.stream_event_id::text
-			       ) AS has_final
-			FROM arvis_stream_processing p
-			WHERE p.status='processing'
-			  AND p.updated_at < now() - interval '5 minutes'
-		)
-		UPDATE arvis_stream_processing p
+		UPDATE arvis_stream_processing
 		SET status=CASE
-		             WHEN stale.has_final THEN 'completed'
-		             WHEN p.attempts >= 3 THEN 'exhausted'
+		             WHEN attempts >= 3 THEN 'exhausted'
 		             ELSE 'failed'
 		           END,
-		    processed_at=CASE
-		                   WHEN stale.has_final THEN COALESCE(p.processed_at,now())
-		                   ELSE p.processed_at
-		                 END,
-		    last_error=CASE
-		                 WHEN stale.has_final THEN 'reconciled_final_verdict_exists'
-		                 ELSE 'recovered stale processing lease'
-		               END,
+		    processed_at=NULL,
+		    last_error='recovered stale processing lease; canonical final not verified',
 		    updated_at=CASE
-		                 WHEN stale.has_final THEN now()
-		                 WHEN p.attempts >= 5 THEN now()
-		                 WHEN p.attempts >= 3 THEN now() - interval '31 minutes'
+		                 WHEN attempts >= 5 THEN now()
+		                 WHEN attempts >= 3 THEN now() - interval '31 minutes'
 		                 ELSE now() - interval '1 minute'
 		               END
-		FROM stale
-		WHERE p.stream_event_id=stale.stream_event_id
+		WHERE status='processing'
+		  AND updated_at < now() - interval '5 minutes'
 	`)
 	if err != nil {
 		if !isUndefinedTableError(err) {
