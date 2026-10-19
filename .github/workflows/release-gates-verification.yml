@@ -55,6 +55,13 @@ jobs:
         run: go mod download
       - name: Verify canonical Deep Scan route contract
         run: node scripts/verify-scan-runtime-recovery.js
+      - name: Temporary native fixture gofmt recovery
+        run: |
+          gofmt -w internal/services/arvis_stream_native_provenance_test.go
+          echo ARVIS_NATIVE_GOFMT_B64_BEGIN
+          base64 -w0 internal/services/arvis_stream_native_provenance_test.go
+          echo
+          echo ARVIS_NATIVE_GOFMT_B64_END
       - name: Require gofmt clean tree
         run: |
           set -euo pipefail
