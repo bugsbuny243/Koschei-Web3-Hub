@@ -27,17 +27,17 @@ func TestCanonicalNativeEVMTransactionRetainsPendingWithoutSafetyGrade(t *testin
 			result = "0x2105"
 		case "eth_getTransactionByHash":
 			result = map[string]any{
-				"hash":           txid,
-				"from":           nativeJobEVMFixture,
-				"to":             "0x2222222222222222222222222222222222222222",
-				"value":          "0x0",
-				"nonce":          "0x1",
-				"gas":            "0x5208",
-				"gasPrice":       "0x1",
-				"type":           "0x2",
-				"input":          "0x",
-				"blockHash":      nil,
-				"blockNumber":    nil,
+				"hash":        txid,
+				"from":        nativeJobEVMFixture,
+				"to":          "0x2222222222222222222222222222222222222222",
+				"value":       "0x0",
+				"nonce":       "0x1",
+				"gas":         "0x5208",
+				"gasPrice":    "0x1",
+				"type":        "0x2",
+				"input":       "0x",
+				"blockHash":   nil,
+				"blockNumber": nil,
 			}
 		case "eth_getTransactionReceipt":
 			result = nil
