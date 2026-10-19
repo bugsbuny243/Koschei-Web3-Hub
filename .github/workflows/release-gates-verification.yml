@@ -117,7 +117,8 @@ jobs:
       - name: Verify ARVIS recovery survives scanner and RPC saver gates on PostgreSQL 17
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_release_gate?sslmode=disable
-        run: go test -v ./internal/services -run '^TestArvisStreamRecoveryIndependentOfScanAndRPCGatesPostgres17      - name: Test all packages
+        run: go test -v ./internal/services -run 'TestArvisStreamRecoveryIndependentOfScanAndRPCGatesPostgres17' -count=1
+      - name: Test all packages
         run: go test ./...
       - name: Race-test July consolidation packages
         run: go test -race ./internal/handlers ./internal/services ./internal/defense
