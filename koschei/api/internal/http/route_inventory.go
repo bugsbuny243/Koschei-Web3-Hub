@@ -89,6 +89,7 @@ func productionRouteInventory() []routeInventoryGroup {
 		}},
 		{Name: "developer_api", Auth: "api_key_plus_professional_entitlement", Routes: []string{
 			"POST /api/v1/scan/token", "GET /api/v1/usage", "POST /api/v1/shield/preflight",
+			"POST /api/v1/intelligence/provider", "GET /api/v1/intelligence/provider/capabilities",
 			"POST /api/v1/shield/transaction", "POST /api/v1/shield/state-recheck", "POST /api/v1/shield/address-poisoning",
 			"POST /api/v1/defense/validation", "POST /api/v1/execution-assurance/safe/verify",
 		}},
