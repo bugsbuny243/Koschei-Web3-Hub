@@ -116,6 +116,10 @@ func canonicalNativeNetworkJobWithClient(ctx context.Context, client *http.Clien
 }
 
 func canonicalNativeEvidenceEnvelope(result services.CustomerScanResult, kind string) map[string]any {
+	scopeLimitation := "Native read-only address collection is not a completed historical investigation or a signed ARVIS safety grade."
+	if kind == "native_network_transaction_observation" {
+		scopeLimitation = "Native read-only transaction and receipt/UTXO observations are not a completed historical investigation or signed ARVIS safety grade."
+	}
 	return map[string]any{
 		"schema_version":     "koschei-canonical-native-investigation-v1",
 		"status":             "evidence_only_partial",
@@ -132,7 +136,7 @@ func canonicalNativeEvidenceEnvelope(result services.CustomerScanResult, kind st
 			"reason":     "no_canonical_native_grade_authority",
 		},
 		"limitations": []string{
-			"Native read-only address collection is not a completed historical investigation or a signed ARVIS safety grade.",
+			scopeLimitation,
 			"Transaction graph, historical fund flows, cross-chain links and unconnected modules are not asserted as completed.",
 		},
 	}
