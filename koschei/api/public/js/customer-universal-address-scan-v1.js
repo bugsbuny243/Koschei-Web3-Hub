@@ -261,13 +261,13 @@ function install(){
         if(!/^[0-9a-f-]{36}$/i.test(id)||job.poll_url!==pollURL||job.canonical_engine!==true){
           throw new Error('The background job confirmation could not be authenticated.');
         }
-        const savedJobLink=document.createElement('a');
-        savedJobLink.href=pollURL;
-        savedJobLink.textContent='Open authenticated job status';
+        // The API status resource requires a bearer session; opening it as a
+        // bare browser link would fail authentication. Use the signed-in
+        // account history page to retrieve the result with its auth helper.
         const historyLink=document.createElement('a');
         historyLink.href='/reports';
-        historyLink.textContent='View account report history';
-        recovery.replaceChildren(button,savedJobLink,historyLink);
+        historyLink.textContent='View retained result in account history';
+        recovery.replaceChildren(button,historyLink);
         recovery.hidden=false;
         const initialHTML=results.innerHTML;
         let polls=0;
