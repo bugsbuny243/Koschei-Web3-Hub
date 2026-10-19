@@ -8,6 +8,11 @@
 <meta name="theme-color" content="#03060a">
 <title>Koschei Web3 | Investigation History</title>
 <link rel="stylesheet" href="/css/koschei.css?v=1">
+<style>
+.ops-retained-evidence{margin-top:14px;padding:12px;border:1px solid #315043;border-radius:12px}
+.ops-retained-evidence summary{cursor:pointer;font-weight:750;color:#b2f7d3}
+.ops-retained-evidence-json{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.55 ui-monospace,monospace;max-height:65vh;padding:12px;background:#050b08}
+</style>
 </head>
 <body class="koschei-v2 koschei-enterprise">
 <main class="ops-page">
@@ -18,7 +23,7 @@
 <section class="ops-panel"><div class="ops-toolbar"><input class="ops-input" id="reportSearch" type="search" autocomplete="off" placeholder="Search target, job state, verdict, grade, or job ID" aria-label="Search investigation history"><select class="ops-select" id="reportStateFilter" aria-label="Filter investigation history by job state"><option value="">All job states</option><option value="queued">Queued</option><option value="running">Running</option><option value="completed">Completed</option><option value="failed">Failed</option></select><span class="ops-count" id="reportVisibleCount">—/—</span></div><div class="ops-list" id="reportList"><div class="ops-empty">Loading investigation history…</div></div></section>
 </main>
 <script src="/js/koschei-auth.js?v=33"></script>
-<script src="/js/customer-reports-v2.js?v=2"></script>
+<script src="/js/customer-reports-v2.js?v=3"></script>
 <script src="/js/customer-command-center-v1.js?v=6"></script>
 <script src="/js/koschei-global-shell.js?v=6"></script>
 <script src="/js/koschei-product-v2.js?v=5"></script>
