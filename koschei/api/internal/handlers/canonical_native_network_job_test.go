@@ -77,8 +77,8 @@ func TestCanonicalNativeBitcoinCustomerJobPersistsObservedProvenance(t *testing.
 			_, _ = w.Write([]byte(nativeJobBitcoinGenesis))
 		case "/address/" + nativeJobBitcoinFixture:
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"address": nativeJobBitcoinFixture,
-				"chain_stats": map[string]any{"funded_txo_count": 2, "funded_txo_sum": 1500, "spent_txo_count": 1, "spent_txo_sum": 500, "tx_count": 2},
+				"address":       nativeJobBitcoinFixture,
+				"chain_stats":   map[string]any{"funded_txo_count": 2, "funded_txo_sum": 1500, "spent_txo_count": 1, "spent_txo_sum": 500, "tx_count": 2},
 				"mempool_stats": map[string]any{"funded_txo_count": 0, "funded_txo_sum": 0, "spent_txo_count": 0, "spent_txo_sum": 0, "tx_count": 0},
 			})
 		default:
