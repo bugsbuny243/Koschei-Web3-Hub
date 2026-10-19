@@ -86,6 +86,7 @@ func TestArvisStreamNativeTransactionGateRequiresExactSourceProof(t *testing.T) 
 		{"cross_target_mint", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.Target = defaultRaydiumProgramID }},
 		{"wrong_stream_signature", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.Signature = strings.Repeat("3", 88) }},
 		{"wrong_slot", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.Slot++ }},
+		{"missing_journal_slot", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.Slot = 0 }},
 		{"unsupported_network", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.Network = "solana-devnet" }},
 		{"unsupported_source_program", func(e *arvisStreamTarget, tx SolanaTransactionResult) {
 			e.ProgramID = "11111111111111111111111111111111"
