@@ -80,7 +80,7 @@ func TestArvisStreamNativeTransactionGateRequiresExactSourceProof(t *testing.T) 
 	}
 
 	cases := []struct {
-		name string
+		name   string
 		mutate func(*arvisStreamTarget, SolanaTransactionResult)
 	}{
 		{"cross_target_mint", func(e *arvisStreamTarget, tx SolanaTransactionResult) { e.Target = defaultRaydiumProgramID }},
@@ -93,7 +93,7 @@ func TestArvisStreamNativeTransactionGateRequiresExactSourceProof(t *testing.T) 
 		{"no_meta", func(e *arvisStreamTarget, tx SolanaTransactionResult) { delete(tx, "meta") }},
 		{"absent_execution_status", func(e *arvisStreamTarget, tx SolanaTransactionResult) { delete(tx["meta"].(map[string]any), "err") }},
 		{"failed_transaction", func(e *arvisStreamTarget, tx SolanaTransactionResult) { tx["meta"].(map[string]any)["err"] = map[string]any{"InstructionError": []any{0,"Custom"}} }},
-		{"wrong_response_signature", func(e *arvisStreamTarget, tx SolanaTransactionResult) { tx["transaction"].(map[string]any)["signatures"] = []any{strings.Repeat("4",88)} }},
+		{"wrong_response_signature", func(e *arvisStreamTarget, tx SolanaTransactionResult) { tx["transaction"].(map[string]any)["signatures"] = []any{strings.Repeat("4", 88)} }},
 		{"missing_signatures", func(e *arvisStreamTarget, tx SolanaTransactionResult) { delete(tx["transaction"].(map[string]any), "signatures") }},
 		{"no_program_invocation", func(e *arvisStreamTarget, tx SolanaTransactionResult) { tx["transaction"].(map[string]any)["message"].(map[string]any)["instructions"] = []any{map[string]any{"programId":defaultRaydiumProgramID}} }},
 		{"missing_mint", func(e *arvisStreamTarget, tx SolanaTransactionResult) {
@@ -138,14 +138,20 @@ func TestArvisStreamNativeEvidenceGatePostgres17AtomicAcceptance(t *testing.T) {
 		t.Skip("KOSCHEI_TEST_DATABASE_URL not configured")
 	}
 	db, err := sql.Open("postgres", url)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer db.Close()
 	db.SetMaxOpenConns(1)
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	if err := db.PingContext(ctx); err != nil { t.Fatal(err) }
+	if err := db.PingContext(ctx); err != nil {
+		t.Fatal(err)
+	}
 	tx, err := db.BeginTx(ctx, nil)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer tx.Rollback() // fake proof is never committed as a source record
 
 	event, native, actor, behavior, registry := arvisStreamNativeProofFixture(t)
@@ -154,29 +160,55 @@ func TestArvisStreamNativeEvidenceGatePostgres17AtomicAcceptance(t *testing.T) {
 		(provider,stream_mode,network,module_id,event_type,target,target_type,signature,evidence_quality,program_id,slot)
 		VALUES('ci_fixture','test',$1,$2,'test_native_source_proof',$3,'token',$4,'fixture_only',$5,$6)
 		RETURNING id::text
-	`,event.Network,event.ModuleID,event.Target,event.Signature,event.ProgramID,event.Slot).Scan(&event.ID); err != nil {t.Fatal(err)}
+	`, event.Network, event.ModuleID, event.Target, event.Signature, event.ProgramID, event.Slot).Scan(&event.ID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO arvis_stream_processing(stream_event_id,target,signature,status,attempts)
 		VALUES($1::uuid,$2,$3,'processing',1)
-	`,event.ID,event.Target,event.Signature);err!=nil {t.Fatal(err)}
+	`, event.ID, event.Target, event.Signature); err != nil {
+		t.Fatal(err)
+	}
 
 	mismatched := make(SolanaTransactionResult)
-	for k,v := range native {mismatched[k]=v}
-	mismatched["slot"]=float64(event.Slot+1)
-	if _, err := persistArvisStreamNativeEvidenceFinalTx(ctx,tx,event,mismatched,actor,behavior,registry);!errors.Is(err,errArvisStreamCanonicalFinalUnavailable){t.Fatalf("wrong native source wrote a final: %v",err)}
+	for k, v := range native {
+		mismatched[k] = v
+	}
+	mismatched["slot"] = float64(event.Slot + 1)
+	if _, err := persistArvisStreamNativeEvidenceFinalTx(ctx, tx, event, mismatched, actor, behavior, registry); !errors.Is(err, errArvisStreamCanonicalFinalUnavailable) {
+		t.Fatalf("wrong native source wrote a final: %v", err)
+	}
 	var status string
-	if err:=tx.QueryRowContext(ctx,`SELECT status FROM arvis_stream_processing WHERE stream_event_id=$1::uuid`,event.ID).Scan(&status);err!=nil||status!="processing"{t.Fatalf("invalid proof changed claim: %q %v",status,err)}
+	if err := tx.QueryRowContext(ctx, `SELECT status FROM arvis_stream_processing WHERE stream_event_id=$1::uuid`, event.ID).Scan(&status); err != nil || status != "processing" {
+		t.Fatalf("invalid proof changed claim: %q %v", status, err)
+	}
 	var count int
-	if err:=tx.QueryRowContext(ctx,`SELECT count(*) FROM arvis_stream_canonical_finals WHERE stream_event_id=$1::uuid`,event.ID).Scan(&count);err!=nil||count!=0{t.Fatalf("bad proof minted receipt: count=%d err=%v",count,err)}
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM arvis_stream_canonical_finals WHERE stream_event_id=$1::uuid`, event.ID).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("bad proof minted receipt: count=%d err=%v", count, err)
+	}
 
-	final,err:=persistArvisStreamNativeEvidenceFinalTx(ctx,tx,event,native,actor,behavior,registry)
-	if err!=nil{t.Fatalf("native source + independently evaluated canonical decision rejected: %v",err)}
-	if final.Grade!="B"||!final.Signed{t.Fatalf("untrusted or wrong canonical grade=%q signed=%v",final.Grade,final.Signed)}
-	if err:=tx.QueryRowContext(ctx,`SELECT status FROM arvis_stream_processing WHERE stream_event_id=$1::uuid`,event.ID).Scan(&status);err!=nil||status!="completed"{t.Fatalf("signed atomic completion failed: %q %v",status,err)}
-	again,err:=persistArvisStreamNativeEvidenceFinalTx(ctx,tx,event,native,actor,behavior,registry)
-	if err!=nil||again.Signature!=final.Signature||again.PayloadHash!=final.PayloadHash{t.Fatalf("replayed exact native proof not idempotent: err=%v",err)}
-	if err:=tx.QueryRowContext(ctx,`SELECT count(*) FROM arvis_stream_canonical_finals WHERE stream_event_id=$1::uuid`,event.ID).Scan(&count);err!=nil||count!=1{t.Fatalf("duplicate native final: count=%d err=%v",count,err)}
-	other:=event
-	other.Target=defaultRaydiumProgramID
-	if _,err:=persistArvisStreamNativeEvidenceFinalTx(ctx,tx,other,native,actor,behavior,registry);err==nil{t.Fatal("cross-target native evidence substitution accepted")}
+	final, err := persistArvisStreamNativeEvidenceFinalTx(ctx, tx, event, native, actor, behavior, registry)
+	if err != nil {
+		t.Fatalf("native source and independently evaluated canonical decision rejected: %v", err)
+	}
+	if final.Grade != "B" || !final.Signed {
+		t.Fatalf("untrusted or wrong canonical grade=%q signed=%v", final.Grade, final.Signed)
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT status FROM arvis_stream_processing WHERE stream_event_id=$1::uuid`, event.ID).Scan(&status); err != nil || status != "completed" {
+		t.Fatalf("signed atomic completion failed: %q %v", status, err)
+	}
+
+	again, err := persistArvisStreamNativeEvidenceFinalTx(ctx, tx, event, native, actor, behavior, registry)
+	if err != nil || again.Signature != final.Signature || again.PayloadHash != final.PayloadHash {
+		t.Fatalf("replayed exact native proof not idempotent: err=%v", err)
+	}
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM arvis_stream_canonical_finals WHERE stream_event_id=$1::uuid`, event.ID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("duplicate native final: count=%d err=%v", count, err)
+	}
+
+	other := event
+	other.Target = defaultRaydiumProgramID
+	if _, err := persistArvisStreamNativeEvidenceFinalTx(ctx, tx, other, native, actor, behavior, registry); err == nil {
+		t.Fatal("cross-target native evidence substitution accepted")
+	}
 }
