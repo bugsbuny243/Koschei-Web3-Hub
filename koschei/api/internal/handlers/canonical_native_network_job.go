@@ -110,19 +110,19 @@ func canonicalNativeNetworkJobWithClient(ctx context.Context, client *http.Clien
 		return nil, fmt.Errorf("no connected native customer job collector for %s", network)
 	}
 	return map[string]any{
-		"schema_version": "koschei-canonical-native-investigation-v1",
-		"status": "evidence_only_partial",
-		"target": target,
-		"network": network,
+		"schema_version":     "koschei-canonical-native-investigation-v1",
+		"status":             "evidence_only_partial",
+		"target":             target,
+		"network":            network,
 		"investigation_kind": "native_network_address_observation",
-		"customer_scan": result,
-		"evidence_refs": result.EvidenceRefs,
-		"coverage": result.Coverage,
-		"arm_count": result.ArmCount,
+		"customer_scan":      result,
+		"evidence_refs":      result.EvidenceRefs,
+		"coverage":           result.Coverage,
+		"arm_count":          result.ArmCount,
 		"final_verdict": map[string]any{
 			"grade": "-", "signed": false, "withheld": true,
 			"risk_level": "unknown",
-			"reason": "no_canonical_native_grade_authority",
+			"reason":     "no_canonical_native_grade_authority",
 		},
 		"limitations": []string{
 			"Native read-only address collection is not a completed historical investigation or a signed ARVIS safety grade.",
