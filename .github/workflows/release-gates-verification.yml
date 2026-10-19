@@ -55,6 +55,8 @@ jobs:
         run: go mod download
       - name: Verify canonical Deep Scan route contract
         run: node scripts/verify-scan-runtime-recovery.js
+      - name: Verify public agent lead IDs cannot inject executable admin markup
+        run: node --test public/js/__tests__/agent-admin-lead-injection.test.cjs
       - name: Require gofmt clean tree
         run: |
           set -euo pipefail
