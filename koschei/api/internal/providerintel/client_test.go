@@ -76,9 +76,9 @@ func TestExternalProviderRequestsFailClosed(t *testing.T) {
 func TestSlitherImportNeverSignsRisk(t *testing.T) {
 	client := NewFromEnv()
 	input := Input{
-		Provider: "slither",
+		Provider:  "slither",
 		Operation: "findings",
-		Payload: json.RawMessage(`{"success":true,"results":{"detectors":[{"check":"reentrancy-eth","impact":"High","confidence":"High","description":"External call"}]}}`),
+		Payload:   json.RawMessage(`{"success":true,"results":{"detectors":[{"check":"reentrancy-eth","impact":"High","confidence":"High","description":"External call"}]}}`),
 	}
 	result, err := client.Query(context.Background(), input)
 	if err != nil {
