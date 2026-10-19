@@ -34,11 +34,17 @@ func arvisRecoverStaleStreamJobs(ctx context.Context, db *sql.DB) {
 	if db == nil {
 		return
 	}
-	// Never infer completion from a legacy radar verdict row's signed=true.
-	// The legacy store uses a different signing domain and this recovery loop
-	// has no trusted-key verification, source-event binding or canonical final
-	// persistence proof. A stale lease therefore remains a retryable failure
-	// (or exhausted) until a separately accepted canonical reconciler exists.
+	// A configured, explicitly trusted Ed25519 public-key registry permits
+	// recovery ONLY from a source-bound, authenticated canonical final receipt.
+	// This never infers completion from a legacy arm verdict's signed=true.
+	registry, configured, trustErr := arvisStreamRecoveryTrustRegistry()
+	if trustErr != nil {
+		log.Printf("arvis stale stream recovery trusted registry unavailable: %v", trustErr)
+	} else if configured {
+		arvisReconcileStaleCanonicalReceipts(ctx, db, registry)
+	}
+	// Any remaining processing lease has no accepted canonical final. Keep it
+	// retryable/failed (or exhausted); never silently declare completion.
 	result, err := db.ExecContext(ctx, `
 		UPDATE arvis_stream_processing
 		SET status=CASE
