@@ -126,9 +126,11 @@ func persistArvisStreamCanonicalFinalTx(
 		return fmt.Errorf("read back ARVIS canonical final: %w", err)
 	}
 	if persistedTarget != event.Target || persistedNetwork != event.Network ||
-		persistedSignature != event.Signature || persistedModule != event.ModuleID ||
-		persistedHash != verdict.PayloadHash || persistedKey != verdict.KeyID {
-		return errors.New("ARVIS persisted canonical final identity or signer mismatch")
+		persistedSignature != event.Signature || persistedModule != event.ModuleID {
+		return errors.New("ARVIS persisted canonical final source identity mismatch")
+	}
+	if persistedHash != verdict.PayloadHash || persistedKey != verdict.KeyID {
+		return errors.New("ARVIS stream event already has a different immutable canonical final")
 	}
 	var stored arvisStreamCanonicalFinalEnvelope
 	if err := json.Unmarshal(readback, &stored); err != nil {
