@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+
+	_ "github.com/lib/pq"
 )
 
 func TestArvisStreamCanonicalJobBridgeFailsClosedWithoutSourceAndTrust(t *testing.T) {
