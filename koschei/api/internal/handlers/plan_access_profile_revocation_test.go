@@ -45,7 +45,7 @@ func TestPlanEntitlementRejectsOwnerBannedAndRemovedProfilesPostgres17(t *testin
 		t.Fatal(err)
 	}
 	h := &Handler{DB: db}
-	for _, tc := range []struct{subject, email string}{
+	for _, tc := range []struct{ subject, email string }{
 		{"test-ban-subject", "test-ban@example.invalid"},
 		{"test-remove-subject", "test-remove@example.invalid"},
 		// Revoke access even if a principal supplies the old email with a
