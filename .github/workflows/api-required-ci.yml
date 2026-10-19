@@ -218,6 +218,10 @@ jobs:
           ! grep -Eqi 'Paste it before|Token ikinci planda|KOSCH stays as|What ARVIS does|Who it is for|Power users|Automatic flow' public/index.html
           ! grep -Eqi 'Login yok|Wallet connect yok|Read-only analiz|İmzalı verdict geçmişi|Taramayı Başlat|Token Tara' public/scan.html
           ! grep -Eqi 'Holder ve likidite|Kontrol ediliyor|Tam Radar' public/safe-check.html
+      - name: Verify ARVIS trusted canonical final on PostgreSQL 17
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
+        run: go test -v ./internal/services -run '^TestArvisStreamCanonicalFinal' -count=1
       - name: Test
         run: |
           set -o pipefail

@@ -27,6 +27,9 @@ jobs:
     env:
       BASE_URL: https://tradepigloball.co
     steps:
+      - name: Check out repository tests
+        uses: actions/checkout@v7
+
       - name: Verify public health response contract
         run: node --test koschei/api/scripts/verify-public-health-liveness.test.cjs
 

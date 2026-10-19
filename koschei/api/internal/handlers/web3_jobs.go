@@ -4,9 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 
 	"koschei/api/internal/jobs"
+	"koschei/api/internal/networktarget"
+	"koschei/api/internal/services"
 )
 
 type asyncWeb3Request struct {
@@ -51,19 +54,58 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "target required"})
 		return
 	}
-	// The durable canonical worker currently classifies Solana accounts and
-	// mints. Reject other networks before consuming a premium output or
-	// creating a job; cross-chain customer evidence remains available through
-	// the native /api/scan adapters, not this Solana-only worker.
+	// Only create a customer-paid job when a real adapter accepts this network
+	// and address. EVM/UTXO use native evidence-only workers; the existing
+	// Solana token/wallet investigation retains its own canonical classifier.
 	if jobType == CanonicalInvestigationJobType && req.Network != "solana-mainnet" {
-		writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
-			"error":   "canonical_job_network_collector_not_connected",
-			"network": req.Network,
-		})
-		return
+		network, registered := networktarget.LookupNetwork(req.Network)
+		if !registered || (network.Family != "evm" && req.Network != "bitcoin-mainnet") {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
+				"error": "canonical_job_network_collector_not_connected", "network": req.Network,
+			})
+			return
+		}
+		classified, classifyErr := services.ClassifyCustomerScanTarget(target, req.Network)
+		if classifyErr != nil || classified.RequiresNetwork || classified.Route == services.CustomerScanRouteUnresolved {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
+				"error": "canonical_job_target_network_mismatch", "network": req.Network,
+			})
+			return
+		}
+		// Transactions are validated by the chain-specific canonical hash
+		// classifier; address probes still require networktarget.Resolve.
+		if classified.Route == services.CustomerScanRouteTxLookup {
+			if classified.Kind != services.CustomerScanTargetTxHash ||
+				(network.Family == "evm" && !strings.HasPrefix(target, "0x")) ||
+				(req.Network == "bitcoin-mainnet" && strings.HasPrefix(target, "0x")) {
+				writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
+					"error": "canonical_job_target_network_mismatch", "network": req.Network,
+				})
+				return
+			}
+		} else if _, err := networktarget.Resolve(req.Network, target); err != nil {
+			writeJSON(w, http.StatusUnprocessableEntity, map[string]string{
+				"error": "canonical_job_target_network_mismatch", "network": req.Network,
+			})
+			return
+		}
+		// Do not meter or queue an investigation that cannot obtain any
+		// native evidence because its provider is not configured.
+		if network.Family == "evm" && canonicalNativeRPCEnv(req.Network) == "" ||
+			req.Network == "bitcoin-mainnet" && strings.TrimSpace(os.Getenv("BITCOIN_ESPLORA_URL")) == "" {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+				"error": "canonical_native_collector_configuration_required", "network": req.Network,
+			})
+			return
+		}
 	}
 	requestPayload := any(req)
-	if jobType == CanonicalInvestigationJobType {
+	if jobType == CanonicalInvestigationJobType && req.Network != "solana-mainnet" {
+		requestPayload = canonicalInvestigationJobPayload{
+			Address: target, Network: req.Network, Mode: "customer_canonical_job",
+			RootTarget: target, Source: "customer_radar_job", Depth: 0, MaxDepth: 0,
+		}
+	} else if jobType == CanonicalInvestigationJobType {
 		classification := classifyRadarTarget(r.Context(), target)
 		resolvedTarget := target
 		if classification.Type == radarTargetTokenAccount && strings.TrimSpace(classification.TokenOwnerWallet) != "" {
