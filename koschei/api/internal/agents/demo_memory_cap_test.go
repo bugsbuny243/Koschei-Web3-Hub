@@ -11,11 +11,11 @@ func TestDemoFixtureRetentionIsBounded(t *testing.T) {
 	s := NewDemoService()
 	for i := 0; i < 330; i++ {
 		s.Handle(context.Background(), Message{
-			TenantID: "demo-automotive",
-			Channel: ChannelWeb,
+			TenantID:      "demo-automotive",
+			Channel:       ChannelWeb,
 			ChannelUserID: fmt.Sprintf("fixture-user-%d", i),
-			Text: "Hello",
-			ReceivedAt: time.Now().UTC(),
+			Text:          "Hello",
+			ReceivedAt:    time.Now().UTC(),
 		})
 	}
 	s.mu.RLock()
