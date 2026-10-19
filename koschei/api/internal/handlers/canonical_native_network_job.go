@@ -21,13 +21,16 @@ func canonicalNativeNetworkJob(ctx context.Context, target, network string) (map
 }
 
 func canonicalNativeNetworkJobWithClient(ctx context.Context, client *http.Client, target, network string) (map[string]any, error) {
-	resolution, err := networktarget.Resolve(network, target)
-	if err != nil {
-		return nil, fmt.Errorf("native customer job target: %w", err)
-	}
 	classified, err := services.ClassifyCustomerScanTarget(target, network)
 	if err != nil {
 		return nil, err
+	}
+	if classified.Route == services.CustomerScanRouteTxLookup {
+		return canonicalNativeTransactionJob(ctx, client, target, network, classified)
+	}
+	resolution, err := networktarget.Resolve(network, target)
+	if err != nil {
+		return nil, fmt.Errorf("native customer job target: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -109,12 +112,16 @@ func canonicalNativeNetworkJobWithClient(ctx context.Context, client *http.Clien
 	default:
 		return nil, fmt.Errorf("no connected native customer job collector for %s", network)
 	}
+	return canonicalNativeEvidenceEnvelope(result, "native_network_address_observation"), nil
+}
+
+func canonicalNativeEvidenceEnvelope(result services.CustomerScanResult, kind string) map[string]any {
 	return map[string]any{
 		"schema_version":     "koschei-canonical-native-investigation-v1",
 		"status":             "evidence_only_partial",
-		"target":             target,
-		"network":            network,
-		"investigation_kind": "native_network_address_observation",
+		"target":             result.Target.Raw,
+		"network":            result.Target.NetworkHint,
+		"investigation_kind": kind,
 		"customer_scan":      result,
 		"evidence_refs":      result.EvidenceRefs,
 		"coverage":           result.Coverage,
@@ -128,7 +135,7 @@ func canonicalNativeNetworkJobWithClient(ctx context.Context, client *http.Clien
 			"Native read-only address collection is not a completed historical investigation or a signed ARVIS safety grade.",
 			"Transaction graph, historical fund flows, cross-chain links and unconnected modules are not asserted as completed.",
 		},
-	}, nil
+	}
 }
 
 func canonicalNativeGap(result *services.CustomerScanResult, reason string) {
