@@ -28,11 +28,10 @@ func validateArvisStreamNativeTransaction(event arvisStreamTarget, tx SolanaTran
 	if !arvisStreamSourceProgramPermitted(event.ModuleID, event.ProgramID) {
 		return reject("source program is not an approved Pump/Raydium program")
 	}
-	if len(tx) == 0 || radarInt64(tx["slot"]) <= 0 {
-		return reject("missing transaction or positive slot")
+	if event.Slot <= 0 || len(tx) == 0 || radarInt64(tx["slot"]) <= 0 {
+		return reject("source event or RPC response has no positive slot")
 	}
-	slot := radarInt64(tx["slot"])
-	if event.Slot > 0 && slot != event.Slot {
+	if radarInt64(tx["slot"]) != event.Slot {
 		return reject("slot does not match journal event")
 	}
 	meta, ok := tx["meta"].(map[string]any)
