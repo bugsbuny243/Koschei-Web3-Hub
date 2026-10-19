@@ -21,12 +21,15 @@ concurrency:
 
 jobs:
   smoke:
-    name: Distinguish proxy, application and database health
+    name: Verify proxy/application liveness and report database mode
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
       BASE_URL: https://tradepigloball.co
     steps:
+      - name: Verify public health response contract
+        run: node --test koschei/api/scripts/verify-public-health-liveness.test.cjs
+
       - name: Probe public API transport
         id: probe
         shell: bash
@@ -72,7 +75,11 @@ jobs:
                 echo 'APPLICATION_FAILURE: /api/version returned an unexpected body.' >&2
                 exit 12
               }
-              echo "PUBLIC_API_HEALTHY: proxy, application and database health checks passed on attempt ${attempt}."
+              health_observation="$(node koschei/api/scripts/verify-public-health-liveness.cjs diagnostics/health.body)" || {
+                echo 'PUBLIC_HEALTH_CONTRACT_FAILURE: /health returned an unexpected JSON liveness contract.' >&2
+                exit 16
+              }
+              echo "PUBLIC_API_LIVENESS_HEALTHY: proxy/application reachable; ${health_observation}; database connectivity not tested."
               exit 0
             fi
 
@@ -111,11 +118,11 @@ jobs:
         run: |
           set -euo pipefail
           state=failure
-          description='Public API transport or dependency check failed'
+          description='Public API transport/liveness failed; database readiness not evaluated'
           target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           if [ "${JOB_STATUS}" = success ]; then
             state=success
-            description='Proxy, application and database health verified'
+            description='Proxy/application liveness verified; DB connectivity not probed'
             target_url="${BASE_URL}/health"
           fi
           export STATE="${state}" DESCRIPTION="${description}" TARGET_URL="${target_url}"
