@@ -27,11 +27,15 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 	if db == nil {
 		return func() {}
 	}
-	// Retention and corpus aggregation are pure database hygiene. They stay
-	// active even when every quota-consuming automatic scanner is disabled.
+	// Retention, corpus aggregation AND recovery of orphaned signed-final
+	// processing claims are PostgreSQL-only lifecycle work. None should depend
+	// on automatic scanning or the Solana RPC saver: an operator can disable
+	// network traffic without abandoning durable queue recovery.
 	stopRetention := StartSecurityRadarRetentionWorkerV2(ctx, db)
 	stopCorpus := StartHolderConcentrationCorpusWorker(ctx, db)
+	stopStreamRecovery := StartArvisStreamRecovery(ctx, db)
 	stopDatabaseWorkers := func() {
+		stopStreamRecovery()
 		stopCorpus()
 		stopRetention()
 	}
@@ -52,10 +56,8 @@ func StartSecurityRadarWatcher(ctx context.Context, db *sql.DB, _ *web3.SolanaRP
 	}
 	stopHeartbeat := StartArvisRadarHeartbeat(ctx, db)
 	stopStreamVerdicts := StartArvisStreamVerdictWorker(ctx, db)
-	stopStreamRecovery := StartArvisStreamRecovery(ctx, db)
 	stopAll := func() {
 		stopGapHealer()
-		stopStreamRecovery()
 		stopStreamVerdicts()
 		stopHeartbeat()
 		stopDatabaseWorkers()
