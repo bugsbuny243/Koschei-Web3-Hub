@@ -264,7 +264,7 @@ test('customer starts full retained ARVIS job and sees entire verified network-b
  button.dispatch('click');await settle();await settle();
  assert.equal(calls.length,3);
  assert.deepEqual(JSON.parse(calls[1].options.body),{address:sol,network:'solana-mainnet',max_depth:3});
- assert.equal(h.nodes.customerUniversalRecovery.children[1].href,'/reports');
+ assert.equal(h.nodes.customerUniversalRecovery.children[1].href,'/reports?job='+encodeURIComponent(id));
  assert.match(h.nodes.customerUniversalResults.innerHTML,/Complete retained ARVIS report/);
  assert.match(h.nodes.customerUniversalResults.innerHTML,/relation_history/);
  assert.match(h.nodes.customerUniversalResults.innerHTML,/fixture_not_attested/);
@@ -309,8 +309,30 @@ test('EVM native job displays retained evidence without implying completed ARVIS
  h.submit(evm,'base-mainnet');await settle();
  h.nodes.customerUniversalRecovery.children[0].dispatch('click');await settle();await settle();
  assert.equal(calls.length,3);
- assert.deepEqual(JSON.parse(calls[1].options.body),{address:evm,network:'base-mainnet',max_depth:3});
+ assert.deepEqual(JSON.parse(calls[1].options.body),{address:evm,network:'base-mainnet',max_depth:0});
  assert.match(h.nodes.customerUniversalResults.innerHTML,/chain_id_response_sha256/);
  assert.match(h.nodes.customerUniversalResults.innerHTML,/historical collectors and a signed grade are NOT claimed/);
+ assert.doesNotMatch(calls.map(c=>c.url).join('|'),/\/api\/owner\//);
+});
+
+test('transaction evidence is retained by a customer-owned job without claiming a signed grade',async()=>{
+ const id='12345678-1234-1234-1234-123456789abc';
+ const native={schema_version:'koschei-canonical-native-investigation-v1',status:'evidence_only_partial',investigation_kind:'native_network_transaction_observation',transaction_evidence:{attributes:{receipt_status:'0x1'}},final_verdict:{signed:false,withheld:true,grade:'-'}};
+ const calls=[];
+ const h=harness(async(url,options)=>{
+   calls.push({url,options});
+   if(url==='/api/scan')return response(200,transactionEnvelope());
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   if(url==='/api/v1/radar/jobs/'+id)return response(200,{id,job_type:'canonical_investigation',status:'completed',target:evmTx,network:'base-mainnet',result:native});
+   throw Error('unexpected endpoint '+url);
+ });
+ h.submit(evmTx,'base-mainnet');await settle();
+ const button=h.nodes.customerUniversalRecovery.children[0];
+ assert.equal(button.textContent,'Run and save transaction evidence');
+ button.dispatch('click');await settle();await settle();
+ assert.equal(calls.length,3);
+ assert.deepEqual(JSON.parse(calls[1].options.body),{address:evmTx,network:'base-mainnet',max_depth:0});
+ assert.equal(h.nodes.customerUniversalRecovery.children[1].href,'/reports?job='+encodeURIComponent(id));
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/native_network_transaction_observation/);
  assert.doesNotMatch(calls.map(c=>c.url).join('|'),/\/api\/owner\//);
 });
