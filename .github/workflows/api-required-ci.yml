@@ -305,7 +305,6 @@ jobs:
             ${{ runner.temp }}/gosec.txt
           if-no-files-found: error
           retention-days: 7
- -count=1
       - name: Test
         run: |
           set -o pipefail
