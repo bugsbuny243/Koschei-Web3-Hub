@@ -31,6 +31,7 @@ func evaluateArvisStreamCanonicalEvidenceFinal(
 	}
 	if strings.TrimSpace(behavior.Mint) != event.Target ||
 		behavior.RulesetVersion != UnifiedRadarRulesetVersionV140 ||
+		behavior.GeneratedAt.IsZero() ||
 		actor.RulesetVersion != ActorDefenseRulesetVersion {
 		return UnifiedRadarVerdict{}, fmt.Errorf("%w: actor/behavior target or ruleset unavailable", errArvisStreamInsufficientEvidence)
 	}
@@ -81,6 +82,10 @@ func evaluateArvisStreamCanonicalEvidenceFinal(
 	if verdict.Grade == "-" || strings.TrimSpace(verdict.Grade) == "" {
 		return UnifiedRadarVerdict{}, fmt.Errorf("%w: canonical decision has no supported grade trigger", errArvisStreamInsufficientEvidence)
 	}
+	// Pin the original collector's evidence-generation time. Replaying the
+	// exact SAME verified evidence must never mint a different Ed25519
+	// decision just because a worker retry happened seconds later.
+	verdict.GeneratedAt = behavior.GeneratedAt.UTC()
 	verdict = FinalizeUnifiedRadarVerdictContractForNetwork(event.Target, event.Network, verdict)
 	if !verdict.Signed || verdict.Signature == "" || verdict.KeyID == "" {
 		return UnifiedRadarVerdict{}, fmt.Errorf("%w: canonical Ed25519 signer unavailable", errArvisStreamCanonicalFinalUnavailable)
