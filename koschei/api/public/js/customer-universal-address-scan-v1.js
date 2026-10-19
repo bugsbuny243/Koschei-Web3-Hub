@@ -224,7 +224,7 @@ function install(){
     const button=document.createElement('button');
     button.type='button';
     const nativeOnly=request.family!=='solana';
-    button.textContent=nativeOnly?'Run and save native evidence':'Run durable ARVIS investigation';
+    button.textContent=request.kind==='transaction'?'Run and save transaction evidence':nativeOnly?'Run and save native evidence':'Run durable ARVIS investigation';
     button.addEventListener('click',async()=>{
       const current=generation;
       if(deepAbort)return;
@@ -244,7 +244,7 @@ function install(){
         const response=await window.KoscheiAuth.apiCall('/api/v1/radar/jobs',{
           method:'POST',credentials:'same-origin',cache:'no-store',
           headers:{'Content-Type':'application/json','Accept':'application/json'},
-          body:JSON.stringify({address:request.target,network:request.network,max_depth:3}),
+          body:JSON.stringify({address:request.target,network:request.network,max_depth:nativeOnly?0:3}),
           signal:controller.signal
         });
         if(!response)throw new Error('Authenticated job transport unavailable.');
@@ -254,7 +254,7 @@ function install(){
           status.textContent=response.status===401?'Sign in to run a deep investigation.':
             [402,403].includes(response.status)?'An active Professional account is required for a deep investigation.':
             'The deep investigation could not be started. No report was created.';
-          button.disabled=false;return;
+          button.disabled=false;deepAbort=null;return;
         }
         const id=String(job?.job_id||'');
         const pollURL='/api/v1/radar/jobs/'+id;
@@ -265,7 +265,7 @@ function install(){
         // bare browser link would fail authentication. Use the signed-in
         // account history page to retrieve the result with its auth helper.
         const historyLink=document.createElement('a');
-        historyLink.href='/reports';
+        historyLink.href='/reports?job='+encodeURIComponent(id);
         historyLink.textContent='View retained result in account history';
         recovery.replaceChildren(button,historyLink);
         recovery.hidden=false;
