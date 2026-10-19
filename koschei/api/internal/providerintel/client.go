@@ -46,12 +46,12 @@ type Result struct {
 }
 
 type Client struct {
-	HTTP           *http.Client
-	BlockaidKey    string
-	GoPlusKey      string
-	BubblemapsKey  string
-	blockaidOrigin string
-	goplusOrigin   string
+	HTTP             *http.Client
+	BlockaidKey      string
+	GoPlusKey        string
+	BubblemapsKey    string
+	blockaidOrigin   string
+	goplusOrigin     string
 	bubblemapsOrigin string
 }
 
@@ -63,11 +63,11 @@ func NewFromEnv() *Client {
 				return http.ErrUseLastResponse
 			},
 		},
-		BlockaidKey:    strings.TrimSpace(os.Getenv("KOSCHEI_BLOCKAID_API_KEY")),
-		GoPlusKey:      strings.TrimSpace(os.Getenv("KOSCHEI_GOPLUS_ACCESS_TOKEN")),
-		BubblemapsKey: strings.TrimSpace(os.Getenv("KOSCHEI_BUBBLEMAPS_API_KEY")),
-		blockaidOrigin: "https://api.blockaid.io",
-		goplusOrigin: "https://api.gopluslabs.io",
+		BlockaidKey:      strings.TrimSpace(os.Getenv("KOSCHEI_BLOCKAID_API_KEY")),
+		GoPlusKey:        strings.TrimSpace(os.Getenv("KOSCHEI_GOPLUS_ACCESS_TOKEN")),
+		BubblemapsKey:    strings.TrimSpace(os.Getenv("KOSCHEI_BUBBLEMAPS_API_KEY")),
+		blockaidOrigin:   "https://api.blockaid.io",
+		goplusOrigin:     "https://api.gopluslabs.io",
 		bubblemapsOrigin: "https://api.bubblemaps.io",
 	}
 }
