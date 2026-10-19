@@ -76,6 +76,16 @@ function render(){
     card.append(head,metadata);
     if(state==='failed'){const error=text(item?.error_message)||text(item?.error_code)||'Failure details unavailable.';card.append(node('p','ops-record-copy',error));}
     if(state==='completed'&&item?.result_available!==true)card.append(node('p','ops-record-copy','Job is marked completed but result payload is unavailable. No verdict or signature state is inferred.'));
+    // The authenticated customer can inspect every field actually retained by
+    // the job, including nested provenance, evidence hashes, and limitations.
+    // JSON is text content, never untrusted server-provided HTML.
+    const retained=resultOf(item);
+    if(retained){
+      const details=node('details','ops-retained-evidence');
+      details.append(node('summary','','Complete retained evidence and provenance'));
+      details.append(node('pre','ops-retained-evidence-json',JSON.stringify(retained,null,2)));
+      card.append(details);
+    }
     const actions=node('div','ops-record-actions');
     if(target){actions.append(actionLink('Open in ARVIS',scanURL(target),true));const copy=node('button','ops-btn','Copy target');copy.type='button';copy.dataset.copyTarget=target;actions.append(copy);}
     if(actions.childNodes.length)card.append(actions);
@@ -111,7 +121,63 @@ async function load(){
   }catch(error){history=null;updateKPIs(history);render();status(error.message||'Investigation history is unavailable.','bad');}
 }
 
+const customerJobNetworks=new Set([
+  'solana-mainnet','ethereum-mainnet','base-mainnet','arbitrum-mainnet',
+  'optimism-mainnet','polygon-mainnet','bnb-mainnet','avalanche-mainnet','bitcoin-mainnet'
+]);
+
+async function createCustomerDeepInvestigation(event){
+  event.preventDefault();
+  const target=text($('customerDeepTarget')?.value);
+  const network=text($('customerDeepNetwork')?.value);
+  const button=$('customerDeepCreate'),state=$('customerDeepJobState');
+  if(!target||target.length>128||!customerJobNetworks.has(network)){
+    if(state)state.textContent='Enter a public target and explicitly select one supported network.';
+    return;
+  }
+  if(button)button.disabled=true;
+  if(state)state.textContent='Creating a metered, account-owned investigation…';
+  try{
+    await KoscheiAuth.init();
+    if(!KoscheiAuth.requireAuth('/login.html'))return;
+    const payload={address:target,network};
+    if(network==='solana-mainnet')payload.max_depth=3;
+    const response=await KoscheiAuth.apiCall('/api/v1/radar/jobs',{
+      method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify(payload),cache:'no-store'
+    });
+    if(!response)throw new Error('The authenticated job service is unavailable.');
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok){
+      const message=response.status===401?'Sign in to start this investigation.':
+        [402,403].includes(response.status)?'Professional entitlement or available investigation outputs required.':
+        response.status===422?'Target, network, or native collector unsupported. No investigation was created.':
+        'Job creation failed; no completed analysis is claimed.';
+      if(state)state.textContent=message;
+      status(message,'bad');
+      return;
+    }
+    const jobID=text(data.job_id);
+    if(!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(jobID)||
+       data.poll_url!=='/api/v1/radar/jobs/'+jobID||
+       data.canonical_engine!==true){
+      throw new Error('The job service returned an invalid investigation confirmation.');
+    }
+    await load();
+    const message='Investigation queued: '+jobID+'. Its collected evidence and limitations will appear in account history.';
+    if(state)state.textContent=message;
+    status(message,'good');
+  }catch(error){
+    const message=error?.message||'Investigation service unavailable; no job completion inferred.';
+    if(state)state.textContent=message;
+    status(message,'bad');
+  }finally{
+    if(button)button.disabled=false;
+  }
+}
+
 async function copyTarget(value,button){try{await navigator.clipboard.writeText(value);const previous=button.textContent;button.textContent='Copied';window.setTimeout(()=>{button.textContent=previous;},900);}catch{status('Clipboard access is unavailable in this browser.','bad');}}
+$('customerDeepJobForm')?.addEventListener('submit',createCustomerDeepInvestigation);
 document.addEventListener('click',event=>{const button=event.target.closest('[data-copy-target]');if(button)copyTarget(button.dataset.copyTarget||'',button);});
 $('reportSearch')?.addEventListener('input',render);$('reportStateFilter')?.addEventListener('change',render);$('reportReload')?.addEventListener('click',load);
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load);else load();

@@ -52,10 +52,19 @@ requireText(inventory,'"GET /api/v1/radar/jobs/"','machine-readable radar jobs G
 if(inventory.includes('/api/v1/investigations/history'))throw new Error('inventory: parallel history endpoint must not be advertised');
 
 requireText(reportsHTML,'PROFESSIONAL · DURABLE CANONICAL JOB HISTORY','history Professional access copy');
+requireText(reportsHTML,'id="customerDeepJobForm"','account-scoped job creation form');
+requireText(reportsHTML,'id="customerDeepNetwork"','explicit customer network select');
+for(const network of ['solana-mainnet','ethereum-mainnet','base-mainnet','arbitrum-mainnet','optimism-mainnet','polygon-mainnet','bnb-mainnet','avalanche-mainnet','bitcoin-mainnet']){
+  requireText(reportsHTML,'value="'+network+'"','customer network '+network);
+}
+requireText(reportsJS,"KoscheiAuth.apiCall('/api/v1/radar/jobs',","metered customer job creation transport");
+requireText(reportsJS,'JSON.stringify(retained,null,2)','complete retained customer evidence display');
+requireText(reportsJS,"node('pre','ops-retained-evidence-json'","customer evidence safe text-only renderer");
+
 requireText(reportsHTML,'History access requires an active Professional entitlement.','history entitlement boundary');
 requireText(reportsHTML,'Commercial access is determined only by the active server-side entitlement.','history authority copy');
 requireText(reportsHTML,'signed=true','history strict signed copy');
-requireText(reportsHTML,'/js/customer-reports-v2.js?v=2','history controller');
+requireText(reportsHTML,'/js/customer-reports-v2.js?v=3','history controller');
 requireText(reportsHTML,'/arvis-chat','ARVIS investigation route');
 forbid(reportsHTML,/\bKOSCH\b|token holdings|STARTER\+|ENTERPRISE\+|Basic KOSCH tier/i,'legacy authorization copy');
 
