@@ -14,11 +14,11 @@ func TestArvisStreamWorkerDirectPathsFailClosedBeforeClaimOrCollection(t *testin
 	}
 
 	target := arvisStreamTarget{
-		ID: "00000000-0000-4000-8000-000000000001",
-		Target: "So11111111111111111111111111111111111111112",
+		ID:        "00000000-0000-4000-8000-000000000001",
+		Target:    "So11111111111111111111111111111111111111112",
 		Signature: "untrusted-event-reference",
-		Network: "solana-mainnet",
-		ModuleID: ModulePumpSybilRadar,
+		Network:   "solana-mainnet",
+		ModuleID:  ModulePumpSybilRadar,
 	}
 	// No DB or collector is configured. Any attempt to claim the event through
 	// processOne would panic here; a direct call must remain a no-op.
