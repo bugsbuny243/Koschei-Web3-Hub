@@ -288,7 +288,6 @@ jobs:
             diagnostics/cases.body > diagnostics/public-registry-smoke.json
 
           echo 'RELEASE_ACCEPTANCE_PASS: deployed public product, customer Deep Scan auth boundary, owner concealment boundary and registry are operational.'
- -count=1
       - name: Test all packages
         run: go test ./...
       - name: Race-test July consolidation packages
