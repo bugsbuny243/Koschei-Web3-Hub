@@ -87,12 +87,21 @@ func reconcileArvisStreamCanonicalFinalTx(
 	verdict := UnifiedRadarVerdict(envelope.Verdict)
 	if envelope.Target != event.Target || envelope.Network != event.Network ||
 		envelope.PayloadHash != storedHash || envelope.KeyID != storedKey ||
-		envelope.SignatureAlgorithm != "ed25519" ||
-		verdict.Target != envelope.Target || verdict.Network != envelope.Network ||
-		verdict.Digest != envelope.Digest || verdict.PayloadHash != envelope.PayloadHash ||
-		verdict.KeyID != envelope.KeyID || verdict.SignatureAlgorithm != envelope.SignatureAlgorithm {
+		envelope.SignatureAlgorithm != "ed25519" {
 		return false, errors.New("ARVIS recovery canonical signed envelope binding mismatch")
 	}
+	// UnifiedRadarVerdict intentionally excludes target, network, digest,
+	// algorithm, key ID and payload hash from its raw JSON representation.
+	// These fields belong to the authenticated outer envelope and must be
+	// restored BEFORE verifying the original canonical Ed25519 payload.
+	// Do not call FinalizeUnifiedRadarVerdictContractForNetwork here: that
+	// would create new authority rather than verify the persisted decision.
+	verdict.Target = envelope.Target
+	verdict.Network = envelope.Network
+	verdict.Digest = envelope.Digest
+	verdict.SignatureAlgorithm = envelope.SignatureAlgorithm
+	verdict.KeyID = envelope.KeyID
+	verdict.PayloadHash = envelope.PayloadHash
 	if err := validateArvisStreamCanonicalVerdict(event, verdict, registry); err != nil {
 		return false, fmt.Errorf("ARVIS recovery canonical verdict authentication failed: %w", err)
 	}
