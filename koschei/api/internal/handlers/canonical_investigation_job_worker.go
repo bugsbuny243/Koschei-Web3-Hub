@@ -225,6 +225,21 @@ func (w *canonicalInvestigationJobWorker) processJob(ctx context.Context, job jo
 	switch classification.Type {
 	case radarTargetTokenMint:
 		assembly := w.Handler.buildUnifiedInvestigationReport(ctx, target, network, mode)
+		if payload.Source == "arvis_stream" {
+			if job.Type != CanonicalInvestigationJobType || strings.TrimSpace(payload.SourceEventID) == "" {
+				return nil, errors.New("ARVIS stream canonical job requires an original source event id")
+			}
+			// The report engine already collected native actor and behavior
+			// evidence. The service independently reloads and authenticates the
+			// real stream source, verifies getTransaction and commits the trusted
+			// signed v1.4 verdict with the source claim in ONE transaction.
+			if _, err := services.PersistArvisStreamCanonicalJobFinal(
+				ctx, w.Handler.DB, payload.SourceEventID, target, network,
+				assembly.ActorVerdict, assembly.Behavior, strings.TrimSpace(os.Getenv("SOLANA_RPC_URL")),
+			); err != nil {
+				return nil, fmt.Errorf("ARVIS source-bound signed final withheld: %w", err)
+			}
+		}
 		_ = w.Store.UpdateProgress(ctx, job.ID, 75)
 		if services.SecurityRadarHasLiveEvidence(assembly.Core.Bundle) {
 			if err := w.Handler.saveSecurityRadarBundle(ctx, "system:canonical_job_worker", mode, assembly.Core.Bundle); err != nil {
