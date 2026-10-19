@@ -285,8 +285,14 @@ func writeTradePIAgentJSON(w http.ResponseWriter, value any) {
 
 func tradePIAgentDemo(w http.ResponseWriter, r *http.Request) {
 	var req agentDemoRequest
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&req); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	// The public fixture must never retain unbounded user identifiers or lead
+	// display fields in the singleton Go process.
+	if len(req.UserID) > 128 || len(req.DisplayName) > 128 || len(req.Text) > 4096 {
+		http.Error(w, "demo input exceeds field limit", http.StatusRequestEntityTooLarge)
 		return
 	}
 	if strings.TrimSpace(req.Text) == "" {

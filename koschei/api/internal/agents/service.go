@@ -36,6 +36,7 @@ func (d *DemoInventory) Search(_ context.Context, query string) ([]Vehicle, erro
 type Service struct {
 	mu             sync.RWMutex
 	leads          map[string]Lead
+	demo           bool
 	core           *Core
 	workerCancel   context.CancelFunc
 	workerWG       sync.WaitGroup
@@ -59,7 +60,7 @@ func NewService() *Service {
 
 // NewDemoService is an explicit fixture sandbox with no database or provider.
 func NewDemoService() *Service {
-	return &Service{leads: map[string]Lead{}, core: NewCore(NewDemoInventory())}
+	return &Service{leads: map[string]Lead{}, demo: true, core: NewCore(NewDemoInventory())}
 }
 
 func (s *Service) PersistenceEnabled() bool { return s.db != nil }
@@ -124,6 +125,16 @@ func (s *Service) Handle(ctx context.Context, msg Message) Result {
 	result = s.ApplyBusinessContext(ctx, msg, result)
 
 	s.mu.Lock()
+	if s.demo && len(s.leads) >= 256 {
+		if _, exists := s.leads[key]; !exists {
+			// Demo fixtures are strictly bounded. Customer stores use PostgreSQL,
+			// not this eviction policy.
+			for oldest := range s.leads {
+				delete(s.leads, oldest)
+				break
+			}
+		}
+	}
 	s.leads[key] = result.Lead
 	s.mu.Unlock()
 	return result
