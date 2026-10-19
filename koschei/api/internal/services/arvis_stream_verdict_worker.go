@@ -132,6 +132,12 @@ sendLoop:
 }
 
 func (w *arvisStreamVerdictWorker) processOne(ctx context.Context, target arvisStreamTarget) {
+	// StartArvisStreamVerdictWorker is not the only possible call site. Never
+	// claim a queue event through a direct invocation while canonical signed
+	// final persistence is still deliberately disconnected.
+	if !arvisStreamCanonicalFinalPipelineWired {
+		return
+	}
 	if !w.claimTarget(ctx, target) {
 		return
 	}
@@ -297,6 +303,11 @@ func arvisStreamFinalAuthorityGate(bundle SecurityRadarBundle) error {
 }
 
 func (w *arvisStreamVerdictWorker) processTarget(ctx context.Context, target arvisStreamTarget) error {
+	// Also gate the target path itself: direct callers must not collect remote
+	// evidence or persist legacy arms before canonical final acceptance.
+	if !arvisStreamCanonicalFinalPipelineWired {
+		return errArvisStreamCanonicalFinalUnavailable
+	}
 	mode := arvisStreamAnalysisMode(target.ModuleID)
 	analysis := AnalyzeArvisRadars(SecurityRadarRequest{Target: target.Target, Network: target.Network, Mode: mode})
 	for i := range analysis.Arms {
