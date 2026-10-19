@@ -116,6 +116,32 @@ function transactionRows(evidence){
     rows.filter(([,value])=>value!==undefined&&value!==null&&value!=='').map(([key,value])=>'<div class="cus-row"><span>'+esc(key)+'</span><b title="'+esc(value)+'">'+esc(short(value))+'</b></div>').join('')+'</div>';
 }
 
+// Customer decision availability is derived from the server's per-network
+// investigation plan, never from an owner privilege or an address's syntax.
+// This read-only /api/scan response does NOT contain a verified signed verdict.
+// Preserve every returned native-adapter field for the customer, including
+// provenance, metrics and new attributes not yet assigned a compact UI label.
+function fullEvidencePanel(label,evidence){
+  if(!evidence)return '';
+  const details=JSON.stringify(evidence,null,2);
+  return `<details class="cus-details cus-deep-evidence" open><summary>${esc(label)} — complete collector evidence</summary><pre class="cus-raw">${esc(details)}</pre></details>`;
+}
+
+function customerDecisionAvailability(result){
+  const plan=result?.investigation_plan;
+  if(result?.target?.requires_network===true)return{label:'NETWORK REQUIRED',copy:'Select the target network before interpreting evidence or requesting a security decision.'};
+  if(!plan)return{label:'DECISION NOT AVAILABLE',copy:'A supported network investigation plan has not been established. No risk grade or safety conclusion has been issued.'};
+  if(plan.executable!==true)return{label:'COLLECTOR NOT CONNECTED',copy:'This network is registered but its customer evidence collector is not executable. A risk grade is unavailable.'};
+  switch(String(plan.verdict_authority||'')){
+    case 'existing_deterministic_rules_only':
+      return{label:'SIGNED VERDICT NOT PROVIDED',copy:'Deterministic rules are declared for this network, but this customer evidence request alone does not provide a verified signed final decision.'};
+    case 'evidence_only_no_grade_authority':
+      return{label:'EVIDENCE ONLY — NO RISK GRADE',copy:'Network observations can be inspected. This adapter is not authorized to assign a signed risk grade; observed activity is not proof of safety.'};
+    default:
+      return{label:'NO CONNECTED VERDICT AUTHORITY',copy:'No customer risk grade is available for this network. Collected evidence must not be treated as a safety decision.'};
+  }
+}
+
 function resultCard(entry){
   const result=entry.data?.result;
   if(!entry.ok||!result){
@@ -124,18 +150,24 @@ function resultCard(entry){
   }
   const authority=result.evm_authority;
   const reasons=Array.isArray(result.reasons)?result.reasons:[];
+  const decision=customerDecisionAvailability(result);
   return `<article class="cus-network-card">
     <div class="cus-card-head"><div><span>${esc(entry.label)}</span><b>${esc(customerSummary(result))}</b></div><em>${esc(String(result.evidence_status||'unknown').toUpperCase())}</em></div>
     <div class="cus-target">${esc(result.target?.raw||'')}</div>
-    <details class="cus-details"><summary>Technical evidence</summary>
+    <details class="cus-details" open><summary>All collected evidence and provenance</summary>
       ${renderTrust(result.trust||{})}
+      ${fullEvidencePanel('Native network observation',result.network_evidence)}
       ${authority?`<div class="cus-authority"><div class="cus-subhead"><span>Authority surface</span><b>Observed evidence</b></div>${authorityRows(authority)}</div>`:''}
       ${assetRows(result.asset_evidence)}
       ${transactionRows(result.transaction_evidence)}
+      ${fullEvidencePanel('Authority investigation',authority)}
+      ${fullEvidencePanel('Asset investigation',result.asset_evidence)}
+      ${fullEvidencePanel('Transaction investigation',result.transaction_evidence)}
       <div class="cus-reasons"><div class="cus-subhead"><span>Reason codes</span><b>${reasons.length}</b></div>${reasons.length?reasons.map(reason=>`<code>${esc(reason)}</code>`).join(''):'<span class="cus-empty">No reason code attached.</span>'}</div>
       <div class="cus-reasons"><div class="cus-subhead">Evidence references</div>${(result.evidence_refs||[]).map(ref=>`<code>${esc(ref)}</code>`).join('')||'<span class="cus-empty">No reference was attached.</span>'}</div>
       <details class="cus-details"><summary>Complete response</summary><pre class="cus-raw">${esc(JSON.stringify(entry.data,null,2))}</pre></details>
     </details>
+    <div class="cus-decision-policy" role="status" aria-label="Customer decision availability"><b>${esc(decision.label)}</b><p>${esc(decision.copy)}</p></div>
   </article>`;
 }
 
@@ -167,11 +199,13 @@ function install(){
   const active=()=>!shared||['address','lookup'].includes(window.KoscheiRadar?.mode);
   const wrap=$('customerUniversalResultsWrap'),overview=$('customerUniversalOverview'),results=$('customerUniversalResults');
   const recovery=$('customerUniversalRecovery'),advanced=$('advancedTools');
-  let pending=null,generation=0;
+  let pending=null,generation=0,deepAbort=null,deepPollTimer=null;
 
   function stop(){
     generation++;
     pending?.abort();pending=null;
+    deepAbort?.abort();deepAbort=null;
+    if(deepPollTimer!==null){clearTimeout(deepPollTimer);deepPollTimer=null;}
     form.removeAttribute('aria-busy');if(active()){submit.disabled=false;submit.textContent=shared?'Investigate target':'Analyze target';}cancel.hidden=true;
   }
   function invalidate(){
@@ -184,6 +218,104 @@ function install(){
   cancel.addEventListener('click',()=>{if(!active())return;stop();wrap.hidden=true;status.textContent='Analysis canceled. You can start another request.';});
   window.addEventListener('pagehide',stop);
 
+  // The canonical customer job endpoint is already account-scoped and durable.
+  // Never route this through owner APIs or claim non-Solana collectors exist.
+  function offerCanonicalDeepJob(request){
+    const button=document.createElement('button');
+    button.type='button';button.textContent='Run full ARVIS investigation';
+    button.addEventListener('click',async()=>{
+      const current=generation;
+      if(deepAbort)return;
+      const controller=new AbortController();deepAbort=controller;
+      button.disabled=true;
+      status.textContent='Creating a durable, account-scoped ARVIS investigation…';
+      try{
+        const response=await fetch('/api/v1/radar/jobs',{
+          method:'POST',credentials:'same-origin',cache:'no-store',
+          headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body:JSON.stringify({address:request.target,network:request.network,max_depth:3}),
+          signal:controller.signal
+        });
+        const job=await response.json();
+        if(current!==generation)return;
+        if(!response.ok){
+          status.textContent=response.status===401?'Sign in to run a deep investigation.':
+            [402,403].includes(response.status)?'An active Professional account is required for a deep investigation.':
+            'The deep investigation could not be started. No report was created.';
+          button.disabled=false;return;
+        }
+        const id=String(job?.job_id||'');
+        const pollURL='/api/v1/radar/jobs/'+id;
+        if(!/^[0-9a-f-]{36}$/i.test(id)||job.poll_url!==pollURL||job.canonical_engine!==true){
+          throw new Error('The background job confirmation could not be authenticated.');
+        }
+        const savedJobLink=document.createElement('a');
+        savedJobLink.href=pollURL;
+        savedJobLink.textContent='Open retained investigation result';
+        recovery.replaceChildren(button,savedJobLink);
+        recovery.hidden=false;
+        const initialHTML=results.innerHTML;
+        let polls=0;
+        const show=(message,report)=>{if(current!==generation)return;
+          results.innerHTML=initialHTML+
+            `<section class="cus-deep-evidence" aria-label="Durable customer investigation"><h3>Deep ARVIS investigation</h3><p>${esc(message)}</p>`+
+            `<p>Account-scoped job: <code>${esc(id)}</code></p>`+
+            (report?fullEvidencePanel('Complete retained ARVIS report',report):'')+
+            '</section>';
+        };
+        show('Queued. The investigation continues on the server and remains in your account history.');
+        const poll=async()=>{
+          if(current!==generation||controller.signal.aborted)return;
+          try{
+            const response=await fetch(pollURL,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'},signal:controller.signal});
+            if(!response.ok)throw new Error('Deep investigation status is temporarily unavailable.');
+            const snapshot=await response.json();
+            if(current!==generation)return;
+            if(snapshot.id!==id||snapshot.job_type!=='canonical_investigation'||
+               snapshot.target!==request.target||snapshot.network!==request.network)
+              throw new Error('The background report does not match this customer target/network.');
+            if(snapshot.status==='completed'){
+              if(!snapshot.result||typeof snapshot.result!=='object'||Array.isArray(snapshot.result))
+                throw new Error('Job completed without readable evidence; no verdict can be inferred.');
+              show('Completed. All retained findings and provenance are shown below.',snapshot.result);
+              status.textContent='Deep investigation complete; the report is also retained in your account.';
+              deepAbort=null;return;
+            }
+            if(snapshot.status==='failed'){
+              show('The background investigation failed. Existing scan evidence remains visible; no complete report is claimed.');
+              status.textContent='Deep investigation failed. Review account history for retry status.';
+              deepAbort=null;return;
+            }
+            if(snapshot.status!=='queued'&&snapshot.status!=='running')
+              throw new Error('The investigation returned an unknown state; no complete report is claimed.');
+            const progress=Number(snapshot.progress);
+            const percentage=Number.isInteger(progress)&&progress>=0&&progress<=100?` (${progress}%)`:'';
+            show('Background investigation '+snapshot.status+percentage+'. Evidence is retained by the job service.');
+            if(++polls>=60){
+              show('Still processing. Automatic checks have stopped; the durable job continues in your account history.');
+              deepAbort=null;return;
+            }
+            deepPollTimer=setTimeout(poll,5000);
+          }catch(error){
+            if(current!==generation||controller.signal.aborted)return;
+            show('Report polling interrupted: '+(error.message||'unknown')+'. The durable job may still be running.');
+            status.textContent='Open your investigation history to inspect the retained job.';
+            deepAbort=null;
+          }
+        };
+        await poll();
+      }catch(error){
+        if(current!==generation||controller.signal.aborted)return;
+        status.textContent='Deep investigation request failed: '+(error.message||'unavailable');
+        button.disabled=false;deepAbort=null;
+      }
+    });
+    const chat=document.createElement('a');
+    chat.href='/arvis-chat?'+new URLSearchParams({target:request.target,network:request.network});
+    chat.textContent='Explore evidence with ARVIS';
+    recovery.replaceChildren(button,chat);recovery.hidden=false;
+  }
+
   async function runScan(){
     if(!active())return;
     stop();wrap.hidden=true;recovery.hidden=true;
@@ -194,7 +326,7 @@ function install(){
     }
     input.removeAttribute('aria-invalid');network.value=request.network;
     const current=++generation,controller=new AbortController();pending=controller;
-    const timer=setTimeout(()=>controller.abort(),15000);
+    const timer=setTimeout(()=>controller.abort(),40000);
     submit.disabled=true;submit.textContent='Analyzing…';cancel.hidden=false;form.setAttribute('aria-busy','true');
     status.textContent=`Collecting read-only ${request.kind==='transaction'?'transaction':'address'} evidence on ${request.label}…`;
     history.replaceState({},'',routing.url(request.target,request.network).url);
@@ -214,13 +346,12 @@ function install(){
         link.textContent=response.status===401?'Sign in to continue':'Review account access';
         recovery.replaceChildren(link);recovery.hidden=false;
       }
-      if(!shared&&response.ok&&request.family==='solana'){
-        const link=document.createElement('a');link.href='/arvis-chat?'+new URLSearchParams({target:request.target,network:request.network});
-        link.textContent='Continue with ARVIS investigation';recovery.replaceChildren(link);recovery.hidden=false;
+      if(response.ok&&request.family==='solana'&&request.kind!=='transaction'&&request.network==='solana-mainnet'){
+        offerCanonicalDeepJob(request);
       }
     }catch(error){
       if(current!==generation)return;
-      status.textContent=controller.signal.aborted?'The evidence service did not respond within 15 seconds. Try again.':(error instanceof SyntaxError?'The service returned an unreadable response. Try again.':error.message||'Connection failed. Try again.');
+      status.textContent=controller.signal.aborted?'The evidence service did not respond within 40 seconds. Some network sources may be unavailable; try again.':(error instanceof SyntaxError?'The service returned an unreadable response. Try again.':error.message||'Connection failed. Try again.');
       wrap.hidden=true;
     }finally{
       clearTimeout(timer);

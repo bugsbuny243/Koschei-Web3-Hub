@@ -11,6 +11,8 @@
       // Full evidence collectors can legitimately spend multiple bounded RPC windows.
       if(path.indexOf('/api/token/scan')===0)return 210000;
       if(path.indexOf('/api/v1/radar/detail')===0)return 210000;
+      // Customer multi-probe evidence collection has a 30s backend budget.
+      if(path==='/api/scan')return 40000;
       if(path.indexOf('/api/v1/radar/')===0||path.indexOf('/api/owner/')===0||path.indexOf('/api/jobs/')===0)return 45000;
       return 15000;
     }

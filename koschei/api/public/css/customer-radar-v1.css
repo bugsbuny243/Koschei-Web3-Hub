@@ -33,3 +33,8 @@
 @media(max-width:780px){.customer-single-radar .customer-mobile-trigger{display:inline-flex!important}}
 .customer-single-radar #empty h2{font-size:22px!important;border:0!important;text-decoration:none!important}
 .customer-single-radar #empty h2::after{display:none!important}
+
+/* Customer-visible chain capability boundary; never imply grade from observations. */
+.cus-decision-policy{margin:12px 0;padding:12px 14px;border:1px solid #42564d;border-radius:10px;background:#10211a;color:#dae8df;line-height:1.5}
+.cus-decision-policy b{display:block;font-size:13px;letter-spacing:.025em}
+.cus-decision-policy p{margin:6px 0 0;font-size:13px;color:#bfd0c5}

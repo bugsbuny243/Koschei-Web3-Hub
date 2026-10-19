@@ -152,7 +152,7 @@ function collapsePremiumEvidence(card){
   if(card.querySelector(':scope > details.customer-full-technical'))return;
   const grid=card.querySelector(':scope > .arvis-premium-grid');if(!grid)return;
   const sectionCount=grid.querySelectorAll(':scope > .arvis-premium-section').length;
-  const details=document.createElement('details');details.className='customer-full-technical';details.dataset.customerFullTechnical='v2';
+  const details=document.createElement('details');details.className='customer-full-technical';details.dataset.customerFullTechnical='v2';details.open=true;
   const summary=document.createElement('summary');
   const copy=el('div','');copy.append(el('b','',`Full technical evidence${sectionCount?` · ${sectionCount} sections`:''}`),el('span','','Funding, token controls, exits, actor context, and the rule-by-rule trace remain available here.'));
   summary.append(copy,el('em','','OPEN EVIDENCE'));details.appendChild(summary);
@@ -167,7 +167,7 @@ function collapseSourcePanels(card){
   const root=customerRoot(card);if(!root)return;
   let details=[...root.children].find(node=>node.matches?.('details.customer-source-panels'));
   if(!details){
-    details=document.createElement('details');details.className='customer-source-panels';details.dataset.customerSourcePanels='v2';
+    details=document.createElement('details');details.className='customer-source-panels';details.dataset.customerSourcePanels='v2';details.open=true;
     const summary=document.createElement('summary');
     const copy=el('div','');copy.append(el('b','','Source evidence panels'),el('span','','Canonical report, liquidity-control evidence, and bounded live-transaction evidence.'));
     summary.append(copy,el('em','','OPEN SOURCES'));details.appendChild(summary);

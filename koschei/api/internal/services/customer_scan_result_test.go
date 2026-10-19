@@ -1,6 +1,9 @@
 package services
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestCustomerScanResultFromNetworkProbeStaysObserved(t *testing.T) {
 	target := CustomerScanTarget{
@@ -14,9 +17,13 @@ func TestCustomerScanResultFromNetworkProbeStaysObserved(t *testing.T) {
 	projection := NetworkProbeIntelligenceProjection{
 		Subject: subject,
 		Evidence: IntelligenceEvidence{
-			ID:        "ev-1",
-			SubjectID: subject.ID,
-			Status:    IntelligenceEvidenceObserved,
+			ID:         "ev-1",
+			SubjectID:  subject.ID,
+			Status:     IntelligenceEvidenceObserved,
+			Source:     "customer_rpc_fixture",
+			Network:    target.NetworkHint,
+			Provenance: "synthetic_network_observation",
+			Attributes: map[string]any{"code_hash": "synthetic-hash", "extra_collector_fact": 17},
 		},
 	}
 
@@ -32,6 +39,14 @@ func TestCustomerScanResultFromNetworkProbeStaysObserved(t *testing.T) {
 	}
 	if result.EvidenceStatus != Web3TrustEvidenceObserved {
 		t.Fatalf("evidence_status=%q", result.EvidenceStatus)
+	}
+	if result.NetworkEvidence == nil || result.NetworkEvidence.ID != "ev-1" ||
+		result.NetworkEvidence.Attributes["extra_collector_fact"] != 17 ||
+		result.NetworkEvidence.Provenance != "synthetic_network_observation" {
+		t.Fatalf("base network probe evidence was dropped from customer result: %#v", result.NetworkEvidence)
+	}
+	if result.Verdict != CustomerScanVerdictReview || result.Trust.Verified || result.Trust.Finalized {
+		t.Fatal("preserving native observation must not manufacture trusted final authority")
 	}
 }
 
@@ -203,5 +218,52 @@ func TestCustomerScanResultFromEVMTransactionRejectsEvidenceSubjectMismatch(t *t
 	}
 	if _, err := CustomerScanResultFromEVMTransaction(target, projection); err == nil {
 		t.Fatal("mismatched evidence subject was accepted")
+	}
+}
+
+func TestCustomerNetworkScanSerializesEntireBaseEvidenceWithoutPromotion(t *testing.T) {
+	for _, network := range []string{"ethereum-mainnet", "bitcoin-mainnet"} {
+		t.Run(network, func(t *testing.T) {
+			var raw, kind, route string
+			if network == "bitcoin-mainnet" {
+				raw, kind, route = "1BoatSLRHtKNngkdXEeobR76b53LETtpyT", CustomerScanTargetBitcoin, CustomerScanRouteBitcoinProbe
+			} else {
+				raw, kind, route = "0x1111111111111111111111111111111111111111", CustomerScanTargetEVMAddress, CustomerScanRouteEVMProbe
+			}
+			target := CustomerScanTarget{Raw: raw, NetworkHint: network, Kind: kind, Route: route}
+			subject := ClassifyIntelligenceSubject(raw, network)
+			projection := NetworkProbeIntelligenceProjection{
+				Subject: subject,
+				Evidence: IntelligenceEvidence{
+					ID: "native-customer-evidence", SubjectID: subject.ID,
+					Network: network, Status: IntelligenceEvidenceObserved,
+					Source: "native-fixture-provider", Provenance: "synthetic-native-evidence",
+					Attributes: map[string]any{"unabridged_native_observation": map[string]any{"block_height": 23, "signals": []any{"a", "b"}}},
+				},
+			}
+			result, err := CustomerScanResultFromNetworkProbe(target, projection)
+			if err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := json.Marshal(result)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var wire map[string]any
+			if err := json.Unmarshal(encoded, &wire); err != nil {
+				t.Fatal(err)
+			}
+			evidence, ok := wire["network_evidence"].(map[string]any)
+			if !ok || evidence["provenance"] != "synthetic-native-evidence" {
+				t.Fatalf("%s full evidence missing from customer JSON: %s", network, encoded)
+			}
+			attrs, ok := evidence["attributes"].(map[string]any)
+			if !ok || attrs["unabridged_native_observation"] == nil {
+				t.Fatalf("%s deep native fact was truncated: %s", network, encoded)
+			}
+			if wire["verdict"] != CustomerScanVerdictReview || wire["evidence_status"] != Web3TrustEvidenceObserved {
+				t.Fatalf("%s observed evidence was promoted into a final safety verdict: %s", network, encoded)
+			}
+		})
 	}
 }
