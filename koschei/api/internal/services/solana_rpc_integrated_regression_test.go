@@ -12,6 +12,7 @@ import (
 
 func TestARVISIntegratedBatchReusesUnsupportedVersionEvidenceWithoutExtraRPC(t *testing.T) {
 	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_BATCH_MODE", "batch")
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -61,6 +62,7 @@ func TestARVISIntegratedBatchReusesUnsupportedVersionEvidenceWithoutExtraRPC(t *
 
 func TestARVISIntegratedBatchRejectsMissingResponseEvenWhenAnotherMemberIsCached(t *testing.T) {
 	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_BATCH_MODE", "batch")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Once the unsupported signature is cached, the provider silently
 		// returns an empty JSON-RPC batch for the other signature.
