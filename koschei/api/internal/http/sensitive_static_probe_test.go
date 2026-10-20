@@ -34,6 +34,7 @@ func TestSensitiveStaticProbePathRejectsSecretRepositoryAndTestOnlyPaths(t *test
 		"/js/__tests__/crypto-brief.test.cjs",
 		"/js/arvis-premium-contract.test.cjs",
 		"/js/impact-contract.test.cjs",
+		"/js/koschei-auth-security.test.cjs",
 		"/js/__tests__/arvis-canonical-projection.test.mjs",
 		"/js/__fixtures__/cfpk-live-scan.json",
 		"/js/__fixtures__/historical-scan.json",
