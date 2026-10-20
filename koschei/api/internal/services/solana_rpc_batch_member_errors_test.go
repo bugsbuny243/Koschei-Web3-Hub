@@ -151,3 +151,49 @@ func TestSolanaRPCBatchDuplicateEnvelopeDiscardsAmbiguousMember(t *testing.T) {
 		t.Fatalf("duplicate member was treated as trusted evidence: %#v", out)
 	}
 }
+
+func TestSolanaRPCBatchNullResultNeverCountsAsVerifiedEvidence(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"jsonrpc": "2.0", "id": 1, "result": map[string]any{"slot": 123}},
+			{"jsonrpc": "2.0", "id": 2, "result": nil},
+		})
+	}))
+	defer server.Close()
+	out, err := SolanaGetTransactionsJSONParsedBatch(context.Background(), server.URL, []string{"verified", "unavailable"})
+	if err == nil || !strings.Contains(err.Error(), "null_results=1") {
+		t.Fatalf("null transaction evidence must be explicitly incomplete: %v", err)
+	}
+	if len(out) != 1 || out["verified"] == nil || out["unavailable"] != nil {
+		t.Fatalf("must preserve only verified evidence: %#v", out)
+	}
+}
+
+func TestSolanaRPCSingleFallbackNullResultReportsMissingEvidence(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_BATCH_MODE", "single")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request solanaRPCRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Errorf("decode request: %v", err)
+			return
+		}
+		params := request.Params.([]any)
+		if params[0] == "verified" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"jsonrpc": "2.0", "id": request.ID, "result": map[string]any{"slot": 123},
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": request.ID, "result": nil})
+	}))
+	defer server.Close()
+	out, err := SolanaGetTransactionsJSONParsedBatch(context.Background(), server.URL, []string{"verified", "unavailable"})
+	if err == nil || !strings.Contains(err.Error(), "evidence unavailable") {
+		t.Fatalf("null result from single fallback must fail closed: %v", err)
+	}
+	if len(out) != 1 || out["verified"] == nil || out["unavailable"] != nil {
+		t.Fatalf("single fallback must keep only verified evidence: %#v", out)
+	}
+}
