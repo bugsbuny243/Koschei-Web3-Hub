@@ -156,3 +156,52 @@ func TestARVISBatchStopsOnJSONRPCMemberRateLimitInHTTP200(t *testing.T) {
 		t.Fatalf("provider throttling should stop remaining chunks: calls=%d", got)
 	}
 }
+
+func TestARVISBatch413SplitContinuesAfterOneRejectedMember(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_BATCH_MODE", "auto")
+	t.Setenv("SOLANA_RPC_TX_BATCH_SIZE", "4")
+	t.Setenv("SOLANA_RPC_BATCH_CHUNK_SIZE", "4")
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var batch []solanaRPCRequest
+		if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+			t.Errorf("decode request: %v", err)
+			return
+		}
+		if len(batch) > 2 {
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
+		responses := make([]map[string]any, 0, len(batch))
+		for _, item := range batch {
+			sig := item.Params.([]any)[0]
+			if sig == "rejected-v1" {
+				responses = append(responses, map[string]any{
+					"jsonrpc": "2.0", "id": item.ID,
+					"error": map[string]any{"code": -32015, "message": "Transaction version (1) is not supported"},
+				})
+			} else {
+				responses = append(responses, map[string]any{
+					"jsonrpc": "2.0", "id": item.ID, "result": map[string]any{"slot": 123},
+				})
+			}
+		}
+		_ = json.NewEncoder(w).Encode(responses)
+	}))
+	defer server.Close()
+
+	out, err := SolanaGetTransactionsJSONParsedBatch(context.Background(), server.URL, []string{
+		"rejected-v1", "good-a", "good-b", "good-c",
+	})
+	if err == nil || !strings.Contains(err.Error(), "-32015") {
+		t.Fatalf("split-member error must remain visible: %v", err)
+	}
+	if len(out) != 3 || out["good-a"] == nil || out["good-b"] == nil || out["good-c"] == nil {
+		t.Fatalf("413 split lost independent verified members: %#v", out)
+	}
+	if got := calls.Load(); got != 3 {
+		t.Fatalf("expected one 413 and two partial/successful half-batches: calls=%d", got)
+	}
+}
