@@ -311,6 +311,7 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 		out := map[string]SolanaTransactionResult{}
 		seenIDs := make(map[int]bool, len(signatures))
 		duplicateIDs := make(map[int]bool)
+		unsupportedErrorIDs := make(map[int]bool)
 		memberErrors := 0
 		nullResults := 0
 		invalidIDs := 0
@@ -335,7 +336,10 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 				}
 				memberErr := fmt.Errorf("solana rpc error %d: %s", response.Error.Code, response.Error.Message)
 				if isSolanaUnsupportedTransactionVersionError(memberErr) {
-					cacheSolanaUnsupportedTransactionVersion(solanaTransactionFetchKey(rpcURL, signatures[response.ID-1]))
+					// Delay negative caching until ALL envelopes are examined.
+					// A duplicate ID (including a conflicting success) is not
+					// authoritative evidence that this signature is version 1.
+					unsupportedErrorIDs[response.ID] = true
 				}
 				web3.LogRPCFailure("getTransaction", actualEndpoint, res.StatusCode, memberErr)
 				continue
@@ -347,6 +351,11 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 				continue
 			}
 			out[signatures[response.ID-1]] = response.Result
+		}
+		for id := range unsupportedErrorIDs {
+			if !duplicateIDs[id] {
+				cacheSolanaUnsupportedTransactionVersion(solanaTransactionFetchKey(rpcURL, signatures[id-1]))
+			}
 		}
 		missingResponses := len(signatures) - len(seenIDs)
 		if memberErrors > 0 || nullResults > 0 || missingResponses > 0 || len(duplicateIDs) > 0 || invalidIDs > 0 {
