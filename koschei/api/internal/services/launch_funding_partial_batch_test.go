@@ -162,3 +162,38 @@ func TestLaunchFundingEarlierPageSurvivesLaterSignaturePageError(t *testing.T) {
 		t.Fatalf("verified earlier-page funding must survive later-page failure with incomplete=true: source=%q amount=%v incomplete=%v", source, amount, incomplete)
 	}
 }
+
+func TestLaunchForensicsDisclosesIncompleteCreatorFundingHistory(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_MIN_INTERVAL_MS", "0")
+	t.Setenv("SOLANA_RPC_MAX_429_RETRIES", "0")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"jsonrpc": "2.0", "id": 1,
+			"error": map[string]any{"code": -32005, "message": "history unavailable"},
+		})
+	}))
+	defer server.Close()
+
+	roles := HolderRoleAnalysis{
+		Available: true,
+		Accounts: []HolderRoleAccount{{
+			OwnerWallet: "holder-wallet", TokenAccount: "holder-token-account",
+			Balance: 10, Role: "externally_owned_wallet",
+		}},
+	}
+	result := AnalyzeLaunchForensics(context.Background(), nil, server.URL, "test-mint", "test-creator", roles, 0, 0)
+	found := false
+	for _, limitation := range result.Limitations {
+		if strings.Contains(limitation, "Creator funding history was partially unavailable") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("creator RPC history was unavailable but not reported: status=%q limitations=%#v", result.Status, result.Limitations)
+	}
+	if result.CreatorLinkedCount != 0 {
+		t.Fatalf("unverified creator funding must never be promoted to verified linkage: %#v", result)
+	}
+}
