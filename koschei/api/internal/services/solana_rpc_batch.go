@@ -292,6 +292,7 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 		seenIDs := make(map[int]bool, len(signatures))
 		duplicateIDs := make(map[int]bool)
 		memberErrors := 0
+		nullResults := 0
 		invalidIDs := 0
 		firstErrorCode := 0
 		for _, response := range responses {
@@ -316,18 +317,21 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 				continue
 			}
 			if response.Result == nil {
+				// getTransaction legitimately returns JSON null for unknown or
+				// unavailable history; it does NOT establish verified evidence.
+				nullResults++
 				continue
 			}
 			out[signatures[response.ID-1]] = response.Result
 		}
 		missingResponses := len(signatures) - len(seenIDs)
-		if memberErrors > 0 || missingResponses > 0 || len(duplicateIDs) > 0 || invalidIDs > 0 {
+		if memberErrors > 0 || nullResults > 0 || missingResponses > 0 || len(duplicateIDs) > 0 || invalidIDs > 0 {
 			// HTTP 200 does not guarantee that every batch member responded.
 			// Never silently treat omitted, duplicated or invalid JSON-RPC IDs
 			// as complete evidence; preserve only unambiguous successful rows.
 			return out, res.StatusCode, fmt.Errorf(
-				"solana rpc batch partial evidence: %d/%d transaction request(s) failed; missing_responses=%d duplicate_ids=%d invalid_ids=%d first_rpc_code=%d",
-				memberErrors, len(signatures), missingResponses, len(duplicateIDs), invalidIDs, firstErrorCode,
+				"solana rpc batch partial evidence: %d/%d transaction request(s) failed; null_results=%d missing_responses=%d duplicate_ids=%d invalid_ids=%d first_rpc_code=%d",
+				memberErrors, len(signatures), nullResults, missingResponses, len(duplicateIDs), invalidIDs, firstErrorCode,
 			)
 		}
 		return out, res.StatusCode, nil
@@ -345,6 +349,9 @@ func solanaGetTransactionsJSONParsedSingles(ctx context.Context, rpcURL string, 
 		}
 		if result != nil {
 			out[signature] = result
+		} else {
+			// A nil result is an unavailable transaction, not verified evidence.
+			lastErr = fmt.Errorf("solana rpc single-transaction evidence unavailable")
 		}
 	}
 	if lastErr != nil {
