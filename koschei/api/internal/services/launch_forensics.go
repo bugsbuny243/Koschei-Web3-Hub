@@ -156,7 +156,7 @@ func AnalyzeLaunchForensics(ctx context.Context, db *sql.DB, rpcURL, mint, creat
 	fundingBudget := newHolderScanRPCBudget(cfg.FundingRPCBudget)
 	creatorFunder := ""
 	if creator != "" && strings.TrimSpace(rpcURL) != "" {
-		creatorFunder, _ = earliestIncomingSOLSource(ctx, rpcURL, creator, cfg, fundingBudget)
+		creatorFunder, _, _ = earliestIncomingSOLSource(ctx, rpcURL, creator, cfg, fundingBudget)
 	}
 	checks := cfg.FundingCheckCount
 	if checks > len(profiles) {
