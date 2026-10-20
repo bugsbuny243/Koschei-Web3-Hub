@@ -121,7 +121,7 @@ func TestLaunchFundingEarlierPageSurvivesLaterSignaturePageError(t *testing.T) {
 				rows = append(rows, map[string]any{
 					"jsonrpc": "2.0", "id": request.ID,
 					"result": map[string]any{
-						"slot": 1,
+						"slot":        1,
 						"transaction": map[string]any{"message": map[string]any{"accountKeys": []any{funder, wallet}}},
 						"meta": map[string]any{
 							"preBalances":  []any{2000000000, 0},
