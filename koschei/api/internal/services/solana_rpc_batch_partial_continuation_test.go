@@ -120,3 +120,39 @@ func TestARVISBatchStopsOnProviderWideRateLimit(t *testing.T) {
 		t.Fatalf("429 must stop later chunks to avoid a request storm: requests=%d", got)
 	}
 }
+
+func TestARVISBatchStopsOnJSONRPCMemberRateLimitInHTTP200(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_BATCH_MODE", "batch")
+	t.Setenv("SOLANA_RPC_TX_BATCH_SIZE", "2")
+	t.Setenv("SOLANA_RPC_429_COOLDOWN_SECONDS", "30")
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var batch []solanaRPCRequest
+		if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+			t.Errorf("decode request: %v", err)
+			return
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"jsonrpc": "2.0", "id": batch[0].ID, "result": map[string]any{"slot": 123}},
+			{"jsonrpc": "2.0", "id": batch[1].ID, "error": map[string]any{"code": 429, "message": "compute capacity exceeded"}},
+		})
+	}))
+	defer server.Close()
+
+	out, err := SolanaGetTransactionsJSONParsedBatch(context.Background(), server.URL, []string{"verified", "rate-limited", "must-not-request"})
+	if err == nil || !strings.Contains(err.Error(), "provider rate limited") {
+		t.Fatalf("HTTP 200 member code 429 must throttle the provider: err=%v", err)
+	}
+	var partial *solanaRPCBatchPartialEvidenceError
+	if errors.As(err, &partial) {
+		t.Fatalf("provider rate-limit incorrectly treated as recoverable partial evidence: %v", err)
+	}
+	if len(out) != 1 || out["verified"] == nil {
+		t.Fatalf("independent successful evidence must remain available: %#v", out)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("provider throttling should stop remaining chunks: calls=%d", got)
+	}
+}
