@@ -341,6 +341,7 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 		duplicateIDs := make(map[int]bool)
 		unsupportedErrorIDs := make(map[int]bool)
 		memberErrors := 0
+		rateLimitedMembers := 0
 		nullResults := 0
 		invalidIDs := 0
 		firstErrorCode := 0
@@ -363,6 +364,12 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 					firstErrorCode = response.Error.Code
 				}
 				memberErr := fmt.Errorf("solana rpc error %d: %s", response.Error.Code, response.Error.Message)
+				if response.Error.Code == http.StatusTooManyRequests {
+					// A provider can rate-limit JSON-RPC members inside HTTP 200.
+					// Treat this as global throttling, not a recoverable
+					// individual evidence gap that permits more chunks.
+					rateLimitedMembers++
+				}
 				if isSolanaUnsupportedTransactionVersionError(memberErr) {
 					// Delay negative caching until ALL envelopes are examined.
 					// A duplicate ID (including a conflicting success) is not
@@ -386,6 +393,17 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 			}
 		}
 		missingResponses := len(signatures) - len(seenIDs)
+		if rateLimitedMembers > 0 {
+			delay := solanaRPC429Cooldown()
+			deferSolanaRPCRequests(delay)
+			web3.DeferSolanaRPCProvider(actualEndpoint, delay)
+			// Other successful signatures remain valid partial evidence, but
+			// additional chunks MUST NOT amplify the provider's rate limit.
+			return out, res.StatusCode, fmt.Errorf(
+				"solana rpc batch provider rate limited: %d/%d member(s) returned json-rpc code 429; first_rpc_code=%d",
+				rateLimitedMembers, len(signatures), firstErrorCode,
+			)
+		}
 		if memberErrors > 0 || nullResults > 0 || missingResponses > 0 || len(duplicateIDs) > 0 || invalidIDs > 0 {
 			// HTTP 200 does not guarantee that every batch member responded.
 			// Never silently treat omitted, duplicated or invalid JSON-RPC IDs
