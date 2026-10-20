@@ -216,7 +216,7 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 	}
 	maxRetries := solanaRPCMax429Retries()
 	for attempt := 0; ; attempt++ {
-		if err := reserveSolanaRPCBudget(ctx, "getTransactionBatch"); err != nil {
+		if err := reserveSolanaRPCBudgetUnits(ctx, "getTransactionBatch", len(signatures)); err != nil {
 			web3.LogRPCFailure("getTransactionBatch", rpcURL, 0, err)
 			return nil, 0, err
 		}
