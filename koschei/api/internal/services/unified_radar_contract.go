@@ -99,6 +99,10 @@ func normalizeUnifiedRadarVerdictDecision(verdict UnifiedRadarVerdict) UnifiedRa
 			decision = append(decision, "Supporting evidence groups may exist, but only one distinct compounding rule ID was satisfied; it cannot issue a letter grade alone.")
 		}
 		decision = append(decision, fmt.Sprintf("Evidence-backed hard-trigger ceiling applied: grade %s.", verdict.Grade))
+	case len(compoundRuleIDs) >= 2 && unifiedRadarContractSevereCompounding(verdict.TriggeredRules, false):
+		verdict.Grade = "C"
+		verdict.Verdict = "severe_compounding_rule"
+		decision = append(decision, "Independent evidence of a dominant-holder position at least 10x liquidity and a verified/observed holder exit capped the grade at C.")
 	case len(compoundRuleIDs) >= 2:
 		verdict.Grade = "B"
 		verdict.Verdict = "compounding_rule"
@@ -135,6 +139,9 @@ func applyRuntimeVerdictMode(verdict UnifiedRadarVerdict) UnifiedRadarVerdict {
 		}
 		verifiedCompounding := unifiedRadarVerifiedCompoundingRuleCount(verdict.TriggeredRules)
 		switch {
+		case verifiedCompounding >= 2 && unifiedRadarContractSevereCompounding(verdict.TriggeredRules, true):
+			verdict.Grade = "C"
+			verdict.Verdict = "severe_compounding_rule"
 		case verifiedCompounding >= 2:
 			verdict.Grade = "B"
 			verdict.Verdict = "compounding_rule"
@@ -156,6 +163,31 @@ func applyRuntimeVerdictMode(verdict UnifiedRadarVerdict) UnifiedRadarVerdict {
 		verdict.DecisionPath = append(nonNilStrings(verdict.DecisionPath), "KOSCHEI_VERDICT_MODE="+mode+" withheld letter-grade publication while preserving evidence and deterministic signing.")
 	}
 	return verdict
+}
+
+// Severe compounding is reconstructed from eligible rule facts, not from a
+// previously supplied grade. This prevents both silent C->B downgrades during
+// finalization and unverified inputs from manufacturing a C verdict.
+func unifiedRadarContractSevereCompounding(hits []ActorDefenseRuleHit, strict bool) bool {
+	pressure := false
+	exit := false
+	for _, hit := range hits {
+		if !strings.EqualFold(strings.TrimSpace(hit.Tier), "compounding") {
+			continue
+		}
+		status := normalizeActorEvidenceStatus(hit.EvidenceStatus)
+		if status != "verified" && (strict || status != "observed") {
+			continue
+		}
+		switch hit.RuleID {
+		case UnifiedRuleHolderLiquidityPressure:
+			metrics, _ := hit.Facts["metrics"].(map[string]any)
+			pressure = pressure || unifiedRadarMetricFloat(metrics["position_liquidity_ratio"]) >= 10
+		case UnifiedRuleDominantHolderFirstExit:
+			exit = true
+		}
+	}
+	return pressure && exit
 }
 
 func unifiedRadarVerifiedHardCaps(hits []ActorDefenseRuleHit) []string {
