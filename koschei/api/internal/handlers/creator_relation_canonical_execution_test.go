@@ -12,16 +12,16 @@ func TestCanonicalCreatorVerificationFailsClosedForExecutionAndMintMismatch(t *t
 	const target = "MintCanonicalProof"
 
 	cases := []struct {
-		name          string
-		hasMetaErr    bool
-		metaErr       any
-		instruction   string
-		initMint      string
-		wantStatus    string
+		name        string
+		hasMetaErr  bool
+		metaErr     any
+		instruction string
+		initMint    string
+		wantStatus  string
 	}{
 		{
 			name: "failed on-chain transaction", hasMetaErr: true,
-			metaErr: map[string]any{"InstructionError": []any{0, "Custom"}},
+			metaErr:     map[string]any{"InstructionError": []any{0, "Custom"}},
 			instruction: "initializeMint2", initMint: target,
 			wantStatus: "canonical_transaction_failed",
 		},
@@ -31,12 +31,12 @@ func TestCanonicalCreatorVerificationFailsClosedForExecutionAndMintMismatch(t *t
 			wantStatus: "canonical_execution_status_unavailable",
 		},
 		{
-			name: "different mint initialized, target merely referenced",
+			name:       "different mint initialized, target merely referenced",
 			hasMetaErr: true, instruction: "initializeMint2", initMint: "OtherMint",
 			wantStatus: "mint_not_referenced",
 		},
 		{
-			name: "target only transferred during another launch",
+			name:       "target only transferred during another launch",
 			hasMetaErr: true, instruction: "transferChecked", initMint: target,
 			wantStatus: "mint_not_referenced",
 		},
@@ -46,7 +46,7 @@ func TestCanonicalCreatorVerificationFailsClosedForExecutionAndMintMismatch(t *t
 		t.Run(tc.name, func(t *testing.T) {
 			meta := map[string]any{
 				"postTokenBalances": []any{map[string]any{"mint": target, "owner": creator}},
-				"logMessages": []any{"Program log: Instruction: Create", "Program log: Instruction: InitializeMint2"},
+				"logMessages":       []any{"Program log: Instruction: Create", "Program log: Instruction: InitializeMint2"},
 			}
 			if tc.hasMetaErr {
 				meta["err"] = tc.metaErr
