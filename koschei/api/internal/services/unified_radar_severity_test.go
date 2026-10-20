@@ -66,7 +66,7 @@ func TestUnifiedRadarSeveritySurvivesFinalizationAndJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	var public struct {
-		Grade string `json:"grade"`
+		Grade   string `json:"grade"`
 		Verdict string `json:"verdict"`
 	}
 	if err := json.Unmarshal(encoded, &public); err != nil {
