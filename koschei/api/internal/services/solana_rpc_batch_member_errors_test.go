@@ -59,3 +59,59 @@ func TestSolanaRPCBatchReportsAllMembersRejected(t *testing.T) {
 		t.Fatalf("all rejected batch must be incomplete: out=%#v err=%v", out, err)
 	}
 }
+
+func TestSolanaRPCBatchReportsLaterChunkFailureAfterEarlierSuccess(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_TX_BATCH_SIZE", "1")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var requests []solanaRPCRequest
+		if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
+			t.Errorf("decode batch: %v", err)
+			return
+		}
+		params := requests[0].Params.([]any)
+		signature := params[0].(string)
+		if signature == "first" {
+			_ = json.NewEncoder(w).Encode([]map[string]any{
+				{"jsonrpc": "2.0", "id": 1, "result": map[string]any{"slot": 123}},
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"jsonrpc": "2.0", "id": 1, "error": map[string]any{"code": -32015, "message": "unsupported version"}},
+		})
+	}))
+	defer server.Close()
+	out, err := SolanaGetTransactionsJSONParsedBatch(context.Background(), server.URL, []string{"first", "second"})
+	if err == nil || len(out) != 1 || out["first"] == nil {
+		t.Fatalf("later chunk failure must preserve evidence and error: out=%#v err=%v", out, err)
+	}
+}
+
+func TestSolanaRPCSingleFallbackReportsPartialFailures(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_BATCH_MODE", "single")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request solanaRPCRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Errorf("decode single: %v", err)
+			return
+		}
+		params := request.Params.([]any)
+		if params[0] == "first" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"jsonrpc": "2.0", "id": request.ID, "result": map[string]any{"slot": 123},
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"jsonrpc": "2.0", "id": request.ID,
+			"error": map[string]any{"code": -32015, "message": "unsupported version"},
+		})
+	}))
+	defer server.Close()
+	out, err := SolanaGetTransactionsJSONParsedBatch(context.Background(), server.URL, []string{"first", "second"})
+	if err == nil || len(out) != 1 || out["first"] == nil {
+		t.Fatalf("single fallback partial failure must not disappear: out=%#v err=%v", out, err)
+	}
+}
