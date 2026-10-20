@@ -73,13 +73,18 @@ func earliestIncomingSOLSource(ctx context.Context, rpcURL, wallet string, cfg l
 	}
 	before := ""
 	signatures := []SolanaSignatureInfo{}
+	historyIncomplete := false
 	for page := 0; page < 2; page++ {
 		if ctx.Err() != nil || !budget.Reserve(1) {
-			return "", 0, false
+			historyIncomplete = true
+			break
 		}
 		pageRows, err := SolanaGetSignaturesForAddressBefore(ctx, rpcURL, wallet, cfg.FundingSigLimit, before)
 		if err != nil {
-			return "", 0, true
+			// A later page failing must not erase independently verified
+			// signatures from an earlier page. Preserve the limitation.
+			historyIncomplete = true
+			break
 		}
 		signatures = append(signatures, pageRows...)
 		if len(pageRows) < cfg.FundingSigLimit || len(pageRows) == 0 {
@@ -88,7 +93,7 @@ func earliestIncomingSOLSource(ctx context.Context, rpcURL, wallet string, cfg l
 		before = pageRows[len(pageRows)-1].Signature
 	}
 	if len(signatures) == 0 {
-		return "", 0, false
+		return "", 0, historyIncomplete
 	}
 	// Parse a bounded set of the oldest observations returned by the two-page
 	// window. Every batch member consumes one unit of the per-scan RPC budget.
@@ -107,11 +112,11 @@ func earliestIncomingSOLSource(ctx context.Context, rpcURL, wallet string, cfg l
 	}
 	granted := budget.ReserveUpTo(len(keys))
 	if granted == 0 {
-		return "", 0, false
+		return "", 0, true
 	}
 	keys = keys[:granted]
 	transactions, err := SolanaGetTransactionsJSONParsedBatch(ctx, rpcURL, keys)
-	incomplete := err != nil || len(transactions) != len(keys)
+	incomplete := historyIncomplete || err != nil || len(transactions) != len(keys)
 	// A partial RPC batch still contains individually verified transaction
 	// evidence. Discarding successful siblings would hide real creator funding
 	// edges whenever another signature is version-unsupported or unavailable.
