@@ -116,6 +116,26 @@ func SolanaGetTransactionsJSONParsedBatch(ctx context.Context, rpcURL string, si
 			Provider: solanaRPCBatchProviderKey(rpcURL), Reason: "disabled by SOLANA_RPC_BATCH_ENABLED",
 		}
 	}
+	// Skip deterministic unsupported-version failures already observed for
+	// this exact provider and signature. This remains an explicit incomplete
+	// evidence error; cached signatures never become verified transactions.
+	pending := make([]string, 0, len(clean))
+	cachedUnsupported := 0
+	for _, signature := range clean {
+		if cachedSolanaUnsupportedTransactionVersion(solanaTransactionFetchKey(rpcURL, signature)) {
+			cachedUnsupported++
+			continue
+		}
+		pending = append(pending, signature)
+	}
+	var cachedErr error
+	if cachedUnsupported > 0 {
+		cachedErr = fmt.Errorf("%d Solana transaction(s) still unsupported: %w", cachedUnsupported, errSolanaUnsupportedTransactionVersion)
+	}
+	if len(pending) == 0 {
+		return map[string]SolanaTransactionResult{}, cachedErr
+	}
+	clean = pending
 
 	solanaRPCBatchGate.Lock()
 	defer solanaRPCBatchGate.Unlock()
@@ -137,10 +157,10 @@ func SolanaGetTransactionsJSONParsedBatch(ctx context.Context, rpcURL string, si
 		chunk, err := solanaGetTransactionsJSONParsedBatchChunk(ctx, rpcURL, clean[start:end])
 		mergeSolanaTransactionResults(out, chunk)
 		if err != nil {
-			return out, err
+			return out, errors.Join(cachedErr, err)
 		}
 	}
-	return out, nil
+	return out, cachedErr
 }
 
 func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL string, clean []string) (map[string]SolanaTransactionResult, error) {
@@ -313,7 +333,11 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 				if memberErrors == 1 {
 					firstErrorCode = response.Error.Code
 				}
-				web3.LogRPCFailure("getTransaction", actualEndpoint, res.StatusCode, fmt.Errorf("solana rpc error %d: %s", response.Error.Code, response.Error.Message))
+				memberErr := fmt.Errorf("solana rpc error %d: %s", response.Error.Code, response.Error.Message)
+				if isSolanaUnsupportedTransactionVersionError(memberErr) {
+					cacheSolanaUnsupportedTransactionVersion(solanaTransactionFetchKey(rpcURL, signatures[response.ID-1]))
+				}
+				web3.LogRPCFailure("getTransaction", actualEndpoint, res.StatusCode, memberErr)
 				continue
 			}
 			if response.Result == nil {
