@@ -311,16 +311,27 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 			if len(signatures) > 1 {
 				mid := len(signatures) / 2
 				left, _, leftErr := solanaGetTransactionsJSONParsedBatchRequest(ctx, rpcURL, signatures[:mid])
-				right := map[string]SolanaTransactionResult{}
-				var rightErr error
-				if leftErr == nil {
-					right, _, rightErr = solanaGetTransactionsJSONParsedBatchRequest(ctx, rpcURL, signatures[mid:])
-				}
-				mergeSolanaTransactionResults(left, right)
-				if leftErr != nil {
+				var leftPartial *solanaRPCBatchPartialEvidenceError
+				if leftErr != nil && !errors.As(leftErr, &leftPartial) {
+					// Provider-wide failures must stop recursive retries,
+					// especially throttling and exhausted RPC budgets.
 					return left, res.StatusCode, leftErr
 				}
-				return left, res.StatusCode, rightErr
+				right, _, rightErr := solanaGetTransactionsJSONParsedBatchRequest(ctx, rpcURL, signatures[mid:])
+				mergeSolanaTransactionResults(left, right)
+				var rightPartial *solanaRPCBatchPartialEvidenceError
+				if rightErr != nil && !errors.As(rightErr, &rightPartial) {
+					// Retain earlier successful evidence, but do not classify
+					// a terminal provider error as safe-to-continue partial.
+					if leftErr != nil {
+						return left, res.StatusCode, fmt.Errorf("earlier member gap: %v; provider failed: %w", leftErr, rightErr)
+					}
+					return left, res.StatusCode, rightErr
+				}
+				// The oversized envelope was successfully split; member-level
+				// gaps now carry the returned 200 status so auto mode does not
+				// degrade the entire chunk to single-RPC retries.
+				return left, http.StatusOK, errors.Join(leftErr, rightErr)
 			}
 			return nil, res.StatusCode, tripSolanaRPCBatchCircuit(rpcURL, res.StatusCode, "provider rejected a single-member batch")
 		}
