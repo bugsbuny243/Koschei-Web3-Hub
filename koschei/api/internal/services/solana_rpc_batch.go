@@ -174,6 +174,11 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 		}
 		chunk := clean[index:end]
 		results, status, err := solanaGetTransactionsJSONParsedBatchRequest(ctx, rpcURL, chunk)
+		// Keep successful batch members before reporting a partial provider error.
+		// A failed member must not discard independently verified siblings.
+		for signature, result := range results {
+			out[signature] = result
+		}
 		if err != nil {
 			lastErr = err
 		}
@@ -191,9 +196,6 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 			// Silently discarding a batch error makes an incomplete investigation
 			// indistinguishable from a complete one at the caller.
 			return out, err
-		}
-		for signature, result := range results {
-			out[signature] = result
 		}
 		index = end
 	}
