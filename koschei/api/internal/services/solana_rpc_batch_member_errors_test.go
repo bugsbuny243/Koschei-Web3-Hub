@@ -115,3 +115,39 @@ func TestSolanaRPCSingleFallbackReportsPartialFailures(t *testing.T) {
 		t.Fatalf("single fallback partial failure must not disappear: out=%#v err=%v", out, err)
 	}
 }
+
+func TestSolanaRPCBatchMissingEnvelopeReportsIncompleteEvidence(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"jsonrpc": "2.0", "id": 1, "result": map[string]any{"slot": 123}},
+		})
+	}))
+	defer server.Close()
+	out, err := SolanaGetTransactionsJSONParsedBatch(context.Background(), server.URL, []string{"first", "missing"})
+	if err == nil || !strings.Contains(err.Error(), "missing_responses=1") {
+		t.Fatalf("missing response envelope must be reported: %v", err)
+	}
+	if len(out) != 1 || out["first"] == nil || out["missing"] != nil {
+		t.Fatalf("must retain only unambiguous evidence: %#v", out)
+	}
+}
+
+func TestSolanaRPCBatchDuplicateEnvelopeDiscardsAmbiguousMember(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode([]map[string]any{
+			{"jsonrpc": "2.0", "id": 1, "result": map[string]any{"slot": 123}},
+			{"jsonrpc": "2.0", "id": 1, "result": map[string]any{"slot": 999}},
+			{"jsonrpc": "2.0", "id": 2, "result": map[string]any{"slot": 456}},
+		})
+	}))
+	defer server.Close()
+	out, err := SolanaGetTransactionsJSONParsedBatch(context.Background(), server.URL, []string{"ambiguous", "valid"})
+	if err == nil || !strings.Contains(err.Error(), "duplicate_ids=1") {
+		t.Fatalf("duplicate response envelope must be reported: %v", err)
+	}
+	if len(out) != 1 || out["valid"] == nil || out["ambiguous"] != nil {
+		t.Fatalf("duplicate member was treated as trusted evidence: %#v", out)
+	}
+}
