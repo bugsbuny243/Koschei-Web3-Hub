@@ -71,6 +71,20 @@ func (e *solanaRPCBatchUnavailableError) Error() string {
 	return message
 }
 
+// solanaRPCBatchPartialEvidenceError means an HTTP-successful provider batch
+// contained unusable individual responses. Remaining independent chunks may
+// still be queried, while the caller must retain an explicit incomplete error.
+type solanaRPCBatchPartialEvidenceError struct {
+	Summary string
+}
+
+func (e *solanaRPCBatchPartialEvidenceError) Error() string {
+	if e == nil {
+		return "solana rpc batch partial evidence"
+	}
+	return e.Summary
+}
+
 func IsSolanaRPCBatchUnavailable(err error) bool {
 	var target *solanaRPCBatchUnavailableError
 	return errors.As(err, &target)
@@ -145,10 +159,11 @@ func SolanaGetTransactionsJSONParsedBatch(ctx context.Context, rpcURL string, si
 	}
 
 	out := map[string]SolanaTransactionResult{}
+	incompleteErr := cachedErr
 	batchSize := solanaRPCTransactionBatchSize()
 	for start := 0; start < len(clean); start += batchSize {
 		if ctx.Err() != nil {
-			return out, ctx.Err()
+			return out, errors.Join(incompleteErr, ctx.Err())
 		}
 		end := start + batchSize
 		if end > len(clean) {
@@ -157,10 +172,20 @@ func SolanaGetTransactionsJSONParsedBatch(ctx context.Context, rpcURL string, si
 		chunk, err := solanaGetTransactionsJSONParsedBatchChunk(ctx, rpcURL, clean[start:end])
 		mergeSolanaTransactionResults(out, chunk)
 		if err != nil {
-			return out, errors.Join(cachedErr, err)
+			var partial *solanaRPCBatchPartialEvidenceError
+			if errors.As(err, &partial) {
+				// A member-level failure is not an HTTP/provider-wide outage.
+				// Continue the bounded independent chunks, but never erase
+				// or downgrade the evidence gap from the final report.
+				incompleteErr = errors.Join(incompleteErr, err)
+				continue
+			}
+			// Rate limits, provider outages and budget exhaustion are terminal:
+			// do not amplify 429 pressure by advancing to later chunks.
+			return out, errors.Join(incompleteErr, err)
 		}
 	}
-	return out, cachedErr
+	return out, incompleteErr
 }
 
 func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL string, clean []string) (map[string]SolanaTransactionResult, error) {
@@ -199,9 +224,6 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 		for signature, result := range results {
 			out[signature] = result
 		}
-		if err != nil {
-			lastErr = err
-		}
 		if status == http.StatusRequestEntityTooLarge && err != nil && modeOverride != "batch" {
 			if !degradationLogged {
 				log.Printf("rpc batch degraded host=%s reason=%d chunk=%d→single", host, status, chunkSize)
@@ -212,10 +234,16 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 			continue
 		}
 		if err != nil {
-			// Preserve successful members while reporting missing RPC evidence.
-			// Silently discarding a batch error makes an incomplete investigation
-			// indistinguishable from a complete one at the caller.
-			return out, err
+			var partial *solanaRPCBatchPartialEvidenceError
+			if errors.As(err, &partial) {
+				// Continue collecting independent signatures in this bounded
+				// chunk despite a rejected/null/missing member response.
+				lastErr = errors.Join(lastErr, err)
+				index = end
+				continue
+			}
+			// Only provider-wide faults stop the remaining chunk.
+			return out, errors.Join(lastErr, err)
 		}
 		index = end
 	}
@@ -362,10 +390,10 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 			// HTTP 200 does not guarantee that every batch member responded.
 			// Never silently treat omitted, duplicated or invalid JSON-RPC IDs
 			// as complete evidence; preserve only unambiguous successful rows.
-			return out, res.StatusCode, fmt.Errorf(
+			return out, res.StatusCode, &solanaRPCBatchPartialEvidenceError{Summary: fmt.Sprintf(
 				"solana rpc batch partial evidence: %d/%d transaction request(s) failed; null_results=%d missing_responses=%d duplicate_ids=%d invalid_ids=%d first_rpc_code=%d",
 				memberErrors, len(signatures), nullResults, missingResponses, len(duplicateIDs), invalidIDs, firstErrorCode,
-			)
+			)}
 		}
 		return out, res.StatusCode, nil
 	}
