@@ -98,3 +98,67 @@ func TestLaunchFundingPreservesVerifiedLinkWhenSiblingTransactionFails(t *testin
 		t.Fatalf("partial RPC evidence boundary was hidden: %#v", profile.Evidence)
 	}
 }
+
+func TestLaunchFundingEarlierPageSurvivesLaterSignaturePageError(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_BATCH_MODE", "batch")
+	const wallet, funder = "wallet-bounded-history", "funder-bounded-history"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var raw json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			t.Errorf("decode RPC: %v", err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if len(raw) > 0 && raw[0] == '[' {
+			var requests []solanaRPCRequest
+			if err := json.Unmarshal(raw, &requests); err != nil {
+				t.Errorf("decode batch: %v", err)
+				return
+			}
+			rows := make([]map[string]any, 0, len(requests))
+			for _, request := range requests {
+				rows = append(rows, map[string]any{
+					"jsonrpc": "2.0", "id": request.ID,
+					"result": map[string]any{
+						"slot": 1,
+						"transaction": map[string]any{"message": map[string]any{"accountKeys": []any{funder, wallet}}},
+						"meta": map[string]any{
+							"preBalances": []any{2000000000, 0},
+							"postBalances": []any{1000000000, 1000000000},
+						},
+					},
+				})
+			}
+			_ = json.NewEncoder(w).Encode(rows)
+			return
+		}
+		var request solanaRPCRequest
+		if err := json.Unmarshal(raw, &request); err != nil {
+			t.Errorf("decode single: %v", err)
+			return
+		}
+		params := request.Params.([]any)
+		options := params[1].(map[string]any)
+		if options["before"] != nil {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"jsonrpc": "2.0", "id": request.ID,
+				"error": map[string]any{"code": -32005, "message": "node is behind"},
+			})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"jsonrpc": "2.0", "id": request.ID,
+			"result": []map[string]any{
+				{"signature": "sig-newer", "slot": 2, "err": nil},
+				{"signature": "sig-older", "slot": 1, "err": nil},
+			},
+		})
+	}))
+	defer server.Close()
+	cfg := launchForensicsConfig{FundingSigLimit: 2, FundingTxParse: 8, FundingRPCBudget: 10}
+	source, amount, incomplete := earliestIncomingSOLSource(context.Background(), server.URL, wallet, cfg, newHolderScanRPCBudget(10))
+	if source != funder || amount != 1 || !incomplete {
+		t.Fatalf("verified earlier-page funding must survive later-page failure with incomplete=true: source=%q amount=%v incomplete=%v", source, amount, incomplete)
+	}
+}
