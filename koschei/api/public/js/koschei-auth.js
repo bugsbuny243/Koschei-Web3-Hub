@@ -1,6 +1,19 @@
 (function () {
   const KEY = 'koschei_jwt';
   const LEGACY_KEY = 'koschei_token';
+  const SIGNED_OUT_KEY = 'koschei_explicitly_signed_out';
+
+  function markSignedOut() {
+    try { localStorage.setItem(SIGNED_OUT_KEY, '1'); } catch {}
+  }
+
+  function clearSignedOut() {
+    try { localStorage.removeItem(SIGNED_OUT_KEY); } catch {}
+  }
+
+  function explicitlySignedOut() {
+    try { return localStorage.getItem(SIGNED_OUT_KEY) === '1'; } catch { return false; }
+  }
   // A syntactically valid JWT is not an authenticated session until /api/me confirms it.
   let sessionVerified = false;
 
@@ -96,12 +109,20 @@
   }
 
   function cleanInternalPath(value, fallback) {
+    const safeFallback = fallback || '/';
     const raw = String(value || '').trim();
-    if (!raw || !raw.startsWith('/')) return fallback || '/';
-    if (raw.startsWith('//')) return fallback || '/';
-    if (/^\/\/[a-z0-9]/i.test(raw)) return fallback || '/';
-    if (raw.startsWith('/login')) return fallback || '/';
-    return raw;
+    // Backslashes are authority separators in WHATWG URLs; they are not
+    // harmless pathname characters when a next= value is navigated to.
+    if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\') ||
+        /^\/(?:%2f|%5c)/i.test(raw) || /[\x00-\x1f\x7f]/.test(raw)) return safeFallback;
+    try {
+      const url = new URL(raw, window.location.origin);
+      if (url.origin !== window.location.origin || !/^https?:$/.test(url.protocol) ||
+          url.pathname.startsWith('/login')) return safeFallback;
+      return url.pathname + url.search + url.hash;
+    } catch {
+      return safeFallback;
+    }
   }
 
   function currentReturnPath() {
@@ -275,6 +296,7 @@
   }
 
   async function restoreNeonSession() {
+    if (explicitlySignedOut()) return false;
     try {
       const baseURL = await neonAuthBaseURL();
       const session = await fetchNeonSession(baseURL);
@@ -288,6 +310,10 @@
 
   async function init() {
     sessionVerified = false;
+    if (explicitlySignedOut()) {
+      clearJwt();
+      return false;
+    }
     consumeAccessTokenFromHash();
     try { await loadConfig(); } catch {}
 
@@ -320,12 +346,14 @@
 
   async function signUp(email, password) {
     try {
-      return await neonEmailAuth('/sign-up/email', {
+      const result = await neonEmailAuth('/sign-up/email', {
         email,
         password,
         name: defaultUserName(email),
         callbackURL: successCallbackURL(),
       });
+      clearSignedOut();
+      return result;
     } catch (error) {
       if (!String(error && error.message || '').includes('Giriş oturumu alınamadı')) throw error;
       return signIn(email, password);
@@ -333,12 +361,29 @@
   }
 
   async function signIn(email, password) {
-    return neonEmailAuth('/sign-in/email', { email, password, callbackURL: successCallbackURL() });
+    const result = await neonEmailAuth('/sign-in/email', { email, password, callbackURL: successCallbackURL() });
+    clearSignedOut();
+    return result;
   }
 
   async function signOut() {
+    // Lock local session restoration *before* asynchronous remote sign-out.
+    markSignedOut();
     clearJwt();
-    window.location.href = '/login.html';
+    let remoteSignedOut = false;
+    try {
+      const baseURL = await neonAuthBaseURL();
+      const res = await fetch(baseURL + '/sign-out', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      remoteSignedOut = res.ok;
+    } catch {}
+    // If remote sign-out fails, never silently resume its surviving cookie.
+    // The distinct query value avoids claiming server logout succeeded.
+    window.location.replace('/login.html?signed_out=' + (remoteSignedOut ? '1' : 'local_only'));
   }
 
   function isLoggedIn() { return sessionVerified && jwtIsUsable(getJwt()); }
