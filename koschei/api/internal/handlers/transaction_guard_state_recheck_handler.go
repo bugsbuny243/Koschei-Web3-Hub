@@ -13,8 +13,8 @@ import (
 // A signed permit can expire during slow RPC or independent provider quorum
 // collection. Authorization is only valid at the moment the response is made.
 func transactionGuardStateRecheckPermitActiveAt(claims transactionGuardEnforcementPermitClaims, now time.Time) bool {
-  expiry, err := time.Parse(time.RFC3339Nano, claims.ExpiresAt)
-  return err == nil && !now.IsZero() && now.Before(expiry)
+	expiry, err := time.Parse(time.RFC3339Nano, claims.ExpiresAt)
+	return err == nil && !now.IsZero() && now.Before(expiry)
 }
 
 type transactionGuardStateRecheckRequest struct {
