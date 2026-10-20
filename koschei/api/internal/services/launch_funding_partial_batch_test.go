@@ -124,7 +124,7 @@ func TestLaunchFundingEarlierPageSurvivesLaterSignaturePageError(t *testing.T) {
 						"slot": 1,
 						"transaction": map[string]any{"message": map[string]any{"accountKeys": []any{funder, wallet}}},
 						"meta": map[string]any{
-							"preBalances": []any{2000000000, 0},
+							"preBalances":  []any{2000000000, 0},
 							"postBalances": []any{1000000000, 1000000000},
 						},
 					},
