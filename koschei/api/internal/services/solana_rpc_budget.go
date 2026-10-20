@@ -78,6 +78,17 @@ func interactiveSolanaRPCBudget(ctx context.Context) bool {
 }
 
 func reserveSolanaRPCBudget(ctx context.Context, method string) error {
+	return reserveSolanaRPCBudgetUnits(ctx, method, 1)
+}
+
+// reserveSolanaRPCBudgetUnits atomically charges a conservative unit per
+// requested transaction, not merely one unit per HTTP JSON-RPC batch.
+// Providers may charge batch members individually; without this accounting,
+// a single 20-member batch could bypass a 20-request local safety ceiling.
+func reserveSolanaRPCBudgetUnits(ctx context.Context, method string, units int) error {
+	if units < 1 || units > 20 {
+		return fmt.Errorf("invalid Solana RPC reservation units: %d", units)
+	}
 	if interactiveSolanaRPCBudget(ctx) {
 		return nil
 	}
@@ -95,8 +106,10 @@ func reserveSolanaRPCBudget(ctx context.Context, method string) error {
 		solanaRPCBudget.WindowStart = now
 		solanaRPCBudget.Count = 0
 	}
-	if solanaRPCBudget.Count < maxRequests {
-		solanaRPCBudget.Count++
+	// Check remaining capacity instead of incrementing one request at a time:
+	// partial batch reservations must never be charged or sent.
+	if units <= maxRequests && solanaRPCBudget.Count <= maxRequests-units {
+		solanaRPCBudget.Count += units
 		solanaRPCBudget.Unlock()
 		return nil
 	}
