@@ -328,7 +328,8 @@ func solanaGetTransactionsJSONParsedSingles(ctx context.Context, rpcURL string, 
 			out[signature] = result
 		}
 	}
-	if len(out) == 0 && lastErr != nil {
+	if lastErr != nil {
+		// A single successful fallback must not hide other rejected signatures.
 		return out, lastErr
 	}
 	return out, nil
