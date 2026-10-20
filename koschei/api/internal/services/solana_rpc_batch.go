@@ -289,12 +289,24 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 			return nil, res.StatusCode, wrapped
 		}
 		out := map[string]SolanaTransactionResult{}
+		seenIDs := make(map[int]bool, len(signatures))
+		duplicateIDs := make(map[int]bool)
 		memberErrors := 0
+		invalidIDs := 0
 		firstErrorCode := 0
 		for _, response := range responses {
 			if response.ID <= 0 || response.ID > len(signatures) {
+				invalidIDs++
 				continue
 			}
+			if seenIDs[response.ID] {
+				// Duplicate JSON-RPC IDs make the corresponding evidence
+				// ambiguous. Keep independent successful members only.
+				duplicateIDs[response.ID] = true
+				delete(out, signatures[response.ID-1])
+				continue
+			}
+			seenIDs[response.ID] = true
 			if response.Error != nil {
 				memberErrors++
 				if memberErrors == 1 {
@@ -308,10 +320,15 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 			}
 			out[signatures[response.ID-1]] = response.Result
 		}
-		if memberErrors > 0 {
-			// Successful transactions remain usable, but upstream must know that
-			// some requested evidence was rejected, e.g. unsupported tx version.
-			return out, res.StatusCode, fmt.Errorf("solana rpc batch partial evidence: %d/%d transaction request(s) failed; first_rpc_code=%d", memberErrors, len(signatures), firstErrorCode)
+		missingResponses := len(signatures) - len(seenIDs)
+		if memberErrors > 0 || missingResponses > 0 || len(duplicateIDs) > 0 || invalidIDs > 0 {
+			// HTTP 200 does not guarantee that every batch member responded.
+			// Never silently treat omitted, duplicated or invalid JSON-RPC IDs
+			// as complete evidence; preserve only unambiguous successful rows.
+			return out, res.StatusCode, fmt.Errorf(
+				"solana rpc batch partial evidence: %d/%d transaction request(s) failed; missing_responses=%d duplicate_ids=%d invalid_ids=%d first_rpc_code=%d",
+				memberErrors, len(signatures), missingResponses, len(duplicateIDs), invalidIDs, firstErrorCode,
+			)
 		}
 		return out, res.StatusCode, nil
 	}
