@@ -187,10 +187,10 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 			continue
 		}
 		if err != nil {
-			if len(out) == 0 {
-				return nil, err
-			}
-			return out, nil
+			// Preserve successful members while reporting missing RPC evidence.
+			// Silently discarding a batch error makes an incomplete investigation
+			// indistinguishable from a complete one at the caller.
+			return out, err
 		}
 		for signature, result := range results {
 			out[signature] = result
@@ -198,8 +198,8 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 		index = end
 	}
 
-	if len(out) == 0 && lastErr != nil {
-		return nil, lastErr
+	if lastErr != nil {
+		return out, lastErr
 	}
 	return out, nil
 }
@@ -287,11 +287,17 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 			return nil, res.StatusCode, wrapped
 		}
 		out := map[string]SolanaTransactionResult{}
+		memberErrors := 0
+		firstErrorCode := 0
 		for _, response := range responses {
 			if response.ID <= 0 || response.ID > len(signatures) {
 				continue
 			}
 			if response.Error != nil {
+				memberErrors++
+				if memberErrors == 1 {
+					firstErrorCode = response.Error.Code
+				}
 				web3.LogRPCFailure("getTransaction", actualEndpoint, res.StatusCode, fmt.Errorf("solana rpc error %d: %s", response.Error.Code, response.Error.Message))
 				continue
 			}
@@ -299,6 +305,11 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 				continue
 			}
 			out[signatures[response.ID-1]] = response.Result
+		}
+		if memberErrors > 0 {
+			// Successful transactions remain usable, but upstream must know that
+			// some requested evidence was rejected, e.g. unsupported tx version.
+			return out, res.StatusCode, fmt.Errorf("solana rpc batch partial evidence: %d/%d transaction request(s) failed; first_rpc_code=%d", memberErrors, len(signatures), firstErrorCode)
 		}
 		return out, res.StatusCode, nil
 	}
