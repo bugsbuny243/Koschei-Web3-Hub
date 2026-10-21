@@ -98,6 +98,7 @@ func StartCanonicalInvestigationJobWorker(ctx context.Context, db, readDB *sql.D
 		Heartbeat:  time.Duration(canonicalWorkerEnvInt("KOSCHEI_CANONICAL_JOB_HEARTBEAT_SECONDS", 30, 10, 300)) * time.Second,
 		ChildLimit: canonicalWorkerEnvInt("ACTOR_CHILD_MINT_JOB_LIMIT", 40, 1, 200),
 	}
+	worker.Heartbeat = canonicalSafeHeartbeat(worker.StaleAfter, worker.Heartbeat)
 	go worker.Start(workerCtx)
 	log.Printf("canonical investigation job worker started mode=event-driven recovery-ceiling=%s stale=%s concurrency=1", workerwake.RecoveryCeiling(), worker.StaleAfter)
 	return cancel
@@ -166,6 +167,22 @@ func (w *canonicalInvestigationJobWorker) Start(ctx context.Context) {
 	}
 }
 
+// canonicalSafeHeartbeat keeps the active job's lease refreshed well before
+// another replica can requeue it. A configured heartbeat equal to the stale
+// threshold is unsafe even though both values are individually valid.
+func canonicalSafeHeartbeat(staleAfter, requested time.Duration) time.Duration {
+	if requested <= 0 {
+		requested = 30 * time.Second
+	}
+	if staleAfter > 0 && requested > staleAfter/3 {
+		requested = staleAfter / 3
+		if requested < time.Second {
+			requested = time.Second
+		}
+	}
+	return requested
+}
+
 // canonicalStaleRecoveryInterval bounds background recovery work while ensuring
 // short configured leases are checked before another full lease period elapses.
 func canonicalStaleRecoveryInterval(staleAfter time.Duration) time.Duration {
@@ -184,8 +201,9 @@ func (w *canonicalInvestigationJobWorker) RunOnce(ctx context.Context) (bool, er
 	jobCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	heartbeatDone := make(chan struct{})
+	heartbeat := canonicalSafeHeartbeat(w.StaleAfter, w.Heartbeat)
 	go func() {
-		ticker := time.NewTicker(w.Heartbeat)
+		ticker := time.NewTicker(heartbeat)
 		defer ticker.Stop()
 		defer close(heartbeatDone)
 		for {
