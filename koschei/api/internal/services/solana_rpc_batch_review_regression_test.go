@@ -61,9 +61,7 @@ func TestARVISSingleModePreservesLaterChunkAfterPerSignatureEvidenceGaps(t *test
 
 func TestARVISBatchStopsOnRequestWideMemberErrorButKeepsSiblingEvidence(t *testing.T) {
 	for _, code := range []int{-32600, -32601, -32602, -32603, -32005} {
-		t.Run(strings.ReplaceAll(strings.TrimPrefix(strings.TrimSpace(
-			map[int]string{-32600: "invalid-request", -32601: "method-not-found", -32602: "invalid-params", -32603: "internal-error", -32005: "node-behind"}[code],
-		), " "), " ", "-"), func(t *testing.T) {
+		t.Run(map[int]string{-32600: "invalid-request", -32601: "method-not-found", -32602: "invalid-params", -32603: "internal-error", -32005: "node-behind"}[code], func(t *testing.T) {
 			prepareSolanaRPCBatchTest(t)
 			t.Setenv("SOLANA_RPC_BATCH_MODE", "batch")
 			t.Setenv("SOLANA_RPC_TX_BATCH_SIZE", "2")
