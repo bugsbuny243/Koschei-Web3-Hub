@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"koschei/api/internal/outboundhttp"
 	"koschei/api/internal/web3"
 )
 
@@ -274,7 +275,7 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 			web3.LogRPCFailure("getTransactionBatch", rpcURL, 0, err)
 			return nil, 0, err
 		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, rpcURL, bytes.NewReader(payload))
+		req, err := outboundhttp.NewRequest(ctx, http.MethodPost, rpcURL, bytes.NewReader(payload))
 		if err != nil {
 			web3.LogRPCFailure("getTransactionBatch", rpcURL, 0, err)
 			return nil, 0, err
@@ -282,7 +283,10 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Koschei-RPC-Method", "getTransactionBatch")
 		req.Header.Set("X-Koschei-RPC-Adaptive-Batch", "1")
-		res, err := solanaRPCClient.Do(req)
+		// Match single-transaction RPC's protected egress boundary. The
+		// batch path must reject private destinations, unsafe transports
+		// and cross-origin redirects even when a provider URL is misset.
+		res, err := outboundhttp.Do(solanaRPCClient, req)
 		if err != nil {
 			return nil, 0, err
 		}
