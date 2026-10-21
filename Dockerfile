@@ -1,4 +1,4 @@
-FROM golang:1.26.9-alpine3.24 AS builder
+FROM golang:1.26.10-alpine3.24 AS builder
 WORKDIR /app
 COPY koschei/api/go.mod koschei/api/go.sum ./
 RUN go mod download
