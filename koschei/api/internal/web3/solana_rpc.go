@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"koschei/api/internal/outboundhttp"
 	"koschei/api/internal/cache"
+	"koschei/api/internal/outboundhttp"
 	"koschei/api/internal/runtimecfg"
 )
 
