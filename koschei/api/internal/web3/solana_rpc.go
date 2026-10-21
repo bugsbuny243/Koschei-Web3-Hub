@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"koschei/api/internal/cache"
+	"koschei/api/internal/outboundhttp"
 	"koschei/api/internal/runtimecfg"
 )
 
@@ -497,13 +498,15 @@ func (s *SolanaRPC) deferRPCEndpoint(endpoint string, delay time.Duration) {
 }
 
 func callSolanaRPC(ctx context.Context, client *http.Client, endpoint, method string, body []byte, target any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		LogRPCFailure(method, endpoint, 0, err)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
+	// Apply the shared protected egress boundary: URL checks, DNS pinning
+	// and same-origin redirects apply to this Solana RPC path as well.
+	resp, err := outboundhttp.Do(client, req)
 	if err != nil {
 		LogRPCFailure(method, endpoint, 0, err)
 		return err
