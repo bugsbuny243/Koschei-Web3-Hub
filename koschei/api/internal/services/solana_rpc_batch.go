@@ -357,6 +357,7 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 		unsupportedErrorIDs := make(map[int]bool)
 		memberErrors := 0
 		rateLimitedMembers := 0
+		requestWideErrorCode := 0
 		nullResults := 0
 		invalidIDs := 0
 		firstErrorCode := 0
@@ -379,6 +380,9 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 					firstErrorCode = response.Error.Code
 				}
 				memberErr := fmt.Errorf("solana rpc error %d: %s", response.Error.Code, response.Error.Message)
+				if requestWideErrorCode == 0 && solanaRPCBatchRequestWideError(response.Error.Code) {
+					requestWideErrorCode = response.Error.Code
+				}
 				if response.Error.Code == http.StatusTooManyRequests {
 					// A provider can rate-limit JSON-RPC members inside HTTP 200.
 					// Treat this as global throttling, not a recoverable
@@ -419,6 +423,12 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 				rateLimitedMembers, len(signatures), firstErrorCode,
 			)
 		}
+		if requestWideErrorCode != 0 {
+			// Method/parameter failures and node-wide unavailability apply
+			// to the request shape, not just one signature. Preserve valid
+			// sibling evidence but stop all later chunks to avoid a storm.
+			return out, res.StatusCode, fmt.Errorf("solana rpc batch request-wide failure: code=%d", requestWideErrorCode)
+		}
 		if memberErrors > 0 || nullResults > 0 || missingResponses > 0 || len(duplicateIDs) > 0 || invalidIDs > 0 {
 			// HTTP 200 does not guarantee that every batch member responded.
 			// Never silently treat omitted, duplicated or invalid JSON-RPC IDs
@@ -432,25 +442,42 @@ func solanaGetTransactionsJSONParsedBatchRequest(ctx context.Context, rpcURL str
 	}
 }
 
+// solanaRPCBatchRequestWideError identifies faults that cannot be fixed by
+// changing the signature in a later request with the same method and options.
+// Signature-specific unsupported transaction versions (-32015) remain partial.
+func solanaRPCBatchRequestWideError(code int) bool {
+	switch code {
+	case -32600, -32601, -32602, -32603, -32005:
+		return true
+	default:
+		return false
+	}
+}
+
 func solanaGetTransactionsJSONParsedSingles(ctx context.Context, rpcURL string, signatures []string) (map[string]SolanaTransactionResult, error) {
 	out := map[string]SolanaTransactionResult{}
-	var lastErr error
+	var partialErr error
 	for _, signature := range signatures {
 		result, err := SolanaGetTransactionJSONParsed(ctx, rpcURL, signature)
 		if err != nil {
-			lastErr = err
-			continue
+			if isSolanaUnsupportedTransactionVersionError(err) {
+				// This signature alone lacks supported evidence. Keep querying
+				// independent signatures and later outer chunks.
+				partialErr = errors.Join(partialErr, err)
+				continue
+			}
+			// Provider-wide failures, including 429, must stop requests.
+			return out, errors.Join(partialErr, err)
 		}
 		if result != nil {
 			out[signature] = result
 		} else {
-			// A nil result is an unavailable transaction, not verified evidence.
-			lastErr = fmt.Errorf("solana rpc single-transaction evidence unavailable")
+			// A nil result is unavailable history, never verified evidence.
+			partialErr = errors.Join(partialErr, fmt.Errorf("solana rpc single-transaction evidence unavailable"))
 		}
 	}
-	if lastErr != nil {
-		// A single successful fallback must not hide other rejected signatures.
-		return out, lastErr
+	if partialErr != nil {
+		return out, &solanaRPCBatchPartialEvidenceError{Summary: fmt.Sprintf("solana rpc single-transaction partial evidence: %v", partialErr)}
 	}
 	return out, nil
 }
