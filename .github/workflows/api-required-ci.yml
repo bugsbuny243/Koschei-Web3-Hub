@@ -65,6 +65,8 @@ jobs:
         run: node --test scripts/verify-public-health-liveness.test.cjs
       - name: Verify ARVIS widget and Shield SDK never turn missing evidence into allow
         run: node --test public/js/__tests__/arvis-widget-shield-failclosed.test.cjs
+      - name: Verify browser logout and return-URL security
+        run: node --test public/js/koschei-auth-security.test.cjs
 
       - name: Download modules
         run: go mod download
