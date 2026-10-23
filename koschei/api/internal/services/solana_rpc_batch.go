@@ -476,7 +476,9 @@ func solanaGetTransactionsJSONParsedSingles(ctx context.Context, rpcURL string, 
 		if err != nil {
 			if isSolanaUnsupportedTransactionVersionError(err) {
 				// This signature alone lacks supported evidence. Keep querying
-				// independent signatures and later outer chunks.
+				// independent signatures and later outer chunks. The node
+				// understood the request, so it also proves the request shape.
+				shape.answered++
 				partialErr = errors.Join(partialErr, err)
 				continue
 			}
