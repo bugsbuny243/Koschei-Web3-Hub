@@ -111,7 +111,7 @@ func (c *Client) InsertGlobalRadarSnapshot(ctx context.Context, snapshot service
 
 	insertURL := *c.endpoint
 	query := insertURL.Query()
-	query.Set("query", "INSERT INTO global_radar_graph_records FORMAT JSONEachRow")
+	query.Set("query", "INSERT INTO "+globalRadarGraphTableName()+" FORMAT JSONEachRow")
 	query.Set("async_insert", "1")
 	query.Set("wait_for_async_insert", "1")
 	query.Set("date_time_input_format", "best_effort")
@@ -350,7 +350,7 @@ WHERE record_date >= toDate({since:DateTime64(9)})
 		queryText += "\n  AND record_type = {record_type:String}"
 	}
 	queryText += "\nORDER BY recorded_at ASC, record_type ASC, record_id ASC, payload_sha256 ASC\nLIMIT {limit:UInt64}\nFORMAT JSONEachRow"
-	params.Set("query", queryText)
+	params.Set("query", globalRadarGraphQuery(queryText))
 	params.Set("param_since", globalRadarTimeParam(request.Since))
 	params.Set("param_until", globalRadarTimeParam(request.Until))
 	params.Set("param_network", request.Network)

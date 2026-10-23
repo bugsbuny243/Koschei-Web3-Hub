@@ -276,6 +276,7 @@ func resetSolanaRPCCachesForTest() {
 	solanaRPCRateLimiter.Next = time.Time{}
 	solanaRPCRateLimiter.Unlock()
 	resetSolanaRPCBudgetForTest()
+	resetSolanaUnsupportedTransactionVersionForTest()
 }
 
 func solanaRPCDo[T any](ctx context.Context, rpcURL, method string, params any) (T, error) {

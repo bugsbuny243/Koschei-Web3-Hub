@@ -10,6 +10,13 @@ import (
 	"koschei/api/internal/services"
 )
 
+// A signed permit can expire during slow RPC or independent provider quorum
+// collection. Authorization is only valid at the moment the response is made.
+func transactionGuardStateRecheckPermitActiveAt(claims transactionGuardEnforcementPermitClaims, now time.Time) bool {
+	expiry, err := time.Parse(time.RFC3339Nano, claims.ExpiresAt)
+	return err == nil && !now.IsZero() && now.Before(expiry)
+}
+
 type transactionGuardStateRecheckRequest struct {
 	PermitToken  string                       `json:"permit_token"`
 	Transaction  string                       `json:"transaction"`
@@ -169,6 +176,21 @@ func (h *Handler) TransactionGuardStateRecheck(w http.ResponseWriter, r *http.Re
 		} else if court.Enabled {
 			response["warning"] = "Evidence Court is enabled for this deployment; an independent fresh provider quorum corroborated the bounded State Witness root. Koschei never signs or submits the transaction."
 		}
+	}
+	if !transactionGuardStateRecheckPermitActiveAt(claims, time.Now().UTC()) {
+		// The initial permit check cannot authorize a decision made after an RPC
+		// delay. Never return a positive action or a stale unchanged-state decision.
+		decision.Status = "permit_expired"
+		decision.Action = "withhold"
+		decision.RequiresResimulation = true
+		decision.Reason = "State Witness permit expired while fresh evidence was collected; run a new Transaction Guard simulation."
+		response["ok"] = false
+		response["code"] = "state_bound_permit_expired"
+		response["decision"] = decision
+		response["requires_resimulation"] = true
+		response["safe_to_proceed"] = false
+		writeJSON(w, http.StatusConflict, response)
+		return
 	}
 	response["safe_to_proceed"] = transactionGuardStateRecheckSafeToProceed(decision)
 	writeJSON(w, http.StatusOK, response)

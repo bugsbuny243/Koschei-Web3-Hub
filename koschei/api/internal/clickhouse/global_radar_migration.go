@@ -8,6 +8,7 @@ import (
 
 var allowedGlobalRadarMigrationTables = map[string]struct{}{
 	"koschei_web3.global_radar_graph_records":      {},
+	"koschei_web3.global_radar_graph_records_v2":   {},
 	"koschei_web3.global_radar_events":             {},
 	"koschei_web3.global_radar_ingest_checkpoints": {},
 	"koschei_web3.global_radar_ingest_gaps":        {},

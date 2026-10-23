@@ -156,7 +156,13 @@ func AnalyzeLaunchForensics(ctx context.Context, db *sql.DB, rpcURL, mint, creat
 	fundingBudget := newHolderScanRPCBudget(cfg.FundingRPCBudget)
 	creatorFunder := ""
 	if creator != "" && strings.TrimSpace(rpcURL) != "" {
-		creatorFunder, _ = earliestIncomingSOLSource(ctx, rpcURL, creator, cfg, fundingBudget)
+		var incompleteCreatorFunding bool
+		creatorFunder, _, incompleteCreatorFunding = earliestIncomingSOLSource(ctx, rpcURL, creator, cfg, fundingBudget)
+		if incompleteCreatorFunding {
+			// An observed funder remains usable positive evidence, but a
+			// truncated RPC history cannot disprove other funding sources.
+			out.Limitations = append(out.Limitations, "Creator funding history was partially unavailable; other funding sources cannot be excluded.")
+		}
 	}
 	checks := cfg.FundingCheckCount
 	if checks > len(profiles) {

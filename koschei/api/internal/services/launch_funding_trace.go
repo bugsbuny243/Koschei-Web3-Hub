@@ -27,7 +27,10 @@ func traceLaunchFunding(ctx context.Context, rpcURL, creator, creatorFunder stri
 		profile.Evidence = append(profile.Evidence, "Funding not traced: per-scan funding RPC budget was exhausted.")
 		return
 	}
-	first, amount := earliestIncomingSOLSource(ctx, rpcURL, profile.OwnerWallet, cfg, budget)
+	first, amount, firstIncomplete := earliestIncomingSOLSource(ctx, rpcURL, profile.OwnerWallet, cfg, budget)
+	if firstIncomplete {
+		profile.Evidence = append(profile.Evidence, "Funding transaction inspection was partial: some RPC evidence was unavailable; a verified positive funding link remains usable, but missing history is not clean evidence.")
+	}
 	if first == "" {
 		if budget.Used() >= cfg.FundingRPCBudget {
 			profile.FundingStatus = "funding_budget_exhausted"
@@ -48,7 +51,10 @@ func traceLaunchFunding(ctx context.Context, rpcURL, creator, creatorFunder stri
 		profile.Evidence = append(profile.Evidence, "İkinci funding hop'u bütçe nedeniyle izlenemedi.")
 		return
 	}
-	second, secondAmount := earliestIncomingSOLSource(ctx, rpcURL, first, cfg, budget)
+	second, secondAmount, secondIncomplete := earliestIncomingSOLSource(ctx, rpcURL, first, cfg, budget)
+	if secondIncomplete {
+		profile.Evidence = append(profile.Evidence, "Second-hop funding inspection was partial; incomplete RPC evidence cannot exclude additional funding sources.")
+	}
 	if second == "" {
 		return
 	}
@@ -60,20 +66,25 @@ func traceLaunchFunding(ctx context.Context, rpcURL, creator, creatorFunder stri
 	}
 }
 
-func earliestIncomingSOLSource(ctx context.Context, rpcURL, wallet string, cfg launchForensicsConfig, budget *holderScanRPCBudget) (string, float64) {
+func earliestIncomingSOLSource(ctx context.Context, rpcURL, wallet string, cfg launchForensicsConfig, budget *holderScanRPCBudget) (string, float64, bool) {
 	wallet = strings.TrimSpace(wallet)
 	if wallet == "" || strings.TrimSpace(rpcURL) == "" {
-		return "", 0
+		return "", 0, false
 	}
 	before := ""
 	signatures := []SolanaSignatureInfo{}
+	historyIncomplete := false
 	for page := 0; page < 2; page++ {
 		if ctx.Err() != nil || !budget.Reserve(1) {
-			return "", 0
+			historyIncomplete = true
+			break
 		}
 		pageRows, err := SolanaGetSignaturesForAddressBefore(ctx, rpcURL, wallet, cfg.FundingSigLimit, before)
 		if err != nil {
-			return "", 0
+			// A later page failing must not erase independently verified
+			// signatures from an earlier page. Preserve the limitation.
+			historyIncomplete = true
+			break
 		}
 		signatures = append(signatures, pageRows...)
 		if len(pageRows) < cfg.FundingSigLimit || len(pageRows) == 0 {
@@ -82,7 +93,7 @@ func earliestIncomingSOLSource(ctx context.Context, rpcURL, wallet string, cfg l
 		before = pageRows[len(pageRows)-1].Signature
 	}
 	if len(signatures) == 0 {
-		return "", 0
+		return "", 0, historyIncomplete
 	}
 	// Parse a bounded set of the oldest observations returned by the two-page
 	// window. Every batch member consumes one unit of the per-scan RPC budget.
@@ -101,12 +112,17 @@ func earliestIncomingSOLSource(ctx context.Context, rpcURL, wallet string, cfg l
 	}
 	granted := budget.ReserveUpTo(len(keys))
 	if granted == 0 {
-		return "", 0
+		return "", 0, true
 	}
 	keys = keys[:granted]
 	transactions, err := SolanaGetTransactionsJSONParsedBatch(ctx, rpcURL, keys)
-	if err != nil {
-		return "", 0
+	incomplete := historyIncomplete || err != nil || len(transactions) != len(keys)
+	// A partial RPC batch still contains individually verified transaction
+	// evidence. Discarding successful siblings would hide real creator funding
+	// edges whenever another signature is version-unsupported or unavailable.
+	// Preserve the gap in the Launch Forensics profile instead.
+	if len(transactions) == 0 {
+		return "", 0, incomplete
 	}
 	for _, signature := range keys {
 		tx, ok := transactions[signature]
@@ -114,10 +130,10 @@ func earliestIncomingSOLSource(ctx context.Context, rpcURL, wallet string, cfg l
 			continue
 		}
 		if source, amount := holderClusterFundingSource(map[string]any(tx), wallet); source != "" && amount > 0 {
-			return source, amount
+			return source, amount, incomplete
 		}
 	}
-	return "", 0
+	return "", 0, incomplete
 }
 
 func fundingMatches(value, creator, creatorFunder string) bool {

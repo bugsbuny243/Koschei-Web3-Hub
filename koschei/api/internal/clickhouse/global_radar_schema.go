@@ -3,9 +3,35 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 )
 
 const globalRadarGraphSortingKey = "record_type, network, record_date, subject_id, record_id, payload_sha256"
+const globalRadarGraphV2SortingKey = "record_type, network, record_date, subject_id, record_id, snapshot_sha256, payload_sha256"
+
+// The legacy graph table remains the default until its historical snapshots are
+// explicitly migrated and reconciled by an operator. Never switch on migration
+// creation alone: V2 is additive and initially empty.
+func globalRadarGraphTableName() string {
+	if strings.TrimSpace(os.Getenv("KOSCHEI_GLOBAL_RADAR_GRAPH_V2_ENABLED")) == "1" {
+		return "global_radar_graph_records_v2"
+	}
+	return "global_radar_graph_records"
+}
+
+func globalRadarGraphExpectedSortingKey() string {
+	if globalRadarGraphTableName() == "global_radar_graph_records_v2" {
+		return globalRadarGraphV2SortingKey
+	}
+	return globalRadarGraphSortingKey
+}
+
+// Only a hardcoded, environment-selected table identifier is interpolated into
+// query templates; callers cannot provide arbitrary SQL table names.
+func globalRadarGraphQuery(query string) string {
+	return strings.Replace(query, "FROM global_radar_graph_records FINAL", "FROM "+globalRadarGraphTableName()+" FINAL", 1)
+}
 
 func (c *Client) VerifyGlobalRadarGraphSchema(ctx context.Context) error {
 	if c == nil {
@@ -16,9 +42,10 @@ func (c *Client) VerifyGlobalRadarGraphSchema(ctx context.Context) error {
 	metadataParams := metadataURL.Query()
 	metadataParams.Set("query", `SELECT engine, sorting_key
 FROM system.tables
-WHERE database={db:String} AND name='global_radar_graph_records'
+WHERE database={db:String} AND name={table:String}
 FORMAT JSON`)
 	metadataParams.Set("param_db", c.database)
+	metadataParams.Set("param_table", globalRadarGraphTableName())
 	metadataParams.Set("max_execution_time", "10")
 	metadataParams.Set("max_result_rows", "10")
 	metadataURL.RawQuery = metadataParams.Encode()
@@ -33,8 +60,8 @@ FORMAT JSON`)
 	if !isReplacingMergeTreeEngine(metadata.Data[0].Engine) {
 		return fmt.Errorf("ClickHouse Global Radar table engine=%q want ReplacingMergeTree", metadata.Data[0].Engine)
 	}
-	if metadata.Data[0].SortingKey != globalRadarGraphSortingKey {
-		return fmt.Errorf("ClickHouse Global Radar sorting_key=%q want %q", metadata.Data[0].SortingKey, globalRadarGraphSortingKey)
+	if metadata.Data[0].SortingKey != globalRadarGraphExpectedSortingKey() {
+		return fmt.Errorf("ClickHouse Global Radar sorting_key=%q want %q", metadata.Data[0].SortingKey, globalRadarGraphExpectedSortingKey())
 	}
 
 	columnsURL := *c.endpoint
@@ -42,7 +69,7 @@ FORMAT JSON`)
 	columnParams.Set("query", `SELECT count() AS count
 FROM system.columns
 WHERE database={db:String}
-  AND table='global_radar_graph_records'
+  AND table={table:String}
   AND name IN (
     'record_type',
     'record_id',
@@ -65,6 +92,7 @@ WHERE database={db:String}
   )
 FORMAT JSON`)
 	columnParams.Set("param_db", c.database)
+	columnParams.Set("param_table", globalRadarGraphTableName())
 	columnParams.Set("max_execution_time", "10")
 	columnParams.Set("max_result_rows", "10")
 	columnsURL.RawQuery = columnParams.Encode()
