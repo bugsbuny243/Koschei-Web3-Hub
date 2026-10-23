@@ -45,7 +45,8 @@ func canonicalCreatorVerificationRank(status string) int {
 	switch strings.TrimSpace(status) {
 	case "verified_canonical_create_transaction":
 		return 100
-	case "slot_unavailable", "creator_not_signer", "mint_not_referenced", "launch_semantics_not_verified":
+	case "slot_unavailable", "creator_not_signer", "mint_not_referenced", "launch_semantics_not_verified",
+		"canonical_execution_status_unavailable", "canonical_transaction_failed":
 		return 80
 	case "canonical_transaction_missing":
 		return 40
@@ -152,15 +153,25 @@ func (h *Handler) verifyCanonicalCreatorRelation(ctx context.Context, target, ne
 	}
 	meta := creatorIntelMap(tx["meta"])
 	message := creatorIntelMap(creatorIntelMap(tx["transaction"])["message"])
-	accountKeys, signers := creatorIntelAccountKeys(message)
-	instructionTypes, instructionMints := creatorIntelInstructions(message, meta)
+	_, signers := creatorIntelAccountKeys(message)
+	instructionTypes, _ := creatorIntelInstructions(message, meta)
 	out.InstructionTypes = append([]string{}, instructionTypes...)
 	out.CreatorSigner = creatorIntelContains(signers, creator)
-	out.MintReferenced = creatorIntelContains(accountKeys, target) || creatorIntelContains(instructionMints, target) || canonicalTokenBalancesMentionMint(meta, target)
+	// An account reference or token balance can occur in a transfer or a
+	// different mint's launch. Require this exact mint in a parsed SPL-token
+	// initialization instruction before upgrading the creator relationship.
+	out.MintReferenced = canonicalCreatorTargetMintInitialized(message, meta, target)
 	logs := strings.ToLower(strings.Join(creatorIntelStringSlice(meta["logMessages"]), "\n"))
 	out.LaunchLike = creatorIntelLaunchRelated(logs, instructionTypes)
+	executionError, hasExecutionStatus := meta["err"]
 
 	switch {
+	case !hasExecutionStatus:
+		out.Status = "canonical_execution_status_unavailable"
+		out.Limitations = append(out.Limitations, "Canonical transaction did not provide a trusted execution result; creator relation remains observed only.")
+	case executionError != nil:
+		out.Status = "canonical_transaction_failed"
+		out.Limitations = append(out.Limitations, "The candidate create transaction failed on chain; creator relation cannot be verified.")
 	case out.Slot <= 0:
 		out.Status = "slot_unavailable"
 		out.Limitations = append(out.Limitations, "Canonical transaction did not expose a positive slot.")
@@ -178,6 +189,43 @@ func (h *Handler) verifyCanonicalCreatorRelation(ctx context.Context, target, ne
 		out.Status = "verified_canonical_create_transaction"
 	}
 	return out
+}
+
+// canonicalCreatorTargetMintInitialized binds launch evidence to the exact
+// requested mint, not another mint in the same transaction, arbitrary account
+// keys, or post-transaction balances.
+func canonicalCreatorTargetMintInitialized(message, meta map[string]any, target string) bool {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return false
+	}
+	matches := func(raw any) bool {
+		items, _ := raw.([]any)
+		for _, item := range items {
+			parsed := creatorIntelMap(creatorIntelMap(item)["parsed"])
+			kind := strings.ToLower(creatorIntelCleanString(parsed["type"]))
+			if kind != "initializemint" && kind != "initializemint2" {
+				continue
+			}
+			info := creatorIntelMap(parsed["info"])
+			for _, field := range []string{"mint", "tokenMint", "mintAddress"} {
+				if strings.TrimSpace(creatorIntelCleanString(info[field])) == target {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if matches(message["instructions"]) {
+		return true
+	}
+	inner, _ := meta["innerInstructions"].([]any)
+	for _, item := range inner {
+		if matches(creatorIntelMap(item)["instructions"]) {
+			return true
+		}
+	}
+	return false
 }
 
 func canonicalTokenBalancesMentionMint(meta map[string]any, mint string) bool {
