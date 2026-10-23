@@ -272,7 +272,8 @@ func (w *canonicalInvestigationJobWorker) processJob(ctx context.Context, job jo
 	switch classification.Type {
 	case radarTargetTokenMint:
 		assembly := w.Handler.buildUnifiedInvestigationReport(ctx, target, network, mode)
-		if payload.Source == "arvis_stream" {
+		var streamFinal map[string]any
+		if payload.Source == services.ArvisStreamCanonicalSource {
 			if job.Type != CanonicalInvestigationJobType || strings.TrimSpace(payload.SourceEventID) == "" {
 				return nil, errors.New("ARVIS stream canonical job requires an original source event id")
 			}
@@ -280,11 +281,20 @@ func (w *canonicalInvestigationJobWorker) processJob(ctx context.Context, job jo
 			// evidence. The service independently reloads and authenticates the
 			// real stream source, verifies getTransaction and commits the trusted
 			// signed v1.4 verdict with the source claim in ONE transaction.
+			streamFinal = map[string]any{"source_event_id": payload.SourceEventID, "status": "completed"}
 			if _, err := services.PersistArvisStreamCanonicalJobFinal(
 				ctx, w.Handler.DB, payload.SourceEventID, target, network,
 				assembly.ActorVerdict, assembly.Behavior, strings.TrimSpace(os.Getenv("SOLANA_RPC_URL")),
 			); err != nil {
-				return nil, fmt.Errorf("ARVIS source-bound signed final withheld: %w", err)
+				// A withheld final closes the stream claim (insufficient
+				// evidence, or a retryable failure) instead of failing this
+				// job: the stream claim owns its own bounded retries.
+				status, markErr := services.MarkArvisStreamCanonicalOutcome(ctx, w.Handler.DB, payload.SourceEventID, err)
+				if markErr != nil {
+					log.Printf("ARVIS stream claim outcome not recorded event=%s err=%v", payload.SourceEventID, markErr)
+				}
+				streamFinal["status"] = status
+				streamFinal["withheld_reason"] = err.Error()
 			}
 		}
 		_ = w.Store.UpdateProgress(ctx, job.ID, 75)
@@ -310,6 +320,9 @@ func (w *canonicalInvestigationJobWorker) processJob(ctx context.Context, job jo
 		report["final_verdict_persistence"] = unifiedPersistence
 		report["final_verdict_history"] = unifiedHistory
 		report["behavior_evidence_persistence"] = behaviorPersistence
+		if streamFinal != nil {
+			report["arvis_stream_final"] = streamFinal
+		}
 		attachCanonicalInvestigationDiagnostics(report)
 	case radarTargetWallet:
 		var err error
