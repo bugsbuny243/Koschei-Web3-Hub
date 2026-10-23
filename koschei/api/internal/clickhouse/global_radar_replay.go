@@ -39,7 +39,7 @@ func (c *Client) ReadGlobalCampaignReplay(ctx context.Context, cursor services.G
 
 	queryURL := *c.endpoint
 	params := queryURL.Query()
-	params.Set("query", `SELECT
+	params.Set("query", globalRadarGraphQuery(`SELECT
     toString(snapshot_sha256) AS snapshot_sha256,
     toUnixTimestamp64Nano(min(recorded_at)) AS recorded_at_ns
 FROM global_radar_graph_records FINAL
@@ -48,7 +48,7 @@ WHERE recorded_at > {after:DateTime64(9)}
 GROUP BY snapshot_sha256
 ORDER BY recorded_at_ns ASC, snapshot_sha256 ASC
 LIMIT {limit:UInt64}
-FORMAT JSONEachRow`)
+FORMAT JSONEachRow`))
 	params.Set("param_after", globalRadarTimeParam(cursor.RecordedAt))
 	params.Set("param_after_hash", cursor.SnapshotSHA256)
 	params.Set("param_limit", strconv.Itoa(limit+1))
@@ -128,7 +128,7 @@ func decodeGlobalRadarReplayHeadPage(decoder *json.Decoder, limit int) ([]global
 func (c *Client) readGlobalRadarSnapshotForReplay(ctx context.Context, snapshotSHA256 string, recordedAt time.Time) (services.GlobalRadarSnapshot, error) {
 	queryURL := *c.endpoint
 	params := queryURL.Query()
-	params.Set("query", `SELECT
+	params.Set("query", globalRadarGraphQuery(`SELECT
     record_type,
     record_id,
     schema_version,
@@ -149,7 +149,7 @@ FROM global_radar_graph_records FINAL
 WHERE toString(snapshot_sha256) = {snapshot:String}
 ORDER BY record_type ASC, record_id ASC, payload_sha256 ASC
 LIMIT {limit:UInt64}
-FORMAT JSONEachRow`)
+FORMAT JSONEachRow`))
 	params.Set("param_snapshot", snapshotSHA256)
 	params.Set("param_limit", strconv.FormatUint(globalRadarReplayMaxRowsPerSnapshot+1, 10))
 	params.Set("max_execution_time", "30")

@@ -11,6 +11,8 @@ on:
       - "koschei/api/clickhouse/migrations/007_global_radar_ingest_checkpoints.sql.sha256"
       - "koschei/api/clickhouse/migrations/008_global_radar_ingest_gaps.sql"
       - "koschei/api/clickhouse/migrations/008_global_radar_ingest_gaps.sql.sha256"
+      - "koschei/api/clickhouse/migrations/009_global_radar_graph_records_v2.sql"
+      - "koschei/api/clickhouse/migrations/009_global_radar_graph_records_v2.sql.sha256"
       - "koschei/api/internal/clickhouse/global_radar_event_store.go"
       - "koschei/api/internal/clickhouse/global_radar_event_store_test.go"
       - "koschei/api/internal/clickhouse/global_radar_ingest_checkpoint_store.go"
@@ -39,6 +41,8 @@ on:
       - "koschei/api/clickhouse/migrations/007_global_radar_ingest_checkpoints.sql.sha256"
       - "koschei/api/clickhouse/migrations/008_global_radar_ingest_gaps.sql"
       - "koschei/api/clickhouse/migrations/008_global_radar_ingest_gaps.sql.sha256"
+      - "koschei/api/clickhouse/migrations/009_global_radar_graph_records_v2.sql"
+      - "koschei/api/clickhouse/migrations/009_global_radar_graph_records_v2.sql.sha256"
       - "koschei/api/internal/clickhouse/global_radar_event_store.go"
       - "koschei/api/internal/clickhouse/global_radar_event_store_test.go"
       - "koschei/api/internal/clickhouse/global_radar_ingest_checkpoint_store.go"
@@ -111,6 +115,7 @@ jobs:
           sha256sum -c 006_global_radar_events.sql.sha256
           sha256sum -c 007_global_radar_ingest_checkpoints.sql.sha256
           sha256sum -c 008_global_radar_ingest_gaps.sql.sha256
+          sha256sum -c 009_global_radar_graph_records_v2.sql.sha256
 
       - name: Validate migration on ClickHouse 26.2
         run: |
@@ -121,6 +126,7 @@ jobs:
           docker exec -i "${container_id}" clickhouse-client --multiquery < clickhouse/migrations/006_global_radar_events.sql
           docker exec -i "${container_id}" clickhouse-client --multiquery < clickhouse/migrations/007_global_radar_ingest_checkpoints.sql
           docker exec -i "${container_id}" clickhouse-client --multiquery < clickhouse/migrations/008_global_radar_ingest_gaps.sql
+          docker exec -i "${container_id}" clickhouse-client --multiquery < clickhouse/migrations/009_global_radar_graph_records_v2.sql
 
           table_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,'|',sorting_key) FROM system.tables WHERE database='koschei_web3' AND name='global_radar_graph_records' FORMAT TSVRaw")"
           payload_hash_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='global_radar_graph_records' AND name='payload_sha256' FORMAT TSVRaw")"
@@ -129,6 +135,9 @@ jobs:
           test "${table_meta}" = "ReplacingMergeTree|record_type, network, record_date, subject_id, record_id, payload_sha256"
           test "${payload_hash_type}" = "FixedString(64)"
           test "${observed_type}" = "Nullable(DateTime64(9, 'UTC'))"
+
+          v2_table_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,'|',sorting_key) FROM system.tables WHERE database='koschei_web3' AND name='global_radar_graph_records_v2' FORMAT TSVRaw")"
+          test "${v2_table_meta}" = "ReplacingMergeTree|record_type, network, record_date, subject_id, record_id, snapshot_sha256, payload_sha256"
 
           event_table_meta="$(docker exec "${container_id}" clickhouse-client --query "SELECT concat(engine,'|',sorting_key) FROM system.tables WHERE database='koschei_web3' AND name='global_radar_events' FORMAT TSVRaw")"
           event_payload_hash_type="$(docker exec "${container_id}" clickhouse-client --query "SELECT type FROM system.columns WHERE database='koschei_web3' AND table='global_radar_events' AND name='payload_sha256' FORMAT TSVRaw")"
@@ -174,6 +183,19 @@ jobs:
           test "${state_versions}" = "2"
           test "${unverified_versions}" = "1"
           test "${verified_versions}" = "1"
+
+          # The same record and exact payload across two independent snapshots
+          # MUST remain two rows under ReplacingMergeTree FINAL in V2.
+          docker exec -i "${container_id}" clickhouse-client --multiquery <<'SQL'
+          INSERT INTO koschei_web3.global_radar_graph_records_v2
+          (record_type,record_id,schema_version,snapshot_sha256,network,secondary_network,subject_id,target_subject_id,record_kind,evidence_status,evidence_refs,observed_at,recorded_at,payload_json,payload_sha256,ingest_version)
+          VALUES
+          ('observation','snapshot-isolation','koschei.global-radar-observation.v1',repeat('a',64),'ethereum-mainnet','','same-subject','','state','observed',[],NULL,toDateTime64('2026-09-23 19:00:00.000000001',9,'UTC'),'{}',repeat('c',64),1),
+          ('observation','snapshot-isolation','koschei.global-radar-observation.v1',repeat('b',64),'ethereum-mainnet','','same-subject','','state','observed',[],NULL,toDateTime64('2026-09-23 19:00:00.000000001',9,'UTC'),'{}',repeat('c',64),2),
+          ('observation','snapshot-isolation','koschei.global-radar-observation.v1',repeat('a',64),'ethereum-mainnet','','same-subject','','state','observed',[],NULL,toDateTime64('2026-09-23 19:00:00.000000001',9,'UTC'),'{}',repeat('c',64),3);
+          SQL
+          isolated_count="$(docker exec "${container_id}" clickhouse-client --query "SELECT count() FROM koschei_web3.global_radar_graph_records_v2 FINAL WHERE record_id='snapshot-isolation'")"
+          test "${isolated_count}" = "2"
 
           if docker exec "${container_id}" clickhouse-client --query "INSERT INTO koschei_web3.global_radar_graph_records (record_type,record_id,schema_version,snapshot_sha256,network,subject_id,record_kind,evidence_status,evidence_refs,recorded_at,payload_json,payload_sha256,ingest_version) VALUES ('observation','bad-hash','v1',repeat('c',64),'solana-mainnet','subject','state','observed',[],now64(9),'{}',repeat('z',64),4)"; then
             echo "invalid Global Radar payload hash unexpectedly accepted" >&2
