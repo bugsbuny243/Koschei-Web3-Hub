@@ -82,3 +82,43 @@ func TestARVISSingleModeRepeatedInvalidParamsBeforeAnyAnswerStops(t *testing.T) 
 		t.Fatalf("request-shape fault was not bounded: calls=%d want 2", got)
 	}
 }
+
+func TestARVISSingleModeProvenShapeCarriesAcrossOuterChunks(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_BATCH_MODE", "single")
+	t.Setenv("SOLANA_RPC_TX_BATCH_SIZE", "2")
+	var calls atomic.Int32
+	server := singleInvalidParamsServer(t, &calls, map[string]bool{"malformed-a": true, "malformed-b": true})
+	defer server.Close()
+
+	result, err := SolanaGetTransactionsJSONParsedBatch(context.Background(), server.URL, []string{"good-a", "good-b", "malformed-a", "malformed-b", "good-c"})
+	var partial *solanaRPCBatchPartialEvidenceError
+	if !errors.As(err, &partial) {
+		t.Fatalf("malformed signatures after a proven shape must stay partial: %v", err)
+	}
+	if len(result) != 3 || result["good-c"] == nil {
+		t.Fatalf("later-chunk evidence was dropped: %#v", result)
+	}
+	if got := calls.Load(); got != 5 {
+		t.Fatalf("outer chunk forgot the proven request shape: calls=%d want 5", got)
+	}
+}
+
+func TestARVISSingleModeInvalidParamsGuardHoldsWithChunkSizeOne(t *testing.T) {
+	prepareSolanaRPCBatchTest(t)
+	t.Setenv("SOLANA_RPC_BATCH_MODE", "single")
+	t.Setenv("SOLANA_RPC_TX_BATCH_SIZE", "1")
+	var calls atomic.Int32
+	server := singleInvalidParamsServer(t, &calls, map[string]bool{"first": true, "second": true, "third": true, "fourth": true})
+	defer server.Close()
+
+	// The first chunk's gap stays joined into the error; the second
+	// unproven rejection is terminal, so later chunks are never requested.
+	result, err := SolanaGetTransactionsJSONParsedBatch(context.Background(), server.URL, []string{"first", "second", "third", "fourth"})
+	if err == nil || !strings.Contains(err.Error(), "-32602") || len(result) != 0 {
+		t.Fatalf("request-shape fault must fail closed across chunks: result=%#v err=%v", result, err)
+	}
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("invalid-params guard did not hold across chunks of one: calls=%d want 2", got)
+	}
+}

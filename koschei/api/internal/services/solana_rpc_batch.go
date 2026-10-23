@@ -161,6 +161,9 @@ func SolanaGetTransactionsJSONParsedBatch(ctx context.Context, rpcURL string, si
 
 	out := map[string]SolanaTransactionResult{}
 	incompleteErr := cachedErr
+	// Shared across outer chunks so a proven request shape is not forgotten
+	// and the invalid-params guard stays bounded for the whole call.
+	shape := &solanaSinglesShapeState{}
 	batchSize := solanaRPCTransactionBatchSize()
 	for start := 0; start < len(clean); start += batchSize {
 		if ctx.Err() != nil {
@@ -170,7 +173,7 @@ func SolanaGetTransactionsJSONParsedBatch(ctx context.Context, rpcURL string, si
 		if end > len(clean) {
 			end = len(clean)
 		}
-		chunk, err := solanaGetTransactionsJSONParsedBatchChunk(ctx, rpcURL, clean[start:end])
+		chunk, err := solanaGetTransactionsJSONParsedBatchChunk(ctx, rpcURL, clean[start:end], shape)
 		mergeSolanaTransactionResults(out, chunk)
 		if err != nil {
 			var partial *solanaRPCBatchPartialEvidenceError
@@ -189,7 +192,7 @@ func SolanaGetTransactionsJSONParsedBatch(ctx context.Context, rpcURL string, si
 	return out, incompleteErr
 }
 
-func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL string, clean []string) (map[string]SolanaTransactionResult, error) {
+func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL string, clean []string, shape *solanaSinglesShapeState) (map[string]SolanaTransactionResult, error) {
 	if len(clean) == 0 {
 		return map[string]SolanaTransactionResult{}, nil
 	}
@@ -204,7 +207,7 @@ func solanaGetTransactionsJSONParsedBatchChunk(ctx context.Context, rpcURL strin
 
 	for index := 0; index < len(clean); {
 		if degradedToSingles {
-			results, err := solanaGetTransactionsJSONParsedSingles(ctx, rpcURL, clean[index:])
+			results, err := solanaGetTransactionsJSONParsedSingles(ctx, rpcURL, clean[index:], shape)
 			for signature, result := range results {
 				out[signature] = result
 			}
@@ -458,11 +461,16 @@ func isSolanaInvalidParamsError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "solana rpc error -32602:")
 }
 
-func solanaGetTransactionsJSONParsedSingles(ctx context.Context, rpcURL string, signatures []string) (map[string]SolanaTransactionResult, error) {
+// solanaSinglesShapeState records whether single getTransaction requests have
+// been answered during one top-level batch call.
+type solanaSinglesShapeState struct {
+	answered              int
+	unprovenInvalidParams int
+}
+
+func solanaGetTransactionsJSONParsedSingles(ctx context.Context, rpcURL string, signatures []string, shape *solanaSinglesShapeState) (map[string]SolanaTransactionResult, error) {
 	out := map[string]SolanaTransactionResult{}
 	var partialErr error
-	answered := 0
-	unprovenInvalidParams := 0
 	for _, signature := range signatures {
 		result, err := SolanaGetTransactionJSONParsed(ctx, rpcURL, signature)
 		if err != nil {
@@ -476,9 +484,9 @@ func solanaGetTransactionsJSONParsedSingles(ctx context.Context, rpcURL string, 
 			// signature (e.g. a malformed externally sourced value) once the
 			// request shape is proven by an answered request. Before that, a
 			// second consecutive rejection is treated as a request-shape fault.
-			if isSolanaInvalidParamsError(err) && (answered > 0 || unprovenInvalidParams == 0) {
-				if answered == 0 {
-					unprovenInvalidParams++
+			if isSolanaInvalidParamsError(err) && (shape.answered > 0 || shape.unprovenInvalidParams == 0) {
+				if shape.answered == 0 {
+					shape.unprovenInvalidParams++
 				}
 				partialErr = errors.Join(partialErr, err)
 				continue
@@ -487,7 +495,7 @@ func solanaGetTransactionsJSONParsedSingles(ctx context.Context, rpcURL string, 
 			return out, errors.Join(partialErr, err)
 		}
 		// Any answer, including null history, proves the request shape works.
-		answered++
+		shape.answered++
 		if result != nil {
 			out[signature] = result
 		} else {
