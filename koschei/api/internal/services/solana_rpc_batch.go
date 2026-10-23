@@ -454,9 +454,15 @@ func solanaRPCBatchRequestWideError(code int) bool {
 	}
 }
 
+func isSolanaInvalidParamsError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "solana rpc error -32602:")
+}
+
 func solanaGetTransactionsJSONParsedSingles(ctx context.Context, rpcURL string, signatures []string) (map[string]SolanaTransactionResult, error) {
 	out := map[string]SolanaTransactionResult{}
 	var partialErr error
+	answered := 0
+	unprovenInvalidParams := 0
 	for _, signature := range signatures {
 		result, err := SolanaGetTransactionJSONParsed(ctx, rpcURL, signature)
 		if err != nil {
@@ -466,9 +472,22 @@ func solanaGetTransactionsJSONParsedSingles(ctx context.Context, rpcURL string, 
 				partialErr = errors.Join(partialErr, err)
 				continue
 			}
+			// A one-signature request rejected as invalid params points at that
+			// signature (e.g. a malformed externally sourced value) once the
+			// request shape is proven by an answered request. Before that, a
+			// second consecutive rejection is treated as a request-shape fault.
+			if isSolanaInvalidParamsError(err) && (answered > 0 || unprovenInvalidParams == 0) {
+				if answered == 0 {
+					unprovenInvalidParams++
+				}
+				partialErr = errors.Join(partialErr, err)
+				continue
+			}
 			// Provider-wide failures, including 429, must stop requests.
 			return out, errors.Join(partialErr, err)
 		}
+		// Any answer, including null history, proves the request shape works.
+		answered++
 		if result != nil {
 			out[signature] = result
 		} else {
