@@ -29,7 +29,31 @@ jobs:
           printf '%s\n' "$changed"
 
           protected='^(koschei/api/public/(login|register)\.html|koschei/api/public/js/koschei-auth[^/]*\.js|koschei/api/internal/handlers/neon_auth_config(_test)?\.go|koschei/api/internal/handlers/(auth|auth_[^/]*)\.go|koschei/api/internal/handlers/(jwt|jwt_[^/]*)\.go|koschei/api/internal/handlers/(session|session_[^/]*)\.go)$'
-          violations="$(printf '%s\n' "$changed" | grep -E "$protected" || true)"
+          candidates="$(printf '%s\n' "$changed" | grep -E "$protected" || true)"
+
+          # Owner-approved exceptions pin one exact transition of a file: its
+          # digest on the base and its digest on the head. Any other edit, and
+          # any later rollback to an approved digest, is rejected again.
+          # Approvals are read from the base revision only: a PR cannot approve
+          # its own change; the approval must already be merged.
+          approvals='.github/auth-freeze-approvals.sha256'
+          violations=''
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            if git cat-file -e "$head:$path" 2>/dev/null && git cat-file -e "$base:$approvals" 2>/dev/null; then
+              to="$(git show "$head:$path" | sha256sum | awk '{print $1}')"
+              from='absent'
+              if git cat-file -e "$base:$path" 2>/dev/null; then
+                from="$(git show "$base:$path" | sha256sum | awk '{print $1}')"
+              fi
+              if git show "$base:$approvals" | grep -v '^#' | awk -v f="$from" -v t="$to" -v p="$path" '$1 == f && $2 == t && $3 == p { found = 1 } END { exit !found }'; then
+                echo "Owner-approved exception: $path ($from -> $to)"
+                continue
+              fi
+            fi
+            violations+="$path"$'\n'
+          done <<< "$candidates"
+
           if [ -n "$violations" ]; then
             echo 'Authentication subsystem is frozen by project owner instruction.' >&2
             echo 'Protected files changed:' >&2
@@ -38,4 +62,4 @@ jobs:
             exit 1
           fi
 
-          echo 'No protected authentication files changed.'
+          echo 'No unapproved protected authentication files changed.'
