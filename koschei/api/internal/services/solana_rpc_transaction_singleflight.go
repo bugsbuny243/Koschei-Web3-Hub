@@ -33,8 +33,16 @@ func solanaGetTransactionJSONParsedSingleflight(ctx context.Context, rpcURL, sig
 	rpcURL = strings.TrimSpace(rpcURL)
 	signature = strings.TrimSpace(signature)
 	key := solanaTransactionFetchKey(rpcURL, signature)
+	if cachedSolanaUnsupportedTransactionVersion(key) {
+		return nil, errSolanaUnsupportedTransactionVersion
+	}
 
 	value, err, _ := solanaTransactionFetchGroup.DoContext(ctx, key, func() (interface{}, error) {
+		// A concurrent fetch may have completed with a deterministic
+		// unsupported-version response between the outer check and this call.
+		if cachedSolanaUnsupportedTransactionVersion(key) {
+			return nil, errSolanaUnsupportedTransactionVersion
+		}
 		workCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), solanaTransactionSharedFetchTimeout())
 		defer cancel()
 		result, callErr := solanaRPCDo[SolanaTransactionResult](workCtx, rpcURL, "getTransaction", []any{signature, map[string]any{
@@ -43,6 +51,9 @@ func solanaGetTransactionJSONParsedSingleflight(ctx context.Context, rpcURL, sig
 			"maxSupportedTransactionVersion": SolanaMaxSupportedTransactionVersion,
 		}})
 		if callErr != nil {
+			if isSolanaUnsupportedTransactionVersionError(callErr) {
+				cacheSolanaUnsupportedTransactionVersion(key)
+			}
 			return nil, callErr
 		}
 		// Serialize once so every caller receives an independent map. Sharing the

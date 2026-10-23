@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"koschei/api/internal/outboundhttp"
 	"koschei/api/internal/web3"
 )
 
@@ -249,7 +250,7 @@ func (h *securityRadarGapHealer) fetchSignaturePage(ctx context.Context, program
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.RPCURL, bytes.NewReader(payload))
+	req, err := outboundhttp.NewRequest(ctx, http.MethodPost, h.RPCURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}
@@ -258,7 +259,9 @@ func (h *securityRadarGapHealer) fetchSignaturePage(ctx context.Context, program
 	if client == nil {
 		client = http.DefaultClient
 	}
-	resp, err := client.Do(req)
+	// Apply the shared protected egress boundary: URL checks, DNS pinning
+	// and same-origin redirects apply to this Solana RPC path as well.
+	resp, err := outboundhttp.Do(client, req)
 	if err != nil {
 		return nil, err
 	}

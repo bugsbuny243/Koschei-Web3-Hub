@@ -25,7 +25,11 @@ func configureWeb3SignaturePressureTest(t *testing.T, primaryURL, fallbackURL st
 	for _, key := range []string{"ALCHEMY_SOLANA_RPC_URL", "HELIUS_SOLANA_RPC_URL", "QUICKNODE_SOLANA_RPC_URL", "ALCHEMY_API_KEY"} {
 		t.Setenv(key, "")
 	}
-	t.Setenv("APP_ENV", "production")
+	// Local httptest providers must run in test mode. Production egress
+	// validation deliberately rejects loopback addresses; these fixtures
+	// exercise shared signature-pressure state, not egress validation.
+	// Production cooldown and private-endpoint rejection have separate tests.
+	t.Setenv("APP_ENV", "test")
 	t.Setenv("SOLANA_RPC_SIGNATURE_GUARD_ENABLED", "true")
 	t.Setenv("SOLANA_RPC_URL", primaryURL)
 	t.Setenv("SOLANA_RPC_FALLBACK_URL", fallbackURL)
