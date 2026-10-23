@@ -11,7 +11,7 @@ import (
 	"koschei/api/internal/clickhouse"
 )
 
-var migrations = []string{"005_global_radar_graph_records.sql", "006_global_radar_events.sql", "007_global_radar_ingest_checkpoints.sql", "008_global_radar_ingest_gaps.sql"}
+var migrations = []string{"005_global_radar_graph_records.sql", "006_global_radar_events.sql", "007_global_radar_ingest_checkpoints.sql", "008_global_radar_ingest_gaps.sql", "009_global_radar_graph_records_v2.sql"}
 
 func main() {
 	if err := run(context.Background()); err != nil {
