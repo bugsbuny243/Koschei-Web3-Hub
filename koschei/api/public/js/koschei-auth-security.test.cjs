@@ -9,7 +9,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, 'koschei-auth.js'), 'utf8');
 const token = ['head', Buffer.from(JSON.stringify({ exp: 4102444800 })).toString('base64url'), 'signature'].join('.');
 
-function setup({ next = '', search = '', hash = '', remoteOK = true, remoteThrows = false, failWrites = false, store = new Map() } = {}) {
+function setup({ next = '', search = '', hash = '', remoteOK = true, remoteThrows = false, remoteHangs = false, meOK = true, failWrites = false, fastTimers = false, store = new Map() } = {}) {
   const requests = [];
   const location = {
     origin: 'https://koschei.example',
@@ -38,9 +38,10 @@ function setup({ next = '', search = '', hash = '', remoteOK = true, remoteThrow
     const url = typeof input === 'string' ? input : input.url;
     requests.push({ url, init });
     if (url === '/api/config') return response({ neonAuthUrl: 'https://neon.example' });
-    if (url === '/api/me') return response({ email: 'member@example.org' });
+    if (url === '/api/me') return meOK ? response({ email: 'member@example.org' }) : response({ error: 'unauthorized' }, false, 401);
     if (url.endsWith('/sign-out')) {
       if (remoteThrows) throw new Error('network unavailable');
+      if (remoteHangs) return new Promise(() => {});
       return response({}, remoteOK, remoteOK ? 200 : 503);
     }
     if (url.endsWith('/sign-in/email')) return response({ token });
@@ -57,6 +58,8 @@ function setup({ next = '', search = '', hash = '', remoteOK = true, remoteThrow
     URLSearchParams,
     atob,
     fetch: fakeFetch,
+    setTimeout: fastTimers ? (fn) => setTimeout(fn, 0) : setTimeout,
+    clearTimeout,
   };
   context.window = context;
   vm.runInNewContext(source, context, { filename: 'koschei-auth.js' });
@@ -71,6 +74,9 @@ test('nextPath rejects URL authority tricks and accepts a local route', () => {
     '/%2foutside.example.invalid',
     'https://outside.example.invalid/',
     '/login?next=/dashboard',
+    '/%2e%2e//outside.example.invalid',
+    '/.//outside.example.invalid',
+    '/a/..//outside.example.invalid',
   ]) {
     const { auth } = setup({ next: value });
     assert.equal(auth.nextPath('/'), '/', value);
@@ -134,4 +140,20 @@ test('logout stays fail closed when localStorage writes fail', async () => {
   assert.equal(await landing.auth.init(), false);
   assert.equal(await landing.auth.restoreNeonSession(), false);
   assert.equal(landing.requests.length, 0, 'logout landing page must not restore the provider session');
+});
+
+test('a JWT-shaped fragment that /api/me rejects never lifts the logout', async () => {
+  const store = new Map([['koschei_explicitly_signed_out', '1']]);
+  const { auth, requests } = setup({ store, meOK: false, hash: '#access_token=' + token });
+  assert.equal(await auth.init(), false);
+  assert.equal(store.get('koschei_explicitly_signed_out'), '1');
+  assert.equal(store.has('koschei_jwt'), false);
+  assert.equal(requests.some(x => /\/(token|get-session)$/.test(x.url)), false, 'must not restore the provider session');
+});
+
+test('a stalled provider sign-out still reaches the fail-closed landing page', async () => {
+  const { auth, store, location } = setup({ remoteHangs: true, fastTimers: true });
+  await auth.signOut();
+  assert.equal(store.get('koschei_explicitly_signed_out'), '1');
+  assert.equal(location.replaced, '/login.html?signed_out=local_only');
 });

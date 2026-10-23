@@ -2,6 +2,7 @@
   const KEY = 'koschei_jwt';
   const LEGACY_KEY = 'koschei_token';
   const SIGNED_OUT_KEY = 'koschei_explicitly_signed_out';
+  const REMOTE_SIGN_OUT_TIMEOUT_MS = 5000;
 
   // Kept in memory too, so a failed localStorage write cannot drop the logout.
   let signedOutThisPage = false;
@@ -125,8 +126,9 @@
         /^\/(?:%2f|%5c)/i.test(raw) || /[\x00-\x1f\x7f]/.test(raw)) return safeFallback;
     try {
       const url = new URL(raw, window.location.origin);
+      // Dot segments can normalize to a network path (/%2e%2e//host -> //host).
       if (url.origin !== window.location.origin || !/^https?:$/.test(url.protocol) ||
-          url.pathname.startsWith('/login')) return safeFallback;
+          url.pathname.startsWith('//') || url.pathname.startsWith('/login')) return safeFallback;
       return url.pathname + url.search + url.hash;
     } catch {
       return safeFallback;
@@ -318,8 +320,17 @@
 
   async function init() {
     sessionVerified = false;
-    // A fresh hosted-login callback token supersedes an earlier logout.
-    if (consumeAccessTokenFromHash()) clearSignedOut();
+    // A hosted-login callback token supersedes an earlier logout, but only
+    // once /api/me accepts it; a merely JWT-shaped fragment must not.
+    if (consumeAccessTokenFromHash()) {
+      try { await loadConfig(); } catch {}
+      try {
+        await verifyMe(getJwt());
+        clearSignedOut();
+        sessionVerified = true;
+        return true;
+      } catch {}
+    }
     if (explicitlySignedOut()) {
       clearJwt();
       return false;
@@ -381,17 +392,23 @@
     clearJwt();
     // Retry once clearing the JWT has freed storage space.
     markSignedOut();
-    let remoteSignedOut = false;
-    try {
-      const baseURL = await neonAuthBaseURL();
-      const res = await fetch(baseURL + '/sign-out', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      remoteSignedOut = res.ok;
-    } catch {}
+    // A stalled provider must not keep the user on an authenticated-looking page.
+    const remoteSignOut = (async () => {
+      try {
+        const baseURL = await neonAuthBaseURL();
+        const res = await fetch(baseURL + '/sign-out', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    })();
+    const timedOut = new Promise(resolve => setTimeout(() => resolve(false), REMOTE_SIGN_OUT_TIMEOUT_MS));
+    const remoteSignedOut = await Promise.race([remoteSignOut, timedOut]);
     // If remote sign-out fails, never silently resume its surviving cookie.
     // The distinct query value avoids claiming server logout succeeded.
     window.location.replace('/login.html?signed_out=' + (remoteSignedOut ? '1' : 'local_only'));

@@ -1,6 +1,8 @@
 # Owner-approved exceptions to the Auth Freeze Guard.
-# Each line pins one protected file to the exact SHA-256 of its approved
-# contents (sha256sum format). Any other edit to that file fails the guard.
+# Each line approves one exact transition of a protected file:
+#   <SHA-256 on the base (or "absent")>  <SHA-256 on the head>  <path>
+# The guard reads this file from the PR base only, so an approval must be
+# merged before the change it approves. Any other edit fails the guard.
 #
 # PR #1443: close Neon sessions on sign-out, reject unsafe post-login redirects.
-98d77a66e163ee2f83b6611fab4cd1f10e643fdc950d694d1486bb0a615ee228  koschei/api/public/js/koschei-auth.js
+ce6d52cb0dbeda5c10653ccbfcf9f0a8048a81de589aec5b4785aec90fc4fb24  ba311331824b687da1cffe3dccd15dad4cfaa73e3db3034ac4057e1564759ee6  koschei/api/public/js/koschei-auth.js
