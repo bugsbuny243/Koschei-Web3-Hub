@@ -1,17 +1,33 @@
 package main
 
 import (
-	"os"
-	"strings"
+	"bytes"
+	"go/ast"
+	"go/parser"
+	"go/printer"
+	"go/token"
 	"testing"
 )
 
 func TestBackgroundRuntimeWiresPreservedProductionWorkers(t *testing.T) {
-	body, err := os.ReadFile("runtime_workers.go")
+	// Parse the file so commented-out calls do not count as wiring.
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "runtime_workers.go", nil, 0)
 	if err != nil {
-		t.Fatalf("read runtime worker wiring: %v", err)
+		t.Fatalf("parse runtime worker wiring: %v", err)
 	}
-	source := string(body)
+	calls := map[string]bool{}
+	ast.Inspect(file, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		var buf bytes.Buffer
+		if err := printer.Fprint(&buf, fset, call); err == nil {
+			calls[buf.String()] = true
+		}
+		return true
+	})
 	for _, required := range []string{
 		"services.StartGlobalCampaignRuntime(ctx, *cfg)",
 		"services.StartGlobalCampaignReconciler(ctx, cfg.DB, globalCampaignReplaySource, cfg.Health)",
@@ -30,8 +46,8 @@ func TestBackgroundRuntimeWiresPreservedProductionWorkers(t *testing.T) {
 		"handlers.StartCanonicalInvestigationJobWorker(ctx, db, readDB, solanaRPC, jobStore)",
 		"handlers.StartCanonicalPumpJobScheduler(ctx, db, jobStore)",
 	} {
-		if !strings.Contains(source, required) {
-			t.Fatalf("production background runtime missing preserved worker wiring %q", required)
+		if !calls[required] {
+			t.Fatalf("production background runtime missing preserved worker call %q", required)
 		}
 	}
 }
