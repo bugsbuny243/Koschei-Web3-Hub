@@ -29,7 +29,24 @@ jobs:
           printf '%s\n' "$changed"
 
           protected='^(koschei/api/public/(login|register)\.html|koschei/api/public/js/koschei-auth[^/]*\.js|koschei/api/internal/handlers/neon_auth_config(_test)?\.go|koschei/api/internal/handlers/(auth|auth_[^/]*)\.go|koschei/api/internal/handlers/(jwt|jwt_[^/]*)\.go|koschei/api/internal/handlers/(session|session_[^/]*)\.go)$'
-          violations="$(printf '%s\n' "$changed" | grep -E "$protected" || true)"
+          candidates="$(printf '%s\n' "$changed" | grep -E "$protected" || true)"
+
+          # Owner-approved exceptions are pinned to exact file contents. A later
+          # edit to an approved file changes its digest and is rejected again.
+          approvals='.github/auth-freeze-approvals.sha256'
+          violations=''
+          while IFS= read -r path; do
+            [ -n "$path" ] || continue
+            if git cat-file -e "$head:$path" 2>/dev/null && git cat-file -e "$head:$approvals" 2>/dev/null; then
+              digest="$(git show "$head:$path" | sha256sum | awk '{print $1}')"
+              if git show "$head:$approvals" | grep -v '^#' | awk -v d="$digest" -v p="$path" '$1 == d && $2 == p { found = 1 } END { exit !found }'; then
+                echo "Owner-approved exception: $path ($digest)"
+                continue
+              fi
+            fi
+            violations+="$path"$'\n'
+          done <<< "$candidates"
+
           if [ -n "$violations" ]; then
             echo 'Authentication subsystem is frozen by project owner instruction.' >&2
             echo 'Protected files changed:' >&2
@@ -38,4 +55,4 @@ jobs:
             exit 1
           fi
 
-          echo 'No protected authentication files changed.'
+          echo 'No unapproved protected authentication files changed.'
