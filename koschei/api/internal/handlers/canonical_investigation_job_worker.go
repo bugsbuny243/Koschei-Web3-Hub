@@ -107,11 +107,21 @@ func (w *canonicalInvestigationJobWorker) Start(ctx context.Context) {
 	if w == nil || w.Store == nil || w.Handler == nil {
 		return
 	}
-	if recovered, err := w.Store.RequeueStale(ctx, w.StaleAfter); err != nil {
-		log.Printf("canonical investigation stale-job recovery failed: %v", err)
-	} else if recovered > 0 {
-		log.Printf("canonical investigation stale-job recovery affected=%d", recovered)
+	// Recover at startup and periodically, even if no new enqueue wake arrives.
+	// Without the periodic pass, a job stranded after process startup can remain
+	// running indefinitely until the next deployment.
+	recoveryInterval := canonicalStaleRecoveryInterval(w.StaleAfter)
+	recoverStale := func() {
+		if recovered, err := w.Store.RequeueStale(ctx, w.StaleAfter, CanonicalInvestigationJobType, legacyTokenScanJobType); err != nil {
+			if ctx.Err() == nil {
+				log.Printf("canonical investigation stale-job recovery failed: %v", err)
+			}
+		} else if recovered > 0 {
+			log.Printf("canonical investigation stale-job recovery affected=%d", recovered)
+		}
 	}
+	recoverStale()
+	nextRecovery := time.Now().Add(recoveryInterval)
 	// Event-driven idle (#697). web3_jobs rows are claimable as soon as they are
 	// queued, so there is no future schedule to compute: when a claim finds
 	// nothing, the worker sleeps until an in-process enqueue signal arrives or the
@@ -121,6 +131,10 @@ func (w *canonicalInvestigationJobWorker) Start(ctx context.Context) {
 	for {
 		if ctx.Err() != nil {
 			return
+		}
+		if !time.Now().Before(nextRecovery) {
+			recoverStale()
+			nextRecovery = time.Now().Add(recoveryInterval)
 		}
 		gate.Drain()
 		processed, err := w.RunOnce(ctx)
@@ -143,8 +157,23 @@ func (w *canonicalInvestigationJobWorker) Start(ctx context.Context) {
 			gate.Wait(ctx, canonicalWorkerErrorBackoff)
 			continue
 		}
-		gate.Wait(ctx, workerwake.RecoveryCeiling())
+		// An idle wake timeout must not delay the next stale lease pass.
+		wait := workerwake.RecoveryCeiling()
+		if until := time.Until(nextRecovery); until > 0 && until < wait {
+			wait = until
+		}
+		gate.Wait(ctx, wait)
 	}
+}
+
+// canonicalStaleRecoveryInterval bounds background recovery work while ensuring
+// short configured leases are checked before another full lease period elapses.
+func canonicalStaleRecoveryInterval(staleAfter time.Duration) time.Duration {
+	interval := workerwake.RecoveryCeiling()
+	if staleAfter > 0 && staleAfter/2 < interval {
+		return staleAfter / 2
+	}
+	return interval
 }
 
 func (w *canonicalInvestigationJobWorker) RunOnce(ctx context.Context) (bool, error) {

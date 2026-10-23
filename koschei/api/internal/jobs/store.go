@@ -200,14 +200,31 @@ func (s *Store) ClaimNext(ctx context.Context, jobTypes ...string) (Job, error) 
 	return scanJob(s.DB.QueryRowContext(ctx, query, args...))
 }
 
-func (s *Store) RequeueStale(ctx context.Context, olderThan time.Duration) (int64, error) {
-	if s == nil || s.DB == nil {
-		return 0, errors.New("job store database unavailable")
-	}
+// staleRequeueQuery refuses an unscoped update: a canonical worker must never
+// requeue a running job owned by another processor or job type.
+func staleRequeueQuery(olderThan time.Duration, jobTypes ...string) (string, []any, error) {
 	if olderThan <= 0 {
 		olderThan = 30 * time.Minute
 	}
-	result, err := s.DB.ExecContext(ctx, `
+	seen := make(map[string]bool, len(jobTypes))
+	clean := make([]string, 0, len(jobTypes))
+	for _, jobType := range jobTypes {
+		jobType = strings.TrimSpace(jobType)
+		if jobType != "" && !seen[jobType] {
+			seen[jobType] = true
+			clean = append(clean, jobType)
+		}
+	}
+	if len(clean) == 0 {
+		return "", nil, errors.New("stale-job recovery requires explicit job types")
+	}
+	placeholders := make([]string, 0, len(clean))
+	args := []any{int64(olderThan / time.Second)}
+	for _, jobType := range clean {
+		placeholders = append(placeholders, fmt.Sprintf("$%d", len(args)+1))
+		args = append(args, jobType)
+	}
+	query := `
 		UPDATE web3_jobs
 		SET status=CASE WHEN attempts < max_attempts THEN 'queued' ELSE 'failed' END,
 		    progress=CASE WHEN attempts < max_attempts THEN LEAST(progress,10) ELSE progress END,
@@ -215,7 +232,20 @@ func (s *Store) RequeueStale(ctx context.Context, olderThan time.Duration) (int6
 		    error_message=CASE WHEN attempts < max_attempts THEN NULL ELSE 'Investigation worker lease expired after maximum attempts.' END,
 		    failed_at=CASE WHEN attempts < max_attempts THEN NULL ELSE now() END,
 		    updated_at=now()
-		WHERE status='running' AND updated_at < now() - ($1 * interval '1 second')`, int64(olderThan/time.Second))
+		WHERE status='running' AND updated_at < now() - ($1 * interval '1 second')
+		  AND job_type IN (` + strings.Join(placeholders, ",") + `) `
+	return query, args, nil
+}
+
+func (s *Store) RequeueStale(ctx context.Context, olderThan time.Duration, jobTypes ...string) (int64, error) {
+	if s == nil || s.DB == nil {
+		return 0, errors.New("job store database unavailable")
+	}
+	query, args, err := staleRequeueQuery(olderThan, jobTypes...)
+	if err != nil {
+		return 0, err
+	}
+	result, err := s.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return 0, err
 	}
