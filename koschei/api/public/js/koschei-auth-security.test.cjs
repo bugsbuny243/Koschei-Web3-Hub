@@ -9,21 +9,23 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, 'koschei-auth.js'), 'utf8');
 const token = ['head', Buffer.from(JSON.stringify({ exp: 4102444800 })).toString('base64url'), 'signature'].join('.');
 
-function setup({ next = '', remoteOK = true, remoteThrows = false } = {}) {
-  const store = new Map();
+function setup({ next = '', search = '', hash = '', remoteOK = true, remoteThrows = false, failWrites = false, store = new Map() } = {}) {
   const requests = [];
   const location = {
     origin: 'https://koschei.example',
     pathname: '/dashboard',
-    search: next ? '?next=' + encodeURIComponent(next) : '',
-    hash: '',
+    search: search || (next ? '?next=' + encodeURIComponent(next) : ''),
+    hash,
     href: '',
     replaced: '',
     replace(value) { this.replaced = value; },
   };
   const storage = {
     getItem: key => store.get(key) ?? null,
-    setItem: (key, value) => store.set(key, String(value)),
+    setItem: (key, value) => {
+      if (failWrites) throw new Error('QuotaExceededError');
+      store.set(key, String(value));
+    },
     removeItem: key => store.delete(key),
   };
   const response = (body, ok = true, status = 200) => ({
@@ -49,6 +51,7 @@ function setup({ next = '', remoteOK = true, remoteThrows = false } = {}) {
     localStorage: storage,
     location,
     document: { title: 'Test' },
+    history: { replaceState(_state, _title, url) { location.hash = String(url).includes('#') ? String(url).slice(String(url).indexOf('#')) : ''; } },
     Headers,
     URL,
     URLSearchParams,
@@ -110,4 +113,25 @@ test('explicit successful sign-in clears local logout state', async () => {
   await auth.signIn('member@example.org', 'not-a-real-password');
   assert.equal(store.has('koschei_explicitly_signed_out'), false);
   assert.equal(await auth.init(), true);
+});
+
+test('hosted Neon callback token after logout completes sign-in and is scrubbed', async () => {
+  const store = new Map([['koschei_explicitly_signed_out', '1']]);
+  const { auth, location } = setup({ store, hash: '#access_token=' + token });
+  assert.equal(await auth.init(), true);
+  assert.equal(store.has('koschei_explicitly_signed_out'), false);
+  assert.equal(store.get('koschei_jwt'), token);
+  assert.equal(location.hash, '');
+});
+
+test('logout stays fail closed when localStorage writes fail', async () => {
+  const store = new Map();
+  const first = setup({ store, remoteOK: false, failWrites: true });
+  await first.auth.signOut();
+  assert.equal(store.has('koschei_explicitly_signed_out'), false, 'storage write failed in this scenario');
+  assert.equal(await first.auth.init(), false, 'same page must stay signed out');
+  const landing = setup({ store, search: '?signed_out=local_only' });
+  assert.equal(await landing.auth.init(), false);
+  assert.equal(await landing.auth.restoreNeonSession(), false);
+  assert.equal(landing.requests.length, 0, 'logout landing page must not restore the provider session');
 });

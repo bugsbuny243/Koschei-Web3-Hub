@@ -33,13 +33,15 @@ jobs:
 
           # Owner-approved exceptions are pinned to exact file contents. A later
           # edit to an approved file changes its digest and is rejected again.
+          # Approvals are read from the base revision only: a PR cannot approve
+          # its own change; the approval must already be merged.
           approvals='.github/auth-freeze-approvals.sha256'
           violations=''
           while IFS= read -r path; do
             [ -n "$path" ] || continue
-            if git cat-file -e "$head:$path" 2>/dev/null && git cat-file -e "$head:$approvals" 2>/dev/null; then
+            if git cat-file -e "$head:$path" 2>/dev/null && git cat-file -e "$base:$approvals" 2>/dev/null; then
               digest="$(git show "$head:$path" | sha256sum | awk '{print $1}')"
-              if git show "$head:$approvals" | grep -v '^#' | awk -v d="$digest" -v p="$path" '$1 == d && $2 == p { found = 1 } END { exit !found }'; then
+              if git show "$base:$approvals" | grep -v '^#' | awk -v d="$digest" -v p="$path" '$1 == d && $2 == p { found = 1 } END { exit !found }'; then
                 echo "Owner-approved exception: $path ($digest)"
                 continue
               fi

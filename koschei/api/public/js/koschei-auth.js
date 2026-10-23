@@ -3,15 +3,23 @@
   const LEGACY_KEY = 'koschei_token';
   const SIGNED_OUT_KEY = 'koschei_explicitly_signed_out';
 
+  // Kept in memory too, so a failed localStorage write cannot drop the logout.
+  let signedOutThisPage = false;
+
   function markSignedOut() {
+    signedOutThisPage = true;
     try { localStorage.setItem(SIGNED_OUT_KEY, '1'); } catch {}
   }
 
   function clearSignedOut() {
+    signedOutThisPage = false;
     try { localStorage.removeItem(SIGNED_OUT_KEY); } catch {}
   }
 
   function explicitlySignedOut() {
+    if (signedOutThisPage) return true;
+    // The post-logout landing page carries signed_out= even if storage failed.
+    try { if (new URLSearchParams(window.location.search).has('signed_out')) return true; } catch {}
     try { return localStorage.getItem(SIGNED_OUT_KEY) === '1'; } catch { return false; }
   }
   // A syntactically valid JWT is not an authenticated session until /api/me confirms it.
@@ -310,11 +318,12 @@
 
   async function init() {
     sessionVerified = false;
+    // A fresh hosted-login callback token supersedes an earlier logout.
+    if (consumeAccessTokenFromHash()) clearSignedOut();
     if (explicitlySignedOut()) {
       clearJwt();
       return false;
     }
-    consumeAccessTokenFromHash();
     try { await loadConfig(); } catch {}
 
     const jwt = getJwt();
@@ -370,6 +379,8 @@
     // Lock local session restoration *before* asynchronous remote sign-out.
     markSignedOut();
     clearJwt();
+    // Retry once clearing the JWT has freed storage space.
+    markSignedOut();
     let remoteSignedOut = false;
     try {
       const baseURL = await neonAuthBaseURL();
