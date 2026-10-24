@@ -157,10 +157,19 @@ func (w *arvisStreamVerdictWorker) processOne(ctx context.Context, target arvisS
 }
 
 func (w *arvisStreamVerdictWorker) pendingTargets(ctx context.Context, limit int) ([]arvisStreamTarget, error) {
+	return arvisStreamPendingTargets(ctx, w.db, limit)
+}
+
+// arvisStreamPendingTargets lists Pump/Raydium token stream events that have
+// no processing claim yet or whose failed claim is due for a bounded retry.
+func arvisStreamPendingTargets(ctx context.Context, db *sql.DB, limit int) ([]arvisStreamTarget, error) {
+	if db == nil {
+		return nil, errors.New("ARVIS stream queue database unavailable")
+	}
 	if limit <= 0 || limit > 100 {
 		limit = arvisStreamVerdictBatchSize()
 	}
-	rows, err := w.db.QueryContext(ctx, `
+	rows, err := db.QueryContext(ctx, `
 		WITH eligible AS (
 			SELECT s.id::text,
 			       COALESCE(s.target,'') AS target,
@@ -234,8 +243,24 @@ func (w *arvisStreamVerdictWorker) pendingTargets(ctx context.Context, limit int
 }
 
 func (w *arvisStreamVerdictWorker) claimTarget(ctx context.Context, target arvisStreamTarget) bool {
+	return claimArvisStreamTarget(ctx, w.db, target)
+}
+
+// claimArvisStreamTarget takes a new processing claim, or re-claims a failed
+// one within its retry budget. It never touches completed or insufficient rows.
+func claimArvisStreamTarget(ctx context.Context, db *sql.DB, target arvisStreamTarget) bool {
+	_, claimed := claimArvisStreamTargetAttempt(ctx, db, target)
+	return claimed
+}
+
+// claimArvisStreamTargetAttempt also returns the claim's attempt number, so
+// each retry of one stream event can be told apart downstream.
+func claimArvisStreamTargetAttempt(ctx context.Context, db *sql.DB, target arvisStreamTarget) (int, bool) {
+	if db == nil {
+		return 0, false
+	}
 	var attempts int
-	err := w.db.QueryRowContext(ctx, `
+	err := db.QueryRowContext(ctx, `
 		INSERT INTO arvis_stream_processing(stream_event_id,target,signature,status,attempts,last_error,created_at,updated_at)
 		VALUES($1::uuid,$2,$3,'processing',1,'',now(),now())
 		ON CONFLICT(stream_event_id) DO UPDATE SET
@@ -247,7 +272,10 @@ func (w *arvisStreamVerdictWorker) claimTarget(ctx context.Context, target arvis
 		   OR (arvis_stream_processing.status='exhausted' AND arvis_stream_processing.attempts < 5)
 		RETURNING attempts
 	`, target.ID, target.Target, target.Signature).Scan(&attempts)
-	return err == nil && attempts > 0
+	if err != nil || attempts <= 0 {
+		return 0, false
+	}
+	return attempts, true
 }
 
 func (w *arvisStreamVerdictWorker) streamArmAlreadySaved(ctx context.Context, streamEventID, moduleID string) (bool, error) {

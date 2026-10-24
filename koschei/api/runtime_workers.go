@@ -104,6 +104,7 @@ func startBackgroundRuntime(
 			handlers.StartAutopublishWorker(ctx, db),
 			handlers.StartCanonicalInvestigationJobWorker(ctx, db, readDB, solanaRPC, jobStore),
 			handlers.StartCanonicalPumpJobScheduler(ctx, db, jobStore),
+			handlers.StartCanonicalArvisStreamJobScheduler(ctx, db, jobStore, runtimeHealth),
 		)
 	}
 	return func() {

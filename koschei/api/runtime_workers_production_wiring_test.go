@@ -45,6 +45,7 @@ func TestBackgroundRuntimeWiresPreservedProductionWorkers(t *testing.T) {
 		"handlers.StartAutopublishWorker(ctx, db)",
 		"handlers.StartCanonicalInvestigationJobWorker(ctx, db, readDB, solanaRPC, jobStore)",
 		"handlers.StartCanonicalPumpJobScheduler(ctx, db, jobStore)",
+		"handlers.StartCanonicalArvisStreamJobScheduler(ctx, db, jobStore, runtimeHealth)",
 	} {
 		if !calls[required] {
 			t.Fatalf("production background runtime missing preserved worker call %q", required)
