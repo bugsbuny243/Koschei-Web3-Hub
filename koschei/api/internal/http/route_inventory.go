@@ -49,7 +49,7 @@ func productionRouteInventory() []routeInventoryGroup {
 		{Name: "crypto_brief_customer", Auth: "customer_session", Routes: []string{"GET|PUT|PATCH|DELETE /api/customer/crypto-brief", "POST /api/customer/crypto-brief/pair"}},
 		{Name: "arvis_telegram_customer", Auth: "customer_session_plus_explicit_pairing_consent", Routes: []string{"GET|PATCH|DELETE /api/customer/arvis/telegram", "POST /api/customer/arvis/telegram/pair"}},
 		{Name: "public_and_system", Auth: "public_or_mixed", Routes: []string{
-			"GET /health", "GET /api/config", "GET /api/version", "GET /api/web3/health", "GET /api/web3/health/logs",
+			"GET /health", "GET /.well-known/koschei-verdict-keys.json", "GET /api/config", "GET /api/version", "GET /api/web3/health", "GET /api/web3/health/logs",
 			"POST /api/analytics/event", "GET /api/v1/risk/badge",
 			"GET /api/public/impact", "GET /api/public/metrics", "GET /api/public/tool-prices", "GET /api/public/cases", "GET /api/public/soc/feed",
 			"GET /api/public/token/status", "GET /api/public/token/readiness", "GET /api/public/scan-history", "POST /api/public/transaction-simulate",
