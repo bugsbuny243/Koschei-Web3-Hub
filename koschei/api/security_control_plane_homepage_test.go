@@ -41,7 +41,10 @@ func TestHomepageKeepsKoscheiWeb3EvidenceFirstProductTruth(t *testing.T) {
 		"Production core",
 		"LIVE CORE",
 		"PROBE READY",
-		"/css/koschei-home.css?v=4",
+		"/css/koschei-home.css?v=5",
+		"data-home-session-link",
+		"/js/koschei-auth.js?v=33",
+		"/js/home-session.js?v=1",
 	} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("homepage missing evidence-first product contract %q", required)
@@ -65,6 +68,7 @@ func TestHomepageKeepsKoscheiWeb3EvidenceFirstProductTruth(t *testing.T) {
 		"ETHEREUM</b><small>LIVE",
 		"TRON</b><small>LIVE",
 		"100% secure",
+		`</p>\n`,
 	} {
 		if strings.Contains(text, forbidden) {
 			t.Fatalf("homepage regressed into retired/demo-first or unsupported presentation: found %q", forbidden)
