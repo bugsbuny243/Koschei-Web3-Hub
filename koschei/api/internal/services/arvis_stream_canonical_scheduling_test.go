@@ -178,13 +178,45 @@ func TestArvisStreamCanonicalSchedulingPostgres17(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `UPDATE arvis_stream_processing SET updated_at=now()-interval '2 hours' WHERE stream_event_id=$1::uuid`, claimedID); err != nil {
 		t.Fatal(err)
 	}
-	if !claimArvisStreamTarget(ctx, db, mine[claimedID].asTarget()) {
+	first := mine[claimedID]
+	attempt, reclaimed := claimArvisStreamTargetAttempt(ctx, db, first.asTarget())
+	if !reclaimed {
 		t.Fatal("failed claim within its retry budget must be re-claimable")
+	}
+	retry := first
+	retry.Attempt = attempt
+	if first.Attempt != 1 || retry.Attempt != 2 || first.DedupeKey() == retry.DedupeKey() {
+		t.Fatalf("a retry must get its own job dedupe key: first=%q retry=%q", first.DedupeKey(), retry.DedupeKey())
 	}
 	if _, err := db.ExecContext(ctx, `UPDATE arvis_stream_processing SET updated_at=now()-interval '2 hours' WHERE stream_event_id=$1::uuid`, claimedID); err != nil {
 		t.Fatal(err)
 	}
-	released, err := ReleaseStaleArvisStreamCanonicalClaims(ctx, db, time.Hour, 50)
+
+	// A queued or running investigation keeps its claim however long it takes.
+	const jobType = "ci_arvis_stream_canonical_fixture"
+	var jobID string
+	if err := db.QueryRowContext(ctx, `
+		INSERT INTO web3_jobs (job_type,status,network,target,request_payload,progress)
+		VALUES ($1,'running','solana-mainnet',$2,jsonb_build_object('source',$3::text,'source_event_id',$4::text),0)
+		RETURNING id::text
+	`, jobType, mintA, ArvisStreamCanonicalSource, claimedID).Scan(&jobID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanup, done := context.WithTimeout(context.Background(), 15*time.Second)
+		defer done()
+		_, _ = db.ExecContext(cleanup, `DELETE FROM web3_jobs WHERE id=$1::uuid`, jobID)
+	})
+	if _, err := ReleaseStaleArvisStreamCanonicalClaims(ctx, db, jobType, time.Hour, 50); err != nil {
+		t.Fatal(err)
+	}
+	if got := status(claimedID); got != "processing" {
+		t.Fatalf("claim with a live investigation must not be released, got %q", got)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE web3_jobs SET status='failed' WHERE id=$1::uuid`, jobID); err != nil {
+		t.Fatal(err)
+	}
+	released, err := ReleaseStaleArvisStreamCanonicalClaims(ctx, db, jobType, time.Hour, 50)
 	if err != nil || released < 1 {
 		t.Fatalf("stale claim was not released: released=%d err=%v", released, err)
 	}

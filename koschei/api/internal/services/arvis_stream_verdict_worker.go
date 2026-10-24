@@ -249,8 +249,15 @@ func (w *arvisStreamVerdictWorker) claimTarget(ctx context.Context, target arvis
 // claimArvisStreamTarget takes a new processing claim, or re-claims a failed
 // one within its retry budget. It never touches completed or insufficient rows.
 func claimArvisStreamTarget(ctx context.Context, db *sql.DB, target arvisStreamTarget) bool {
+	_, claimed := claimArvisStreamTargetAttempt(ctx, db, target)
+	return claimed
+}
+
+// claimArvisStreamTargetAttempt also returns the claim's attempt number, so
+// each retry of one stream event can be told apart downstream.
+func claimArvisStreamTargetAttempt(ctx context.Context, db *sql.DB, target arvisStreamTarget) (int, bool) {
 	if db == nil {
-		return false
+		return 0, false
 	}
 	var attempts int
 	err := db.QueryRowContext(ctx, `
@@ -265,7 +272,10 @@ func claimArvisStreamTarget(ctx context.Context, db *sql.DB, target arvisStreamT
 		   OR (arvis_stream_processing.status='exhausted' AND arvis_stream_processing.attempts < 5)
 		RETURNING attempts
 	`, target.ID, target.Target, target.Signature).Scan(&attempts)
-	return err == nil && attempts > 0
+	if err != nil || attempts <= 0 {
+		return 0, false
+	}
+	return attempts, true
 }
 
 func (w *arvisStreamVerdictWorker) streamArmAlreadySaved(ctx context.Context, streamEventID, moduleID string) (bool, error) {

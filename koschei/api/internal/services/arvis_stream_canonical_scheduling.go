@@ -26,6 +26,15 @@ type ArvisStreamCanonicalEvent struct {
 	Target    string
 	Signature string
 	Network   string
+	// Attempt is the claim attempt this event was claimed under.
+	Attempt int
+}
+
+// DedupeKey identifies one claim attempt of one stream event. A retry after a
+// withheld final must open a new investigation, because the previous one is
+// already completed and job deduplication also matches completed jobs.
+func (e ArvisStreamCanonicalEvent) DedupeKey() string {
+	return fmt.Sprintf("%s|%s|attempt-%d", ArvisStreamCanonicalSource, e.ID, e.Attempt)
 }
 
 // ArvisStreamCanonicalJobsReady reports whether stream events may be turned
@@ -87,7 +96,8 @@ func ClaimArvisStreamCanonicalEvents(ctx context.Context, db *sql.DB, limit int)
 			continue
 		}
 		seen[target.Target] = true
-		if !claimArvisStreamTarget(ctx, db, target) {
+		attempt, claimed := claimArvisStreamTargetAttempt(ctx, db, target)
+		if !claimed {
 			continue
 		}
 		if target.Network != "solana-mainnet" || !arvisStreamSourceProgramPermitted(target.ModuleID, target.ProgramID) {
@@ -99,6 +109,7 @@ func ClaimArvisStreamCanonicalEvents(ctx context.Context, db *sql.DB, limit int)
 		}
 		out = append(out, ArvisStreamCanonicalEvent{
 			ID: target.ID, Target: target.Target, Signature: target.Signature, Network: target.Network,
+			Attempt: attempt,
 		})
 	}
 	return out, nil
@@ -127,11 +138,16 @@ func MarkArvisStreamCanonicalOutcome(ctx context.Context, db *sql.DB, eventID st
 }
 
 // ReleaseStaleArvisStreamCanonicalClaims fails processing claims older than
-// olderThan that have no signed final, so a canonical job that died before
-// reporting its outcome is retried within the normal attempt budget.
-func ReleaseStaleArvisStreamCanonicalClaims(ctx context.Context, db *sql.DB, olderThan time.Duration, limit int) (int, error) {
+// olderThan that have no signed final and no queued or running job of
+// jobType for them, so a canonical job that died before reporting its outcome
+// is retried within the normal attempt budget. A live job keeps its claim:
+// the job store recovers expired job leases on its own.
+func ReleaseStaleArvisStreamCanonicalClaims(ctx context.Context, db *sql.DB, jobType string, olderThan time.Duration, limit int) (int, error) {
 	if db == nil {
 		return 0, errors.New("ARVIS stream claim database unavailable")
+	}
+	if strings.TrimSpace(jobType) == "" {
+		return 0, errors.New("ARVIS stream stale release requires the canonical job type")
 	}
 	if olderThan <= 0 || limit <= 0 {
 		return 0, nil
@@ -145,9 +161,16 @@ func ReleaseStaleArvisStreamCanonicalClaims(ctx context.Context, db *sql.DB, old
 		    SELECT 1 FROM arvis_stream_canonical_finals AS f
 		    WHERE f.stream_event_id=p.stream_event_id
 		  )
+		  AND NOT EXISTS (
+		    SELECT 1 FROM web3_jobs AS j
+		    WHERE j.job_type=$3
+		      AND j.status IN ('queued','running')
+		      AND j.request_payload->>'source'=$4
+		      AND j.request_payload->>'source_event_id'=p.stream_event_id::text
+		  )
 		ORDER BY p.updated_at
 		LIMIT $2
-	`, olderThan.Seconds(), limit)
+	`, olderThan.Seconds(), limit, jobType, ArvisStreamCanonicalSource)
 	if err != nil {
 		return 0, err
 	}

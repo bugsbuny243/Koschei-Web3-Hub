@@ -88,7 +88,7 @@ func (s *canonicalArvisStreamJobScheduler) RunOnce(ctx context.Context) (release
 	if ready, _ := services.ArvisStreamCanonicalJobsReady(); !ready {
 		return 0, 0, nil
 	}
-	released, err = services.ReleaseStaleArvisStreamCanonicalClaims(ctx, s.DB, s.StaleAfter, 20)
+	released, err = services.ReleaseStaleArvisStreamCanonicalClaims(ctx, s.DB, CanonicalInvestigationJobType, s.StaleAfter, 20)
 	if err != nil {
 		return released, 0, err
 	}
@@ -97,7 +97,7 @@ func (s *canonicalArvisStreamJobScheduler) RunOnce(ctx context.Context) (release
 		return released, 0, err
 	}
 	for _, event := range events {
-		dedupe := services.ArvisStreamCanonicalSource + "|" + event.ID
+		dedupe := event.DedupeKey()
 		payload := canonicalInvestigationJobPayload{
 			Mint: event.Target, Network: event.Network, Mode: canonicalArvisStreamMode,
 			RootTarget: event.Target, Source: services.ArvisStreamCanonicalSource, SourceEventID: event.ID,
