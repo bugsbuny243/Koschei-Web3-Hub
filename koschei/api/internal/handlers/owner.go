@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -1135,10 +1136,28 @@ func lastField(s string) string {
 	return strings.Trim(f[len(f)-1], " .")
 }
 
+// ownerSchemaEnsured records the database handles whose owner/member schema
+// has been applied in this process. The statements are idempotent, but each
+// one costs a database round trip (a fresh connection while the pool keeps no
+// idle connections), and running ~15 of them on every sign-in made login take
+// 15-25 seconds against the cross-region production database.
+var ownerSchemaEnsured sync.Map
+
 func ensureOwnerSchema(ctx context.Context, db *sql.DB) error {
 	if db == nil {
 		return errors.New("db nil")
 	}
+	if _, done := ownerSchemaEnsured.Load(db); done {
+		return nil
+	}
+	if err := applyOwnerSchema(ctx, db); err != nil {
+		return err
+	}
+	ownerSchemaEnsured.Store(db, struct{}{})
+	return nil
+}
+
+func applyOwnerSchema(ctx context.Context, db *sql.DB) error {
 	stmts := []string{
 		`ALTER TABLE app_user_profiles ADD COLUMN IF NOT EXISTS wallet_address text`,
 		`ALTER TABLE app_user_profiles ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active'`,
