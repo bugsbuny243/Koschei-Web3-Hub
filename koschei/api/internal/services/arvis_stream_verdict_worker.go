@@ -169,34 +169,83 @@ func arvisStreamPendingTargets(ctx context.Context, db *sql.DB, limit int) ([]ar
 	if limit <= 0 || limit > 100 {
 		limit = arvisStreamVerdictBatchSize()
 	}
+	// Each bucket is read separately through an index and capped at $1 rows
+	// (per module for unclaimed events), which is all the ranking below can
+	// select from a bucket. Filtering the whole stream table in one pass made
+	// every call scan the full raw journal: about two minutes per call against
+	// the ~97 GB production table.
 	rows, err := db.QueryContext(ctx, `
-		WITH eligible AS (
-			SELECT s.id::text,
-			       COALESCE(s.target,'') AS target,
-			       COALESCE(s.signature,'') AS signature,
-			       COALESCE(s.network,'solana-mainnet') AS network,
-			       COALESCE(s.slot,0) AS slot,
-			       COALESCE(s.program_id,'') AS program_id,
-			       COALESCE(s.module_id,'') AS module_id,
-			       s.created_at,
-			       p.updated_at,
-			       CASE
-			         WHEN p.status='failed' THEN 'failed'
-			         WHEN p.status='exhausted' THEN 'exhausted'
-			         WHEN p.stream_event_id IS NULL AND s.created_at >= now() - interval '2 minutes' THEN 'fresh'
-			         ELSE 'backlog'
-			       END AS bucket,
-			       COALESCE(p.updated_at,s.created_at) AS queue_time
-			FROM security_radar_stream_events s
-			LEFT JOIN arvis_stream_processing p ON p.stream_event_id=s.id
-			WHERE COALESCE(s.target,'') <> ''
-			  AND COALESCE(s.target_type,'')='token'
-			  AND COALESCE(s.module_id,'') IN ($2,$3)
-			  AND (
-				p.stream_event_id IS NULL
-				OR (p.status='failed' AND p.attempts < 3 AND p.updated_at < now() - interval '30 seconds')
-				OR (p.status='exhausted' AND p.attempts < 5 AND p.updated_at < now() - interval '30 minutes')
-			  )
+		WITH retry AS (
+			SELECT r.*
+			FROM (VALUES ('failed', 3, interval '30 seconds'), ('exhausted', 5, interval '30 minutes')) AS b(status, max_attempts, backoff)
+			CROSS JOIN LATERAL (
+				SELECT s.id::text,
+				       COALESCE(s.target,'') AS target,
+				       COALESCE(s.signature,'') AS signature,
+				       COALESCE(s.network,'solana-mainnet') AS network,
+				       COALESCE(s.slot,0) AS slot,
+				       COALESCE(s.program_id,'') AS program_id,
+				       COALESCE(s.module_id,'') AS module_id,
+				       s.created_at,
+				       b.status AS bucket,
+				       p.updated_at AS queue_time
+				FROM arvis_stream_processing p
+				JOIN security_radar_stream_events s ON s.id=p.stream_event_id
+				WHERE p.status=b.status
+				  AND p.attempts < b.max_attempts
+				  AND p.updated_at < now() - b.backoff
+				  AND COALESCE(s.target,'') <> ''
+				  AND s.target_type='token'
+				  AND s.module_id IN ($2,$3)
+				ORDER BY p.updated_at ASC, s.created_at ASC
+				LIMIT $1
+			) AS r
+		), unclaimed AS (
+			SELECT u.*
+			FROM unnest(ARRAY[$2::text,$3::text]) AS m(module_id)
+			CROSS JOIN LATERAL (
+				(SELECT s.id::text,
+				        COALESCE(s.target,'') AS target,
+				        COALESCE(s.signature,'') AS signature,
+				        COALESCE(s.network,'solana-mainnet') AS network,
+				        COALESCE(s.slot,0) AS slot,
+				        COALESCE(s.program_id,'') AS program_id,
+				        COALESCE(s.module_id,'') AS module_id,
+				        s.created_at,
+				        'fresh'::text AS bucket,
+				        s.created_at AS queue_time
+				 FROM security_radar_stream_events s
+				 WHERE COALESCE(s.target,'') <> ''
+				   AND s.target_type='token'
+				   AND s.module_id=m.module_id
+				   AND s.created_at >= now() - interval '2 minutes'
+				   AND NOT EXISTS (SELECT 1 FROM arvis_stream_processing p WHERE p.stream_event_id=s.id)
+				 ORDER BY s.created_at DESC
+				 LIMIT $1)
+				UNION ALL
+				(SELECT s.id::text,
+				        COALESCE(s.target,'') AS target,
+				        COALESCE(s.signature,'') AS signature,
+				        COALESCE(s.network,'solana-mainnet') AS network,
+				        COALESCE(s.slot,0) AS slot,
+				        COALESCE(s.program_id,'') AS program_id,
+				        COALESCE(s.module_id,'') AS module_id,
+				        s.created_at,
+				        'backlog'::text AS bucket,
+				        s.created_at AS queue_time
+				 FROM security_radar_stream_events s
+				 WHERE COALESCE(s.target,'') <> ''
+				   AND s.target_type='token'
+				   AND s.module_id=m.module_id
+				   AND s.created_at < now() - interval '2 minutes'
+				   AND NOT EXISTS (SELECT 1 FROM arvis_stream_processing p WHERE p.stream_event_id=s.id)
+				 ORDER BY s.created_at ASC
+				 LIMIT $1)
+			) AS u
+		), eligible AS (
+			SELECT id,target,signature,network,slot,program_id,module_id,created_at,bucket,queue_time FROM retry
+			UNION ALL
+			SELECT id,target,signature,network,slot,program_id,module_id,created_at,bucket,queue_time FROM unclaimed
 		), ranked AS (
 			SELECT eligible.*,
 			       row_number() OVER (
