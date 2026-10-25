@@ -146,7 +146,7 @@ const exact=new Map(Object.entries({
   'Zaten hesabınız var mı?':'Already have an account?',
   'Hesap oturumunu aç. Derin ARVIS araçları için girişten sonra Phantom cüzdanını doğrula ve KOSCH holder durumunu kontrol et.':'Open your account session to manage your Koschei SaaS entitlement and access features included in your active plan. Token holdings and wallet balances do not unlock paid access.',
   'Hesap oturumunu aç. Ücretli ARVIS araçları aktif Koschei SaaS aboneliğine göre açılır.':'Continue to the customer security command center and your account-scoped intelligence workspace.',
-  'Hesap ücretsiz oluşturulur. Public Safe Check açıktır; derin ürün erişimi doğrulanmış KOSCH bakiyesiyle açılır.':'Account creation is free. Public Safe Check remains open; paid product features unlock through an active SaaS entitlement after Paddle checkout.',
+  'Hesap ücretsiz oluşturulur. Public Safe Check açıktır; derin ürün erişimi doğrulanmış KOSCH bakiyesiyle açılır.':'Account creation is free. Public Safe Check remains open; paid product features unlock through an active SaaS entitlement after Polar checkout.',
   'Hesap ücretsiz oluşturulur. Public Safe Check açıktır; ücretli özellikler yalnızca aktif Koschei SaaS aboneliğiyle açılır.':'Create an account for the Koschei Web3 customer workspace. Paid capabilities remain server-authoritative SaaS entitlements.',
   '✓ Ücretsiz hesap için kart bilgisi gerekmez':'✓ No payment method is required to create an account',
   '✓ Ücretli planlar standart SaaS aboneliği olarak yönetilir':'✓ Paid plans are managed as standard SaaS entitlements',
@@ -173,7 +173,7 @@ function translateText(value){
       .replace(/^Giriş Yap\s*[—-]\s*/,'Sign In — ')
       .replace(/^Hesap Oluştur\s*[—-]\s*/,'Create Account — ')
       .replace(/Koschei ARVIS hesabınıza Neon Auth ile giriş yapın; derin araçlar doğrulanmış KOSCH holder access gerektirir\./g,'Sign in to Koschei ARVIS with Neon Auth. Paid features require an active SaaS entitlement.')
-      .replace(/Koschei ARVIS hesabınızı Neon Auth ile oluşturun; derin araçlar doğrulanmış KOSCH holder access ile açılır\./g,'Create a Koschei ARVIS account with Neon Auth. Paid features unlock after verified Paddle billing.');
+      .replace(/Koschei ARVIS hesabınızı Neon Auth ile oluşturun; derin araçlar doğrulanmış KOSCH holder access ile açılır\./g,'Create a Koschei ARVIS account with Neon Auth. Paid features unlock after verified Polar billing.');
   }
   if(translated===trimmed&&translated===source)return source;
   const leading=source.match(/^\s*/)?.[0]||'';

@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'koschei/api/public/pricing.html'
+      - 'koschei/api/public/privacy.html'
+      - 'koschei/api/public/refund-policy.html'
       - 'koschei/api/public/css/pricing-policy-v2.css'
       - 'koschei/api/scripts/verify-pricing-policy-v2.js'
       - '.github/workflows/pricing-policy-v2.yml'

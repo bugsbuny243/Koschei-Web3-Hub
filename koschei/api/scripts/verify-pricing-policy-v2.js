@@ -8,6 +8,8 @@ const universe=fs.readFileSync(path.join(root,'public','css','koschei.css'),'utf
 const planAccess=fs.readFileSync(path.join(root,'internal','handlers','plan_access.go'),'utf8');
 const premiumAccess=fs.readFileSync(path.join(root,'internal','handlers','premium_access_status.go'),'utf8');
 const checkoutGate=fs.readFileSync(path.join(root,'internal','handlers','polar_checkout_gate.go'),'utf8');
+const privacy=fs.readFileSync(path.join(root,'public','privacy.html'),'utf8');
+const refundPolicy=fs.readFileSync(path.join(root,'public','refund-policy.html'),'utf8');
 
 function requireText(source,needle,label){if(!source.includes(needle))throw new Error(`${label}: missing ${needle}`);}
 function forbid(source,pattern,label){if(pattern.test(source))throw new Error(`${label}: forbidden pattern ${pattern}`);}
@@ -40,6 +42,11 @@ forbid(html,/paddle/i,'retired Paddle billing surface');
 forbid(html,/data-koschei-checkout/i,'retired browser checkout action');
 forbid(html,/<script(?![^>]*\bsrc=)[^>]*>/i,'inline runtime script');
 forbid(html,/\son[a-z]+\s*=/i,'inline event handler');
+
+requireText(privacy,'Paid checkout is processed by Polar as Merchant of Record.','privacy billing processor');
+requireText(refundPolicy,'<strong>Polar is Merchant of Record.</strong>','refund policy billing processor');
+forbid(privacy,/paddle/i,'retired Paddle billing processor in privacy policy');
+forbid(refundPolicy,/paddle/i,'retired Paddle billing processor in refund policy');
 
 requireText(checkoutGate,'KOSCHEI_COMMERCIAL_CHECKOUT_ENABLED','server readiness flag');
 requireText(checkoutGate,'h.PolarCheckout(w, r)','Polar checkout delegation');
