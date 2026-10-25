@@ -249,7 +249,7 @@ jobs:
       - name: Verify ARVIS stream canonical job scheduling claims on PostgreSQL 17
         env:
           KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_ci?sslmode=disable
-        run: go test -v ./internal/services -run '^TestArvisStreamCanonicalSchedulingPostgres17$' -count=1
+        run: go test -v ./internal/services -run '^(TestArvisStreamCanonicalSchedulingPostgres17|TestArvisStreamPendingTargetsMatchesLegacyQueryPostgres17)$' -count=1
       - name: Test
         run: |
           set -o pipefail
