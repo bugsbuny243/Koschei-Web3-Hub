@@ -129,14 +129,7 @@ func (h *Handler) OwnerOperationsStatus(w http.ResponseWriter, r *http.Request) 
 			"status":    serviceStatus(tokenTelemetryAvailable, "available", "unavailable"),
 			"authority": "audit_only",
 		},
-		"polar_billing": map[string]any{
-			"status": serviceStatus(
-				envSet("POLAR_ACCESS_TOKEN") && envSet("POLAR_WEBHOOK_SECRET") && envSet("POLAR_PRODUCT_PROFESSIONAL_ID"),
-				"configured",
-				"incomplete",
-			),
-			"provider": "polar",
-		},
+		"polar_billing":   ownerPolarBillingStatus(ctx, entitlementDB),
 		"visual_renderer": map[string]any{"status": "ready", "mode": "client_canvas_png"},
 		"owner_assistant": map[string]any{
 			"status":       serviceStatus(ownerAIProviderConfigured(), "configured", "not_configured"),

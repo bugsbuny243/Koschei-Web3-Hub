@@ -163,3 +163,41 @@ func TestSwapV2DeprecatedPriceImpactPctFallbackUsesLegacyRatioUnits(t *testing.T
 		t.Fatalf("deprecated ratio fallback=%v want 1.25", quote.AdverseImpactPct)
 	}
 }
+
+// Jupiter returns fractional split percentages (for example 11.93 / 88.07).
+// Decoding them into integers failed the whole quote and dropped exit-liquidity
+// evidence from production investigations.
+func TestJupiterSplitRoutePercentagesMayBeFractional(t *testing.T) {
+	ammKey := jupiterV2AdapterTestAMMKey()
+	split := []any{
+		map[string]any{"swapInfo": map[string]any{"ammKey": ammKey, "label": "PumpSwap"}, "percent": 11.93, "bps": 1193, "usdValue": 11.93},
+		map[string]any{"swapInfo": map[string]any{"ammKey": ammKey, "label": "Meteora DLMM"}, "percent": 88.07, "bps": 8807, "usdValue": 88.07},
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"outAmount": "1000", "priceImpact": -0.4, "priceImpactPct": "0.004", "contextSlot": 461256126,
+			"transaction": nil, "routePlan": split,
+		})
+	}))
+	defer server.Close()
+
+	order, err := requestJupiterV2QuoteOnlyOrder(context.Background(), server.Client(), server.URL+"/order?inputMint=a&outputMint=b&amount=1&swapMode=ExactIn")
+	if err != nil {
+		t.Fatalf("swap v2 order with a fractional split was rejected: %v", err)
+	}
+	legacy, err := requestExitLiquidityQuote(context.Background(), server.Client(), server.URL+"/quote")
+	if err != nil {
+		t.Fatalf("metis quote with a fractional split was rejected: %v", err)
+	}
+	for name, plan := range map[string][]float64{
+		"swap_v2_order":  {order.RoutePlan[0].Percent, order.RoutePlan[1].Percent},
+		"metis_v1_quote": {normalizeExitLiquidityRoutePlan(legacy.RoutePlan)[0].Percent, normalizeExitLiquidityRoutePlan(legacy.RoutePlan)[1].Percent},
+	} {
+		if plan[0] != 11.93 || plan[1] != 88.07 {
+			t.Fatalf("%s route split = %v, want [11.93 88.07]", name, plan)
+		}
+	}
+	if order.RoutePlan[0].BPS != 1193 {
+		t.Fatalf("swap v2 bps = %v, want 1193", order.RoutePlan[0].BPS)
+	}
+}

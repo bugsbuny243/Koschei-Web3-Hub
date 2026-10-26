@@ -34,8 +34,13 @@ type arvisTransactionEvidence struct {
 	RaydiumRelated        bool
 	PumpRelated           bool
 	ComputeBudgetRelated  bool
-	JitoRelated           bool
-	Errors                []string
+	// TransactionConfigPriority marks a v1 transaction whose
+	// message.transactionConfig sets a priority fee or compute-unit limit;
+	// v1 carries these there instead of Compute Budget instructions.
+	TransactionConfigPriority bool
+	TransactionVersion        string
+	JitoRelated               bool
+	Errors                    []string
 }
 
 func AnalyzeArvisRadarsWithTransactions(req SecurityRadarRequest) ArvisAnalysis {
@@ -158,6 +163,10 @@ func parseArvisTransactionMap(tx map[string]any, out *arvisTransactionEvidence) 
 	meta := asRadarMap(tx["meta"])
 	out.FeeLamports = radarInt64(meta["fee"])
 	out.ComputeUnits = radarInt64(meta["computeUnitsConsumed"])
+	out.TransactionVersion = solanaTransactionVersionLabel(tx["version"])
+	if config := asRadarMap(message["transactionConfig"]); len(config) > 0 {
+		out.TransactionConfigPriority = radarInt64(config["priorityFee"]) > 0 || radarInt64(config["computeUnitLimit"]) > 0
+	}
 
 	keysRaw, _ := message["accountKeys"].([]any)
 	for _, raw := range keysRaw {
@@ -263,6 +272,19 @@ func parseArvisTransactionMap(tx map[string]any, out *arvisTransactionEvidence) 
 	}
 }
 
+// solanaTransactionVersionLabel normalizes getTransaction's version field:
+// "legacy" for legacy messages, otherwise the numeric version (0 or 1).
+func solanaTransactionVersionLabel(raw any) string {
+	switch value := raw.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case float64:
+		return strconv.FormatInt(int64(value), 10)
+	default:
+		return ""
+	}
+}
+
 func parseInstructionList(raw any, out *arvisTransactionEvidence, programSet, typeSet, mintSet map[string]bool) {
 	instructions, ok := raw.([]any)
 	if !ok {
@@ -356,11 +378,12 @@ func tokenBalanceTotals(raw any, mintSet map[string]bool) map[string]float64 {
 }
 
 func buildTransactionMEVArm(req SecurityRadarRequest, tx arvisTransactionEvidence, generatedAt string) SecurityRadarVerdict {
-	if !tx.Available || (!looksLikeSolanaSignature(req.Target) && !tx.ComputeBudgetRelated && !tx.JitoRelated) {
+	priorityConfigured := tx.ComputeBudgetRelated || tx.TransactionConfigPriority
+	if !tx.Available || (!looksLikeSolanaSignature(req.Target) && !priorityConfigured && !tx.JitoRelated) {
 		return unavailableArm("MEV Shield", ModuleMEVShield, req, generatedAt, "A parsed transaction with priority-fee or bundle evidence is required.")
 	}
 	risk := 8
-	if tx.ComputeBudgetRelated {
+	if priorityConfigured {
 		risk += 12
 	}
 	if tx.FeeLamports >= 1_000_000 {
@@ -386,9 +409,11 @@ func buildTransactionMEVArm(req SecurityRadarRequest, tx arvisTransactionEvidenc
 	s["fee_lamports"] = tx.FeeLamports
 	s["compute_units"] = tx.ComputeUnits
 	s["compute_budget_program"] = tx.ComputeBudgetRelated
+	s["transaction_config_priority"] = tx.TransactionConfigPriority
+	s["transaction_version"] = tx.TransactionVersion
 	s["jito_related"] = tx.JitoRelated
 	s["scope_note"] = "priority and route exposure; slippage-specific sandwich simulation requires swap inputs"
-	e := []string{fmt.Sprintf("Transaction fee: %d lamports; compute units: %d.", tx.FeeLamports, tx.ComputeUnits), fmt.Sprintf("Compute Budget program present: %t; Jito-related log evidence: %t.", tx.ComputeBudgetRelated, tx.JitoRelated), "This arm measures transaction priority and route exposure; it does not claim a confirmed sandwich attack without swap and slippage inputs."}
+	e := []string{fmt.Sprintf("Transaction fee: %d lamports; compute units: %d.", tx.FeeLamports, tx.ComputeUnits), fmt.Sprintf("Compute Budget program present: %t; v1 transactionConfig priority/compute settings: %t; Jito-related log evidence: %t.", tx.ComputeBudgetRelated, tx.TransactionConfigPriority, tx.JitoRelated), "This arm measures transaction priority and route exposure; it does not claim a confirmed sandwich attack without swap and slippage inputs."}
 	return evidenceArm("MEV Shield", ModuleMEVShield, req, risk, s, e, generatedAt)
 }
 
@@ -515,6 +540,9 @@ func classifyTransactionIntent(tx arvisTransactionEvidence) (string, []string) {
 	if tx.ComputeBudgetRelated {
 		reasons = append(reasons, "Compute Budget program observed")
 	}
+	if tx.TransactionConfigPriority {
+		reasons = append(reasons, "v1 transactionConfig priority/compute settings observed")
+	}
 	if tx.JitoRelated {
 		reasons = append(reasons, "Jito or bundle log evidence observed")
 	}
@@ -545,7 +573,7 @@ func classifyTransactionIntent(tx arvisTransactionEvidence) (string, []string) {
 		return "trade_or_swap", reasons
 	case hasInstructionContaining(tx.InstructionTypes, "transfer") || len(nonZeroTokenBalanceChanges(tx.TokenBalanceChanges)) > 0 || len(nonZeroLamportDeltas(tx.LamportDeltas)) > 0:
 		return "asset_transfer", reasons
-	case tx.ComputeBudgetRelated || tx.JitoRelated:
+	case tx.ComputeBudgetRelated || tx.TransactionConfigPriority || tx.JitoRelated:
 		return "priority_or_bundle_routing", reasons
 	default:
 		return "program_interaction", reasons

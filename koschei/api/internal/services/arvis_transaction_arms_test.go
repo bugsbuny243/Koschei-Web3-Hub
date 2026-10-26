@@ -123,3 +123,69 @@ func TestTransactionIntentProgramArmClassifiesParsedIntent(t *testing.T) {
 		t.Fatalf("missing evidence-only scope note: %#v", arm.Signals)
 	}
 }
+
+// A v1 transaction (SIMD-0385) has every account inline, no
+// addressTableLookups, and its priority fee and compute-unit limit in
+// message.transactionConfig instead of Compute Budget instructions. Reading it
+// as "no priority settings" would understate MEV exposure.
+func TestParseArvisTransactionEvidenceReadsV1TransactionConfig(t *testing.T) {
+	trader := "11111111111111111111111111111111"
+	pool := "22222222222222222222222222222222"
+	mint := "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"
+	tx := map[string]any{
+		"slot":      float64(461256126),
+		"blockTime": float64(1793000000),
+		"version":   float64(1),
+		"transaction": map[string]any{
+			"message": map[string]any{
+				"accountKeys": []any{
+					map[string]any{"pubkey": trader, "signer": true, "writable": true, "source": "transaction"},
+					map[string]any{"pubkey": pool, "signer": false, "writable": true, "source": "transaction"},
+				},
+				"instructions": []any{
+					map[string]any{"programId": defaultPumpProgramID, "parsed": map[string]any{"type": "buy", "info": map[string]any{"mint": mint}}},
+				},
+				"transactionConfig": map[string]any{
+					"priorityFee": float64(250000), "computeUnitLimit": float64(200000),
+					"loadedAccountsDataSizeLimit": float64(65536), "heapSize": float64(32768),
+				},
+			},
+		},
+		"meta": map[string]any{
+			"fee":                  float64(255000),
+			"computeUnitsConsumed": float64(180000),
+			"preBalances":          []any{float64(2_000_000), float64(0)},
+			"postBalances":         []any{float64(1_745_000), float64(0)},
+			"loadedAddresses":      map[string]any{"readonly": []any{}, "writable": []any{}},
+			"logMessages":          []any{"Program log: Instruction: Buy"},
+		},
+	}
+	var evidence arvisTransactionEvidence
+	evidence.TokenBalanceChanges = map[string]float64{}
+	evidence.LamportDeltas = map[string]int64{}
+	parseArvisTransactionMap(tx, &evidence)
+
+	if evidence.TransactionVersion != "1" || !evidence.TransactionConfigPriority || evidence.ComputeBudgetRelated {
+		t.Fatalf("v1 transactionConfig not read as priority settings: version=%q config=%t computeBudget=%t",
+			evidence.TransactionVersion, evidence.TransactionConfigPriority, evidence.ComputeBudgetRelated)
+	}
+	if len(evidence.AccountKeys) != 2 || len(evidence.Signers) != 1 || evidence.Signers[0] != trader {
+		t.Fatalf("inline v1 account keys not parsed: %#v", evidence.AccountKeys)
+	}
+	evidence.Available = true
+	evidence.Signature = "v1-fixture-signature"
+	arm := buildTransactionMEVArm(SecurityRadarRequest{Target: mint, Network: "solana-mainnet"}, evidence, time.Now().UTC().Format(time.RFC3339))
+	if arm.Signals["transaction_config_priority"] != true || arm.Signals["transaction_version"] != "1" {
+		t.Fatalf("MEV arm withheld v1 priority evidence: %#v", arm.Signals)
+	}
+	if kind, _ := classifyTransactionIntent(evidence); kind == "" {
+		t.Fatal("v1 transaction intent was not classified")
+	}
+
+	legacy := map[string]any{"version": "legacy", "transaction": map[string]any{"message": map[string]any{}}, "meta": map[string]any{}}
+	var legacyEvidence arvisTransactionEvidence
+	parseArvisTransactionMap(legacy, &legacyEvidence)
+	if legacyEvidence.TransactionVersion != "legacy" || legacyEvidence.TransactionConfigPriority {
+		t.Fatalf("legacy transaction misread: %#v", legacyEvidence)
+	}
+}

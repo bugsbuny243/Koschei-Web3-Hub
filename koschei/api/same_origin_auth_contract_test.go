@@ -31,7 +31,7 @@ func TestAuthPresentationInstallsSameOriginEmailContract(t *testing.T) {
 }
 
 func TestAuthPresentationCacheVersionIsBumped(t *testing.T) {
-	if !strings.Contains(authEnglishOverlayScript, "english-auth-presentation.js?v=4") {
+	if !strings.Contains(authEnglishOverlayScript, "english-auth-presentation.js?v=5") {
 		t.Fatalf("auth presentation script was not cache-busted: %s", authEnglishOverlayScript)
 	}
 }

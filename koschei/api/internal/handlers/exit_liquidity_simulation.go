@@ -189,7 +189,7 @@ type exitLiquidityQuoteResponse struct {
 			AMMKey string `json:"ammKey"`
 			Label  string `json:"label"`
 		} `json:"swapInfo"`
-		Percent int `json:"percent"`
+		Percent float64 `json:"percent"`
 	} `json:"routePlan"`
 }
 
