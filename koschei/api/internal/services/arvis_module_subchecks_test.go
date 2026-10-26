@@ -115,3 +115,23 @@ func TestArvisSubchecksCountObservedLiquidityMovementsAsPerformed(t *testing.T) 
 		t.Fatalf("a failed movement collection must stay unknown, got %q", got)
 	}
 }
+
+// Fresh scans carry the funding analyses as typed structs; stored reports carry
+// them as JSON maps. Both must prove the funding checks, and only when available.
+func TestArvisSubchecksReadTypedAndStoredFundingAnalyses(t *testing.T) {
+	arm := func(cluster, recurrence any) ArvisModuleSubchecks {
+		return arvisModuleSubchecks(SecurityRadarVerdict{ModuleID: ModuleFundingClusterDetector, EvidenceVerified: true, Evidence: []string{"ci fixture evidence"}, Signals: map[string]any{
+			"execution_status": ArvisExecutionCompleted, "real_onchain_evidence": true,
+			"holder_cluster_analysis": cluster, "funding_recurrence": recurrence,
+		}}, ArvisExecutionCompleted)
+	}
+	if got := arm(HolderClusterAnalysis{Available: true}, FundingRecurrenceAnalysis{Available: true}); got.RequiredChecksStatus != "passed" || got.Checks["funding_recurrence"] != "performed" {
+		t.Fatalf("typed analyses not read: %#v", got)
+	}
+	if got := arm(map[string]any{"available": true}, map[string]any{"available": true}); got.RequiredChecksStatus != "passed" {
+		t.Fatalf("stored analyses not read: %#v", got)
+	}
+	if got := arm(HolderClusterAnalysis{Available: false}, map[string]any{"available": false, "status": "unavailable"}); got.RequiredChecksStatus != "unknown" || got.Checks["funding_recurrence"] != "unknown" {
+		t.Fatalf("unavailable analyses must not prove a check: %#v", got)
+	}
+}

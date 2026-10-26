@@ -180,11 +180,9 @@ func arvisSubcheckProven(signals map[string]any, check string) bool {
 	case "holder_role_resolution":
 		return arvisSignalBool(signals, "holder_role_adjusted")
 	case "holder_funding_edges", "holder_funding_clusters", "funding_cluster_links":
-		cluster, _ := signals["holder_cluster_analysis"].(map[string]any)
-		return len(cluster) > 0
+		return arvisAnalysisAvailable(signals["holder_cluster_analysis"])
 	case "funding_recurrence":
-		recurrence, _ := signals["funding_recurrence"].(map[string]any)
-		return len(recurrence) > 0
+		return arvisAnalysisAvailable(signals["funding_recurrence"])
 	case "creator_relation_evidence":
 		return arvisSignalBool(signals, "creator_relation_verified")
 	case "launch_trade_history":
@@ -193,6 +191,26 @@ func arvisSubcheckProven(signals map[string]any, check string) bool {
 		return positive("launch_slot")
 	case "persistent_actor_memory_lookup":
 		return arvisSignalBool(signals, "persistent_actor_index")
+	default:
+		return false
+	}
+}
+
+// arvisAnalysisAvailable reads the availability flag of a funding analysis,
+// which fresh scans carry as a typed struct and stored reports as a map.
+func arvisAnalysisAvailable(value any) bool {
+	switch analysis := value.(type) {
+	case HolderClusterAnalysis:
+		return analysis.Available
+	case *HolderClusterAnalysis:
+		return analysis != nil && analysis.Available
+	case FundingRecurrenceAnalysis:
+		return analysis.Available
+	case *FundingRecurrenceAnalysis:
+		return analysis != nil && analysis.Available
+	case map[string]any:
+		available, _ := analysis["available"].(bool)
+		return available
 	default:
 		return false
 	}
