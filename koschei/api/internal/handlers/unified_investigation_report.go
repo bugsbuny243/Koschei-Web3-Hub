@@ -416,9 +416,12 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	evidenceReferences = applyLPControlEvidenceReferences(evidenceReferences, core.LPControl)
 	evidenceReferences = applyMarketProgramEvidenceReferences(evidenceReferences, core)
 
+	serialLaunchShadow := evaluateSerialLaunchShadowRule(target, externalDiscovery.CreatorOutcomeHistory)
 	report := map[string]any{
 		"ok": true, "schema_version": unifiedInvestigationSchemaVersion,
-		"target": target, "network": network, "generated_at": now.Format(time.RFC3339),
+		// Shadow rules sit beside the signed verdict and never alter it.
+		"shadow_rules": []serialLaunchShadowRule{serialLaunchShadow},
+		"target":       target, "network": network, "generated_at": now.Format(time.RFC3339),
 		"analysis_scope": "token_plus_actor_plus_market_behavior",
 		"final_verdict":  unifiedVerdict, "threat_anticipation": threat,
 		"investigation_coverage": coverage, "holder_distribution": core.Distribution,
