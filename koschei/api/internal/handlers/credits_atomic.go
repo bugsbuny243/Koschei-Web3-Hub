@@ -140,12 +140,14 @@ func (h *Handler) hasActivePaidPackage(authSubject, email string) (bool, error) 
 	if err != nil {
 		return false, err
 	}
-	return evaluation.Active && planTierAuthorizes(evaluation.Plan, "starter"), nil
+	return evaluation.Active && planTierAuthorizes(evaluation.Plan, "professional"), nil
 }
 
 // Existing premium handlers may still perform an internal preflight in addition
 // to the route-level SaaS gate. Keep that compatibility check entitlement-backed
-// so it can never reintroduce KOSCH holder authorization.
+// so it can never reintroduce KOSCH holder authorization. It must require the
+// same Professional tier as the route gate: removed tier labels rank zero, so
+// requiring one here refused every paying customer with 402.
 func (h *Handler) requirePremiumOutput(authSubject string, emails ...string) (int, error) {
 	if h == nil || h.entitlementStore() == nil {
 		return 0, errors.New("entitlement store unavailable")
@@ -158,7 +160,7 @@ func (h *Handler) requirePremiumOutput(authSubject string, emails ...string) (in
 	if err != nil {
 		return 0, err
 	}
-	if !evaluation.Active || !planTierAuthorizes(evaluation.Plan, "starter") || evaluation.OutputsRemaining <= 0 {
+	if !evaluation.Active || !planTierAuthorizes(evaluation.Plan, "professional") || evaluation.OutputsRemaining <= 0 {
 		return 0, errors.New("active package output required")
 	}
 	return evaluation.OutputsRemaining, nil

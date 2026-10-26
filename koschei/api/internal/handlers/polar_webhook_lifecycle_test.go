@@ -138,6 +138,13 @@ func TestPolarWebhookSubscriptionLifecyclePostgres17(t *testing.T) {
 		h.RequirePlanTier("professional", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })(rec, req)
 		return rec.Code
 	}
+	// premiumPreflight is the handler-level check behind customer jobs, radar
+	// checks, graph and MEV routes; it must agree with the route gate.
+	premiumPreflight := func() bool {
+		t.Helper()
+		_, err := h.requirePremiumOutput(subject, email)
+		return err == nil
+	}
 	profilePlan := func() string {
 		t.Helper()
 		var plan string
@@ -147,7 +154,7 @@ func TestPolarWebhookSubscriptionLifecyclePostgres17(t *testing.T) {
 		return plan
 	}
 
-	if access().Active || professionalGate() != http.StatusForbidden {
+	if access().Active || professionalGate() != http.StatusForbidden || premiumPreflight() {
 		t.Fatal("a free profile must not hold Professional access before any payment")
 	}
 
@@ -178,7 +185,7 @@ func TestPolarWebhookSubscriptionLifecyclePostgres17(t *testing.T) {
 	if !got.Active || got.Plan != "professional" || got.PaymentProvider != "polar" || got.ExpiresAt == nil || !got.ExpiresAt.Equal(firstPeriodEnd) {
 		t.Fatalf("Professional access after activation = %+v, want active until %s", got, firstPeriodEnd)
 	}
-	if professionalGate() != http.StatusOK || profilePlan() != "professional" {
+	if professionalGate() != http.StatusOK || !premiumPreflight() || profilePlan() != "professional" {
 		t.Fatal("an active Polar subscription must open the Professional gate and profile plan")
 	}
 
@@ -227,7 +234,7 @@ func TestPolarWebhookSubscriptionLifecyclePostgres17(t *testing.T) {
 	if revoked["entitlement_revoked"] != true || revoked["profile_plan"] != "free" {
 		t.Fatalf("subscription.revoked did not end Professional access: %v", revoked)
 	}
-	if access().Active || professionalGate() != http.StatusForbidden || profilePlan() != "free" {
+	if access().Active || professionalGate() != http.StatusForbidden || premiumPreflight() || profilePlan() != "free" {
 		t.Fatal("a revoked subscription must close the Professional gate and reset the profile plan")
 	}
 
