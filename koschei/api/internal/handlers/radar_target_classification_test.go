@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/binary"
 	"strings"
@@ -120,4 +121,24 @@ func loaderStateData(state uint32) []any {
 	data := make([]byte, 4)
 	binary.LittleEndian.PutUint32(data, state)
 	return []any{base64.StdEncoding.EncodeToString(data), "base64"}
+}
+
+// A malformed key (here a valid mint with its first 14 characters pasted twice)
+// must be rejected before any RPC lookup, so an owner sees an input error rather
+// than an unavailable service.
+func TestClassifyRadarTargetRejectsMalformedAddressLocally(t *testing.T) {
+	t.Setenv("SOLANA_RPC_URL", "")
+	valid := "AdgZULsSbgvopxu9Avv53F8dtrZasPpEdXXZUAdWTdyT"
+	for _, target := range []string{"AdgZULsSbgvopx" + valid, valid[:30], valid + "0", "not-a-solana-address"} {
+		got := classifyRadarTarget(context.Background(), target)
+		if got.Status != radarTargetStatusInvalidAddress || got.Type != radarTargetUnknown {
+			t.Fatalf("classifyRadarTarget(%q) = %+v, want invalid_address with unknown type", target, got)
+		}
+		if ownerUnifiedRadarRoute(got) != "classification_gap" {
+			t.Fatalf("malformed target %q was routed to a scan", target)
+		}
+	}
+	if got := classifyRadarTarget(context.Background(), valid); got.Status == radarTargetStatusInvalidAddress {
+		t.Fatalf("valid mint rejected as malformed: %+v", got)
+	}
 }

@@ -85,6 +85,14 @@ func (h *Handler) OwnerUnifiedRadarScan(w http.ResponseWriter, r *http.Request) 
 	case "program_artifact":
 		h.ownerUnifiedProgramArtifactRadar(w, target, network, classification)
 	default:
+		if classification.Status == radarTargetStatusInvalidAddress {
+			writeJSON(w, http.StatusBadRequest, map[string]any{
+				"ok": false, "error": "invalid_solana_address", "target": target,
+				"network": network, "target_classification": classification,
+				"message": "Girilen değer geçerli bir Solana adresi değil (base58, 32 bayt). Fazla, eksik veya tekrarlanmış karakter olup olmadığını kontrol edin.",
+			})
+			return
+		}
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
 			"ok": false, "error": "target_classification_unavailable", "target": target,
 			"network": network, "target_classification": classification,
