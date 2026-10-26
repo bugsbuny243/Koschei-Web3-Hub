@@ -255,10 +255,7 @@ func (h *Handler) OwnerRadarScan(w http.ResponseWriter, r *http.Request) {
 	}
 	classification := classifyRadarTarget(r.Context(), target)
 	if !radarTargetTokenVerdictAllowed(classification) {
-		statusCode := http.StatusUnprocessableEntity
-		if classification.Type == radarTargetUnknown {
-			statusCode = http.StatusServiceUnavailable
-		}
+		statusCode := radarTargetRejectionStatus(classification)
 		writeJSON(w, statusCode, map[string]any{
 			"ok": false, "error": "token_mint_required", "charged": false,
 			"target": target, "network": network, "target_classification": classification,

@@ -61,7 +61,10 @@ type LaunchActorProfile struct {
 	Source                  string    `json:"source,omitempty"`
 	WindowExhausted         bool      `json:"window_exhausted,omitempty"`
 	SignaturesFetched       int       `json:"signatures_fetched,omitempty"`
-	TransactionsParsed      int       `json:"transactions_parsed,omitempty"`
+	// SuccessfulSignatures counts fetched signatures that did not fail; only
+	// those can change token ownership and are parsed.
+	SuccessfulSignatures int `json:"successful_signatures,omitempty"`
+	TransactionsParsed   int `json:"transactions_parsed,omitempty"`
 }
 
 type LaunchTimelineEntry struct {

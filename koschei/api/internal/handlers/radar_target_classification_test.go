@@ -142,3 +142,19 @@ func TestClassifyRadarTargetRejectsMalformedAddressLocally(t *testing.T) {
 		t.Fatalf("valid mint rejected as malformed: %+v", got)
 	}
 }
+
+func TestRadarTargetRejectionStatusSeparatesInputErrorsFromUnavailableEvidence(t *testing.T) {
+	malformed := classifyRadarTarget(context.Background(), "AdgZULsSbgvopxAdgZULsSbgvopxu9Avv53F8dtrZasPpEdXXZUAdWTdyT")
+	if got := radarTargetRejectionStatus(malformed); got != 400 {
+		t.Fatalf("malformed address status = %d, want 400", got)
+	}
+	if !strings.Contains(radarTargetRejectionMessage(malformed), "geçerli bir Solana adresi değil") {
+		t.Fatalf("malformed address message = %q", radarTargetRejectionMessage(malformed))
+	}
+	if got := radarTargetRejectionStatus(radarTargetClassification{Type: radarTargetUnknown, Status: "lookup_failed"}); got != 503 {
+		t.Fatalf("unverified target status = %d, want 503", got)
+	}
+	if got := radarTargetRejectionStatus(radarTargetClassification{Type: radarTargetWallet, Status: "verified_rpc_observation"}); got != 422 {
+		t.Fatalf("wallet target status = %d, want 422", got)
+	}
+}

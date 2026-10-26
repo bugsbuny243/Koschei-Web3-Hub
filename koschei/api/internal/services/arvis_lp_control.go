@@ -127,6 +127,7 @@ func lpControlPoolArm(req SecurityRadarRequest, lp LPControlEvidence, generatedA
 		"locker_account":                 lp.LockerAccount,
 		"locked_until":                   lp.LockedUntil,
 		"movement_status":                lp.MovementStatus,
+		"vault_balances_read":            lp.TokenVaultRead && lp.QuoteVaultRead,
 		"liquidity_movement_count":       len(lp.LiquidityMovements),
 		"liquidity_movement_signatures":  movementSignatures,
 		"liquidity_movement_slots":       movementSlots,

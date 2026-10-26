@@ -15,25 +15,29 @@ const (
 // LPControlEvidence is informational evidence only. It cannot issue a grade and
 // never infers intent from LP ownership alone.
 type LPControlEvidence struct {
-	Available                   bool                         `json:"available"`
-	Status                      string                       `json:"status"`
-	ReasonCode                  string                       `json:"reason_code,omitempty"`
-	PoolAddress                 string                       `json:"pool_address,omitempty"`
-	PoolProgram                 string                       `json:"pool_program,omitempty"`
-	PoolType                    string                       `json:"pool_type,omitempty"`
-	ControlModel                string                       `json:"control_model,omitempty"`
-	PositionModel               string                       `json:"position_model,omitempty"`
-	PoolCreator                 string                       `json:"pool_creator,omitempty"`
-	CreatorWallet               string                       `json:"creator_wallet,omitempty"`
-	CanonicalPool               bool                         `json:"canonical_pool"`
-	TokenMint                   string                       `json:"token_mint,omitempty"`
-	QuoteMint                   string                       `json:"quote_mint,omitempty"`
-	LPMint                      string                       `json:"lp_mint,omitempty"`
-	TokenVault                  string                       `json:"token_vault,omitempty"`
-	QuoteVault                  string                       `json:"quote_vault,omitempty"`
-	ReadSlot                    uint64                       `json:"read_slot,omitempty"`
-	TokenReserve                float64                      `json:"token_reserve,omitempty"`
-	QuoteReserve                float64                      `json:"quote_reserve,omitempty"`
+	Available     bool    `json:"available"`
+	Status        string  `json:"status"`
+	ReasonCode    string  `json:"reason_code,omitempty"`
+	PoolAddress   string  `json:"pool_address,omitempty"`
+	PoolProgram   string  `json:"pool_program,omitempty"`
+	PoolType      string  `json:"pool_type,omitempty"`
+	ControlModel  string  `json:"control_model,omitempty"`
+	PositionModel string  `json:"position_model,omitempty"`
+	PoolCreator   string  `json:"pool_creator,omitempty"`
+	CreatorWallet string  `json:"creator_wallet,omitempty"`
+	CanonicalPool bool    `json:"canonical_pool"`
+	TokenMint     string  `json:"token_mint,omitempty"`
+	QuoteMint     string  `json:"quote_mint,omitempty"`
+	LPMint        string  `json:"lp_mint,omitempty"`
+	TokenVault    string  `json:"token_vault,omitempty"`
+	QuoteVault    string  `json:"quote_vault,omitempty"`
+	ReadSlot      uint64  `json:"read_slot,omitempty"`
+	TokenReserve  float64 `json:"token_reserve,omitempty"`
+	QuoteReserve  float64 `json:"quote_reserve,omitempty"`
+	// TokenVaultRead and QuoteVaultRead record that the vault balance RPCs
+	// succeeded, so a zero reserve is a read result rather than a failed read.
+	TokenVaultRead              bool                         `json:"token_vault_read,omitempty"`
+	QuoteVaultRead              bool                         `json:"quote_vault_read,omitempty"`
 	VirtualQuoteReserve         float64                      `json:"virtual_quote_reserve,omitempty"`
 	EffectiveQuoteReserve       float64                      `json:"effective_quote_reserve,omitempty"`
 	ReserveLiquidityUSD         float64                      `json:"reserve_liquidity_usd,omitempty"`

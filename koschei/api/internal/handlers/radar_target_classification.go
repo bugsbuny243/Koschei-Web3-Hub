@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -140,7 +141,25 @@ func radarTargetTokenVerdictAllowed(classification radarTargetClassification) bo
 	return classification.Type == radarTargetTokenMint && classification.Status == "verified_rpc_observation"
 }
 
+// radarTargetRejectionStatus maps a target that cannot receive a token verdict
+// to an HTTP status: a malformed address is the caller's input error (400), an
+// unverified target type is unavailable evidence (503), and any other verified
+// type is the wrong kind of target (422).
+func radarTargetRejectionStatus(classification radarTargetClassification) int {
+	switch {
+	case classification.Status == radarTargetStatusInvalidAddress:
+		return http.StatusBadRequest
+	case classification.Type == radarTargetUnknown:
+		return http.StatusServiceUnavailable
+	default:
+		return http.StatusUnprocessableEntity
+	}
+}
+
 func radarTargetRejectionMessage(classification radarTargetClassification) string {
+	if classification.Status == radarTargetStatusInvalidAddress {
+		return "Girilen değer geçerli bir Solana adresi değil (base58, 32 bayt). Fazla, eksik veya tekrarlanmış karakter olup olmadığını kontrol edin."
+	}
 	switch classification.Type {
 	case radarTargetTokenAccount:
 		if classification.TokenOwnerWallet != "" {

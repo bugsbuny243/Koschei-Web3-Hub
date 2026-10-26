@@ -196,6 +196,7 @@ func populatePositionPoolReserves(ctx context.Context, rpc solanaRPCCall, networ
 	var tokenReserve, quoteReserve rpcTokenBalanceResponse
 	if err := rpc(ctx, network, "getTokenAccountBalance", []any{out.TokenVault, map[string]any{"commitment": "confirmed"}}, &tokenReserve); err == nil {
 		out.TokenReserve = tokenReserve.Value.number()
+		out.TokenVaultRead = true
 		if tokenReserve.Context.Slot > out.ReadSlot {
 			out.ReadSlot = tokenReserve.Context.Slot
 		}
@@ -204,6 +205,7 @@ func populatePositionPoolReserves(ctx context.Context, rpc solanaRPCCall, networ
 	}
 	if err := rpc(ctx, network, "getTokenAccountBalance", []any{out.QuoteVault, map[string]any{"commitment": "confirmed"}}, &quoteReserve); err == nil {
 		out.QuoteReserve = quoteReserve.Value.number()
+		out.QuoteVaultRead = true
 		out.EffectiveQuoteReserve = out.QuoteReserve
 		if quoteReserve.Context.Slot > out.ReadSlot {
 			out.ReadSlot = quoteReserve.Context.Slot

@@ -264,6 +264,7 @@ func analyzeLaunchOwnerATA(ctx context.Context, rpcURL, mint string, candidate l
 			signatures = append(signatures, signature)
 		}
 	}
+	successfulSignatures := len(signatures)
 	sort.SliceStable(signatures, func(i, j int) bool {
 		if signatures[i].BlockTime != nil && signatures[j].BlockTime != nil && *signatures[i].BlockTime != *signatures[j].BlockTime {
 			return *signatures[i].BlockTime < *signatures[j].BlockTime
@@ -335,6 +336,7 @@ func analyzeLaunchOwnerATA(ctx context.Context, rpcURL, mint string, candidate l
 	profile.Source = "ata_history"
 	profile.WindowExhausted = base.WindowExhausted
 	profile.SignaturesFetched = base.SignaturesFetched
+	profile.SuccessfulSignatures = successfulSignatures
 	profile.TransactionsParsed = base.TransactionsParsed
 	profile.FundingStatus = "not_checked"
 	profile.Evidence = append(profile.Evidence, base.Evidence...)

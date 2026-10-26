@@ -124,10 +124,7 @@ func (h *Handler) SecurityRadarCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	if !radarTargetTokenVerdictAllowed(classification) {
 		services.WriteSecurityAuditEvent(r.Context(), h.DB, securityAuditFromRequest(r, "radar_check_wrong_target_type", "customer", "warning", map[string]any{"network": input.Network, "target": target, "target_type": classification.Type}))
-		statusCode := http.StatusUnprocessableEntity
-		if classification.Type == radarTargetUnknown {
-			statusCode = http.StatusServiceUnavailable
-		}
+		statusCode := radarTargetRejectionStatus(classification)
 		writeJSON(w, statusCode, map[string]any{"ok": false, "error": "token_mint_required", "message": radarTargetRejectionMessage(classification), "target": target, "target_classification": classification, "charged": false, "final_verdict": map[string]any{"risk_index": nil, "risk_level": "unknown", "signed": false, "recommendation": classification.Type + "_intelligence_required"}})
 		return
 	}
@@ -173,10 +170,7 @@ func (h *Handler) SecurityRiskBadge(w http.ResponseWriter, r *http.Request) {
 	}
 	classification := classifyRadarTarget(r.Context(), address)
 	if !radarTargetTokenVerdictAllowed(classification) {
-		statusCode := http.StatusUnprocessableEntity
-		if classification.Type == radarTargetUnknown {
-			statusCode = http.StatusServiceUnavailable
-		}
+		statusCode := radarTargetRejectionStatus(classification)
 		writeJSON(w, statusCode, map[string]any{"ok": false, "error": "token_mint_required", "message": radarTargetRejectionMessage(classification), "address": address, "target_classification": classification, "risk_index": nil, "risk_level": "unknown", "signed": false})
 		return
 	}
