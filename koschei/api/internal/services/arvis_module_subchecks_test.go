@@ -74,6 +74,7 @@ func TestArvisSubchecksReportPerformedChecksFromArmSignalsOnly(t *testing.T) {
 
 	liquidity := arvisModuleSubchecks(verifiedArm(ModuleLiquidityMovement, map[string]any{
 		"canonical_pool": true, "pool_program": "ci-fixture-pool-program", "effective_quote_reserve": 27.3, "lp_lock_status": "unverified",
+		"reserve_snapshot_verified": true,
 	}), ArvisExecutionCompleted)
 	if liquidity.RequiredChecksStatus != "partial" || liquidity.RequiredChecksPassed || liquidity.Checks["lp_control_evidence"] != "unknown" {
 		t.Fatalf("unverified LP control must leave the module partial: %#v", liquidity)
@@ -81,9 +82,20 @@ func TestArvisSubchecksReportPerformedChecksFromArmSignalsOnly(t *testing.T) {
 
 	deadline := arvisModuleSubchecks(verifiedArm(ModuleHolderConcentration, map[string]any{
 		"largest_accounts": 20, "holder_role_adjusted": true, "evidence_status": "partial_rpc_evidence_deadline",
+		"rpc_errors": []string{"STAGE_DEADLINE_EXCEEDED stage=largest_accounts"},
 	}), ArvisExecutionCompleted)
-	if deadline.RequiredChecksStatus != "unknown" || deadline.Checks["token_largest_accounts"] != "performed_partial" {
-		t.Fatalf("checks cut short by a deadline must not count as performed: %#v", deadline)
+	if deadline.RequiredChecksStatus != "partial" || deadline.Checks["token_largest_accounts"] != "performed_partial" || deadline.Checks["holder_role_resolution"] != "performed" {
+		t.Fatalf("only the check whose stage hit its deadline is partial: %#v", deadline)
+	}
+
+	// The profile is shared, so a holder-cluster deadline is copied into every
+	// profile-backed arm; it must not downgrade the authority checks.
+	unrelated := arvisModuleSubchecks(verifiedArm(ModuleTokenAuthorityScanner, map[string]any{
+		"account_owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "mint_authority_present": false, "freeze_authority_present": false,
+		"evidence_status": "partial_rpc_evidence_deadline", "rpc_errors": []any{"STAGE_DEADLINE_EXCEEDED stage=holder_cluster"},
+	}), ArvisExecutionCompleted)
+	if unrelated.RequiredChecksStatus != "passed" || unrelated.Checks["mint_account_observation"] != "performed" {
+		t.Fatalf("an unrelated stage deadline must not downgrade completed checks: %#v", unrelated)
 	}
 
 	pending := arvisModuleSubchecks(SecurityRadarVerdict{ModuleID: ModuleTokenAuthorityScanner, Signals: map[string]any{
@@ -133,5 +145,39 @@ func TestArvisSubchecksReadTypedAndStoredFundingAnalyses(t *testing.T) {
 	}
 	if got := arm(HolderClusterAnalysis{Available: false}, map[string]any{"available": false, "status": "unavailable"}); got.RequiredChecksStatus != "unknown" || got.Checks["funding_recurrence"] != "unknown" {
 		t.Fatalf("unavailable analyses must not prove a check: %#v", got)
+	}
+}
+
+// A drained pool still had its reserves read, and a role scan that found
+// nothing to exclude still resolved roles; both checks ran.
+func TestArvisSubchecksSeparateTheCheckFromItsResult(t *testing.T) {
+	arm := func(moduleID string, signals map[string]any) ArvisModuleSubchecks {
+		signals["execution_status"] = ArvisExecutionCompleted
+		signals["real_onchain_evidence"] = true
+		return arvisModuleSubchecks(SecurityRadarVerdict{ModuleID: moduleID, EvidenceVerified: true, Evidence: []string{"ci fixture evidence"}, Signals: signals}, ArvisExecutionCompleted)
+	}
+	drained := arm(ModuleRaydiumPoolGuardian, map[string]any{
+		"canonical_pool": true, "pool_program": "ci-fixture-pool-program", "effective_quote_reserve": 0,
+		"reserve_snapshot_verified": true, "read_slot": 461256126, "token_vault": "ci-token-vault", "quote_vault": "ci-quote-vault",
+	})
+	if drained.Checks["pool_reserves"] != "performed" || drained.RequiredChecksStatus != "passed" {
+		t.Fatalf("a verified zero-reserve read is a performed check: %#v", drained)
+	}
+	if noRead := arm(ModuleRaydiumPoolGuardian, map[string]any{"canonical_pool": true, "pool_program": "ci-fixture-pool-program"}); noRead.Checks["pool_reserves"] != "unknown" {
+		t.Fatalf("without a reserve read the check stays unknown: %#v", noRead)
+	}
+
+	plain := arm(ModuleHolderConcentration, map[string]any{
+		"largest_accounts": 20, "holder_role_adjusted": false,
+		"holder_role_analysis": HolderRoleAnalysis{Available: true, Status: "verified_role_resolution"},
+	})
+	if plain.Checks["holder_role_resolution"] != "performed" || plain.RequiredChecksStatus != "passed" {
+		t.Fatalf("role resolution with nothing to exclude still ran: %#v", plain)
+	}
+	gap := arm(ModuleHolderConcentration, map[string]any{
+		"largest_accounts": 20, "holder_role_analysis": map[string]any{"available": true, "blocking_evidence_gap": true},
+	})
+	if gap.Checks["holder_role_resolution"] != "unknown" {
+		t.Fatalf("a role analysis with a blocking evidence gap proves nothing: %#v", gap)
 	}
 }

@@ -103,12 +103,12 @@ func arvisModuleSubchecks(arm SecurityRadarVerdict, status string) ArvisModuleSu
 	}
 	out.Checks = map[string]string{}
 	passedRequired := 0
-	partialEvidence := arvisSubcheckEvidencePartial(arm.Signals)
+	deadlineStages := arvisSubcheckDeadlineStages(arm.Signals)
 	for _, check := range append(append([]string{}, definition.required...), definition.optional...) {
 		out.Checks[check] = "unknown"
 		if status == ArvisExecutionCompleted && verified && arvisSubcheckProven(arm.Signals, check) {
 			out.Checks[check] = "performed"
-			if partialEvidence {
+			if deadlineStages[arvisSubcheckStage[check]] {
 				out.Checks[check] = "performed_partial"
 			}
 		}
@@ -141,15 +141,41 @@ func arvisModuleSubchecks(arm SecurityRadarVerdict, status string) ArvisModuleSu
 	return out
 }
 
-// arvisSubcheckEvidencePartial reports an arm whose collector stopped early,
-// for example at a stage deadline; its checks ran but did not finish.
-func arvisSubcheckEvidencePartial(signals map[string]any) bool {
-	for _, key := range []string{"evidence_status", "data_quality"} {
-		if strings.Contains(strings.ToLower(strings.TrimSpace(anyString(signals[key]))), "partial") {
-			return true
+// arvisSubcheckStage names the collector stage each check depends on. The
+// evidence profile is shared by several arms, so only a deadline recorded for
+// a check's own stage marks that check partial.
+var arvisSubcheckStage = map[string]string{
+	"mint_account_observation":  "account",
+	"mint_and_freeze_authority": "account",
+	"account_program_owner":     "account",
+	"token_largest_accounts":    "largest_accounts",
+	"holder_role_resolution":    "holder_roles",
+	"token_signature_history":   "signatures",
+	"holder_funding_edges":      "holder_cluster",
+	"holder_funding_clusters":   "holder_cluster",
+	"funding_cluster_links":     "holder_cluster",
+	"funding_recurrence":        "holder_cluster",
+}
+
+// arvisSubcheckDeadlineStages returns the stages whose collector recorded
+// a STAGE_DEADLINE_EXCEEDED marker in the arm's rpc_errors.
+func arvisSubcheckDeadlineStages(signals map[string]any) map[string]bool {
+	stages := map[string]bool{}
+	var errs []string
+	switch value := signals["rpc_errors"].(type) {
+	case []string:
+		errs = value
+	case []any:
+		for _, item := range value {
+			errs = append(errs, anyString(item))
 		}
 	}
-	return false
+	for _, item := range errs {
+		if _, stage, ok := strings.Cut(item, "STAGE_DEADLINE_EXCEEDED stage="); ok {
+			stages[strings.TrimSpace(strings.Fields(stage + " ")[0])] = true
+		}
+	}
+	return stages
 }
 
 // arvisSubcheckProven names, per check, the arm signal that proves it was
@@ -164,7 +190,9 @@ func arvisSubcheckProven(signals map[string]any, check string) bool {
 	case "pump_program_relation", "pool_program_relation":
 		return arvisSignalBool(signals, "program_relation_observed") || (arvisSignalBool(signals, "canonical_pool") && text("pool_program") != "")
 	case "pool_reserves", "pool_reserve_evidence":
-		return arvisSignalBool(signals, "canonical_pool") && positive("effective_quote_reserve")
+		// A reserve read is the check; a drained (zero) reserve is its result.
+		return arvisSignalBool(signals, "reserve_snapshot_verified") ||
+			(positive("read_slot") && text("token_vault") != "" && text("quote_vault") != "")
 	case "lp_control_evidence":
 		status := strings.ToLower(text("lp_lock_status"))
 		return status != "" && status != "unverified" && status != "unknown"
@@ -178,7 +206,8 @@ func arvisSubcheckProven(signals map[string]any, check string) bool {
 	case "token_largest_accounts":
 		return positive("largest_accounts")
 	case "holder_role_resolution":
-		return arvisSignalBool(signals, "holder_role_adjusted")
+		// Resolution completes even when no protocol or burn balance needed excluding.
+		return arvisSignalBool(signals, "holder_role_adjusted") || arvisAnalysisAvailable(signals["holder_role_analysis"])
 	case "holder_funding_edges", "holder_funding_clusters", "funding_cluster_links":
 		return arvisAnalysisAvailable(signals["holder_cluster_analysis"])
 	case "funding_recurrence":
@@ -204,13 +233,18 @@ func arvisAnalysisAvailable(value any) bool {
 		return analysis.Available
 	case *HolderClusterAnalysis:
 		return analysis != nil && analysis.Available
+	case HolderRoleAnalysis:
+		return analysis.Available && !analysis.BlockingEvidenceGap
+	case *HolderRoleAnalysis:
+		return analysis != nil && analysis.Available && !analysis.BlockingEvidenceGap
 	case FundingRecurrenceAnalysis:
 		return analysis.Available
 	case *FundingRecurrenceAnalysis:
 		return analysis != nil && analysis.Available
 	case map[string]any:
 		available, _ := analysis["available"].(bool)
-		return available
+		gap, _ := analysis["blocking_evidence_gap"].(bool)
+		return available && !gap
 	default:
 		return false
 	}
