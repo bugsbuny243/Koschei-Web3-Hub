@@ -275,20 +275,29 @@ func arvisLaunchRecipientProfiles(signals map[string]any) (complete bool, ok boo
 		return false, false
 	}
 	// A profile is complete only when its ATA history reached its start and
-	// every fetched signature was parsed; pagination alone does not prove the
-	// earliest acquisition transaction was decoded.
+	// every successful (non-failed) signature was parsed; pagination alone
+	// does not prove the earliest acquisition transaction was decoded.
 	exhausted := []bool{}
 	switch profiles := signals["profiles"].(type) {
 	case []LaunchActorProfile:
 		for _, profile := range profiles {
-			exhausted = append(exhausted, profile.WindowExhausted && profile.SignaturesFetched > 0 && profile.TransactionsParsed >= profile.SignaturesFetched)
+			eligible := profile.SuccessfulSignatures
+			if eligible == 0 {
+				eligible = profile.SignaturesFetched
+			}
+			exhausted = append(exhausted, profile.WindowExhausted && eligible > 0 && profile.TransactionsParsed >= eligible)
 		}
 	case []any:
 		for _, item := range profiles {
 			profile, _ := item.(map[string]any)
 			done, _ := profile["window_exhausted"].(bool)
-			fetched, parsed := radarFloat(profile["signatures_fetched"]), radarFloat(profile["transactions_parsed"])
-			exhausted = append(exhausted, done && fetched > 0 && parsed >= fetched)
+			eligible, parsed := radarFloat(profile["successful_signatures"]), radarFloat(profile["transactions_parsed"])
+			if eligible == 0 {
+				// Profiles stored before failed signatures were counted fall
+				// back to every fetched signature, which can only understate.
+				eligible = radarFloat(profile["signatures_fetched"])
+			}
+			exhausted = append(exhausted, done && eligible > 0 && parsed >= eligible)
 		}
 	}
 	if len(exhausted) == 0 {

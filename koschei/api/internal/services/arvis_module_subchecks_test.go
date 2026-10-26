@@ -244,4 +244,16 @@ func TestArvisSubchecksRequireProducerCompletionEvidence(t *testing.T) {
 	if unparsed.Checks["mint_specific_initial_recipients"] != "performed_partial" {
 		t.Fatalf("pagination without parsing every signature must stay partial: %#v", unparsed)
 	}
+
+	// A failed signature cannot change token ownership and is never parsed.
+	withFailed := arm(ModuleLaunchDistribution, map[string]any{"ata_only_policy": true, "owners_with_trade_history": 1,
+		"profiles": []LaunchActorProfile{{WindowExhausted: true, SignaturesFetched: 5, SuccessfulSignatures: 4, TransactionsParsed: 4}}})
+	if withFailed.Checks["mint_specific_initial_recipients"] != "performed" {
+		t.Fatalf("every successful signature parsed is a complete analysis: %#v", withFailed)
+	}
+	stored := arm(ModuleLaunchDistribution, map[string]any{"ata_only_policy": true, "owners_with_trade_history": 1,
+		"profiles": []any{map[string]any{"window_exhausted": true, "signatures_fetched": 5, "successful_signatures": 4, "transactions_parsed": 4}}})
+	if stored.Checks["mint_specific_initial_recipients"] != "performed" {
+		t.Fatalf("stored profiles must use the successful signature count: %#v", stored)
+	}
 }
