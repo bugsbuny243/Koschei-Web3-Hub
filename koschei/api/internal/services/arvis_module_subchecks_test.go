@@ -181,3 +181,38 @@ func TestArvisSubchecksSeparateTheCheckFromItsResult(t *testing.T) {
 		t.Fatalf("a role analysis with a blocking evidence gap proves nothing: %#v", gap)
 	}
 }
+
+// Timing evidence comes from launch forensics (launch_slot) or from the base
+// collector (an exhausted mint signature history or synchronized holders);
+// recipient analysis is complete only when every owner's ATA history reached
+// its start.
+func TestArvisSubchecksRecognizeTimingAndRecipientCollectors(t *testing.T) {
+	arm := func(moduleID string, signals map[string]any) ArvisModuleSubchecks {
+		signals["execution_status"] = ArvisExecutionCompleted
+		signals["real_onchain_evidence"] = true
+		return arvisModuleSubchecks(SecurityRadarVerdict{ModuleID: moduleID, EvidenceVerified: true, Evidence: []string{"ci fixture evidence"}, Signals: signals}, ArvisExecutionCompleted)
+	}
+	for _, signals := range []map[string]any{
+		{"launch_slot": 447298339},
+		{"mint_signature_history_exhausted": true, "recent_signature_count": 12},
+		{"synchronized_wallet_count": 0, "synchronization_slot_spread": 0},
+	} {
+		if got := arm(ModuleSniperTimingDetector, signals).Checks["launch_signature_timing"]; got != "performed" {
+			t.Fatalf("timing collector %v: launch_signature_timing = %q", signals, got)
+		}
+	}
+
+	complete := arm(ModuleLaunchDistribution, map[string]any{"ata_only_policy": true, "owners_with_trade_history": 2,
+		"profiles": []LaunchActorProfile{{WindowExhausted: true}, {WindowExhausted: true}}})
+	if complete.Checks["mint_specific_initial_recipients"] != "performed" || complete.RequiredChecksStatus != "passed" {
+		t.Fatalf("exhausted recipient histories must prove the check: %#v", complete)
+	}
+	bounded := arm(ModuleLaunchDistribution, map[string]any{"ata_only_policy": true, "owners_with_trade_history": 2,
+		"profiles": []any{map[string]any{"window_exhausted": true}, map[string]any{"window_exhausted": false}}})
+	if bounded.Checks["mint_specific_initial_recipients"] != "performed_partial" || bounded.RequiredChecksStatus != "partial" {
+		t.Fatalf("a bounded recipient history is partial, not first recipients: %#v", bounded)
+	}
+	if none := arm(ModuleLaunchDistribution, map[string]any{"owners_with_trade_history": 2}); none.Checks["mint_specific_initial_recipients"] != "unknown" {
+		t.Fatalf("without recipient profiles the check stays unknown: %#v", none)
+	}
+}

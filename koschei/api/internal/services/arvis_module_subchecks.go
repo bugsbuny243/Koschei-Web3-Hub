@@ -111,6 +111,12 @@ func arvisModuleSubchecks(arm SecurityRadarVerdict, status string) ArvisModuleSu
 			if deadlineStages[arvisSubcheckStage[check]] {
 				out.Checks[check] = "performed_partial"
 			}
+		} else if check == "mint_specific_initial_recipients" && status == ArvisExecutionCompleted && verified {
+			// Recipients were analysed but some owner's ATA history did not
+			// reach its start, so first recipients are not asserted.
+			if _, ok := arvisLaunchRecipientProfiles(arm.Signals); ok && arvisSignalBool(arm.Signals, "ata_only_policy") {
+				out.Checks[check] = "performed_partial"
+			}
 		}
 	}
 	for _, check := range definition.required {
@@ -217,7 +223,13 @@ func arvisSubcheckProven(signals map[string]any, check string) bool {
 	case "launch_trade_history":
 		return positive("owners_with_trade_history")
 	case "launch_signature_timing":
-		return positive("launch_slot")
+		// Launch forensics emits the launch slot; the base timing collector
+		// emits an exhausted mint signature history or synchronized holders.
+		return positive("launch_slot") || arvisSignalBool(signals, "mint_signature_history_exhausted") ||
+			arvisSignalPresent(signals, "synchronized_wallet_count")
+	case "mint_specific_initial_recipients":
+		complete, ok := arvisLaunchRecipientProfiles(signals)
+		return ok && complete
 	case "persistent_actor_memory_lookup":
 		return arvisSignalBool(signals, "persistent_actor_index")
 	default:
@@ -248,4 +260,35 @@ func arvisAnalysisAvailable(value any) bool {
 	default:
 		return false
 	}
+}
+
+// arvisLaunchRecipientProfiles reports whether mint-specific recipient
+// profiles exist (ok) and whether every profile's ATA history window reached
+// its start (complete). Fresh scans carry typed profiles, stored reports maps.
+func arvisLaunchRecipientProfiles(signals map[string]any) (complete bool, ok bool) {
+	if !arvisSignalBool(signals, "ata_only_policy") {
+		return false, false
+	}
+	exhausted := []bool{}
+	switch profiles := signals["profiles"].(type) {
+	case []LaunchActorProfile:
+		for _, profile := range profiles {
+			exhausted = append(exhausted, profile.WindowExhausted)
+		}
+	case []any:
+		for _, item := range profiles {
+			profile, _ := item.(map[string]any)
+			done, _ := profile["window_exhausted"].(bool)
+			exhausted = append(exhausted, done)
+		}
+	}
+	if len(exhausted) == 0 {
+		return false, false
+	}
+	for _, done := range exhausted {
+		if !done {
+			return false, true
+		}
+	}
+	return true, true
 }
