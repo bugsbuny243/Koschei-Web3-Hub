@@ -95,7 +95,7 @@ func TestPumpSwapCollectorDecodesCanonicalPoolAndVirtualReserve(t *testing.T) {
 	if got.Status != services.LPControlVerifiedBurned || got.BurnedSharePct != 90 {
 		t.Fatalf("control=%#v", got)
 	}
-	if got.VirtualQuoteReserve != 5 || got.EffectiveQuoteReserve != 105 {
+	if got.VirtualQuoteReserve != 5 || got.EffectiveQuoteReserve != 105 || !got.TokenVaultRead || !got.QuoteVaultRead {
 		t.Fatalf("virtual reserve=%#v", got)
 	}
 }
@@ -196,7 +196,7 @@ func TestMeteoraDLMMCollectorDecodesPinnedBytemuckMintAndVaultOffsets(t *testing
 	if got.TokenVault != reserveX || got.QuoteVault != reserveY || got.QuoteMint != quoteMint {
 		t.Fatalf("vaults=%#v", got)
 	}
-	if got.TokenReserve != 7000 || got.QuoteReserve != 350 {
+	if got.TokenReserve != 7000 || got.QuoteReserve != 350 || !got.TokenVaultRead || !got.QuoteVaultRead {
 		t.Fatalf("reserves=%#v", got)
 	}
 }

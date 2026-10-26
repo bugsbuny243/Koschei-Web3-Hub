@@ -74,7 +74,7 @@ func TestArvisSubchecksReportPerformedChecksFromArmSignalsOnly(t *testing.T) {
 
 	liquidity := arvisModuleSubchecks(verifiedArm(ModuleLiquidityMovement, map[string]any{
 		"canonical_pool": true, "pool_program": "ci-fixture-pool-program", "effective_quote_reserve": 27.3, "lp_lock_status": "unverified",
-		"reserve_snapshot_verified": true,
+		"vault_balances_read": true,
 	}), ArvisExecutionCompleted)
 	if liquidity.RequiredChecksStatus != "partial" || liquidity.RequiredChecksPassed || liquidity.Checks["lp_control_evidence"] != "unknown" {
 		t.Fatalf("unverified LP control must leave the module partial: %#v", liquidity)
@@ -158,12 +158,16 @@ func TestArvisSubchecksSeparateTheCheckFromItsResult(t *testing.T) {
 	}
 	drained := arm(ModuleRaydiumPoolGuardian, map[string]any{
 		"canonical_pool": true, "pool_program": "ci-fixture-pool-program", "effective_quote_reserve": 0,
-		"reserve_snapshot_verified": true, "read_slot": 461256126, "token_vault": "ci-token-vault", "quote_vault": "ci-quote-vault",
+		"vault_balances_read": true, "read_slot": 461256126, "token_vault": "ci-token-vault", "quote_vault": "ci-quote-vault",
 	})
 	if drained.Checks["pool_reserves"] != "performed" || drained.RequiredChecksStatus != "passed" {
 		t.Fatalf("a verified zero-reserve read is a performed check: %#v", drained)
 	}
-	if noRead := arm(ModuleRaydiumPoolGuardian, map[string]any{"canonical_pool": true, "pool_program": "ci-fixture-pool-program"}); noRead.Checks["pool_reserves"] != "unknown" {
+	// A decoded pool whose vault balance RPC failed still has a read slot and
+	// vault addresses; that is not a reserve read.
+	if noRead := arm(ModuleRaydiumPoolGuardian, map[string]any{"canonical_pool": true, "pool_program": "ci-fixture-pool-program",
+		"reserve_snapshot_verified": true, "read_slot": 461256126, "token_vault": "ci-token-vault", "quote_vault": "ci-quote-vault",
+		"vault_balances_read": false}); noRead.Checks["pool_reserves"] != "unknown" {
 		t.Fatalf("without a reserve read the check stays unknown: %#v", noRead)
 	}
 
@@ -203,16 +207,41 @@ func TestArvisSubchecksRecognizeTimingAndRecipientCollectors(t *testing.T) {
 	}
 
 	complete := arm(ModuleLaunchDistribution, map[string]any{"ata_only_policy": true, "owners_with_trade_history": 2,
-		"profiles": []LaunchActorProfile{{WindowExhausted: true}, {WindowExhausted: true}}})
+		"profiles": []LaunchActorProfile{{WindowExhausted: true, SignaturesFetched: 5, TransactionsParsed: 5}, {WindowExhausted: true, SignaturesFetched: 2, TransactionsParsed: 2}}})
 	if complete.Checks["mint_specific_initial_recipients"] != "performed" || complete.RequiredChecksStatus != "passed" {
 		t.Fatalf("exhausted recipient histories must prove the check: %#v", complete)
 	}
 	bounded := arm(ModuleLaunchDistribution, map[string]any{"ata_only_policy": true, "owners_with_trade_history": 2,
-		"profiles": []any{map[string]any{"window_exhausted": true}, map[string]any{"window_exhausted": false}}})
+		"profiles": []any{map[string]any{"window_exhausted": true, "signatures_fetched": 5, "transactions_parsed": 5}, map[string]any{"window_exhausted": false, "signatures_fetched": 5, "transactions_parsed": 5}}})
 	if bounded.Checks["mint_specific_initial_recipients"] != "performed_partial" || bounded.RequiredChecksStatus != "partial" {
 		t.Fatalf("a bounded recipient history is partial, not first recipients: %#v", bounded)
 	}
 	if none := arm(ModuleLaunchDistribution, map[string]any{"owners_with_trade_history": 2}); none.Checks["mint_specific_initial_recipients"] != "unknown" {
 		t.Fatalf("without recipient profiles the check stays unknown: %#v", none)
+	}
+}
+
+func TestArvisSubchecksRequireProducerCompletionEvidence(t *testing.T) {
+	arm := func(moduleID string, signals map[string]any) ArvisModuleSubchecks {
+		signals["execution_status"] = ArvisExecutionCompleted
+		signals["real_onchain_evidence"] = true
+		return arvisModuleSubchecks(SecurityRadarVerdict{ModuleID: moduleID, EvidenceVerified: true, Evidence: []string{"ci fixture evidence"}, Signals: signals}, ArvisExecutionCompleted)
+	}
+	if got := arm(ModulePumpSybilRadar, map[string]any{"program_relation_verified": true}).Checks["pump_program_relation"]; got != "performed" {
+		t.Fatalf("a transaction-verified program relation must prove the check, got %q", got)
+	}
+
+	parsedURL := arm(ModuleClaimSurfaceRisk, map[string]any{"evidence_status": "verified_parsed_url", "url_host": "claim.example.invalid", "url_scheme": "https"})
+	if parsedURL.Checks["claim_url_or_domain"] != "performed" || parsedURL.RequiredChecksStatus != "passed" {
+		t.Fatalf("a parsed claim URL must prove the check: %#v", parsedURL)
+	}
+	if onchain := arm(ModuleClaimSurfaceRisk, map[string]any{"evidence_status": "verified_rpc_observation", "scope": "top_token_holder_owner_programs"}); onchain.Checks["claim_url_or_domain"] != "unknown" {
+		t.Fatalf("on-chain distributor discovery does not inspect a URL: %#v", onchain)
+	}
+
+	unparsed := arm(ModuleLaunchDistribution, map[string]any{"ata_only_policy": true, "owners_with_trade_history": 1,
+		"profiles": []LaunchActorProfile{{WindowExhausted: true, SignaturesFetched: 9, TransactionsParsed: 4}}})
+	if unparsed.Checks["mint_specific_initial_recipients"] != "performed_partial" {
+		t.Fatalf("pagination without parsing every signature must stay partial: %#v", unparsed)
 	}
 }

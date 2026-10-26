@@ -194,11 +194,12 @@ func arvisSubcheckProven(signals map[string]any, check string) bool {
 	case "token_signature_history":
 		return positive("owners_with_trade_history") || positive("recent_signature_count")
 	case "pump_program_relation", "pool_program_relation":
-		return arvisSignalBool(signals, "program_relation_observed") || (arvisSignalBool(signals, "canonical_pool") && text("pool_program") != "")
+		return arvisSignalBool(signals, "program_relation_observed") || arvisSignalBool(signals, "program_relation_verified") ||
+			(arvisSignalBool(signals, "canonical_pool") && text("pool_program") != "")
 	case "pool_reserves", "pool_reserve_evidence":
-		// A reserve read is the check; a drained (zero) reserve is its result.
-		return arvisSignalBool(signals, "reserve_snapshot_verified") ||
-			(positive("read_slot") && text("token_vault") != "" && text("quote_vault") != "")
+		// Both vault balance reads succeeding is the check; a drained (zero)
+		// reserve is its result. A decoded pool with a failed read proves nothing.
+		return arvisSignalBool(signals, "vault_balances_read")
 	case "lp_control_evidence":
 		status := strings.ToLower(text("lp_lock_status"))
 		return status != "" && status != "unverified" && status != "unknown"
@@ -227,6 +228,10 @@ func arvisSubcheckProven(signals map[string]any, check string) bool {
 		// emits an exhausted mint signature history or synchronized holders.
 		return positive("launch_slot") || arvisSignalBool(signals, "mint_signature_history_exhausted") ||
 			arvisSignalPresent(signals, "synchronized_wallet_count")
+	case "claim_url_or_domain":
+		// Only an explicitly supplied URL that was parsed proves this check;
+		// on-chain distributor discovery does not inspect a URL.
+		return text("evidence_status") == "verified_parsed_url" && text("url_host") != ""
 	case "mint_specific_initial_recipients":
 		complete, ok := arvisLaunchRecipientProfiles(signals)
 		return ok && complete
@@ -269,17 +274,21 @@ func arvisLaunchRecipientProfiles(signals map[string]any) (complete bool, ok boo
 	if !arvisSignalBool(signals, "ata_only_policy") {
 		return false, false
 	}
+	// A profile is complete only when its ATA history reached its start and
+	// every fetched signature was parsed; pagination alone does not prove the
+	// earliest acquisition transaction was decoded.
 	exhausted := []bool{}
 	switch profiles := signals["profiles"].(type) {
 	case []LaunchActorProfile:
 		for _, profile := range profiles {
-			exhausted = append(exhausted, profile.WindowExhausted)
+			exhausted = append(exhausted, profile.WindowExhausted && profile.SignaturesFetched > 0 && profile.TransactionsParsed >= profile.SignaturesFetched)
 		}
 	case []any:
 		for _, item := range profiles {
 			profile, _ := item.(map[string]any)
 			done, _ := profile["window_exhausted"].(bool)
-			exhausted = append(exhausted, done)
+			fetched, parsed := radarFloat(profile["signatures_fetched"]), radarFloat(profile["transactions_parsed"])
+			exhausted = append(exhausted, done && fetched > 0 && parsed >= fetched)
 		}
 	}
 	if len(exhausted) == 0 {
