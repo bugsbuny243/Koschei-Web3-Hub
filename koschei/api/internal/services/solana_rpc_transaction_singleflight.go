@@ -15,9 +15,12 @@ import (
 var solanaTransactionFetchGroup singleflight.Group
 
 // SolanaMaxSupportedTransactionVersion is the maximum transaction version whose
-// evidence parsing ARVIS currently supports. Version 1 must not be advertised
-// until its transactionConfig resource and priority evidence is handled.
-const SolanaMaxSupportedTransactionVersion = 0
+// evidence parsing ARVIS supports. It is a ceiling, not a filter: legacy, v0
+// and v1 transactions are all returned. Version 1 (SIMD-0385, live on mainnet)
+// carries every account inline and moves compute/priority settings from
+// Compute Budget instructions into message.transactionConfig, which
+// parseArvisTransactionMap reads.
+const SolanaMaxSupportedTransactionVersion = 1
 
 // solanaGetTransactionJSONParsedSingleflight suppresses identical in-flight
 // transaction fetches before they consume the services RPC budget, local pacing

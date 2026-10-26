@@ -10,8 +10,8 @@ const ExitImpactVersion = "koschei-exit-impact-v3"
 type ExitLiquidityRouteStep struct {
 	AMMKey   string  `json:"amm_key,omitempty"`
 	Label    string  `json:"label,omitempty"`
-	Percent  int     `json:"percent,omitempty"`
-	BPS      int     `json:"bps,omitempty"`
+	Percent  float64 `json:"percent,omitempty"`
+	BPS      float64 `json:"bps,omitempty"`
 	USDValue float64 `json:"usd_value,omitempty"`
 }
 

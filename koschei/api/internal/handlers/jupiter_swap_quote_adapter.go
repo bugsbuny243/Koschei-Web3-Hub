@@ -142,8 +142,8 @@ type jupiterV2OrderResponse struct {
 			AMMKey string `json:"ammKey"`
 			Label  string `json:"label"`
 		} `json:"swapInfo"`
-		Percent  int     `json:"percent"`
-		BPS      int     `json:"bps"`
+		Percent  float64 `json:"percent"`
+		BPS      float64 `json:"bps"`
 		USDValue float64 `json:"usdValue"`
 	} `json:"routePlan"`
 }
@@ -206,7 +206,7 @@ func normalizeExitLiquidityRoutePlan(plan []struct {
 		AMMKey string `json:"ammKey"`
 		Label  string `json:"label"`
 	} `json:"swapInfo"`
-	Percent int `json:"percent"`
+	Percent float64 `json:"percent"`
 }) []services.ExitLiquidityRouteStep {
 	out := make([]services.ExitLiquidityRouteStep, 0, len(plan))
 	for _, step := range plan {
