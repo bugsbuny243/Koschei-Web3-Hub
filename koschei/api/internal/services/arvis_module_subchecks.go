@@ -193,7 +193,12 @@ func arvisSubcheckProven(signals map[string]any, check string) bool {
 	switch check {
 	case "token_signature_history":
 		return positive("owners_with_trade_history") || positive("recent_signature_count")
-	case "pump_program_relation", "pool_program_relation":
+	case "pump_program_relation":
+		// A `pump` address suffix is only a hint; the owning program or a
+		// parsed transaction must link the mint to Pump.
+		return arvisSignalBool(signals, "program_relation_verified") ||
+			(arvisSignalBool(signals, "program_relation_observed") && text("program_relation_basis") == "account_owner")
+	case "pool_program_relation":
 		return arvisSignalBool(signals, "program_relation_observed") || arvisSignalBool(signals, "program_relation_verified") ||
 			(arvisSignalBool(signals, "canonical_pool") && text("pool_program") != "")
 	case "pool_reserves", "pool_reserve_evidence":

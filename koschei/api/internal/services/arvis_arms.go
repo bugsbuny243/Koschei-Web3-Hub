@@ -248,6 +248,14 @@ func pumpProgramRelationObserved(req SecurityRadarRequest, p radarEvidenceProfil
 	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(req.Target)), "pump")
 }
 
+func pumpProgramRelationBasis(p radarEvidenceProfile) string {
+	owner := strings.TrimSpace(p.AccountOwner)
+	if owner == defaultPumpProgramID || owner == defaultPumpSwapProgramID || owner == pumpBondingCurveProgramID || owner == pumpLiquidityProgramID {
+		return "account_owner"
+	}
+	return "mint_suffix_hint"
+}
+
 func raydiumProgramRelationObserved(p radarEvidenceProfile) bool {
 	return isKnownRaydiumProgram(p.AccountOwner)
 }
@@ -256,6 +264,9 @@ func buildPumpProgramArm(req SecurityRadarRequest, p radarEvidenceProfile, gener
 	s := armSignals(req, p, ModulePumpSybilRadar)
 	s["source_verified_program_event"] = arvisSourceModule(req.Mode) == ModulePumpSybilRadar
 	s["program_relation_observed"] = true
+	// The relation is verified only by the mint's owning program; a `pump`
+	// address suffix alone is an observed hint.
+	s["program_relation_basis"] = pumpProgramRelationBasis(p)
 	s["recent_signature_count"] = p.RecentSignatureCount
 	s["signature_window_seconds"] = p.SignatureWindowSeconds
 	s["failed_signature_count"] = p.FailedSignatureCount

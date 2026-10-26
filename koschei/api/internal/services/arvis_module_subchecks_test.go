@@ -230,6 +230,12 @@ func TestArvisSubchecksRequireProducerCompletionEvidence(t *testing.T) {
 	if got := arm(ModulePumpSybilRadar, map[string]any{"program_relation_verified": true}).Checks["pump_program_relation"]; got != "performed" {
 		t.Fatalf("a transaction-verified program relation must prove the check, got %q", got)
 	}
+	if got := arm(ModulePumpSybilRadar, map[string]any{"program_relation_observed": true, "program_relation_basis": "account_owner"}).Checks["pump_program_relation"]; got != "performed" {
+		t.Fatalf("a Pump-owned mint must prove the check, got %q", got)
+	}
+	if got := arm(ModulePumpSybilRadar, map[string]any{"program_relation_observed": true, "program_relation_basis": "mint_suffix_hint"}).Checks["pump_program_relation"]; got != "unknown" {
+		t.Fatalf("a pump address suffix alone must not prove the relation, got %q", got)
+	}
 
 	parsedURL := arm(ModuleClaimSurfaceRisk, map[string]any{"evidence_status": "verified_parsed_url", "url_host": "claim.example.invalid", "url_scheme": "https"})
 	if parsedURL.Checks["claim_url_or_domain"] != "performed" || parsedURL.RequiredChecksStatus != "passed" {
