@@ -56,3 +56,40 @@ func TestArvisModuleSubcheckContractReturnsIndependentSlices(t *testing.T) {
 		t.Fatal("module contract slices must not be shared")
 	}
 }
+
+func TestArvisSubchecksReportPerformedChecksFromArmSignalsOnly(t *testing.T) {
+	verifiedArm := func(moduleID string, signals map[string]any) SecurityRadarVerdict {
+		signals["execution_status"] = ArvisExecutionCompleted
+		signals["real_onchain_evidence"] = true
+		signals["verified_evidence"] = true
+		return SecurityRadarVerdict{ModuleID: moduleID, EvidenceVerified: true, Evidence: []string{"ci fixture evidence"}, Signals: signals}
+	}
+	authority := arvisModuleSubchecks(verifiedArm(ModuleTokenAuthorityScanner, map[string]any{
+		"account_owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "mint_authority_present": false, "freeze_authority_present": false,
+	}), ArvisExecutionCompleted)
+	if authority.RequiredChecksStatus != "passed" || !authority.RequiredChecksPassed ||
+		authority.Checks["mint_and_freeze_authority"] != "performed" || authority.Checks["token_2022_extensions"] != "unknown" {
+		t.Fatalf("authority checks = %#v", authority)
+	}
+
+	liquidity := arvisModuleSubchecks(verifiedArm(ModuleLiquidityMovement, map[string]any{
+		"canonical_pool": true, "pool_program": "ci-fixture-pool-program", "effective_quote_reserve": 27.3, "lp_lock_status": "unverified",
+	}), ArvisExecutionCompleted)
+	if liquidity.RequiredChecksStatus != "partial" || liquidity.RequiredChecksPassed || liquidity.Checks["lp_control_evidence"] != "unknown" {
+		t.Fatalf("unverified LP control must leave the module partial: %#v", liquidity)
+	}
+
+	deadline := arvisModuleSubchecks(verifiedArm(ModuleHolderConcentration, map[string]any{
+		"largest_accounts": 20, "holder_role_adjusted": true, "evidence_status": "partial_rpc_evidence_deadline",
+	}), ArvisExecutionCompleted)
+	if deadline.RequiredChecksStatus != "unknown" || deadline.Checks["token_largest_accounts"] != "performed_partial" {
+		t.Fatalf("checks cut short by a deadline must not count as performed: %#v", deadline)
+	}
+
+	pending := arvisModuleSubchecks(SecurityRadarVerdict{ModuleID: ModuleTokenAuthorityScanner, Signals: map[string]any{
+		"account_owner": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", "mint_authority_present": false, "freeze_authority_present": false,
+	}}, ArvisExecutionEvidencePending)
+	if pending.RequiredChecksStatus != "unknown" || pending.Checks["mint_account_observation"] != "unknown" {
+		t.Fatalf("an arm without verified completed evidence proves no check: %#v", pending)
+	}
+}
