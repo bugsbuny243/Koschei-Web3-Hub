@@ -138,7 +138,9 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	// wallet evidence and the existing mint-specific distribution investigator.
 	// Safe Check and stored-only projections remain network-call free.
 	if liveRequested && creator != "" {
-		externalDiscovery = h.collectActorExternalDiscovery(ctx, store, creator, network)
+		discoveryCtx, discoveryCancel := actorDiscoveryStageContext(ctx)
+		externalDiscovery = h.collectActorExternalDiscovery(discoveryCtx, store, creator, network)
+		discoveryCancel()
 		actorRun.Limitations = append(actorRun.Limitations, externalDiscovery.Limitations...)
 		actorRun.Limitations = append(actorRun.Limitations, creatorRelation.Limitations...)
 	}
@@ -414,9 +416,12 @@ func (h *Handler) assembleUnifiedInvestigationReportMode(ctx context.Context, co
 	evidenceReferences = applyLPControlEvidenceReferences(evidenceReferences, core.LPControl)
 	evidenceReferences = applyMarketProgramEvidenceReferences(evidenceReferences, core)
 
+	serialLaunchShadow := evaluateSerialLaunchShadowRule(target, externalDiscovery.CreatorOutcomeHistory)
 	report := map[string]any{
 		"ok": true, "schema_version": unifiedInvestigationSchemaVersion,
-		"target": target, "network": network, "generated_at": now.Format(time.RFC3339),
+		// Shadow rules sit beside the signed verdict and never alter it.
+		"shadow_rules": []serialLaunchShadowRule{serialLaunchShadow},
+		"target":       target, "network": network, "generated_at": now.Format(time.RFC3339),
 		"analysis_scope": "token_plus_actor_plus_market_behavior",
 		"final_verdict":  unifiedVerdict, "threat_anticipation": threat,
 		"investigation_coverage": coverage, "holder_distribution": core.Distribution,
@@ -578,4 +583,22 @@ func unifiedMintOwnerEvidenceProjection(source map[string]any) map[string]any {
 		return out
 	}
 	return mintOwnerProgramEvidence(owner)
+}
+
+// actorDiscoveryStageContext bounds creator discovery so it cannot spend the
+// whole request deadline. Creator history now verifies dozens of created mints;
+// without a reserve, funding origin and live wallet evidence, which run after
+// it on the same deadline, started already cancelled and returned nothing.
+func actorDiscoveryStageContext(parent context.Context) (context.Context, context.CancelFunc) {
+	deadline, ok := parent.Deadline()
+	if !ok {
+		return context.WithCancel(parent)
+	}
+	reserve := time.Duration(actorDefenseEnvInt("ARVIS_ACTOR_STAGE_RESERVE_SECONDS", 45, 0, 170)) * time.Second
+	remaining := time.Until(deadline)
+	budget := remaining - reserve
+	if budget < remaining/2 {
+		budget = remaining / 2
+	}
+	return context.WithTimeout(parent, budget)
 }

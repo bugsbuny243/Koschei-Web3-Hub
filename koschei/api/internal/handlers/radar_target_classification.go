@@ -21,6 +21,7 @@ const (
 	radarTargetProgramLoaderAccount = "program_loader_account"
 	radarTargetTransactionSignature = "transaction_signature"
 	radarTargetUnknown              = "unknown"
+	radarTargetStatusInvalidAddress = "invalid_address"
 	arvisUpgradeableLoaderID        = "BPFLoaderUpgradeab1e11111111111111111111111"
 )
 
@@ -44,6 +45,13 @@ func classifyRadarTarget(parent context.Context, target string) radarTargetClass
 	if target == "" {
 		out.Status = "empty_target"
 		out.Evidence = "Target is empty."
+		return out
+	}
+	if len(target) <= 60 && !isValidSolanaAddress(target) {
+		// Rejected locally: an RPC lookup of a malformed key only returns
+		// "WrongSize", which used to surface as an unavailable service.
+		out.Status = radarTargetStatusInvalidAddress
+		out.Evidence = "The supplied value is not a valid Solana address (a base58 32-byte public key). Check for duplicated, missing or extra characters."
 		return out
 	}
 	if len(target) > 60 {

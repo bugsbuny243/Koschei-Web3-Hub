@@ -135,9 +135,15 @@
     holder.innerHTML=`<article class="card"><div class="card-head"><div><span class="eyebrow">ACTOR INVESTIGATION</span><h2>${esc(short(actor.wallet,40))}</h2></div>${badge(obj(dossier.track).state||'observed')}</div></article>`;
   }
 
+  // Shadow rules are review-only: they sit beside the signed verdict and never change its grade.
+  function renderShadowRules(rules){
+    rules=arr(rules);if(!rules.length)return'';
+    return`<div class="card section-gap"><div class="card-head"><div><span class="eyebrow">Gölge kurallar · notu değiştirmez</span><h2>İnceleme için deneme kuralları</h2><p class="muted">Bu kurallar imzalı karara, nota ve kuyruğa girmez. Gerçek taramalarda doğrulandıktan sonra açık onayla devreye alınır.</p></div></div>${rules.map(rule=>{const ev=arr(rule.evidence);return`<details class="owner-details section-gap"${rule.triggered?' open':''}><summary><span><b>${esc(rule.rule_id)} · ${esc(rule.title)}</b><small>${esc(rule.summary)}</small></span><span class="badge ${rule.status==='not_triggered'?'ok':'warn'}">${esc(rule.status)}</span></summary><div class="metadata section-gap"><div><label>Doğrulanmış önceki token</label><b>${num(rule.verified_prior_tokens)}</b></div><div><label>İnaktif / bilinen</label><b>${num(rule.inactive_or_dead)} / ${num(rule.known_fate_tokens)}</b></div><div><label>1 saatte en fazla</label><b>${num(rule.max_launches_per_hour)}</b></div><div><label>İlk – son</label><b>${esc(rule.first_launch_at||'—')} – ${esc(rule.last_launch_at||'—')}</b></div></div>${ev.length?`<div class="table-wrap section-gap"><table class="table"><thead><tr><th>Mint</th><th>Oluşturma imzası</th><th>Slot</th><th>Zaman</th><th>Durum</th></tr></thead><tbody>${ev.map(x=>`<tr><td class="mono">${esc(x.mint)}</td><td class="mono">${esc(String(x.creation_signature||'').slice(0,20))}…</td><td>${esc(x.creation_slot||'')}</td><td>${esc(x.created_on_chain_at||'')}</td><td>${esc(x.fate_status)}</td></tr>`).join('')}</tbody></table></div>`:''}<div class="warning-box section-gap">${arr(rule.limitations).map(esc).join('<br>')}</div></details>`}).join('')}</div>`;
+  }
+
   function renderUnified(root,payload){
     root=rootFor(root);if(!root)return;
-    root.innerHTML=`${renderInvestigationCoverage(payload.legacy_14_arm_radar)}${renderTargetIdentity(payload)}${renderVerdictCard(payload)}<div class="grid compact-grid section-gap" id="full-report-detail"><div class="span-12">${renderVerdict(payload.final_verdict)}</div><div class="span-12">${renderBehavior(payload.behavior_signals)}</div><div class="span-12">${renderThreatAnticipation(payload.threat_anticipation)}</div><div class="span-12">${renderLegacy(payload.legacy_14_arm_radar)}</div></div>`;
+    root.innerHTML=`${renderInvestigationCoverage(payload.legacy_14_arm_radar)}${renderTargetIdentity(payload)}${renderVerdictCard(payload)}<div class="grid compact-grid section-gap" id="full-report-detail"><div class="span-12">${renderVerdict(payload.final_verdict)}</div><div class="span-12">${renderBehavior(payload.behavior_signals)}</div><div class="span-12">${renderShadowRules(payload.shadow_rules)}</div><div class="span-12">${renderThreatAnticipation(payload.threat_anticipation)}</div><div class="span-12">${renderLegacy(payload.legacy_14_arm_radar)}</div></div>`;
     bindTargetIdentity(root,payload);
     renderActor(root,payload);
   }
