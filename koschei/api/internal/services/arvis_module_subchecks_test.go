@@ -93,3 +93,25 @@ func TestArvisSubchecksReportPerformedChecksFromArmSignalsOnly(t *testing.T) {
 		t.Fatalf("an arm without verified completed evidence proves no check: %#v", pending)
 	}
 }
+
+// A collection that found liquidity movements reports movement_status
+// "observed"; that is the check succeeding, not an unperformed one.
+func TestArvisSubchecksCountObservedLiquidityMovementsAsPerformed(t *testing.T) {
+	for _, signals := range []map[string]any{
+		{"movement_status": "observed", "liquidity_movement_transaction_verified": true},
+		{"movement_status": "complete_no_movement_observed"},
+	} {
+		signals["execution_status"] = ArvisExecutionCompleted
+		signals["real_onchain_evidence"] = true
+		arm := SecurityRadarVerdict{ModuleID: ModuleLiquidityMovement, EvidenceVerified: true, Evidence: []string{"ci fixture evidence"}, Signals: signals}
+		if got := arvisModuleSubchecks(arm, ArvisExecutionCompleted).Checks["liquidity_delta_transactions"]; got != "performed" {
+			t.Fatalf("movement_status %v: liquidity_delta_transactions = %q, want performed", signals["movement_status"], got)
+		}
+	}
+	arm := SecurityRadarVerdict{ModuleID: ModuleLiquidityMovement, EvidenceVerified: true, Evidence: []string{"ci fixture evidence"}, Signals: map[string]any{
+		"execution_status": ArvisExecutionCompleted, "real_onchain_evidence": true, "movement_status": "collection_failed",
+	}}
+	if got := arvisModuleSubchecks(arm, ArvisExecutionCompleted).Checks["liquidity_delta_transactions"]; got != "unknown" {
+		t.Fatalf("a failed movement collection must stay unknown, got %q", got)
+	}
+}

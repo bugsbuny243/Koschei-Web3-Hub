@@ -169,7 +169,8 @@ func arvisSubcheckProven(signals map[string]any, check string) bool {
 		status := strings.ToLower(text("lp_lock_status"))
 		return status != "" && status != "unverified" && status != "unknown"
 	case "liquidity_movement_history", "liquidity_delta_transactions":
-		return strings.HasPrefix(text("movement_status"), "complete")
+		status := text("movement_status")
+		return status == "observed" || strings.HasPrefix(status, "complete") || arvisSignalBool(signals, "liquidity_movement_transaction_verified")
 	case "mint_account_observation", "account_program_owner":
 		return text("account_owner") != ""
 	case "mint_and_freeze_authority":
