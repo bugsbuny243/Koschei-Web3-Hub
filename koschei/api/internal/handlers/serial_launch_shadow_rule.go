@@ -85,6 +85,7 @@ func evaluateSerialLaunchShadowRule(target string, history creatorOutcomeHistory
 	}
 
 	launches := []time.Time{}
+	undated := 0
 	for _, outcome := range history.Outcomes {
 		mint := strings.TrimSpace(outcome.Mint)
 		if mint == "" || mint == target || !strings.HasPrefix(outcome.EvidenceStatus, "verified_creator_mint") {
@@ -97,7 +98,9 @@ func evaluateSerialLaunchShadowRule(target string, history creatorOutcomeHistory
 		case services.ActorTokenFateActive:
 			out.Active++
 		}
-		if outcome.CreatedOnChainAt != nil {
+		if outcome.CreatedOnChainAt == nil {
+			undated++
+		} else {
 			at := outcome.CreatedOnChainAt.UTC()
 			launches = append(launches, at)
 			if out.FirstLaunchAt == nil || at.Before(*out.FirstLaunchAt) {
@@ -127,6 +130,12 @@ func evaluateSerialLaunchShadowRule(target string, history creatorOutcomeHistory
 		return out
 	}
 	out.Triggered = out.InactiveRatio >= serialLaunchMinInactiveRatio && out.MaxLaunchesPerHour >= serialLaunchMinBurstLaunches
+	if !out.Triggered && out.InactiveRatio >= serialLaunchMinInactiveRatio && out.MaxLaunchesPerHour+undated >= serialLaunchMinBurstLaunches {
+		// Missing creation times could hide a burst; an unknown burst is not an absent one.
+		out.Summary = fmt.Sprintf("%d of %d verified prior tokens are inactive, but %d have no creation timestamp, so whether %d launched within one hour cannot be determined.",
+			out.InactiveOrDead, out.KnownFateTokens, undated, serialLaunchMinBurstLaunches)
+		return out
+	}
 	if out.Triggered {
 		out.Status = "triggered_shadow"
 		out.Summary = fmt.Sprintf("The creator wallet canonically created %d verified prior tokens, up to %d within one hour; %d of %d with a known fate are inactive now.",

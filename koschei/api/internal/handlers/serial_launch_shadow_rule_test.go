@@ -69,3 +69,29 @@ func TestSerialLaunchShadowRuleExcludesTheScannedMintAndUnverifiedRows(t *testin
 		t.Fatalf("scanned mint and unverified rows must be excluded: %+v", rule)
 	}
 }
+
+// Creation transactions without blockTime leave outcomes undated. Those must
+// keep the burst unknown instead of reporting "at most 0 within one hour".
+func TestSerialLaunchShadowRuleKeepsBurstUnknownWithoutCreationTimes(t *testing.T) {
+	history := serialLaunchFixture(12, time.Minute, services.ActorTokenFateInactiveOrDead)
+	for i := range history.Outcomes {
+		history.Outcomes[i].CreatedOnChainAt = nil
+	}
+	if rule := evaluateSerialLaunchShadowRule("ci-fixture-target", history); rule.Triggered || rule.Status != "insufficient_evidence" {
+		t.Fatalf("undated outcomes must leave the burst unknown: %+v", rule)
+	}
+
+	partly := serialLaunchFixture(12, 24*time.Hour, services.ActorTokenFateInactiveOrDead)
+	for i := 0; i < 9; i++ {
+		partly.Outcomes[i].CreatedOnChainAt = nil
+	}
+	if rule := evaluateSerialLaunchShadowRule("ci-fixture-target", partly); rule.Status != "insufficient_evidence" {
+		t.Fatalf("nine undated tokens could complete the burst: %+v", rule)
+	}
+
+	spread := serialLaunchFixture(20, 24*time.Hour, services.ActorTokenFateInactiveOrDead)
+	spread.Outcomes[0].CreatedOnChainAt = nil
+	if rule := evaluateSerialLaunchShadowRule("ci-fixture-target", spread); rule.Status != "not_triggered" {
+		t.Fatalf("one undated token cannot complete a burst of ten here: %+v", rule)
+	}
+}
