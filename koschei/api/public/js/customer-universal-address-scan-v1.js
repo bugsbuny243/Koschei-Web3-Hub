@@ -368,28 +368,56 @@ function install(){
 
   // The canonical customer job endpoint is already account-scoped and durable.
   // Never route this through owner APIs or claim non-Solana collectors exist.
-  // A Solana address investigation starts with the scan itself (auto); the
-  // button stays as a manual retry. Other networks still wait for a click.
-  function offerCanonicalDeepJob(request,{auto=false}={}){
+  // The account's newest retained job for this target, or null. Any failure
+  // (signed out, no Professional access, network) means "nothing to reuse".
+  async function latestRetainedJob(request,signal){
+    try{
+      const query=new URLSearchParams({target:request.target,network:request.network});
+      const response=await window.KoscheiAuth.apiCall('/api/v1/radar/jobs/?'+query,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'},signal});
+      if(!response?.ok)return null;
+      const item=(await response.json())?.history?.[0];
+      if(!item||item.target!==request.target||item.network!==request.network||!/^[0-9a-f-]{36}$/i.test(String(item.id||'')))return null;
+      return item;
+    }catch{return null;}
+  }
+  const RETAINED_REUSE_MS=30*60*1000;
+
+  // A Solana address investigation starts with an explicit scan (auto); a
+  // shared link only reattaches to retained work (resume). Either way a
+  // running job is followed, and a recent finished report is shown, before
+  // any new output is spent. Other networks still wait for a click.
+  function offerCanonicalDeepJob(request,{auto=false,resume=false}={}){
     const button=document.createElement('button');
     button.type='button';
     const nativeOnly=request.family!=='solana';
     button.textContent=request.kind==='transaction'?'Run and save transaction evidence':nativeOnly?'Run and save native evidence':'Run durable ARVIS investigation';
-    const start=async()=>{
+    const start=async({fresh=true,reuseOnly=false}={})=>{
       const current=generation;
       if(deepAbort)return;
       const controller=new AbortController();deepAbort=controller;
       button.disabled=true;
-      status.textContent='Creating a durable, account-scoped investigation…';
+      if(!reuseOnly)status.textContent='Creating a durable, account-scoped investigation…';
       try{
         if(!window.KoscheiAuth?.apiCall){
-          status.textContent='Sign in to create an account-scoped investigation.';
+          if(!reuseOnly)status.textContent='Sign in to create an account-scoped investigation.';
           button.disabled=false;deepAbort=null;return;
         }
         await window.KoscheiAuth.init();
         if(!window.KoscheiAuth.isLoggedIn()){
-          status.textContent='Sign in to start this retained investigation.';
+          if(!reuseOnly)status.textContent='Sign in to start this retained investigation.';
           button.disabled=false;deepAbort=null;return;
+        }
+        if(!nativeOnly&&!fresh){
+          const latest=await latestRetainedJob(request,controller.signal);
+          if(current!==generation)return;
+          const age=Date.now()-Date.parse(latest?.updated_at||'');
+          if(latest&&['queued','running'].includes(latest.status)){
+            follow(String(latest.id),{joined:true});return;
+          }
+          if(latest&&latest.status==='completed'&&latest.result_available===true&&(reuseOnly||age<RETAINED_REUSE_MS)){
+            follow(String(latest.id),{retainedAt:latest.updated_at});return;
+          }
+          if(reuseOnly){button.disabled=false;deepAbort=null;return;}
         }
         const response=await window.KoscheiAuth.apiCall('/api/v1/radar/jobs',{
           method:'POST',credentials:'same-origin',cache:'no-store',
@@ -406,12 +434,23 @@ function install(){
             'The deep investigation could not be started. No report was created.';
           button.disabled=false;deepAbort=null;return;
         }
-        const joined=job?.joined_existing_job===true;
         const id=String(job?.job_id||'');
-        const pollURL='/api/v1/radar/jobs/'+id;
-        if(!/^[0-9a-f-]{36}$/i.test(id)||job.poll_url!==pollURL||job.canonical_engine!==true){
+        if(!/^[0-9a-f-]{36}$/i.test(id)||job.poll_url!=='/api/v1/radar/jobs/'+id||job.canonical_engine!==true){
           throw new Error('The background job confirmation could not be authenticated.');
         }
+        follow(id,{joined:job?.joined_existing_job===true});
+      }catch(error){
+        if(current!==generation||controller.signal.aborted)return;
+        status.textContent='Deep investigation request failed: '+(error.message||'unavailable');
+        button.disabled=false;deepAbort=null;
+      }
+
+      // Follows one account-scoped job to its terminal state. joined: an
+      // in-flight job was reused; retainedAt: a finished report is reopened.
+      async function follow(id,{joined=false,retainedAt=''}={}){
+        const pollURL='/api/v1/radar/jobs/'+id;
+        if(retainedAt)button.textContent='Run a fresh investigation';
+        button.disabled=false;
         // The API status resource requires a bearer session; opening it as a
         // bare browser link would fail authentication. Use the signed-in
         // account history page to retrieve the result with its auth helper.
@@ -439,8 +478,9 @@ function install(){
             '</section>';
           if(readable)bindTechnicalEvidence(results,report);
         };
-        show('Queued. The investigation continues on the server and remains in your account history.');
-        status.textContent=joined?'This target is already being investigated for your account; the running job was reused and no additional output was used.':'ARVIS investigation started; one Professional output is used for this report.';
+        const retainedNote=retainedAt?`Showing your retained report from ${retainedAt}; no output was used. "Run a fresh investigation" starts a new one (1 output).`:'';
+        show(retainedAt?'Loading your retained report…':'Queued. The investigation continues on the server and remains in your account history.');
+        status.textContent=retainedNote||(joined?'This target is already being investigated for your account; the running job was reused and no additional output was used.':'ARVIS investigation started; one Professional output is used for this report.');
         const poll=async()=>{
           if(current!==generation||controller.signal.aborted)return;
           try{
@@ -455,7 +495,7 @@ function install(){
               if(!snapshot.result||typeof snapshot.result!=='object'||Array.isArray(snapshot.result))
                 throw new Error('Job completed without readable evidence; no verdict can be inferred.');
               show(nativeOnly?'Native collection finished. All observed evidence is retained; historical collectors and a signed grade are NOT claimed.':'Completed. All retained findings and provenance are shown below.',snapshot.result);
-              status.textContent=nativeOnly?'Native evidence job completed; the result is retained in account history.':'ARVIS job completed; the report is retained in account history.';
+              status.textContent=retainedNote||(nativeOnly?'Native evidence job completed; the result is retained in account history.':'ARVIS job completed; the report is retained in account history.');
               settleOverview();
               deepAbort=null;return;
             }
@@ -485,18 +525,15 @@ function install(){
           }
         };
         await poll();
-      }catch(error){
-        if(current!==generation||controller.signal.aborted)return;
-        status.textContent='Deep investigation request failed: '+(error.message||'unavailable');
-        button.disabled=false;deepAbort=null;
       }
     };
-    button.addEventListener('click',start);
+    button.addEventListener('click',()=>start({fresh:true}));
     const chat=document.createElement('a');
     chat.href='/arvis-chat?'+new URLSearchParams({target:request.target,network:request.network});
     chat.textContent='Explore evidence with ARVIS';
     recovery.replaceChildren(button,chat);recovery.hidden=false;
-    if(auto)start();
+    if(auto)start({fresh:false});
+    else if(resume&&!nativeOnly)start({fresh:false,reuseOnly:true});
   }
 
   // Only an explicit form submission may start a paid investigation; opening a
@@ -534,7 +571,8 @@ function install(){
       const durableAddress=request.kind==='address'&&['solana','evm','bitcoin'].includes(request.family);
       const durableTransaction=request.kind==='transaction'&&['evm','bitcoin'].includes(request.family);
       if(response.ok&&(durableAddress||durableTransaction)){
-        offerCanonicalDeepJob(request,{auto:explicit&&durableAddress&&request.family==='solana'});
+        const solanaAddress=durableAddress&&request.family==='solana';
+        offerCanonicalDeepJob(request,{auto:explicit&&solanaAddress,resume:!explicit&&solanaAddress});
       }
     }catch(error){
       if(current!==generation)return;

@@ -56,3 +56,24 @@ func (s *Store) ListByUser(ctx context.Context, userID, jobType string, limit in
 	}
 	return out, nil
 }
+
+// LatestForTarget returns the account's most recent job of jobType for one
+// network and target, so a page that lost track of a running or finished
+// investigation can reattach to it instead of paying for another one.
+func (s *Store) LatestForTarget(ctx context.Context, userID, jobType, network, target string) (Job, error) {
+	if s == nil || s.DB == nil {
+		return Job{}, errors.New("job store database unavailable")
+	}
+	userID, target = strings.TrimSpace(userID), strings.TrimSpace(target)
+	if userID == "" || target == "" {
+		return Job{}, errors.New("job owner and target required")
+	}
+	return scanJob(s.DB.QueryRowContext(ctx, `
+		SELECT id,user_id,email,job_type,status,network,target,request_payload,
+		       COALESCE(result_payload,'null'::jsonb),COALESCE(error_code,''),COALESCE(error_message,''),
+		       progress,attempts,queued_at,updated_at
+		FROM web3_jobs
+		WHERE user_id=$1 AND job_type=$2 AND COALESCE(network,'')=$3 AND target=$4
+		ORDER BY queued_at DESC,id DESC
+		LIMIT 1`, userID, strings.TrimSpace(jobType), strings.TrimSpace(network), target))
+}

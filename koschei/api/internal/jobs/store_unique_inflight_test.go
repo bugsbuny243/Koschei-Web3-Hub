@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -54,5 +55,16 @@ func TestCreateUniqueInFlightJoinsOnlyQueuedOrRunningJobsPostgres17(t *testing.T
 	}
 	if reused, created, err := store.CreateUniqueActive(ctx, input("ci-fixture-user-a"), "customer|ci-fixture-user-a"); err != nil || created || reused.ID != fresh.ID {
 		t.Fatalf("CreateUniqueActive must keep matching existing jobs: got %s created=%v err=%v", reused.ID, created, err)
+	}
+
+	// A page that lost its job reattaches to the account's newest job for the target.
+	if latest, err := store.LatestForTarget(ctx, "ci-fixture-user-a", "canonical_investigation", "solana-mainnet", target); err != nil || latest.ID != fresh.ID {
+		t.Fatalf("latest job for user a = %s err=%v, want %s", latest.ID, err, fresh.ID)
+	}
+	if latest, err := store.LatestForTarget(ctx, "ci-fixture-user-b", "canonical_investigation", "solana-mainnet", target); err != nil || latest.ID != other.ID {
+		t.Fatalf("latest job for user b = %s err=%v, want %s", latest.ID, err, other.ID)
+	}
+	if _, err := store.LatestForTarget(ctx, "ci-fixture-user-a", "canonical_investigation", "base-mainnet", target); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("another network must not match: err=%v", err)
 	}
 }

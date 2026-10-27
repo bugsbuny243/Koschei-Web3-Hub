@@ -261,8 +261,8 @@ test('a Solana address scan starts the retained ARVIS job without a second click
  h.submit(sol,'solana-mainnet');await settle();await settle();await settle();
  const button=h.nodes.customerUniversalRecovery.children[0];
  assert.equal(button.textContent,'Run durable ARVIS investigation');
- assert.equal(calls.length,3,'scan, job creation and one status read');
- assert.deepEqual(JSON.parse(calls[1].options.body),{address:sol,network:'solana-mainnet',max_depth:3});
+ assert.deepEqual(calls.map(c=>c.url.split('?')[0]),['/api/scan','/api/v1/radar/jobs/','/api/v1/radar/jobs','/api/v1/radar/jobs/'+id],'scan, retained-job lookup, job creation and one status read');
+ assert.deepEqual(JSON.parse(calls[2].options.body),{address:sol,network:'solana-mainnet',max_depth:3});
  assert.equal(h.nodes.customerUniversalRecovery.children[1].href,'/reports?job='+encodeURIComponent(id));
  assert.match(h.nodes.customerUniversalResults.innerHTML,/Complete retained ARVIS report/);
  assert.match(h.nodes.customerUniversalResults.innerHTML,/relation_history/);
@@ -401,9 +401,11 @@ test('a repeated request that joins a running job says no extra output was used'
 
 test('opening a Solana result link runs only the free pre-check and starts no paid job',async()=>{
  const calls=[];
- const h=harness(async(url,options)=>{calls.push(url);return response(200,envelope(sol,'solana-mainnet'));},'?mode=address&network=solana-mainnet&target='+sol);
+ const h=harness(async(url,options)=>{calls.push(url);
+   if(url.startsWith('/api/v1/radar/jobs/?'))return response(200,{history:[]});
+   return response(200,envelope(sol,'solana-mainnet'));},'?mode=address&network=solana-mainnet&target='+sol);
  for(let i=0;i<3;i++)await settle();
- assert.deepEqual(calls,['/api/scan']);
+ assert.deepEqual(calls,['/api/scan','/api/v1/radar/jobs/?target='+sol+'&network=solana-mainnet']);
  assert.equal(h.nodes.customerUniversalRecovery.children[0].textContent,'Run durable ARVIS investigation');
 });
 for(const [state,label] of [['failed',/INVESTIGATION FAILED/],['completed',/^$/]])test(`a ${state} job never leaves the INVESTIGATING headline behind`,async()=>{
@@ -417,4 +419,55 @@ for(const [state,label] of [['failed',/INVESTIGATION FAILED/],['completed',/^$/]
  h.submit(sol,'solana-mainnet');for(let i=0;i<4;i++)await settle();
  assert.doesNotMatch(h.nodes.customerUniversalOverview.innerHTML,/INVESTIGATING/);
  assert.match(h.nodes.customerUniversalOverview.innerHTML,label);
+});
+
+// Mobile browsers freeze or reload a backgrounded tab mid-investigation. The
+// page must find the account's retained job again instead of paying twice.
+const retainedID='87654321-4321-4321-4321-cba987654321';
+function retainedHarness(item,search){
+ const calls=[];
+ const h=harness(async(url,options)=>{
+   calls.push({url,method:options?.method||'GET'});
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url.startsWith('/api/v1/radar/jobs/?'))return response(200,{history:item?[item]:[]});
+   if(url==='/api/v1/radar/jobs/'+retainedID)return response(200,{id:retainedID,job_type:'canonical_investigation',status:item.status,progress:item.progress,target:sol,network:'solana-mainnet',result:item.status==='completed'?readableFixture():undefined});
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:'12345678-1234-1234-1234-123456789abc',poll_url:'/api/v1/radar/jobs/12345678-1234-1234-1234-123456789abc',canonical_engine:true});
+   return response(200,{id:'12345678-1234-1234-1234-123456789abc',job_type:'canonical_investigation',status:'running',progress:5,target:sol,network:'solana-mainnet'});
+ },search);
+ return {h,calls,posts:()=>calls.filter(c=>c.method==='POST'&&c.url==='/api/v1/radar/jobs').length};
+}
+const minutesAgo=n=>new Date(Date.now()-n*60000).toISOString();
+const deepLink='?mode=address&network=solana-mainnet&target='+sol;
+test('a reopened link follows the running investigation without a new charge',async()=>{
+ const r=retainedHarness({id:retainedID,status:'running',progress:40,target:sol,network:'solana-mainnet',updated_at:minutesAgo(1)},deepLink);
+ for(let i=0;i<5;i++)await settle();
+ assert.equal(r.posts(),0);
+ assert.ok(r.calls.some(c=>c.url==='/api/v1/radar/jobs/'+retainedID));
+ assert.match(r.h.nodes.customerUniversalStatus.textContent,/no additional output was used/);
+ assert.match(r.h.nodes.customerUniversalResults.innerHTML,/running \(40%\)/);
+});
+test('a reopened link shows the finished report for free and offers a fresh run',async()=>{
+ const r=retainedHarness({id:retainedID,status:'completed',result_available:true,target:sol,network:'solana-mainnet',updated_at:minutesAgo(240)},deepLink);
+ for(let i=0;i<5;i++)await settle();
+ assert.equal(r.posts(),0);
+ assert.match(r.h.nodes.customerUniversalResults.innerHTML,/Signed ARVIS grade B/);
+ assert.match(r.h.nodes.customerUniversalStatus.textContent,/retained report from .*no output was used/);
+ assert.equal(r.h.nodes.customerUniversalRecovery.children[0].textContent,'Run a fresh investigation');
+});
+test('an explicit scan reuses a report finished in the last 30 minutes',async()=>{
+ const r=retainedHarness({id:retainedID,status:'completed',result_available:true,target:sol,network:'solana-mainnet',updated_at:minutesAgo(10)});
+ r.h.submit(sol,'solana-mainnet');for(let i=0;i<5;i++)await settle();
+ assert.equal(r.posts(),0);
+ assert.match(r.h.nodes.customerUniversalResults.innerHTML,/Signed ARVIS grade B/);
+});
+test('an explicit scan starts a new investigation when the last report is older',async()=>{
+ const r=retainedHarness({id:retainedID,status:'completed',result_available:true,target:sol,network:'solana-mainnet',updated_at:minutesAgo(45)});
+ r.h.submit(sol,'solana-mainnet');for(let i=0;i<5;i++)await settle();
+ assert.equal(r.posts(),1);
+});
+test('a fresh run from a reopened report is an explicit, charged request',async()=>{
+ const r=retainedHarness({id:retainedID,status:'completed',result_available:true,target:sol,network:'solana-mainnet',updated_at:minutesAgo(5)},deepLink);
+ for(let i=0;i<5;i++)await settle();
+ r.h.nodes.customerUniversalRecovery.children[0].dispatch('click');for(let i=0;i<4;i++)await settle();
+ assert.equal(r.posts(),1);
 });
