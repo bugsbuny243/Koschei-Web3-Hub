@@ -1,9 +1,14 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 	"time"
+
+	"koschei/api/internal/jobs"
 )
 
 type customerInvestigationHistoryItem struct {
@@ -41,7 +46,21 @@ func (h *Handler) customerInvestigationHistoryRead(w http.ResponseWriter, r *htt
 		return
 	}
 
-	jobsList, err := h.JobStore.ListByUser(r.Context(), claims.Sub, CanonicalInvestigationJobType, 100)
+	// ?target=&network= narrows the history to the latest job for one target,
+	// which the radar page uses to reattach without loading every report.
+	var jobsList []jobs.Job
+	var err error
+	if target := strings.TrimSpace(r.URL.Query().Get("target")); target != "" {
+		var job jobs.Job
+		job, err = h.JobStore.LatestForTarget(r.Context(), claims.Sub, CanonicalInvestigationJobType, r.URL.Query().Get("network"), target)
+		if err == nil {
+			jobsList = []jobs.Job{job}
+		} else if errors.Is(err, sql.ErrNoRows) {
+			jobsList, err = []jobs.Job{}, nil
+		}
+	} else {
+		jobsList, err = h.JobStore.ListByUser(r.Context(), claims.Sub, CanonicalInvestigationJobType, 100)
+	}
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "investigation history read failed"})
 		return

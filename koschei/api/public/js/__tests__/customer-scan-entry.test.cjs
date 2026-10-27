@@ -261,8 +261,8 @@ test('a Solana address scan starts the retained ARVIS job without a second click
  h.submit(sol,'solana-mainnet');await settle();await settle();await settle();
  const button=h.nodes.customerUniversalRecovery.children[0];
  assert.equal(button.textContent,'Run durable ARVIS investigation');
- assert.equal(calls.length,3,'scan, job creation and one status read');
- assert.deepEqual(JSON.parse(calls[1].options.body),{address:sol,network:'solana-mainnet',max_depth:3});
+ assert.deepEqual(calls.map(c=>c.url.split('?')[0]),['/api/scan','/api/v1/radar/jobs/','/api/v1/radar/jobs','/api/v1/radar/jobs/'+id],'scan, retained-job lookup, job creation and one status read');
+ assert.deepEqual(JSON.parse(calls[2].options.body),{address:sol,network:'solana-mainnet',max_depth:3});
  assert.equal(h.nodes.customerUniversalRecovery.children[1].href,'/reports?job='+encodeURIComponent(id));
  assert.match(h.nodes.customerUniversalResults.innerHTML,/Complete retained ARVIS report/);
  assert.match(h.nodes.customerUniversalResults.innerHTML,/relation_history/);
@@ -401,9 +401,11 @@ test('a repeated request that joins a running job says no extra output was used'
 
 test('opening a Solana result link runs only the free pre-check and starts no paid job',async()=>{
  const calls=[];
- const h=harness(async(url,options)=>{calls.push(url);return response(200,envelope(sol,'solana-mainnet'));},'?mode=address&network=solana-mainnet&target='+sol);
+ const h=harness(async(url,options)=>{calls.push(url);
+   if(url.startsWith('/api/v1/radar/jobs/?'))return response(200,{history:[]});
+   return response(200,envelope(sol,'solana-mainnet'));},'?mode=address&network=solana-mainnet&target='+sol);
  for(let i=0;i<3;i++)await settle();
- assert.deepEqual(calls,['/api/scan']);
+ assert.deepEqual(calls,['/api/scan','/api/v1/radar/jobs/?target='+sol+'&network=solana-mainnet']);
  assert.equal(h.nodes.customerUniversalRecovery.children[0].textContent,'Run durable ARVIS investigation');
 });
 for(const [state,label] of [['failed',/INVESTIGATION FAILED/],['completed',/^$/]])test(`a ${state} job never leaves the INVESTIGATING headline behind`,async()=>{
@@ -417,4 +419,154 @@ for(const [state,label] of [['failed',/INVESTIGATION FAILED/],['completed',/^$/]
  h.submit(sol,'solana-mainnet');for(let i=0;i<4;i++)await settle();
  assert.doesNotMatch(h.nodes.customerUniversalOverview.innerHTML,/INVESTIGATING/);
  assert.match(h.nodes.customerUniversalOverview.innerHTML,label);
+});
+
+// Mobile browsers freeze or reload a backgrounded tab mid-investigation. The
+// page must find the account's retained job again instead of paying twice.
+const retainedID='87654321-4321-4321-4321-cba987654321';
+function retainedHarness(item,search){
+ const calls=[];
+ const h=harness(async(url,options)=>{
+   calls.push({url,method:options?.method||'GET'});
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url.startsWith('/api/v1/radar/jobs/?'))return response(200,{history:item?[item]:[]});
+   if(url==='/api/v1/radar/jobs/'+retainedID)return response(200,{id:retainedID,job_type:'canonical_investigation',status:item.status,progress:item.progress,target:sol,network:'solana-mainnet',result:item.status==='completed'?readableFixture():undefined});
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:'12345678-1234-1234-1234-123456789abc',poll_url:'/api/v1/radar/jobs/12345678-1234-1234-1234-123456789abc',canonical_engine:true});
+   return response(200,{id:'12345678-1234-1234-1234-123456789abc',job_type:'canonical_investigation',status:'running',progress:5,target:sol,network:'solana-mainnet'});
+ },search);
+ return {h,calls,posts:()=>calls.filter(c=>c.method==='POST'&&c.url==='/api/v1/radar/jobs').length};
+}
+const minutesAgo=n=>new Date(Date.now()-n*60000).toISOString();
+const deepLink='?mode=address&network=solana-mainnet&target='+sol;
+test('a reopened link follows the running investigation without a new charge',async()=>{
+ const r=retainedHarness({id:retainedID,status:'running',progress:40,target:sol,network:'solana-mainnet',updated_at:minutesAgo(1)},deepLink);
+ for(let i=0;i<5;i++)await settle();
+ assert.equal(r.posts(),0);
+ assert.ok(r.calls.some(c=>c.url==='/api/v1/radar/jobs/'+retainedID));
+ assert.match(r.h.nodes.customerUniversalStatus.textContent,/no additional output was used/);
+ assert.match(r.h.nodes.customerUniversalResults.innerHTML,/running \(40%\)/);
+});
+test('a reopened link shows the finished report for free and offers a fresh run',async()=>{
+ const r=retainedHarness({id:retainedID,status:'completed',result_available:true,target:sol,network:'solana-mainnet',updated_at:minutesAgo(240)},deepLink);
+ for(let i=0;i<5;i++)await settle();
+ assert.equal(r.posts(),0);
+ assert.match(r.h.nodes.customerUniversalResults.innerHTML,/Signed ARVIS grade B/);
+ assert.match(r.h.nodes.customerUniversalStatus.textContent,/retained report from .*no output was used/);
+ assert.equal(r.h.nodes.customerUniversalRecovery.children[0].textContent,'Run a fresh investigation');
+});
+test('an explicit scan reuses a report finished in the last 30 minutes',async()=>{
+ const r=retainedHarness({id:retainedID,status:'completed',result_available:true,target:sol,network:'solana-mainnet',updated_at:minutesAgo(10)});
+ r.h.submit(sol,'solana-mainnet');for(let i=0;i<5;i++)await settle();
+ assert.equal(r.posts(),0);
+ assert.match(r.h.nodes.customerUniversalResults.innerHTML,/Signed ARVIS grade B/);
+});
+test('an explicit scan starts a new investigation when the last report is older',async()=>{
+ const r=retainedHarness({id:retainedID,status:'completed',result_available:true,target:sol,network:'solana-mainnet',updated_at:minutesAgo(45)});
+ r.h.submit(sol,'solana-mainnet');for(let i=0;i<5;i++)await settle();
+ assert.equal(r.posts(),1);
+});
+test('a fresh run from a reopened report is an explicit, charged request',async()=>{
+ const r=retainedHarness({id:retainedID,status:'completed',result_available:true,target:sol,network:'solana-mainnet',updated_at:minutesAgo(5)},deepLink);
+ for(let i=0;i<5;i++)await settle();
+ r.h.nodes.customerUniversalRecovery.children[0].dispatch('click');for(let i=0;i<4;i++)await settle();
+ assert.equal(r.posts(),1);
+});
+
+test('the readable report shows every section: shadow alert, threat paths, behavior rules, all modules and cited tokens',async()=>{
+ const id='12345678-1234-1234-1234-123456789abc',report=readableFixture();
+ const mint='So11111111111111111111111111111111111111112',sig='5'.repeat(88);
+ report.shadow_rules[0]={...report.shadow_rules[0],verified_prior_tokens:36,inactive_or_dead:36,known_fate_tokens:36,max_launches_per_hour:30,creator_wallet:mint,
+   evidence:[{mint,creation_signature:sig,created_on_chain_at:'2026-10-26T05:41:16Z',fate_status:'inactive_or_dead'},{mint:'javascript:alert(1)',creation_signature:'not-a-signature',fate_status:'inactive_or_dead'}]};
+ report.final_verdict.triggered_rules[1].signatures=[sig,'<script>'];
+ report.threat_anticipation={primary_exposure:'fixture exposure',exit_capacity:{available:true,owner_percentage:14.0154,dominant_owner_wallet:mint,owner_reference_usd_value:39.23,position_liquidity_multiple:0.01,capacity:'elevated',interpretation:'fixture interpretation'},
+   pathways:[{id:'dominant_holder_exit',label:'Dominant-holder market exit',status:'open',summary:'fixture open path'},{id:'liquidity_removal',label:'Liquidity removal',status:'unknown',summary:'fixture unknown path'}],
+   rug_pathway_assessment:{conclusion:'fixture pathway conclusion'},missing_evidence:['LP mint and LP token owner'],scenarios:[],watch_signals:[]};
+ report.behavior_signals={signals:[{rule_id:'URD-C004',title:'Dominant-holder first observed exit',triggered:false,evidence_status:'unverified',summary:'fixture not evaluated'},{rule_id:'URD-C005',title:'Owner-resolved dominant concentration',triggered:false,evidence_status:'verified',summary:'fixture below threshold'}]};
+ report.modules=[{module:'Pool Control Guardian',module_id:'raydium_pool_guardian',signed:true,verified:true,verdict:'fixture pool verdict',evidence:['fixture pool evidence line one','fixture pool evidence line two']},
+   {module:'Claim Surface Risk',module_id:'claim_surface_risk',signed:false,verdict:'Real data unavailable.',evidence:[]}];
+ report.investigation_coverage.arms[0].module_id='raydium_pool_guardian';
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   return response(200,{id,job_type:'canonical_investigation',status:'completed',target:sol,network:'solana-mainnet',result:report});
+ });
+ h.submit(sol,'solana-mainnet');for(let i=0;i<5;i++)await settle();
+ const html=h.nodes.customerUniversalResults.innerHTML;
+ assert.match(html,/PATTERN DETECTED · GRADE NOT CHANGED/);
+ assert.ok(html.indexOf('PATTERN DETECTED')<html.indexOf('Rules that set the grade'),'the triggered shadow rule is shown before the rule list');
+ assert.match(html,/All 2 cited token creations/);
+ assert.match(html,new RegExp('https://solscan.io/token/'+mint));
+ assert.match(html,new RegExp('https://solscan.io/tx/'+sig));
+ assert.doesNotMatch(html,/href="[^"]*javascript:/,'non-base58 values are never turned into links');
+ assert.doesNotMatch(html,/<script/i,"report text is escaped, never injected as markup");
+ assert.match(html,/How the risk could play out/);
+ assert.match(html,/Dominant-holder market exit/);
+ assert.match(html,/Evidence still missing for a decision:/);
+ assert.match(html,/URD-C004 · Dominant-holder first observed exit<\/span><b>NOT EVALUATED/);
+ assert.match(html,/All ARVIS modules \(2\)/);
+ assert.match(html,/fixture pool evidence line two/);
+ assert.match(html,/Claim Surface Risk · EVIDENCE PENDING/);
+ assert.match(html,/This module produced no evidence lines/);
+ assert.doesNotMatch(html,/\bSAFE\b/);
+});
+
+// The report leads with who is behind the target and what that wallet did.
+function ownerFixture(){
+ const creator='CreatorWa11etFixture1111111111111111111111',other='Counterparty1111111111111111111111111111111';
+ const mintA='MintA1111111111111111111111111111111111111',mintB='MintB1111111111111111111111111111111111111',sig='4'.repeat(88);
+ return {creator,other,mintA,mintB,sig,actor:{wallet:creator,
+  current_creator_relation:{status:'verified',evidence:{program:'pump.fun'},target:{mint:sol,creator_wallet:creator,first_observed_at:'2026-09-15T16:43:01Z',creation_signature:sig,verification_status:'verified'}},
+  dossier:{track:{created_token_count:145,first_seen_at:'2026-09-15T16:43:01Z',last_seen_at:'2026-10-27T01:16:05Z',dossier:{verified_creator_token_count:23}}},
+  funding_origin:{status:'funding_not_observed',signatures_scanned:2000,boundary:{reason:'Funding origin was not reachable within the effective transaction parse limit.'}},
+  external_discovery:{
+   address_attribution:{status:'no_verified_attribution',entities:[]},
+   behavior_summary:{primary_observations:['The exact address has verified creation evidence for 6 distinct token mint(s).']},
+   creator_outcome_history:{verified_token_count:2,outcomes:[
+     {mint:mintA,created_on_chain_at:'2026-10-26T05:41:16Z',fate_status:'inactive_or_dead',current_liquidity_usd:0,creation_signature:sig},
+     {mint:mintB,created_on_chain_at:'2026-10-27T01:01:45Z',fate_status:'inactive_or_dead',current_liquidity_usd:0,creation_signature:sig}],limitations:['fixture outcome limitation']},
+   created_mint_portfolio:{lifecycle_summary:{average_inactive_age_days:0.68}},
+   behavior_timeline:{events:[
+     {event_type:'mint_created',token_mint:mintA,observed_at:'2026-10-26T05:41:16Z',signature:sig},
+     {event_type:'transfer_out',counterparty:other,amount_native:0.00175,asset_type:'SOL',observed_at:'2026-10-27T01:09:14Z',signature:sig}]},
+   address_relationships:{relationships:[{address:other,relation:'outbound_direct_flow',outbound_transfers:3,inbound_transfers:0,assets:['SPL_TOKEN'],token_mints:[mintB],first_observed_at:'2026-10-27T01:09:14Z',last_observed_at:'2026-10-27T01:09:16Z',evidence_signatures:[sig]}]},
+   behavior_patterns:{matches:[{pattern_id:'KOSCH-ADDR-BEH-001',label:'Repeated direct interaction with the same counterparty',triggered:true,explanation:'fixture explanation'},{pattern_id:'KOSCH-ADDR-BEH-002',label:'Bidirectional direct fund-flow relationship',triggered:false,status:'not_triggered'}]},
+   address_history:{signatures_seen:500,history_complete:false,limitations:['fixture history limitation']}}}};
+}
+async function renderCompleted(result){
+ const id='12345678-1234-1234-1234-123456789abc';
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   return response(200,{id,job_type:'canonical_investigation',status:'completed',target:sol,network:'solana-mainnet',result});
+ });
+ h.submit(sol,'solana-mainnet');for(let i=0;i<5;i++)await settle();
+ return h.nodes.customerUniversalResults.innerHTML;
+}
+test('a token report opens with who created it and everything that wallet has done',async()=>{
+ const f=ownerFixture(),report=readableFixture();report.actor_investigation=f.actor;
+ const html=await renderCompleted(report);
+ assert.match(html,/Who is behind this token and what they have done/);
+ assert.ok(html.indexOf('Who is behind this token')<html.indexOf('Signed ARVIS grade B'),'owner history comes before the grade');
+ assert.match(html,new RegExp('https://solscan.io/account/'+f.creator));
+ assert.match(html,/Tokens created \(indexed\)<\/span><b>145/);
+ assert.match(html,/Tokens this wallet created \(2 verified of 145 indexed\)/);
+ assert.match(html,/<b>2<\/b> inactive or dead/);
+ assert.match(html,new RegExp('https://solscan.io/token/'+f.mintA));
+ assert.match(html,/Activity timeline \(2 decoded events, newest first\)/);
+ assert.ok(html.indexOf('Sent 0.00175 SOL')<html.indexOf('Created token'),'newest event first');
+ assert.match(html,/Wallets it moved funds or tokens with \(1\)/);
+ assert.match(html,/<b>UNKNOWN\.<\/b> Funding origin was not reachable/);
+ assert.match(html,/No verified identity label exists/);
+ assert.match(html,/Repeated direct interaction with the same counterparty<\/b> · OBSERVED/);
+ assert.match(html,/partial; older activity may exist/);
+ assert.match(html,/not proof of a rug pull/);
+ assert.doesNotMatch(html,/\bSAFE\b/);
+});
+test('a wallet investigation is readable and leads with what the wallet has done',async()=>{
+ const f=ownerFixture();
+ const html=await renderCompleted({wallet:f.creator,target:f.creator,final_verdict:{grade:'-',signed:true},actor_investigation:{...f.actor,current_creator_relation:undefined}});
+ assert.match(html,/What this wallet has done/);
+ assert.match(html,/No signed grade was issued/);
+ assert.doesNotMatch(html,/Market snapshot|Investigation coverage/,'sections a wallet report does not carry are left out');
+ assert.doesNotMatch(html,/complete collector evidence/,'no raw dump for a wallet report');
 });

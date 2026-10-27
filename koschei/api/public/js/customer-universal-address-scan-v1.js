@@ -198,7 +198,7 @@ const label=value=>String(value??'').replaceAll('_',' ').trim();
 
 function readableArvisReport(report){
   report=obj(report);
-  return Boolean(report.final_verdict&&typeof report.final_verdict==='object'&&(Array.isArray(report.modules)||report.investigation_coverage));
+  return Boolean(report.final_verdict&&typeof report.final_verdict==='object'&&(Array.isArray(report.modules)||report.investigation_coverage||Object.keys(obj(report.actor_investigation)).length));
 }
 
 function arvisDecisionHeader(report){
@@ -224,6 +224,7 @@ function arvisDecisionHeader(report){
 }
 
 function arvisMarketSnapshot(report){
+  if(!('market' in report))return '';
   const market=obj(report.market);
   if(market.available!==true)return `<section class="car-card"><h4>Market snapshot</h4><p class="cus-empty">No verified market snapshot was returned. Liquidity and price are UNKNOWN.</p></section>`;
   const name=[market.name,market.symbol&&`(${market.symbol})`].filter(Boolean).join(' ')||'Name not observed';
@@ -236,6 +237,81 @@ function arvisMarketSnapshot(report){
       <div><span>24h buys / sells</span><b>${esc(market.buys_24h??'?')} / ${esc(market.sells_24h??'?')}</b></div>
     </div>
     <p class="car-note">Point-in-time snapshot from ${esc(market.provider||'an external market source')} at ${esc(market.observed_at||'an unknown time')}; not a guaranteed exit price.</p></section>`;
+}
+
+// Explorer links are built only from base58 values, so report text can never
+// become an arbitrary URL.
+const base58=value=>/^[1-9A-HJ-NP-Za-km-z]{32,90}$/.test(String(value||''));
+const shortRef=value=>{value=String(value||'');return value.length>14?value.slice(0,6)+'…'+value.slice(-6):value;};
+const solscan=(kind,value,text)=>base58(value)?`<a href="https://solscan.io/${kind}/${encodeURIComponent(value)}" target="_blank" rel="noopener noreferrer"><code>${esc(text||shortRef(value))}</code></a>`:`<code>${esc(text||value||'—')}</code>`;
+const txLinks=(signatures,limit=3)=>{const list=arr(signatures).filter(base58);if(!list.length)return '';return `<p class="car-note">Transactions: ${list.slice(0,limit).map(sig=>solscan('tx',sig)).join(' ')}${list.length>limit?` +${list.length-limit} more in technical evidence`:''}</p>`;};
+
+// The point of an investigation: who controls this target and what that
+// wallet has done so far. Every row comes from verified or observed on-chain
+// evidence in the retained report; nothing is inferred about a real person.
+const eventLabel={mint_created:'Created token',transfer_out:'Sent',transfer_in:'Received',liquidity_remove_activity:'Removed liquidity',liquidity_add_activity:'Added liquidity',swap:'Swapped'};
+const when=value=>{const t=Date.parse(value||'');return Number.isFinite(t)?new Date(t).toISOString().replace('T',' ').slice(0,16)+' UTC':'time unknown';};
+function arvisOwnerHistory(report){
+  const actor=obj(report.actor_investigation),ext=obj(actor.external_discovery);
+  if(!Object.keys(actor).length)return '';
+  const relation=obj(actor.current_creator_relation),creation=obj(relation.target);
+  const track=obj(obj(actor.dossier).track),trackFacts=obj(track.dossier);
+  const wallet=String(actor.wallet||creation.creator_wallet||report.wallet||'');
+  const isToken=Boolean(creation.mint);
+  const attribution=obj(ext.address_attribution),entities=arr(attribution.entities);
+  const outcomesReport=obj(ext.creator_outcome_history),outcomes=arr(outcomesReport.outcomes).slice().sort((a,b)=>String(b.created_on_chain_at||'').localeCompare(String(a.created_on_chain_at||'')));
+  const lifecycle=obj(obj(ext.created_mint_portfolio).lifecycle_summary);
+  const events=arr(obj(ext.behavior_timeline).events).slice().sort((a,b)=>String(b.observed_at||'').localeCompare(String(a.observed_at||'')));
+  const relationships=arr(obj(ext.address_relationships).relationships);
+  const patterns=arr(obj(ext.behavior_patterns).matches);
+  const observations=arr(obj(ext.behavior_summary).primary_observations);
+  const funding=obj(actor.funding_origin),fundingPaths=obj(ext.funding_paths);
+  const history=obj(ext.address_history);
+  const launch=arr(obj(report.launch_forensics).findings);
+  const fates=outcomes.reduce((acc,o)=>{acc[o.fate_status]=(acc[o.fate_status]||0)+1;return acc;},{});
+
+  const header=`<div class="cus-overview car-metrics">
+      <div><span>${isToken?'Creator / deployer wallet':'Wallet'}</span><b>${solscan('account',wallet)}</b></div>
+      <div><span>Tokens created (indexed)</span><b>${esc(track.created_token_count??'UNKNOWN')}</b></div>
+      <div><span>Verified creations</span><b>${esc(trackFacts.verified_creator_token_count??outcomesReport.verified_token_count??'UNKNOWN')}</b></div>
+      <div><span>First seen</span><b>${esc(track.first_seen_at?when(track.first_seen_at):'UNKNOWN')}</b></div>
+      <div><span>Last seen</span><b>${esc(track.last_seen_at?when(track.last_seen_at):'UNKNOWN')}</b></div>
+    </div>
+    ${isToken?`<p>This token was created by ${solscan('account',wallet)} on ${esc(when(creation.first_observed_at))}${relation.evidence?.program?` via ${esc(relation.evidence.program)}`:''} — ${esc(String(relation.status||creation.verification_status||'unknown').toUpperCase())} by the creation transaction ${solscan('tx',creation.creation_signature,'creation tx')}.</p>`:''}
+    <p>${entities.length?`Verified labels: ${entities.map(e=>esc(e.label||e.name||e.entity||'labelled entity')).join(', ')}`:'No verified identity label exists for this wallet. It is described by its on-chain activity only, not as a real person.'}</p>
+    ${observations.length?`<ul>${observations.map(o=>`<li>${esc(o)}</li>`).join('')}</ul>`:''}`;
+
+  const tokens=outcomes.length?`<h5>Tokens this wallet created (${outcomes.length} verified${track.created_token_count>outcomes.length?` of ${esc(track.created_token_count)} indexed`:''})</h5>
+    <p>${Object.entries(fates).map(([fate,n])=>`<b>${n}</b> ${esc(label(fate))}`).join(' · ')}${lifecycle.average_inactive_age_days!=null?` · inactive after ${esc(Number(lifecycle.average_inactive_age_days).toFixed(2))} days on average`:''}</p>
+    <div class="car-table"><table><thead><tr><th>Token</th><th>Created</th><th>Status now</th><th>Liquidity now</th><th>Proof</th></tr></thead><tbody>${outcomes.map(o=>`<tr><td>${solscan('token',o.mint)}</td><td>${esc(when(o.created_on_chain_at))}</td><td>${esc(label(o.fate_status)||'unknown')}</td><td>${o.current_liquidity_usd==null?'UNKNOWN':esc(usd(o.current_liquidity_usd))}</td><td>${solscan('tx',o.creation_signature,'creation tx')}</td></tr>`).join('')}</tbody></table></div>
+    <p class="car-note">"Inactive" is the current market state, not proof of a rug pull. ${arr(outcomesReport.limitations).map(esc).join(' ')}</p>`:
+    `<p class="cus-empty">No verified token creations were found for this wallet in the investigated window.</p>`;
+
+  const eventRow=e=>`<li><b>${esc(when(e.observed_at))}</b> · ${esc(eventLabel[e.event_type]||label(e.event_type))}${e.amount_native!=null?` ${esc(e.amount_native)} ${esc(e.asset_type||'')}`:''}${e.token_mint?` ${solscan('token',e.token_mint)}`:''}${e.counterparty?` → ${solscan('account',e.counterparty)}`:''} · ${solscan('tx',e.signature,'tx')}</li>`;
+  const timeline=events.length?`<h5>Activity timeline (${events.length} decoded events, newest first)</h5><ol class="car-timeline">${events.slice(0,15).map(eventRow).join('')}</ol>${events.length>15?`<details class="cus-details"><summary>${events.length-15} earlier events</summary><ol class="car-timeline">${events.slice(15).map(eventRow).join('')}</ol></details>`:''}`:'';
+
+  const relationRow=r=>`<li>${solscan('account',r.address)} · ${esc(label(r.relation))} · ${esc(r.outbound_transfers??0)} out / ${esc(r.inbound_transfers??0)} in${arr(r.assets).length?` · ${arr(r.assets).map(esc).join(', ')}`:''}${arr(r.token_mints).length?` · tokens ${arr(r.token_mints).map(m=>solscan('token',m)).join(' ')}`:''} · ${esc(when(r.first_observed_at))} – ${esc(when(r.last_observed_at))}${txLinks(r.evidence_signatures,2)}</li>`;
+  const money=relationships.length?`<h5>Wallets it moved funds or tokens with (${relationships.length})</h5><ul>${relationships.map(relationRow).join('')}</ul><p class="car-note">A transfer relationship is not proof of common ownership or wrongdoing.</p>`:'';
+
+  const fundingStatus=String(funding.status||'unknown');
+  const fundingFound=!/not_observed|unknown|unavailable/.test(fundingStatus);
+  const fundingBlock=`<h5>Where its money came from</h5>${fundingFound?`<p>${esc(label(funding.trail_status||fundingStatus))}${funding.source_wallet?` · source ${solscan('account',funding.source_wallet)}`:''}</p>`:`<p><b>UNKNOWN.</b> ${esc(obj(funding.boundary).reason||'The funding origin was not reached in the investigated history.')} ${funding.signatures_scanned?`${esc(funding.signatures_scanned)} signatures were scanned.`:''}</p>`}${arr(fundingPaths.funding_sources).length?`<ul>${arr(fundingPaths.funding_sources).map(f=>`<li>${solscan('account',f.address||f.source||f.wallet)} ${esc(f.amount_native??'')} ${esc(f.asset_type||'')}</li>`).join('')}</ul>`:''}${arr(funding.limitations).length?`<p class="car-note">${arr(funding.limitations).map(esc).join(' ')}</p>`:''}`;
+
+  const patternBlock=patterns.length?`<h5>Behavior patterns checked (${patterns.length})</h5><ul>${patterns.map(p=>`<li><b>${esc(p.label||p.pattern_id)}</b> · ${esc(p.triggered?'OBSERVED':String(p.status||'not observed').replaceAll('_',' ').toUpperCase())}${p.explanation?` — ${esc(p.explanation)}`:''}</li>`).join('')}</ul>`:'';
+  const launchBlock=launch.length?`<h5>Launch-window behavior of this token</h5><ul>${launch.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`:'';
+  const coverage=Object.keys(history).length?`<p class="car-note">History read: ${esc(history.signatures_seen??'?')} signatures${history.history_complete===true?' (complete)':' — partial; older activity may exist outside this window'}. ${arr(history.limitations).map(esc).join(' ')}</p>`:'';
+
+  return `<section class="car-card car-owner"><h4>${isToken?'Who is behind this token and what they have done':'What this wallet has done'}</h4>${header}${tokens}${timeline}${money}${fundingBlock}${patternBlock}${launchBlock}${coverage}</section>`;
+}
+
+// A triggered shadow rule is surfaced right under the decision so the
+// customer sees it first, while it stays explicit that it did not set the grade.
+function arvisShadowAlert(report){
+  const hits=arr(report.shadow_rules).filter(rule=>rule&&rule.triggered===true);
+  if(!hits.length)return '';
+  return `<section class="cus-customer-verdict car-alert" data-tone="review" aria-label="Triggered shadow rules"><span>PATTERN DETECTED · GRADE NOT CHANGED</span>
+    ${hits.map(rule=>`<h3>${esc(rule.rule_id)} · ${esc(rule.title)}</h3><p>${esc(rule.summary||'')}</p>`).join('')}
+    <p class="car-note">This rule runs in shadow mode: it is shown in full but is not part of the signed grade until it is explicitly promoted. Details and every cited token are listed below.</p></section>`;
 }
 
 function arvisRuleGroups(rules){
@@ -252,7 +328,7 @@ function arvisRules(report){
   const verdict=obj(report.final_verdict),groups=arvisRuleGroups(verdict.triggered_rules),watch=arr(verdict.watch_flags);
   const group=g=>{
     const first=g.rows.slice(0,3),rest=g.rows.slice(3);
-    const line=r=>`<li>${esc(r.summary||r.title||'')}</li>`;
+    const line=r=>`<li>${esc(r.summary||r.title||'')}${txLinks(r.signatures)}</li>`;
     return `<article class="car-rule"><div class="cus-subhead"><span>${esc(g.id)} · ${esc(g.title)}</span><b>${esc(String(g.status||'unknown').toUpperCase())} · ${g.rows.length}</b></div><ul>${first.map(line).join('')}</ul>${rest.length?`<details class="cus-details"><summary>${rest.length} more</summary><ul>${rest.map(line).join('')}</ul></details>`:''}</article>`;
   };
   return `<section class="car-card"><h4>Rules that set the grade</h4>
@@ -274,16 +350,76 @@ function arvisFindings(report){
 function arvisShadowRules(report){
   const rules=arr(report.shadow_rules);
   if(!rules.length)return '';
+  const row=x=>`<tr><td>${solscan('token',x.mint)}</td><td>${esc(x.created_on_chain_at||'unknown')}</td><td>${esc(label(x.fate_status)||'unknown')}</td><td>${solscan('tx',x.creation_signature,'creation tx')}</td></tr>`;
   return `<section class="car-card"><h4>Shadow rules · do not change the grade</h4>
-    <p class="car-note">Trial rules shown for review. They are not part of the signed verdict until explicitly promoted.</p>
-    ${rules.map(rule=>`<details class="cus-details"${rule.triggered?' open':''}><summary>${esc(rule.rule_id)} · ${esc(rule.title)} · ${esc(label(rule.status))}</summary>
+    <p class="car-note">Trial rules shown in full for review. They are not part of the signed verdict until explicitly promoted.</p>
+    ${rules.map(rule=>{const ev=arr(rule.evidence);return `<details class="cus-details"${rule.triggered?' open':''}><summary>${esc(rule.rule_id)} · ${esc(rule.title)} · ${esc(label(rule.status))}</summary>
       <p>${esc(rule.summary||'')}</p>
-      ${arr(rule.evidence).length?`<p class="car-note">${arr(rule.evidence).length} cited token creations with signatures are included in the technical evidence.</p>`:''}
-      <p class="car-note">${arr(rule.limitations).map(esc).join('<br>')}</p></details>`).join('')}
+      <div class="cus-overview car-metrics">
+        <div><span>Verified prior tokens</span><b>${esc(rule.verified_prior_tokens??'?')}</b></div>
+        <div><span>Inactive / known fate</span><b>${esc(rule.inactive_or_dead??'?')} / ${esc(rule.known_fate_tokens??'?')}</b></div>
+        <div><span>Most launches in 1 hour</span><b>${esc(rule.max_launches_per_hour??'?')}</b></div>
+        <div><span>Creator wallet</span><b>${solscan('account',rule.creator_wallet)}</b></div>
+      </div>
+      ${rule.first_launch_at?`<p class="car-note">Launch window: ${esc(rule.first_launch_at)} – ${esc(rule.last_launch_at||'')}</p>`:''}
+      ${ev.length?`<details class="cus-details"><summary>All ${ev.length} cited token creations</summary><div class="car-table"><table><thead><tr><th>Token</th><th>Created</th><th>Status now</th><th>Proof</th></tr></thead><tbody>${ev.map(row).join('')}</tbody></table></div></details>`:''}
+      <p class="car-note">${arr(rule.limitations).map(esc).join('<br>')}</p></details>`;}).join('')}
+  </section>`;
+}
+
+const pathTone={open:'review',closed:'observed',not_observed:'observed',unknown:'limited'};
+function arvisThreatPaths(report){
+  const threat=obj(report.threat_anticipation);
+  if(!Object.keys(threat).length)return '';
+  const exit=obj(threat.exit_capacity),rug=obj(threat.rug_pathway_assessment);
+  const paths=arr(threat.pathways),scenarios=arr(threat.scenarios),watch=arr(threat.watch_signals),missing=arr(threat.missing_evidence);
+  const pct=value=>Number.isFinite(Number(value))&&value!==null?Number(value).toFixed(2)+'%':'UNKNOWN';
+  return `<section class="car-card"><h4>How the risk could play out</h4>
+    <p class="car-note">Technical pathways, not a rug probability or a claim about intent.</p>
+    ${exit.available===true?`<div class="cus-overview car-metrics">
+      <div><span>Largest risk-bearing owner</span><b>${esc(pct(exit.owner_percentage))}</b></div>
+      <div><span>Owner wallet</span><b>${solscan('account',exit.dominant_owner_wallet)}</b></div>
+      <div><span>Position value (ref.)</span><b>${esc(usd(exit.owner_reference_usd_value))}</b></div>
+      <div><span>Position / liquidity</span><b>${exit.position_liquidity_multiple==null?'UNKNOWN':esc(exit.position_liquidity_multiple)+'x'}</b></div>
+      <div><span>Exit capacity</span><b>${esc(label(exit.capacity)||'unknown').toUpperCase()}</b></div>
+    </div>${exit.interpretation?`<p class="car-note">${esc(exit.interpretation)}</p>`:''}`:'<p class="cus-empty">Exit capacity could not be computed; it stays UNKNOWN.</p>'}
+    ${paths.length?`<ul class="car-paths">${paths.map(p=>`<li data-tone="${esc(pathTone[p.status]||'limited')}"><b>${esc(p.label||p.id)}</b> <em class="car-tag">${esc(label(p.status).toUpperCase())}</em><br>${esc(p.summary||'')}</li>`).join('')}</ul>`:''}
+    ${rug.conclusion?`<p><b>Pathway summary:</b> ${esc(rug.conclusion)}</p>`:''}
+    ${missing.length?`<p><b>Evidence still missing for a decision:</b> ${missing.map(esc).join(' · ')}</p>`:''}
+    ${scenarios.length?`<details class="cus-details"><summary>Possible next behaviors to watch (${scenarios.length})</summary><ul>${scenarios.map(x=>`<li><b>${esc(x.title||x.id)}</b> — ${esc(x.basis||'')}${arr(x.next_signals).length?`<br><span class="car-note">Next signals: ${arr(x.next_signals).map(esc).join(' · ')}</span>`:''}</li>`).join('')}</ul></details>`:''}
+    ${watch.length?`<details class="cus-details"><summary>Early-warning triggers (${watch.length})</summary><ul>${watch.map(x=>`<li><b>${esc(x.title||'')}</b> — ${esc(x.trigger||'')}</li>`).join('')}</ul></details>`:''}
+  </section>`;
+}
+
+function arvisBehaviorRules(report){
+  const signals=arr(obj(report.behavior_signals).signals);
+  if(!signals.length)return '';
+  const state=s=>s.triggered===true?'TRIGGERED':s.evidence_status==='unverified'?'NOT EVALUATED':'NOT TRIGGERED';
+  return `<section class="car-card"><h4>Market and holder behavior rules (${signals.length})</h4>
+    <p class="car-note">Every rule is listed, including ones that did not fire or could not be evaluated. "Not evaluated" means evidence was missing, not that the behavior is absent.</p>
+    ${signals.map(s=>`<article class="car-rule"><div class="cus-subhead"><span>${esc(s.rule_id)} · ${esc(s.title)}</span><b>${esc(state(s))} · ${esc(String(s.evidence_status||'unknown').toUpperCase())}</b></div><p>${esc(s.summary||'')}</p>${txLinks(s.signatures)}</article>`).join('')}
+  </section>`;
+}
+
+function arvisModules(report){
+  const modules=arr(report.modules);
+  if(!modules.length)return '';
+  const checks=new Map(arr(obj(report.investigation_coverage).arms).filter(a=>a&&a.subchecks&&a.subchecks.checks).map(a=>[a.module_id,a.subchecks]));
+  const checkLabel={performed:'done',performed_partial:'partial (time limit)',unknown:'unknown'};
+  const moduleState=m=>m.signed===true?(m.verified===true?'VERIFIED':'COMPLETED'):'EVIDENCE PENDING';
+  return `<section class="car-card"><h4>All ARVIS modules (${modules.length})</h4>
+    <p class="car-note">Each module with its conclusion, every evidence line it produced and the checks it ran. "Done" means a check ran on verified evidence; it does not mean the result is safe.</p>
+    ${modules.map(m=>{const sc=checks.get(m.module_id),required=new Set(arr(sc?.required)),ev=arr(m.evidence);
+      return `<details class="cus-details car-module"><summary>${esc(m.module||m.module_id)} · ${esc(moduleState(m))}</summary>
+        <p>${esc(m.verdict||'No conclusion was returned.')}</p>
+        ${sc?`<div class="cus-reasons">${Object.entries(sc.checks).sort().map(([k,v])=>`<code data-state="${esc(v)}">${required.has(k)?'● ':''}${esc(label(k))}: ${esc(checkLabel[v]||v)}</code>`).join('')}</div>`:''}
+        ${ev.length?`<ol class="car-evidence">${ev.map(line=>`<li>${esc(typeof line==='string'?line:JSON.stringify(line))}</li>`).join('')}</ol>`:'<p class="cus-empty">This module produced no evidence lines.</p>'}
+      </details>`;}).join('')}
   </section>`;
 }
 
 function arvisCoverage(report){
+  if(!report.investigation_coverage)return '';
   const coverage=obj(report.investigation_coverage),arms=arr(coverage.arms).filter(a=>a&&a.subchecks&&a.subchecks.checks);
   const checkLabel={performed:'done',performed_partial:'partial (time limit)',unknown:'unknown'};
   const gaps=arr(coverage.critical_gaps);
@@ -297,7 +433,7 @@ function arvisCoverage(report){
     </div>
     ${coverage.summary?`<p class="car-note">${esc(coverage.summary)}</p>`:''}
     ${gaps.length?`<p><b>Critical gaps:</b> ${gaps.map(esc).join(' · ')}</p>`:''}
-    ${arms.length?`<details class="cus-details"><summary>Module checks (${arms.length})</summary><p class="car-note">"done" means the check ran on verified evidence; it does not mean the result is safe.</p>
+    ${arms.length&&!arr(report.modules).length?`<details class="cus-details"><summary>Module checks (${arms.length})</summary><p class="car-note">"done" means the check ran on verified evidence; it does not mean the result is safe.</p>
       ${arms.map(a=>{const sc=a.subchecks,required=new Set(arr(sc.required));return `<div class="car-module"><div class="cus-subhead"><span>${esc(a.module||a.module_id)}</span><b>${esc(label(sc.required_checks_status)||'unknown')}</b></div><div class="cus-reasons">${Object.entries(sc.checks).sort().map(([k,v])=>`<code data-state="${esc(v)}">${required.has(k)?'● ':''}${esc(label(k))}: ${esc(checkLabel[v]||v)}</code>`).join('')}</div></div>`;}).join('')}</details>`:''}
   </section>`;
 }
@@ -314,7 +450,7 @@ function arvisLimits(report){
 }
 
 function readableArvisReportHTML(report){
-  return `<div class="car-report">${arvisDecisionHeader(report)}${arvisMarketSnapshot(report)}${arvisRules(report)}${arvisFindings(report)}${arvisShadowRules(report)}${arvisCoverage(report)}${arvisLimits(report)}
+  return `<div class="car-report">${arvisOwnerHistory(report)}${arvisDecisionHeader(report)}${arvisShadowAlert(report)}${arvisMarketSnapshot(report)}${arvisRules(report)}${arvisFindings(report)}${arvisThreatPaths(report)}${arvisBehaviorRules(report)}${arvisShadowRules(report)}${arvisModules(report)}${arvisCoverage(report)}${arvisLimits(report)}
     <details class="cus-details car-technical" data-arvis-technical><summary>Technical evidence (JSON)</summary><p class="car-note">The complete retained report with every collector row and provenance. It is rendered when opened.</p><button type="button" data-arvis-download>Download JSON</button><pre class="cus-raw" data-arvis-raw></pre></details>
     <p class="car-note">Koschei never converts missing evidence into a safe result. A grade is not a safety certificate or financial advice.</p></div>`;
 }
@@ -368,28 +504,56 @@ function install(){
 
   // The canonical customer job endpoint is already account-scoped and durable.
   // Never route this through owner APIs or claim non-Solana collectors exist.
-  // A Solana address investigation starts with the scan itself (auto); the
-  // button stays as a manual retry. Other networks still wait for a click.
-  function offerCanonicalDeepJob(request,{auto=false}={}){
+  // The account's newest retained job for this target, or null. Any failure
+  // (signed out, no Professional access, network) means "nothing to reuse".
+  async function latestRetainedJob(request,signal){
+    try{
+      const query=new URLSearchParams({target:request.target,network:request.network});
+      const response=await window.KoscheiAuth.apiCall('/api/v1/radar/jobs/?'+query,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'},signal});
+      if(!response?.ok)return null;
+      const item=(await response.json())?.history?.[0];
+      if(!item||item.target!==request.target||item.network!==request.network||!/^[0-9a-f-]{36}$/i.test(String(item.id||'')))return null;
+      return item;
+    }catch{return null;}
+  }
+  const RETAINED_REUSE_MS=30*60*1000;
+
+  // A Solana address investigation starts with an explicit scan (auto); a
+  // shared link only reattaches to retained work (resume). Either way a
+  // running job is followed, and a recent finished report is shown, before
+  // any new output is spent. Other networks still wait for a click.
+  function offerCanonicalDeepJob(request,{auto=false,resume=false}={}){
     const button=document.createElement('button');
     button.type='button';
     const nativeOnly=request.family!=='solana';
     button.textContent=request.kind==='transaction'?'Run and save transaction evidence':nativeOnly?'Run and save native evidence':'Run durable ARVIS investigation';
-    const start=async()=>{
+    const start=async({fresh=true,reuseOnly=false}={})=>{
       const current=generation;
       if(deepAbort)return;
       const controller=new AbortController();deepAbort=controller;
       button.disabled=true;
-      status.textContent='Creating a durable, account-scoped investigation…';
+      if(!reuseOnly)status.textContent='Creating a durable, account-scoped investigation…';
       try{
         if(!window.KoscheiAuth?.apiCall){
-          status.textContent='Sign in to create an account-scoped investigation.';
+          if(!reuseOnly)status.textContent='Sign in to create an account-scoped investigation.';
           button.disabled=false;deepAbort=null;return;
         }
         await window.KoscheiAuth.init();
         if(!window.KoscheiAuth.isLoggedIn()){
-          status.textContent='Sign in to start this retained investigation.';
+          if(!reuseOnly)status.textContent='Sign in to start this retained investigation.';
           button.disabled=false;deepAbort=null;return;
+        }
+        if(!nativeOnly&&!fresh){
+          const latest=await latestRetainedJob(request,controller.signal);
+          if(current!==generation)return;
+          const age=Date.now()-Date.parse(latest?.updated_at||'');
+          if(latest&&['queued','running'].includes(latest.status)){
+            follow(String(latest.id),{joined:true});return;
+          }
+          if(latest&&latest.status==='completed'&&latest.result_available===true&&(reuseOnly||age<RETAINED_REUSE_MS)){
+            follow(String(latest.id),{retainedAt:latest.updated_at});return;
+          }
+          if(reuseOnly){button.disabled=false;deepAbort=null;return;}
         }
         const response=await window.KoscheiAuth.apiCall('/api/v1/radar/jobs',{
           method:'POST',credentials:'same-origin',cache:'no-store',
@@ -406,12 +570,23 @@ function install(){
             'The deep investigation could not be started. No report was created.';
           button.disabled=false;deepAbort=null;return;
         }
-        const joined=job?.joined_existing_job===true;
         const id=String(job?.job_id||'');
-        const pollURL='/api/v1/radar/jobs/'+id;
-        if(!/^[0-9a-f-]{36}$/i.test(id)||job.poll_url!==pollURL||job.canonical_engine!==true){
+        if(!/^[0-9a-f-]{36}$/i.test(id)||job.poll_url!=='/api/v1/radar/jobs/'+id||job.canonical_engine!==true){
           throw new Error('The background job confirmation could not be authenticated.');
         }
+        follow(id,{joined:job?.joined_existing_job===true});
+      }catch(error){
+        if(current!==generation||controller.signal.aborted)return;
+        status.textContent='Deep investigation request failed: '+(error.message||'unavailable');
+        button.disabled=false;deepAbort=null;
+      }
+
+      // Follows one account-scoped job to its terminal state. joined: an
+      // in-flight job was reused; retainedAt: a finished report is reopened.
+      async function follow(id,{joined=false,retainedAt=''}={}){
+        const pollURL='/api/v1/radar/jobs/'+id;
+        if(retainedAt)button.textContent='Run a fresh investigation';
+        button.disabled=false;
         // The API status resource requires a bearer session; opening it as a
         // bare browser link would fail authentication. Use the signed-in
         // account history page to retrieve the result with its auth helper.
@@ -439,8 +614,9 @@ function install(){
             '</section>';
           if(readable)bindTechnicalEvidence(results,report);
         };
-        show('Queued. The investigation continues on the server and remains in your account history.');
-        status.textContent=joined?'This target is already being investigated for your account; the running job was reused and no additional output was used.':'ARVIS investigation started; one Professional output is used for this report.';
+        const retainedNote=retainedAt?`Showing your retained report from ${retainedAt}; no output was used. "Run a fresh investigation" starts a new one (1 output).`:'';
+        show(retainedAt?'Loading your retained report…':'Queued. The investigation continues on the server and remains in your account history.');
+        status.textContent=retainedNote||(joined?'This target is already being investigated for your account; the running job was reused and no additional output was used.':'ARVIS investigation started; one Professional output is used for this report.');
         const poll=async()=>{
           if(current!==generation||controller.signal.aborted)return;
           try{
@@ -455,7 +631,7 @@ function install(){
               if(!snapshot.result||typeof snapshot.result!=='object'||Array.isArray(snapshot.result))
                 throw new Error('Job completed without readable evidence; no verdict can be inferred.');
               show(nativeOnly?'Native collection finished. All observed evidence is retained; historical collectors and a signed grade are NOT claimed.':'Completed. All retained findings and provenance are shown below.',snapshot.result);
-              status.textContent=nativeOnly?'Native evidence job completed; the result is retained in account history.':'ARVIS job completed; the report is retained in account history.';
+              status.textContent=retainedNote||(nativeOnly?'Native evidence job completed; the result is retained in account history.':'ARVIS job completed; the report is retained in account history.');
               settleOverview();
               deepAbort=null;return;
             }
@@ -485,18 +661,15 @@ function install(){
           }
         };
         await poll();
-      }catch(error){
-        if(current!==generation||controller.signal.aborted)return;
-        status.textContent='Deep investigation request failed: '+(error.message||'unavailable');
-        button.disabled=false;deepAbort=null;
       }
     };
-    button.addEventListener('click',start);
+    button.addEventListener('click',()=>start({fresh:true}));
     const chat=document.createElement('a');
     chat.href='/arvis-chat?'+new URLSearchParams({target:request.target,network:request.network});
     chat.textContent='Explore evidence with ARVIS';
     recovery.replaceChildren(button,chat);recovery.hidden=false;
-    if(auto)start();
+    if(auto)start({fresh:false});
+    else if(resume&&!nativeOnly)start({fresh:false,reuseOnly:true});
   }
 
   // Only an explicit form submission may start a paid investigation; opening a
@@ -534,7 +707,8 @@ function install(){
       const durableAddress=request.kind==='address'&&['solana','evm','bitcoin'].includes(request.family);
       const durableTransaction=request.kind==='transaction'&&['evm','bitcoin'].includes(request.family);
       if(response.ok&&(durableAddress||durableTransaction)){
-        offerCanonicalDeepJob(request,{auto:explicit&&durableAddress&&request.family==='solana'});
+        const solanaAddress=durableAddress&&request.family==='solana';
+        offerCanonicalDeepJob(request,{auto:explicit&&solanaAddress,resume:!explicit&&solanaAddress});
       }
     }catch(error){
       if(current!==generation)return;
