@@ -168,6 +168,15 @@ func (h *Handler) collectActorFundingOrigin(ctx context.Context, store *services
 		OldestTransactionsToParse: actorDefenseEnvInt("ACTOR_FUNDING_TRANSACTION_LIMIT", 60, 10, 250),
 	}
 	origin, err := services.FindActorFundingOrigin(fundingCtx, creatorIntelRPCURL(), wallet, options)
+	// A busy wallet's newest-first walk stops before its first transaction;
+	// read the start of its history directly instead of reporting UNKNOWN.
+	if err == nil && origin.SourceWallet == "" && origin.ResultState == services.ActorFundingResultBounded {
+		if oldest, ok := services.FindActorFundingOriginOldestFirst(ctx, creatorIntelRPCURL(), wallet); ok {
+			oldest.PagesScanned, oldest.SignaturesScanned = origin.PagesScanned, origin.SignaturesScanned
+			oldest.TransactionsParsed += origin.TransactionsParsed
+			origin = oldest
+		}
+	}
 	if err != nil {
 		reason := "Funding-origin araştırması tamamlanamadı: " + creatorIntelCompactError(err)
 		return services.ActorFundingOrigin{

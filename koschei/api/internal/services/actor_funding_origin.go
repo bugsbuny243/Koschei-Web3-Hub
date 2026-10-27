@@ -268,7 +268,10 @@ func ActorFundingOriginEvidence(origin ActorFundingOrigin, network string) (Acto
 	}
 	relation := "oldest_funding_in_window"
 	evidenceSuffix := ":oldest_funding_window"
-	if origin.HistoryComplete {
+	// An oldest-first read starts at the wallet's first transaction, so its
+	// earliest funding transfer is the initial funding even though the
+	// newest-first signature walk did not complete.
+	if origin.HistoryComplete || origin.Boundary.Kind == "oldest_first_history" {
 		relation = "initial_funding_in"
 		evidenceSuffix = ":initial_funding"
 	}
