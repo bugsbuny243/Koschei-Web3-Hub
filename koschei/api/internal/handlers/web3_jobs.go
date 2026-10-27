@@ -141,10 +141,20 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusPaymentRequired, insufficientOutputsResponse())
 		return
 	}
-	job, err := h.JobStore.Create(r.Context(), jobs.CreateInput{
+	input := jobs.CreateInput{
 		UserID: claims.Sub, Email: claims.Email, Type: jobType,
 		Network: req.Network, Target: target, Request: requestPayload,
-	})
+	}
+	var job jobs.Job
+	created := true
+	var err error
+	if jobType == CanonicalInvestigationJobType {
+		// A repeated request for the same account, target and network joins the
+		// queued or running investigation instead of paying for a second one.
+		job, created, err = h.JobStore.CreateUniqueInFlight(r.Context(), input, "customer|"+claims.Sub)
+	} else {
+		job, err = h.JobStore.Create(r.Context(), input)
+	}
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "job create failed"})
 		return
@@ -153,9 +163,15 @@ func (h *Handler) CreateWeb3Job(w http.ResponseWriter, r *http.Request) {
 	if jobType == CanonicalInvestigationJobType {
 		pollURL = "/api/v1/radar/jobs/" + job.ID
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{
+	status := http.StatusCreated
+	if !created {
+		w.Header().Set("X-Koschei-Quota-Consume", "false")
+		status = http.StatusOK
+	}
+	writeJSON(w, status, map[string]any{
 		"job_id": job.ID, "status": job.Status, "poll_url": pollURL,
 		"package_required": true, "canonical_engine": jobType == CanonicalInvestigationJobType,
+		"joined_existing_job": !created, "charged": created,
 	})
 }
 

@@ -246,7 +246,7 @@ test('blank evidence reference entries are rejected without requiring evidence t
  assert.equal(router.matchesResult(envelope(),request),true);
 });
 
-test('customer starts full retained ARVIS job and sees entire verified network-bound report',async()=>{
+test('a Solana address scan starts the retained ARVIS job without a second click',async()=>{
  const id='12345678-1234-1234-1234-123456789abc',calls=[];
  const full={final_verdict:{signed:false,grade:'-',limitation:'fixture_not_attested'},
    all_collector_rows:[{module:'fixture',provenance:{source:'synthetic',height:47}}],
@@ -258,11 +258,10 @@ test('customer starts full retained ARVIS job and sees entire verified network-b
    if(url==='/api/v1/radar/jobs/'+id)return response(200,{id,job_type:'canonical_investigation',status:'completed',target:sol,network:'solana-mainnet',result:full});
    throw new Error('unexpected fixture route '+url);
  });
- h.submit(sol,'solana-mainnet');await settle();
+ h.submit(sol,'solana-mainnet');await settle();await settle();await settle();
  const button=h.nodes.customerUniversalRecovery.children[0];
  assert.equal(button.textContent,'Run durable ARVIS investigation');
- button.dispatch('click');await settle();await settle();
- assert.equal(calls.length,3);
+ assert.equal(calls.length,3,'scan, job creation and one status read');
  assert.deepEqual(JSON.parse(calls[1].options.body),{address:sol,network:'solana-mainnet',max_depth:3});
  assert.equal(h.nodes.customerUniversalRecovery.children[1].href,'/reports?job='+encodeURIComponent(id));
  assert.match(h.nodes.customerUniversalResults.innerHTML,/Complete retained ARVIS report/);
@@ -335,4 +334,87 @@ test('transaction evidence is retained by a customer-owned job without claiming 
  assert.equal(h.nodes.customerUniversalRecovery.children[1].href,'/reports?job='+encodeURIComponent(id));
  assert.match(h.nodes.customerUniversalResults.innerHTML,/native_network_transaction_observation/);
  assert.doesNotMatch(calls.map(c=>c.url).join('|'),/\/api\/owner\//);
+});
+
+// Explicit synthetic fixture shaped like a retained Solana ARVIS report.
+function readableFixture(){
+ return {target:sol,network:'solana-mainnet',
+  final_verdict:{grade:'B',signed:true,verdict:'compounding_rule',ruleset_version:'fixture-rules-v1',signature:'fixture-signature-value-not-real',generated_at:'2026-10-26T19:41:38Z',
+   triggered_rules:[{rule_id:'ARD-C001',title:'Creator/deployer reuse',summary:'fixture creator linked to 125 tokens',evidence_status:'verified'},
+    ...Array.from({length:5},(_,i)=>({rule_id:'ARD-C004',title:'Repeated direct transfer relation',summary:'fixture relation '+i,evidence_status:'verified'}))],
+   watch_flags:[{rule_id:'ARD-W002',title:'Possible dust',summary:'fixture dust observation'}]},
+  investor_protection_decision:{decision:'NOT_CLEARED',summary:'fixture: missing evidence is not converted into a safe result',critical_gaps:[],evidence_limits:[{capability:'fixture collector',reason:'fixture history bounded'}]},
+  market:{available:true,name:'Fixture Cat',symbol:'FCAT',liquidity_usd:3694.49,market_cap_usd:2993,volume_24h_usd:0.29,price_usd:0.000003,provider:'fixture-market',observed_at:'2026-10-26T19:40:05Z'},
+  shadow_rules:[{rule_id:'ARD-C006',title:'Verified serial launch factory',status:'triggered_shadow',triggered:true,summary:'fixture: 40 launches in one hour',evidence:[{mint:'fixture-mint'}],limitations:['Shadow rule: fixture limitation']}],
+  investigation_coverage:{status:'partial_investigation',completed:12,capability_total:14,evidence_producing:12,evidence_pending:2,source_unavailable:0,critical_gaps:[],
+   arms:[{module:'Pool Control Guardian',subchecks:{checks:{pool_reserves:'performed',pool_program_relation:'unknown'},required:['pool_reserves'],required_checks_status:'partial'}}]},
+  modules:[],collector_only_marker:'fixture-raw-collector-row'};
+}
+test('a completed Solana report reads as decision, rules, shadow rules and coverage, not a raw dump',async()=>{
+ const id='12345678-1234-1234-1234-123456789abc';
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   return response(200,{id,job_type:'canonical_investigation',status:'completed',target:sol,network:'solana-mainnet',result:readableFixture()});
+ });
+ h.submit(sol,'solana-mainnet');for(let i=0;i<4;i++)await settle();
+ const html=h.nodes.customerUniversalResults.innerHTML;
+ assert.match(html,/Signed ARVIS grade B/);
+ assert.match(html,/NOT CLEARED/);
+ assert.match(html,/ARD-C004 · Repeated direct transfer relation/);
+ assert.match(html,/2 more/,'long rule groups fold after three rows');
+ assert.match(html,/Shadow rules · do not change the grade/);
+ assert.match(html,/pool reserves: done/);
+ assert.match(html,/pool program relation: unknown/);
+ assert.match(html,/fixture history bounded/);
+ assert.match(html,/Pre-check · live account observation/);
+ assert.doesNotMatch(html,/fixture-raw-collector-row/,'the raw report is rendered only when the technical section is opened');
+ assert.doesNotMatch(html,/\bSAFE\b/);
+ assert.equal(h.nodes.customerUniversalOverview.innerHTML,'');
+});
+test('an unsigned report says no grade was issued instead of implying safety',async()=>{
+ const id='12345678-1234-1234-1234-123456789abc',report=readableFixture();
+ report.final_verdict={signed:false,grade:'-'};report.market={available:false};
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   return response(200,{id,job_type:'canonical_investigation',status:'completed',target:sol,network:'solana-mainnet',result:report});
+ });
+ h.submit(sol,'solana-mainnet');for(let i=0;i<4;i++)await settle();
+ const html=h.nodes.customerUniversalResults.innerHTML;
+ assert.match(html,/No signed grade was issued/);
+ assert.match(html,/Liquidity and price are UNKNOWN/);
+ assert.match(html,/No grade-changing rule was triggered. This does not mean the token is safe/);
+});
+test('a repeated request that joins a running job says no extra output was used',async()=>{
+ const id='12345678-1234-1234-1234-123456789abc';
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(200,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true,joined_existing_job:true,charged:false});
+   return response(200,{id,job_type:'canonical_investigation',status:'running',progress:40,target:sol,network:'solana-mainnet'});
+ });
+ h.submit(sol,'solana-mainnet');await settle();await settle();
+ assert.match(h.nodes.customerUniversalOverview.innerHTML,/INVESTIGATING/);
+ assert.match(h.nodes.customerUniversalStatus.textContent,/no additional output was used/);
+ assert.match(h.nodes.customerUniversalResults.innerHTML,/running \(40%\)/);
+});
+
+test('opening a Solana result link runs only the free pre-check and starts no paid job',async()=>{
+ const calls=[];
+ const h=harness(async(url,options)=>{calls.push(url);return response(200,envelope(sol,'solana-mainnet'));},'?mode=address&network=solana-mainnet&target='+sol);
+ for(let i=0;i<3;i++)await settle();
+ assert.deepEqual(calls,['/api/scan']);
+ assert.equal(h.nodes.customerUniversalRecovery.children[0].textContent,'Run durable ARVIS investigation');
+});
+for(const [state,label] of [['failed',/INVESTIGATION FAILED/],['completed',/^$/]])test(`a ${state} job never leaves the INVESTIGATING headline behind`,async()=>{
+ const id='12345678-1234-1234-1234-123456789abc';
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   // A wallet report has no modules or coverage, so the readable renderer does not apply.
+   return response(200,{id,job_type:'canonical_investigation',status:state,target:sol,network:'solana-mainnet',result:{wallet:sol,final_verdict:{grade:'-',signed:false}}});
+ });
+ h.submit(sol,'solana-mainnet');for(let i=0;i<4;i++)await settle();
+ assert.doesNotMatch(h.nodes.customerUniversalOverview.innerHTML,/INVESTIGATING/);
+ assert.match(h.nodes.customerUniversalOverview.innerHTML,label);
 });

@@ -24,10 +24,13 @@ func registerWatchlistRoutes(mux *http.ServeMux, h *handlers.Handler, proMetered
 	// Watchlist alerts enqueue webhook deliveries through a PostgreSQL AFTER
 	// INSERT trigger. Wake after the request handler returns, which is after the
 	// transaction commits and the trigger-created delivery rows are visible.
-	mux.HandleFunc("/api/watchlist", requiresDB(h, proMetered(wakeWebhookDeliveryAfterWatchlistPost(h.WatchlistCollection))))
+	// Reading the watchlist or its alerts requires Professional but consumes no
+	// output; the customer workspace loads both on every visit.
+	watchlistGate := meterWatchlistWrites(proMetered, enterprise)
+	mux.HandleFunc("/api/watchlist", requiresDB(h, watchlistGate(wakeWebhookDeliveryAfterWatchlistPost(h.WatchlistCollection))))
 	mux.HandleFunc("/api/watchlist/refresh", requiresDB(h, proMetered(wakeWebhookDeliveryAfterWatchlistPost(method(http.MethodPost, h.WatchlistRefresh)))))
-	mux.HandleFunc("/api/watchlist/alerts", requiresDB(h, proMetered(h.WatchlistAlerts)))
-	mux.HandleFunc("/api/watchlist/", requiresDB(h, proMetered(wakeWebhookDeliveryAfterWatchlistPost(h.WatchlistItem))))
+	mux.HandleFunc("/api/watchlist/alerts", requiresDB(h, watchlistGate(h.WatchlistAlerts)))
+	mux.HandleFunc("/api/watchlist/", requiresDB(h, watchlistGate(wakeWebhookDeliveryAfterWatchlistPost(h.WatchlistItem))))
 
 	// Webhook management requires Professional entitlement but does not consume a
 	// scan output. The analyses that produce webhook events are metered separately.
@@ -36,6 +39,21 @@ func registerWatchlistRoutes(mux *http.ServeMux, h *handlers.Handler, proMetered
 	mux.HandleFunc("/api/webhooks/deliveries/", requiresDB(h, enterprise(h.WebhookDeliveryItem)))
 	mux.HandleFunc("/api/webhooks", requiresDB(h, enterprise(h.WebhookEndpoints)))
 	mux.HandleFunc("/api/webhooks/", requiresDB(h, enterprise(h.WebhookEndpointItem)))
+}
+
+// meterWatchlistWrites sends GET and HEAD through the access-only gate and
+// every other method through the metered gate.
+func meterWatchlistWrites(metered, accessOnly routeGate) routeGate {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		read, write := accessOnly(next), metered(next)
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet || r.Method == http.MethodHead {
+				read(w, r)
+				return
+			}
+			write(w, r)
+		}
+	}
 }
 
 func wakeWebhookDeliveryAfterWatchlistPost(next http.HandlerFunc) http.HandlerFunc {

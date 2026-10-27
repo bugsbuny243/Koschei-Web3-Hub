@@ -44,3 +44,23 @@ func TestWatchlistReadDoesNotWakeWebhookDelivery(t *testing.T) {
 		t.Fatal("GET unexpectedly woke webhook delivery")
 	}
 }
+
+func TestWatchlistReadsAreGatedWithoutConsumingOutputs(t *testing.T) {
+	var gates []string
+	gate := func(name string) routeGate {
+		return func(next http.HandlerFunc) http.HandlerFunc {
+			return func(w http.ResponseWriter, r *http.Request) { gates = append(gates, name); next(w, r) }
+		}
+	}
+	handler := meterWatchlistWrites(gate("metered"), gate("access"))(func(w http.ResponseWriter, r *http.Request) {})
+	for _, tc := range []struct{ method, want string }{
+		{http.MethodGet, "access"}, {http.MethodHead, "access"},
+		{http.MethodPost, "metered"}, {http.MethodPatch, "metered"}, {http.MethodDelete, "metered"},
+	} {
+		gates = nil
+		handler(httptest.NewRecorder(), httptest.NewRequest(tc.method, "/api/watchlist", nil))
+		if len(gates) != 1 || gates[0] != tc.want {
+			t.Fatalf("%s /api/watchlist passed gates %v, want only %s", tc.method, gates, tc.want)
+		}
+	}
+}

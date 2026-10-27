@@ -57,6 +57,16 @@ func (s *Store) Create(ctx context.Context, in CreateInput) (Job, error) {
 // transaction-scoped advisory lock. The same root/depth/target branch is not
 // duplicated while queued, running or already completed.
 func (s *Store) CreateUniqueActive(ctx context.Context, in CreateInput, dedupeKey string) (Job, bool, error) {
+	return s.createUnique(ctx, in, dedupeKey, true)
+}
+
+// CreateUniqueInFlight is CreateUniqueActive without the completed match: a
+// queued or running job is reused, but a finished one never blocks a new run.
+func (s *Store) CreateUniqueInFlight(ctx context.Context, in CreateInput, dedupeKey string) (Job, bool, error) {
+	return s.createUnique(ctx, in, dedupeKey, false)
+}
+
+func (s *Store) createUnique(ctx context.Context, in CreateInput, dedupeKey string, matchCompleted bool) (Job, bool, error) {
 	if s == nil || s.DB == nil {
 		return Job{}, false, errors.New("job store database unavailable")
 	}
@@ -95,9 +105,9 @@ func (s *Store) CreateUniqueActive(ctx context.Context, in CreateInput, dedupeKe
 		FROM web3_jobs
 		WHERE job_type=$1 AND COALESCE(network,'')=COALESCE($2,'') AND COALESCE(target,'')=COALESCE($3,'')
 		  AND COALESCE(request_payload->>'dedupe_key','')=$4
-		  AND status IN ('queued','running','completed')
+		  AND (status IN ('queued','running') OR ($5 AND status='completed'))
 		ORDER BY queued_at DESC
-		LIMIT 1`, in.Type, in.Network, in.Target, dedupeKey))
+		LIMIT 1`, in.Type, in.Network, in.Target, dedupeKey, matchCompleted))
 	if err == nil {
 		if commitErr := tx.Commit(); commitErr != nil {
 			return Job{}, false, commitErr
