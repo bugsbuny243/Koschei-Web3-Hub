@@ -471,3 +471,41 @@ test('a fresh run from a reopened report is an explicit, charged request',async(
  r.h.nodes.customerUniversalRecovery.children[0].dispatch('click');for(let i=0;i<4;i++)await settle();
  assert.equal(r.posts(),1);
 });
+
+test('the readable report shows every section: shadow alert, threat paths, behavior rules, all modules and cited tokens',async()=>{
+ const id='12345678-1234-1234-1234-123456789abc',report=readableFixture();
+ const mint='So11111111111111111111111111111111111111112',sig='5'.repeat(88);
+ report.shadow_rules[0]={...report.shadow_rules[0],verified_prior_tokens:36,inactive_or_dead:36,known_fate_tokens:36,max_launches_per_hour:30,creator_wallet:mint,
+   evidence:[{mint,creation_signature:sig,created_on_chain_at:'2026-10-26T05:41:16Z',fate_status:'inactive_or_dead'},{mint:'javascript:alert(1)',creation_signature:'not-a-signature',fate_status:'inactive_or_dead'}]};
+ report.final_verdict.triggered_rules[1].signatures=[sig,'<script>'];
+ report.threat_anticipation={primary_exposure:'fixture exposure',exit_capacity:{available:true,owner_percentage:14.0154,dominant_owner_wallet:mint,owner_reference_usd_value:39.23,position_liquidity_multiple:0.01,capacity:'elevated',interpretation:'fixture interpretation'},
+   pathways:[{id:'dominant_holder_exit',label:'Dominant-holder market exit',status:'open',summary:'fixture open path'},{id:'liquidity_removal',label:'Liquidity removal',status:'unknown',summary:'fixture unknown path'}],
+   rug_pathway_assessment:{conclusion:'fixture pathway conclusion'},missing_evidence:['LP mint and LP token owner'],scenarios:[],watch_signals:[]};
+ report.behavior_signals={signals:[{rule_id:'URD-C004',title:'Dominant-holder first observed exit',triggered:false,evidence_status:'unverified',summary:'fixture not evaluated'},{rule_id:'URD-C005',title:'Owner-resolved dominant concentration',triggered:false,evidence_status:'verified',summary:'fixture below threshold'}]};
+ report.modules=[{module:'Pool Control Guardian',module_id:'raydium_pool_guardian',signed:true,verified:true,verdict:'fixture pool verdict',evidence:['fixture pool evidence line one','fixture pool evidence line two']},
+   {module:'Claim Surface Risk',module_id:'claim_surface_risk',signed:false,verdict:'Real data unavailable.',evidence:[]}];
+ report.investigation_coverage.arms[0].module_id='raydium_pool_guardian';
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   return response(200,{id,job_type:'canonical_investigation',status:'completed',target:sol,network:'solana-mainnet',result:report});
+ });
+ h.submit(sol,'solana-mainnet');for(let i=0;i<5;i++)await settle();
+ const html=h.nodes.customerUniversalResults.innerHTML;
+ assert.match(html,/PATTERN DETECTED · GRADE NOT CHANGED/);
+ assert.ok(html.indexOf('PATTERN DETECTED')<html.indexOf('Rules that set the grade'),'the triggered shadow rule is shown before the rule list');
+ assert.match(html,/All 2 cited token creations/);
+ assert.match(html,new RegExp('https://solscan.io/token/'+mint));
+ assert.match(html,new RegExp('https://solscan.io/tx/'+sig));
+ assert.doesNotMatch(html,/href="[^"]*javascript:/,'non-base58 values are never turned into links');
+ assert.doesNotMatch(html,/<script>/);
+ assert.match(html,/How the risk could play out/);
+ assert.match(html,/Dominant-holder market exit/);
+ assert.match(html,/Evidence still missing for a decision:/);
+ assert.match(html,/URD-C004 · Dominant-holder first observed exit<\/span><b>NOT EVALUATED/);
+ assert.match(html,/All ARVIS modules \(2\)/);
+ assert.match(html,/fixture pool evidence line two/);
+ assert.match(html,/Claim Surface Risk · EVIDENCE PENDING/);
+ assert.match(html,/This module produced no evidence lines/);
+ assert.doesNotMatch(html,/\bSAFE\b/);
+});

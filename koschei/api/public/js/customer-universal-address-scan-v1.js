@@ -238,6 +238,23 @@ function arvisMarketSnapshot(report){
     <p class="car-note">Point-in-time snapshot from ${esc(market.provider||'an external market source')} at ${esc(market.observed_at||'an unknown time')}; not a guaranteed exit price.</p></section>`;
 }
 
+// Explorer links are built only from base58 values, so report text can never
+// become an arbitrary URL.
+const base58=value=>/^[1-9A-HJ-NP-Za-km-z]{32,90}$/.test(String(value||''));
+const shortRef=value=>{value=String(value||'');return value.length>14?value.slice(0,6)+'…'+value.slice(-6):value;};
+const solscan=(kind,value,text)=>base58(value)?`<a href="https://solscan.io/${kind}/${encodeURIComponent(value)}" target="_blank" rel="noopener noreferrer"><code>${esc(text||shortRef(value))}</code></a>`:`<code>${esc(text||value||'—')}</code>`;
+const txLinks=(signatures,limit=3)=>{const list=arr(signatures).filter(base58);if(!list.length)return '';return `<p class="car-note">Transactions: ${list.slice(0,limit).map(sig=>solscan('tx',sig)).join(' ')}${list.length>limit?` +${list.length-limit} more in technical evidence`:''}</p>`;};
+
+// A triggered shadow rule is surfaced right under the decision so the
+// customer sees it first, while it stays explicit that it did not set the grade.
+function arvisShadowAlert(report){
+  const hits=arr(report.shadow_rules).filter(rule=>rule&&rule.triggered===true);
+  if(!hits.length)return '';
+  return `<section class="cus-customer-verdict car-alert" data-tone="review" aria-label="Triggered shadow rules"><span>PATTERN DETECTED · GRADE NOT CHANGED</span>
+    ${hits.map(rule=>`<h3>${esc(rule.rule_id)} · ${esc(rule.title)}</h3><p>${esc(rule.summary||'')}</p>`).join('')}
+    <p class="car-note">This rule runs in shadow mode: it is shown in full but is not part of the signed grade until it is explicitly promoted. Details and every cited token are listed below.</p></section>`;
+}
+
 function arvisRuleGroups(rules){
   const groups=new Map();
   for(const rule of arr(rules)){
@@ -252,7 +269,7 @@ function arvisRules(report){
   const verdict=obj(report.final_verdict),groups=arvisRuleGroups(verdict.triggered_rules),watch=arr(verdict.watch_flags);
   const group=g=>{
     const first=g.rows.slice(0,3),rest=g.rows.slice(3);
-    const line=r=>`<li>${esc(r.summary||r.title||'')}</li>`;
+    const line=r=>`<li>${esc(r.summary||r.title||'')}${txLinks(r.signatures)}</li>`;
     return `<article class="car-rule"><div class="cus-subhead"><span>${esc(g.id)} · ${esc(g.title)}</span><b>${esc(String(g.status||'unknown').toUpperCase())} · ${g.rows.length}</b></div><ul>${first.map(line).join('')}</ul>${rest.length?`<details class="cus-details"><summary>${rest.length} more</summary><ul>${rest.map(line).join('')}</ul></details>`:''}</article>`;
   };
   return `<section class="car-card"><h4>Rules that set the grade</h4>
@@ -274,12 +291,71 @@ function arvisFindings(report){
 function arvisShadowRules(report){
   const rules=arr(report.shadow_rules);
   if(!rules.length)return '';
+  const row=x=>`<tr><td>${solscan('token',x.mint)}</td><td>${esc(x.created_on_chain_at||'unknown')}</td><td>${esc(label(x.fate_status)||'unknown')}</td><td>${solscan('tx',x.creation_signature,'creation tx')}</td></tr>`;
   return `<section class="car-card"><h4>Shadow rules · do not change the grade</h4>
-    <p class="car-note">Trial rules shown for review. They are not part of the signed verdict until explicitly promoted.</p>
-    ${rules.map(rule=>`<details class="cus-details"${rule.triggered?' open':''}><summary>${esc(rule.rule_id)} · ${esc(rule.title)} · ${esc(label(rule.status))}</summary>
+    <p class="car-note">Trial rules shown in full for review. They are not part of the signed verdict until explicitly promoted.</p>
+    ${rules.map(rule=>{const ev=arr(rule.evidence);return `<details class="cus-details"${rule.triggered?' open':''}><summary>${esc(rule.rule_id)} · ${esc(rule.title)} · ${esc(label(rule.status))}</summary>
       <p>${esc(rule.summary||'')}</p>
-      ${arr(rule.evidence).length?`<p class="car-note">${arr(rule.evidence).length} cited token creations with signatures are included in the technical evidence.</p>`:''}
-      <p class="car-note">${arr(rule.limitations).map(esc).join('<br>')}</p></details>`).join('')}
+      <div class="cus-overview car-metrics">
+        <div><span>Verified prior tokens</span><b>${esc(rule.verified_prior_tokens??'?')}</b></div>
+        <div><span>Inactive / known fate</span><b>${esc(rule.inactive_or_dead??'?')} / ${esc(rule.known_fate_tokens??'?')}</b></div>
+        <div><span>Most launches in 1 hour</span><b>${esc(rule.max_launches_per_hour??'?')}</b></div>
+        <div><span>Creator wallet</span><b>${solscan('account',rule.creator_wallet)}</b></div>
+      </div>
+      ${rule.first_launch_at?`<p class="car-note">Launch window: ${esc(rule.first_launch_at)} – ${esc(rule.last_launch_at||'')}</p>`:''}
+      ${ev.length?`<details class="cus-details"><summary>All ${ev.length} cited token creations</summary><div class="car-table"><table><thead><tr><th>Token</th><th>Created</th><th>Status now</th><th>Proof</th></tr></thead><tbody>${ev.map(row).join('')}</tbody></table></div></details>`:''}
+      <p class="car-note">${arr(rule.limitations).map(esc).join('<br>')}</p></details>`;}).join('')}
+  </section>`;
+}
+
+const pathTone={open:'review',closed:'observed',not_observed:'observed',unknown:'limited'};
+function arvisThreatPaths(report){
+  const threat=obj(report.threat_anticipation);
+  if(!Object.keys(threat).length)return '';
+  const exit=obj(threat.exit_capacity),rug=obj(threat.rug_pathway_assessment);
+  const paths=arr(threat.pathways),scenarios=arr(threat.scenarios),watch=arr(threat.watch_signals),missing=arr(threat.missing_evidence);
+  const pct=value=>Number.isFinite(Number(value))&&value!==null?Number(value).toFixed(2)+'%':'UNKNOWN';
+  return `<section class="car-card"><h4>How the risk could play out</h4>
+    <p class="car-note">Technical pathways, not a rug probability or a claim about intent.</p>
+    ${exit.available===true?`<div class="cus-overview car-metrics">
+      <div><span>Largest risk-bearing owner</span><b>${esc(pct(exit.owner_percentage))}</b></div>
+      <div><span>Owner wallet</span><b>${solscan('account',exit.dominant_owner_wallet)}</b></div>
+      <div><span>Position value (ref.)</span><b>${esc(usd(exit.owner_reference_usd_value))}</b></div>
+      <div><span>Position / liquidity</span><b>${exit.position_liquidity_multiple==null?'UNKNOWN':esc(exit.position_liquidity_multiple)+'x'}</b></div>
+      <div><span>Exit capacity</span><b>${esc(label(exit.capacity)||'unknown').toUpperCase()}</b></div>
+    </div>${exit.interpretation?`<p class="car-note">${esc(exit.interpretation)}</p>`:''}`:'<p class="cus-empty">Exit capacity could not be computed; it stays UNKNOWN.</p>'}
+    ${paths.length?`<ul class="car-paths">${paths.map(p=>`<li data-tone="${esc(pathTone[p.status]||'limited')}"><b>${esc(p.label||p.id)}</b> <em class="car-tag">${esc(label(p.status).toUpperCase())}</em><br>${esc(p.summary||'')}</li>`).join('')}</ul>`:''}
+    ${rug.conclusion?`<p><b>Pathway summary:</b> ${esc(rug.conclusion)}</p>`:''}
+    ${missing.length?`<p><b>Evidence still missing for a decision:</b> ${missing.map(esc).join(' · ')}</p>`:''}
+    ${scenarios.length?`<details class="cus-details"><summary>Possible next behaviors to watch (${scenarios.length})</summary><ul>${scenarios.map(x=>`<li><b>${esc(x.title||x.id)}</b> — ${esc(x.basis||'')}${arr(x.next_signals).length?`<br><span class="car-note">Next signals: ${arr(x.next_signals).map(esc).join(' · ')}</span>`:''}</li>`).join('')}</ul></details>`:''}
+    ${watch.length?`<details class="cus-details"><summary>Early-warning triggers (${watch.length})</summary><ul>${watch.map(x=>`<li><b>${esc(x.title||'')}</b> — ${esc(x.trigger||'')}</li>`).join('')}</ul></details>`:''}
+  </section>`;
+}
+
+function arvisBehaviorRules(report){
+  const signals=arr(obj(report.behavior_signals).signals);
+  if(!signals.length)return '';
+  const state=s=>s.triggered===true?'TRIGGERED':s.evidence_status==='unverified'?'NOT EVALUATED':'NOT TRIGGERED';
+  return `<section class="car-card"><h4>Market and holder behavior rules (${signals.length})</h4>
+    <p class="car-note">Every rule is listed, including ones that did not fire or could not be evaluated. "Not evaluated" means evidence was missing, not that the behavior is absent.</p>
+    ${signals.map(s=>`<article class="car-rule"><div class="cus-subhead"><span>${esc(s.rule_id)} · ${esc(s.title)}</span><b>${esc(state(s))} · ${esc(String(s.evidence_status||'unknown').toUpperCase())}</b></div><p>${esc(s.summary||'')}</p>${txLinks(s.signatures)}</article>`).join('')}
+  </section>`;
+}
+
+function arvisModules(report){
+  const modules=arr(report.modules);
+  if(!modules.length)return '';
+  const checks=new Map(arr(obj(report.investigation_coverage).arms).filter(a=>a&&a.subchecks&&a.subchecks.checks).map(a=>[a.module_id,a.subchecks]));
+  const checkLabel={performed:'done',performed_partial:'partial (time limit)',unknown:'unknown'};
+  const moduleState=m=>m.signed===true?(m.verified===true?'VERIFIED':'COMPLETED'):'EVIDENCE PENDING';
+  return `<section class="car-card"><h4>All ARVIS modules (${modules.length})</h4>
+    <p class="car-note">Each module with its conclusion, every evidence line it produced and the checks it ran. "Done" means a check ran on verified evidence; it does not mean the result is safe.</p>
+    ${modules.map(m=>{const sc=checks.get(m.module_id),required=new Set(arr(sc?.required)),ev=arr(m.evidence);
+      return `<details class="cus-details car-module"><summary>${esc(m.module||m.module_id)} · ${esc(moduleState(m))}</summary>
+        <p>${esc(m.verdict||'No conclusion was returned.')}</p>
+        ${sc?`<div class="cus-reasons">${Object.entries(sc.checks).sort().map(([k,v])=>`<code data-state="${esc(v)}">${required.has(k)?'● ':''}${esc(label(k))}: ${esc(checkLabel[v]||v)}</code>`).join('')}</div>`:''}
+        ${ev.length?`<ol class="car-evidence">${ev.map(line=>`<li>${esc(typeof line==='string'?line:JSON.stringify(line))}</li>`).join('')}</ol>`:'<p class="cus-empty">This module produced no evidence lines.</p>'}
+      </details>`;}).join('')}
   </section>`;
 }
 
@@ -297,7 +373,7 @@ function arvisCoverage(report){
     </div>
     ${coverage.summary?`<p class="car-note">${esc(coverage.summary)}</p>`:''}
     ${gaps.length?`<p><b>Critical gaps:</b> ${gaps.map(esc).join(' · ')}</p>`:''}
-    ${arms.length?`<details class="cus-details"><summary>Module checks (${arms.length})</summary><p class="car-note">"done" means the check ran on verified evidence; it does not mean the result is safe.</p>
+    ${arms.length&&!arr(report.modules).length?`<details class="cus-details"><summary>Module checks (${arms.length})</summary><p class="car-note">"done" means the check ran on verified evidence; it does not mean the result is safe.</p>
       ${arms.map(a=>{const sc=a.subchecks,required=new Set(arr(sc.required));return `<div class="car-module"><div class="cus-subhead"><span>${esc(a.module||a.module_id)}</span><b>${esc(label(sc.required_checks_status)||'unknown')}</b></div><div class="cus-reasons">${Object.entries(sc.checks).sort().map(([k,v])=>`<code data-state="${esc(v)}">${required.has(k)?'● ':''}${esc(label(k))}: ${esc(checkLabel[v]||v)}</code>`).join('')}</div></div>`;}).join('')}</details>`:''}
   </section>`;
 }
@@ -314,7 +390,7 @@ function arvisLimits(report){
 }
 
 function readableArvisReportHTML(report){
-  return `<div class="car-report">${arvisDecisionHeader(report)}${arvisMarketSnapshot(report)}${arvisRules(report)}${arvisFindings(report)}${arvisShadowRules(report)}${arvisCoverage(report)}${arvisLimits(report)}
+  return `<div class="car-report">${arvisDecisionHeader(report)}${arvisShadowAlert(report)}${arvisMarketSnapshot(report)}${arvisRules(report)}${arvisFindings(report)}${arvisThreatPaths(report)}${arvisBehaviorRules(report)}${arvisShadowRules(report)}${arvisModules(report)}${arvisCoverage(report)}${arvisLimits(report)}
     <details class="cus-details car-technical" data-arvis-technical><summary>Technical evidence (JSON)</summary><p class="car-note">The complete retained report with every collector row and provenance. It is rendered when opened.</p><button type="button" data-arvis-download>Download JSON</button><pre class="cus-raw" data-arvis-raw></pre></details>
     <p class="car-note">Koschei never converts missing evidence into a safe result. A grade is not a safety certificate or financial advice.</p></div>`;
 }

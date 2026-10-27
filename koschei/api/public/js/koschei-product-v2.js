@@ -71,8 +71,8 @@
     const current=cleanPath(location.pathname);
     if(current==='/scan'||current.startsWith('/scan/')){
       loadStyle('/css/koschei.css?v=1','customer-result-guidance-v3');
-      loadStyle('/css/customer-universal-address-scan-v1.css?v=5','universal-address-scan-v1');
-      loadEnhancement('/js/customer-universal-address-scan-v1.js?v=5','universal-address-scan-v1');
+      loadStyle('/css/customer-universal-address-scan-v1.css?v=6','universal-address-scan-v1');
+      loadEnhancement('/js/customer-universal-address-scan-v1.js?v=6','universal-address-scan-v1');
       // The static address desk owns input and mode state. Retain the legacy
       // enhancer only for older pages that do not include the new desk.
       if(!document.getElementById('customerUniversalScan'))loadEnhancement('/js/customer-scan-flow-v3.js?v=1','scan-v3');
