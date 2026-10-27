@@ -570,3 +570,12 @@ test('a wallet investigation is readable and leads with what the wallet has done
  assert.doesNotMatch(html,/Market snapshot|Investigation coverage/,'sections a wallet report does not carry are left out');
  assert.doesNotMatch(html,/complete collector evidence/,'no raw dump for a wallet report');
 });
+
+test('a found funding origin shows amount, source wallet, time and transaction',async()=>{
+ const f=ownerFixture(),report=readableFixture();
+ report.actor_investigation={...f.actor,funding_origin:{status:'initial_funding_observed',source_wallet:f.other,amount_sol:1.5,observed_at:'2026-09-15T16:00:00Z',signature:f.sig,verification_status:'verified'}};
+ const html=await renderCompleted(report);
+ assert.match(html,/First funding: <b>1.5 SOL<\/b> from/);
+ assert.match(html,new RegExp('https://solscan.io/account/'+f.other));
+ assert.match(html,/may be an exchange or service wallet/);
+});
