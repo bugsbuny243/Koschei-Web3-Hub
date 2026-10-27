@@ -16,7 +16,7 @@ requireText(html,'id="target"','single target input');
 requireText(html,'id="scanNetwork"','network context');
 requireText(html,'id="customerUniversalResultsWrap"','single result surface');
 requireText(html,'/js/customer-scan-entry.js?v=1','target router');
-requireText(html,'/js/customer-universal-address-scan-v1.js?v=3','single-radar controller');
+requireText(html,'/js/customer-universal-address-scan-v1.js?v=4','single-radar controller');
 requireText(html,'/js/public-solana-scan.js?v=14','legacy evidence adapter bootstrap');
 requireText(html,'Missing evidence stays unknown.','evidence boundary');
 requireText(html,'never signs or broadcasts.','custody boundary');
@@ -35,7 +35,7 @@ for(const needle of [
 ])forbidText(html,needle,'scan html');
 
 const routeIndex=html.indexOf('/js/customer-scan-entry.js?v=1');
-const controllerIndex=html.indexOf('/js/customer-universal-address-scan-v1.js?v=3');
+const controllerIndex=html.indexOf('/js/customer-universal-address-scan-v1.js?v=4');
 const legacyIndex=html.indexOf('/js/public-solana-scan.js?v=14');
 if(routeIndex<0||controllerIndex<routeIndex||legacyIndex<controllerIndex)throw new Error('scan html: single-radar script order is invalid');
 

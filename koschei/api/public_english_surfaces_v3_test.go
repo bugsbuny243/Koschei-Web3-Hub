@@ -53,7 +53,7 @@ func TestCanonicalInvestigationSurfaceIsOneCustomerRadar(t *testing.T) {
 		`id="scanNetwork"`,
 		`id="target"`,
 		`id="customerUniversalResultsWrap"`,
-		"customer-universal-address-scan-v1.js?v=3",
+		"customer-universal-address-scan-v1.js?v=4",
 		"public-solana-scan.js?v=14",
 		"One target only.",
 		"Missing evidence stays unknown.",
