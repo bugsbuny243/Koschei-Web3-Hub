@@ -156,7 +156,7 @@ func TestCustomerRouteVisibilityIsNotOwnedByOwnerDashboardCSS(t *testing.T) {
 	for _, required := range []string{
 		"body.koschei-enterprise main.page{display:block!important",
 		"/js/customer-scan-entry.js?v=1",
-		"/js/customer-universal-address-scan-v1.js?v=6",
+		"/js/customer-universal-address-scan-v1.js?v=7",
 	} {
 		if !strings.Contains(scan, required) {
 			t.Fatalf("single radar visibility contract missing %q", required)

@@ -198,7 +198,7 @@ const label=value=>String(value??'').replaceAll('_',' ').trim();
 
 function readableArvisReport(report){
   report=obj(report);
-  return Boolean(report.final_verdict&&typeof report.final_verdict==='object'&&(Array.isArray(report.modules)||report.investigation_coverage));
+  return Boolean(report.final_verdict&&typeof report.final_verdict==='object'&&(Array.isArray(report.modules)||report.investigation_coverage||Object.keys(obj(report.actor_investigation)).length));
 }
 
 function arvisDecisionHeader(report){
@@ -224,6 +224,7 @@ function arvisDecisionHeader(report){
 }
 
 function arvisMarketSnapshot(report){
+  if(!('market' in report))return '';
   const market=obj(report.market);
   if(market.available!==true)return `<section class="car-card"><h4>Market snapshot</h4><p class="cus-empty">No verified market snapshot was returned. Liquidity and price are UNKNOWN.</p></section>`;
   const name=[market.name,market.symbol&&`(${market.symbol})`].filter(Boolean).join(' ')||'Name not observed';
@@ -244,6 +245,64 @@ const base58=value=>/^[1-9A-HJ-NP-Za-km-z]{32,90}$/.test(String(value||''));
 const shortRef=value=>{value=String(value||'');return value.length>14?value.slice(0,6)+'…'+value.slice(-6):value;};
 const solscan=(kind,value,text)=>base58(value)?`<a href="https://solscan.io/${kind}/${encodeURIComponent(value)}" target="_blank" rel="noopener noreferrer"><code>${esc(text||shortRef(value))}</code></a>`:`<code>${esc(text||value||'—')}</code>`;
 const txLinks=(signatures,limit=3)=>{const list=arr(signatures).filter(base58);if(!list.length)return '';return `<p class="car-note">Transactions: ${list.slice(0,limit).map(sig=>solscan('tx',sig)).join(' ')}${list.length>limit?` +${list.length-limit} more in technical evidence`:''}</p>`;};
+
+// The point of an investigation: who controls this target and what that
+// wallet has done so far. Every row comes from verified or observed on-chain
+// evidence in the retained report; nothing is inferred about a real person.
+const eventLabel={mint_created:'Created token',transfer_out:'Sent',transfer_in:'Received',liquidity_remove_activity:'Removed liquidity',liquidity_add_activity:'Added liquidity',swap:'Swapped'};
+const when=value=>{const t=Date.parse(value||'');return Number.isFinite(t)?new Date(t).toISOString().replace('T',' ').slice(0,16)+' UTC':'time unknown';};
+function arvisOwnerHistory(report){
+  const actor=obj(report.actor_investigation),ext=obj(actor.external_discovery);
+  if(!Object.keys(actor).length)return '';
+  const relation=obj(actor.current_creator_relation),creation=obj(relation.target);
+  const track=obj(obj(actor.dossier).track),trackFacts=obj(track.dossier);
+  const wallet=String(actor.wallet||creation.creator_wallet||report.wallet||'');
+  const isToken=Boolean(creation.mint);
+  const attribution=obj(ext.address_attribution),entities=arr(attribution.entities);
+  const outcomesReport=obj(ext.creator_outcome_history),outcomes=arr(outcomesReport.outcomes).slice().sort((a,b)=>String(b.created_on_chain_at||'').localeCompare(String(a.created_on_chain_at||'')));
+  const lifecycle=obj(obj(ext.created_mint_portfolio).lifecycle_summary);
+  const events=arr(obj(ext.behavior_timeline).events).slice().sort((a,b)=>String(b.observed_at||'').localeCompare(String(a.observed_at||'')));
+  const relationships=arr(obj(ext.address_relationships).relationships);
+  const patterns=arr(obj(ext.behavior_patterns).matches);
+  const observations=arr(obj(ext.behavior_summary).primary_observations);
+  const funding=obj(actor.funding_origin),fundingPaths=obj(ext.funding_paths);
+  const history=obj(ext.address_history);
+  const launch=arr(obj(report.launch_forensics).findings);
+  const fates=outcomes.reduce((acc,o)=>{acc[o.fate_status]=(acc[o.fate_status]||0)+1;return acc;},{});
+
+  const header=`<div class="cus-overview car-metrics">
+      <div><span>${isToken?'Creator / deployer wallet':'Wallet'}</span><b>${solscan('account',wallet)}</b></div>
+      <div><span>Tokens created (indexed)</span><b>${esc(track.created_token_count??'UNKNOWN')}</b></div>
+      <div><span>Verified creations</span><b>${esc(trackFacts.verified_creator_token_count??outcomesReport.verified_token_count??'UNKNOWN')}</b></div>
+      <div><span>First seen</span><b>${esc(track.first_seen_at?when(track.first_seen_at):'UNKNOWN')}</b></div>
+      <div><span>Last seen</span><b>${esc(track.last_seen_at?when(track.last_seen_at):'UNKNOWN')}</b></div>
+    </div>
+    ${isToken?`<p>This token was created by ${solscan('account',wallet)} on ${esc(when(creation.first_observed_at))}${relation.evidence?.program?` via ${esc(relation.evidence.program)}`:''} — ${esc(String(relation.status||creation.verification_status||'unknown').toUpperCase())} by the creation transaction ${solscan('tx',creation.creation_signature,'creation tx')}.</p>`:''}
+    <p>${entities.length?`Verified labels: ${entities.map(e=>esc(e.label||e.name||e.entity||'labelled entity')).join(', ')}`:'No verified identity label exists for this wallet. It is described by its on-chain activity only, not as a real person.'}</p>
+    ${observations.length?`<ul>${observations.map(o=>`<li>${esc(o)}</li>`).join('')}</ul>`:''}`;
+
+  const tokens=outcomes.length?`<h5>Tokens this wallet created (${outcomes.length} verified${track.created_token_count>outcomes.length?` of ${esc(track.created_token_count)} indexed`:''})</h5>
+    <p>${Object.entries(fates).map(([fate,n])=>`<b>${n}</b> ${esc(label(fate))}`).join(' · ')}${lifecycle.average_inactive_age_days!=null?` · inactive after ${esc(Number(lifecycle.average_inactive_age_days).toFixed(2))} days on average`:''}</p>
+    <div class="car-table"><table><thead><tr><th>Token</th><th>Created</th><th>Status now</th><th>Liquidity now</th><th>Proof</th></tr></thead><tbody>${outcomes.map(o=>`<tr><td>${solscan('token',o.mint)}</td><td>${esc(when(o.created_on_chain_at))}</td><td>${esc(label(o.fate_status)||'unknown')}</td><td>${o.current_liquidity_usd==null?'UNKNOWN':esc(usd(o.current_liquidity_usd))}</td><td>${solscan('tx',o.creation_signature,'creation tx')}</td></tr>`).join('')}</tbody></table></div>
+    <p class="car-note">"Inactive" is the current market state, not proof of a rug pull. ${arr(outcomesReport.limitations).map(esc).join(' ')}</p>`:
+    `<p class="cus-empty">No verified token creations were found for this wallet in the investigated window.</p>`;
+
+  const eventRow=e=>`<li><b>${esc(when(e.observed_at))}</b> · ${esc(eventLabel[e.event_type]||label(e.event_type))}${e.amount_native!=null?` ${esc(e.amount_native)} ${esc(e.asset_type||'')}`:''}${e.token_mint?` ${solscan('token',e.token_mint)}`:''}${e.counterparty?` → ${solscan('account',e.counterparty)}`:''} · ${solscan('tx',e.signature,'tx')}</li>`;
+  const timeline=events.length?`<h5>Activity timeline (${events.length} decoded events, newest first)</h5><ol class="car-timeline">${events.slice(0,15).map(eventRow).join('')}</ol>${events.length>15?`<details class="cus-details"><summary>${events.length-15} earlier events</summary><ol class="car-timeline">${events.slice(15).map(eventRow).join('')}</ol></details>`:''}`:'';
+
+  const relationRow=r=>`<li>${solscan('account',r.address)} · ${esc(label(r.relation))} · ${esc(r.outbound_transfers??0)} out / ${esc(r.inbound_transfers??0)} in${arr(r.assets).length?` · ${arr(r.assets).map(esc).join(', ')}`:''}${arr(r.token_mints).length?` · tokens ${arr(r.token_mints).map(m=>solscan('token',m)).join(' ')}`:''} · ${esc(when(r.first_observed_at))} – ${esc(when(r.last_observed_at))}${txLinks(r.evidence_signatures,2)}</li>`;
+  const money=relationships.length?`<h5>Wallets it moved funds or tokens with (${relationships.length})</h5><ul>${relationships.map(relationRow).join('')}</ul><p class="car-note">A transfer relationship is not proof of common ownership or wrongdoing.</p>`:'';
+
+  const fundingStatus=String(funding.status||'unknown');
+  const fundingFound=!/not_observed|unknown|unavailable/.test(fundingStatus);
+  const fundingBlock=`<h5>Where its money came from</h5>${fundingFound?`<p>${esc(label(funding.trail_status||fundingStatus))}${funding.source_wallet?` · source ${solscan('account',funding.source_wallet)}`:''}</p>`:`<p><b>UNKNOWN.</b> ${esc(obj(funding.boundary).reason||'The funding origin was not reached in the investigated history.')} ${funding.signatures_scanned?`${esc(funding.signatures_scanned)} signatures were scanned.`:''}</p>`}${arr(fundingPaths.funding_sources).length?`<ul>${arr(fundingPaths.funding_sources).map(f=>`<li>${solscan('account',f.address||f.source||f.wallet)} ${esc(f.amount_native??'')} ${esc(f.asset_type||'')}</li>`).join('')}</ul>`:''}${arr(funding.limitations).length?`<p class="car-note">${arr(funding.limitations).map(esc).join(' ')}</p>`:''}`;
+
+  const patternBlock=patterns.length?`<h5>Behavior patterns checked (${patterns.length})</h5><ul>${patterns.map(p=>`<li><b>${esc(p.label||p.pattern_id)}</b> · ${esc(p.triggered?'OBSERVED':String(p.status||'not observed').replaceAll('_',' ').toUpperCase())}${p.explanation?` — ${esc(p.explanation)}`:''}</li>`).join('')}</ul>`:'';
+  const launchBlock=launch.length?`<h5>Launch-window behavior of this token</h5><ul>${launch.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>`:'';
+  const coverage=Object.keys(history).length?`<p class="car-note">History read: ${esc(history.signatures_seen??'?')} signatures${history.history_complete===true?' (complete)':' — partial; older activity may exist outside this window'}. ${arr(history.limitations).map(esc).join(' ')}</p>`:'';
+
+  return `<section class="car-card car-owner"><h4>${isToken?'Who is behind this token and what they have done':'What this wallet has done'}</h4>${header}${tokens}${timeline}${money}${fundingBlock}${patternBlock}${launchBlock}${coverage}</section>`;
+}
 
 // A triggered shadow rule is surfaced right under the decision so the
 // customer sees it first, while it stays explicit that it did not set the grade.
@@ -360,6 +419,7 @@ function arvisModules(report){
 }
 
 function arvisCoverage(report){
+  if(!report.investigation_coverage)return '';
   const coverage=obj(report.investigation_coverage),arms=arr(coverage.arms).filter(a=>a&&a.subchecks&&a.subchecks.checks);
   const checkLabel={performed:'done',performed_partial:'partial (time limit)',unknown:'unknown'};
   const gaps=arr(coverage.critical_gaps);
@@ -390,7 +450,7 @@ function arvisLimits(report){
 }
 
 function readableArvisReportHTML(report){
-  return `<div class="car-report">${arvisDecisionHeader(report)}${arvisShadowAlert(report)}${arvisMarketSnapshot(report)}${arvisRules(report)}${arvisFindings(report)}${arvisThreatPaths(report)}${arvisBehaviorRules(report)}${arvisShadowRules(report)}${arvisModules(report)}${arvisCoverage(report)}${arvisLimits(report)}
+  return `<div class="car-report">${arvisOwnerHistory(report)}${arvisDecisionHeader(report)}${arvisShadowAlert(report)}${arvisMarketSnapshot(report)}${arvisRules(report)}${arvisFindings(report)}${arvisThreatPaths(report)}${arvisBehaviorRules(report)}${arvisShadowRules(report)}${arvisModules(report)}${arvisCoverage(report)}${arvisLimits(report)}
     <details class="cus-details car-technical" data-arvis-technical><summary>Technical evidence (JSON)</summary><p class="car-note">The complete retained report with every collector row and provenance. It is rendered when opened.</p><button type="button" data-arvis-download>Download JSON</button><pre class="cus-raw" data-arvis-raw></pre></details>
     <p class="car-note">Koschei never converts missing evidence into a safe result. A grade is not a safety certificate or financial advice.</p></div>`;
 }

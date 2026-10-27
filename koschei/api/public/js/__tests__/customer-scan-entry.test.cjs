@@ -498,7 +498,7 @@ test('the readable report shows every section: shadow alert, threat paths, behav
  assert.match(html,new RegExp('https://solscan.io/token/'+mint));
  assert.match(html,new RegExp('https://solscan.io/tx/'+sig));
  assert.doesNotMatch(html,/href="[^"]*javascript:/,'non-base58 values are never turned into links');
- assert.doesNotMatch(html,/<script>/);
+ assert.doesNotMatch(html,/<script/i,"report text is escaped, never injected as markup");
  assert.match(html,/How the risk could play out/);
  assert.match(html,/Dominant-holder market exit/);
  assert.match(html,/Evidence still missing for a decision:/);
@@ -508,4 +508,65 @@ test('the readable report shows every section: shadow alert, threat paths, behav
  assert.match(html,/Claim Surface Risk · EVIDENCE PENDING/);
  assert.match(html,/This module produced no evidence lines/);
  assert.doesNotMatch(html,/\bSAFE\b/);
+});
+
+// The report leads with who is behind the target and what that wallet did.
+function ownerFixture(){
+ const creator='CreatorWa11etFixture1111111111111111111111',other='Counterparty1111111111111111111111111111111';
+ const mintA='MintA1111111111111111111111111111111111111',mintB='MintB1111111111111111111111111111111111111',sig='4'.repeat(88);
+ return {creator,other,mintA,mintB,sig,actor:{wallet:creator,
+  current_creator_relation:{status:'verified',evidence:{program:'pump.fun'},target:{mint:sol,creator_wallet:creator,first_observed_at:'2026-09-15T16:43:01Z',creation_signature:sig,verification_status:'verified'}},
+  dossier:{track:{created_token_count:145,first_seen_at:'2026-09-15T16:43:01Z',last_seen_at:'2026-10-27T01:16:05Z',dossier:{verified_creator_token_count:23}}},
+  funding_origin:{status:'funding_not_observed',signatures_scanned:2000,boundary:{reason:'Funding origin was not reachable within the effective transaction parse limit.'}},
+  external_discovery:{
+   address_attribution:{status:'no_verified_attribution',entities:[]},
+   behavior_summary:{primary_observations:['The exact address has verified creation evidence for 6 distinct token mint(s).']},
+   creator_outcome_history:{verified_token_count:2,outcomes:[
+     {mint:mintA,created_on_chain_at:'2026-10-26T05:41:16Z',fate_status:'inactive_or_dead',current_liquidity_usd:0,creation_signature:sig},
+     {mint:mintB,created_on_chain_at:'2026-10-27T01:01:45Z',fate_status:'inactive_or_dead',current_liquidity_usd:0,creation_signature:sig}],limitations:['fixture outcome limitation']},
+   created_mint_portfolio:{lifecycle_summary:{average_inactive_age_days:0.68}},
+   behavior_timeline:{events:[
+     {event_type:'mint_created',token_mint:mintA,observed_at:'2026-10-26T05:41:16Z',signature:sig},
+     {event_type:'transfer_out',counterparty:other,amount_native:0.00175,asset_type:'SOL',observed_at:'2026-10-27T01:09:14Z',signature:sig}]},
+   address_relationships:{relationships:[{address:other,relation:'outbound_direct_flow',outbound_transfers:3,inbound_transfers:0,assets:['SPL_TOKEN'],token_mints:[mintB],first_observed_at:'2026-10-27T01:09:14Z',last_observed_at:'2026-10-27T01:09:16Z',evidence_signatures:[sig]}]},
+   behavior_patterns:{matches:[{pattern_id:'KOSCH-ADDR-BEH-001',label:'Repeated direct interaction with the same counterparty',triggered:true,explanation:'fixture explanation'},{pattern_id:'KOSCH-ADDR-BEH-002',label:'Bidirectional direct fund-flow relationship',triggered:false,status:'not_triggered'}]},
+   address_history:{signatures_seen:500,history_complete:false,limitations:['fixture history limitation']}}}};
+}
+async function renderCompleted(result){
+ const id='12345678-1234-1234-1234-123456789abc';
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   return response(200,{id,job_type:'canonical_investigation',status:'completed',target:sol,network:'solana-mainnet',result});
+ });
+ h.submit(sol,'solana-mainnet');for(let i=0;i<5;i++)await settle();
+ return h.nodes.customerUniversalResults.innerHTML;
+}
+test('a token report opens with who created it and everything that wallet has done',async()=>{
+ const f=ownerFixture(),report=readableFixture();report.actor_investigation=f.actor;
+ const html=await renderCompleted(report);
+ assert.match(html,/Who is behind this token and what they have done/);
+ assert.ok(html.indexOf('Who is behind this token')<html.indexOf('Signed ARVIS grade B'),'owner history comes before the grade');
+ assert.match(html,new RegExp('https://solscan.io/account/'+f.creator));
+ assert.match(html,/Tokens created \(indexed\)<\/span><b>145/);
+ assert.match(html,/Tokens this wallet created \(2 verified of 145 indexed\)/);
+ assert.match(html,/<b>2<\/b> inactive or dead/);
+ assert.match(html,new RegExp('https://solscan.io/token/'+f.mintA));
+ assert.match(html,/Activity timeline \(2 decoded events, newest first\)/);
+ assert.ok(html.indexOf('Sent 0.00175 SOL')<html.indexOf('Created token'),'newest event first');
+ assert.match(html,/Wallets it moved funds or tokens with \(1\)/);
+ assert.match(html,/<b>UNKNOWN\.<\/b> Funding origin was not reachable/);
+ assert.match(html,/No verified identity label exists/);
+ assert.match(html,/Repeated direct interaction with the same counterparty<\/b> · OBSERVED/);
+ assert.match(html,/partial; older activity may exist/);
+ assert.match(html,/not proof of a rug pull/);
+ assert.doesNotMatch(html,/\bSAFE\b/);
+});
+test('a wallet investigation is readable and leads with what the wallet has done',async()=>{
+ const f=ownerFixture();
+ const html=await renderCompleted({wallet:f.creator,target:f.creator,final_verdict:{grade:'-',signed:true},actor_investigation:{...f.actor,current_creator_relation:undefined}});
+ assert.match(html,/What this wallet has done/);
+ assert.match(html,/No signed grade was issued/);
+ assert.doesNotMatch(html,/Market snapshot|Investigation coverage/,'sections a wallet report does not carry are left out');
+ assert.doesNotMatch(html,/complete collector evidence/,'no raw dump for a wallet report');
 });
