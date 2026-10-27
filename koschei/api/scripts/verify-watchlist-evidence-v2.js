@@ -28,7 +28,12 @@ forbid(html,/<script(?![^>]*\bsrc=)[^>]*>/i,'inline runtime script');
 forbid(html,/\son[a-z]+\s*=/i,'inline event handler');
 
 requireText(routes,'func registerWatchlistRoutes','watchlist route registration function');
-for(const route of ['"/api/watchlist", requiresDB(h, proMetered(','"/api/watchlist/refresh", requiresDB(h, proMetered(','"/api/watchlist/alerts", requiresDB(h, proMetered(','"/api/watchlist/", requiresDB(h, proMetered('])requireText(routes,route,`metered watchlist route ${route}`);
+// Refresh runs analysis and is always metered. List, alerts and item routes are
+// Professional-gated; only their writes are metered, reads consume no output.
+requireText(routes,'"/api/watchlist/refresh", requiresDB(h, proMetered(','metered watchlist refresh route');
+requireText(routes,'watchlistGate := meterWatchlistWrites(proMetered, enterprise)','watchlist read/write metering split');
+for(const route of ['"/api/watchlist", requiresDB(h, watchlistGate(','"/api/watchlist/alerts", requiresDB(h, watchlistGate(','"/api/watchlist/", requiresDB(h, watchlistGate('])requireText(routes,route,`Professional watchlist route ${route}`);
+requireText(routes,'if r.Method == http.MethodGet || r.Method == http.MethodHead {\n\t\t\t\tread(w, r)','watchlist reads use the access-only gate');
 requireText(server,'return planTier("professional", next)','Professional watchlist server gate');
 requireText(server,'return planTierAccess("professional", next)','Professional watchlist access gate');
 requireText(server,'registerWatchlistRoutes(mux, h','watchlist route registration');
