@@ -426,6 +426,9 @@ function install(){
           `<details class="cus-details car-precheck"><summary>Pre-check · live account observation</summary>${results.innerHTML}</details>`;
         if(!nativeOnly)overview.innerHTML='<section class="cus-customer-verdict" data-tone="observed"><span>INVESTIGATING</span><h3>ARVIS is collecting evidence for this target.</h3><p>The full investigation usually takes one to four minutes. No grade is shown until the signed verdict is ready.</p></section>';
         let polls=0;
+        // Leave the INVESTIGATING headline only while the job is in flight.
+        const settleOverview=(label,title,copy)=>{if(current!==generation||nativeOnly)return;
+          overview.innerHTML=label?`<section class="cus-customer-verdict" data-tone="limited"><span>${esc(label)}</span><h3>${esc(title)}</h3><p>${esc(copy)}</p></section>`:'';};
         const show=(message,report)=>{if(current!==generation)return;
           const readable=!nativeOnly&&report&&readableArvisReport(report);
           if(readable)overview.innerHTML='';
@@ -453,11 +456,13 @@ function install(){
                 throw new Error('Job completed without readable evidence; no verdict can be inferred.');
               show(nativeOnly?'Native collection finished. All observed evidence is retained; historical collectors and a signed grade are NOT claimed.':'Completed. All retained findings and provenance are shown below.',snapshot.result);
               status.textContent=nativeOnly?'Native evidence job completed; the result is retained in account history.':'ARVIS job completed; the report is retained in account history.';
+              settleOverview();
               deepAbort=null;return;
             }
             if(snapshot.status==='failed'){
               show('The background investigation failed. Existing scan evidence remains visible; no complete report is claimed.');
               status.textContent='Deep investigation failed. Review account history for retry status.';
+              settleOverview('INVESTIGATION FAILED','No ARVIS report was produced.','The pre-check below is not a security decision. Missing evidence is not treated as safe.');
               deepAbort=null;return;
             }
             if(snapshot.status!=='queued'&&snapshot.status!=='running')
@@ -467,6 +472,7 @@ function install(){
             show('Background investigation '+snapshot.status+percentage+'. Evidence is retained by the job service.');
             if(++polls>=60){
               show('Still processing. Automatic checks have stopped; the durable job continues in your account history.');
+              settleOverview('STILL PROCESSING','The investigation continues on the server.','Open your account history later to see the retained report.');
               deepAbort=null;return;
             }
             deepPollTimer=setTimeout(poll,5000);
@@ -474,6 +480,7 @@ function install(){
             if(current!==generation||controller.signal.aborted)return;
             show('Report polling interrupted: '+(error.message||'unknown')+'. The durable job may still be running.');
             status.textContent='Open your investigation history to inspect the retained job.';
+            settleOverview('STATUS UNAVAILABLE','This page stopped following the investigation.','The job may still finish; its report is retained in your account history.');
             deepAbort=null;
           }
         };
@@ -492,7 +499,9 @@ function install(){
     if(auto)start();
   }
 
-  async function runScan(){
+  // Only an explicit form submission may start a paid investigation; opening a
+  // shared or bookmarked result link runs the free pre-check only.
+  async function runScan(explicit=false){
     if(!active())return;
     stop();wrap.hidden=true;recovery.hidden=true;
     const request=routing.resolve(input.value,network.value);
@@ -525,7 +534,7 @@ function install(){
       const durableAddress=request.kind==='address'&&['solana','evm','bitcoin'].includes(request.family);
       const durableTransaction=request.kind==='transaction'&&['evm','bitcoin'].includes(request.family);
       if(response.ok&&(durableAddress||durableTransaction)){
-        offerCanonicalDeepJob(request,{auto:durableAddress&&request.family==='solana'});
+        offerCanonicalDeepJob(request,{auto:explicit&&durableAddress&&request.family==='solana'});
       }
     }catch(error){
       if(current!==generation)return;
@@ -536,7 +545,7 @@ function install(){
       if(current===generation){pending=null;submit.disabled=false;submit.textContent=shared?'Investigate target':'Analyze target';cancel.hidden=true;form.removeAttribute('aria-busy');}
     }
   }
-  form.addEventListener('submit',event=>{if(!active())return;event.preventDefault();runScan();});
+  form.addEventListener('submit',event=>{if(!active())return;event.preventDefault();runScan(true);});
   const params=new URLSearchParams(location.search),addressView=routing.isAddressView();
   if(advanced){
     advanced.open=!addressView;

@@ -398,3 +398,23 @@ test('a repeated request that joins a running job says no extra output was used'
  assert.match(h.nodes.customerUniversalStatus.textContent,/no additional output was used/);
  assert.match(h.nodes.customerUniversalResults.innerHTML,/running \(40%\)/);
 });
+
+test('opening a Solana result link runs only the free pre-check and starts no paid job',async()=>{
+ const calls=[];
+ const h=harness(async(url,options)=>{calls.push(url);return response(200,envelope(sol,'solana-mainnet'));},'?mode=address&network=solana-mainnet&target='+sol);
+ for(let i=0;i<3;i++)await settle();
+ assert.deepEqual(calls,['/api/scan']);
+ assert.equal(h.nodes.customerUniversalRecovery.children[0].textContent,'Run durable ARVIS investigation');
+});
+for(const [state,label] of [['failed',/INVESTIGATION FAILED/],['completed',/^$/]])test(`a ${state} job never leaves the INVESTIGATING headline behind`,async()=>{
+ const id='12345678-1234-1234-1234-123456789abc';
+ const h=harness(async(url)=>{
+   if(url==='/api/scan')return response(200,envelope(sol,'solana-mainnet'));
+   if(url==='/api/v1/radar/jobs')return response(201,{job_id:id,poll_url:'/api/v1/radar/jobs/'+id,canonical_engine:true});
+   // A wallet report has no modules or coverage, so the readable renderer does not apply.
+   return response(200,{id,job_type:'canonical_investigation',status:state,target:sol,network:'solana-mainnet',result:{wallet:sol,final_verdict:{grade:'-',signed:false}}});
+ });
+ h.submit(sol,'solana-mainnet');for(let i=0;i<4;i++)await settle();
+ assert.doesNotMatch(h.nodes.customerUniversalOverview.innerHTML,/INVESTIGATING/);
+ assert.match(h.nodes.customerUniversalOverview.innerHTML,label);
+});
