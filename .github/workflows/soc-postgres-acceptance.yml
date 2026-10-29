@@ -9,6 +9,7 @@ on:
       - "koschei/api/internal/handlers/soc_postgres_acceptance_guard_test.go"
       - "koschei/api/internal/http/owner_soc_http_auth_postgres_test.go"
       - "koschei/api/internal/http/soc_owner_http_postgres_test.go"
+      - "koschei/api/internal/http/soc_owner_auth_postgres_test.go"
       - "docs/security-center/SOC_POSTGRES_ACCEPTANCE_V1.md"
   workflow_dispatch:
 
@@ -48,7 +49,7 @@ jobs:
       - name: Verify formatting for SOC acceptance tests
         run: |
           set -euo pipefail
-          unformatted="$(gofmt -l internal/handlers/owner_incident*_test.go internal/handlers/soc_postgres_acceptance_guard_test.go internal/http/soc_owner_http_postgres_test.go)"
+          unformatted="$(gofmt -l internal/handlers/owner_incident*_test.go internal/handlers/soc_postgres_acceptance_guard_test.go internal/http/soc_owner_http_postgres_test.go internal/http/soc_owner_auth_postgres_test.go)"
           if [ -n "$unformatted" ]; then
             printf '%s\n' "$unformatted"
             exit 1
@@ -94,9 +95,10 @@ jobs:
           set -euo pipefail
           logfile="${RUNNER_TEMP}/soc-postgres-acceptance.log"
           go test -v ./internal/http \
-            -run '^(TestOwnerSOCIncidentHTTPAuthBoundaryPostgres17|TestSOCIncidentOwnerAuthorizationPostgres17)$' -count=1 2>&1 | tee -a "$logfile"
+            -run '^(TestOwnerSOCIncidentHTTPAuthBoundaryPostgres17|TestSOCIncidentOwnerAuthorizationPostgres17|TestOwnerIncidentHTTPAuthPostgres17)$' -count=1 2>&1 | tee -a "$logfile"
           grep -Fq -- '--- PASS: TestOwnerSOCIncidentHTTPAuthBoundaryPostgres17 (' "$logfile"
           grep -Fq -- '--- PASS: TestSOCIncidentOwnerAuthorizationPostgres17 (' "$logfile"
+          grep -Fq -- '--- PASS: TestOwnerIncidentHTTPAuthPostgres17 (' "$logfile"
           if grep -Fq -- '--- SKIP:' "$logfile"; then
             echo 'SOC owner HTTP acceptance was skipped'
             exit 1
