@@ -13522,97 +13522,9 @@
     },
     "/api/owner/soc/readiness": {
       "get": {
-        "description": "Owner-only operational case metadata. No verdict or enforcement authority. Queue telemetry covers the returned page. Missing storage returns 503, not a healthy or empty state. First-response SLA uses original creation severity and persisted response history.",
+        "description": "Owner-only read-only PostgreSQL SOC storage readiness probe. It checks bounded case/action read access and linked samples without exposing case data. No staffing, response, incident containment, SLA, or end-to-end security acceptance is proven.",
         "operationId": "get__api_owner_soc_readiness",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "tier",
-            "required": false,
-            "schema": {
-              "enum": [
-                "L1",
-                "L2",
-                "L3"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "status",
-            "required": false,
-            "schema": {
-              "enum": [
-                "active",
-                "all",
-                "open",
-                "investigating",
-                "contained",
-                "resolved",
-                "closed"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "severity",
-            "required": false,
-            "schema": {
-              "enum": [
-                "info",
-                "low",
-                "medium",
-                "high",
-                "critical"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "assignee",
-            "required": false,
-            "schema": {
-              "maxLength": 120,
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "unassigned",
-            "required": false,
-            "schema": {
-              "enum": [
-                "1"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "limit",
-            "required": false,
-            "schema": {
-              "default": 100,
-              "maximum": 250,
-              "minimum": 1,
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "offset",
-            "required": false,
-            "schema": {
-              "default": 0,
-              "maximum": 100000,
-              "minimum": 0,
-              "type": "integer"
-            }
-          }
-        ],
+        "parameters": [],
         "responses": {
           "200": {
             "content": {
@@ -13622,42 +13534,51 @@
                   "properties": {
                     "ok": {
                       "const": true
+                    },
+                    "readiness": {
+                      "additionalProperties": true,
+                      "type": "object"
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "readiness"
                   ],
                   "type": "object"
                 }
               }
             },
-            "description": "Operational queue, case and handoff history, or updated SOC state. Private response is not cacheable."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Invalid filter, pagination, identifier or command."
+            "description": "Read path queried; readiness.state may still be not accepted. No production readiness is implied."
           },
           "404": {
-            "description": "Owner authentication missing/invalid, or incident not found."
+            "description": "Owner authentication absent or invalid."
           },
           "405": {
-            "description": "Unsupported method."
+            "description": "Only GET is permitted."
           },
           "503": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
+                  "additionalProperties": true,
+                  "properties": {
+                    "ok": {
+                      "const": false
+                    },
+                    "readiness": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "readiness"
+                  ],
+                  "type": "object"
                 }
               }
             },
-            "description": "SOC storage, migration or query unavailable. No healthy state inferred."
+            "description": "Storage unavailable or required probe failed; always unavailable_not_accepted."
           }
         },
         "security": [
