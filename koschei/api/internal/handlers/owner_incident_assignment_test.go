@@ -37,12 +37,12 @@ func TestOwnerIncidentAssignmentEventsAreVersionedNotes(t *testing.T) {
 	if action != "note" {
 		t.Fatalf("migration 123 only accepts existing action types, got %q", action)
 	}
-	payload, ok := fields[ownerIncidentAssignmentPayloadKey].(map[string]any)
+	payload, ok := fields[ownerIncidentAssignmentFieldName].(map[string]any)
 	if !ok || payload["status"] != "assigned" || payload["analyst_id"] != "soc-001" || payload["tier"] != "L2" {
 		t.Fatalf("assignment audit payload incorrect: %#v", fields)
 	}
 	action, fields = ownerIncidentAssignmentEvent("unassign_analyst", "", "")
-	payload, ok = fields[ownerIncidentAssignmentPayloadKey].(map[string]any)
+	payload, ok = fields[ownerIncidentAssignmentFieldName].(map[string]any)
 	if action != "note" || !ok || payload["status"] != "unassigned" {
 		t.Fatalf("unassignment audit payload incorrect: %#v", fields)
 	}
