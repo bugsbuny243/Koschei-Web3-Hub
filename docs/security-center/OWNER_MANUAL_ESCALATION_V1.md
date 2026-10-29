@@ -55,6 +55,12 @@ Both calls persist a `note` event with one of the following `payload.soc_escalat
 
 The projection returns HTTP 503 if the escalation audit cannot be queried or validated; missing events are omitted. The incident queue is still a **bounded window** and does not represent all historical cases. The `sla_state` remains unconfigured: **no timers, breach labels, human-response targets, or automatic escalation** are implemented.
 
+## Private owner SOC view
+
+`GET /owner/soc-triage` is a new, isolated **owner-authenticated**, read-only HTML page. It requests the existing `GET /api/owner/incidents?triage=1&limit=100` endpoint using same-origin credentials. The page displays returned case severity/status, persisted age, historical analyst labels, latest manual escalation state, and count of evidence references. It deliberately does **not** claim evidence verification, severity correctness, staffing, an active SLA, acknowledged escalation, or technical containment.
+
+It has no POST actions, no client-side verdict engine, no automatic paging of historical cases, and no user-provided HTML injection. Non-owner page access is denied by the existing `ownerOnly` gate; HTML is `no-store` and uses the repository's nonce-based CSP processing.
+
 ## Validation
 
 - Unit tests cover tier ordering, structured audit schema, invalid inputs, non-acknowledgment semantics, inactive cases, and unchanged evidence references.
