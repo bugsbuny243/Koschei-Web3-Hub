@@ -25,7 +25,7 @@ func socPostgresAcceptanceDSN(t *testing.T) string {
 		parsed.Port() != "5432" ||
 		parsed.Path != "/koschei_soc_acceptance" ||
 		parsed.User == nil || parsed.User.Username() == "" ||
-		parsed.Query().Get("sslmode") != "disable" {
+		parsed.RawQuery != "sslmode=disable" || parsed.Fragment != "" {
 		t.Fatal("SOC acceptance DSN must target only the disposable loopback koschei_soc_acceptance database")
 	}
 	return dsn
