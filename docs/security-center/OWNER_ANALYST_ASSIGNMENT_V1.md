@@ -60,7 +60,7 @@ For unassignment the same namespace contains `{"status":"unassigned"}`. Historic
 
 The prerequisite `GET /api/owner/incidents?triage=1` projection is enriched with an optional `analyst_assignment` per returned case, derived exclusively from the latest matching persisted `note` event. Missing assignment is omitted, not fabricated. Retrieval uses the bounded case IDs and deterministic `created_at DESC, id DESC` ordering. Failure to read the assignment ledger returns HTTP 503.
 
-The endpoint's `sla_state` **remains** `not_configured_no_deadline_or_assignment_claim`: it makes no SLA assertions. The field will be separately versioned when an actual owner-approved SLA policy and acknowledgement events exist.
+The endpoint's `sla_state` **remains** `not_configured_no_deadline_or_authenticated_assignment_claim`: it makes no SLA assertions. The field will be separately versioned when an actual owner-approved SLA policy and acknowledgement events exist.
 
 ## SOC SLA policy contract — not activated
 
