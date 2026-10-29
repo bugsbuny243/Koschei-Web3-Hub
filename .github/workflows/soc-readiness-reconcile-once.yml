@@ -1,0 +1,40 @@
+name: One-time SOC readiness generated contract reconciliation
+
+on:
+  push:
+    branches:
+      - feature/soc-runtime-readiness-20261029
+    paths:
+      - .github/workflows/soc-readiness-reconcile-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    if: github.repository == 'bugsbuny243/Koschei-Web3-Hub' && github.ref == 'refs/heads/feature/soc-runtime-readiness-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/soc-runtime-readiness-20261029
+          persist-credentials: true
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Reconcile intended SOC files and remove this workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd koschei/api
+          gofmt -w internal/handlers/owner_soc_readiness.go internal/handlers/owner_soc_readiness_test.go
+          go run ./cmd/openapi-gen
+          go run ./cmd/openapi-gen -check
+          cd ../..
+          git rm .github/workflows/soc-readiness-reconcile-once.yml
+          git add koschei/api/internal/handlers/owner_soc_readiness.go koschei/api/internal/handlers/owner_soc_readiness_test.go koschei/api/openapi.yaml
+          git diff --cached --check
+          git -c user.name='koschei-ci-reconcile' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(soc): regenerate exact OpenAPI and gofmt readiness handlers'
+          git push origin HEAD:refs/heads/feature/soc-runtime-readiness-20261029
