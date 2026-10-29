@@ -161,7 +161,9 @@ func applyOwnerIncidentEscalations(items []ownerIncidentTriageItem, events map[s
 			if !item.Active {
 				event.State = "historical_request_case_inactive"
 			} else if item.AnalystAssignment != nil &&
-				item.AnalystAssignment.UpdatedAt.After(event.RequestedAt) {
+				item.AnalystAssignment.Status == "assigned" &&
+				item.AnalystAssignment.UpdatedAt.After(event.RequestedAt) &&
+				incidentAnalystTierRank(item.AnalystAssignment.Tier) >= incidentAnalystTierRank(event.TargetTier) {
 				event.State = "superseded_by_later_assignment_not_acknowledged"
 			}
 		}
