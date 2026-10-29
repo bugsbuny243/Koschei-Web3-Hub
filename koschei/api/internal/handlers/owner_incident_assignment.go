@@ -20,7 +20,7 @@ type ownerIncidentAssignment struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-const ownerIncidentAssignmentPayloadKey = "soc_assignment_v1"
+const ownerIncidentAssignmentFieldName = "soc_assignment_v1"
 
 func validIncidentAnalystTier(tier string) bool {
 	return tier == "L1" || tier == "L2" || tier == "L3"
@@ -49,13 +49,13 @@ func validIncidentAnalystID(id string) bool {
 func ownerIncidentAssignmentEvent(action, analystID, tier string) (string, map[string]any) {
 	if action == "unassign_analyst" {
 		return "note", map[string]any{
-			ownerIncidentAssignmentPayloadKey: map[string]any{
+			ownerIncidentAssignmentFieldName: map[string]any{
 				"status": "unassigned",
 			},
 		}
 	}
 	return "note", map[string]any{
-		ownerIncidentAssignmentPayloadKey: map[string]any{
+		ownerIncidentAssignmentFieldName: map[string]any{
 			"status": "assigned",
 			"analyst_id": analystID,
 			"tier": tier,
