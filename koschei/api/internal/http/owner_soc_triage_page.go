@@ -27,13 +27,13 @@ th{color:#a8c4c5;font-size:11px;letter-spacing:.04em}td small{display:block;colo
 </style></head>
 <body><main>
 <header><div><span class="muted">KOSCHEI WEB3 · SECURITY OPERATIONS</span><h1>Owner SOC triage</h1></div><a href="/owner-production">Owner console</a></header>
-<p class="muted">Private operational view · case age, persisted assignments and owner-requested escalation events.</p>
-<div class="boundary">Operator case state is not an ARVIS security verdict. L1/L2/L3 labels do not grant access or prove analyst acknowledgement. Escalation requests are not delivered notifications. SLA is not configured; no breach claim is made.</div>
+<p class="muted">Private operational view · case age, persisted assignments, owner escalation requests and manually recorded owner reviews.</p>
+<div class="boundary">Operator case state is not an ARVIS security verdict. L1/L2/L3 labels do not grant access or prove analyst acknowledgement. Escalation requests are not delivered notifications. Manual owner reviews are not analyst responses. SLA is not configured; no breach claim is made.</div>
 <section class="panel">
 <div class="controls"><label for="case-status">Case status</label><select id="case-status"><option value="">All statuses</option><option value="open">Open</option><option value="investigating">Investigating</option><option value="contained">Contained (operator state)</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select><button id="refresh" type="button">Refresh owner queue</button></div>
 <p id="status" class="muted" role="status" aria-live="polite">No data loaded.</p>
 <div id="summary" class="summary"></div>
-<div class="scroll"><table><thead><tr><th>Incident</th><th>Severity / status</th><th>Age / updated</th><th>Assignment label</th><th>Escalation audit state</th><th>Evidence refs</th></tr></thead><tbody id="cases"></tbody></table></div>
+<div class="scroll"><table><thead><tr><th>Incident</th><th>Severity / status</th><th>Age / updated</th><th>Assignment label</th><th>Escalation audit state</th><th>Owner review record</th><th>Evidence refs</th></tr></thead><tbody id="cases"></tbody></table></div>
 </section><p class="muted">Only the latest 100 cases in this view. Empty, unavailable and incomplete data are never interpreted as a safe chain or a healthy SOC.</p>
 </main>
 <script>
@@ -73,6 +73,9 @@ function render(data){
    cell(row,a&&a.status==="assigned"?label(a.tier)+" · "+label(a.analyst_id):"No verified analyst",a?"Owner label: "+label(a.status):"No assignment event");
    var e=item.escalation;
    cell(row,e?label(e.state):"No escalation event",e&&e.target_tier?"Target: "+label(e.target_tier):"");
+   var review=item.owner_review;
+   cell(row,review&&review.evidence_state==="owner_manual_review_recorded"?"Owner review recorded":"No owner review record",
+       review?"First recorded after "+duration(review.seconds_from_case_creation)+" · "+String(review.record_count)+" record(s)":"No review audit event");
    var refs=Array.isArray(inc.evidence_refs)?inc.evidence_refs.length:0;
    cell(row,String(refs),"References only; verification is separate");
    body.appendChild(row);
