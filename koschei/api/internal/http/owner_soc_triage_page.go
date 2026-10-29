@@ -92,6 +92,7 @@ async function loadReadiness(){
    readiness.textContent="SOC storage: "+label(snapshot.state)+
      " · sampled cases: "+(Number.isInteger(snapshot.sampled_cases)?String(snapshot.sampled_cases):"unknown")+
      " · audited actions observed: "+(snapshot.any_audited_actions===true?"yes":"no")+
+     " · cases linked to audit rows: "+(Number.isInteger(snapshot.linked_audit_case_samples)?String(snapshot.linked_audit_case_samples):"unknown")+
      " · NOT end-to-end accepted";
  }catch(err){
    readiness.textContent="SOC storage: UNAVAILABLE / NOT VERIFIED. No healthy state can be inferred.";
