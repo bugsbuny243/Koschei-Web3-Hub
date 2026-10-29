@@ -1,0 +1,26 @@
+name: One-time SOC OpenAPI Go formatting
+on:
+  push:
+    branches: [feature/soc-runtime-readiness-20261029]
+    paths: [.github/workflows/soc-openapi-format-once.yml]
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.repository == 'bugsbuny243/Koschei-Web3-Hub' && github.ref == 'refs/heads/feature/soc-runtime-readiness-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/soc-runtime-readiness-20261029
+      - name: Format new isolated OpenAPI contract sources; remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          gofmt -w koschei/api/internal/openapi/soc_operations.go koschei/api/internal/openapi/soc_operations_test.go
+          git rm .github/workflows/soc-openapi-format-once.yml
+          git add koschei/api/internal/openapi/soc_operations.go koschei/api/internal/openapi/soc_operations_test.go
+          git diff --cached --check
+          git -c user.name='koschei-ci-reconcile' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(soc): gofmt generated-contract operation sources'
+          git push origin HEAD:refs/heads/feature/soc-runtime-readiness-20261029
