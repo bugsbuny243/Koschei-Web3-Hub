@@ -11,13 +11,13 @@ const ownerIncidentTriageSchema = "koschei.owner-incident-triage.v1"
 const ownerIncidentTriageBoundary = "operator-assigned severity and incident status are triage metadata, not independent evidence of compromise, on-chain safety, or ARVIS verdict authority"
 
 type ownerIncidentTriageItem struct {
-	Incident                ownerIncidentRecord      `json:"incident"`
-	AgeSeconds              int64                    `json:"age_seconds"`
-	SinceLastUpdateSeconds  int64                    `json:"since_last_update_seconds"`
-	TimeToResolutionSeconds *int64                   `json:"time_to_resolution_seconds,omitempty"`
-	Active                  bool                     `json:"active"`
-	AnalystAssignment       *ownerIncidentAssignment `json:"analyst_assignment,omitempty"`
-	Escalation              *ownerIncidentEscalation `json:"escalation,omitempty"`
+	Incident                ownerIncidentRecord       `json:"incident"`
+	AgeSeconds              int64                     `json:"age_seconds"`
+	SinceLastUpdateSeconds  int64                     `json:"since_last_update_seconds"`
+	TimeToResolutionSeconds *int64                    `json:"time_to_resolution_seconds,omitempty"`
+	Active                  bool                      `json:"active"`
+	AnalystAssignment       *ownerIncidentAssignment  `json:"analyst_assignment,omitempty"`
+	Escalation              *ownerIncidentEscalation  `json:"escalation,omitempty"`
 	OwnerReview             *ownerIncidentReviewProof `json:"owner_review,omitempty"`
 }
 
