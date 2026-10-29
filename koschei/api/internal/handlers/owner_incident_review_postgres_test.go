@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -19,10 +18,7 @@ import (
 // The confirmation flag is mandatory to prevent accidental data writes to
 // an arbitrary environment, including production.
 func TestOwnerIncidentManualReviewPostgres(t *testing.T) {
-	dsn := os.Getenv("KOSCHEI_TEST_DATABASE_URL")
-	if dsn == "" || os.Getenv("KOSCHEI_SOC_TEST_DB_CONFIRMATION") != "isolated" {
-		t.Skip("isolated PostgreSQL + KOSCHEI_SOC_TEST_DB_CONFIRMATION=isolated required")
-	}
+	dsn := socPostgresAcceptanceDSN(t)
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		t.Fatal(err)
