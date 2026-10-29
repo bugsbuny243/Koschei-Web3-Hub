@@ -1,0 +1,98 @@
+name: SOC PostgreSQL 17 Acceptance
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/soc-postgres-acceptance.yml"
+      - "koschei/api/internal/handlers/owner_incident*.go"
+      - "koschei/api/internal/handlers/soc_postgres_acceptance_guard_test.go"
+      - "docs/security-center/SOC_POSTGRES_ACCEPTANCE_V1.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  soc-postgres-acceptance:
+    name: Isolated SOC incident lifecycle on PostgreSQL 17
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: koschei_soc_acceptance
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d koschei_soc_acceptance"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    defaults:
+      run:
+        working-directory: koschei/api
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+      - name: Set up repository Go toolchain
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: koschei/api/go.mod
+          cache-dependency-path: koschei/api/go.sum
+      - name: Verify formatting for SOC acceptance tests
+        run: |
+          set -euo pipefail
+          unformatted="$(gofmt -l internal/handlers/owner_incident*_test.go internal/handlers/soc_postgres_acceptance_guard_test.go)"
+          if [ -n "$unformatted" ]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
+      - name: Apply existing PostgreSQL schema migrations to ephemeral test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          for migration in $(find migrations -maxdepth 1 -type f -name '*.sql' | sort); do
+            psql --host=127.0.0.1 --port=5432 --username=postgres \
+              --dbname=koschei_soc_acceptance --set=ON_ERROR_STOP=1 \
+              --file="$migration" > /dev/null
+          done
+          psql --host=127.0.0.1 --port=5432 --username=postgres \
+            --dbname=koschei_soc_acceptance --tuples-only --no-align \
+            --set=ON_ERROR_STOP=1 --command="SELECT to_regclass('public.security_incident_cases') IS NOT NULL AND to_regclass('public.security_incident_actions') IS NOT NULL;" | grep -Fxq 't'
+      - name: Execute real database-backed SOC assignment, escalation and review acceptance
+        env:
+          KOSCHEI_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/koschei_soc_acceptance?sslmode=disable
+          KOSCHEI_SOC_TEST_DB_CONFIRMATION: isolated
+        run: |
+          set -euo pipefail
+          logfile="${RUNNER_TEMP}/soc-postgres-acceptance.log"
+          go test -v ./internal/handlers \
+            -run '^TestOwnerIncident(AnalystAssignmentCyclePostgres17|EscalationCyclePostgres|ManualReviewPostgres)$' \
+            -count=1 2>&1 | tee "$logfile"
+          for name in \
+            TestOwnerIncidentAnalystAssignmentCyclePostgres17 \
+            TestOwnerIncidentEscalationCyclePostgres \
+            TestOwnerIncidentManualReviewPostgres; do
+            grep -Fq -- "--- PASS: $name (" "$logfile"
+          done
+          if grep -Fq -- '--- SKIP:' "$logfile"; then
+            echo 'SOC PostgreSQL acceptance unexpectedly skipped a test'
+            exit 1
+          fi
+      - name: Verify private SOC owner page auth and CSP
+        run: |
+          go test -v ./internal/http \
+            -run '^TestOwnerSOCTriagePageRejectsAnonymousAccess$' -count=1
+      - name: Upload isolated SOC acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: soc-postgres17-acceptance-evidence
+          path: ${{ runner.temp }}/soc-postgres-acceptance.log
+          if-no-files-found: warn
+          retention-days: 7
