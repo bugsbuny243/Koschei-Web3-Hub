@@ -11,11 +11,12 @@ const ownerIncidentTriageSchema = "koschei.owner-incident-triage.v1"
 const ownerIncidentTriageBoundary = "operator-assigned severity and incident status are triage metadata, not independent evidence of compromise, on-chain safety, or ARVIS verdict authority"
 
 type ownerIncidentTriageItem struct {
-	Incident                ownerIncidentRecord `json:"incident"`
-	AgeSeconds              int64               `json:"age_seconds"`
-	SinceLastUpdateSeconds  int64               `json:"since_last_update_seconds"`
-	TimeToResolutionSeconds *int64              `json:"time_to_resolution_seconds,omitempty"`
-	Active                  bool                `json:"active"`
+	Incident                ownerIncidentRecord      `json:"incident"`
+	AgeSeconds              int64                    `json:"age_seconds"`
+	SinceLastUpdateSeconds  int64                    `json:"since_last_update_seconds"`
+	TimeToResolutionSeconds *int64                   `json:"time_to_resolution_seconds,omitempty"`
+	Active                  bool                     `json:"active"`
+	AnalystAssignment       *ownerIncidentAssignment `json:"analyst_assignment,omitempty"`
 }
 
 func incidentElapsedSeconds(start, end time.Time) int64 {
@@ -96,8 +97,18 @@ func (h *Handler) ownerIncidentTriage(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident triage is unavailable")
 		return
 	}
+	if err := rows.Close(); err != nil {
+		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident triage rows could not be closed")
+		return
+	}
 	asOf := time.Now().UTC()
 	items, statusCounts, severityCounts := buildOwnerIncidentTriage(incidents, asOf)
+	assignments, err := latestOwnerIncidentAssignments(r.Context(), db, incidents)
+	if err != nil {
+		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident analyst assignments are unavailable")
+		return
+	}
+	applyOwnerIncidentAssignments(items, assignments)
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":                 true,
@@ -105,7 +116,7 @@ func (h *Handler) ownerIncidentTriage(w http.ResponseWriter, r *http.Request) {
 		"decision_boundary":  ownerIncidentTriageBoundary,
 		"as_of":              asOf,
 		"scope":              "bounded_latest_updated_incidents_not_complete_history",
-		"sla_state":          "not_configured_no_deadline_or_assignment_claim",
+		"sla_state":          "not_configured_no_deadline_or_authenticated_assignment_claim",
 		"count":              len(items),
 		"counts_by_status":   statusCounts,
 		"counts_by_severity": severityCounts,

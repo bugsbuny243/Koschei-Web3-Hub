@@ -51,10 +51,12 @@ type ownerIncidentCreateRequest struct {
 }
 
 type ownerIncidentActionRequest struct {
-	Action   string `json:"action"`
-	Summary  string `json:"summary"`
-	Severity string `json:"severity"`
-	Ref      string `json:"ref"`
+	Action    string `json:"action"`
+	Summary   string `json:"summary"`
+	Severity  string `json:"severity"`
+	Ref       string `json:"ref"`
+	AnalystID string `json:"analyst_id,omitempty"`
+	Tier      string `json:"tier,omitempty"`
 }
 
 type incidentScanner interface {
@@ -491,6 +493,8 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	input.Summary = strings.TrimSpace(input.Summary)
 	input.Severity = strings.ToLower(strings.TrimSpace(input.Severity))
 	input.Ref = strings.TrimSpace(input.Ref)
+	input.AnalystID = strings.TrimSpace(input.AnalystID)
+	input.Tier = strings.ToUpper(strings.TrimSpace(input.Tier))
 	if len(input.Summary) > 4000 || len(input.Ref) > 512 {
 		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Incident action fields are invalid")
 		return
@@ -498,6 +502,7 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	validAction := map[string]bool{
 		"note": true, "investigate": true, "contain": true, "resolve": true, "reopen": true, "close": true,
 		"severity_change": true, "link_evidence": true, "link_alert": true, "link_dossier": true,
+		"assign_analyst": true, "unassign_analyst": true,
 	}
 	if !validAction[input.Action] {
 		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Unsupported incident action")
@@ -509,6 +514,18 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	}
 	if strings.HasPrefix(input.Action, "link_") && input.Ref == "" {
 		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Incident reference is required")
+		return
+	}
+	if input.Action == "assign_analyst" && (!validIncidentAnalystID(input.AnalystID) || !validIncidentAnalystTier(input.Tier)) {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Analyst assignment requires a valid label and L1/L2/L3 tier")
+		return
+	}
+	if input.Action == "unassign_analyst" && (input.AnalystID != "" || input.Tier != "") {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Unassignment must not specify an analyst or tier")
+		return
+	}
+	if input.Action != "assign_analyst" && input.Action != "unassign_analyst" && (input.AnalystID != "" || input.Tier != "") {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Analyst fields are only valid for analyst assignment")
 		return
 	}
 
@@ -529,6 +546,11 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	}
 
 	nextStatus := incidentActionStatus(input.Action)
+	if (input.Action == "assign_analyst" || input.Action == "unassign_analyst") &&
+		currentStatus != "open" && currentStatus != "investigating" && currentStatus != "contained" {
+		writeAPIError(w, http.StatusConflict, APICodeConflict, "Analyst assignments require an active incident")
+		return
+	}
 	if nextStatus != "" && !incidentStatusTransitionAllowed(currentStatus, nextStatus) {
 		writeAPIError(w, http.StatusConflict, APICodeConflict, "Incident status transition is not allowed")
 		return
@@ -593,6 +615,14 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	}
 
 	payloadFields := map[string]any{"severity": input.Severity, "ref": input.Ref}
+	auditActionType := input.Action
+	if input.Action == "assign_analyst" || input.Action == "unassign_analyst" {
+		var assignmentPayload map[string]any
+		auditActionType, assignmentPayload = ownerIncidentAssignmentEvent(input.Action, input.AnalystID, input.Tier)
+		for key, value := range assignmentPayload {
+			payloadFields[key] = value
+		}
+	}
 	if nextStatus != "" {
 		payloadFields["status_from"] = currentStatus
 		payloadFields["status_to"] = nextStatus
@@ -611,7 +641,7 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 	if _, err := tx.ExecContext(r.Context(), `
 		INSERT INTO security_incident_actions (incident_id,action_type,actor,summary,payload)
 		VALUES ($1::uuid,$2,'owner',$3,$4::jsonb)
-	`, id, input.Action, input.Summary, string(payload)); err != nil {
+	`, id, auditActionType, input.Summary, string(payload)); err != nil {
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident action audit record could not be written")
 		return
 	}
