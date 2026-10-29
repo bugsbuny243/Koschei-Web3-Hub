@@ -30,4 +30,6 @@ a455be911c6cff06e7587dd6557a56123c2bc189:koschei/api/evidence/production-full-sc
 # This exemption is pinned to the exact historical finding fingerprint.
 84ba4ce9c9522c54647d9e6fabdb8649f2277ff4:koschei/api/internal/services/provider_error_redaction_test.go:generic-api-key:27
 
-# Confirmed false positive: static JSON field identifier for SOC assignment\n# (not a secret, token, password or key); one exact historical finding only.\n7bbc2eed06f582a023e5750339a55789de299df4:koschei/api/internal/handlers/owner_incident_assignment.go:generic-api-key:23
+# Confirmed false positive: static JSON field identifier for SOC assignment
+# (not a secret, token, password or key); one exact historical finding only.
+7bbc2eed06f582a023e5750339a55789de299df4:koschei/api/internal/handlers/owner_incident_assignment.go:generic-api-key:23
