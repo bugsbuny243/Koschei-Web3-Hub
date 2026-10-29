@@ -97,6 +97,10 @@ func (h *Handler) ownerIncidentTriage(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident triage is unavailable")
 		return
 	}
+	if err := rows.Close(); err != nil {
+		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident triage rows could not be closed")
+		return
+	}
 	asOf := time.Now().UTC()
 	items, statusCounts, severityCounts := buildOwnerIncidentTriage(incidents, asOf)
 	assignments, err := latestOwnerIncidentAssignments(r.Context(), db, incidents)
