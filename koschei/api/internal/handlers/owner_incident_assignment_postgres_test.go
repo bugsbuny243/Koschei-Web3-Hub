@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -17,10 +16,7 @@ import (
 // Requires an isolated test database with migration 123 applied.
 // Never point KOSCHEI_TEST_DATABASE_URL at a production database.
 func TestOwnerIncidentAnalystAssignmentCyclePostgres17(t *testing.T) {
-	dsn := os.Getenv("KOSCHEI_TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("KOSCHEI_TEST_DATABASE_URL is not configured; PostgreSQL acceptance is not verified")
-	}
+	dsn := socPostgresAcceptanceDSN(t)
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		t.Fatal(err)
