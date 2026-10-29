@@ -11,14 +11,16 @@ func TestSOCRuntimeReadinessStatesPreserveUnknown(t *testing.T) {
 	for _, tc := range []struct {
 		cases int
 		audit bool
+		linked int
 		want  string
 	}{
-		{0, false, "not_accepted_no_case_observations"},
-		{0, true, "not_accepted_no_case_observations"},
-		{1, false, "not_accepted_no_audit_event_observations"},
-		{5, true, "read_path_observed_not_end_to_end_accepted"},
+		{0, false, 0, "not_accepted_no_case_observations"},
+		{0, true, 0, "not_accepted_no_case_observations"},
+		{1, false, 0, "not_accepted_no_audit_event_observations"},
+		{5, true, 0, "not_accepted_no_linked_sample_audit_events"},
+		{5, true, 1, "bounded_case_audit_link_observed_not_end_to_end_accepted"},
 	} {
-		if actual := socReadinessState(tc.cases, tc.audit); actual != tc.want {
+		if actual := socReadinessState(tc.cases, tc.audit, tc.linked); actual != tc.want {
 			t.Fatalf("cases=%d audit=%v: got %q, want %q", tc.cases, tc.audit, actual, tc.want)
 		}
 	}
