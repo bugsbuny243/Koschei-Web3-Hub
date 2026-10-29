@@ -17,6 +17,7 @@ type ownerIncidentTriageItem struct {
 	TimeToResolutionSeconds *int64                   `json:"time_to_resolution_seconds,omitempty"`
 	Active                  bool                     `json:"active"`
 	AnalystAssignment       *ownerIncidentAssignment `json:"analyst_assignment,omitempty"`
+	Escalation             *ownerIncidentEscalation `json:"escalation,omitempty"`
 }
 
 func incidentElapsedSeconds(start, end time.Time) int64 {
@@ -109,6 +110,12 @@ func (h *Handler) ownerIncidentTriage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	applyOwnerIncidentAssignments(items, assignments)
+	escalations, err := latestOwnerIncidentEscalations(r.Context(), db, incidents)
+	if err != nil {
+		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Incident escalation ledger is unavailable")
+		return
+	}
+	applyOwnerIncidentEscalations(items, escalations)
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":                 true,
