@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -18,10 +17,7 @@ import (
 // Uses migration 123 on a dedicated PostgreSQL test database.
 // If the environment variable is absent, the test is skipped (not accepted).
 func TestOwnerIncidentEscalationCyclePostgres(t *testing.T) {
-	dsn := os.Getenv("KOSCHEI_TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("isolated PostgreSQL not configured; manual escalation acceptance remains unverified")
-	}
+	dsn := socPostgresAcceptanceDSN(t)
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		t.Fatal(err)
