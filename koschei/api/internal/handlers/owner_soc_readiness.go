@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"time"
 )
@@ -149,5 +148,3 @@ func (h *Handler) OwnerSOCReadiness(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "readiness": snapshot})
 }
 
-// Keep database/sql import explicit: readiness is backed by real SQL probes.
-var _ *sql.DB
