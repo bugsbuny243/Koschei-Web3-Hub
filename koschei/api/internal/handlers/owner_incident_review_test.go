@@ -32,12 +32,12 @@ func TestOwnerIncidentReviewProjectionNeverInventsResponseProof(t *testing.T) {
 	}
 	items, _, _ := buildOwnerIncidentTriage([]ownerIncidentRecord{incident, {
 		ID: "case-two", CreatedAt: start, UpdatedAt: start, Status: "investigating",
-	}}, start.Add(2*time.Hour))
+	}}, start.Add(2 * time.Hour))
 	event := ownerIncidentReviewProof{
 		EvidenceState: "owner_manual_review_recorded", Actor: "owner",
-		FirstRecordedAt: start.Add(12*time.Minute),
-		LatestRecordedAt: start.Add(35*time.Minute),
-		RecordCount: 2, SecondsFromCaseCreation: 720,
+		FirstRecordedAt:  start.Add(12 * time.Minute),
+		LatestRecordedAt: start.Add(35 * time.Minute),
+		RecordCount:      2, SecondsFromCaseCreation: 720,
 	}
 	applyOwnerIncidentReviewProofs(items, map[string]ownerIncidentReviewProof{"case-one": event})
 	if items[0].OwnerReview == nil ||
