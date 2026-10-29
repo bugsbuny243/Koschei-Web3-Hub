@@ -31,6 +31,8 @@ var databaseOptionalAPIPaths = func() map[string]struct{} {
 		"/api/owner/token-telemetry",
 		// The owner handler authenticates first and reports unavailable storage.
 		"/api/owner/campaigns",
+		"/api/owner/soc/queue",
+		"/api/owner/soc/case",
 		// Isolated memory-only fixture sandbox; never a customer data operation.
 		"/api/agents/demo",
 		"/api/owner/arvis",

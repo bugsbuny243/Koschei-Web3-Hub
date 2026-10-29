@@ -269,6 +269,9 @@ func buildDocument(routes []Route, inventory []InventoryRoute) Document {
 }
 
 func operation(route Route, method string) map[string]any {
+	if strings.HasPrefix(route.Path, "/api/owner/soc/") {
+		return socOperation(route, method)
+	}
 	group := strings.TrimSpace(route.InventoryGroup)
 	if group == "" {
 		group = routeTag(route.Path)

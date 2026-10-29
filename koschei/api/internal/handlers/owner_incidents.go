@@ -317,6 +317,10 @@ func (h *Handler) OwnerIncidentItem(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
+		if r.URL.Query().Get("handoff") == "1" {
+			h.ownerIncidentHandoff(w, r, id)
+			return
+		}
 		h.ownerIncidentGet(w, r, id)
 	case http.MethodPost:
 		h.ownerIncidentAction(w, r, id)
@@ -504,6 +508,7 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 		"severity_change": true, "link_evidence": true, "link_alert": true, "link_dossier": true,
 		"assign_analyst": true, "unassign_analyst": true,
 		"request_escalation": true, "clear_escalation": true,
+		"record_owner_review": true,
 	}
 	if !validAction[input.Action] {
 		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Unsupported incident action")
@@ -535,8 +540,14 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Escalation clearing must not specify analyst or tier")
 		return
 	}
+	if input.Action == "record_owner_review" &&
+		(len(input.Summary) < 8 || input.AnalystID != "" || input.Tier != "" || input.Ref != "" || input.Severity != "") {
+		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Manual owner review requires a substantive rationale and no unrelated fields")
+		return
+	}
 	if input.Action != "assign_analyst" && input.Action != "unassign_analyst" &&
 		input.Action != "request_escalation" && input.Action != "clear_escalation" &&
+		input.Action != "record_owner_review" &&
 		(input.AnalystID != "" || input.Tier != "") {
 		writeAPIError(w, http.StatusBadRequest, APICodeInvalidInput, "Analyst fields are only valid for assignment or escalation")
 		return
@@ -560,7 +571,8 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 
 	nextStatus := incidentActionStatus(input.Action)
 	if (input.Action == "assign_analyst" || input.Action == "unassign_analyst" ||
-		input.Action == "request_escalation" || input.Action == "clear_escalation") &&
+		input.Action == "request_escalation" || input.Action == "clear_escalation" ||
+		input.Action == "record_owner_review") &&
 		currentStatus != "open" && currentStatus != "investigating" && currentStatus != "contained" {
 		writeAPIError(w, http.StatusConflict, APICodeConflict, "SOC operator actions require an active incident")
 		return
@@ -571,7 +583,7 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Analyst assignment ledger is unavailable")
 			return
 		}
-		if incidentAnalystTierRank(input.Tier) <= incidentAnalystTierRank(tier) {
+		if incidentAnalystTierRank(tier) == 0 || incidentAnalystTierRank(input.Tier) <= incidentAnalystTierRank(tier) {
 			writeAPIError(w, http.StatusConflict, APICodeConflict, "Escalation requires an existing lower-tier assignment")
 			return
 		}
@@ -663,6 +675,13 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 		var escalationPayload map[string]any
 		auditActionType, escalationPayload = ownerIncidentEscalationEvent(input.Action, input.Tier)
 		for key, value := range escalationPayload {
+			payloadFields[key] = value
+		}
+	}
+	if input.Action == "record_owner_review" {
+		var reviewPayload map[string]any
+		auditActionType, reviewPayload = ownerIncidentReviewEvent()
+		for key, value := range reviewPayload {
 			payloadFields[key] = value
 		}
 	}

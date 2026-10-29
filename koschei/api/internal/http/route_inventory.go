@@ -70,6 +70,7 @@ func productionRouteInventory() []routeInventoryGroup {
 		{Name: "owner", Auth: "owner_session", Routes: []string{
 			"GET /api/owner/crypto-brief", "GET /api/owner/arvis/telegram",
 			"GET /api/owner/campaigns",
+			"GET /api/owner/soc/queue", "GET /api/owner/soc/case", "POST /api/owner/soc/case",
 			"POST /api/owner/login", "POST /api/owner/logout", "GET /api/owner/command-center", "GET /api/owner/operations", "GET /api/owner/token-telemetry",
 			"GET /api/owner/arvis", "POST /api/owner/arvis/scan", "POST /api/owner/radar/unified", "POST /api/owner/radar/jobs", "GET /api/owner/radar/jobs/",
 			"POST /api/owner/radar/funding-corpus/warmup", "GET /api/owner/radar/global/records", "GET /api/owner/radar/global/events", "GET /api/owner/radar/flow-metrics", "GET /api/owner/radar/coverage-episodes", "GET /api/owner/creator-intelligence", "GET /api/owner/wallet-linkage", "GET /api/owner/actor-intelligence",

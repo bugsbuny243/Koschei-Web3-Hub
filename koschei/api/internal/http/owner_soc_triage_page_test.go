@@ -39,8 +39,16 @@ func TestOwnerSOCTriagePageRejectsAnonymousAccess(t *testing.T) {
 		t.Fatal("owner view is missing read-only SOC queue contract")
 	}
 	if !strings.Contains(rec.Body.String(), "No verified analyst") ||
-		!strings.Contains(rec.Body.String(), "SLA: NOT CONFIGURED") {
-		t.Fatal("owner view must preserve unverified assignment and SLA semantics")
+		!strings.Contains(rec.Body.String(), "SLA: NOT CONFIGURED") ||
+		!strings.Contains(rec.Body.String(), "No owner review record") ||
+		!strings.Contains(rec.Body.String(), "Manual owner reviews are not analyst responses") ||
+		!strings.Contains(rec.Body.String(), "Review attention (not SLA)") ||
+		!strings.Contains(rec.Body.String(), "No configured review window") {
+		t.Fatal("owner view must preserve non-verified assignment, review and SLA semantics")
+	}
+	if !strings.Contains(rec.Body.String(), "Open handoff JSON") ||
+		!strings.Contains(rec.Body.String(), "?handoff=1") {
+		t.Fatal("owner view must link to the private, read-only handoff endpoint")
 	}
 	if strings.Contains(rec.Body.String(), "innerHTML") ||
 		strings.Contains(rec.Body.String(), "eval(") {
