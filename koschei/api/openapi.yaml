@@ -13140,6 +13140,386 @@
         "x-koschei-route-source": "route_inventory.go"
       }
     },
+    "/api/owner/soc/case": {
+      "get": {
+        "description": "Owner-only operational case metadata. No verdict or enforcement authority. Queue telemetry covers the returned page. Missing storage returns 503, not a healthy or empty state. First-response SLA uses original creation severity and persisted response history.",
+        "operationId": "get__api_owner_soc_case",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before_event",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Operational queue, case and handoff history, or updated SOC state. Private response is not cacheable."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid filter, pagination, identifier or command."
+          },
+          "404": {
+            "description": "Owner authentication missing/invalid, or incident not found."
+          },
+          "405": {
+            "description": "Unsupported method."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "SOC storage, migration or query unavailable. No healthy state inferred."
+          }
+        },
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "summary": "GET /api/owner/soc/case",
+        "tags": [
+          "owner"
+        ],
+        "x-koschei-auth-tier": "owner_session",
+        "x-koschei-inventory-auth": "owner_session",
+        "x-koschei-route-source": "route_inventory.go"
+      },
+      "post": {
+        "description": "Owner-only operational case metadata. No verdict or enforcement authority. Queue telemetry covers the returned page. Missing storage returns 503, not a healthy or empty state. First-response SLA uses original creation severity and persisted response history.",
+        "operationId": "post__api_owner_soc_case",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "description": "16 KiB maximum body. assign accepts an assignee label (empty clears it); escalate requires a strictly higher tier; acknowledge accepts neither field. A nonblank reason and current revision are required. Actor cannot be supplied.",
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "assign",
+                      "escalate",
+                      "acknowledge"
+                    ],
+                    "type": "string"
+                  },
+                  "assignee": {
+                    "maxLength": 120,
+                    "type": "string"
+                  },
+                  "expected_version": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "summary": {
+                    "maxLength": 4000,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "tier": {
+                    "enum": [
+                      "L2",
+                      "L3"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action",
+                  "summary",
+                  "expected_version"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Operational queue, case and handoff history, or updated SOC state. Private response is not cacheable."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid filter, pagination, identifier or command."
+          },
+          "404": {
+            "description": "Owner authentication missing/invalid, or incident not found."
+          },
+          "405": {
+            "description": "Unsupported method."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Expected revision is stale, or case is resolved/closed. Reload before retry."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Content-Type must be application/json."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "SOC storage, migration or query unavailable. No healthy state inferred."
+          }
+        },
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "summary": "POST /api/owner/soc/case",
+        "tags": [
+          "owner"
+        ],
+        "x-koschei-auth-tier": "owner_session",
+        "x-koschei-inventory-auth": "owner_session",
+        "x-koschei-route-source": "route_inventory.go"
+      }
+    },
+    "/api/owner/soc/queue": {
+      "get": {
+        "description": "Owner-only operational case metadata. No verdict or enforcement authority. Queue telemetry covers the returned page. Missing storage returns 503, not a healthy or empty state. First-response SLA uses original creation severity and persisted response history.",
+        "operationId": "get__api_owner_soc_queue",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tier",
+            "required": false,
+            "schema": {
+              "enum": [
+                "L1",
+                "L2",
+                "L3"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "active",
+                "all",
+                "open",
+                "investigating",
+                "contained",
+                "resolved",
+                "closed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "enum": [
+                "info",
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "assignee",
+            "required": false,
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unassigned",
+            "required": false,
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 250,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Operational queue, case and handoff history, or updated SOC state. Private response is not cacheable."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid filter, pagination, identifier or command."
+          },
+          "404": {
+            "description": "Owner authentication missing/invalid, or incident not found."
+          },
+          "405": {
+            "description": "Unsupported method."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "SOC storage, migration or query unavailable. No healthy state inferred."
+          }
+        },
+        "security": [
+          {
+            "ownerSession": []
+          }
+        ],
+        "summary": "GET /api/owner/soc/queue",
+        "tags": [
+          "owner"
+        ],
+        "x-koschei-auth-tier": "owner_session",
+        "x-koschei-inventory-auth": "owner_session",
+        "x-koschei-route-source": "route_inventory.go"
+      }
+    },
     "/api/owner/status": {
       "get": {
         "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",

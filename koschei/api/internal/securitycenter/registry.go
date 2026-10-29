@@ -210,9 +210,9 @@ func Current() Snapshot {
 			{
 				ID: "operator-incident-workflow", Layer: "response", Domain: "security-operations", Mode: "implemented", EvidenceAuthority: "operator_workflow_only", Activation: "owner session plus application database",
 				DependsOn:        []string{"watchlist-alert-and-webhook-plane", "durable-evidence-memory", "global-radar-coverage-alert-lifecycle"},
-				BackendSurfaces:  []string{"/api/owner/incidents", "/api/owner/incidents/"},
-				FrontendSurfaces: []string{"/owner-production"},
-				Telemetry:        []string{"incident status", "severity", "linked evidence refs", "persisted-alert-backed alert refs", "linked dossier refs", "coverage episode ownership via alert identity", "append-only operator action timeline"},
+				BackendSurfaces:  []string{"/api/owner/incidents", "/api/owner/incidents/", "/api/owner/soc/queue", "/api/owner/soc/case"},
+				FrontendSurfaces: []string{"/owner-production", "/owner/soc"},
+				Telemetry:        []string{"incident status", "severity", "linked evidence refs", "persisted-alert-backed alert refs", "linked dossier refs", "coverage episode ownership via alert identity", "append-only operator action timeline", "L1/L2/L3 queue", "assignee label", "versioned SOC handoff history", "page-scoped first-response SLA and unassigned counts"},
 				Notes:            []string{"new incident alert links must resolve to persisted security_alert_events", "coverage episode ownership is derived from alert identity without changing episode or verdict authority", "operator response state never mutates ARVIS evidence, grades or signatures", "incident state is operational workflow metadata, not a security verdict"},
 			},
 		},

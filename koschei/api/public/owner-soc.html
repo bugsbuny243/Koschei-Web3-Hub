@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Koschei · SOC Operations</title>
+  <link rel="stylesheet" href="/css/owner-soc.css?v=1">
+</head>
+<body>
+  <header><a class="brand" href="/owner-production">K<span>KOSCHEI / SECURITY OPERATIONS</span></a><a href="/owner-production#security">Owner control center ↗</a></header>
+  <main>
+    <div class="intro"><div><p class="eyebrow">OPERATIONS WORKSPACE · V1</p><h1>Incident response</h1><p class="muted">Triage, assign and track the first response to evidence-linked incidents.</p></div><button id="refresh" type="button">Refresh queue</button></div>
+    <p class="boundary">Owner-managed queue · L1/L2/L3 are workflow levels, not separate access roles. Response actions record operator state; they do not execute on-chain containment.</p>
+    <div id="connection" role="status" aria-live="polite">Connecting to incident store…</div>
+    <section class="metrics" aria-label="Current page metrics"><div><span>Displayed cases</span><strong id="count">—</strong></div><div><span>Unassigned</span><strong id="unassignedCount">—</strong></div><div><span>First response overdue</span><strong id="overdue">—</strong></div><div><span>Responded late</span><strong id="breached">—</strong></div></section>
+    <form id="filters" class="filters">
+      <label>Level<select name="tier"><option value="">All levels</option><option>L1</option><option>L2</option><option>L3</option></select></label>
+      <label>Status<select name="status"><option value="active">Active cases</option><option value="all">All statuses</option><option value="open">Open</option><option value="investigating">Investigating</option><option value="contained">Contained</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select></label>
+      <label>Severity<select name="severity"><option value="">All severities</option><option>critical</option><option>high</option><option>medium</option><option>low</option><option>info</option></select></label>
+      <label>Assignee<input name="assignee" maxlength="120" placeholder="Exact label"></label>
+      <label class="check"><input type="checkbox" name="unassigned" value="1">Unassigned only</label><button type="submit">Apply filters</button>
+    </form>
+    <div class="workspace">
+      <section class="panel"><div class="panel-heading"><h2>Analyst queue</h2><span id="pageLabel">Page 1</span></div><p class="muted small">Priority first, oldest case first. Metrics cover this page only.</p><div id="queue" class="queue" aria-live="polite"></div><div class="pagination"><button id="previous" type="button" disabled>Previous</button><button id="next" type="button" disabled>Next</button></div></section>
+      <section class="panel" aria-label="Case workspace"><div class="panel-heading"><h2>Case workspace</h2><button id="reloadCase" type="button" hidden>Reload case</button></div><p id="caseNotice" role="status" aria-live="polite">Select an incident to open its evidence and response timeline.</p><div id="case"></div></section>
+    </div>
+    <details class="policy"><summary>First-response policy and limits</summary><p>Critical: 15 min · High: 1 hour · Medium: 4 hours · Low: 24 hours · Info: 48 hours. These are internal targets, not a contractual guarantee.</p><p>The clock starts at incident creation and uses the severity in the original creation event. The earliest explicit acknowledgement or investigation, containment, resolution or close event counts as a response. Reopening does not reset the first-response clock. Missing creation history or inconsistent timestamps remain UNKNOWN.</p><p>The queue polls every 15 seconds while this page is visible. The selected case refreshes on request so your unsaved inputs stay intact. This is a shared case workspace, not a chat or external war-room integration.</p></details>
+  </main>
+  <script src="/js/owner-soc.js?v=1" defer></script>
+</body>
+</html>
