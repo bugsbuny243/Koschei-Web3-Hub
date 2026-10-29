@@ -41,7 +41,9 @@ func TestOwnerSOCTriagePageRejectsAnonymousAccess(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "No verified analyst") ||
 		!strings.Contains(rec.Body.String(), "SLA: NOT CONFIGURED") ||
 		!strings.Contains(rec.Body.String(), "No owner review record") ||
-		!strings.Contains(rec.Body.String(), "Manual owner reviews are not analyst responses") {
+		!strings.Contains(rec.Body.String(), "Manual owner reviews are not analyst responses") ||
+		!strings.Contains(rec.Body.String(), "Review attention (not SLA)") ||
+		!strings.Contains(rec.Body.String(), "No configured review window") {
 		t.Fatal("owner view must preserve non-verified assignment, review and SLA semantics")
 	}
 	if !strings.Contains(rec.Body.String(), "Open handoff JSON") ||
