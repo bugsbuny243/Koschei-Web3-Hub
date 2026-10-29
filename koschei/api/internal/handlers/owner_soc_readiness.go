@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"time"
+
+	"github.com/lib/pq"
 )
 
 const ownerSOCReadinessVersion = "koschei.soc-runtime-readiness.v1"
@@ -19,23 +21,27 @@ type ownerSOCReadinessSnapshot struct {
 	ActionsTableReadable bool      `json:"actions_table_readable"`
 	SampledCases         int       `json:"sampled_cases"`
 	AnyAuditedActions    bool      `json:"any_audited_actions"`
+	LinkedAuditCases      int       `json:"linked_audit_case_samples"`
 	AssignedCaseSamples  int       `json:"assigned_case_samples"`
 	EscalationSamples    int       `json:"escalation_samples"`
 	Scope                string    `json:"scope"`
 	Boundary             string    `json:"boundary"`
 }
 
-const socReadinessScope = "read_only_latest_50_cases; audit_event_existence; latest_assignment_and_escalation_projections_only"
+const socReadinessScope = "read_only_latest_50_cases; audit_event_existence; sampled_case_action_linkage; latest_assignment_and_escalation_projections_only"
 const socReadinessBoundary = "DB reads verify only this owner API's storage read path; no write acceptance, data completeness, active coverage, analyst identity, SLA compliance, ARVIS verdict safety or deployed enforcement is implied"
 
-func socReadinessState(sampleCount int, anyAction bool) string {
+func socReadinessState(sampleCount int, anyAction bool, linkedAuditCases int) string {
 	if sampleCount == 0 {
 		return "not_accepted_no_case_observations"
 	}
 	if !anyAction {
 		return "not_accepted_no_audit_event_observations"
 	}
-	return "read_path_observed_not_end_to_end_accepted"
+	if linkedAuditCases == 0 {
+		return "not_accepted_no_linked_sample_audit_events"
+	}
+	return "bounded_case_audit_link_observed_not_end_to_end_accepted"
 }
 
 func socReadinessUnavailable(w http.ResponseWriter, snapshot ownerSOCReadinessSnapshot) {
@@ -127,6 +133,22 @@ func (h *Handler) OwnerSOCReadiness(w http.ResponseWriter, r *http.Request) {
 		socReadinessUnavailable(w, snapshot)
 		return
 	}
+	if len(sampled) > 0 {
+		ids := make([]string, 0, len(sampled))
+		for _, item := range sampled {
+			ids = append(ids, item.ID)
+		}
+		// Verify actual case->audit relationships in the bounded sample.
+		err = db.QueryRowContext(ctx, `
+			SELECT COUNT(DISTINCT incident_id)
+			FROM security_incident_actions
+			WHERE incident_id = ANY($1::uuid[])
+		`, pq.Array(ids)).Scan(&snapshot.LinkedAuditCases)
+		if err != nil || snapshot.LinkedAuditCases > len(sampled) {
+			socReadinessUnavailable(w, snapshot)
+			return
+		}
+	}
 	assignments, err := latestOwnerIncidentAssignments(ctx, db, sampled)
 	if err != nil {
 		socReadinessUnavailable(w, snapshot)
@@ -143,7 +165,7 @@ func (h *Handler) OwnerSOCReadiness(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	snapshot.EscalationSamples = len(escalations)
-	snapshot.State = socReadinessState(snapshot.SampledCases, snapshot.AnyAuditedActions)
+	snapshot.State = socReadinessState(snapshot.SampledCases, snapshot.AnyAuditedActions, snapshot.LinkedAuditCases)
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "readiness": snapshot})
 }
