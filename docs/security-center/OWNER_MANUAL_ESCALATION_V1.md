@@ -51,7 +51,7 @@ Both calls persist a `note` event with one of the following `payload.soc_escalat
 - `requested`: active request, with no evidence of delivery/acknowledgment.
 - `cleared`: owner cleared the request.
 - `historical_request_case_inactive`: case resolved or closed without a later clear event.
-- `superseded_by_later_assignment_not_acknowledged`: a later assignment event means the earlier request must not be represented as currently binding or as acknowledged.
+- `superseded_by_later_assignment_not_acknowledged`: a **later persisted assignment at or above the requested tier** supersedes the pending queue hint. This is not analyst acknowledgement or proof that the request was delivered. A later lower-tier assignment or unassignment does **not** clear the original request.
 
 The projection returns HTTP 503 if the escalation audit cannot be queried or validated; missing events are omitted. The incident queue is still a **bounded window** and does not represent all historical cases. The `sla_state` remains unconfigured: **no timers, breach labels, human-response targets, or automatic escalation** are implemented.
 
