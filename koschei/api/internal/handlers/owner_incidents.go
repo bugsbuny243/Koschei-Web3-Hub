@@ -579,7 +579,7 @@ func (h *Handler) ownerIncidentAction(w http.ResponseWriter, r *http.Request, id
 			writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Analyst assignment ledger is unavailable")
 			return
 		}
-		if incidentAnalystTierRank(input.Tier) <= incidentAnalystTierRank(tier) {
+		if incidentAnalystTierRank(tier) == 0 || incidentAnalystTierRank(input.Tier) <= incidentAnalystTierRank(tier) {
 			writeAPIError(w, http.StatusConflict, APICodeConflict, "Escalation requires an existing lower-tier assignment")
 			return
 		}
