@@ -56,16 +56,19 @@ func TestOwnerIncidentEscalationReadProjectionNeverClaimsAcknowledgement(t *test
 		{ID: "inactive", Status: "closed"},
 		{ID: "changed", Status: "open"},
 		{ID: "missing", Status: "open"},
+		{ID: "lower-tier", Status: "investigating"},
 	}
 	items, _, _ := buildOwnerIncidentTriage(incidents, at)
 	applyOwnerIncidentAssignments(items, map[string]ownerIncidentAssignment{
 		"active": {Status: "assigned", Tier: "L1", AnalystID: "soc-001", UpdatedAt: at.Add(-time.Hour)},
 		"changed": {Status: "assigned", Tier: "L3", AnalystID: "soc-002", UpdatedAt: at.Add(time.Minute)},
+		"lower-tier": {Status: "assigned", Tier: "L1", AnalystID: "soc-003", UpdatedAt: at.Add(time.Minute)},
 	})
 	applyOwnerIncidentEscalations(items, map[string]ownerIncidentEscalation{
 		"active":   {State: "requested", TargetTier: "L2", RequestedAt: at},
 		"inactive": {State: "requested", TargetTier: "L3", RequestedAt: at},
 		"changed":  {State: "requested", TargetTier: "L3", RequestedAt: at},
+		"lower-tier": {State: "requested", TargetTier: "L3", RequestedAt: at},
 	})
 	if items[0].Escalation == nil || items[0].Escalation.State != "requested" {
 		t.Fatalf("active request was lost: %#v", items[0])
@@ -78,6 +81,9 @@ func TestOwnerIncidentEscalationReadProjectionNeverClaimsAcknowledgement(t *test
 	}
 	if items[3].Escalation != nil {
 		t.Fatalf("missing audit event must not be fabricated: %#v", items[3])
+	}
+	if items[4].Escalation == nil || items[4].Escalation.State != "requested" {
+		t.Fatalf("lower-tier reassignments must preserve pending escalation requests: %#v", items[4])
 	}
 	if len(items[0].Incident.EvidenceRefs) != 1 || items[0].Incident.EvidenceRefs[0] != "evidence-a" {
 		t.Fatal("escalation projected an altered evidence reference")
