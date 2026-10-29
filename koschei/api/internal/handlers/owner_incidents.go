@@ -141,6 +141,10 @@ func (h *Handler) OwnerIncidents(w http.ResponseWriter, r *http.Request) {
 			h.ownerIncidentSuggestions(w, r)
 			return
 		}
+		if r.URL.Query().Get("triage") == "1" {
+			h.ownerIncidentTriage(w, r)
+			return
+		}
 		h.ownerIncidentList(w, r)
 	case http.MethodPost:
 		h.ownerIncidentCreate(w, r)
