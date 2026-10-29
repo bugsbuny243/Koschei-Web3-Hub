@@ -56,9 +56,9 @@ func ownerIncidentAssignmentEvent(action, analystID, tier string) (string, map[s
 	}
 	return "note", map[string]any{
 		ownerIncidentAssignmentFieldName: map[string]any{
-			"status": "assigned",
+			"status":     "assigned",
 			"analyst_id": analystID,
-			"tier": tier,
+			"tier":       tier,
 		},
 	}
 }
