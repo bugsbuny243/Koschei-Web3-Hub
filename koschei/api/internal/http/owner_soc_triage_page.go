@@ -31,6 +31,7 @@ th{color:#a8c4c5;font-size:11px;letter-spacing:.04em}td small{display:block;colo
 <div class="boundary">Operator case state is not an ARVIS security verdict. L1/L2/L3 labels do not grant access or prove analyst acknowledgement. Escalation requests are not delivered notifications. SLA is not configured; no breach claim is made.</div>
 <section class="panel">
 <div class="controls"><label for="case-status">Case status</label><select id="case-status"><option value="">All statuses</option><option value="open">Open</option><option value="investigating">Investigating</option><option value="contained">Contained (operator state)</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select><button id="refresh" type="button">Refresh owner queue</button></div>
+<p id="runtime-readiness" class="muted" role="status" aria-live="polite">SOC database read path: unverified.</p>
 <p id="status" class="muted" role="status" aria-live="polite">No data loaded.</p>
 <div id="summary" class="summary"></div>
 <div class="scroll"><table><thead><tr><th>Incident</th><th>Severity / status</th><th>Age / updated</th><th>Assignment label</th><th>Escalation audit state</th><th>Evidence refs</th></tr></thead><tbody id="cases"></tbody></table></div>
@@ -40,6 +41,7 @@ th{color:#a8c4c5;font-size:11px;letter-spacing:.04em}td small{display:block;colo
 (function(){
 "use strict";
 var status=document.getElementById("status");
+var readiness=document.getElementById("runtime-readiness");
 var body=document.getElementById("cases");
 var summary=document.getElementById("summary");
 var refresh=document.getElementById("refresh");
@@ -79,6 +81,22 @@ function render(data){
  }
  status.textContent="Read-only snapshot · "+label(data.as_of)+" · "+data.items.length+" returned cases.";
 }
+async function loadReadiness(){
+ readiness.textContent="SOC storage: verifying read path...";
+ try{
+   var response=await fetch("/api/owner/soc/readiness",{method:"GET",credentials:"same-origin",cache:"no-store",headers:{"Accept":"application/json"}});
+   if(!response.ok){throw new Error("read probes unavailable");}
+   var data=await response.json();
+   if(data.ok!==true||!data.readiness){throw new Error("unverified read response");}
+   var snapshot=data.readiness;
+   readiness.textContent="SOC storage: "+label(snapshot.state)+
+     " · sampled cases: "+(Number.isInteger(snapshot.sampled_cases)?String(snapshot.sampled_cases):"unknown")+
+     " · audited actions observed: "+(snapshot.any_audited_actions===true?"yes":"no")+
+     " · NOT end-to-end accepted";
+ }catch(err){
+   readiness.textContent="SOC storage: UNAVAILABLE / NOT VERIFIED. No healthy state can be inferred.";
+ }
+}
 async function load(){
  refresh.disabled=true;status.textContent="Loading owner-only queue...";
  body.replaceChildren();summary.replaceChildren();
@@ -93,7 +111,9 @@ async function load(){
  }catch(err){status.textContent=String(err&&err.message||"Queue unavailable")+" No empty/healthy state is inferred.";}
  finally{refresh.disabled=false;}
 }
-refresh.addEventListener("click",load);filter.addEventListener("change",load);load();
+refresh.addEventListener("click",function(){loadReadiness();load();});
+filter.addEventListener("change",load);
+loadReadiness();load();
 })();
 </script></body></html>`
 
