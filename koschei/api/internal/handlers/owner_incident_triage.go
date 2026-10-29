@@ -143,17 +143,17 @@ func (h *Handler) ownerIncidentTriage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":                 true,
-		"schema_version":     ownerIncidentTriageSchema,
-		"decision_boundary":  ownerIncidentTriageBoundary,
-		"as_of":              asOf,
-		"scope":              "bounded_latest_updated_incidents_not_complete_history",
+		"ok":                  true,
+		"schema_version":      ownerIncidentTriageSchema,
+		"decision_boundary":   ownerIncidentTriageBoundary,
+		"as_of":               asOf,
+		"scope":               "bounded_latest_updated_incidents_not_complete_history",
 		"sla_state":           "not_configured_no_deadline_or_authenticated_assignment_claim",
 		"review_policy_state": reviewPolicyState,
 		"review_policy":       reviewPolicy,
-		"count":              len(items),
-		"counts_by_status":   statusCounts,
-		"counts_by_severity": severityCounts,
-		"items":              items,
+		"count":               len(items),
+		"counts_by_status":    statusCounts,
+		"counts_by_severity":  severityCounts,
+		"items":               items,
 	})
 }
