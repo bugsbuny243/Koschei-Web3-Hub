@@ -20,6 +20,7 @@ type ownerIncidentTriageItem struct {
 	Escalation              *ownerIncidentEscalation         `json:"escalation,omitempty"`
 	OwnerReview             *ownerIncidentReviewProof        `json:"owner_review,omitempty"`
 	WorkflowMilestones      *ownerIncidentWorkflowMilestones `json:"workflow_milestones,omitempty"`
+	ReviewAttention         *ownerIncidentReviewAttention    `json:"review_attention,omitempty"`
 }
 
 func incidentElapsedSeconds(start, end time.Time) int64 {
@@ -130,6 +131,16 @@ func (h *Handler) ownerIncidentTriage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	applyOwnerIncidentMilestones(items, milestones)
+	reviewPolicy, err := configuredOwnerIncidentReviewPolicy()
+	if err != nil {
+		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "SOC review attention policy is invalid or unavailable")
+		return
+	}
+	applyOwnerIncidentReviewPolicy(items, asOf, reviewPolicy)
+	reviewPolicyState := "disabled_unconfigured"
+	if reviewPolicy != nil {
+		reviewPolicyState = "configured_operational_review_only"
+	}
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":                 true,
@@ -137,7 +148,9 @@ func (h *Handler) ownerIncidentTriage(w http.ResponseWriter, r *http.Request) {
 		"decision_boundary":  ownerIncidentTriageBoundary,
 		"as_of":              asOf,
 		"scope":              "bounded_latest_updated_incidents_not_complete_history",
-		"sla_state":          "not_configured_no_deadline_or_authenticated_assignment_claim",
+		"sla_state":           "not_configured_no_deadline_or_authenticated_assignment_claim",
+		"review_policy_state": reviewPolicyState,
+		"review_policy":       reviewPolicy,
 		"count":              len(items),
 		"counts_by_status":   statusCounts,
 		"counts_by_severity": severityCounts,

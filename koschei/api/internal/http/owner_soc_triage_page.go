@@ -28,12 +28,12 @@ th{color:#a8c4c5;font-size:11px;letter-spacing:.04em}td small{display:block;colo
 <body><main>
 <header><div><span class="muted">KOSCHEI WEB3 · SECURITY OPERATIONS</span><h1>Owner SOC triage</h1></div><a href="/owner-production">Owner console</a></header>
 <p class="muted">Private operational view · case age, persisted assignments, owner escalation requests and manually recorded owner reviews.</p>
-<div class="boundary">Operator case state is not an ARVIS security verdict. L1/L2/L3 labels do not grant access or prove analyst acknowledgement. Escalation requests are not delivered notifications. Manual owner reviews are not analyst responses. SLA is not configured; no breach claim is made.</div>
+<div class="boundary">Operator case state is not an ARVIS security verdict. L1/L2/L3 labels do not grant access or prove analyst acknowledgement. Escalation requests are not delivered notifications. Manual owner reviews are not analyst responses. Optional UTC review attention is owner-configured and never a contractual SLA. SLA is not configured; no breach claim is made.</div>
 <section class="panel">
 <div class="controls"><label for="case-status">Case status</label><select id="case-status"><option value="">All statuses</option><option value="open">Open</option><option value="investigating">Investigating</option><option value="contained">Contained (operator state)</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select><button id="refresh" type="button">Refresh owner queue</button></div>
 <p id="status" class="muted" role="status" aria-live="polite">No data loaded.</p>
 <div id="summary" class="summary"></div>
-<div class="scroll"><table><thead><tr><th>Incident</th><th>Severity / status</th><th>Age / updated</th><th>Assignment label</th><th>Escalation audit state</th><th>Owner review record</th><th>Evidence refs</th></tr></thead><tbody id="cases"></tbody></table></div>
+<div class="scroll"><table><thead><tr><th>Incident</th><th>Severity / status</th><th>Age / updated</th><th>Assignment label</th><th>Escalation audit state</th><th>Owner review record</th><th>Review attention (not SLA)</th><th>Evidence refs</th></tr></thead><tbody id="cases"></tbody></table></div>
 </section><p class="muted">Only the latest 100 cases in this view. Empty, unavailable and incomplete data are never interpreted as a safe chain or a healthy SOC.</p>
 </main>
 <script>
@@ -58,6 +58,9 @@ function render(data){
  summary.appendChild(text("span","Open: "+String(counts.open||0)));
  summary.appendChild(text("span","Investigating: "+String(counts.investigating||0)));
  summary.appendChild(text("span","SLA: NOT CONFIGURED"));
+ var policy=data.review_policy;
+ summary.appendChild(text("span",policy&&policy.policy_id?
+   "Review policy: "+label(policy.policy_id)+" · elapsed UTC":"Review attention: NOT CONFIGURED"));
  if(!data.items.length){status.textContent="No persisted incidents returned for this filter. This is not a security verdict.";return;}
  for(var item of data.items){
    var inc=item.incident||{},row=document.createElement("tr");
@@ -84,6 +87,20 @@ function render(data){
    var review=item.owner_review;
    cell(row,review&&review.evidence_state==="owner_manual_review_recorded"?"Owner review recorded":"No owner review record",
        review?"First recorded after "+duration(review.seconds_from_case_creation)+" · "+String(review.record_count)+" record(s)":"No review audit event");
+   var attention=item.review_attention;
+   var attentionLabel="No configured review window";
+   var attentionDetail="";
+   if(attention){
+     attentionLabel=label(attention.state).replaceAll("_"," ");
+     if(Number.isFinite(attention.over_target_seconds)){
+       attentionDetail=duration(attention.over_target_seconds)+" past review target (NOT SLA breach)";
+     }else if(attention.review_at){
+       attentionDetail="Review target: "+label(attention.review_at);
+     }else{
+       attentionDetail="Not measured; no review deadline inferred";
+     }
+   }
+   cell(row,attentionLabel,attentionDetail);
    var refs=Array.isArray(inc.evidence_refs)?inc.evidence_refs.length:0;
    cell(row,String(refs),"References only; verification is separate");
    body.appendChild(row);
