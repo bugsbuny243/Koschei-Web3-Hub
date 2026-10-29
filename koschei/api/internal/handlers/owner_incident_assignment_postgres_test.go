@@ -25,7 +25,7 @@ func TestOwnerIncidentAnalystAssignmentCyclePostgres17(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	t.Cleanup(func() { _ = db.Close() })
 	if err := db.Ping(); err != nil {
 		t.Fatal(err)
 	}
