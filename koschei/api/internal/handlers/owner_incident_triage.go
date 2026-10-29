@@ -18,6 +18,7 @@ type ownerIncidentTriageItem struct {
 	Active                  bool                     `json:"active"`
 	AnalystAssignment       *ownerIncidentAssignment `json:"analyst_assignment,omitempty"`
 	Escalation              *ownerIncidentEscalation `json:"escalation,omitempty"`
+	OwnerReview             *ownerIncidentReviewProof `json:"owner_review,omitempty"`
 }
 
 func incidentElapsedSeconds(start, end time.Time) int64 {
@@ -116,6 +117,12 @@ func (h *Handler) ownerIncidentTriage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	applyOwnerIncidentEscalations(items, escalations)
+	reviews, err := ownerIncidentReviewProofs(r.Context(), db, incidents)
+	if err != nil {
+		writeAPIError(w, http.StatusServiceUnavailable, APICodeServiceUnavailable, "Owner manual-review audit is unavailable")
+		return
+	}
+	applyOwnerIncidentReviewProofs(items, reviews)
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":                 true,
