@@ -39,8 +39,10 @@ func TestOwnerSOCTriagePageRejectsAnonymousAccess(t *testing.T) {
 		t.Fatal("owner view is missing read-only SOC queue contract")
 	}
 	if !strings.Contains(rec.Body.String(), "No verified analyst") ||
-		!strings.Contains(rec.Body.String(), "SLA: NOT CONFIGURED") {
-		t.Fatal("owner view must preserve unverified assignment and SLA semantics")
+		!strings.Contains(rec.Body.String(), "SLA: NOT CONFIGURED") ||
+		!strings.Contains(rec.Body.String(), "No owner review record") ||
+		!strings.Contains(rec.Body.String(), "Manual owner reviews are not analyst responses") {
+		t.Fatal("owner view must preserve non-verified assignment, review and SLA semantics")
 	}
 	if strings.Contains(rec.Body.String(), "innerHTML") ||
 		strings.Contains(rec.Body.String(), "eval(") {
