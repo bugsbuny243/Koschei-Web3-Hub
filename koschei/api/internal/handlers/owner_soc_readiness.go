@@ -21,7 +21,7 @@ type ownerSOCReadinessSnapshot struct {
 	ActionsTableReadable bool      `json:"actions_table_readable"`
 	SampledCases         int       `json:"sampled_cases"`
 	AnyAuditedActions    bool      `json:"any_audited_actions"`
-	LinkedAuditCases      int       `json:"linked_audit_case_samples"`
+	LinkedAuditCases     int       `json:"linked_audit_case_samples"`
 	AssignedCaseSamples  int       `json:"assigned_case_samples"`
 	EscalationSamples    int       `json:"escalation_samples"`
 	Scope                string    `json:"scope"`
@@ -169,4 +169,3 @@ func (h *Handler) OwnerSOCReadiness(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "readiness": snapshot})
 }
-

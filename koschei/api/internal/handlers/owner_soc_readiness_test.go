@@ -9,10 +9,10 @@ import (
 
 func TestSOCRuntimeReadinessStatesPreserveUnknown(t *testing.T) {
 	for _, tc := range []struct {
-		cases int
-		audit bool
+		cases  int
+		audit  bool
 		linked int
-		want  string
+		want   string
 	}{
 		{0, false, 0, "not_accepted_no_case_observations"},
 		{0, true, 0, "not_accepted_no_case_observations"},

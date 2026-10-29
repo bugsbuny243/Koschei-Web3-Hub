@@ -13522,19 +13522,116 @@
     },
     "/api/owner/soc/readiness": {
       "get": {
-        "description": "Registered boot-chain operation. Required evidence that cannot be produced yields a successful withheld result rather than an inferred verdict.",
+        "description": "Owner-only operational case metadata. No verdict or enforcement authority. Queue telemetry covers the returned page. Missing storage returns 503, not a healthy or empty state. First-response SLA uses original creation severity and persisted response history.",
         "operationId": "get__api_owner_soc_readiness",
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tier",
+            "required": false,
+            "schema": {
+              "enum": [
+                "L1",
+                "L2",
+                "L3"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "active",
+                "all",
+                "open",
+                "investigating",
+                "contained",
+                "resolved",
+                "closed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "enum": [
+                "info",
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "assignee",
+            "required": false,
+            "schema": {
+              "maxLength": 120,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "unassigned",
+            "required": false,
+            "schema": {
+              "enum": [
+                "1"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 250,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "maximum": 100000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvidenceResponse"
+                  "additionalProperties": true,
+                  "properties": {
+                    "ok": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
                 }
               }
             },
-            "description": "Evidence-backed result, including valid WITHHOLD outcomes."
+            "description": "Operational queue, case and handoff history, or updated SOC state. Private response is not cacheable."
           },
           "400": {
             "content": {
@@ -13544,39 +13641,15 @@
                 }
               }
             },
-            "description": "Invalid request."
+            "description": "Invalid filter, pagination, identifier or command."
           },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Identity credential missing or invalid."
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Authenticated identity lacks the required access tier."
+          "404": {
+            "description": "Owner authentication missing/invalid, or incident not found."
           },
           "405": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Method not allowed."
+            "description": "Unsupported method."
           },
-          "429": {
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -13584,17 +13657,7 @@
                 }
               }
             },
-            "description": "Rate or quota limit reached."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Internal failure; no unsupported verdict is emitted."
+            "description": "SOC storage, migration or query unavailable. No healthy state inferred."
           }
         },
         "security": [
