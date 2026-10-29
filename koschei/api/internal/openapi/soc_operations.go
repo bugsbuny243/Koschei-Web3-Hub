@@ -3,6 +3,43 @@ package openapi
 import "strings"
 
 func socOperation(route Route, method string) map[string]any {
+	if route.Path == "/api/owner/soc/readiness" {
+		// A read-only bounded storage probe is not a case-management API or SLA.
+		// Do not inherit SOC case pagination, mutation or response-time claims.
+		readinessResponse := func(ok bool) map[string]any {
+			return map[string]any{
+				"type": "object", "additionalProperties": true,
+				"required": []string{"ok", "readiness"},
+				"properties": map[string]any{
+					"ok": map[string]any{"const": ok},
+					"readiness": map[string]any{"type": "object", "additionalProperties": true},
+				},
+			}
+		}
+		body := func(description string, ok bool) map[string]any {
+			return map[string]any{
+				"description": description,
+				"content": map[string]any{"application/json": map[string]any{"schema": readinessResponse(ok)}},
+			}
+		}
+		return map[string]any{
+			"operationId": operationID(method, route.Path),
+			"summary": strings.ToUpper(method) + " " + route.Path,
+			"description": "Owner-only read-only PostgreSQL SOC storage readiness probe. It checks bounded case/action read access and linked samples without exposing case data. No staffing, response, incident containment, SLA, or end-to-end security acceptance is proven.",
+			"tags": []string{"owner"},
+			"security": security("owner_session"),
+			"parameters": []any{},
+			"x-koschei-auth-tier": "owner_session",
+			"x-koschei-inventory-auth": route.InventoryAuth,
+			"x-koschei-route-source": route.InventorySource,
+			"responses": map[string]any{
+				"200": body("Read path queried; readiness.state may still be not accepted. No production readiness is implied.", true),
+				"404": map[string]any{"description": "Owner authentication absent or invalid."},
+				"405": map[string]any{"description": "Only GET is permitted."},
+				"503": body("Storage unavailable or required probe failed; always unavailable_not_accepted.", false),
+			},
+		}
+	}
 	parameter := func(name string, required bool, schema map[string]any) any {
 		return map[string]any{"name": name, "in": "query", "required": required, "schema": schema}
 	}
