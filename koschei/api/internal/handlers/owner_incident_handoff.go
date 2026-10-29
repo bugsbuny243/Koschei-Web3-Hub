@@ -167,6 +167,6 @@ func (h *Handler) ownerIncidentHandoff(w http.ResponseWriter, r *http.Request, i
 		"content_hash_contract": fmt.Sprintf("SHA-256 of compact encoding/json marshaled content; max %d actions; not a signature or evidence verification", ownerIncidentHandoffActionLimit),
 		"evidence_validation":   "not_performed_references_only",
 		"actor_verification":    "not_performed_owner_operator_labels_only",
-		"decision_boundary":    ownerIncidentDecisionBoundary,
+		"decision_boundary":     ownerIncidentDecisionBoundary,
 	})
 }
